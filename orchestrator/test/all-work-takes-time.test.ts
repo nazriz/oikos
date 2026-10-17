@@ -107,6 +107,16 @@ export function errorsDrawnOutsideSlip(dir: string): string[] {
   return out;
 }
 
+/** The same in Rust: every .rs file under `dir` (the Rust world's actors and rules), by path relative to it. */
+export function errorsDrawnOutsideSlipRust(dir: string): string[] {
+  const out: string[] = [];
+  for (const f of [...new Glob("**/*.rs").scanSync(dir)].sort()) {
+    if (f.endsWith("slip.rs")) continue;
+    readFileSync(join(dir, f), "utf8").split("\n").forEach((l, i) => { if (CHANCE_OF_WRONG.test(l)) out.push(`${f}:${i + 1}`); });
+  }
+  return out;
+}
+
 /** Everything the foundations delete, still standing (the inventory: `history` entries are a decision's record and are never edited). */
 export function specialCasesLeft(inventory: string): string[] {
   const inv = JSON.parse(readFileSync(inventory, "utf8")) as { entries: { id: string; step: string; kind: string; file: string; find: string }[] };
@@ -132,6 +142,9 @@ test("every profile's town, as code and with every office a model's, has no free
 test("no module draws an error except through slip(), and the foundations' special cases are gone", () => {
   expect(existsSync(join(root, "participants/src/slip.ts")), "the one helper").toBe(true);
   expect(errorsDrawnOutsideSlip(BEHAVIOUR), "errors drawn outside slip()").toEqual([]);
+  // (The Rust world's actors and rules: a slip only through oikos_rules::slip, docs/port-guide.md section 2.)
+  expect(existsSync(join(root, "kernel/crates/rules/src/slip.rs")), "the one helper, in Rust").toBe(true);
+  for (const dir of ["kernel/crates/actors/src", "kernel/crates/rules/src"]) expect(errorsDrawnOutsideSlipRust(join(root, dir)), `errors drawn outside slip() in ${dir}`).toEqual([]);
   expect(specialCasesLeft(join(import.meta.dir, "fixtures/foundations-inventory.json")), "special cases the foundations delete, still standing").toEqual([]);
   // And no profile states a dial of its own.
   for (const profile of profiles) expect(JSON.stringify(loadProfile(profile).values), profile).not.toMatch(/"(cases_per_day|capacity_per_day|processing_days)"/);

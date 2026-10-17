@@ -17,13 +17,30 @@
 
 use crate::events::{Event, EventBody, VacateReason};
 use crate::state::State;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
+
+/// (A name for it, so serde does not take the word as borrowed from what it reads.)
+type Why = &'static str;
+
+/// Why a unit wakes, saved as its word and read back as the same word (a snapshot: kernel/src/snapshot.rs).
+mod why {
+    use serde::{Deserialize, Deserializer, Serializer};
+    pub const ALL: [&str; 5] = ["start", "cadence", "done", "asked", "news"];
+    pub fn serialize<S: Serializer>(w: &&'static str, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(w)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<&'static str, D::Error> {
+        let w = String::deserialize(d)?;
+        ALL.iter().find(|x| **x == w).copied().ok_or_else(|| serde::de::Error::custom(format!("no wake is for {w:?}")))
+    }
+}
 
 /// More cohorts than this at one moment means units are waking each other without end.
 pub const MAX_COHORTS_PER_MOMENT: u32 = 1000;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Unit {
     participant: String,
     /// "self", a position, or None (a language-model participant: all its capacities).
@@ -45,8 +62,10 @@ struct Unit {
     sort: String,
     cadence: i64,
     next_wake: i64,
-    wake_for: &'static str,
-    woke_for: &'static str,
+    #[serde(with = "why")]
+    wake_for: Why,
+    #[serde(with = "why")]
+    woke_for: Why,
     last_wake: Option<i64>,
     since: i64,
     news_tick: i64,
@@ -57,13 +76,14 @@ struct Unit {
 /// A perturbation for invariance tests (docs/design/rebuild.md 6.6, 8.1), never for research runs: each wake, with
 /// this chance, the unit's next wake comes early (somewhere before its cadence, on a tick), as if something woke it.
 /// Nothing a module computes per period should move when it's woken more often.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Perturb {
     pub extra_wakes_bps: u32,
     pub seed: u64,
 }
 
-#[derive(Debug, Default)]
+/// (Saved whole in a snapshot and read back as it was: every wake from then on is the same.)
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Scheduler {
     tick: i64,
     perturb: Option<Perturb>,

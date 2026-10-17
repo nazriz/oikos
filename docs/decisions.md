@@ -5944,3 +5944,75 @@ Revisit if: a seat is ever to sit in several posts of one person (then `post` be
 - **A seat that ended with its person's departure is refused as the person's own participant is.** Twin-seat-year also showed a seat's act in flight when its person left the world refused as "no longer acts" (`participant_inactive`), where the person's own participant, which lives on abroad, is refused as not holding the post (`not_in_position`). When the person has left (alive, not present) and the participant no longer holds the post, the post is what is wrong, for both (`inactive_refusal`, kernel exec.rs). A death is unchanged: both are ended, both are told so (logs with deaths replay as before).
 - **twin-draws, the mock-seat test: a larger town, the same floor.** The mayor's seat parts from its code twin on the first day (it files the permit application on day 14 where the code does on day 1), so the two towns share only requests that nothing the seat did reached: 7 of 12 and 7 of 16 in the two branches, 5 of 20 once merged (the draws moved). That is not the cause of any wrong answer (none differed among those shared); the sample was small. 450 citizens give 16 of 27, all alike. The floor (more than 5) and the assertion that follow are unchanged.
 - **invariance, `collected` at 15%, justified:** see the comment in the test: one hand's resignation two days earlier in the base run cost one weekly round (8% of the measure). Revisit if a second measure needs a tolerance this wide, or if the crew's round should not stop for one resignation (a works office that cannot field a round for a fortnight after a resignation may be a thing to look at on its own).
+
+## 2026-10-17 · Port lane F: the platform (snapshot and fork, the binary log, the live stream, the host, twins, rules by name, travel shapes; no model called)
+
+**Built.**
+- **Snapshot and fork** (`kernel/src/engine/snapshot.rs`): the whole run at a moment (the kernel's state; the schedule;
+  the cast; every unit's view, keyed draws, looks, answers and actor memory; what each seat and unit knows for the
+  resolver; questions not yet answered; a round waiting on seats; the log's head). `Engine::next_by(t)` stops between
+  moments without moving the clock, so a snapshot there changes nothing. Resumed, on any number of threads, from
+  memory or from its bytes, the run writes the straight run's log byte for byte and reaches its hash
+  (`kernel/tests/snapshot.rs`). In memory a fork is cheap (the state is persistent). Kernel additions: the scheduler
+  and the resolver's `Knowledge` serialise; `State::rebuild_derived` makes the derived lookups again from a read-back
+  state; `World::resume`/`fork`, `Kernel::resume`/`fork`, `Run::resume` carry a log on from its head.
+- **The binary log** (`kernel/src/blog.rs`): the JSONL log's entries, unchanged in what is hashed, compressed in 1 MiB
+  blocks (zstd 3), hashes as bytes, `prev`/`seq` implied; snapshot frames among them; a fork's log names its parent.
+  It is a `Write` taking the log's lines, so the log writer and hash chain are untouched; `oikos-kernel export`
+  writes the JSONL back byte for byte, a fork's with its parents' entries first, so every tool keeps working.
+- **The live stream** (`kernel/src/stream.rs`): every log line to a pulled, capped queue; a slow watcher is told what
+  it missed and never slows the run.
+- **The host** (`kernel/src/host.rs`, N-API `World`/`Detached`/`rules`/`manifests`, `orchestrator/src/rust-world.ts`):
+  JSON in and out; `OIKOS_WORLD=rust` hands `runWorld` to it. Seats of several forks out at once; seats' usage and cost
+  recorded with `annotate` (checked by the contract). A seat sitting as its code twin is scheduled as its brain's unit
+  (`hears`, `sort`, `body`, as run.ts) and decided by the brain's Rust kind run detached (`Detached`, with save and
+  restore so a fork's twin goes on as its parent's).
+- **Rules by name** (`kernel/src/rules_api.rs`; `worlds/generator/rules.ts`): the generator's `planLaw`,
+  `planLawWords`, `possessionOrderFor` and `draftLaw` come from Rust under `OIKOS_WORLD=rust`; three profiles' towns are
+  the same, as canonical JSON.
+- **Backstops read Rust**: no-god-view holds the Rust kinds' `keeps`/`boundary` to its lists; all-work-takes-time
+  scans `kernel/crates/actors` and `rules` for errors drawn outside `slip`; generality already scanned `kernel/crates`.
+- **Travel shapes** (contract change under the blanket approval; docs/design/travel.md): `travel.roads` (cells in
+  order, capacity an hour), `vehicle_types`, `vehicles` (owned, kept in the state), `State.transit`. No traffic.
+
+**Measured** (1,017-participant town, a year, weather only, the rest idle; machine at load 13, so wall times are
+rough): 3.3 s on 1 thread and 3.5 s on 8, the same hash (the actors are idle, so this measures the kernel, not the
+decide pass); JSONL log 16.0 MB, binary 2.27 MB (7x smaller), binary with a snapshot every 30 days 16.0 MB (each
+snapshot about 1.15 MB, about 17 ms); the binary writer costs 24 ms for the year's 31,338 entries, export 10 ms.
+
+**Decided fresh.** A snapshot is JSON compressed, not a binary serde format: the state holds `serde_json::Value`s,
+which non-self-describing formats cannot read back. A snapshot carries its config, so it stands alone (in a binary log
+this repeats the header's config: about a quarter of each snapshot). `next_by` rather than a new `Due` variant, so no
+lane's exhaustive match breaks. The stand-in and decision recording are the snapshot's; threads and `until` the
+resumer's.
+
+**Model seats on the Rust world** (the same day, second step): the TS host's own run loop (`orchestrator/src/run.ts`)
+drives the engine under `OIKOS_WORLD=rust`, with every seat feature as on the TS world, by the requests it always
+made: the session started with `engine` (kernel/src/protocol.rs) runs every built-in actor in the engine
+(`host_seats`, kernel/src/engine/hosted.rs); `next` gives the host its seats only, unobserved, after the engine's own
+events (so the host keeps its cast); the host observes, decides (prompts, framing, notebooks), translates (our model
+first, the one behind), confirms or declines, and acts by commands, and the round's code actions before each seat in
+key order are carried out before its first act. No code unit is made in TS. A mock twin's brain the engine has is the
+engine's kind run detached. Decided fresh: a seat that looks again takes its further rounds at once, in its place (the
+TS world took them after the whole round); records cross whole, not by reference (the engine's actors are handed
+records the host never sees). Proved by the mock dry run of w2-16 with the translator first (`scripts/pilot-mock.ts`
+with `OIKOS_WORLD=rust OIKOS_STAND_IN=idle`, 30 days: 4 seats, 87 usage records, a draft confirmed through the
+arrangement, 4 debriefs complete, no errors) and by a twin seat warning as its code does. Snapshots in a binary log
+no longer carry the config (`blog::snapshot_in` reads them with the log's). `runRustWorld` stays as a light host for
+code-only worlds and forks (`RustWorld.fork`), not used by `runWorld`.
+
+**Left for integration.** Until every kind is ported, a pilot on the Rust world needs `OIKOS_STAND_IN=idle`, and its
+dry-run conditions that depend on code offices (a clerk's books) are not shown. Snapshot and fork are not yet served
+through the protocol session (the TARA experiment forks through `RustWorld`, whose seats then need the same host:
+next step). Twin exactness beyond the weather bureau is gate item 3. The summary's profile and health fields are mostly
+empty on the Rust world. A fork of a JSONL-logged run must log in binary (it names its parent). No socket server yet
+(`serve` over a socket for outside seats). The experiment harness on fork is lane G's.
+
+**Tests.** `kernel/tests/snapshot.rs` (4), `blog.rs` (4), `host.rs` (4), `travel.rs` (2);
+`orchestrator/test/rust-world.test.ts` (4); the extended backstops; `cargo test`, `bun run typecheck`,
+`bun run test:fast`.
+
+**Revisit if** snapshots in long runs dominate the log's size (then drop the config from in-log snapshots and write
+the state as deltas of the persistent maps); JSON snapshots take over a second at 10,000 people (a self-describing
+binary format, or `Value`s out of the state); or a lane's actor memory does not round-trip through JSON (its save is
+then wrong, and the snapshot test catches it once the lane adds its kind to a snapshot test).

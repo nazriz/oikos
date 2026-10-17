@@ -61,6 +61,19 @@ impl<W: Write> LogWriter<W> {
         LogWriter { out, anchors, anchor_every: anchor_every.max(1), next_seq: 0, prev: ZERO_HASH.to_string() }
     }
 
+    /// A log carried on from entry `next_seq`, the one before it hashed `prev` (a resumed or forked run).
+    pub fn resume(out: W, anchors: Option<Box<dyn Write>>, anchor_every: u64, next_seq: u64, prev: &str) -> Self {
+        LogWriter { out, anchors, anchor_every: anchor_every.max(1), next_seq, prev: prev.to_string() }
+    }
+
+    pub fn out_ref(&self) -> &W {
+        &self.out
+    }
+
+    pub fn out_mut(&mut self) -> &mut W {
+        &mut self.out
+    }
+
     pub fn next_seq(&self) -> u64 {
         self.next_seq
     }

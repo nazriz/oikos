@@ -472,6 +472,17 @@ impl Kernel {
         Ok(Kernel { world: oikos_world::World::new(loaded)?, index: Default::default(), delivered: Default::default(), handed: None, planned: vec![], planned_done: 0, ready: BTreeMap::new(), threads: threads(), worth_sharing: WORTH_SHARING, from_ready: 0 })
     }
 
+    /// A kernel in a state it was in before (a snapshot's): see `World::resume`. Nothing it derives (perception's
+    /// index, what has been encoded) is carried over: it is made again as it is needed, and no answer depends on it.
+    pub fn resume(loaded: &crate::config::LoadedConfig, state: State) -> Result<Kernel, String> {
+        Ok(Kernel { world: oikos_world::World::resume(loaded, state)?, index: Default::default(), delivered: Default::default(), handed: None, planned: vec![], planned_done: 0, ready: BTreeMap::new(), threads: threads(), worth_sharing: WORTH_SHARING, from_ready: 0 })
+    }
+
+    /// The same world, apart from now on (a fork: see `World::fork`), with the same number of threads.
+    pub fn fork(&self) -> Kernel {
+        Kernel { world: self.world.fork(), index: Default::default(), delivered: Default::default(), handed: None, planned: vec![], planned_done: 0, ready: BTreeMap::new(), threads: self.threads, worth_sharing: self.worth_sharing, from_ready: 0 }
+    }
+
     /// From now on, an observation's JSON has a second form (`Observed::wire`) for a host that keeps the records it's
     /// handed: a record it has had before is written there as its id alone. What's observed, hashed and logged is the
     /// same either way.

@@ -114,6 +114,38 @@ pub struct State {
     /// (`caps.entity_record_bytes`), so it never grows. The kernel reads none of it: its sections are opaque.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub entity_records: Map<Id, Arc<EntityRecord>>,
+    /// Vehicles (reserved shapes for travel, docs/design/travel.md): each its type, its owner and where it stands, as
+    /// the config declares them. Things their owners own; nothing moves them yet.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub vehicles: Map<Id, Vehicle>,
+    /// Bodies on their way between places (reserved: nothing puts anyone in transit yet; a visit is still the time it
+    /// takes, spent where one set out). Keyed by the body.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub transit: Map<Id, Transit>,
+}
+
+/// A vehicle as the world keeps it (reserved shapes for travel).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Vehicle {
+    #[serde(rename = "type")]
+    pub type_: Id,
+    pub owner: Id,
+    /// A cell, or a structure.
+    pub at: Id,
+}
+
+/// A body on its way (reserved shapes for travel): from where, to where, when it set out and when it arrives, and by
+/// which road and vehicle, where it goes by one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Transit {
+    pub from: Id,
+    pub to: Id,
+    pub departed: i64,
+    pub arrives: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub road: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vehicle: Option<Id>,
 }
 
 /// An entity's own record: its sections (opaque, whole numbers only), how many times it has been set (`n`), when
@@ -841,6 +873,15 @@ impl State {
 
     /// `store`, for a record held elsewhere too (the config's, at the start): the same one is kept, not a copy.
     pub fn store_shared(&mut self, record: Arc<Record>) {
+        self.mark(&record);
+        self.counters.record_seq += 1;
+        let seq = self.counters.record_seq;
+        self.record_order.push_back(record.id.clone());
+        self.records.insert(record.id.clone(), Stored { seq, record });
+    }
+
+    /// What a record adds to the derived lookups (`agreements_of`, `marks`), as it is stored.
+    fn mark(&mut self, record: &Record) {
         match &record.body {
             crate::blocks::RecordBody::Agreement { terms } => {
                 for p in &terms.parties {
@@ -869,10 +910,39 @@ impl State {
             }
             _ => {}
         }
-        self.counters.record_seq += 1;
-        let seq = self.counters.record_seq;
-        self.record_order.push_back(record.id.clone());
-        self.records.insert(record.id.clone(), Stored { seq, record });
+    }
+
+    /// Every derived lookup (never serialised) made again from what is: a state read back from a snapshot is then the
+    /// state it was saved from, lookups and all (snapshot and fork, kernel/src/snapshot.rs). The caches (`ground`)
+    /// start empty, which changes no answer.
+    pub fn rebuild_derived(&mut self) {
+        self.whereabouts = Map::new();
+        for (sid, spaces) in self.occupancy.iter() {
+            for bodies in spaces.values() {
+                for b in bodies {
+                    self.whereabouts.entry(b.clone()).or_default().insert(sid.clone());
+                }
+            }
+        }
+        self.positions_of = Map::new();
+        self.held = Map::new();
+        for (id, x) in self.positions.iter() {
+            self.positions_of.entry(x.entity.clone()).or_default().insert(id.clone());
+            if let Some(h) = &x.holder {
+                self.held.entry(h.clone()).or_default().insert(id.clone());
+            }
+        }
+        self.marks = Map::new();
+        self.agreements_of = Map::new();
+        // (In the order they were made, as they were marked when stored: a withdrawal is read against the records made
+        // before it, and every record it can take down was.)
+        let order: Vec<Id> = self.record_order.iter().cloned().collect();
+        for id in order {
+            if let Some(r) = self.records.get(&id).map(|s| s.record.clone()) {
+                self.mark(&r);
+            }
+        }
+        self.ground = GroundCache::default();
     }
 
     /// The quantity of a kind held by an entity at a place (0 if none).

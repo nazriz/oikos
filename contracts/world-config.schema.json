@@ -760,6 +760,9 @@
     "knowing": {
       "$ref": "#/$defs/Knowing"
     },
+    "travel": {
+      "$ref": "#/$defs/Travel"
+    },
     "caps": {
       "type": "object",
       "required": [
@@ -3232,6 +3235,57 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 10000
+            }
+          }
+        }
+      }
+    },
+    "Travel": {
+      "description": "Reserved shapes for travel (lane F, 2026-10-17; docs/design/travel.md): roads with a capacity, vehicles as things someone owns, and (in the state) bodies in transit between places. Shapes only: nothing moves along a road, fills one or drives a vehicle yet. A world may declare them; they are checked when it is loaded, and the vehicles are kept in the state (and hashed with it) as their owners' things.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "roads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "cells", "capacity_per_hour"],
+            "properties": {
+              "id": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+              "name": { "type": "string" },
+              "cells": { "description": "The cells it runs through, in order.", "type": "array", "minItems": 2, "items": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/CellId" } },
+              "capacity_per_hour": { "description": "How many vehicles it carries an hour each way, at most.", "type": "integer", "minimum": 1 },
+              "lanes": { "type": "integer", "minimum": 1 },
+              "seconds_per_cell": { "description": "How long crossing one of its cells takes at its usual speed.", "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "vehicle_types": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "seats"],
+            "properties": {
+              "id": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+              "seats": { "type": "integer", "minimum": 0 },
+              "load_kg": { "type": "integer", "minimum": 0 },
+              "seconds_per_cell": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "vehicles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "owner", "at"],
+            "properties": {
+              "id": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+              "type": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+              "owner": { "description": "The entity that owns it.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+              "at": { "description": "Where it stands: a cell, or a structure.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" }
             }
           }
         }

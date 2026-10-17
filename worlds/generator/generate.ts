@@ -6,7 +6,8 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { particularsOf, DECISION_KIND, decisionsInWords, returnsOf, returnsInWords, BOOKS, drawValues, raisedValues, UPBRINGING, adultAgeBands, bedroomsNeeded, declarationFor, drawHousehold, drawSavings, formatMoney, inCurrency, planLaw, planLawWords, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, possessionOrderFor, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
+import { particularsOf, DECISION_KIND, decisionsInWords, returnsOf, returnsInWords, BOOKS, drawValues, raisedValues, UPBRINGING, adultAgeBands, bedroomsNeeded, declarationFor, drawHousehold, drawSavings, formatMoney, inCurrency,  POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST,  forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling,  type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
+import { draftLaw, planLaw, planLawWords, possessionOrderFor } from "./rules";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";

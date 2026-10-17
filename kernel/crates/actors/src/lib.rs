@@ -39,7 +39,7 @@ pub use oikos_sight::{Action, Picture};
 use oikos_core::rng::{Randomness, Rng};
 use oikos_rules::slip::{Performer, SlipTable, Slipper};
 use oikos_sight::calls::Currency;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::sync::Arc;
 
@@ -99,7 +99,7 @@ impl Ctx {
 /// A question an actor puts to a model (the sparse mind's consult, the composer, the reading desk): asked in one wake,
 /// answered by the next (docs/design/rust-port.md 2.3). `kind` names which model service; `about` is the actor's own
 /// name for it, which the answer carries back; `body` is the question as that service takes it.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Question {
     pub kind: String,
     pub about: String,
@@ -108,7 +108,7 @@ pub struct Question {
 
 /// A model's answer to a question of this actor's, with the question's `about`. `body` is `Null` where no answer
 /// could be had (the allowance spent, the model did not answer): the actor decides without it, as it would offline.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Answer {
     pub kind: String,
     pub about: String,
@@ -141,7 +141,7 @@ pub struct Cx<'a> {
 }
 
 /// What a step left beside its action.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Kept {
     /// Decisions on the way (docs/design/ai-citizens.md 7: `decision` annotations), as their JSON.
     pub decisions: Vec<Value>,

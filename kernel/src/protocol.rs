@@ -40,6 +40,10 @@ pub struct Session {
     currency: Option<oikos_resolver::calls::Currency>,
     /// The registers of lots seats have been shown whole, held once between them (never part of what a seat knows).
     registers: oikos_resolver::knowledge::Registers,
+    /// The Rust world (`start` with `engine`): the engine runs every built-in actor, the host its seats.
+    engine: Option<crate::engine::Engine<BufWriter<File>>>,
+    /// What `next` found while the host still had the engine's events to read: given at the next `next`.
+    due: Option<Value>,
 }
 
 impl Session {
@@ -57,6 +61,9 @@ impl Session {
     }
 
     fn reply(&mut self, req: &Value) -> Reply {
+        if self.engine.is_some() {
+            return engine_reply(self, req).unwrap_or_else(refused);
+        }
         let done = match req.get("op").and_then(Value::as_str) {
             Some("command") => command(self, req).map(Reply::Line),
             Some("next") => next(self, req),
@@ -68,7 +75,7 @@ impl Session {
     /// As `reply`, for a request that is the caller's to take from: a run is started from its config where it is (a
     /// large world's isn't copied first).
     fn reply_taking(&mut self, req: &mut Value) -> Reply {
-        if req.get("op").and_then(Value::as_str) != Some("start") || self.run.is_some() {
+        if req.get("op").and_then(Value::as_str) != Some("start") || self.run.is_some() || self.engine.is_some() {
             return self.reply(req);
         }
         // (What the session keeps of the config is read before the config is taken.)
@@ -103,6 +110,11 @@ impl Session {
 
     /// The connection closed: a run still open ends as aborted (errors if it already ended, which is fine).
     pub fn close(&mut self) {
+        if let Some(mut e) = self.engine.take() {
+            if !e.run().ended() {
+                let _ = e.run_mut().finish("aborted", Some("orchestrator closed the connection"));
+            }
+        }
         if let Some(mut r) = self.run.take() {
             let _ = r.finish("aborted", Some("orchestrator closed the connection"));
         }
@@ -249,7 +261,10 @@ fn structure_types(config: &Value) -> std::collections::BTreeMap<String, Value> 
 
 /// Starts a session's run from a config (the request's, handed over), with what the session keeps of it.
 fn start(session: &mut Session, req: &Value, config: Option<Value>, structure_types: std::collections::BTreeMap<String, Value>, money: Option<oikos_resolver::calls::Currency>) -> Result<Value, String> {
-    let Session { run, sched, knowledge, types, currency, registers } = session;
+    if req.get("engine").is_some_and(Value::is_object) {
+        return start_engine(session, req, config);
+    }
+    let Session { run, sched, knowledge, types, currency, registers, .. } = session;
     let str_field = |k: &str| req.get(k).and_then(Value::as_str).ok_or(format!("missing {k}"));
     if run.is_some() {
         return Err("a run is already started".into());
@@ -384,5 +399,151 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
             Ok(json!({ "ok": true, "seq": seq, "state_hash": hash }))
         }
         other => Err(format!("unknown op {other}")),
+    }
+}
+
+// ------------------------------------------------------------------ the Rust world (lane F)
+
+/// `start` with `engine: {stand_in?, threads?, audit?, record_decisions?}`: the Rust world. The engine runs every
+/// built-in actor (crate::engine, `host_seats`); the host runs its seats with the same requests as ever: `command`
+/// (its seats' looks and acts, in their places in the round), `annotate`, `resolve`, `check`, `units_add` (its seats),
+/// `finished`, `next`, `flush`, `finish`. `next` gives a cohort of the host's seats only, unobserved, and before it
+/// the events of the engine's own commands since last asked (as an `advanced` reply), so the host keeps its cast.
+fn start_engine(session: &mut Session, req: &Value, config: Option<Value>) -> Result<Value, String> {
+    let str_field = |k: &str| req.get(k).and_then(Value::as_str).ok_or(format!("missing {k}"));
+    let log = File::create(str_field("log_path")?).map_err(|e| e.to_string())?;
+    let anchors: Option<Box<dyn Write>> = match req.get("anchors_path").and_then(Value::as_str) {
+        Some(p) => Some(Box::new(File::create(p).map_err(|e| e.to_string())?)),
+        None => None,
+    };
+    let o = &req["engine"];
+    let mut opts = crate::engine::EngineOptions { host_seats: true, stand_in: o["stand_in"].as_str().map(String::from), audit: o["audit"].as_bool() == Some(true), ..Default::default() };
+    if let Some(n) = o["threads"].as_u64() {
+        opts.threads = (n as usize).max(1);
+    }
+    if let Some(b) = o["record_decisions"].as_bool() {
+        opts.record_decisions = b;
+    }
+    if let Some(b) = o["mock_seats"].as_bool() {
+        opts.mock_seats = b;
+    }
+    let mut e = crate::engine::Engine::start(config.ok_or("missing config")?, str_field("run_id")?, BufWriter::new(log), anchors, opts)?;
+    // (Records by reference are not kept here: the engine's own actors are handed records the host never sees, so the
+    // host is handed every record whole. Only its seats' observations cross, and they are few.)
+    let reply = json!({ "ok": true, "seq": 0, "head": e.run().head(), "t": e.t(), "engine": crate::engine::ENGINE_VERSION });
+    session.engine = Some(e);
+    session.due = None;
+    Ok(reply)
+}
+
+fn engine_reply(session: &mut Session, req: &Value) -> Result<Reply, String> {
+    let op = req.get("op").and_then(Value::as_str).ok_or("missing op")?;
+    let str_field = |k: &str| req.get(k).and_then(Value::as_str).ok_or(format!("missing {k}"));
+    let e = session.engine.as_mut().expect("checked");
+    match op {
+        "start" => Err("a run is already started".into()),
+        "command" => {
+            let cmd: Command = serde_json::from_value(req.get("command").cloned().ok_or("missing command")?).map_err(|x| format!("bad command: {x}"))?;
+            let (resp, observed) = e.host_command(&cmd)?;
+            let written = observed.as_ref().map(|o| o.wire.as_ref().unwrap_or(&o.canonical));
+            let mut line = Vec::with_capacity(written.map_or(0, |w| w.len()) + 256 + resp.logged.iter().map(|b| b.len() + 1).sum::<usize>());
+            line.extend_from_slice(b"{\"events\":");
+            write_events(&resp, &mut line)?;
+            if let Some(w) = written {
+                line.extend_from_slice(b",\"observation\":");
+                line.extend_from_slice(w);
+            }
+            line.extend_from_slice(format!(",\"ok\":true,\"seq\":{}}}", resp.seq).as_bytes());
+            String::from_utf8(line).map(Reply::Line).map_err(|x| x.to_string())
+        }
+        "next" => {
+            if let Some(u) = req["until"].as_i64() {
+                e.set_until(u);
+            }
+            let due = match session.due.take() {
+                Some(d) => d,
+                None => match e.host_next()? {
+                    crate::engine::Due::End => json!({ "ok": true, "end": true }),
+                    crate::engine::Due::Seats(seats) => {
+                        let cohort: Vec<Value> = seats.iter().map(|s| json!({ "key": s.key, "woke_for": s.woke_for, "since": s.since })).collect();
+                        json!({ "ok": true, "t": e.t(), "cohort": cohort })
+                    }
+                },
+            };
+            // (What the engine's own actors did first: the host keeps its cast from it, as from an advance's events.)
+            let events = e.host_events();
+            if !events.is_empty() {
+                session.due = Some(due);
+                let ev = serde_json::to_value(&events).map_err(|x| x.to_string())?;
+                return Ok(Reply::Value(json!({ "ok": true, "advanced": e.t(), "events": ev, "seq": e.log_head().0.saturating_sub(1) })));
+            }
+            Ok(Reply::Value(due))
+        }
+        "resolve" => {
+            let participant = str_field("participant")?;
+            let key = req["only"].as_str().map_or_else(|| participant.to_string(), |o| format!("{participant}|{o}"));
+            let program = oikos_resolver::calls::parse_program(str_field("program")?).map_err(|x| format!("the call doesn't parse: {}", x.0))?;
+            Ok(Reply::Value(match e.host_resolve(&key, &program, req["as"].as_str()) {
+                oikos_resolver::Resolution::Blocks(blocks) => json!({ "ok": true, "blocks": blocks }),
+                oikos_resolver::Resolution::Questions { questions, invalid } => {
+                    let mut v = json!({ "ok": true, "questions": questions });
+                    if !invalid.is_empty() {
+                        v["invalid"] = json!(invalid);
+                    }
+                    v
+                }
+            }))
+        }
+        "units_add" => {
+            // (The host's seats only: the engine has every code unit.)
+            let units: Vec<Value> = req["units"].as_array().ok_or("missing units")?.iter().filter(|u| u["llm"].as_bool() == Some(true)).cloned().collect();
+            e.host_units_add(&units)?;
+            Ok(Reply::Value(json!({ "ok": true })))
+        }
+        "units_remove" => {
+            let keys: Vec<String> = req["keys"].as_array().ok_or("missing keys")?.iter().filter_map(|k| k.as_str().map(String::from)).filter(|k| !k.contains('|')).collect();
+            e.host_units_remove(&keys);
+            Ok(Reply::Value(json!({ "ok": true })))
+        }
+        "to_cadence" => {
+            e.host_to_cadence(str_field("participant")?);
+            Ok(Reply::Value(json!({ "ok": true })))
+        }
+        "perturb" => {
+            let p = crate::schedule::Perturb { extra_wakes_bps: req["extra_wakes_bps"].as_u64().unwrap_or(0) as u32, seed: req["seed"].as_u64().unwrap_or(0) };
+            e.host_perturb(p);
+            e.annotate_from_host(json!({ "annotation": "note", "subject": "orchestrator", "data": { "perturbed": { "extra_wakes_bps": p.extra_wakes_bps, "seed": p.seed } } }))?;
+            Ok(Reply::Value(json!({ "ok": true })))
+        }
+        "finished" => {
+            e.host_finished(str_field("key")?, req["until"].as_i64());
+            Ok(Reply::Value(json!({ "ok": true })))
+        }
+        "check" => {
+            let blocks: Vec<Block> = serde_json::from_value(req.get("blocks").cloned().ok_or("missing blocks")?).map_err(|x| format!("bad blocks: {x}"))?;
+            let check = e.run().kernel().check(str_field("participant")?, req.get("as").and_then(Value::as_str), &blocks).map_err(|x| x.to_string())?;
+            Ok(Reply::Value(json!({ "ok": true, "check": check })))
+        }
+        "annotate" => {
+            let seq = e.run_mut().annotate(req.get("annotation").cloned().ok_or("missing annotation")?).map_err(|x| x.to_string())?;
+            Ok(Reply::Value(json!({ "ok": true, "seq": seq })))
+        }
+        "view" => {
+            let obs = e.run_mut().full_view(str_field("participant")?).ok_or("unknown participant")?;
+            Ok(Reply::Value(json!({ "ok": true, "observation": obs })))
+        }
+        "state" => {
+            let hash = e.state_hash()?;
+            Ok(Reply::Value(json!({ "ok": true, "t": e.t(), "state_hash": hash, "head": e.run().head() })))
+        }
+        "flush" => {
+            e.run_mut().flush().map_err(|x| format!("log write failed: {x}"))?;
+            Ok(Reply::Value(json!({ "ok": true, "head": e.run().head() })))
+        }
+        "finish" => {
+            let (seq, hash) = e.run_mut().finish(str_field("reason")?, req.get("detail").and_then(Value::as_str)).map_err(|x| x.to_string())?;
+            Ok(Reply::Value(json!({ "ok": true, "seq": seq, "state_hash": hash })))
+        }
+        other => Err(format!("unknown op {other} (in the Rust world)")),
     }
 }

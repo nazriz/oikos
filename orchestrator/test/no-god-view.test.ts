@@ -13,6 +13,7 @@ import { culture, DayBook, modules, townmemory } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { PUBLISHED } from "@oikos/worlds/generator/knowing";
 import { wholeViews, type WholeView } from "../src/views";
+import { rustManifests } from "./lib/rust-manifests";
 
 const root = join(import.meta.dir, "../..");
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
@@ -84,6 +85,19 @@ test("every keeper and every boundary module is listed here, and each says why",
       const seats = town.positions.filter((p: any) => p.entity === k.entity).map((p: any) => p.role_module?.code);
       expect(Object.values(modules).some((m) => seats.includes(m.name) && (m.keeps ?? []).some((x) => x.what === k.what && x.why === k.why))).toBe(true);
     }
+  }
+});
+
+test("the Rust world's actor kinds declare only the keepers and boundaries listed here, each with its reason (the port's backstop)", () => {
+  const allowed = new Set([...KEEPERS, ...BOUNDARY]);
+  for (const m of rustManifests()) for (const k of [...(m.keeps ?? []), ...(m.boundary ?? [])]) {
+    expect(allowed.has(line(m.name, k.what)), `${line(m.name, k.what)}: a Rust kind's declaration not in the list`).toBe(true);
+    expect(k.why.length).toBeGreaterThan(40);
+  }
+  // (And each says it as its TS module does, while both exist.)
+  for (const m of rustManifests()) {
+    const ts = Object.values(modules).find((x) => x.name === m.name);
+    if (ts) for (const field of ["keeps", "boundary"] as const) expect((m[field] ?? []).map((k) => k.what).sort()).toEqual((ts[field] ?? []).map((k) => k.what).sort());
   }
 });
 

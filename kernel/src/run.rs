@@ -101,6 +101,9 @@ pub struct Run<W: Write> {
     /// Requests to observe whose shape has been checked against the contract (participant -> capacities asked for):
     /// the same one, asked again, keeps to it as it did. (A wake is one of these, and there are a few thousand kinds.)
     observes_checked: std::collections::BTreeMap<String, std::collections::BTreeSet<Option<String>>>,
+    /// The config as it was given, in canonical JSON (what the header carries): a snapshot carries it too.
+    config: std::sync::Arc<[u8]>,
+    run_id: String,
 }
 
 impl<W: Write> Run<W> {
@@ -139,7 +142,44 @@ impl<W: Write> Run<W> {
         canon::write_object(members, &mut bytes, |key, x, out| if key == "config" { out.extend_from_slice(&loaded.canonical) } else { canon::write_value(x, out) });
         let mut log = LogWriter::new(out, anchors, anchor_every);
         log.append_canonical(0, Kind::Header, &bytes)?;
-        Ok(Run { checkpoint_every, kernel, log, ended: false, observed: None, observes_checked: Default::default() })
+        let config = std::sync::Arc::from(loaded.canonical);
+        Ok(Run { checkpoint_every, kernel, log, ended: false, observed: None, observes_checked: Default::default(), config, run_id: run_id.into() })
+    }
+
+    /// A run going on from where it was (a snapshot, or a fork): this kernel, its log carried on from entry `next_seq`
+    /// whose previous entry's hash is `prev` (no header is written: the log before it is the run's, or its parent's).
+    pub fn resume(kernel: Kernel, config: std::sync::Arc<[u8]>, run_id: &str, next_seq: u64, prev: &str, out: W, anchors: Option<Box<dyn Write>>) -> Self {
+        let (anchor_every, checkpoint_every) =
+            (kernel.statics().config.log.anchor_every_entries, kernel.statics().config.log.checkpoint_every);
+        let log = LogWriter::resume(out, anchors, anchor_every, next_seq, prev);
+        Run { checkpoint_every, kernel, log, ended: false, observed: None, observes_checked: Default::default(), config, run_id: run_id.into() }
+    }
+
+    /// The config as it was given, in canonical JSON.
+    pub fn config_bytes(&self) -> &std::sync::Arc<[u8]> {
+        &self.config
+    }
+
+    pub fn run_id(&self) -> &str {
+        &self.run_id
+    }
+
+    /// Where the log stands: the next entry's seq, and the hash of the last.
+    pub fn log_head(&self) -> (u64, String) {
+        (self.log.next_seq(), self.log.head().to_string())
+    }
+
+    /// The log's writer (whoever wrote a snapshot into the log, or tees its entries to a stream).
+    pub fn log_out(&mut self) -> &mut W {
+        self.log.out_mut()
+    }
+
+    pub fn log_ref(&self) -> &W {
+        self.log.out_ref()
+    }
+
+    pub fn ended(&self) -> bool {
+        self.ended
     }
 
     /// The full picture a participant's channels cover right now (the perception invariant's reference). Changes nothing; not logged.

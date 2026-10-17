@@ -35,6 +35,7 @@ import { lexiconReader, READING_TABLE, Tagger, READING_VERSION, type Reader, typ
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
+import { DetachedActor, rustManifests } from "./rust-world";
 import { divergences } from "./truth";
 import type { Watchdog } from "./watchdog";
 
@@ -114,6 +115,9 @@ export interface RunOptions {
   /** Asked to stop from outside (`scripts/mini stop`, a TERM signal: batch.ts): set `requested` to why, and the run stops
    * before its next moment, between rounds, as it does at a usage limit: its log closed, to be resumed. */
   stop?: { requested?: string };
+  /** The Rust world (OIKOS_WORLD=rust) only, until the cut-over: the kind that stands in for every kind the engine
+   * lacks (`idle`); default OIKOS_STAND_IN, else none (a world naming a kind the engine lacks is refused). */
+  standIn?: string;
 }
 
 /** The run was asked to stop from outside. It stops as it does at a usage limit: cleanly, to be resumed. */
@@ -272,6 +276,9 @@ interface Unit {
 }
 
 const ceilTo = (t: number, tick: number) => Math.ceil(t / tick) * tick;
+/** The actor kinds the engine has (the Rust world's). */
+let kindsInRust: Set<string> | undefined;
+const rustKinds = () => (kindsInRust ??= new Set(Object.keys(rustManifests())));
 
 /** Whose resolver turns calls into acts: the engine's (kernel/crates/resolver; the default), this package's ("ts"), or
  * both, compared ("shadow": every difference recorded, and under test an error). */
@@ -345,7 +352,13 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     }
   } } : a);
 
-  await k.request({ op: "start", config: cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath });
+  // The Rust world (OIKOS_WORLD=rust; docs/design/rust-port.md, lane F): the engine runs every built-in actor, and this
+  // host its seats exactly as on the TS world, through the same requests (kernel/src/engine/hosted.rs). No code unit
+  // is made here. Until the cut-over a kind the engine lacks stands idle where OIKOS_STAND_IN (or `standIn`) says so.
+  const rustWorld = process.env.OIKOS_WORLD === "rust";
+  const standIn = o.standIn ?? process.env.OIKOS_STAND_IN;
+  await k.request({ op: "start", config: cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath,
+    ...(rustWorld ? { engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(o.recordDecisions === "none" ? { record_decisions: false } : {}) } } : {}) });
   if (o.perturb) await k.request({ op: "perturb", extra_wakes_bps: o.perturb.extraWakesBps, seed: o.perturb.seed });
 
   // Every model call (participants, translator, debriefs) is recorded as it happens.
@@ -624,7 +637,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         // (A twin's brain is its person's own code unit for the post: the same name for what it draws, so that it draws as its twin does.)
         const asPerson = twin && office ? cfg.participants.find((x: any) => x.person && x.person === p.person && x.id !== p.id && !x.shares_body)?.id : undefined;
         const bctx = asPerson ? ctxFor(asPerson, office!.id, entity, pp.mock?.params ?? {}) : { ...ctx, params: sortedKeys(pp.mock?.params ?? {}) as any };
-        brains.set(p.id, { controller: brainModule.create(bctx), ctx: bctx, capacity: office?.id ?? "self", cadence: brainModule.cadence(bctx), rejectBps: pp.mock?.reject_bps, ...(twin ? { twin: true } : {}), optOutAt: pp.mock?.opt_out_at, ...(pp.mock?.back_days ? { backDays: pp.mock.back_days } : {}) });
+        // (In the Rust world a brain the engine has is the engine's own kind, run detached: the same code as the post's
+        // code unit, so a twin is exact.)
+        const rustBrain = rustWorld && rustKinds().has(b) ? new DetachedActor({ kind: b, participant: asPerson ?? p.id, capacity: office?.id ?? "self", entity, system: p.kind === "system", params: pp.mock?.params ?? {}, config: cfg }) : undefined;
+        const brainController = rustBrain ? ({ step: (x: any) => rustBrain.step(x, x.woke_for ?? "cadence", x.since ?? 0).action, sent: (a: string) => rustBrain.sent(a) } as unknown as Controller) : brainModule.create(bctx);
+        brains.set(p.id, { controller: brainController, ctx: bctx, capacity: office?.id ?? "self", cadence: brainModule.cadence(bctx), rejectBps: pp.mock?.reject_bps, ...(twin ? { twin: true } : {}), optOutAt: pp.mock?.opt_out_at, ...(pp.mock?.back_days ? { backDays: pp.mock.back_days } : {}) });
         bindings[p.id] = { ...bindings[p.id], mock_brain: b };
       }
     }
@@ -647,7 +664,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const want = new Set<string>();
     if (!p.ended) {
       if (isLlm(p)) want.add(pid);
-      else {
+      else if (!rustWorld) {
         if (p.kind === "person") want.add(`${pid}|self`);
         for (const x of held(pid)) want.add(`${pid}|${x.id}`);
       }

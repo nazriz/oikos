@@ -11,11 +11,15 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::float_arithmetic, clippy::float_cmp)]
 
+pub mod blog;
 pub mod engine;
+pub mod host;
 pub mod kernel;
 pub mod log;
 pub mod protocol;
+pub mod rules_api;
 pub mod run;
+pub mod stream;
 
 // The world (its state, physics and records: the only writer) and perception (read-only), as crates of their own,
 // where the kernel has always had them.
