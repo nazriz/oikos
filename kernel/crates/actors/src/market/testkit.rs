@@ -26,7 +26,7 @@ pub fn ctx(entity: &str, params: Value) -> Ctx {
         participant: format!("{entity}-system"),
         performer: Performer::default(),
         entity: entity.into(),
-        position: Some(format!("{entity}-manager")),
+        position: None,
         params: params.as_object().cloned().unwrap_or_default(),
         world: Arc::new(world()),
     }
@@ -55,7 +55,7 @@ impl Harness {
     pub fn new(kind: &'static dyn Kind, entity: &str, params: Value) -> Harness {
         let ctx = ctx(entity, params);
         let actor = kind.create(&ctx).expect("the actor is made");
-        let draws = Draws::new(&ctx.participant, ctx.position.as_deref().unwrap_or("self"));
+        let draws = Draws::new(&ctx.participant, "self");
         Harness { kind, ctx, actor, draws, view: View::default(), seed: 11, n: 0, t: 0, sent: vec![] }
     }
 
@@ -83,7 +83,7 @@ impl Harness {
         let mut woke_for = "cadence";
         for _ in 0..200 {
             let obs = self.observation(t, chans.clone(), outcomes.clone());
-            let pic: Picture = self.view.apply(obs, Some(self.ctx.position.as_deref().unwrap_or("self")), &self.ctx.entity, woke_for, 0);
+            let pic: Picture = self.view.apply(obs, None, &self.ctx.entity, woke_for, 0);
             let mut cx = Cx::new(t, &self.ctx, &mut self.draws, self.seed, vec![]);
             let action = self.actor.step(&pic, &mut cx);
             chans = json!({});
@@ -124,7 +124,7 @@ impl Harness {
         let mut woke_for = "cadence";
         for _ in 0..50 {
             let obs = self.observation(t, chans.clone(), outcomes.clone());
-            let pic: Picture = self.view.apply(obs, Some(self.ctx.position.as_deref().unwrap_or("self")), &self.ctx.entity, woke_for, 0);
+            let pic: Picture = self.view.apply(obs, None, &self.ctx.entity, woke_for, 0);
             let mut cx = Cx::new(t, &self.ctx, &mut self.draws, self.seed, vec![]);
             let action = self.actor.step(&pic, &mut cx);
             chans = json!({});

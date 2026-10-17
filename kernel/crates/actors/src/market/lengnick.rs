@@ -115,6 +115,39 @@ pub fn move_wage(p: &Lengnick, rng: &mut Rng, wage: i64, o: WageMonth, money: &d
     (wage, o.full_months, None)
 }
 
+/// The trade a firm plans on: its sales (or its orders) smoothed over a few months, never one month's alone (Holt,
+/// Modigliani, Muth and Simon 1960; docs/behaviour/firms.md, "Adjusting labour"). `smooth_months` 0 or 1: last month's
+/// figure, as the rule was.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Expectation {
+    level: i64,
+    smooth_months: i64,
+}
+
+impl Expectation {
+    /// `opening`: the trade the firm expected when it took its staff on, where it has one.
+    pub fn new(smooth_months: i64, opening: Option<i64>) -> Self {
+        Expectation { level: opening.filter(|o| *o > 0).unwrap_or(-1), smooth_months }
+    }
+    /// The trade expected, after another month's figure: an average weighted to the recent months over the horizon
+    /// (an exponential average with the span `smooth_months`; half-up rounding, decided here).
+    pub fn expect(&mut self, month: i64) -> i64 {
+        let h = self.smooth_months.max(0);
+        self.level = if self.level < 0 || h <= 1 {
+            month
+        } else {
+            let n = (month - self.level) * 2;
+            let d = h + 1;
+            self.level + (2 * n + d).div_euclid(2 * d)
+        };
+        self.level
+    }
+    /// The trade expected now (before any month's figure: -1).
+    pub fn level(&self) -> i64 {
+        self.level
+    }
+}
+
 /// One holder on a firm's register.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Holder {
@@ -235,6 +268,19 @@ mod tests {
         // Nobody on the staff and nothing posted: nothing is learned.
         let (w, full, _) = move_wage(&p, &mut rng, 100_000, WageMonth { unfilled: false, posting: false, staffed: false, full_months: 9 }, &money);
         assert_eq!((w, full), (100_000, 9));
+    }
+
+    #[test]
+    fn expectation_follows_the_months_figure_weighted_to_the_recent_over_the_horizon() {
+        let mut e = Expectation::new(3, None);
+        assert_eq!(e.expect(100), 100, "the first figure is the expectation");
+        assert_eq!(e.expect(200), 150, "span 3: half the way");
+        assert_eq!(e.expect(100), 125);
+        let mut last = Expectation::new(0, None);
+        last.expect(100);
+        assert_eq!(last.expect(300), 300, "no smoothing: last month's");
+        let mut opened = Expectation::new(3, Some(250));
+        assert_eq!(opened.expect(150), 200, "an opening expectation is moved like any other month's");
     }
 
     #[test]

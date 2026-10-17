@@ -8,12 +8,14 @@
 
 use crate::Kind;
 
+pub mod body;
 pub mod lengnick;
 pub mod prices;
 pub mod rents;
+pub mod retailer;
 pub mod trade;
 #[cfg(test)]
 pub mod testkit;
 
 /// Every kind of this lane, in name order.
-pub static KINDS: &[&dyn Kind] = &[];
+pub static KINDS: &[&dyn Kind] = &[&retailer::Retailer];
