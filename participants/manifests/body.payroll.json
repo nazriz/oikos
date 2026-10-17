@@ -1,6 +1,6 @@
 {
   "name": "body.payroll",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "doc": "docs/behaviour/staffing.md",
   "params": {
     "after_days": {
@@ -33,6 +33,21 @@
         "description": "an appointer: the posts of its own body (no deputy keeps them filled, so it need not wait for one)"
       },
       "default": [],
+      "source": "placeholder"
+    },
+    "owner": {
+      "schema": {
+        "type": "string",
+        "description": "an owner's appointer (a firm's): the owner, who fills a post themselves where none of the staff is left, wherever they live"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "owner_participant": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
       "source": "placeholder"
     },
     "part": {

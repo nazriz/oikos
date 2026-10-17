@@ -29,7 +29,7 @@ const slotOf = (post: string): number => { let h = 2166136261; for (let i = 0; i
 export const bodyPayroll: BehaviourModule = {
   name: "body.payroll",
   answers: { office: "the payroll office", acts: "What it acts on: the employment agreements of its organisation's staff and the standing payments that pay them; the tax withheld from wages, paid over on the law's days; and a member of staff who has died." },
-  version: "0.4.1", // 0.4.1: an appointer looks at each post it has not seen vacant once in six rounds, on a round of the post's own (from its name), not by a turn kept in the holder's memory, so a vacancy is found on the same round whatever else is watched (bug hunt 2026-10-17); 0.4.0: an appointer that finds none of the staff to second hires for the body; 0.3.0: an appointer (the authority a body's constitution names fills a post that has stood vacant); 0.2.0: deaf to news, on a round of its own
+  version: "0.5.0", // 0.5.0: an owner's appointer: where none of a firm's staff is left, its owner fills a vacant post themselves, wherever they live; 0.4.1: an appointer looks at each post it has not seen vacant once in six rounds, on a round of the post's own (from its name), not by a turn kept in the holder's memory, so a vacancy is found on the same round whatever else is watched (bug hunt 2026-10-17); 0.4.0: an appointer that finds none of the staff to second hires for the body; 0.3.0: an appointer (the authority a body's constitution names fills a post that has stood vacant); 0.2.0: deaf to news, on a round of its own
   deaf: true,
   doc: "docs/behaviour/staffing.md",
   cadence: () => 3 * DAY,
@@ -44,6 +44,7 @@ export const bodyPayroll: BehaviourModule = {
       who: "who", // its channel onto who's who
       // An appointer that recruits (the city's: where no staff is left to second, it hires for the body it is part of, through ordinary hiring).
       workplace: "", industry: "", wage: 0, payroll_office: "", staff_line: "",
+      owner: "", owner_participant: "", // an owner's appointer (a firm's): the owner, who fills a post themselves where none of the staff is left, wherever they live
       own: [] as string[], // an appointer: the posts of its own body (no deputy keeps them filled, so it need not wait for one)
     }, ctx.params);
     const me = ctx.entity;
@@ -61,7 +62,7 @@ export const bodyPayroll: BehaviourModule = {
     };
     const waits = (post: string) => (p.own.includes(post) ? 0 : p.after_days * DAY); // (a body's own posts have no deputy to give a few days to)
     const vacant = (post: string) => book.positions.has(post) && !book.positions.get(post)!.holder;
-    const participantOf = (person: string) => [...book.participantPerson].find(([, who]) => who === person)?.[0];
+    const participantOf = (person: string) => (p.owner && person === p.owner && p.owner_participant ? p.owner_participant : [...book.participantPerson].find(([, who]) => who === person)?.[0]);
     // The round is the payroll's own: every few days on a day of its own, whatever else wakes it. A paper addressed to the organisation wakes everyone who acts
     // for it (a seat's, say), and a payroll that did its work whenever it was woken would file on other days in a town with a seat than in the town without one.
     const phase = ctx.rng("first-wake").below(3) * DAY;
@@ -87,7 +88,9 @@ export const bodyPayroll: BehaviourModule = {
           if (vacant(post)) { if (!vacantSince.has(post)) vacantSince.set(post, t); } else vacantSince.delete(post);
         }
         // A vacant post of the organisation's: one of its living staff takes it.
-        const candidates = living(t);
+        // (Where none of the staff is left, the owner themselves: an owner keeps the business and its posts wherever they live, and hiring for it is the owner's to do next.)
+        const staffLeft = living(t);
+        const candidates = staffLeft.length || !p.owner || gone.has(p.owner) ? staffLeft : [p.owner];
         // An appointer where none of the staff is left to second: it hires for the body, through the ordinary hiring (a posting, an
         // applicant, an agreement, a wage as the body's staff are paid), and seconds whoever is hired at the next round.
         if (p.part === "appointer" && p.workplace && !candidates.length) {

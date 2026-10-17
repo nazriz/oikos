@@ -91,3 +91,15 @@ fn a_new_holder_of_a_post_is_told_of_the_payments_the_office_has_had() {
     assert_eq!(outcome(&mut run, &appoint), None);
     assert_eq!(told(&mut run, "alice-self"), 2, "the new holder was told of nothing the office had had");
 }
+
+/// An owner's post that the world marks `holds_abroad` stays theirs when they leave; any other falls vacant.
+#[test]
+fn a_post_that_holds_abroad_stays_with_its_holder_who_leaves() {
+    let mut c = world(&default_params());
+    let p = c["positions"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == "clerk").unwrap();
+    p["holder"] = json!("alice-self");
+    p["holds_abroad"] = json!(true);
+    let mut run = Run::start(c, "abroad", Vec::new(), None).unwrap();
+    assert_eq!(outcome(&mut run, &cmd("alice-self", None, json!([{"block": "leave"}]))), None);
+    assert_eq!(run.kernel().state().positions["clerk"].holder.as_deref(), Some("alice-self"));
+}
