@@ -94,6 +94,8 @@ pub struct Life {
     pub rent_share: Option<i64>,
     /// Their account at a bank, where they have one (a want's acts that cost money need it).
     pub account: Option<String>,
+    /// Where they work (the job's workplace), where it has one.
+    pub workplace: Option<String>,
 }
 
 /// Where the person lives.
@@ -481,6 +483,12 @@ pub struct Planned {
     pub chosen: Vec<Chosen>,
     /// What the plan asks of life beyond the ways chosen (`StopLooking`, `FoundBusiness`).
     pub intents: Vec<Intent>,
+    /// Steps that come before everything else of the wake (TS `steps.unshift`: going to a gathering that is on now,
+    /// going home from one that is over).
+    pub first: Vec<Step<()>>,
+    /// When the mind wants to be awake again whatever the plan (a gathering's start or end; the next tick, when it has
+    /// asked a model and waits on the answer): life wakes by the earliest of this and its own.
+    pub wake_at: Option<i64>,
 }
 
 // ------------------------------------------------------------------ what life may ask of the mind
@@ -520,6 +528,8 @@ pub trait Outlook {
     /// `practice`): citizen.ts `pursuing`. Life asks by the goal's method name.
     fn initiative(&self) -> bool;
     fn pursuing(&self, method: &str) -> bool;
+    /// The space of the gathering they are at now, where they are at one (the daily round keeps them there).
+    fn at_gathering(&self, t: i64) -> Option<String>;
     /// How patient with a hard situation before acting on it (days), as their attachments and temperament make them.
     fn patience_days(&self) -> i64;
     /// Life as a whole as the person rates it now (basis points), from `life`.
@@ -612,6 +622,9 @@ impl Outlook for Plain {
     }
     fn pursuing(&self, _: &str) -> bool {
         false
+    }
+    fn at_gathering(&self, _: i64) -> Option<String> {
+        None
     }
     fn patience_days(&self) -> i64 {
         30
