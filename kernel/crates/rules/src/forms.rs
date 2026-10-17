@@ -267,6 +267,12 @@ pub fn catalogue() -> Ordered<Vec<Issued>> {
     )
 }
 
+/// The names of the catalogue's groups, in the order papers.ts exports them (for the translator, which asks for forms
+/// by name: lane E owns the catalogue and what it is called).
+pub fn group_names() -> Vec<String> {
+    catalogue().keys().map(String::from).collect()
+}
+
 /// One group of forms, by its name in the catalogue (empty if there is none).
 pub fn group(name: &str) -> Vec<Issued> {
     catalogue().remove(name).unwrap_or_default()
