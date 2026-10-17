@@ -96,6 +96,11 @@ pub struct Life {
     pub account: Option<String>,
     /// Where they work (the job's workplace), where it has one.
     pub workplace: Option<String>,
+    /// The shop they go to and how fully it last served them (basis points), for what they tell (citizen.ts
+    /// `favourite`, `lastServed`); whether they have claimed unpaid wages from the job (`job.claimed`).
+    pub shop: Option<String>,
+    pub served_bps: Option<i64>,
+    pub claimed_wages: bool,
 }
 
 /// Where the person lives.
@@ -572,7 +577,7 @@ pub trait Mind: Outlook + Send {
     fn treated(&mut self, cx: &mut Cx, t: Treated);
     /// Something happened: feelings, ties and wants follow, as the mind holds them. Talk returns what of it was the
     /// mind's; a rent rise, the way taken (`ways`: life's openings, as `plan` has them).
-    fn event(&mut self, cx: &mut Cx, life: &Life, e: Event, ways: &dyn Openings) -> Heard;
+    fn event(&mut self, cx: &mut Cx, pic: &Picture, book: &Book, life: &Life, e: Event, ways: &dyn Openings) -> Heard;
     /// A full plan is due (citizen.ts `plan`'s mind half: upbringing, attachments, drift, views, goals, wants born and
     /// met, wants due and their ways, gatherings, founding and groups, civic acts, talk, thanks). `ways` is life's
     /// openings for each want.
@@ -682,7 +687,7 @@ impl Mind for Plain {
         }
     }
     fn treated(&mut self, _: &mut Cx, _: Treated) {}
-    fn event(&mut self, _: &mut Cx, _: &Life, e: Event, _: &dyn Openings) -> Heard {
+    fn event(&mut self, _: &mut Cx, _: &Picture, _: &Book, _: &Life, e: Event, _: &dyn Openings) -> Heard {
         match e {
             Event::Talk { .. } => Heard::NotMine,
             _ => Heard::Taken,

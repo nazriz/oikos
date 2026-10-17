@@ -121,7 +121,7 @@ mod tests {
     use super::*;
 
     fn world() -> WorldInfo {
-        let currency = oikos_sight::calls::Currency { code: "AUD".into(), symbol: Some("$".into()), minor_units: 2, ..Default::default() };
+        let currency = oikos_sight::calls::Currency { code: "XTS".into(), symbol: Some("$".into()), minor_units: 2, ..Default::default() };
         WorldInfo { currency: Some(currency), ..Default::default() }
     }
 

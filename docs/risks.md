@@ -452,7 +452,9 @@ scale 5. Assumptions audit: 31, of which 8 are outcomes built in.
   gb-eng's age cut (25 to 65) refuses every younger claimant, which may be a misreading of the law.
 - **Where:** `support.*` fields; `docs/design/profile-depth.md` tracks D, E; `living-7b.review.md` fault 5.
 - **Effect:** Welfare experiments overstate coverage; a support seat's workload is the profile's reading.
-- **L / I:** medium / medium · **Status:** accepted; the gb-eng age rule to check
+- **L / I:** medium / medium · **Status:** accepted; the gb-eng age rule to check. Take-up: the mechanism is in the
+  Rust citizen (`take_up_bps`, a share of the entitled who claim, keyed per payment and spell; lane A1, 2026-10-17,
+  docs/behaviour/citizen.md "Taking up support"); **to source** per profile (none states one yet, so everyone still claims).
 - **Fix when:** a support-office experiment.
 
 ### PB-14 · A code council votes on one axis
@@ -998,7 +1000,7 @@ are, and its register entry. "Read in code" means the line was opened, not only 
 - **A-28 · Households do not pool money; income, job and savings are unrelated draws.** Most couples pool; hardship
   clusters. Sure: medium-high. ME-17.
 - **A-29 · People leave only on failure and arrive only for jobs.** Sure: high on the mechanism. WM-8.
-- **A-30 · Everyone entitled claims, and support does not change job search.** Real take-up is well under full. Sure: high. PB-13.
+- **A-30 · Everyone entitled claims, and support does not change job search.** Real take-up is well under full. Sure: high. PB-13. (Take-up now a profile figure in the Rust citizen, `take_up_bps`, to source per profile: lane A1, 2026-10-17.)
 - **A-31 · Groups are founded only out of grievance.** Sure: medium. PC-11.
 
 **Assumptions checked and found sound** (for the record): the kernel conserves money and draws are deterministic

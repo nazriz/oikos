@@ -114,6 +114,8 @@ impl Person {
         for (what, by) in self.mind.troubles_to_tell() {
             self.tell_household_trouble(w, &what, &by);
         }
+        // (What was new this week has been planned with.)
+        self.take_fresh();
     }
 
     /// Deposits, and rent the bank could not pay, paid now, oldest first, once there's enough.
@@ -152,7 +154,7 @@ impl Person {
         let t = w.t;
         let me = self.me.clone();
         if self.s.living_at.is_none() && matches!(w.pic.channels.get("street"), Some(oikos_sight::Seen::Sites { .. })) {
-            self.s.living_at = super::person::spaces(w.pic).find(|sp| sp.kind == "dwelling" && super::person::occupants(sp).iter().any(|o| *o == me)).map(|sp| sp.space.clone());
+            self.s.living_at = super::person::spaces(w.pic).find(|sp| sp.kind == "dwelling" && super::person::occupants(sp).contains(&me)).map(|sp| sp.space.clone());
         }
         for (_, what) in std::mem::take(&mut self.s.heard) {
             match what {

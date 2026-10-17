@@ -803,3 +803,9 @@ Each profile's own source notes carry the full citation, table and what was open
 | Who lives in the town; how long they have lived there | IBGE Censo 2022, SIDRA 9605, Aguanil; ACS 2020-2024 5-year, Wyandot County, B03002, B07001, B25038; English Housing Survey 2023-24, length of residence **(to confirm)**; ABS, Housing Occupancy and Costs 2019-20, cubes 2 and 5; Pew Religious Landscape Study 2023-24, Ohio | `culture.origin`, `outlook.residence`, `tenancy.rent_share_of_income`, `households.kin_households_most_bps`, `groups.kinds.held_at_start_bps` |
 | Business births | Eurostat, business demography, bd_size (Germany, 2024); IBGE, Demografia das Empresas 2021; US Census, Business Dynamics Statistics 2023 | `business.entry_bps_per_year` |
 | Redundancy: the Mexican seniority premium | Ley Federal del Trabajo arts 48, 50 and 162 | `employment.termination` in mx-jal |
+
+## The citizen's life in Rust (lane A1, 2026-10-17; docs/decisions.md)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Take-up of support is well under full | DWP, "Income-related benefits: estimates of take-up", financial year ending 2018 (Pension Credit about 60% by caseload, 70% by expenditure) **(to confirm)**; Hernanz, Malherbet and Pellizzari (2004), "Take-up of welfare benefits in OECD countries: a review of the evidence", OECD Social, Employment and Migration Working Paper 17 (40 to 80%) **(to confirm)** | `take_up_bps` (kernel/crates/actors/src/citizen/money.rs); docs/behaviour/citizen.md "Taking up support" |

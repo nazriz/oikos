@@ -517,6 +517,9 @@ impl Person {
             leaving: self.s.leaving,
             rent_share: self.s.share.as_ref().map(|s| s.0),
             account: acc.map(|a| a.account),
+            shop: self.money.favourite.clone(),
+            served_bps: Some(self.money.last_served),
+            claimed_wages: self.s.job.as_ref().is_some_and(|j| j.claimed),
             workplace: self.s.job.as_ref().and_then(|j| j.workplace.clone()).or_else(|| self.s.own_work.as_ref().and_then(|w| w.at.clone())),
         }
     }
@@ -569,7 +572,7 @@ impl Person {
         // (The mind may take a way at once, a rent rise, so it is handed life's openings: the mind is taken out for
         // the call so that the openings read life while the mind is busy.)
         let mut m = std::mem::replace(&mut self.mind, Box::new(mind::Plain::default()));
-        let heard = m.event(w.cx, &life, e, &super::recourse::Ways { person: self, pic: w.pic });
+        let heard = m.event(w.cx, w.pic, &self.book, &life, e, &super::recourse::Ways { person: self, pic: w.pic });
         self.mind = m;
         heard
     }
@@ -614,7 +617,7 @@ pub fn cells<'a>(pic: &'a Picture, channel: &str) -> &'a [SiteCell] {
     }
 }
 /// Every space of the street's view.
-pub fn spaces<'a>(pic: &'a Picture) -> impl Iterator<Item = &'a SiteSpace> {
+pub fn spaces(pic: &Picture) -> impl Iterator<Item = &SiteSpace> {
     cells(pic, "street").iter().filter_map(|c| c.structure.as_ref()).flat_map(|st| st.spaces.iter())
 }
 /// Who is in a space, as the view shows (none shown: nobody we can tell).

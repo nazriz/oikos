@@ -69,4 +69,59 @@ fn a_town_of_citizens_runs_in_the_engine_the_same_on_one_thread_and_on_fourteen(
     let log = lines(&l1);
     let acts = log.iter().filter(|l| l["kind"] == "command" && l["body"]["command"] == "act" && l["body"]["participant"].as_str().is_some_and(|p| p.starts_with('c'))).count();
     eprintln!("citizens' acts in 21 days: {acts}");
+    assert!(acts > 100, "citizens live: they shop, pay, apply and move ({acts} acts)");
+}
+
+/// What citizens published in a run (statements, by kind), and the acts' calls.
+fn statements(log: &[Value], kind: &str) -> Vec<Value> {
+    log.iter().filter(|l| l["kind"] == "event" && l["body"]["event"] == "recorded" && l["body"]["record"]["kind"] == kind).map(|l| l["body"]["record"].clone()).collect()
+}
+
+#[test]
+fn over_two_months_people_apply_for_work_and_order_goods_and_nobody_retired_applies() {
+    let until = 60 * DAY;
+    let c = plain_town();
+    let retired: Vec<String> = c["participants"].as_array().unwrap().iter().filter(|p| p["controller"]["params"]["own_work"].is_object()).filter_map(|p| p["person"].as_str().map(String::from)).collect();
+    let (_, e) = run_code_world(c, "a1-60", Vec::new(), opts(4, until)).unwrap();
+    let log = lines(&e.into_log());
+    let apps = statements(&log, "job_application");
+    eprintln!("job applications: {}; orders: {}", apps.len(), statements(&log, "order").len());
+    assert!(apps.iter().all(|a| !retired.iter().any(|r| a["speaks_for"] == r.as_str())), "someone who works for themself does not apply for jobs");
+}
+
+#[test]
+fn with_take_up_at_nothing_nobody_claims_support() {
+    let mut c = plain_town();
+    for p in c["participants"].as_array_mut().unwrap() {
+        if p["controller"]["impl"] == "citizen.default" {
+            p["controller"]["params"]["take_up_bps"] = json!(0);
+        }
+    }
+    let (_, e) = run_code_world(c, "a1-takeup", Vec::new(), opts(4, 60 * DAY)).unwrap();
+    let log = lines(&e.into_log());
+    assert!(statements(&log, "benefit_claim").is_empty());
+}
+
+#[test]
+#[ignore]
+fn tally() {
+    let (_, e) = run_code_world(plain_town(), "a1-tally", Vec::new(), opts(4, 60 * DAY)).unwrap();
+    let log = lines(&e.into_log());
+    let mut k = std::collections::BTreeMap::<String, usize>::new();
+    for l in &log {
+        if l["kind"] == "event" && l["body"]["event"] == "recorded" {
+            *k.entry(format!("rec:{}", l["body"]["record"]["kind"].as_str().unwrap_or(l["body"]["record"]["record"].as_str().unwrap_or("?")))).or_default() += 1;
+        }
+        if l["kind"] == "command" && l["body"]["command"] == "act" {
+            let c = l["body"]["provenance"]["call"].as_str().unwrap_or("").split('(').next().unwrap_or("").to_string();
+            *k.entry(format!("call:{c}")).or_default() += 1;
+        }
+        if l["kind"] == "event" {
+            *k.entry(format!("event:{}", l["body"]["event"].as_str().unwrap_or("?"))).or_default() += 1;
+        }
+        if l["kind"] == "outcome" || l["body"]["status"] == "refused" {
+            *k.entry(format!("status:{}:{}", l["body"]["status"].as_str().unwrap_or("?"), l["body"]["refusal"]["code"].as_str().unwrap_or(""))).or_default() += 1;
+        }
+    }
+    eprintln!("{k:#?}");
 }
