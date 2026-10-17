@@ -60,7 +60,10 @@ a live run's lines, and every query works at any moment while it is fed. Kept li
 4096 (the open frame plain, 24 decompressed frames cached), so memory stays bounded. Debriefs, debrief annotations and
 observations are dropped before they are parsed (VISION 15). Each kept line is parsed once with serde_json (the TS read
 them with regexes); parsing runs on several threads and lines are applied in order, so the index is the same as a
-one-thread read.
+one-thread read. Measured on `runs/explorer-1000-2026-10-17` (1.43 million lines, 1,003 people, 90 days; 265 thousand
+kept lines): about 5 s to index with a release build on a busy machine, 640 MB resident (the kept lines are 30 MB of it),
+counts equal to the TS index's on lines, kept, people, days, actions, pulses, moves and holders; the tracks `where`,
+`agency`, `pulses` and `moves` are byte for byte the TS files, and 20 traces and 30 panels are equal.
 
 ### The query interface (a library)
 

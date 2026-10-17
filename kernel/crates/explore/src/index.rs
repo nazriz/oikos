@@ -97,27 +97,48 @@ impl Index {
     pub fn load_path(&self, path: &Path) -> std::io::Result<()> {
         self.set_state("indexing");
         let f = std::fs::File::open(path)?;
-        let mut rd: Box<dyn BufRead> = if path.extension().map(|e| e == "zst").unwrap_or(false) {
+        let mut rd: Box<dyn BufRead + Send> = if path.extension().map(|e| e == "zst").unwrap_or(false) {
             Box::new(BufReader::with_capacity(1 << 20, zstd::stream::read::Decoder::new(f)?))
         } else {
             Box::new(BufReader::with_capacity(1 << 20, f))
         };
-        let mut buf: Vec<String> = Vec::with_capacity(CHUNK);
-        let mut bytes = Vec::new();
-        loop {
-            bytes.clear();
-            let n = rd.read_until(b'\n', &mut bytes)?;
-            if n == 0 {
-                break;
+        // (reading and decompressing run on their own thread, a few chunks ahead of the parsing and applying)
+        let (tx, rx) = std::sync::mpsc::sync_channel::<std::io::Result<Vec<String>>>(4);
+        let reader = std::thread::spawn(move || {
+            let mut buf: Vec<String> = Vec::with_capacity(CHUNK);
+            let mut bytes = Vec::new();
+            loop {
+                bytes.clear();
+                match rd.read_until(b'\n', &mut bytes) {
+                    Err(e) => {
+                        let _ = tx.send(Err(e));
+                        return;
+                    }
+                    Ok(0) => break,
+                    Ok(_) => {}
+                }
+                buf.push(String::from_utf8_lossy(&bytes).into_owned());
+                if buf.len() == CHUNK && tx.send(Ok(std::mem::replace(&mut buf, Vec::with_capacity(CHUNK)))).is_err() {
+                    return;
+                }
             }
-            buf.push(String::from_utf8_lossy(&bytes).into_owned());
-            if buf.len() == CHUNK {
-                self.apply(parse_many(&buf));
-                buf.clear();
+            if !buf.is_empty() {
+                let _ = tx.send(Ok(buf));
+            }
+        });
+        let mut err = None;
+        for chunk in rx {
+            match chunk {
+                Ok(lines) => self.apply(parse_many(&lines)),
+                Err(e) => {
+                    err = Some(e);
+                    break;
+                }
             }
         }
-        if !buf.is_empty() {
-            self.apply(parse_many(&buf));
+        let _ = reader.join();
+        if let Some(e) = err {
+            return Err(e);
         }
         self.set_state("ready");
         Ok(())
