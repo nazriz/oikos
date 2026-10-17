@@ -44,3 +44,15 @@ pub static KINDS: &[&dyn Kind] = &[
     &utilities::Energy,
     &utilities::Water,
 ];
+
+/// Where in its first hour an office first wakes: `base` seconds plus a spread of up to `span` that depends only on who
+/// the participant is (TS drew `ctx.rng("first-wake")`; `Kind::first_wake` has no stream to draw from, and an office's
+/// first wake needs spreading only so that they do not all act at the same second). FNV-1a of the participant's id.
+pub fn spread(ctx: &crate::Ctx, base: i64, span: i64) -> i64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in ctx.participant.bytes() {
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    base + if span > 0 { (h % span as u64) as i64 } else { 0 }
+}
