@@ -1,0 +1,827 @@
+{
+ "about": "Ordinary dates (docs/design/names-and-dates.md section 5): a calendar's civil date written in the place's words, and read back. `calendars`: the world's `calendar` section (start date, days of rest, and the style: format, long_format, months, weekdays; `iso` has no style, so dates are ISO). `words`: moment `t` (seconds from the start) is written as `text` (`long`: with the weekday). `reads`: `text` is read, with `now` as the moment it is read at (for a date with no year, the year of now), as the moment `at` that day begins. `refused`: `text` is not a date for that calendar. Held by kernel/crates/rules (DateStyle) and participants/src/calendar.ts equally.",
+ "now": 1814400,
+ "calendars": {
+  "dmy": {
+   "start": "2026-03-12",
+   "weekend": [
+    5,
+    6
+   ],
+   "format": "{d} {month} {y}",
+   "long_format": "{weekday} {d} {month} {y}",
+   "months": [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+   ],
+   "weekdays": [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday"
+   ]
+  },
+  "mdy": {
+   "start": "2026-03-12",
+   "weekend": [
+    5,
+    6
+   ],
+   "format": "{month} {d}, {y}",
+   "long_format": "{weekday}, {month} {d}, {y}",
+   "months": [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+   ],
+   "weekdays": [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday"
+   ]
+  },
+  "numeric": {
+   "start": "2026-03-12",
+   "weekend": [
+    6
+   ],
+   "format": "{dd}.{m}.{y}",
+   "long_format": "{weekday} {dd}.{m}.{y}",
+   "months": [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+   ],
+   "weekdays": [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday"
+   ]
+  },
+  "iso": {
+   "start": "2026-03-12",
+   "weekend": [
+    5,
+    6
+   ]
+  }
+ },
+ "words": [
+  {
+   "calendar": "dmy",
+   "t": 0,
+   "long": false,
+   "text": "12 March 2026"
+  },
+  {
+   "calendar": "dmy",
+   "t": 0,
+   "long": true,
+   "text": "Thursday 12 March 2026"
+  },
+  {
+   "calendar": "dmy",
+   "t": 86400,
+   "long": false,
+   "text": "13 March 2026"
+  },
+  {
+   "calendar": "dmy",
+   "t": 86400,
+   "long": true,
+   "text": "Friday 13 March 2026"
+  },
+  {
+   "calendar": "dmy",
+   "t": 1641600,
+   "long": false,
+   "text": "31 March 2026"
+  },
+  {
+   "calendar": "dmy",
+   "t": 1641600,
+   "long": true,
+   "text": "Tuesday 31 March 2026"
+  },
+  {
+   "calendar": "dmy",
+   "t": 1728000,
+   "long": false,
+   "text": "1 April 2026"
+  },
+  {
+   "calendar": "dmy",
+   "t": 1728000,
+   "long": true,
+   "text": "Wednesday 1 April 2026"
+  },
+  {
+   "calendar": "dmy",
+   "t": 28080000,
+   "long": false,
+   "text": "31 January 2027"
+  },
+  {
+   "calendar": "dmy",
+   "t": 28080000,
+   "long": true,
+   "text": "Sunday 31 January 2027"
+  },
+  {
+   "calendar": "dmy",
+   "t": -86400,
+   "long": false,
+   "text": "11 March 2026"
+  },
+  {
+   "calendar": "dmy",
+   "t": -86400,
+   "long": true,
+   "text": "Wednesday 11 March 2026"
+  },
+  {
+   "calendar": "dmy",
+   "t": 62121600,
+   "long": false,
+   "text": "29 February 2028"
+  },
+  {
+   "calendar": "dmy",
+   "t": 62121600,
+   "long": true,
+   "text": "Tuesday 29 February 2028"
+  },
+  {
+   "calendar": "dmy",
+   "t": 622800,
+   "long": false,
+   "text": "19 March 2026"
+  },
+  {
+   "calendar": "dmy",
+   "t": 622800,
+   "long": true,
+   "text": "Thursday 19 March 2026"
+  },
+  {
+   "calendar": "mdy",
+   "t": 0,
+   "long": false,
+   "text": "March 12, 2026"
+  },
+  {
+   "calendar": "mdy",
+   "t": 0,
+   "long": true,
+   "text": "Thursday, March 12, 2026"
+  },
+  {
+   "calendar": "mdy",
+   "t": 86400,
+   "long": false,
+   "text": "March 13, 2026"
+  },
+  {
+   "calendar": "mdy",
+   "t": 86400,
+   "long": true,
+   "text": "Friday, March 13, 2026"
+  },
+  {
+   "calendar": "mdy",
+   "t": 1641600,
+   "long": false,
+   "text": "March 31, 2026"
+  },
+  {
+   "calendar": "mdy",
+   "t": 1641600,
+   "long": true,
+   "text": "Tuesday, March 31, 2026"
+  },
+  {
+   "calendar": "mdy",
+   "t": 1728000,
+   "long": false,
+   "text": "April 1, 2026"
+  },
+  {
+   "calendar": "mdy",
+   "t": 1728000,
+   "long": true,
+   "text": "Wednesday, April 1, 2026"
+  },
+  {
+   "calendar": "mdy",
+   "t": 28080000,
+   "long": false,
+   "text": "January 31, 2027"
+  },
+  {
+   "calendar": "mdy",
+   "t": 28080000,
+   "long": true,
+   "text": "Sunday, January 31, 2027"
+  },
+  {
+   "calendar": "mdy",
+   "t": -86400,
+   "long": false,
+   "text": "March 11, 2026"
+  },
+  {
+   "calendar": "mdy",
+   "t": -86400,
+   "long": true,
+   "text": "Wednesday, March 11, 2026"
+  },
+  {
+   "calendar": "mdy",
+   "t": 62121600,
+   "long": false,
+   "text": "February 29, 2028"
+  },
+  {
+   "calendar": "mdy",
+   "t": 62121600,
+   "long": true,
+   "text": "Tuesday, February 29, 2028"
+  },
+  {
+   "calendar": "mdy",
+   "t": 622800,
+   "long": false,
+   "text": "March 19, 2026"
+  },
+  {
+   "calendar": "mdy",
+   "t": 622800,
+   "long": true,
+   "text": "Thursday, March 19, 2026"
+  },
+  {
+   "calendar": "numeric",
+   "t": 0,
+   "long": false,
+   "text": "12.3.2026"
+  },
+  {
+   "calendar": "numeric",
+   "t": 0,
+   "long": true,
+   "text": "Thursday 12.3.2026"
+  },
+  {
+   "calendar": "numeric",
+   "t": 86400,
+   "long": false,
+   "text": "13.3.2026"
+  },
+  {
+   "calendar": "numeric",
+   "t": 86400,
+   "long": true,
+   "text": "Friday 13.3.2026"
+  },
+  {
+   "calendar": "numeric",
+   "t": 1641600,
+   "long": false,
+   "text": "31.3.2026"
+  },
+  {
+   "calendar": "numeric",
+   "t": 1641600,
+   "long": true,
+   "text": "Tuesday 31.3.2026"
+  },
+  {
+   "calendar": "numeric",
+   "t": 1728000,
+   "long": false,
+   "text": "01.4.2026"
+  },
+  {
+   "calendar": "numeric",
+   "t": 1728000,
+   "long": true,
+   "text": "Wednesday 01.4.2026"
+  },
+  {
+   "calendar": "numeric",
+   "t": 28080000,
+   "long": false,
+   "text": "31.1.2027"
+  },
+  {
+   "calendar": "numeric",
+   "t": 28080000,
+   "long": true,
+   "text": "Sunday 31.1.2027"
+  },
+  {
+   "calendar": "numeric",
+   "t": -86400,
+   "long": false,
+   "text": "11.3.2026"
+  },
+  {
+   "calendar": "numeric",
+   "t": -86400,
+   "long": true,
+   "text": "Wednesday 11.3.2026"
+  },
+  {
+   "calendar": "numeric",
+   "t": 62121600,
+   "long": false,
+   "text": "29.2.2028"
+  },
+  {
+   "calendar": "numeric",
+   "t": 62121600,
+   "long": true,
+   "text": "Tuesday 29.2.2028"
+  },
+  {
+   "calendar": "numeric",
+   "t": 622800,
+   "long": false,
+   "text": "19.3.2026"
+  },
+  {
+   "calendar": "numeric",
+   "t": 622800,
+   "long": true,
+   "text": "Thursday 19.3.2026"
+  },
+  {
+   "calendar": "iso",
+   "t": 0,
+   "long": false,
+   "text": "2026-03-12"
+  },
+  {
+   "calendar": "iso",
+   "t": 0,
+   "long": true,
+   "text": "2026-03-12"
+  },
+  {
+   "calendar": "iso",
+   "t": 86400,
+   "long": false,
+   "text": "2026-03-13"
+  },
+  {
+   "calendar": "iso",
+   "t": 86400,
+   "long": true,
+   "text": "2026-03-13"
+  },
+  {
+   "calendar": "iso",
+   "t": 1641600,
+   "long": false,
+   "text": "2026-03-31"
+  },
+  {
+   "calendar": "iso",
+   "t": 1641600,
+   "long": true,
+   "text": "2026-03-31"
+  },
+  {
+   "calendar": "iso",
+   "t": 1728000,
+   "long": false,
+   "text": "2026-04-01"
+  },
+  {
+   "calendar": "iso",
+   "t": 1728000,
+   "long": true,
+   "text": "2026-04-01"
+  },
+  {
+   "calendar": "iso",
+   "t": 28080000,
+   "long": false,
+   "text": "2027-01-31"
+  },
+  {
+   "calendar": "iso",
+   "t": 28080000,
+   "long": true,
+   "text": "2027-01-31"
+  },
+  {
+   "calendar": "iso",
+   "t": -86400,
+   "long": false,
+   "text": "2026-03-11"
+  },
+  {
+   "calendar": "iso",
+   "t": -86400,
+   "long": true,
+   "text": "2026-03-11"
+  },
+  {
+   "calendar": "iso",
+   "t": 62121600,
+   "long": false,
+   "text": "2028-02-29"
+  },
+  {
+   "calendar": "iso",
+   "t": 62121600,
+   "long": true,
+   "text": "2028-02-29"
+  },
+  {
+   "calendar": "iso",
+   "t": 622800,
+   "long": false,
+   "text": "2026-03-19"
+  },
+  {
+   "calendar": "iso",
+   "t": 622800,
+   "long": true,
+   "text": "2026-03-19"
+  }
+ ],
+ "reads": [
+  {
+   "calendar": "dmy",
+   "text": "2026-03-12",
+   "at": 0
+  },
+  {
+   "calendar": "dmy",
+   "text": "2026-12-01",
+   "at": 22809600
+  },
+  {
+   "calendar": "dmy",
+   "text": "12 March 2026",
+   "at": 0
+  },
+  {
+   "calendar": "dmy",
+   "text": "Thursday 12 March 2026",
+   "at": 0
+  },
+  {
+   "calendar": "dmy",
+   "text": "31 January 2027",
+   "at": 28080000
+  },
+  {
+   "calendar": "dmy",
+   "text": "Tuesday 29 February 2028",
+   "at": 62121600
+  },
+  {
+   "calendar": "mdy",
+   "text": "2026-03-12",
+   "at": 0
+  },
+  {
+   "calendar": "mdy",
+   "text": "2026-12-01",
+   "at": 22809600
+  },
+  {
+   "calendar": "mdy",
+   "text": "March 12, 2026",
+   "at": 0
+  },
+  {
+   "calendar": "mdy",
+   "text": "Thursday, March 12, 2026",
+   "at": 0
+  },
+  {
+   "calendar": "mdy",
+   "text": "January 31, 2027",
+   "at": 28080000
+  },
+  {
+   "calendar": "mdy",
+   "text": "Tuesday, February 29, 2028",
+   "at": 62121600
+  },
+  {
+   "calendar": "numeric",
+   "text": "2026-03-12",
+   "at": 0
+  },
+  {
+   "calendar": "numeric",
+   "text": "2026-12-01",
+   "at": 22809600
+  },
+  {
+   "calendar": "numeric",
+   "text": "12.3.2026",
+   "at": 0
+  },
+  {
+   "calendar": "numeric",
+   "text": "Thursday 12.3.2026",
+   "at": 0
+  },
+  {
+   "calendar": "numeric",
+   "text": "31.1.2027",
+   "at": 28080000
+  },
+  {
+   "calendar": "numeric",
+   "text": "Tuesday 29.2.2028",
+   "at": 62121600
+  },
+  {
+   "calendar": "dmy",
+   "text": "12 March 2026",
+   "at": 0
+  },
+  {
+   "calendar": "dmy",
+   "text": "12th March 2026",
+   "at": 0
+  },
+  {
+   "calendar": "dmy",
+   "text": "1st April 2026",
+   "at": 1728000
+  },
+  {
+   "calendar": "dmy",
+   "text": "Thursday, 12 March, 2026",
+   "at": 0
+  },
+  {
+   "calendar": "dmy",
+   "text": "thu 12 mar 2026",
+   "at": 0
+  },
+  {
+   "calendar": "dmy",
+   "text": "12 MARCH 2026",
+   "at": 0
+  },
+  {
+   "calendar": "dmy",
+   "text": "12 September 2026",
+   "at": 15897600
+  },
+  {
+   "calendar": "dmy",
+   "text": "3 sept 2026",
+   "at": 15120000
+  },
+  {
+   "calendar": "dmy",
+   "text": "the 3rd of April 2026",
+   "at": 1900800
+  },
+  {
+   "calendar": "dmy",
+   "text": "15 April",
+   "at": 2937600
+  },
+  {
+   "calendar": "dmy",
+   "text": "April 15",
+   "at": 2937600
+  },
+  {
+   "calendar": "mdy",
+   "text": "March 12, 2026",
+   "at": 0
+  },
+  {
+   "calendar": "mdy",
+   "text": "March 12 2026",
+   "at": 0
+  },
+  {
+   "calendar": "mdy",
+   "text": "12 March 2026",
+   "at": 0
+  },
+  {
+   "calendar": "mdy",
+   "text": "4/15/2026",
+   "at": 2937600
+  },
+  {
+   "calendar": "numeric",
+   "text": "15.4.2026",
+   "at": 2937600
+  },
+  {
+   "calendar": "numeric",
+   "text": "15/04/2026",
+   "at": 2937600
+  },
+  {
+   "calendar": "iso",
+   "text": "2026-03-12",
+   "at": 0
+  },
+  {
+   "calendar": "dmy",
+   "text": "13/12/2026",
+   "at": 23846400
+  }
+ ],
+ "refused": [
+  {
+   "calendar": "dmy",
+   "text": "31 February 2026"
+  },
+  {
+   "calendar": "dmy",
+   "text": "12 Marsh 2026"
+  },
+  {
+   "calendar": "dmy",
+   "text": "32 March 2026"
+  },
+  {
+   "calendar": "dmy",
+   "text": "March 2026"
+  },
+  {
+   "calendar": "dmy",
+   "text": "12"
+  },
+  {
+   "calendar": "dmy",
+   "text": "year"
+  },
+  {
+   "calendar": "dmy",
+   "text": "12 March 26"
+  },
+  {
+   "calendar": "dmy",
+   "text": ""
+  },
+  {
+   "calendar": "dmy",
+   "text": "tomorrow"
+  },
+  {
+   "calendar": "dmy",
+   "text": "12 March 2026 2026"
+  },
+  {
+   "calendar": "dmy",
+   "text": "Funday 12 March 2026"
+  },
+  {
+   "calendar": "mdy",
+   "text": "31 February 2026"
+  },
+  {
+   "calendar": "mdy",
+   "text": "12 Marsh 2026"
+  },
+  {
+   "calendar": "mdy",
+   "text": "32 March 2026"
+  },
+  {
+   "calendar": "mdy",
+   "text": "March 2026"
+  },
+  {
+   "calendar": "mdy",
+   "text": "12"
+  },
+  {
+   "calendar": "mdy",
+   "text": "year"
+  },
+  {
+   "calendar": "mdy",
+   "text": "12 March 26"
+  },
+  {
+   "calendar": "mdy",
+   "text": ""
+  },
+  {
+   "calendar": "mdy",
+   "text": "tomorrow"
+  },
+  {
+   "calendar": "mdy",
+   "text": "12 March 2026 2026"
+  },
+  {
+   "calendar": "mdy",
+   "text": "Funday 12 March 2026"
+  },
+  {
+   "calendar": "numeric",
+   "text": "31 February 2026"
+  },
+  {
+   "calendar": "numeric",
+   "text": "12 Marsh 2026"
+  },
+  {
+   "calendar": "numeric",
+   "text": "32 March 2026"
+  },
+  {
+   "calendar": "numeric",
+   "text": "March 2026"
+  },
+  {
+   "calendar": "numeric",
+   "text": "12"
+  },
+  {
+   "calendar": "numeric",
+   "text": "year"
+  },
+  {
+   "calendar": "numeric",
+   "text": "12 March 26"
+  },
+  {
+   "calendar": "numeric",
+   "text": ""
+  },
+  {
+   "calendar": "numeric",
+   "text": "tomorrow"
+  },
+  {
+   "calendar": "numeric",
+   "text": "12 March 2026 2026"
+  },
+  {
+   "calendar": "numeric",
+   "text": "Funday 12 March 2026"
+  },
+  {
+   "calendar": "mdy",
+   "text": "13/12/2026"
+  },
+  {
+   "calendar": "numeric",
+   "text": "4/15/2026"
+  },
+  {
+   "calendar": "iso",
+   "text": "12 March 2026"
+  }
+ ]
+}

@@ -233,7 +233,11 @@ export class Knowledge {
       const posts = [...this.positionWords].filter(([, w]) => w.title?.toLowerCase() === n || w.role?.toLowerCase() === n || w.role?.toLowerCase().replace(/_/g, " ") === n).map(([k]) => k).sort();
       if (posts.length) return posts;
     }
-    return [];
+    // Last, a name written without the marks it carries (Muñoz as Munoz) or with its spaces spread, only when it finds
+    // exactly one: a near miss is a question, never a guess (docs/design/names-and-dates.md section 4). Never fuzzy.
+    const plain = plainName(written.toLowerCase());
+    const hits = plain ? [...this.names].filter(([, v]) => plainName(v.toLowerCase()) === plain).map(([k]) => k) : [];
+    return hits.length === 1 ? hits : [];
   }
 
   name(id: string): string {
@@ -277,4 +281,11 @@ export class Knowledge {
   static formOf(f: StatementRecord): string {
     return (typeof f.data?.office === "string" ? f.data.office : undefined) ?? f.in_position ?? f.speaks_for ?? f.author;
   }
+}
+
+/** A name for matching without its marks and spacing: lower case, the letters that carry a mark as the plain letter
+ * (NFD with the combining marks dropped; the Rust twin `plain_name` folds the Latin letters people write the same way),
+ * runs of spaces as one. */
+export function plainName(s: string): string {
+  return s.normalize("NFD").replace(/\p{M}/gu, "").replace(/ı/g, "i").replace(/đ/g, "d").replace(/\s+/g, " ").trim();
 }

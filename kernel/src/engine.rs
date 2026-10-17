@@ -180,6 +180,7 @@ pub fn world_info(config: &Value) -> Result<WorldInfo, String> {
 struct Base {
     types: BTreeMap<String, Value>,
     currency: Option<oikos_resolver::calls::Currency>,
+    dated: Option<oikos_rules::calendar::Dated>,
     templates: BTreeMap<String, Value>,
     world: Arc<WorldInfo>,
     seed: u64,
@@ -216,10 +217,12 @@ impl Base {
                 .map_err(|e| format!("orchestration.slip: {e}"))?,
             // (The config's calendar, where a world has one: lane N writes the section; docs/port-guide.md, step 1b.)
             calendar: config.get("calendar").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| format!("calendar: {e}"))?,
+            date_style: config.get("calendar").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| format!("calendar: {e}"))?,
         });
+        let dated = oikos_rules::calendar::Dated::from_config(config.get("calendar"));
         let templates =
             config["templates"].as_array().into_iter().flatten().filter_map(|t| Some((t["id"].as_str()?.to_string(), t.clone()))).collect();
-        Ok(Base { types, currency, templates, world, seed, tick, run_end, lean, thinking })
+        Ok(Base { types, currency, dated, templates, world, seed, tick, run_end, lean, thinking })
     }
 }
 
@@ -230,6 +233,7 @@ pub struct Engine<W: Write> {
     registers: oikos_resolver::knowledge::Registers,
     types: BTreeMap<String, Value>,
     currency: Option<oikos_resolver::calls::Currency>,
+    dated: Option<oikos_rules::calendar::Dated>,
     parts: BTreeMap<String, Part>,
     positions: BTreeMap<String, Pos>,
     templates: BTreeMap<String, Value>,
@@ -342,6 +346,7 @@ impl<W: Write> Engine<W> {
             registers: Default::default(),
             types: base.types,
             currency: base.currency,
+            dated: base.dated,
             parts: BTreeMap::new(),
             positions: BTreeMap::new(),
             templates: base.templates,
@@ -418,7 +423,8 @@ impl<W: Write> Engine<W> {
             if let Command::Observe { participant, only } | Command::Look { participant, only, .. } = cmd {
                 let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
                 let cur = self.currency.clone();
-                self.knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(cur)).absorb_seen(
+                let dated = self.dated.clone();
+                self.knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(cur).with_dated(dated)).absorb_seen(
                     &crate::kernel::seen(obs),
                     &o.shown,
                     &mut self.registers,
@@ -1041,7 +1047,7 @@ impl<W: Write> Engine<W> {
             Action::Call { program, reasoning } => {
                 let text = oikos_resolver::calls::program_text(&program);
                 let kkey = if seat { pid.clone() } else { key.to_string() };
-                let empty = oikos_resolver::Knowledge::new(self.currency.clone());
+                let empty = oikos_resolver::Knowledge::new(self.currency.clone()).with_dated(self.dated.clone());
                 let k = self.knowledge.get(&kkey).unwrap_or(&empty);
                 let types = &self.types;
                 let type_of = |t: &str| types.get(t).cloned();

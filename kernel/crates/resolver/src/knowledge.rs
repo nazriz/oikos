@@ -72,6 +72,39 @@ pub struct Knowledge {
     /// reads a snapshot back gives it the world's again.)
     #[serde(skip)]
     pub currency: Option<crate::calls::Currency>,
+    /// The world's calendar and the words its dates are written in (its config's `calendar`): how the resolver reads and
+    /// writes a date. Absent: the old "year N, day D".
+    pub dated: Option<oikos_rules::calendar::Dated>,
+}
+
+/// A name for matching without its marks and spacing: lower case, the Latin letters that carry a mark as the plain
+/// letter (the same as taking the name apart with NFD and dropping the combining marks, for the letters people write),
+/// runs of spaces as one. The twin of `plainName` in translator/src/knowledge.ts.
+pub fn plain_name(s: &str) -> String {
+    let folded: String = s
+        .chars()
+        .flat_map(|c| {
+            let base = match c {
+                'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' | 'ā' | 'ă' | 'ą' => 'a',
+                'ç' | 'ć' | 'ĉ' | 'ċ' | 'č' => 'c',
+                'ď' | 'đ' => 'd',
+                'è' | 'é' | 'ê' | 'ë' | 'ē' | 'ĕ' | 'ė' | 'ę' | 'ě' => 'e',
+                'ĝ' | 'ğ' | 'ġ' | 'ģ' => 'g',
+                'ì' | 'í' | 'î' | 'ï' | 'ĩ' | 'ī' | 'ĭ' | 'į' | 'ı' => 'i',
+                'ñ' | 'ń' | 'ņ' | 'ň' => 'n',
+                'ò' | 'ó' | 'ô' | 'õ' | 'ö' | 'ō' | 'ŏ' | 'ő' => 'o',
+                'ŕ' | 'ř' => 'r',
+                'ś' | 'ŝ' | 'ş' | 'š' => 's',
+                'ţ' | 'ť' => 't',
+                'ù' | 'ú' | 'û' | 'ü' | 'ũ' | 'ū' | 'ŭ' | 'ů' | 'ű' | 'ų' => 'u',
+                'ý' | 'ÿ' => 'y',
+                'ź' | 'ż' | 'ž' => 'z',
+                other => other,
+            };
+            Some(base)
+        })
+        .collect();
+    folded.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// A routine as a procedure states it.
@@ -336,6 +369,12 @@ impl Knowledge {
         Knowledge { currency, ..Default::default() }
     }
 
+    /// With the world's calendar and the words its dates are written in.
+    pub fn with_dated(mut self, dated: Option<oikos_rules::calendar::Dated>) -> Self {
+        self.dated = dated;
+        self
+    }
+
     pub fn absorb(&mut self, obs: &Value) {
         self.absorb_with(obs, &BTreeMap::new());
     }
@@ -539,6 +578,13 @@ impl Knowledge {
                 return posts;
             }
         }
+        // Last, a name written without the marks it carries (Muñoz as Munoz) or with its spaces spread, only when it finds
+        // exactly one: a near miss is a question, never a guess (docs/design/names-and-dates.md section 4). Never fuzzy.
+        let plain = plain_name(&lower);
+        let hits: Vec<String> = self.names.iter().filter(|(_, x)| plain_name(&x.to_lowercase()) == plain).map(|(k, _)| k.clone()).collect();
+        if hits.len() == 1 && !plain.is_empty() {
+            return hits;
+        }
         Vec::new()
     }
 
@@ -612,6 +658,24 @@ impl Knowledge {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// A person's name among those the seat has been shown: as written, then without its marks if that finds one person
+    /// (translator/test/resolver.test.ts has the same cases).
+    #[test]
+    fn a_persons_name_as_written_then_without_its_marks_and_a_collision_is_a_question() {
+        let mut k = Knowledge::default();
+        k.absorb(&json!({ "entity": "me", "t": 0, "positions": [], "channels": { "who": { "kind": "directory",
+            "entities": [{ "entity": "c0001", "name": "José Muñoz García" }, { "entity": "c0002", "name": "Mary Wanjiru" }, { "entity": "c0003", "name": "Mary Wanjiru" }, { "entity": "c0004", "name": "Hanna Müller" }, { "entity": "c0005", "name": "Hanna Muller" }],
+            "positions": [] } } }));
+        assert_eq!(k.by_name("José Muñoz García"), vec!["c0001"]);
+        assert_eq!(k.by_name("Jose Munoz Garcia"), vec!["c0001"], "without its marks: one person");
+        assert_eq!(k.by_name("jose  munoz garcia"), vec!["c0001"], "spaces and case");
+        assert_eq!(k.by_name("Mary Wanjiru"), vec!["c0002", "c0003"], "two of them: the participant is asked which");
+        assert_eq!(k.by_name("Hanna Müller"), vec!["c0004"], "as written first");
+        assert_eq!(k.by_name("Hanna Muller"), vec!["c0005"]);
+        assert!(k.by_name("Hanna Mueller").is_empty(), "a near miss is a question, not a guess");
+        assert!(k.by_name("Jose Garcia").is_empty());
+    }
 
     #[test]
     fn a_name_as_written_then_a_description() {

@@ -24,12 +24,106 @@ export function tenureBandProblems(b: TenureBands | undefined): string[] {
   return out;
 }
 
+
+/** A name and how common it is among those the list covers (relative: only ratios matter; whole numbers). */
+export interface Weighted { name: string; weight: number }
+
+/** What a profile states about names (docs/design/names-and-dates.md section 2). Frequencies only: nothing here is a
+ * record of a person. Every list has its source in `sources["names.*"]`, or says PLACEHOLDER and what it stands on. */
+export interface NamesSection {
+  /** How a full name is made. */
+  customs: {
+    /** Where a child's family name comes from: "father" (one family name, the father's), "both" (two: the father's then
+     * the mother's, as in Iberian-descended places), "father_given" (the father's given name stands as the second name:
+     * a patronymic), or "own" (each adult draws a family name of their own). */
+    family_name_from: "father" | "both" | "father_given" | "own";
+    /** The order a name is written in. */
+    order: "given_first" | "family_first";
+    /** With `family_name_from: "both"`: whose family name is written first ("father_first", the default, or "mother_first"). */
+    surname_order?: "father_first" | "mother_first";
+    /** Of married couples, the share (basis points) in which the wife takes the husband's family name; the rest keep their own. */
+    wife_takes_husband_bps: number;
+    /** How a person is addressed on paper, by sex ("Mr", "Ms", "Sr.", "Sra."); left out: none. */
+    titles?: { male?: string; female?: string };
+  };
+  /** Given names by sex and cohort of birth: each cohort lists names for those born from `born_from` (a year) until the next cohort's year. Ascending. */
+  given: { male: { born_from: number; names: Weighted[] }[]; female: { born_from: number; names: Weighted[] }[] };
+  /** Family names. `by_group` replaces `all` for people of a group the profile's `culture.origin` names, where the
+   * group is a country of birth, a nationality or a language community; never for caste, race or colour. */
+  family: { all: Weighted[]; by_group?: { [group_id: string]: Weighted[] } };
+  /** Names of bodies, by pattern. A template's `{family}` is a family name drawn from the profile's list, `{town}` the
+   * town's name, `{street}` a street name, and `{x}` for any other `x` an entry of `lists`. */
+  organisations: {
+    lists?: { [list: string]: string[] };
+    landlord: { template: string; weight: number }[];
+    shop: { template: string; weight: number }[];
+    factory: { template: string; weight: number }[];
+    /** Of the town's landlords, the share (basis points) that are a person (named as a person is) and not a company. */
+    landlord_is_person_bps: number;
+  };
+  /** The town's name (a plausible one, not a real town's) and the names of the place's bodies, by the keys the generator uses
+   * (`city`, `bank`, `builder`, `union`, `land_registry`, `tribunal`, `ombudsman`, `consumer_desk`, `electoral_commission`,
+   * `paper`, `police`, `water`, `energy`, `clinic`, `school`, `retirement_fund`). `{town}` stands for the town's name. */
+  town: string;
+  institutions: { [key: string]: string };
+  /** The references offices issue for what they file, by series (`lease`: a landlord's numbering of its tenancies; `case`: a
+   * tribunal's): a pattern with `{y}` the year, `{n}` the office's own running number, `{n4}`/`{n6}` padded. Each has its
+   * source in `sources["names.references"]`. Left out for a series: its records carry no reference. */
+  references?: { [series: string]: string };
+  /** Streets and addresses. `streets: []` where the place does not name streets; then `building` is the whole address. */
+  places: {
+    streets: string[];
+    /** How a building's address is written: `{number}` (by position along the street), `{street}`. */
+    building: string;
+    /** How a home in a block of flats is written, `{unit}` the flat's number and `{building}` the building's address. */
+    unit: string;
+  };
+}
+
+/** A public holiday, by the rule that gives its date each year. */
+export type HolidayRule = { name: string } & (
+  | { fixed: { month: number; day: number } }
+  | { nth_weekday: { month: number; weekday: number; n: number } }
+  | { easter_offset: number }
+  | { on: string[] }
+) & {
+  /** A holiday on a day of rest is kept on the next day that is not. */
+  shift_if_rest?: boolean;
+  /** Where the place keeps a holiday that falls on a Saturday or a Sunday: days to move it by (2: the Monday; -1: the Friday). Takes the place of `shift_if_rest`. */
+  observed?: { saturday?: number; sunday?: number };
+};
+
+/** The place's calendar for civil life (docs/design/names-and-dates.md section 5). */
+export interface CalendarSection {
+  /** The first day of a run in this place (YYYY-MM-DD): the profile's reference date; a spec may override it. */
+  start_date: string;
+  /** How a date is written: tokens `{d}` (day), `{dd}` (two digits), `{month}` (the month's name), `{m}` (number), `{y}` (year). */
+  format: string;
+  /** The same with the weekday: `{weekday}` too. */
+  long_format: string;
+  /** Twelve month names, January first, as the place's papers print them, in the language seats read. */
+  months: string[];
+  /** Seven weekday names, Monday first. */
+  weekdays: string[];
+  /** The days of rest in a week (Monday 0 to Sunday 6). */
+  weekend: number[];
+  /** The weekday a week begins on (Monday 0 to Sunday 6). */
+  week_starts: number;
+  /** The month and day the fiscal year of public bodies begins. */
+  fiscal_year_starts: { month: number; day: number };
+  holidays: HolidayRule[];
+}
+
 export interface Profile {
   id: string;
   place: string;
   as_of: string;
   about?: string;
   values: {
+    /** What people are called here (read only by a town whose spec turns `names` on). */
+    names?: NamesSection;
+    /** The place's calendar (read only by a town whose spec turns `calendar` on). */
+    calendar?: CalendarSection;
     /** The place's money, as the world config declares it (contracts: world.currencies): its code and decimal places,
      * and how people write it (its sign, the words for its unit and its smallest unit). */
     currency: Currency;

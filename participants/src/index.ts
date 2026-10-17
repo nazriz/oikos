@@ -6,6 +6,8 @@ export { slip, slipPpm, slipRow, type SlipRow, type SlipTable, type Slipper, typ
 export * from "./law";
 export * from "./canon";
 export * from "./money";
+export * from "./calendar";
+export * from "./identity";
 export * as calls from "./calls";
 export * as forms from "./forms";
 export { View } from "./view";

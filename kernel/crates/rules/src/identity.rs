@@ -34,3 +34,34 @@ pub struct PersonName {
 pub fn name_stream_key(kind: &str, stable: &str) -> [String; 3] {
     ["names".into(), kind.into(), stable.into()]
 }
+
+/// An office's own reference for a record it files, from its pattern (the profile's `names.references`): `{y}` the year,
+/// `{n}` the office's running number in that series, `{n4}` and `{n6}` the number padded to that many digits (never cut).
+/// The number is the office's own counter, kept in its own books (the count of references it has issued in the series, so
+/// a record's reference never depends on what another office did); the kernel's `rec.N` stays underneath. The twin of
+/// participants/src/identity.ts, both held to contracts/test/references.json.
+pub fn reference(pattern: &str, year: i32, n: u64) -> String {
+    pattern
+        .replace("{y}", &year.to_string())
+        .replace("{n4}", &format!("{n:04}"))
+        .replace("{n6}", &format!("{n:06}"))
+        .replace("{n}", &n.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn references_as_the_shared_cases_have_them() {
+        let table: serde_json::Value = serde_json::from_str(include_str!("../../../../contracts/test/references.json")).unwrap();
+        for c in table["cases"].as_array().unwrap() {
+            assert_eq!(reference(c["pattern"].as_str().unwrap(), c["year"].as_i64().unwrap() as i32, c["n"].as_u64().unwrap()), c["text"].as_str().unwrap(), "{c}");
+        }
+    }
+
+    #[test]
+    fn a_name_stream_is_keyed_on_what_is_named() {
+        assert_eq!(name_stream_key("person", "c0042"), ["names".to_string(), "person".into(), "c0042".into()]);
+    }
+}

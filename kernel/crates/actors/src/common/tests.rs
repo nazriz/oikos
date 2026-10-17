@@ -291,7 +291,15 @@ fn dates_and_notices() {
     assert_eq!(when_words(-DAY - 5, &w), "2 days before the year began");
     let cal = oikos_rules::calendar::Calendar { start: oikos_rules::calendar::Date { year: 2026, month: 3, day: 12 }, weekend: vec![5, 6], holidays: vec![] };
     let w = WorldInfo { calendar: Some(cal.clone()), ..Default::default() };
-    assert_eq!(when_words(DAY, &w), "2026-03-13");
+    assert_eq!(when_words(DAY, &w), "2026-03-13", "a calendar with no words: ISO");
+    let table: serde_json::Value = serde_json::from_str(include_str!("../../../../../contracts/test/dates.json")).unwrap();
+    let w = WorldInfo { calendar: Some(cal.clone()), date_style: serde_json::from_value(table["calendars"]["dmy"].clone()).unwrap(), ..Default::default() };
+    assert_eq!(when_words(DAY, &w), "13 March 2026");
+    assert_eq!(when_words_long(DAY, &w), "Friday 13 March 2026");
+    assert_eq!(read_date("Friday 13 March 2026", 0, &w), Some(DAY));
+    assert_eq!(read_date("year 1, day 3", 0, &w), Some(2 * DAY), "an old paper still reads");
+    assert_eq!(read_date("31 April 2026", 0, &w), None);
+    let w = WorldInfo { calendar: Some(cal.clone()), ..Default::default() };
     assert_eq!(starts_on(DAY - 60, 60 * DAY), 62 * DAY, "a notice sent in a day's last minutes runs from the next");
     assert_eq!(next_working(&cal, 0, 9 * 3600), 9 * 3600);
     assert_eq!(next_working(&cal, DAY + 10 * 3600, 9 * 3600), 4 * DAY + 9 * 3600, "Friday after nine: Monday");

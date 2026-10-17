@@ -30,7 +30,7 @@ import { actedOn, besideOf, drawTies, largest, leftAlone, renderSummary, SUMMARY
 import { readForEnd } from "./run-end";
 import { ReadingDesk, type DeskCounts } from "./reading";
 import { culture as cultureNs, reading as readingNs } from "@oikos/participants";
-import { DayBook, calls, canonical, diaryText, forms, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
+import { DayBook, calls, canonical, diaryText, forms, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, inCalendar, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { lexiconReader, READING_TABLE, Tagger, READING_VERSION, type Reader, type ReadingTable } from "@oikos/participants/llm";
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
@@ -315,6 +315,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // amounts in words are read and written in, by the resolver and by the participants' own wording.
   const currency: Currency = cfg.world.currencies[0];
   inCurrency(currency);
+  // (The world's calendar, where its config has one: dates are written and read as the place does; docs/design/names-and-dates.md.)
+  const calendar = cfg.calendar;
+  inCalendar(calendar);
   const randomness = new Randomness(BigInt(cfg.seed));
   mkdirSync(o.outDir, { recursive: true });
   const logPath = join(o.outDir, `${o.runId}.jsonl`);
@@ -496,7 +499,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       o.drawTrace?.(key);
       return randomness.stream(key);
     },
-    world: { tickSeconds: tick, runEnd, currency, ...(cfg.dials ? { dials: cfg.dials } : {}), ...(cfg.orchestration?.slip ? { slip: cfg.orchestration.slip } : {}) },
+    world: { tickSeconds: tick, runEnd, currency, ...(calendar ? { calendar } : {}), ...(cfg.dials ? { dials: cfg.dials } : {}), ...(cfg.orchestration?.slip ? { slip: cfg.orchestration.slip } : {}) },
     ...(consult ? { consult } : {}),
     ...(composer ? { compose: composer } : {}),
     ...(readingCfg ? { read: (paper: string, standing: readingNs.Standing) => desk?.lookup(paper, standing) } : {}),
@@ -554,6 +557,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     await hashSource(module);
     const ctx = ctxFor(p.id, cap, entity, params);
     inCurrency(currency);
+    inCalendar(calendar);
     return {
       key: `${p.id}|${cap}`, participant: p.id, capacity: cap, entity, module, controller: module.create(ctx), ctx,
       cadence: ceilTo(module.cadence(ctx), tick), firstWake: wakeAt ?? ceilTo(module.firstWake?.(ctx) ?? 0, tick), wokeFor: "start", since: 0,
@@ -1358,6 +1362,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           mark({ doing: "deciding", participant: x.u.key });
           const s0 = performance.now();
           inCurrency(currency); // (said before each step: another world's run may share this process)
+          inCalendar(calendar);
           const r = x.u.controller.step(x.obs, x.u.ctx);
           const pm = (profModules[x.u.module.name] ??= { ms: 0, steps: 0 });
           pm.ms += performance.now() - s0;

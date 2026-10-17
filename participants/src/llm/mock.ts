@@ -17,6 +17,7 @@ import { slice, type LookRequest, type ParticipantAction } from "../contracts";
 import { claimFieldsFor, fieldsFor, writeClaim, type FormData, type Paper } from "../forms";
 import type { Controller, ParticipantContext } from "../module";
 import { formatMoney, inCurrency, type Currency } from "../money";
+import { inCalendar } from "../calendar";
 import type { ContentBlock, LlmRequest, MockPolicy } from "./adapter";
 import { mockCompose } from "./compose";
 import { mockAccount } from "./account";
@@ -181,6 +182,7 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     for (const m of (req.context.missed ?? []) as typeof obs[]) {
       see(id, brain.capacity, m);
       inCurrency(brain.ctx.world.currency);
+      inCalendar(brain.ctx.world.calendar);
       const x = (await brain.controller.step(slice(m, brain.capacity, brain.ctx.entity), brain.ctx)) as ParticipantAction;
       if (x.type === "call" || x.type === "message") q.push(x);
       // (A look it asks for while reading what it missed is made now, at the sitting: the brain asks for each thing
@@ -189,6 +191,7 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     }
     see(id, brain.capacity, obs);
     inCurrency(brain.ctx.world.currency);
+    inCalendar(brain.ctx.world.calendar);
     // (A seat that sits as its code twin does takes a step of its brain where the code unit does: at each wake, and after a look it made. Not on the
     // turns between its asking for a paper and confirming it: those are the seat's plumbing, and the code unit has no step there, being busy with its act.)
     const midAct = !!brain.twin && brain.busy === true && !!obs.drafts[0];
@@ -232,6 +235,7 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     if (next) {
       // A paper of the office's own is asked for on the office's form for it, as whoever holds the office would.
       inCurrency(brain.ctx.world.currency);
+      inCalendar(brain.ctx.world.calendar);
       const said = onOwnForms(next.call, [...(stationery.get(id)?.values() ?? [])].sort((x, y) => (x.form < y.form ? -1 : 1)), { self: brain.ctx.entity, now: obs.t, currency: brain.ctx.world.currency });
       brain.busy = true;
       return [tool("notebook", { text: `Last request on day ${Math.floor(obs.t / 86_400)}.` }), tool("do", { what: PREFIX + said.program, ...as })];

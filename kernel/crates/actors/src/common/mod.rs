@@ -42,19 +42,43 @@ pub fn starts_on(at: i64, lead: i64) -> i64 {
 }
 
 /// A moment in the world's words, for reasons, letters and reports: the one place every lane writes a date, so the
-/// names-and-dates lane changes it once (docs/design/names-and-dates.md). With a calendar: its civil date
-/// (`2026-03-12`, until lane N gives the profile's words); without one (the old towns): "year 1, day 12", and a
-/// moment before the start as "N days before the year began" (common.ts `whenWords`, forms.ts `dateWords`).
+/// names-and-dates lane changes it once (docs/design/names-and-dates.md). With a calendar: the civil date as the place
+/// writes one ("12 March 2026", the profile's pattern; ISO where the config gives none); without one (the old towns):
+/// "year 1, day 12", and a moment before the start as "N days before the year began" (common.ts `whenWords`, forms.ts
+/// `dateWords`). `when_words_long` adds the weekday ("Thursday 12 March 2026"), for a letter's head.
 pub fn when_words(t: i64, world: &crate::WorldInfo) -> String {
+    dated(t, world, false)
+}
+
+/// As `when_words`, with the weekday where the world's calendar writes one.
+pub fn when_words_long(t: i64, world: &crate::WorldInfo) -> String {
+    dated(t, world, true)
+}
+
+fn dated(t: i64, world: &crate::WorldInfo, long: bool) -> String {
     if let Some(cal) = &world.calendar {
-        let d = cal.date(t);
-        return format!("{:04}-{:02}-{:02}", d.year, d.month, d.day);
+        return world.date_style.clone().unwrap_or_default().words(cal, t, long);
     }
     if t < 0 {
         let n = (-t + DAY - 1) / DAY;
         return format!("{n} day{} before the year began", if n == 1 { "" } else { "s" });
     }
     format!("year {}, day {}", t / YEAR + 1, (t % YEAR) / DAY + 1)
+}
+
+/// A date a seat or a paper wrote, read to the moment its day begins: the place's way ("12 March 2026") where the world
+/// has a calendar, the old "year N, day D" always (an old paper still reads). None: not a date.
+pub fn read_date(text: &str, now: i64, world: &crate::WorldInfo) -> Option<i64> {
+    if let (Some(cal), Some(style)) = (&world.calendar, &world.date_style) {
+        if let Some(t) = style.parse(cal, text, now) {
+            return Some(t);
+        }
+    }
+    let t = text.trim().to_lowercase();
+    let rest = t.strip_prefix("year ")?;
+    let (y, d) = rest.split_once(", day ").or_else(|| rest.split_once(" day "))?;
+    let (y, d): (i64, i64) = (y.trim().parse().ok()?, d.trim().parse().ok()?);
+    ((y >= 1) && (1..=365).contains(&d)).then(|| ((y - 1) * 365 + (d - 1)) * DAY)
 }
 
 /// A length of time in words, as people say one (forms.ts `durationWords`): whole days ("14 days", "1 day"); else

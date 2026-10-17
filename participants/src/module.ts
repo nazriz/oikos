@@ -15,6 +15,7 @@
 
 import type { PaperRead, Standing } from "./behaviour/reading";
 import type { Block, Observation, ParticipantAction } from "./contracts";
+import type { WorldCalendar } from "./calendar";
 import type { Currency } from "./money";
 import type { Rng } from "./rng";
 
@@ -88,6 +89,8 @@ export interface WorldInfo {
   runEnd: number;
   /** How the world's money is written (its config's first currency): what amounts in words are read and written in. */
   currency: Currency;
+  /** The world's calendar (its config's `calendar`): dates are written and read as the place does. Absent: "year N, day D". */
+  calendar?: WorldCalendar;
   /** Dials of a living world (docs/design/ai-citizens.md 10j), as the world's config sets them. Absent: every dial is off. */
   dials?: { [name: string]: unknown };
   /** The world's table of slips (`orchestration.slip`: the rate at which a performer gets a kind of work wrong, with its

@@ -878,7 +878,7 @@ class Resolver {
 
   /** A date as written ("year 1, day 12"), as the moment that day begins. */
   private date(c: Call, field: string): number {
-    return this.written(() => forms.parseDate(this.str(c, field)!));
+    return this.written(() => forms.parseDate(this.str(c, field)!, this.k.t));
   }
   /** What a form's own reading says is wrong is a question back. */
   private written<T>(f: () => T): T {

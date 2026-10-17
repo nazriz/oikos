@@ -1,0 +1,41 @@
+{
+ "about": "An office's own reference for a record it files (docs/design/names-and-dates.md section 3): its pattern, with {y} the year, {n} its own running number, {n4} and {n6} the number padded to that many digits (never cut). Held by kernel/crates/rules (identity::reference) and participants/src/identity.ts equally.",
+ "cases": [
+  {
+   "pattern": "L/{y}/{n4}",
+   "year": 2026,
+   "n": 42,
+   "text": "L/2026/0042"
+  },
+  {
+   "pattern": "T-{y}-{n4}",
+   "year": 2026,
+   "n": 412,
+   "text": "T-2026-0412"
+  },
+  {
+   "pattern": "{n}",
+   "year": 2026,
+   "n": 7,
+   "text": "7"
+  },
+  {
+   "pattern": "No. {n}/{y}",
+   "year": 2027,
+   "n": 13,
+   "text": "No. 13/2027"
+  },
+  {
+   "pattern": "R{y}{n6}",
+   "year": 2026,
+   "n": 123456,
+   "text": "R2026123456"
+  },
+  {
+   "pattern": "L/{y}/{n4}",
+   "year": 2026,
+   "n": 123456,
+   "text": "L/2026/123456"
+  }
+ ]
+}

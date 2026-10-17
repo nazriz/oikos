@@ -4,6 +4,7 @@
 // these tables convert it, deterministically.
 
 import { canonical } from "./canon";
+import { calendarNow, readCalendarDate } from "./calendar";
 import { currencyNow, marksOf, type Currency } from "./money";
 import CALLS_SCHEMA from "../../contracts/calls.schema.json";
 
@@ -482,6 +483,10 @@ export function parseWhen(s: string, now: number): When {
   }
   if (["today", "now", "immediately", "at once", "straight away"].includes(t)) return { in: 0 };
   if (t === "tomorrow") return { at: (Math.floor(now / DAY) + 1) * DAY };
+  // (A date as the world's calendar writes one, where it has a calendar: "12 March 2026", "15 April".)
+  const cal = calendarNow();
+  const civil = cal ? readCalendarDate(cal, t, now) : undefined;
+  if (civil !== undefined) return { at: civil };
   const m = /^(?:year ?([0-9]{1,6}))? ?,? ?(?:day ?([0-9]{1,3}))?$/.exec(t);
   if (m && (m[1] !== undefined || m[2] !== undefined)) {
     const year = m[1] === undefined ? Math.floor(now / YEAR) + 1 : Number(m[1]);
