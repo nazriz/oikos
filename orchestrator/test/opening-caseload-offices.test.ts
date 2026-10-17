@@ -1,6 +1,6 @@
 // The other offices' opening caseload (docs/behaviour/generator.md, "The other offices' caseload"): support claims in
 // hand and refusals asked about, complaints before the town's desks, permit applications before planning, invoices
-// unpaid at finance, loans behind at the bank. Off: the town is the town it was, to the state hash. On: each office's
+// unpaid at finance, loans behind at the bank. Off: the town is the town without the option. On: only the opening papers are added, and each office's
 // code acts on the papers on its first days, and its clerk's books list them.
 
 import { expect, test } from "bun:test";
@@ -21,24 +21,24 @@ const worldHash = (c: any) => createHash("sha256").update(JSON.stringify(c.world
 const OTHERS = ["benefit_claim", "benefit_decision", "review_request", "application", "complaint_notice", "permit_application", "invoice", "loan_statement", "loan_arrears"];
 const ofOthers = (c: any) => c.world.records.filter((r: any) => OTHERS.includes(r.kind) && r.data?.brought_forward);
 
-test("off, a town is unchanged to the state hash (the world as origin/main generated it); the option alone adds only the new offices' papers", () => {
-  // (Hashes of `config.world` for these specs, taken on origin/main (1f28843) before the change. Moved on purpose,
-  // 2026-10-13, by generator 0.54.0: every town whose profile states one now publishes its law on cutting hours,
-  // `law-cutting-hours`, and the modules' versions; docs/decisions.md, "Hours before heads". Nothing of the opening caseload in it.)
-  // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 4e1e761a... until then.)
-  // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; 02ce106f..., 0236786b... until then.)
-  // (Re-taken on 2026-10-17 at foundations F9 and F10: three public forms for what a person files with an office that decides, and a row of the table of work for `take`; c1bfd56e... and be56fcce... until then.)
-//   (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 2d57fb3a... until then.)
-  expect(worldHash(generate(town()))).toBe("0c54931f9be69c608a74d5cf80b27074508b0696791429f167226c961171a381");
-  // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; f16bee9e... until then.)
-  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("25c61c59e45327d6d7dd016aaa003baf5c0269814a9f76092388a94b2bf1ca02");
-  // (On, the landlords' and the tribunal's papers are as they were; a scale of nothing adds no paper to the other offices.)
-  const POSS = ["rent_statement", "notice_to_vacate", "tribunal_application", "hearing_notice", "tribunal_order"];
-  const possession = (c: any) => createHash("sha256").update(JSON.stringify(c.world.records.filter((r: any) => POSS.includes(r.kind)))).digest("hex");
-  expect(possession(generate(town({ opening_caseload: true })))).toBe("4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945");
-  // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; e07d6054... until then.)
-  // (Re-taken on 2026-10-17 on the merge of the profile source check (ke-nakuru-2026's possession papers changed with its figures) with the seated twins; 8694a655... until then.)
-  expect(possession(generate(town({ profile: "ke-nakuru-2026", opening_caseload: true })))).toBe("799dd850d4754a0483f3274b4dd2f0fce6e6b0c98644d400bb6d924d724392e0");
+test("the option alone adds only the opening papers: off, the town is the town without it; on, nothing else moves", () => {
+  // (Until 2026-10-17 this held four pinned hashes of the generated world, re-taken at nearly every change to the
+  // generator (eight times in five days), so they caught little but change. What they stood for is said here directly:
+  // the option adds brought-forward papers to the world's records, removes none, and changes nothing else in the world
+  // or the config. docs/testing.md, "Change detectors".)
+  for (const profile of ["au-vic-2026", "ke-nakuru-2026"]) {
+    const off = generate(town({ profile })) as any, on = generate(town({ profile, opening_caseload: true })) as any;
+    expect(worldHash(generate(town({ profile, opening_caseload: false })))).toBe(worldHash(off));
+    const key = (r: unknown) => JSON.stringify(r);
+    const before = new Set(off.world.records.map(key)), after = new Set(on.world.records.map(key));
+    expect(off.world.records.filter((r: any) => !after.has(key(r))).map((r: any) => r.id)).toEqual([]);
+    const added = on.world.records.filter((r: any) => !before.has(key(r)));
+    expect(added.length).toBeGreaterThan(0);
+    expect(added.filter((r: any) => !r.data?.brought_forward).map((r: any) => r.id)).toEqual([]);
+    const { records: _a, ...restOff } = off.world, { records: _b, ...restOn } = on.world;
+    expect(restOn).toEqual(restOff);
+    expect({ ...on, world: undefined }).toEqual({ ...off, world: undefined });
+  }
   const nothing = generate(town({ opening_caseload: true, opening_caseload_scale_bps: 0 })) as any;
   expect(ofOthers(nothing).filter((r: any) => !r.id.startsWith("claim-") && !r.id.startsWith("grant-"))).toEqual([]);
   // (A town is a twin of itself: the same description and seed give the same town.)

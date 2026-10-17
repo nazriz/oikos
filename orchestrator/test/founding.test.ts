@@ -94,9 +94,11 @@ const LIVING = "living.initiative_bps=10000";
 // (Re-taken on 2026-10-16 at the profile source check, on the merged foundations review: the au-vic-2026 profile's tribunal and hearing times, fee, rent bands, students per teacher and kin ceiling changed; 46a26c4c... until then.)
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing): the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; b805a015... until then.)
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 6fb51f08... until then.)
-const STEP_2B = "a6c71654c710ee11431590d967a1addb2c04dc27dc5f7abd7791b0d641bd53d6";
+// (Until 2026-10-17 the off town's state was pinned here, as STEP_2B, and re-taken at nearly every change to what every
+// living town runs. What the test stands for is below: off, nothing of founding is in the world; on with no shape to
+// found, nobody does anything other than off; on, the town differs. docs/testing.md, "Change detectors".)
 
-test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
+test("with founding off a living town has nothing of founding; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
   try {
     const plain = (await loadWorld(TOWN, [LIVING])).config;
@@ -105,7 +107,6 @@ test("with founding off a living town is step 2b's town, to the state hash; turn
     expect(JSON.stringify(plain)).not.toContain("group.founded");
     expect(JSON.stringify(plain)).not.toContain('"memberships"');
     const off = await runWorld({ config: lean(plain), runId: "off", outDir: out, until: 60 * DAY, recordObservations: "none" });
-    expect(off.stateHash).toBe(STEP_2B);
     const on = (await loadWorld(TOWN, [LIVING, "living.founding=true", SURE])).config;
     expect(on.dials.founding).toEqual({ shapes: ["gathering", "fund", "cause", "business"], scale_bps: 600_000 });
     const none = await runWorld({ config: { ...lean(on), dials: { ...on.dials, founding: { shapes: [], scale_bps: 600_000 } } }, runId: "none", outDir: out, until: 60 * DAY, recordObservations: "none" });

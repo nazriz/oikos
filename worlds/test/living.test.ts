@@ -32,57 +32,12 @@ test("every profile states residence and job tenure bands that are well formed, 
 });
 
 const params = (c: any) => c.participants.filter((p: any) => p.kind === "person").map((p: any) => p.controller.params ?? {});
-const hash = (x: unknown) => new Bun.CryptoHasher("sha256").update(JSON.stringify(x)).digest("hex");
 
-test("a spec without `living` generates what it generated before (byte for byte)", () => {
+test("a spec without `living` generates a town with nothing of `living` in it", () => {
   const c = generate(small);
-  // The generator's output for worlds/town.yaml on origin/main at ab23f96 (generated there and compared, 2026-10-11),
-  // which has no `living`. (At 750bc30, before starting attachment existed, it was 404b59db...; main's planning
-  // form gained two fields since, and nothing else differs: this branch gave 404b59db... before merging that.)
-  // Moved on purpose, 2026-10-11 (it was cef691ee...): every town's config gains its place's laws on ending a job
-  // and on possession, how its firms adjust their staff, where a landlord's application for possession goes, the
-  // venture of a business of one with its derived chance (and the task `sell`), and the generator's version; a
-  // town whose profile has `frictions` and no `living` is otherwise unchanged (docs/decisions.md, "Four faults on
-  // the firm and landlord side"). What this test guards is unchanged: nothing of `living` reaches such a town.
-  // And again at the merge of the fixes after the second living pilot, the same day (b52528bc... until then;
-  // docs/decisions.md, "What the second living pilot found"): each lease and mortgage a town starts with names its
-  // own first due day (`attrs.first_due`), the town publishes its rule on petitions, the payments procedure says
-  // which line a wage is on, the support office has a file for what is put before it, the mayor's office a clerk.
-  // And again on 2026-10-12 (21d4a10f... until then; docs/decisions.md, "What the third living pilot found"): the
-  // generator's version, in the town's description; and, only where a model holds an office, that office's forms,
-  // notices and procedures. Nothing of `living` reaches a town without it.
-  // And again the same day (e14634d0... until then; docs/decisions.md, "What the fourth living pilot found"): the
-  // generator's version; the petition response form's `answer` and the words added to six other forms; a
-  // landlord's and the member's procedure on a home the tenant has left (only where a model holds the office).
-  // `opening_caseload` is off unless a description sets it, and nothing of it reaches a town without it.
-  // And on 2026-10-12 (245ca46c... until then; docs/decisions.md, "Homes by income"): every town's opening state:
-  // the profile's payments in force from the first day, people with nothing coming in living with kin, owners by the
-  // head's age, and the first tenancies dealt by income (generator 0.49.0); and the outside world's funding, market
-  // and weather offices are given their own papers by kind, no longer the support office's file. Nothing of `living` in it.
-  // And on 2026-10-12 (5cb516d4... until then; docs/decisions.md, "What the fifth living pilot found"): generator
-  // 0.50.0: the law on possession carries what the place's law has of a plan to pay, the tribunal's form for a
-  // tenant's answer is published, people are given their place's rate of answering an application, and the modules'
-  // versions. Nothing of `living` in it.
-  // And on 2026-10-12 (with the last: docs/decisions.md, "Returns on the law's days"): the tax law lists its returns
-  // (the profile's public_finance.returns: words and data) and says on which day each falls due. Nothing of `living` in it.
-  // And on 2026-10-12 (d61b32ae... until then; docs/decisions.md, "Firms respond to a shock"): generator 0.52.0, the producer's, retailer's and world market's versions and params:
-  // a place's trade credit days (the profile's business.trade_credit_days) reach the factories and the world market as `terms_days`. Nothing of `living` in it.
-  // And on 2026-10-12 (8f41e1af... until then; docs/decisions.md, "Opening caseloads of the other offices"): generator 0.53.0 and the support office's, the bank's
-  // lending office's and the citizen's versions. The opening caseload's own test holds the world's hash, apart from the budget line of the next item.
-  // And again the same day (b794ef5b... until then): the town's opening wage orders name the staff line and the finance office has two parameters more (payments that carry a budget line).
-  // And on 2026-10-13 (a465b4e3... until then; docs/decisions.md, "Hours before heads"): generator 0.54.0: the profile's law on cutting hours
-  // is published (`law-cutting-hours`) and the retailer's, the producer's and the citizen's versions. Nothing of `living` in it.
-  // And on 2026-10-15 (2300e2d0... until then; docs/decisions.md, "Foundations F2"): the world's table of act times has rows by what an act makes
-  // (publish/<kind of record>) and their sources. Nothing of `living` in it.
-  // (Re-taken on 2026-10-15 at foundations F4: the generated systems name a template and a supplier and the world says where work is done; 3facfdc8... until then.)
-  // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 1f5ef6f6... until then.)
-  // (Re-taken on 2026-10-16 at foundations F7: the generator's version moved with the table of slips, which a spec without `living` does not have; be6ff50f... until then.)
-  // (Re-taken on 2026-10-16 at foundations F11: the work table has a row for a keeper's answer (`answer`); a84328b7... until then.)
-  // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; d60a26bc... until then.)
-  // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority (`appointed_by`), and every generated system is owned by the organisation whose post it holds; 8dc56724... until then.)
-  // (Re-taken on 2026-10-17 at foundations F9 and F10: three public forms for what a person files with an office that decides (generator 0.60.0) and a row of the table of work for `take`, which had none; 033bebfc... until then.)
-// (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; e82365d7... until then.)
-  expect(hash(c)).toBe("640002cd9f8730df0af3361082fa2ee2d2ed462cdd2d6abc035b06e945886109");
+  // (Until 2026-10-17 the generated config's hash was pinned here, and re-taken at nearly every generator change
+  // (twenty times); orchestrator/test/culture-dial.test.ts pins the same config (CONFIG_BEFORE). What it stood for is
+  // what follows: nothing of `living` reaches a town without it. docs/testing.md, "Change detectors".)
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");
