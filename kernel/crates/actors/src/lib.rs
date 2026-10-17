@@ -19,7 +19,15 @@
 #![forbid(unsafe_code)]
 
 pub mod boundary;
+pub mod citizen;
+pub mod common;
 pub mod draws;
+pub mod finance;
+pub mod firms;
+pub mod market;
+pub mod mind;
+pub mod offices;
+pub mod papers;
 pub mod registry;
 pub mod steps;
 pub mod stub;
@@ -49,6 +57,9 @@ pub struct WorldInfo {
     pub dials: Value,
     /// `orchestration.slip`, read only through `oikos_rules::slip`.
     pub slip: Option<SlipTable>,
+    /// The world's calendar (the config's `calendar`: docs/design/names-and-dates.md section 5), where it has one:
+    /// civil dates, working days and calendar months. Absent: the old towns, whose dates are "year N, day D".
+    pub calendar: Option<oikos_rules::calendar::Calendar>,
 }
 
 /// Where an actor runs: which participant, acting for which entity, in which position (absent: as itself), and its

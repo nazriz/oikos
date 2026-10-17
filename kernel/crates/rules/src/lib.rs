@@ -10,7 +10,11 @@
 //! - `withholding`, `support`: tax withheld from a pay, support payments owed (behaviour/tax.ts, payments.ts): agent C1.
 //! - `decisions`: what a decision waits for, its deadlines, review routes (behaviour/decisions.ts): agent D.
 //! - `household`: drawing a household and its savings (behaviour/household.ts): agent A1.
-//! - `forms`: a form's fields and how it writes its paper (participants/src/forms.ts): agent E.
+//! - `forms`: an office's stationery (participants/src/module.ts `Issued`, `Taken`, `Routine`, `Answers`; papers.ts):
+//!   the form types and the catalogue of the papers offices issue, as data, exported by name. Step 1b; lane E owns
+//!   the catalogue's content from then on.
+//! - `law`: reading a law's formal condition against an act (oikos-law), and writing a law from its figures by a
+//!   schedule (common.ts `draftLaw`). Step 1b.
 //! - `calendar`, `identity`: the world's civil dates and what things are called (docs/design/names-and-dates.md): the
 //!   types and the date arithmetic are in the frame; names, references and dates in words are lane N's.
 
@@ -18,5 +22,7 @@
 #![deny(clippy::float_arithmetic, clippy::float_cmp)]
 
 pub mod calendar;
+pub mod forms;
 pub mod identity;
+pub mod law;
 pub mod slip;

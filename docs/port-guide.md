@@ -19,19 +19,27 @@ kernel/crates/
   sight     what an actor may see and say: Observation and its parts, the Picture (view.rs, from view.ts),
             Action, the call language (re-exported). Values only.
   rules     pure rules the actors and the generator share: slip.rs; calendar.rs (civil dates, weekdays, holidays,
-            calendar months from the world's start date); identity.rs (ids and names); withholding, support,
-            decisions, household, forms to come. Depends on core alone.
+            calendar months from the world's start date); identity.rs (ids and names); forms.rs (an office's
+            stationery and the forms catalogue, forms/papers.json); law.rs (reading a law against an act; laws
+            written from figures); withholding, support, decisions, household to come. Depends on core and law.
   actors    the actors: lib.rs (Actor, Kind, Ctx, Cx, Question/Answer, Belief), steps.rs (Step, Plan, Stepper, say/pay),
-            draws.rs (how streams are named), registry.rs, boundary/weather.rs (the worked example), stub.rs.
+            draws.rs (how streams are named), registry.rs (joins each group's KINDS), stub.rs;
+            common/ (the book, asking, letters, standing work, laws, money, call builders: section 5.1);
+            papers/ (a type per paper kind, by lane, and agreements: 5.2);
+            citizen/ (A1; mind.rs is the seam to A2: 5.4), mind/ (A2), firms/ (C1), market/ (C2),
+            finance/ (D), offices/ (E), boundary/ (weather.rs, the worked example; C2's outside world).
   explore   the explorer's data layer, interface only (section 9).
 kernel/src/engine.rs   the run loop with the actors inside: units from the cast, rounds, parallel decide, carry-out.
-kernel/tests/engine.rs, actors_boundary.rs   the engine's tests and the boundary backstop.
+kernel/tests/engine.rs, actors_boundary.rs, papers_typed.rs   the engine's tests, the boundary and paper backstops.
 orchestrator/test/port-weather.test.ts       the worked example against the TS module, to the state hash.
+participants/test/port-forms.test.ts         the forms catalogue equal to papers.ts until the cut-over.
+contracts/test/law-drafts.json               laws drafted from figures: the TS answers the Rust is held to.
 scripts/port-gate.ts                         the gate's measured half.
 ```
 
 - **The boundary is a dependency rule.** `oikos-actors` depends on `oikos-sight`, `oikos-core`, `oikos-contracts`,
-  `oikos-rules`, `serde`, `serde_json` and nothing else (`kernel/tests/actors_boundary.rs` checks the list). A Rust
+  `oikos-rules`, `serde`, `serde_json` and nothing else; `oikos-rules` on `oikos-core`, `oikos-law` (the law reader:
+  pure) and serde (`kernel/tests/actors_boundary.rs` checks both lists). A Rust
   crate can name only its own dependencies, so an actor cannot name `State`, `World`, `observe` or the resolver's
   knowledge. Adding a dependency to `actors` needs the integration agent's yes and a line in this guide.
 - **A moment** (engine.rs, top comment): those due wake in key order; each looks through the kernel's command path
@@ -92,7 +100,7 @@ scripts/port-gate.ts                         the gate's measured half.
    create, restore) and its actor. An office that plans work and sends it one act at a time is a `Plan` run by
    `Stepper` (steps.rs: what `stepper` was in firms.ts; `then`/`redo` are the plan's methods given the step's token).
    Build calls with `steps::say`, `steps::pay`, `steps::call`; the program is written in name order, as TS's was.
-3. Register it in `registry.rs` (one line).
+3. Register it in its group's `KINDS` (`<group>/mod.rs`, one line; `registry.rs` joins the groups).
 4. Port its unit tests beside the code (`#[cfg(test)]`), rewritten to assert the behaviour, not TS's numbers.
 5. Test it alone in the Rust world (section 4).
 6. Bump nothing in TS. TS behaviour is frozen.
@@ -123,23 +131,130 @@ the test asserts the behaviour instead.
 - **Heavy runs through the slots** (`bun scripts/slots.ts --weight N -- cargo test ...`). Each lane builds in its own
   worktree's `kernel/target`. Never run `test:all`.
 
-## 5. The interfaces between modules
+## 5. The interfaces between modules (step 1b: settled)
 
 Modules meet only through the world: papers (statements of a kind, with their `data`), agreements (by template),
-payments (with memos, `settles`, `per_instruction`), letters, and forms. That is the whole interface, so it is fixed
-before the lanes start:
-- **Paper types.** Every statement kind a module writes and another reads has one Rust type, in
-  `actors::papers::<kind>` (from participants/src/behaviour/papers.ts and the `say(...)` calls), `Serialize` +
-  `Deserialize`, with the writer's and readers' modules named in its doc comment. The writer serialises it into the
-  statement's `data`; readers deserialise it. Owned by the lane that writes it; changed only with the readers' lanes
-  told (SendMessage) and a line in the decisions log.
-- **Agreement templates** and their terms: `actors::papers::agreements`, the same way.
-- **Forms** (an office's stationery: `issues`, `takes`): data, in `rules::forms`, exported in a stable schema the
-  translator reads by name (lane E).
-- **The mind's seam** (A1 and A2 share `citizen.ts`): a trait `citizen::Mind` (decide among options with their facts,
-  consult, feelings, pursuits; the TS `decide` and `ConsultQuestion` shapes) that A1's life code calls and A2
-  implements.
-These are written in the common-ground step (section 8, step 1b) before the seven start, from the TS as it is.
+payments (memos, `settles`, `per_instruction`), letters, and forms; and the citizen's life meets its mind through one
+trait. All of it was written in step 1b (decisions log, 2026-10-17, "Port step 1b"), so the lanes can work at once.
+
+### 5.1 The common ground: `actors::common` (common.ts, contracts.ts helpers)
+
+| Rust | Replaces | What it is |
+|---|---|---|
+| `Book` (`common/book.rs`) | `Book` | Everything an actor has seen, indexed as records arrive: `absorb(&pic)` (fresh records back), `get`, `all(kind)`, `open(kind)` (standing), `of_type`, `claims_by(ClaimKey, v)`, `lot_over(cell)`, `practices`/`hearings`/`assertions`; `withdrawn`, `withdrawn_at`, `current` (follows amendments), `repealed`, `on_hold(id, by)`, `released`; `signed_by`, `concluded`, `taken_back`, `in_force`, `ends_at`, `reading`, `signed_at`, `notices`; `author_entity`, `position`, `person_of`, `entity_kind`, `entities_of_kind`; `note_unread`/`take_unread`; `save`/`restore` (and `Serialize`). No shelves (decided fresh: no globals; records are `Arc`s already). |
+| `data`, `kind`, `is_kind`, `text`, `addressed_to`, `part(r, Piece)`, `bases_of`, `cites`, `cited_words`, `first_due`, `made_at`, `truthy`, `Fields` (`.s`, `.i`, `.ids`, `.flag` on JSON) | contracts.ts `basesOf`, `firstDue`, `madeAt`, `r.data?.x` | Reading a record's parts leniently, for code not yet on a typed paper. |
+| `ask::{one, about, board}`, `look_up::{entity, participant, position, name, holders}`, `go_see`, `visited`, `owner_looks`, `who_wrote`, `Asked`, `VISIT_MAX`, `LOOKS_MAX` (`asking.rs`) | `ask`, `lookUp`, `goSee`, `visited`, `ownerLooks`, `whoWrote`, `Asked` | The only ways to know what someone else keeps (docs/no-god-view.md). |
+| `Letters`, `Letter`, `message`, `office_note`, `REPORT_TAIL`, `what_it_acts_on`, `acknowledged`, `Answering<A>`, `PAYMENT_FAILED::{note, is}`, `PAYEE_DIED::{note, who}` (`letters.rs`) | the same | An office's letters; `Answering` wraps an actor whose module's `answers` has no report (common.ts `answering`). |
+| `StandingWork`, `Part`, `WorkOrder`, `work::Routine`, `work::ReportOf`, `CounterWork`, `Directions`, `approval_of`, `Pace` (`work.rs`) | the same | Routine work by standing order, the staff's report (`staff_report`), the counter, directions on an office's own form, who approves a payment, a manager's sense of pace (integers: thousandths of a second). |
+| `prohibitions`, `breaches`, `holds_of`, `noted`, `condition_of`, `laws::figures` (`laws.rs`) | the same | Laws weighed against an act (a law binds code only this way). |
+| `own_account`, `own_banked`, `receipts`, `cents`, `notices_of`, `bill_settled`, `published_price`, `brought_forward` (`money.rs`) | the same; firms.ts `receipts` | Money as an actor sees it: `i64` cents (the kernel's `i128` saturated). |
+| `withdraw`, `move_in`, `move_out`, `vote`, `record` (`calls.rs`); `steps::{say, pay, call, because}`; `papers::agreements::{offer, sign, notice}` | the call builders | Every act an actor writes. |
+| `filed_before`, `team`, `out_of_time`, `next_look`, `next_working(cal, ..)`, `stood_empty`, `variable_today`, `structure_of`, `cells_of`, `lot_of`, `petition_signatures`, `published_count`, `between(lo, hi, rng)`, `Occurrences`, `latest_by_speaker`, `starts_on`, `NOTICE_LAG`, `DAY`, `MONTH` (30 days, only where TS meant a fixed 30), `YEAR` | the same; `Latest` | Small shared rules. |
+| `when_words(t, world)`, `money_words(n, world)`, `duration_words(s)` | `whenWords`/`dateWords`, `usd`, `durationWords` | **The one place a date is written in words.** With a calendar it writes the civil date (ISO until lane N gives the profile's words); without, "year N, day D". Lane N changes it; every other lane calls it and never formats a date itself. |
+
+`WorldInfo` gained `calendar: Option<rules::calendar::Calendar>`, read by the engine from the config's `calendar`
+(lane N writes the section). `oikos-sight` re-exports `CmpOp`, `Condition`, `Order` and `Going` (a visit's places)
+for `ask`.
+
+### 5.2 Papers: `actors::papers`
+
+One Rust type per statement kind one module writes and another reads: **172 kinds**, `Serialize` + `Deserialize`,
+each with `impl Paper { const KIND }`, a doc comment naming its writers and readers, and round-trip tests from JSON
+shaped as the TS writes it. Conventions are in `papers/mod.rs` (optional fields, unknown fields allowed, `lenient`
+readers for amounts a seat's form writes as decimal strings and yes/no written as words). A writer puts
+`papers::data(&p)` in `Say { data }`; a reader takes `papers::read::<P>(record)`.
+
+| File | Owner | Kinds |
+|---|---|---|
+| `citizen.rs` | A1 | 30: job and rental applications, claims for support, a tenant's answers and requests, death and birth notifications, household, petitions, enrolments, departures, care, stays, supply, trading |
+| `mind.rs` | A2 | 7: founded groups' papers (purpose, membership, notice, fund claim and decision, hall booking, wound up) |
+| `firms.rs` | C1 | 26: job postings, payroll notices, withholding and tax reports, hours, wage offers, closures and sales, the landlord's listings, rent increases, notices to vacate, applications and replies to the tribunal, rent statements |
+| `market.rs` | C2 | 27: price lists, orders, delivery notes, invoices, buying offers, the outside world's support decisions, statistics, valuations, weather, arrivals, environment and habitat; gd-adoption's systems and tenders (marked) |
+| `finance.rs` | D | 30: the bank instruction (`request`), loans, the fund, the union's papers, news, grievances and their answers, evidence and review papers, signatories and registers |
+| `offices.rs` | E | 52: what every office reads (hold, direction, work_order, staff_report, budget, law, law_schedule, procedure, form, lot), the council, planning and the inspector, registries, police, tribunal and desk, school, elections, utilities, office books |
+
+A kind written in two lanes is in the file of its first writer, and the others write it through the same type
+(`tribunal_application`: firms.rs, the police write it too; `death_notification`: citizen.rs, the police and firms
+too). `kernel/tests/papers_typed.rs` fails if a kind TS writes by name, or a module reads by name, has no type.
+
+**Agreements** (`papers/agreements.rs`): the templates in use (`EMPLOYMENT`, `LEASE`, `LOAN`, `MEMBERSHIP`, `SALE`,
+`PITCH`, `LICENCE`, `NEWCOMER`), each with who offers and who reads it; `Outcome` and its parts; `outcome_of`,
+`template_of`, `parties_of`, `other_party`, `commitment_of`, `commitments_of`, `lease_terms` (`LeaseTerms`),
+`job_terms` (`JobTerms`), `advertised_job`; the builders `offer` (`Offer`), `sign`, `notice`. Owned by 1b: a change
+is told to every lane a template's doc names.
+
+### 5.3 Forms and law: `oikos_rules::forms`, `oikos_rules::law`
+
+- **Forms** (`rules/src/forms.rs`): the types (`FormField`, `Issued`, `FormWrites`, `FormClaim`, `Sends`, `Taken`,
+  `Routine`, `Every`, `Answers`, `AnswerForm`, `Opening`, `Kept`, `Ordered` for fields in the order written) and the
+  **catalogue**: papers.ts's 77 forms in 28 groups by export name (`catalogue()`, `group("LANDLORD")`,
+  `form("TRIBUNAL_MEMBER", "possession_order")`, `all()`), read from `rules/forms/papers.json`, which
+  `scripts/port-forms.ts` writes and `participants/test/port-forms.test.ts` holds equal to the TS until the cut-over
+  (then the JSON is the source). `plan_law`, `plan_law_words`, `possession_order_for`, `staffing_own` port papers.ts's
+  functions. A kind's manifest builds its `issues` from the catalogue. Writing a filled form into its paper stays the
+  engine resolver's (`resolver/src/forms.rs`); the mock seat's reverse (`fieldsFor`) stays TS. **Lane E owns the
+  catalogue's content and exports it by name for the translator.**
+- **Law** (`rules/src/law.rs`): `evaluate`, `violations`, `standing_claims`, `Claim` (the law reader, `oikos-law`:
+  `rules` now depends on it; the boundary test says so), and laws written from figures by a schedule: `LawFigure`,
+  `LawSchedule`, `HeldFigure`, `DraftLaw` (`data()`, `formal_part()`), `draft_law`, `figure_words`, `held_in`,
+  `held_value`, `figure_given`, `figures_of`. Held to the TS by `contracts/test/law-drafts.json` (every schedule of
+  worlds/law/schedules.json, with each optional figure left out: `scripts/port-law-cases.ts`): equal in all 10.
+
+### 5.4 The mind's seam: `actors::citizen::mind`
+
+A1 writes the citizen's life against the trait `Mind` (`Outlook` + the calls below); A2 implements it in
+`actors::mind` (`mind::make`, `mind::restore`, which until A2 lands return `Plain`, the stand-in A1 tests with:
+params `mind: "plain"`). The rule: life owns the body, household, money, home, job, the book and every act; the mind
+owns values, temperament, what was learned, feelings, ties, trust, agency, wants, norms, beliefs, town memory, the
+person's own record, the `decision`/`outcome` annotations and every question to a model (`cx.ask`; answers in
+`cx.answers` at the next wake). Neither reads the other's insides.
+
+| Call | From citizen.ts |
+|---|---|
+| `woke(cx, pic, book, life)` | the start of a wake; answers to its questions arrive here |
+| `decide(cx, life, Decide) -> Decision` | `decide` (home, job, shop, practice, vote ...): needs from `Life`, recorded and numbered |
+| `choose_known(cx, domain, options, follows)` | `learned(d).choose` (the shop retry) |
+| `choose_conduct(cx, life, ConductAsk) -> Conduct` | `cul.term`/`reads`/`cul.act`: a yes-or-no a norm leans; life draws (`draw_bps`) |
+| `outcome(cx, life, Outcome)` | `outcome`, `learn`, `hearOf` (about 70 places) |
+| `treated(cx, Treated)` | `inner.experience`, `tried`, `doneTo`, `landing` (about 60) |
+| `event(cx, life, Event) -> Heard` | `inner.happened`, `wantBorn` from life's events, `grieve`, the inbox's talk |
+| `plan(cx, pic, book, life, &dyn Openings) -> Planned` | `plan`'s mind half: wants and their ways, gatherings, founding, civic acts, talk; returns steps and chosen ways (`Intent`), which life carries out |
+| `say_how`, `troubles_to_tell`, `record(cx, life)`, `words_done`, `save` | `newsOfMine`, `SAYING.trouble`, `writeRecord`, `Words.done`, memory |
+| `Outlook`: `value_z`, `facet`, `trust_z`, `agency_z`, `attached`, `feeling`, `affinity`, `closest`, `learned`, `wants`, `initiative`, `pursuing`, `patience_days`, `satisfaction` | the ~40 places life read mind state |
+
+Shared plain data: `Life` (the person's circumstances, made fresh by life before each call), `Housed`, `Born`,
+`Facts`, `Choice`, `Decide`, `Decision`, `ConductAsk`, `Conduct`, `Way`, `Outcome`, `Treated`, `Event`, `Heard`,
+`WantView`, `Opening`, `Intent`, `Openings` (life's trait: the ways open for a want), `Chosen`, `Planned`, `Tie`.
+z-scores are hundredths of a standard deviation (integers). The file is A2's; A1 is told of every change.
+
+### 5.5 The registry
+
+Each group has its own `KINDS` list (`boundary`, `citizen`, `mind`, `firms`, `market`, `finance`, `offices`);
+`registry.rs` joins them, so no lane edits another's line.
+
+### 5.6 What the lanes must still agree (not settled by 1b)
+
+1. **The mind seam's `Event` and `Intent` variants** (A1 and A2). The lists are TS's as the seam analysis found them,
+   each with an `Other` for what recurs; A2 says by its first day which variants it handles, A1 which it reports, and
+   a variant one side needs is added by A2 with A1 told.
+2. **Who builds `Life`, and when** (A1): before each `decide` and `choose_conduct`, as TS read balances fresh.
+3. **Rents at review** (the guide's C2 "with A1"): the landlord is firms.ts, so **C1** owns the rule; the market
+   evidence it reads (listings, what let and for how much) is C2's. C1 and C2 agree the paper (a `rental_listing`
+   and what a let says) before building.
+4. **gd-adoption** (not merged): it settles strikes by what a stoppage costs each side (Hicks; B10) in TS, which lane
+   **D** ports as its bargaining model rather than inventing one; and it adds `automation.ts` (an outside vendor's
+   systems, adoption by firms and offices), which is in no lane: proposed **C2** (the vendor, at the world's edge)
+   with **C1** (the firms' adoption). Its paper types are in market.rs, marked (two of their fields are fractional as the TS writes them, held as the
+   JSON number: whoever ports it gives them an integer unit). Whoever ports it reads its decisions
+   entries first. No entry called a "market check" was found on the branch; C1 and C2 ask its owner before building
+   entry, hiring and prices natively.
+5. **`books.ts`** (an office's books for its clerk) was in no lane: assigned to **E** with the offices (its paper,
+   `office_books`, is in offices.rs). The seat-side readers (`openbooks*`, `daybook`, `roster`, `tally`, `diary`) stay
+   TS.
+6. **Dates in words** are lane N's (`common::when_words`); until N lands, papers carry ISO dates where a world has a
+   calendar and "year N, day D" where not.
+7. **Memory at 10,000 people**: a book holds a pointer per record and its own indexes (no shared shelves). If phase 3
+   finds books too large, the engine hands them a shared index; no lane's code changes.
 
 ## 6. What not to touch
 
@@ -163,23 +278,35 @@ test with zero divergences (the engine's `audit` option ports truth.ts).
 
 ## 8. The split
 
-**Step 1b, the common ground (1 Opus, about 2 days; before the seven).** `common.ts`'s Book, Letters, StandingWork,
-ask/lookUp, Occurrences, `filedBefore`, `team`, agreement reading (`commitmentOf`, `Outcome`), `receipts`; the paper and
-agreement types of section 5 (papers.ts and every `say(...)`'s kind); `forms.ts` and `law.ts` into `rules`; the mind's
-seam trait. About 3,500 lines of TS. Everything below stands on it; with it, the seven need not wait on each other.
+**Step 1b, the common ground: done** (decisions log, 2026-10-17, "Port step 1b"). Section 5 is what it built: the
+common ground, 172 paper types and the agreement templates, forms and law in `rules`, the mind's seam, and a registry
+by lane. The seven start from the branch it is on.
 
-**Step 2, the seven at once (6 to 8 days).** Each in its own worktree off the frame; each ports its unit tests, tests
-its kinds alone (section 4), and messages the owner of any paper type it needs changed.
+**Step 2, the seven at once (6 to 8 days).** Each in its own worktree off the frame (with 1b); each ports its unit
+tests, tests its kinds alone (section 4), and messages the owner of any paper type it needs changed. **All seven can
+start now, together.** Nothing waits on another lane: what a lane needs of another is a paper type (written), a
+stand-in (`idle`, `stub.script` writing the other lane's papers), or for A1 the plain mind. Order within the week, so
+the others' tests get real counterparts sooner: A2 settles the seam's `Event`/`Intent` lists on its first day; C1's
+`Staffing` and landlord and E's registry and tribunal are what most other lanes' scripted stand-ins imitate, so they
+go first in those lanes.
 
-| Lane | Model | Modules | Needs | Also |
-|---|---|---|---|---|
-| A1 citizen: life | Opus | `citizen.ts` housing, work, money, lifecycle, deaths, recourse; `household`, `health` | 1b, A2's seam (trait only) | `rules::household` for the generator |
-| A2 citizen: mind | Opus | `citizen.ts` deciding; `mind`, `inner`, `wants`, `culture`, `townmemory`, `reading`, `founding`, `founded` | 1b | the questions to models (consult, compose, reading) |
-| C1 firms | Sonnet | `firms`, `payroll`, `returns`, `tax`, `payments`, `orgwants`, `practice` | 1b | native firm entry by expected profit and hiring by need (risks); `rules::withholding`, `support` |
-| C2 market | Sonnet | `retailer`, `producer`, `trade`, `lengnick`, `world.ts` (the rest of the edge), `environment` | 1b | native price formation; exports from demand (ME-15); rents at review (with A1) |
-| D finance and bodies | Sonnet | `bank`, `credit`, `fund`, `union`, `news`, `frictions`, `decisions` | 1b | a bargaining model for strikes (A-2); `rules::decisions` |
-| E public offices | Sonnet | `government`, `institutions`, `police`, `tribunal`, `desk`, `school`, `elections`, `utilities`, `papers` (issued forms) | 1b | the forms registry exported by name for the translator |
-| F the platform | Opus | the seat interface (N-API/socket `next`/`submit`; many seats in flight across forks; cost per seat), the TS host on it (`OIKOS_WORLD=rust`), snapshot and fork (kernel state + `Engine::save_actors` + schedule + knowledge), a binary log (snapshots + deltas) with JSONL as an export, a live event stream, manifests to JSON, the generator calling `rules`, the twins' detached actor (`actorStep`), the backstops reading Rust, the reserved shapes for travel (positions in transit, roads with capacity, vehicles as owned things that work: shapes only) | the frame | the experiment harness on snapshot and fork if time allows; otherwise lane G |
+Every lane may call: all of `actors::common`, `actors::steps`, `actors::papers` (read any type; write its own),
+`actors::papers::agreements`, `oikos_rules` (`slip`, `calendar`, `identity`, `forms`, `law`, and the rules lanes add),
+`oikos_sight`, and `Cx` (`rng`, `chance`, `ask`, `decided`, `learned`, `set_record`). No lane calls another lane's
+actor code; they meet only through papers, agreements, payments, letters and forms (and A1 and A2 through the seam).
+
+| Lane | Model | Owns (writes) | Also owns | May call beyond the common set | Its tests |
+|---|---|---|---|---|---|
+| A1 citizen: life | Opus | `actors/src/citizen/` (all but `mind.rs`): citizen.ts's life, `household`, `health`; `papers/citizen.rs` | `rules::household` (the generator calls it) | the seam: `citizen::mind::{make, restore, Mind, Outlook}` and its data types; implements `Openings` | participants/test's citizen, household, health, deaths, housing, recourse tests, rewritten in `citizen/` and `kernel/tests/a1_*.rs`, with `mind: "plain"`; the citizen's scenario tests (deaths, housing, recourse) against a Rust world with the rest idle or scripted |
+| A2 citizen: mind | Opus | `actors/src/mind/`, `citizen/mind.rs` (the seam), `papers/mind.rs`: citizen.ts's deciding half, `mind`, `inner`, `wants`, `culture`, `townmemory`, `reading`, `founding`, `founded` | the questions to models (consult, compose, reading) as `Question` kinds the host answers | nothing of A1's | mind, inner, wants, culture, townmemory, reading, founding tests, driving `Mind` directly from a test harness of `Life`s and events (no life code needed); `kernel/tests/a2_*.rs`; the founded group's post as a kind |
+| C1 firms | Sonnet | `actors/src/firms/`, `papers/firms.rs`: `firms` (employers, landlords, builders, works), `payroll`, `returns`, `tax`, `payments`, `orgwants`, `practice` | `rules::withholding`, `rules::support`; native firm entry by expected profit and hiring by need (risks ME-*); rents at review (5.6, 3) | — | participants/test's firms, payroll, tax, payments, landlord tests; `kernel/tests/c1_*.rs` with citizens scripted (applications, rent, tenants' answers as `stub.script` papers) |
+| C2 market | Sonnet | `actors/src/market/`, `actors/src/boundary/` (but `weather.rs`), `papers/market.rs`: `retailer`, `producer`, `trade`, `lengnick`, `world`, `environment`; `automation` once gd-adoption merges (5.6, 4) | native price formation from supply and demand; exports from demand (ME-15) | — | retail, production, trade, world, environment tests; `kernel/tests/c2_*.rs` with shoppers and firms scripted |
+| D finance and bodies | Sonnet | `actors/src/finance/`, `papers/finance.rs`: `bank`, `credit`, `fund`, `union`, `news`, `frictions`, `decisions` | `rules::decisions`; the strike bargaining model, ported from gd-adoption's (5.6, 4) | — | bank, lending, fund, union, news, frictions, decisions tests; `kernel/tests/d_*.rs` |
+| E public offices | Sonnet | `actors/src/offices/`, `papers/offices.rs`, `rules/forms/papers.json` (the catalogue): `government`, `institutions`, `police`, `tribunal`, `desk`, `school`, `elections`, `utilities`, `books`, papers.ts's forms | the forms registry exported by name for the translator | — | government, institutions, police, tribunal, desk, school, elections, utilities, books tests; `kernel/tests/e_*.rs`; `participants/test/port-forms.test.ts` until the cut-over |
+| F the platform | Opus | `kernel/src/engine.rs`, `crates/sight`, `crates/napi`, the TS host, snapshot and fork, the binary log, the event stream, manifests to JSON, the generator calling `rules`, the twins' detached actor, the backstops reading Rust, the reserved shapes for travel | the experiment harness on snapshot and fork if time allows; otherwise lane G | everything in the frame | `kernel/tests/engine.rs`, the backstops, twin and determinism tests |
+
+What every lane owes besides: its manifests equal `participants/manifests/<name>.json` (section 2), its behaviour
+docs updated where the Rust decides fresh, risks it fixes updated in `docs/risks.md`, and one decisions entry.
 
 **Lane G, the explorer and experiments (1 Sonnet, can start now; reads logs only, independent of the actors).** The
 explorer's data layer in `kernel/crates/explore` (section 9), ported from the `explorer` branch; then the experiment
@@ -191,8 +318,8 @@ collected per fork set (the unit of an experiment is a set of forks).
 in the generator by streams keyed on stable identities (twins hold); offices' own references for records
 (`data.reference`); the config's start date and `rules::calendar` (types in the frame) with a shared test file in
 `contracts/test/`; the resolver reading names and dates (only among what the seat has been shown) and seats shown names
-and dates, ids underneath for the log and tools. Lanes A1 to E write papers with dates through `rules::calendar` and
-never "year N, day D". The translator's next round learns names and dates.
+and dates, ids underneath for the log and tools. Lanes A1 to E count dates with `rules::calendar` and write them in words only
+through `common::when_words`, which N changes (it writes ISO dates until then), never "year N, day D" themselves. The translator's next round learns names and dates.
 
 Seat-side readers (`openbooks*`, `daybook`, `roster`, `tally`, `diary`) stay TS.
 
