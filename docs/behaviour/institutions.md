@@ -112,3 +112,19 @@ Someone with no home dies unseen, and nobody reports it (in reality, the police 
 
 On a registration naming children with no adult at home, or a child's own request for help (a `care_request`, made when every adult of their household has died), it takes them into care. The town has no foster homes yet, so care is elsewhere: they leave the town with the office's worker. Loosely after Victoria's child protection service; foster and kinship care in town are future work.
 
+
+## In Rust: the registries are keepers staffed to their load (PB-19, 2026-10-17)
+
+`land.registry`, `city.registry` and `city.child_protection` read what they have done from their own papers (the entries
+a registrar made, the notices of acquisition and transfers the land registry made), so a new holder neither registers a
+death twice nor applies again for a transmission.
+
+At 10,000 people a perf run found thousands of questions asked of keepers held at its end. Asking a keeper takes the
+time of whoever holds its posts (foundations F11: `answer` in the table of work), one question at a time, in working
+hours; the questions grow with the people who ask, and the posts did not. A real registry is staffed to its caseload.
+Each keeper now declares in its manifest a `capacity` (the asks it expects per 1,000 residents a year, and the seconds an
+answer takes: placeholders, to source), and `oikos_rules::staffing::clerks_needed` is the sum the generator calls to give
+the counter as many staff as that needs (1 clerk at 1,000 people, 5 at 10,000, 42 at 100,000 on the placeholder
+figures). The generator change itself (lane F, which owns it) is not made here.
+Revisit when: the asks per resident are measured from a run (the figures are guesses), or when a keeper's load turns
+out to follow something other than the population (the lots, the titles).

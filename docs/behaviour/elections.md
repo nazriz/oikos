@@ -78,3 +78,19 @@ The mayor's office is no longer shown the roll either.
 - Campaigns: spending, canvassing, debates, how-to-vote cards. A candidate's platform is their top two values.
 - Postal and early voting; scrutineers; recounts; challenges in a court (justice, §5).
 - Penalties for not voting (compulsory, but no fine is issued).
+
+## In Rust: the election is read from the office's own file (2026-10-17)
+
+The electoral office (0.7.0 in behaviour) no longer keeps where the election stands only in the holder's memory. Every
+wake it reads its own file (what was put on record in its position, whoever held it): the results declared (each carries
+its `poll_at`) move the poll on a term each; a notice or a ballot filed for this poll puts the office at that stage. A
+successor therefore carries on: it does not announce an election already held (the bug hunt's scratch test: a successor
+on day 200 published "an election for Mayor on day 100"), and does not count an old nomination as a new one. A stage moves
+on only when its act is applied, so a notice, ballot or result the world refused (no time left, not at work, the holder
+dead) is tried again at the next wake instead of leaving the office in "voting" with no ballot for good.
+Revisit if: a term is changed by a charter amendment mid-term (the next poll is `term_days` after the last result's
+poll, as now; the law would need to say otherwise).
+
+## Votes after the poll closed
+
+Told once, for polls closed since the office began to look (a successor does not write to voters of polls long closed).
