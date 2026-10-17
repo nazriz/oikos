@@ -759,6 +759,19 @@ impl Mind {
         self.domains.entry(domain.to_string()).or_insert_with(|| Attractions::new(e, prior))
     }
 
+    /// What has been learned of an option, read only (a domain not yet entered gives its prior: what `learned` would
+    /// make of it).
+    pub fn learned_get(&self, domain: &str, option: &str) -> i64 {
+        match self.domains.get(domain) {
+            Some(a) => a.get(option),
+            None => self.expect.get(domain).copied().unwrap_or(0),
+        }
+    }
+    /// Whether an option is known in a domain, read only.
+    pub fn learned_known(&self, domain: &str, option: &str) -> bool {
+        self.domains.get(domain).map_or(false, |a| a.known(option))
+    }
+
     pub fn learn(&mut self, domain: &str, chosen: &str, payoff_bps: i64, forgone: &BTreeMap<String, i64>) {
         self.learned(domain).update(chosen, payoff_bps, forgone);
     }

@@ -809,6 +809,22 @@ impl Inner {
         hundredths(((x - start) / spread).clamp(-3.0, 3.0))
     }
 
+    /// `z_trust` read without keeping the entry (what it would be were it read now): for weighing several at once,
+    /// whose entries the caller then keeps with `trust_in`, as TS's reads did.
+    pub fn z_trust_peek(&self, values: &Values, who: &str, kind: &str) -> i64 {
+        let start = self.start_of(kind) as f64;
+        let spread = self.p.trust.spread_bps.max(1) as f64;
+        let x = match self.trust.get(who) {
+            Some(e) => as_bps(e.fine),
+            None => {
+                let z = |v| self.z(values, v);
+                let conserving = (z(Value::Conformity) + z(Value::Tradition) + z(Value::Security)) / 3.0 - (z(Value::SelfDirection) + z(Value::Stimulation)) / 2.0;
+                math::clamp_bps(start + self.p.trust.spread_bps as f64 * self.lean_f() + self.p.trust.values_bps as f64 * conserving) as f64
+            }
+        };
+        hundredths(((x - start) / spread).clamp(-3.0, 3.0))
+    }
+
     /// Kept: among the last few, and, if large, among the few that defined us (the largest, kept for good).
     pub fn remember(&mut self, r: Remembered) {
         self.since.push(r.clone());
