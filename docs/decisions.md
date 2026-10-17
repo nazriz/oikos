@@ -5713,9 +5713,25 @@ this repeats the header's config: about a quarter of each snapshot). `next_by` r
 lane's exhaustive match breaks. The stand-in and decision recording are the snapshot's; threads and `until` the
 resumer's.
 
-**Left for integration.** The model seats' controllers (prompts, the translator's drafts and confirmations, notices,
-debriefs, exit accounts) are not yet wired into `rust-world.ts`: a seat with no controller waits, and the log says
-so once. Twin exactness beyond the weather bureau is gate item 3. The summary's profile and health fields are mostly
+**Model seats on the Rust world** (the same day, second step): the TS host's own run loop (`orchestrator/src/run.ts`)
+drives the engine under `OIKOS_WORLD=rust`, with every seat feature as on the TS world, by the requests it always
+made: the session started with `engine` (kernel/src/protocol.rs) runs every built-in actor in the engine
+(`host_seats`, kernel/src/engine/hosted.rs); `next` gives the host its seats only, unobserved, after the engine's own
+events (so the host keeps its cast); the host observes, decides (prompts, framing, notebooks), translates (our model
+first, the one behind), confirms or declines, and acts by commands, and the round's code actions before each seat in
+key order are carried out before its first act. No code unit is made in TS. A mock twin's brain the engine has is the
+engine's kind run detached. Decided fresh: a seat that looks again takes its further rounds at once, in its place (the
+TS world took them after the whole round); records cross whole, not by reference (the engine's actors are handed
+records the host never sees). Proved by the mock dry run of w2-16 with the translator first (`scripts/pilot-mock.ts`
+with `OIKOS_WORLD=rust OIKOS_STAND_IN=idle`, 30 days: 4 seats, 87 usage records, a draft confirmed through the
+arrangement, 4 debriefs complete, no errors) and by a twin seat warning as its code does. Snapshots in a binary log
+no longer carry the config (`blog::snapshot_in` reads them with the log's). `runRustWorld` stays as a light host for
+code-only worlds and forks (`RustWorld.fork`), not used by `runWorld`.
+
+**Left for integration.** Until every kind is ported, a pilot on the Rust world needs `OIKOS_STAND_IN=idle`, and its
+dry-run conditions that depend on code offices (a clerk's books) are not shown. Snapshot and fork are not yet served
+through the protocol session (the TARA experiment forks through `RustWorld`, whose seats then need the same host:
+next step). Twin exactness beyond the weather bureau is gate item 3. The summary's profile and health fields are mostly
 empty on the Rust world. A fork of a JSONL-logged run must log in binary (it names its parent). No socket server yet
 (`serve` over a socket for outside seats). The experiment harness on fork is lane G's.
 

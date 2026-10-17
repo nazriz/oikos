@@ -30,6 +30,7 @@ use std::sync::Arc;
 
 pub const ENGINE_VERSION: &str = "0.2.0";
 
+mod hosted;
 mod snapshot;
 pub use snapshot::{Snapshot, SNAPSHOT_FORMAT};
 
@@ -57,6 +58,11 @@ pub struct EngineOptions {
     /// The seats are the mock (no model): a seat that sits as its code twin (`mock.twin` with a `mock.brain`) is
     /// scheduled as its brain's unit would be (run.ts `llmUnit`). A host with a real model says false.
     pub mock_seats: bool,
+    /// The host carries its seats through the participant API itself (the TS host's run loop, orchestrator/src/run.ts,
+    /// under OIKOS_WORLD=rust): a seat awake is handed over unobserved, the host observes it, decides and acts for it
+    /// with commands of its own, and says when its wake is done (`host_finished`); the round's code actions before a
+    /// seat in key order are carried out before that seat's first act (`host_command`).
+    pub host_seats: bool,
 }
 
 impl Default for EngineOptions {
@@ -69,6 +75,7 @@ impl Default for EngineOptions {
             audit: false,
             share_at: WORTH_SHARING,
             mock_seats: true,
+            host_seats: false,
         }
     }
 }
@@ -158,6 +165,10 @@ enum Decided {
 struct Round {
     awake: Vec<(String, u32)>,
     decided: BTreeMap<String, Decided>,
+    /// How many of `awake` have been carried out (a host's seats carry themselves out in their places: `host_seats`).
+    cursor: usize,
+    /// Those carried out whose wakes go on.
+    next: Vec<(String, u32)>,
 }
 
 /// What an actor may know of the run (its clock, money, dials, slips and calendar), as a world's config gives it.
@@ -238,6 +249,11 @@ pub struct Engine<W: Write> {
     /// `next_by`'s limit: nothing after it is begun (the clock is not moved past it), so a snapshot taken there is
     /// one the run goes on from exactly as it would have.
     pause: Option<i64>,
+    /// A host's own command is being carried out (its events are in its reply, not in `for_host`).
+    hosting: bool,
+    /// The events of the engine's own commands since the host last took them (`host_seats`: the host keeps its cast
+    /// from them, as from its own commands' replies).
+    for_host: Vec<crate::events::Event>,
     /// For whoever measures: how many steps the actors took (never logged).
     pub steps: u64,
 }
@@ -307,7 +323,12 @@ impl<W: Write> Engine<W> {
             e.sync_units(&pid, None)?;
         }
         let modules: Map<String, Value> = e.used.iter().map(|(k, v)| (k.clone(), json!({ "version": v }))).collect();
-        e.annotate(json!({ "annotation": "orchestrator", "subject": "orchestrator", "data": { "version": format!("engine {ENGINE_VERSION}"), "modules": modules, "thinking_time": thinking_time } }))?;
+        if e.opts.host_seats {
+            // (The host writes the run's `orchestrator` record, as it always has: the engine's part is a note beside it.)
+            e.note("orchestrator", json!({ "engine": { "version": ENGINE_VERSION, "modules": modules } }))?;
+        } else {
+            e.annotate(json!({ "annotation": "orchestrator", "subject": "orchestrator", "data": { "version": format!("engine {ENGINE_VERSION}"), "modules": modules, "thinking_time": thinking_time } }))?;
+        }
         Ok(e)
     }
 
@@ -338,6 +359,8 @@ impl<W: Write> Engine<W> {
             thinking: base.thinking,
             used: BTreeMap::new(),
             pause: None,
+            hosting: false,
+            for_host: vec![],
             steps: 0,
         }
     }
@@ -383,7 +406,13 @@ impl<W: Write> Engine<W> {
     /// A command through the kernel, as the session's `command` takes one: logged, the seat's knowledge kept from what
     /// it was shown, the schedule told, the cast changed. `Err`: off-contract (never logged).
     fn command(&mut self, cmd: &Command) -> Result<crate::run::Response, String> {
+        self.command_seen(cmd).map(|x| x.0)
+    }
+
+    /// `command`, with the observation as it was delivered (its JSON, for a host's reply).
+    fn command_seen(&mut self, cmd: &Command) -> Result<(crate::run::Response, Option<crate::kernel::Observed>), String> {
         let mut resp = self.run.command(cmd).map_err(|e| e.to_string())?;
+        let mut seen = None;
         if let Some(obs) = resp.observation.as_mut() {
             let o = self.run.observed(obs).map_err(|e| e.to_string())?;
             if let Command::Observe { participant, only } | Command::Look { participant, only, .. } = cmd {
@@ -395,11 +424,15 @@ impl<W: Write> Engine<W> {
                     &mut self.registers,
                 );
             }
+            seen = Some(o);
         }
         let t = self.run.kernel().t();
         self.sched.note_events(Some(self.run.kernel().state()), &resp.events, t);
         self.note_cast(&resp.events)?;
-        Ok(resp)
+        if self.opts.host_seats && !self.hosting {
+            self.for_host.extend(resp.events.iter().cloned());
+        }
+        Ok((resp, seen))
     }
 
     /// The cast as commands change it: participants and positions come and go, and units with them (run.ts `noteCast`).
@@ -663,7 +696,7 @@ impl<W: Write> Engine<W> {
     fn go(&mut self) -> Result<Due, String> {
         loop {
             if let Some(r) = self.round.take() {
-                let waiting: Vec<&String> = r.decided.iter().filter(|(_, d)| matches!(d, Decided::Seat(None))).map(|(k, _)| k).collect();
+                let waiting: Vec<&String> = r.decided.iter().filter(|(_, d)| matches!(d, Decided::Seat(None)) && !self.opts.host_seats).map(|(k, _)| k).collect();
                 if !waiting.is_empty() {
                     let msg =
                         format!("seats awake without an action: {}", waiting.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "));
@@ -762,6 +795,13 @@ impl<W: Write> Engine<W> {
         let mut kept_awake = vec![];
         for (key, n) in awake {
             let Some(mut u) = self.units.remove(&key) else { continue };
+            if u.seat() && self.opts.host_seats {
+                // (The host looks for it, through the participant API, as it decides and acts for it.)
+                seats.push(SeatWake { key: key.clone(), participant: u.participant.clone(), t, woke_for: u.woke_for.clone(), since: u.since, observation: Value::Null });
+                self.units.insert(key.clone(), u);
+                kept_awake.push((key, n));
+                continue;
+            }
             let only = u.capacity.clone();
             let looks = u.looks.take().map(|ls| match &only {
                 Some(c) if c != "self" => ls
@@ -840,19 +880,31 @@ impl<W: Write> Engine<W> {
         for s in &seats {
             decided.insert(s.key.clone(), Decided::Seat(None));
         }
-        self.round = Some(Round { awake: kept_awake, decided });
+        self.round = Some(Round { awake: kept_awake, decided, cursor: 0, next: vec![] });
         Ok((!seats.is_empty()).then_some(Due::Seats(seats)))
     }
 
     /// What the round decided, carried out in key order; those whose wakes go on.
     fn carry_out(&mut self, mut r: Round) -> Result<Vec<(String, u32)>, String> {
-        let mut next = vec![];
-        for (key, n) in std::mem::take(&mut r.awake) {
+        self.carry_some(&mut r, None)?;
+        Ok(r.next)
+    }
+
+    /// The round carried out in key order from where it stands, up to (not including) the unit `stop`, or to its end.
+    fn carry_some(&mut self, r: &mut Round, stop: Option<&str>) -> Result<(), String> {
+        while r.cursor < r.awake.len() {
+            let (key, n) = r.awake[r.cursor].clone();
+            if stop == Some(key.as_str()) {
+                return Ok(());
+            }
+            r.cursor += 1;
             let Some(d) = r.decided.remove(&key) else { continue };
             if !self.units.contains_key(&key) {
                 continue; // it ended this round
             }
             let action = match d {
+                // (A host's seat carried itself out in its place, and said when its wake was done.)
+                Decided::Seat(None) if self.opts.host_seats => continue,
                 Decided::Seat(a) => a.expect("checked: every seat answered"),
                 Decided::Code(Err(e)) => {
                     let u = self.units.get_mut(&key).expect("checked");
@@ -878,13 +930,13 @@ impl<W: Write> Engine<W> {
                 continue;
             }
             if goes_on && !acted {
-                next.push((key, n + 1));
+                r.next.push((key, n + 1));
             } else {
                 let t = self.run.kernel().t();
                 self.sched.finished(&key, until, t);
             }
         }
-        Ok(next)
+        Ok(())
     }
 
     /// What a step left beside its action: its decisions and outcomes (annotations, unless the log is lean), a change

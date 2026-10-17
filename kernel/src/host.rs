@@ -262,7 +262,8 @@ impl Host {
 
     /// A snapshot into the binary log, before its next entry.
     pub fn snapshot_to_log(&mut self) -> Result<(), String> {
-        let bytes = self.snapshot()?;
+        // (Without its config: the log's header holds it once; blog::snapshot_in reads it back with it.)
+        let bytes = self.e.snapshot()?.to_bytes_for_log()?;
         let t = self.e.t();
         match self.e.log_out().inner() {
             Out::Binary(b) => b.snapshot(t, &bytes).map_err(|e| e.to_string()),

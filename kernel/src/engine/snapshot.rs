@@ -57,6 +57,9 @@ pub struct Head {
     pub state_hash: String,
     /// Seats awake in an open round (waiting on their actions): their keys. Empty: taken between moments.
     pub seats_waiting: Vec<String>,
+    /// Its config is not in it: it is the log's (a snapshot in a binary log, whose header holds the config once).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub config_elsewhere: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -99,6 +102,10 @@ enum DecidedSaved {
 struct RoundSaved {
     awake: Vec<(String, u32)>,
     decided: Vec<(String, DecidedSaved)>,
+    #[serde(default)]
+    cursor: usize,
+    #[serde(default)]
+    next: Vec<(String, u32)>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -142,11 +149,24 @@ impl Snapshot {
     /// Its bytes (for a file, or the binary log): `OIKOSNP1`, the head's length and JSON, then the rest compressed
     /// (the config as given, the state, the engine's part, each with its length).
     pub fn to_bytes(&self) -> Result<Vec<u8>, String> {
-        let head = serde_json::to_vec(&self.head).map_err(|e| e.to_string())?;
+        self.bytes(false)
+    }
+
+    /// Its bytes without its config, for a binary log (whose header has the config): read back with
+    /// `from_bytes_with` and the log's config (`blog::snapshot_in` does both).
+    pub fn to_bytes_for_log(&self) -> Result<Vec<u8>, String> {
+        self.bytes(true)
+    }
+
+    fn bytes(&self, without_config: bool) -> Result<Vec<u8>, String> {
+        let mut head = self.head.clone();
+        head.config_elsewhere = without_config;
+        let head = serde_json::to_vec(&head).map_err(|e| e.to_string())?;
         let state = serde_json::to_vec(self.kernel.state()).map_err(|e| format!("the state: {e}"))?;
         let engine = serde_json::to_vec(&self.saved).map_err(|e| format!("the engine: {e}"))?;
         let mut body = Vec::with_capacity(self.config.len() + state.len() + engine.len() + 24);
-        for part in [&self.config[..], &state, &engine] {
+        let config: &[u8] = if without_config { &[] } else { &self.config[..] };
+        for part in [config, &state, &engine] {
             body.extend_from_slice(&(part.len() as u64).to_le_bytes());
             body.extend_from_slice(part);
         }
@@ -176,7 +196,16 @@ impl Snapshot {
     /// A snapshot read back: the world made again from its config and state, and checked against the hash it was
     /// taken with.
     pub fn from_bytes(bytes: &[u8]) -> Result<Snapshot, String> {
-        let head = Self::head_of(bytes)?;
+        Self::read(bytes, None)
+    }
+
+    /// A snapshot taken for a log (its config left out), read back with the log's config (canonical JSON).
+    pub fn from_bytes_with(bytes: &[u8], config: &[u8]) -> Result<Snapshot, String> {
+        Self::read(bytes, Some(config))
+    }
+
+    fn read(bytes: &[u8], given: Option<&[u8]>) -> Result<Snapshot, String> {
+        let mut head = Self::head_of(bytes)?;
         let n = u32::from_le_bytes(bytes[8..12].try_into().expect("four bytes")) as usize;
         let rest = &bytes[12 + n..];
         let size = u64::from_le_bytes(rest.get(..8).ok_or("a snapshot cut short")?.try_into().expect("eight bytes")) as usize;
@@ -188,7 +217,12 @@ impl Snapshot {
             parts.push(body.get(at + 8..at + 8 + len).ok_or("a snapshot's body cut short")?);
             at += 8 + len;
         }
-        let config: Arc<[u8]> = Arc::from(parts[0]);
+        let config: Arc<[u8]> = match (head.config_elsewhere, given) {
+            (false, _) => Arc::from(parts[0]),
+            (true, Some(c)) => Arc::from(c),
+            (true, None) => return Err("this snapshot was taken for a log and holds no config: read it with the log's (blog::snapshot_in)".into()),
+        };
+        head.config_elsewhere = false;
         let loaded = crate::config::load(serde_json::from_slice(&config).map_err(|e| format!("the config: {e}"))?)?;
         let state: crate::state::State = serde_json::from_slice(parts[1]).map_err(|e| format!("the state: {e}"))?;
         let kernel = Kernel::resume(&loaded, state)?;
@@ -236,6 +270,8 @@ impl<W: Write> Engine<W> {
             .collect::<Result<Vec<_>, String>>()?;
         let round = self.round.as_ref().map(|r| RoundSaved {
             awake: r.awake.clone(),
+            cursor: r.cursor,
+            next: r.next.clone(),
             decided: r
                 .decided
                 .iter()
@@ -264,6 +300,7 @@ impl<W: Write> Engine<W> {
                 prev,
                 state_hash: self.state_hash()?,
                 seats_waiting,
+                config_elsewhere: false,
             },
             config: self.run.config_bytes().clone(),
             kernel: self.run.kernel().fork(),
@@ -365,7 +402,7 @@ impl<W: Write> Engine<W> {
                 };
                 decided.insert(k.clone(), d);
             }
-            e.round = Some(Round { awake: r.awake.clone(), decided });
+            e.round = Some(Round { awake: r.awake.clone(), decided, cursor: r.cursor, next: r.next.clone() });
         }
         Ok(e)
     }

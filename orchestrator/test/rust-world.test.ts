@@ -121,3 +121,31 @@ test("the generator calling the Rust rules (OIKOS_WORLD=rust) makes the same tow
     }
   }
 }, 120_000);
+
+test("on the Rust world, a mock seat sitting as its code twin (its brain the engine's own kind, run detached) warns as the code does, through the TS seat host", async () => {
+  const code = weatherOnly();
+  const until = 45 * DAY;
+  const twin = structuredClone(code);
+  const holder = officeAt(twin, "weather-bureau").holder;
+  holder.controller = { type: "llm", impl: "mock", params: { mock: { twin: true, brain: "world.weather", params: holder.controller.params } } };
+  const out = join(root, "runs", "test-rust-twin");
+  rmSync(out, { recursive: true, force: true });
+  mkdirSync(out, { recursive: true });
+  const was = process.env.OIKOS_WORLD;
+  process.env.OIKOS_WORLD = "rust";
+  try {
+    const a = await runWorld({ config: code, runId: "code", outDir: out, until });
+    const b = await runWorld({ config: twin, runId: "twin", outDir: out, until });
+    const wa = warnings(read(a.logPath)), wb = warnings(read(b.logPath));
+    expect(wa.length).toBe(2);
+    expect(wb).toEqual(wa);
+    // The seat went through the seat host as any seat does: its model's usage recorded, and its debrief.
+    const lines = read(b.logPath);
+    expect(lines.some((l) => l.body?.annotation === "usage" && l.body.subject === holder.id)).toBe(true);
+    expect(b.debriefs?.[holder.id]).toBeDefined();
+  } finally {
+    if (was === undefined) delete process.env.OIKOS_WORLD;
+    else process.env.OIKOS_WORLD = was;
+    rmSync(out, { recursive: true, force: true });
+  }
+}, 180_000);

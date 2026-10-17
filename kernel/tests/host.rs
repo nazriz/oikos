@@ -119,6 +119,13 @@ fn a_host_drives_a_world_by_json_and_forks_of_it_run_side_by_side_with_their_sea
     let snaps = r.snapshots();
     assert_eq!(snaps.len(), 2, "{snaps:?}");
     assert!(snaps[0].1 <= 10 * DAY && snaps[1].1 <= 20 * DAY && snaps[0].1 < snaps[1].1, "{snaps:?}");
+    // Each is taken without the config (the log's header has it once), and reads back with it, to be resumed.
+    let (_, bytes) = r.snapshot_by(Some(20 * DAY)).unwrap();
+    assert!(oikos_kernel::engine::Snapshot::from_bytes(bytes).is_err(), "it holds no config of its own");
+    let snap = oikos_kernel::blog::snapshot_in(&d.join("straight.oklog"), Some(20 * DAY)).unwrap();
+    assert!(bytes.len() < snap.to_bytes().unwrap().len());
+    let mut again = Host::resume(&snap.to_bytes().unwrap(), &json!({ "threads": 3 })).unwrap();
+    assert_eq!(drive(&mut again, 0, "quiet")["t"], end["t"]);
 }
 
 #[test]

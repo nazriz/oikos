@@ -443,3 +443,34 @@ fn export_until(path: &std::path::Path, until: Option<u64>, out: &mut dyn Write)
     n += r.export(until, out)?;
     Ok(n)
 }
+
+/// The run's config (canonical JSON), from the header of the log a binary log begins with (following its parents).
+pub fn config_of(path: &std::path::Path) -> io::Result<Vec<u8>> {
+    let bytes = std::fs::read(path)?;
+    let r = Read::of(&bytes)?;
+    if let Some(parent) = &r.about.parent {
+        return config_of(&path.parent().unwrap_or(std::path::Path::new(".")).join(parent));
+    }
+    let mut config = None;
+    r.each(Some(1), |p| {
+        let v: serde_json::Value = serde_json::from_slice(p.body).map_err(|e| bad(&e.to_string()))?;
+        config = Some(crate::canon::canonical_value(&v["config"]).map_err(|e| bad(&e.to_string()))?);
+        Ok(())
+    })?;
+    config.ok_or_else(|| bad("no header"))
+}
+
+/// The last snapshot a binary log holds at or before `t` (any, if absent), read back with the run's config: the run
+/// as it stood then, to resume or fork.
+pub fn snapshot_in(path: &std::path::Path, t: Option<i64>) -> Result<crate::engine::Snapshot, String> {
+    let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let r = Read::of(&bytes).map_err(|e| e.to_string())?;
+    let (_, snap) = r.snapshot_by(t).ok_or("the log holds no snapshot by then")?;
+    let head = crate::engine::Snapshot::head_of(snap)?;
+    if head.config_elsewhere {
+        let config = config_of(path).map_err(|e| e.to_string())?;
+        crate::engine::Snapshot::from_bytes_with(snap, &config)
+    } else {
+        crate::engine::Snapshot::from_bytes(snap)
+    }
+}
