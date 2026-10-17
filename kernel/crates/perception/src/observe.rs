@@ -859,20 +859,31 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                 ChannelKind::Records { area, .. } | ChannelKind::Sites { area, .. } => area.as_ref(),
                 _ => None,
             };
-            // A search: what matches now, within what the capacity may see; its cursor for changes is untouched.
-            if let (Some(LookRequest { query: Some(q), .. }), ChannelKind::Records { way, filter, from, of, by, .. }) = (asked, &ch.kind) {
+            // A search: what matches now, within what the capacity may see; its cursor for changes is untouched. (Several
+            // searches through one channel in one look, as when a keeper's several answers arrive together: each is
+            // answered, and the answers are shown together.)
+            let searches: Vec<&crate::observe::Query> = requested.iter().filter(|l| l.channel == path).filter_map(|l| l.query.as_ref()).collect();
+            if let (false, ChannelKind::Records { way, filter, from, of, by, .. }) = (searches.is_empty(), &ch.kind) {
                 let scope = area.map(|a| index.scope(s, st, a, &me));
                 let want = Want::of(*way, from.as_ref(), &me);
-                // How many one answer gives is the keeper's to say, and a board's how many one reading takes in.
-                let most = match way {
-                    Way::Ask => {
-                        let named = q.conditions.iter().flatten().find(|c| c.op == CmpOp::Eq && by.iter().flatten().any(|f| f == &c.field)).map(|c| c.field.as_str());
-                        named.map(|f| s.config.knowing.answer_most(of.as_deref().unwrap_or(""), filter, f))
+                let mut found: Vec<Arc<Record>> = vec![];
+                for q in searches {
+                    // How many one answer gives is the keeper's to say, and a board's how many one reading takes in.
+                    let most = match way {
+                        Way::Ask => {
+                            let named = q.conditions.iter().flatten().find(|c| c.op == CmpOp::Eq && by.iter().flatten().any(|f| f == &c.field)).map(|c| c.field.as_str());
+                            named.map(|f| s.config.knowing.answer_most(of.as_deref().unwrap_or(""), filter, f))
+                        }
+                        Way::Published if from.is_none() => s.config.knowing.board_most(filter),
+                        _ => None,
+                    };
+                    for r in search(st, index, &me, filter, want.as_ref(), scope.as_ref(), q, most) {
+                        if !found.iter().any(|x| x.id == r.id) {
+                            found.push(r);
+                        }
                     }
-                    Way::Published if from.is_none() => s.config.knowing.board_most(filter),
-                    _ => None,
-                };
-                channels.insert(path, ChannelData::Records { records: search(st, index, &me, filter, want.as_ref(), scope.as_ref(), q, most), search: Some(true), whole: None });
+                }
+                channels.insert(path, ChannelData::Records { records: found, search: Some(true), whole: None });
                 continue;
             }
             // What is only ever answered, never shown (docs/design/knowing.md): a register asked of its keeper and a

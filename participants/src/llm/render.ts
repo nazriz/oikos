@@ -427,6 +427,7 @@ function describeSurvey(cells: number, open: number, structures: SiteStructure[]
 }
 
 /** What a seat is told when it has sent someone to look at a place it is not at. */
+const WAITING_ON_KEEPER = "Your question is still with the one who keeps this. The answer comes when they have done it; until then nothing is known either way.";
 const SET_OUT = "Someone has set out. What they find comes with the report after they are back.";
 
 /** What a participant asked to see when it looked at a report: places or people by name, the buildings a measure is
@@ -905,7 +906,7 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
     }
   }
   // Somewhere it looked that isn't there to be seen (a report it no longer has): said.
-  for (const [id, asked] of o.looked ?? []) if (!(id in obs.channels)) out.push("", `## ${title(id)}`, asked.sent ? SET_OUT : "Nothing could be seen there.");
+  for (const [id, asked] of o.looked ?? []) if (!(id in obs.channels)) out.push("", `## ${title(id)}`, asked.sent ? SET_OUT : (obs.asking ?? []).some((a) => a === id || a.endsWith(`/${id}`)) ? WAITING_ON_KEEPER : "Nothing could be seen there.");
   if (obs.drafts.length) {
     out.push("", "## Waiting for you to confirm");
     for (const d of obs.drafts) out.push(o.draftText ? o.draftText(d) : `(${d.id}) ${d.summary}`);

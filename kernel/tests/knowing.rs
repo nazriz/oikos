@@ -477,3 +477,24 @@ fn a_keeper_with_every_post_vacant_does_not_answer_at_once() {
     assert!(!matches!(o.channels.get("developer/titles"), Some(ChannelData::Records { records, .. }) if !records.is_empty()), "answered at once with nobody in post");
     assert_eq!(o.asking, ["developer/titles"]);
 }
+
+/// Bug hunt 2026-10-17, finding 6: two answers from one register's keeper, arriving together, are both shown.
+#[test]
+fn two_answers_from_one_keeper_arriving_together_are_both_shown() {
+    let titles = json!({"id": "titles", "kind": "records", "way": "ask", "of": "city", "by": ["holder", "id"], "match": {"records": ["claim"]}, "on_request": true});
+    let mut c = with_channel(Some("developer"), titles);
+    c["orchestration"]["act_time"]["system"]["answer"] = json!(120);
+    let mut run = Run::start(c, "knowing-two-answers", Vec::new(), None).unwrap();
+    for holder in ["city", "devco"] {
+        let looks = serde_json::from_value(json!([{"channel": "developer/titles", "query": {"where": [{"field": "holder", "op": "=", "value": holder}], "order": {"field": "id"}, "limit": 200}}])).unwrap();
+        run.command(&Command::Look { participant: "developer-system".into(), only: None, looks }).unwrap();
+    }
+    run.command(&Command::Advance { to: 120 }).unwrap();
+    let o = run.command(&Command::Observe { participant: "developer-system".into(), only: None }).unwrap().observation.unwrap();
+    let ids: Vec<String> = match o.channels.get("developer/titles") {
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id.clone()).collect(),
+        other => panic!("{other:?}"),
+    };
+    assert!(ids.contains(&"title-lot-a".to_string()), "the first answer: {ids:?}");
+    assert!(ids.contains(&"title-lot-b".to_string()), "the second answer was lost: {ids:?}");
+}
