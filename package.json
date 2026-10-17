@@ -9,7 +9,8 @@
     "orchestrator",
     "worlds",
     "measure",
-    "pilot-view"
+    "pilot-view",
+    "renderer"
   ],
   "scripts": {
     "test": "bun test",

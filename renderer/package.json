@@ -1,0 +1,14 @@
+{
+  "name": "@oikos/renderer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "The pilot explorer: a run's town, people, institutions and seats' acts in an isometric WebGPU scene, read from the log through an index. It never writes to a run.",
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0"
+  }
+}

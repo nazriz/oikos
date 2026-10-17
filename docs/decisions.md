@@ -5743,3 +5743,43 @@ empty on the Rust world. A fork of a JSONL-logged run must log in binary (it nam
 the state as deltas of the persistent maps); JSON snapshots take over a second at 10,000 people (a self-describing
 binary format, or `Value`s out of the state); or a lane's actor memory does not round-trip through JSON (its save is
 then wrong, and the snapshot test catches it once the lane adds its kind to a snapshot test).
+=======
+## 2026-10-17: the pilot explorer, the first real renderer (`oikos explore`; no model called)
+
+**Why.** After the first pilot viewer Naz asked for "something way way more exciting, visual, innovative", to see each
+pilot's actions and look at different citizens and institutions, with a simple renderer and WebGPU if it helps. The
+approved plan (docs/design/renderer.md) already had the shape; this builds a first version of it and merges the pilot
+viewer into it. **What.** A new workspace `renderer/` and `oikos explore <run-dir> | --all | index <run-dir>`
+(docs/explorer.md): one streaming pass to a view index beside the runs (`runs/views/<run>.<head hash>/`, never inside a
+run), Bun serving it on 127.0.0.1 under a path prefix, and a Three.js client on WebGPU (WebGL 2 where it is missing):
+the town as an isometric scene with day and night, people as lights hopping between the buildings they are in, seats'
+acts as arcs from the office to where they land, consequential changes as rings by who decided, a timeline with a rail
+per seat, panels for a person, an organisation, a building and a seat's act (its words, the draft, sign-off, outcome,
+twin, sitting and causal trace), two overlays (who decided; hardship from people's own records), search, a linkable URL.
+
+**Choices.** (1) The index is files and Bun's SQLite, not the plan's varint postings: simpler, 180 MB for a 3,000-person
+90-day pilot. (2) No WASM: indexing is bounded by reading the log (about 50 s of 70 to 130 s), and nothing on the
+client needs it. (3) People drawn one by one at every zoom, on the roof of the building they are in (the owner asked to
+see people move); the hop between buildings is drawn over the travel time and is not a route (the log has none). (4) The
+pilot viewer's fold is reused whole for seats (`buildView`, with a new `debriefs: false`, and each twin act's `seq`), so
+the two views cannot disagree; the explorer reads no debrief, and its index drops debrief annotations. (5) The
+consequential-acts list lives in `measure/src/consequential.ts`, as the plan asked, for M1 to share. (6) "Who decided"
+is by role (a person, an organisation's system, a model seat, the world); a standing payment is decided by whoever gave
+the instruction; an effect with no act is the world's.
+
+**Measured.** Indexing: 1,000 people for 90 days (code only) 12 to 14 s; the 3,000-person pilots lv-07a and lv-07b 70 to
+130 s each with their twins (about 50 s of it reading the log), 1 GB of memory at peak. Client: 1.06 MB of script; at
+3,000 people the script's own frame time is 1.2 to 2.6 ms (positions, colours, rings, labels), the same order at 1,000;
+headless Chrome draws 10 to 20 frames a second whatever the size (its own limit, on WebGPU and on WebGL 2 alike), so
+frame rate on a real screen was not measured here.
+
+**Found on the way.** A seat's act was counted beside the changes it made (a person's "who decided" counted the order
+and its effects); the trace named a standing instruction "basis" when it was carried in an act's block; a person with no
+home on record was drawn at the town's edge; an office's own reports to itself filled its backlog. All fixed, the first
+two by the tests.
+
+**Not done** (docs/design/renderer.md 11): money checked by week for conservation in real runs, the record's kernel
+digests, a parcel view, live attach, a year at 10,000, a mock-pilot test of the whole page. **Revisit if** indexing a
+year at 10,000 takes over an hour, a fold disagrees with the kernel, or the owner finds the people-as-roof-lights
+metaphor misleads (then markers beside buildings, as the plan had).
+>>>>>>> explorer
