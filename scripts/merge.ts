@@ -87,7 +87,7 @@ async function main() {
   const g = (...a: string[]) => run(wt, ["git", ...a]);
   if (!g("fetch", "origin", "main").ok) stop("fetch failed");
   const dirty = g("status", "--porcelain").out.trim();
-  if (dirty) { g("merge", "--abort"); }
+  if (dirty) run(wt, ["git", "merge", "--abort"], true);
   if (!g("reset", "--hard", "origin/main").ok) stop("reset failed");
   g("clean", "-fd", "-e", "node_modules", "-e", "kernel/target");
   const ref = run(wt, ["git", "rev-parse", "--verify", "--quiet", branch]).ok ? branch : `origin/${branch}`;
@@ -112,8 +112,7 @@ async function main() {
 
   const log = join(wt, "merge-test.log");
   for (const [name, cmd] of [
-    ["bun install", ["bun", "install"]],
-    ["kernel build", ["bun", "run", "kernel"]],
+    ["warm worktree (installs, cel-check, kernel build)", ["bun", join(main, "scripts", "worktree-warm.ts"), wt]],
     ["typecheck", ["bun", "run", "typecheck"]],
     ["cargo test", ["bun", "scripts/slots.ts", "--weight", "half", "--what", "merge cargo test", "--", "cargo", "test", "--release", "--manifest-path", "kernel/Cargo.toml", "--workspace", "-q"]],
   ] as [string, string[]][]) {

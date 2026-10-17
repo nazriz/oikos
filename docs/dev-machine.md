@@ -84,8 +84,8 @@ bun scripts/merge.ts <branch> [--message "..."] [--no-push]
 ```
 
 What the maintainer does by hand, in a clean worktree of its own (`.claude/worktrees/merge-bot`, made if missing; never
-`merge-main`): fetch; reset to `origin/main`; `git merge --no-ff <branch>`; then `bun install`, `bun run kernel`,
-`bun run typecheck`, `cargo test` for the kernel, and `bun run test:all` (output in `merge-bot/merge-test.log`); restores
+`merge-main`): fetch; reset to `origin/main`; `git merge --no-ff <branch>`; then the worktree warm-up
+(`scripts/worktree-warm.ts`: installs, including cel-check, and `bun run kernel`), `bun run typecheck`, `cargo test` for the kernel, and `bun run test:all` (output in `merge-bot/merge-test.log`); restores
 `scripts/test-times.json`; pushes to `origin main` only if all passed; prints tests passed, time and the pushed sha.
 
 - **Conflicts:** only `docs/decisions.md` and `docs/research/references.md` are resolved (both sides kept, markers
