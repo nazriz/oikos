@@ -5671,3 +5671,59 @@ entry called a "market check" was found on gd-adoption; C1 and C2 ask its owner 
 10,000 people are too large for memory (then the engine hands books a shared index; no lane's code changes); the
 seam's `Other` variants carry most of the traffic by the end of step 2 (then the seam was cut in the wrong place and
 A1 and A2 redraw it together); or the forms catalogue and papers.ts drift before the cut-over (the test fails first).
+
+## 2026-10-17 · Port lane F: the platform (snapshot and fork, the binary log, the live stream, the host, twins, rules by name, travel shapes; no model called)
+
+**Built.**
+- **Snapshot and fork** (`kernel/src/engine/snapshot.rs`): the whole run at a moment (the kernel's state; the schedule;
+  the cast; every unit's view, keyed draws, looks, answers and actor memory; what each seat and unit knows for the
+  resolver; questions not yet answered; a round waiting on seats; the log's head). `Engine::next_by(t)` stops between
+  moments without moving the clock, so a snapshot there changes nothing. Resumed, on any number of threads, from
+  memory or from its bytes, the run writes the straight run's log byte for byte and reaches its hash
+  (`kernel/tests/snapshot.rs`). In memory a fork is cheap (the state is persistent). Kernel additions: the scheduler
+  and the resolver's `Knowledge` serialise; `State::rebuild_derived` makes the derived lookups again from a read-back
+  state; `World::resume`/`fork`, `Kernel::resume`/`fork`, `Run::resume` carry a log on from its head.
+- **The binary log** (`kernel/src/blog.rs`): the JSONL log's entries, unchanged in what is hashed, compressed in 1 MiB
+  blocks (zstd 3), hashes as bytes, `prev`/`seq` implied; snapshot frames among them; a fork's log names its parent.
+  It is a `Write` taking the log's lines, so the log writer and hash chain are untouched; `oikos-kernel export`
+  writes the JSONL back byte for byte, a fork's with its parents' entries first, so every tool keeps working.
+- **The live stream** (`kernel/src/stream.rs`): every log line to a pulled, capped queue; a slow watcher is told what
+  it missed and never slows the run.
+- **The host** (`kernel/src/host.rs`, N-API `World`/`Detached`/`rules`/`manifests`, `orchestrator/src/rust-world.ts`):
+  JSON in and out; `OIKOS_WORLD=rust` hands `runWorld` to it. Seats of several forks out at once; seats' usage and cost
+  recorded with `annotate` (checked by the contract). A seat sitting as its code twin is scheduled as its brain's unit
+  (`hears`, `sort`, `body`, as run.ts) and decided by the brain's Rust kind run detached (`Detached`, with save and
+  restore so a fork's twin goes on as its parent's).
+- **Rules by name** (`kernel/src/rules_api.rs`; `worlds/generator/rules.ts`): the generator's `planLaw`,
+  `planLawWords`, `possessionOrderFor` and `draftLaw` come from Rust under `OIKOS_WORLD=rust`; three profiles' towns are
+  the same, as canonical JSON.
+- **Backstops read Rust**: no-god-view holds the Rust kinds' `keeps`/`boundary` to its lists; all-work-takes-time
+  scans `kernel/crates/actors` and `rules` for errors drawn outside `slip`; generality already scanned `kernel/crates`.
+- **Travel shapes** (contract change under the blanket approval; docs/design/travel.md): `travel.roads` (cells in
+  order, capacity an hour), `vehicle_types`, `vehicles` (owned, kept in the state), `State.transit`. No traffic.
+
+**Measured** (1,017-participant town, a year, weather only, the rest idle; machine at load 13, so wall times are
+rough): 3.3 s on 1 thread and 3.5 s on 8, the same hash (the actors are idle, so this measures the kernel, not the
+decide pass); JSONL log 16.0 MB, binary 2.27 MB (7x smaller), binary with a snapshot every 30 days 16.0 MB (each
+snapshot about 1.15 MB, about 17 ms); the binary writer costs 24 ms for the year's 31,338 entries, export 10 ms.
+
+**Decided fresh.** A snapshot is JSON compressed, not a binary serde format: the state holds `serde_json::Value`s,
+which non-self-describing formats cannot read back. A snapshot carries its config, so it stands alone (in a binary log
+this repeats the header's config: about a quarter of each snapshot). `next_by` rather than a new `Due` variant, so no
+lane's exhaustive match breaks. The stand-in and decision recording are the snapshot's; threads and `until` the
+resumer's.
+
+**Left for integration.** The model seats' controllers (prompts, the translator's drafts and confirmations, notices,
+debriefs, exit accounts) are not yet wired into `rust-world.ts`: a seat with no controller waits, and the log says
+so once. Twin exactness beyond the weather bureau is gate item 3. The summary's profile and health fields are mostly
+empty on the Rust world. A fork of a JSONL-logged run must log in binary (it names its parent). No socket server yet
+(`serve` over a socket for outside seats). The experiment harness on fork is lane G's.
+
+**Tests.** `kernel/tests/snapshot.rs` (4), `blog.rs` (4), `host.rs` (4), `travel.rs` (2);
+`orchestrator/test/rust-world.test.ts` (4); the extended backstops; `cargo test`, `bun run typecheck`,
+`bun run test:fast`.
+
+**Revisit if** snapshots in long runs dominate the log's size (then drop the config from in-log snapshots and write
+the state as deltas of the persistent maps); JSON snapshots take over a second at 10,000 people (a self-describing
+binary format, or `Value`s out of the state); or a lane's actor memory does not round-trip through JSON (its save is
+then wrong, and the snapshot test catches it once the lane adds its kind to a snapshot test).

@@ -32,6 +32,7 @@ let native: { KernelSession: { new (): NativeSession; source(): string } } | und
  * fingerprint): building only the binary (`cargo test`, say) leaves a stale module that would write logs the binary
  * can't replay, and a quiet divergence costs more than a loud stop. */
 function loadNative(path: string) {
+  native ??= (globalThis as { __oikosNative?: typeof native }).__oikosNative;
   if (!native) {
     const m = { exports: {} as any };
     process.dlopen(m, path);
@@ -43,8 +44,17 @@ function loadNative(path: string) {
         throw new Error(`the engine's native module (source ${ours ?? "unknown"}) and the kernel binary beside it (source ${theirs ?? "unknown"}) were built from different sources: run \`bun run kernel\` (or OIKOS_ENGINE=stdio)`);
     }
     native = m.exports;
+    // (Shared with the generator's loader, worlds/generator/rules.ts: a native module is loaded once a process.)
+    (globalThis as { __oikosNative?: unknown }).__oikosNative ??= native;
   }
   return native!;
+}
+
+/** The engine's native module, loaded (and checked against the binary beside it), for the Rust world's host
+ * (orchestrator/src/rust-world.ts): its `World`, `Detached`, `rules` and `manifests`. Undefined where it isn't built. */
+export function nativeEngine(): any | undefined {
+  const mod = engineModule();
+  return mod ? loadNative(mod) : undefined;
 }
 
 /** The kernel refused a request (a protocol error: off-contract input, never logged). */

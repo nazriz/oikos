@@ -45,6 +45,9 @@ pub struct Config {
     /// Who knows what: what is published, who keeps each register (docs/design/knowing.md).
     #[serde(default, skip_serializing_if = "Knowing::is_empty")]
     pub knowing: Knowing,
+    /// Reserved shapes for travel (docs/design/travel.md): roads, vehicle types, vehicles. Shapes only: no traffic.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub travel: Option<Travel>,
     pub caps: Caps,
     /// Dials of a living world (docs/design/ai-citizens.md 10j). Opaque to the kernel; absent, every dial is off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1720,7 +1723,113 @@ fn check_nature(c: &Config) -> Result<(), String> {
     Ok(())
 }
 
+/// Reserved shapes for travel (lane F, 2026-10-17; docs/design/travel.md): what traffic will be built on. Nothing moves
+/// along a road or drives a vehicle yet; they are checked, and vehicles are kept in the state as their owners' things.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Travel {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roads: Vec<Road>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vehicle_types: Vec<VehicleType>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vehicles: Vec<VehicleCfg>,
+}
+
+/// A road: the cells it runs through in order, and how much it carries.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Road {
+    pub id: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub cells: Vec<Id>,
+    /// Vehicles an hour each way, at most.
+    pub capacity_per_hour: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lanes: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seconds_per_cell: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VehicleType {
+    pub id: Id,
+    pub seats: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub load_kg: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seconds_per_cell: Option<i64>,
+}
+
+/// A vehicle: a thing its owner owns, standing at a cell or in a structure.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VehicleCfg {
+    pub id: Id,
+    #[serde(rename = "type")]
+    pub type_: Id,
+    pub owner: Id,
+    pub at: Id,
+}
+
+/// The travel section checked against the world: each road runs through cells of the ground, a cell next to the one
+/// before; each vehicle is of a declared type, owned by an entity of the world, and stands at a cell or a structure;
+/// every id once.
+fn validate_travel(t: &Travel, w: &World) -> Result<(), String> {
+    let cell = |id: &str| -> Option<(i64, i64)> {
+        let mut it = id.strip_prefix("cell.")?.split('.');
+        let (x, y) = (it.next()?.parse::<i64>().ok()?, it.next()?.parse::<i64>().ok()?);
+        (it.next().is_none() && (0..w.ground.w).contains(&x) && (0..w.ground.h).contains(&y)).then_some((x, y))
+    };
+    let mut ids = std::collections::BTreeSet::new();
+    for r in &t.roads {
+        if !ids.insert(r.id.clone()) {
+            return Err(format!("travel: {} is declared twice", r.id));
+        }
+        if r.cells.len() < 2 || r.capacity_per_hour < 1 || r.lanes.is_some_and(|l| l < 1) || r.seconds_per_cell.is_some_and(|s| s < 1) {
+            return Err(format!("travel: road {} needs two cells or more and a positive capacity", r.id));
+        }
+        let mut last: Option<(i64, i64)> = None;
+        for c in &r.cells {
+            let at = cell(c).ok_or_else(|| format!("travel: road {} runs through {c}, which is no cell of the ground", r.id))?;
+            if let Some(l) = last {
+                if (l.0 - at.0).abs() + (l.1 - at.1).abs() != 1 {
+                    return Err(format!("travel: road {} jumps from one cell to {c}, which is not next to it", r.id));
+                }
+            }
+            last = Some(at);
+        }
+    }
+    for v in &t.vehicle_types {
+        if !ids.insert(v.id.clone()) || v.seats < 0 {
+            return Err(format!("travel: vehicle type {} is declared twice, or has fewer than no seats", v.id));
+        }
+    }
+    let structures: std::collections::BTreeSet<&str> = w.structures.iter().map(|s| s.id.as_str()).collect();
+    let entities: std::collections::BTreeSet<&str> = w.entities.iter().map(|e| e.id.as_str()).collect();
+    for v in &t.vehicles {
+        if !ids.insert(v.id.clone()) {
+            return Err(format!("travel: {} is declared twice", v.id));
+        }
+        if !t.vehicle_types.iter().any(|x| x.id == v.type_) {
+            return Err(format!("travel: vehicle {} is of type {}, which is not declared", v.id, v.type_));
+        }
+        if !entities.contains(v.owner.as_str()) {
+            return Err(format!("travel: vehicle {} is owned by {}, which is no entity of the world", v.id, v.owner));
+        }
+        if cell(&v.at).is_none() && !structures.contains(v.at.as_str()) {
+            return Err(format!("travel: vehicle {} stands at {}, which is no cell or structure", v.id, v.at));
+        }
+    }
+    Ok(())
+}
+
 pub fn validate(c: &Config) -> Result<(), String> {
+    if let Some(t) = &c.travel {
+        validate_travel(t, &c.world)?;
+    }
     if c.contracts != CONTRACTS_VERSION {
         return Err(format!("contracts version {} is not {}", c.contracts, CONTRACTS_VERSION));
     }

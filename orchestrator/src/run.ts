@@ -285,6 +285,8 @@ const ACCOUNT_PROMPT_CHARS = 8_000;
 const endCosts = (): EndCosts => JSON.parse(readFileSync(join(import.meta.dir, "../debrief-costs.json"), "utf8"));
 
 export async function runWorld(o: RunOptions): Promise<RunSummary> {
+  // The Rust world (docs/design/rust-port.md; lane F): the engine runs the world and its built-in actors, this host the seats.
+  if (process.env.OIKOS_WORLD === "rust") return (await import("./rust-world")).runRustWorld(o);
   const k = o.kernel ?? new Kernel();
   try {
     return await runWith(o, k);

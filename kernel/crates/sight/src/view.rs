@@ -96,13 +96,13 @@ impl Picture {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct SitesKept {
     as_of: i64,
     cells: BTreeMap<Id, SiteCell>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct DirectoryKept {
     entities: BTreeMap<Id, EntityItem>,
     positions: BTreeMap<Id, PositionItem>,
@@ -110,7 +110,7 @@ struct DirectoryKept {
 
 /// One unit's view. `full`: channels whose every record the actor always sees (standing documents). Serialisable:
 /// a snapshot of a run keeps every unit's view (docs/port-guide.md, "Snapshots").
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct View {
     full: BTreeSet<Id>,
     accounts: BTreeMap<Id, BTreeMap<Id, AccountItem>>,

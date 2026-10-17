@@ -282,6 +282,13 @@ impl World {
             takings: vec![],
             asks_held: vec![],
             entity_records: Default::default(),
+            vehicles: c
+                .travel
+                .iter()
+                .flat_map(|t| t.vehicles.iter())
+                .map(|v| (v.id.clone(), crate::state::Vehicle { type_: v.type_.clone(), owner: v.owner.clone(), at: v.at.clone() }))
+                .collect(),
+            transit: Default::default(),
         };
         for p in &c.positions {
             let position = Position { entity: p.entity.clone(), title: p.title.clone(), role: p.role.clone(), channels: Arc::new(p.channels.clone()), role_module: p.role_module.clone(), holder: p.holder.clone(), changed: 0 };
@@ -354,6 +361,22 @@ impl World {
         let k = World { s, state: st, canon_cache: Default::default() };
         k.state_hash().map_err(|e| format!("initial state is not canonical: {e}"))?;
         Ok(k)
+    }
+
+    /// A world in a state it was in before (a snapshot's): the statics made again from its config, the state as
+    /// saved with its lookups made again (`State::rebuild_derived`). It goes on exactly as the world it was saved from.
+    pub fn resume(loaded: &LoadedConfig, mut state: State) -> Result<World, String> {
+        let s = World::new(loaded)?.s;
+        state.rebuild_derived();
+        let k = World { s, state, canon_cache: Default::default() };
+        k.state_hash().map_err(|e| format!("the resumed state is not canonical: {e}"))?;
+        Ok(k)
+    }
+
+    /// The same world, apart from this one from now on (a fork): the state is persistent, so this copies almost
+    /// nothing until one of them changes.
+    pub fn fork(&self) -> World {
+        World { s: self.s.clone(), state: self.state.clone(), canon_cache: Default::default() }
     }
 
     pub fn state(&self) -> &State {

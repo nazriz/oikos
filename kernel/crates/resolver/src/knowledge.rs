@@ -2,24 +2,25 @@
 //! names into ids only from this; it never looks at the world beyond what the seat has seen. Kept from each
 //! observation the engine delivers (its changes), as translator/src/knowledge.ts did.
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountFact {
     pub holder: String,
     pub custodian: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructureFact {
     pub type_: String,
     pub at: String,
     pub spaces: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CellFact {
     pub x: i64,
     pub y: i64,
@@ -27,7 +28,7 @@ pub struct CellFact {
     pub built: bool,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Knowledge {
     pub withdrawn: BTreeSet<String>,
     pub accounts: BTreeMap<String, AccountFact>,
@@ -67,12 +68,14 @@ pub struct Knowledge {
     pub entity: String,
     pub t: i64,
     /// How the world's money is written (its config's first currency): how the resolver reads and writes amounts.
-    /// Absent (a seat nothing has been said to about the world's money): amounts can't be read.
+    /// Absent (a seat nothing has been said to about the world's money): amounts can't be read. (Not saved: whoever
+    /// reads a snapshot back gives it the world's again.)
+    #[serde(skip)]
     pub currency: Option<crate::calls::Currency>,
 }
 
 /// A routine as a procedure states it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RoutineFact {
     pub procedure: String,
     pub every: Option<i64>,

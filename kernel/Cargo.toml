@@ -34,6 +34,9 @@ jsonschema = { workspace = true }
 imbl = { version = "7.0.2", features = ["serde"] }
 # A faster allocator: the kernel allocates heavily (JSON values, canonical encoding). Results don't depend on it.
 mimalloc = { version = "0.1", default-features = false }
+# Snapshots and the binary log are compressed (kernel/src/engine/snapshot.rs, kernel/src/blog.rs): zstd, whose output is
+# the same for the same input and level.
+zstd = { version = "0.13", default-features = false }
 
 # On ARM (Apple silicon), SHA-256 uses the CPU's SHA instructions (the same hashes, several times faster).
 [target.'cfg(target_arch = "aarch64")'.dependencies]

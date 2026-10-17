@@ -340,3 +340,27 @@ indexer.ts`, `store.ts`, `trace.ts`, `world.ts` and `panels.ts` on branch `explo
 - `ROUTES`: the HTTP/JSON service on 127.0.0.1, the same routes `renderer/src/server.ts` serves, so the Three.js client
   is unchanged. A Rust viewer (Bevy) uses the trait in process, and can index a live run from F's event stream.
 - Debriefs and what a seat kept back are never indexed (VISION 15).
+
+## 10. The platform (lane F): snapshot, fork, the binary log, the stream, the host
+
+- **Snapshot and fork** (`kernel/src/engine/snapshot.rs`): `Engine::snapshot()` saves the whole run: the kernel's state
+  (derived lookups made again on reading, `State::rebuild_derived`), the schedule, the cast, every unit's view, draws,
+  looks, answers and actor memory (`Actor::save`), what each seat and unit knows for the resolver, unanswered
+  questions, and a round still waiting on seats. Take it between moments (`Engine::next_by(t)` stops there without
+  moving the clock) or while seats are out (`Due::Seats`). `Engine::resume(&snap, out, ..)` goes on exactly as the run
+  would have (the same log bytes and hash, on any number of threads); `Engine::fork` is the same in memory, cheap (the
+  state is persistent). `Snapshot::to_bytes`/`from_bytes` for disk. **Every lane's `save`/`restore` must round-trip
+  through JSON**: an actor whose memory is nothing saves `null`.
+- **The binary log** (`kernel/src/blog.rs`): put `BinLog` where the JSONL file would go. The same hash-chained entries,
+  compressed in blocks (zstd), hashes as bytes, `prev`/`seq` implied; snapshot frames among them; a fork's log names
+  its parent and the entry it carries on from. `oikos-kernel export <log.oklog>` writes the JSONL log back byte for
+  byte (a fork's with its parents' entries first), so `verify`, `replay` and every tool read it.
+- **The live stream** (`kernel/src/stream.rs`): `Tee` hands every log line to a `Stream` the watcher pulls, capped, with
+  a count of what a slow watcher missed. Nothing in the world reads it.
+- **The host** (`kernel/src/host.rs`; N-API `World`, `Detached`, `rules`, `manifests` in `kernel/crates/napi`): JSON in
+  and out. TS: `orchestrator/src/rust-world.ts` (`RustWorld`, `DetachedActor`, `rustRule`, `runRustWorld`);
+  `runWorld` hands a run to it under `OIKOS_WORLD=rust`. Seats of every fork can be out at once; the host records each
+  seat's usage with `annotate`. A mock seat sitting as its code twin is decided by its brain's Rust kind run detached.
+- **Rules by name** (`kernel/src/rules_api.rs`): the generator calls them through `worlds/generator/rules.ts` under
+  `OIKOS_WORLD=rust`. A lane porting a rule the generator uses adds a line in each.
+- **Travel** (docs/design/travel.md): roads, vehicle types, vehicles and positions in transit, as shapes only.

@@ -6,7 +6,11 @@
 //!   oikos-kernel version
 //!   oikos-kernel world <config.json> --out <dir> [--run-id ID] [--until S] [--threads N] [--stand-in KIND]
 //!                                              run a world in the engine, its actors in Rust, with no seats
+//!                                              [--binary] [--snapshot-every DAYS]: the binary log, snapshots in it
 //!   oikos-kernel manifests                     every actor kind's manifest, as JSON
+//!   oikos-kernel export <log.oklog> [--out F]  a binary log (a fork's with its parents') as the JSONL log
+//!   oikos-kernel snapshots <log.oklog>         the snapshots a binary log holds
+//!   oikos-kernel rules                         the shared rules the N-API module serves by name
 
 use std::process::ExitCode;
 
@@ -58,11 +62,37 @@ fn main() -> ExitCode {
             println!("{}", serde_json::to_string_pretty(&all).unwrap_or_default());
             Ok(())
         }
+        Some("export") if args.len() >= 2 => (|| {
+            let flag = args.iter().position(|a| a == "--out").and_then(|i| args.get(i + 1));
+            let n = match flag {
+                Some(p) => {
+                    let mut f = std::io::BufWriter::new(std::fs::File::create(p).map_err(|e| format!("{p}: {e}"))?);
+                    let n = oikos_kernel::blog::export_file(std::path::Path::new(&args[1]), &mut f).map_err(|e| e.to_string())?;
+                    std::io::Write::flush(&mut f).map_err(|e| e.to_string())?;
+                    n
+                }
+                None => oikos_kernel::blog::export_file(std::path::Path::new(&args[1]), &mut std::io::stdout().lock()).map_err(|e| e.to_string())?,
+            };
+            eprintln!("{n} entries");
+            Ok(())
+        })(),
+        Some("snapshots") if args.len() >= 2 => (|| {
+            let bytes = read(&args[1])?;
+            let r = oikos_kernel::blog::Read::of(&bytes).map_err(|e| e.to_string())?;
+            println!("{}", serde_json::json!({ "about": r.about, "first_seq": r.first_seq, "cut_short": r.cut_short, "snapshots": r.snapshots().iter().map(|(s, t)| serde_json::json!({ "seq": s, "t": t })).collect::<Vec<_>>() }));
+            Ok(())
+        })(),
+        Some("rules") => {
+            for (name, _, what) in oikos_kernel::rules_api::RULES {
+                println!("{name}\t{what}");
+            }
+            Ok(())
+        }
         Some("version") => {
             println!("oikos-kernel {} ({}) source {}", run::KERNEL_VERSION, run::KERNEL_BUILD, run::KERNEL_SOURCE);
             Ok(())
         }
-        _ => Err("usage: oikos-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | world <config.json> --out <dir> [--run-id ID] [--until S] [--threads N] [--stand-in KIND] | manifests | version".into()),
+        _ => Err("usage: oikos-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | world <config.json> --out <dir> [--run-id ID] [--until S] [--threads N] [--stand-in KIND] | manifests | export <log.oklog> [--out F] | snapshots <log.oklog> | rules | version".into()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -86,6 +116,24 @@ fn world(args: &[String]) -> Result<(), String> {
     }
     opts.until = flag("--until").map(|u| u.parse::<i64>()).transpose().map_err(|_| "--until S")?;
     opts.stand_in = flag("--stand-in");
+    if args.iter().any(|a| a == "--binary") {
+        let mut o = serde_json::json!({ "run_id": run_id, "log": format!("{out}/{run_id}.oklog"), "threads": opts.threads, "until": opts.until, "stand_in": opts.stand_in });
+        if let Some(d) = flag("--snapshot-every") {
+            o["snapshot_every_days"] = serde_json::json!(d.parse::<i64>().map_err(|_| "--snapshot-every DAYS")?);
+        }
+        let mut h = oikos_kernel::host::Host::start(config, &o)?;
+        loop {
+            let due = h.next()?;
+            if due["due"] == "end" {
+                break;
+            }
+            for s in due["seats"].as_array().into_iter().flatten() {
+                h.submit(s["key"].as_str().unwrap_or_default(), &serde_json::json!({ "type": "wait" }))?;
+            }
+        }
+        println!("{}", h.finish()?);
+        return Ok(());
+    }
     let log = std::io::BufWriter::new(std::fs::File::create(format!("{out}/{run_id}.jsonl")).map_err(|e| e.to_string())?);
     let (hash, e) = oikos_kernel::engine::run_code_world(config, &run_id, log, opts)?;
     println!("{{\"run_id\":{:?},\"state_hash\":{:?},\"t\":{},\"steps\":{}}}", run_id, hash, e.t(), e.steps);

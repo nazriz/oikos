@@ -9,4 +9,6 @@ rust-version = "1.85"
 [dependencies]
 serde_json = { workspace = true }
 # A persistent map: a town's register of lots, known to every seat that has read it, is held once between them.
-imbl = "7.0.2"
+imbl = { version = "7.0.2", features = ["serde"] }
+# What a seat knows is saved with a snapshot (kernel/src/snapshot.rs).
+serde = { workspace = true }

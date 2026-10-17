@@ -47,3 +47,173 @@ impl KernelSession {
         oikos_kernel::run::KERNEL_SOURCE.to_string()
     }
 }
+
+// ------------------------------------------------------------------ the engine with its actors (lane F)
+
+use napi::bindgen_prelude::Buffer;
+use oikos_kernel::host::{Detached as DetachedActor, Host};
+
+fn err(e: String) -> napi::Error {
+    napi::Error::from_reason(e)
+}
+fn parse(s: &str, what: &str) -> napi::Result<serde_json::Value> {
+    serde_json::from_str(s).map_err(|e| err(format!("{what}: {e}")))
+}
+
+/// A world run in the engine, its built-in actors in Rust, its seats hosted by the caller (kernel/src/host.rs):
+/// every call takes and gives JSON text.
+#[napi]
+pub struct World {
+    host: Host,
+}
+
+#[napi]
+impl World {
+    /// `config`: the world's config; `options`: see kernel/src/host.rs (`run_id`, `log`, `threads`, `until`,
+    /// `stand_in`, `snapshot_every_days`, `stream`...).
+    #[napi(constructor)]
+    pub fn new(config: String, options: String) -> napi::Result<Self> {
+        Ok(World { host: Host::start(parse(&config, "config")?, &parse(&options, "options")?).map_err(err)? })
+    }
+
+    /// A run taken up again from a snapshot's bytes, with its own options (its log, `parent`, threads).
+    #[napi(factory)]
+    pub fn resume(snapshot: Buffer, options: String) -> napi::Result<Self> {
+        Ok(World { host: Host::resume(&snapshot, &parse(&options, "options")?).map_err(err)? })
+    }
+
+    /// A fork of this run now, apart from it from here on.
+    #[napi]
+    pub fn fork(&mut self, options: String) -> napi::Result<World> {
+        Ok(World { host: self.host.fork(&parse(&options, "options")?).map_err(err)? })
+    }
+
+    /// `{"due":"seats","t","seats":[{key, participant, t, woke_for, since, observation}]}` or `{"due":"end","t"}`.
+    #[napi]
+    pub fn next(&mut self) -> napi::Result<String> {
+        Ok(self.host.next().map_err(err)?.to_string())
+    }
+
+    /// `next`, stopping between moments before anything after `by` (`{"due":"paused","t"}`).
+    #[napi]
+    pub fn next_by(&mut self, by: i64) -> napi::Result<String> {
+        Ok(self.host.next_by(by).map_err(err)?.to_string())
+    }
+
+    /// A seat's action (the participant API's: wait, look, call, act with its provenance, message, opt_out).
+    #[napi]
+    pub fn submit(&mut self, key: String, action: String) -> napi::Result<()> {
+        self.host.submit(&key, &parse(&action, "action")?).map_err(err)
+    }
+
+    /// The host's own record into the log (usage and cost per seat, transcripts, debriefs).
+    #[napi]
+    pub fn annotate(&mut self, annotation: String) -> napi::Result<()> {
+        self.host.annotate(parse(&annotation, "annotation")?).map_err(err)
+    }
+
+    /// Code actors' questions to models since last asked: `[{key, kind, about, body}]`.
+    #[napi]
+    pub fn questions(&mut self) -> String {
+        self.host.questions().to_string()
+    }
+
+    /// Answers for a unit (`[{kind, about, body}]`), given to it with its next observation.
+    #[napi]
+    pub fn answer(&mut self, key: String, answers: String) -> napi::Result<()> {
+        self.host.answer(&key, &parse(&answers, "answers")?).map_err(err)
+    }
+
+    /// The whole run now, as bytes (between moments, or while seats are out).
+    #[napi]
+    pub fn snapshot(&self) -> napi::Result<Buffer> {
+        Ok(self.host.snapshot().map_err(err)?.into())
+    }
+
+    /// A snapshot into the run's binary log.
+    #[napi]
+    pub fn snapshot_to_log(&mut self) -> napi::Result<()> {
+        self.host.snapshot_to_log().map_err(err)
+    }
+
+    /// The live stream: `{entries: [log entries...], missed}` (options.stream must have asked for it).
+    #[napi]
+    pub fn events(&self, max: u32) -> String {
+        self.host.events(max as usize).to_string()
+    }
+
+    #[napi]
+    pub fn t(&self) -> i64 {
+        self.host.t()
+    }
+
+    #[napi]
+    pub fn state_hash(&self) -> napi::Result<String> {
+        self.host.state_hash().map_err(err)
+    }
+
+    /// The run's end: `{state_hash, t, steps, log?}`.
+    #[napi]
+    pub fn finish(&mut self) -> napi::Result<String> {
+        Ok(self.host.finish().map_err(err)?.to_string())
+    }
+
+    /// The log, where it was kept in memory (after `finish`): the JSONL lines.
+    #[napi]
+    pub fn log_bytes(&mut self) -> Option<Buffer> {
+        self.host.log_bytes().map(Buffer::from)
+    }
+}
+
+/// One actor kind run on observations it is handed (twins: a mock seat sitting as its code twin).
+#[napi]
+pub struct Detached {
+    inner: DetachedActor,
+}
+
+#[napi]
+impl Detached {
+    /// `{kind, participant, capacity, entity, system?, params, seed, config}`.
+    #[napi(constructor)]
+    pub fn new(spec: String) -> napi::Result<Self> {
+        Ok(Detached { inner: DetachedActor::new(&parse(&spec, "spec")?).map_err(err)? })
+    }
+
+    /// One step: `{action, decisions, outcomes, record, questions}`.
+    #[napi]
+    pub fn step(&mut self, observation: String, woke_for: String, since: i64, answers: Option<String>) -> napi::Result<String> {
+        let answers = match answers {
+            Some(a) => parse(&a, "answers")?,
+            None => serde_json::Value::Null,
+        };
+        Ok(self.inner.step(&parse(&observation, "observation")?, &woke_for, since, &answers).map_err(err)?.to_string())
+    }
+
+    #[napi]
+    pub fn sent(&mut self, action: String) {
+        self.inner.sent(&action);
+    }
+
+    #[napi]
+    pub fn save(&self) -> napi::Result<String> {
+        Ok(self.inner.save().map_err(err)?.to_string())
+    }
+}
+
+/// A shared rule by name (kernel/src/rules_api.rs), its arguments and answer as JSON text.
+#[napi]
+pub fn rules(name: String, args: String) -> napi::Result<String> {
+    Ok(oikos_kernel::rules_api::call(&name, &parse(&args, "args")?).map_err(err)?.to_string())
+}
+
+/// The rules served: `[[name, what it takes]]`.
+#[napi]
+pub fn rules_list() -> String {
+    serde_json::Value::Array(oikos_kernel::rules_api::RULES.iter().map(|(n, _, d)| serde_json::json!([n, d])).collect()).to_string()
+}
+
+/// Every actor kind's manifest, by name.
+#[napi]
+pub fn manifests() -> String {
+    oikos_kernel::rules_api::manifests().to_string()
+}
