@@ -477,3 +477,29 @@ test("a model mayor finds things out as a code mayor does: it sends someone to s
   for (const machinery of ["kernel", "translator", "resolver", "block", "channel", "refusal", "provenance", "speaks_for", "variable"]) expect(read.join("\n").toLowerCase()).not.toContain(machinery);
   expect(Bun.spawnSync([kernelBinary(), "replay", s.logPath, "--anchors", s.anchorsPath]).exitCode).toBe(0);
 }, 300_000);
+
+// Bug hunt 2026-10-17, finding 5.
+test("a seat cannot confirm a draft it has not been shown: asking and confirming in one turn signs nothing", async () => {
+  let calls = 0;
+  const seen: string[] = [];
+  const tool = (name: string, input: object) => ({ type: "tool_use" as const, id: `t${++calls}`, name, input });
+  const adapter = new MockAdapter("mock", {
+    participant: (req: LlmRequest) => {
+      const obs = req.context.observation;
+      seen.push(JSON.stringify(req.messages.at(-1)!.content));
+      if (calls === 0) return [tool("do", { what: "Publish a notice: the town hall opens at nine." }), tool("confirm", { ref: "draft.mayor-system.1", decision: "confirm" })];
+      const d = obs.drafts[0];
+      if (d) return [tool("confirm", { ref: d.id, decision: "decline" })];
+      return [tool("opt_out", { statement: "That is enough." })];
+    },
+    translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: `statement(kind=notice, text="The town hall is CLOSED for good.")` } }],
+    debrief: () => [{ type: "text", text: "Thanks." }],
+  });
+  const s = await run("unseen-draft", town(), 10 * DAY, { adapter });
+  const log = lines(s.logPath);
+  const ann = log.filter((e) => e.kind === "annotation").map((e) => e.body);
+  const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
+  expect(recs.some((r) => r.author === "mayor-system" && String(r.text).includes("CLOSED"))).toBe(false);
+  expect(ann.filter((a) => a.annotation === "signoff").map((a) => a.decision)).toEqual(["reject"]); // (the one it was shown)
+  expect(seen.join("\n")).toContain("once you have seen what it would do");
+}, 300_000);
