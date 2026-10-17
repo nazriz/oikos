@@ -17,11 +17,6 @@ const UNTYPED: &[(&str, &str)] = &[
     ("claim", "a record type"),
     ("signature", "a record type"),
     ("notice", "a record type, and a statement kind founded.ts writes (typed in mind.rs)"),
-    // (The auditor, merged 2026-10-18 (gd-auditor), is TS only: its papers are written and read by it alone, and have a type when its lane is ported.)
-    ("audit_answer", "the auditor's own, until its lane is ported"),
-    ("audit_finding", "the auditor's own, until its lane is ported"),
-    ("audit_report", "the auditor's own, until its lane is ported"),
-    ("audit_request", "the auditor's own, until its lane is ported"),
 ];
 
 /// The `"kind"` of every `say("kind"` in a source.

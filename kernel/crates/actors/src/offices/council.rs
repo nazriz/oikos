@@ -812,10 +812,10 @@ impl Mayor {
                 &key,
                 format!(
                     "A petition passed {}% of the town: putting what it asks that the {} form covers ({}) to the council on that form (we respond to {}% of such petitions).",
-                    self.p.petition_threshold_bps as f64 / 100.0,
+                    crate::firms::decimal::fmt_dec(self.p.petition_threshold_bps, 100),
                     fd.form.replace('_', " "),
                     asked.iter().map(|x| x.0.as_str()).collect::<Vec<_>>().join(", "),
-                    self.p.responsiveness_bps as f64 / 100.0
+                    crate::firms::decimal::fmt_dec(self.p.responsiveness_bps, 100)
                 ),
                 vec![
                     call("form", cargs),
@@ -839,7 +839,7 @@ impl Mayor {
         self.guard.put(&key, t);
         Some(vec![sent_step(
             &key,
-            format!("A petition passed {}% of the town: putting its demand to the council (we respond to {}% of such petitions).", self.p.petition_threshold_bps as f64 / 100.0, self.p.responsiveness_bps as f64 / 100.0),
+            format!("A petition passed {}% of the town: putting its demand to the council (we respond to {}% of such petitions).", crate::firms::decimal::fmt_dec(self.p.petition_threshold_bps, 100), crate::firms::decimal::fmt_dec(self.p.responsiveness_bps, 100)),
             vec![say("proposal", &format!("Proposal (from petition {}): {text_}", pet.id), Say { to: Some(vec![me.to_string()]), basis: Some(pet.id.clone()), data: Some(json!({ "enact": Value::Object(enact), "tags": tags })), ..Default::default() })],
         )])
     }
@@ -851,11 +851,16 @@ fn per_text(v: i64, per: i64) -> String {
     if v % per == 0 {
         return (v / per).to_string();
     }
-    let mut s = format!("{:.6}", v as f64 / per as f64);
-    while s.ends_with('0') {
-        s.pop();
+    // (Six places, rounded half away from nought, trailing noughts dropped.)
+    let neg = (v < 0) != (per < 0) && v != 0;
+    let (n, d) = (i128::from(v).abs(), i128::from(per).abs());
+    let scaled = (n * 1_000_000 * 2 + d) / (2 * d);
+    let (whole, frac) = (scaled / 1_000_000, scaled % 1_000_000);
+    let sign = if neg { "-" } else { "" };
+    if frac == 0 {
+        return format!("{sign}{whole}");
     }
-    s
+    format!("{sign}{whole}.{}", format!("{frac:06}").trim_end_matches('0'))
 }
 
 // ====================================================================== city.council_clerk

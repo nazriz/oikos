@@ -100,3 +100,10 @@ code does not tell a seat what to do.
 - A new task for the people freed is not built: whether the markets give it is checked (docs/decisions.md, "Adoption by the numbers: the market check").
 - Replacement of striking workers by systems: the strike is by cost (docs/behaviour/unions.md); a law on replacement is not built.
 - A system cannot be sold on, only ended; the fee is a standing payment, never indexed.
+
+## Offices in the Rust port (`kernel/crates/actors/src/offices/systems.rs`)
+
+`OfficeAdoption` and `OfficeDesk` (the planning and rates offices' side) are written over the vendor's library (`market::automation`:
+`Fleet`, `appraise`, `best`, `dropping`). A paper's seconds, the volume a month and the cost of an error are whole numbers, rounded half
+up. The tender's id is read from the notice's outcome. Where the bids are in and none is worth taking, the Rust says nothing (the TS made a
+step with no act). The planning officer puts `done_by` on the first call of a permit decision, the rates officer on each chunk of notices.

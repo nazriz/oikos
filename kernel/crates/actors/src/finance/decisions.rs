@@ -245,17 +245,27 @@ impl Reconsiderations {
         v
     }
 
-    /// `redo(decision, request)`: the deciding again; `None` where it cannot be done yet (the request stays to be taken
+    /// `redo(book, decision, request)`: the deciding again, on the office's own book (the office reads its laws through
+    /// it, which may note what it could not read); `None` where it cannot be done yet (the request stays to be taken
     /// up at the next round).
-    pub fn steps<T>(&mut self, book: &Book, t: i64, mut redo: impl FnMut(&Record, &Record) -> Option<Redone<T>>) -> Vec<Step<T>> {
+    pub fn steps<T>(&mut self, book: &mut Book, t: i64, mut redo: impl FnMut(&mut Book, &Record, &Record) -> Option<Redone<T>>) -> Vec<Step<T>> {
         let mut steps: Vec<Step<T>> = vec![];
-        let mut requests: Vec<&Arc<Record>> =
-            book.open(kind::REQUEST).filter(|x| addressed_to(x).contains(&self.me) && !self.handled.contains(&x.id)).collect();
+        // (What our own file shows we have answered is answered: a successor in the post does not answer twice.)
+        let answered: BTreeSet<String> = book
+            .open(kind::ANSWER)
+            .filter(|a| a.speaks_for.as_deref() == Some(self.me.as_str()))
+            .filter_map(|a| data(a).s("request").map(String::from))
+            .collect();
+        let mut requests: Vec<Arc<Record>> = book
+            .open(kind::REQUEST)
+            .filter(|x| addressed_to(x).contains(&self.me) && !self.handled.contains(&x.id) && !answered.contains(&x.id))
+            .cloned()
+            .collect();
         requests.sort_by(|a, b| made_at(a).cmp(&made_at(b)).then_with(|| a.id.cmp(&b.id)));
-        for r in requests {
-            let about = data(r).s("about").and_then(|id| book.get(id));
+        for r in &requests {
+            let about = data(r).s("about").and_then(|id| book.get(id)).cloned();
             // (Not about one of our decisions of a kind with a review: some other request, not ours to look at again.)
-            let Some(about) = about else { continue };
+            let Some(about) = about.as_ref() else { continue };
             let Some(about_kind) = crate::common::kind(about) else { continue };
             if about.speaks_for.as_deref() != Some(self.me.as_str()) || !self.kinds.iter().any(|k| k == about_kind) {
                 continue;
@@ -314,7 +324,7 @@ impl Reconsiderations {
                 said(self, first == Result_::Changed, outcome, "it has been looked at already", words, vec![], &mut steps);
                 continue;
             }
-            let Some(out) = redo(about, r) else {
+            let Some(out) = redo(book, about, r) else {
                 self.handled.remove(&r.id);
                 continue;
             };
@@ -430,9 +440,9 @@ mod tests {
 
     #[test]
     fn a_refusal_asked_about_inside_the_laws_days_is_looked_at_again_found_wrong_it_is_put_right_with_a_record_and_an_answer() {
-        let b = review_world(vec![ask("q1", 4 * DAY, "a")]);
+        let mut b = review_world(vec![ask("q1", 4 * DAY, "a")]);
         let mut r = Reconsiderations::new("outside", &["benefit_decision"]);
-        let steps = r.steps::<()>(&b, 4 * DAY, |dec, _req| {
+        let steps = r.steps::<()>(&mut b, 4 * DAY, |_, dec, _req| {
             assert_eq!(dec.id, "dec1");
             Some(Redone { changed: true, found: "the claim could be verified".into(), steps: vec![] })
         });
@@ -448,14 +458,14 @@ mod tests {
     fn a_second_request_on_the_same_decision_is_answered_from_the_first_and_one_found_right_stands() {
         let mut r = Reconsiderations::new("outside", &["benefit_decision"]);
         let mut calls = 0;
-        let mut redo = |_: &Record, _: &Record| {
+        let mut redo = |_: &mut crate::common::Book, _: &Record, _: &Record| {
             calls += 1;
             Some(Redone::<()> { changed: false, found: "the claimant is too young".into(), steps: vec![] })
         };
-        let first = r.steps(&review_world(vec![ask("q1", DAY, "a")]), DAY, &mut redo);
+        let first = r.steps(&mut review_world(vec![ask("q1", DAY, "a")]), DAY, &mut redo);
         assert_eq!(crate::finance::kit::json_arg(&first[0].lines[0].call, "data")["outcome"], "upheld");
         assert_eq!(crate::finance::kit::json_arg(&first[0].lines[1].call, "data")["granted"], false);
-        let again = r.steps(&review_world(vec![ask("q1", DAY, "a"), ask("q2", 2 * DAY, "a")]), 2 * DAY, &mut redo);
+        let again = r.steps(&mut review_world(vec![ask("q1", DAY, "a"), ask("q2", 2 * DAY, "a")]), 2 * DAY, &mut redo);
         assert_eq!(crate::finance::kit::json_arg(&again[0].lines[0].call, "data")["found"], "it has been looked at already");
         assert_eq!(calls, 1, "looked at once");
     }
@@ -463,7 +473,7 @@ mod tests {
     #[test]
     fn after_the_days_the_law_gives_the_answer_is_no_and_says_so_and_the_decision_is_not_looked_at() {
         let mut r = Reconsiderations::new("outside", &["benefit_decision"]);
-        let steps = r.steps::<()>(&review_world(vec![ask("q3", 31 * DAY, "a")]), 31 * DAY, |_, _| panic!("not looked at"));
+        let steps = r.steps::<()>(&mut review_world(vec![ask("q3", 31 * DAY, "a")]), 31 * DAY, |_, _, _| panic!("not looked at"));
         let review = crate::finance::kit::json_arg(&steps[0].lines[0].call, "data");
         assert_eq!(review["outcome"], "out_of_time");
         assert_eq!(crate::finance::kit::json_arg(&steps[0].lines[1].call, "data")["granted"], false);
@@ -475,12 +485,12 @@ mod tests {
         let mut no_review = route();
         no_review["review"] = Value::Null;
         no_review["needs"] = json!([]);
-        let b = book_of("outside", vec![law(vec![no_review]), decision(), ask("q", DAY, "b")]);
-        assert!(Reconsiderations::new("outside", &["benefit_decision"]).steps::<()>(&b, DAY, |_, _| panic!("no review in the law")).is_empty());
+        let mut b = book_of("outside", vec![law(vec![no_review]), decision(), ask("q", DAY, "b")]);
+        assert!(Reconsiderations::new("outside", &["benefit_decision"]).steps::<()>(&mut b, DAY, |_, _, _| panic!("no review in the law")).is_empty());
         // One the office cannot do yet (it declines to say): not handled, so it is taken up at the next round.
         let mut r = Reconsiderations::new("outside", &["benefit_decision"]);
-        assert!(r.steps::<()>(&review_world(vec![ask("q", DAY, "b")]), DAY, |_, _| None).is_empty());
-        let next = r.steps::<()>(&review_world(vec![ask("q", DAY, "b")]), 2 * DAY, |_, _| Some(Redone { changed: false, found: "fine".into(), steps: vec![] }));
+        assert!(r.steps::<()>(&mut review_world(vec![ask("q", DAY, "b")]), DAY, |_, _, _| None).is_empty());
+        let next = r.steps::<()>(&mut review_world(vec![ask("q", DAY, "b")]), 2 * DAY, |_, _, _| Some(Redone { changed: false, found: "fine".into(), steps: vec![] }));
         assert_eq!(kinds(&next), ["decision_review", "remedy_answer"]);
     }
 

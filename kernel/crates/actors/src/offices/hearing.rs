@@ -14,10 +14,10 @@
 //!   bridge the time an act of ours takes to reach the file.
 //! - Days are written through `when_words` (a civil date where the world has a calendar), never "day N".
 //! - Ties among cases of one day go by when they were filed, then `filed_before` (rec.9 before rec.10).
-//! - An appeal law is read from the laws on file (`appeal_law`); lane D's `rules::decisions` replaces the reader at
-//!   integration.
+//! - An appeal law is read from the laws on file by lane D's `finance::decisions::appeal_law` (`rules::decisions`).
 //! - A venue's hours are the caller's `can_decide`; a case is never decided more than once.
 
+use crate::finance::decisions::appeal_law;
 use crate::common::{data, filed_before, money_words, when_words, Book, Fields, Occurrences, DAY};
 use crate::steps::{because, say, Say, Step, Visible};
 use crate::Cx;
@@ -221,21 +221,6 @@ pub fn hearing_notices(me: &str, words: &str, hears: &[Hears], o: &NoticeOpts, c
     by_fee.into_iter().map(|(fee, hs)| hearing_notice(me, words, &hs, &NoticeOpts { fee, ..o.clone() }, cx)).collect()
 }
 
-/// The law on file whose appeal is about this matter: the days an appeal may be made in (decisions.ts `appealLaw`;
-/// stands in for lane D's `rules::decisions`, which replaces it at integration).
-pub fn appeal_law(book: &Book, matter: &str) -> Option<Value> {
-    let mut best: Option<(&Value, i64)> = None;
-    for l in book.open("law") {
-        let Some(ds) = data(l).get("decisions").and_then(Value::as_array) else { continue };
-        for d in ds {
-            if d.get("appeal").and_then(|a| a.s("matter")) == Some(matter) && best.is_none_or(|(_, at)| l.at >= at) {
-                best = Some((d, l.at));
-            }
-        }
-    }
-    best.map(|(d, _)| d.clone())
-}
-
 /// Whether an application says what it is about: it gives its particulars, or names a paper, a place, a sum, what is
 /// sought, or evidence (frictions.ts `hasParticulars`).
 pub fn has_particulars(d: &Value) -> bool {
@@ -257,6 +242,58 @@ pub fn response_to<'a>(book: &'a Book, kind: &str, application: &str, from: &str
 
 fn by_time_then_id(a: &Arc<Record>, b: &Arc<Record>) -> std::cmp::Ordering {
     a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id))
+}
+
+/// A union's hearing of its members' grievances (union.ts `cases`): lane D's seam `finance::union::Grievances`, here as the
+/// desk's `Hearings`. What the union takes up it says in public once, for its members; a case put to the employer, and what
+/// the union then says should be done, is a recommendation with the union behind it, never an order (`can: represent`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnionCases {
+    me: String,
+    hears: Vec<Hears>,
+    hearings: Hearings,
+    said: bool,
+}
+
+impl UnionCases {
+    pub fn new(me: &str, hears: Vec<Hears>, answer_days: i64) -> Self {
+        let hears: Vec<Hears> = hears.into_iter().map(|h| Hears { can: vec!["represent".to_string()], ..h }).collect();
+        let params = HearingParams { hears: hears.clone(), answer_days, ..Default::default() };
+        UnionCases { me: me.to_string(), hears, hearings: Hearings::new(me, params, Forms::default(), &[]), said: false }
+    }
+}
+
+impl crate::finance::union::Grievances for UnionCases {
+    fn steps(&mut self, _pic: &crate::Picture, book: &Book, cx: &mut Cx) -> Vec<Step<()>> {
+        let mut steps: Vec<Step<()>> = vec![];
+        if !self.said {
+            self.said = true;
+            if !book.open("hearing").any(|r| r.speaks_for.as_deref() == Some(self.me.as_str())) {
+                let o = NoticeOpts { fee: 0, account: "", members_of: &self.me, members_apply: true };
+                for n in hearing_notices(&self.me, "The union takes up for its members", &self.hears, &o, cx) {
+                    steps.push(because(
+                        "Saying what the union takes up for its members, so that a member with such a matter can bring it.",
+                        vec![say(&n.kind, &n.text, Say { visible: Some(Visible::Public), data: Some(n.data), extra: vec![("offer", n.offer)], ..Default::default() })],
+                    ));
+                }
+            }
+        }
+        steps.extend(self.hearings.steps(book, cx, HearPart::All, None));
+        steps
+    }
+    fn save(&self) -> Value {
+        serde_json::to_value(self).unwrap_or(Value::Null)
+    }
+}
+
+/// Builds a union's grievance hearings from its parameters (`hears`, `answer_days`) and what `save` left (`Null`: new).
+pub fn union_cases(ctx: &crate::Ctx, saved: &Value) -> Result<Box<dyn crate::finance::union::Grievances>, String> {
+    if !saved.is_null() {
+        let back: UnionCases = serde_json::from_value(saved.clone()).map_err(|e| format!("union.organiser: the saved hearings: {e}"))?;
+        return Ok(Box::new(back));
+    }
+    let hears: Vec<Hears> = ctx.param("hears", vec![])?;
+    Ok(Box::new(UnionCases::new(&ctx.entity, hears, ctx.param("answer_days", 14)?)))
 }
 
 /// The hearing of applications for one venue (saved with the actor).
@@ -489,12 +526,12 @@ impl Hearings {
                     // the decision, or from the answer to a review where the law makes a review come first.
                     if hears.orders() {
                         if let Some(law) = appeal_law(book, &matter) {
-                            if let Some(appeal) = law.get("appeal") {
+                            if let Some(appeal) = &law.appeal {
                                 let decided = d.get("evidence").and_then(|e| e.i("at")).or_else(|| d.i("decided_on"));
                                 let reviewed = d.i("reviewed_on");
-                                let review_required = law.get("review").and_then(|r| r.get("required")).is_some_and(|v| v == &Value::Bool(true));
+                                let review_required = law.review.as_ref().is_some_and(|r| r.required);
                                 let from = if review_required { reviewed } else { decided };
-                                let within = appeal.i("within_days").unwrap_or(i64::MAX);
+                                let within = appeal.within_days;
                                 if review_required && from.is_none() {
                                     self.say2(&mut steps, t, &c, "rejected", "the law asks that the decision be looked at again by the office that made it before it is appealed, and there is no answer to that on the papers.", json!({}), format!("An appeal ({}) without the review the law asks first: saying so.", matter.replace('_', " ")), true);
                                     continue;

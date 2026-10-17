@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Every kind of this lane, in name order.
-pub static KINDS: &[&dyn Kind] = &[&credit::Lending { payroll: None }, &bank::PaymentSystem, &news::Newspaper, &fund::Retirement, &union::Organiser { grievances: None }];
+pub static KINDS: &[&dyn Kind] = &[&credit::Lending { payroll: None }, &bank::PaymentSystem, &news::Newspaper, &fund::Retirement, &union::Organiser { grievances: Some(crate::offices::hearing::union_cases) }];
 
 /// A manifest as the module file carries it (until the cut-over each equals `participants/manifests/<name>.json`).
 pub(crate) fn manifest_of(json: &str) -> Value {

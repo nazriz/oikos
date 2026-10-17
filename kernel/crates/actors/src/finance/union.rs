@@ -213,7 +213,6 @@ impl Kind for Organiser {
         if let Some(p) = m["params"].as_object_mut() {
             // (Retired: a union's keeping to the law is weighed, not drawn: see the module's doc.)
             p.remove("compliance_bps");
-            p.insert("pay_per_day".into(), json!({ "schema": { "type": "object", "description": "a day's pay in each industry it organises, in the smallest unit" }, "default": {}, "source": "placeholder" }));
             p.insert("pursued_bps".into(), json!({ "schema": { "type": "integer", "description": "the chance unprotected action is pursued, the prior the union starts from (none: it keeps to the law)" }, "unit": "bps", "default": null, "source": "the world gives it (no default)" }));
             p.insert("penalty".into(), json!({ "schema": { "type": "integer", "description": "what being pursued for unprotected action costs the union, in the smallest unit (none: it keeps to the law)" }, "default": null, "source": "the world gives it (no default)" }));
             p.insert("prior_weight".into(), json!({ "schema": { "type": "integer", "description": "how many observations its prior chance of being pursued is worth" }, "default": 2, "source": "placeholder" }));
@@ -952,6 +951,32 @@ mod tests {
         let ballot = day(&mut m, 3, vec![offer_of("o1", 3 * DAY, &id, 100)]);
         assert_eq!(kinds(&ballot), ["action_ballot"]);
         m
+    }
+
+    #[test]
+    fn a_union_that_hears_its_members_grievances_says_so_once_and_puts_one_to_the_employer() {
+        let mut m = Rig::new(
+            &Organiser { grievances: Some(crate::offices::hearing::union_cases) },
+            UNION,
+            "union-organiser-system",
+            json!({ "employers": ["shop-1"], "claim_margin_bps": 500, "accept_share_bps": 9900, "first_claim_days": 100, "dues": 0, "pay_per_day": { "retail": 10_000 },
+                "hears": [{ "about": "pay_short" }], "answer_days": 7 }),
+        );
+        let first = day(&mut m, 0, members());
+        assert_eq!(kinds(&first).iter().filter(|k| *k == "hearing").count(), 1, "{:?}", kinds(&first));
+        let notice = first.iter().find(|c| arg(c, "kind").as_deref() == Some("hearing")).unwrap();
+        assert_eq!(data(notice)["hears"], json!(["pay_short"]));
+        // The offer says whom it is open to (the union's members) and what the union can do for them: represent.
+        let offer = json_arg(notice, "offer");
+        assert_eq!(offer["to"]["members_of"], UNION);
+        assert_eq!(offer["hears"][0]["can"], json!(["represent"]));
+        assert!(!kinds(&day(&mut m, 1, vec![])).contains(&"hearing".to_string()), "said once");
+        // A member's application about pay short, against their employer: put to the employer, who is given time to answer.
+        let app = statement("rec.40", 2 * DAY, "application", json!({ "speaks_for": "m1", "addressed_to": [UNION], "visible_to": ["m1", UNION] }), json!({ "matter": "pay_short", "against": "shop-1", "amount": 5000, "account": "acc-m1" }));
+        let put = day(&mut m, 2, vec![app]);
+        assert!(kinds(&put).contains(&"complaint_notice".to_string()), "{:?}", kinds(&put));
+        let n = put.iter().find(|c| arg(c, "kind").as_deref() == Some("complaint_notice")).unwrap();
+        assert_eq!(data(n)["against"], "shop-1");
     }
 
     #[test]

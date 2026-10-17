@@ -32,22 +32,24 @@
 //! tribunal's order, as the TS `Respondent` (lane D's) does: by drawing at the profile's rates. Here, where its own
 //! books show the bill was wrong, it puts it right: an energy retailer is obliged to refund an overcharge it has found
 //! (Australia: National Energy Retail Rules r.21; UK: Ofgem standards of conduct; to confirm) so there is no coin for
-//! the cause the books state; the coin remains only where the books are silent (`grant_bps`). The stand-in `Respondent`
-//! below marks that `// stands in for lane D's Respondent; integration replaces`.
+//! the cause the books state; the coin remains only where the books are silent (`grant_bps`). The `Respondent` is lane
+//! D's (`finance::frictions`); the retailer's books answer it through `BillTruth`; the order to the grid is C2's
+//! `market::trade::order`.
 //!
 //! Decided fresh: bills fall on the round's own date (a calendar, not drifting by the lateness of the wake); first wake
 //! is spread by a hash of the participant id.
 
 use crate::common::{
-    addressed_to, bases_of, cents, data, filed_before, go_see, latest_by_speaker, money_words, own_account, variable_today, visited,
-    work::ReportOf, work::Routine, work::WorkOrder, Book, Fields, Occurrences, Part, StandingWork, DAY, VISIT_MAX,
+    addressed_to, cents, data, filed_before, go_see, money_words, own_account, variable_today, visited,
+    work::ReportOf, work::Routine, work::WorkOrder, Book, Fields, Part, StandingWork, DAY, VISIT_MAX,
 };
+use crate::finance::frictions::{Answerer, Matter, Respondent, Truth};
+use crate::market::trade::{self, Ordering};
 use crate::offices::police::{param, spread};
-use crate::steps::{arg, because, call, pay, say, text, Done, Pay, Plan, Say, Step, Stepper, Visible};
+use crate::steps::{arg, because, call, say, text, Done, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
 use oikos_rules::forms;
 use oikos_rules::slip::{slip, SlipOptions};
-use oikos_sight::calls::Line;
 use oikos_sight::{LookRequest, Record, Seen};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -469,7 +471,7 @@ impl Plan for WaterWorks {
                     .filter_map(|r| data(r).i("read_litres"))
                     .max()
                     .unwrap_or(0);
-                let kl = read.map_or(0, |(l, _)| ((l - prev) as f64 / 1000.0).round().max(0.0) as i64);
+                let kl = read.map_or(0, |(l, _)| (l - prev + 500).div_euclid(1000).max(0));
                 let Some(owner) = owner else { continue };
                 if *owner == me {
                     continue;
@@ -672,7 +674,7 @@ impl Kind for Energy {
         Ok(Box::new(Stepper::new(Retailer {
             routines: StandingWork::new(&me, part, []),
             position: ctx.position.clone().unwrap_or_default(),
-            resp: Respondent::new(&p.respond),
+            resp: Respondent::new(&me, &p.respond, vec![], true),
             me,
             p,
             part,
@@ -857,11 +859,8 @@ impl Plan for Retailer {
         // (Below a fortnight's use, with what's on order: a month's from the grid.)
         let on_order = self.on_order(t);
         let fortnight = n * per_day * 14;
-        let grid = latest_by_speaker(&self.book, "price_list", |r| data(r).get("goods").is_some()).get(&Some(self.p.grid.as_str())).map(|r| {
-            let d = data(r);
-            (d.get("goods").and_then(|g| g.i(&self.p.kind)), d.s("account").map(String::from))
-        });
-        let (unit, grid_account) = grid.unwrap_or((None, None));
+        let grid = trade::goods_prices(&self.book, &self.p.grid);
+        let (unit, grid_account) = (grid.prices.get(&self.p.kind).copied(), grid.account);
         let low = supplying && held - supply + on_order < fortnight + self.owed;
         if supplying {
             let q = (n * per_day * 30 + self.owed).max(1);
@@ -886,7 +885,26 @@ impl Plan for Retailer {
             let q = (n * per_day * 30 + self.owed).max(1);
             if a.balance >= q * u {
                 self.placing.push((q, t));
-                steps.push(order(&me, &self.p.grid, ga, &self.p.kind, q, u, &self.p.depot, &a.account, &format!("Below a fortnight's supply: buying a month's from the grid ({q})."), cx));
+                let mut s = trade::order::<EnergyThen>(
+                    &Ordering {
+                        me: me.clone(),
+                        seller: self.p.grid.clone(),
+                        seller_account: ga.clone(),
+                        kind: self.p.kind.clone(),
+                        quantity: q,
+                        unit_price: u,
+                        to: None,
+                        at: self.p.depot.clone(),
+                        from: a.account.clone(),
+                        why: format!("Below a fortnight's supply: buying a month's from the grid ({q})."),
+                        retry_of: None,
+                        for_days: None,
+                        terms: None,
+                    },
+                    cx,
+                );
+                s.then = Some(EnergyThen::Order(q));
+                steps.push(s);
             }
         }
         // ---- the round's bills: each customer, the supply charge and their use; a customer gone, their last ----
@@ -904,7 +922,7 @@ impl Plan for Retailer {
                 if self.billed_cache.contains(&key) {
                     continue;
                 }
-                let days = ((t - c.billed_to) as f64 / DAY as f64).round().max(0.0) as i64;
+                let days = (t - c.billed_to + DAY / 2).div_euclid(DAY).max(0);
                 if days == 0 {
                     continue;
                 }
@@ -940,26 +958,8 @@ impl Plan for Retailer {
         // Customers who ask for a bill to be put right are answered by whoever does the billing, once.
         if billing_by.is_some() {
             if let Some(a) = &acc {
-                let right = |units_day: i64, price: i64, supply: i64, who_bill: &Value| -> Option<(i64, bool)> {
-                    let days = who_bill.i("days").unwrap_or(0).max(0);
-                    let billed = who_bill.get("outcome").and_then(|o| o.get("money")).and_then(|m| m.i("amount")).unwrap_or(0).max(0);
-                    let right = days * supply + units_day * days * price;
-                    Some(((billed - right).max(0), billed > right))
-                };
-                let (units_day, price, supply) = (per_day, self.p.price_per_unit, self.p.supply_per_day);
-                let me2 = me.clone();
-                let truth = move |m: &Value, from: &str, book: &Book| -> Option<Truth> {
-                    if m.s("matter") != Some("bill") {
-                        return None;
-                    }
-                    let inv = book.get(m.s("about")?)?;
-                    if crate::common::kind(inv) != Some("invoice") || inv.speaks_for.as_deref() != Some(me2.as_str()) || !addressed_to(inv).iter().any(|x| x == from) || data(inv).s("service") != Some("energy") {
-                        return None;
-                    }
-                    let (owed, wrong) = right(units_day, price, supply, data(inv))?;
-                    Some(Truth { owed: Some(owed), done: None, wrong: Some(wrong) })
-                };
-                steps.extend(self.resp.steps::<EnergyThen>(&self.book, cx, &me, Some((&a.account, a.balance)), &truth));
+                let mut truth = BillTruth { me: me.clone(), units_a_day: per_day, price_per_unit: self.p.price_per_unit, supply_per_day: self.p.supply_per_day };
+                steps.extend(self.resp.steps::<EnergyThen>(cx, &self.book, t, Some(&a.account), a.balance, None, &mut truth));
             }
         }
         tell(self, &mut steps, cx);
@@ -978,197 +978,29 @@ impl Plan for Retailer {
     }
 }
 
-/// An order for goods, paid with the order in the same act (trade.ts `order`).
-// stands in for lane C2's order; integration replaces
-#[allow(clippy::too_many_arguments)]
-fn order(me: &str, seller: &str, seller_account: &str, kind: &str, quantity: i64, unit_price: i64, at: &str, from: &str, why: &str, cx: &Cx) -> Step<EnergyThen> {
-    let total = quantity * unit_price;
-    let w = &cx.ctx.world;
-    let d = json!({ "kind": kind, "quantity": quantity, "unit_price": unit_price, "deliver_to": me, "at": at, "account": from });
-    let c = say(
-        "order",
-        &format!("Order: {quantity} {kind} at {} each ({}), delivered to {me} at {at}. Paid with this order.", money_words(unit_price, w), money_words(total, w)),
-        Say { to: Some(vec![seller.to_string()]), visible: Some(Visible::Only(vec![me.to_string(), seller.to_string()])), data: Some(d), ..Default::default() },
-    );
-    let p = pay(seller_account, total, Pay { from: Some(from.to_string()), for_: Some(format!("Order: {quantity} {kind}.")), ..Default::default() }, cx);
-    let mut s = Step::new(vec![Line { bind: Some("order".into()), call: c }, Line { bind: None, call: p }]);
-    s.why = Some(why.to_string());
-    s.then = Some(EnergyThen::Order(quantity));
-    s
+/// What the retailer's own books say of a bill asked about: what it should have been, from the days it names, against
+/// what was billed. Only a bill of ours, to the asker (frictions.ts `truth`).
+struct BillTruth {
+    me: String,
+    units_a_day: i64,
+    price_per_unit: i64,
+    supply_per_day: i64,
 }
 
-// ------------------------------------------------------------------------------------- the stand-in Respondent
-
-/// What an organisation's own books say of something complained of.
-struct Truth {
-    owed: Option<i64>,
-    done: Option<bool>,
-    wrong: Option<bool>,
-}
-
-/// An organisation asked to put something right, told of a complaint, or ordered to (frictions.ts `Respondent`), reduced
-/// to what the retailer uses: no character (the organisation's own leaning is nil), no remedy beyond paying.
-// stands in for lane D's Respondent; integration replaces
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Respondent {
-    handled: BTreeSet<String>,
-    nth: Occurrences,
-    grant_bps: BTreeMap<String, i64>,
-    answers_bps: i64,
-    responds_bps: i64,
-    comply_bps: i64,
-    heed_bps: i64,
-}
-
-impl Respondent {
-    fn new(given: &Value) -> Self {
-        let mut grant_bps: BTreeMap<String, i64> = BTreeMap::from([("other".to_string(), 5_000)]);
-        if let Some(g) = given.get("grant_bps").and_then(Value::as_object) {
-            for (k, v) in g {
-                if let Some(n) = v.as_i64() {
-                    grant_bps.insert(k.clone(), n);
-                }
-            }
+impl Answerer<EnergyThen> for BillTruth {
+    fn truth(&mut self, m: &Matter, from: &str, book: &Book, _t: i64) -> Option<Truth> {
+        if m.matter != "bill" {
+            return None;
         }
-        Respondent {
-            handled: BTreeSet::new(),
-            nth: Occurrences::default(),
-            grant_bps,
-            answers_bps: given.i("answers_bps").unwrap_or(5_000),
-            responds_bps: given.i("responds_bps").unwrap_or(8_000),
-            comply_bps: given.i("comply_bps").unwrap_or(8_000),
-            heed_bps: given.i("heed_bps").unwrap_or(6_000),
+        let inv = book.get(m.about.as_deref()?)?;
+        if crate::common::kind(inv) != Some("invoice") || inv.speaks_for.as_deref() != Some(self.me.as_str()) || !addressed_to(inv).iter().any(|x| x == from) || data(inv).s("service") != Some("energy") {
+            return None;
         }
-    }
-
-    fn draw(cx: &mut Cx, key: &str, bps: i64) -> bool {
-        (cx.rng(key).below(10_000) as i64) < bps.clamp(0, 10_000)
-    }
-
-    fn steps<T: Clone + Send + Serialize + serde::de::DeserializeOwned>(&mut self, book: &Book, cx: &mut Cx, me: &str, account: Option<(&str, i64)>, truth: &dyn Fn(&Value, &str, &Book) -> Option<Truth>) -> Vec<Step<T>> {
-        let mut steps: Vec<Step<T>> = vec![];
-        let mut left = account.map_or(0, |a| a.1);
-        let w = cx.ctx.world.clone();
-        // What the file shows we have answered (a successor does not answer again).
-        let answered: BTreeSet<&str> = book.all("remedy_answer").chain(book.all("complaint_response")).filter(|r| r.speaks_for.as_deref() == Some(me)).flat_map(|r| bases_of(r).iter().map(String::as_str)).collect();
-        let mine = |r: &Record, h: &BTreeSet<String>| addressed_to(r).iter().any(|x| x == me) && !h.contains(&r.id) && !answered.contains(r.id.as_str());
-        // ---- asked to put something right ----
-        let requests: Vec<Arc<Record>> = book.open("review_request").filter(|r| mine(r, &self.handled)).cloned().collect();
-        for r in requests {
-            self.handled.insert(r.id.clone());
-            let m = data(&r);
-            let from = r.speaks_for.clone().unwrap_or_default();
-            let matter = m.s("matter").unwrap_or("").to_string();
-            let t = truth(m, &from, book);
-            let owed = match &t {
-                Some(Truth { owed: Some(o), .. }) => *o,
-                _ => match (m.i("amount"), t.as_ref().and_then(|x| x.wrong)) {
-                    (Some(a), w) if w != Some(false) => a,
-                    _ => 0,
-                },
-            };
-            let nothing = t.as_ref().is_some_and(|x| x.wrong == Some(false) || x.done == Some(true) || (x.owed.is_some_and(|o| o <= 0) && x.wrong != Some(true) && x.done != Some(false)));
-            let which = self.nth.key(&r.id, &[Some(&from), Some(&matter), m.s("structure").or_else(|| m.s("about"))]);
-            let rate = self.grant_bps.get(&matter).or_else(|| self.grant_bps.get("other")).copied().unwrap_or(5_000);
-            // Where its own books show it billed too much, it puts it right: there is a cause, no coin (PB-16).
-            let books_say_wrong = t.as_ref().is_some_and(|x| x.wrong == Some(true)) && owed > 0;
-            let granted = !nothing && (books_say_wrong || Self::draw(cx, &format!("remedy-{which}"), rate)) && (owed <= 0 || (account.is_some() && left >= owed));
-            let words = matter.replace('_', " ");
-            if granted {
-                let mut calls = vec![say(
-                    "remedy_answer",
-                    &format!("Answer to your request {}: yes{}.", r.id, if owed > 0 { format!(", {} is paid to you", money_words(owed, &w)) } else { String::new() }),
-                    Say { to: Some(vec![from.clone()]), visible: Some(Visible::Only(vec![from.clone(), me.to_string()])), basis: Some(r.id.clone()), data: Some({
-                        let mut d = json!({ "request": r.id, "matter": matter, "granted": true });
-                        if owed > 0 {
-                            d["amount"] = json!(owed);
-                        }
-                        d }), ..Default::default() },
-                )];
-                if let (true, Some(acct), Some((from_acc, _))) = (owed > 0, m.s("account"), account) {
-                    calls.push(pay(acct, owed, Pay { from: Some(from_acc.to_string()), for_: Some(format!("Putting right: {words}.")), settles: Some(r.id.clone()), ..Default::default() }, cx));
-                }
-                steps.push(because(format!("Asked by {from} to put something right ({words}{}): we will.", if owed > 0 { format!(", {}", money_words(owed, &w)) } else { String::new() }), calls));
-                left -= owed;
-            } else if nothing || Self::draw(cx, &format!("answers-{which}"), self.answers_bps) {
-                let mut d = json!({ "request": r.id, "matter": matter, "granted": false });
-                if nothing {
-                    d["reason"] = json!("nothing owed on our records");
-                }
-                steps.push(because(
-                    format!("Asked by {from} to put something right ({words}): {}; saying so.", if nothing { "our books show nothing to put right" } else { "we will not" }),
-                    vec![say("remedy_answer", &format!("Answer to your request {}: no{}.", r.id, if nothing { ": our records show nothing owed" } else { "" }), Say { to: Some(vec![from.clone()]), visible: Some(Visible::Only(vec![from.clone(), me.to_string()])), basis: Some(r.id.clone()), data: Some(d), ..Default::default() })],
-                ));
-            }
-        }
-        // ---- told of a complaint by a venue: answering from our books ----
-        let notices: Vec<Arc<Record>> = book.open("complaint_notice").filter(|r| mine(r, &self.handled)).cloned().collect();
-        for n in notices {
-            let m = data(&n);
-            let (Some(matter), Some(application)) = (m.s("matter"), m.s("application")) else { continue };
-            if m.s("against") != Some(me) {
-                continue;
-            }
-            self.handled.insert(n.id.clone());
-            let applicant = m.s("applicant").unwrap_or("").to_string();
-            let venue = n.speaks_for.clone().unwrap_or_default();
-            let which = self.nth.key(&n.id, &[Some(&venue), Some(&applicant), Some(matter), m.s("structure").or_else(|| m.s("about"))]);
-            if !Self::draw(cx, &format!("responds-{which}"), self.responds_bps) {
-                continue;
-            }
-            let t = truth(m, &applicant, book);
-            let said = match &t {
-                Some(Truth { owed: Some(o), .. }) => format!("our records show {} owed", money_words(*o, &w)),
-                Some(Truth { done: Some(d), .. }) => (if *d { "it is done" } else { "it is not yet done" }).to_string(),
-                Some(Truth { wrong: Some(x), .. }) => (if *x { "the paper was wrong" } else { "the paper was right" }).to_string(),
-                _ => "we have nothing on our records about it".to_string(),
-            };
-            let mut d = json!({ "application": application, "known": t.is_some() });
-            if let Some(t) = &t {
-                if let Some(o) = t.owed {
-                    d["owed"] = json!(o);
-                }
-                if let Some(x) = t.done {
-                    d["done"] = json!(x);
-                }
-                if let Some(x) = t.wrong {
-                    d["wrong"] = json!(x);
-                }
-            }
-            let mut visible = vec![venue.clone(), me.to_string()];
-            if !applicant.is_empty() {
-                visible.push(applicant.clone());
-            }
-            steps.push(because(
-                format!("{venue} tells us of a complaint by {applicant} ({}): answering from our books.", matter.replace('_', " ")),
-                vec![say("complaint_response", &format!("Answer on {application}: {said}."), Say { to: Some(vec![venue.clone()]), visible: Some(Visible::Only(visible)), basis: Some(application.to_string()), data: Some(d), ..Default::default() })],
-            ));
-        }
-        // ---- a decision against us: doing as ordered or recommended, or not ----
-        let decisions: Vec<Arc<Record>> = book
-            .open("venue_decision")
-            .filter(|r| !self.handled.contains(&r.id) && data(r).s("against") == Some(me) && data(r).s("matter").is_some() && matches!(data(r).s("finding"), Some("pay" | "do" | "set_aside")))
-            .cloned()
-            .collect();
-        for d in decisions {
-            self.handled.insert(d.id.clone());
-            let x = data(&d);
-            let binding = x.get("binding").and_then(Value::as_bool) != Some(false);
-            let amount = if x.s("finding") == Some("pay") { x.i("amount").unwrap_or(0) } else { 0 };
-            let applicant = x.s("applicant").unwrap_or("").to_string();
-            let which = self.nth.key(&d.id, &[d.speaks_for.as_deref(), Some(&applicant), x.s("matter"), x.s("structure").or_else(|| x.s("about"))]);
-            let will = Self::draw(cx, &format!("complies-{which}"), if binding { self.comply_bps } else { self.heed_bps }) && (amount <= 0 || (account.is_some() && left >= amount));
-            if !will {
-                continue;
-            }
-            let venue = d.speaks_for.clone().unwrap_or_default();
-            let why = format!("{venue} {} that we {}: doing so.", if binding { "orders" } else { "recommends" }, match x.s("finding") { Some("pay") => format!("pay {applicant} {}", money_words(amount, &w)), Some("do") => format!("put right {}", x.s("matter").unwrap_or("").replace('_', " ")), _ => "withdraw the paper".to_string() });
-            if let (Some("pay"), true, Some(to), Some((from_acc, _))) = (x.s("finding"), amount > 0, x.s("to"), account) {
-                steps.push(because(why, vec![pay(to, amount, Pay { from: Some(from_acc.to_string()), for_: Some(format!("Under {}.", d.id)), settles: Some(d.id.clone()), ..Default::default() }, cx)]));
-            }
-            left -= amount;
-        }
-        steps
+        let who_bill = data(inv);
+        let days = who_bill.i("days").unwrap_or(0).max(0);
+        let billed = who_bill.get("outcome").and_then(|o| o.get("money")).and_then(|m| m.i("amount")).unwrap_or(0).max(0);
+        let right = days * self.supply_per_day + self.units_a_day * days * self.price_per_unit;
+        Some(Truth { owed: Some((billed - right).max(0)), done: None, wrong: Some(billed > right) })
     }
 }
 

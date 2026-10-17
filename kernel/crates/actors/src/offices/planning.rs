@@ -21,14 +21,16 @@
 //!   is stated, are late). A standing direction from a post the rule names is followed (its cause of not being followed
 //!   is lack of authority or a hold, both on file); `direction_compliance_bps` is accepted and unused.
 //!
-//! Stand-in for lane D's decisions.ts `Reconsiderations`: `Recon` below (a refusal looked at again when asked inside
-//! the days the law gives); integration replaces.
+//! A refusal looked at again when asked, inside the days the law gives, is lane D's `Reconsiderations`
+//! (`finance::decisions`); the office's own second look is `second_look` below.
 
 use crate::common::asking::Register;
-use crate::common::{
-    addressed_to, ask, breaches, data, filed_before, go_see, holds_of, is_kind, lot_of, made_at, money_words, noted, owner_looks, prohibitions, record, visited,
+use crate::common::{own_account, 
+    addressed_to, ask, breaches, data, filed_before, go_see, holds_of, lot_of, money_words, noted, owner_looks, prohibitions, record, visited,
     Asked, Book, ClaimKey, Directions, Fields, Letters, DAY, VISIT_MAX,
 };
+use crate::finance::decisions::{Reconsiderations, Redone};
+use super::systems::{DeskParams, DeskThen, OfficeDesk};
 use crate::offices::land::{own_land, owner_of};
 use crate::papers::{self, offices as po};
 use crate::steps::{because, say, Done, Plan, Say, Step, Stepper, Visible};
@@ -103,8 +105,11 @@ impl Kind for PlanningOfficer {
             "name": self.name(), "version": self.version(), "doc": self.doc(),
             "params": {
                 "compliance_bps": { "schema": { "type": "integer" }, "unit": "bps", "default": 10000, "source": "placeholder" },
+                "automation": { "schema": {}, "default": null, "source": "placeholder" },
+                "casework": { "schema": {}, "default": null, "source": "placeholder" },
                 "habitat_law": { "schema": { "type": "string" }, "default": "", "source": "placeholder" },
                 "part": { "schema": {}, "source": "the world gives it (no default)" },
+                "procurement": { "schema": {}, "default": null, "source": "placeholder" },
                 "town": { "schema": { "type": "string" }, "default": "e", "source": "placeholder" },
             },
             "perceives": [], "state": "none",
@@ -128,7 +133,8 @@ impl Kind for PlanningOfficer {
             cache: BTreeMap::new(),
             noticed: BTreeMap::new(),
             in_hand: BTreeMap::new(),
-            reviewed: BTreeSet::new(),
+            recon: Reconsiderations::new(&ctx.entity, &["permit_decision"]),
+            desk: OfficeDesk::new(&ctx.entity, DeskParams::read(ctx)?),
         };
         Ok(Box::new(Noting(Stepper::new(plan))))
     }
@@ -166,7 +172,14 @@ fn planning_rules(book: &Book) -> Option<Rules> {
 enum PThen {
     Decided { app: String, decision: String, law: Option<String> },
     Noticed { app: String },
-    Reviewed { request: String },
+    /// What follows from the office's dealings with systems.
+    Desk(DeskThen),
+}
+
+impl From<DeskThen> for PThen {
+    fn from(d: DeskThen) -> Self {
+        PThen::Desk(d)
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -185,8 +198,10 @@ struct Office {
     noticed: BTreeMap<String, i64>,
     /// Steps planned and not yet heard of (kept from being planned twice): key -> when.
     in_hand: BTreeMap<String, i64>,
-    /// Requests to look at a decision again answered this round, not yet on the file.
-    reviewed: BTreeSet<String>,
+    /// Requests to look at a refusal again (the law's route, foundations F8).
+    recon: Reconsiderations,
+    /// The systems it may take up to write its decisions (docs/behaviour/automation.md): none unless the world gives it.
+    desk: OfficeDesk,
 }
 
 impl Booked for Office {
@@ -226,12 +241,12 @@ impl Office {
 
     /// The law an application would breach, if any: a prohibition the act of granting is true of, or the habitat law
     /// where the latest habitat register lists the lot.
-    fn breach(&mut self, applicant: &str, lot: &str, structure_type: &str, t: i64) -> Option<String> {
+    fn breach(book: &mut Book, habitat_law: &str, applicant: &str, lot: &str, structure_type: &str, t: i64) -> Option<String> {
         let granting = json!({ "block": "grant_permit", "lot": lot, "structure_type": structure_type });
-        let habitat = if self.habitat_law.is_empty() { None } else { self.book.current(&self.habitat_law).cloned() };
+        let habitat = if habitat_law.is_empty() { None } else { book.current(habitat_law).cloned() };
         let on_habitat = habitat.is_some()
-            && self.book.open("habitat_register").max_by_key(|r| r.at).is_some_and(|r| data(r).ids("lots").contains(&lot));
-        let hit = breaches(&mut self.book, &granting, applicant, t).first().map(|l| l.id.clone());
+            && book.open("habitat_register").max_by_key(|r| r.at).is_some_and(|r| data(r).ids("lots").contains(&lot));
+        let hit = breaches(book, &granting, applicant, t).first().map(|l| l.id.clone());
         hit.or_else(|| if on_habitat { habitat.map(|h| h.id.clone()) } else { None })
     }
 
@@ -273,123 +288,29 @@ impl Office {
         )
     }
 
-    /// The law's rule for a kind of decision (decisions.ts `decisionLaw`, for a decision with no payment): the review days.
-    fn review_days(&self, kind: &str) -> Option<i64> {
-        let mut best: Option<(i64, i64)> = None;
-        for l in self.book.open("law") {
-            let Some(list) = data(l).get("decisions").and_then(Value::as_array) else { continue };
-            for d in list {
-                if d.s("kind") != Some(kind) || d.get("payments").is_some() {
-                    continue;
-                }
-                if best.is_none_or(|(at, _)| l.at > at) {
-                    best = Some((l.at, d.get("review").and_then(|r| r.i("within_days")).unwrap_or(-1)));
-                }
-            }
-        }
-        best.map(|b| b.1).filter(|d| *d >= 0)
-    }
-
-    /// Asked to look at a refusal again (stand-in for decisions.ts `Reconsiderations`).
+    /// Asked to look at a refusal again: D's `Reconsiderations` (decisions.ts), inside the days the law gives; the second
+    /// look is this office's own (`second_look`).
     fn recon(&mut self, t: i64) -> Vec<Step<PThen>> {
-        let mut reqs: Vec<Arc<Record>> = self
-            .book
-            .open("review_request")
-            .filter(|r| addressed_to(r).contains(&self.me))
-            .cloned()
-            .collect();
-        reqs.sort_by(|a, b| made_at(a).cmp(&made_at(b)).then_with(|| filed_before(&a.id, &b.id)));
-        let mut steps = vec![];
-        let mut done_now: BTreeMap<String, bool> = BTreeMap::new();
-        for r in reqs {
-            let answered = self.book.open("remedy_answer").any(|a| self.ours(a) && data(a).s("request") == Some(&r.id));
-            if answered || self.reviewed.contains(&r.id) {
-                continue;
-            }
-            let Some(about) = data(&r).s("about").and_then(|a| self.book.get(a)).cloned() else { continue };
-            if !(is_kind(&about, "permit_decision") && about.speaks_for.as_deref() == Some(self.me.as_str())) {
-                continue;
-            }
-            let Some(within) = self.review_days("permit_decision") else { continue };
-            self.reviewed.insert(r.id.clone());
-            let Some(from) = r.speaks_for.clone() else { continue };
-            let matter = data(&r).s("matter").unwrap_or("").to_string();
-            let left = within - (t - about.at).div_euclid(DAY);
-            let me = self.me.clone();
-            let say2 = |granted: bool, outcome: &str, found: &str, text: &str, more: Vec<Step<PThen>>, steps: &mut Vec<Step<PThen>>, req: &Record| {
-                let mut ans = json!({ "request": req.id, "matter": matter, "granted": granted, "review": outcome, "decision": about.id });
-                if !granted {
-                    ans["reason"] = json!(found);
-                }
-                let mut s = because(
-                    format!("{from} asks us to look at our decision {} again: {found}.", about.id),
-                    vec![
-                        say(
-                            "decision_review",
-                            &format!("Review of {}, asked by {from}: {text}", about.id),
-                            Say {
-                                to: Some(vec![from.clone()]),
-                                visible: Some(Visible::Only(vec![from.clone(), me.clone()])),
-                                basis: Some(about.id.clone()),
-                                data: Some(json!({ "decision": about.id, "kind": "permit_decision", "request": req.id, "outcome": outcome, "found": found, "asked_by": from, "decided_on": about.at })),
-                                ..Default::default()
-                            },
-                        ),
-                        say(
-                            "remedy_answer",
-                            &format!("Answer to your request {}: {}: {text}", req.id, if granted { "yes" } else { "no" }),
-                            Say { to: Some(vec![from.clone()]), visible: Some(Visible::Only(vec![from.clone(), me.clone()])), basis: Some(req.id.clone()), data: Some(ans), ..Default::default() },
-                        ),
-                    ],
-                );
-                s.then = Some(PThen::Reviewed { request: req.id.clone() });
-                steps.push(s);
-                steps.extend(more);
-            };
-            if left < 0 {
-                say2(
-                    false,
-                    "out_of_time",
-                    &format!("the law allows {within} days to ask, and the decision was made {} days ago", (t - about.at).div_euclid(DAY)),
-                    &format!("it was asked for after the {within} days the law allows."),
-                    vec![],
-                    &mut steps,
-                    &r,
-                );
-                continue;
-            }
-            // (Looked at already: from the file, or from this round's.)
-            let filed = self
-                .book
-                .all("decision_review")
-                .filter(|x| self.ours(x) && data(x).s("decision") == Some(&about.id) && matches!(data(x).s("outcome"), Some("changed" | "upheld")))
-                .max_by_key(|x| x.at)
-                .map(|x| data(x).s("outcome") == Some("changed"));
-            if let Some(first) = done_now.get(&about.id).copied().or(filed) {
-                say2(first, if first { "changed" } else { "upheld" }, "it has been looked at already", if first { "it was found wrong and has been put right." } else { "it was looked at and stands." }, vec![], &mut steps, &r);
-                continue;
-            }
-            let (changed, found, more) = self.second_look(&about, &r, t);
-            done_now.insert(about.id.clone(), changed);
-            let text = if changed { format!("found wrong: {found}; put right.") } else { format!("looked at again: {found}; it stands.") };
-            say2(changed, if changed { "changed" } else { "upheld" }, &found, &text, more, &mut steps, &r);
-        }
-        steps
+        let habitat_law = self.habitat_law.clone();
+        self.recon.steps::<PThen>(&mut self.book, t, |book, dec, req| {
+            let (changed, found, steps) = Self::second_look(book, &habitat_law, dec, req, t);
+            Some(Redone { changed, found, steps })
+        })
     }
 
     /// The law applied once more to a refused application as it stands, with the laws now in force (a review does not
     /// draw whether the office follows them).
-    fn second_look(&mut self, dec: &Arc<Record>, req: &Record, t: i64) -> (bool, String, Vec<Step<PThen>>) {
+    fn second_look(book: &mut Book, habitat_law: &str, dec: &Record, req: &Record, t: i64) -> (bool, String, Vec<Step<PThen>>) {
         if data(dec).s("decision") != Some("refused") {
             return (false, "the permit was not refused".into(), vec![]);
         }
-        let app = data(dec).s("application").and_then(|a| self.book.get(a)).cloned();
+        let app = data(dec).s("application").and_then(|a| book.get(a)).cloned();
         let Some(app) = app.filter(|a| matches!(a.body, RecordBody::Statement { .. }) && a.speaks_for == req.speaks_for) else {
             return (false, "the application is not on our file, or is not the asker's".into(), vec![]);
         };
         let who = app.speaks_for.clone().unwrap_or_default();
         let (lot, st) = (data(&app).s("lot").unwrap_or("").to_string(), data(&app).s("structure_type").unwrap_or("").to_string());
-        if let Some(l) = self.breach(&who, &lot, &st, t) {
+        if let Some(l) = Self::breach(book, habitat_law, &who, &lot, &st, t) {
             return (false, format!("it would still breach {l}"), vec![]);
         }
         let grant = say(
@@ -415,13 +336,17 @@ impl Plan for Office {
     type Then = PThen;
     fn absorb(&mut self, pic: &Picture, _: &mut Cx) {
         self.book.absorb(pic);
+        self.desk.absorb(&self.book);
         self.letters.take(pic, &self.book);
     }
 
-    fn plan(&mut self, pic: &Picture, _cx: &mut Cx) -> Vec<Step<PThen>> {
+    fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<PThen>> {
         let t = pic.t;
         self.in_hand.retain(|_, at| t - *at <= STALE);
         let mut steps: Vec<Step<PThen>> = vec![];
+        if let Some(acc) = own_account(pic) {
+            steps.extend(self.desk.steps::<PThen>(&mut self.book, t, &acc.account, acc.balance, 1, 0, cx));
+        }
         let rules = planning_rules(&self.book);
         let decided = self.decisions();
         let mut apps: Vec<Arc<Record>> = self.book.open("permit_application").filter(|a| addressed_to(a).contains(&self.me)).cloned().collect();
@@ -489,7 +414,7 @@ impl Plan for Office {
         for app in ready.into_iter().take(cap) {
             let applicant = app.speaks_for.clone().unwrap_or_else(|| app.author.clone());
             let (lot, st) = (data(&app).s("lot").unwrap_or("").to_string(), data(&app).s("structure_type").unwrap_or("").to_string());
-            let breached = self.breach(&applicant, &lot, &st, t);
+            let breached = Self::breach(&mut self.book, &self.habitat_law, &applicant, &lot, &st, t);
             // The objections heard: made in the objection period, about this application.
             let mut objections: Vec<Arc<Record>> = vec![];
             if let Some(r) = rules.filter(|r| r.notice_days > 0) {
@@ -540,6 +465,7 @@ impl Plan for Office {
             lines.push(decision);
             let mut s = because(why, lines);
             s.then = Some(PThen::Decided { app: app.id.clone(), decision: if refuse { "refused" } else { "granted" }.into(), law: breached });
+            self.desk.assign(&mut s, "permit_decision"); // (a system of ours that writes decisions does, if we hold one)
             self.in_hand.insert(format!("decide:{}", app.id), t);
             steps.push(s);
         }
@@ -570,15 +496,11 @@ impl Plan for Office {
                     self.cache.insert(app.clone(), (decision.clone(), law.clone()));
                 }
             }
+            PThen::Desk(d) => self.desk.then(d, done),
             PThen::Noticed { app } => {
                 self.in_hand.remove(&format!("notice:{app}"));
                 if done.applied() {
                     self.noticed.insert(app.clone(), cx.t);
-                }
-            }
-            PThen::Reviewed { request } => {
-                if !done.applied() {
-                    self.reviewed.remove(request);
                 }
             }
         }

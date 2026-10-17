@@ -30,7 +30,7 @@ use crate::common::{
     addressed_to, data, filed_before, go_see, money_words, next_look, out_of_time, visited, work::ReportOf, work::Routine, Book,
     Fields, Part, StandingWork, DAY, VISIT_MAX,
 };
-use crate::offices::staff::{lift, Own, Staff, StaffOpts, StaffThen, Want};
+use crate::firms::staffing::{Own, Staffing, StaffingOpts, Want};
 use crate::steps::{arg, because, call, json, say, Done, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
 use oikos_rules::forms;
@@ -193,17 +193,13 @@ impl Kind for Station {
         let p = Params::read(ctx)?;
         let me = ctx.entity.clone();
         let part = Part::from_param(&p.part);
-        let staff = Staff::new(
+        let staff = Staffing::new(
             &me,
-            StaffOpts {
-                period: p.period,
-                notice_days: p.notice_days,
+            StaffingOpts {
                 workplace: Some(p.workplace.clone()),
-                role: p.role.clone(),
                 industry: Some(p.industry.clone()),
-                own: Own::RoleOrUnnamed,
-                hire: true,
-                pay: true,
+                own: Some(Own::RoleOrUnnamed),
+                ..StaffingOpts::new(p.period, p.notice_days, &p.role)
             },
         );
         Ok(Box::new(Stepper::new(Police {
@@ -259,7 +255,6 @@ struct Executed {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum Then {
-    Staff(StaffThen),
     /// An investigation ordered: when it is applied, its finding is awaited.
     Look(Inquiry),
     /// One of a household put out; the last says what was done.
@@ -279,7 +274,7 @@ struct Police {
     p: Params,
     part: Part,
     book: Book,
-    staff: Staff,
+    staff: Staffing,
     routines: StandingWork,
     /// The station as its officers see it (who is at work in it).
     view: Option<oikos_sight::SiteStructure>,
@@ -393,13 +388,13 @@ impl Plan for Police {
         let workers = self.staff.workers(&self.book, t);
         if self.part != Part::Staff {
             let want = Want {
-                target: self.p.officers.max(0) as usize,
+                target: self.p.officers.max(0),
                 wage: self.p.wage,
                 can_post: (workers.len() as i64) < self.p.officers,
                 why: Some(format!("The station's establishment is {} officers; we have {}: posting a job.", self.p.officers, workers.len())),
                 ..Default::default()
             };
-            steps.extend(lift(self.staff.routine(pic, &self.book, &self.p.account, &want, cx), Then::Staff));
+            steps.extend(self.staff.routine(pic, &self.book, cx, &self.p.account, &want));
         }
 
         // What is on our file: the reports we have charged or closed, the warrants we have done, the deaths we have reported.
@@ -642,7 +637,6 @@ impl Plan for Police {
 
     fn then(&mut self, token: &Then, done: Done, cx: &mut Cx) -> Vec<Step<Then>> {
         match token {
-            Then::Staff(s) => lift(self.staff.then(s, done, cx), Then::Staff),
             Then::Look(q) => {
                 match done {
                     Done::Outcome(o) if o.status == oikos_sight::OutcomeStatus::Applied => {
@@ -677,7 +671,7 @@ impl Plan for Police {
 impl Police {
     /// The notice that a warrant has been carried out, telling both what was found.
     fn executed(&self, e: &Executed, put: i64, cx: &Cx) -> Vec<Step<Then>> {
-        let hours = (self.p.task_seconds as f64 / 3600.0).round() as i64;
+        let hours = (self.p.task_seconds + 1800).div_euclid(3600);
         let _ = cx;
         let why = if put > 0 {
             format!("Warrant {} carried out at {} ({hours} hours of an officer's day): {put} of the household put out; possession is {}'s. Telling both.", e.warrant, e.space, e.landlord)

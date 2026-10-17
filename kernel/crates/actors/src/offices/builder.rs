@@ -32,16 +32,18 @@
 //!   arise here; debts recorded against it (a fine, rates, a worker's claim for wages) are paid oldest first before
 //!   any other spending in the wake.
 
-use super::staff::{lift, Own, Staff, StaffOpts, StaffThen, Want};
+use crate::firms::bargaining::{Bargaining, Takings};
+use crate::firms::staffing::{Staffing, StaffingOpts, Want};
+use crate::firms::winding::{creditor_account, WindingParams, WindingUp};
+use crate::market::trade::{self, Ordering};
 use crate::common::{
-  ask, bases_of, cells_of, data, filed_before, go_see, money_words, next_look, out_of_time, own_account, receipts, team, withdraw,
-  Asked, ClaimKey, Fields, Book, Letters, DAY, MONTH,
+  ask, cells_of, data, filed_before, go_see, money_words, next_look, out_of_time, own_account, receipts, team, withdraw,
+  Asked, Fields, Book, Letters, DAY,
 };
-use crate::papers::agreements::{self, commitment_of, job_terms};
+use crate::papers::agreements::{self, commitment_of};
 use crate::papers::{self, data as paper_data};
-use crate::papers::market::{Invoice, Order, PaymentOutcome};
+use crate::papers::market::{Invoice, PaymentOutcome};
 use crate::papers::offices::{BuildingNotice, OfferDeclined, RepairDeclined, RepairDone};
-use crate::papers::firms::{EnterpriseAgreement, WageOffer};
 use crate::steps::{arg, because, call, json, pay, say, text, Done, Pay, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
 use oikos_rules::forms::{self, Answers};
@@ -57,7 +59,6 @@ pub struct Builder;
 const PARAMS: &str = r#"{"build_markup_bps":{"schema":{"type":"integer"},"unit":"bps","default":2000,"source":"placeholder"},"casual_bps":{"schema":{"type":"integer"},"unit":"bps","default":0,"source":"placeholder"},"day_wage":{"schema":{"type":"integer"},"default":0,"source":"placeholder"},"horizon_days":{"schema":{"type":"integer","description":"the crew it wants: enough to do the work in hand within this"},"unit":"days","default":90,"source":"placeholder"},"industry":{"schema":{"type":"string","description":"what the work is (its postings say)"},"default":"","source":"placeholder"},"let_go_every_days":{"schema":{"type":"integer","description":"at most one let go in this time"},"unit":"days","default":7,"source":"placeholder"},"look_at":{"schema":{},"source":"the world gives it (no default)"},"look_days":{"schema":{},"unit":"days","source":"the world gives it (no default)"},"max_crew":{"schema":{"type":"integer"},"default":12,"source":"placeholder"},"min_crew":{"schema":{"type":"integer","description":"a core crew, kept through quiet times"},"default":2,"source":"placeholder"},"notice_days":{"schema":{"type":"integer"},"unit":"days","default":14,"source":"placeholder"},"notify":{"schema":{"type":"array"},"default":[],"source":"placeholder"},"period":{"schema":{"type":"integer"},"default":1209600,"source":"placeholder"},"quote_valid_days":{"schema":{"type":"integer","description":"a published price is honoured this long (placeholder: a common term for a builder's quote)"},"unit":"days","default":30,"source":"a published price is honoured this long (placeholder: a common term for a builder's quote)"},"register":{"schema":{},"default":null,"source":"placeholder"},"registered_bps":{"schema":{"type":"integer"},"unit":"bps","default":10000,"source":"placeholder"},"repair_first":{"schema":{"type":"boolean"},"default":true,"source":"placeholder"},"repair_labour":{"schema":{"type":"integer"},"default":0,"source":"placeholder"},"repair_price":{"schema":{"type":"integer"},"default":0,"source":"placeholder"},"repair_task":{"schema":{"type":"string"},"default":"","source":"placeholder"},"sites":{"schema":{"type":"string"},"default":"","source":"placeholder"},"supplier":{"schema":{"type":"string","description":"whom it buys materials from (the world must say)"},"default":"","required":true,"source":"whom it buys materials from (the world must say)"},"types":{"schema":{"type":"object"},"default":{},"source":"placeholder"},"wage":{"schema":{"type":"integer","description":"the crew's pay, cents per period"},"default":150000,"source":"placeholder"},"work_days":{"schema":{"type":"integer","description":"of every 7 look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)"},"unit":"days","default":5,"source":"placeholder"},"working_day":{"schema":{"type":"integer","description":"seconds a worker works in a day"},"default":28800,"source":"placeholder"},"workplace":{"schema":{"type":"string","description":"the space in the yard its crew works in"},"default":"","source":"placeholder"},"yard":{"schema":{"type":"string"},"default":"","source":"placeholder"}}"#;
 
 const ROLE: &str = "construction worker";
-const DEBT_KINDS: [&str; 4] = ["debt", "fine", "rates", "rates_interest"];
 
 fn answers() -> Answers {
     Answers {
@@ -73,8 +74,7 @@ impl Kind for Builder {
         "firm.builder"
     }
     fn version(&self) -> &'static str {
-        // 0.13.1 (TS). Ported to Rust: version kept so the manifest equals the TS one.
-        "0.13.1"
+        "0.14.0"
     }
     fn doc(&self) -> &'static str {
         "docs/behaviour/institutions.md"
@@ -95,20 +95,20 @@ impl Kind for Builder {
     }
     fn create(&self, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
         let p = Params::read(ctx)?;
-        let staff = Staff::new(
+        let staff = Staffing::new(
             &ctx.entity,
-            StaffOpts {
-                period: p.period,
-                notice_days: p.notice_days,
+            StaffingOpts {
                 workplace: Some(p.workplace.clone()).filter(|w| !w.is_empty()),
-                role: ROLE.into(),
                 industry: Some(p.industry.clone()).filter(|w| !w.is_empty()),
-                own: Own::All,
-                hire: true,
-                pay: true,
+                registered_bps: Some(p.registered_bps),
+                casual_bps: Some(p.casual_bps),
+                day_wage: Some(p.day_wage),
+                work_days: Some(p.work_days),
+                week_days: p.look_days,
+                ..StaffingOpts::new(p.period, p.notice_days, ROLE)
             },
         );
-        Ok(Box::new(Stepper::new(Firm::new(p, staff))))
+        Ok(Box::new(Stepper::new(Firm::new(p, staff, &ctx.entity))))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
         Ok(Box::new(Stepper::<Firm>::restore(saved)?))
@@ -152,13 +152,14 @@ struct Params {
     repair_labour: i64,
     repair_price: i64,
     repair_first: bool,
-    concede_after: i64,
+    registered_bps: i64,
+    casual_bps: i64,
+    day_wage: i64,
 }
 
 impl Params {
     fn read(ctx: &Ctx) -> Result<Params, String> {
         let supplier: String = ctx.need("supplier", "firm.builder")?;
-        // (`registered_bps`, `casual_bps`, `day_wage` are the staffing's: lane C1's Staffing reads them at integration.)
         #[derive(Deserialize)]
         struct Reg {
             lots: String,
@@ -190,7 +191,9 @@ impl Params {
             repair_labour: ctx.param("repair_labour", 0)?,
             repair_price: ctx.param("repair_price", 0)?,
             repair_first: ctx.param("repair_first", true)?,
-            concede_after: 3,
+            registered_bps: ctx.param("registered_bps", 10_000)?,
+            casual_bps: ctx.param("casual_bps", 0)?,
+            day_wage: ctx.param("day_wage", 0)?,
         })
     }
 }
@@ -229,7 +232,6 @@ struct Waiting {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum Then {
-    Staff(StaffThen),
     /// A sign, decline, or start in flight for an agreement.
     Agreement(String),
     Started { agreement: String, type_: String, on: String, client: String, at: String, labour: i64 },
@@ -239,14 +241,16 @@ enum Then {
     Paying(String),
     Work { structure: String, build: bool, units: i64, share: i64, crew: Vec<String> },
     Mend { order: String, units: i64, share: i64, crew: Vec<String> },
-    Offered(String),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Firm {
   p: Params,
   book: Book,
-  staff: Staff,
+  staff: Staffing,
+  dues: WindingUp,
+  takings: Takings,
+  bargaining: Bargaining,
   letters: Letters,
   asked: Asked,
   plans_out: BTreeSet<String>,
@@ -258,7 +262,6 @@ struct Firm {
   /// Jobs without an agreed price that we have begun (no invoice records it).
   begun: BTreeSet<String>,
   /// Debts we have paid (the payment settling them was seen).
-  paid: BTreeSet<String>,
   paying: BTreeSet<String>,
   projects: Vec<Project>,
   /// Structures whose hours are done or which are gone: never worked on again.
@@ -299,60 +302,11 @@ fn held(pic: &Picture, at: &str, kind: &str) -> i64 {
         .map_or(0, |h| h.quantity.clamp(0, i128::from(i64::MAX)) as i64)
 }
 
-/// Stands in for lane C2's `goodsPrices`; integration replaces. A seller's latest standing price list of goods.
-fn goods_prices(book: &Book, seller: &str) -> (BTreeMap<String, i64>, Option<String>) {
-    let best = crate::common::latest_by_speaker(book, "price_list", |r| d(r).get("goods").is_some());
-    match best.get(&Some(seller)) {
-        Some(r) => {
-            let prices = d(r).get("goods").and_then(Value::as_object).map(|o| o.iter().filter_map(|(k, v)| v.as_i64().map(|n| (k.clone(), n))).collect()).unwrap_or_default();
-            (prices, d(r).s("account").map(String::from))
-        }
-        None => (BTreeMap::new(), None),
-    }
-}
-
-/// Stands in for lane C2's `order`; integration replaces. An order paid with the order.
-fn order(me: &str, seller: &str, seller_account: &str, kind: &str, quantity: i64, unit_price: i64, at: &str, from: &str, why: String, cx: &Cx) -> Step<Then> {
-    let total = quantity * unit_price;
-    let w = &cx.ctx.world;
-    let paper = Order { kind: kind.into(), quantity, unit_price, deliver_to: Some(me.into()), at: at.into(), account: from.into(), pay_in_days: None, retry_of: None, for_days: None };
-    let words = format!("Order: {quantity} {kind} at {} each, delivered to {me} at {at}. Paid with this order.", money_words(unit_price, w));
-    let _ = total;
-    let mut s = because(
-        why,
-        vec![
-            say("order", &words, Say { to: Some(vec![seller.into()]), visible: Some(Visible::Only(vec![me.into(), seller.into()])), data: Some(paper_data(&paper)), ..Default::default() }),
-            pay(seller_account, quantity * unit_price, Pay { from: Some(from.into()), for_: Some(format!("Order: {quantity} {kind}.")), ..Default::default() }, cx),
-        ],
-    );
-    s.lines[0].bind = Some("order".into());
-    s.then = Some(Then::Ordered);
-    s
-}
-
-/// Stands in for lane C1's `creditorAccount`; integration replaces.
-fn creditor_account(book: &Book, holder: &str) -> Option<String> {
-    for r in book.of_type("agreement") {
-        let RecordBody::Agreement { terms } = &r.body else { continue };
-        if !terms.parties.iter().any(|p| p == holder) {
-            continue;
-        }
-        let loan = terms.template.as_deref() == Some(agreements::LOAN) && terms.parties.first().map(String::as_str) == Some(holder);
-        let job = terms.template.as_deref() == Some(agreements::EMPLOYMENT) && terms.parties.get(1).map(String::as_str) == Some(holder);
-        if loan || job {
-            if let Some(to) = terms.commitments.iter().find(|c| c.who != holder).and_then(|c| agreements::outcome_of(&c.does)).and_then(|o| o.money).map(|m| m.to).filter(|s| !s.is_empty()) {
-                return Some(to);
-            }
-        }
-    }
-    None
-}
-
 impl Firm {
-    fn new(p: Params, staff: Staff) -> Firm {
+    fn new(p: Params, staff: Staffing, me: &str) -> Firm {
         Firm {
-            p, book: Book::new(), staff, letters: Letters::default(), asked: Asked::default(), plans_out: BTreeSet::new(), no_plan: BTreeSet::new(),
-            in_flight: BTreeSet::new(), ordering: vec![], publishing: None, begun: BTreeSet::new(), paid: BTreeSet::new(), paying: BTreeSet::new(),
+            p, book: Book::new(), staff, dues: WindingUp::new(me, WindingParams { short_days: 0, wind_up_days: 0, idle_days: 0, reprice_days: 0, reprice_bps: 0 }), takings: Takings::default(), bargaining: Bargaining::new(me), letters: Letters::default(), asked: Asked::default(), plans_out: BTreeSet::new(), no_plan: BTreeSet::new(),
+            in_flight: BTreeSet::new(), ordering: vec![], publishing: None, begun: BTreeSet::new(), paying: BTreeSet::new(),
             projects: vec![], over: BTreeSet::new(), finished: BTreeSet::new(), seen_type: BTreeMap::new(), repairs: vec![], dealt: BTreeSet::new(),
             paid_in: BTreeMap::new(), spoken_for: BTreeMap::new(), used: BTreeMap::new(), used_day: -1,
         }
@@ -433,28 +387,13 @@ impl Firm {
             .unwrap_or(i64::MIN / 2)
     }
 
-    // ---- debts recorded against us (stands in for lane C1's WindingUp.payDebts; integration replaces)
+    // ---- debts recorded against us, paid as a firm pays its debts (we don't wind up): wages, tax withheld, then the rest
 
-    fn debts(&self, me: &str) -> Vec<Arc<Record>> {
-        let mut v: Vec<Arc<Record>> = self
-            .book
-            .claims_by(ClaimKey::Counterparty, me)
-            .filter(|r| match &r.body {
-                RecordBody::Claim { position, about, .. } => {
-                    *position == oikos_contracts::blocks::Position::Right && DEBT_KINDS.contains(&about.s("kind").unwrap_or("")) && !self.paid.contains(&r.id) && !self.paying.contains(&r.id)
-                }
-                _ => false,
-            })
-            .cloned()
-            .collect();
-        v.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
-        v
-    }
     fn pay_debts(&mut self, account: &str, balance: i64, keep: i64, cx: &Cx) -> Vec<Step<Then>> {
-        let me = cx.ctx.entity.clone();
         let mut left = balance - keep;
         let mut out = vec![];
-        for dbt in self.debts(&me) {
+        let debts: Vec<Arc<Record>> = self.dues.debts(&self.book).into_iter().filter(|r| !self.paying.contains(&r.id)).cloned().collect();
+        for dbt in debts {
             let RecordBody::Claim { holder, about, .. } = &dbt.body else { continue };
             let amount = about.i("amount").unwrap_or(0);
             let Some(to) = about.s("account").map(String::from).or_else(|| creditor_account(&self.book, holder)) else { break };
@@ -473,107 +412,6 @@ impl Firm {
         }
         out
     }
-
-    // ---- bargaining (stands in for lane C1's Bargaining; integration replaces; stop/resume/raise are Staffing's)
-
-    fn bargain(&mut self, me: &str, t: i64, balance: i64, cx: &Cx) -> Vec<Step<Then>> {
-        let mut steps = vec![];
-        let mine = |r: &Record, this: &Firm| crate::common::addressed_to(r).iter().any(|a| a == me) && d(r).s("employer") == Some(me) && !this.in_flight.contains(&r.id);
-        let staff = self.staff.staff(&self.book, t);
-        let month_bill: i64 = staff
-            .iter()
-            .map(|a| {
-                let w = agreements::parties_of(a).get(1).cloned().unwrap_or_default();
-                let jt = job_terms(a, &w, Some(&self.book));
-                (jt.wage as i128 * MONTH as i128).div_euclid(jt.period.max(1) as i128) as i64
-            })
-            .sum();
-        let offer_for = |claim: i64| -> i64 {
-            let year = (month_bill as i128 * 12 * claim as i128).div_euclid(10_000);
-            let spare = (balance - month_bill).max(0) as i128;
-            if year <= 0 || spare >= 2 * year {
-                claim
-            } else {
-                (claim as i128 * spare).div_euclid(2 * year).div_euclid(10) as i64 * 10
-            }
-        };
-        let offers: Vec<Arc<Record>> = self.book.open("wage_offer").filter(|r| self.ours(r, me)).cloned().collect();
-        let offer_to = |claim: &str| offers.iter().filter(|o| d(o).s("claim") == Some(claim)).max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id))).cloned();
-        let said = |claim: &Record, rise: i64, why: &str, union: &str| -> Step<Then> {
-            let p = WageOffer { employer: me.into(), claim: claim.id.clone(), rise_bps: rise, why: Some(why.into()) };
-            let mut s = because(
-                String::new(),
-                vec![say("wage_offer", &format!("We offer a rise of {}% (the claim was {}%).", rise as f64 / 100.0, d(claim).i("rise_bps").unwrap_or(0).max(0) as f64 / 100.0), Say { to: Some(vec![union.into()]), visible: Some(Visible::Only(vec![me.into(), union.into()])), basis: Some(claim.id.clone()), data: Some(paper_data(&p)), ..Default::default() })],
-            );
-            s.then = Some(Then::Offered(claim.id.clone()));
-            s
-        };
-        for c in self.book.open("wage_claim").filter(|r| mine(r, self)).cloned().collect::<Vec<_>>() {
-            if offer_to(&c.id).is_some() {
-                continue;
-            }
-            let union = c.speaks_for.clone().unwrap_or_default();
-            let claim = d(&c).i("rise_bps").unwrap_or(0).max(0);
-            let offer = claim.min(offer_for(claim));
-            let mut s = said(&c, offer, "capacity to pay", &union);
-            s.why = Some(format!("A wage claim from {union} for {}%: offering {}%, as far as what we hold beyond a month's wages ({}) covers twice its cost for a year.", claim as f64 / 100.0, offer as f64 / 100.0, money_words((balance - month_bill).max(0), &cx.ctx.world)));
-            self.in_flight.insert(c.id.clone());
-            steps.push(s);
-        }
-        let agreed: BTreeSet<String> = self
-            .book
-            .open("enterprise_agreement")
-            .filter(|r| self.ours(r, me))
-            .flat_map(|r| bases_of(r).to_vec())
-            .collect();
-        for a in self.book.open("offer_accepted").filter(|r| mine(r, self)).cloned().collect::<Vec<_>>() {
-            if agreed.contains(&a.id) {
-                continue;
-            }
-            let Some(claim) = d(&a).s("claim").map(String::from) else { continue };
-            let Some(offer) = offer_to(&claim) else { continue };
-            // (a claim already settled by an earlier acceptance is not settled twice)
-            let settled = self.book.open("offer_accepted").any(|o| d(o).s("claim") == Some(claim.as_str()) && agreed.contains(&o.id));
-            if settled {
-                continue;
-            }
-            let rise = d(&offer).i("rise_bps").unwrap_or(0);
-            let union = self.book.get(&claim).and_then(|c| c.speaks_for.clone()).unwrap_or_default();
-            let p = EnterpriseAgreement { employer: me.into(), union: union.clone(), rise_bps: rise, from: t };
-            let mut s = because(
-                format!("{union} accepted our offer: an enterprise agreement, a rise of {}% for all our staff.", rise as f64 / 100.0),
-                vec![say("enterprise_agreement", &format!("Enterprise agreement between {me} and {union}: wages rise {}% from now.", rise as f64 / 100.0), Say { visible: Some(Visible::Public), to: Some(vec![union.clone()]), basis: Some(a.id.clone()), data: Some(paper_data(&p)), ..Default::default() })],
-            );
-            s.then = Some(Then::Offered(a.id.clone()));
-            self.in_flight.insert(a.id.clone());
-            steps.push(s);
-        }
-        // After each stoppage the offer rises by half the gap to the claim, to all of it after `concede_after`.
-        for c in self.book.open("wage_claim").filter(|r| crate::common::addressed_to(r).iter().any(|a| a == me) && d(r).s("employer") == Some(me)).cloned().collect::<Vec<_>>() {
-            let Some(mut last) = offer_to(&c.id) else { continue };
-            if self.book.open("offer_accepted").any(|o| d(o).s("claim") == Some(c.id.as_str()) && agreed.contains(&o.id)) {
-                continue;
-            }
-            let claim = d(&c).i("rise_bps").unwrap_or(0).max(0);
-            let back = self.book.open("return_to_work").filter(|r| crate::common::addressed_to(r).iter().any(|a| a == me) && d(r).s("employer") == Some(me) && r.at >= c.at).count() as i64;
-            let done = offers.iter().filter(|o| d(o).s("claim") == Some(c.id.as_str()) && d(o).s("why") == Some("after a stoppage")).count() as i64;
-            let mut cur = d(&last).i("rise_bps").unwrap_or(0);
-            if back > done && !self.in_flight.contains(&format!("{}:stop{}", c.id, done)) {
-                let n = done + 1;
-                cur = if n >= self.p.concede_after { claim } else { cur + ceil_div((claim - cur) as i128, 20) as i64 * 10 };
-                let union = c.speaks_for.clone().unwrap_or_default();
-                let mut s = said(&c, cur, "after a stoppage", &union);
-                s.why = Some(format!("After {n} stoppage{}: improving our offer to {}%.", if n > 1 { "s" } else { "" }, cur as f64 / 100.0));
-                let key = format!("{}:stop{}", c.id, done);
-                s.then = Some(Then::Offered(key.clone()));
-                self.in_flight.insert(key);
-                steps.push(s);
-                last = last.clone();
-            }
-            let _ = last;
-        }
-        steps
-    }
 }
 
 impl Plan for Firm {
@@ -583,14 +421,18 @@ impl Plan for Firm {
         self.book.absorb(pic);
         self.staff.absorb(pic);
         let acc = own_account(pic);
+        self.dues.absorb(pic, acc.as_ref().map(|a| a.account.as_str()));
         if let Some(a) = &acc {
             for tx in pic.transactions() {
                 if tx.from == a.account {
                     if let Some(s) = &tx.settles {
-                        self.paid.insert(s.clone());
                         self.paying.remove(s);
                     }
                 }
+            }
+            // What others paid in: what a day without our crew costs us (Bargaining).
+            for (_, c) in receipts(pic, &a.account) {
+                self.takings.add(pic.t, c);
             }
             if !self.p.repair_task.is_empty() {
                 for (from, c) in receipts(pic, &a.account) {
@@ -698,7 +540,8 @@ impl Plan for Firm {
         }
 
         // Prices.
-        let (supply, supply_account) = goods_prices(&self.book, &self.p.supplier);
+        let offered = trade::goods_prices(&self.book, &self.p.supplier);
+        let (supply, supply_account) = (offered.prices, offered.account);
         let hourly = self.hourly(wage);
         let with_margin = |x: i64| (x as i128 * (10_000 + self.p.build_markup_bps) as i128).div_euclid(10_000) as i64;
         let mut prices: BTreeMap<String, i64> = BTreeMap::new();
@@ -837,7 +680,26 @@ impl Plan for Firm {
                 continue;
             }
             self.ordering.push((kind.clone(), short));
-            steps.push(order(&me, &self.p.supplier, seller_acc, kind, short, *price, &self.p.yard, &acc.account, format!("Our waiting jobs need {q} {kind} and the yard has {}: ordering {short} from our supplier.", held(pic, &self.p.yard, kind)), cx));
+            let mut s = trade::order::<Then>(
+                &Ordering {
+                    me: me.clone(),
+                    seller: self.p.supplier.clone(),
+                    seller_account: seller_acc.clone(),
+                    kind: kind.clone(),
+                    quantity: short,
+                    unit_price: *price,
+                    to: None,
+                    at: self.p.yard.clone(),
+                    from: acc.account.clone(),
+                    why: format!("Our waiting jobs need {q} {kind} and the yard has {}: ordering {short} from our supplier.", held(pic, &self.p.yard, kind)),
+                    retry_of: None,
+                    for_days: None,
+                    terms: None,
+                },
+                cx,
+            );
+            s.then = Some(Then::Ordered);
+            steps.push(s);
         }
 
         // Start what we can, oldest first: buildings once their materials are in the yard; demolitions at once.
@@ -964,25 +826,27 @@ impl Plan for Firm {
         let per_hand = (self.p.horizon_days * self.p.working_day * self.p.work_days).div_euclid(7).max(1);
         let want = self.p.max_crew.min(self.p.min_crew.max(ceil_div(in_hand as i128, per_hand as i128) as i64));
         let bill = (crew_now.len() as i128 * wage as i128 * 30 * DAY as i128).div_euclid(self.p.period.max(1) as i128) as i64;
-        steps.extend(self.bargain(&me, t, acc.balance, cx));
+        // Bargaining with a union (the employer's side: C1's): its offers follow what a stoppage costs it in takings.
+        let per_day = self.takings.per_day(t);
+        steps.extend(self.bargaining.steps::<Then>(&self.book, t, cx, &mut self.staff, &acc.account, acc.balance, per_day, 0).steps);
         let hours = round_div(in_hand, 3600);
         let wanted = Want {
-            target: want as usize,
+            target: want,
             wage,
             can_post: acc.balance >= bill + wage,
             why: Some(format!("{hours} hours of work in hand need {want} hands to do within {} days; we have {}: posting a job.", self.p.horizon_days, crew_now.len())),
             recruit: None,
             stopped: None,
+            work: Some(in_hand > 0),
         };
-        let hire = self.staff.routine(pic, &self.book, &acc.account, &wanted, cx);
-        steps.extend(lift(hire, Then::Staff));
+        steps.extend(self.staff.routine(pic, &self.book, cx, &acc.account, &wanted));
         // (Short of the next pay period for those we're keeping: someone already given notice is still crew until it runs out.)
         let keeping = self.staff.staying(&self.book, t) as i64;
         let broke = keeping > 0 && acc.balance < keeping * wage;
         if (crew_now.len() as i64 > want && t - self.last_let_go(&me) >= self.p.let_go_every_days * DAY) || broke {
             let why = if broke { format!("Can't cover the next pay period ({} for {keeping}): letting the most recent hire go.", money_words(acc.balance, &cx.ctx.world)) } else { format!("{hours} hours of work in hand need {want} hands; we have {}: letting the most recent hire go.", crew_now.len()) };
             let reason = if broke { "Redundancy: we can't cover the wage bill." } else { "Redundancy: there isn't the work." };
-            steps.extend(lift(self.staff.let_go(&self.book, t, &why, reason), Then::Staff));
+            steps.extend(self.staff.let_go(&self.book, t, cx, &why, reason));
         }
         let text = format!("Our prices for building on your lot, finished, and for demolition: {}. To have us build or demolish, offer us a construction agreement: what to build and on which lot (or what to demolish), and the price, paid from your account on our invoice. We start once you've signed and we have the materials; permits are the owner's to get.", if price_text.is_empty() { "none yet (we're waiting on our supplier's prices)".to_string() } else { price_text });
         let a = answers();
@@ -1000,8 +864,7 @@ impl Plan for Firm {
         let applied = done.applied();
         let out = match done { Done::Outcome(o) => Some(o), _ => None };
         match tok {
-            Then::Staff(s) => lift(self.staff.then(s, done, cx), Then::Staff),
-            Then::Agreement(id) | Then::Offered(id) => {
+            Then::Agreement(id) => {
                 self.in_flight.remove(id);
                 vec![]
             }

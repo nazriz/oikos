@@ -3,9 +3,9 @@
 
 use crate::Kind;
 
+pub mod auditor;
 pub mod hearing;
 pub mod land;
-pub mod staff;
 pub mod books;
 pub mod builder;
 pub mod council;
@@ -15,12 +15,14 @@ pub mod planning;
 pub mod police;
 pub mod registry;
 pub mod school;
+pub mod systems;
 pub mod treasury;
 pub mod tribunal;
 pub mod utilities;
 
 /// Every kind of this lane, in name order.
 pub static KINDS: &[&dyn Kind] = &[
+    &auditor::Auditor,
     &registry::ChildProtection,
     &council::CouncilClerk,
     &council::Councillor,
@@ -123,6 +125,7 @@ pub mod testing {
             "city.works" => include_str!("../../../../../participants/manifests/city.works.json"),
             "firm.builder" => include_str!("../../../../../participants/manifests/firm.builder.json"),
             "land.registry" => include_str!("../../../../../participants/manifests/land.registry.json"),
+            "office.auditor" => include_str!("../../../../../participants/manifests/office.auditor.json"),
             "office.clerk" => include_str!("../../../../../participants/manifests/office.clerk.json"),
             "office.desk" => include_str!("../../../../../participants/manifests/office.desk.json"),
             "police.station" => include_str!("../../../../../participants/manifests/police.station.json"),

@@ -21,24 +21,25 @@
 //! - Order: owners, invoices and addresses are walked in id order (`filed_before` for record ids), not hash or
 //!   insertion order. Money is `i64` cents; percentages are written from integers.
 //! - `Math.round`: none needed. First wake of the works office: a stable spread by the participant's id.
-//! - Payroll: the reduced `offices::staff::Staff` stands in for lane C1's `Staffing`: it hires and ends employment but
-//!   withholds nothing and does not file returns, so wages are paid whole. Payroll notices (starter and leaver) and
-//!   the finance office's reading of them are private code here (`// stands in for lane C1's Staffing`; integration
-//!   replaces them).
+//! - Payroll: C1's `Staffing` (`firms::staffing`) for the finance officer (pays: a wage by standing order, tax withheld
+//!   and reported) and for the works office (hires and sends the payroll notices of starters and leavers).
 //! - Papers read by someone (PB-7): `payroll_notice` by the finance officer; `rates_notice`, `rates_interest` and
 //!   `tax_penalty` by their payers (citizen, landlord) and by the issuing office itself; `disposal_docket` by the
 //!   works office (its next weekly round) and the landfill; `staff_report` by the office-holder. The finance
 //!   officer's letter to the mayor for an approval is read by the mayor.
 
-use super::staff::{lift, Own, Staff, StaffOpts, StaffThen, Want};
+use crate::firms::staffing::{Own, Staffing, StaffingOpts, Want};
+use super::systems::{DeskParams, DeskThen, OfficeDesk};
+use crate::firms::tax::{income_tax_law, withholding};
+use super::auditor::{Answerer, Audited, InBank, InBooks, Statement};
 use crate::common::work::ReportOf;
 use crate::common::{
-    addressed_to, approval_of, bases_of, bill_settled, cents, data, duration_words, filed_before, is_kind, message,
+    addressed_to, approval_of, bases_of, bill_settled, cents, data, filed_before, is_kind, message,
     money_words, out_of_time, own_account, record, team, variable_today, visited, when_words,
     CounterWork, Directions, Fields, Letters, Part, StandingWork, DAY, MONTH, YEAR,
 };
 use crate::papers::agreements::{self, job_terms};
-use crate::papers::firms::{PayrollNotice, TaxReport};
+use crate::papers::firms::TaxReport;
 use crate::papers::market::{Invoice, Valuation};
 use crate::papers::offices::{Approval, Budget, Direction, DisposalDocket, Law, RatesNotice};
 use crate::papers::{self, data as paper_data};
@@ -128,78 +129,197 @@ fn year_in_days(year: i64) -> String {
 }
 
 const MANIFEST_FINANCE: &str = r##"{
- "name": "city.finance_officer",
- "version": "0.10.1",
- "doc": "docs/behaviour/government.md",
- "params": {
-  "budget_lines": {
-   "schema": {
-    "type": "object"
-   },
-   "default": {},
-   "source": "placeholder"
+  "name": "city.finance_officer",
+  "version": "0.10.1",
+  "doc": "docs/behaviour/government.md",
+  "params": {
+    "budget_lines": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "compliance_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
+      "source": "placeholder"
+    },
+    "lines_by_position": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "lines_by_structure": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "part": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "payroll_wait_days": {
+      "schema": {
+        "type": "integer",
+        "description": "how long it waits for the hiring office's notice of a new starter before setting the wage up from the agreement on file"
+      },
+      "unit": "days",
+      "default": 3,
+      "source": "placeholder"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
+    },
+    "procedure": {
+      "schema": {
+        "type": "string",
+        "description": "the record its approval rule comes from (who approves a payment over what sum: its `data.approval`); withdrawn, or none, and no approval is asked"
+      },
+      "default": "",
+      "source": "placeholder"
+    }
   },
-  "compliance_bps": {
-   "schema": {
-    "type": "integer"
-   },
-   "unit": "bps",
-   "default": 10000,
-   "source": "placeholder"
-  },
-  "lines_by_position": {
-   "schema": {
-    "type": "object"
-   },
-   "default": {},
-   "source": "placeholder"
-  },
-  "lines_by_structure": {
-   "schema": {
-    "type": "object"
-   },
-   "default": {},
-   "source": "placeholder"
-  },
-  "notice_days": {
-   "schema": {
-    "type": "integer"
-   },
-   "unit": "days",
-   "default": 14,
-   "source": "placeholder"
-  },
-  "part": {
-   "schema": {},
-   "source": "the world gives it (no default)"
-  },
-  "payroll_wait_days": {
-   "schema": {
-    "type": "integer",
-    "description": "how long it waits for the hiring office's notice of a new starter before setting the wage up from the agreement on file"
-   },
-   "unit": "days",
-   "default": 3,
-   "source": "placeholder"
-  },
-  "period": {
-   "schema": {
-    "type": "integer"
-   },
-   "default": 1209600,
-   "source": "placeholder"
-  },
-  "procedure": {
-   "schema": {
-    "type": "string",
-    "description": "the record its approval rule comes from (who approves a payment over what sum: its `data.approval`); withdrawn, or none, and no approval is asked"
-   },
-   "default": "",
-   "source": "placeholder"
-  }
- },
- "perceives": [],
- "state": "none"
+  "perceives": [],
+  "state": "none",
+  "issues": [
+    {
+      "form": "withholding_return",
+      "title": "Return of tax withheld from wages, to a collector",
+      "does": "Reports to a collector what has been withheld from the wages paid in a period and what is paid over with it. It moves no money: what is paid over is paid besides, by a payment to each collector's account. The office's books count what is withheld and not yet paid over from the day of the last return. The law on tax from pay lists its returns and the day each falls due by; one return reports the charges the law names for it, and the books say which return falls due next.",
+      "fields": {
+        "collector": {
+          "type": "entity",
+          "required": true,
+          "description": "The collector reported to."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account the wages were paid from."
+        },
+        "period_end": {
+          "type": "date",
+          "required": true,
+          "description": "The day the period ended."
+        },
+        "withheld": {
+          "type": "amount",
+          "required": true,
+          "description": "What was withheld in the period, in all."
+        },
+        "paid": {
+          "type": "amount",
+          "required": true,
+          "description": "What is paid over now, in all."
+        },
+        "law": {
+          "type": "record",
+          "description": "The law it is withheld under: the tax law that lists the return (it names the charges each return reports; report them in that return, not in another)."
+        }
+      },
+      "writes": {
+        "kind": "withholding_report",
+        "text": "Withheld from wages, owed: {withheld}; paid now: {paid}.",
+        "basis": "=law",
+        "to": [
+          "=collector"
+        ],
+        "visible": [
+          "=self",
+          "=collector"
+        ],
+        "data": {
+          "account": "=account",
+          "paid": "#paid",
+          "period_end": "=period_end",
+          "withheld": "#withheld"
+        }
+      }
+    },
+    {
+      "form": "audit_answer",
+      "title": "Answer to the audit office's request for a named item",
+      "does": "Answers the audit office's public request under the audit law, by the day it gives: the count of your decisions of a kind in a period, one of them by its number with its file, or your payments for the period against the bank's record. Say only what your books show. It does nothing else by itself.",
+      "fields": {
+        "request": {
+          "type": "record",
+          "required": true,
+          "description": "The request this answers."
+        },
+        "auditor": {
+          "type": "entity",
+          "required": true,
+          "description": "The audit office."
+        },
+        "audit": {
+          "type": "text",
+          "required": true,
+          "description": "The audit's key, as the request gives it."
+        },
+        "ask": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "count",
+            "nth",
+            "statement"
+          ],
+          "description": "What was asked for."
+        },
+        "nth": {
+          "type": "count",
+          "description": "For a decision by its number: which."
+        },
+        "count": {
+          "type": "count",
+          "description": "For a count: how many."
+        },
+        "statement": {
+          "type": "text",
+          "description": "The books' entries asked for, in words."
+        }
+      },
+      "writes": {
+        "kind": "audit_answer",
+        "text": "Answer to audit request {request}: {statement}",
+        "basis": "=request",
+        "to": [
+          "=auditor"
+        ],
+        "visible": [
+          "=auditor",
+          "=self"
+        ],
+        "data": {
+          "request": "=request",
+          "audit": "=audit",
+          "ask": "=ask",
+          "nth": "=nth",
+          "count": "=count"
+        }
+      }
+    }
+  ]
 }"##;
 
 const MANIFEST_TAX: &str = r##"{
@@ -228,418 +348,662 @@ const MANIFEST_TAX: &str = r##"{
 }"##;
 
 const MANIFEST_RATES: &str = r##"{
- "name": "city.rates_officer",
- "version": "0.4.2",
- "doc": "docs/behaviour/public-finance.md",
- "params": {
-  "directed_under": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "",
-   "source": "placeholder"
-  },
-  "direction_compliance_bps": {
-   "schema": {
-    "type": "integer"
-   },
-   "unit": "bps",
-   "default": 10000,
-   "source": "placeholder"
-  },
-  "first_day": {
-   "schema": {
-    "type": "integer"
-   },
-   "default": 30,
-   "source": "placeholder"
-  },
-  "law": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "law-rates",
-   "source": "placeholder"
-  },
-  "office": {
-   "schema": {
-    "type": "string",
-    "description": "where its clerks work, as a standing order names it (none given: the office itself)"
-   },
-   "default": "",
-   "source": "placeholder"
-  },
-  "part": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "",
-   "source": "placeholder"
-  }
- },
- "perceives": [],
- "state": "none",
- "keeps": [
-  {
-   "what": "valuation",
-   "why": "The rating authority keeps the rate book: the valuer sends it the valuation of every rateable lot, which is what it levies on."
-  }
- ],
- "takes": [
-  {
-   "form": "rates_recovery",
-   "title": "Recovery direction to the rates officer",
-   "fields": {
-    "interest": {
-     "type": "choice",
-     "options": [
-      "yes",
-      "no"
-     ],
-     "required": true,
-     "description": "Whether rates left unpaid after their due date are charged the law's penalty interest: yes, as the office does of its own accord; no, none is added."
+  "name": "city.rates_officer",
+  "version": "0.4.3",
+  "doc": "docs/behaviour/public-finance.md",
+  "params": {
+    "automation": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
+    "casework": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
+    "directed_under": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "direction_compliance_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
+      "source": "placeholder"
+    },
+    "first_day": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 30,
+      "source": "placeholder"
+    },
+    "law": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "law-rates",
+      "source": "placeholder"
+    },
+    "office": {
+      "schema": {
+        "type": "string",
+        "description": "where its clerks work, as a standing order names it (none given: the office itself)"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "part": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "procurement": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
     }
-   },
-   "follows": "While a direction with interest no stands, the rates officer adds no penalty interest to overdue rates and writes to nobody about them. The rates themselves are still levied and still owed, and interest already recorded stays on record."
-  }
- ],
- "routines": [
-  {
-   "task": "levy",
-   "at": "office",
-   "follows": [
-    "law",
-    "law-rates"
-   ],
-   "what": "At each instalment the rating law sets, the rates clerks send every owner on the rate book a notice of their share and record it as owed to the town; each month they add the law's penalty interest to what is overdue and write to the owner. When the notices go out is the law's: the first once the valuer has valued the town's properties and not before the office's first levy day, then one for each instalment the law sets, evenly through the year (two instalments a year are 182 days apart, four are 91). The order says only that they are to be sent."
-  }
- ]
+  },
+  "perceives": [],
+  "state": "none",
+  "keeps": [
+    {
+      "what": "valuation",
+      "why": "The rating authority keeps the rate book: the valuer sends it the valuation of every rateable lot, which is what it levies on."
+    }
+  ],
+  "takes": [
+    {
+      "form": "rates_recovery",
+      "title": "Recovery direction to the rates officer",
+      "fields": {
+        "interest": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "description": "Whether rates left unpaid after their due date are charged the law's penalty interest: yes, as the office does of its own accord; no, none is added."
+        }
+      },
+      "follows": "While a direction with interest no stands, the rates officer adds no penalty interest to overdue rates and writes to nobody about them. The rates themselves are still levied and still owed, and interest already recorded stays on record."
+    }
+  ],
+  "routines": [
+    {
+      "task": "levy",
+      "at": "office",
+      "follows": [
+        "law",
+        "law-rates"
+      ],
+      "what": "At each instalment the rating law sets, the rates clerks send every owner on the rate book a notice of their share and record it as owed to the town; each month they add the law's penalty interest to what is overdue and write to the owner. When the notices go out is the law's: the first once the valuer has valued the town's properties and not before the office's first levy day, then one for each instalment the law sets, evenly through the year (two instalments a year are 182 days apart, four are 91). The order says only that they are to be sent."
+    }
+  ]
 }"##;
 
 const MANIFEST_WORKS: &str = r##"{
- "name": "city.works",
- "version": "0.6.2",
- "doc": "docs/behaviour/services.md",
- "params": {
-  "collect_every_days": {
-   "schema": {
-    "type": "integer"
-   },
-   "unit": "days",
-   "default": 7,
-   "source": "placeholder"
-  },
-  "collect_labour": {
-   "schema": {
-    "type": "integer"
-   },
-   "default": 0,
-   "source": "placeholder"
-  },
-  "collect_per_unit": {
-   "schema": {
-    "type": "integer"
-   },
-   "default": 0,
-   "source": "placeholder"
-  },
-  "collect_task": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "collect",
-   "source": "placeholder"
-  },
-  "counter": {
-   "schema": {
-    "type": "boolean"
-   },
-   "default": false,
-   "source": "placeholder"
-  },
-  "depot": {
-   "schema": {
-    "type": "string",
-    "description": "its depot, and the space the crew works in there (the world must say)"
-   },
-   "default": "",
-   "required": true,
-   "source": "its depot, and the space the crew works in there (the world must say)"
-  },
-  "depot_channel": {
-   "schema": {
-    "type": "string",
-    "description": "the channel that shows the depot, with who's there by name"
-   },
-   "default": "depot",
-   "source": "placeholder"
-  },
-  "directed_under": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "",
-   "source": "placeholder"
-  },
-  "direction_compliance_bps": {
-   "schema": {
-    "type": "integer"
-   },
-   "unit": "bps",
-   "default": 10000,
-   "source": "placeholder"
-  },
-  "dispose_every_days": {
-   "schema": {
-    "type": "integer"
-   },
-   "unit": "days",
-   "default": 7,
-   "source": "placeholder"
-  },
-  "industry": {
-   "schema": {
-    "type": "string",
-    "description": "what the work is (its postings say)"
-   },
-   "default": "",
-   "source": "placeholder"
-  },
-  "inspections": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "",
-   "source": "placeholder"
-  },
-  "kind": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "waste",
-   "source": "placeholder"
-  },
-  "landfill": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "",
-   "required": true,
-   "source": "placeholder"
-  },
-  "look_at": {
-   "schema": {
-    "type": "integer"
-   },
-   "default": 0,
-   "source": "placeholder"
-  },
-  "look_days": {
-   "schema": {
-    "type": "integer"
-   },
-   "unit": "days",
-   "default": 5,
-   "source": "placeholder"
-  },
-  "maintain_labour": {
-   "schema": {
-    "type": "integer"
-   },
-   "default": 0,
-   "source": "placeholder"
-  },
-  "maintain_over": {
-   "schema": {
-    "type": "integer"
-   },
-   "default": 0,
-   "source": "placeholder"
-  },
-  "maintain_per_unit": {
-   "schema": {
-    "type": "integer"
-   },
-   "default": 0,
-   "source": "placeholder"
-  },
-  "maintain_task": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "maintain",
-   "source": "placeholder"
-  },
-  "notice_days": {
-   "schema": {
-    "type": "integer"
-   },
-   "unit": "days",
-   "default": 14,
-   "source": "placeholder"
-  },
-  "part": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "",
-   "source": "placeholder"
-  },
-  "payroll_office": {
-   "schema": {
-    "type": "string",
-    "description": "the office of the town that pays its staff, which is sent notice of starters and leavers (the world says; none: no notice is sent)"
-   },
-   "default": "",
-   "source": "placeholder"
-  },
-  "period": {
-   "schema": {
-    "type": "integer"
-   },
-   "default": 1209600,
-   "source": "placeholder"
-  },
-  "role": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "works crew",
-   "source": "placeholder"
-  },
-  "round": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "",
-   "source": "placeholder"
-  },
-  "staff_line": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "staff",
-   "source": "placeholder"
-  },
-  "wage": {
-   "schema": {
-    "type": "integer"
-   },
-   "default": 0,
-   "source": "placeholder"
-  },
-  "waste": {
-   "schema": {
-    "type": "string",
-    "description": "per unit: seconds of work, and waste taken"
-   },
-   "default": "waste",
-   "source": "placeholder"
-  },
-  "wear": {
-   "schema": {
-    "type": "string",
-    "description": "wear worth a crew's time above this"
-   },
-   "default": "wear",
-   "source": "placeholder"
-  },
-  "work_days": {
-   "schema": {
-    "type": "integer"
-   },
-   "unit": "days",
-   "default": 5,
-   "source": "placeholder"
-  },
-  "working_day": {
-   "schema": {
-    "type": "integer",
-    "description": "when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)"
-   },
-   "default": 28800,
-   "source": "placeholder"
-  },
-  "workplace": {
-   "schema": {
-    "type": "string"
-   },
-   "default": "",
-   "required": true,
-   "source": "placeholder"
-  }
- },
- "perceives": [],
- "state": "none",
- "keeps": [
-  {
-   "what": "service_address",
-   "why": "The round is the works office's own: it makes an entry for each address its crew collects from, and adds to it as homes are built."
-  }
- ],
- "takes": [
-  {
-   "form": "works_staffing",
-   "title": "Staffing direction to the works office",
-   "fields": {
-    "recruit": {
-     "type": "choice",
-     "options": [
-      "yes",
-      "no"
-     ],
-     "required": true,
-     "description": "Whether the works office recruits: yes, it advertises and fills the posts it is short of; no, it advertises none and takes nobody on."
+  "name": "city.works",
+  "version": "0.6.2",
+  "doc": "docs/behaviour/services.md",
+  "params": {
+    "collect_every_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 7,
+      "source": "placeholder"
     },
-    "posts": {
-     "type": "count",
-     "description": "The most works crew it is to have, where that is fewer than its budget pays for. Left out: as many as the budget pays for."
+    "collect_labour": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "collect_per_unit": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "collect_task": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "collect",
+      "source": "placeholder"
+    },
+    "counter": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": false,
+      "source": "placeholder"
+    },
+    "depot": {
+      "schema": {
+        "type": "string",
+        "description": "its depot, and the space the crew works in there (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "its depot, and the space the crew works in there (the world must say)"
+    },
+    "depot_channel": {
+      "schema": {
+        "type": "string",
+        "description": "the channel that shows the depot, with who's there by name"
+      },
+      "default": "depot",
+      "source": "placeholder"
+    },
+    "directed_under": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "direction_compliance_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
+      "source": "placeholder"
+    },
+    "dispose_every_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 7,
+      "source": "placeholder"
+    },
+    "industry": {
+      "schema": {
+        "type": "string",
+        "description": "what the work is (its postings say)"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "inspections": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "kind": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "waste",
+      "source": "placeholder"
+    },
+    "landfill": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "required": true,
+      "source": "placeholder"
+    },
+    "look_at": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "look_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 5,
+      "source": "placeholder"
+    },
+    "maintain_labour": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "maintain_over": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "maintain_per_unit": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "maintain_task": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "maintain",
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "part": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "payroll_office": {
+      "schema": {
+        "type": "string",
+        "description": "the office of the town that pays its staff, which is sent notice of starters and leavers (the world says; none: no notice is sent)"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
+    },
+    "role": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "works crew",
+      "source": "placeholder"
+    },
+    "round": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "staff_line": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "staff",
+      "source": "placeholder"
+    },
+    "wage": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "waste": {
+      "schema": {
+        "type": "string",
+        "description": "per unit: seconds of work, and waste taken"
+      },
+      "default": "waste",
+      "source": "placeholder"
+    },
+    "wear": {
+      "schema": {
+        "type": "string",
+        "description": "wear worth a crew's time above this"
+      },
+      "default": "wear",
+      "source": "placeholder"
+    },
+    "work_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 5,
+      "source": "placeholder"
+    },
+    "working_day": {
+      "schema": {
+        "type": "integer",
+        "description": "when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)"
+      },
+      "default": 28800,
+      "source": "placeholder"
+    },
+    "workplace": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "required": true,
+      "source": "placeholder"
     }
-   },
-   "follows": "While a direction with recruit no stands, the works office advertises no post, takes down the advertisements it has out and offers nobody employment. With recruit yes it recruits up to what its budget pays for, or up to posts where that is fewer. Nobody is stood down by it and nobody's pay changes."
   },
-  {
-   "form": "works_collection",
-   "title": "Collection direction to the works office",
-   "fields": {
-    "every": {
-     "type": "duration",
-     "required": true,
-     "description": "How often each address on the round is to be collected from (a week, a fortnight)."
-    }
-   },
-   "follows": "While it stands, the crew collects from each address on the round once in that time, as its hours allow, homes complained about first. With no direction, the office keeps to its own round."
-  }
- ],
- "routines": [
-  {
-   "task": "collect",
-   "at": "depot",
-   "every": [
-    "collect_every_days",
-    7
-   ],
-   "what": "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket."
-  },
-  {
-   "task": "maintain",
-   "at": "depot",
-   "every": 1,
-   "what": "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen."
-  },
-  {
-   "task": "answer",
-   "at": "depot",
-   "every": 1,
-   "what": "The office's counter staff sort the day's post that is routine under this procedure and answer it, each working day, so that the works manager is not brought back for it.",
-   "papers": [
+  "perceives": [],
+  "state": "none",
+  "keeps": [
     {
-     "kind": "complaint",
-     "how": "a complaint of a collection missed puts the home first on the next round of collection"
+      "what": "service_address",
+      "why": "The round is the works office's own: it makes an entry for each address its crew collects from, and adds to it as homes are built."
     }
-   ]
-  }
- ]
+  ],
+  "takes": [
+    {
+      "form": "works_staffing",
+      "title": "Staffing direction to the works office",
+      "fields": {
+        "recruit": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "description": "Whether the works office recruits: yes, it advertises and fills the posts it is short of; no, it advertises none and takes nobody on."
+        },
+        "posts": {
+          "type": "count",
+          "description": "The most works crew it is to have, where that is fewer than its budget pays for. Left out: as many as the budget pays for."
+        }
+      },
+      "follows": "While a direction with recruit no stands, the works office advertises no post, takes down the advertisements it has out and offers nobody employment. With recruit yes it recruits up to what its budget pays for, or up to posts where that is fewer. Nobody is stood down by it and nobody's pay changes."
+    },
+    {
+      "form": "works_collection",
+      "title": "Collection direction to the works office",
+      "fields": {
+        "every": {
+          "type": "duration",
+          "required": true,
+          "description": "How often each address on the round is to be collected from (a week, a fortnight)."
+        }
+      },
+      "follows": "While it stands, the crew collects from each address on the round once in that time, as its hours allow, homes complained about first. With no direction, the office keeps to its own round."
+    }
+  ],
+  "issues": [
+    {
+      "form": "job_advertisement",
+      "title": "Job advertisement",
+      "does": "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
+      "fields": {
+        "wage": {
+          "type": "amount",
+          "required": true,
+          "description": "The wage for each pay period."
+        },
+        "period": {
+          "type": "duration",
+          "required": true,
+          "description": "The pay period: how often the wage is paid."
+        },
+        "posts": {
+          "type": "count",
+          "required": true,
+          "description": "How many posts this advertisement is for."
+        },
+        "account": {
+          "type": "account",
+          "description": "The account the wages are paid from, where the office itself pays them."
+        }
+      },
+      "writes": {
+        "kind": "job_posting",
+        "text": "Hiring: {wage} every {period}.",
+        "data": {
+          "wage": "#wage",
+          "period": "=period",
+          "role": "@role",
+          "industry": "@industry",
+          "workplace": "@workplace_structure",
+          "space": "@workplace"
+        },
+        "offer": {
+          "by": "=self",
+          "to": {
+            "min_age_years": 18
+          },
+          "take_up": "apply",
+          "available": "=posts",
+          "terms": {
+            "template": "employment",
+            "commitments": [
+              {
+                "who": "=self",
+                "does": {
+                  "outcome": {
+                    "money": {
+                      "from": "=account",
+                      "amount": "=wage",
+                      "for": "wages"
+                    }
+                  }
+                },
+                "every": "=period"
+              },
+              "@occupancy"
+            ],
+            "termination": "@termination"
+          }
+        }
+      }
+    },
+    {
+      "form": "payroll_starter",
+      "title": "Payroll notice of a new starter, to the office that pays the organisation's staff",
+      "does": "Tells the office that pays the organisation's staff that someone has been taken on, with what it needs to set their wage up. It pays nobody by itself: the paying office sets the payment up. Write to that office too, naming the notice: a paper on the organisation's own file is not put in front of it.",
+      "fields": {
+        "employee": {
+          "type": "entity",
+          "required": true,
+          "description": "Who has been taken on."
+        },
+        "post": {
+          "type": "text",
+          "required": true,
+          "description": "The post they hold."
+        },
+        "agreement": {
+          "type": "record",
+          "required": true,
+          "description": "The employment agreement, signed by both."
+        },
+        "wage": {
+          "type": "amount",
+          "required": true,
+          "description": "The wage for each pay period, before tax."
+        },
+        "period": {
+          "type": "duration",
+          "required": true,
+          "description": "The pay period."
+        },
+        "first_pay": {
+          "type": "date",
+          "required": true,
+          "description": "The first pay day (a pay period after both signed, unless the agreement says otherwise)."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account the wage is paid into."
+        }
+      },
+      "writes": {
+        "kind": "payroll_notice",
+        "text": "Payroll notice, new starter: {employee}, {post}, under employment agreement {agreement}. Pay: {wage} every {period} before tax, into {account}; first pay day {first_pay}, then every {period}. The post is one of those the {@budget_line} line of the adopted budget pays for: the wage is on that line. For the {@payroll_office} office: the wage payment is to be set up from that day.",
+        "basis": "=agreement",
+        "to": [
+          "=self"
+        ],
+        "visible": [
+          "=self"
+        ],
+        "data": {
+          "notice": "starter",
+          "office": "@payroll_office",
+          "employee": "=employee",
+          "post": "=post",
+          "agreement": "=agreement",
+          "wage": "=wage",
+          "period": "=period",
+          "first_pay": "=first_pay",
+          "account": "=account",
+          "line": "@budget_line"
+        }
+      }
+    },
+    {
+      "form": "payroll_leaver",
+      "title": "Payroll notice of a leaver, to the office that pays the organisation's staff",
+      "does": "Tells the office that pays the organisation's staff that someone's employment is ending and when, so that their wage payment ends then. It ends no employment and stops no payment by itself. Write to that office too, naming the notice.",
+      "fields": {
+        "employee": {
+          "type": "entity",
+          "required": true,
+          "description": "Who is leaving."
+        },
+        "post": {
+          "type": "text",
+          "required": true,
+          "description": "The post they held."
+        },
+        "agreement": {
+          "type": "record",
+          "required": true,
+          "description": "The employment agreement that is ending."
+        },
+        "last_day": {
+          "type": "date",
+          "required": true,
+          "description": "The last day of the employment."
+        },
+        "reason": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "notice",
+            "died"
+          ],
+          "description": "Why it ends."
+        }
+      },
+      "writes": {
+        "kind": "payroll_notice",
+        "text": "Payroll notice, leaver: {employee}, {post}, employment agreement {agreement} ends on {last_day} ({reason}). For the {@payroll_office} office: pay is due to that day, and the wage payment under the agreement is to end then.",
+        "basis": "=agreement",
+        "to": [
+          "=self"
+        ],
+        "visible": [
+          "=self"
+        ],
+        "data": {
+          "notice": "leaver",
+          "office": "@payroll_office",
+          "employee": "=employee",
+          "post": "=post",
+          "agreement": "=agreement",
+          "last_day": "=last_day",
+          "reason": "=reason"
+        }
+      }
+    },
+    {
+      "form": "disposal_docket",
+      "title": "Docket for waste delivered to the landfill",
+      "does": "Goes with a load of waste taken to the landfill: what was delivered and how much, which the landfill charges by.",
+      "fields": {
+        "kind": {
+          "type": "text",
+          "required": true,
+          "description": "What was delivered."
+        },
+        "quantity": {
+          "type": "count",
+          "required": true,
+          "description": "How much of it."
+        }
+      },
+      "writes": {
+        "sends": [
+          {
+            "to": [
+              "@landfill"
+            ],
+            "why": "The landfill takes the load and charges by the docket."
+          }
+        ],
+        "kind": "disposal_docket",
+        "text": "Delivered: {quantity} of {kind}.",
+        "to": [
+          "@landfill"
+        ],
+        "visible": [
+          "=self",
+          "@landfill"
+        ],
+        "data": {
+          "kind": "=kind",
+          "quantity": "=quantity"
+        }
+      }
+    }
+  ],
+  "routines": [
+    {
+      "task": "collect",
+      "at": "depot",
+      "every": [
+        "collect_every_days",
+        7
+      ],
+      "what": "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket."
+    },
+    {
+      "task": "maintain",
+      "at": "depot",
+      "every": 1,
+      "what": "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen."
+    },
+    {
+      "task": "answer",
+      "at": "depot",
+      "every": 1,
+      "what": "The office's counter staff sort the day's post that is routine under this procedure and answer it, each working day, so that the works manager is not brought back for it.",
+      "papers": [
+        {
+          "kind": "complaint",
+          "how": "a complaint of a collection missed puts the home first on the next round of collection"
+        }
+      ]
+    }
+  ]
 }"##;
 
 
@@ -874,6 +1238,14 @@ enum RatesThen {
     Levy(Vec<String>),
     /// Interest charged on a claim at this moment.
     Interest(String, i64),
+    /// What follows from the office's dealings with systems.
+    Desk(DeskThen),
+}
+
+impl From<DeskThen> for RatesThen {
+    fn from(d: DeskThen) -> Self {
+        RatesThen::Desk(d)
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -898,6 +1270,8 @@ struct RatesPlan {
     retry: BTreeSet<String>,
     /// Interest charged and not yet on the file.
     interest_cache: BTreeMap<String, i64>,
+    /// The systems it may take up to write its notices (docs/behaviour/automation.md): none unless the world gives it.
+    desk: OfficeDesk,
 }
 
 impl RatesPlan {
@@ -923,6 +1297,7 @@ impl RatesPlan {
             report_day: -1,
             retry: BTreeSet::new(),
             interest_cache: BTreeMap::new(),
+            desk: OfficeDesk::new(&ctx.entity, DeskParams::read(ctx)?),
         })
     }
     fn paid(&self, c: &Record) -> bool {
@@ -938,6 +1313,7 @@ impl Plan for RatesPlan {
     type Then = RatesThen;
     fn absorb(&mut self, pic: &Picture, _: &mut Cx) {
         self.book.absorb(pic);
+        self.desk.absorb(&self.book);
         self.letters.take(pic, &self.book);
         if let Some(acc) = own_account(pic) {
             for tx in pic.transactions() {
@@ -951,6 +1327,10 @@ impl Plan for RatesPlan {
         }
     }
     fn then(&mut self, tok: &RatesThen, done: Done, _: &mut Cx) -> Vec<Step<RatesThen>> {
+        if let RatesThen::Desk(d) = tok {
+            self.desk.then(d, done);
+            return vec![];
+        }
         if !done.applied() {
             match tok {
                 RatesThen::Levy(owners) => self.retry.extend(owners.iter().cloned()),
@@ -959,6 +1339,7 @@ impl Plan for RatesPlan {
                         self.interest_cache.remove(c);
                     }
                 }
+                RatesThen::Desk(_) => {}
             }
         }
         vec![]
@@ -987,6 +1368,9 @@ impl Plan for RatesPlan {
                 let e = last_interest.entry(b.clone()).or_insert(i64::MIN);
                 *e = (*e).max(r.at);
             }
+        }
+        if self.routines.part != Part::Staff {
+            steps.extend(self.desk.steps::<RatesThen>(&mut self.book, t, &acc.account, acc.balance, 1, 0, cx));
         }
         let office_at = if !self.office.is_empty() { self.office.clone() } else { self.position.clone().unwrap_or_else(|| "office".into()) };
         let why = "Setting the rates clerks' work: the notices sent at each instalment and interest added to what is overdue, as a standing work order.";
@@ -1047,6 +1431,7 @@ impl Plan for RatesPlan {
                     calls,
                 );
                 s.then = Some(RatesThen::Levy(who));
+                self.desk.assign(&mut s, "rates_notice"); // (a system of ours that writes them does, if we hold one)
                 steps.push(s);
             }
         }
@@ -1159,7 +1544,7 @@ impl Kind for RatesOfficer {
         "city.rates_officer"
     }
     fn version(&self) -> &'static str {
-        "0.4.2"
+        "0.4.3"
     }
     fn doc(&self) -> &'static str {
         "docs/behaviour/public-finance.md"
@@ -1192,8 +1577,6 @@ pub struct FinanceOfficer;
 enum FinThen {
     /// An invoice paid.
     Paid(String),
-    /// A wage standing order made for this agreement.
-    Order(String),
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -1215,142 +1598,60 @@ struct FinPlan {
     me: String,
     book: crate::common::Book,
     letters: Letters,
-    /// Whose staff the town has (stands in for lane C1's `Staffing`).
-    staff: Staff,
+    /// The town's payroll: whose staff the town has, their wages by standing order, the tax withheld (C1's `Staffing`).
+    staff: Staffing,
     /// Invoices paid: id -> (sum, year). Read from the account's statement and from our own payments.
     paid: BTreeMap<String, (i64, i64)>,
     /// Invoices a payment is under way for.
     pending: BTreeMap<String, (i64, i64)>,
+    /// Our books of what we paid against an invoice, and the bank's record of it as the account shows it (the audit office
+    /// asks for both: docs/behaviour/auditor.md): invoice -> (sum, when).
+    booked: BTreeMap<String, (i64, i64)>,
+    banked: BTreeMap<String, (i64, i64)>,
+    audited: Audited,
     /// Invoices the mayor has been asked to approve (a letter: no paper records it).
     asked: BTreeSet<String>,
     flows: Vec<Flow>,
-    /// Wages paid out of the account by year.
-    wages: BTreeMap<i64, i64>,
-    /// Wage orders made and not yet on the file: agreement -> when. // stands in for lane C1's Staffing
-    ordering: BTreeMap<String, i64>,
-    retiring: BTreeMap<String, i64>,
-}
-
-fn payee_of(book: &crate::common::Book, a: &Record, me: &str, told: Option<&PayrollNotice>) -> Option<String> {
-    let worker = agreements::parties_of(a).get(1).cloned().unwrap_or_default();
-    agreements::commitment_of(a, me)
-        .0
-        .and_then(|o| o.money)
-        .map(|m| m.to)
-        .filter(|s| !s.is_empty())
-        .or_else(|| told.and_then(|n| n.account.clone()))
-        .or_else(|| book.all("job_application").find(|r| r.speaks_for.as_deref() == Some(worker.as_str())).and_then(|r| data(r).s("account").map(String::from)))
+    /// The year the town's wages are counted from, and what the payroll had paid (gross) when it began.
+    wages_year: i64,
+    wages_at_year: i64,
 }
 
 impl FinPlan {
     fn new(ctx: &Ctx) -> Result<Self, String> {
         let period: i64 = ctx.param("period", 14 * DAY)?;
         let notice_days: i64 = ctx.param("notice_days", 14)?;
+        let payroll_wait_days: i64 = ctx.param("payroll_wait_days", 3)?;
         Ok(FinPlan {
             compliance_bps: ctx.param("compliance_bps", 10_000)?,
             budget_lines: ctx.param("budget_lines", BTreeMap::new())?,
             period,
             procedure: str_param(ctx, "procedure", "")?,
-            payroll_wait_days: ctx.param("payroll_wait_days", 3)?,
+            payroll_wait_days,
             lines_by_structure: ctx.param("lines_by_structure", BTreeMap::new())?,
             lines_by_position: ctx.param("lines_by_position", BTreeMap::new())?,
             me: ctx.entity.clone(),
             book: Default::default(),
             letters: Default::default(),
-            staff: Staff::new(&ctx.entity, StaffOpts { period, notice_days, role: "staff".into(), own: Own::All, hire: false, pay: false, ..Default::default() }),
+            staff: Staffing::new(
+                &ctx.entity,
+                StaffingOpts { hire: false, pay: true, notice_wait: Some(payroll_wait_days * DAY), wakes: Some(3 * DAY), ..StaffingOpts::new(period, notice_days, "staff") },
+            ),
             paid: BTreeMap::new(),
             pending: BTreeMap::new(),
+            booked: BTreeMap::new(),
+            banked: BTreeMap::new(),
+            audited: Audited::new(&ctx.entity),
             asked: BTreeSet::new(),
             flows: vec![],
-            wages: BTreeMap::new(),
-            ordering: BTreeMap::new(),
-            retiring: BTreeMap::new(),
+            wages_year: 0,
+            wages_at_year: 0,
         })
-    }
-    /// The wage standing orders on file: agreement -> request.
-    fn orders_on_file(&self, withdrawn_too: bool) -> BTreeMap<String, String> {
-        let me = self.me.as_str();
-        let reqs: Vec<&Arc<Record>> = if withdrawn_too { self.book.all("request").collect() } else { self.book.open("request").collect() };
-        let mut m = BTreeMap::new();
-        for r in reqs {
-            if r.speaks_for.as_deref() == Some(me) && data(r).get("every").is_some_and(|e| !e.is_null()) {
-                for b in bases_of(r) {
-                    m.entry(b.clone()).or_insert_with(|| r.id.clone());
-                }
-            }
-        }
-        m
     }
     fn spent(&self, year: i64) -> i64 {
         let paid: i64 = self.paid.values().filter(|(_, y)| *y == year).map(|(a, _)| a).sum();
         let pend: i64 = self.pending.iter().filter(|(k, (_, y))| *y == year && !self.paid.contains_key(*k)).map(|(_, (a, _))| a).sum();
         paid + pend
-    }
-    /// stands in for lane C1's Staffing (payroll notices and the wage standing orders); integration replaces.
-    fn payroll(&mut self, pic: &Picture, account: &str, cx: &mut Cx) -> Vec<Step<FinThen>> {
-        let t = pic.t;
-        let me = self.me.clone();
-        let on_file = self.orders_on_file(false);
-        self.ordering.retain(|a, at| !on_file.contains_key(a) && t - *at < 2 * DAY);
-        self.retiring.retain(|a, at| on_file.contains_key(a) && t - *at < 2 * DAY);
-        let starters: BTreeMap<String, (String, PayrollNotice)> = self
-            .book
-            .open("payroll_notice")
-            .filter(|n| n.speaks_for.as_deref() == Some(me.as_str()))
-            .filter_map(|n| papers::read::<PayrollNotice>(n).filter(|p| p.notice == "starter").map(|p| (p.agreement.clone(), (n.id.clone(), p))))
-            .collect();
-        let mut steps = vec![];
-        for a in self.staff.staff(&self.book, t) {
-            if on_file.contains_key(&a.id) || self.ordering.contains_key(&a.id) || self.staff.noticed.contains_key(&a.id) {
-                continue;
-            }
-            let worker = agreements::parties_of(&a).get(1).cloned().unwrap_or_default();
-            let pays = job_terms(&a, &worker, Some(&self.book));
-            let told = starters.get(&a.id);
-            let signed = self.book.signed_at(&a.id).unwrap_or(a.at);
-            if told.is_none() && t - signed < self.payroll_wait_days * DAY {
-                continue;
-            }
-            let Some(to) = payee_of(&self.book, &a, &me, told.map(|x| &x.1)) else { continue };
-            let first_pay = told.and_then(|x| x.1.first_pay).unwrap_or(signed + pays.period);
-            let first = (first_pay - t).max(0);
-            self.ordering.insert(a.id.clone(), t);
-            let on = match told {
-                Some((id, _)) => format!("Payroll notice {id}: a new starter, first pay day {}", when_words(first_pay, &cx.ctx.world)),
-                None => format!(
-                    "A new starter's agreement ({}) is on file and no payroll notice has come for it: setting the wage up from the agreement, first pay day {}",
-                    a.id,
-                    when_words(first_pay, &cx.ctx.world)
-                ),
-            };
-            let c = pay(
-                &to,
-                pays.wage,
-                Pay { from: Some(account.to_string()), every: Some(pays.period), first: Some(first), basis: Some(a.id.clone()), for_: Some(format!("Wages for {worker}.")), line: told.and_then(|x| x.1.line.clone()), ..Default::default() },
-                cx,
-            );
-            let mut s = because(format!("{on}: starting their wages by standing order."), vec![c]);
-            s.then = Some(FinThen::Order(a.id.clone()));
-            steps.push(s);
-        }
-        // Employment ended: the wages stop.
-        let ended: Vec<Arc<Record>> = self
-            .book
-            .of_type("agreement")
-            .filter(|a| agreements::template_of(a) == Some(agreements::EMPLOYMENT) && agreements::parties_of(a).first() == Some(&me))
-            .filter(|a| self.book.concluded(&a.id) && t >= self.book.ends_at(&a.id).unwrap_or(i64::MAX))
-            .cloned()
-            .collect();
-        for a in ended {
-            if let Some(order) = on_file.get(&a.id) {
-                if self.retiring.contains_key(&a.id) {
-                    continue;
-                }
-                self.retiring.insert(a.id.clone(), t);
-                steps.push(because("Employment has ended: stopping the wages.", vec![crate::common::withdraw(order, Some("Employment ended; stop wages."))]));
-            }
-        }
-        steps
     }
 }
 
@@ -1358,8 +1659,8 @@ impl Plan for FinPlan {
     type Then = FinThen;
     fn absorb(&mut self, pic: &Picture, _: &mut Cx) {
         self.book.absorb(pic);
+        self.staff.absorb(pic);
         self.letters.take(pic, &self.book);
-        let wage_orders: BTreeSet<String> = self.orders_on_file(true).into_values().collect();
         if let Some(mine) = own_account(pic).map(|a| a.account) {
             for x in pic.transactions() {
                 let amount = cents(x.amount);
@@ -1368,11 +1669,9 @@ impl Plan for FinPlan {
                 }
                 if x.from == mine && x.to != mine {
                     self.flows.push(Flow { t: x.t, amount: -amount, party: x.to.clone() });
-                    if x.per_instruction.as_ref().is_some_and(|p| wage_orders.contains(p)) {
-                        *self.wages.entry(age_year(x.t)).or_insert(0) += amount;
-                    }
                     if let Some(s) = &x.settles {
                         self.paid.insert(s.clone(), (amount, age_year(x.t)));
+                        self.banked.insert(s.clone(), (amount, x.t));
                         self.pending.remove(s);
                     }
                 }
@@ -1386,11 +1685,6 @@ impl Plan for FinPlan {
             FinThen::Paid(inv) => {
                 if !done.applied() {
                     self.pending.remove(inv);
-                }
-            }
-            FinThen::Order(a) => {
-                if !done.applied() {
-                    self.ordering.remove(a);
                 }
             }
         }
@@ -1409,8 +1703,12 @@ impl Plan for FinPlan {
         let adopted = budgets.iter().filter(|(_, b)| b.year == year).max_by(|a, b| a.0.at.cmp(&b.0.at).then_with(|| filed_before(&b.0.id, &a.0.id)));
         let last = budgets.iter().filter(|(_, b)| b.year < year).max_by(|a, b| a.1.year.cmp(&b.1.year).then(a.0.at.cmp(&b.0.at)).then_with(|| filed_before(&b.0.id, &a.0.id)));
         let budget = adopted.or(last);
-        steps.extend(self.payroll(pic, &acc.account, cx));
-        let wages = self.wages.get(&year).copied().unwrap_or(0);
+        if year != self.wages_year {
+            self.wages_year = year;
+            self.wages_at_year = self.staff.wages_paid;
+        }
+        steps.extend(self.staff.routine(pic, &self.book, cx, &acc.account, &Want { target: 0, wage: 0, can_post: false, ..Default::default() }));
+        let wages = self.staff.wages_paid - self.wages_at_year;
         let total: i64 = budget.map_or(0, |(_, b)| b.lines.values().sum());
         let months = ((t - (year - 1) * YEAR) * 12 / YEAR + 1).min(12);
         let limit = if adopted.is_some() { total } else { total * months / 12 };
@@ -1459,6 +1757,7 @@ impl Plan for FinPlan {
                 continue;
             }
             self.pending.insert(inv.id.clone(), (amount, year));
+            self.booked.insert(inv.id.clone(), (amount, t));
             let line = {
                 let by_kind = data(&inv).s("type").and_then(|t| self.lines_by_structure.get(t));
                 by_kind.or_else(|| inv.position.as_ref().and_then(|p| self.lines_by_position.get(p))).cloned()
@@ -1475,12 +1774,30 @@ impl Plan for FinPlan {
             s.then = Some(FinThen::Paid(inv.id.clone()));
             steps.push(s);
         }
+        // The audit office's requests of us, answered from our books (the law names the auditor; we cannot refuse).
+        let books = OurBooks { booked: &self.booked, banked: &self.banked };
+        steps.extend(self.audited.steps::<FinThen>(&self.book, &books));
         if !self.letters.is_empty() {
             let report = self.report(t, &acc.account, acc.balance, year, adopted.map(|x| &x.0), last.map(|x| (&x.0, x.1.year)), budget.map(|x| &x.1), limit, cx);
             let answers = answers_of(FINANCE_ANSWERS);
             steps.extend(self.letters.answer::<FinThen>(Some(&answers), "A letter to our office: answering with our standard report.", |_| report.clone()));
         }
         steps
+    }
+}
+
+/// What the finance office answers an audit with: the payments in its books and the bank's record of them.
+struct OurBooks<'a> {
+    booked: &'a BTreeMap<String, (i64, i64)>,
+    banked: &'a BTreeMap<String, (i64, i64)>,
+}
+
+impl Answerer for OurBooks<'_> {
+    fn statement(&self, _from: i64, _to: i64) -> Option<Option<Statement>> {
+        Some(Some(Statement {
+            books: self.booked.iter().map(|(id, (amount, at))| InBooks { id: id.clone(), amount: *amount, at: *at }).collect(),
+            bank: self.banked.iter().map(|(id, (amount, t))| InBank { id: id.clone(), amount: *amount, t: *t }).collect(),
+        }))
     }
 }
 
@@ -1506,7 +1823,7 @@ impl FinPlan {
         let mut top: Vec<(&str, i64)> = by_payer.into_iter().collect();
         top.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
         let top = top.iter().take(5).map(|(a, v)| format!("{a} {}", money_words(*v, w))).collect::<Vec<_>>().join(", ");
-        let days = (t.min(365 * DAY) as f64 / DAY as f64).round().max(1.0) as i64;
+        let days = (t.min(365 * DAY) + DAY / 2).div_euclid(DAY).max(1);
         let twelve = since(365);
         let history = if !self.flows.is_empty() {
             format!(
@@ -1523,7 +1840,7 @@ impl FinPlan {
             "No money has moved in or out of the account yet. ".to_string()
         };
         // The town's payroll, itemised (a mayor otherwise sees only recurring payments it can't place: pilots 8, 9).
-        // (Tax withheld is not shown: the reduced staff stands in for lane C1's `Staffing`, which withholds.)
+        let law = income_tax_law(&self.book);
         let staff = self.staff.staff(&self.book, t);
         let payroll = if staff.is_empty() {
             "The town employs nobody at present. ".to_string()
@@ -1533,19 +1850,21 @@ impl FinPlan {
                 .map(|a| {
                     let worker = agreements::parties_of(a).get(1).cloned().unwrap_or_default();
                     let jt = job_terms(a, &worker, None);
+                    let gross = self.staff.wage_of(a);
+                    let net = gross - withholding(law.as_ref(), gross, jt.period);
                     format!(
-                        "{worker}, every {} days, {} gross, {} paid to {} (agreement {})",
+                        "{worker}, every {} days, {} gross, {} paid to {} after tax withheld (agreement {})",
                         (jt.period + DAY / 2) / DAY,
-                        money_words(jt.wage, w),
-                        money_words(jt.wage, w),
-                        payee_of(&self.book, a, me, None).unwrap_or_else(|| "their account".into()),
+                        money_words(gross, w),
+                        money_words(net, w),
+                        self.staff.payee(&self.book, a).unwrap_or_else(|| "their account".into()),
                         a.id
                     )
                 })
                 .collect();
             format!("The town's payroll ({}, recurring payments from {account}): {}. ", staff.len(), each.join("; "))
         };
-        let wages = self.wages.get(&year).copied().unwrap_or(0);
+        let wages = self.staff.wages_paid - self.wages_at_year;
         let spent = self.spent(year);
         let mut out = format!("Report from the finance office: the town's account {account} holds {}. ", money_words(balance, w)) + &history + &payroll;
         out += &match (adopted, last) {
@@ -1608,7 +1927,7 @@ impl Kind for FinanceOfficer {
         "docs/behaviour/government.md"
     }
     fn manifest(&self) -> Value {
-        manifest_of(MANIFEST_FINANCE, FINANCE_ANSWERS, Some(forms::group("FINANCE")))
+        manifest_of(MANIFEST_FINANCE, FINANCE_ANSWERS, Some([forms::group("FINANCE"), forms::group("AUDIT_ANSWER")].concat()))
     }
     fn cadence(&self, _: &Ctx) -> i64 {
         3 * DAY
@@ -1625,7 +1944,6 @@ impl Kind for FinanceOfficer {
 
 const WORKS_ANSWERS: &str = r#"{"office":"the works office","acts":"What it acts on: the adopted budget's staff line, which sets its crew; a complaint of a collection missed; and a direction on one of its own forms from those the town's rule on directions names.","forms":[{"about":["staff","recruit","hire","hiring","crew","vacanc","posts"],"say":"On staffing it follows a direction on its staffing form (works_staffing) from those the town's rule on directions names, and no letter."},{"about":["collect","round","waste","bin","rubbish"],"say":"On how often it collects it follows a direction on its collection form (works_collection) from those the town's rule on directions names; a collection missed is reported as a complaint."}],"report":true}"#;
 
-const PAYROLL_NOTE: &str = "Payroll notice from the hiring office, ";
 
 /// city.works: the town's works office (docs/behaviour/services.md). It hires a works crew to what the adopted
 /// budget's staff line pays for (the finance officer runs their payroll), and each working day sets the crew at the
@@ -1728,13 +2046,10 @@ struct RoundItem {
 
 #[derive(Clone, Serialize, Deserialize)]
 enum WorksThen {
-    Staff(StaffThen),
     /// A weekly load taken to the landfill.
     Disposed(i64),
     /// A part of the day's round: what was planned and when, and who did it.
     Round { items: Vec<RoundItem>, t: i64, present: Vec<String> },
-    /// A payroll notice (its key), sent again if refused.
-    Notice(String),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1748,7 +2063,7 @@ struct WorksPlan {
     directions: Directions,
     routines: StandingWork,
     counter: CounterWork,
-    staff: Staff,
+    staff: Staffing,
     /// Each building as last seen: as the crew that worked on it left it, or as whoever was sent found it.
     known: BTreeMap<String, SiteStructure>,
     /// The round: the addresses we collect from.
@@ -1770,21 +2085,6 @@ struct WorksPlan {
     next_dispose: i64,
     month: i64,
     collected_kg: i64,
-    /// Payroll notices sent and not yet on the file. // stands in for lane C1's Staffing
-    notified: BTreeSet<String>,
-}
-
-fn role_of(a: &Record, fallback: &str) -> String {
-    if let RecordBody::Agreement { terms } = &a.body {
-        if let Some(text) = terms.text.as_deref() {
-            if let Some(i) = text.find(" as ") {
-                if let Some(j) = text[i + 4..].find(" for ") {
-                    return text[i + 4..i + 4 + j].to_string();
-                }
-            }
-        }
-    }
-    fallback.to_string()
 }
 
 impl WorksPlan {
@@ -1814,17 +2114,17 @@ impl WorksPlan {
             directions: Directions::new(ctx, &p.directed_under, Some(p.direction_compliance_bps), "the works office"),
             routines: StandingWork::new(&ctx.entity, part, offices),
             counter: CounterWork::new(p.counter),
-            staff: Staff::new(
+            staff: Staffing::new(
                 &ctx.entity,
-                StaffOpts {
-                    period: p.period,
-                    notice_days: p.notice_days,
+                StaffingOpts {
                     workplace: Some(p.workplace.clone()),
-                    role: p.role.clone(),
                     industry: (!p.industry.is_empty()).then(|| p.industry.clone()),
-                    own: Own::RoleOrUnnamed,
                     hire: true,
                     pay: false,
+                    own: Some(Own::RoleOrUnnamed),
+                    payroll: (!p.payroll_office.is_empty()).then(|| p.payroll_office.clone()),
+                    line: (!p.staff_line.is_empty()).then(|| p.staff_line.clone()),
+                    ..StaffingOpts::new(p.period, p.notice_days, &p.role)
                 },
             ),
             known: BTreeMap::new(),
@@ -1844,124 +2144,10 @@ impl WorksPlan {
             next_dispose: p.dispose_every_days * DAY,
             month: -1,
             collected_kg: 0,
-            notified: BTreeSet::new(),
             p,
         })
     }
 
-    /// stands in for lane C1's Staffing (payroll notices); integration replaces.
-    fn payroll_notices(&mut self, t: i64, cx: &Cx) -> Vec<Step<WorksThen>> {
-        let mut steps = vec![];
-        if self.p.payroll_office.is_empty() {
-            return steps;
-        }
-        let me = self.me.clone();
-        let w = &cx.ctx.world;
-        let filed: Vec<PayrollNotice> = self.book.open("payroll_notice").filter(|n| n.speaks_for.as_deref() == Some(me.as_str())).filter_map(|n| papers::read::<PayrollNotice>(n)).collect();
-        let on_line = if self.p.staff_line.is_empty() {
-            String::new()
-        } else {
-            format!(" The post is one of those the {} line of the adopted budget pays for: the wage is on that line.", self.p.staff_line)
-        };
-        let office = self.p.payroll_office.clone();
-        for a in self.staff.staff(&self.book, t) {
-            let key = format!("starter:{}", a.id);
-            let signed = self.book.signed_at(&a.id);
-            // (Those the organisation started with were on its payroll before the year began.)
-            if a.author == oikos_contracts::blocks::GENESIS || signed.is_none() || self.notified.contains(&key) || filed.iter().any(|n| n.notice == "starter" && n.agreement == a.id) {
-                continue;
-            }
-            let signed = signed.unwrap_or(0);
-            let worker = agreements::parties_of(&a).get(1).cloned().unwrap_or_default();
-            let pays = job_terms(&a, &worker, Some(&self.book));
-            let Some(to) = payee_of(&self.book, &a, &me, None) else { continue };
-            self.notified.insert(key.clone());
-            let first_pay = signed + pays.period;
-            let post = role_of(&a, &self.p.role);
-            let body = format!(
-                "new starter: {worker}, {post}, under employment agreement {}. Pay: {} every {} before tax, into {to}; first pay day {}, then every {}.{on_line}",
-                a.id,
-                money_words(pays.wage, w),
-                duration_words(pays.period),
-                when_words(first_pay, w),
-                duration_words(pays.period)
-            );
-            let notice = PayrollNotice {
-                notice: "starter".into(),
-                office: Some(office.clone()),
-                employee: worker.clone(),
-                post: post.clone(),
-                agreement: a.id.clone(),
-                wage: Some(pays.wage),
-                period: Some(pays.period),
-                first_pay: Some(first_pay),
-                account: Some(to.clone()),
-                line: (!self.p.staff_line.is_empty()).then(|| self.p.staff_line.clone()),
-                last_day: None,
-                reason: None,
-            };
-            let mut s = because(
-                format!("{worker} has signed and started: sending the {office} office a payroll notice (who, the post, the pay, the first pay day, the agreement), for it to set the wage up."),
-                vec![
-                    say(
-                        "payroll_notice",
-                        &format!("Payroll notice, {body} For the {office} office: the wage payment is to be set up from that day."),
-                        Say { to: Some(vec![me.clone()]), visible: Some(Visible::Only(vec![me.clone()])), basis: Some(a.id.clone()), data: Some(paper_data(&notice)), ..Default::default() },
-                    ),
-                    message(
-                        std::slice::from_ref(&office),
-                        &format!("{PAYROLL_NOTE}{body} The notice is on the organisation's file. The wage payment is to be set up from that day: a payment from the organisation's account to {to} every {}, first on {}, citing {}, of the pay.", duration_words(pays.period), when_words(first_pay, w), a.id),
-                        Some(&a.id),
-                    ),
-                ],
-            );
-            s.then = Some(WorksThen::Notice(key));
-            steps.push(s);
-        }
-        let ending: Vec<Arc<Record>> = self.staff.staff(&self.book, t);
-        for a in ending {
-            let key = format!("leaver:{}", a.id);
-            if !self.book.concluded(&a.id) || self.notified.contains(&key) || filed.iter().any(|n| n.notice == "leaver" && n.agreement == a.id) {
-                continue;
-            }
-            let Some(end) = self.book.ends_at(&a.id) else { continue };
-            self.notified.insert(key.clone());
-            let worker = agreements::parties_of(&a).get(1).cloned().unwrap_or_default();
-            let post = role_of(&a, &self.p.role);
-            let notice = PayrollNotice {
-                notice: "leaver".into(),
-                office: Some(office.clone()),
-                employee: worker.clone(),
-                post: post.clone(),
-                agreement: a.id.clone(),
-                wage: None,
-                period: None,
-                first_pay: None,
-                account: None,
-                line: None,
-                last_day: Some(end),
-                reason: Some("notice".into()),
-            };
-            let mut s = because(
-                format!("{worker}'s employment ends on {}: telling the {office} office.", when_words(end, w)),
-                vec![
-                    say(
-                        "payroll_notice",
-                        &format!("Payroll notice, leaver: {worker}, {post}, employment agreement {} ends on {} (notice). For the {office} office: pay is due to that day, and the wage payment under the agreement is to end then.", a.id, when_words(end, w)),
-                        Say { to: Some(vec![me.clone()]), visible: Some(Visible::Only(vec![me.clone()])), basis: Some(a.id.clone()), data: Some(paper_data(&notice)), ..Default::default() },
-                    ),
-                    message(
-                        std::slice::from_ref(&office),
-                        &format!("{PAYROLL_NOTE}leaver: {worker}, {post}, employment agreement {} ends on {} (notice). The notice is on the organisation's file. Pay is due to that day, and the standing payment of their wage is to be withdrawn then.", a.id, when_words(end, w)),
-                        Some(&a.id),
-                    ),
-                ],
-            );
-            s.then = Some(WorksThen::Notice(key));
-            steps.push(s);
-        }
-        steps
-    }
 }
 
 impl Plan for WorksPlan {
@@ -2043,12 +2229,6 @@ impl Plan for WorksPlan {
 
     fn then(&mut self, tok: &WorksThen, done: Done, cx: &mut Cx) -> Vec<Step<WorksThen>> {
         match tok {
-            WorksThen::Staff(_) => {}
-            WorksThen::Notice(k) => {
-                if !done.applied() {
-                    self.notified.remove(k);
-                }
-            }
             WorksThen::Disposed(q) => {
                 if done.applied() {
                     self.at_depot = (self.at_depot - q).max(0);
@@ -2160,7 +2340,7 @@ impl Plan for WorksPlan {
             }
             if self.staff.staying(&self.book, t) > target && !staff_only {
                 let why = format!("The adopted budget's {} line ({}) pays for a crew of {target}, and we have {}: letting one go.", p.staff_line, money_words(line, &w), workers.len());
-                steps.extend(lift(self.staff.let_go(&self.book, t, &why, "Redundancy: the budget doesn't pay for the position."), WorksThen::Staff));
+                steps.extend(self.staff.let_go(&self.book, t, cx, &why, "Redundancy: the budget doesn't pay for the position."));
             }
         }
         // A staffing direction that stands (from whoever the town says may direct us): whether to recruit, and the most
@@ -2172,7 +2352,7 @@ impl Plan for WorksPlan {
         // (Taking on and standing down are the office-holder's: its staff, where they are a post of their own, do neither.)
         if !staff_only {
             let want = Want {
-                target: hire_to,
+                target: hire_to as i64,
                 wage: p.wage,
                 can_post: budget.is_some() && hire_to > workers.len(),
                 recruit: Some(recruit),
@@ -2184,9 +2364,9 @@ impl Plan for WorksPlan {
                     if hire_to < target { format!(" (and direction {} says to fill {hire_to})", staffing_dir.as_ref().map(|x| x.0.as_str()).unwrap_or("")) } else { String::new() },
                     workers.len()
                 )),
+                ..Default::default()
             };
-            steps.extend(lift(self.staff.routine(pic, &self.book, "", &want, cx), WorksThen::Staff));
-            steps.extend(self.payroll_notices(t, cx));
+            steps.extend(self.staff.routine(pic, &self.book, cx, "", &want));
         }
         // How often each address is collected from: as directed, while a direction on it stands; else our own round.
         let collection_dir = self.directions.standing(&self.book, "works_collection", cx).map(|d| (d.id.clone(), dir_of(d)));
@@ -2735,6 +2915,57 @@ mod tests {
         assert!(without.wake(6 * DAY, with_money(papers(staff), "900000000"), vec![]).is_empty());
         let late = joined(&without.wake(9 * DAY, with_money(papers(vec![]), "900000000"), vec![]));
         assert!(late.contains("acc-c9"), "{late}");
+    }
+
+    // ---------------------------------------------------------------- an office and the systems on offer
+
+    fn system_offer(id: &str) -> Value {
+        st(
+            "rec.90",
+            DAY,
+            "system_offer",
+            json!({ "id": id, "title": "rates notice writer", "for": "offices", "kinds": ["rates_notice"], "template": "installed-system", "seconds": 600, "speed_bps": 2000, "scope_bps": 9000, "setup": 100_000, "fee_per_year": 120_000,
+                "exit": 0, "term_days": 365, "notice_days": 30, "oversight_hours_per_month": 0, "error_bps": 0, "account": "acc-vendor", "fee_month": 10_000, "references": 0 }),
+            json!({ "speaks_for": "vendor-1", "author": "vendor-system" }),
+        )
+    }
+    fn made_notices(n: i64) -> Vec<Value> {
+        (0..n).map(|i| st(&format!("rec.{}", 100 + i), 5 * DAY + i, "rates_notice", json!({ "amount": 1000, "lots": ["lot-1"], "due": 40 * DAY, "account": "acc-city" }), json!({ "addressed_to": ["landlord-1"] }))).collect()
+    }
+    fn desk_params(procurement: Value) -> Value {
+        json!({ "automation": {}, "procurement": procurement,
+            "casework": { "kinds": ["rates_notice"], "person_seconds": { "rates_notice": 3600 }, "wage_month": 500_000, "seconds_per_worker_month": 144_000, "utilisation_bps": 8000 } })
+    }
+
+    #[test]
+    fn an_office_that_may_take_systems_orders_those_that_save_its_staff_more_than_they_cost_once_and_only_once() {
+        let mut rates = rig(&RatesOfficer, "rates-system", "rates", desk_params(Value::Null));
+        let mut shown = made_notices(40);
+        shown.push(system_offer("writer-1"));
+        // Before the first monthly look it does nothing about systems.
+        assert!(!joined(&rates.wake(10 * DAY, with_money(papers(shown.clone()), "900000000"), vec![])).contains("system:writer-1"));
+        let out = joined(&rates.wake(35 * DAY, with_money(papers(vec![]), "900000000"), vec![]));
+        assert!(out.contains("kind=order") && out.contains("system:writer-1") && out.contains("acc-vendor"), "{out}");
+        let again = joined(&rates.wake(66 * DAY, with_money(papers(vec![]), "900000000"), vec![]));
+        assert!(!again.contains("system:writer-1"), "one order out until the systems come: {again}");
+    }
+
+    #[test]
+    fn above_the_laws_threshold_it_invites_bids_first() {
+        let mut rates = rig(&RatesOfficer, "rates-system", "rates", desk_params(json!({ "threshold": 1, "bid_days": 10 })));
+        let mut shown = made_notices(40);
+        shown.push(system_offer("writer-1"));
+        let out = joined(&rates.wake(35 * DAY, with_money(papers(shown), "900000000"), vec![]));
+        assert!(out.contains("kind=tender") && out.contains("write rates_notice"), "{out}");
+        assert!(!out.contains("system:writer-1"), "not ordered before the bids are in: {out}");
+    }
+
+    #[test]
+    fn an_office_given_no_systems_to_weigh_looks_at_none() {
+        let mut rates = rig(&RatesOfficer, "rates-system", "rates", json!({}));
+        let mut shown = made_notices(40);
+        shown.push(system_offer("writer-1"));
+        assert!(!joined(&rates.wake(35 * DAY, with_money(papers(shown), "900000000"), vec![])).contains("system:writer-1"));
     }
 
     // ---------------------------------------------------------------- the works office
