@@ -63,6 +63,9 @@ pub struct EngineOptions {
     /// with commands of its own, and says when its wake is done (`host_finished`); the round's code actions before a
     /// seat in key order are carried out before that seat's first act (`host_command`).
     pub host_seats: bool,
+    /// Record each code actor's observation in full, as an `observation` annotation, as run.ts did for code units when
+    /// asked (`recordObservations: "code" | "all"`): for the invariants' no-god-view check and for training data.
+    pub record_observations: bool,
 }
 
 impl Default for EngineOptions {
@@ -76,6 +79,7 @@ impl Default for EngineOptions {
             share_at: WORTH_SHARING,
             mock_seats: true,
             host_seats: false,
+            record_observations: false,
         }
     }
 }
@@ -856,6 +860,22 @@ impl<W: Write> Engine<W> {
                 });
                 self.units.insert(key.clone(), u);
             } else {
+                if self.opts.record_observations {
+                    // (Its channels as a list, each with its path, as run.ts recorded them: a position's channel paths
+                    // have a "/", which the log's free-form data does not allow in a key.)
+                    let mut v = serde_json::to_value(&obs).map_err(|e| e.to_string())?;
+                    if let Some(chans) = v.get("channels").and_then(Value::as_object).cloned() {
+                        v["channels"] = Value::Array(chans.into_iter().map(|(path, mut c)| {
+                            c["path"] = json!(path);
+                            c
+                        }).collect());
+                    }
+                    let mut data = json!({ "t": t, "observation": v });
+                    if let Some(c) = only.as_deref().filter(|c| *c != "self") {
+                        data["as"] = json!(c);
+                    }
+                    self.annotate(json!({ "annotation": "observation", "subject": u.participant, "data": data }))?;
+                }
                 let pic = u.view.apply(obs, only.as_deref(), &u.entity.clone(), &u.woke_for.clone(), u.since);
                 stepping.push((u, pic));
             }

@@ -361,7 +361,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const rustWorld = process.env.OIKOS_WORLD === "rust";
   const standIn = o.standIn ?? process.env.OIKOS_STAND_IN;
   await k.request({ op: "start", config: cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath,
-    ...(rustWorld ? { engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(o.recordDecisions === "none" ? { record_decisions: false } : {}) } } : {}) });
+    ...(rustWorld ? { engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(o.recordDecisions === "none" ? { record_decisions: false } : {}), ...(o.recordObservations === "all" || o.recordObservations === "code" ? { record_observations: true } : {}) } } : {}) });
   if (o.perturb) await k.request({ op: "perturb", extra_wakes_bps: o.perturb.extraWakesBps, seed: o.perturb.seed });
 
   // Every model call (participants, translator, debriefs) is recorded as it happens.

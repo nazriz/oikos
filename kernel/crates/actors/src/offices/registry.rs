@@ -19,7 +19,7 @@
 //!   whoever holds their posts (foundations F11). Each declares in its manifest its `capacity`: the asks it expects
 //!   per resident a year and the seconds an answer takes, so the generator sizes the counter with
 //!   `oikos_rules::staffing::clerks_needed` from the population instead of one clerk whatever the town's size
-//!   (docs/risks.md PB-19; real registries are staffed to caseload: Land Registry (England and Wales) annual report
+//!   (docs/risks.md PB-19; real registries are staffed to caseload: a national land registry's annual report
 //!   (to confirm); Registrar General annual reports (to confirm)).
 
 use super::{spread, Booked, Noting};

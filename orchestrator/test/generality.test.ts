@@ -13,7 +13,8 @@ const root = join(import.meta.dir, "../..");
 
 /** The platform's code: everything that runs, for any world. (Docs, profiles, example worlds, laws and tests are content.) */
 const CODE = ["kernel/src", "kernel/crates", "participants/src", "orchestrator/src", "translator/src", "measure/src", "measure/queries", "worlds/generator", "contracts"];
-const SKIP = [/node_modules/, /\/examples\//, /\.test\.ts$/, /\/tests?\//, /\/target\//, /\.md$/];
+// (A Rust module's tests in a file of their own, `tests.rs`, and the market's test kit are tests, as a `.test.ts` is.)
+const SKIP = [/node_modules/, /\/examples\//, /\.test\.ts$/, /\/tests?\//, /\/tests\.rs$/, /\/testkit\.rs$/, /\/target\//, /\.md$/];
 
 /**
  * Names that belong to one place: its statistics offices, agencies, laws, payments and currency. Seen in platform code,

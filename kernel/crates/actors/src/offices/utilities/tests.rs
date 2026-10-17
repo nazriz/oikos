@@ -5,7 +5,7 @@ use super::*;
 use crate::offices::police::tests::{ctx, st, Driver};
 
 fn accounts(balance: i64) -> Seen {
-    let a: oikos_sight::AccountItem = serde_json::from_value(json!({ "account": "acc-u", "holder": "police", "custodian": "bank", "currency": "AUD", "balance": balance.to_string() })).unwrap();
+    let a: oikos_sight::AccountItem = serde_json::from_value(json!({ "account": "acc-u", "holder": "police", "custodian": "bank", "currency": "XTS", "balance": balance.to_string() })).unwrap();
     Seen::Accounts { accounts: Arc::new(vec![a]), transactions: vec![] }
 }
 

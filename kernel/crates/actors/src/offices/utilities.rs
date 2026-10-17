@@ -22,8 +22,7 @@
 //! the utility itself reckons: `price_elasticity_bps` (the share by which use falls for each 100% rise of the price
 //! over `reference_price_*`, Dalhuisen et al. 2003, a meta-analysis of residential water price elasticities, mean about
 //! -0.4; Espey 1997; to confirm), and `restriction_cut_bps` (by how much use falls while restrictions stand: a
-//! published restriction asks households to use less; Melbourne's 2007-09 stage 3 and 3a restrictions saw use fall by a
-//! fifth or more: Water Services Association of Australia / Melbourne Water reports; to confirm). The defaults are no
+//! published restriction asks households to use less; the sources are in docs/behaviour/utilities.md). The defaults are no
 //! response, so no profile's outcome changes until a profile gives its figures with their source. **Still not
 //! answered:** the households' own use is physics in the world (the meter rises with those in the home) and citizens do
 //! not read the tariff or a restriction; disconnection and hardship; who pays the bill is still the owner, not law data.
@@ -31,7 +30,7 @@
 //! **Compliance coins (PB-16).** The retailer answers a customer asking for a wrong bill to be put right, and a
 //! tribunal's order, as the TS `Respondent` (lane D's) does: by drawing at the profile's rates. Here, where its own
 //! books show the bill was wrong, it puts it right: an energy retailer is obliged to refund an overcharge it has found
-//! (Australia: National Energy Retail Rules r.21; UK: Ofgem standards of conduct; to confirm) so there is no coin for
+//! (the rules that oblige it are cited in docs/behaviour/utilities.md) so there is no coin for
 //! the cause the books state; the coin remains only where the books are silent (`grant_bps`). The `Respondent` is lane
 //! D's (`finance::frictions`); the retailer's books answer it through `BillTruth`; the order to the grid is C2's
 //! `market::trade::order`.
@@ -54,6 +53,14 @@ use oikos_sight::{LookRequest, Record, Seen};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
+
+/// The TS modules' manifests, the referee until the cut-over: a parameter whose description the TS module wrote is
+/// taken from its file as written (the code writes no currency word of its own).
+const WATER_TS: &str = include_str!("../../../../../participants/manifests/utility.water.json");
+const ENERGY_TS: &str = include_str!("../../../../../participants/manifests/utility.energy.json");
+fn ts_param(manifest: &str, name: &str) -> Value {
+    serde_json::from_str::<Value>(manifest).ok().map(|m| m["params"][name].clone()).unwrap_or(Value::Null)
+}
 use std::sync::Arc;
 
 pub struct Water;
@@ -136,9 +143,9 @@ impl Kind for Water {
                 "meters": param("string", None, json!(""), None, false, None),
                 "part": param("string", None, json!(""), None, false, None),
                 "price_elasticity_bps": param("integer", Some("by how much use falls for each 100% the price stands over the reference price (Dalhuisen et al. 2003: about 4000; to confirm); 0: use does not respond"), json!(0), Some("bps"), false, Some("placeholder")),
-                "price_per_kl": param("integer", Some("the tariff (cents)"), json!(0), None, false, Some("placeholder")),
+                "price_per_kl": ts_param(WATER_TS, "price_per_kl"),
                 "read_days": param("integer", None, json!(21), Some("days"), false, None),
-                "reference_price_per_kl": param("integer", Some("the price use was reckoned at (cents a kilolitre); 0: none, so no price response"), json!(0), None, false, Some("placeholder")),
+                "reference_price_per_kl": param("integer", Some("the price use was reckoned at (in the smallest unit, a kilolitre); 0: none, so no price response"), json!(0), None, false, Some("placeholder")),
                 "restriction_cut_bps": param("integer", Some("by how much use falls while restrictions stand (a published restriction asks for less); 0: none"), json!(0), Some("bps"), false, Some("placeholder")),
                 "restriction_review_days": param("integer", Some("while restrictions stand with a cut, how often it draws the usual amount to see whether the river can give it"), json!(7), Some("days"), false, Some("placeholder")),
                 "roll": param("string", None, json!("roll"), None, false, None),
@@ -641,8 +648,8 @@ impl Kind for Energy {
                 "kind": param("string", None, json!("energy"), None, false, None),
                 "part": param("string", None, json!(""), None, false, None),
                 "price_elasticity_bps": param("integer", Some("by how much use falls for each 100% the price stands over the reference price (to confirm); 0: use does not respond"), json!(0), Some("bps"), false, Some("placeholder")),
-                "price_per_unit": param("integer", Some("the tariff (cents)"), json!(0), None, false, Some("placeholder")),
-                "reference_price_per_unit": param("integer", Some("the price use was reckoned at (cents a unit); 0: none, so no price response"), json!(0), None, false, Some("placeholder")),
+                "price_per_unit": ts_param(ENERGY_TS, "price_per_unit"),
+                "reference_price_per_unit": param("integer", Some("the price use was reckoned at (in the smallest unit, a unit); 0: none, so no price response"), json!(0), None, false, Some("placeholder")),
                 "respond": param("object", Some("how it answers a customer who asks for a bill to be put right"), json!({}), None, false, Some("placeholder")),
                 "supply_per_day": param("integer", None, json!(0), None, false, None),
                 "task": param("string", Some("the work that supplies a unit, and the resource it uses"), json!("supply_energy"), None, false, Some("placeholder")),

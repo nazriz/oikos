@@ -101,3 +101,10 @@ The figures (the slip row, `billing_over_bps`, `respond`) are the profile's, wit
 - **Use responds, in the utility's own reckoning.** `price_elasticity_bps` with `reference_price_*`: use falls by that share of each 100% the price stands over the reference (Dalhuisen, de Groot, Nijkamp 2003, a meta-analysis of residential water demand price elasticities, mean about -0.4 (to confirm); Espey et al. 1997). `restriction_cut_bps`: while restrictions stand with a cut, the daily draw is cut by that share, except once each `restriction_review_days` when it draws the usual amount to see whether the river can give it (Melbourne's 2007-09 restrictions cut use by a fifth or more: to confirm). Defaults are no response: a profile gives its figures with their source. **Still not:** the households' own use (a meter that rises with those in the home) does not respond; citizens do not read the tariff or the notice; no disconnection or hardship programme; who pays the water bill is still the owner, not law data.
 - **The retailer's answer to a wrong bill has a cause** (risk PB-16): where its own books show it billed more than was right it puts it right (an energy retailer must refund an overcharge it has found: National Energy Retail Rules; Ofgem standards of conduct; to confirm); the coin at `respond.grant_bps` remains for matters where the books are silent.
 - New paper kinds written: `utility_tariff` and `meter_round` (they need a type in papers/offices.rs).
+
+## Sources the Rust utilities cite (moved from the code, which names no place)
+
+- Restrictions on water use: Melbourne's 2007-09 stage 3 and 3a restrictions saw use fall by a fifth or more (Water
+  Services Association of Australia; Melbourne Water reports; to confirm).
+- A retailer refunds an overcharge it has found: Australia, National Energy Retail Rules r.21; UK, Ofgem standards of
+  conduct (to confirm).

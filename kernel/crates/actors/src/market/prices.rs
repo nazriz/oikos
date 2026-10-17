@@ -269,7 +269,16 @@ impl ExportRoom {
     pub fn month_end(&mut self, probe_bps: i64) {
         if self.shipped > 0 {
             let accepted = (self.shipped - self.returned).max(0);
-            self.room = Some(if self.returned == 0 { accepted + (accepted * probe_bps / 10_000).max(1) } else { accepted });
+            // Only what comes back says where the outside's appetite ends: a month that sent less than the room for a
+            // reason of our own (stock short, more kept for the town) teaches nothing of the outside, so the room it
+            // had is kept, and probed upward from whichever is the larger. (Taking the room down to what happened to be
+            // shipped ratcheted every factory's exports down month by month while the outside's appetite stood unmet.)
+            self.room = Some(if self.returned == 0 {
+                let base = accepted.max(self.room.unwrap_or(0));
+                base + (accepted * probe_bps / 10_000).max(1)
+            } else {
+                accepted
+            });
         } else if let Some(r) = self.room {
             // Nothing sent: the room is kept as it was found.
             self.room = Some(r);
@@ -310,6 +319,23 @@ mod tests {
     /// The same draw every time the seed is: runs of the rule over many seeds, to read what it does on average.
     fn runs(l: &Lengnick, s: &Signals, n: u64) -> Vec<Moved> {
         (0..n).map(|i| move_price(l, &PriceFigures::default(), &mut Randomness::new(i).stream(&["price"]), s, &money)).collect()
+    }
+
+    #[test]
+    fn an_exporters_room_falls_only_when_the_outside_sends_some_back() {
+        let mut r = ExportRoom::default();
+        r.shipped(1_000);
+        r.month_end(1_000);
+        assert_eq!(r.found(), Some(1_100), "all taken: probed up");
+        // A short month of our own (only 400 made to send): nothing came back, so the room is not lowered.
+        r.shipped(400);
+        r.month_end(1_000);
+        assert!(r.found().unwrap() >= 1_100);
+        // Some sent back: the room is what was taken.
+        r.shipped(1_100);
+        r.sent_back(300);
+        r.month_end(1_000);
+        assert_eq!(r.found(), Some(800));
     }
 
     #[test]
