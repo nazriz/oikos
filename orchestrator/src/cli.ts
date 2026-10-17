@@ -230,7 +230,7 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR> [--out file.html] [--twin DIR | --no-twin] | debriefs <DIR|log>... [--json] | replay <log.jsonl> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
+const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR> [--out file.html] [--twin DIR | --no-twin] | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -310,6 +310,11 @@ try {
     // A finished pilot as one self-contained HTML page (pilot-view/, docs/pilot-view.md). The run is only read.
     const { runPilotView } = await import("../../pilot-view/src/cli");
     console.log(await runPilotView(process.argv.slice(3)));
+  } else if (cmd === "explore" && (positional()[0] || process.argv.includes("--all"))) {
+    // The pilot explorer (renderer/, docs/explorer.md): a run's town, people, institutions and seats' acts, served on
+    // 127.0.0.1 from an index built beside the runs. The run is only read; nothing is fed back.
+    const { runExplore } = await import("../../renderer/src/cli");
+    await runExplore(process.argv.slice(3));
   } else if (cmd === "debriefs" && positional()[0]) {
     // Debriefs across runs (VISION 15, point 7; debriefs.ts): by setting and framing, how often seats reported distress
     // or being pushed against their values, with their words, for review before a scenario is run again. It lists; it
