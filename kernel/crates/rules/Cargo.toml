@@ -1,0 +1,12 @@
+[package]
+name = "oikos-rules"
+version = "0.7.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Pure rules of the law and the profile that the actors and the generator share (docs/design/rust-port.md 2.1): slips, and in the port withholding, support payments, decision deadlines, household drawing and forms."
+rust-version = "1.85"
+
+[dependencies]
+oikos-core = { path = "../core" }
+serde = { workspace = true }
+serde_json = { workspace = true }

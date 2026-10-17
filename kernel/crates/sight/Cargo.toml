@@ -1,0 +1,15 @@
+[package]
+name = "oikos-sight"
+version = "0.7.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "What a built-in actor may see and say (docs/design/rust-port.md 2.1): the typed observation, its picture, the call language and the participant's action. Values only: nothing here can reach the world's state."
+rust-version = "1.85"
+
+[dependencies]
+oikos-perception = { path = "../perception" }
+oikos-world = { path = "../world" }
+oikos-resolver = { path = "../resolver" }
+oikos-terms = { path = "../terms" }
+serde = { workspace = true }
+serde_json = { workspace = true }

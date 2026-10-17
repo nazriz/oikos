@@ -791,6 +791,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "oikos-actors"
+version = "0.7.0"
+dependencies = [
+ "oikos-contracts",
+ "oikos-core",
+ "oikos-rules",
+ "oikos-sight",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "oikos-contracts"
 version = "0.7.0"
 dependencies = [
@@ -810,16 +822,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "oikos-explore"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "oikos-kernel"
 version = "0.7.0"
 dependencies = [
  "imbl",
  "jsonschema",
  "mimalloc",
+ "oikos-actors",
  "oikos-contracts",
  "oikos-core",
  "oikos-perception",
  "oikos-resolver",
+ "oikos-rules",
+ "oikos-sight",
  "oikos-terms",
  "oikos-time",
  "oikos-world",
@@ -875,6 +898,27 @@ name = "oikos-resolver"
 version = "0.7.0"
 dependencies = [
  "imbl",
+ "serde_json",
+]
+
+[[package]]
+name = "oikos-rules"
+version = "0.7.0"
+dependencies = [
+ "oikos-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "oikos-sight"
+version = "0.7.0"
+dependencies = [
+ "oikos-perception",
+ "oikos-resolver",
+ "oikos-terms",
+ "oikos-world",
+ "serde",
  "serde_json",
 ]
 

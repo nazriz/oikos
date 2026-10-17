@@ -4,6 +4,9 @@
 //!   oikos-kernel verify <log> [--anchors <f>]  check the hash chain (and witness)
 //!   oikos-kernel replay <log> [--anchors <f>]  replay and require a byte-identical log
 //!   oikos-kernel version
+//!   oikos-kernel world <config.json> --out <dir> [--run-id ID] [--until S] [--threads N] [--stand-in KIND]
+//!                                              run a world in the engine, its actors in Rust, with no seats
+//!   oikos-kernel manifests                     every actor kind's manifest, as JSON
 
 use std::process::ExitCode;
 
@@ -49,11 +52,17 @@ fn main() -> ExitCode {
             println!("ok: {} entries replayed byte-identically; final state {}", r.entries, r.state_hash);
             Ok(())
         })(),
+        Some("world") if args.len() >= 2 => world(&args),
+        Some("manifests") => {
+            let all: Vec<serde_json::Value> = oikos_actors::registry::kinds().iter().map(|k| k.manifest()).collect();
+            println!("{}", serde_json::to_string_pretty(&all).unwrap_or_default());
+            Ok(())
+        }
         Some("version") => {
             println!("oikos-kernel {} ({}) source {}", run::KERNEL_VERSION, run::KERNEL_BUILD, run::KERNEL_SOURCE);
             Ok(())
         }
-        _ => Err("usage: oikos-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | version".into()),
+        _ => Err("usage: oikos-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | world <config.json> --out <dir> [--run-id ID] [--until S] [--threads N] [--stand-in KIND] | manifests | version".into()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -62,4 +71,23 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// `world`: a world run in the engine with its actors in Rust, to its end or `--until`; prints its final state hash.
+fn world(args: &[String]) -> Result<(), String> {
+    let flag = |name: &str| args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned();
+    let config: serde_json::Value = serde_json::from_slice(&read(&args[1])?).map_err(|e| format!("{}: {e}", args[1]))?;
+    let out = flag("--out").ok_or("--out <dir> is needed")?;
+    std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
+    let run_id = flag("--run-id").unwrap_or_else(|| "world".into());
+    let mut opts = oikos_kernel::engine::EngineOptions::default();
+    if let Some(n) = flag("--threads") {
+        opts.threads = n.parse().map_err(|_| "--threads N")?;
+    }
+    opts.until = flag("--until").map(|u| u.parse::<i64>()).transpose().map_err(|_| "--until S")?;
+    opts.stand_in = flag("--stand-in");
+    let log = std::io::BufWriter::new(std::fs::File::create(format!("{out}/{run_id}.jsonl")).map_err(|e| e.to_string())?);
+    let (hash, e) = oikos_kernel::engine::run_code_world(config, &run_id, log, opts)?;
+    println!("{{\"run_id\":{:?},\"state_hash\":{:?},\"t\":{},\"steps\":{}}}", run_id, hash, e.t(), e.steps);
+    Ok(())
 }

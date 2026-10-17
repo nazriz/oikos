@@ -1,0 +1,18 @@
+[package]
+name = "oikos-actors"
+version = "0.7.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "The world's built-in actors (docs/design/rust-port.md 2.1): code participants that see only what they are shown and answer with actions. Cannot name the world's state."
+rust-version = "1.85"
+
+# What an actor may depend on is a rule (kernel/tests/actors_boundary.rs): what it is shown (oikos-sight), the shared
+# core, the contract types and the shared rules. Never oikos-world, oikos-perception, oikos-resolver or the kernel:
+# a crate can name only its own dependencies, so an actor cannot reach the world's state.
+[dependencies]
+oikos-sight = { path = "../sight" }
+oikos-core = { path = "../core" }
+oikos-contracts = { path = "../contracts" }
+oikos-rules = { path = "../rules" }
+serde = { workspace = true }
+serde_json = { workspace = true }

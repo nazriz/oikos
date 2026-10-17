@@ -5528,3 +5528,66 @@ The profile-sources merge was held back for three failing tests and left four fa
 ## 2026-10-17: `oikos pilot-view`, a pilot as one page for a person
 
 **Why.** Naz asked for a way to see what seats and actors did in a pilot without reading markdown or logs, ahead of the full renderer. **What.** A new package `pilot-view/` and one CLI command (`oikos pilot-view <run-dir> [--out f.html]`, docs/pilot-view.md) that folds a finished run's log once and writes a single self-contained page (overview, per seat timeline with the seat's own words, translator draft, confirm/decline and outcome, notebook and debrief; seat vs code twin; actors; town measures). **Choices.** (1) The log is folded in TypeScript in one streaming pass, as the renderer plan does for its index, so the pass and its `ViewData` carry over; the page is plain DOM and can be replaced. (2) Read-only: no file in the run is opened for writing and the output path may not be inside the run; a test holds it. (3) Debriefs use the orchestrator's `isKeptBack`; what a seat kept back is never shown, and debrief transcripts are not read. (4) The twin is matched by parties and kind of matter, not paper number (papers are numbered differently once the runs diverge); twin acts of kinds the seat never made are counted, not listed. (5) The root `package.json` workspaces and `tsconfig.json` include the package; no kernel, participant or world code is touched. **Revisit if** the renderer lands (the page becomes its seat panels), a run is large enough that the 10 MB cap cuts excerpts too hard, or the twin match proves misleading on pilots with many same-kind matters.
+
+## 2026-10-17 · The port's frame: the engine runs the world's actors in Rust (step 1 of docs/design/rust-port.md; no model called)
+
+**What.** The frame the seven porting agents build on, with no TS actor changed. New crates: `oikos-sight` (what an
+actor may see and say: the typed observation re-exported as values, the `Picture` a view keeps up to date (view.ts
+ported), the `Action`, the call language), `oikos-rules` (pure shared rules; `slip` ported from slip.ts), `oikos-actors`
+(the `Actor` and `Kind` traits, `Ctx`/`Cx` with the kernel's keyed streams named as run.ts named them (`draws.rs`),
+questions to models asked in one wake and answered by the next, beliefs for truth audits; `steps.rs`, the stepper of
+firms.ts with `then`/`redo` as the plan's methods given a step's token; the registry; stand-ins `idle` and
+`stub.script`; the worked example `world.weather`), and `oikos-explore` (the explorer's data layer, interface only).
+`kernel/src/engine.rs` is the run loop with the actors inside it: units from the cast and its changes, the moment as
+run.ts ran it (look in key order through the kernel's own command path, every code actor of a round deciding at once
+on up to `threads` threads into its own slot, seats handed to the host as the contract's JSON (`Due::Seats`, `submit`),
+everything carried out serially in key order), the resolver for calls, decisions, outcomes and record changes kept as
+run.ts kept them, truth audits ported from truth.ts. `oikos-kernel world <config>` runs a seatless world in it.
+`scripts/port-gate.ts` is the gate's measured half; `docs/port-guide.md` is what the porting agents follow.
+
+**Choices.**
+- **The boundary is a dependency rule.** `oikos-actors` depends on `sight`, `core`, `contracts`, `rules`, `serde` and
+  nothing else; Rust lets a crate name only its own dependencies, so an actor cannot name `State`, `World`, perception's
+  functions or the resolver's knowledge. `kernel/tests/actors_boundary.rs` holds the dependency list, the values-only
+  re-exports of `sight`, and the determinism rules (no clock, I/O, env, threads, globals, `RefCell`, `Mutex`, iterated
+  `HashMap`, `rand`) in `actors` and `rules`.
+- **No bridge** (the owner, 2026-10-17: pilots halted, the cutover all at once). Each lane tests its kinds alone in the
+  Rust world with every other kind standing idle (`EngineOptions::stand_in`) or scripted (`stub.script`); the TS
+  scenario tests are the referee once every module is in; an explicit integration step switches everything together.
+- **Every actor's memory saves** (`Actor::save` and `Kind::restore` are required, and the stepper saves its plan and
+  steps for any plan that derives serde; views and draws are serialisable): snapshot and fork rest on it, and it is
+  cheap now and dear to retrofit across 50 modules.
+- **Deterministic sharing** with `std::thread::scope` over contiguous chunks, each result in its item's place (no new
+  dependency; a persistent pool is phase 3's if spawning shows in a profile).
+- **A step 1b before the seven** (one Opus agent, about two days): `common.ts`'s shared machinery, the paper and
+  agreement types every module reads of another's (the interface between modules, now that they meet only in the
+  finished world), forms and law into `rules`, the mind's seam. Not done here: the frame is the runtime, and those are
+  ports.
+- **What else the owner asked to design in** (snapshot and fork, a binary log with JSONL as an export, a live event
+  stream, room for travel, forms as data, native market laws, the explorer's data layer, an experiment harness, the seat
+  interface): the actor-side half of snapshots and the explorer's interface are in the frame; the rest are lanes in the
+  guide's split (F the platform, G the explorer and experiments; native market laws in C1, C2 and D, coordinated with
+  `gd-adoption`).
+- **Names and ordinary dates** (docs/design/names-and-dates.md; the owner, 2026-10-17: done in the rebuild): the
+  types are in the frame (`rules::calendar`, a Gregorian reading of the clock from the world's start date with its
+  week and holidays, months by the calendar; `rules::identity`, ids kept as keys and names drawn by stable identity);
+  drawing names, offices' references, the profiles' sourced `names` and `calendar` sections, the resolver reading names
+  and dates, and what seats are shown are a lane of their own (N). The translator's next round must learn names and
+  dates; it is rebuilt after forms settle anyway.
+
+**Measured.** `orchestrator/test/port-weather.test.ts`: the generated 200-person town, 40 days, every actor idle but the
+weather bureau, the TS module in the TS loop against the Rust kind in the engine: the same warnings and **the same
+final state hash**, and the same hash on 1 and 14 threads (the first difference found, a missing final advance to the
+run's end, was the engine's and is fixed). A year of the 1,017-participant town the same way (15,005 wakes): TS loop
+6.9 s in process, the engine 6.9 s on one thread and 6.5 s on fourteen as a fresh process reading the config from disk,
+all three to the same hash. With idle actors nearly all of it is the kernel's (starting the world, building, encoding
+and hashing observations: the TS side spent 11 ms in modules and 0.1 s in its own platform work), so this measures the
+loop, not the port's gain, which rests on the actors' own logic and on phase 3's work in the kernel. The plan's first
+stop line ("the boundary's cost under a fifth of what section 6 assumes") cannot be read off idle actors: it is read
+again when A1/A2 have the citizen running alone. The worked example steps in about 2.1 µs a wake,
+its view included (release build). The kernel tests, the boundary and determinism lints pass.
+
+**Revisit if** an actor needs something `sight` does not give (add it there as a value, never a handle on the world);
+the deterministic sharing's thread starts show in a profile; the stepper's token pattern proves awkward for the large
+offices (then a plan may own a small state machine per matter instead); or step 1b's paper types turn out to need a
+change by more than one lane at once (then they belong in a crate of their own, `oikos-papers`).
