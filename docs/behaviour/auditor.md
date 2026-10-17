@@ -133,3 +133,14 @@ in its own words.
 - the audit should reach decisions the way a real one does for a health or tax agency: the planning, tribunal and bank roles above;
 - the sample should follow the body's record (more where the last report found more);
 - the accounts check should reconcile something richer than invoices paid (budget lines; wages; receipts).
+
+## In the Rust port (`kernel/crates/actors/src/offices/auditor.rs`)
+
+Same rules, rewritten: the kind is `office.auditor` 0.1.0 with the TS manifest; the four papers are typed (`papers::offices`:
+`AuditRequest`, `AuditAnswer`, `AuditFinding`, `AuditReport`). A support payment's conditions are `oikos_rules::support::decide`, the one
+reading the paying office uses. Money, shares and the sample are integers (Floyd's algorithm on the stream `audit/<body>/<check>/<n>`, drawn
+with `cx.rng`). Days in the requests and reports are written through `when_words` (a civil date where the world has a calendar), not "day N";
+record ids are ordered by filing, not as strings. `Audited`, the answering side, is a library in the same file: the finance officer
+(`offices::treasury`) runs it from its books of invoices paid and the bank's record of them; the support office's side is the boundary's and
+is not yet wired in Rust, so an audit of `support` decisions is asked and, until it is, reported as not answered. Scenario test:
+`kernel/tests/e_auditor.rs` (the accounts of the finance office reconcile; the same hash on 1 and 14 threads).
