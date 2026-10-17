@@ -98,8 +98,11 @@ pub struct State {
     pub takings: Vec<Taking>,
     /// Questions put to a register's keeper that nobody was there to answer (no one of its posts present and on duty), in
     /// the order asked: taken up, one after another, when someone is (checked each hour while any are held).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub asks_held: Vec<HeldAsk>,
+    ///
+    /// Behind a shared pointer, like the state's persistent maps: every act copies the state to dry-run or apply it, and a
+    /// plain list of thousands of held questions (a large town's) was copied whole each time. Serialised as the list it is.
+    #[serde(default, skip_serializing_if = "held_is_empty")]
+    pub asks_held: Arc<Vec<HeldAsk>>,
     /// Each entity's own record (docs/design/ai-citizens.md 10d): who they are and how things stand with them, as
     /// their mind keeps it. Held here and written only here (the `entity_record` command); bounded in size
     /// (`caps.entity_record_bytes`), so it never grows. The kernel reads none of it: its sections are opaque.
@@ -689,6 +692,10 @@ impl<'a> IntoIterator for &'a Timeline {
     fn into_iter(self) -> Self::IntoIter {
         self.lanes.iter()
     }
+}
+
+fn held_is_empty(v: &Arc<Vec<HeldAsk>>) -> bool {
+    v.is_empty()
 }
 
 /// A question a keeper has not yet taken up (State::asks_held).
