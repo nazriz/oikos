@@ -195,6 +195,9 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     // (A seat that sits as its code twin does takes a step of its brain where the code unit does: at each wake, and after a look it made. Not on the
     // turns between its asking for a paper and confirming it: those are the seat's plumbing, and the code unit has no step there, being busy with its act.)
     const midAct = !!brain.twin && brain.busy === true && !!obs.drafts[0];
+    // (What it was shown on such a turn is still shown to it: a brain that keeps its own view of what is new is told it, to
+    // take in with its next step, as the code unit's next look would have brought it all.)
+    if (midAct) brain.controller.seen?.(slice(obs, brain.capacity, brain.ctx.entity));
     const a = midAct ? ({ type: "wait" } as ParticipantAction) : ((await brain.controller.step(slice(obs, brain.capacity, brain.ctx.entity), brain.ctx)) as ParticipantAction);
     if (a.type === "call" || a.type === "message") q.push(a);
     if (a.type === "opt_out") return [tool("opt_out", { statement: a.statement })];

@@ -44,7 +44,7 @@ pub struct Observation {
     pub asking: Vec<Id>,
     /// Readings of the agreements this observation brings (an agreement, or a signature or notice on one), by their own
     /// terms (contracts 0.7; docs/design/rebuild.md section 7): beside the records, never in their place.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", skip_deserializing)]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub readings: BTreeMap<Id, oikos_terms::Reading>,
 }
 

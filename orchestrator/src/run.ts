@@ -35,7 +35,7 @@ import { lexiconReader, READING_TABLE, Tagger, READING_VERSION, type Reader, typ
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
-import { DetachedActor, rustManifests } from "./rust-world";
+import { DetachedActor, joinRaw, RAW, rustManifests } from "./rust-world";
 import { divergences } from "./truth";
 import type { Watchdog } from "./watchdog";
 
@@ -649,7 +649,14 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         // post's channels by their paths, "<post>/<channel>", as the engine hands them: put back.)
         const cap = office?.id;
         const asPath = (x: any) => (cap && x?.channels ? { ...x, channels: Object.fromEntries(Object.entries(x.channels).map(([k, v]) => [k.includes("/") ? k : `${cap}/${k}`, v])) } : x);
-        const brainController = rustBrain ? ({ step: (x: any) => rustBrain.step(asPath(x), x.woke_for ?? "cadence", x.since ?? 0).action, sent: (a: string) => rustBrain.sent(a) } as unknown as Controller) : brainModule.create(bctx);
+        // (It is handed what the kernel sent (`RAW`), not the host's picture of it, and keeps its own view, as its code twin
+        // does; what it was shown on a turn it took no step at, it takes in with its next.)
+        let unstepped: any;
+        const kernelSent = (x: any) => asPath(x[RAW] ? { ...x[RAW], entity: x.entity } : x);
+        const brainController = rustBrain ? ({
+          step: (x: any) => { const seen = unstepped ? joinRaw(unstepped, kernelSent(x)) : kernelSent(x); unstepped = undefined; return rustBrain.step(seen, x.woke_for ?? "cadence", x.since ?? 0).action; },
+          seen: (x: any) => { unstepped = unstepped ? joinRaw(unstepped, kernelSent(x)) : kernelSent(x); },
+          sent: (a: string) => rustBrain.sent(a) } as unknown as Controller) : brainModule.create(bctx);
         // (A Rust brain is scheduled as the engine's unit of its kind is: its first wake and cadence are the Rust kind's.)
         const rustSchedule = rustBrain?.schedule();
         if (rustSchedule) brainFirstWake.set(p.id, rustSchedule.firstWake);
@@ -1011,6 +1018,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     // drafts' previews and law warnings.)
     if (u.llm || RESOLVER_MODE !== "engine") u.knowledge.absorb(raw);
     const obs: Observation = { ...u.view.apply(raw), woke_for: u.wokeFor, since: u.since };
+    // (What the kernel sent, kept beside the picture for a mock seat's brain run detached on the Rust world: rust-world.ts.)
+    if (u.llm && rustWorld) (obs as any)[RAW] = raw;
     // (A seat's roster of its own staff, and what a draft's preview may say of it: read from what it is shown.)
     u.llm?.tally?.absorb(obs);
     u.llm?.dayBook?.absorb(obs);

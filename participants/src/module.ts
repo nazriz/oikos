@@ -138,6 +138,9 @@ export interface Controller {
   beliefs?(): Belief[];
   /** The act it just returned reached the world as this action: its outcome, when it comes, names it. */
   sent?(action: string): void;
+  /** An observation it is shown and takes no step at (a twin seat's brain between asking for a paper and confirming it):
+   * a controller that keeps its own view of what is new takes it in with its next step. */
+  seen?(obs: Observation): void;
 }
 
 /**
