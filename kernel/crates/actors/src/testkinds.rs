@@ -101,7 +101,7 @@ impl Actor for FaultyActor {
         if pic.t >= self.at {
             if self.hang {
                 loop {
-                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    std::thread::park(); // (no clock: the determinism rules; nothing unparks it)
                 }
             }
             panic!("Error: a bug at t={}", pic.t);
