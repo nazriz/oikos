@@ -492,7 +492,8 @@ pub struct Valuation {
     pub owner: String,
     #[serde(deserialize_with = "lenient::int")]
     pub land: i64,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    // (Always written, empty for a lot with nothing built: the TS valuer's paper, and what a reader of valuations counts on.)
+    #[serde(default)]
     pub buildings: Vec<ValuedBuilding>,
     #[serde(deserialize_with = "lenient::int")]
     pub value: i64,
