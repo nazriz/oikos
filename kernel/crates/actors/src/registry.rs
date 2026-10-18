@@ -26,7 +26,7 @@ pub fn kinds() -> Vec<&'static dyn Kind> {
     v
 }
 
-/// The kind of this name, if the engine has it.
+/// The kind of this name, if the engine has it (the test doubles of `testkinds` too: they are found, never listed).
 pub fn find(name: &str) -> Option<&'static dyn Kind> {
-    groups().into_iter().flatten().copied().find(|k| k.name() == name)
+    groups().into_iter().flatten().chain(crate::testkinds::KINDS.iter()).copied().find(|k| k.name() == name)
 }

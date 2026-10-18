@@ -30,3 +30,15 @@ const exporter: BehaviourModule = {
 };
 
 export const modules = Object.fromEntries([exporter].map((m) => [m.name, m]));
+
+/** The exporter's office as a world takes it: on the TS world the module above; on the Rust world (OIKOS_WORLD=rust) the
+ * frame's `stub.script`, with each day's shipment and invoice written as the same call. Returns [kind name, params]. */
+export function exporterOffice(p: { account: string; from_at: string; price: number; script: { day: number; ship: number; invoice: number }[] }): [string, Record<string, unknown>] {
+  if (process.env.OIKOS_WORLD !== "rust") return ["test.exporter", p];
+  const lines = (s: { ship: number; invoice: number }) => [
+    ...(s.ship ? [C.call("goods", { kind: "goods", quantity: C.text(String(s.ship)), to: "outside", at: "outside", from_at: p.from_at })] : []),
+    C.call("statement", { kind: "invoice", text: C.text(`Invoice: ${s.invoice} goods.`), to: C.json(["outside"]),
+      data: C.json({ kind: "goods", quantity: s.invoice, from_at: p.from_at, outcome: { money: { to: p.account, amount: String(s.invoice * p.price) } } }) }),
+  ];
+  return ["stub.script", { script: p.script.map((s) => ({ at: s.day * DAY, call: C.program(...lines(s)) })) }];
+}

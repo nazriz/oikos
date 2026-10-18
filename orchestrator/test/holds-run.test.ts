@@ -12,6 +12,8 @@ import { join } from "node:path";
 import { calls as C, modules as builtin, type BehaviourModule } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { inCurrency } from "../../participants/src/money";
+import { onRust } from "./lib/doubles";
 import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
@@ -65,10 +67,15 @@ async function held(name: string, settle: boolean, asList: boolean) {
   expect((config.world.records as any[]).some((r) => r.id === order.basis && r.record === "agreement" && r.terms.template === "employment")).toBe(true);
   const script: Script = { held: asList ? [order.id] : order.id, hold_day: F + 3, lift_day: F + 15, ...(settle ? { settle: { to, amount: wage, from: "acc-city" } } : {}) };
   const finance = officeBy(config, "city.finance_officer");
-  finance.run(holding.name, { ...finance.params, script });
+  // (On the Rust world the same-named kind wraps the real finance officer, with the same days as calls: testkinds.rs.)
+  if (onRust) inCurrency(config.world.currencies[0]); // (wording the settlement's amount)
+  finance.run(holding.name, onRust ? { ...finance.params, inner: "city.finance_officer", calls: [
+    { at: script.hold_day * DAY, call: C.program(C.call("statement", { hold: typeof script.held === "string" ? script.held : C.json(script.held), text: C.text("Held while the payroll is checked.") })) },
+    ...(script.settle ? [{ at: script.lift_day * DAY, after_withdrawals: true, call: C.program(C.call("money", { to: script.settle.to, amount: C.amountText(script.settle.amount), from: script.settle.from, for: C.text("wages for the pay day that was held") })) }] : []),
+  ], withdraw: [{ at: script.lift_day * DAY, kind: "hold", by: "entity" }] } : { ...finance.params, script });
   const out = join(root, "runs", `test-holds-run-${name}`);
   rmSync(out, { recursive: true, force: true });
-  const s = await runWorld({ config, runId: name, outDir: out, until: (F + 45) * DAY, modules: { [holding.name]: holding } });
+  const s = await runWorld({ config, runId: name, outDir: out, until: (F + 45) * DAY, modules: onRust ? {} : { [holding.name]: holding } });
   expect(s.participantErrors).toBe(0);
   const lines = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const events = lines.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));

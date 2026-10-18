@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 import { workStarts } from "./lib/work-starts";
-import { modules } from "./fixtures/trade-modules";
+import { exporterOffice, modules } from "./fixtures/trade-modules";
 import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
@@ -131,8 +131,8 @@ test("the world market buys exports it has received, up to the month's demand, a
   const config = generate({ ...base, citizens: 60 });
   const trader = officeAt(config, "outside-trade");
   trader.params.buys = { goods: { unit_price: 1000, per_month: 300 } };
-  officeAt(config, "factory-1-manager").run("test.exporter", { account: "acc-factory-1", from_at: "factory-1-works", price: 1000,
-    script: [{ day: 2, ship: 100, invoice: 100 }, { day: 3, ship: 100, invoice: 100 }, { day: 4, ship: 200, invoice: 200 }, { day: 5, ship: 0, invoice: 50 }] });
+  officeAt(config, "factory-1-manager").run(...exporterOffice({ account: "acc-factory-1", from_at: "factory-1-works", price: 1000,
+    script: [{ day: 2, ship: 100, invoice: 100 }, { day: 3, ship: 100, invoice: 100 }, { day: 4, ship: 200, invoice: 200 }, { day: 5, ship: 0, invoice: 50 }] }));
   config.world.holdings = config.world.holdings.filter((h: any) => !(h.holder === "factory-1" && h.kind === "goods"));
   config.world.holdings.push({ kind: "goods", holder: "factory-1", at: "factory-1-works", quantity: "1000" });
   const { ev, recs } = await run("exports", config, 25 * DAY);

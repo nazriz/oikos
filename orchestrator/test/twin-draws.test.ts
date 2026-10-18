@@ -292,7 +292,10 @@ test("no module names a draw for a moment", () => {
 
 // Bug hunt 2026-10-17, finding 14: a draw about a lease (or any paper) is never keyed on the paper's number in the world's
 // file, whether it is drawn on the participant's stream or on the run's stream for one thing (`ctx.chance`).
-test("a draw on the run's stream for one thing is named for which paper it is, never for the paper's number", async () => {
+// (TS world only: the draw trace (`drawTrace`) is the TS loop's. On the Rust world the keys are `actors/src/draws.rs`'s, and its
+// own unit tests hold the same rule: a record's number is never in a key, `paper#n` is.)
+const tsOnly = process.env.OIKOS_WORLD === "rust" ? test.skip : test;
+tsOnly("a draw on the run's stream for one thing is named for which paper it is, never for the paper's number", async () => {
   const probing = (inner: string): BehaviourModule => ({
     ...builtin[inner]!,
     name: `test.probing.${inner.replace(/\./g, "_")}`,
