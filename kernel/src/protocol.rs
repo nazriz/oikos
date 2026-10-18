@@ -511,6 +511,10 @@ fn engine_reply(session: &mut Session, req: &Value) -> Result<Reply, String> {
             e.host_finished(str_field("key")?, req["until"].as_i64());
             Ok(Reply::Value(json!({ "ok": true })))
         }
+        "goes_on" => {
+            e.host_goes_on(str_field("key")?);
+            Ok(Reply::Value(json!({ "ok": true })))
+        }
         "check" => {
             let blocks: Vec<Block> = serde_json::from_value(req.get("blocks").cloned().ok_or("missing blocks")?).map_err(|x| format!("bad blocks: {x}"))?;
             let check = e.run().kernel().check(str_field("participant")?, req.get("as").and_then(Value::as_str), &blocks).map_err(|x| x.to_string())?;

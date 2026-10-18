@@ -43,6 +43,24 @@ impl<W: Write> Engine<W> {
     }
 
     /// A host's seat's wake is done (`until`: when it asked to be woken).
+    /// A host seat's wake goes on (it looked or drafted): it takes the round's next round with the engine's units, in
+    /// key order, as a code unit that looked does, so a seat that sits as its code twin acts where its twin would.
+    pub fn host_goes_on(&mut self, key: &str) {
+        // (Already passed in the round's carrying out: it joins the next round now; not yet: when it is reached.)
+        if let Some(r) = self.round.as_mut() {
+            if let Some(&(_, n)) = r.awake[..r.cursor].iter().find(|(k, _)| k == key) {
+                r.next.push((key.to_string(), n + 1));
+                // (In the round's own order, as its units were carried out.)
+                let at = |k: &str| r.awake.iter().position(|(x, _)| x == k).unwrap_or(usize::MAX);
+                let mut next = std::mem::take(&mut r.next);
+                next.sort_by_key(|(k, _)| at(k));
+                r.next = next;
+                return;
+            }
+        }
+        self.host_going_on.insert(key.to_string());
+    }
+
     pub fn host_finished(&mut self, key: &str, until: Option<i64>) {
         let t = self.run.kernel().t();
         self.sched.finished(key, until, t);

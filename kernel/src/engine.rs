@@ -280,6 +280,9 @@ pub struct Engine<W: Write> {
     /// memory (10 GB for a 1,000-person year) to hand them over in one reply at the end.
     for_host: Vec<crate::events::Event>,
     for_host_any: bool,
+    /// Host seats whose wake goes on after this round (they looked): they take the round's next round with everyone
+    /// else's, in key order, as a code twin's further rounds do (`host_goes_on`).
+    host_going_on: BTreeSet<String>,
     /// For whoever measures: how many steps the actors took (never logged).
     pub steps: u64,
 }
@@ -411,6 +414,7 @@ impl<W: Write> Engine<W> {
             hosting: false,
             for_host: vec![],
             for_host_any: false,
+            host_going_on: BTreeSet::new(),
             steps: 0,
         }
     }
@@ -981,7 +985,12 @@ impl<W: Write> Engine<W> {
             }
             let action = match d {
                 // (A host's seat carried itself out in its place, and said when its wake was done.)
-                Decided::Seat(None) if self.opts.host_seats => continue,
+                Decided::Seat(None) if self.opts.host_seats => {
+                    if self.host_going_on.remove(&key) {
+                        r.next.push((key, n + 1));
+                    }
+                    continue;
+                }
                 Decided::Seat(a) => a.expect("checked: every seat answered"),
                 Decided::Code(Err(e)) => {
                     let u = self.units.get_mut(&key).expect("checked");

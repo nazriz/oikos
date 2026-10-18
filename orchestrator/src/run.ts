@@ -1461,6 +1461,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           // so in the next round, at this moment. Either way, or waiting, the engine sets its next wake.
           if (goesOn && !x.u.acted) {
             if (x.u.hears && (r.value as ParticipantAction)?.type === "propose") next.push(...(await round([{ u: x.u, n: x.n + 1 }], true)));
+            // (On the Rust world a seat that sits as its code twin takes its next round in the engine's, with every code
+            // unit that looked, in key order: as its twin does. Taken here at once, it acted before them.)
+            else if (rustWorld && x.u.hears) await k.request({ op: "goes_on", key: x.u.key });
             else next.push({ u: x.u, n: x.n + 1 });
           } else await k.request({ op: "finished", key: x.u.key, ...(x.u.waitUntil !== undefined ? { until: x.u.waitUntil } : {}) });
         }
