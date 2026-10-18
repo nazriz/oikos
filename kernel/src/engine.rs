@@ -20,7 +20,7 @@
 use crate::kernel::Command;
 use crate::run::Run;
 use crate::schedule::{Next, Scheduler};
-use oikos_actors::sight::{Action, LookRequest, Picture, Provenance, View};
+use oikos_actors::sight::{Action, LookRequest, Provenance, View};
 use oikos_actors::{Actor, Answer, Belief, Ctx, Cx, Draws, Kept, Question, WorldInfo, DAY};
 use oikos_rules::slip::Performer;
 use serde_json::{json, Map, Value};
@@ -84,6 +84,17 @@ impl Default for EngineOptions {
             record_observations: false,
             record_observations_of: BTreeSet::new(),
         }
+    }
+}
+
+/// The events a host carrying its seats reads from the engine's own commands (orchestrator/src/run.ts, `absorb`): the
+/// cast as it changes, refusals (its summary counts them), and statements recorded (its reading desk reads seats').
+fn host_reads(e: &crate::events::EventBody) -> bool {
+    use crate::events::EventBody as E;
+    match e {
+        E::ParticipantCreated { .. } | E::ParticipantEnded { .. } | E::PositionCreated { .. } | E::Appointed { .. } | E::ActionRefused { .. } => true,
+        E::Recorded { record } => matches!(record.body, crate::blocks::RecordBody::Statement { .. }),
+        _ => false,
     }
 }
 
@@ -262,9 +273,13 @@ pub struct Engine<W: Write> {
     pause: Option<i64>,
     /// A host's own command is being carried out (its events are in its reply, not in `for_host`).
     hosting: bool,
-    /// The events of the engine's own commands since the host last took them (`host_seats`: the host keeps its cast
-    /// from them, as from its own commands' replies).
+    /// The events of the engine's own commands since the host last took them that the host reads (`host_seats`: it
+    /// keeps its cast from them, counts refusals and reads seats' statements, as from its own commands' replies), and
+    /// whether there were any events at all (the host is told time moved on either way). Only those it reads are kept:
+    /// with no seat awake the host is not asked for a whole run, and keeping every event held the run's events in
+    /// memory (10 GB for a 1,000-person year) to hand them over in one reply at the end.
     for_host: Vec<crate::events::Event>,
+    for_host_any: bool,
     /// For whoever measures: how many steps the actors took (never logged).
     pub steps: u64,
 }
@@ -276,20 +291,36 @@ fn ceil_to(t: i64, tick: i64) -> i64 {
     t.div_euclid(tick) * tick + if t.rem_euclid(tick) == 0 { 0 } else { tick }
 }
 
-/// `f` of each item, in the items' order, on up to `threads` threads: contiguous chunks, each thread its own, each
-/// result in its item's place. The same results however the work falls out.
+/// `f` of each item, in the items' order, on up to `threads` threads: each thread takes the next item not yet taken
+/// (one actor's step can take a hundred times another's, so even chunks left most threads waiting on one), and each
+/// result goes in its item's place. The same results however the work falls out.
 pub fn each_mut<T: Send, R: Send>(items: &mut [T], threads: usize, share_at: usize, f: impl Fn(&mut T) -> R + Sync) -> Vec<R> {
     let threads = threads.min(items.len()).max(1);
     if threads < 2 || items.len() < share_at.max(1) {
         return items.iter_mut().map(f).collect();
     }
-    let size = items.len().div_ceil(threads);
-    let f = &f;
-    std::thread::scope(|scope| {
-        let handles: Vec<_> =
-            items.chunks_mut(size).map(|chunk| scope.spawn(move || chunk.iter_mut().map(f).collect::<Vec<R>>())).collect();
-        handles.into_iter().flat_map(|h| h.join().expect("an actor's thread does not panic: steps are caught")).collect()
-    })
+    let n = items.len();
+    let next = std::sync::Mutex::new(items.iter_mut().enumerate());
+    let (f, next) = (&f, &next);
+    let done: Vec<Vec<(usize, R)>> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..threads)
+            .map(|_| {
+                scope.spawn(move || {
+                    let mut mine = vec![];
+                    loop {
+                        let Some((i, item)) = next.lock().unwrap_or_else(|e| e.into_inner()).next() else { break mine };
+                        mine.push((i, f(item)));
+                    }
+                })
+            })
+            .collect();
+        handles.into_iter().map(|h| h.join().expect("an actor's thread does not panic: steps are caught")).collect()
+    });
+    let mut slots: Vec<Option<R>> = (0..n).map(|_| None).collect();
+    for (i, r) in done.into_iter().flatten() {
+        slots[i] = Some(r);
+    }
+    slots.into_iter().map(|r| r.expect("every item was worked out")).collect()
 }
 
 impl<W: Write> Engine<W> {
@@ -344,7 +375,13 @@ impl<W: Write> Engine<W> {
     }
 
     /// An engine around a run, with nobody in it yet (`start` and `resume` fill it in).
-    fn assemble(run: Run<W>, base: Base, opts: EngineOptions, sched: Scheduler) -> Self {
+    fn assemble(mut run: Run<W>, base: Base, opts: EngineOptions, sched: Scheduler) -> Self {
+        // A moment's observations are made ready on the engine's threads, as its actors decide on them: the kernel's own
+        // default (one) is for a host that decides itself. OIKOS_KERNEL_THREADS, where it is set, still says how many.
+        // Nothing depends on it (`Kernel::plan`).
+        if std::env::var_os("OIKOS_KERNEL_THREADS").is_none() {
+            run.share(opts.threads, None);
+        }
         let until = opts.until.map_or(base.run_end, |u| u.min(base.run_end));
         Engine {
             sched,
@@ -373,6 +410,7 @@ impl<W: Write> Engine<W> {
             pause: None,
             hosting: false,
             for_host: vec![],
+            for_host_any: false,
             steps: 0,
         }
     }
@@ -442,8 +480,9 @@ impl<W: Write> Engine<W> {
         let t = self.run.kernel().t();
         self.sched.note_events(Some(self.run.kernel().state()), &resp.events, t);
         self.note_cast(&resp.events)?;
-        if self.opts.host_seats && !self.hosting {
-            self.for_host.extend(resp.events.iter().cloned());
+        if self.opts.host_seats && !self.hosting && !resp.events.is_empty() {
+            self.for_host_any = true;
+            self.for_host.extend(resp.events.iter().filter(|e| host_reads(&e.body)).cloned());
         }
         Ok((resp, seen))
     }
@@ -803,7 +842,8 @@ impl<W: Write> Engine<W> {
             ));
         }
         // Look, in key order.
-        let mut stepping: Vec<(Unit, Picture)> = vec![];
+        // (Each code unit with what it was shown: its view takes the observation in as it decides, on its thread.)
+        let mut stepping: Vec<(Unit, Option<crate::observe::Observation>, Option<String>)> = vec![];
         let mut seats = vec![];
         let mut kept_awake = vec![];
         for (key, n) in awake {
@@ -885,14 +925,16 @@ impl<W: Write> Engine<W> {
                     }
                     self.annotate(json!({ "annotation": "observation", "subject": u.participant, "data": data }))?;
                 }
-                let pic = u.view.apply(obs, only.as_deref(), &u.entity.clone(), &u.woke_for.clone(), u.since);
-                stepping.push((u, pic));
+                stepping.push((u, Some(obs), only));
             }
             kept_awake.push((key, n));
         }
         // Decide, all at once.
         let seed = self.seed;
-        let results = each_mut(&mut stepping, self.opts.threads, self.opts.share_at, |(u, pic)| {
+        let results = each_mut(&mut stepping, self.opts.threads, self.opts.share_at, |(u, obs, only)| {
+            let obs = obs.take().expect("each unit is stepped once");
+            let pic = u.view.apply(obs, only.as_deref(), &u.entity, &u.woke_for, u.since);
+            let pic = &pic;
             let answers = std::mem::take(&mut u.answers);
             let ctx = u.ctx.as_ref().expect("a code unit has its context");
             let actor = u.actor.as_mut().expect("a code unit has its actor");
@@ -908,7 +950,7 @@ impl<W: Write> Engine<W> {
         });
         self.steps += results.len() as u64;
         let mut decided = BTreeMap::new();
-        for ((u, _), r) in stepping.into_iter().zip(results) {
+        for ((u, _, _), r) in stepping.into_iter().zip(results) {
             decided.insert(u.key.clone(), Decided::Code(r));
             self.units.insert(u.key.clone(), u);
         }

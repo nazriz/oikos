@@ -63,9 +63,10 @@ impl<W: Write> Engine<W> {
         self.sched.perturb(p);
     }
 
-    /// The events of the engine's own commands since last taken (the host keeps its cast from them).
-    pub fn host_events(&mut self) -> Vec<crate::events::Event> {
-        std::mem::take(&mut self.for_host)
+    /// The events of the engine's own commands since last taken that the host reads (it keeps its cast from them),
+    /// and whether there were any events at all since then.
+    pub fn host_events(&mut self) -> (Vec<crate::events::Event>, bool) {
+        (std::mem::take(&mut self.for_host), std::mem::take(&mut self.for_host_any))
     }
 
     /// The run ends at `until` (the host's), no later than the world's end.

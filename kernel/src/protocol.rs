@@ -463,8 +463,8 @@ fn engine_reply(session: &mut Session, req: &Value) -> Result<Reply, String> {
                 },
             };
             // (What the engine's own actors did first: the host keeps its cast from it, as from an advance's events.)
-            let events = e.host_events();
-            if !events.is_empty() {
+            let (events, any) = e.host_events();
+            if any {
                 session.due = Some(due);
                 let ev = serde_json::to_value(&events).map_err(|x| x.to_string())?;
                 return Ok(Reply::Value(json!({ "ok": true, "advanced": e.t(), "events": ev, "seq": e.log_head().0.saturating_sub(1) })));

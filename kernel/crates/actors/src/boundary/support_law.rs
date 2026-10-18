@@ -16,7 +16,7 @@ use crate::steps::{because, say, Say, Step};
 use oikos_sight::Record;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 const DAY: i64 = 86_400;
@@ -472,11 +472,25 @@ pub struct Waits {
     me: String,
     /// need key (claim|need) -> when we asked and the day it is due by.
     asked: BTreeMap<String, (i64, i64)>,
+    /// What has come, by claim and need, as the book stood when last read (`came`): made again when the book has
+    /// taken in more. Never saved (it is the book's, read again).
+    #[serde(skip)]
+    came: Option<Came>,
+}
+
+/// The office's file read once for `Waits::came`: of the standing evidence addressed to it, who each piece speaks for, by
+/// (claim, need); and the (claim, need) of each standing confirmation answer addressed to it. Each claim's every need
+/// was looked for through the whole file, at every round of the office: as many readings of it as claims open.
+#[derive(Debug, Clone, Default)]
+struct Came {
+    stamp: (usize, usize, usize),
+    evidence: BTreeMap<(String, String), BTreeSet<Option<String>>>,
+    answers: BTreeSet<(String, String)>,
 }
 
 impl Waits {
     pub fn new(me: &str) -> Self {
-        Waits { me: me.to_string(), asked: BTreeMap::new() }
+        Waits { me: me.to_string(), asked: BTreeMap::new(), came: None }
     }
 
     /// The employer to ask: whom the claimant's own papers name as their last employer, else the last that reported pay
@@ -510,13 +524,49 @@ impl Waits {
     }
 
     fn came(&self, book: &Book, n: &Need, claim: &Record, who: &str) -> bool {
-        let to_me = |r: &Record| addressed_to(r).iter().any(|x| x == &self.me);
-        let about = |r: &Record| data(r).s("claim") == Some(claim.id.as_str()) && data(r).s("need") == Some(n.id.as_str());
+        let key = (claim.id.clone(), n.id.clone());
+        let Some(c) = self.came.as_ref().filter(|c| c.stamp == Self::stamp(book)) else {
+            // (Not read for this book as it stands: read it through, as `read_came` would.)
+            let to_me = |r: &Record| addressed_to(r).iter().any(|x| x == &self.me);
+            let about = |r: &Record| data(r).s("claim") == Some(claim.id.as_str()) && data(r).s("need") == Some(n.id.as_str());
+            return if n.from == "claimant" {
+                book.open("evidence").any(|r| r.speaks_for.as_deref() == Some(who) && to_me(r) && about(r))
+            } else {
+                book.open("confirmation_answer").any(|r| to_me(r) && about(r))
+            };
+        };
         if n.from == "claimant" {
-            book.open("evidence").any(|r| r.speaks_for.as_deref() == Some(who) && to_me(r) && about(r))
+            c.evidence.get(&key).is_some_and(|by| by.contains(&Some(who.to_string())))
         } else {
-            book.open("confirmation_answer").any(|r| to_me(r) && about(r))
+            c.answers.contains(&key)
         }
+    }
+
+    fn stamp(book: &Book) -> (usize, usize, usize) {
+        (book.len(), book.open("evidence").len(), book.open("confirmation_answer").len())
+    }
+
+    /// The file read once for `came`, unless it was read as it stands.
+    fn read_came(&mut self, book: &Book) {
+        let stamp = Self::stamp(book);
+        if self.came.as_ref().is_some_and(|c| c.stamp == stamp) {
+            return;
+        }
+        let me = self.me.clone();
+        let to_me = |r: &Record| addressed_to(r).iter().any(|x| *x == me);
+        let about = |r: &Record| Some((data(r).s("claim")?.to_string(), data(r).s("need")?.to_string()));
+        let mut c = Came { stamp, ..Default::default() };
+        for r in book.open("evidence").filter(|r| to_me(r)) {
+            if let Some(k) = about(r) {
+                c.evidence.entry(k).or_default().insert(r.speaks_for.clone());
+            }
+        }
+        for r in book.open("confirmation_answer").filter(|r| to_me(r)) {
+            if let Some(k) = about(r) {
+                c.answers.insert(k);
+            }
+        }
+        self.came = Some(c);
     }
 
     /// Asked at each round of the office, for each claim not yet decided. `words` writes a day as the world does.
@@ -525,6 +575,7 @@ impl Waits {
         let needs = law.map_or(&empty, |l| &l.needs);
         let mut steps = vec![];
         let Some(who) = c.speaks_for.clone() else { return (Wait::Ready, steps) };
+        self.read_came(book);
         let (mut waiting, mut lapsed) = (false, None::<String>);
         for n in needs {
             let key = format!("{}|{}", c.id, n.id);
