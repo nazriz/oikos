@@ -6533,3 +6533,37 @@ world looks reachable.
 **Revisit if** the measures here are retaken on a quiet machine and differ (wall times here were taken at load 10 to 13 on
 14 cores: the main thread's CPU time is given as the critical path); a town with many seats changes where the time goes
 (the host is then busy per wake); or the owner decides the log need not hash every observation.
+
+**Third pass (the same day).**
+
+*Fixed:*
+- A landlord's owners' draw goes to its shareholders, as TS paid it.
+- The truth audits and a test's inspector are served on the Rust world.
+- A recorded observation names its entity and, for a system, its post.
+- A listed participant's observations can be recorded alone.
+- The dataset reads the engine's note of its modules.
+- A seated twin that looks takes its next round in the engine's, in the round's order.
+
+*Merged:*
+- The Rust doubles of the TS-only test modules (test.leaving, test.directing, test.finance_holding; the exporter as
+  `stub.script`). The draw-trace test skips on the Rust world, its rule held by draws.rs.
+- port-perf: memory at 1,000 people falls from 10 GB to 2.9 GB.
+
+*Test changes, each with its reason in the test:*
+- places.test compares a law's figures as a set.
+- retail.test reads a refusal for a post its holder left town mid-act as the `not_present` race.
+
+*Scenario tests on the Rust world: 475 pass, 40 fail.*
+- Seated offices: member sittings, seat acts, tenant answers, government, office books and the books walk, opening
+  caseloads.
+- Rents and justice.
+- Founding, consult and the reading dial: the mind's model questions.
+- Clinic and school, word of mouth, taken in, home market, public finance.
+- Perception, invariance, reliability, the resolver shadow, production's Lengnick test, building's first test.
+- twin-draws: 3 tests use another TS-only double, test.scribbling; 2 more fail, one of them on a sample-size floor.
+- The 19-seat twin year: it parts at t=1500, where a seat's act after its look and draft lands later in the moment
+  than its twin's.
+
+*ME-20 stays on the register.* Both parts need a design, not a patch:
+- Landlords should build by expected return on the market's rents.
+- Shops should split orders, or factories should state what they have to clear.
