@@ -366,6 +366,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
 
   // Every model call (participants, translator, debriefs) is recorded as it happens.
   const brains = new Map<string, MockBrain>(); // filled below, as mock participants are created
+  const brainFirstWake = new Map<string, number>(); // (the Rust world: a brain's first wake, as the engine's unit of its kind has it)
   // While a cohort decides, annotations from its model calls are held by subject and written afterwards in the
   // cohort's order, so the log doesn't depend on which call came back first (D58 §4.8).
   let holding: Map<string, object[]> | null = null;
@@ -644,8 +645,15 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         // (In the Rust world a brain the engine has is the engine's own kind, run detached: the same code as the post's
         // code unit, so a twin is exact.)
         const rustBrain = rustWorld && rustKinds().has(b) ? new DetachedActor({ kind: b, participant: asPerson ?? p.id, capacity: office?.id ?? "self", entity, system: p.kind === "system", params: pp.mock?.params ?? {}, config: cfg }) : undefined;
-        const brainController = rustBrain ? ({ step: (x: any) => rustBrain.step(x, x.woke_for ?? "cadence", x.since ?? 0).action, sent: (a: string) => rustBrain.sent(a) } as unknown as Controller) : brainModule.create(bctx);
-        brains.set(p.id, { controller: brainController, ctx: bctx, capacity: office?.id ?? "self", cadence: brainModule.cadence(bctx), rejectBps: pp.mock?.reject_bps, ...(twin ? { twin: true } : {}), optOutAt: pp.mock?.opt_out_at, ...(pp.mock?.back_days ? { backDays: pp.mock.back_days } : {}) });
+        // (The mock hands its brain its capacity's slice, the channels named without the post; the engine's actor reads a
+        // post's channels by their paths, "<post>/<channel>", as the engine hands them: put back.)
+        const cap = office?.id;
+        const asPath = (x: any) => (cap && x?.channels ? { ...x, channels: Object.fromEntries(Object.entries(x.channels).map(([k, v]) => [k.includes("/") ? k : `${cap}/${k}`, v])) } : x);
+        const brainController = rustBrain ? ({ step: (x: any) => rustBrain.step(asPath(x), x.woke_for ?? "cadence", x.since ?? 0).action, sent: (a: string) => rustBrain.sent(a) } as unknown as Controller) : brainModule.create(bctx);
+        // (A Rust brain is scheduled as the engine's unit of its kind is: its first wake and cadence are the Rust kind's.)
+        const rustSchedule = rustBrain?.schedule();
+        if (rustSchedule) brainFirstWake.set(p.id, rustSchedule.firstWake);
+        brains.set(p.id, { controller: brainController, ctx: bctx, capacity: office?.id ?? "self", cadence: rustSchedule?.cadence ?? brainModule.cadence(bctx), rejectBps: pp.mock?.reject_bps, ...(twin ? { twin: true } : {}), optOutAt: pp.mock?.opt_out_at, ...(pp.mock?.back_days ? { backDays: pp.mock.back_days } : {}) });
         bindings[p.id] = { ...bindings[p.id], mock_brain: b };
       }
     }
@@ -656,7 +664,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       key: p.id, participant: p.id, entity, module, controller: controller as unknown as Controller, ctx,
       llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}), ...(dayBook ? { dayBook } : {}) },
       ...(codeTwin && office ? { sort: `${codeTwin}|${office.id}` } : {}), ...(brain ? { hears: true, ...(codeTwin ? { body: codeTwin } : {}), ...(office ? { post: office.id } : {}) } : {}),
-      cadence: ceilTo(brain?.cadence ?? cadence, tick), firstWake: wakeAt ?? (brain ? ceilTo(mods[pp.mock.brain]!.firstWake?.(brain.ctx) ?? 0, tick) : 0), wokeFor: "start", since: 0,
+      cadence: ceilTo(brain?.cadence ?? cadence, tick), firstWake: wakeAt ?? (brain ? ceilTo(brainFirstWake.get(p.id) ?? mods[pp.mock.brain]!.firstWake?.(brain.ctx) ?? 0, tick) : 0), wokeFor: "start", since: 0,
       knowledge: new Knowledge(currency), view: new View(new Set(standingIds)), notices: [],
     };
   };

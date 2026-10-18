@@ -132,6 +132,11 @@ export class DetachedActor {
   sent(action: string): void {
     this.a.sent(action);
   }
+  /** When the engine's unit of this kind would first wake, and how often (seconds, before the tick rounds them). */
+  schedule(): { firstWake: number; cadence: number } {
+    const [firstWake, cadence] = this.a.schedule() as number[];
+    return { firstWake: firstWake!, cadence: cadence! };
+  }
 }
 
 /** A shared rule by name (kernel/src/rules_api.rs): what the generator calls in Rust. */

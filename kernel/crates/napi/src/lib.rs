@@ -195,6 +195,13 @@ impl Detached {
         Ok(self.inner.step(&parse(&observation, "observation")?, &woke_for, since, &answers).map_err(err)?.to_string())
     }
 
+    /// `[first_wake, cadence]`: when the engine's unit of this kind would first wake, and how often.
+    #[napi]
+    pub fn schedule(&self) -> Vec<i64> {
+        let (f, c) = self.inner.schedule();
+        vec![f, c]
+    }
+
     #[napi]
     pub fn sent(&mut self, action: String) {
         self.inner.sent(&action);

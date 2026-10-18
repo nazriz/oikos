@@ -328,6 +328,7 @@ fn relative(parent: &Path, fork: &Path) -> Option<String> {
 /// the same observations as the engine's unit for that post, it decides exactly as that unit would: the same code, the
 /// same keyed draws, the same memory.
 pub struct Detached {
+    kind: &'static dyn oikos_actors::Kind,
     actor: Box<dyn Actor>,
     ctx: Ctx,
     draws: Draws,
@@ -360,10 +361,16 @@ impl Detached {
             let actor = kind.restore(&ctx, saved["actor"].clone())?;
             let draws = serde_json::from_value(saved["draws"].clone()).map_err(|e| format!("saved draws: {e}"))?;
             let view = serde_json::from_value(saved["view"].clone()).map_err(|e| format!("saved view: {e}"))?;
-            return Ok(Detached { actor, draws, ctx, view, seed, capacity: Some(capacity) });
+            return Ok(Detached { kind, actor, draws, ctx, view, seed, capacity: Some(capacity) });
         }
         let actor = kind.create(&ctx)?;
-        Ok(Detached { actor, draws: Draws::new(&participant, &capacity), ctx, view: View::default(), seed, capacity: Some(capacity) })
+        Ok(Detached { kind, actor, draws: Draws::new(&participant, &capacity), ctx, view: View::default(), seed, capacity: Some(capacity) })
+    }
+
+    /// When the engine's unit of this kind would first wake, and how often after (its `Kind`'s, before the world's tick
+    /// rounds them): a seat sitting as its code twin is scheduled by these, not by the TS module's.
+    pub fn schedule(&self) -> (i64, i64) {
+        (self.kind.first_wake(&self.ctx), self.kind.cadence(&self.ctx))
     }
 
     /// One step on an observation (the contract's, as JSON: the seat's whole one is fine, its capacity is taken):
