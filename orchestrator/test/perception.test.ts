@@ -16,7 +16,13 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
-test("every capacity's view equals the kernel's full picture, after every look", async () => {
+// (This checks the TS runtime's View, which the Rust world does not use: its engine keeps each actor's view in
+// kernel/crates/sight, held to the kernel's full picture by kernel/tests/perception.rs, a property test over generated
+// worlds and ops, every look of every participant. The inspector here is also called once a day on the Rust world, not
+// at every look.)
+const tsOnly = process.env.OIKOS_WORLD === "rust" ? test.skip : test;
+
+tsOnly("every capacity's view equals the kernel's full picture, after every look", async () => {
   const out = join(root, "runs", "test-perception");
   rmSync(out, { recursive: true, force: true });
   let checked = 0, moves = 0;

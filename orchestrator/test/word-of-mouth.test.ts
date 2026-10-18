@@ -7,7 +7,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { ASKING } from "@oikos/participants";
+import { ASKING, View } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 
@@ -24,17 +24,26 @@ test("people ask the people they know, and are told only what those people could
   // (People who hold no post of the town's: a person of the town who holds several decides over several wakes of their own and acts later, and what they
   // could see "when they decided" is not one look. Foundations F5 made the town's staff such people.)
   const postHolders = new Set(config.positions.map((p: any) => p.holder));
+  // (What each could see is rebuilt from the log, where the run records these citizens' observations in full, through the
+  // same View a participant keeps: the Rust world's engine decides for them itself, so a test cannot be handed their
+  // observations as they are made.)
   const s = await runWorld({
     config, runId: "word-of-mouth", outDir: out, until: 240 * DAY,
-    inspect: async (participant, obs) => {
-      const street = obs.channels.street;
-      if (street?.kind !== "sites") return;
-      const buildings = street.cells.flatMap((c) => (c.structure ? [c.structure] : []));
-      const people = new Set<string>(buildings.flatMap((x) => x.spaces.flatMap((sp) => sp.occupants ?? [])));
-      seen.set(participant, [...(seen.get(participant) ?? []), { t: obs.t, structures: new Set(buildings.map((x) => x.structure)), people, carryingOn: obs.woke_for === "done" }]);
-    },
+    recordObservations: config.participants.filter((p: any) => p.kind === "person").map((p: any) => p.id),
   });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const views = new Map<string, View>();
+  for (const e of log) {
+    if (e.kind !== "annotation" || e.body.annotation !== "observation" || e.body.data.as) continue; // (a citizen's own sight, not a post's)
+    const participant: string = e.body.subject, raw = e.body.data.observation;
+    const view = views.get(participant) ?? views.set(participant, new View()).get(participant)!;
+    const obs = view.apply({ ...raw, channels: Object.fromEntries(raw.channels.map((c: any) => [c.path, c])) });
+    const street = obs.channels.street;
+    if (street?.kind !== "sites") continue;
+    const buildings = street.cells.flatMap((c) => (c.structure ? [c.structure] : []));
+    const people = new Set<string>(buildings.flatMap((x) => x.spaces.flatMap((sp) => sp.occupants ?? [])));
+    seen.set(participant, [...(seen.get(participant) ?? []), { t: e.body.data.t, structures: new Set(buildings.map((x) => x.structure)), people, carryingOn: raw.woke_for === "done" }]);
+  }
   const said = log.filter((e) => e.kind === "command" && e.body.command === "act" && /^c\d+-self$/.test(e.body.participant))
     .flatMap((e) => e.body.blocks.filter((b: any) => b.block === "message").map((b: any) => ({ t: e.t, participant: e.body.participant, ...b })));
   const asks = said.filter((m) => m.text === ASKING.home || m.text === ASKING.work);

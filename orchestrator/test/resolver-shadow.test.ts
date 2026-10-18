@@ -9,7 +9,12 @@ import { join } from "node:path";
 
 const root = join(import.meta.dir, "../..");
 
-test("sixty days of the town, every call resolved by both resolvers: no difference", async () => {
+// (The shadow is the host's: it resolves the calls its own units make both ways. On the Rust world the engine resolves
+// every code actor's calls itself, with the one resolver it has, so there is nothing for a second to shadow; that the
+// two agree is what this shows on the TS world's run, and the translator's test set runs the TS resolver on its own.)
+const tsOnly = process.env.OIKOS_WORLD === "rust" ? test.skip : test;
+
+tsOnly("sixty days of the town, every call resolved by both resolvers: no difference", async () => {
   const out = join(root, "runs/test-resolver-shadow");
   rmSync(out, { recursive: true, force: true });
   // (The resolver is chosen when the run's code loads, so this run is a process of its own.)
