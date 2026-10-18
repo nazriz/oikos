@@ -49,6 +49,12 @@ scripts/port-gate.ts                         the gate's measured half.
 - **Questions to models** (consult, compose, reading): `cx.ask(Question)` in one wake; the engine queues them
   (`Engine::questions`); the host answers (`Engine::answer`); the answers arrive in `cx.answers` at the actor's next
   wake. An actor never waits inside a step.
+- **Words through the translator** (a founder's composed piece: docs/behaviour/founding.md) are a fourth: a `words`
+  question (`mind::founding::words_question`), which the host drafts as run.ts `wordsFor` does, up to the draft. The
+  actor holds the answer to its own `accept_*` (`words_came`); an accepted draft is a step that sends blocks with the
+  draft's provenance (`steps::Drafted`, `Step::drafted`), the one place a code actor's act is not a call. What it made
+  of each draft goes in `Cx::worded` (`Worded`), and the engine writes the signoff and the `words` note, after the act
+  where there is one; the `questions` op hands the host the signoffs too, for a trained translator's arrangement.
 - **Seats** attach through the participant API: `Engine::next()` returns `Due::Seats` with each awake seat's
   observation as the contract's JSON; the host `submit`s an `Action` for each (a confirmed draft is an `Act` with its
   provenance); `next()` again carries the round out. The TS seat host is wired to this in the integration step (lane F).

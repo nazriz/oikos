@@ -1137,7 +1137,7 @@ impl CitizenMind {
         } else {
             Some(Json::Null)
         };
-        self.s.begun = Some(Begun { want: w.clone(), shape: shape.name().into(), sharers: list, brief, dues: dues_open, piece, sent: false, name_by: None, naming: false });
+        self.s.begun = Some(Begun { want: w.clone(), shape: shape.name().into(), sharers: list, brief, dues: dues_open, piece, sent: false, name_by: None, naming: false, words: None, attempt: 0, redo_plain: false });
     }
 }
 
@@ -1263,7 +1263,7 @@ impl CitizenMind {
         self.s.join_now = false;
         // Founding and what was founded (citizen.ts 2669-2736).
         if let (Some(f), Some(acc)) = (self.p.founding.clone(), account.clone()) {
-            self.found_now(cx, book, life, &f, t, out);
+            self.found_now(cx, pic, life, &f, t, out);
             if let Some((org, _, _)) = self.s.my_group.clone() {
                 if !self.member_of(book, &org) && !self.s.applied_to.contains(&org) && book.open("membership").any(|r| r.speaks_for.as_deref() == Some(org.as_str())) {
                     self.s.join_group.insert(org);
@@ -1444,65 +1444,117 @@ impl CitizenMind {
     }
 
     /// What we have begun, once its words are in hand: the organisation, with us in its first post (citizen.ts
-    /// 2674-2699). A composed name goes to the translator as a seat's words would (`words`), and the founding waits
-    /// for its answer; decided fresh: the act is then the same call with the name the translator made, since a code
-    /// actor's steps are calls.
-    fn found_now(&mut self, cx: &mut Cx, book: &Book, life: &Life, f: &founding::FoundingParams, t: i64, out: &mut Planned) {
-        let _ = book;
+    /// 2674-2699). A composed name goes to the translator as a seat's words would: a `words` question the host drafts
+    /// (run.ts `wordsFor`), and the founding waits for its answer. The draft is done only as `accept_entity` says it may
+    /// be, with the post's channels and module put in as our own plumbing; otherwise, or if its acts cannot be begun,
+    /// the plain name (`Words.done`).
+    fn found_now(&mut self, cx: &mut Cx, pic: &Picture, life: &Life, f: &founding::FoundingParams, t: i64, out: &mut Planned) {
         let me = self.me().to_string();
         let Some(place) = life.dwelling.clone() else { return };
         let Some(tpl) = f.template.clone() else { return };
+        let owner_values: Option<Json> = tpl.role_module.pointer("/params/values").map(|_| {
+            let pp = &self.s.mind.person;
+            Json::Object(Value::ALL.iter().map(|v| (v.name().to_string(), json!(pp.values[v.index()]))).collect())
+        });
         let Some(b) = self.s.begun.as_mut() else { return };
-        if b.sent || b.naming || b.piece.is_none() {
+        let redo = b.sent && b.redo_plain;
+        if (b.sent && !redo) || b.piece.is_none() {
             return;
         }
         let piece = b.piece.clone().filter(|p| !p.is_null() && p.get("declined") != Some(&Json::Bool(true)));
-        if let (Some(name), None) = (piece.as_ref().and_then(|p| p.get("name")).and_then(Json::as_str).map(|n| n.split_whitespace().collect::<Vec<_>>().join(" ").replace('"', "'")), b.name_by.as_ref()) {
-            if !name.is_empty() {
-                let name: String = name.chars().take(100).collect();
-                b.naming = true;
-                cx.ask(crate::Question {
-                    kind: "words".into(),
-                    about: b.brief["idea"].as_str().unwrap_or_default().to_string(),
-                    body: json!({ "what": "name", "text": format!("Found a {} called \"{name}\", with me in its first post as {}.", tpl.kind, tpl.title), "kind": tpl.kind, "title": tpl.title }),
-                });
-                return;
-            }
-        }
-        b.sent = true;
         let room = (life.household as i64 + 4 - life.household as i64).max(1);
+        // (The cell our home stands on, where we see it: a translator can then write the gathering's notice on it.)
+        let place_on = match pic.channels.get("street") {
+            Some(Seen::Sites { cells, .. }) => cells.iter().filter_map(|c| c.structure.as_ref()).find(|st| st.spaces.iter().any(|sp| sp.space == place)).map(|st| st.at.clone()),
+            _ => None,
+        };
         let fill = |x: &Json| fill_founder(x, &me);
-        let mut params = fill(&tpl.role_module.get("params").cloned().unwrap_or(json!({})));
-        let name = b.brief["code"]["name"].as_str().unwrap_or_default().to_string();
-        let mut want = json!({ "about": b.want.about, "since": b.want.since, "weight": b.want.weight });
-        if let Some(w) = &b.want.whom {
-            want["whom"] = json!(w);
-        }
-        let extra = json!({
-            "founder": me, "shape": b.shape, "idea": b.brief["idea"], "name": name, "purpose": b.brief["code"]["purpose"], "want": want,
-            "place": place, "place_room": room, "bank": f.bank, "founded_at": t,
-            "dues": b.dues, "every_days": f.every_days, "starts_in_days": f.starts_in_days, "lasts_minutes": f.lasts_minutes, "at_seconds": f.at_seconds,
-            "lapse_days": f.lapse_days, "min_members": f.min_members, "hall": f.hall, "fund": f.fund, "cause": f.cause,
-        });
-        if let (Json::Object(p), Json::Object(e)) = (&mut params, extra) {
-            for (k, v) in e {
-                p.insert(k, v);
+        let bb = b.clone();
+        let module = |name: &str| -> Json {
+            let b = &bb;
+            let mut params = fill(&tpl.role_module.get("params").cloned().unwrap_or(json!({})));
+            let mut want = json!({ "about": b.want.about, "since": b.want.since, "weight": b.want.weight });
+            if let Some(w) = &b.want.whom {
+                want["whom"] = json!(w);
             }
-            if let Some(pc) = &piece {
-                p.insert("composed".into(), json!({ "purpose": pc.get("purpose"), "asks": pc.get("asks"), "gathers": pc.get("gathers"), "choice": pc.get("choice"), "model": pc.get("model") }));
+            let extra = json!({
+                "founder": me, "shape": b.shape, "idea": b.brief["idea"], "name": name, "purpose": b.brief["code"]["purpose"], "want": want,
+                "place": place, "place_room": room, "bank": f.bank, "founded_at": t,
+                "dues": b.dues, "every_days": f.every_days, "starts_in_days": f.starts_in_days, "lasts_minutes": f.lasts_minutes, "at_seconds": f.at_seconds,
+                "lapse_days": f.lapse_days, "min_members": f.min_members, "hall": f.hall, "fund": f.fund, "cause": f.cause,
+            });
+            if let (Json::Object(p), Json::Object(e)) = (&mut params, extra) {
+                for (k, v) in e {
+                    p.insert(k, v);
+                }
+                if let Some(on) = &place_on {
+                    p.insert("place_on".into(), json!(on));
+                }
+                if let Some(pc) = &piece {
+                    p.insert("composed".into(), json!({ "purpose": pc.get("purpose"), "asks": pc.get("asks"), "gathers": pc.get("gathers"), "choice": pc.get("choice"), "model": pc.get("model") }));
+                }
+                if let Some(v) = &owner_values {
+                    p.insert("owner_values".into(), v.clone());
+                }
             }
-            if tpl.role_module.pointer("/params/values").is_some() {
-                let pp = &self.s.mind.person;
-                p.insert("owner_values".into(), Json::Object(Value::ALL.iter().map(|v| (v.name().to_string(), json!(pp.values[v.index()]))).collect()));
-            }
-        }
-        let mut module = fill(&tpl.role_module);
-        module["params"] = params;
+            let mut m = fill(&tpl.role_module);
+            m["params"] = params;
+            m
+        };
         let channels = fill(&Json::Array(tpl.channels.clone()));
         let why = format!("{} others we know are in the same case ({}), and nothing answers it: starting something of our own ({}).", b.sharers.len(), b.want.about.replace('_', " "), b.shape);
+        let idea = b.brief["idea"].as_str().unwrap_or_default().to_string();
+        let composed_name = piece.as_ref().and_then(|p| p.get("name")).and_then(Json::as_str).map(|n| n.split_whitespace().collect::<Vec<_>>().join(" ").replace('"', "'"));
+        if let (false, Some(name), None) = (redo, composed_name.filter(|n| !n.is_empty()), b.name_by.as_ref()) {
+            let name: String = name.chars().take(100).collect();
+            let text = format!("Found a {} called \"{name}\", with me in its first post as {}.", tpl.kind, tpl.title);
+            if !b.naming {
+                b.naming = true;
+                b.attempt = 1;
+                cx.ask(founding::words_question(&idea, "name", &idea, &text, 1));
+                return;
+            }
+            let Some(answer) = b.words.take() else { return };
+            let channels_list = channels.as_array().cloned().unwrap_or_default();
+            let came = founding::words_came(&idea, "name", &idea, &answer, |blocks| {
+                let mut r = founding::accept_entity(&tpl.kind, &tpl.title, &channels_list, &json!({}), blocks)?;
+                let named = r[0]["name"].as_str().unwrap_or_default().to_string();
+                r[0]["first_position"]["role_module"] = module(&named);
+                Ok(r)
+            });
+            match came {
+                founding::Came::Accepted(d) => {
+                    b.naming = false;
+                    b.sent = true;
+                    b.name_by = Some("translator".into());
+                    out.steps.push(steps::Step::drafted(d));
+                    self.s.pending_group = true;
+                    return;
+                }
+                founding::Came::Again(w) if b.attempt < 2 => {
+                    cx.worded(w);
+                    b.attempt = 2;
+                    cx.ask(founding::words_question(&idea, "name", &idea, &text, 2));
+                    return;
+                }
+                founding::Came::Again(mut w) | founding::Came::NotDone(mut w) => {
+                    w.again = false;
+                    cx.worded(w);
+                    b.naming = false;
+                    b.name_by = Some("code".into());
+                }
+            }
+        }
+        // The plain name (no composed one, the translator's not done, or its acts not begun).
+        b.sent = true;
+        b.redo_plain = false;
+        if redo {
+            b.name_by = Some("code".into());
+        }
+        let name = b.brief["code"]["name"].as_str().unwrap_or_default().to_string();
         // (Bound as `founded`, as citizen.ts wrote it: the world names what it made by that ref in the act's outcome, which
         // is how the founder learns its id. Unbound, no founder ever learned it and nothing founded was ever recorded.)
-        let made = call("entity", vec![("kind", Some(steps::arg(&tpl.kind))), ("name", Some(text(name.clone()))), ("position", Some(text(tpl.title.clone()))), ("channels", Some(jarg(channels))), ("role_module", Some(jarg(module)))]);
+        let made = call("entity", vec![("kind", Some(steps::arg(&tpl.kind))), ("name", Some(text(name.clone()))), ("position", Some(text(tpl.title.clone()))), ("channels", Some(jarg(channels))), ("role_module", Some(jarg(module(&name))))]);
         let mut st = because(why, vec![]);
         st.lines.push(oikos_sight::calls::Line { bind: Some("founded".into()), call: made });
         out.steps.push(st);

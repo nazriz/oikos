@@ -1307,6 +1307,50 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     words.done(result === "done", why || undefined);
   }
 
+  /**
+   * The Rust world's half of `wordsFor`: a code actor's `words` question (its founder's words, docs/behaviour/
+   * founding.md), drafted here as above, up to the draft: the translator's calls, retries and route, a failure, the
+   * draft. What the draft may be is the actor's own module's to say (kernel/crates/actors/src/mind/founding.rs
+   * `words_came`), at its next wake: the engine then writes the signoff and the `words` note, and the act goes with the
+   * draft's provenance. `attempt` 2: the first draft, a trained translator's, was not what was meant (its signoff came
+   * first, so the arrangement sends this behind).
+   */
+  async function draftWords(key: string, body: { what?: string; text?: string; attempt?: number }): Promise<object> {
+    const [participant, capacity] = key.split("|") as [string, string | undefined];
+    const as = capacity && capacity !== "self" ? capacity : undefined;
+    const n = (worded.get(participant) ?? 0) + 1;
+    worded.set(participant, n);
+    const draftId = `draft.${participant}.w${n}`;
+    const proposal = String(body?.text ?? "");
+    const notes: object[] = [];
+    const tr = await translating.run(notes, async () => {
+      try {
+        return await translator.translate({ draftId, participant, as, proposal, knowledge: units.get(key)?.knowledge ?? new Knowledge(currency), called: (id) => whoIs(id)?.name, ...(capacity ? { only: capacity } : {}) });
+      } catch (e) {
+        if (!(e instanceof ModelCallFailed)) throw e;
+        return { ok: false as const, notices: ["The translator did not answer."], raw: { model_call_failed: e.message } } as Awaited<ReturnType<typeof translator.translate>>;
+      }
+    });
+    for (const annotation of notes.splice(0)) await k.request({ op: "annotate", annotation });
+    for (const [i, x] of (tr.retries ?? []).entries())
+      await k.request({ op: "annotate", annotation: { annotation: "note", subject: participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason, ...(x.call ? { call: x.call } : {}) } } } });
+    if (tr.route) await k.request({ op: "annotate", annotation: { annotation: "note", subject: participant, data: { translation_route: { draft: draftId, ...tr.route } } } });
+    const by = tr.route?.used;
+    if (!tr.ok) {
+      await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: participant, data: { draft: draftId, proposal, reason: tr.notices.join(" "), ...(tr.asked_back ? { asked_back: true } : {}), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}) } } });
+      return { ok: false, draft: draftId, why: tr.notices.join(" ").slice(0, 500), ...(by ? { by } : {}) };
+    }
+    const [drafted] = await k.tryRequestMany([{ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } }]);
+    if (drafted === null) return { ok: false, draft: draftId, why: `the draft could not be recorded: ${k.lastError.slice(0, 300)}`, ...(by ? { by } : {}) };
+    return {
+      ok: true, draft: draftId, draft_hash: tr.hash, blocks: tr.draft.blocks,
+      check: tr.draft.check.ok ? { ok: true } : { ok: false, refusal: tr.draft.check.refusal?.code ?? "refused" },
+      provenance: { via: "translator", proposal: tr.draft.proposal, draft: draftId, draft_hash: tr.hash, translator: tr.draft.translator, call: tr.draft.call, resolver: tr.draft.resolver },
+      ...(by ? { by } : {}),
+      ...((body?.attempt ?? 1) === 1 && tr.route?.used === "first" && tr.route.arrangement === "then" ? { again: true } : {}),
+    };
+  }
+
   // Deciding takes world time if the world says so (docs/design/rebuild.md 6.4): a model by its tokens, code a fixed time.
   const thinkingCosts = cfg.orchestration.thinking_time === "costs_world_time";
   const rates = cfg.orchestration.thinking ?? {};
@@ -1315,10 +1359,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   let lastPause = performance.now();
   let askedBy = 0; // (the Rust world: how far the engine was last asked to go before handing back)
   /** The Rust world's actors' questions to models, answered as the TS world's modules have them answered through their
-   * context (`consult`, `compose`, `read`): the same services, the same bodies, by the asker's next wake. One the run has
-   * no model for, or of a kind not answered here, is answered with nothing, as an actor decides offline. */
+   * context (`consult`, `compose`, `read`), and a founder's words drafted by the translator (`words`: `draftWords`): the
+   * same services, the same bodies, by the asker's next wake. One the run has no model for, or of a kind not answered here, is answered with nothing, as an actor decides offline. */
   const answerQuestions = async () => {
-    const { questions } = (await k.request({ op: "questions" })) as { questions: { key: string; kind: string; about: string; body: any }[] };
+    const { questions, signed } = (await k.request({ op: "questions" })) as { questions: { key: string; kind: string; about: string; body: any }[]; signed?: { draft: string; decision: "accept" | "reject" }[] };
+    // (The engine's signoffs of its actors' words first: a draft not what was meant sends the next asking behind.)
+    for (const x of signed ?? []) arranged?.signed(x.draft, x.decision);
     for (const q of questions) {
       const subject = q.key.split("|")[0]!;
       let body: unknown = null;
@@ -1328,6 +1374,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         body = ans ? { scores: ans.scores } : null;
       } else if (q.kind === "compose" && composer) body = (await composer(q.body, subject).catch(() => undefined)) ?? null;
       else if (q.kind === "reading" && desk) body = desk.lookup(String(q.body?.paper ?? q.about), q.body?.standing) ?? null;
+      else if (q.kind === "words") body = await draftWords(q.key, q.body);
       await k.request({ op: "answer", key: q.key, answers: [{ kind: q.kind, about: q.about, body }] });
     }
   };

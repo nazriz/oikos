@@ -427,7 +427,7 @@ impl Plan for Union {
         let mut steps: Vec<Step<Then>> = vec![];
         if let Some(mut g) = self.grievances.inner.take() {
             for s in g.steps(pic, &self.book, cx) {
-                steps.push(Step { lines: s.lines, why: s.why, then: None, redo: s.redo, planned: s.planned, lapses_at: s.lapses_at });
+                steps.push(Step { lines: s.lines, act: s.act, why: s.why, then: None, redo: s.redo, planned: s.planned, lapses_at: s.lapses_at });
             }
             self.grievances.inner = Some(g);
         }

@@ -384,6 +384,15 @@ pub struct Begun {
     pub name_by: Option<String>,
     /// The words asked of the translator for the name, awaiting the answer.
     pub naming: bool,
+    /// The host's answer to it (a draft, or why none), until the plan takes it up.
+    #[serde(default)]
+    pub words: Option<Json>,
+    /// Which time it was asked (a second, where the first draft was a trained translator's and not what was meant).
+    #[serde(default)]
+    pub attempt: u8,
+    /// The translator's name was accepted but its acts could not be begun: founded under the plain name instead.
+    #[serde(default)]
+    pub redo_plain: bool,
 }
 
 /// What a child is told on coming of age (citizen.ts `upbringing`).
@@ -1649,6 +1658,16 @@ impl CitizenMind {
             "compose" => {
                 if let Some(b) = self.s.begun.as_mut().filter(|b| b.brief.get("idea").and_then(Json::as_str) == Some(a.about.as_str())) {
                     b.piece = Some(a.body);
+                }
+            }
+            "words" => {
+                if let Some(b) = self.s.begun.as_mut().filter(|b| b.brief.get("idea").and_then(Json::as_str) == Some(a.about.as_str())) {
+                    // (`{done: false}`: the engine could not begin the acts of the draft we accepted: `Words.done(false)`.)
+                    if a.body.get("done").and_then(Json::as_bool) == Some(false) {
+                        b.redo_plain = b.sent;
+                    } else if b.naming {
+                        b.words = Some(a.body);
+                    }
                 }
             }
             "reading" => {

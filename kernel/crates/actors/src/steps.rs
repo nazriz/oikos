@@ -36,10 +36,24 @@ impl Done<'_> {
     }
 }
 
+/// Acts a translator drafted for the actor's words and its own module accepted (docs/behaviour/founding.md, "Through the
+/// translator"): sent as they are, with the draft's provenance, in place of calls. A code actor's steps are otherwise
+/// calls; these are the one place its acts are a draft's, so the log says the translator wrote them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Drafted {
+    pub blocks: Vec<Value>,
+    /// The draft's provenance as the host gave it (`via: translator`, the proposal, draft, hash, translator, call, resolver).
+    pub provenance: Value,
+    /// What the actor made of it, reported as the acts are sent (`Cx::worded`).
+    pub worded: crate::Worded,
+}
+
 /// Calls in one action, with its reason, and the plan's token for what follows from it.
 #[derive(Debug, Clone)]
 pub struct Step<T> {
     pub lines: Vec<Line>,
+    /// A translator's accepted draft, sent in place of the lines (which are then empty).
+    pub act: Option<Box<Drafted>>,
     pub why: Option<String>,
     /// What follows from its outcome: the plan's `then` is given this.
     pub then: Option<T>,
@@ -53,7 +67,32 @@ pub struct Step<T> {
 
 impl<T> Step<T> {
     pub fn new(lines: Vec<Line>) -> Self {
-        Step { lines, why: None, then: None, redo: false, planned: None, lapses_at: None }
+        Step { lines, act: None, why: None, then: None, redo: false, planned: None, lapses_at: None }
+    }
+    /// A step that sends a translator's accepted draft (with no reasoning of its own: run.ts `wordsFor` gave none).
+    pub fn drafted(d: Drafted) -> Self {
+        let mut s = Step::new(vec![]);
+        s.act = Some(Box::new(d));
+        s
+    }
+    /// Whether there is nothing to send.
+    pub fn is_empty(&self) -> bool {
+        self.lines.is_empty() && self.act.is_none()
+    }
+    /// The action that sends it: its calls, or the draft it carries (reported to the engine as it goes: `Cx::worded`).
+    pub fn action(&self, cx: &mut Cx) -> Action {
+        match &self.act {
+            Some(d) => {
+                cx.worded(d.worded.clone());
+                Action::Act {
+                    blocks: d.blocks.iter().filter_map(|b| serde_json::from_value(b.clone()).ok()).collect(),
+                    reasoning: self.why.clone(),
+                    by: vec![],
+                    provenance: oikos_sight::Provenance::Given(d.provenance.clone()),
+                }
+            }
+            None => Action::Call { program: self.program(), reasoning: self.why.clone() },
+        }
     }
     pub fn then(mut self, token: T) -> Self {
         self.then = Some(token);
@@ -138,7 +177,7 @@ impl<P: Plan> Stepper<P> {
 
     fn follow(&mut self, step: &Step<P::Then>, done: Done, cx: &mut Cx) -> Vec<Step<P::Then>> {
         match &step.then {
-            Some(tok) => self.plan.then(tok, done, cx).into_iter().filter(|s| !s.lines.is_empty()).collect(),
+            Some(tok) => self.plan.then(tok, done, cx).into_iter().filter(|s| !s.is_empty()).collect(),
             None => vec![],
         }
     }
@@ -152,6 +191,8 @@ impl<P: Plan> Stepper<P> {
 #[derive(Serialize, Deserialize)]
 struct SavedStep<T> {
     program: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    act: Option<Drafted>,
     why: Option<String>,
     then: Option<T>,
     redo: bool,
@@ -162,6 +203,7 @@ struct SavedStep<T> {
 fn save_step<T: Clone>(s: &Step<T>) -> SavedStep<T> {
     SavedStep {
         program: program_text(&s.program()),
+        act: s.act.as_deref().cloned(),
         why: s.why.clone(),
         then: s.then.clone(),
         redo: s.redo,
@@ -175,7 +217,7 @@ fn load_step<T>(s: SavedStep<T>) -> Result<Step<T>, String> {
         Program::Lines(l) => l,
         Program::None(_) => vec![],
     };
-    Ok(Step { lines, why: s.why, then: s.then, redo: s.redo, planned: s.planned, lapses_at: s.lapses_at })
+    Ok(Step { lines, act: s.act.map(Box::new), why: s.why, then: s.then, redo: s.redo, planned: s.planned, lapses_at: s.lapses_at })
 }
 
 #[derive(Serialize, Deserialize)]
@@ -274,14 +316,14 @@ impl<P: Plan> Actor for Stepper<P> {
                     self.todo = more;
                 }
             }
-            let mut fresh: Vec<_> = self.plan.plan(pic, cx).into_iter().filter(|s| !s.lines.is_empty()).collect();
+            let mut fresh: Vec<_> = self.plan.plan(pic, cx).into_iter().filter(|s| !s.is_empty()).collect();
             for s in &mut fresh {
                 s.planned.get_or_insert(pic.t);
             }
             self.todo.extend(fresh);
             self.planned_at = pic.t;
         }
-        follow.retain(|s| !s.lines.is_empty());
+        follow.retain(|s| !s.is_empty());
         follow.append(&mut self.todo);
         self.todo = follow;
         let mut next = if self.todo.is_empty() { None } else { Some(self.todo.remove(0)) };
@@ -300,7 +342,7 @@ impl<P: Plan> Actor for Stepper<P> {
         if next.redo && next.planned.is_some_and(|p| p != pic.t) {
             next = self.plan.redo(next, pic.t);
         }
-        let action = Action::Call { program: next.program(), reasoning: next.why.clone() };
+        let action = next.action(cx);
         self.last = Some(next.clone());
         self.returned = Some(next);
         self.last_at = pic.t;

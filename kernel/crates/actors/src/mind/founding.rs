@@ -645,6 +645,75 @@ pub fn accept_membership(me: &str, o: &MembershipBounds, blocks: &[Block]) -> Re
         "offer": membership_offer(me, dues as i64, o.account.as_deref(), o.notice, None) })])
 }
 
+// ------------------------------------------------------------------------------- words through the translator
+
+/// The question that sends one part of a founder's words to the translator (`words`): the plain request, as a seat's
+/// would be (docs/behaviour/founding.md, "Through the translator"). The host drafts it as run.ts `wordsFor` does, and
+/// answers with the draft (`blocks`, its `check`, its `provenance`), or `ok: false` and why. `attempt` 2: the first
+/// draft was not what was meant and a trained translator wrote it, so the host's arrangement sends it behind.
+pub fn words_question(about: &str, what: &str, idea: &str, text: &str, attempt: u8) -> crate::Question {
+    let mut body = json!({ "what": what, "idea": idea, "text": text });
+    if attempt > 1 {
+        body["attempt"] = json!(attempt);
+    }
+    crate::Question { kind: "words".into(), about: about.to_string(), body }
+}
+
+/// What an answer to a `words` question came to, held to what the module says the draft may be.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Came {
+    /// What may be done: the accepted acts, to be sent as they are (their report goes with them).
+    Accepted(crate::steps::Drafted),
+    /// Not done: no draft, or not what was meant (reported now; the module's other way follows).
+    NotDone(crate::Worded),
+    /// Not what was meant, and to be put once more (reported now; ask again with attempt 2).
+    Again(crate::Worded),
+}
+
+/// An answer to a `words` question (run.ts `wordsFor`, its half after the draft): a draft the kernel would refuse is not
+/// what was meant; otherwise the module's `accept` says what it may be. `Null` (no translator to be had) is not done.
+pub fn words_came(about: &str, what: &str, idea: &str, body: &Value, accept: impl FnOnce(&[Block]) -> Result<Vec<Value>, String>) -> Came {
+    let s = |k: &str| body.get(k).and_then(Value::as_str).map(String::from);
+    let mut w = crate::Worded { about: about.into(), what: what.into(), idea: Some(idea.to_string()).filter(|i| !i.is_empty()), draft: s("draft"), by: s("by"), ..Default::default() };
+    if body.get("ok").and_then(Value::as_bool) != Some(true) {
+        w.why = Some(s("why").unwrap_or_else(|| "The translator did not answer.".into()));
+        return Came::NotDone(w);
+    }
+    w.draft_hash = s("draft_hash");
+    let drafted = body.get("blocks").cloned().unwrap_or(json!([]));
+    let blocks: Result<Vec<Block>, _> = serde_json::from_value(drafted.clone());
+    let accepted = if body.pointer("/check/ok").and_then(Value::as_bool) == Some(false) {
+        Err(format!("the acts would be refused ({})", body.pointer("/check/refusal").and_then(Value::as_str).unwrap_or("refused")))
+    } else {
+        match &blocks {
+            Ok(b) => accept(b),
+            Err(e) => Err(format!("a draft whose acts could not be read ({e})")),
+        }
+    }
+    // (What it accepts is sent as blocks: each must read as one.)
+    .and_then(|acc| match acc.iter().map(|b| serde_json::from_value::<Block>(b.clone())).collect::<Result<Vec<_>, _>>() {
+        Ok(_) => Ok(acc),
+        Err(e) => Err(format!("acts that could not be written ({e})")),
+    });
+    match accepted {
+        Ok(acc) => {
+            w.accepted = Some(true);
+            w.plumbing_added = Value::Array(acc.clone()) != drafted;
+            Came::Accepted(crate::steps::Drafted { blocks: acc, provenance: body.get("provenance").cloned().unwrap_or(Value::Null), worded: w })
+        }
+        Err(why) => {
+            w.accepted = Some(false);
+            w.why = Some(why);
+            if body.get("again").and_then(Value::as_bool) == Some(true) {
+                w.again = true;
+                Came::Again(w)
+            } else {
+                Came::NotDone(w)
+            }
+        }
+    }
+}
+
 /// The offer of membership as the contract's typed vocabulary has it (blocks: Offer): joining, with dues if any. `draws`:
 /// what a fund pays a member who is short, cents.
 pub fn membership_offer(me: &str, dues: i64, account: Option<&str>, notice: i64, draws: Option<i64>) -> Value {
