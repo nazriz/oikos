@@ -831,7 +831,9 @@ impl Person {
     fn looks(&mut self, pic: &Picture, cx: &mut Cx) -> Option<Vec<LookRequest>> {
         let t = pic.t;
         let register = self.register_looks(t);
-        let acc = crate::common::money::own_banked(pic, &self.me)?;
+        // (Not yet banked: nothing to search the market with, but papers about land of ours are still read up on first,
+        // so a plan is never made not knowing a home we own: citizen.ts `wake` takes `register` whatever `acc` is.)
+        let Some(acc) = crate::common::money::own_banked(pic, &self.me) else { return (!register.is_empty()).then_some(register) };
         let budget = self.home_budget(acc.balance, t);
         let need_home = self.need_home(t);
         let wants_work = self.s.job.is_none() && self.s.own_work.is_none() && !self.s.retired && self.p.in_labour_force;

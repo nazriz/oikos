@@ -397,6 +397,9 @@ impl Person {
             let repay = self.mortgage_for(&space).map_or(0, |l| self.repayment(&l));
             self.s.home = Some(Home { agreement: title, space, structure: st.structure.clone(), landlord: self.me.clone(), rent: repay, moved_in: true, owned: true, ..Default::default() });
             self.s.living_at = None;
+            // (A home of our own ends being without one. The lot it stands on is asked of the register, which takes its time to
+            // answer, so at the first plan we may have marked ourselves homeless in the home we own.)
+            self.s.homeless_since = None;
             return;
         }
     }
@@ -1841,6 +1844,25 @@ impl Person {
         Some((st.structure.clone(), st.structure_type.clone(), st.spaces.iter().find(|sp| sp.kind == "dwelling").map(|sp| sp.space.clone())))
     }
     /// Put a lot of ours with a house on it up for sale, at its valuation.
+    /// The lot of the home we own and live in (citizen.ts `ownLot`).
+    pub fn own_lot(&self) -> Option<String> {
+        self.s.home.as_ref().filter(|h| h.owned).and_then(|h| match &self.book.get(&h.agreement)?.body {
+            RecordBody::Claim { about, .. } => about.get("object").and_then(Value::as_str).map(String::from),
+            _ => None,
+        })
+    }
+    /// Whether we are selling our home.
+    pub fn is_selling(&self) -> bool {
+        self.housing.selling.is_some()
+    }
+    /// An owner who would leave town puts the home up for sale to go once it is sold (citizen.ts, in `leaving`).
+    pub fn sell_to_leave(&mut self, pic: &oikos_sight::Picture) {
+        if self.p.market.is_some() && self.housing.selling.is_none() {
+            if let Some(lot) = self.own_lot() {
+                self.sell(pic, &lot, true);
+            }
+        }
+    }
     fn sell(&mut self, pic: &oikos_sight::Picture, lot: &str, leave_after: bool) -> bool {
         let Some((structure, ty, Some(space))) = self.house_on(pic, lot) else { return false };
         let Some(price) = self.valuation_of(lot) else { return false };
@@ -1874,10 +1896,7 @@ impl Person {
             return;
         }
         // Our mortgage in default: the home sold before the bank takes it (we rent after).
-        let own_lot = self.s.home.as_ref().filter(|h| h.owned).and_then(|h| match &self.book.get(&h.agreement)?.body {
-            RecordBody::Claim { about, .. } => about.get("object").and_then(Value::as_str).map(String::from),
-            _ => None,
-        });
+        let own_lot = self.own_lot();
         let our_loan = self.s.home.as_ref().filter(|h| h.owned).and_then(|h| self.mortgage_for(&h.space));
         if self.housing.selling.is_none() {
             if let (Some(loan), Some(lot)) = (&our_loan, &own_lot) {

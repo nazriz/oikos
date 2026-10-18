@@ -491,7 +491,11 @@ impl Person {
         let jobless_long = self.s.jobless_since.is_some_and(|j| t - j >= jobless_days * DAY) && self.earned_income(t) + household_pay == 0 && broke;
         let would_leave = self.is_leaseholder() && (homeless_long || jobless_long);
         // (An owner who'd leave sells first, and goes once it's sold: housing's sale, docs/behaviour/ownership.md.)
-        if !would_leave || self.s.home.as_ref().is_some_and(|h| h.owned) {
+        let owned = self.s.home.as_ref().is_some_and(|h| h.owned);
+        if would_leave && owned {
+            self.sell_to_leave(w.pic);
+        }
+        if !would_leave || owned || self.is_selling() {
             return false;
         }
         let why = match (homeless_long, self.s.homeless_since, self.s.jobless_since) {

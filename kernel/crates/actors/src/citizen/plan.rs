@@ -105,6 +105,10 @@ impl Person {
             w.push(s);
         }
         self.s.mind_wake_at = planned.wake_at;
+        // (Without a job or a business of our own we are out of work from now, if not already: citizen.ts, at the end of the wants.)
+        if self.s.job.is_none() && self.s.own_work.is_none() && self.s.jobless_since.is_none() {
+            self.s.jobless_since = Some(t);
+        }
         for c in planned.chosen {
             self.carry_out(w, &c.opening.intent, Some(&c.why));
         }

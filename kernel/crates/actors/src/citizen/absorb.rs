@@ -45,16 +45,6 @@ pub struct BinSeen {
     pub view: Option<VariableView>,
 }
 
-/// Money for a home we are selling, paid by the buyer of one of our listings (housing's selling counts it).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SaleReceipt {
-    /// The purchase paper, its buyer, the account it came from, and how much.
-    pub purchase: String,
-    pub buyer: Option<String>,
-    pub account: String,
-    pub amount: i64,
-}
-
 /// This part's own memory: what absorb took in for the parts that act on it (each field says whose it is).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Absorbed {
@@ -82,9 +72,6 @@ pub struct Absorbed {
     /// The listings of homes for sale, as the last look at the board answered, and when (housing).
     pub on_sale: Option<Vec<String>>,
     pub sale_seen_at: i64,
-    /// Money paid us for a home we are selling (housing drains it); purchase loans of ours whose principal came in.
-    pub sale_receipts: Vec<SaleReceipt>,
-    pub funded_loans: BTreeSet<String>,
     /// A household member told us of a death at home (person, space) (lifecycle drains it).
     pub told_dead: Vec<(String, String)>,
     /// A lease on a home we found under water (housing ends it).
@@ -510,25 +497,13 @@ impl Person {
         let law = income_tax_law(&self.book);
         let dial = friction_dial(w.cx);
         let work_days = self.p.round.map_or(5, |r| r.work_days);
-        // Our own listings of a home for sale, and the purchases that answer them.
-        let listings: BTreeSet<String> = self.book.all("property_for_sale").filter(|r| r.speaks_for.as_deref() == Some(me.as_str())).map(|r| r.id.clone()).collect();
         for tx in pic.transactions() {
             if !mine.contains(tx.to.as_str()) || mine.contains(tx.from.as_str()) {
                 continue;
             }
             let amount = crate::common::cents(tx.amount);
-            if !listings.is_empty() {
-                let sale = self
-                    .book
-                    .open("property_purchase")
-                    .find(|r| bases_of(r).iter().any(|b| listings.contains(b)) && data(r).s("account") == Some(tx.from.as_str()));
-                if let Some(s) = sale {
-                    self.absorbed.sale_receipts.push(SaleReceipt { purchase: s.id.clone(), buyer: s.speaks_for.clone(), account: tx.from.clone(), amount });
-                    continue;
-                }
-            }
-            if let Some(loan) = tx.settles.as_ref().filter(|l| self.book.get(l).is_some_and(|r| terms_text(r).contains("their home, "))) {
-                self.absorbed.funded_loans.insert(loan.clone());
+            // A home's price paid us for one we're selling, or the principal of the loan for one we're buying, is the home's.
+            if self.home_money_in(&tx.from, amount, tx.settles.as_deref()) {
                 continue;
             }
             self.s.inflows.push((tx.t, amount));
