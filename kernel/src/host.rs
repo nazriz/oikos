@@ -358,12 +358,12 @@ impl Detached {
         // on as its parent's would.)
         let saved = &spec["saved"];
         if saved.is_object() {
-            let actor = kind.restore(&ctx, saved["actor"].clone())?;
+            let actor = oikos_actors::offices::books::restore(kind, &ctx, saved["actor"].clone())?;
             let draws = serde_json::from_value(saved["draws"].clone()).map_err(|e| format!("saved draws: {e}"))?;
             let view = serde_json::from_value(saved["view"].clone()).map_err(|e| format!("saved view: {e}"))?;
             return Ok(Detached { kind, actor, draws, ctx, view, seed, capacity: Some(capacity) });
         }
-        let actor = kind.create(&ctx)?;
+        let actor = oikos_actors::offices::books::create(kind, &ctx)?;
         Ok(Detached { kind, actor, draws: Draws::new(&participant, &capacity), ctx, view: View::default(), seed, capacity: Some(capacity) })
     }
 

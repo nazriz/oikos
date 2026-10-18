@@ -698,8 +698,7 @@ impl<W: Write> Engine<W> {
             params: params.as_object().cloned().unwrap_or_default(),
             world: self.world.clone(),
         };
-        let actor = kind
-            .create(&ctx)
+        let actor = oikos_actors::offices::books::create(kind, &ctx)
             .map_err(|e| format!("participant {pid}{}: {e}", if cap == "self" { String::new() } else { format!(" (as {cap})") }))?;
         let key = format!("{pid}|{cap}");
         let cadence = ceil_to(kind.cadence(&ctx), self.tick);

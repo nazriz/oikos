@@ -369,7 +369,12 @@ pub fn say(kind: &str, words: &str, o: Say) -> Call {
         ("on", o.on.as_deref().map(arg)),
     ];
     for (k, v) in o.extra {
-        args.push((k, Some(json(v))));
+        // (A law's formal condition is text, as common.ts `say` writes it (`C.text`): as JSON the resolver asks for it to
+        // be written out, and a council's amended law was never published, 2026-10-18.)
+        match (k, v) {
+            ("formal", Value::String(f)) => args.push((k, Some(text(f)))),
+            (k, v) => args.push((k, Some(json(v)))),
+        }
     }
     call("statement", args)
 }

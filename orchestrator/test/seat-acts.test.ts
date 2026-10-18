@@ -112,7 +112,13 @@ test("a landlord, the tribunal's member and its registrar in seats take a tenanc
   const order = recs.find((r) => r.kind === "tribunal_order" && r.data?.application === app.id);
   expect(order.author).toBe("tribunal-member-system");
   expect(order.data).toMatchObject({ finding: "possession", against: tenant, applicant: landlord, about: alone.id });
-  expect(Math.round((order.data.due - order.at) / DAY)).toBe(14);
+  // (Fourteen days from the hearing, where the member decides. The seat files the order at its next sitting: the same
+  // moment where the hearing falls in its office hours, as in the TS world's draws; on the Rust world's (2026-10-18) it
+  // fell on a day the seat was not at its desk, and the order dated at the hearing was filed two days later, giving 12
+  // days from its filing. What the law asks of the order is the fourteen days from the hearing.)
+  expect(order.data.due - listed.data.hearing_at).toBe(14 * DAY);
+  expect(order.at).toBeGreaterThanOrEqual(listed.data.hearing_at);
+  expect(order.at - listed.data.hearing_at).toBeLessThan(7 * DAY);
   const request = recs.find((r) => r.kind === "warrant_request" && r.data?.order === order.id);
   expect(request.at).toBeGreaterThan(order.data.due);
   const warrant = recs.find((r) => r.kind === "warrant" && r.data?.order === order.id);

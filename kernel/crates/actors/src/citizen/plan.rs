@@ -64,6 +64,12 @@ impl Person {
         self.answers(w);
         self.opening_caseload(w);
         self.rent_rise(w);
+        // Out of work (no job, no work of our own), since this wake if not before: as TS's plan says at each wake
+        // (citizen.ts, "joblessSince === null"); the Rust port set it only when a job ended, so someone who had none
+        // when the year began was never out of work since any day (tenant-answers.test.ts).
+        if self.s.job.is_none() && self.s.own_work.is_none() && self.s.jobless_since.is_none() {
+            self.s.jobless_since = Some(t);
+        }
         self.possession(w);
         self.ordered_to_pay_rent(w);
         self.hours_asked(w);

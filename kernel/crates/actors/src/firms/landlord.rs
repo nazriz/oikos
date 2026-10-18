@@ -1393,7 +1393,8 @@ impl Office {
                     steps.push(step(
                         format!("{tenant} is {} behind with the rent: writing to ask for it.", e.usd(behind)),
                         vec![say(
-                            "request",
+                            // (A request to put something right, as TS's `PAPER.request`: the rent_reminder form's own kind.)
+                            "review_request",
                             &format!("Request: the rent for your home is {} in arrears. Please pay it.", e.usd(behind)),
                             Say {
                                 to: Some(vec![tenant.clone()]),
