@@ -14,12 +14,10 @@
 //! - **A new clerk carries on from the last paper on the organisation's file** (bug hunt 2026-10-17): what stood open
 //!   at that paper, and what has left the list since, is said; the clerk never starts from an empty memory.
 //! - Dates are written through `when_words`; the key that says nothing has changed is the JSON of the open list.
-//! - **Seam (integration must decide):** the clerk reads each office's books through the `OfficeBooks` trait, one
-//!   reader for each module that keeps books (`books_of`). Those readers are the seat-side `openbooks*`, `daybook`,
-//!   `roster`, `tally`, `diary` modules, which the port plan leaves in TypeScript; a Rust clerk cannot call them. None
-//!   is registered here, so `office.clerk` refuses to start for a module with no reader, as the TS did. Porting the
-//!   readers (about 1,800 lines) to implement `OfficeBooks`, or running the clerk for seats on the host side, is the
-//!   integration step's call (see the decisions entry).
+//! - **The readers** (`OfficeBooks`, one for each module that keeps books, chosen by `books_of`) are ported from the
+//!   seat-side `openbooks*.ts` as `openbooks`, `openbooks_town` and `openbooks_venues`: integers, ordered collections,
+//!   the same papers out. (`daybook`, `roster`, `tally` and `diary` are not readers: they are what a seat is shown of
+//!   an office's file, and stay TS.) A module with no reader still cannot have a clerk.
 
 use super::spread;
 use crate::common::{data, when_words, Book, DAY};
@@ -71,18 +69,47 @@ pub struct OpenHeading {
     pub always: bool,
 }
 
-/// An office's books as a clerk keeps them: fed what the office is shown, and asked what stands open now.
+impl OpenItem {
+    /// An item with an id and its line; the rest is added with the methods below.
+    pub fn new(id: impl Into<String>, line: String) -> Self {
+        OpenItem { id: id.into(), line, since: None, amount: None, due: None, running: false }
+    }
+    pub fn since(mut self, v: i64) -> Self {
+        self.since = Some(v);
+        self
+    }
+    pub fn amount(mut self, v: Option<i64>) -> Self {
+        self.amount = v;
+        self
+    }
+    pub fn due(mut self, v: Option<i64>) -> Self {
+        self.due = v;
+        self
+    }
+    pub fn running(mut self) -> Self {
+        self.running = true;
+        self
+    }
+}
+
+/// An office's books as a clerk keeps them: fed what the office is shown, and asked what stands open now (`world`:
+/// how the place writes a date and its money).
 pub trait OfficeBooks: Send {
     fn absorb(&mut self, pic: &Picture);
-    fn open(&self, t: i64) -> Vec<OpenHeading>;
+    fn open(&self, t: i64, world: &crate::WorldInfo) -> Vec<OpenHeading>;
     fn save(&self) -> Result<Value, String>;
     fn restore(&mut self, saved: &Value) -> Result<(), String>;
 }
 
-/// The reader of the books of a module's office, by the module's name (`of`). None are registered yet: see the module
-/// doc.
-pub fn books_of(_of: &str, _office: &str, _params: &serde_json::Map<String, Value>) -> Option<Box<dyn OfficeBooks>> {
-    None
+/// The reader of the books of a module's office, by the module's name (`of`): `me` is the organisation the office is
+/// of, `office` its id, `params` the module's own parameters (`with`). The readers are `openbooks` (the letting office
+/// and the support office), `openbooks_town` (the town hall's offices) and `openbooks_venues` (the offices that hear
+/// and decide, a union's organiser, a lender's office): each a restatement of what the module's code works out for
+/// itself, read from the same papers (participants/src/behaviour/openbooks*.ts).
+pub fn books_of(of: &str, me: &str, office: &str, params: &serde_json::Map<String, Value>) -> Option<Box<dyn OfficeBooks>> {
+    super::openbooks::reader(of, me, office, params)
+        .or_else(|| super::openbooks_town::reader(of, me, office, params))
+        .or_else(|| super::openbooks_venues::reader(of, me, office, params))
 }
 
 /// What stood open at the last paper: heading -> (id -> line).
@@ -299,7 +326,7 @@ impl Actor for ClerkActor {
     fn step(&mut self, pic: &Picture, cx: &mut Cx) -> Action {
         self.keeping.book.absorb(pic);
         self.books.absorb(pic);
-        let open = self.books.open(pic.t);
+        let open = self.books.open(pic.t, &cx.ctx.world);
         match self.keeping.due(open, pic.t, &cx.ctx.world) {
             Some(s) => Action::Call { program: s.program(), reasoning: s.why },
             None => Action::Wait { until: None },
@@ -340,14 +367,14 @@ impl Kind for Clerk {
         let of: String = ctx.param("of", String::new())?;
         let with: serde_json::Map<String, Value> = ctx.param("with", Default::default())?;
         let office = office_of(ctx.position.as_deref());
-        let books = books_of(&of, &office, &with).ok_or_else(|| format!("office.clerk: no module \"{of}\" that keeps books"))?;
+        let books = books_of(&of, &ctx.entity, &office, &with).ok_or_else(|| format!("office.clerk: no module \"{of}\" that keeps books"))?;
         Ok(Box::new(ClerkActor { keeping: Keeping::new(&ctx.entity, &office), books }))
     }
     fn restore(&self, ctx: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
         let of: String = ctx.param("of", String::new())?;
         let with: serde_json::Map<String, Value> = ctx.param("with", Default::default())?;
         let office = office_of(ctx.position.as_deref());
-        let mut books = books_of(&of, &office, &with).ok_or_else(|| format!("office.clerk: no module \"{of}\" that keeps books"))?;
+        let mut books = books_of(&of, &ctx.entity, &office, &with).ok_or_else(|| format!("office.clerk: no module \"{of}\" that keeps books"))?;
         books.restore(saved.get("books").unwrap_or(&Value::Null))?;
         let keeping: Keeping = serde_json::from_value(saved.get("keeping").cloned().unwrap_or(Value::Null)).map_err(|e| e.to_string())?;
         Ok(Box::new(ClerkActor { keeping, books }))
@@ -408,7 +435,7 @@ mod tests {
 
     #[test]
     fn an_office_with_no_reader_of_its_books_cannot_have_a_clerk() {
-        let ctx = Ctx { participant: "p".into(), performer: Default::default(), entity: "o".into(), position: Some("works-staff".into()), params: json!({ "of": "city.works" }).as_object().unwrap().clone(), world: Default::default() };
+        let ctx = Ctx { participant: "p".into(), performer: Default::default(), entity: "o".into(), position: Some("works-staff".into()), params: json!({ "of": "city.registry" }).as_object().unwrap().clone(), world: Default::default() };
         assert!(Clerk.create(&ctx).is_err());
     }
 
