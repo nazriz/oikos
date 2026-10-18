@@ -1356,6 +1356,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       }
       // (On the Rust world the engine's actors put their questions to models (the sparse mind, the composer, the reading
       // desk) through the host, which answers those it has the model for, by their next wake: kernel/src/protocol.rs.)
+      // (The engine's own events come first, in an `advanced` reply: they are taken in before its questions are answered,
+      // so a decision recorded in the moment is on the reading desk's file when its addressee's question is answered.)
+      if (rustWorld && due.advanced !== undefined) { t = due.advanced; await absorb(due); }
       if (rustWorld && (consult || composer || desk) && !due.end) {
         t = due.t ?? due.advanced ?? t; // (the moment they were asked at: a composer's month is counted from it)
         await answerQuestions();
@@ -1363,7 +1366,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       if (due.end) break;
       if (due.advanced !== undefined) {
         t = due.advanced;
-        await absorb(due); // (the advance's events: who's come or gone while time passed)
+        if (!rustWorld) await absorb(due); // (the advance's events: who's come or gone while time passed)
         // (On the Rust world the engine's own actors are not observed here: a test's inspector is called once a day
         // instead, with the moment and the kernel, so what it asks of the live engine it still can.)
         if (rustWorld && o.inspect) await o.inspect("", { t } as any, k, undefined, undefined as any);

@@ -12,6 +12,7 @@ import { MockAdapter, type LlmRequest } from "@oikos/participants/llm";
 import { generate, rentIncreaseLaw } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 import { officeAt, officesBy } from "./lib/offices";
+import { publishRentsBoard } from "./lib/rents-board";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -38,6 +39,11 @@ async function amendment(name: string, leaning: number) {
   for (const x of config.participants) challenging(x.controller);
   for (const t of config.templates) challenging(t.controller);
   for (const pos of config.positions) if (/^landlord-[2-9]-office$/.test(pos.id)) pos.channels = pos.channels.filter((c: any) => c.id !== "laws");
+  // (The market has moved: a rents board 10% over each kind's dearest rent. On the Rust world a landlord raises a rent
+  // only towards what comparable homes let for, and a generated town lets none for months, so without it landlord-1
+  // gave no increase at all in 100 days and what the amended law binds was never tested: lib/rents-board.ts. The TS
+  // landlord ignores the board. 2026-10-18, port step 3.)
+  publishRentsBoard(config, 1_000);
   let calls = 0, asked = false;
   const seen: string[] = [];
   const tool = (tool: string, input: object) => [{ type: "tool_use" as const, id: `t${++calls}`, name: tool, input }];

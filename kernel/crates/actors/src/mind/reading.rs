@@ -718,6 +718,20 @@ pub fn reading_question(paper_id: &str, standing: Standing) -> crate::Question {
     crate::Question { kind: READING_KIND.into(), about: paper_id.into(), body: json!({ "paper": paper_id, "standing": standing.name() }) }
 }
 
+/// The reading questions a paper raises as it is recorded, where the world's reading dial is on (`dials` is the
+/// world's `dials`): one for each person a decision is addressed to, asked on their behalf and put to the host with
+/// the moment's other questions. TS's desk reads a seat's worded decision as it is recorded and the addressee looks
+/// it up (`ctx.read`) when the paper lands; here the engine asks for the addressee then, the host's desk answers from
+/// what it filed (`null` where nothing was: code's papers, or no words of their own), and the answer is in the
+/// addressee's next wake, the first that can see the paper. Nobody waits and nobody wakes for it, so with a reader
+/// that shifts nothing the world is the world with the dial off. Empty for anything else.
+pub fn questions_on_record(dials: &serde_json::Value, id: &str, kind: &str, addressed_to: &[String]) -> Vec<(String, crate::Question)> {
+    if !DECISION_KINDS.contains(&kind) || !matches!(reading_dial(&json!({ "dials": dials })), Ok(Some(_))) {
+        return vec![];
+    }
+    addressed_to.iter().map(|a| (a.clone(), reading_question(id, Standing::Addressee))).collect()
+}
+
 /// The reading in an answer to `reading_question`: `None` for another kind of answer, for no answer (a `Null` body:
 /// the paper was not read) or for a body that is not a whole `PaperRead`. A read whose shift `is_no_shift` is for
 /// the caller to ignore (as TS's `readOf`).
@@ -994,5 +1008,20 @@ mod tests {
         let d = reading_dial(&json!({ "dials": { "reading": { "reader": "m" } } })).unwrap().unwrap();
         let d2: ReadingDial = serde_json::from_value(serde_json::to_value(&d).unwrap()).unwrap();
         assert_eq!(d, d2);
+    }
+
+    #[test]
+    fn a_decision_recorded_raises_a_question_for_each_addressee_only_where_the_dial_is_on() {
+        let on = json!({ "reading": { "reader": "mock" } });
+        let to = vec!["par.1|self".to_string(), "c0002-self|self".to_string()];
+        let qs = questions_on_record(&on, "rec.9", "loan_decision", &to);
+        assert_eq!(qs.len(), 2);
+        assert_eq!(qs[0].0, "par.1|self");
+        assert_eq!(qs[1].1, reading_question("rec.9", Standing::Addressee));
+        // (Not a decision, the dial off, or a dial the run would refuse: nothing asked.)
+        assert!(questions_on_record(&on, "rec.9", "benefit_claim", &to).is_empty());
+        assert!(questions_on_record(&json!({}), "rec.9", "loan_decision", &to).is_empty());
+        assert!(questions_on_record(&serde_json::Value::Null, "rec.9", "loan_decision", &to).is_empty());
+        assert!(questions_on_record(&json!({ "reading": { "reader": "mock", "step": { "refusal": { "floor_milli": 0 } } } }), "rec.9", "loan_decision", &to).is_empty());
     }
 }

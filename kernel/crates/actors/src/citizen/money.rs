@@ -736,7 +736,9 @@ impl Person {
                     "other" => "civil_service",
                     k => k,
                 };
-                self.treated(w, Treated { who: by, kind: k.into(), good: a.granted, tried: true, paper: Some(r.id.clone()), ..Default::default() });
+                // (No paper: a claim's decision is not where its words land, as in citizen.ts and docs/behaviour/reading.md,
+                // whose sites are the five where a paper already lands. It made no outcome for a reading to go on.)
+                self.treated(w, Treated { who: by, kind: k.into(), good: a.granted, tried: true, ..Default::default() });
             }
             self.money.claiming.remove(&payment);
         }

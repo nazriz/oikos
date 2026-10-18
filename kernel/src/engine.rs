@@ -503,6 +503,26 @@ impl<W: Write> Engine<W> {
             self.for_host_any = true;
             self.for_host.extend(resp.events.iter().filter(|e| host_reads(&e.body)).cloned());
         }
+        // (Where the world reads seats' words, a decision recorded raises a reading question for each addressee, put
+        // to the host as the moment ends with the actors' own: oikos_actors::mind::reading::questions_on_record.)
+        if self.opts.host_seats && self.world.dials.get("reading").is_some_and(Value::is_object) {
+            for e in &resp.events {
+                if let crate::events::EventBody::Recorded { record } = &e.body {
+                    if let crate::blocks::RecordBody::Statement { kind, addressed_to: Some(to), .. } = &record.body {
+                        // (Addressed to a person: asked for whoever lives as them, in their own unit, `<participant>|self`.)
+                        let to: Vec<String> = self
+                            .parts
+                            .iter()
+                            .filter(|(_, p)| !p.ended && !p.shares_body && p.person.as_ref().is_some_and(|e| to.contains(e)))
+                            .map(|(pid, _)| format!("{pid}|self"))
+                            .filter(|k| self.units.contains_key(k))
+                            .collect();
+                        let qs = oikos_actors::mind::reading::questions_on_record(&self.world.dials, &record.id, kind, &to);
+                        self.questions.extend(qs);
+                    }
+                }
+            }
+        }
         Ok((resp, seen))
     }
 

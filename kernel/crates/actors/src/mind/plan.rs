@@ -1328,6 +1328,7 @@ impl CitizenMind {
             } else if !foretold {
                 self.s.refused_by.insert(host.clone());
             }
+            self.read_follows = true; // (the draw's outcome, below, names the paper)
             self.treated(cx, Treated { who: host.clone(), kind: String::new(), good: granted, weight_bps: Some(if granted || !foretold { 20_000 } else { 10_000 }), paper: Some(r.id.clone()), ..Default::default() });
             let facts = if granted { json!({ "with": host, "amount": jc(data.get("amount").unwrap_or(&Json::Null)) }) } else { json!({ "with": host, "why": why, "foretold": foretold }) };
             let mut o = Map::new();

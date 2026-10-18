@@ -516,6 +516,9 @@ pub struct State {
 pub struct CitizenMind {
     pub p: P,
     pub s: State,
+    /// For one `treated` only: the outcome its paper's reading goes on is recorded after it (and names the paper), not
+    /// before. Never saved: set and cleared within one call.
+    pub read_follows: bool,
 }
 
 // ------------------------------------------------------------------ making one
@@ -537,6 +540,7 @@ pub fn make(cx: &mut Cx, born: &Born) -> Result<Box<dyn Mind>, String> {
     let mut m = CitizenMind {
         s: State::new(mind, inner, wants, initiative, Ties::new(180, p.max_contacts + 3, people), &p, born.own_values.is_some()),
         p,
+        read_follows: false,
     };
     // (citizen.ts's order of draws: person, inner, initiative; culture's own; then threshold, petition-willing, reads-news.)
     if let Some(cd) = m.p.cdial.clone() {
@@ -573,7 +577,7 @@ pub fn restore(ctx: &Ctx, saved: Json) -> Result<Box<dyn Mind>, String> {
     let s: State = serde_json::from_value(saved).map_err(|e| format!("the citizen's mind: {e}"))?;
     let mut p = P::of(ctx);
     p.founding = founding_of(ctx, s.initiative);
-    Ok(Box::new(CitizenMind { p, s }))
+    Ok(Box::new(CitizenMind { p, s, read_follows: false }))
 }
 
 impl State {
@@ -1574,8 +1578,19 @@ impl Mind for CitizenMind {
             if bump != 0 {
                 self.s.recourse_bump.insert(tr.kind.clone(), bump);
             }
-            self.s.last_read = Some((r.paper.clone(), serde_json::to_value(reading::read_facts(r, moved)).unwrap_or(Json::Null)));
+            let read = serde_json::to_value(reading::read_facts(r, moved)).unwrap_or(Json::Null);
+            // (What the words did goes on the outcome just recorded, as citizen.ts `withRead` puts it on the last: a
+            // landing comes after the outcome it moved. Where the outcome comes after, it names the paper and takes it
+            // then (`outcome_rec`). Until 2026-10-18 every read waited for an outcome naming its paper, and only one
+            // site wrote one, so almost no outcome carried what the words did.)
+            match cx.outcomes.last_mut().and_then(Json::as_object_mut).filter(|o| !self.read_follows && !o.contains_key("read")) {
+                Some(o) => {
+                    o.insert("read".into(), read);
+                }
+                None => self.s.last_read = Some((r.paper.clone(), read)),
+            }
         }
+        self.read_follows = false;
     }
 
     fn event(&mut self, cx: &mut Cx, pic: &Picture, book: &Book, life: &Life, e: Event, ways: &dyn Openings) -> Heard {
