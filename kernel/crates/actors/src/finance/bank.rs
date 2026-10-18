@@ -307,9 +307,11 @@ impl Bank {
         if changed {
             self.read = Some(now_read);
         }
-        let all: Vec<Arc<Record>> = self.book.all("request").cloned().collect();
-        let fresh: Vec<Arc<Record>> = all.iter().skip(self.cursor).filter(|r| addressed_to(r).contains(&me)).cloned().collect();
-        self.cursor = all.len();
+        // (Only what has come since the last plan is read: the book's lists grow all run, and copying each whole at every
+        // plan made the bank's wakes cost more the longer the town had run.)
+        let requests = self.book.all("request").len();
+        let fresh: Vec<Arc<Record>> = self.book.all("request").skip(self.cursor).filter(|r| addressed_to(r).contains(&me)).cloned().collect();
+        self.cursor = requests;
         for r in &fresh {
             let every = data(r).get("every").and_then(Value::as_i64).is_some_and(|e| e > 0);
             if every && !data(r).get("payments").is_some_and(Value::is_array) && !self.ended.contains_key(&r.id) {
@@ -323,10 +325,10 @@ impl Bank {
         // on only from whoever may instruct on the account; the rest are answered, and what they named stands.
         let mut just_ended: Vec<String> = vec![];
         let mut lifts: Vec<(Arc<Record>, Arc<Record>, Vec<String>)> = vec![];
-        let withdrawals: Vec<Arc<Record>> = self.book.of_type("withdrawal").cloned().collect();
+        let withdrawals = self.book.of_type("withdrawal").len();
         let mut to_place: Vec<Arc<Record>> = std::mem::take(&mut self.unplaced).iter().filter_map(|id| self.book.get(id).cloned()).collect();
-        to_place.extend(withdrawals.iter().skip(self.withdrawal_cursor).cloned());
-        self.withdrawal_cursor = withdrawals.len();
+        to_place.extend(self.book.of_type("withdrawal").skip(self.withdrawal_cursor).cloned());
+        self.withdrawal_cursor = withdrawals;
         for w in to_place {
             let RecordBody::Withdrawal { withdraws, .. } = &w.body else { continue };
             let Some(target) = self.book.get(withdraws).cloned() else {
@@ -391,8 +393,9 @@ impl Bank {
         // Holds that have arrived since the last plan. One counts for a standing order the bank has from whoever may
         // instruct on the account it pays from (the same check as for any instruction); for anything else the writer is
         // told, in one sentence that says nothing of anyone else's instructions. Either way it is answered, once.
-        let holds: Vec<Arc<Record>> = self.book.all("hold").cloned().collect();
-        for h in holds.iter().skip(self.hold_cursor) {
+        let holds_seen = self.book.all("hold").len();
+        let holds: Vec<Arc<Record>> = self.book.all("hold").skip(self.hold_cursor).cloned().collect();
+        for h in holds.iter() {
             if !addressed_to(h).contains(&me) {
                 continue;
             }
@@ -435,7 +438,7 @@ impl Bank {
             let to = self.to_whom(h, &me);
             self.hold_notes.push(Note::new(to, said.join(" "), Some(&h.id)));
         }
-        self.hold_cursor = holds.len();
+        self.hold_cursor = holds_seen;
         // Holds withdrawn: a hold is lifted by whoever may instruct on the accounts its orders pay from, every one of them.
         // (The accounts as they were when the hold was taken: an order since ended is no longer looked at.)
         for (w, hold, to) in lifts {
