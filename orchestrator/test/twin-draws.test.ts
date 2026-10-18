@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { calls as C, modules as builtin, type BehaviourModule } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { onRust } from "./lib/doubles";
 import { officeAt, systemAt } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
@@ -28,6 +29,7 @@ const living = { ...spec, citizens: 300, profile: "ke-nakuru-2026", living: { in
 
 /** An office doing its job as its module does it, and filing besides, each time it has nothing else to do, an entry
  * on its organisation's own file: a paper of no effect on anyone, which takes a number in the world's file. */
+const SCRIBBLE = (t: string | number) => C.program(C.call("statement", { kind: "entry", visible: "own", text: C.text(`Nothing to enter at ${t}.`) }), C.call("statement", { kind: "entry", visible: "own", text: C.text("Nor here.") }));
 const scribbling = (inner: string): BehaviourModule => ({
   ...builtin[inner]!,
   name: `test.scribbling.${inner.replace(/\./g, "_")}`,
@@ -39,7 +41,7 @@ const scribbling = (inner: string): BehaviourModule => ({
         const a = office.step(obs, x) as any;
         if (a?.type !== "wait" || obs.t - last < DAY / 2) return a;
         last = obs.t;
-        return { type: "call" as const, call: C.program(C.call("statement", { kind: "entry", visible: "own", text: C.text(`Nothing to enter at ${obs.t}.`) }), C.call("statement", { kind: "entry", visible: "own", text: C.text("Nor here.") })) };
+        return { type: "call" as const, call: SCRIBBLE(obs.t) };
       },
     });
   },
@@ -69,9 +71,13 @@ async function town(name: string, more: object, scribe?: string, days = Number(p
     let modules: { [k: string]: BehaviourModule } | undefined;
     if (scribe) {
       const part = officeAt(config, scribe);
-      const wrapped = scribbling(part.impl);
-      part.run(wrapped.name);
-      modules = { [wrapped.name]: wrapped };
+      // (On the Rust world the same double wraps the office's own kind: kernel/crates/actors/src/testkinds.rs, `scribble`.)
+      if (onRust) part.run("test.scribbling", { ...part.params, inner: part.impl, scribble: { every: DAY / 2, call: SCRIBBLE("{t}") } });
+      else {
+        const wrapped = scribbling(part.impl);
+        part.run(wrapped.name);
+        modules = { [wrapped.name]: wrapped };
+      }
     }
     const draws = new Map<string, number>();
     const s = await runWorld({ config, runId: name, outDir: dir, until: days * DAY, logDetail: "lean", recordObservations: "none", drawTrace: (k: readonly string[]) => { const x = k.join("|"); draws.set(x, (draws.get(x) ?? 0) + 1); }, ...(modules ? { modules } : {}) } as any);
@@ -274,7 +280,9 @@ test("a year with one office in a mock seat that sits at other hours and files p
   const mDecided = matched(twin.decisions, mayor.decisions, (pid) => !pid.startsWith("mayor"));
   console.log(`twin moments, the mayor's seat: draws ${share(mDraws)}; decisions ${share(mDecided)}`);
   // (A year of this town with draws named for the hour: 34% of draws and 35% of decisions alike; now 79% and 45%.)
-  expect(mDraws.same / mDraws.all).toBeGreaterThan(0.65);
+  // (Not on the Rust world: the draw trace is the TS loop's, so there are no draws to set side by side; the rule is held by
+  // actors/src/draws.rs's own tests, as for the draw-trace test below.)
+  if (!onRust) expect(mDraws.same / mDraws.all).toBeGreaterThan(0.65);
   // (0.37 where it was 0.4, foundations F5: 39.9% now, 43.5% before. The mayor's seat is a person's time spent, so what the town does on other days
   // moves a little more; the floor stays above the 35% the hour-named draws gave.)
   expect(mDecided.same / mDecided.all).toBeGreaterThan(0.37);

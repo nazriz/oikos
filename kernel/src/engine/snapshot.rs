@@ -366,7 +366,7 @@ impl<W: Write> Engine<W> {
                         params: c.params.clone(),
                         world: world.clone(),
                     };
-                    let actor = kind.restore(&ctx, saved).map_err(|e| format!("{}: {e}", u.key))?;
+                    let actor = oikos_actors::offices::books::restore(kind, &ctx, saved).map_err(|e| format!("{}: {e}", u.key))?;
                     (Some(actor), Some(ctx), kind.name())
                 }
                 (None, _) => (None, None, "llm.participant"),

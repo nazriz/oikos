@@ -35,7 +35,7 @@ import { lexiconReader, READING_TABLE, Tagger, READING_VERSION, type Reader, typ
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
-import { DetachedActor, rustManifests } from "./rust-world";
+import { DetachedActor, joinRaw, RAW, rustManifests } from "./rust-world";
 import { divergences } from "./truth";
 import type { Watchdog } from "./watchdog";
 
@@ -360,7 +360,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // is made here. Until the cut-over a kind the engine lacks stands idle where OIKOS_STAND_IN (or `standIn`) says so.
   const rustWorld = process.env.OIKOS_WORLD === "rust";
   const standIn = o.standIn ?? process.env.OIKOS_STAND_IN;
-  await k.request({ op: "start", config: cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath,
+  // (On the Rust world the actors read the sparse mind's dial from the world, as they read the others: said there.)
+  await k.request({ op: "start", config: rustWorld && o.consult ? { ...cfg, dials: { ...(cfg.dials ?? {}), consult: true } } : cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath,
     ...(rustWorld ? { engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(o.recordDecisions === "none" ? { record_decisions: false } : {}), ...(o.recordObservations === "all" || o.recordObservations === "code" ? { record_observations: true } : Array.isArray(o.recordObservations) ? { record_observations: o.recordObservations } : {}) } } : {}) });
   if (o.perturb) await k.request({ op: "perturb", extra_wakes_bps: o.perturb.extraWakesBps, seed: o.perturb.seed });
 
@@ -649,7 +650,14 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         // post's channels by their paths, "<post>/<channel>", as the engine hands them: put back.)
         const cap = office?.id;
         const asPath = (x: any) => (cap && x?.channels ? { ...x, channels: Object.fromEntries(Object.entries(x.channels).map(([k, v]) => [k.includes("/") ? k : `${cap}/${k}`, v])) } : x);
-        const brainController = rustBrain ? ({ step: (x: any) => rustBrain.step(asPath(x), x.woke_for ?? "cadence", x.since ?? 0).action, sent: (a: string) => rustBrain.sent(a) } as unknown as Controller) : brainModule.create(bctx);
+        // (It is handed what the kernel sent (`RAW`), not the host's picture of it, and keeps its own view, as its code twin
+        // does; what it was shown on a turn it took no step at, it takes in with its next.)
+        let unstepped: any;
+        const kernelSent = (x: any) => asPath(x[RAW] ? { ...x[RAW], entity: x.entity } : x);
+        const brainController = rustBrain ? ({
+          step: (x: any) => { const seen = unstepped ? joinRaw(unstepped, kernelSent(x)) : kernelSent(x); unstepped = undefined; return rustBrain.step(seen, x.woke_for ?? "cadence", x.since ?? 0).action; },
+          seen: (x: any) => { unstepped = unstepped ? joinRaw(unstepped, kernelSent(x)) : kernelSent(x); },
+          sent: (a: string) => rustBrain.sent(a) } as unknown as Controller) : brainModule.create(bctx);
         // (A Rust brain is scheduled as the engine's unit of its kind is: its first wake and cadence are the Rust kind's.)
         const rustSchedule = rustBrain?.schedule();
         if (rustSchedule) brainFirstWake.set(p.id, rustSchedule.firstWake);
@@ -1011,6 +1019,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     // drafts' previews and law warnings.)
     if (u.llm || RESOLVER_MODE !== "engine") u.knowledge.absorb(raw);
     const obs: Observation = { ...u.view.apply(raw), woke_for: u.wokeFor, since: u.since };
+    // (What the kernel sent, kept beside the picture for a mock seat's brain run detached on the Rust world: rust-world.ts.)
+    if (u.llm && rustWorld) (obs as any)[RAW] = raw;
     // (A seat's roster of its own staff, and what a draft's preview may say of it: read from what it is shown.)
     u.llm?.tally?.absorb(obs);
     u.llm?.dayBook?.absorb(obs);
@@ -1304,6 +1314,23 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   let stoppedBy: string | undefined; // (the error's name)
   let lastPause = performance.now();
   let askedBy = 0; // (the Rust world: how far the engine was last asked to go before handing back)
+  /** The Rust world's actors' questions to models, answered as the TS world's modules have them answered through their
+   * context (`consult`, `compose`, `read`): the same services, the same bodies, by the asker's next wake. One the run has
+   * no model for, or of a kind not answered here, is answered with nothing, as an actor decides offline. */
+  const answerQuestions = async () => {
+    const { questions } = (await k.request({ op: "questions" })) as { questions: { key: string; kind: string; about: string; body: any }[] };
+    for (const q of questions) {
+      const subject = q.key.split("|")[0]!;
+      let body: unknown = null;
+      if (q.kind === "consult" && consult) {
+        const { participant: _p, ...asked } = q.body ?? {};
+        const ans = await consult(asked, subject).catch(() => undefined);
+        body = ans ? { scores: ans.scores } : null;
+      } else if (q.kind === "compose" && composer) body = (await composer(q.body, subject).catch(() => undefined)) ?? null;
+      else if (q.kind === "reading" && desk) body = desk.lookup(String(q.body?.paper ?? q.about), q.body?.standing) ?? null;
+      await k.request({ op: "answer", key: q.key, answers: [{ kind: q.kind, about: q.about, body }] });
+    }
+  };
   try {
     for (;;) {
       // (With the engine in this process nothing here waits on anything outside it, so a signal would go unheard until
@@ -1326,6 +1353,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       } catch (e) {
         if (e instanceof Error && /kept waking each other/.test(e.message)) throw new RunStuck(e.message);
         throw e;
+      }
+      // (On the Rust world the engine's actors put their questions to models (the sparse mind, the composer, the reading
+      // desk) through the host, which answers those it has the model for, by their next wake: kernel/src/protocol.rs.)
+      if (rustWorld && (consult || composer || desk) && !due.end) {
+        t = due.t ?? due.advanced ?? t; // (the moment they were asked at: a composer's month is counted from it)
+        await answerQuestions();
       }
       if (due.end) break;
       if (due.advanced !== undefined) {

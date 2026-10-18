@@ -19,6 +19,7 @@ import { exportDataset } from "../src/dataset";
 import { recordChanges, Records } from "../src/records";
 import { recordedCalls, Serving } from "../src/resume";
 import { runWorld } from "../src/run";
+import { onRust } from "./lib/doubles";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -140,7 +141,9 @@ test("founding in code: with the composer off no model is called; a founded thin
     // (Why a hop and not a fault, 2026-10-16: two who share the want that founds is one town in eight or fewer before foundations F5 (only seed 6 of 1 to 8) and two of sixteen after (2 and 5); the rate is the same, only the seed moves. Seed 6, the original, has one who shares it on the foundations-review branch, and the test needs two.)
     // (Seed 3 from 2026-10-16, the profile source check, on the merged foundations review: the au-vic-2026 profile changed and in seed 2 nothing is founded in 205 days; of seeds 1 to 9 only 3 and 5 found something with two who share the want. Which seed has it is a matter of draws, not of the rule.)
     // (Seed 39 from 2026-10-17, adoption, the auditor and strikes by cost: the world differs again; of run seeds 1 to 45 only 22, 26, 34, 39, 42 and 43 had two who share the want that founds in 205 days before the shop's serving was held to the day (seed 22 then, 39 after). Which seed has two is a matter of draws, not of the rule.)
-    const s = await runWorld({ config: { ...config, seed: 39 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
+    // (On the Rust world, seed 15, 2026-10-18: of its seeds 1 to 24 only 15 has two who share the want behind the first thing founded. It founds
+    // four to sixteen things in these 205 days where the TS world founds about one: recorded in the decisions log, not yet traced.)
+    const s = await runWorld({ config: { ...config, seed: onRust ? 15 : 39 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
     expect(s.composer).toBeUndefined();
     const log = readFileSync(s.logPath, "utf8");
     // No model anywhere: not a usage entry, not a transcript.

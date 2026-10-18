@@ -1499,7 +1499,12 @@ impl CitizenMind {
         module["params"] = params;
         let channels = fill(&Json::Array(tpl.channels.clone()));
         let why = format!("{} others we know are in the same case ({}), and nothing answers it: starting something of our own ({}).", b.sharers.len(), b.want.about.replace('_', " "), b.shape);
-        out.steps.push(because(why, vec![call("entity", vec![("kind", Some(steps::arg(&tpl.kind))), ("name", Some(text(name.clone()))), ("position", Some(text(tpl.title.clone()))), ("channels", Some(jarg(channels))), ("role_module", Some(jarg(module)))])]));
+        // (Bound as `founded`, as citizen.ts wrote it: the world names what it made by that ref in the act's outcome, which
+        // is how the founder learns its id. Unbound, no founder ever learned it and nothing founded was ever recorded.)
+        let made = call("entity", vec![("kind", Some(steps::arg(&tpl.kind))), ("name", Some(text(name.clone()))), ("position", Some(text(tpl.title.clone()))), ("channels", Some(jarg(channels))), ("role_module", Some(jarg(module)))]);
+        let mut st = because(why, vec![]);
+        st.lines.push(oikos_sight::calls::Line { bind: Some("founded".into()), call: made });
+        out.steps.push(st);
         self.s.pending_group = true;
     }
 

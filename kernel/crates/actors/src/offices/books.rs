@@ -316,6 +316,71 @@ impl Keeping {
     }
 }
 
+/// A unit of a kind that keeps books, run as its office's staff (`part: "staff"`): the staff's clerk keeps them too, and
+/// files what has changed when the staff's own work for the wake is done (participants/src/index.ts `keepingBooks` and
+/// books.ts `booked`). Every place that makes or takes up an actor goes through `create` and `restore`, so the engine's
+/// unit, a detached brain and a snapshot's are the same.
+pub struct StaffClerk {
+    inner: Box<dyn Actor>,
+    keeping: Keeping,
+    books: Box<dyn OfficeBooks>,
+}
+
+fn staff_books(kind: &dyn Kind, ctx: &Ctx) -> Option<(String, Box<dyn OfficeBooks>)> {
+    if ctx.params.get("part").and_then(Value::as_str) != Some("staff") {
+        return None;
+    }
+    let office = office_of(ctx.position.as_deref());
+    books_of(kind.name(), &ctx.entity, &office, &ctx.params).map(|b| (office, b))
+}
+
+/// The actor of `kind` for `ctx`: its own, with its staff's clerk where it keeps books and runs as staff.
+pub fn create(kind: &dyn Kind, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
+    let inner = kind.create(ctx)?;
+    Ok(match staff_books(kind, ctx) {
+        Some((office, books)) => Box::new(StaffClerk { inner, keeping: Keeping::new(&ctx.entity, &office), books }),
+        None => inner,
+    })
+}
+
+/// The same, taken up again as `save` left it.
+pub fn restore(kind: &dyn Kind, ctx: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
+    match staff_books(kind, ctx) {
+        Some((_, mut books)) => {
+            let inner = kind.restore(ctx, saved.get("inner").cloned().unwrap_or(Value::Null))?;
+            books.restore(saved.get("books").unwrap_or(&Value::Null))?;
+            let keeping: Keeping = serde_json::from_value(saved.get("keeping").cloned().unwrap_or(Value::Null)).map_err(|e| e.to_string())?;
+            Ok(Box::new(StaffClerk { inner, keeping, books }))
+        }
+        None => kind.restore(ctx, saved),
+    }
+}
+
+impl Actor for StaffClerk {
+    fn step(&mut self, pic: &Picture, cx: &mut Cx) -> Action {
+        self.keeping.book.absorb(pic);
+        self.books.absorb(pic);
+        let a = self.inner.step(pic, cx);
+        if !matches!(a, Action::Wait { .. }) {
+            return a;
+        }
+        let open = self.books.open(pic.t, &cx.ctx.world);
+        match self.keeping.due(open, pic.t, &cx.ctx.world) {
+            Some(s) => Action::Call { program: s.program(), reasoning: s.why },
+            None => a,
+        }
+    }
+    fn beliefs(&self) -> Vec<crate::Belief> {
+        self.inner.beliefs()
+    }
+    fn sent(&mut self, action: &str) {
+        self.inner.sent(action)
+    }
+    fn save(&self) -> Result<Value, String> {
+        Ok(json!({ "inner": self.inner.save()?, "keeping": serde_json::to_value(&self.keeping).map_err(|e| e.to_string())?, "books": self.books.save()? }))
+    }
+}
+
 /// The staff post that keeps an office's books (`office.clerk`): does nothing else of the office's business.
 pub struct ClerkActor {
     keeping: Keeping,

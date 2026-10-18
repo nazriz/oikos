@@ -328,7 +328,9 @@ impl P {
             rdial: reading::reading_dial(&json!({ "dials": dials })).ok().flatten(),
             conduct_rates,
             consult: dials.get("consult").map_or(false, |x| !x.is_null() && x != &Json::Bool(false)) || ctx.params.get("consult").and_then(Json::as_bool) == Some(true),
-            compose: dials.get("compose").map_or(false, |x| !x.is_null() && x != &Json::Bool(false)) || ctx.params.get("compose").and_then(Json::as_bool) == Some(true),
+            // (The world's composer dial is `composer`, as the generator writes it and run.ts reads it; the port read
+            // `compose`, so a Rust world never asked for a piece.)
+            compose: dials.get("composer").map_or(false, |x| !x.is_null() && x != &Json::Bool(false)) || ctx.params.get("compose").and_then(Json::as_bool) == Some(true),
             tick: ctx.world.tick.max(1),
         }
     }

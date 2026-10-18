@@ -713,8 +713,7 @@ impl<W: Write> Engine<W> {
             params: params.as_object().cloned().unwrap_or_default(),
             world: self.world.clone(),
         };
-        let actor = kind
-            .create(&ctx)
+        let actor = oikos_actors::offices::books::create(kind, &ctx)
             .map_err(|e| format!("participant {pid}{}: {e}", if cap == "self" { String::new() } else { format!(" (as {cap})") }))?;
         let key = format!("{pid}|{cap}");
         let cadence = ceil_to(kind.cadence(&ctx), self.tick);
@@ -779,6 +778,12 @@ impl<W: Write> Engine<W> {
                     if let Some(due) = self.start_round(awake)? {
                         return Ok(due);
                     }
+                    continue;
+                }
+                // (A host that answers the actors' questions to models is handed them as the moment's work ends, before
+                // time moves on: asked in one wake, answered by the next, as on the TS world. An empty cohort says so.)
+                if self.opts.host_seats && !self.questions.is_empty() {
+                    return Ok(Due::Seats(vec![]));
                 }
                 continue;
             }

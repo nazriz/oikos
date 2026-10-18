@@ -8,16 +8,19 @@
 //! The order of a moment: the engine wakes everyone due, code actors look and decide; the seats are handed to the host
 //! (`Due::Seats`, unobserved). As the host acts for a seat, the code actions before it in key order are carried out
 //! first (`host_command`); when the host asks what is next, the rest of the round is, and then the moment's further
-//! rounds. A seat that looks again or drafts takes its further rounds in the host, at once, in its place.
+//! rounds. A seat that looks again takes its next round in the engine's (`goes_on`); one that drafts takes its further
+//! rounds in the host, at once, in its place. A seat's look carries nothing out: every code unit's look is made before
+//! the round's actions too.
 
 use super::{Due, Engine};
 use crate::kernel::Command;
 use serde_json::Value;
 use std::io::Write;
 
-/// Whether a command changes the world (an observation does not: it may be made before the round is carried out).
+/// Whether a command changes the world (an observation or a look does not: it may be made before the round is carried
+/// out, as every code unit's look of the round is, in `start_round`, before any of the round's actions).
 fn changes(cmd: &Command) -> bool {
-    !matches!(cmd, Command::Observe { .. })
+    !matches!(cmd, Command::Observe { .. } | Command::Look { .. })
 }
 
 fn participant_of(cmd: &Command) -> Option<String> {
@@ -30,8 +33,14 @@ impl<W: Write> Engine<W> {
     pub fn host_command(&mut self, cmd: &Command) -> Result<(crate::run::Response, Option<crate::kernel::Observed>), String> {
         if changes(cmd) {
             if let Some(mut r) = self.round.take() {
-                let stop = participant_of(cmd).filter(|p| r.awake.iter().any(|(k, _)| k == p));
-                let done = self.carry_some(&mut r, stop.as_deref());
+                // (A seat of the round: what is before it in key order. One already passed (it acts again after its
+                // place, a second act of its wake) carries out nothing more: what is after it stays after it.)
+                let at = participant_of(cmd).and_then(|p| r.awake.iter().position(|(k, _)| *k == p).map(|i| (p, i)));
+                let done = match at {
+                    Some((_, i)) if i < r.cursor => Ok(()),
+                    Some((p, _)) => self.carry_some(&mut r, Some(&p)),
+                    None => self.carry_some(&mut r, None),
+                };
                 self.round = Some(r);
                 done?;
             }

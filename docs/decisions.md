@@ -6630,3 +6630,74 @@ draws; a step to go to a gathering could check that it is still on when it is ca
 **Revisit if** the jobless count moves the gate's population measures out of line, the rent portal is put into the generated
 world (the rents board in the tests then goes), or the engine's note of whom it is deciding for costs anything measurable
 (it is one string written per round).
+
+## 2026-10-18 · Port step 3, seats and twins on the Rust world (branch `integ-seats`; no model called)
+
+**Twins are exact.** The 19-seat twin year (twin-seat-year.test.ts) is the town without its seats act for act and
+event for event on the Rust world (89,263 acts, 365,473 events), and so are its other two tests. Four faults, each traced
+in a kept pair of logs:
+- **A seat's look carried out its round.** Looking was taken as a change, so a seat's look carried out the code actions
+  before it in key order; with two seats in a round, the second's look carried out the first's place, and the first then
+  acted after everyone. A look now carries out nothing (every code unit's look of a round is made before its actions),
+  and a seat already passed in its round carries out nothing more (hosted.rs).
+- **A Rust brain read the host's picture.** A mock seat's brain was handed the host view's whole picture and took it in
+  as news: a holding gone to nothing was left out of the picture, so the brain kept the last figure (a shop that sold out
+  served 4 goods it did not have, five times). It is now handed what the kernel sent (`RAW`, rust-world.ts).
+- **What a brain was shown on a turn it took no step at was lost.** Between asking for a paper and confirming it the seat's
+  brain takes no step (its twin is busy with its act), but the kernel's observation is what is new since the last: those
+  turns' records are now joined to the next step's (`seen`, `joinRaw`).
+- **Readings were never read back.** oikos-terms' `Reading` was skipped when an observation was read from JSON, so a
+  detached brain never learned that a notice had ended an agreement (a foreman stopped no wages). It deserializes now.
+
+The ninth TS-only double, `test.scribbling`, is a parameter of the Rust doubles (`scribble`), so twin-draws' three tests
+that use it run. twin-draws on the Rust world: 4 of 5 pass (the draw-trace test skips, as before).
+- **The sample floor** ("the same requests ... from those the seat did not deal with") was the world's, not the floor's:
+  landlords' reminders were not requests to put something right (below), so the town had too few. With that fixed, 15 of
+  19 requests are shared and all answered alike. The floor stays.
+- **The draws ratio** of the mayor's seat is checked on the TS world only (the draw trace is the TS loop's), with the reason
+  in the test. Its decisions part is checked on both.
+- **A person's time at the registry** still moves more of the town than the test allows: 264 of 6,615 papers have other
+  words (2% allowed), almost all shops' prices and the orders quoting them, a few cents apart. The first paper moved is the
+  city's, by less than the entries took, as the test asks. Not loosened; recorded as open. Likely cause: the Rust shops
+  reprice from what they sold, so an order a day late moves a price list, which TS's did not.
+
+**Faults found behind the seated offices' tests** (each a port's, against TS):
+- A kind that keeps books, run as its office's staff, now has its staff's clerk file the books (`offices::books::create`,
+  as index.ts `keepingBooks`). No seated office's staff filed books, so a member's day's list never came.
+- A landlord's reminder of rent owed is a `review_request` (the rent_reminder form's kind); the port wrote a plain
+  `request`, which a tenant does not read as one.
+- A citizen is out of work since its wake when it has no job and no work of its own (TS sets it at every wake; the port only
+  when a job ended).
+- A law's formal condition is text in a statement (as common.ts `say`); as JSON the resolver refused a council's amended law.
+- A Rust actor's draw about one thing (`Cx::chance`) names its papers `paper#n`, as run.ts does: a tenant's draw to stay
+  was keyed on the lease's number, so a seat's papers filed earlier moved an eviction 330 days on.
+- The founding act binds what it makes as `founded`, as citizen.ts wrote it: unbound, no founder learned its group's id and
+  nothing founded was recorded.
+- The mind read the composer's dial as `compose`; the world writes `composer`.
+
+**The citizens' questions to models.** The engine now hands the host its actors' questions as a moment's work ends
+(`questions`, `answer`: kernel/src/protocol.rs), and run.ts answers them from the same services TS's modules use
+(`consult`, `compose`, the reading desk's `lookup`), by the asker's next wake. The sparse mind's dial is said in the Rust
+world's config (`dials.consult`).
+
+**Tests changed, each with its reason in the test:** seat-acts reads an order's fourteen days from the hearing (on the
+Rust world's draws the hearing fell on a day the seat was not at its desk, and it filed the order two days later);
+founding's code test runs seed 15 on the Rust world (of seeds 1 to 24 only 15 has two who share the first founder's want);
+twin-draws' draws ratio, as above.
+
+**On the Rust world, of the tests in this scope:** twin-seat-year 3 of 3; member sittings, seat acts, tenant answers,
+office books, the books walk and opening caseloads all pass; consult passes; founding 3 of 4; government 0 of 2;
+reading-dial 2 of 3.
+
+**Still open:**
+- **Reading:** the Rust mind never asks a `reading` question (`reading_question` has no caller outside its tests). TS reads
+  a paper's words at the wake it lands; on the Rust world the answer comes a wake later, so the landing must wait for it.
+  Needs a design, not a patch.
+- **Words:** a founder's composed name and parts go to the translator in TS (`wordsFor`); the Rust mind asks a `words`
+  question nobody answers yet, and ignores its answer (founding's composer test).
+- **Government:** after the amendment the landlord who reads the laws gives no rent increase at all in 100 days, and the
+  mayor never approves the builder's invoice for the park. Not traced.
+- **Founding rate:** with founding on, the Rust world founds 4 to 16 things in a small town's 205 days where the TS world
+  founds about one. Not traced; a measure to look at before the gate.
+
+**Revisit if** a twin parts again (the four causes above are the places to look first), or the reading design lands.

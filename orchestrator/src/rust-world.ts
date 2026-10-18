@@ -139,6 +139,31 @@ export class DetachedActor {
   }
 }
 
+/** The kernel's observation as it was sent (what is new since the last), kept on the picture the host's view made of it:
+ * a brain run detached keeps its own view, as the engine's unit does, and is handed what the kernel sent, never the host's
+ * picture (taken in again, a holding gone to nothing or an account closed would be kept: the picture leaves them out). */
+export const RAW = Symbol("the kernel's observation");
+
+/** Two of the kernel's observations of one participant, one after the other, as one: what a detached brain would have
+ * been sent had nobody looked between them (a twin seat's brain shown an observation on a turn it took no step at).
+ * Lists are the earlier's then the later's, as a view takes them in, one after the other; a channel's picture sent
+ * whole in the later starts from it; readings as last delivered; the rest is the later's. */
+export function joinRaw(a: any, b: any): any {
+  const channels: { [id: string]: any } = { ...b.channels };
+  for (const [id, x] of Object.entries<any>(a.channels ?? {})) {
+    const y = b.channels?.[id];
+    if (!y) { if (!x.search) channels[id] = x; continue; }
+    if (x.kind !== y.kind || y.whole || y.search) continue;
+    if (y.kind === "records") channels[id] = { ...y, records: [...x.records.filter((r: any) => !y.records.some((q: any) => q.id === r.id)), ...y.records], ...(x.whole ? { whole: true } : {}) };
+    else if (y.kind === "accounts") channels[id] = { ...y, accounts: [...x.accounts, ...y.accounts], transactions: [...x.transactions, ...y.transactions] };
+    else if (y.kind === "holdings") channels[id] = { ...y, holdings: [...x.holdings, ...y.holdings] };
+    else if (y.kind === "sites") channels[id] = { ...y, cells: [...x.cells, ...y.cells], ...(x.whole ? { whole: true } : {}), ...(x.visited || y.visited ? { visited: true } : {}) };
+    else if (y.kind === "directory") channels[id] = { ...y, entities: [...x.entities, ...y.entities], positions: [...x.positions, ...y.positions] };
+  }
+  const readings = a.readings || b.readings ? { readings: { ...(a.readings ?? {}), ...(b.readings ?? {}) } } : {};
+  return { ...b, channels, outcomes: [...(a.outcomes ?? []), ...(b.outcomes ?? [])], inbox: [...(a.inbox ?? []), ...(b.inbox ?? [])], ...readings };
+}
+
 /** A shared rule by name (kernel/src/rules_api.rs): what the generator calls in Rust. */
 export function rustRule<T = unknown>(name: string, args: object = {}): T {
   return JSON.parse(need().rules(name, JSON.stringify(args)));

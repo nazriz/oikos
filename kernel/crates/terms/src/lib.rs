@@ -6,7 +6,7 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::float_arithmetic, clippy::float_cmp)]
 
-use serde::Serialize;
+use serde::{Deserialize, Deserializer, Serialize};
 use oikos_contracts::blocks::AgreementTerms;
 
 /// This reader's version, stated on every reading.
@@ -29,6 +29,32 @@ pub struct Reading {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ended_by: Option<&'static str>,
     pub reader: &'static str,
+}
+
+/// A reading as it was handed on (an observation read back, as a seat's brain run apart from the engine reads what it was
+/// shown: kernel/src/host.rs). Its words are this reader's few, so they are taken back as its own; any other is refused.
+impl<'de> Deserialize<'de> for Reading {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Words {
+            of: String,
+            status: String,
+            #[serde(default)]
+            ends_at: Option<i64>,
+            #[serde(default)]
+            ended_by: Option<String>,
+            reader: String,
+        }
+        let w = Words::deserialize(d)?;
+        let word = |x: &str, of: &[&'static str], what: &str| of.iter().copied().find(|y| *y == x).ok_or_else(|| serde::de::Error::custom(format!("a reading's {what} {x:?} is not one this reader writes")));
+        Ok(Reading {
+            of: word(&w.of, &["agreement"], "kind")?,
+            status: word(&w.status, &["offered", "in_force", "ending", "ended"], "status")?,
+            ends_at: w.ends_at,
+            ended_by: w.ended_by.as_deref().map(|x| word(x, &["notice", "term"], "end")).transpose()?,
+            reader: word(&w.reader, &[READER], "reader")?,
+        })
+    }
 }
 
 /// Reads an agreement at `now`, from its terms and the signatures and notices made on it.
@@ -82,6 +108,14 @@ mod tests {
     use oikos_contracts::blocks::{AgreementTerms, Termination};
 
     const DAY: i64 = 86_400;
+
+    #[test]
+    fn a_reading_read_back_is_the_same() {
+        let r = Reading { of: "agreement", status: "ending", ends_at: Some(5), ended_by: Some("notice"), reader: READER };
+        let back: Reading = serde_json::from_value(serde_json::to_value(&r).unwrap()).unwrap();
+        assert_eq!(back, r);
+        assert!(serde_json::from_value::<Reading>(serde_json::json!({ "of": "agreement", "status": "void", "reader": READER })).is_err());
+    }
     fn terms(term: Option<i64>, clauses: &[(&str, i64)]) -> AgreementTerms {
         serde_json::from_value(serde_json::json!({ "parties": ["union", "c1"], "commitments": [] })).map(|mut t: AgreementTerms| {
             t.term = term;

@@ -11,7 +11,10 @@
 //! - `calls`: `[{ "at": seconds, "call": "<call language>", "after_withdrawals": bool }]`, each made once at its first
 //!   wake on or after `at` (and, with `after_withdrawals`, once every withdrawal below is made);
 //! - `withdraw`: `[{ "at": seconds, "kind": "hold", "by": "entity" | "author" }]`: from `at`, withdraws the double's own
-//!   latest statement of that kind (one it was shown, made by its entity or by itself), once.
+//!   latest statement of that kind (one it was shown, made by its entity or by itself), once;
+//! - `scribble`: `{ "every": seconds, "call": "<call language>" }`: each time the real kind would wait, and `every` has
+//!   gone by since it last did this, makes the call instead (`{t}` in it is the moment, in seconds): papers of no effect
+//!   (twin-draws.test.ts's `test.scribbling`).
 //!
 //! The wake it spends on its own act is the real kind's wake lost, as in TS.
 
@@ -43,7 +46,19 @@ struct Withdraw {
     done: bool,
 }
 
-const OWN_PARAMS: [&str; 3] = ["inner", "calls", "withdraw"];
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Scribble {
+    every: i64,
+    call: String,
+    /// (As the TS double began: -1, so the first is made at a wait half a day in.)
+    #[serde(default = "minus_one")]
+    last: i64,
+}
+fn minus_one() -> i64 {
+    -1
+}
+
+const OWN_PARAMS: [&str; 4] = ["inner", "calls", "withdraw", "scribble"];
 
 pub struct Double {
     name: &'static str,
@@ -57,6 +72,7 @@ pub static KINDS: &[&dyn Kind] = &[
     &Double { name: "test.directing", default_inner: "" },
     &Double { name: "test.finance_holding", default_inner: "city.finance_officer" },
     &Double { name: "test.leaving", default_inner: "" },
+    &Double { name: "test.scribbling", default_inner: "" },
 ];
 
 /// `test.hang` and `test.throw`, for the reliability tests (the TS fixtures of the same names): a participant that waits a
@@ -153,14 +169,18 @@ impl Kind for Double {
         }
         let mut withdraw: Vec<Withdraw> = ctx.param("withdraw", vec![])?;
         withdraw.sort_by_key(|w| w.at);
-        Ok(Box::new(Wrapped { inner: kind.create(&ictx)?, calls, withdraw }))
+        let scribble: Option<Scribble> = ctx.param("scribble", None)?;
+        if let Some(sc) = &scribble {
+            parse_program(&sc.call.replace("{t}", "0")).map_err(|e| format!("{}: {}: {}", self.name, sc.call, e.0))?;
+        }
+        Ok(Box::new(Wrapped { inner: kind.create(&ictx)?, calls, withdraw, scribble }))
     }
     fn restore(&self, ctx: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
         let (kind, ictx) = self.inner(ctx)?;
         let mut saved = saved;
         let inner = saved.get_mut("inner").map(Value::take).ok_or("test double: no inner memory")?;
         let own: Own2 = serde_json::from_value(saved).map_err(|e| e.to_string())?;
-        Ok(Box::new(Wrapped { inner: kind.restore(&ictx, inner)?, calls: own.calls, withdraw: own.withdraw }))
+        Ok(Box::new(Wrapped { inner: kind.restore(&ictx, inner)?, calls: own.calls, withdraw: own.withdraw, scribble: own.scribble }))
     }
 }
 
@@ -168,12 +188,15 @@ impl Kind for Double {
 struct Own2 {
     calls: Vec<Own>,
     withdraw: Vec<Withdraw>,
+    #[serde(default)]
+    scribble: Option<Scribble>,
 }
 
 struct Wrapped {
     inner: Box<dyn Actor>,
     calls: Vec<Own>,
     withdraw: Vec<Withdraw>,
+    scribble: Option<Scribble>,
 }
 
 fn call(text: &str) -> Action {
@@ -202,7 +225,14 @@ impl Actor for Wrapped {
             w.done = true;
             return call(&format!("statement(withdraw={})", w.seen.as_ref().unwrap()));
         }
-        self.inner.step(pic, cx)
+        let a = self.inner.step(pic, cx);
+        if let (Action::Wait { .. }, Some(sc)) = (&a, self.scribble.as_mut()) {
+            if pic.t - sc.last >= sc.every {
+                sc.last = pic.t;
+                return Action::Call { program: parse_program(&sc.call.replace("{t}", &pic.t.to_string())).expect("checked when made"), reasoning: None };
+            }
+        }
+        a
     }
     fn beliefs(&self) -> Vec<crate::Belief> {
         self.inner.beliefs()
@@ -211,7 +241,7 @@ impl Actor for Wrapped {
         self.inner.sent(action)
     }
     fn save(&self) -> Result<Value, String> {
-        Ok(json!({ "inner": self.inner.save()?, "calls": self.calls, "withdraw": self.withdraw }))
+        Ok(json!({ "inner": self.inner.save()?, "calls": self.calls, "withdraw": self.withdraw, "scribble": self.scribble }))
     }
 }
 
