@@ -6567,3 +6567,66 @@ world looks reachable.
 *ME-20 stays on the register.* Both parts need a design, not a patch:
 - Landlords should build by expected return on the market's rents.
 - Shops should split orders, or factories should state what they have to clear.
+
+## 2026-10-18 · Port step 3, the remaining scenario failures on the Rust world: rents, homes, reliability and the TS-runtime checks (branch `integ-rest`; no model called)
+
+Scope: rents and justice, clinic and school, word of mouth, taken in, home market, public finance, perception, invariance,
+reliability, the resolver shadow, production and building (seats, twins and the citizens' model questions are `integ-seats`'s).
+Each was run on the Rust world (`OIKOS_WORLD=rust`), traced in a kept log to its cause, and fixed in the Rust module with a
+test, or changed in the test with the reason written there. All of them pass, and so do prices, possession, tenancy and
+ownership, which the rent fix touched.
+
+**Faults in the Rust modules (each found by tracing a log):**
+- **A household with no home asked nobody.** The mind (A2) added ties for talking, mourning and meeting, but life (A1) read
+  `people_we_know`, which only a tip filled. The mind now keeps who it has come to know at the four places TS added to
+  `peopleWeKnow`, and the housing reads it. (`taken-in`; a unit test on the mind.)
+- **Selling and buying a home never completed.** absorb set aside a sale's payment and a mortgage's principal
+  (`sale_receipts`, `funded_loans`) and nothing read them: a buyer was never "funded", a seller never "paid". absorb now
+  calls the housing's own `home_money_in`.
+- **A home we own was not found at the first plan.** The first look came after the plan when the citizen was not yet banked
+  (an early return), and the lot is asked of the register, which answers hours later. The register is now looked up first
+  whatever the bank, and finding a home of our own ends the days without one counted from the first plan.
+- **An owner who would leave never sold.** `sell(.., leave_after = true)` was never called. Now it is, as in citizen.ts.
+- **Jobless days were counted only after a job ended.** TS counts them from the first plan with no job or business of one's
+  own. This means someone out of work and broke now leaves town after the months their patience allows, as in TS; it moves
+  the leaving rate in a living town (watch it at the gate).
+- **A valuation left out `buildings` when empty;** the builder's invoice wrote its amount as a number. Both now as TS and as
+  every other paper of the kind.
+- **The run's summary counted only seats' wakes and failures.** The engine now counts its own actors' wakes by why, and the
+  failures it recovers, and says so at the finish. It also keeps a note of whom it is deciding for, read by the watchdog's
+  thread through the native module, so a stall in the engine is diagnosed with who as well as when.
+- `test.hang` and `test.throw` exist as Rust doubles (found by the registry, never listed).
+
+**Where the native market rules changed an outcome a test pinned (judged against the real world):**
+- *Rents.* The Rust landlord raises a sitting tenant's rent only to what comparable homes let for lately or ask, part of the
+  way. In a generated town no home comes to let for months, so nothing moves, which is what a market with no turnover and no
+  general inflation does; the TS rule (own going rent plus 5%) raised them regardless. The justice and prices tests need rises
+  to test the tribunal and the law's timing, so they now publish a rents board (`orchestrator/test/lib/rents-board.ts`: a
+  public `rental_evidence` paper 10% over each kind's dearest rent, on a channel the landlord's post reads). Not a fault. The
+  rent portal is not yet in the generated world (no landlord sees a board there); that is a profile/generator decision, not
+  taken here. Revisit if the code-only year's rent index shows rents flat for years against a profile that says otherwise.
+- *Production.* A factory's export share is the room it learned (ME-15), which the offer does not name, so the band's-top
+  bound reads the offer's whole quantity for the export part, as the exports' bound already did.
+
+**Tests changed, each with its reason in the test:**
+- justice, word-of-mouth: what the offices or citizens were shown is read from the log (recorded observations, through the
+  participant's own `View`), not handed over as it is made, which the Rust world cannot do (its engine decides for them).
+  This works on either world.
+- clinic-school: a teacher who reached the school after the day's lessons were set is not counted as absent (the school sets
+  the day once, as the TS school does; on day 294 a councillor's vote kept her at home that morning).
+- reliability: the stall's diagnosis in its Rust form (`doing` is the host's call to the engine, `deciding` the unit);
+  the log-fails run breaks its pipe at the 10th daily look (the inspector is called once a day here).
+- possession: seed 4 (seeds 3 and 5 of the Rust world's draws have the tenant leave town three days before the warrant's
+  day, as the TS world's seed 2 does; 1, 2, 4 and 6 carry it out). Untested on the TS world.
+- perception, resolver shadow: skip on the Rust world, with the reasons in the tests (they check the TS runtime's `View` and
+  a second resolver; the Rust view is held to the kernel's picture by `kernel/tests/perception.rs`, and the engine has one
+  resolver).
+
+**Seen, not fixed.** `gatherings` passed on the build before this branch and now has one arrival in 727, at 21:06 for a
+gathering that ended at 21:00: the citizen's act to go home took until 20:40 (the shop's crew hours), and the plan's next
+step, to go to the hall, ran then. That is TS's rule too (the steps of a plan are carried out in order), exposed by shifted
+draws; a step to go to a gathering could check that it is still on when it is carried out. Left for the owner.
+
+**Revisit if** the jobless count moves the gate's population measures out of line, the rent portal is put into the generated
+world (the rents board in the tests then goes), or the engine's note of whom it is deciding for costs anything measurable
+(it is one string written per round).
