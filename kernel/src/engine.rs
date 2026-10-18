@@ -264,6 +264,8 @@ pub struct Engine<W: Write> {
     run_end: i64,
     round: Option<Round>,
     rounds_at: (i64, u32),
+    /// Wakes of the engine's own actors by why they woke (not state: no result depends on it, and a resumed run counts afresh).
+    wakes_by: std::collections::BTreeMap<String, u64>,
     questions: Vec<(String, Question)>,
     lean: bool,
     thinking: Option<i64>,
@@ -406,6 +408,7 @@ impl<W: Write> Engine<W> {
             run_end: base.run_end,
             round: None,
             rounds_at: (-1, 0),
+            wakes_by: Default::default(),
             questions: vec![],
             lean: base.lean,
             thinking: base.thinking,
@@ -798,6 +801,9 @@ impl<W: Write> Engine<W> {
                         if let Some(u) = self.units.get_mut(&key) {
                             u.woke_for = why.to_string();
                             u.since = since;
+                            if !(u.seat() && self.opts.host_seats) {
+                                *self.wakes_by.entry(why.to_string()).or_default() += 1;
+                            }
                             awake.push((key, 0));
                         }
                     }
@@ -807,6 +813,11 @@ impl<W: Write> Engine<W> {
                 }
             }
         }
+    }
+
+    /// Wakes of the engine's own actors so far, by why they woke.
+    pub fn wakes_by(&self) -> &std::collections::BTreeMap<String, u64> {
+        &self.wakes_by
     }
 
     /// A seat's action for this round (its host's: a confirmed draft is an `Act` with its provenance).

@@ -1599,6 +1599,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   if (o.resumedFrom) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { resumed_from: { log: o.resumedFrom.log, model_calls_served: o.resumedFrom.serving.served, ...(o.resumedFrom.serving.diverged ? { serving_stopped_at: o.resumedFrom.serving.diverged } : {}) } } } });
   const completed = !stopped && until === runEnd;
   const end = await k.request({ op: "finish", reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) });
+  // (On the Rust world the engine woke its own actors itself: they are counted with the wakes the host made for seats.)
+  for (const [why, n] of Object.entries((end.wakes_by ?? {}) as { [why: string]: number })) { wakes += n; wakesBy[why] = (wakesBy[why] ?? 0) + n; }
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
   if (resolverDiffCount) await Bun.write(join(o.outDir, `${o.runId}.resolver-diffs.json`), JSON.stringify(resolverDiffs, null, 1));

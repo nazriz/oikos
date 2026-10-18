@@ -538,7 +538,7 @@ fn engine_reply(session: &mut Session, req: &Value) -> Result<Reply, String> {
         }
         "finish" => {
             let (seq, hash) = e.run_mut().finish(str_field("reason")?, req.get("detail").and_then(Value::as_str)).map_err(|x| x.to_string())?;
-            Ok(Reply::Value(json!({ "ok": true, "seq": seq, "state_hash": hash })))
+            Ok(Reply::Value(json!({ "ok": true, "seq": seq, "state_hash": hash, "wakes_by": e.wakes_by() })))
         }
         other => Err(format!("unknown op {other} (in the Rust world)")),
     }
