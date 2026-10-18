@@ -372,7 +372,13 @@ impl<W: Write> Engine<W> {
     }
 
     /// An engine around a run, with nobody in it yet (`start` and `resume` fill it in).
-    fn assemble(run: Run<W>, base: Base, opts: EngineOptions, sched: Scheduler) -> Self {
+    fn assemble(mut run: Run<W>, base: Base, opts: EngineOptions, sched: Scheduler) -> Self {
+        // A moment's observations are made ready on the engine's threads, as its actors decide on them: the kernel's own
+        // default (one) is for a host that decides itself. OIKOS_KERNEL_THREADS, where it is set, still says how many.
+        // Nothing depends on it (`Kernel::plan`).
+        if std::env::var_os("OIKOS_KERNEL_THREADS").is_none() {
+            run.share(opts.threads, None);
+        }
         let until = opts.until.map_or(base.run_end, |u| u.min(base.run_end));
         Engine {
             sched,
