@@ -6409,3 +6409,78 @@ rust-port.md says); or the shop mix changes measures the owner wants compared be
 That is 1.1 times as fast at 1,000 and 1.8 times at 10,000, well short of the plan's 4 to 10 times, and using up to
 four times the memory at 1,000 (each actor's own book: port-guide 5.6, item 7). Not profiled yet; phase 3's work.
 rust-port.md's stop rule (a 1,000-person year under twice as fast) is met on this reading: profile before going on.
+
+## 2026-10-18 · The Rust world profiled after its first integration: where its time and memory go (branch `port-perf`)
+
+**Why.** The first integrated measure (above) had the Rust world 1.1 times as fast as the TS world at 1,000 people and
+1.8 at 10,000, against the plan's 4 to 6, and a 1,000-person year peaking at 10.2 GB against the TS world's 2.5.
+Measured with macOS `sample` (1 ms) on the running process, `malloc_history` on a build with the system allocator,
+`/usr/bin/time -l` and per-thread CPU times (`ps -M`). Raw notes: `runs/port-perf/STATUS` in the `port-perf` worktree on the run server (not in git).
+
+**What was found.**
+- **The TS host does nothing per wake.** With no seat in the town, the engine runs the whole run inside one call (`next`
+  is asked twice a run). No crossing per wake, no observation built in JS.
+- **One core.** CPU time was 1.02 times wall time at 1,000 and 1.14 at 10,000. The main thread was busy throughout; at
+  1,000 almost every round is under the 16 actors worth sharing, so actors decided on it too.
+- **The serial path is most of the work, not the deciding.** Main thread, 1,000 / 10,000: observations built, encoded
+  and hashed in the logged path 37% / 37%; actors deciding 27% / 12% (plus the threads' share at 10,000); views taking
+  observations in 8% / 10%; carrying the round out 11% / 20%; the rest advancing time. rust-port.md section 6 counted on
+  the deciding being the bulk and spreading over cores.
+- **Memory at 1,000 was one structure**: every event of the engine's own commands was cloned for the host
+  (`Engine::for_host`) and, with no seat to hand back, held for the whole run and made one JSON reply at its end.
+- **Memory at 10,000 is the config, four times over**: each participant's controller params (about 7.7 KB of JSON; the
+  venture catalogue alone, the same for everyone, 3.6 KB) held as JSON values in the kernel's typed config, the engine's
+  copy of each participant, each unit's params and what each actor derives from them: about 3.3 GB made at start.
+- **Two offices re-read their whole files at every wake**: the support office looked for every open claim's every need
+  through all its evidence (18% of the main thread at times at 10,000), and the bank copied its whole book of
+  requests, withdrawals and holds.
+
+**Nothing basic in the design is wrong**; the plan's expectation was. The bound is the serial path a moment takes in key
+order (look, log, carry out), and at 1,000 people a moment's cohort is a handful, so there is little to spread.
+
+**Fixed** (each result-identical: same state hashes; the log the same line for line after the header, whose kernel build
+id differs; tests pass):
+| commit | change | measured |
+|---|---|---|
+| `a60e8e31` | the host is kept only the events it reads (cast, refusals, statements) | 1,000-person year peak 9.9 to 2.9 GB |
+| `13ea78c9` | views take observations in on the actors' threads; each thread takes the next actor free | at 10,000, a tenth of the main thread off it |
+| `48d83b58` | the support office indexes its file once per change; the bank reads its book from where it left off | instructions -3.9% at 10,000 x 30 days, -0.7% at 1,000 x 365 |
+| `49f20aed` | the engine makes a moment's observations ready on its threads (`OIKOS_KERNEL_THREADS` still decides where set) | main thread at 10,000 x 30 days 112 to 75 s of CPU |
+
+Base (`48f66344`) against the last, the same machine, run in turn twice (load 7 to 13 on 14 cores, so wall times
+move by half between identical runs):
+
+| run | base | after | |
+|---|---|---|---|
+| 1,000 people, a year: wall | 210, 284 s | 285, 212 s | no change past the noise |
+| instructions retired | 1,374, 1,366 G | 1,318, 1,315 G | -4% |
+| main thread CPU (the critical path) | 193, 259 s | 224, 184 s | noise |
+| peak memory | 8.3, 10.6 GB | 2.84, 2.85 GB | -72% |
+| 10,000 people, 30 days: wall | 109, 225 s | 98, 164 s | -10%, -27% |
+| main thread CPU | (not caught), 171 s | 72, 110 s | about 1.5 times shorter |
+| instructions retired | 1,115, 1,127 G | 1,131, 1,133 G | +1% (the threads' own work) |
+| peak memory | 10.3, 7.7 GB | 7.5, 7.2 GB | |
+
+Against the TS world (integration's 160 s and 147 s): at 1,000 people still about 1.1 times as fast, at 10,000 about
+2 to 2.5 times on a machine with cores free (estimated from the main thread's time; not measured quiet).
+
+**What is left, with estimates** (of a 1,000-person year / a 10,000-person month, on idle cores):
+- the observation builder (structure views cached by a change stamp, ids not formatted per cell: performance.md idea 3):
+  10 to 15% / 5 to 10%;
+- the carry-out and its decision annotations (a fifth of the main thread at 10,000): batching annotations, applying
+  without re-serialising commands: 5 to 10% at 10,000;
+- a pool of threads kept for the run, not started per round (1,378 thread starts in 25 s at 10,000), so that the
+  small rounds of a 1,000-person town (a step costs about 30 us, as much as starting a thread) can be shared too:
+  5 to 15% / 3 to 8%;
+- the config's params shared, not copied, per participant (an `Arc` per template's params, or the generator putting the
+  town-wide catalogue on the template): about -2.5 GB at 10,000; the second changes the config, so the log;
+- ids as integers inside the kernel (idea 4): 10 to 15% at both, 8 to 12 agent-days;
+- not hashing each observation's canonical JSON for the log (idea 7): 6 to 8% at 10,000; a log-format decision for the
+  owner, not an optimisation.
+Together, at 1,000 people, about 1.4 to 1.6 times today (so 1.5 to 1.8 times the TS world); 4 to 6 times at 1,000 is
+not in reach without changing what a moment does serially, in key order. At 10,000 on free cores, 3 to 4 times the TS
+world looks reachable.
+
+**Revisit if** the measures here are retaken on a quiet machine and differ (wall times here were taken at load 10 to 13 on
+14 cores: the main thread's CPU time is given as the critical path); a town with many seats changes where the time goes
+(the host is then busy per wake); or the owner decides the log need not hash every observation.
