@@ -13,6 +13,7 @@ import { loadWorld } from "../src/batch";
 import { logLines } from "../src/logs";
 import { recordChanges, Records } from "../src/records";
 import { runWorld } from "../src/run";
+import { onRust } from "./lib/doubles";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -67,7 +68,15 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; e82365d7..., 0fb4991d... and 9679d7f3... until then.)
 // (Re-taken on 2026-10-17 at the bug hunt, a firm's owner's post: every firm with a principal shareholder of the town has an `-owners` post held abroad, so the config hashes and the states move; the towns' draws and life do not change for it before a holder leaves. 640002cd..., 0cc086d6... and 9be6db49... until then.)
 // (Re-taken once on 2026-10-18 at the merge of gd-adoption (strikes by cost, adoption by the numbers, the auditor) with the bug hunt's fixes: the generated town gained a vendor of systems, an auditor and the union's day's pay, so the config hashes and the states moved; 93e473eb..., e861d6a0... and ef1fa3d2... for the configs until then.)
-const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "114d1ca2a6b11dfb", "gb-eng-2026": "c05933adeb72d1d4", "ke-nakuru-2026": "c7e0c67230dbcaa2" };
+// (Re-taken on 2026-10-18 at port step 3, the config hashes only, a pin per world: the generator moved at integration (0.62.0, lane N's names and dates with the auditor's 0.61.0) and on the Rust world calls the shared rules natively (worlds/generator/rules.ts), whose town is its own; 114d1ca2..., c05933ad... and c7e0c672... until then. The TS states did not move. The Rust states are pinned beside them, from the same commit.)
+const CONFIG_BEFORE: { [profile: string]: string } = onRust
+  ? { "au-vic-2026": "ba713978250e9748", "gb-eng-2026": "b1dc67013806a78c", "ke-nakuru-2026": "6597ecc38406bd1b" }
+  : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
+const RUST_STATE: { [profile: string]: string } = {
+  "au-vic-2026": "2d57339dcbfb9501db2ed149a4be2cd7af9d0da4256af7aabc3b676fb8e511c8",
+  "gb-eng-2026": "44f157a88a8ee9870f49168dc8a28f4f85966a00c795d3c109dfcef9106d7c37",
+  "ke-nakuru-2026": "072c2a5eb2ed47a509b902bfa1aac3c82d52dec1a660e603d10beabd99014d55",
+};
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
   const v = ajv.getSchema(`${NS}:world-config`)!;
@@ -92,7 +101,7 @@ test("dial off, a town is the town it was: the same generated config and the sam
       // (A living town that asks for it off, or says nothing of it, is one and the same town.)
       expect(cfgHash(generate({ ...base, profile, living: { culture: false } })), profile).toBe(cfgHash(generate({ ...base, profile, living: {} })));
       const r = await runWorld({ config: lean(config), runId: `off-${profile}`, outDir: d, until: days * DAY, recordObservations: "none" });
-      expect(r.stateHash, profile).toBe(state);
+      expect(r.stateHash, profile).toBe(onRust ? RUST_STATE[profile]! : state);
     }
   } finally { rmSync(d, { recursive: true, force: true }); }
 }, 600_000);

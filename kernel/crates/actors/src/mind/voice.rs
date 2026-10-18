@@ -149,6 +149,23 @@ impl CitizenMind {
                 Heard::Taken
             }
             Event::Talk { from, person, text, re } => self.talk(cx, book, life, &from, &person, &text, re.as_deref()),
+            // A grievance over (citizen.ts `ended`, and a refusal granted on review, 3647-3652): on the record, and its
+            // want met or given up. Until 2026-10-18 the want outlived its grievance: with nothing left to answer it,
+            // it was withdrawn again and again, each withdrawal an occasion to found something (port step 3).
+            Event::Other { what, about: Some(about), facts } if what == "friction_ended" => {
+                let s = |k: &str| facts.get(k).and_then(Json::as_str).unwrap_or_default().to_string();
+                let (matter, how) = (s("matter"), s("how"));
+                let days = facts.get("days").and_then(Json::as_i64).unwrap_or(0);
+                self.s.inner.note(inner::Remembered { t, what: "friction_ended".into(), about: Some(matter.clone()), size: days.clamp(0, 10_000), by: Some(s("by")) });
+                if let Some(w) = self.s.wants.get(&matter, Some(&about)).cloned() {
+                    match facts.get("met").and_then(Json::as_str) {
+                        Some("met") => self.s.wants.met(&w, t, Some(&how)),
+                        Some("good") => self.want_met(cx, life, &w, &how, t),
+                        _ => self.s.wants.give_up(&w, t, Some(&how)),
+                    }
+                }
+                Heard::Taken
+            }
             Event::Other { .. } => Heard::NotMine,
         }
     }

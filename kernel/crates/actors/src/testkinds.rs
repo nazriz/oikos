@@ -116,9 +116,12 @@ impl Actor for FaultyActor {
     fn step(&mut self, pic: &Picture, _: &mut Cx) -> Action {
         if pic.t >= self.at {
             if self.hang {
-                loop {
-                    std::thread::park(); // (no clock: the determinism rules; nothing unparks it)
-                }
+                // (Waits on a message nobody sends: no clock and no thread of its own, as the determinism rules ask, and
+                // no core spent while the watchdog finds the stall.)
+                let (tx, rx) = std::sync::mpsc::channel::<()>();
+                std::mem::forget(tx);
+                let _ = rx.recv();
+                unreachable!("nobody sends")
             }
             panic!("Error: a bug at t={}", pic.t);
         }

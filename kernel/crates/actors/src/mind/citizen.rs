@@ -447,6 +447,11 @@ pub struct State {
     pub counted_ballots: BTreeSet<String>,
     // gatherings
     pub attending: Option<Attending>,
+    /// How long it took us to get to a place last time we set off for it (space -> seconds), and the trip under way.
+    #[serde(default)]
+    pub way_to: BTreeMap<String, i64>,
+    #[serde(default)]
+    pub setting_off: Option<(String, i64)>,
     pub going: BTreeMap<String, i64>,
     pub decided_for: BTreeMap<String, i64>,
     pub company_at: BTreeMap<String, i64>,
@@ -626,6 +631,8 @@ impl State {
             read_news: BTreeSet::new(),
             counted_ballots: BTreeSet::new(),
             attending: None,
+            way_to: BTreeMap::new(),
+            setting_off: None,
             going: BTreeMap::new(),
             decided_for: BTreeMap::new(),
             company_at: BTreeMap::new(),
@@ -1146,6 +1153,12 @@ impl Outlook for CitizenMind {
     fn knows(&self, who: &str) -> bool {
         self.s.people_known.contains(who)
     }
+    fn contact(&self, who: &str) -> bool {
+        self.s.contacts.iter().any(|(c, _)| c == who)
+    }
+    fn contacts(&self) -> usize {
+        self.s.contacts.len()
+    }
     fn closest(&self, n: usize, t: i64) -> Vec<Tie> {
         self.s.ties.closest(n, t).into_iter().map(|x| Tie { who: x.who.clone(), affinity_bps: x.affinity, trust_bps: Some(x.trust) }).collect()
     }
@@ -1363,6 +1376,15 @@ impl Mind for CitizenMind {
             self.s.inner.spent(cat, t - self.s.last_seen);
         }
         self.s.last_seen = t;
+        // (There, from a trip we set off on: how long the way took, remembered for the next time.)
+        if let Some((sp, from)) = self.s.setting_off.clone() {
+            if pic.body.as_ref().and_then(|b| b.in_space.as_deref()) == Some(sp.as_str()) {
+                self.s.way_to.insert(sp, t - from);
+                self.s.setting_off = None;
+            } else if t - from > DAY {
+                self.s.setting_off = None;
+            }
+        }
         self.refresh_teachings(book);
         for a in std::mem::take(&mut cx.answers) {
             self.answered(a);

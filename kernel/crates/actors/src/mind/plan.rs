@@ -536,7 +536,7 @@ impl CitizenMind {
     }
 
     /// A want met: what was tried worked (or waiting did), and it is no longer held (citizen.ts `wantMet`).
-    fn want_met(&mut self, cx: &mut Cx, life: &Life, w: &Want, why: &str, t: i64) {
+    pub(crate) fn want_met(&mut self, cx: &mut Cx, life: &Life, w: &Want, why: &str, t: i64) {
         if let Some(way) = &w.way {
             let mut o = Map::new();
             o.insert("t".into(), json!(t));
@@ -1600,11 +1600,18 @@ impl CitizenMind {
                 start += every;
             }
             if t >= start {
-                if self.s.going.get(&r.id) == Some(&start) && self.s.attending.is_none() {
+                // (Not set off for when, by how long the way took us last time, we would get there after it ends: free
+                // only at 20:50 for a gathering over at 21:00, 26 minutes away, nobody who knows the way goes. Until
+                // 2026-10-18 we went whenever it was still on, as citizen.ts does, and arrived after it had ended.)
+                let too_late = !inside(&at) && self.s.way_to.get(&at).is_some_and(|d| t + d >= start + lasts);
+                if self.s.going.get(&r.id) == Some(&start) && self.s.attending.is_none() && too_late {
+                    self.s.going.remove(&r.id);
+                } else if self.s.going.get(&r.id) == Some(&start) && self.s.attending.is_none() {
                     self.s.going.remove(&r.id);
                     self.s.attending = Some(Attending { practice: r.id.clone(), host: host.clone(), space: at.clone(), until: start + lasts, gone: false, seen: None });
                     if !inside(&at) {
                         out.first.insert(0, because(format!("Going to {host}'s gathering."), vec![common::move_in(&at)]));
+                        self.s.setting_off = Some((at.clone(), t));
                     }
                 }
             } else if start - t <= 7 * DAY && self.s.decided_for.get(&r.id) != Some(&start) {

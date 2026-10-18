@@ -210,8 +210,6 @@ pub struct State {
     /// On strike from our job: the employer, whether out, the workplace we left.
     pub striking: Option<(String, bool, Option<String>)>,
     // ---- word of mouth and the market
-    /// People remembered from homes and workplaces shared, and when last met.
-    pub contacts: BTreeMap<String, i64>,
     /// Buildings someone told us to look at, most recent last; and who told us.
     pub leads: Vec<String>,
     pub lead_from: BTreeMap<String, String>,
@@ -499,7 +497,7 @@ impl Person {
             retired: self.s.retired,
             in_labour_force: self.p.in_labour_force,
             goods_held,
-            contacts: self.s.contacts.len() as u32,
+            contacts: self.mind.contacts() as u32,
             deals_with: self.dealings(),
             member_of,
             industry: self.s.job.as_ref().and_then(|j| self.s.industry_of.get(&j.employer).cloned()),
@@ -572,7 +570,7 @@ impl Person {
         // (The mind may take a way at once, a rent rise, so it is handed life's openings: the mind is taken out for
         // the call so that the openings read life while the mind is busy.)
         let mut m = std::mem::replace(&mut self.mind, Box::new(mind::Plain::default()));
-        let heard = m.event(w.cx, w.pic, &self.book, &life, e, &super::recourse::Ways { person: self, pic: w.pic });
+        let heard = m.event(w.cx, w.pic, &self.book, &life, e, &super::recourse::Ways { person: self, pic: w.pic, contacts: life.contacts as usize });
         self.mind = m;
         heard
     }
@@ -580,7 +578,7 @@ impl Person {
     pub fn mind_plan(&mut self, w: &mut Week) -> mind::Planned {
         let life = self.life(w.pic, w.t, w.acc.as_ref().map(|a| a.balance));
         let mut m = std::mem::replace(&mut self.mind, Box::new(mind::Plain::default()));
-        let planned = m.plan(w.cx, w.pic, &self.book, &life, &super::recourse::Ways { person: self, pic: w.pic });
+        let planned = m.plan(w.cx, w.pic, &self.book, &life, &super::recourse::Ways { person: self, pic: w.pic, contacts: life.contacts as usize });
         self.mind = m;
         planned
     }

@@ -539,6 +539,15 @@ pub trait Outlook {
         false
     }
     fn closest(&self, n: usize, t: i64) -> Vec<Tie>;
+    /// The people we remember from homes and workplaces shared (citizen.ts `contacts`, kept by the mind's word of
+    /// mouth): whether this is one, and how many. Life reads them here; until 2026-10-18 it kept a copy of its own that
+    /// nothing filled, so nobody ever told those they know of a wrong done them.
+    fn contact(&self, _who: &str) -> bool {
+        false
+    }
+    fn contacts(&self) -> usize {
+        0
+    }
     /// What has been learned of an option in a domain (experience-weighted attraction, basis points), if anything.
     fn learned(&self, domain: &str, option: &str) -> Option<i64>;
     /// The person's wants as they stand, heaviest first.

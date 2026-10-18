@@ -381,6 +381,16 @@ impl Person {
             f["amount"] = json!(a);
         }
         self.tell(w, Outcome { domain: "friction".into(), option: g.matter.clone(), kind: "ended".into(), way: Way::Mine, from: Some(g.party.clone()), facts: facts(f), ..Default::default() });
+        self.friction_ended(w, &g, how, if good { "good" } else { "given_up" });
+    }
+
+    /// A grievance over, told to the mind: its note (how it ended, whether we asked and what came of it, how many
+    /// venues) and the want it was, met or given up (`met`: "good" as `wantMet`, "met" as `wants.met`, else given up).
+    fn friction_ended(&mut self, w: &mut Week, g: &Grievance, how: &str, met: &str) {
+        let asked = if g.asked.is_some() { format!("; asked: {}", g.answer.as_deref().unwrap_or("no answer yet")) } else { String::new() };
+        let venues = if g.applied.is_empty() { String::new() } else { format!("; venues: {}", g.applied.len()) };
+        let f = facts(json!({ "matter": g.matter, "how": how, "met": met, "days": (w.t - g.since).div_euclid(DAY), "by": format!("{how}{asked}{venues}") }));
+        self.happened(w, Event::Other { what: "friction_ended".into(), about: Some(g.about.clone().unwrap_or_else(|| g.party.clone())), facts: f });
     }
 
     /// A refused claim granted after all (money's claims, citizen.ts 3647-3652): its grievances are over.
@@ -390,6 +400,7 @@ impl Person {
             let Some(g) = self.recourse.grievances.remove(&k) else { continue };
             let f = json!({ "how": "granted on review", "put_right": true, "days": (w.t - g.since).div_euclid(DAY), "asked": g.asked.is_some(), "venues": g.applied.len() });
             self.tell(w, Outcome { domain: "friction".into(), option: g.matter.clone(), kind: "ended".into(), way: Way::Mine, from: Some(g.party.clone()), facts: facts(f), ..Default::default() });
+            self.friction_ended(w, &g, "granted on review", "met");
         }
     }
 
@@ -1033,7 +1044,7 @@ impl Person {
                 let (matter, party) = (g.matter.clone(), g.party.clone());
                 // (Whom: as the mind named them, else those it holds closest, of the people we know.)
                 let whom: Vec<String> = if whom.is_empty() {
-                    self.mind.closest(3, t).into_iter().map(|x| x.who).filter(|x| self.s.contacts.contains_key(x)).collect()
+                    self.mind.closest(3, t).into_iter().map(|x| x.who).filter(|x| self.mind.contact(x)).collect()
                 } else {
                     whom.clone()
                 };
@@ -1082,6 +1093,9 @@ fn venue_fee(offer: &Value) -> Option<(String, i64)> {
 pub struct Ways<'a> {
     pub person: &'a Person,
     pub pic: &'a oikos_sight::Picture,
+    /// How many people we remember (the mind's contacts, as life last read them: the mind is out of the person while
+    /// it weighs these openings).
+    pub contacts: usize,
 }
 
 impl Ways<'_> {
@@ -1268,7 +1282,7 @@ impl Openings for Ways<'_> {
                     out.push(o);
                 }
             }
-            if !p.s.contacts.is_empty() && !g.told {
+            if self.contacts > 0 && !g.told {
                 let mut o = Self::open("tell".into(), "tell", Intent::TellWronged { grievance: g.key.clone(), whom: vec![] });
                 o.bears = vec![g.party.clone()];
                 o.others = Some(0);
@@ -1312,6 +1326,7 @@ mod tests {
     struct Kept {
         anger: i64,
         close: Vec<String>,
+        contacts: Vec<String>,
         said: Vec<Value>,
     }
     impl Outlook for Kept {
@@ -1342,6 +1357,12 @@ mod tests {
         }
         fn closest(&self, n: usize, _: i64) -> Vec<Tie> {
             self.close.iter().take(n).map(|w| Tie { who: w.clone(), affinity_bps: 5_000, trust_bps: None }).collect()
+        }
+        fn contact(&self, who: &str) -> bool {
+            self.contacts.iter().any(|c| c == who)
+        }
+        fn contacts(&self) -> usize {
+            self.contacts.len()
         }
         fn learned(&self, _: &str, _: &str) -> Option<i64> {
             None
@@ -1389,6 +1410,9 @@ mod tests {
             }
             if let Event::ServiceLapsed { share_bps, .. } = &e {
                 self.said.push(json!({ "lapsed": share_bps }));
+            }
+            if let Event::Other { what, about, facts } = &e {
+                self.said.push(json!({ "other": what, "about": about, "facts": facts }));
             }
             Heard::Taken
         }
@@ -1497,7 +1521,7 @@ mod tests {
         WantView { about: about.into(), whom: Some(whom.into()), against: against.map(|(r, k)| (r.into(), k.into(), whom.into())), seeks: seeks.iter().map(|s| s.to_string()).collect(), weight_bps: 5_000, since: 0 }
     }
     fn ways(p: &Person, pc: &Picture, w: &WantView) -> Vec<Opening> {
-        Ways { person: p, pic: pc }.for_want(w, pc.t)
+        Ways { person: p, pic: pc, contacts: p.mind.contacts() }.for_want(w, pc.t)
     }
     fn tenant(p: &mut Person) {
         p.s.home = Some(Home { agreement: "L1".into(), space: HOME.into(), structure: "apts-1".into(), landlord: "landlord-1".into(), rent: 100_000, moved_in: true, ..Default::default() });
@@ -1519,7 +1543,7 @@ mod tests {
         let g = &p.recourse.grievances["underpaid:J1"];
         assert_eq!((g.amount, g.since), (Some(9_000), 15 * DAY));
         let pc = pic(16 * DAY, vec![]);
-        let view = Ways { person: &p, pic: &pc }.grievance(&want("underpaid", "factory-1", Some(("J1", "underpaid")), &["money.to"])).unwrap();
+        let view = Ways { person: &p, pic: &pc, contacts: p.mind.contacts() }.grievance(&want("underpaid", "factory-1", Some(("J1", "underpaid")), &["money.to"])).unwrap();
         assert_eq!((view.key.as_str(), view.amount, view.asked_at), ("underpaid:J1", Some(9_000), None));
     }
 
@@ -1568,6 +1592,13 @@ mod tests {
         let ended: Vec<Value> = said(&p).into_iter().filter(|x| x["kind"] == "ended").collect();
         assert_eq!(ended.len(), 1);
         assert_eq!((ended[0]["facts"]["how"].as_str(), ended[0]["facts"]["put_right"].as_bool(), ended[0]["facts"]["venues"].as_i64()), (Some("paid on a recommendation"), Some(true), Some(1)));
+        // (The mind is told it is over, for the want it bore (met: it was put right) and its note; until 2026-10-18 the
+        // want outlived the grievance, with nothing left to answer it.)
+        let over: Vec<Value> = said(&p).into_iter().filter(|x| x["other"] == "friction_ended").collect();
+        assert_eq!(over.len(), 1);
+        assert_eq!(over[0]["about"], json!("J1"));
+        assert_eq!((over[0]["facts"]["matter"].as_str(), over[0]["facts"]["met"].as_str()), (Some("underpaid"), Some("good")));
+        assert_eq!(over[0]["facts"]["by"], json!("paid on a recommendation; asked: refused; venues: 1"));
         assert_eq!(p.s.job.as_ref().unwrap().short, None);
     }
 
@@ -1722,7 +1753,7 @@ mod tests {
         let c = ctx(json!({}), true);
         let mut p = person(&c, 0);
         in_work(&mut p);
-        p.s.contacts.insert("c2".into(), 0);
+        p.mind = Box::new(Kept { close: vec!["c2".into(), "c3".into()], contacts: vec!["c2".into()], ..Default::default() });
         at(&mut p, &c, &pic(DAY, vec![]), |p, w| {
             p.grieve(w, "underpaid", "factory-1", Some("J1"), Some(6_000), None, 8_000, "security", None);
         });

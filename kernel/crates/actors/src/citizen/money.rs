@@ -910,20 +910,13 @@ impl Person {
                 let over = 10_000 + self.p.frictions.bill_over_bps.unwrap_or(1_500);
                 match self.money.billed.get(&service).copied() {
                     Some(usual) if per_day * 10_000 > usual * over => {
+                        // (A grievance of life's, as citizen.ts `grieve`: so it can be asked about, taken to a venue with
+                        // the bill as evidence, and told. Until 2026-10-18 only the mind heard of it, and the want it bore
+                        // had no way to answer it: withdrawn again and again, each time an occasion to found something.)
                         let party = inv.speaks_for.clone().unwrap_or_default();
-                        self.happened(
-                            w,
-                            Event::Grieved {
-                                matter: "bill".into(),
-                                party,
-                                about: Some(inv.id.clone()),
-                                amount: Some(amount - usual * days),
-                                structure: None,
-                                size_bps: 5_000,
-                                need: "security".into(),
-                                cause: Some("over the usual".into()),
-                            },
-                        );
+                        let evidence = super::recourse::tendered(&inv);
+                        let g = self.grieve(w, "bill", &party, Some(&inv.id), Some(amount - usual * days), None, 5_000, "security", Some("over the usual"));
+                        g.evidence = Some(evidence);
                     }
                     _ => {
                         self.money.billed.insert(service.clone(), per_day);
@@ -1126,10 +1119,9 @@ impl Person {
                 let facts: BTreeMap<String, Value> = [("delivered".to_string(), json!(delivered)), ("faulty".to_string(), json!(bad)), ("order".to_string(), json!(oid))].into();
                 self.tell(w, Outcome { domain: "shop".into(), option: seller.clone(), kind: "faulty".into(), way: Way::Mine, facts, payoff: Some(half_up(served * (delivered - bad).max(0), delivered)), of, ..Default::default() });
                 if price > 0 {
-                    self.happened(
-                        w,
-                        Event::Grieved { matter: "goods".into(), party: seller.clone(), about: order.clone(), amount: Some(bad * price), structure: None, size_bps: 4_000, need: "subsistence".into(), cause: Some("faulty".into()) },
-                    );
+                    // (life's grievance, as citizen.ts `grieve`, with what was found as its evidence: see the bill's above.)
+                    let g = self.grieve(w, "goods", &seller, order.as_deref(), Some(bad * price), None, 4_000, "subsistence", Some("faulty"));
+                    g.evidence = Some(json!({ "order": order, "delivered": delivered, "faulty": bad }));
                 }
             }
             if short <= 0 {
@@ -1707,6 +1699,22 @@ mod tests {
         p.money.bills = vec![(0, 9_000)];
         assert_eq!(p.bills_monthly(10 * DAY), 9_000 * MONTH / (40 * DAY));
         assert_eq!(p.bills_monthly(200 * DAY), 0, "a bill over 90 days old no longer counts");
+    }
+
+    #[test]
+    fn a_bill_well_over_the_usual_is_a_grievance_of_ours_with_the_bill_as_evidence() {
+        // (Until 2026-10-18 only the mind heard of it: life held no grievance, so the want it bore had nothing to answer
+        // it, not even telling those we know.)
+        let mut c = ctx(json!({}));
+        c.world = Arc::new(WorldInfo { dials: json!({ "friction_bps": 10_000 }), ..WorldInfo::default() });
+        let mut p = Person::new(&c).unwrap();
+        let bill = |id: &str, at: i64, amount: i64| st(id, at, "invoice", "energy-co", &["c1"], json!({ "service": "energy", "days": 30, "outcome": { "money": { "amount": amount, "to": "acc-energy" } } }));
+        run(&mut p, &c, 30 * DAY, 40, 1_000_000, &[bill("inv-1", 30 * DAY, 3_000)], |p, w| p.recorded_against(w));
+        assert!(p.recourse.grievances.is_empty(), "the first bill is the usual");
+        run(&mut p, &c, 60 * DAY, 40, 1_000_000, &[bill("inv-2", 60 * DAY, 6_000)], |p, w| p.recorded_against(w));
+        let g = &p.recourse.grievances["bill:inv-2"];
+        assert_eq!((g.matter.as_str(), g.party.as_str(), g.amount), ("bill", "energy-co", Some(3_000)));
+        assert_eq!(g.evidence.as_ref().unwrap()["id"], json!("inv-2"));
     }
 
     #[test]

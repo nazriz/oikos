@@ -331,7 +331,6 @@ impl Person {
             // A death in the household: ours, mourned with the other adults of it, and told to those we are closest to.
             let adults: Vec<String> = hh.members.iter().filter(|m| m.person != me && m.person != who && age_at(m.born_at, t, self.p.year) >= ADULT_YEARS).map(|m| m.person.clone()).collect();
             let heard = self.happened(w, Event::Bereaved { who: who.clone(), adults });
-            self.s.contacts.remove(&who);
             if let Heard::Mourn(close) = heard {
                 let close: Vec<String> = close.into_iter().filter(|c| !hh.members.iter().any(|m| m.person == *c)).collect();
                 if !close.is_empty() {

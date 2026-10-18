@@ -278,6 +278,9 @@ pub struct Engine<W: Write> {
     /// Failures of its own actors recovered in place (`participant_error` notes), for the run's summary.
     failures: u64,
     questions: Vec<(String, Question)>,
+    /// Those a round's carry-out woke, held while the host answers the reading questions it raised: a decision's
+    /// addressee may wake for it in the moment's next round, and must have its reading by then.
+    held_round: Option<Vec<(String, u32)>>,
     lean: bool,
     thinking: Option<i64>,
     used: BTreeMap<String, String>,
@@ -422,6 +425,7 @@ impl<W: Write> Engine<W> {
             wakes_by: Default::default(),
             failures: 0,
             questions: vec![],
+            held_round: None,
             lean: base.lean,
             thinking: base.thinking,
             used: BTreeMap::new(),
@@ -785,6 +789,12 @@ impl<W: Write> Engine<W> {
 
     fn go(&mut self) -> Result<Due, String> {
         loop {
+            if let Some(awake) = self.held_round.take() {
+                if let Some(due) = self.start_round(awake)? {
+                    return Ok(due);
+                }
+                continue;
+            }
             if let Some(r) = self.round.take() {
                 let waiting: Vec<&String> = r.decided.iter().filter(|(_, d)| matches!(d, Decided::Seat(None)) && !self.opts.host_seats).map(|(k, _)| k).collect();
                 if !waiting.is_empty() {
@@ -794,6 +804,12 @@ impl<W: Write> Engine<W> {
                     return Err(msg);
                 }
                 let awake = self.carry_out(r)?;
+                // (A decision recorded in this round asks its addressee's reading of the host now, before anyone the
+                // round woke looks: the addressee may be among them.)
+                if !awake.is_empty() && self.opts.host_seats && self.questions.iter().any(|(_, q)| q.kind == oikos_actors::mind::reading::READING_KIND) {
+                    self.held_round = Some(awake);
+                    return Ok(Due::Seats(vec![]));
+                }
                 if !awake.is_empty() {
                     if let Some(due) = self.start_round(awake)? {
                         return Ok(due);
