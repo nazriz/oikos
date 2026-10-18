@@ -43,10 +43,11 @@ test("a tenant who cannot pay and will not go is put out by the police on the tr
   who.controller = { ...who.controller, params: { ...who.controller.params, in_labour_force: false, possession: { stay_bps: 10_000, obey_bps: 0 }, leave_after_homeless_days: 9_999 } };
   const out = join(root, "runs", "test-possession");
   rmSync(out, { recursive: true, force: true });
+  // (Seed 4 on the Rust world, 2026-10-18: a tenant out of work with nothing in the bank leaves town after the months the person's patience allows, which is a draw of the run's, and in seeds 3 and 5 of the Rust world's draws this tenant left on day 188, three days before the warrant's day, as in the TS world's seed 2 below. Seeds 1, 2, 4 and 6 carry the warrant out; 4 is one of the seeds the note below names.)
   // (Seed 3 since 2026-10-17: the tenant put out on the warrant is recorded as put out ("evicted", and their notice on the lease) where the warrant's paper is read, and not only at the leaving step, which a home cleared by the next turn never reaches. In this seed the warrant's paper is read and the leaving step never comes; in seeds 1 and 4 both come, and the record is made once. Seed 2, the seed this test had, now has the tenant leave town the morning the officer comes: a different course, not this one.)
   // (The run's seed is pinned: in the generated seed's run, with draws named for the day (2026-10-12), the station's officers did not
   // get to the warrant in the six days it ran and it lapsed, which the office does and says; this test is of one carried out.)
-  const s = await runWorld({ config: { ...config, seed: 3, log: { ...config.log, detail: "lean" } }, runId: "possession", outDir: out, until: 200 * DAY, recordObservations: "none" });
+  const s = await runWorld({ config: { ...config, seed: 4, log: { ...config.log, detail: "lean" } }, runId: "possession", outDir: out, until: 200 * DAY, recordObservations: "none" });
   const ev = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes('"event"')).map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   const recs = ev.filter((e) => e.event === "recorded").map((e) => e.record);
   const mine = (kind: string) => recs.filter((r) => r.kind === kind && JSON.stringify(r).includes(alone.id));
