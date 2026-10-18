@@ -294,7 +294,7 @@ impl Wanting for ArrearsWants {
         json!(self
             .held
             .iter()
-            .map(|w| json!({ "about": "arrears", "whom": w.tenant, "seeks": ["money.to"], "against": { "record": w.lease, "kind": "arrears", "by": w.tenant },
+            .map(|w| json!({ "about": "arrears", "whom": w.tenant, "seeks": [{ "money": { "to": "me" } }], "against": { "record": w.lease, "kind": "arrears", "by": w.tenant },
                 "weight": w.weight, "since": w.since, "from": "event", "tried": w.tried, "way": w.way }))
             .collect::<Vec<_>>())
     }
