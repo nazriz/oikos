@@ -20,7 +20,7 @@
 use crate::kernel::Command;
 use crate::run::Run;
 use crate::schedule::{Next, Scheduler};
-use oikos_actors::sight::{Action, LookRequest, Picture, Provenance, View};
+use oikos_actors::sight::{Action, LookRequest, Provenance, View};
 use oikos_actors::{Actor, Answer, Belief, Ctx, Cx, Draws, Kept, Question, WorldInfo, DAY};
 use oikos_rules::slip::Performer;
 use serde_json::{json, Map, Value};
@@ -288,20 +288,36 @@ fn ceil_to(t: i64, tick: i64) -> i64 {
     t.div_euclid(tick) * tick + if t.rem_euclid(tick) == 0 { 0 } else { tick }
 }
 
-/// `f` of each item, in the items' order, on up to `threads` threads: contiguous chunks, each thread its own, each
-/// result in its item's place. The same results however the work falls out.
+/// `f` of each item, in the items' order, on up to `threads` threads: each thread takes the next item not yet taken
+/// (one actor's step can take a hundred times another's, so even chunks left most threads waiting on one), and each
+/// result goes in its item's place. The same results however the work falls out.
 pub fn each_mut<T: Send, R: Send>(items: &mut [T], threads: usize, share_at: usize, f: impl Fn(&mut T) -> R + Sync) -> Vec<R> {
     let threads = threads.min(items.len()).max(1);
     if threads < 2 || items.len() < share_at.max(1) {
         return items.iter_mut().map(f).collect();
     }
-    let size = items.len().div_ceil(threads);
-    let f = &f;
-    std::thread::scope(|scope| {
-        let handles: Vec<_> =
-            items.chunks_mut(size).map(|chunk| scope.spawn(move || chunk.iter_mut().map(f).collect::<Vec<R>>())).collect();
-        handles.into_iter().flat_map(|h| h.join().expect("an actor's thread does not panic: steps are caught")).collect()
-    })
+    let n = items.len();
+    let next = std::sync::Mutex::new(items.iter_mut().enumerate());
+    let (f, next) = (&f, &next);
+    let done: Vec<Vec<(usize, R)>> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..threads)
+            .map(|_| {
+                scope.spawn(move || {
+                    let mut mine = vec![];
+                    loop {
+                        let Some((i, item)) = next.lock().unwrap_or_else(|e| e.into_inner()).next() else { break mine };
+                        mine.push((i, f(item)));
+                    }
+                })
+            })
+            .collect();
+        handles.into_iter().map(|h| h.join().expect("an actor's thread does not panic: steps are caught")).collect()
+    });
+    let mut slots: Vec<Option<R>> = (0..n).map(|_| None).collect();
+    for (i, r) in done.into_iter().flatten() {
+        slots[i] = Some(r);
+    }
+    slots.into_iter().map(|r| r.expect("every item was worked out")).collect()
 }
 
 impl<W: Write> Engine<W> {
@@ -817,7 +833,8 @@ impl<W: Write> Engine<W> {
             ));
         }
         // Look, in key order.
-        let mut stepping: Vec<(Unit, Picture)> = vec![];
+        // (Each code unit with what it was shown: its view takes the observation in as it decides, on its thread.)
+        let mut stepping: Vec<(Unit, Option<crate::observe::Observation>, Option<String>)> = vec![];
         let mut seats = vec![];
         let mut kept_awake = vec![];
         for (key, n) in awake {
@@ -893,14 +910,16 @@ impl<W: Write> Engine<W> {
                     }
                     self.annotate(json!({ "annotation": "observation", "subject": u.participant, "data": data }))?;
                 }
-                let pic = u.view.apply(obs, only.as_deref(), &u.entity.clone(), &u.woke_for.clone(), u.since);
-                stepping.push((u, pic));
+                stepping.push((u, Some(obs), only));
             }
             kept_awake.push((key, n));
         }
         // Decide, all at once.
         let seed = self.seed;
-        let results = each_mut(&mut stepping, self.opts.threads, self.opts.share_at, |(u, pic)| {
+        let results = each_mut(&mut stepping, self.opts.threads, self.opts.share_at, |(u, obs, only)| {
+            let obs = obs.take().expect("each unit is stepped once");
+            let pic = u.view.apply(obs, only.as_deref(), &u.entity, &u.woke_for, u.since);
+            let pic = &pic;
             let answers = std::mem::take(&mut u.answers);
             let ctx = u.ctx.as_ref().expect("a code unit has its context");
             let actor = u.actor.as_mut().expect("a code unit has its actor");
@@ -916,7 +935,7 @@ impl<W: Write> Engine<W> {
         });
         self.steps += results.len() as u64;
         let mut decided = BTreeMap::new();
-        for ((u, _), r) in stepping.into_iter().zip(results) {
+        for ((u, _, _), r) in stepping.into_iter().zip(results) {
             decided.insert(u.key.clone(), Decided::Code(r));
             self.units.insert(u.key.clone(), u);
         }
