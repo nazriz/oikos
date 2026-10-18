@@ -63,6 +63,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   mkdirSync(outDir, { recursive: true });
   let header: any;
   let orch: any = {};
+  let engineModules: { [name: string]: unknown } | undefined;
   let entries = 0;
   let lastHash = "";
   let lastT = 0;
@@ -232,7 +233,12 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     if (actions && e.seq !== undefined && e.kind !== "event") flushActions(e.seq);
     if (e.kind === "annotation") {
       const a = b.annotation;
-      if (a === "orchestrator") orch = b.data ?? {};
+      if (a === "orchestrator") orch = { ...b.data, ...(engineModules ? { modules: { ...engineModules, ...(b.data?.modules ?? {}) } } : {}) };
+      // (The Rust world: the engine's note of the modules it runs, beside the host's own record of its seats' brains.)
+      else if (a === "note" && b.data?.engine?.modules) {
+        engineModules = b.data.engine.modules;
+        if (orch.version !== undefined) orch = { ...orch, modules: { ...engineModules, ...(orch.modules ?? {}) } };
+      }
       else if (a === "usage") pendingUsage.set(b.subject, { input: b.input_tokens, output: b.output_tokens, cost_microusd: b.cost_microusd });
       else if (a === "transcript") {
         const d = b.data ?? {};

@@ -66,6 +66,8 @@ pub struct EngineOptions {
     /// Record each code actor's observation in full, as an `observation` annotation, as run.ts did for code units when
     /// asked (`recordObservations: "code" | "all"`): for the invariants' no-god-view check and for training data.
     pub record_observations: bool,
+    /// Or only these participants' (run.ts `recordObservations` as a list).
+    pub record_observations_of: BTreeSet<String>,
 }
 
 impl Default for EngineOptions {
@@ -80,6 +82,7 @@ impl Default for EngineOptions {
             mock_seats: true,
             host_seats: false,
             record_observations: false,
+            record_observations_of: BTreeSet::new(),
         }
     }
 }
@@ -860,10 +863,12 @@ impl<W: Write> Engine<W> {
                 });
                 self.units.insert(key.clone(), u);
             } else {
-                if self.opts.record_observations {
+                if self.opts.record_observations || self.opts.record_observations_of.contains(&u.participant) {
                     // (Its channels as a list, each with its path, as run.ts recorded them: a position's channel paths
                     // have a "/", which the log's free-form data does not allow in a key.)
                     let mut v = serde_json::to_value(&obs).map_err(|e| e.to_string())?;
+                    // (Whom it was shown to act for, as a seat's observation says: what the checker holds it to.)
+                    v["entity"] = json!(u.entity);
                     if let Some(chans) = v.get("channels").and_then(Value::as_object).cloned() {
                         v["channels"] = Value::Array(chans.into_iter().map(|(path, mut c)| {
                             c["path"] = json!(path);
@@ -871,7 +876,11 @@ impl<W: Write> Engine<W> {
                         }).collect());
                     }
                     let mut data = json!({ "t": t, "observation": v });
-                    if let Some(c) = only.as_deref().filter(|c| *c != "self") {
+                    // (The capacity it was shown in: its unit's post, or the one post a system holds, which a system's
+                    // unit of no capacity sees as run.ts's did.)
+                    let held = self.held(&u.participant);
+                    let as_ = only.clone().filter(|c| c != "self").or_else(|| (held.len() == 1 && self.parts.get(&u.participant).is_some_and(|p| p.kind == "system")).then(|| held[0].clone()));
+                    if let Some(c) = as_ {
                         data["as"] = json!(c);
                     }
                     self.annotate(json!({ "annotation": "observation", "subject": u.participant, "data": data }))?;

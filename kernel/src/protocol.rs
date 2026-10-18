@@ -403,8 +403,10 @@ fn start_engine(session: &mut Session, req: &Value, config: Option<Value>) -> Re
     if let Some(n) = o["threads"].as_u64() {
         opts.threads = (n as usize).max(1);
     }
-    if let Some(b) = o["record_observations"].as_bool() {
-        opts.record_observations = b;
+    match &o["record_observations"] {
+        Value::Bool(b) => opts.record_observations = *b,
+        Value::Array(ids) => opts.record_observations_of = ids.iter().filter_map(Value::as_str).map(String::from).collect(),
+        _ => {}
     }
     if let Some(b) = o["record_decisions"].as_bool() {
         opts.record_decisions = b;
