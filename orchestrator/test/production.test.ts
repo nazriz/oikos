@@ -229,7 +229,10 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   for (const f of ["factory-1", "factory-2"]) {
     // What the shops ordered, as the factory counts it: orders paid that month, in full, met or not (its delivery notes).
     const ordered = (m: number) => recs1.filter((r) => r.kind === "delivery_note" && r.speaks_for === f && !r.data.declined && Math.floor(r.at / MONTH) === m).reduce((x, r) => x + r.data.ordered, 0);
-    const quota = (m: number) => recs1.filter((r) => r.kind === "buying_offer" && Math.floor(r.at / MONTH) === m).reduce((x, r) => x + (r.data.quantities?.[f] ?? 0), 0);
+    // (Changed 2026-10-18, integration, with the exports above: its export share is the room it has learned (risks ME-15,
+    // boundary.md "Exports"), which the offer does not say, so the bound is the offer's whole quantity. On the TS world,
+    // where a factory's share was named in the offer, the band's top is the tighter bound it was; this holds there too.)
+    const quota = (m: number) => recs1.filter((r) => r.kind === "buying_offer" && Math.floor(r.at / MONTH) === m).reduce((x, r) => x + (r.data.quantity ?? 0), 0);
     let stock = Number(slack.world.holdings.find((h: any) => h.holder === f && h.kind === "goods")?.quantity ?? 0);
     // (Making takes the crew's hours now (F1, 2026-10-15), so it takes effect hours after it was ordered: it is held to the
     // month it was ordered in, which is the month the factory counted its band for.)
