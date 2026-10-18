@@ -1295,6 +1295,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   let stopped: string | undefined; // why the run stopped early, if it did (a spending limit)
   let stoppedBy: string | undefined; // (the error's name)
   let lastPause = performance.now();
+  let askedBy = 0; // (the Rust world: how far the engine was last asked to go before handing back)
   try {
     for (;;) {
       // (With the engine in this process nothing here waits on anything outside it, so a signal would go unheard until
@@ -1310,7 +1311,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       mark({ doing: "scheduling" });
       let due: any;
       try {
-        due = await k.request({ op: "next", until });
+        // (On the Rust world the engine runs everything between seats' wakes itself: it is asked a day at a time, so this
+        // process's other runs and its watchdog are heard. Nothing the world does depends on it.)
+        if (rustWorld) askedBy = Math.max(askedBy, t) + DAY; // (each ask a day further than the last, whatever the clock says)
+        due = await k.request(rustWorld ? { op: "next", until, by: askedBy } : { op: "next", until });
       } catch (e) {
         if (e instanceof Error && /kept waking each other/.test(e.message)) throw new RunStuck(e.message);
         throw e;

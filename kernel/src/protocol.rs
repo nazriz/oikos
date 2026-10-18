@@ -466,11 +466,15 @@ fn engine_reply(session: &mut Session, req: &Value) -> Result<Reply, String> {
             if let Some(u) = req["until"].as_i64() {
                 e.set_until(u);
             }
+            // (`by`: stop between moments once the clock reaches it, and say how far it got, so a host running several
+            // worlds in one process, or watching for a stall, gets its turn: nothing the world does depends on it.)
+            let by = req["by"].as_i64();
             let due = match session.due.take() {
                 Some(d) => d,
-                None => match e.host_next()? {
-                    crate::engine::Due::End => json!({ "ok": true, "end": true }),
-                    crate::engine::Due::Seats(seats) => {
+                None => match (match by { Some(b) => e.next_by(b), None => e.host_next().map(Some) })? {
+                    None => json!({ "ok": true, "advanced": e.t(), "events": [] }),
+                    Some(crate::engine::Due::End) => json!({ "ok": true, "end": true }),
+                    Some(crate::engine::Due::Seats(seats)) => {
                         let cohort: Vec<Value> = seats.iter().map(|s| json!({ "key": s.key, "woke_for": s.woke_for, "since": s.since })).collect();
                         json!({ "ok": true, "t": e.t(), "cohort": cohort })
                     }
