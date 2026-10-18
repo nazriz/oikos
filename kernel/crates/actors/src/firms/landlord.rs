@@ -294,8 +294,15 @@ impl Wanting for ArrearsWants {
         json!(self
             .held
             .iter()
-            .map(|w| json!({ "about": "arrears", "whom": w.tenant, "seeks": [{ "money": { "to": "me" } }], "against": { "record": w.lease, "kind": "arrears", "by": w.tenant },
-                "weight": w.weight, "since": w.since, "from": "event", "tried": w.tried, "way": w.way }))
+            .map(|w| {
+                let mut v = json!({ "about": "arrears", "whom": w.tenant, "seeks": [{ "money": { "to": "me" } }], "against": { "record": w.lease, "kind": "arrears", "by": w.tenant },
+                    "weight": w.weight, "since": w.since, "from": "event", "tried": w.tried });
+                // (No way tried yet: none written, as the record's contract has it.)
+                if let Some(way) = &w.way {
+                    v["way"] = json!(way);
+                }
+                v
+            })
             .collect::<Vec<_>>())
     }
 }

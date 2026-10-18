@@ -63,13 +63,13 @@ pub fn num(v: Option<&Value>) -> Option<i64> {
     match v? {
         Value::Null => Some(0),
         Value::Bool(b) => Some(i64::from(*b)),
-        Value::Number(n) => n.as_i64().or_else(|| n.as_f64().filter(|f| f.is_finite()).map(|f| f as i64)),
+        Value::Number(n) => n.as_i64().or_else(|| crate::papers::lenient::whole(&Value::Number(n.clone()))),
         Value::String(s) => {
             let t = s.trim();
             if t.is_empty() {
                 Some(0)
             } else {
-                t.parse::<i64>().ok().or_else(|| t.parse::<f64>().ok().filter(|f| f.is_finite()).map(|f| f as i64))
+                t.parse::<i64>().ok().or_else(|| crate::papers::lenient::whole(&Value::String(t.to_string())))
             }
         }
         _ => None,

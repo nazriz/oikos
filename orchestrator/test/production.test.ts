@@ -98,7 +98,11 @@ test("goods are made from inputs by workers' hours, exported within each factory
       || recs.some((r) => r.record === "claim" && r.basis === o.id) || o.at + (o.data.pay_in_days + 40) * DAY > 300 * DAY);
     expect(paid || declined || onTerms || o.at > 290 * DAY).toBe(true);
   }
-  // Exports: paid for at the month's offer price (world prices move), never beyond a factory's share of that month's demand.
+  // Exports: paid for at the month's offer price (world prices move), never beyond that month's demand. (Changed
+  // 2026-10-18, integration: exports follow what the outside will buy, not a share fixed for each factory (risks ME-15,
+  // docs/behaviour/boundary.md "Exports"; the Rust world's native rule): the outside pays for what it takes up to its
+  // appetite, open to every seller, so the bound is the offer's whole quantity, not each factory's named share. On the TS
+  // world a factory never ships past its share, so this holds there too.)
   const offersBy = recs.filter((r) => r.kind === "buying_offer" && r.speaks_for === "outside");
   const units = new Map<string, number>();
   // (Payments for exports settle the factory's invoice; other payments from outside are refunds.)
@@ -110,7 +114,9 @@ test("goods are made from inputs by workers' hours, exported within each factory
     const f = e.to.replace("acc-", "");
     const k = `${f}|${offer.id}`;
     units.set(k, (units.get(k) ?? 0) + Number(e.amount) / offer.data.unit_price);
-    expect(units.get(k)!).toBeLessThanOrEqual(offer.data.quantities[f]);
+    const all = `*|${offer.id}`;
+    units.set(all, (units.get(all) ?? 0) + Number(e.amount) / offer.data.unit_price);
+    expect(units.get(all)!).toBeLessThanOrEqual(offer.data.quantity ?? Object.values(offer.data.quantities as { [f: string]: number }).reduce((a, b) => a + b, 0));
   }
   expect(units.size).toBeGreaterThan(0);
   void share;

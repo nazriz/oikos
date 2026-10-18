@@ -433,6 +433,23 @@ The mechanism:
   place's counts.
 - **Fix when:** the flag is turned on for a study, or the other six profiles are given the table.
 
+### ME-20 · Landlords build whenever their homes are fully let, and shops chase the cheapest factory
+- **Gap:** A landlord applies to build on an empty lot whenever its homes have been fully let for 90 days, whatever the
+  cost against the rents it expects (a fixed rule, TS and Rust alike): a 1,000-person town builds 20 (TS) to 35 (Rust)
+  homes a year against England's net additions of about 1% of the stock a year (about 4 for a town of 400 households;
+  DLUHC, Housing supply: net additional dwellings, to confirm). And shops move their whole restocking to the cheapest
+  factory once it is more than 1% cheaper, so when a factory clears stock at a discount every shop piles on it and the
+  others' trade falls to nothing for a month (a cobweb: Ezekiel 1938); in some seeds this still drives factory layoffs
+  for want of cash (unemployment 7 to 11% in one seed of five per profile, against 0 to 3% in the others).
+- **Where:** `kernel/crates/actors/src/firms/landlord.rs` (building), `kernel/crates/actors/src/market/retailer.rs` (supplier
+  choice), `market/producer.rs`.
+- **Effect:** Construction and building jobs too high in every town; employment more volatile across seeds than a real
+  town's.
+- **L / I:** high / medium · **Status:** to fix (building by expected return on the market's rents; buyers splitting
+  orders across suppliers or holding standing contracts)
+- **Notice by:** town/economy construction against net additions; economy/summary unemployment's spread over seeds.
+- **Fix when:** Before a study of housing supply or employment; with ME-14's rents.
+
 ---
 
 ## Public bodies and law
@@ -1089,7 +1106,7 @@ The mechanism:
   `market/` (hiring, construction, shops' supply); `scripts/port-gate.ts`.
 - **Effect:** Any run on the Rust world is not comparable with the TS world's baselines and calibration notes; a steward
   experiment would read the port's differences as the steward's.
-- **L / I:** high / high · **Status:** to fix before the TS actors are deleted
+- **L / I:** high / medium · **Status:** partly fixed (decisions 2026-10-18, "Port step 3, second pass"): six faults found and fixed; what is left is explained there and judged against real figures
 - **Notice by:** `bun scripts/port-gate.ts` (runs/port-gate/gate.json).
 - **Fix when:** Before phase 4 (deleting the TS actors) and before any pilot on the Rust world.
 

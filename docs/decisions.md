@@ -6409,3 +6409,53 @@ rust-port.md says); or the shop mix changes measures the owner wants compared be
 That is 1.1 times as fast at 1,000 and 1.8 times at 10,000, well short of the plan's 4 to 10 times, and using up to
 four times the memory at 1,000 (each actor's own book: port-guide 5.6, item 7). Not profiled yet; phase 3's work.
 rust-port.md's stop rule (a 1,000-person year under twice as fast) is met on this reading: profile before going on.
+
+## 2026-10-18 · Port step 3, second pass: the faults behind the gate's moves, the books' readers, twins (no model called)
+
+The owner's adjustment (2026-10-18): matching the TS world is not the goal. The gate's measures item is now: no
+measure moved by a fault, and every big move explained and plausible against the real world. Twins and invariants
+stay strict.
+
+**Faults found behind the moves, and fixed** (each traced in a kept log, the TS twin of the same town beside it):
+- **Shops chased the cheapest factory.** Each week a shop moved its whole order to whichever factory was a penny
+  cheaper: one factory got everything, the rest nothing, they bought inputs for demand that vanished and let people go
+  for want of cash. A shop now stays with its supplier unless another is cheaper by more than 1%
+  (`supplier_switch_bps`; Lengnick 2013's threshold for households, Klemperer 1995; to confirm for buyers). A gb-eng
+  town's unemployment at 240 days went from 14.5% to 1.2%.
+- **First-month exports.** An exporter that had not yet learned its room shipped the whole outside offer, keeping
+  nothing for the shops. It now plans on its named share until it learns.
+- **Gatherings.** A citizen woken for a gathering's start filtered that wake away, so almost nobody went (40 goings
+  in 240 days, against the TS world's 1,900), and belief (learnt at gatherings) went with them. Now 49% take part
+  (TS 45%) and affiliation ends at 42% (TS 43%).
+- **Twins.** A mock seat's Rust brain was handed bare channel names, so it saw nothing and never acted. Seats now pass
+  the post's channel paths and are scheduled by the Rust kind's first wake and cadence.
+- **The host.** It now asks the engine a day at a time (`next` with `by`), so several runs in one process no longer
+  starve each other's watchdogs. The state hash is unchanged.
+- **The landlord's want record.** It now matches the contract: what it seeks is a typed outcome, and no null way.
+
+**The books' readers.** A helper ported the thirteen modules' readers (`offices/openbooks*.rs`), so `office.clerk`
+starts for every module the TS clerk served.
+
+**The gate's measures, after them** (gate.json):
+- **Threads:** the hash is the same on 1 and 14 threads in all three profiles.
+- **Beyond 3 SE:** 9 in au-vic, 4 in gb-eng and 6 in ke-nakuru.
+- **Explained:**
+  - About 1 to 2% more adults stay in town, and more households live together: partly housed 4 against the TS
+    world's 18 in gb-eng. A household in one home is what the real world has, so the Rust world is closer.
+  - From that, more homes are fully let, so more lets and move-ins, so more building: 1.7 times the TS world's in
+    gb-eng. Both worlds overbuild against real net additions; that is a fixed rule (ME-20), not the port.
+  - Business entry in au-vic now meets its target (16.2% against 16.4%) where the TS world's breached it: the native
+    entry rule.
+- **Still open (ME-20):** shops still pile onto a factory that clears stock at a discount (a cobweb). One seed in five
+  per profile has unemployment of 7 to 11%, and au-vic's households going without (6%, against a 5% target) is a new
+  breach. Mean unemployment (2.7 to 4.9%) is nearer the profiles' 4.6 to 5.4% than the TS world's (0 to 2%).
+
+**Scenario tests on the Rust world: 461 pass and 55 fail** (they were 385 and 131).
+- **TS-specific:** 8 register TS test modules the engine does not have (test.leaving, test.probing,
+  test.finance_holding, test.directing, test.exporter). They need Rust doubles or a `stub.script`.
+- **Pin:** culture-dial's pins are re-taken at the cut-over.
+- **Changed:** one assertion in production.test.ts, with its reason in the test. Exports are bounded by the outside's
+  whole appetite, not each factory's share (ME-15).
+- **Still failing, behaviour to trace:** seated offices (member sittings, seat acts, tenant answers, government),
+  rents and justice, households, clinic and school, building, home market, truth audits, invariance, word of mouth,
+  the 19-seat twin year and twin-draws. Twin-seat-year's first test is exact.

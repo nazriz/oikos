@@ -36,31 +36,24 @@ fn js_or(v: Option<&Value>, fallback: &str) -> String {
     nn(v).map_or_else(|| fallback.to_string(), |x| js(Some(x)))
 }
 
-/// `Number(x)` as a JavaScript number (NaN where it is not one).
-fn numf(v: Option<&Value>) -> f64 {
-    match v {
-        Some(Value::Number(n)) => n.as_f64().unwrap_or(f64::NAN),
-        Some(Value::String(s)) => {
-            let t = s.trim();
-            if t.is_empty() {
-                0.0
-            } else {
-                t.parse::<f64>().unwrap_or(f64::NAN)
-            }
-        }
-        Some(Value::Null) => 0.0,
-        Some(Value::Bool(b)) => f64::from(u8::from(*b)),
-        _ => f64::NAN,
-    }
-}
-
-/// a template literal of `Number(x) / 100`: basis points as a percentage, written as JavaScript writes the number.
+/// a template literal of `Number(x) / 100`: basis points as a percentage, written as JavaScript writes the number
+/// (exactly, from the whole number of basis points: "12.5", "7", "0.25"); "NaN" where it is not a whole number.
 fn pct(v: Option<&Value>) -> String {
-    let n = numf(v) / 100.0;
-    if n.is_nan() {
-        "NaN".to_string()
+    let n = match v {
+        Some(Value::Null) => Some(0),
+        Some(Value::Bool(b)) => Some(i64::from(*b)),
+        Some(x) => crate::papers::lenient::whole(x),
+        None => None,
+    };
+    let Some(n) = n else { return "NaN".to_string() };
+    let (sign, a) = if n < 0 { ("-", -n) } else { ("", n) };
+    let (w, f) = (a / 100, a % 100);
+    if f == 0 {
+        format!("{sign}{w}")
+    } else if f % 10 == 0 {
+        format!("{sign}{w}.{}", f / 10)
     } else {
-        format!("{n}")
+        format!("{sign}{w}.{f:02}")
     }
 }
 

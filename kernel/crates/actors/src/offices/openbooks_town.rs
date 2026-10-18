@@ -97,7 +97,7 @@ fn lines_words(lines: &[(String, i64)], w: &WorldInfo) -> String {
 
 /// Is a budget's year this year (`b.data?.year === year`).
 fn year_is(b: &Record, year: i64) -> bool {
-    d(b).get("year").and_then(Value::as_f64) == Some(year as f64)
+    d(b).get("year").and_then(Value::as_i64) == Some(year)
 }
 
 /// The town's budget for a year, of those adopted (the latest, if the council adopted more than one for it).
@@ -515,9 +515,9 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
     }
     let adopted = budget_for(book, year);
     let last: Option<&R> = adopted.or_else(|| {
-        let mut best: Option<(&R, f64)> = None;
+        let mut best: Option<(&R, i64)> = None;
         for b in book.open("budget") {
-            let Some(y) = d(b).get("year").and_then(Value::as_f64).filter(|y| *y < year as f64) else { continue };
+            let Some(y) = d(b).get("year").and_then(Value::as_i64).filter(|y| *y < year) else { continue };
             if best.is_none_or(|(c, cy)| y > cy || (y == cy && b.at > c.at)) {
                 best = Some((b, y));
             }
