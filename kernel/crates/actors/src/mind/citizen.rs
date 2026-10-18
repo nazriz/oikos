@@ -427,6 +427,10 @@ pub struct State {
     // talk
     pub told_us: BTreeMap<String, (News, i64)>,
     pub talked: BTreeMap<String, i64>,
+    /// People we have come to know by talking with them, mourning with them or meeting them at a gathering (TS's
+    /// `peopleWeKnow`, kept at the same places): those asked whether we may stay when we have no home.
+    #[serde(default)]
+    pub people_known: BTreeSet<String>,
     /// The people we know from homes and workplaces shared, with when, in the order TS's Map kept them.
     pub contacts: Vec<(String, i64)>,
     pub asked_how: Vec<String>,
@@ -603,6 +607,7 @@ impl State {
             last_seen: 0,
             told_us: BTreeMap::new(),
             talked: BTreeMap::new(),
+            people_known: BTreeSet::new(),
             contacts: vec![],
             asked_how: vec![],
             asked: vec![],
@@ -1131,6 +1136,9 @@ impl Outlook for CitizenMind {
     }
     fn affinity(&self, who: &str, t: i64) -> i64 {
         self.s.ties.affinity(who, t)
+    }
+    fn knows(&self, who: &str) -> bool {
+        self.s.people_known.contains(who)
     }
     fn closest(&self, n: usize, t: i64) -> Vec<Tie> {
         self.s.ties.closest(n, t).into_iter().map(|x| Tie { who: x.who.clone(), affinity_bps: x.affinity, trust_bps: Some(x.trust) }).collect()

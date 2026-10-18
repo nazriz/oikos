@@ -217,12 +217,14 @@ impl CitizenMind {
             self.s.contacts.retain(|(c, _)| *c != gone);
             self.s.told_us.remove(&gone);
             self.s.ties.add(person, 500, t, Some("mourned"));
+            self.s.people_known.insert(person.into());
             return Heard::Taken;
         }
         if text == catching_up::ASK {
             self.s.asked_how.push(from.into());
             self.s.talked.insert(person.into(), t);
             self.s.ties.add(person, 300, t, Some("talked"));
+            self.s.people_known.insert(person.into());
             return Heard::Taken;
         }
         if self.s.culture.is_some() {
@@ -233,6 +235,7 @@ impl CitizenMind {
             self.s.told_us.insert(person.into(), (told.clone(), t));
             self.s.talked.insert(person.into(), t);
             self.s.ties.add(person, 300, t, Some("talked"));
+            self.s.people_known.insert(person.into());
             self.s.ties.trusted(person, true, 200);
             if let Some(b) = &told.let_go_by {
                 if self.s.inner.trusted(b).is_some() || life.employer.as_deref() == Some(b.as_str()) {

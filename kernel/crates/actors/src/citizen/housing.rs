@@ -1290,7 +1290,7 @@ impl Person {
         let owes: i64 = self.s.missed.iter().filter(|x| x.what == "the rent").map(|x| x.amount).sum();
         let mine: BTreeSet<String> = self.s.household.as_ref().map(|h| h.members.iter().map(|m| m.person.clone()).collect()).unwrap_or_default();
         let pb = Self::people_bps(w);
-        let someone = self.mind.closest(5, t).into_iter().any(|x| self.s.people_we_know.contains(&x.who) && !mine.contains(&x.who) && x.affinity_bps >= 1_000 && x.trust_bps.unwrap_or(0) >= pb);
+        let someone = self.mind.closest(5, t).into_iter().any(|x| (self.s.people_we_know.contains(&x.who) || self.mind.knows(&x.who)) && !mine.contains(&x.who) && x.affinity_bps >= 1_000 && x.trust_bps.unwrap_or(0) >= pb);
         let go_to = if balance >= home.rent + self.p.essentials {
             "means_for_another"
         } else if someone {
@@ -1661,7 +1661,7 @@ impl Person {
                 .closest(n, t)
                 .into_iter()
                 .map(|x| x.who)
-                .filter(|x| self.s.people_we_know.contains(x) && !mine.contains(x) && !self.housing.stay_asked.contains(x))
+                .filter(|x| (self.s.people_we_know.contains(x) || self.mind.knows(x)) && !mine.contains(x) && !self.housing.stay_asked.contains(x))
                 .take(self.p.stay.ask)
                 .collect();
             self.housing.stay_asked.extend(whom.iter().cloned());

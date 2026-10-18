@@ -534,6 +534,10 @@ pub trait Outlook {
     fn feeling(&self, emotion: &str, about: &str, t: i64) -> i64;
     fn affinity(&self, who: &str, t: i64) -> i64;
     /// The closest people, at most `n`, closest first (ties by id).
+    /// Whether we have come to know them by talking with them, mourning with them or meeting them (TS `peopleWeKnow`).
+    fn knows(&self, _who: &str) -> bool {
+        false
+    }
     fn closest(&self, n: usize, t: i64) -> Vec<Tie>;
     /// What has been learned of an option in a domain (experience-weighted attraction, basis points), if anything.
     fn learned(&self, domain: &str, option: &str) -> Option<i64>;

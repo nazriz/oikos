@@ -164,6 +164,8 @@ fn asked_how_we_are_we_answer_in_our_own_words_at_the_plan() {
     let l = life(DAY);
     let (h, _) = at(&c, &mut d, DAY, vec![], |cx| m.event(cx, &pic(DAY), &Book::new(), &l, Event::Talk { from: "p.bea".into(), person: "bea".into(), text: "How are things with you?".into(), re: None }, &NoOpenings));
     assert_eq!(h, Heard::Taken);
+    // Talking with someone is coming to know them (TS `peopleWeKnow`): the people a household with no home asks.
+    assert!(m.knows("bea") && !m.knows("cal"));
     let (planned, _) = at(&c, &mut d, DAY, vec![], |cx| m.plan(cx, &pic(DAY), &Book::new(), &l, &NoOpenings));
     let said: Vec<String> = planned.steps.iter().flat_map(|s| s.lines.iter().map(|l| format!("{:?}", l.call))).collect();
     assert!(said.iter().any(|x| x.contains("I work for firm.1; they pay on time.")), "{said:?}");

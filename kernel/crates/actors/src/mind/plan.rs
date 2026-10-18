@@ -1548,6 +1548,7 @@ impl CitizenMind {
                 for o in &others {
                     self.s.talked.insert(o.clone(), t);
                     self.s.ties.add(o, 100, t, Some("met"));
+                    self.s.people_known.insert(o.clone());
                 }
             }
             self.s.attending = None;
