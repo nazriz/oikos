@@ -711,7 +711,13 @@ impl Plan for Firm {
             let what = if let Some(r) = &w.remove { format!("demolishing {r}") } else { format!("building a {} on {}", w.type_.clone().unwrap_or_default(), w.on.clone().unwrap_or_default()) };
             let invoice = w.price.map(|price| {
                 let p = Invoice { outcome: Some(PaymentOutcome { money: Some(crate::papers::market::MoneyOutcome { from: None, to: acc.account.clone(), amount: price, for_: Some(what.clone()), line: None, settles: None }), account: None }), agreement: Some(w.agreement.clone()), type_: if w.remove.is_some() { None } else { w.type_.clone() }, kind: None, quantity: None, from_at: None, dockets: vec![], service: None, home: None, kl: None, days: None, units: None, estimated: None };
-                say("invoice", &format!("Invoice: {} for {what}.", money_words(price, &cx.ctx.world)), Say { to: Some(vec![w.client.clone()]), basis: Some(w.agreement.clone()), data: Some(paper_data(&p)), ..Default::default() })
+                {
+                    // (The amount of money an outcome asks for is a decimal string in the smallest unit, as every other invoice and
+                    // request in the world writes it, and as the bank's transfers it is paid by record it.)
+                    let mut d = paper_data(&p);
+                    d["outcome"]["money"]["amount"] = Value::String(price.to_string());
+                    say("invoice", &format!("Invoice: {} for {what}.", money_words(price, &cx.ctx.world)), Say { to: Some(vec![w.client.clone()]), basis: Some(w.agreement.clone()), data: Some(d), ..Default::default() })
+                }
             });
             if let Some(sid) = &w.remove {
                 // We need to know what it is (how long it takes to bring down): once we've seen it, we start.
