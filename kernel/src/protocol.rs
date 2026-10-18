@@ -513,8 +513,10 @@ fn engine_reply(session: &mut Session, req: &Value) -> Result<Reply, String> {
         }
         "questions" => {
             // (The code actors' questions to models since last asked: the host answers those it has a model for.)
+            // (With them, the signoffs of the actors' words since: a host whose translators stand as one hears each.)
             let qs: Vec<Value> = e.questions().into_iter().map(|(key, q)| json!({ "key": key, "kind": q.kind, "about": q.about, "body": q.body })).collect();
-            Ok(Reply::Value(json!({ "ok": true, "questions": qs })))
+            let signed: Vec<Value> = e.signed().into_iter().map(|(draft, decision)| json!({ "draft": draft, "decision": decision })).collect();
+            Ok(Reply::Value(json!({ "ok": true, "questions": qs, "signed": signed })))
         }
         "answer" => {
             let answers: Vec<oikos_actors::Answer> = serde_json::from_value(req.get("answers").cloned().ok_or("missing answers")?).map_err(|x| format!("bad answers: {x}"))?;

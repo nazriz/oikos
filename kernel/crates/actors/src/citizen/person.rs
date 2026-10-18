@@ -302,6 +302,9 @@ struct Saved {
     book: Value,
     mind: Value,
     todo: Vec<(String, Option<String>, Mark)>,
+    /// A translator's accepted draft a step of the queue carries, by its place in it (the call language cannot say it).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    drafted: Vec<(usize, crate::steps::Drafted)>,
 }
 
 /// A step's program as text and back (a snapshot keeps the queue as the call language reads it back exactly).
@@ -355,11 +358,16 @@ impl Person {
 
     pub fn restore(ctx: &Ctx, saved: Value) -> Result<Person, String> {
         let v: Saved = serde_json::from_value(saved).map_err(|e| e.to_string())?;
-        let todo = v
+        let mut todo = v
             .todo
             .into_iter()
             .map(|(t, why, mark)| step_of(&t, why).map(|step| Todo { step, mark }))
             .collect::<Result<Vec<_>, _>>()?;
+        for (i, d) in v.drafted {
+            if let Some(t) = todo.get_mut(i) {
+                t.step.act = Some(Box::new(d));
+            }
+        }
         Ok(Person {
             p: Params::of(&ctx.params)?,
             me: ctx.entity.clone(),
@@ -596,12 +604,12 @@ pub struct Week<'w, 'c> {
 
 impl Week<'_, '_> {
     pub fn push(&mut self, s: Step<()>) {
-        if !s.lines.is_empty() {
+        if !s.is_empty() {
             self.steps.push(s.into());
         }
     }
     pub fn push_marked(&mut self, s: Step<()>, mark: Mark) {
-        if !s.lines.is_empty() {
+        if !s.is_empty() {
             self.steps.push(Todo { step: s, mark });
         }
     }
@@ -676,6 +684,7 @@ impl Actor for Person {
             book: self.book.save(),
             mind: self.mind.save()?,
             todo: self.todo.iter().map(|t| (step_text(&t.step), t.step.why.clone(), t.mark.clone())).collect(),
+            drafted: self.todo.iter().enumerate().filter_map(|(i, t)| t.step.act.as_deref().map(|d| (i, d.clone()))).collect(),
         };
         serde_json::to_value(v).map_err(|e| e.to_string())
     }
@@ -770,7 +779,7 @@ impl Person {
             let mut w = Week { pic, cx: &mut *cx, t, acc, steps: vec![] };
             self.plan(&mut w);
             let planned = std::mem::take(&mut w.steps);
-            self.todo.extend(planned.into_iter().filter(|s| !s.step.lines.is_empty()));
+            self.todo.extend(planned.into_iter().filter(|s| !s.step.is_empty()));
             self.s.planned_at = t;
             {
                 let life = self.life(pic, t, None);
@@ -814,8 +823,8 @@ impl Person {
     }
 
     /// One step as the action of this wake (noted against the laws we have read, as every code actor's act is).
-    pub fn send(&mut self, s: Step<()>, _cx: &mut Cx) -> Action {
-        noted(&mut self.book, Action::Call { program: s.program(), reasoning: s.why.clone() })
+    pub fn send(&mut self, s: Step<()>, cx: &mut Cx) -> Action {
+        noted(&mut self.book, s.action(cx))
     }
     pub fn send_go(&mut self, go: Todo, cx: &mut Cx) -> Action {
         if let Mark::Go(to) = &go.mark {

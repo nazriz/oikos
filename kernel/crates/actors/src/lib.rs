@@ -119,6 +119,36 @@ pub struct Answer {
     pub body: Value,
 }
 
+/// What a code actor made of a draft of its words, one the host had the translator write for it (a `words` question;
+/// docs/behaviour/founding.md, "Through the translator"; run.ts `wordsFor` on the TS world). Nobody reads a code
+/// person's draft, so its own module says what the draft may be. The engine writes what the TS host wrote of it: the
+/// signoff (where there was a draft to sign) and one `words` note of what came of it. An accepted draft goes with the
+/// act that carries it out (`steps::Drafted`) and is reported in the step that sends that act, so the note can say
+/// whether the acts were begun; one not accepted, or with no draft, is reported in the step that decided so.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Worded {
+    /// The question's `about`: where the actor is told, as an answer of kind `words` (`{done: false, why}`), that the
+    /// acts of a draft it accepted could not be begun (`Words.done(false)`).
+    pub about: String,
+    /// Which part of the words (`name`, `purpose`, `gathers`, `asks`).
+    pub what: String,
+    pub idea: Option<String>,
+    /// The draft's id, where the host gave one.
+    pub draft: Option<String>,
+    pub draft_hash: Option<String>,
+    /// Whether its module said the draft may be (absent: no draft came back to sign).
+    pub accepted: Option<bool>,
+    /// Why it is not done: the module's reason, or the translator's.
+    pub why: Option<String>,
+    /// Which translator drafted it, where two stand as one (`first`, `behind`).
+    pub by: Option<String>,
+    /// The module put in what it holds to be its own plumbing (the accepted acts are not the draft's).
+    pub plumbing_added: bool,
+    /// Not what was meant, and put once more (a trained translator's first draft): its note waits for the second.
+    pub again: bool,
+}
+
 /// A belief an actor holds about the world, in a form the engine can check against the terms' readings (truth audits,
 /// docs/design/rebuild.md 8.2). Never used to decide anything.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -142,6 +172,7 @@ pub struct Cx<'a> {
     pub(crate) outcomes: Vec<Value>,
     pub(crate) record: Option<Value>,
     pub(crate) questions: Vec<Question>,
+    pub(crate) worded: Vec<Worded>,
 }
 
 /// What a step left beside its action.
@@ -154,6 +185,9 @@ pub struct Kept {
     /// A change to its own record (`{set, because?}`, docs/design/ai-citizens.md 10d): the kernel holds it.
     pub record: Option<Value>,
     pub questions: Vec<Question>,
+    /// Drafts of its words it decided on, or whose acts it sends with this action (the engine writes their signoffs and notes).
+    #[serde(default)]
+    pub worded: Vec<Worded>,
 }
 
 impl<'a> Cx<'a> {
@@ -168,6 +202,7 @@ impl<'a> Cx<'a> {
             outcomes: vec![],
             record: None,
             questions: vec![],
+            worded: vec![],
         }
     }
     /// A deterministic stream for this participant, this matter or day, and this purpose (docs/reliability.md, "Draws
@@ -194,9 +229,13 @@ impl<'a> Cx<'a> {
     pub fn ask(&mut self, q: Question) {
         self.questions.push(q);
     }
+    /// What it made of a draft of its words (`Worded`).
+    pub fn worded(&mut self, w: Worded) {
+        self.worded.push(w);
+    }
     /// What the step left beside its action (the engine's).
     pub fn into_kept(self) -> Kept {
-        Kept { decisions: self.decisions, outcomes: self.outcomes, record: self.record, questions: self.questions }
+        Kept { decisions: self.decisions, outcomes: self.outcomes, record: self.record, questions: self.questions, worded: self.worded }
     }
 }
 

@@ -281,6 +281,9 @@ pub struct Engine<W: Write> {
     /// Those a round's carry-out woke, held while the host answers the reading questions it raised: a decision's
     /// addressee may wake for it in the moment's next round, and must have its reading by then.
     held_round: Option<Vec<(String, u32)>>,
+    /// The signoffs of code actors' words since the host last asked (draft, `accept` or `reject`): a host whose two
+    /// translators stand as one hears them, as it hears a seat's (arrangement.ts `signed`).
+    signed: Vec<(String, String)>,
     lean: bool,
     thinking: Option<i64>,
     used: BTreeMap<String, String>,
@@ -426,6 +429,7 @@ impl<W: Write> Engine<W> {
             failures: 0,
             questions: vec![],
             held_round: None,
+            signed: vec![],
             lean: base.lean,
             thinking: base.thinking,
             used: BTreeMap::new(),
@@ -893,6 +897,10 @@ impl<W: Write> Engine<W> {
     pub fn questions(&mut self) -> Vec<(String, Question)> {
         std::mem::take(&mut self.questions)
     }
+    /// The signoffs of code actors' words since last asked (`Worded`): draft and decision.
+    pub fn signed(&mut self) -> Vec<(String, String)> {
+        std::mem::take(&mut self.signed)
+    }
     /// Answers for a unit, given to it with its next observation.
     pub fn answer(&mut self, key: &str, answers: Vec<Answer>) {
         if let Some(u) = self.units.get_mut(key) {
@@ -1054,6 +1062,7 @@ impl<W: Write> Engine<W> {
                 return Ok(());
             }
             r.cursor += 1;
+            let mut sending: Vec<oikos_actors::Worded> = vec![];
             let Some(d) = r.decided.remove(&key) else { continue };
             if !self.units.contains_key(&key) {
                 continue; // it ended this round
@@ -1083,11 +1092,21 @@ impl<W: Write> Engine<W> {
                 }
                 Decided::Code(Ok((action, kept))) => {
                     self.units.get_mut(&key).expect("checked").failures = 0;
-                    self.keep(&key, kept)?;
+                    sending = self.keep(&key, kept)?;
                     action
                 }
             };
+            let pid = self.units[&key].participant.clone();
             let (goes_on, acted, until) = self.apply(&key, action)?;
+            // (The words this action carried out, as the TS host noted them once the acts were begun or not.)
+            for w in std::mem::take(&mut sending) {
+                self.words_note(&pid, &w, if acted { None } else { Some("the acts could not be carried out".into()) })?;
+                if !acted {
+                    if let Some(u) = self.units.get_mut(&key) {
+                        u.answers.push(Answer { kind: "words".into(), about: w.about.clone(), body: json!({ "done": false, "why": "the acts could not be carried out" }) });
+                    }
+                }
+            }
             if !self.units.contains_key(&key) {
                 continue;
             }
@@ -1101,9 +1120,36 @@ impl<W: Write> Engine<W> {
         Ok(())
     }
 
+    /// One `words` note: what came of a part of a code actor's words sent through the translator (run.ts `wordsFor`).
+    /// `failed`: why the acts of an accepted draft were not begun (absent: they were, or it was not accepted).
+    fn words_note(&mut self, pid: &str, w: &oikos_actors::Worded, failed: Option<String>) -> Result<(), String> {
+        let done = w.accepted == Some(true) && failed.is_none();
+        let mut n = Map::new();
+        n.insert("what".into(), json!(w.what));
+        if let Some(i) = &w.idea {
+            n.insert("idea".into(), json!(i));
+        }
+        if let Some(d) = &w.draft {
+            n.insert("draft".into(), json!(d));
+        }
+        n.insert("result".into(), json!(if done { "done" } else { "not_done" }));
+        if let Some(why) = failed.or_else(|| w.why.clone()).filter(|_| !done).filter(|y| !y.is_empty()) {
+            n.insert("why".into(), json!(why));
+        }
+        if let Some(b) = &w.by {
+            n.insert("by".into(), json!(b));
+        }
+        if done && w.plumbing_added {
+            n.insert("plumbing_added".into(), json!(true));
+        }
+        self.note(pid, json!({ "words": Value::Object(n) }))
+    }
+
     /// What a step left beside its action: its decisions and outcomes (annotations, unless the log is lean), a change
-    /// to its own record (the kernel holds it), and its questions (queued for the host).
-    fn keep(&mut self, key: &str, kept: Kept) -> Result<(), String> {
+    /// to its own record (the kernel holds it), its questions (queued for the host), and what it made of drafts of its
+    /// words: each signoff, a `words` note for one not done, and those its action carries out (returned, for their
+    /// note once the action is applied).
+    fn keep(&mut self, key: &str, kept: Kept) -> Result<Vec<oikos_actors::Worded>, String> {
         let u = &self.units[key];
         let (pid, cap) = (u.participant.clone(), u.capacity.clone());
         if self.opts.record_decisions && !self.lean {
@@ -1148,7 +1194,20 @@ impl<W: Write> Engine<W> {
         for q in kept.questions {
             self.questions.push((key.to_string(), q));
         }
-        Ok(())
+        let mut sending = vec![];
+        for w in kept.worded {
+            if let (Some(draft), Some(ok)) = (&w.draft, w.accepted) {
+                let note: String = if ok { "what its module said the draft may be".into() } else { format!("not what was meant: {}", w.why.clone().unwrap_or_default()).chars().take(500).collect() };
+                self.annotate(json!({ "annotation": "signoff", "participant": pid, "draft": draft, "draft_hash": w.draft_hash.clone().unwrap_or_default(), "decision": if ok { "accept" } else { "reject" }, "note": note }))?;
+                self.signed.push((draft.clone(), if ok { "accept" } else { "reject" }.into()));
+            }
+            if w.accepted == Some(true) {
+                sending.push(w);
+            } else if !w.again {
+                self.words_note(&pid, &w, None)?;
+            }
+        }
+        Ok(sending)
     }
 
     /// One action carried out: whether the wake goes on, whether an act was begun, and until when it waits.

@@ -118,6 +118,8 @@ struct Saved {
     round: Option<RoundSaved>,
     rounds_at: (i64, u32),
     questions: Vec<(String, Question)>,
+    #[serde(default)]
+    signed: Vec<(String, String)>,
     used: BTreeMap<String, String>,
     steps: u64,
     until: i64,
@@ -313,6 +315,7 @@ impl<W: Write> Engine<W> {
                 round,
                 rounds_at: self.rounds_at,
                 questions: self.questions.clone(),
+                signed: self.signed.clone(),
                 used: self.used.clone(),
                 steps: self.steps,
                 until: self.until,
@@ -350,6 +353,7 @@ impl<W: Write> Engine<W> {
         }
         e.rounds_at = s.rounds_at;
         e.questions = s.questions.clone();
+        e.signed = s.signed.clone();
         e.used = s.used.clone();
         e.steps = s.steps;
         for u in &s.units {

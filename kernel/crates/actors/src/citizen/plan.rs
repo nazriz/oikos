@@ -103,7 +103,7 @@ impl Person {
         // for the week; its first steps go before all others (TS's `unshift`).
         let planned = self.mind_plan(w);
         for (i, s) in planned.first.into_iter().enumerate() {
-            if !s.lines.is_empty() {
+            if !s.is_empty() {
                 w.steps.insert(i, s.into());
             }
         }

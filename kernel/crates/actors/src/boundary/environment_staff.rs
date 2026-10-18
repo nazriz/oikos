@@ -66,7 +66,7 @@ pub struct StaffThen(pub Value);
 pub fn lift<T>(steps: Vec<Step<StaffThen>>, f: impl Fn(StaffThen) -> T) -> Vec<Step<T>> {
     steps
         .into_iter()
-        .map(|s| Step { lines: s.lines, why: s.why, then: s.then.map(&f), redo: s.redo, planned: s.planned, lapses_at: s.lapses_at })
+        .map(|s| Step { lines: s.lines, act: s.act, why: s.why, then: s.then.map(&f), redo: s.redo, planned: s.planned, lapses_at: s.lapses_at })
         .collect()
 }
 

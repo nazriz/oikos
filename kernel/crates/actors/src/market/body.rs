@@ -29,7 +29,7 @@ pub struct BodyThen(pub Value);
 pub fn lift<T, U>(steps: Vec<Step<T>>, f: impl Fn(T) -> U) -> Vec<Step<U>> {
     steps
         .into_iter()
-        .map(|s| Step { lines: s.lines, why: s.why, then: s.then.map(&f), redo: s.redo, planned: s.planned, lapses_at: s.lapses_at })
+        .map(|s| Step { lines: s.lines, act: s.act, why: s.why, then: s.then.map(&f), redo: s.redo, planned: s.planned, lapses_at: s.lapses_at })
         .collect()
 }
 

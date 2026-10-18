@@ -10,13 +10,11 @@
 //! grievances with the hours its members give; and winds up when nobody has joined.
 //!
 //! Decided fresh (docs/port-guide.md, section 2):
-//! - **Words through the translator are not here.** TS sent each part of a founder's composed piece through the
-//!   translator as a `propose` and carried it out only if the draft passed `founding.rs`'s `accept_*`. The Rust
-//!   participant API has no such action, so this module writes what the accepted draft would have been: the composer's
-//!   words in the statement's form the `accept_*` checks hold a draft to (a purpose with its assertion; the gathering at
-//!   the one place with the chosen rhythm; an offer of joining with the chosen dues). `arrived` records which way each
-//!   part came: `composer` (the founder's own words), `choice` (the composer's closed choice among what was open), or
-//!   `code`. The `accept_*` functions are ported and tested in `founding.rs` for whoever puts the translator back.
+//! - **Words through the translator** go through the host: each part of a founder's composed piece is a `words` question
+//!   (`founding::words_question`), which the host drafts with the translator as run.ts `wordsFor` does; at the next wake
+//!   the answer is held to `founding.rs`'s `accept_*`, and an accepted draft is sent as its blocks with the draft's
+//!   provenance (`steps::Drafted`). Anything else arrives the other way: the composer's closed choice, or code. TS asked
+//!   and acted in one wake; here the part waits a wake for its answer, and nothing else of setting up is done meanwhile.
 //! - The hours a body's members give are kept as `hours x MONTH` (an integer: `(members + 1) x hours-a-month x seconds`
 //!   added each wake), so the bank and the cases it pays for are exact where TS kept a float.
 //! - A date in a text is written by `common::when_words` ("by day N" in TS), a sum by `common::money_words`.
@@ -27,7 +25,7 @@
 //!   possession), so those branches are left to lane E. Reads of a paper's data are lenient, as TS's were, through
 //!   `Fields`; what it writes goes through the typed papers.
 
-use super::founding::{membership_offer, slice16, Hall};
+use super::founding::{accept_gathering, accept_membership, accept_purpose, membership_offer, slice16, words_came, words_question, Came, GatherBounds, Hall, MembershipBounds};
 use crate::common::{
     addressed_to, cites, data, filed_before, money_words, own_banked, part, when_words, withdraw, Book, Fields, Occurrences, OwnAccount, Piece, DAY, MONTH,
 };
@@ -37,6 +35,7 @@ use crate::papers::finance::ComplaintResponse;
 use crate::papers::{data as paper_data, lenient, Paper};
 use crate::steps::{arg, because, call, pay, say, Pay, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
+use oikos_contracts::blocks::Block;
 use oikos_sight::calls::{Call, Value as Arg};
 use oikos_sight::{Record, RecordBody};
 use serde::{Deserialize, Serialize};
@@ -645,8 +644,17 @@ pub struct Group {
     book: Book,
     hearings: Hearings,
     hears: Vec<Hears>,
-    /// Which way each part arrived: `composer`, `choice` or `code`.
+    /// Which way each part arrived: `translator`, `choice` or `code`.
     arrived: BTreeMap<String, String>,
+    /// Parts sent through the translator (`words` questions), with the time each was asked (1, or 2: asked again).
+    #[serde(default)]
+    asked: BTreeMap<String, u8>,
+    /// The host's answers, by part, until the plan takes them up.
+    #[serde(default)]
+    answers: BTreeMap<String, Value>,
+    /// Parts whose accepted draft's acts could not be begun: they arrive the other way.
+    #[serde(default)]
+    redo: BTreeSet<String>,
     account_asked: bool,
     place: String,
     lapsed: bool,
@@ -757,6 +765,9 @@ impl Group {
             hearings,
             hears,
             arrived: BTreeMap::new(),
+            asked: BTreeMap::new(),
+            answers: BTreeMap::new(),
+            redo: BTreeSet::new(),
             account_asked: false,
             lapsed: false,
             few_since: None,
@@ -858,21 +869,54 @@ impl Group {
 
     // ---- the words ----
     fn say_purpose(&self) -> Step<()> {
-        // (The composer's own words where it wrote some; else the plain statement of the founder's want.)
-        let own = self.p.composed.as_ref().filter(|c| !c.purpose.trim().is_empty());
-        let words = own.map_or(self.p.purpose.as_str(), |c| c.purpose.as_str());
-        let mut d = paper_data(&Purpose { idea: Some(self.p.idea.clone()), written_by: Some(if own.is_some() { "composer" } else { "code" }.into()), for_: Some(self.p.founder.clone()) });
-        if let (Some(c), Some(m)) = (own, d.as_object_mut()) {
-            m.insert("model".into(), json!(c.model));
-        }
+        let words = self.p.purpose.as_str();
         because(
-            if own.is_some() { "Saying what we are for, in the founder's own words." } else { "Saying what we are for, in plain words." },
+            "Saying what we are for, in plain words.",
             vec![say(
                 "purpose",
                 words,
-                Say { visible: Some(Visible::Public), data: Some(d), extra: vec![("assertion", json!({ "that": slice16(words, 1_000) }))], ..Default::default() },
+                Say {
+                    visible: Some(Visible::Public),
+                    data: Some(paper_data(&Purpose { idea: Some(self.p.idea.clone()), written_by: Some("code".into()), for_: Some(self.p.founder.clone()) })),
+                    extra: vec![("assertion", json!({ "that": slice16(words, 1_000) }))],
+                    ..Default::default()
+                },
             )],
         )
+    }
+    /// A part of the piece sent through the translator (founded.ts `through`): asked once; while its answer is out,
+    /// nothing; then the accepted draft, or, if it does not come back as what it may be, `otherwise` (arrived `fallback`).
+    #[allow(clippy::too_many_arguments)]
+    fn through(&mut self, cx: &mut Cx, part: &str, text: String, accept: impl FnOnce(&[Block]) -> Result<Vec<Value>, String>, otherwise: Step<()>, fallback: &str) -> Option<Step<()>> {
+        let about = format!("{}|{part}", self.p.idea);
+        if self.redo.remove(part) {
+            self.arrived.insert(part.into(), fallback.into());
+            return Some(otherwise);
+        }
+        let Some(&attempt) = self.asked.get(part) else {
+            self.asked.insert(part.into(), 1);
+            cx.ask(words_question(&about, part, &self.p.idea, &text, 1));
+            return None;
+        };
+        let answer = self.answers.remove(part)?;
+        match words_came(&about, part, &self.p.idea, &answer, accept) {
+            Came::Accepted(d) => {
+                self.arrived.insert(part.into(), "translator".into());
+                Some(Step::drafted(d))
+            }
+            Came::Again(w) if attempt < 2 => {
+                cx.worded(w);
+                self.asked.insert(part.into(), 2);
+                cx.ask(words_question(&about, part, &self.p.idea, &text, 2));
+                None
+            }
+            Came::Again(mut w) | Came::NotDone(mut w) => {
+                w.again = false;
+                cx.worded(w);
+                self.arrived.insert(part.into(), fallback.into());
+                Some(otherwise)
+            }
+        }
     }
     fn gather_text(&self) -> String {
         format!(
@@ -992,10 +1036,25 @@ impl Group {
             }
             return out;
         }
+        let quoted = |x: &str| x.split_whitespace().collect::<Vec<_>>().join(" ").replace('"', "'");
+        let composed = self.p.composed.clone();
         if self.mine("purpose").is_none() {
-            let way = if self.p.composed.as_ref().is_some_and(|c| !c.purpose.trim().is_empty()) { "composer" } else { "code" };
-            self.arrived.insert("purpose".into(), way.into());
-            out.push(self.say_purpose());
+            if let Some(c) = composed.as_ref().filter(|_| !self.arrived.contains_key("purpose") || self.redo.contains("purpose")) {
+                let (idea, model, founder) = (self.p.idea.clone(), c.model.clone(), self.p.founder.clone());
+                let text = format!("Put out a public statement, of kind purpose, in these words: \"{}\"", quoted(&c.purpose));
+                let accept = |blocks: &[Block]| {
+                    let mut r = accept_purpose(&me, blocks)?;
+                    for b in &mut r {
+                        b["data"] = json!({ "idea": idea, "written_by": "composer", "model": model, "for": founder });
+                    }
+                    Ok(r)
+                };
+                let otherwise = self.say_purpose();
+                out.extend(self.through(cx, "purpose", text, accept, otherwise, "code"));
+            } else if composed.is_none() {
+                self.arrived.insert("purpose".into(), "code".into());
+                out.push(self.say_purpose());
+            }
             return out;
         }
         let Some(gathering) = self.practice() else {
@@ -1006,14 +1065,34 @@ impl Group {
             } else {
                 Way::Code
             };
-            self.arrived.insert("gathers".into(), way.name().into());
-            out.push(self.say_gathering(way, &self.place.clone(), self.first_at()));
+            if let Some(c) = composed.as_ref().filter(|_| !self.arrived.contains_key("gathers") || self.redo.contains("gathers")) {
+                let on = if !self.p.place_on.is_empty() && self.place == self.p.place { format!(", on {}", self.p.place_on) } else { String::new() };
+                let text = format!("Put up a public notice of our gathering, a practice held at {}{on}: \"{}\"", self.place, quoted(&c.gathers));
+                let bounds = GatherBounds { at: self.place.clone(), every_days: self.p.every_days.clone(), lasts_minutes: self.p.lasts_minutes.clone(), first: (t, t + 30 * DAY), at_seconds: self.p.at_seconds };
+                let otherwise = self.say_gathering(way, &self.place.clone(), self.first_at());
+                out.extend(self.through(cx, "gathers", text, |b| accept_gathering(&me, &bounds, b), otherwise, way.name()));
+            } else if composed.is_none() {
+                self.arrived.insert("gathers".into(), way.name().into());
+                out.push(self.say_gathering(way, &self.place.clone(), self.first_at()));
+            }
             return out;
         };
         if self.mine("membership").is_none() {
             let way = self.chose(self.choice().and_then(|c| c.dues), &self.p.dues);
-            self.arrived.insert("asks".into(), way.name().into());
-            out.push(self.say_membership(way, acc.as_ref().map(|a| a.account.as_str()), cx));
+            let account = acc.as_ref().map(|a| a.account.clone());
+            if let Some(c) = composed.as_ref().filter(|_| !self.arrived.contains_key("asks") || self.redo.contains("asks")) {
+                let into = match (&account, dues > 0) {
+                    (Some(a), true) => format!(" Dues are paid monthly into {a}."),
+                    _ => String::new(),
+                };
+                let text = format!("Offer membership publicly, for anyone to join: \"{}\"{into}", quoted(&c.asks));
+                let bounds = MembershipBounds { account: account.clone(), dues: self.p.dues.clone(), notice: self.notice_secs() };
+                let otherwise = self.say_membership(way, account.as_deref(), cx);
+                out.extend(self.through(cx, "asks", text, |b| accept_membership(&me, &bounds, b), otherwise, way.name()));
+            } else if composed.is_none() {
+                self.arrived.insert("asks".into(), way.name().into());
+                out.push(self.say_membership(way, account.as_deref(), cx));
+            }
             return out;
         }
         if !self.hears.is_empty() && !self.book.hearings().any(|r| r.speaks_for.as_deref() == Some(me.as_str())) {
@@ -1310,8 +1389,20 @@ impl Group {
 impl Plan for Group {
     type Then = ();
 
-    fn absorb(&mut self, pic: &Picture, _: &mut Cx) {
+    fn absorb(&mut self, pic: &Picture, cx: &mut Cx) {
         self.book.absorb(pic);
+        // The host's answers to our words: a draft (or why none), or that the acts of one we accepted were not begun.
+        for a in std::mem::take(&mut cx.answers) {
+            let Some(part) = a.about.strip_prefix(&format!("{}|", self.p.idea)).map(String::from) else { continue };
+            if a.kind != "words" {
+                continue;
+            }
+            if a.body.get("done").and_then(Value::as_bool) == Some(false) {
+                self.redo.insert(part);
+            } else if self.asked.contains_key(&part) {
+                self.answers.insert(part, a.body);
+            }
+        }
     }
 
     fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<()>> {
@@ -1368,6 +1459,11 @@ mod tests {
         made: usize,
         /// The record it has set, the changes merged (each change sets only the sections that differ).
         record: Option<Value>,
+        /// The questions it has put (to the host), and the answers it is given at its next wake.
+        asked: Vec<crate::Question>,
+        answers: Vec<crate::Answer>,
+        /// What it made of drafts of its words (the engine's to note).
+        worded: Vec<crate::Worded>,
     }
 
     fn rig(params: Value) -> Rig {
@@ -1386,7 +1482,7 @@ mod tests {
             world: Arc::new(world),
         };
         let actor = Founded.create(&ctx).unwrap();
-        Rig { ctx, actor, view: View::default(), draws: Draws::new(AS, "convenor"), made: 0, record: None }
+        Rig { ctx, actor, view: View::default(), draws: Draws::new(AS, "convenor"), made: 0, record: None, asked: vec![], answers: vec![], worded: vec![] }
     }
 
     fn account(balance: i64) -> Value {
@@ -1407,9 +1503,12 @@ mod tests {
                 }
                 let obs = serde_json::from_value(json!({ "participant": AS, "t": t, "status": "active", "outcomes": [], "inbox": [], "drafts": [], "channels": channels })).unwrap();
                 let pic = self.view.apply(obs, Some("convenor"), ME, woke, DAY);
-                let mut cx = Cx::new(t, &self.ctx, &mut self.draws, 1, vec![]);
+                let mut cx = Cx::new(t, &self.ctx, &mut self.draws, 1, std::mem::take(&mut self.answers));
                 let action = self.actor.step(&pic, &mut cx);
-                if let Some(r) = cx.into_kept().record {
+                let kept = cx.into_kept();
+                self.asked.extend(kept.questions);
+                self.worded.extend(kept.worded);
+                if let Some(r) = kept.record {
                     let mut all = self.record.take().unwrap_or_else(|| json!({ "set": {} }));
                     for (k, v) in r["set"].as_object().unwrap() {
                         all["set"][k] = v.clone();
@@ -1423,6 +1522,21 @@ mod tests {
                         for l in lines {
                             let mut c = call_json(&l.call);
                             c["reasoning"] = json!(reasoning);
+                            out.push(c);
+                        }
+                        woke = "done";
+                    }
+                    // (A translator's draft, accepted: its blocks, written as the call that would say them, with how it came.)
+                    Action::Act { blocks, provenance, .. } => {
+                        self.made += 1;
+                        self.actor.sent(&format!("act.{}", self.made));
+                        for b in blocks {
+                            let mut c = serde_json::to_value(&b).unwrap();
+                            c["fn"] = json!(if c["block"] == "publish" { "statement" } else { "act" });
+                            c["provenance"] = match &provenance {
+                                oikos_sight::Provenance::Given(v) => v.clone(),
+                                oikos_sight::Provenance::Direct => json!("direct"),
+                            };
                             out.push(c);
                         }
                         woke = "done";
@@ -1484,6 +1598,32 @@ mod tests {
                 let rec = recorded(c, &format!("rec.s{}", made.len()), day * DAY);
                 fresh.push(rec.clone());
                 made.push(rec);
+            }
+        }
+        made
+    }
+
+    /// `set_up`, with the host answering each question the group put at a wake by its next.
+    fn set_up_answering(r: &mut Rig, balance: Option<i64>, days: i64, mut answer: impl FnMut(&crate::Question) -> Value) -> Vec<Value> {
+        let mut made: Vec<Value> = vec![];
+        let mut fresh: Vec<Value> = vec![];
+        let mut seen = 0;
+        for day in 0..days {
+            let w = r.wake(day * DAY, std::mem::take(&mut fresh), balance);
+            for c in of(&w, "statement", None) {
+                let rec = recorded(c, &format!("rec.s{}", made.len()), day * DAY);
+                fresh.push(rec.clone());
+                // (What was made, with how it came and in whose name, as the act said it.)
+                let mut m = rec;
+                m["provenance"] = c["provenance"].clone();
+                m["speaks_for"] = c["speaks_for"].clone();
+                made.push(m);
+            }
+            let new: Vec<crate::Question> = r.asked[seen..].to_vec();
+            seen = r.asked.len();
+            for q in new {
+                let body = answer(&q);
+                r.answers.push(crate::Answer { kind: q.kind.clone(), about: q.about.clone(), body });
             }
         }
         made
@@ -1575,15 +1715,19 @@ mod tests {
     }
 
     #[test]
-    fn a_composed_piece_is_said_in_the_composers_words_with_its_choice_where_it_was_among_what_was_open() {
-        let mut r = rig(json!({ "founder": "c0001", "shape": "gathering", "idea": "idea.1", "name": "The Circle", "purpose": "plain", "want": { "about": "loss", "since": 5, "weight": 1 },
-            "place": "house-1/dwelling.1", "place_on": "cell.4.7", "bank": "bank", "founded_at": 0, "dues": [0], "every_days": [14, 7], "starts_in_days": [7, 3], "lasts_minutes": [90, 60],
-            "composed": { "purpose": "We are for something.", "asks": "Come as you are.", "gathers": "The group gathers every week at 19:00.",
-                "choice": { "dues": 0, "every_days": 7, "starts_in_days": 3, "lasts_minutes": 45 }, "model": "m" } }));
-        let made = set_up(&mut r, None, 5);
-        assert_eq!(made[0]["text"], "We are for something.");
-        assert_eq!(made[0]["data"], json!({ "idea": "idea.1", "written_by": "composer", "for": "c0001", "model": "m" }));
-        assert_eq!(made[0]["assertion"], json!({ "that": "We are for something." }));
+    fn a_composed_piece_goes_to_the_translator_a_part_at_a_time_and_with_no_draft_arrives_as_its_choice_or_plain() {
+        let mut r = rig(composed_params());
+        // No translator to be had (the host answers each `words` question with nothing): the plain purpose, and the
+        // composer's closed choice for the gathering and the offer, in its words.
+        let made = set_up_answering(&mut r, None, 8, |_| Value::Null);
+        let parts: Vec<&str> = r.asked.iter().map(|q| q.body["what"].as_str().unwrap()).collect();
+        assert_eq!(parts, ["purpose", "gathers", "asks"], "each part asked once, in order");
+        assert!(r.asked.iter().all(|q| q.kind == "words" && q.about == format!("idea.1|{}", q.body["what"].as_str().unwrap())));
+        assert_eq!(r.asked[0].body["text"], "Put out a public statement, of kind purpose, in these words: \"We are for something.\"");
+        assert_eq!(r.asked[1].body["text"], "Put up a public notice of our gathering, a practice held at house-1/dwelling.1, on cell.4.7: \"The group gathers every week at 19:00.\"");
+        assert_eq!(r.asked[2].body["text"], "Offer membership publicly, for anyone to join: \"Come as you are.\"");
+        assert_eq!(made[0]["text"], "plain");
+        assert_eq!(made[0]["data"], json!({ "idea": "idea.1", "written_by": "code", "for": "c0001" }));
         // Every week, the first in 3 days; 45 minutes was not among what was open, so the plain default length (90).
         assert_eq!(made[1]["practice"]["every"], 7 * DAY);
         assert_eq!(made[1]["practice"]["first"], 3 * DAY + 19 * 3600);
@@ -1592,14 +1736,93 @@ mod tests {
         assert_eq!(made[1]["data"]["words"], "choice");
         assert_eq!(made[2]["text"], "Come as you are.");
         assert_eq!(made[2]["data"]["words"], "choice");
+        assert_eq!(r.worded.iter().map(|w| (w.what.as_str(), w.accepted)).collect::<Vec<_>>(), [("purpose", None), ("gathers", None), ("asks", None)]);
         let set = &r.record.as_ref().unwrap()["set"];
-        assert_eq!(set["purpose"]["arrived"], json!({ "purpose": "composer", "gathers": "choice", "asks": "choice" }));
+        assert_eq!(set["purpose"]["arrived"], json!({ "purpose": "code", "gathers": "choice", "asks": "choice" }));
         assert_eq!(set["purpose"]["model"], "m");
         // A choice outside everything open is the plain default.
-        let mut plain = rig(json!({ "name": "G", "place": "p", "dues": [0], "every_days": [14], "composed": { "purpose": "x", "asks": "y", "gathers": "z", "choice": { "every_days": 3 }, "model": "m" } }));
-        let made = set_up(&mut plain, None, 4);
+        let mut plain = rig(json!({ "name": "G", "place": "p", "idea": "i", "dues": [0], "every_days": [14], "composed": { "purpose": "x", "asks": "y", "gathers": "z", "choice": { "every_days": 3 }, "model": "m" } }));
+        let made = set_up_answering(&mut plain, None, 8, |_| Value::Null);
         assert_eq!(made[1]["data"]["words"], "code");
         assert_eq!(made[1]["text"], "G gathers at p every 14 days at 19:00, for 90 minutes. All welcome.");
+    }
+
+    fn composed_params() -> Value {
+        json!({ "founder": "c0001", "shape": "gathering", "idea": "idea.1", "name": "The Circle", "purpose": "plain", "want": { "about": "loss", "since": 5, "weight": 1 },
+            "place": "house-1/dwelling.1", "place_on": "cell.4.7", "bank": "bank", "founded_at": 0, "dues": [0], "every_days": [14, 7], "starts_in_days": [7, 3], "lasts_minutes": [90, 60],
+            "composed": { "purpose": "We are for something.", "asks": "Come as you are.", "gathers": "The group gathers every week at 19:00.",
+                "choice": { "dues": 0, "every_days": 7, "starts_in_days": 3, "lasts_minutes": 45 }, "model": "m" } })
+    }
+
+    /// The host's answer to a `words` question: the translator's draft of these blocks.
+    fn drafted(q: &crate::Question, blocks: Value) -> Value {
+        let draft = format!("draft.{}", q.body["what"].as_str().unwrap());
+        json!({ "ok": true, "draft": draft, "draft_hash": "h", "blocks": blocks, "check": { "ok": true },
+            "provenance": { "via": "translator", "proposal": q.body["text"], "draft": draft, "draft_hash": "h" } })
+    }
+
+    #[test]
+    fn a_translators_draft_is_done_only_as_the_module_says_it_may_be_and_otherwise_arrives_as_the_composers_choice() {
+        let mut r = rig(composed_params());
+        let made = set_up_answering(&mut r, None, 8, |q| match q.body["what"].as_str().unwrap() {
+            "purpose" => drafted(q, json!([{ "block": "publish", "kind": "purpose", "text": "We are for something.", "visible_to": "public" }])),
+            "gathers" => drafted(q, json!([{ "block": "publish", "kind": "notice", "text": "Weekly.", "visible_to": "public", "practice": { "at": "house-1/dwelling.1", "every": 7 * DAY, "lasts": 3600 } }])),
+            // (Dues into someone else's account: not what may be.)
+            _ => drafted(q, json!([{ "block": "publish", "kind": "notice", "text": "Join.", "visible_to": "public", "offer": { "take_up": "join", "terms": { "commitments": [{ "who": "taker", "does": { "outcome": { "money": { "to": "acc-city", "amount": "999" } } }, "every": 30 * DAY }] } } }])),
+        });
+        // What it is for: the draft's words, in our name, held to be put forward, carrying who wrote them; sent as the draft.
+        assert_eq!(made[0]["text"], "We are for something.");
+        assert_eq!(made[0]["speaks_for"], ME);
+        assert_eq!(made[0]["assertion"], json!({ "that": "We are for something." }));
+        assert_eq!(made[0]["data"], json!({ "idea": "idea.1", "written_by": "composer", "model": "m", "for": "c0001" }));
+        assert_eq!(made[0]["provenance"]["via"], "translator");
+        assert_eq!(made[0]["provenance"]["draft"], "draft.purpose");
+        // The gathering as drafted (weekly, an hour: among what was open), its first now, open to members.
+        assert_eq!(made[1]["practice"], json!({ "at": "house-1/dwelling.1", "every": 7 * DAY, "first": 3 * DAY, "lasts": 3600, "roles": [{ "role": "member", "open": true }] }));
+        assert_eq!(made[1]["provenance"]["via"], "translator");
+        // The offer: not done; by the composer's closed choice, written by code.
+        assert_eq!(made[2]["text"], "Come as you are.");
+        assert_eq!(made[2]["data"]["words"], "choice");
+        assert!(made[2]["provenance"].is_null());
+        let w: Vec<_> = r.worded.iter().map(|w| (w.what.as_str(), w.accepted, w.plumbing_added, w.why.clone(), w.draft.clone())).collect();
+        assert_eq!(w, [
+            ("purpose", Some(true), true, None, Some("draft.purpose".into())),
+            ("gathers", Some(true), true, None, Some("draft.gathers".into())),
+            ("asks", Some(false), false, Some("dues paid to an account that is not ours".into()), Some("draft.asks".into())),
+        ]);
+        let set = &r.record.as_ref().unwrap()["set"];
+        assert_eq!(set["purpose"]["arrived"], json!({ "purpose": "translator", "gathers": "translator", "asks": "choice" }));
+    }
+
+    #[test]
+    fn a_trained_translators_draft_not_meant_is_put_once_more_and_one_whose_acts_were_not_begun_arrives_the_other_way() {
+        // Asked again: the first answer's draft is refused by the kernel and may go behind (`again`); the second is not.
+        let mut r = rig(composed_params());
+        let made = set_up_answering(&mut r, None, 10, |q| {
+            let mut a = drafted(q, json!([{ "block": "publish", "kind": "purpose", "text": "x", "visible_to": "public" }]));
+            if q.body["what"] == "purpose" && q.body.get("attempt").is_none() {
+                a["check"] = json!({ "ok": false, "refusal": "not_permitted" });
+                a["again"] = json!(true);
+            }
+            a
+        });
+        let purpose: Vec<_> = r.asked.iter().filter(|q| q.body["what"] == "purpose").map(|q| q.body.get("attempt").cloned()).collect();
+        assert_eq!(purpose, [None, Some(json!(2))]);
+        assert_eq!(r.worded[0].accepted, Some(false));
+        assert!(r.worded[0].again);
+        assert_eq!(r.worded[0].why.as_deref(), Some("the acts would be refused (not_permitted)"));
+        assert_eq!(made[0]["provenance"]["via"], "translator", "the second draft was what may be");
+        // Accepted, but its acts not begun (the engine's `{done: false}`): the part arrives the other way.
+        let mut r = rig(composed_params());
+        r.wake(0, vec![], None);
+        let q = r.asked.pop().unwrap();
+        r.answers.push(crate::Answer { kind: "words".into(), about: q.about.clone(), body: drafted(&q, json!([{ "block": "publish", "kind": "purpose", "text": "x", "visible_to": "public" }])) });
+        let sent = r.wake(DAY, vec![], None);
+        assert_eq!(sent[0]["provenance"]["via"], "translator");
+        r.answers.push(crate::Answer { kind: "words".into(), about: q.about, body: json!({ "done": false, "why": "the acts could not be carried out" }) });
+        let again = r.wake(2 * DAY, vec![], None);
+        assert_eq!(of(&again, "statement", Some("purpose"))[0]["text"], "plain");
+        assert_eq!(r.record.as_ref().unwrap()["set"]["purpose"]["arrived"]["purpose"], "code");
     }
 
     #[test]
@@ -1775,7 +1998,7 @@ mod tests {
         let a = application("rec.a1", "c0007", 6 * DAY, json!({ "matter": "disrepair", "against": "landlord-1", "about": "lease-1" }));
         r.wake(6 * DAY, vec![a], None);
         let saved = r.actor.save().unwrap();
-        let mut back = Rig { actor: Founded.restore(&r.ctx, saved.clone()).unwrap(), ctx: r.ctx.clone(), view: View::default(), draws: Draws::new(AS, "convenor"), made: r.made, record: None };
+        let mut back = Rig { actor: Founded.restore(&r.ctx, saved.clone()).unwrap(), ctx: r.ctx.clone(), view: View::default(), draws: Draws::new(AS, "convenor"), made: r.made, record: None, asked: vec![], answers: vec![], worded: vec![] };
         assert_eq!(back.actor.save().unwrap(), saved, "restoring and saving again is the same memory");
         // (The view is the engine's, not the actor's: the restored rig is shown the same account and nothing new.)
         let now = r.wake(9 * DAY, vec![], None);

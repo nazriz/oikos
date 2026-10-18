@@ -917,7 +917,7 @@ impl Plan for Lender {
             if t.div_euclid(DAY) > self.payroll_day {
                 self.payroll_day = t.div_euclid(DAY);
                 for s in p.routine(pic, &self.book, &own, cx) {
-                    steps.push(Step { lines: s.lines, why: s.why, then: None, redo: s.redo, planned: s.planned, lapses_at: s.lapses_at });
+                    steps.push(Step { lines: s.lines, act: s.act, why: s.why, then: None, redo: s.redo, planned: s.planned, lapses_at: s.lapses_at });
                 }
             }
         }
