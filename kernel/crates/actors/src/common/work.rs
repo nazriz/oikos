@@ -570,6 +570,26 @@ impl Directions {
         }
     }
 
+    /// Directions as a clerk reads them, never acting on them: the entity they are to, the post of the office (or its
+    /// staff's), and the rule that says who may direct it.
+    pub fn reading(entity: &str, position: Option<&str>, under: &str) -> Self {
+        Directions {
+            entity: entity.to_string(),
+            office: position.map(|p| p.strip_suffix("-staff").unwrap_or(p).to_string()),
+            under: under.to_string(),
+            compliance_bps: 10_000,
+            ..Default::default()
+        }
+    }
+
+    /// The direction on a form that stands as filed (the latest from a post that may direct the office, not on hold),
+    /// whether or not the office's draw of compliance follows it: a clerk reads what is on file and draws nothing.
+    pub fn stands<'a>(&self, book: &'a Book, form: &str) -> Option<&'a Arc<Record>> {
+        let may = self.may(book);
+        let d = self.filed(book, Some(form)).into_iter().rev().find(|x| x.position.as_ref().is_some_and(|p| may.contains(p)))?;
+        (!book.on_hold(&d.id, None)).then_some(d)
+    }
+
     /// The posts that may direct this office, by the organisation's rule as it stands.
     fn may(&self, book: &Book) -> Vec<String> {
         let Some(rule) = (!self.under.is_empty()).then(|| book.current(&self.under)).flatten() else { return vec![] };

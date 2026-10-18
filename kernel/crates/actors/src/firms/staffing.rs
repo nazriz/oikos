@@ -828,7 +828,7 @@ impl Staffing {
     // ---- the staff as the books show it
 
     /// Employment agreements of ours (the offers and the signed), oldest first as filed.
-    fn contracts<'a>(&self, book: &'a Book) -> Vec<&'a Arc<Record>> {
+    pub(crate) fn contracts<'a>(&self, book: &'a Book) -> Vec<&'a Arc<Record>> {
         book.of_type("agreement")
             .filter(|r| {
                 let RecordBody::Agreement { terms } = &r.body else { return false };
