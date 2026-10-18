@@ -763,6 +763,12 @@ impl<W: Write> Engine<W> {
                     if let Some(due) = self.start_round(awake)? {
                         return Ok(due);
                     }
+                    continue;
+                }
+                // (A host that answers the actors' questions to models is handed them as the moment's work ends, before
+                // time moves on: asked in one wake, answered by the next, as on the TS world. An empty cohort says so.)
+                if self.opts.host_seats && !self.questions.is_empty() {
+                    return Ok(Due::Seats(vec![]));
                 }
                 continue;
             }

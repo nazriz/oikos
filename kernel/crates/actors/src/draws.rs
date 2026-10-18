@@ -20,6 +20,9 @@ pub struct Draws {
     day_occurrences: BTreeMap<String, (i64, u64)>,
     matter_occurrences: BTreeMap<String, (i64, u64)>,
     drawn_on: BTreeMap<String, BTreeMap<String, usize>>,
+    /// The same, for draws about one thing (`Cx::chance`; run.ts names those papers apart from the unit's own draws).
+    #[serde(default)]
+    chance_drawn_on: BTreeMap<String, BTreeMap<String, usize>>,
 }
 
 /// Every `rec.<digits>` in `s`, each replaced by `f(the id)`.
@@ -62,11 +65,23 @@ impl Draws {
     }
 
     fn stable(&mut self, purpose: &str) -> String {
+        Self::stable_in(&mut self.drawn_on, purpose)
+    }
+
+    /// A draw about one thing (`Cx::chance`), its papers named as `paper#n` as every other draw's: a lease signed one
+    /// paper later in a run than in its twin is the same lease (run.ts `chance`, bug hunt 2026-10-17 finding 14).
+    /// (run.ts counts them for the participant, across its capacities; here for the unit, which for a person's own
+    /// draws about their home and money is the same.)
+    pub fn chance_purpose(&mut self, purpose: &str) -> String {
+        Self::stable_in(&mut self.chance_drawn_on, purpose)
+    }
+
+    fn stable_in(drawn_on: &mut BTreeMap<String, BTreeMap<String, usize>>, purpose: &str) -> String {
         if !purpose.contains("rec.") {
             return purpose.to_string();
         }
         let what = replace_records(purpose, |_| "rec".into());
-        let seen = self.drawn_on.entry(what).or_default();
+        let seen = drawn_on.entry(what).or_default();
         replace_records(purpose, |id| {
             let n = seen.len() + 1;
             let k = *seen.entry(id.to_string()).or_insert(n);
@@ -104,6 +119,17 @@ impl Draws {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_draw_about_one_thing_names_its_paper_by_which_it_is_never_by_its_number() {
+        let mut d = Draws::new("p1", "self");
+        assert_eq!(d.chance_purpose("p1/stay-rec.13950"), "p1/stay-paper#1");
+        assert_eq!(d.chance_purpose("p1/stay-rec.7"), "p1/stay-paper#2");
+        assert_eq!(d.chance_purpose("p1/stay-rec.13950"), "p1/stay-paper#1");
+        let mut twin = Draws::new("p1", "self");
+        assert_eq!(twin.chance_purpose("p1/stay-rec.13983"), "p1/stay-paper#1");
+        assert_eq!(d.chance_purpose("world-price/goods/3"), "world-price/goods/3");
+    }
 
     #[test]
     fn a_draw_is_named_for_the_day_and_its_occurrence_counted_by_moment() {

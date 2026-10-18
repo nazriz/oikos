@@ -280,7 +280,9 @@ test("a year with one office in a mock seat that sits at other hours and files p
   const mDecided = matched(twin.decisions, mayor.decisions, (pid) => !pid.startsWith("mayor"));
   console.log(`twin moments, the mayor's seat: draws ${share(mDraws)}; decisions ${share(mDecided)}`);
   // (A year of this town with draws named for the hour: 34% of draws and 35% of decisions alike; now 79% and 45%.)
-  expect(mDraws.same / mDraws.all).toBeGreaterThan(0.65);
+  // (Not on the Rust world: the draw trace is the TS loop's, so there are no draws to set side by side; the rule is held by
+  // actors/src/draws.rs's own tests, as for the draw-trace test below.)
+  if (!onRust) expect(mDraws.same / mDraws.all).toBeGreaterThan(0.65);
   // (0.37 where it was 0.4, foundations F5: 39.9% now, 43.5% before. The mayor's seat is a person's time spent, so what the town does on other days
   // moves a little more; the floor stays above the 35% the hour-named draws gave.)
   expect(mDecided.same / mDecided.all).toBeGreaterThan(0.37);

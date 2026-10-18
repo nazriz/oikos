@@ -1049,7 +1049,7 @@ impl Person {
         w.cx.ctx.params.get("outlook").and_then(|o| o.get("people_bps")).and_then(Value::as_i64).unwrap_or(5_000)
     }
     /// A draw that is ours and about one thing (TS `fixed`), in basis points.
-    fn fixed_bps(&self, w: &Week, purpose: &str) -> i64 {
+    fn fixed_bps(&self, w: &mut Week, purpose: &str) -> i64 {
         w.cx.chance(&format!("{}/{purpose}", self.me)).below(10_000) as i64
     }
     fn conduct(&mut self, w: &mut Week, c: ConductAsk) -> super::mind::Conduct {

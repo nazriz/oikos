@@ -511,6 +511,16 @@ fn engine_reply(session: &mut Session, req: &Value) -> Result<Reply, String> {
             e.host_finished(str_field("key")?, req["until"].as_i64());
             Ok(Reply::Value(json!({ "ok": true })))
         }
+        "questions" => {
+            // (The code actors' questions to models since last asked: the host answers those it has a model for.)
+            let qs: Vec<Value> = e.questions().into_iter().map(|(key, q)| json!({ "key": key, "kind": q.kind, "about": q.about, "body": q.body })).collect();
+            Ok(Reply::Value(json!({ "ok": true, "questions": qs })))
+        }
+        "answer" => {
+            let answers: Vec<oikos_actors::Answer> = serde_json::from_value(req.get("answers").cloned().ok_or("missing answers")?).map_err(|x| format!("bad answers: {x}"))?;
+            e.answer(str_field("key")?, answers);
+            Ok(Reply::Value(json!({ "ok": true })))
+        }
         "goes_on" => {
             e.host_goes_on(str_field("key")?);
             Ok(Reply::Value(json!({ "ok": true })))

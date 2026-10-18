@@ -146,7 +146,7 @@ impl Person {
 
     /// How long a silence in a home goes before anybody remarks on it: a band by its share, then any moment in it. The
     /// draw is the home's, not ours (whoever lives beside it would wait as long): `chance`.
-    fn remarked_after(&self, key: &str, cx: &Cx) -> i64 {
+    fn remarked_after(&self, key: &str, cx: &mut Cx) -> i64 {
         let bands = self.p.welfare.as_ref().map_or(&[][..], |w| &w.found_after[..]);
         let total: i64 = bands.iter().map(|b| b.bps).sum();
         if total <= 0 {
@@ -165,7 +165,7 @@ impl Person {
         from * DAY
     }
 
-    fn wonder(&mut self, key: String, space: &str, structure: &str, at: &str, since: i64, cx: &Cx) {
+    fn wonder(&mut self, key: String, space: &str, structure: &str, at: &str, since: i64, cx: &mut Cx) {
         // (Never before nobody has been in or out for a day: where people share a home one of them comes or goes within
         // a day, and it is theirs to say who has died.)
         if !self.lifecycle.wondered.contains_key(&key) && !self.lifecycle.asked_about.contains(&key) {

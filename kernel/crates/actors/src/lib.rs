@@ -178,8 +178,9 @@ impl<'a> Cx<'a> {
         self.randomness.stream(&parts)
     }
     /// A stream for a purpose alone: the same for whoever draws it (a fact about a thing, not about who meets it).
-    pub fn chance(&self, purpose: &str) -> Rng {
-        self.randomness.stream(&["chance", purpose])
+    pub fn chance(&mut self, purpose: &str) -> Rng {
+        let purpose = self.draws.chance_purpose(purpose);
+        self.randomness.stream(&["chance", &purpose])
     }
     pub fn decided(&mut self, decision: Value) {
         self.decisions.push(decision);
