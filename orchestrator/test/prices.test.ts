@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { generate, rentIncreaseLaw } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 import { officesBy } from "./lib/offices";
+import { publishRentsBoard } from "./lib/rents-board";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -32,6 +33,7 @@ test("rents are reviewed as landlords practise, within the law as a record says 
   for (const p of officesBy(config, "firm.landlord")) Object.assign(p.params, { rent_review_months: 6, rent_increase_notice_days: 60 });
   const i = config.world.records.findIndex((r: any) => r.id === "law-rent-increases");
   config.world.records[i] = rentIncreaseLaw(9, 75);
+  publishRentsBoard(config, 1_000); // (the market has moved: the Rust landlord raises a rent only to what homes like it let for)
   const law = { months: 9, notice: 75 };
   const { ev, recs, cmds } = await run("rents", config, 15 * MONTH);
   // (A month in which the bank wrote that the rent could not be paid for want of money is not a month the tenant let
