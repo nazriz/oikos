@@ -24,8 +24,8 @@
 //! - Wants (A2's `Wants`) and the everyday-frictions `Respondent` (lane D) are not in this lane's tree. The arrears wants
 //!   the landlord keeps are its own small book (`ArrearsWants`, behind `Wanting`), and the venue's answers are a hook
 //!   (`Respond`) that answers nothing until lane D's respondent is given; integration gives both.
-//! - The owners' draw to shareholders (`distribute`, lane C2's) is the stand-in the TS kept for a world without a
-//!   register: the draw is spent at a local shop. Integration gives it the register.
+//! - The owners' draw goes to the shareholders on the landlord's register (`market::lengnick::distribute`, as TS did);
+//!   a world with no register keeps TS's stand-in, the draw spent at a local shop.
 //! - The first wake is a day of the week drawn from the participant's id (a kind cannot draw before it exists); the day
 //!   and hour of the rent book are drawn at the first wake from `cx.chance`.
 
@@ -702,6 +702,8 @@ fn visible(ids: &[&str]) -> Option<Visible> {
 struct Env {
     t: i64,
     account: String,
+    /// The bank that keeps the account (it carries out an instruction to pay the shareholders).
+    custodian: String,
     balance: i64,
     world: Arc<crate::WorldInfo>,
     at_books: bool,
@@ -891,7 +893,7 @@ impl Plan for Office {
         let this_week = (t - self.book_time.unwrap_or(0)).div_euclid(WEEK);
         let at_books = Some(this_week) != self.books_week;
         self.books_week = Some(this_week);
-        let e = Env { t, account: acc.account.clone(), balance: acc.balance, world: cx.ctx.world.clone(), at_books, leases, awaiting, active };
+        let e = Env { t, account: acc.account.clone(), custodian: acc.custodian.clone(), balance: acc.balance, world: cx.ctx.world.clone(), at_books, leases, awaiting, active };
         let mut steps: Vec<Step<Then>> = vec![];
         let mut let_now: BTreeSet<String> = BTreeSet::new();
         let mut offered_now: Vec<String> = vec![];
@@ -1891,11 +1893,24 @@ impl Office {
         let spend = (e.balance - tax).min(self.income * self.p.spend_share_bps / 10_000);
         let upkeep = (e.balance - tax - spend).min(self.income * self.p.upkeep_share_bps / 10_000);
         self.income = 0;
-        // The owners' draw: to the shareholders on our register, if we keep one (integration gives that); a world
-        // without one keeps the money-only stand-in, spent at a local shop.
+        // The owners' draw: to the shareholders on our register, if we keep one (they spend it as they will: lengnick.ts
+        // `distribute`, one instruction to the bank); a world without one keeps the money-only stand-in, spent at a
+        // local shop.
         let shops = self.p.shop_accounts.clone();
+        let from = crate::market::lengnick::From { account: &e.account, custodian: &e.custodian };
+        let world = e.world.clone();
+        let (draw, _) = crate::market::lengnick::distribute::<Then>(
+            &self.book,
+            &self.me,
+            &from,
+            spend,
+            &format!("Monthly: the owners draw {}% of rent received, paid to our shareholders by their shares", fmt_dec(self.p.spend_share_bps, 100)),
+            &|n| crate::common::money_words(n, &world),
+        );
+        let drew = !draw.is_empty();
+        steps.extend(draw);
         let mut calls = vec![];
-        if spend > 0 && !shops.is_empty() {
+        if !drew && spend > 0 && !shops.is_empty() {
             let shop = shops[cx.rng("spend").below(shops.len() as u64) as usize].clone();
             calls.push(pay(&shop, spend, Pay { from: Some(e.account.clone()), for_: Some("Owners' spending.".into()), ..Default::default() }, cx));
         }
@@ -1903,7 +1918,7 @@ impl Office {
             calls.push(pay(&outside, upkeep, Pay { from: Some(e.account.clone()), for_: Some("Maintenance and repairs.".into()), ..Default::default() }, cx));
         }
         if !calls.is_empty() {
-            let locally = if shops.is_empty() { String::new() } else { format!(", and the owners spend {}% locally", fmt_dec(self.p.spend_share_bps, 100)) };
+            let locally = if shops.is_empty() || drew { String::new() } else { format!(", and the owners spend {}% locally", fmt_dec(self.p.spend_share_bps, 100)) };
             steps.push(step(format!("Monthly: {}% of rent received goes on upkeep{locally}.", fmt_dec(self.p.upkeep_share_bps, 100)), calls));
         }
     }

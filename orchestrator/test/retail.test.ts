@@ -25,7 +25,11 @@ async function run(name: string, config: any, until: number) {
   // Nothing refused but same-moment races (D58): someone who'd just left, named for work; and, where workers differ in
   // skill, a crew's first day short of time (a shop learns how long a crew takes from being told: Pace). Once per crew,
   // or near it: not the same plan again and again.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead"].includes(e.code))).toEqual([]);
+  // (`not_in_position` is the same race as `not_present`: someone who left town while an act of their post was under way,
+  // which the kernel refuses when it falls due because they no longer hold the post. Seen on the Rust world, 2026-10-18,
+  // a shop manager's serving act begun before they left; the TS world's town happened not to meet it.)
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead"].includes(e.code)
+    && !(e.code === "not_in_position" && ev.some((x) => x.event === "person_left" && `${x.person}-self` === e.participant && x.t <= e.t)))).toEqual([]);
   const short = ev.filter((e) => e.event === "action_refused" && e.code === "no_time_left");
   const acts = ev.filter((e) => e.event === "action_applied").length;
   expect(short.length * 50).toBeLessThan(acts);

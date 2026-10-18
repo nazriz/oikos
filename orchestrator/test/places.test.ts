@@ -220,7 +220,9 @@ test("an institution a place doesn't have is absent from its town: no payment, l
   const B = copy("au-vic-2026");
   delete B.values.industrial_action.notice_days;
   const ballotOnly = generateFrom(spec, B).world.records.find((r: any) => r.id === "law-industrial-action");
-  expect(Object.keys(ballotOnly.data.figures)).toEqual(["turnout", "majority"]);
+  // (As a set: on the Rust world the law is drafted by the shared rule in Rust, whose maps are in key order; a JSON
+  // object's key order is never relied on: docs/port-guide.md section 2. 2026-10-18, integration.)
+  expect(Object.keys(ballotOnly.data.figures).sort()).toEqual(["majority", "turnout"]);
   expect(ballotOnly.text).toBe("Industrial action is protected only where each of these holds. At least 50% of the members concerned have voted in a ballot on it. More than 50% of the votes in a ballot of the members concerned are for it.");
   expect(ballotOnly.formal.condition).toBe("block.block == 'publish' && block.kind == 'industrial_action' && (block.data.voted * 10000 < 5000 * block.data.eligible || block.data.yes * 10000 <= 5000 * block.data.voted)");
   // A figure still stated as nought is taken as not stated: the law says nothing of it, and with nothing but noughts there is no law.
