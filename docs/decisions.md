@@ -6701,3 +6701,103 @@ reading-dial 2 of 3.
   founds about one. Not traced; a measure to look at before the gate.
 
 **Revisit if** a twin parts again (the four causes above are the places to look first), or the reading design lands.
+
+## 2026-10-19 · Port step 3, finished: the last failures, the gate in full, speed (branch `integ-final`; no model called)
+
+`integrate` with `integ-rest` and `integ-seats` merged (the decisions log by union), then one helper's branch
+(`integ-words`). Every fault below was traced in a kept log, the TS twin of the same town beside it where it helped.
+
+**Readings reach the citizen through the host.** TS's desk reads a seat's worded decision as it is recorded and the
+addressee looks it up when the paper lands (`ctx.read`). On the Rust world the engine asks for the addressee: a decision
+recorded raises a reading question for each person it is addressed to (`mind::reading::questions_on_record`, only where
+`dials.reading` is on), put to the host with the actors' other questions; the host takes the moment's statements in
+first, so the desk has read the paper, and answers from what it filed. Where the round's carry-out woke someone, the next
+round is held until the host has answered, since the addressee may be among them. Nobody waits and nobody wakes for it:
+with a reader that shifts nothing the world is the world with the dial off, to the state hash (reading-dial.test, both
+worlds). What the words moved goes on the outcome just recorded, as `withRead` does (the port waited for an outcome
+naming its paper, which one site wrote). A claim's decision is not a landing site (citizen.ts and docs/behaviour/
+reading.md list five); the port had made it one.
+
+**Founders' words through the translator** (helper, `integ-words`, 18092cbd). Each part (name, purpose, gathering,
+offer) is a `words` question; the host drafts it with the translator (the same notes `wordsFor` writes) and answers
+with the draft; the actor accepts or rejects it with its own accept function and acts the accepted blocks with the
+translator's provenance; the engine writes the signoff and the `words` note. Decided fresh: a step may carry a draft
+(`steps::Drafted`), the one case where a code actor's act is not a call; a part waits one wake for its draft where TS
+asked and acted in one.
+
+**Faults behind the founding rate.** The small town of founding.test, at sixty times the rate with frictions six
+times, founded 7 to 9 things in 205 days on the Rust world (TS 0 to 3). Its occasions were wants withdrawn with no way
+seen (146 withdrawals against TS's 56; 101 with no way at all against 26). Three ports' faults:
+- Life kept a copy of the people we know that nothing filled: nobody was offered telling others of a wrong (0 such
+  letters in 205 days; TS 28). Life reads the mind's contacts now.
+- A grievance's end reached the mind as an outcome only: its want lived on with nothing to answer it. The mind now
+  meets or gives it up, with its note, as `ended` does.
+- A bill over the usual and faulty goods were told to the mind but never held by life as grievances.
+After them: 3 to 4 (seeds 1 to 4). What is left is mostly disrepair (neighbours in a worn building count as sharers),
+35 frictions of it against TS's 23: not traced further. At the profile's own rate, four 1,000-person au-vic years
+founded 1 in all (0.25 a year) against the source's target of about 1.5 (TS 1.7). The fitted chance was fitted on the TS
+world, where most occasions were lost work: firms let about 30% of jobs go a year there (a fault, docs/behaviour/
+founding.md). The native hiring by need ended that, so the fit no longer holds; refitting is a calibration for the
+owner (PC-4), not done here.
+
+**Government** (both tests pass): the Rust landlord raises a rent only towards comparable lets, and the generated
+town lets none for months, so landlord-1 gave no increase in 100 days and the amended law was never tested. The test
+publishes a rents board (lib/rents-board.ts), as justice and prices do. The invoice for the park followed.
+
+**Gatherings: a fault, fixed.** A citizen free at 20:50 set off for a gathering over at 21:00, 26 minutes away, and
+arrived after it ended. Nobody who knows the way goes: a person remembers how long the way took last time and does not
+set off when they would arrive after the end (TS sets off whenever it is still on). First trip: as before.
+
+**Also fixed:** decisions of named areas recorded in a lean log (`recordDecisions` as a list: engine `decision_areas`;
+everyday.test); a stand-in named in `on_opt_out` carries a participant on (protocol op `stand_in`; llm.test); test.hang
+waits on a channel nobody sends on (the determinism rules forbid `std::thread`); port-gate.ts printed a measure's Rust
+mean as TS's plus it.
+
+**Tests changed, each with its reason in the test:** government (the rents board), culture-dial (config pins re-taken
+per world: the generator moved at integration and on the Rust world calls the shared rules natively; the Rust state pins
+beside the TS ones), shop-mix (a town of one kind carries no demand figures since 26fb35a9), clinic-school (a shop
+manager who departed with deliveries under way: the `not_present` race in the Rust world's words, as retail reads it).
+
+**Twin-draws, the registry's holder: open, not loosened.** 517 of 7,140 papers have other words (2% allowed; 264 of
+6,615 before this branch). Traced: everything that moves is downstream of the holder's offices. The city's permit is
+first (late by less than the entries took, as the test asks); on day 30 the city's rates notice and a job advert come 30
+minutes late and everyone who answers them moves with them; from day 45, deliveries of the town's own small businesses
+come in another order, and who gets the last of a shop's stock, then refunds and orders, differ. No fault found: the
+Rust market passes the order of arrival into stock and prices where TS's damped it. Either the native market needs a
+reason to be less sensitive (price points or menu costs, each with a source) or the test's bound encodes the TS world;
+the owner's call (MT-17).
+
+**The gate, in full** (runs/port-gate/gate.json in the integ-final worktree's run folder; TS side reused from
+`integrate`'s gate, its checkout at 961e737a):
+- *Threads:* the same state hash on 1 and 14 threads in all three profiles.
+- *Measures beyond 3 SE:* au-vic 2 (union firm believers 1.7% to 1.0%; taking part in gatherings 46.3% to 48.4%,
+  the profile's 50%); gb-eng 2 (gatherings 169 to 165 a year, each larger: 52.6 to 58.6); ke-nakuru 5 of one cause
+  (employed 414 to 441, jobs 111 to 149, hires 106 to 135, unemployment 5.0% to 2.1%, people saving 3.9% to 5.2%).
+- *Explained:* gatherings: the gatherings fix (wakes) and people who no longer set off too late; fewer gatherings each
+  fuller is within what towns of this size have. Ke-nakuru's work: the native hiring by need fills posts the TS firms
+  let go (ME-20's other half); 2.1% unemployment is below the profile's 5.4%, so it is a move away from the figure and
+  stays on the register. Gb-eng's unemployment is now 4.7% against the profile's 4.9% (TS 2.1%): the breach is gone.
+- *Health breaches differ in kind:* the Rust world adds households going without (`demand_unmet_pct`: au-vic 11.3%,
+  ke-nakuru 6.9%, against 5% tolerance; TS 2 to 3%) and, in ke-nakuru, unemployment and employment too low; it drops
+  gb-eng's unemployment breach and au-vic's business entry (15.1% against 16.4%, the native entry rule). Households
+  going without is ME-20's cobweb (shops piling onto one factory); it was 6% in au-vic at the second pass and is 11%
+  now: that rise is not traced.
+- *Backstops:* generality, no-god-view and all-work-takes-time pass, with the Rust files read.
+- *Scenario tests on the Rust world:* every file passes but twin-draws (above). TS world: `bun run test:all` 1,845 pass, 0 fail in 301 files, the kernel's cargo tests with them.
+
+**Speed and memory** (au-vic, seed 1, one run alone, the machine otherwise quiet; TS from integration's table):
+
+| Run | Rust world now | TS world | Rust, integration's first pass |
+|---|---|---|---|
+| 1,000 people, a year | 122 s, 1.6 GB peak | 160 s, 2.5 GB | 142 s, 10.2 GB |
+| 10,000 people, a month | 68 s, 7.4 to 8.0 GB peak (two runs) | 147 s, 7.7 GB | 83 s, 9.9 GB |
+
+1.3 times as fast at 1,000 and 2.2 times at 10,000, short of the plan's 4 to 6 (rust-port.md's stop rule is still met:
+port-perf's entry says why and what is left). Memory at 1,000 is two thirds of the TS world's; at 10,000 about the same,
+most of it each participant's params copied (port-perf's list).
+
+**Before the TS actors can be deleted:** twin-draws' registry case (MT-17); households going without (ME-20, and its
+rise); the founding chance refitted on the Rust world (PC-4); the seat-side readers stay TS by design (port guide §8).
+
+**Revisit if** a reading arrives after its paper lands (the held round is the place to look), a part of a founder's
+words is left waiting, or the gate's ke-nakuru work measures are judged against real hiring figures and found wrong.

@@ -684,6 +684,9 @@ The mechanism:
 - **L / I:** medium / medium · **Status:** to source
 - **Notice by:** Bodies founded per month in a pilot against the sourced rate.
 - **Fix when:** founding or the composer is the question.
+- **Rust world (2026-10-19):** at the fitted chance four 1,000-person au-vic years founded 1 thing in all (0.25 a year,
+  the source's target about 1.5): the chance was fitted on the TS world's occasions, mostly lost work from a firm-side
+  fault the native hiring removed. Refit on the Rust world before founding is measured (decisions, "Port step 3, finished").
 
 ### PC-5 · The everyday model failed its gate
 - **Gap:** No large model passed as a teacher for ordinary decisions (they moved people toward doing nothing and
@@ -1106,9 +1109,22 @@ The mechanism:
   `market/` (hiring, construction, shops' supply); `scripts/port-gate.ts`.
 - **Effect:** Any run on the Rust world is not comparable with the TS world's baselines and calibration notes; a steward
   experiment would read the port's differences as the steward's.
-- **L / I:** high / medium · **Status:** partly fixed (decisions 2026-10-18, "Port step 3, second pass"): six faults found and fixed; what is left is explained there and judged against real figures
+- **L / I:** high / medium · **Status:** partly fixed (decisions 2026-10-18, "Port step 3, second pass"; 2026-10-19, "Port step 3, finished"): the faults found are fixed; on the final gate 9 measures are beyond 3 SE (gatherings and union belief in au-vic, gatherings' size in gb-eng, ke-nakuru's work: more jobs, unemployment 2.1% against the profile's 5.4%), each explained there; households going without (11.3% in au-vic, 6.9% in ke-nakuru) is a new breach, ME-20's cobweb, and its rise since the second pass is not traced. Threads and twins hold.
 - **Notice by:** `bun scripts/port-gate.ts` (runs/port-gate/gate.json).
 - **Fix when:** Before phase 4 (deleting the TS actors) and before any pilot on the Rust world.
+
+### MT-17 · A seated person's time moves more of the Rust world than the twin test allows
+- **Gap:** twin-draws' case of the registry held by a person of the town: on the Rust world 517 of 7,140 papers have
+  other words (the test allows 2%; TS within it). All of it is downstream of the holder's offices (the city's papers
+  come later, those who answer them later, then small businesses' deliveries in another order, stock, refunds, prices).
+  No fault found; the native market passes the order of arrival into stock and prices where TS's damped it.
+- **Where:** `orchestrator/test/twin-draws.test.ts`; `kernel/crates/actors/src/market/` (prices, retail stock).
+- **Effect:** A seat's difference from its twin is noisier on the Rust world: small timing moves spread through the town's
+  shops, so more of a seat-against-twin difference is the economy's sensitivity, not the seat.
+- **L / I:** high / medium · **Status:** open (decisions 2026-10-19, "Port step 3, finished"); the test fails, not loosened
+- **Notice by:** twin-draws' registry test; papers moved per seat-day in a seated twin pair.
+- **Fix when:** Before phase 4, by a sourced reason for the market to be less sensitive (price points, menu costs) or the
+  owner's word that the bound encodes the TS world.
 
 ---
 
