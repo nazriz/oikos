@@ -60,6 +60,9 @@ pub struct EngineOptions {
     pub until: Option<i64>,
     /// Record code actors' decisions and outcomes (unless the log is lean).
     pub record_decisions: bool,
+    /// Or only the decisions of these areas (their `domain`), kept in a lean log too, with no outcomes (run.ts
+    /// `recordDecisions` as a list).
+    pub decision_areas: Option<BTreeSet<String>>,
     /// Truth audits: each actor's beliefs, when a wake is done, checked against the terms' readings.
     pub audit: bool,
     /// Fewer actors than this in a round are stepped on one thread (starting threads costs more than it saves).
@@ -86,6 +89,7 @@ impl Default for EngineOptions {
             stand_in: None,
             until: None,
             record_decisions: true,
+            decision_areas: None,
             audit: false,
             share_at: WORTH_SHARING,
             mock_seats: true,
@@ -1152,7 +1156,12 @@ impl<W: Write> Engine<W> {
     fn keep(&mut self, key: &str, kept: Kept) -> Result<Vec<oikos_actors::Worded>, String> {
         let u = &self.units[key];
         let (pid, cap) = (u.participant.clone(), u.capacity.clone());
-        if self.opts.record_decisions && !self.lean {
+        if let Some(areas) = &self.opts.decision_areas {
+            let areas = areas.clone();
+            for d in kept.decisions.into_iter().filter(|d| d["domain"].as_str().is_some_and(|x| areas.contains(x))) {
+                self.annotate(json!({ "annotation": "decision", "subject": pid, "data": d }))?;
+            }
+        } else if self.opts.record_decisions && !self.lean {
             for d in kept.decisions {
                 self.annotate(json!({ "annotation": "decision", "subject": pid, "data": d }))?;
             }

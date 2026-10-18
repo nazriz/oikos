@@ -101,7 +101,7 @@ for (const profile of profiles) {
       v.measures = rows.length;
       for (const r of rows) {
         const z = Math.abs(r.z ?? 0);
-        if (z > 3) v.fail.push(`${r.query} ${r.key} ${r.measure}: ${z.toFixed(1)} standard errors (${r.base} to ${r.base + r.change})`);
+        if (z > 3) v.fail.push(`${r.query} ${r.key} ${r.measure}: ${z.toFixed(1)} standard errors (TS ${r.base}, Rust ${r.change})`);
         else if (z > 2) v.named.push({ query: r.query, key: r.key, measure: r.measure, z: Number(z.toFixed(2)), base: r.base, change: r.change });
       }
       const targets = (loadProfile(profile) as any).targets ?? [];

@@ -60,7 +60,9 @@ test("a town without the flag is as before: one kind of shop, selling goods, and
   expect(JSON.stringify(generate({ ...spec, shop_mix: false }))).toBe(JSON.stringify(off));
   for (const o of shopsOf(off)) expect(o.params.kind).toBeUndefined();
   const citizen = off.participants.find((p: any) => p.controller?.impl === "citizen.default");
-  expect(citizen.controller.params.demand.kinds.map((k: any) => k.kind)).toEqual(["goods"]);
+  // (A town of one kind carries no demand figures: the citizen weighs goods alone without them, as the TS world's manifest
+  // knows no such parameter. Written only for a town with the shop mix since integration, 2026-10-18, commit 26fb35a9.)
+  expect(citizen.controller.params.demand).toBeUndefined();
   expect(Object.keys(officeParams(off, "world.trade").sells).sort()).toEqual(["energy", "goods", "inputs", "materials"].filter((k) => k in officeParams(off, "world.trade").sells));
   // Turning it on changes the shops and nothing of the households' count.
   const on = generate({ ...spec, shop_mix: true });

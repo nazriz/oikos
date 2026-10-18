@@ -82,6 +82,14 @@ impl<W: Write> Engine<W> {
     pub fn host_units_remove(&mut self, keys: &[String]) {
         self.sched.remove(keys);
     }
+    /// A participant who opted out carried on by a stand-in its world names (`on_opt_out`): its controller is now
+    /// that code, and its units the engine's own from this moment (run.ts, an opt-out).
+    pub fn host_stand_in(&mut self, participant: &str, controller: serde_json::Value) -> Result<(), String> {
+        let t = self.run.kernel().t();
+        let Some(p) = self.parts.get_mut(participant) else { return Err(format!("no participant {participant}")) };
+        p.controller = controller;
+        self.sync_units(participant, Some(t))
+    }
     pub fn host_to_cadence(&mut self, participant: &str) {
         let t = self.run.kernel().t();
         self.sched.to_cadence(participant, t);

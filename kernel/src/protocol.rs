@@ -408,6 +408,9 @@ fn start_engine(session: &mut Session, req: &Value, config: Option<Value>) -> Re
         Value::Array(ids) => opts.record_observations_of = ids.iter().filter_map(Value::as_str).map(String::from).collect(),
         _ => {}
     }
+    if let Some(areas) = o["decision_areas"].as_array() {
+        opts.decision_areas = Some(areas.iter().filter_map(Value::as_str).map(String::from).collect());
+    }
     if let Some(b) = o["record_decisions"].as_bool() {
         opts.record_decisions = b;
     }
@@ -495,6 +498,10 @@ fn engine_reply(session: &mut Session, req: &Value) -> Result<Reply, String> {
         "units_remove" => {
             let keys: Vec<String> = req["keys"].as_array().ok_or("missing keys")?.iter().filter_map(|k| k.as_str().map(String::from)).filter(|k| !k.contains('|')).collect();
             e.host_units_remove(&keys);
+            Ok(Reply::Value(json!({ "ok": true })))
+        }
+        "stand_in" => {
+            e.host_stand_in(str_field("participant")?, req.get("controller").cloned().ok_or("missing controller")?)?;
             Ok(Reply::Value(json!({ "ok": true })))
         }
         "to_cadence" => {

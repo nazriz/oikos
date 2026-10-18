@@ -362,7 +362,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const standIn = o.standIn ?? process.env.OIKOS_STAND_IN;
   // (On the Rust world the actors read the sparse mind's dial from the world, as they read the others: said there.)
   await k.request({ op: "start", config: rustWorld && o.consult ? { ...cfg, dials: { ...(cfg.dials ?? {}), consult: true } } : cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath,
-    ...(rustWorld ? { engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(o.recordDecisions === "none" ? { record_decisions: false } : {}), ...(o.recordObservations === "all" || o.recordObservations === "code" ? { record_observations: true } : Array.isArray(o.recordObservations) ? { record_observations: o.recordObservations } : {}) } } : {}) });
+    ...(rustWorld ? { engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(o.recordDecisions === "none" ? { record_decisions: false } : o.recordDecisions !== undefined && o.recordDecisions !== "full" ? { decision_areas: o.recordDecisions.split(",").map((x) => x.trim()).filter((x) => x) } : {}), ...(o.recordObservations === "all" || o.recordObservations === "code" ? { record_observations: true } : Array.isArray(o.recordObservations) ? { record_observations: o.recordObservations } : {}) } } : {}) });
   if (o.perturb) await k.request({ op: "perturb", extra_wakes_bps: o.perturb.extraWakesBps, seed: o.perturb.seed });
 
   // Every model call (participants, translator, debriefs) is recorded as it happens.
@@ -1079,6 +1079,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       if (standIn) {
         // The stand-in carries the participant on, in the same capacities.
         p.controller = { type: "code", impl: after.code, params: after.params ?? {} };
+        // (On the Rust world the engine runs it: it is told the participant's code now.)
+        if (rustWorld) await k.request({ op: "stand_in", participant: u.participant, controller: p.controller });
         await syncUnits(u.participant, t);
         await k.request({ op: "to_cadence", participant: u.participant });
       } else p.ended = true;
