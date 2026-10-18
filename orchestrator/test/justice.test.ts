@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 import { officeAt, officesBy } from "./lib/offices";
+import { publishRentsBoard } from "./lib/rents-board";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -22,6 +23,7 @@ test("unlawful rent increases are taken to the tribunal, found invalid, and with
     formal: { language: "cel", condition: "block.block == 'publish' && block.kind == 'rent_increase' && block.data.rent * 100 > block.data.was * 104" } });
   const challenging = (c: any) => c?.impl === "citizen.default" && c.params?.tribunal && (c.params = { ...c.params, tribunal: { ...c.params.tribunal, challenge_bps: 10_000 } });
   for (const x of officesBy(config, "firm.landlord")) x.params.rent_review_months = 6; // (their practice: reviews within the run)
+  publishRentsBoard(config, 1_000); // (the market has moved: the Rust landlord raises a rent only to what homes like it let for)
   for (const x of config.participants) challenging(x.controller);
   for (const t of config.templates) challenging(t.controller);
   const out = join(root, "runs", "test-justice");
@@ -64,15 +66,17 @@ test("a law repealed by the town that made it stops binding those who followed i
     adico: { attribute: "landlords", deontic: "must_not", aim: "increase a tenancy's rent", or_else: "the increase is invalid" },
     formal: { language: "cel", condition: "block.block == 'publish' && block.kind == 'rent_increase'" } });
   for (const x of officesBy(config, "firm.landlord")) Object.assign(x.params, { rent_review_months: 6, compliance_bps: 10_000 });
+  publishRentsBoard(config, 1_000); // (as above: without a market that has moved, no rent is raised, repealed law or not)
   const mayor = config.positions.find((p: any) => p.id === "mayor");
   const out = join(root, "runs", "test-justice-repeal");
   rmSync(out, { recursive: true, force: true });
   let repealedAt: number | undefined;
   const told = new Map<string, number>(); // participant -> times its book of laws showed it the repeal
   const s = await runWorld({ config, runId: "repeal", outDir: out, until: 300 * DAY,
-    inspect: async (participant, obs, kernel, _capacity, raw) => {
-      for (const [id, ch] of Object.entries(raw?.channels ?? {})) if (/(^|\/)laws$/.test(id) && ch.kind === "records")
-        for (const r of ch.records) if (r.record === "withdrawal" && r.withdraws === "law-rent-freeze") told.set(participant, (told.get(participant) ?? 0) + 1);
+    // (What each was shown is read from the log, where the run records these participants' observations in full: the Rust
+    // world's engine runs the offices itself, so a test cannot be handed their observations as they are made.)
+    recordObservations: [...new Set(["landlord-1-office", "landlord-2-office", "tribunal-member", "union-organiser"].map((post) => officeAt(config, post).holder.id as string))],
+    inspect: async (_participant, obs, kernel) => {
       if (repealedAt === undefined && obs.t >= 120 * DAY) {
         repealedAt = obs.t;
         await kernel.request({ op: "command", command: { command: "act", participant: mayor.holder, as: "mayor", provenance: { via: "direct" },
@@ -81,6 +85,9 @@ test("a law repealed by the town that made it stops binding those who followed i
     } });
   expect(s.participantErrors).toBe(0);
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  for (const e of log) if (e.kind === "annotation" && e.body.annotation === "observation")
+    for (const ch of e.body.data.observation.channels) if (/(^|\/)laws$/.test(ch.path) && ch.kind === "records")
+      for (const r of ch.records) if (r.record === "withdrawal" && r.withdraws === "law-rent-freeze") told.set(e.body.subject, (told.get(e.body.subject) ?? 0) + 1);
   const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
   expect(recs.filter((r) => r.record === "withdrawal" && r.withdraws === "law-rent-freeze").length).toBe(1);
   // While it stood, no increase; once it's repealed, the landlords' reviews go ahead.
