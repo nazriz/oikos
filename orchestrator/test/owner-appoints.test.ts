@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { calls as C, modules as builtin, type BehaviourModule } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { onRust } from "./lib/doubles";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -37,10 +38,13 @@ test("the holder of a letting office leaves town: the owner fills the vacant pos
       });
     },
   };
-  leaver.controller = { ...leaver.controller, impl: "test.leaving" };
+  // (On the Rust world the same-named kind wraps the real one and sends the same call on the tenth day: testkinds.rs.)
+  leaver.controller = onRust
+    ? { ...leaver.controller, impl: "test.leaving", params: { ...(leaver.controller.params ?? {}), inner, calls: [{ at: 10 * DAY, call: C.program(C.call("presence", { leave: "yes" })) }] } }
+    : { ...leaver.controller, impl: "test.leaving" };
   const dir = mkdtempSync(join(tmpdir(), "oikos-owner-"));
   try {
-    const s = await runWorld({ config, runId: "owner", outDir: dir, until: 90 * DAY, logDetail: "lean", recordObservations: "none", modules: { "test.leaving": leaving } } as any);
+    const s = await runWorld({ config, runId: "owner", outDir: dir, until: 90 * DAY, logDetail: "lean", recordObservations: "none", modules: onRust ? {} : { "test.leaving": leaving } } as any);
     const ev: any[] = readFileSync(s.logPath, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
     const left = ev.find((e) => e.body?.event === "person_left" && `${e.body.person}-self` === post.holder);
     expect(left, "the holder left").toBeDefined();

@@ -31,6 +31,7 @@ pub mod papers;
 pub mod registry;
 pub mod steps;
 pub mod stub;
+pub mod testkinds;
 
 pub use draws::Draws;
 pub use oikos_sight as sight;

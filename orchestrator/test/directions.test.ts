@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { calls as C, modules as builtin, type BehaviourModule } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { onRust } from "./lib/doubles";
 import { giveToAnother, officeAt, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
@@ -62,10 +63,12 @@ async function town(name: string, who: { position: string; module: string }, scr
   const part = officeAt(config, who.position);
   expect(part.impl).toBe(who.module);
   const wrapped = directing(who.module);
-  part.run(wrapped.name, { ...(part.params ?? {}), script });
+  // (On the Rust world the same-named kind wraps the real office, with the same two days as calls: testkinds.rs.)
+  part.run(onRust ? "test.directing" : wrapped.name, onRust ? { ...(part.params ?? {}), inner: who.module, calls: [{ at: script.direct_day * DAY, call: C.program(C.call("form", { form: script.form, to: script.to, ...script.fields })) }],
+    withdraw: [{ at: script.lift_day * DAY, kind: "direction", by: "author" }] } : { ...(part.params ?? {}), script });
   // (The council votes within the week, so that the budget is adopted well inside the run.)
   for (const x of officesBy(config, "city.council_clerk")) Object.assign(x.params, { vote_days: 5 });
-  const s = await runWorld({ config, runId: name, outDir: mkdtempSync(join(tmpdir(), `oikos-directions-${name}-`)), until: until * DAY, modules: { [wrapped.name]: wrapped } });
+  const s = await runWorld({ config, runId: name, outDir: mkdtempSync(join(tmpdir(), `oikos-directions-${name}-`)), until: until * DAY, modules: onRust ? {} : { [wrapped.name]: wrapped } });
   expect(s.participantErrors).toBe(0);
   const lines = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const events = lines.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
