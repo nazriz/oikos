@@ -84,6 +84,17 @@ impl Default for EngineOptions {
     }
 }
 
+/// The events a host carrying its seats reads from the engine's own commands (orchestrator/src/run.ts, `absorb`): the
+/// cast as it changes, refusals (its summary counts them), and statements recorded (its reading desk reads seats').
+fn host_reads(e: &crate::events::EventBody) -> bool {
+    use crate::events::EventBody as E;
+    match e {
+        E::ParticipantCreated { .. } | E::ParticipantEnded { .. } | E::PositionCreated { .. } | E::Appointed { .. } | E::ActionRefused { .. } => true,
+        E::Recorded { record } => matches!(record.body, crate::blocks::RecordBody::Statement { .. }),
+        _ => false,
+    }
+}
+
 /// `OIKOS_ENGINE_THREADS` if set, else the machine's cores.
 pub fn default_threads() -> usize {
     std::env::var("OIKOS_ENGINE_THREADS")
@@ -259,9 +270,13 @@ pub struct Engine<W: Write> {
     pause: Option<i64>,
     /// A host's own command is being carried out (its events are in its reply, not in `for_host`).
     hosting: bool,
-    /// The events of the engine's own commands since the host last took them (`host_seats`: the host keeps its cast
-    /// from them, as from its own commands' replies).
+    /// The events of the engine's own commands since the host last took them that the host reads (`host_seats`: it
+    /// keeps its cast from them, counts refusals and reads seats' statements, as from its own commands' replies), and
+    /// whether there were any events at all (the host is told time moved on either way). Only those it reads are kept:
+    /// with no seat awake the host is not asked for a whole run, and keeping every event held the run's events in
+    /// memory (10 GB for a 1,000-person year) to hand them over in one reply at the end.
     for_host: Vec<crate::events::Event>,
+    for_host_any: bool,
     /// For whoever measures: how many steps the actors took (never logged).
     pub steps: u64,
 }
@@ -370,6 +385,7 @@ impl<W: Write> Engine<W> {
             pause: None,
             hosting: false,
             for_host: vec![],
+            for_host_any: false,
             steps: 0,
         }
     }
@@ -439,8 +455,9 @@ impl<W: Write> Engine<W> {
         let t = self.run.kernel().t();
         self.sched.note_events(Some(self.run.kernel().state()), &resp.events, t);
         self.note_cast(&resp.events)?;
-        if self.opts.host_seats && !self.hosting {
-            self.for_host.extend(resp.events.iter().cloned());
+        if self.opts.host_seats && !self.hosting && !resp.events.is_empty() {
+            self.for_host_any = true;
+            self.for_host.extend(resp.events.iter().filter(|e| host_reads(&e.body)).cloned());
         }
         Ok((resp, seen))
     }
