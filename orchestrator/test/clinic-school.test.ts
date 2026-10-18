@@ -50,10 +50,18 @@ test("children are taught, the ill stay home and are seen at the clinic", async 
   // A teacher teaches on every school day from their first lesson to their last, but for days they were unwell.
   const unwell = (p: string, day: number) => ev.some((e) => e.event === "condition_began" && e.person === p && Math.floor(e.t / DAY) <= day && day <= Math.ceil(e.until / DAY));
   const teachers = [...new Set(lessons.flatMap((e) => e.performers as string[]))];
+  // The school sets the day's lessons once, when the school day begins, for the teachers then at the school (a lesson is
+  // set when it starts; the engine writes it down when it ends, `labour` later). A teacher who walks in after that, kept
+  // from leaving home by something else that morning (a councillor's vote, on the Rust world's day 294), is not unwell
+  // but was not there: the school did not have them to teach. It is the same rule as the TS school's.
+  const lessonsSetAt = new Map<number, number>();
+  for (const e of lessons) lessonsSetAt.set(dayOf(e), Math.min(lessonsSetAt.get(dayOf(e)) ?? Infinity, e.t - e.labour));
+  const arrivals = ev.filter((e) => e.event === "occupied" && /\/workplace\./.test(e.space) && teachers.includes(e.occupant));
+  const arrivedAfterLessonsSet = (who: string, day: number) => arrivals.some((a) => a.occupant === who && dayOf(a) === day && a.t > lessonsSetAt.get(day)!);
   for (const who of teachers) {
     const taught = new Set(lessons.filter((e) => e.performers.includes(who)).map(dayOf));
     const [first, lastDay] = [Math.min(...taught), Math.max(...taught)];
-    const missed = schoolDays.filter((d) => d > first && d < lastDay && !taught.has(d) && !unwell(who, d));
+    const missed = schoolDays.filter((d) => d > first && d < lastDay && !taught.has(d) && !unwell(who, d) && !arrivedAfterLessonsSet(who, d));
     expect({ who, missed }).toEqual({ who, missed: [] });
   }
   // (So a class with no lesson on a school day is one the school had no teacher for.) When it has lost a teacher, it
