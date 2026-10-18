@@ -26,7 +26,7 @@ use oikos_rules::slip::Performer;
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub const ENGINE_VERSION: &str = "0.2.0";
 
@@ -40,6 +40,15 @@ pub const MAX_ROUNDS_PER_MOMENT: u32 = 1000;
 pub const MAX_FAILURES_IN_A_ROW: u32 = 3;
 /// Fewer actors than this in a round are stepped on one thread (starting threads costs more).
 const WORTH_SHARING: usize = 16;
+
+/// Who the engine is deciding for now (the keys of the round in hand, at most a dozen, and when): for the watchdog, which
+/// runs beside the run's thread and says in its diagnosis whom a stall was waiting on. A process-wide note, read by
+/// `deciding()`; nothing in the world depends on it.
+static DECIDING: Mutex<String> = Mutex::new(String::new());
+/// Who the engine is deciding for now (see `DECIDING`).
+pub fn deciding() -> String {
+    DECIDING.lock().map(|g| g.clone()).unwrap_or_default()
+}
 
 #[derive(Debug, Clone)]
 pub struct EngineOptions {
@@ -266,6 +275,8 @@ pub struct Engine<W: Write> {
     rounds_at: (i64, u32),
     /// Wakes of the engine's own actors by why they woke (not state: no result depends on it, and a resumed run counts afresh).
     wakes_by: std::collections::BTreeMap<String, u64>,
+    /// Failures of its own actors recovered in place (`participant_error` notes), for the run's summary.
+    failures: u64,
     questions: Vec<(String, Question)>,
     lean: bool,
     thinking: Option<i64>,
@@ -409,6 +420,7 @@ impl<W: Write> Engine<W> {
             round: None,
             rounds_at: (-1, 0),
             wakes_by: Default::default(),
+            failures: 0,
             questions: vec![],
             lean: base.lean,
             thinking: base.thinking,
@@ -815,6 +827,10 @@ impl<W: Write> Engine<W> {
         }
     }
 
+    /// Failures of the engine's own actors recovered so far.
+    pub fn failures(&self) -> u64 {
+        self.failures
+    }
     /// Wakes of the engine's own actors so far, by why they woke.
     pub fn wakes_by(&self) -> &std::collections::BTreeMap<String, u64> {
         &self.wakes_by
@@ -855,6 +871,13 @@ impl<W: Write> Engine<W> {
                 "participants kept waking each other at t={t} ({MAX_ROUNDS_PER_MOMENT} rounds in one moment): {} among them",
                 awake[0].0
             ));
+        }
+        if let Ok(mut d) = DECIDING.lock() {
+            d.clear();
+            d.push_str(&format!("t={t}: {}", awake.iter().take(12).map(|(k, _)| k.as_str()).collect::<Vec<_>>().join(", ")));
+            if awake.len() > 12 {
+                d.push_str(&format!(" and {} more", awake.len() - 12));
+            }
         }
         // Look, in key order.
         // (Each code unit with what it was shown: its view takes the observation in as it decides, on its thread.)
@@ -1007,6 +1030,7 @@ impl<W: Write> Engine<W> {
                     let u = self.units.get_mut(&key).expect("checked");
                     u.failures += 1;
                     let (pid, in_a_row) = (u.participant.clone(), u.failures);
+                    self.failures += 1;
                     self.note(&pid, json!({ "participant_error": { "unit": key, "error": e.chars().take(2000).collect::<String>(), "in_a_row": in_a_row } }))?;
                     if in_a_row >= MAX_FAILURES_IN_A_ROW {
                         self.retire(&key)?;

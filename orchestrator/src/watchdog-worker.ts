@@ -3,6 +3,7 @@
 // main thread is stuck in a synchronous loop.
 
 import { writeFileSync } from "node:fs";
+import { nativeEngine } from "./kernel";
 
 declare var self: Worker;
 
@@ -35,7 +36,15 @@ self.onmessage = (e: MessageEvent) => {
       // a breadcrumb half-written as time ran out: say so
       doing = "(unreadable)";
     }
-    const diagnosis = { run_id: runId, reason: "stalled", stalled_for_ms: Date.now() - since, doing, at: new Date().toISOString(),
+    // (On the Rust world the engine decides for the code actors inside its own call, which the breadcrumbs cannot see into:
+    // it keeps a note of whom it is deciding for, which this thread reads from the same native module.)
+    let deciding: string | undefined;
+    try {
+      deciding = nativeEngine()?.deciding?.() || undefined;
+    } catch {
+      // no engine in this process, or none that can say
+    }
+    const diagnosis = { run_id: runId, reason: "stalled", stalled_for_ms: Date.now() - since, doing, ...(deciding ? { deciding } : {}), at: new Date().toISOString(),
       what_next: "Fix the cause, then resume the run: `oikos resume <log>` re-runs it with every model response served from this log." };
     try {
       writeFileSync(diagnosisPath, JSON.stringify(diagnosis, null, 2));

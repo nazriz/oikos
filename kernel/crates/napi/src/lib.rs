@@ -60,6 +60,12 @@ fn parse(s: &str, what: &str) -> napi::Result<serde_json::Value> {
     serde_json::from_str(s).map_err(|e| err(format!("{what}: {e}")))
 }
 
+/// Whom the engine is deciding for now (the watchdog's thread asks, while the run's own is inside the engine).
+#[napi]
+pub fn deciding() -> String {
+    oikos_kernel::engine::deciding()
+}
+
 /// A world run in the engine, its built-in actors in Rust, its seats hosted by the caller (kernel/src/host.rs):
 /// every call takes and gives JSON text.
 #[napi]

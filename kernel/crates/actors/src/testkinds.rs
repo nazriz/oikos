@@ -52,10 +52,66 @@ pub struct Double {
 
 /// Every double, in name order (found by `registry::find`, never listed by `registry::kinds`).
 pub static KINDS: &[&dyn Kind] = &[
+    &Faulty { name: "test.hang" },
+    &Faulty { name: "test.throw" },
     &Double { name: "test.directing", default_inner: "" },
     &Double { name: "test.finance_holding", default_inner: "city.finance_officer" },
     &Double { name: "test.leaving", default_inner: "" },
 ];
+
+/// `test.hang` and `test.throw`, for the reliability tests (the TS fixtures of the same names): a participant that waits a
+/// day at a time and, from `hang_at` (or `throw_at`) seconds on, never returns (a hang, in a loop) or fails every time it
+/// is asked (a panic, which the engine recovers in place, records, and retires after three in a row).
+pub struct Faulty {
+    name: &'static str,
+}
+
+impl Kind for Faulty {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn version(&self) -> &'static str {
+        "0.0.1"
+    }
+    fn doc(&self) -> &'static str {
+        "docs/port-guide.md"
+    }
+    fn manifest(&self) -> Value {
+        json!({ "name": self.name, "version": "0.0.1", "doc": "docs/port-guide.md", "params": {}, "perceives": [], "state": "none" })
+    }
+    fn cadence(&self, _: &Ctx) -> i64 {
+        DAY
+    }
+    fn create(&self, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
+        let key = if self.name == "test.hang" { "hang_at" } else { "throw_at" };
+        Ok(Box::new(FaultyActor { hang: self.name == "test.hang", at: ctx.param(key, 0)? }))
+    }
+    fn restore(&self, ctx: &Ctx, _: Value) -> Result<Box<dyn Actor>, String> {
+        self.create(ctx)
+    }
+}
+
+struct FaultyActor {
+    hang: bool,
+    at: i64,
+}
+
+impl Actor for FaultyActor {
+    fn step(&mut self, pic: &Picture, _: &mut Cx) -> Action {
+        if pic.t >= self.at {
+            if self.hang {
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                }
+            }
+            panic!("Error: a bug at t={}", pic.t);
+        }
+        Action::wait()
+    }
+    fn save(&self) -> Result<Value, String> {
+        Ok(Value::Null)
+    }
+}
 
 impl Double {
     fn inner(&self, ctx: &Ctx) -> Result<(&'static dyn Kind, Ctx), String> {

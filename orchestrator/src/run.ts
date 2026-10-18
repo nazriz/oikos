@@ -1601,6 +1601,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const end = await k.request({ op: "finish", reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) });
   // (On the Rust world the engine woke its own actors itself: they are counted with the wakes the host made for seats.)
   for (const [why, n] of Object.entries((end.wakes_by ?? {}) as { [why: string]: number })) { wakes += n; wakesBy[why] = (wakesBy[why] ?? 0) + n; }
+  participantErrors += Number(end.failures ?? 0); // (and the failures of its own actors it recovered in place)
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
   if (resolverDiffCount) await Bun.write(join(o.outDir, `${o.runId}.resolver-diffs.json`), JSON.stringify(resolverDiffs, null, 1));
