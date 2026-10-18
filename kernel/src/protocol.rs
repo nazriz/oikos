@@ -365,28 +365,7 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
             let obs = r.full_view(str_field("participant")?).ok_or("unknown participant")?;
             Ok(json!({ "ok": true, "observation": obs }))
         }
-        "agreements" => {
-            // Agreements read by their terms now (the truth audits, docs/design/rebuild.md 8.2): those named, and every
-            // one a party is in. Not logged; changes nothing.
-            let st = r.kernel().state();
-            let mut ids: Vec<String> = req
-                .get("ids")
-                .and_then(Value::as_array)
-                .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-                .unwrap_or_default();
-            if let Some(p) = req.get("party").and_then(Value::as_str) {
-                ids.extend(st.agreements_of.get(p).into_iter().flat_map(|v| v.iter().cloned()));
-            }
-            let agreements: Vec<Value> = ids
-                .iter()
-                .filter_map(|id| {
-                    let stored = st.records.get(id)?;
-                    let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { return None };
-                    Some(json!({ "id": id, "template": terms.template, "parties": terms.parties, "reading": st.reading(id)? }))
-                })
-                .collect();
-            Ok(json!({ "ok": true, "agreements": agreements }))
-        }
+        "agreements" => agreements_reply(r.kernel().state(), req),
         "state" => {
             let hash = r.kernel().state_hash().map_err(|e| e.to_string())?;
             Ok(json!({ "ok": true, "t": r.kernel().t(), "state_hash": hash, "head": r.head() }))
@@ -448,6 +427,7 @@ fn engine_reply(session: &mut Session, req: &Value) -> Result<Reply, String> {
     let e = session.engine.as_mut().expect("checked");
     match op {
         "start" => Err("a run is already started".into()),
+        "agreements" => agreements_reply(e.run().kernel().state(), req).map(Reply::Value),
         "command" => {
             let cmd: Command = serde_json::from_value(req.get("command").cloned().ok_or("missing command")?).map_err(|x| format!("bad command: {x}"))?;
             let (resp, observed) = e.host_command(&cmd)?;
@@ -557,3 +537,27 @@ fn engine_reply(session: &mut Session, req: &Value) -> Result<Reply, String> {
         other => Err(format!("unknown op {other} (in the Rust world)")),
     }
 }
+
+/// Agreements read by their terms now (the truth audits, docs/design/rebuild.md 8.2): those named, and every one a party
+/// is in. Not logged; changes nothing. (Served by both sessions: a classic run's and the engine's.)
+fn agreements_reply(st: &oikos_world::state::State, req: &Value) -> Result<Value, String> {
+            // Agreements read by their terms now (the truth audits, docs/design/rebuild.md 8.2): those named, and every
+            // one a party is in. Not logged; changes nothing.
+            let mut ids: Vec<String> = req
+                .get("ids")
+                .and_then(Value::as_array)
+                .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .unwrap_or_default();
+            if let Some(p) = req.get("party").and_then(Value::as_str) {
+                ids.extend(st.agreements_of.get(p).into_iter().flat_map(|v| v.iter().cloned()));
+            }
+            let agreements: Vec<Value> = ids
+                .iter()
+                .filter_map(|id| {
+                    let stored = st.records.get(id)?;
+                    let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { return None };
+                    Some(json!({ "id": id, "template": terms.template, "parties": terms.parties, "reading": st.reading(id)? }))
+                })
+                .collect();
+            Ok(json!({ "ok": true, "agreements": agreements }))
+        }

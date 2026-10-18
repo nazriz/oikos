@@ -1331,6 +1331,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       if (due.advanced !== undefined) {
         t = due.advanced;
         await absorb(due); // (the advance's events: who's come or gone while time passed)
+        // (On the Rust world the engine's own actors are not observed here: a test's inspector is called once a day
+        // instead, with the moment and the kernel, so what it asks of the live engine it still can.)
+        if (rustWorld && o.inspect) await o.inspect("", { t } as any, k, undefined, undefined as any);
         continue;
       }
       t = due.t;
