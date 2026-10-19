@@ -267,8 +267,7 @@ Each group has its own `KINDS` list (`boundary`, `citizen`, `mind`, `firms`, `ma
 - `kernel/crates/world`, `perception`, `contracts`, `terms`, `law`, `nature`: the world's physics. A change needs
   the integration agent (and stays physics: no laws in the kernel).
 - `kernel/src/engine.rs` and `crates/sight`: the frame; changes through lane F or the integration agent.
-- Anything in `participants/src/behaviour/*` or the generator's output (frozen; a fault that corrupts a pilot's data is
-  fixed in TS and listed for the port).
+- (Historical: before the cut-over, anything in `participants/src/behaviour/*` or the generator's output was frozen. The behaviour directory is gone; its provenance in the Rust files' headers names paths at the `pre-cutover` tag.)
 - Another lane's modules and paper types (message their owner).
 - `docs/decisions.md` beyond your own appended entry; `CLAUDE.md`.
 

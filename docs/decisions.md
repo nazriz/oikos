@@ -6969,3 +6969,76 @@ Both whole suites passed first (TS world 1,845 of 1,845; Rust world all but four
 
 **Revisit if** a TS module passed with `--modules` is expected to run (it cannot: the engine runs only its own kinds and
 test doubles), or a generated town differs from the one before the cut-over.
+
+## 2026-10-19 · The cut-over, finished: the TypeScript behaviour files are gone (branch `cutover-2`; no model called)
+
+The 31 files left in `participants/src/behaviour/` are gone. The directory no longer exists.
+
+**Where things went** (a tree-shake by symbol over the whole repo, then a mover that rewrote every import; nothing by hand but the cases below):
+- `participants/src/kinds/`: the declarations of the kinds the engine runs, one file for each source file (what each keeps, issues, answers, routines,
+  cadence and first wake, its `books`, `staffed`, `opens`, `issuesWith`), their `create` being `inEngine(name)` (`participants/src/in-engine.ts`: it throws; the
+  engine runs the kind). Together with `engine-kinds.ts` (the ten deleted at the cut-over) this is the registry the generator and the host read.
+- `participants/src/shared/`: what the generator, the host and the readers use of the rules: household, mind and inner draws, tax, payments, returns, the decision
+  law's words, papers, reading's constants and tables, culture's tables, hearings' notices, the shared call helpers (`common.ts`), school, government words.
+- `participants/src/readers/`: the seat-side readers (`daybook`, `diary`, `roster`, `tally`, `openbooks*`) and the two classes they use that are the TypeScript
+  copies of Rust: `staffing.ts` (`Staffing`) and `books.ts` (the clerk's paper, kept for `books.test` and `day-list.test`).
+- **Deleted with the actor code:** 22,084 lines of TypeScript became 7,415 in the three folders (every `create`, and what only a `create` used: the TS citizen, firms, offices, the
+  `Culture`, `TownMemory`, `Inner`, `Attractions`, `Feelings`, `Pursuit`, `Ties`, `Borrowing`, `Hearings`, `Fleet`, `OfficeAdoption`, `stepper`, `ownerOf`, `breaches`
+  ...), found by reachability from everything that is not a test; then the exports of `index.ts` nothing outside used.
+- `participants/manifests/*.json` are now written from the engine's (`bun participants/scripts/manifests.ts` reads `actors.manifests`): the content equals
+  the TypeScript-derived manifests (checked kind by kind), with the engine's four params more on the landlord and keys in name order. Five kinds' versions in the
+  registry were behind the engine's (bank.lending 0.6.0, bank.payment_system 0.18.0, firm.employer 0.7.0, firm.newspaper 0.2.0, union.organiser 0.8.0,
+  world.trade 0.4.0): set to the engine's.
+- **Contract change (blanket approval, logged):** `contracts/module.schema.json` gains optional `answers` (how an office answers a letter) and `capacity` (what sizes a registry's staff), both of which the engine's manifests carry; `contracts/README.md` says so.
+- `kernel/src/rules_api.rs` serves two more rules, `founding.accept_gathering` and `founding.accept_membership`, so the translator's test of what the founding module
+  accepts calls the engine's, not a TypeScript copy.
+
+**Byte identity.** `sha256` of the whole generated config (first 16 hex digits and its length), 4 town specs (`town`, `-300`, `-1000`, `-3000`) x 9 profiles, the 4
+specs with no profile set, and 27 variants (`mayor=llm`, `living.founding`, `living.composer` over the nine profiles, of which 9 refuse alike), 67 in all,
+taken on `origin/main` (0e033354) and on this branch: the same. (`/scratchpad/towns.ts`; the TS rules are not what is compared: the native module is built in both.)
+
+**Tests.** Hard rule held: none weakened. What happened to the ~50 files that exercised the deleted code:
+- *Run against the engine instead* (the cases that stepped a TypeScript actor on hand-built observations, and three orchestrator tests that wrapped a TypeScript office as a mock seat's brain: standing-work, holds-seat and office-papers now wrap or step the engine's office): `participants/test/engine.ts` gives a test
+  `engine("<kind>")`, the Rust kind run detached (`DetachedActor`) on the observation it builds (the least normalisation to the kernel's shape is in `whole()`).
+  Cases that the helper's coverage table had as having no Rust test now run against the Rust actor itself: builder-repairs (4), citizen-civic (8 of 9),
+  citizen-household (4), citizen-death (5), citizen-land (6), citizen-voice (4 of 7), pay-period (2), the culture cases at the citizen (19), counter, directions, staff-report,
+  standing-work, council, budget-year, tribunal, police, registry, payroll-notice, auditor (the full-run cases). Their assertions are unchanged except where a rule had
+  changed on purpose and is documented (council.test: the councillor's 5-point status-quo bias, docs/behaviour/government.md).
+- *Ported to Rust* (the TypeScript class they held is gone, nothing in Rust held the same): `steps::tests` (the stepper: five cases, was stepper.test);
+  `offices::systems::tests` (a tender: the direct order, the invitation, the award to the lowest bid, none with no bids; a small office takes none: was
+  automation.test); `offices::auditor::tests::a_decision_is_decided_again_...` (was orchestrator/test/auditor.test); `finance::credit::tests::a_loan_granted_is_waited_for_...`
+  (was pay-period.test); `common::tests::a_notice_sent_at_any_moment_...` (was notice-lag.test); `market::automation::tests::a_system_that_gets_half_its_units_wrong_...`;
+  and two figures added to `credit::tests` (`repayment`).
+- *Deleted, each with the Rust test that holds the same* (named by the helper's table from reading both, and checked here for the arithmetic ones): culture.test (6 library
+  cases) -> `mind/culture.rs::{the_sizes_are_checked, a_person_starts_with_the_profiles_picture, the_lean_sums_to_nothing_over_a_drawn_town, a_rate_is_swayed_by_the_lean_and_held,
+  the_section_is_bounded_and_whole_percent, what_is_thought_settles_by_half_in_internalise_days}`; culture-events/-learning/-memory/-step4/-talk/-say library cases ->
+  `culture.rs` and `townmemory.rs` tests of the same titles (an_event_is_one_sighting..., a_route_outside_the_three_is_refused, a_ring_of_twenty..., telling_each_act_once...,
+  never_more_than_six..., nothing_past_three_hands..., strength_fades_by_the_formula..., voicing_approval..., a_tie_cools..., being_told_it_is_held_against_you..., pluralistic_ignorance...,
+  a_child_takes_the_mean..., gossip_only_of_what_a_tie_told_me...); mind.test (6 cases) -> `mind/person.rs`; inner.test (10 cases; the `raisedValues` case stays, the function stays) ->
+  `mind/inner.rs`; reading.test (7 cases; two stay) -> `mind/reading.rs`; wants.test (2) -> `mind/wants.rs`; strikes.test -> `rules/bargaining.rs`; lending.test -> `finance/credit.rs`;
+  filed-order.test -> `common/tests.rs::papers_are_ordered_as_filed_not_as_text`; laws.test, and the `breaches` half of one tribunal case -> `common/tests.rs::a_prohibition_binds_an_act_it_is_true_of_and_says_when_it_cannot_be_read`;
+  household.test (2 cases: the household's phrasing, catching up) -> `citizen/household.rs`, `mind/talk.rs`; founding.test (9 code cases; the composer's seven stay) -> `mind/founding.rs`;
+  the library cases of book.test (the lookups of lots, owners, price lists) went with their TypeScript helpers (the Book's own index cases stay).
+- *Kept, because the TypeScript they test is kept* (the readers use it): tax.test (`annualTax` restored), daybook.test (`DAYBOOK_MAX`), books.test and day-list.test (the clerk's paper),
+  strike-pay.test (`Staffing`), reading-tags.test (`plainKeys`), the household draws, mind's `drawPerson`.
+- *Held as `test.failing`, assertion unchanged, and in the register* (they run the engine and it differs; nothing was tuned): 7 cases of the engine's citizen (docs/risks.md PC-15),
+  3 of its offices (PB-21); 4 that need hooks the detached actor lacks and 2 blocked as `test.skip` (MT-18). Nothing is deleted without a covering test.
+- *Guards that scanned the TypeScript behaviour code now scan the engine's too:* `participants/test/unstated.test.ts` (case 3: every sentence the platform can write to
+  a seat, now also every string literal of `kernel/crates/actors/src`, 112 files, 2,642 sentences, floor 2,000; three exceptions named with reasons: a boundary's reason in the
+  log, a manifest's text, a code founder's recorded `why`); `foundations-laws.test` (errors drawn only through `slip()`, no `remedy_request`), `twin-draws.test` (no draw named for a moment),
+  `all-work-takes-time.test`, `boundaries.test`. `participants/test/literals.ts` gained `rustLiterals`.
+- Phrases a test hands a citizen to hear are test data in `participants/test/{sayings,phrasing}.ts` (the words of the deleted citizen, as the Rust tests hold them).
+
+**The gate's measures, re-run** (a year at 1,000 people, three profiles, five seeds, `scripts/port-gate.ts --only measure`, the TS side being the recorded run at 961e737a; this branch's tree
+equals 0e033354 in every engine file): beyond 3 SE: au-vic 2 (gatherings took part 46.3% to 48.4%, now nearer the profile's 50%; people overcrowded 15 to 11); gb-eng 3 (people 859 to 873;
+gatherings 169 to 165; per gathering 52.6 to 56); ke-nakuru 4 (labour force 435 to 448, adults 630 to 644, employed 414 to 429, working age 608 to 621). Against the build before the cut-over's last
+two fixes (the household-death report, gatherings from work) only one measure moved beyond 3 SE: gb-eng people 865 to 873 (3.7 SE). Likely cause, not traced further: a household's death away from home is seen
+and reported now, so its survivors keep their tenancy: in the same runs unhoused 8.4 to 2.4 and partly housed 12 to 6.4 (au-vic), apart 1.0 to 0.2 (ke-nakuru), departures 139 to 134
+(gb-eng): fewer leave. The gatherings fix moved took-part in au-vic from 48.8 to 48.4 and last month's from 42.3 to 42.4 (within noise). The before-fix measures that failed are no longer beyond 3 SE:
+au-vic unemployment by agreement (4.1 SE to 2.1), ke-nakuru employed 5.0 to 3.5 and labour force 6.9 to 4.5. Health breaches in kind: au-vic loses the TS world's business entry breach, as before. The threads
+half of the gate (1 and 14 threads) was not re-run: nothing of the engine changed.
+
+**Risks** (docs/risks.md): PC-15, PB-21 and MT-18 added; MT-16 notes the re-run.
+
+**Revisit if** a generated town differs from the one before this change; or when PC-15, PB-21 or MT-18's cases are mended (flip their `test.failing`); or when the tax, payments, returns and household
+rules are served through `rules_api.rs` (then delete their TypeScript copies and the test files that hold them, MT-18).

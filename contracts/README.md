@@ -662,4 +662,5 @@ No JSON Schema changed.
   actor's observation is regenerated from the log by replaying to its command (`oikos-kernel view <log> <seq>`; the
   explorer's `/api/r/<run>/view/<seq>`), in a recorded observation's shape (channels as a list with `path`; the
   recorded one also says the entity and capacity it was shown for). docs/reliability.md, "Observations in the log".
-
+- **Module manifest: `answers`** (optional, 2026-10-19, the cut-over's second step; blanket contract approval): how an office answers a letter (`office`, `acts`, `report`, `forms`), as the engine's manifests carry it. The manifests in `participants/manifests` are now written from the engine's (`bun participants/scripts/manifests.ts`), and the engine's kinds say it; the schema had no place for it.
+- **Module manifest: `capacity`** (optional, 2026-10-19): what sizes an office's staff where its kind states it (the registries' asks and seconds, the rule that sizes the staff, the figure's source), as the engine's manifests carry it; open inside.

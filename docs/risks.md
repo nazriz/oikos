@@ -656,6 +656,19 @@ The mechanism:
 
 ---
 
+### PB-21 · Three engine offices differ from their TypeScript twins on held cases
+- **Gap:** Held as `test.failing` (assertion unchanged): the engine's landlord offers the tenancy to no one still there after a
+  registered death (it gives the notice only); the engine's mayor, run alone, acknowledges no letter (not traced whether
+  the engine's mayor has a report of its own now or the detached harness drops the letter); the council clerk's report lists a
+  law's figures in alphabetical order (a map's), not the schedule's.
+- **Where:** `kernel/crates/actors/src/offices/council.rs` (`amendable`), `common/letters.rs` (`Answering`), `firms/landlord.rs`;
+  `participants/test/landlord.test.ts`, `letters.test.ts`, `drafting.test.ts`.
+- **Effect:** A household that outlives a tenant may lose its home where the TypeScript landlord offered it on; the order of
+  figures in the clerk's report is not the law's.
+- **L / I:** medium / low · **Status:** to fix (found at the cut-over's test port, 2026-10-19)
+- **Notice by:** the cases flip from `test.failing` to a failure the day one is mended.
+- **Fix when:** Before a seat holds the landlord's or the clerk's office in a study of bereavement or amendment.
+
 ## People and culture
 
 ### PC-1 · Nobody reads what a seat writes
@@ -796,6 +809,21 @@ The mechanism:
 - **Fix when:** A culture or conflict study that needs sudden shifts.
 
 ---
+
+### PC-15 · The engine's citizen differs from the TypeScript citizen it replaced on seven held cases
+- **Gap:** Seven cases of participants/test, run against the engine's `citizen.default` (they were written for the TypeScript one
+  and are held as `test.failing`, assertion unchanged), differ: a heavier weight on trust in `wants.choice` asks the landlord for a
+  held rent less, not more (of 59 seeds, none asks at 100,000; 20 do at 0); the petition a tenant starts is worded generally, not
+  with the place's figures; `petition_willing_bps` draws nobody willing in 300 tries where the TypeScript citizen drew about 44%;
+  the thresholds' mean is 31 where 23 to 27 was drawn; `reads_news_bps` leaves every reader's approval moved (200 of 200) where 60
+  to 100 moved. Some may be deliberate (a general wording per docs/profiles.md) and some draws of the engine's own.
+- **Where:** `kernel/crates/actors/src/mind/`, `citizen/` (wants, voice, civic); `participants/test/citizen-wants.test.ts`,
+  `citizen-voice.test.ts`, `citizen-civic.test.ts`.
+- **Effect:** A town's people may be less willing to petition or ask, and less swayed by the news, than the profiles' calibration
+  of them meant; seed-level draws differ (twins hold on the engine).
+- **L / I:** medium / medium · **Status:** to fix (found at the cut-over's test port, 2026-10-19; not traced to a cause)
+- **Notice by:** the seven cases flip from `test.failing` to a failure the day one is mended (bun reports it).
+- **Fix when:** Before petitions, asks or news reading are read as findings of a study; trace each to the engine's draw or word.
 
 ## Seats and framing
 
@@ -1124,7 +1152,7 @@ The mechanism:
 - **L / I:** high / medium · **Status:** partly fixed (decisions 2026-10-18, "Port step 3, second pass"; 2026-10-19, "Port step 3, finished"): the faults found are fixed; on the final gate 9 measures are beyond 3 SE (gatherings and union belief in au-vic, gatherings' size in gb-eng, ke-nakuru's work: more jobs, unemployment 2.1% against the profile's 5.4%), each explained there; households going without (11.3% in au-vic, 6.9% in ke-nakuru) is a new breach, ME-20's cobweb, and its rise since the second pass is not traced. Threads and twins hold. **The cut-over's gate (2026-10-19, decisions "The cut-over"):** 13 measures beyond 3 SE (au-vic 3, gb-eng 3, ke-nakuru 7), each explained there and none from a fault; households going without is no longer a breach (au-vic 2.7%, ke-nakuru 3.1%); threads hold; twin-draws' registry case (MT-17) still fails, so phase 4 waits.
 - **Notice by:** `bun scripts/port-gate.ts` (runs/port-gate/gate.json).
 - **Fix when:** Before phase 4 (deleting the TS actors) and before any pilot on the Rust world.
-- **Cut-over, 2026-10-19:** the Rust world is the only one; ten TS actor files deleted, the rest kept for the helpers the generator, host and readers import (decisions, "The cut-over").
+- **Cut-over, 2026-10-19:** the Rust world is the only one; the TS actors are deleted (decisions, "The cut-over" and "The cut-over, finished"). **Gate re-run on the build with the two last fixes (a year, 1,000 people, three profiles, five seeds):** beyond 3 SE of the TS world: au-vic 2 (took part in gatherings 46.3% to 48.4%, toward the profile's 50%; people overcrowded 15 to 11), gb-eng 3 (people 859 to 873, gatherings 169 to 165, per gathering 52.6 to 56), ke-nakuru 4 (more adults stay and work: labour force 435 to 448, employed 414 to 429); against the build before the last two fixes only gb-eng people moved beyond 3 SE (865 to 873), with fewer leaving.
 
 ### MT-17 · How far a seated person's time spreads through the Rust world
 - **Gap:** twin-draws' case of the registry held by a person of the town: the holder's entries take their time, and what
@@ -1140,6 +1168,24 @@ The mechanism:
 - **Notice by:** the measure in twin-draws' output; a seat study's twin pair.
 - **Fix when:** a study needs a seat's effect smaller than this spread (then more twin seeds, or a sourced rule at a
   knife-edge).
+
+### MT-18 · Rules still written twice, and cases not yet ported, after the cut-over
+- **Gap:** The Rust world is the only world, but TypeScript still holds copies of rules that live in Rust, kept because the
+  generator, the host or the seat-side readers use them: tax and withholding (`shared/tax.ts`), payments, returns, the
+  household, mind and inner draws, the papers' constants, the decision law's words, the staffing reader (`readers/staffing.ts`,
+  about 1,000 lines beside `firms/staffing.rs`), the book (`shared/common.ts` `Book`) and the clerk's paper (`readers/books.ts`,
+  kept for books.test and day-list.test beside `offices/books.rs`'s five tests), and the open-books readers. Also held:
+  four cases of participants/test/reading-citizen.test.ts (`test.failing`: they hand the citizen a reading and count its draws
+  through hooks the detached engine actor does not carry) and two blocked as `test.skip` (drafting's amended-law judgement,
+  registry's title transfer: the TypeScript helper they called is gone and no engine test judges the same).
+- **Where:** `participants/src/shared/`, `readers/`, `kinds/`; `participants/test/`.
+- **Effect:** A rule changed in Rust and not in TypeScript changes the engine and not the generated town's words or a seat's
+  books; the generated towns are held byte-identical to the cut-over's by decisions 2026-10-19 ("The cut-over, finished").
+- **L / I:** medium / medium · **Status:** to fix (planned: expose the tax, payments, returns and household rules through
+  `kernel/src/rules_api.rs` as the plan, forms and law rules already are, then delete the TypeScript copies)
+- **Notice by:** a profile edit whose generated words differ from what the engine does; the shared-rules tests failing.
+- **Fix when:** Before the next rule in this list changes.
+
 ---
 
 ## Profiles and sources
