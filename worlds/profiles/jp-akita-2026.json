@@ -1327,7 +1327,7 @@
       "survey_staff": 1,
       "spin_up_years": 10
     },
-    "founding": {"registered_per_100000_per_year": 1, "informal_multiple": 5, "chance_bps": 14, "shared_min": 2, "rest_days": 365, "dues_minutes_of_pay": [0, 10, 30, 60], "every_days": [14, 7, 28], "starts_in_days": [7, 3, 14], "lasts_minutes": [90, 60, 120], "lapse_days": 120, "min_members": 2, "leave_after_days": 90, "hall_hire_hours_of_pay": 2, "fund": {"qualify_days": 60, "draw_months": 6, "every_days": 180}, "cause": {"case_hours": 6, "hours_per_member_month": 2}},
+    "founding": {"registered_per_100000_per_year": 1, "informal_multiple": 5, "chance_bps": 109, "shared_min": 2, "rest_days": 365, "dues_minutes_of_pay": [0, 10, 30, 60], "every_days": [14, 7, 28], "starts_in_days": [7, 3, 14], "lasts_minutes": [90, 60, 120], "lapse_days": 120, "min_members": 2, "leave_after_days": 90, "hall_hire_hours_of_pay": 2, "fund": {"qualify_days": 60, "draw_months": 6, "every_days": 180}, "cause": {"case_hours": 6, "hours_per_member_month": 2}},
     "audit": {"office": "the audit commission", "answer_within_days": 14, "report_within_days": 90, "bodies": [{"body": "support", "every_days": 90, "checks": ["decisions"], "sample": {"share_bps": 1500, "least": 6, "most": 25}}, {"body": "town_finance", "every_days": 180, "checks": ["accounts"]}]},
     "decisions": [
       {
