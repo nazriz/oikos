@@ -56,6 +56,10 @@ pub struct Offerings {
     pub min_order: Option<i64>,
     pub at: Option<String>,
     pub terms_days: Option<i64>,
+    /// A clearance the seller states (docs/behaviour/sourcing.md): the quantity it is clearing at this price, and its
+    /// regular price, what it charges once that stock is gone.
+    pub clearance: Option<i64>,
+    pub regular: Option<i64>,
 }
 
 fn goods_of(r: &Record) -> Option<BTreeMap<String, i64>> {
@@ -85,6 +89,8 @@ pub fn goods_prices(book: &Book, seller: &str) -> Offerings {
         min_order: d.i("min_order"),
         at: d.s("at").map(str::to_string),
         terms_days: d.i("terms_days").filter(|n| *n > 0),
+        clearance: d.get("clearance").and_then(|c| c.get("quantity")).and_then(Value::as_i64).filter(|n| *n > 0),
+        regular: d.get("clearance").and_then(|c| c.get("regular")).and_then(Value::as_i64).filter(|n| *n > 0),
     }
 }
 

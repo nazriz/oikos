@@ -49,7 +49,28 @@ world price rises (Armington 1969). Boundary doc: boundary.md.
 listings and when each came down. The landlord (lane C1) feeds it to `oikos_rules::rent`. `market::rents` reads the same
 listings for a landlord that wants its own reading (days on market as the test of an asking rent).
 
-## Staying with a supplier (integration, 2026-10-18)
+## Evidence over the month, the least change, price points (the cut-over, 2026-10-19)
+
+A seller judges its market on what has built up over the month, not on one count or one customer (ME-20, MT-17):
+- **Stock is the month's mean**, a reading at its first wake each day (`StockMeter`), not what is on the shelf at the
+  hour of the review, which turns on whether a delivery came just before it and which customers came first.
+- **The least change** (`price_least_change_bps`, 1%): a move the evidence asks for that is smaller than this is not
+  made; the evidence goes on building until one is worth making (menu costs: Levy et al. 1997; (S, s) pricing:
+  Sheshinski and Weiss 1977). A price below cost is still lifted towards it whatever the size.
+- **Price points:** a move is made in whole steps of the least change, at least one, never more than `vartheta_bps`
+  (prices move between price points, not by the cent: Kashyap 1995; Levy et al. 2011). Two sellers whose evidence
+  differs a little set the same price.
+- **A clearance says so** on the factory's list (`clearance: { quantity, regular }`), and a rival's clearance is read at
+  its regular price (docs/behaviour/sourcing.md).
+
+Measured (au-vic, a year, three seeds): shops' price lists went from about 8 a year to 6 with the month's mean alone;
+see the decisions log (2026-10-19, "The cut-over") for the rest.
+
+## Staying with a supplier (integration, 2026-10-18; replaced at the cut-over)
+
+**Replaced, 2026-10-19:** a shop now spreads its restocking across its suppliers (docs/behaviour/sourcing.md);
+`supplier_switch_bps` is gone. What follows is the rule as it was.
+
 
 A shop restocks from the supplier it bought from last unless another is cheaper by more than `supplier_switch_bps`
 (default 100: 1% of the price) or its own came up short in the last week. Basis: households in Lengnick (2013,

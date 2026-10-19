@@ -46,11 +46,18 @@ pub struct PriceFigures {
     pub clearance_floor_bps: i64,
     /// How old a rival's price list may be and still count, in days.
     pub rival_days: i64,
+    /// The least change a seller makes to its price (bps of it): a smaller one is not worth making (menu costs).
+    #[serde(default = "least_change")]
+    pub least_change_bps: i64,
+}
+
+fn least_change() -> i64 {
+    100
 }
 
 impl Default for PriceFigures {
     fn default() -> Self {
-        PriceFigures { adjust_bps: 5000, rival_weight_bps: 2500, clearance_cover_bps: 30_000, clearance_floor_bps: 8000, rival_days: 60 }
+        PriceFigures { adjust_bps: 5000, rival_weight_bps: 2500, clearance_cover_bps: 30_000, clearance_floor_bps: 8000, rival_days: 60, least_change_bps: least_change() }
     }
 }
 
@@ -63,6 +70,7 @@ impl PriceFigures {
             clearance_cover_bps: ctx.param("clearance_cover_bps", d.clearance_cover_bps)?,
             clearance_floor_bps: ctx.param("clearance_floor_bps", d.clearance_floor_bps)?,
             rival_days: ctx.param("rival_days", d.rival_days)?,
+            least_change_bps: ctx.param("price_least_change_bps", d.least_change_bps)?,
         })
     }
 }
@@ -149,8 +157,22 @@ pub fn move_price(l: &Lengnick, f: &PriceFigures, rng: &mut Rng, s: &Signals, mo
         })
         .unwrap_or(0);
     let total = (answer + pull).clamp(-vt, vt);
-    // Firms differ in boldness: the step is drawn up to its size.
-    let step = (total.abs() * (boldness + 1)) / 10_000;
+    // A change smaller than the least worth making is not made (menu costs: Levy et al. 1997; the (S, s) pricing of
+    // Sheshinski and Weiss 1977): the evidence of the months goes on building until a change is worth it, and a seller
+    // that does change moves at least that far. (A price below cost is still lifted towards it, below.)
+    let least = f.least_change_bps.clamp(0, vt);
+    let total = if total.abs() < least { 0 } else { total };
+    // Firms differ in boldness: the step is drawn up to its size, and made in whole steps of the least change, at least
+    // one (prices move between price points, not by the cent: Kashyap 1995; Levy et al. 2011). So evidence a little
+    // different gives the same price, not one a cent away.
+    let step = if total == 0 {
+        0
+    } else if least == 0 {
+        (total.abs() * (boldness + 1)) / 10_000
+    } else {
+        let drawn = (total.abs() * (boldness + 1)) / 10_000;
+        (((drawn + least / 2) / least).max(1) * least).min(vt.max(least))
+    };
     let mut next = match total {
         t if t > 0 => div_up(s.price * (10_000 + step), 10_000),
         t if t < 0 => s.price * (10_000 - step) / 10_000,
@@ -173,6 +195,7 @@ pub fn move_price(l: &Lengnick, f: &PriceFigures, rng: &mut Rng, s: &Signals, mo
     if next == s.price {
         return stay;
     }
+
     let words = if next > s.price {
         let mut why = vec![];
         if s.turned_away > 0 {
@@ -224,6 +247,8 @@ pub fn rivals_seen(book: &Book, me: &str, kind: &str, level: Level, t: i64, max_
         let Some(s) = r.speaks_for.as_deref().filter(|s| *s != me) else { continue };
         let d = data(r);
         let Some(p) = d.get("goods").and_then(|g| g.get(kind)).and_then(serde_json::Value::as_i64).filter(|p| *p > 0) else { continue };
+        // (A clearance is not a rival's going price: what it charges once the lot is gone is: docs/behaviour/sourcing.md.)
+        let p = d.get("clearance").and_then(|c| c.get("regular")).and_then(serde_json::Value::as_i64).filter(|r| *r > p).unwrap_or(p);
         let wholesale = d.i("min_order").is_some_and(|m| m > 1);
         if (level == Level::Wholesale) != wholesale || t - r.at > max_age {
             continue;
@@ -236,6 +261,37 @@ pub fn rivals_seen(book: &Book, me: &str, kind: &str, level: Level, t: i64, max_
         }
     }
     latest.values().map(|(_, p)| *p).collect()
+}
+
+/// A seller's stock as its books show it over a month: a reading a day, and their mean at the month's end. The price
+/// rule reads this, not the stock at the moment of the review: what is on the shelf at one hour turns on whether a
+/// delivery came just before or just after it and on which customers came first, and a seller judges its stock by what
+/// it has held over the period (accumulated evidence), not by one count (docs/behaviour/prices.md, "Evidence over the
+/// month").
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StockMeter {
+    sum: i64,
+    days: i64,
+    last_day: Option<i64>,
+}
+
+impl StockMeter {
+    /// The day's reading (the first wake of a day counts; later ones that day do not).
+    pub fn read(&mut self, day: i64, stock: i64) {
+        if self.last_day == Some(day) {
+            return;
+        }
+        self.last_day = Some(day);
+        self.sum += stock.max(0);
+        self.days += 1;
+    }
+    /// The month's mean (rounded half up), or `now` if nothing was read; the meter starts again.
+    pub fn month(&mut self, now: i64) -> i64 {
+        let m = if self.days > 0 { (2 * self.sum + self.days).div_euclid(2 * self.days) } else { now };
+        self.sum = 0;
+        self.days = 0;
+        m
+    }
 }
 
 /// How much a seller can expect the outside world to take from it: the room it has found under the world's standing
@@ -322,6 +378,35 @@ mod tests {
     /// The same draw every time the seed is: runs of the rule over many seeds, to read what it does on average.
     fn runs(l: &Lengnick, s: &Signals, n: u64) -> Vec<Moved> {
         (0..n).map(|i| move_price(l, &PriceFigures::default(), &mut Randomness::new(i).stream(&["price"]), s, &money)).collect()
+    }
+
+    #[test]
+    fn a_change_under_the_least_worth_making_is_not_made_and_a_change_is_in_whole_steps_of_it() {
+        let l = certain();
+        // Rivals 2% dearer, balanced: the pull is 25% of 2%, half the least change: the price stays.
+        assert!(runs(&l, &sig(1000, 800, 100, 60, &[1020]), 100).iter().all(|m| m.price == 1000));
+        // Scarce: every move is 1% or 2% of the price, never a cent between.
+        let scarce = Signals { turned_away: 30, ..sig(1000, 800, 100, 5, &[]) };
+        assert!(runs(&l, &scarce, 200).iter().all(|m| m.price == 1010 || m.price == 1020), "price points");
+        // Two sellers whose evidence differs a little set the same price.
+        let a = Signals { turned_away: 30, ..sig(1000, 800, 100, 5, &[]) };
+        let b = Signals { turned_away: 31, ..sig(1000, 800, 100, 6, &[]) };
+        for i in 0..50 {
+            let pa = move_price(&l, &PriceFigures::default(), &mut Randomness::new(i).stream(&["p"]), &a, &money).price;
+            let pb = move_price(&l, &PriceFigures::default(), &mut Randomness::new(i).stream(&["p"]), &b, &money).price;
+            assert_eq!(pa, pb);
+        }
+    }
+
+    #[test]
+    fn the_stock_the_price_rule_reads_is_the_months_mean_a_reading_a_day() {
+        let mut m = StockMeter::default();
+        m.read(0, 100);
+        m.read(0, 0); // (a later wake the same day is not another reading)
+        m.read(1, 50);
+        m.read(2, 0);
+        assert_eq!(m.month(7), 50);
+        assert_eq!(m.month(7), 7, "nothing read since: the stock now");
     }
 
     #[test]

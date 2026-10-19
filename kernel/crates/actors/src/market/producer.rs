@@ -22,7 +22,7 @@
 use super::automation::{self, params_from, Adoption, AdoptionParams, AdoptionThen, Fleet};
 use super::body::{lift, Body, BodyThen, House, PlainBody, Review, Stage, Standing, Surplus, Want, Wind};
 use super::lengnick::{move_wage, pay_out, Expectation, From as Payer, Lengnick, WageMonth};
-use super::prices::{move_price, rivals_seen, ExportRoom, Level, PriceFigures, Signals};
+use super::prices::{move_price, rivals_seen, ExportRoom, Level, PriceFigures, Signals, StockMeter};
 use super::retailer::{fact, Adjust};
 use super::trade::{self, decline, decline_on_terms, fill, goods_prices, held, order, price_list, send_back, Committed, Deliveries, Order, OrderBook, Ordering, Payables, SellingTerms, TradeThen};
 use crate::common::{data, money_words, out_of_time, own_account, published_price, team, withdraw, Book, Fields, Pace, DAY, MONTH};
@@ -213,6 +213,12 @@ pub struct Factory<B: Body> {
     adoption: Adoption,
     /// System -> seconds of today it has been given.
     sys_used: BTreeMap<String, i64>,
+    /// Our stock, a reading a day, over the month (what the price rule reads: prices.rs, `StockMeter`).
+    #[serde(default)]
+    stock_meter: StockMeter,
+    /// What making a unit costs us now (inputs and hours): the regular price a clearance states.
+    #[serde(default)]
+    cost_now: i64,
 }
 
 impl<B: Body> Factory<B> {
@@ -255,6 +261,8 @@ impl<B: Body> Factory<B> {
             fleet: Fleet::new(&me),
             adoption: Adoption::new(&me, p.automation.clone().unwrap_or_default()),
             sys_used: BTreeMap::new(),
+            stock_meter: StockMeter::default(),
+            cost_now: 0,
             body,
             book: Book::new(),
             p,
@@ -510,6 +518,10 @@ impl<B: Body> Factory<B> {
         let marginal_cost = input_cost
             + if by_us > 0 && self.last_demand > 0 { ((self.last_demand - by_us) * labour_cost + self.fleet.fees(&self.p.task) + self.last_demand - 1).div_euclid(self.last_demand) } else { labour_cost };
         let stock = held(pic, &self.p.works, &self.p.output);
+        self.cost_now = marginal_cost;
+        if trading {
+            self.stock_meter.read(t.div_euclid(DAY), stock);
+        }
         let export_unit = offer_now.as_ref().map_or(0, |(_, d)| d.i("unit_price").unwrap_or(0));
         let export_share = offer_now.as_ref().map_or(0, |(_, d)| {
             let q = d.i("quantity").unwrap_or(0);
@@ -550,7 +562,7 @@ impl<B: Body> Factory<B> {
                 &self.p.lengnick,
                 &self.p.figures,
                 &mut rng,
-                &Signals { price: self.price, marginal_cost, demand: self.last_domestic.max(0), turned_away: self.last_short, stock, can_supply: None, rivals: &rivals },
+                &Signals { price: self.price, marginal_cost, demand: self.last_domestic.max(0), turned_away: self.last_short, stock: self.stock_meter.month(stock), can_supply: None, rivals: &rivals },
                 &money,
             );
             self.price = moved.price;
@@ -660,6 +672,15 @@ impl<B: Body> Factory<B> {
             if self.p.terms_days > 0 {
                 extra["terms_days"] = json!(self.p.terms_days);
             }
+            // Below what a unit costs us we are clearing stock (prices.rs): the list says how much, and what we charge once
+            // it is gone, so that a buyer can see the discount lasts one lot (docs/behaviour/sourcing.md).
+            let top = (self.p.lengnick.phi_high_bps * self.last_domestic.max(0) + 9999).div_euclid(10_000);
+            let lot = (stock - top).max(0);
+            let clearing = self.price < self.cost_now && lot > 0;
+            if clearing {
+                extra["clearance"] = json!({ "quantity": lot, "regular": self.cost_now });
+            }
+            let words = if clearing { format!("{words} Clearing {lot} at this price; {} each once they are gone.", money(self.cost_now)) } else { words };
             let mut calls: Vec<Call> = old.iter().map(|id| withdraw(id, Some("Superseded."))).collect();
             calls.push(price_list(&prices, &acct.account, &words, extra, Some(&me), None, true));
             let why = if old.is_empty() { "Publishing our wholesale price.".to_string() } else if self.price_why.is_empty() { format!("Our wholesale price is now {}.", money(self.price)) } else { self.price_why.clone() };

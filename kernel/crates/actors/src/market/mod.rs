@@ -16,6 +16,7 @@ pub mod producer;
 pub mod rent_portal;
 pub mod rents;
 pub mod retailer;
+pub mod sourcing;
 pub mod trade;
 #[cfg(test)]
 pub mod testkit;

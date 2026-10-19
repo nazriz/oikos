@@ -104,16 +104,31 @@ fn what_it_cannot_serve_for_want_of_stock_is_refunded_and_counted_as_customers_t
 }
 
 #[test]
-fn an_order_below_its_price_or_for_something_it_does_not_sell_is_refunded_whole() {
+fn an_order_at_a_price_since_raised_buys_what_its_money_buys_at_ours_and_one_for_something_it_does_not_sell_is_refunded_whole() {
+    // (Until the cut-over, 2026-10-19, an order below the shop's price was refunded whole: a household that last saw the
+    // shop's price before a rise went without until its next trip. A customer pays the price on the shelf, as at a till:
+    // docs/behaviour/retailer.md, "Selling".)
     let mut h = harness(json!({}));
     let cheap = an_order("rec.50", DAY + 8 * H, "ann", 2, 400);
     let other = statement("rec.51", DAY + 8 * H, "bob", "order", &[SHOP], json!({ "kind": "cake", "quantity": 1, "unit_price": 900, "deliver_to": "bob", "at": "home-2", "account": "acc-bob" }));
-    let txs = json!([tx("acc-ann", "acc-shop", 800, DAY + 8 * H, "Order"), tx("acc-bob", "acc-shop", 900, DAY + 8 * H, "Order")]);
-    let out = h.wake(DAY + 9 * H, world(&["w1"], vec![cheap, other], 10, 1_000_000, txs));
+    let too_little = an_order("rec.52", DAY + 8 * H, "cat", 1, 400);
+    let txs = json!([tx("acc-ann", "acc-shop", 800, DAY + 8 * H, "Order"), tx("acc-bob", "acc-shop", 900, DAY + 8 * H, "Order"), tx("acc-cat", "acc-shop", 400, DAY + 8 * H, "Order")]);
+    let out = h.wake(DAY + 9 * H, world(&["w1"], vec![cheap, other, too_little], 10, 1_000_000, txs));
     let t = all(&out);
-    assert!(t.contains("Served 0 of the 2 bread") && t.contains("Served 0 of the 1 cake"), "{t}");
-    assert!(!t.contains("goods(") && !t.contains("work("), "nothing was served: {t}");
-    assert!(t.contains("Refund: 2 bread") && t.contains("Refund: 1 cake"), "{t}");
+    assert!(t.contains("Served: 1 bread to ann"), "800 at our 500 buys one: {t}");
+    assert!(t.contains("Refund: what you paid over our price") && t.contains("\"refund\":300"), "the 300 over comes back with the note: {t}");
+    assert!(t.contains("Served 0 of the 1 cake") && t.contains("Refund: 1 cake"), "{t}");
+    assert!(t.contains("Served 0 of the 1 bread") && t.contains("Refund: 1 bread"), "400 buys none at 500: refunded whole: {t}");
+}
+
+#[test]
+fn a_restock_is_spread_across_suppliers_by_price_and_delivery_and_not_all_given_to_the_cheapest() {
+    let mut h = harness(json!({ "suppliers": ["mill", "farm"], "demand": 400 }));
+    let book = vec![wholesale("rec.1", 0, "mill", 404, 10), wholesale("rec.2", 0, "farm", 400, 10)];
+    let t = all(&h.wake(DAY + 9 * H, world(&["w1"], book, 2, 10_000_000, json!([]))));
+    assert!(t.contains("acc-farm") && t.contains("acc-mill"), "both are ordered from: {t}");
+    // (398 wanted: the cheaper farm 210, the mill 1% dearer 188, by (400/404)^10.)
+    assert!(t.contains("\"quantity\":210,\"unit_price\":400") && t.contains("\"quantity\":188,\"unit_price\":404"), "{t}");
 }
 
 #[test]

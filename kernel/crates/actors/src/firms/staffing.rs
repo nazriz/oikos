@@ -382,7 +382,14 @@ pub struct StaffingOpts {
     pub short_by_bps: Option<i64>,
     /// How often the office wakes (seconds; absent: daily): a return falling due before its next look is filed at this one.
     pub wakes: Option<i64>,
+    /// How long a posting takes applications before the employer chooses among them (days): its closing date. Work by
+    /// the day is taken on at once. (docs/behaviour/firms.md, "Choosing among applicants".)
+    pub closing_days: i64,
 }
+
+/// A posting's closing date, in days: a placeholder (van Ours and Ridder 1992 find most of a vacancy's duration is the
+/// employer's choosing among applicants who came early: to confirm the figure).
+pub const CLOSING_DAYS: i64 = 7;
 
 impl StaffingOpts {
     pub fn new(period: i64, notice_days: i64, role: &str) -> Self {
@@ -405,6 +412,7 @@ impl StaffingOpts {
             week_days: None,
             short_by_bps: None,
             wakes: None,
+            closing_days: CLOSING_DAYS,
         }
     }
 }
@@ -1379,6 +1387,12 @@ impl Staffing {
                 continue;
             }
             let mut mine: Vec<&Arc<Record>> = apps.iter().filter(|a| data(a).get("posting").and_then(Value::as_str) == Some(post.id.as_str())).copied().collect();
+            // An employer chooses among a posting's applicants once it has closed, not at the first wake after the first of
+            // them: who is taken on is not settled by who happened to apply before the employer next looked (an
+            // application half an hour later is the same application). Work by the day is taken on at once.
+            if !data(post).get("by_the_day").is_some_and(truthy) && t - post.at < self.o.closing_days * DAY {
+                continue;
+            }
             mine.sort_by(|x, y| filed_before(&x.id, &y.id));
             for a in &mine {
                 self.handled.insert(a.id.clone());
@@ -2777,9 +2791,17 @@ mod tests {
             rec(json!({ "id": id, "record": "statement", "author": format!("{who}-self"), "speaks_for": who, "at": DAY + 90, "visible_to": ["shop", who], "kind": "job_application", "text": "I apply.",
                 "addressed_to": ["shop"], "data": { "posting": "post-1", "account": format!("acc-{who}") } }))
         };
-        let t = 2 * DAY;
+        // (Before the posting closes, nobody is chosen: the applicants are read together once it has.)
+        let early = with_cx(&c, 2 * DAY, |cx| {
+            let p = picture(2 * DAY, "shop", vec![posting.clone(), apply("app-1", "ann"), apply("app-2", "bob")], &[("acc-shop", "shop", 900_000_000)], vec![]);
+            book.absorb(&p);
+            s.absorb(&p);
+            s.routine::<()>(&p, &book, cx, "acc-shop", &Want { target: 2, wage: SHOP_WAGE, can_post: true, ..Default::default() })
+        });
+        assert!(said(&early).iter().all(|c| c.fn_ != "agreement"), "not before the closing date");
+        let t = DAY + 60 + CLOSING_DAYS * DAY;
         let steps = with_cx(&c, t, |cx| {
-            let p = picture(t, "shop", vec![posting.clone(), apply("app-1", "ann"), apply("app-2", "bob")], &[("acc-shop", "shop", 900_000_000)], vec![]);
+            let p = picture(t, "shop", vec![], &[("acc-shop", "shop", 900_000_000)], vec![]);
             book.absorb(&p);
             s.absorb(&p);
             s.routine::<()>(&p, &book, cx, "acc-shop", &Want { target: 2, wage: SHOP_WAGE, can_post: true, ..Default::default() })

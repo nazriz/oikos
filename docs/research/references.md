@@ -877,3 +877,19 @@ No document was opened for this step; every entry below is named from memory and
 | Idea | Citation | Used in |
 |---|---|---|
 | Buyers move only for a price lower by a threshold | Lengnick, "Agent-based macroeconomics: A baseline model" (JEBO 86, 2013), Table 1 (households, 1%); Klemperer, "Competition when consumers have switching costs" (Rev. Econ. Stud. 62, 1995) **(to confirm the 1% for wholesale buying)** | `firm.retailer` `supplier_switch_bps`; docs/behaviour/prices.md |
+
+**Replaced at the cut-over (2026-10-19):** the threshold above is no longer used; buyers spread their orders (below).
+
+## Buyers spreading orders, and prices on accumulated evidence (the cut-over, 2026-10-19; docs/behaviour/sourcing.md, prices.md)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Buyers multi-source: split purchases of a good among several suppliers | Elmaghraby, "Supply contract competition and sourcing policies" (Manufacturing & Service Operations Management 2(4), 2000); Burke, Carrillo and Vakharia, "Single versus multiple supplier sourcing strategies" (European Journal of Operational Research 182, 2007) **(to confirm)** | `market::sourcing::split`; `firm.retailer` restocking |
+| Price and delivery are what buyers weigh first in choosing suppliers | Dickson, "An analysis of vendor selection systems and decisions" (Journal of Purchasing 2(1), 1966); Weber, Current and Benton, "Vendor selection criteria and methods" (European Journal of Operational Research 50, 1991) **(to confirm)** | the delivery record in `market::sourcing` |
+| A share as attraction over the sum of attractions, attraction multiplicative in its parts | Bell, Keeney and Little, "A market share theorem" (Journal of Marketing Research 12, 1975); Cooper and Nakanishi, *Market-Share Analysis* (Kluwer, 1988) **(to confirm)**; the exponent `supplier_price_power` is a placeholder | `market::sourcing::attraction` |
+| Forward buying on a temporary discount (not modelled) | Blattberg and Neslin, *Sales Promotion: Concepts, Methods, and Strategies* (Prentice Hall, 1990) **(to confirm)** | docs/behaviour/sourcing.md, "Not modelled" |
+| Menu costs: a price change smaller than it is worth is not made | Levy, Bergen, Dutta and Venable, "The magnitude of menu costs: direct evidence from large U.S. supermarket chains" (Quarterly Journal of Economics 112, 1997) **(to confirm)** | `prices::move_price`, `price_least_change_bps` |
+| (S, s) pricing: the price is changed when the gap to the desired one passes a bound | Sheshinski and Weiss, "Inflation and costs of price adjustment" (Review of Economic Studies 44, 1977) **(to confirm)** | `prices::move_price` |
+| Prices move between price points | Kashyap, "Sticky prices: new evidence from retail catalogs" (Quarterly Journal of Economics 110, 1995); Levy, Lee, Chen, Kauffman and Bergen, "Price points and price rigidity" (Review of Economics and Statistics 93, 2011) **(to confirm)** | `prices::move_price` (whole steps of the least change) |
+| Clearance sales | Lazear (1986), Pashigian (1988), as in prices.md | a factory's list states its clearance (`clearance`) |
+| A posting has a closing date; the employer chooses among applicants who came, and most of a vacancy's duration is that choosing | van Ours and Ridder, "Vacancies and the recruitment of new employees" (Journal of Labor Economics 10(2), 1992) **(to confirm)**; the seven days are a placeholder | `actors::firms::staffing` `CLOSING_DAYS`; docs/behaviour/firms.md, "Choosing among applicants" |

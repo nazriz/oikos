@@ -23,7 +23,8 @@
 use super::automation::{self, params_from, system_slips, Adoption, AdoptionParams, AdoptionThen, Fleet};
 use super::body::{lift, Body, BodyThen, House, PlainBody, Review, Stage, Standing, Surplus, Want, Wind};
 use super::lengnick::{distribute, move_wage, pay_out, Expectation, From as Payer, Lengnick, WageMonth};
-use super::prices::{move_price, rivals_seen, Level, PriceFigures, Signals};
+use super::prices::{move_price, rivals_seen, Level, PriceFigures, Signals, StockMeter};
+use super::sourcing::{self, Candidate, SourcingFigures};
 use super::trade::{self, decline, goods_prices, held, order, price_list, send_back, Deliveries, Order, OrderBook, Ordering, Payables, TradeThen, UNDELIVERABLE};
 use crate::common::asking::{ask, Asked};
 use crate::common::{data, money_words, out_of_time, own_account, published_price, team, withdraw, Book, Fields, Pace, DAY, MONTH};
@@ -120,6 +121,9 @@ pub struct Params {
     pub automation: Option<AdoptionParams>,
     pub lengnick: Lengnick,
     pub figures: PriceFigures,
+    /// How its restocking is spread across its suppliers (sourcing.rs).
+    #[serde(default)]
+    pub sourcing: SourcingFigures,
 }
 
 impl Params {
@@ -175,6 +179,7 @@ impl Params {
             automation: params_from(ctx.params.get("automation").unwrap_or(&Value::Null))?,
             lengnick: Lengnick::read(ctx)?,
             figures: PriceFigures::read(ctx)?,
+            sourcing: SourcingFigures::read(ctx)?,
         };
         if p.founding.founder.is_some() && p.founding.bank.is_empty() {
             return Err("firm.retailer: the world must say bank (a shop just founded opens its account here)".into());
@@ -302,15 +307,12 @@ pub struct Shop<B: Body> {
     on_order: i64,
     /// Our order -> (seller, quantity).
     ours: BTreeMap<String, (String, i64)>,
-    /// Supplier -> when it last came up short.
-    short_at: BTreeMap<String, i64>,
-    /// The supplier we last restocked from (we stay with it unless another is cheaper by more than the switching
-    /// threshold, `supplier_switch_bps`).
+    /// What we have learned of each supplier's deliveries (sourcing.rs).
     #[serde(default)]
-    supplier: Option<String>,
-    /// The switching threshold (bps of the price), from the params.
+    sources: sourcing::Record,
+    /// Our stock, a reading a day, over the month (what the price rule reads: prices.rs, `StockMeter`).
     #[serde(default)]
-    switch_bps: i64,
+    stock_meter: StockMeter,
     suppliers: BTreeSet<String>,
     next_trade_look: i64,
     next_rival_look: i64,
@@ -359,6 +361,9 @@ pub struct Shop<B: Body> {
     sys_credit: i64,
     /// Our account now (for a step's outcome to refund from).
     account_now: Option<String>,
+    /// Order -> what its customer paid over our price for what it buys (refunded with its note).
+    #[serde(default)]
+    over_paid: BTreeMap<String, i64>,
 }
 
 impl<B: Body> Shop<B> {
@@ -373,9 +378,8 @@ impl<B: Body> Shop<B> {
             asked: Asked::default(),
             on_order: 0,
             ours: BTreeMap::new(),
-            short_at: BTreeMap::new(),
-            supplier: None,
-            switch_bps: ctx.param("supplier_switch_bps", 100).unwrap_or(100),
+            sources: sourcing::Record::default(),
+            stock_meter: StockMeter::default(),
             suppliers: p.suppliers.iter().cloned().collect(),
             next_trade_look: 0,
             next_rival_look: 0,
@@ -414,6 +418,7 @@ impl<B: Body> Shop<B> {
             sys_used: BTreeMap::new(),
             sys_credit: 0,
             account_now: None,
+            over_paid: BTreeMap::new(),
             body,
             book: Book::new(),
             p,
@@ -685,9 +690,7 @@ impl<B: Body> Plan for Shop<B> {
         for d in self.deliveries.take(&self.book, &self.me) {
             let Some((seller, quantity)) = self.ours.remove(&d.order) else { continue };
             self.on_order = (self.on_order - quantity).max(0);
-            if d.delivered < quantity {
-                self.short_at.insert(seller, pic.t);
-            }
+            self.sources.delivered(&self.p.sourcing, &seller, quantity, d.delivered);
             self.books.r#in += d.delivered;
         }
     }
@@ -881,9 +884,10 @@ impl<B: Body> Shop<B> {
         if total >= 0 {
             // (What a system of ours got wrong is refunded with what we could not serve.)
             let faulty = self.faulty.remove(&o.id).map_or(0, |f| f.len() as i64);
-            let refund = (o.quantity - total + total.min(faulty)) * o.unit_price;
+            let refund = (o.quantity - total + total.min(faulty)) * o.unit_price + self.over_paid.remove(&o.id).unwrap_or(0);
             if refund > 0 {
-                calls.push(pay(&o.account, refund, Pay { from: Some(account.to_string()), for_: Some(format!("Refund: {} {} we couldn't sell you.", o.quantity - total, o.kind)), ..Default::default() }, cx));
+                let memo = if o.quantity > total { format!("Refund: {} {} we couldn't sell you.", o.quantity - total, o.kind) } else { format!("Refund: what you paid over our price of {}.", money(o.unit_price)) };
+                calls.push(pay(&o.account, refund, Pay { from: Some(account.to_string()), for_: Some(memo), ..Default::default() }, cx));
             }
             let words = if total == o.quantity {
                 format!("Served: {total} {} to {} at {}.", o.kind, o.to, o.at)
@@ -991,6 +995,9 @@ impl<B: Body> Shop<B> {
             self.at.nowhere = false;
         }
         let stock = held(pic, &self.at.premises, &self.p.kind);
+        if trading {
+            self.stock_meter.read(t.div_euclid(DAY), stock);
+        }
         // The stocktake (crime: docs/behaviour/crime.md), monthly: what is here against our books (last count, what came,
         // what we served). Short: reported to the police, with what it was worth at our price.
         if !self.p.police.is_empty() && t >= self.books.next {
@@ -1015,13 +1022,15 @@ impl<B: Body> Shop<B> {
                 ));
             }
         }
-        // Our suppliers' prices, cheapest first (those that came up short in the last week, last; at one price, in our own order).
+        // Our suppliers' prices, cheapest first (at one price, in our own order).
         struct Offer {
             seller: String,
             account: String,
             unit: i64,
             min: i64,
             terms: i64,
+            /// The price we weigh it at: its regular price where it states a clearance (sourcing.rs).
+            weigh_at: i64,
         }
         let mut offers: Vec<Offer> = self
             .suppliers
@@ -1029,27 +1038,11 @@ impl<B: Body> Shop<B> {
             .filter_map(|s| {
                 let g = goods_prices(&self.book, s);
                 let unit = *g.prices.get(&self.p.kind)?;
-                Some(Offer { seller: s.clone(), account: g.account?, unit, min: g.min_order.unwrap_or(1), terms: g.terms_days.unwrap_or(0) })
+                let weigh_at = if g.clearance.is_some() { g.regular.unwrap_or(unit).max(unit) } else { unit };
+                Some(Offer { seller: s.clone(), account: g.account?, unit, min: g.min_order.unwrap_or(1), terms: g.terms_days.unwrap_or(0), weigh_at })
             })
             .collect();
-        offers.sort_by(|a, b| {
-            let short = |s: &str| self.short_at.get(s).is_some_and(|at| t - at < 7 * DAY);
-            short(&a.seller).cmp(&short(&b.seller)).then(a.unit.cmp(&b.unit)).then(self.standing_of(&a.seller).cmp(&self.standing_of(&b.seller))).then_with(|| a.seller.cmp(&b.seller))
-        });
-        // We stay with the supplier we buy from unless another is cheaper by more than the switching threshold (or ours
-        // came up short): a buyer does not move its whole custom for a fraction of a per cent, as households in
-        // Lengnick's model move only for a price at least 1% lower (Lengnick 2013, Table 1; switching costs: Klemperer
-        // 1995). Without it every shop moved its whole order each week to whichever factory was a penny cheaper, and
-        // the factories' trade swung between nothing and tens of thousands (integration, 2026-10-18).
-        if let (Some(cur), Some(first)) = (self.supplier.clone(), offers.first().map(|o| o.unit)) {
-            if let Some(i) = offers.iter().position(|o| o.seller == cur) {
-                let short = self.short_at.get(&cur).is_some_and(|at| t - at < 7 * DAY);
-                if !short && i > 0 && (offers[i].unit - first) * 10_000 <= first * self.switch_bps {
-                    let o = offers.remove(i);
-                    offers.insert(0, o);
-                }
-            }
-        }
+        offers.sort_by(|a, b| a.unit.cmp(&b.unit).then(self.standing_of(&a.seller).cmp(&self.standing_of(&b.seller))).then_with(|| a.seller.cmp(&b.seller)));
         if self.unit_cost == 0 {
             if let Some(o) = offers.first() {
                 self.unit_cost = o.unit;
@@ -1095,7 +1088,7 @@ impl<B: Body> Shop<B> {
                 &self.p.lengnick,
                 &self.p.figures,
                 &mut rng,
-                &Signals { price: self.price, marginal_cost, demand: self.last_demand, turned_away: self.last_turned_away, stock, can_supply: Some(can_serve), rivals: &rivals },
+                &Signals { price: self.price, marginal_cost, demand: self.last_demand, turned_away: self.last_turned_away, stock: self.stock_meter.month(stock), can_supply: Some(can_serve), rivals: &rivals },
                 &money,
             );
             self.price = moved.price;
@@ -1259,38 +1252,61 @@ impl<B: Body> Shop<B> {
             let top = (l.phi_high_bps * self.p.stock_for(self.last_demand) + 9999).div_euclid(10_000);
             let mid = ((l.phi_low_bps + l.phi_high_bps) * self.p.stock_for(self.last_demand) + 19_999).div_euclid(20_000);
             let have = stock + self.on_order;
-            let best = &offers[0];
-            self.supplier = Some(best.seller.clone());
-            // As much as we can pay for, keeping the next pay period's wages aside (and at least the supplier's minimum).
-            // On the supplier's terms (if it states any, and we are not behind with it), what we can order is what we can
-            // pay for out of what we expect to sell in the time it gives, less what we already owe it: stock no longer
-            // comes out of the wage bill in the week it is bought (docs/behaviour/trade.md, "Trade credit").
+            // As much as we can pay for, keeping the next pay period's wages aside. On a supplier's terms (if it states
+            // any, and we are not behind with it), what we can order is what we can pay for out of what we expect to sell
+            // in the time it gives, less what we already owe: stock no longer comes out of the wage bill in the week it is
+            // bought (docs/behaviour/trade.md, "Trade credit").
             let keep_for_wages = (workers.len() as i64).max(self.headcount) * self.wage;
-            let terms = if self.p.credit && best.terms > 0 && !self.payables.behind(&best.seller, t) { best.terms } else { 0 };
-            let room = if terms > 0 { (self.last_demand * best.unit * terms / 30 - self.payables.owing()).max(0) } else { 0 };
             let pending = self.payables.pending(t);
-            let affordable = (acct.balance - pending - keep_for_wages + room).div_euclid(best.unit.max(1));
+            let mut cash = (acct.balance - pending - keep_for_wages).max(0);
+            let longest = offers.iter().filter(|o| self.p.credit && o.terms > 0 && !self.payables.behind(&o.seller, t)).map(|o| o.terms).max().unwrap_or(0);
+            let cheapest = offers.iter().map(|o| o.unit).min().unwrap_or(1).max(1);
+            let mut room = if longest > 0 { (self.last_demand * cheapest * longest / 30 - self.payables.owing()).max(0) } else { 0 };
             if have < mid {
-                let q = best.min.max(top - have).min(affordable);
-                if q >= best.min {
+                // The order is spread across our suppliers by their prices and how fully each has delivered (sourcing.rs:
+                // retailers multi-source), never all of it to the cheapest.
+                let cands: Vec<Candidate> = offers
+                    .iter()
+                    .map(|o| Candidate { key: o.seller.clone(), weigh_at: o.weigh_at, min: o.min, fill_bps: self.sources.fill_bps(&o.seller), standing: self.standing_of(&o.seller) })
+                    .collect();
+                let split = sourcing::split(&self.p.sourcing, &cands, top - have);
+                let mut ordered: BTreeSet<String> = BTreeSet::new();
+                for (i, share) in split {
+                    let o = &offers[i];
+                    let terms = if self.p.credit && o.terms > 0 && !self.payables.behind(&o.seller, t) { o.terms } else { 0 };
+                    let can = if terms > 0 { (cash + room).div_euclid(o.unit.max(1)) } else { cash.div_euclid(o.unit.max(1)) };
+                    let q = share.min(can);
+                    if q < o.min || q <= 0 {
+                        continue;
+                    }
+                    let cost = q * o.unit;
+                    if terms > 0 {
+                        let from_room = cost.min(room);
+                        room -= from_room;
+                        cash -= cost - from_room;
+                    } else {
+                        cash -= cost;
+                    }
+                    ordered.insert(o.seller.clone());
                     self.on_order += q;
                     let why = format!(
-                        "Restocking: {stock} in stock and {} on order, below {mid} (the middle of our band of last month's sales, {}): ordering {q}{} from {}, the cheapest of our suppliers at {}{}.",
+                        "Restocking: {stock} in stock and {} on order, below {mid} (the middle of our band of last month's sales, {}): ordering {q}{} from {} at {}, its share of the {} we need by its price and how fully it has delivered{}.",
                         self.on_order - q,
                         self.last_demand,
-                        if q < top - have { format!(", as many as we can pay for (up to {top} would fill our band)") } else { String::new() },
-                        best.seller,
-                        money(best.unit),
+                        if q < share { format!(" (as many as we can pay for of its {share})") } else { String::new() },
+                        o.seller,
+                        money(o.unit),
+                        top - have,
                         if terms > 0 { format!(", on its terms (to pay within {terms} days of delivery)") } else { String::new() }
                     );
                     let mut st = order::<Then>(
                         &Ordering {
                             me: me.clone(),
-                            seller: best.seller.clone(),
-                            seller_account: best.account.clone(),
+                            seller: o.seller.clone(),
+                            seller_account: o.account.clone(),
                             kind: self.p.kind.clone(),
                             quantity: q,
-                            unit_price: best.unit,
+                            unit_price: o.unit,
                             to: None,
                             at: self.at.premises.clone(),
                             from: acct.account.clone(),
@@ -1301,9 +1317,11 @@ impl<B: Body> Shop<B> {
                         },
                         cx,
                     );
-                    st.then = Some(Then::Restocked { seller: best.seller.clone(), quantity: q, unit: best.unit });
+                    st.then = Some(Then::Restocked { seller: o.seller.clone(), quantity: q, unit: o.unit });
                     steps.push(st);
                 }
+                let others: Vec<&str> = offers.iter().map(|o| o.seller.as_str()).filter(|s| !ordered.contains(*s)).collect();
+                self.sources.recover(&self.p.sourcing, &others);
             }
         }
 
@@ -1338,7 +1356,16 @@ impl<B: Body> Shop<B> {
         let present = self.present(pic, t, &workers);
         // Every paid order joins the queue: what customers wanted, served or not.
         let due = self.orders.due(&self.book, t, |_| true);
-        for o in due.paid {
+        for mut o in due.paid {
+            // An order at a price we have since raised: the customer pays the price on our shelf, as at a till, for as many as
+            // their money buys, and the rest of it comes back with the order's note (they read our price when they come,
+            // whatever they last saw of it). Refunded whole only if it buys none.
+            if o.kind == self.p.kind && o.unit_price < self.price && o.total() >= self.price && self.price > 0 {
+                let q = o.total() / self.price;
+                self.over_paid.insert(o.id.clone(), o.total() - q * self.price);
+                o.quantity = q;
+                o.unit_price = self.price;
+            }
             if o.kind != self.p.kind || o.unit_price < self.price {
                 let why = format!("An order {}: refunding it.", if o.kind != self.p.kind { format!("for {}, which we don't sell", o.kind) } else { "below our price".to_string() });
                 steps.push(self.fill_with(cx, &o, 0, 0, &[], &[], &why, &acct.account));
@@ -1496,7 +1523,9 @@ pub fn manifest() -> Value {
     add(params, "rival_weight_bps", json!(2500), Some("bps"), "how much of the gap to rivals' median price a month's step closes");
     add(params, "clearance_cover_bps", json!(30_000), Some("bps"), "stock beyond this share of a month's demand is cleared at a discount");
     add(params, "clearance_floor_bps", json!(8000), Some("bps"), "the lowest a clearance sale takes a price, as a share of marginal cost");
-    add(params, "supplier_switch_bps", json!(100), Some("bps"), "a shop moves its restocking to another supplier only when it is cheaper by more than this share of the price (Lengnick 2013's 1% for households, to confirm for buyers)");
+    add(params, "supplier_price_power", json!(10), None, "the power on a supplier's price relative to the cheapest in the share of a restock it is given (docs/behaviour/sourcing.md; to be sourced)");
+    add(params, "supplier_fill_weight_bps", json!(2500), Some("bps"), "how much a new delivery weighs in a supplier's delivery record");
+    add(params, "supplier_recover_bps", json!(1250), Some("bps"), "how much of the way back to a full record a supplier not ordered from comes at each restock");
     add(params, "rival_days", json!(60), Some("days"), "how old a rival's price list may be and still count");
     add(params, "rivals_board", json!(""), None, "what sellers advertise to households, searched monthly for the prices a shop is compared with (none: only the lists it has been shown)");
     m

@@ -219,6 +219,20 @@ Most employers hire and pay through one office. A town does not: its works manag
 
 **Leaves out.** Pay for the part of a pay period worked before a leaver's last day: the payment simply ends, so the days since the last pay day go unpaid (so before this change too; a gap, listed for a decision: it needs a final payment reckoned by the day). A notice of a change of pay (the town's staff have had none: no enterprise agreement reaches them). A death in service is told to the payroll by the hiring office only if the registry's entry reached the town's papers.
 
+## Choosing among applicants (the cut-over, 2026-10-19)
+
+An employer (`actors::firms::staffing`, every hiring office and firm) chooses among a posting's applicants once the
+posting has been open `CLOSING_DAYS` (7 days, a placeholder), one at random among all who applied by then, as before at
+the posting's wage; until then it reads the applications and takes on nobody. Work by the day is taken on at once, as a
+hand is at the gate. **Why:** until the cut-over it chose at its first wake after the first application, so who was taken
+on, and on what day, turned on whether an application came half an hour before or after the employer looked: in the
+twin test (orchestrator/test/twin-draws.test.ts, MT-17) a person's time shifted two applications by 30 minutes and the
+builder hired a day apart in the two towns, which moved one household's pay days, shopping and home and, from them,
+some 160 papers. A posting with a closing date is how hiring is done (applications are taken for a period and the
+choice made from all of them); most of a vacancy's duration is the employer's choosing among applicants who came early
+(van Ours and Ridder 1992, to confirm). **Revisit if** vacancy durations are measured against a place's figures (the
+seven days then becomes a profile's), or a seat's hiring needs a closing date it sets itself.
+
 ## An offer made on an advertisement (2026-10-09)
 
 **Source:** `advertisedJob` and `jobTerms` (`participants/src/behaviour/common.ts`); `Staffing.roleOf`; the citizen's

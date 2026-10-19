@@ -10,6 +10,8 @@ A shop buys goods wholesale and sells them to households. Selling takes its staf
 
 **Buying.**
 - Weekly, if its stock plus what's on order is below the middle of Lengnick's band of last month's demand (φ, φ̄ = 25%, 100%), it orders up to the top of the band.
+- **Since the cut-over (2026-10-19)** the order is spread across its suppliers by their prices and how fully each has
+  delivered ([sourcing.md](sourcing.md)). The two bullets below are the rule before it.
 - It buys from the cheapest of its suppliers: local factories at wholesale, or the world market's imports. A supplier that came up short in the last week goes to the back. Between suppliers at one price it has its own order of preference, drawn once for each from its own randomness (0.8.2, 2026-10-08: by name, every shop in a town ordered from the same factory, which could fill few of the orders).
 - It orders at least a supplier's minimum, and only as much as it can pay for while keeping the next pay period's wages aside.
 
@@ -19,6 +21,9 @@ A shop buys goods wholesale and sells them to households. Selling takes its staf
 - Each item is a unit of the task `serve` (1.5 hours in the generated town), shared evenly among the staff there, each up to a working day. What's served goes to the customer: home, or kept at the shop for them.
 - A large order can take several days. When the day's hours run out, the rest of the queue waits for tomorrow.
 - **Out of stock:** what it couldn't serve is refunded at once, and the customer goes elsewhere.
+- **At a price since raised** (the customer last saw an older one): it is served what its money buys at the shop's
+  price, as at a till, and the rest comes back with the note; refunded whole only if it buys none (since the cut-over;
+  until then it was refunded whole, and the household went without until its next trip).
 - **Not served within the days the order is for** (a household's order is for until its next trip; 3 days if it doesn't say): the rest is refunded.
 - **Can't be delivered** (the place or person is gone): the whole order is refunded.
 - Every order ends with a delivery note: ordered, delivered, refunded.
