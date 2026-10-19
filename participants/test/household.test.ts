@@ -1,9 +1,8 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { adultAgeBands, bedroomsNeeded, drawHousehold, hear, OCCUPANCY, SAYING, type DrawnHousehold, type HouseholdData, type HouseholdSpec, type Member } from "../src/behaviour/household";
+import { adultAgeBands, bedroomsNeeded, drawHousehold, OCCUPANCY, type DrawnHousehold, type HouseholdData, type HouseholdSpec, type Member } from "../src/shared/household";
 import { Randomness } from "../src/rng";
-import { CATCHING_UP, heardNews } from "../src/behaviour/citizen";
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 
@@ -34,26 +33,7 @@ test("the occupancy standard (CNOS, as the ABS applies it)", () => {
   expect(need(hh([m("a", 35, "male"), m("c", 10, "female"), m("d", 8, "female"), m("e", 6, "female")]))).toBe(3);
 });
 
-test("household members understand their own phrasing, and nothing else", () => {
-  expect(hear(SAYING.moveIn("apts-3/dwelling.2"))).toEqual({ kind: "moveIn", space: "apts-3/dwelling.2" });
-  expect(hear(SAYING.moveOut("house-4"))).toEqual({ kind: "moveOut", from: "house-4" });
-  expect(hear(SAYING.leaving())).toEqual({ kind: "leaving" });
-  expect(hear(SAYING.share(42_550, "acc-c0001"))).toEqual({ kind: "share", cents: 42_550, account: "acc-c0001" });
-  expect(hear(SAYING.share(0, "acc-c0001"))).toEqual({ kind: "share", cents: 0, account: "acc-c0001" });
-  expect(hear(SAYING.pay(257_142))).toEqual({ kind: "pay", cents: 257_142 });
-  expect(hear("We should move somewhere bigger.")).toBeUndefined();
-});
 
-test("catching up: a code citizen's news reads back as what it says", () => {
-  const text = [CATCHING_UP.shop("shop-3", 7_000), CATCHING_UP.work("factory-co-2", true), CATCHING_UP.union(false)].join(" ");
-  expect(heardNews(text)).toEqual({ shop: "shop-3", served: 7_500, employer: "factory-co-2", paid: true, member: false });
-  expect(heardNews(CATCHING_UP.shop("shop-1", 2_000))).toEqual({ shop: "shop-1", served: 3_500 });
-  expect(heardNews([CATCHING_UP.goes("sport-group-1"), CATCHING_UP.goes("union")].join(" "))).toEqual({ goesTo: ["sport-group-1", "union"] });
-  expect(heardNews([CATCHING_UP.holds("religious-group-1"), CATCHING_UP.goes("religious-group-1")].join(" "))).toEqual({ goesTo: ["religious-group-1"], holdsTo: ["religious-group-1"] });
-  expect(heardNews(CATCHING_UP.leans("religious-group-1"))).toEqual({ leansTo: ["religious-group-1"] });
-  expect(heardNews(CATCHING_UP.nothing)).toBeUndefined();
-  expect(heardNews("Lovely weather.")).toBeUndefined();
-});
 
 // Adults' ages follow the census (docs/behaviour/households.md): those whose age no family decides are drawn from the
 // census's adults less the ones families put in each band. Grown children at home are put there by their families as

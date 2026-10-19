@@ -1,10 +1,10 @@
-// The town's offices' books (participants/src/behaviour/openbooks-townhall.ts): what stands open at the finance office,
+// The town's offices' books (participants/src/readers/openbooks-townhall.ts): what stands open at the finance office,
 // the mayor's, the works and environment offices, the planning office and the council clerk's, read from the office's own
 // papers and account. Each: open shows the item (id, since, amount), settled drops it, and the line is the same
 // on two days when nothing has changed.
 
 import { expect, test } from "bun:test";
-import { clerkBooks, environmentBooks, financeBooks, mayorBooks, planningBooks, worksBooks } from "../src/behaviour/openbooks-townhall";
+import { clerkBooks, environmentBooks, financeBooks, mayorBooks, planningBooks, worksBooks } from "../src/readers/openbooks-townhall";
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 const withdrawal = (id: string, at: number, what: string) => ({ id, at, record: "withdrawal", author: "x", withdraws: what, visible_to: "public" });

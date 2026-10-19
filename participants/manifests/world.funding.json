@@ -1,16 +1,20 @@
 {
-  "name": "world.funding",
-  "version": "0.1.0",
+  "answers": {
+    "acts": "What it acts on: a bank's draw on its funding, and the bank's repayments.",
+    "office": "the wholesale funding desk"
+  },
   "doc": "docs/behaviour/boundary.md",
+  "name": "world.funding",
   "params": {
     "account": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "version": "0.1.0"
 }

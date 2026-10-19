@@ -5,8 +5,8 @@
 
 import { expect, test } from "bun:test";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
-import { Book } from "../src/behaviour/common";
-import { Money, owedByUs } from "../src/behaviour/openbooks";
+import { Book } from "../src/shared/common";
+import { Money, owedByUs } from "../src/readers/openbooks";
 import { inCurrency } from "../src/money";
 
 inCurrency(PROFILE.values.currency);

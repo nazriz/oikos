@@ -3,9 +3,11 @@
 import { expect, test } from "bun:test";
 import { parseAmount } from "../src/calls";
 import { currencyNow, inCurrency } from "../src/money";
-import { citizen } from "../src/behaviour/citizen";
-import { paymentsInWords, stopsWorkAt, type PaymentRule } from "../src/behaviour/payments";
+
+import { paymentsInWords, stopsWorkAt, type PaymentRule } from "../src/shared/payments";
 import { context, DAY, MONTH, person, statement, wake } from "./stepping";
+import { engine } from "./engine";
+const citizen = engine("citizen.default");
 
 inCurrency({ code: "XTS", minor_units: 2 });
 const YEAR = 365 * DAY;

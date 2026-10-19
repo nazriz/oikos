@@ -6,9 +6,14 @@
 
 import { expect, test } from "bun:test";
 import type { Observation } from "../src/contracts";
-import { councilClerk, financeOfficer, linesInWords, mayorCode, tabledLines, yearInDays } from "../src/behaviour/government";
+
+import { linesInWords, tabledLines, yearInDays } from "../src/shared/government";
 import { Randomness } from "../src/rng";
 import { formatMoney, inCurrency } from "../src/money";
+import { engine } from "./engine";
+const councilClerk = engine("city.council_clerk");
+const financeOfficer = engine("city.finance_officer");
+const mayorCode = engine("city.mayor_code");
 
 // (Amounts are worded in a world's own money: this test's is made up, and written with its sign after the figure.)
 const MONEY = { code: "ZZZ", symbol: "z", minor_units: 2, symbol_after: true, symbol_spaced: true };
@@ -16,7 +21,7 @@ inCurrency(MONEY);
 const written = (n: number) => formatMoney(n, MONEY);
 
 const DAY = 86_400, YEAR = 365 * DAY;
-const ctx = (participant: string, params: object, position?: string): any => ({ participant, entity: "city", position, rng: (k: string) => new Randomness(1n).stream([participant, k]), world: { tickSeconds: 3600, runEnd: 3 * YEAR }, params });
+const ctx = (participant: string, params: object, position?: string): any => ({ participant, entity: "city", position, rng: (k: string) => new Randomness(1n).stream([participant, k]), world: { tickSeconds: 3600, runEnd: 3 * YEAR, currency: MONEY }, params });
 const SEATS = [1, 2, 3, 4, 5].map((i) => `councillor-${i}`);
 const council = { kind: "directory", entities: [], positions: SEATS.map((position) => ({ position, entity: "city", role: "councillor" })) };
 const obs = (t: number, records: any[], more: object = {}): Observation => ({ t, entity: "city", participant: "x", channels: { business: { kind: "records", records }, who: council, ...more }, inbox: [], outcomes: [], woke_for: "news" }) as unknown as Observation;
@@ -82,7 +87,7 @@ test("the clerk takes up its office's papers: a proposal already balloted is not
   const proposal = stmt("budget-year-1-proposal", 0, "proposal", { addressed_to: ["city"], in_position: "mayor", data: { proposal: "The budget.", kind: "budget", year: 1, parks: "1000" } });
   const ballot = stmt("budget-year-1-ballot", 0, "ballot", { in_position: "council-clerk", basis: proposal.id, data: { proposal: proposal.id, options: ["yes", "no"], closes_at: 0, electorate: "council", tags: ["budget"] } });
   const result = stmt("budget-year-1-result", 0, "ballot_result", { in_position: "council-clerk", basis: ballot.id, data: { ballot: ballot.id, yes: 5, no: 0, passed: true } });
-  const adopted = budget(1, 0, { parks: 1000 }, "budget-year-1");
+  const adopted = { ...budget(1, 0, { parks: 1000 }, "budget-year-1"), basis: ballot.id }; // (the clerk's own budget rests on the ballot that adopted it)
   expect(run(clerk, obs(DAY, [proposal, ballot, result, adopted]))).toBe("");
   expect(run(clerk, obs(2 * DAY, []))).toBe("");
   // Its report knows the budget, the year in days, and that the next year's is still to come.
@@ -100,7 +105,10 @@ test("a budget made on the council proposal form is for the year the form names,
     const b = stmt("b1", at, "ballot", { author: "council-clerk-system", in_position: "council-clerk", basis: "p1", data: { ...dataOf(opened[0]!) } });
     const votes = SEATS.map((seat, i) => ({ id: `v${i}`, at: at + DAY, record: "vote", author: `${seat}-system`, in_position: seat, speaks_for: "city", visible_to: ["city"], ballot: "b1", choice: "yes" }));
     run(clerk, obs(at + DAY, [b, ...votes]));
-    return dataOf(lines(run(clerk, obs(at + 15 * DAY, [])), "budget")[0]!);
+    const declared = lines(run(clerk, obs(at + 15 * DAY, [])), "ballot_result")[0]!;
+    // (What a passed ballot enacts is published from the result on file, at the clerk's next step: the result is shown back to it.)
+    const filed = stmt("res-1", at + 15 * DAY, "ballot_result", { author: "council-clerk-system", in_position: "council-clerk", basis: "b1", data: dataOf(declared) });
+    return dataOf(lines(run(clerk, obs(at + 16 * DAY, [filed])), "budget")[0]!);
   };
   // Put on day 300 for year 2: the council adopts year 2's budget in year 1. The year is not a line.
   expect(made(300 * DAY, { year: 2 })).toEqual({ year: 2, lines: { parks: 1000, staff: 2500 } });

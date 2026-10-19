@@ -8,6 +8,7 @@ import { expect, test } from "bun:test";
 import { modules } from "../src/index";
 import { inCurrency } from "../src/money";
 import { context, DAY, statement, wake } from "./stepping";
+import { engine } from "./engine";
 
 // (An invented money: nothing here is any place's.)
 inCurrency({ code: "XYZ", minor_units: 2 });
@@ -23,7 +24,7 @@ const direction = (id: string, at: number, formId: string, post: string | undefi
 const withdrawal = (id: string, at: number, of: string) => ({ id, at, record: "withdrawal", author: "mayor-system", in_position: "mayor", speaks_for: "city", visible_to: ["city"], withdraws: of });
 const records = (...rs: object[]) => ({ all: { kind: "records", records: rs } });
 
-const works = (params: object = {}) => modules["city.works"]!.create(context("works-system", "city", { depot: "town-hall", workplace: "town-hall/workplace.1", landfill: "outside", wage: WAGE, period: PERIOD, directed_under: "proc-directions", ...params }, { position: "works" }));
+const works = (params: object = {}) => engine("city.works").create(context("works-system", "city", { depot: "town-hall", workplace: "town-hall/workplace.1", landfill: "outside", wage: WAGE, period: PERIOD, directed_under: "proc-directions", ...params }, { position: "works" }));
 const base = [rule(), form("works_staffing", "works"), form("works_collection", "works"), budget];
 const posted = (w: ReturnType<typeof wake>) => w.of("statement", "job_posting").length;
 const letters = (w: ReturnType<typeof wake>) => w.of("message").map((m) => m.args.text as string);
@@ -118,13 +119,13 @@ test("the works office's report says which directions it is following, and colle
 });
 
 test("the environment office takes the same staffing direction on its own form", () => {
-  const env = modules["city.environment"]!.create(context("environment-system", "city", { depot: "town-hall", workplace: "town-hall/workplace.1", planning: "city", wage: WAGE, period: PERIOD, directed_under: "proc-directions" }, { position: "environment" }));
+  const env = engine("city.environment").create(context("environment-system", "city", { depot: "town-hall", workplace: "town-hall/workplace.1", planning: "city", wage: WAGE, period: PERIOD, directed_under: "proc-directions" }, { position: "environment" }));
   const b = statement("budget-1", 0, "budget", { data: { year: 1, lines: { environment: 2 * annual } } });
   const d = direction("rec.50", 5 * DAY, "form-environment-staffing", "mayor", { recruit: "no" });
   const w = wake(env, 6 * DAY, records(rule(), form("environment_staffing", "environment"), b, d), { entity: "city" });
   expect(posted(w)).toBe(0);
   expect(letters(w)[0]).toContain("your direction rec.50 is received");
-  const free = modules["city.environment"]!.create(context("environment-system", "city", { depot: "town-hall", workplace: "town-hall/workplace.1", planning: "city", wage: WAGE, period: PERIOD, directed_under: "proc-directions" }, { position: "environment" }));
+  const free = engine("city.environment").create(context("environment-system", "city", { depot: "town-hall", workplace: "town-hall/workplace.1", planning: "city", wage: WAGE, period: PERIOD, directed_under: "proc-directions" }, { position: "environment" }));
   expect(posted(wake(free, 6 * DAY, records(rule(), form("environment_staffing", "environment"), b), { entity: "city" }))).toBe(1);
 });
 
@@ -132,7 +133,7 @@ test("the rates officer, directed to add no penalty interest, adds none while th
   const law = statement("law-rates", 0, "law", { data: { tax: "rates", rate_ppm: 5000, instalments: 4, due_days: 30, penalty_interest_bps: 1000 } });
   const claim = { id: "rec.20", at: 30 * DAY, record: "claim", author: "rates-system", in_position: "rates", speaks_for: "city", position: "right", holder: "city", counterparty: "c0001", visible_to: ["city", "c0001"], about: { kind: "rates", amount: 120_000, account: "acc-city", due: 60 * DAY, lots: ["lot-1"] } };
   const accounts = { treasury: { kind: "accounts", transactions: [], accounts: [{ account: "acc-city", holder: "city", custodian: "bank", balance: "1000000", currency: "XYZ" }] } };
-  const rates = () => modules["city.rates_officer"]!.create(context("rates-system", "city", { directed_under: "proc-directions" }, { position: "rates" }));
+  const rates = () => engine("city.rates_officer").create(context("rates-system", "city", { directed_under: "proc-directions" }, { position: "rates" }));
   const interest = (w: ReturnType<typeof wake>) => w.of("claim").filter((c) => c.args.about?.kind === "rates_interest").length;
   expect(interest(wake(rates(), 100 * DAY, { ...records(rule(), form("rates_recovery", "rates"), law, claim), ...accounts }, { entity: "city" }))).toBe(1);
   const d = direction("rec.50", 90 * DAY, "form-rates-recovery", "mayor", { interest: "no" });
@@ -146,7 +147,7 @@ test("a payment that names the rates notice pays the rates: no interest is added
   const claim = { id: "rec.20", at: 30 * DAY, record: "claim", author: "rates-system", in_position: "rates", speaks_for: "city", position: "right", holder: "city", counterparty: "landlord-1", visible_to: ["city", "landlord-1"], about: { kind: "rates", amount: 120_000, account: "acc-city", due: 60 * DAY, lots: ["lot-1"] } };
   const notice = { ...statement("rec.19", 30 * DAY, "rates_notice", { author: "rates-system", in_position: "rates", addressed_to: ["landlord-1"], visible_to: ["city", "landlord-1"], data: { amount: 120_000, lots: ["lot-1"], due: 60 * DAY, account: "acc-city" } }) };
   const treasury = (settles?: string) => ({ treasury: { kind: "accounts", transactions: settles ? [{ t: 40 * DAY, from: "acc-landlord-1", to: "acc-city", amount: "120000", settles }] : [], accounts: [{ account: "acc-city", holder: "city", custodian: "bank", balance: "1000000", currency: "XYZ" }] } });
-  const rates = () => modules["city.rates_officer"]!.create(context("rates-system", "city", {}, { position: "rates" }));
+  const rates = () => engine("city.rates_officer").create(context("rates-system", "city", {}, { position: "rates" }));
   const interest = (settles?: string) => wake(rates(), 100 * DAY, { ...records(law, notice, claim), ...treasury(settles) }, { entity: "city" }).of("claim").filter((c) => c.args.about?.kind === "rates_interest").length;
   expect(interest()).toBe(1); // unpaid: a month's interest
   expect(interest("rec.20")).toBe(0); // paid, naming the claim
@@ -188,12 +189,12 @@ test("every direction a module declares has a form's shape: a name, a title, fie
 // Bug hunt 2026-10-17, finding 2: a rates officer's successor carries on from the office's file and the payments it has had.
 test("a new rates officer, shown the office's file, levies no instalment out of turn and charges no interest on a paid notice", () => {
   const law = statement("law-rates", 0, "law", { data: { tax: "rates", rate_ppm: 5000, instalments: 4, due_days: 30, penalty_interest_bps: 1000 } });
-  const valuation = statement("val-1", 5 * DAY, "valuation", { data: { lot: "lot-1", owner: "landlord-1", value: 24_000_000 } });
+  const valuation = statement("val-1", 5 * DAY, "valuation", { data: { lot: "lot-1", owner: "landlord-1", land: 24_000_000, value: 24_000_000, year: 1 } }); // (the valuer's paper always says land and year; the engine reads it so)
   const notice = statement("rec.19", 30 * DAY, "rates_notice", { author: "rates-system", in_position: "rates", addressed_to: ["landlord-1"], visible_to: ["city", "landlord-1"], data: { amount: 120_000, lots: ["lot-1"], due: 60 * DAY, account: "acc-city" } });
   const claim = { id: "rec.20", at: 30 * DAY, record: "claim", author: "rates-system", in_position: "rates", speaks_for: "city", position: "right", holder: "city", counterparty: "landlord-1", visible_to: ["city", "landlord-1"], about: { kind: "rates", amount: 120_000, account: "acc-city", due: 60 * DAY, lots: ["lot-1"] } };
   // The payment of day 40 was made while another held the post; the new holder is told of it as of any payment.
   const treasury = { treasury: { kind: "accounts", transactions: [{ t: 40 * DAY, from: "acc-landlord-1", to: "acc-city", amount: "120000", settles: "rec.20" }], accounts: [{ account: "acc-city", holder: "city", custodian: "bank", balance: "1000000", currency: "XYZ" }] } };
-  const rates = () => modules["city.rates_officer"]!.create(context("rates-successor", "city", { first_day: 30 }, { position: "rates" }));
+  const rates = () => engine("city.rates_officer").create(context("rates-successor", "city", { first_day: 30 }, { position: "rates" }));
   const w = wake(rates(), 100 * DAY, { ...records(law, valuation, notice, claim), ...treasury }, { entity: "city", as: { participant: "rates-successor", position: "rates" } });
   expect(w.of("statement", "rates_notice")).toEqual([]); // the next instalment is not due until day 121
   expect(w.of("claim").filter((c) => c.args.about?.kind === "rates_interest")).toEqual([]);

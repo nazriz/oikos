@@ -1,96 +1,64 @@
 {
-  "name": "city.registry",
-  "version": "0.7.0",
-  "doc": "docs/behaviour/institutions.md",
-  "params": {
-    "counter": {
-      "schema": {
-        "type": "boolean"
-      },
-      "default": false,
-      "source": "placeholder"
-    },
-    "estate_tells": {
-      "schema": {
-        "type": "array"
-      },
-      "default": [],
-      "source": "placeholder"
-    },
-    "feeds": {
-      "schema": {
-        "type": "array"
-      },
-      "default": [],
-      "source": "placeholder"
-    },
-    "land_registry": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "office": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "part": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    }
+  "capacity": {
+    "asks_per_1000_residents_year": 100,
+    "seconds_per_answer": 600,
+    "sized_by": "oikos_rules::staffing::clerks_needed",
+    "source": "placeholder",
+    "why": "notifications of deaths and births, and requests for certified copies, entered by the counter staff"
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/institutions.md",
   "issues": [
     {
-      "form": "death_registration",
-      "title": "Entry in the register of deaths",
       "does": "Registers a death on the notification of it: the entry is what a bank, the land registry and the family act on, and it is sent to whoever reported the death.",
       "fields": {
-        "deceased": {
-          "type": "entity",
-          "required": true,
-          "description": "Who has died."
-        },
-        "notification": {
-          "type": "record",
-          "required": true,
-          "description": "The notification of the death that the entry is made on."
-        },
-        "reported_by": {
-          "type": "entity",
-          "required": true,
-          "description": "Who reported the death: they are sent the entry."
-        },
-        "partner": {
-          "type": "entity",
-          "description": "The dead person's partner, if the notification names one."
-        },
         "children": {
-          "type": "list",
-          "description": "The dead person's children, as the notification names them."
+          "description": "The dead person's children, as the notification names them.",
+          "type": "list"
         },
-        "without_adult": {
-          "type": "list",
-          "description": "Children left with no adult at home, as the notification names them."
-        },
-        "tell": {
-          "type": "list",
-          "description": "Those the notification asks to be told, who are sent the entry too."
+        "deceased": {
+          "description": "Who has died.",
+          "required": true,
+          "type": "entity"
         },
         "estate": {
-          "type": "list",
-          "description": "Those written to where nobody of the family reported the death and the estate is to be administered."
+          "description": "Those written to where nobody of the family reported the death and the estate is to be administered.",
+          "type": "list"
+        },
+        "notification": {
+          "description": "The notification of the death that the entry is made on.",
+          "required": true,
+          "type": "record"
+        },
+        "partner": {
+          "description": "The dead person's partner, if the notification names one.",
+          "type": "entity"
+        },
+        "reported_by": {
+          "description": "Who reported the death: they are sent the entry.",
+          "required": true,
+          "type": "entity"
+        },
+        "tell": {
+          "description": "Those the notification asks to be told, who are sent the entry too.",
+          "type": "list"
+        },
+        "without_adult": {
+          "description": "Children left with no adult at home, as the notification names them.",
+          "type": "list"
         }
       },
+      "form": "death_registration",
+      "title": "Entry in the register of deaths",
       "writes": {
+        "basis": "=notification",
+        "data": {
+          "children": "=children",
+          "deceased": "=deceased",
+          "partner": "=partner",
+          "reported_by": "=reported_by",
+          "without_adult": "=without_adult"
+        },
+        "kind": "death_registration",
         "sends": [
           {
             "to": [
@@ -99,9 +67,7 @@
             "why": "They are sent every entry in the register of deaths as of right, to keep their own records by: whoever keeps a roll of electors takes the dead off it, and whoever pays someone a pension or support stops paying it."
           }
         ],
-        "kind": "death_registration",
         "text": "Death registered: {deceased}.",
-        "basis": "=notification",
         "to": [
           "=reported_by",
           "=tell",
@@ -114,80 +80,80 @@
           "=tell",
           "@feeds",
           "=estate"
-        ],
-        "data": {
-          "deceased": "=deceased",
-          "reported_by": "=reported_by",
-          "partner": "=partner",
-          "children": "=children",
-          "without_adult": "=without_adult"
-        }
+        ]
       }
     },
     {
-      "form": "death_certificate",
-      "title": "Certified copy of an entry of death",
       "does": "Gives whoever asks a certified copy of a death already registered.",
       "fields": {
         "deceased": {
-          "type": "entity",
+          "description": "Who has died.",
           "required": true,
-          "description": "Who has died."
-        },
-        "registration": {
-          "type": "record",
-          "required": true,
-          "description": "The entry in the register."
+          "type": "entity"
         },
         "informant": {
-          "type": "entity",
+          "description": "Whom the copy is for.",
           "required": true,
-          "description": "Whom the copy is for."
+          "type": "entity"
+        },
+        "registration": {
+          "description": "The entry in the register.",
+          "required": true,
+          "type": "record"
         }
       },
+      "form": "death_certificate",
+      "title": "Certified copy of an entry of death",
       "writes": {
-        "kind": "death_certificate",
-        "text": "Death of {deceased}: registered (entry {registration}).",
         "basis": "=registration",
-        "to": [
-          "=informant"
-        ],
         "data": {
           "deceased": "=deceased",
           "registration": "=registration"
-        }
+        },
+        "kind": "death_certificate",
+        "text": "Death of {deceased}: registered (entry {registration}).",
+        "to": [
+          "=informant"
+        ]
       }
     },
     {
-      "form": "birth_registration",
-      "title": "Entry in the register of births",
       "does": "Registers a birth on the notification of it, and sends the entry to whoever reported it.",
       "fields": {
-        "child": {
-          "type": "entity",
-          "required": true,
-          "description": "The child."
-        },
-        "notification": {
-          "type": "record",
-          "required": true,
-          "description": "The notification of the birth."
-        },
-        "reported_by": {
-          "type": "entity",
-          "required": true,
-          "description": "Who reported the birth: they are sent the entry."
-        },
         "born_at": {
-          "type": "date",
-          "description": "When the child was born, as the notification gives it."
+          "description": "When the child was born, as the notification gives it.",
+          "type": "date"
+        },
+        "child": {
+          "description": "The child.",
+          "required": true,
+          "type": "entity"
         },
         "mother": {
-          "type": "entity",
-          "description": "The child's mother."
+          "description": "The child's mother.",
+          "type": "entity"
+        },
+        "notification": {
+          "description": "The notification of the birth.",
+          "required": true,
+          "type": "record"
+        },
+        "reported_by": {
+          "description": "Who reported the birth: they are sent the entry.",
+          "required": true,
+          "type": "entity"
         }
       },
+      "form": "birth_registration",
+      "title": "Entry in the register of births",
       "writes": {
+        "basis": "=notification",
+        "data": {
+          "born_at": "=born_at",
+          "child": "=child",
+          "mother": "=mother"
+        },
+        "kind": "birth_registration",
         "sends": [
           {
             "to": [
@@ -196,9 +162,7 @@
             "why": "They are sent every entry in the register of births as of right, to keep their own records by."
           }
         ],
-        "kind": "birth_registration",
         "text": "Birth registered: {child}.",
-        "basis": "=notification",
         "to": [
           "=reported_by",
           "@feeds"
@@ -207,36 +171,37 @@
           "=self",
           "=reported_by",
           "@feeds"
-        ],
-        "data": {
-          "child": "=child",
-          "born_at": "=born_at",
-          "mother": "=mother"
-        }
+        ]
       }
     },
     {
-      "form": "transmission_application",
-      "title": "Application to the land registry for a dead owner's land to pass",
       "does": "Asks the land registry to pass a dead owner's land to the heir the law of succession names.",
       "fields": {
         "deceased": {
-          "type": "entity",
+          "description": "The owner who has died.",
           "required": true,
-          "description": "The owner who has died."
+          "type": "entity"
         },
         "heir": {
-          "type": "entity",
+          "description": "Whom the land passes to, as the law of succession says.",
           "required": true,
-          "description": "Whom the land passes to, as the law of succession says."
+          "type": "entity"
         },
         "notification": {
-          "type": "record",
+          "description": "The notification of the death.",
           "required": true,
-          "description": "The notification of the death."
+          "type": "record"
         }
       },
+      "form": "transmission_application",
+      "title": "Application to the land registry for a dead owner's land to pass",
       "writes": {
+        "basis": "=notification",
+        "data": {
+          "deceased": "=deceased",
+          "heir": "=heir"
+        },
+        "kind": "transmission_application",
         "sends": [
           {
             "to": [
@@ -245,35 +210,77 @@
             "why": "The land registry keeps the titles to land: passing a dead owner's land is its to do."
           }
         ],
-        "kind": "transmission_application",
         "text": "Transmission on death: whatever land {deceased} held passes to {heir}.",
-        "basis": "=notification",
         "to": [
           "@land_registry"
-        ],
-        "data": {
-          "deceased": "=deceased",
-          "heir": "=heir"
-        }
+        ]
       }
     }
   ],
+  "name": "city.registry",
+  "params": {
+    "counter": {
+      "default": false,
+      "schema": {
+        "type": "boolean"
+      },
+      "source": "placeholder"
+    },
+    "estate_tells": {
+      "default": [],
+      "schema": {
+        "type": "array"
+      },
+      "source": "placeholder"
+    },
+    "feeds": {
+      "default": [],
+      "schema": {
+        "type": "array"
+      },
+      "source": "placeholder"
+    },
+    "land_registry": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "office": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "part": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
   "routines": [
     {
-      "task": "answer",
       "at": "office",
       "every": 1,
-      "what": "The office's counter staff enter in the register each notification of a death or of a birth that comes to the office, and those entitled are told, each working day, so that the registrar is not brought back for it.",
       "papers": [
         {
-          "kind": "death_notification",
-          "how": "entered in the register from the notification, and those entitled are told of the entry"
+          "how": "entered in the register from the notification, and those entitled are told of the entry",
+          "kind": "death_notification"
         },
         {
-          "kind": "birth_notification",
-          "how": "entered in the register from the notification, and those entitled are told of the entry"
+          "how": "entered in the register from the notification, and those entitled are told of the entry",
+          "kind": "birth_notification"
         }
-      ]
+      ],
+      "task": "answer",
+      "what": "The office's counter staff enter in the register each notification of a death or of a birth that comes to the office, and those entitled are told, each working day, so that the registrar is not brought back for it."
     }
-  ]
+  ],
+  "state": "none",
+  "version": "0.7.0"
 }

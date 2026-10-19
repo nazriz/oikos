@@ -4,7 +4,7 @@
 // it is a stand-in that shows the harness can pass a reader that tells the pairs apart, and each of the others is
 // that reader with ONE thing wrong, so each should fail the check that is about that thing.
 
-import { NEUTRAL, POLES, type Line, type Reading } from "../behaviour/reading";
+import { NEUTRAL, POLES, type Line, type Reading } from "../shared/reading";
 import { phrasesAt, quoteFrom, READING_VERSION, type ReadAnswer, type Reader, type ReadRequest } from "./reader";
 
 const count = (text: string, re: RegExp): { n: number; at: number } => {

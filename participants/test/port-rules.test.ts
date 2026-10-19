@@ -4,8 +4,8 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { chargesOn, taxLawOf, withheld } from "../src/behaviour/tax";
-import { declarationFor, paymentsInWords, stopsWorkAt } from "../src/behaviour/payments";
+import { chargesOn, taxLawOf, withheld } from "../src/shared/tax";
+import { declarationFor, paymentsInWords, stopsWorkAt } from "../src/shared/payments";
 
 const read = (f: string) => JSON.parse(readFileSync(join(import.meta.dir, "../../contracts/test", f), "utf8"));
 

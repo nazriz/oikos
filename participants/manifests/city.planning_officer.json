@@ -1,106 +1,83 @@
 {
-  "name": "city.planning_officer",
-  "version": "0.11.0",
-  "doc": "docs/behaviour/institutions.md",
-  "params": {
-    "automation": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "casework": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "compliance_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 10000,
-      "source": "placeholder"
-    },
-    "habitat_law": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "part": {
-      "schema": {},
-      "source": "the world gives it (no default)"
-    },
-    "procurement": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "town": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "e",
-      "source": "placeholder"
-    }
+  "answers": {
+    "acts": "What it acts on: an application for a planning permit on the permit form (permit_application), which it decides under the planning law.",
+    "forms": [
+      {
+        "about": [
+          "permit",
+          "build",
+          "applic",
+          "develop"
+        ],
+        "say": "An application to build goes on the permit form (permit_application), naming the lot and the kind of building."
+      }
+    ],
+    "office": "the planning office",
+    "report": true
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/institutions.md",
   "issues": [
     {
-      "form": "permit_decision",
-      "title": "Decision on a planning permit application",
       "does": "Decides a permit application (granted, refused, or sent back as incomplete) and tells the applicant. A decision to grant records the permission with it: the applicant's liberty to build that kind of building on that lot, which the building inspector reads. So a grant says the lot and the kind of building, as the application gives them.",
       "fields": {
-        "application": {
-          "type": "record",
-          "required": true,
-          "description": "The application decided."
-        },
         "applicant": {
-          "type": "entity",
+          "description": "Who applied: the decision is sent to them.",
           "required": true,
-          "description": "Who applied: the decision is sent to them."
+          "type": "entity"
+        },
+        "application": {
+          "description": "The application decided.",
+          "required": true,
+          "type": "record"
         },
         "decision": {
-          "type": "choice",
-          "required": true,
+          "description": "Granted, refused, or sent back as incomplete.",
           "options": [
             "granted",
             "refused",
             "incomplete"
           ],
-          "description": "Granted, refused, or sent back as incomplete."
-        },
-        "lot": {
-          "type": "lot",
-          "description": "For a grant: the lot the permission is for, as the application names it."
-        },
-        "structure_type": {
-          "type": "structure_type",
-          "description": "For a grant: the kind of building permitted, as the application names it."
+          "required": true,
+          "type": "choice"
         },
         "law": {
-          "type": "record",
-          "description": "The law the building would breach, if any."
+          "description": "The law the building would breach, if any.",
+          "type": "record"
+        },
+        "lot": {
+          "description": "For a grant: the lot the permission is for, as the application names it.",
+          "type": "lot"
         },
         "missing": {
-          "type": "list",
-          "description": "For an incomplete application: what it does not say (lot, structure_type)."
+          "description": "For an incomplete application: what it does not say (lot, structure_type).",
+          "type": "list"
         },
         "reason": {
-          "type": "text",
-          "description": "Why it is decided so, in words, where the law named does not say it (a refusal, or what to send in)."
+          "description": "Why it is decided so, in words, where the law named does not say it (a refusal, or what to send in).",
+          "type": "text"
+        },
+        "structure_type": {
+          "description": "For a grant: the kind of building permitted, as the application names it.",
+          "type": "structure_type"
         }
       },
+      "form": "permit_decision",
+      "title": "Decision on a planning permit application",
       "writes": {
-        "kind": "permit_decision",
-        "text": "Permit {decision}: application {application}.",
         "basis": "=application",
-        "to": [
-          "=applicant"
-        ],
+        "claim": {
+          "about": {
+            "action": "build",
+            "object": "=lot",
+            "structure_type": "=structure_type"
+          },
+          "basis": "=application",
+          "holder": "=applicant",
+          "position": "liberty",
+          "when": {
+            "decision": "granted"
+          }
+        },
         "data": {
           "application": "=application",
           "decision": "=decision",
@@ -108,20 +85,59 @@
           "missing": "=missing",
           "reason": "=reason"
         },
-        "claim": {
-          "when": {
-            "decision": "granted"
-          },
-          "position": "liberty",
-          "holder": "=applicant",
-          "about": {
-            "action": "build",
-            "object": "=lot",
-            "structure_type": "=structure_type"
-          },
-          "basis": "=application"
-        }
+        "kind": "permit_decision",
+        "text": "Permit {decision}: application {application}.",
+        "to": [
+          "=applicant"
+        ]
       }
     }
-  ]
+  ],
+  "name": "city.planning_officer",
+  "params": {
+    "automation": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "casework": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "compliance_bps": {
+      "default": 10000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "habitat_law": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "part": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "procurement": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "town": {
+      "default": "e",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.11.0"
 }

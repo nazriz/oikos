@@ -3,11 +3,13 @@
 // take an offer back before: a hire was signed after the employer had been directed not to hire.
 
 import { expect, test } from "bun:test";
-import { citizen } from "../src/behaviour/citizen";
-import { Book } from "../src/behaviour/common";
+
+import { Book } from "../src/shared/common";
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { DAY, employment, person } from "./stepping";
+import { engine } from "./engine";
+const citizen = engine("citizen.default");
 
 inCurrency(PROFILE.values.currency);
 

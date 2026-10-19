@@ -5,8 +5,8 @@
 // which moments it paid.
 
 import { expect, test } from "bun:test";
-import { Book, callAction, type Step } from "../src/behaviour/common";
-import { Staffing } from "../src/behaviour/firms";
+import { Book, callAction, type Step } from "../src/shared/common";
+import { Staffing } from "../src/readers/staffing";
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { callsOf, context, DAY, employment, signed, standingOrder } from "./stepping";

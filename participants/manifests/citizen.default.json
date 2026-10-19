@@ -1,22 +1,33 @@
 {
-  "name": "citizen.default",
-  "version": "0.58.0",
+  "beliefs": [
+    {
+      "about": "agreement",
+      "name": "agreement"
+    }
+  ],
+  "decisions": [
+    "home",
+    "job",
+    "practice",
+    "shop"
+  ],
   "doc": "docs/behaviour/citizen.md",
+  "name": "citizen.default",
   "params": {
     "accept_fewer_bedrooms_after_days": {
-      "schema": {
-        "type": "integer",
-        "description": "still hunting after this long: accept one bedroom fewer than the standard asks, and so on (placeholder)"
-      },
-      "unit": "days",
       "default": 60,
-      "source": "still hunting after this long: accept one bedroom fewer than the standard asks, and so on (placeholder)"
+      "schema": {
+        "description": "still hunting after this long: accept one bedroom fewer than the standard asks, and so on (placeholder)",
+        "type": "integer"
+      },
+      "source": "still hunting after this long: accept one bedroom fewer than the standard asks, and so on (placeholder)",
+      "unit": "days"
     },
     "adverts": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "agency": {
@@ -24,145 +35,145 @@
       "source": "the world gives it (no default)"
     },
     "aggrieved_bps": {
-      "schema": {
-        "type": "integer",
-        "description": "anger with the landlord at which a tenant is aggrieved (placeholder: the anger at a notice to go lasts about 95 days)"
-      },
-      "unit": "bps",
       "default": 2000,
-      "source": "anger with the landlord at which a tenant is aggrieved (placeholder: the anger at a notice to go lasts about 95 days)"
+      "schema": {
+        "description": "anger with the landlord at which a tenant is aggrieved (placeholder: the anger at a notice to go lasts about 95 days)",
+        "type": "integer"
+      },
+      "source": "anger with the landlord at which a tenant is aggrieved (placeholder: the anger at a notice to go lasts about 95 days)",
+      "unit": "bps"
     },
     "answer_days": {
       "schema": {},
-      "unit": "days",
-      "source": "the world gives it (no default)"
+      "source": "the world gives it (no default)",
+      "unit": "days"
     },
     "ask_again_days": {
-      "schema": {
-        "type": "integer",
-        "description": "still hunting after this long: a new hunt, asked about again (placeholder)"
-      },
-      "unit": "days",
       "default": 60,
-      "source": "still hunting after this long: a new hunt, asked about again (placeholder)"
+      "schema": {
+        "description": "still hunting after this long: a new hunt, asked about again (placeholder)",
+        "type": "integer"
+      },
+      "source": "still hunting after this long: a new hunt, asked about again (placeholder)",
+      "unit": "days"
     },
     "ask_home_bps": {
-      "schema": {
-        "type": "integer",
-        "description": "chance a new home hunt starts by asking around (37% of renters ask friends or family: Apartments.com/NAA 2026)"
-      },
-      "unit": "bps",
       "default": 3700,
-      "source": "chance a new home hunt starts by asking around (37% of renters ask friends or family: Apartments.com/NAA 2026)"
+      "schema": {
+        "description": "chance a new home hunt starts by asking around (37% of renters ask friends or family: Apartments.com/NAA 2026)",
+        "type": "integer"
+      },
+      "source": "chance a new home hunt starts by asking around (37% of renters ask friends or family: Apartments.com/NAA 2026)",
+      "unit": "bps"
     },
     "ask_work_bps": {
-      "schema": {
-        "type": "integer",
-        "description": "chance a new job hunt starts by asking around (69% of young job seekers used friends and relatives over a year: Holzer 1987)"
-      },
-      "unit": "bps",
       "default": 6900,
-      "source": "chance a new job hunt starts by asking around (69% of young job seekers used friends and relatives over a year: Holzer 1987)"
+      "schema": {
+        "description": "chance a new job hunt starts by asking around (69% of young job seekers used friends and relatives over a year: Holzer 1987)",
+        "type": "integer"
+      },
+      "source": "chance a new job hunt starts by asking around (69% of young job seekers used friends and relatives over a year: Holzer 1987)",
+      "unit": "bps"
     },
     "aspiration_bps": {
       "schema": {},
-      "unit": "bps",
-      "source": "the world gives it (no default)"
+      "source": "the world gives it (no default)",
+      "unit": "bps"
     },
     "attach_mean": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "ballot_turnout_bps": {
+      "default": 7000,
       "schema": {
         "type": "integer"
       },
-      "unit": "bps",
-      "default": 7000,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "bps"
     },
     "bank": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "belief": {
+      "default": {
+        "affiliate_bps": 3000,
+        "display_bps": 500,
+        "fade_bps": 300,
+        "meaning": 0.2,
+        "tell_at_bps": 6000,
+        "told_bps": 300
+      },
       "schema": {
         "type": "object"
-      },
-      "default": {
-        "fade_bps": 300,
-        "display_bps": 500,
-        "told_bps": 300,
-        "tell_at_bps": 6000,
-        "affiliate_bps": 3000,
-        "meaning": 0.2
       },
       "source": "placeholder"
     },
     "beliefs": {
+      "default": {},
       "schema": {
         "type": "object"
       },
-      "default": {},
       "source": "placeholder"
     },
     "beta": {
-      "schema": {
-        "type": "integer",
-        "description": "shops tried in one trip, at most"
-      },
       "default": 5,
+      "schema": {
+        "description": "shops tried in one trip, at most",
+        "type": "integer"
+      },
       "source": "placeholder"
     },
     "births": {
-      "schema": {
-        "type": "boolean",
-        "description": "whether this world has births (its life physics), so whether having a child is possible"
-      },
       "default": false,
+      "schema": {
+        "description": "whether this world has births (its life physics), so whether having a child is possible",
+        "type": "boolean"
+      },
       "source": "placeholder"
     },
     "buffer_months": {
+      "default": 3,
       "schema": {
         "type": "integer"
       },
-      "unit": "months",
-      "default": 3,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "months"
     },
     "care": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "catch_up_days": {
+      "default": 14,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "child_protection": {
       "schema": {},
       "source": "the world gives it (no default)"
     },
     "child_template": {
+      "default": "child",
       "schema": {
         "type": "string"
       },
-      "default": "child",
       "source": "placeholder"
     },
     "child_template_outside_lf": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "choice": {
@@ -170,280 +181,280 @@
       "source": "the world gives it (no default)"
     },
     "civic": {
-      "schema": {
-        "type": "object"
-      },
       "default": {
-        "turnout_bps": 9000,
-        "stand_bps": 30,
-        "reads_news_bps": 5000,
         "approval_memory_weeks": 26,
         "news_weight_bps": 1500,
-        "platform_weight_bps": 2500
+        "platform_weight_bps": 2500,
+        "reads_news_bps": 5000,
+        "stand_bps": 30,
+        "turnout_bps": 9000
+      },
+      "schema": {
+        "type": "object"
       },
       "source": "placeholder"
     },
     "close_affinity_bps": {
       "schema": {},
-      "unit": "bps",
-      "source": "the world gives it (no default)"
+      "source": "the world gives it (no default)",
+      "unit": "bps"
     },
     "complain_about": {
+      "default": "waste",
       "schema": {
         "type": "string"
       },
-      "default": "waste",
       "source": "placeholder"
     },
     "complain_after_days": {
+      "default": 14,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "complain_bps": {
+      "default": 3000,
       "schema": {
         "type": "integer"
       },
-      "unit": "bps",
-      "default": 3000,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "bps"
     },
     "complain_to": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "crime": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "electoral_body": {
+      "default": null,
       "schema": {
         "description": "with whom we enrol, nominate and vote, where that is not the town itself (the world says)"
       },
-      "default": null,
       "source": "placeholder"
     },
     "electoral_town": {
+      "default": null,
       "schema": {
         "description": "the town whose government we elect (the world says; none: no elections)"
       },
-      "default": null,
       "source": "placeholder"
     },
     "essentials": {
-      "schema": {
-        "type": "integer",
-        "description": "cents per month: what's spent however little comes in"
-      },
       "default": 40000,
+      "schema": {
+        "description": "cents per month: what's spent however little comes in",
+        "type": "integer"
+      },
       "source": "placeholder"
     },
     "essentials_units": {
-      "schema": {
-        "type": "integer",
-        "description": "goods a household uses in a fortnight, for how well subsistence is met (placeholder)"
-      },
       "default": 10,
+      "schema": {
+        "description": "goods a household uses in a fortnight, for how well subsistence is met (placeholder)",
+        "type": "integer"
+      },
       "source": "goods a household uses in a fortnight, for how well subsistence is met (placeholder)"
     },
     "event_bps": {
       "schema": {},
-      "unit": "bps",
-      "source": "the world gives it (no default)"
+      "source": "the world gives it (no default)",
+      "unit": "bps"
     },
     "fertility_per_10000": {
+      "default": [],
       "schema": {
         "type": "array"
       },
-      "default": [],
       "source": "placeholder"
     },
     "found_bps": {
+      "default": 0,
       "schema": {
         "type": "integer"
       },
-      "unit": "bps",
-      "default": 0,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "bps"
     },
     "found_own_buffer_months": {
+      "default": 1,
       "schema": {
         "type": "integer"
       },
-      "unit": "months",
-      "default": 1,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "months"
     },
     "found_own_ppm": {
+      "default": 0,
       "schema": {
         "type": "integer"
       },
-      "default": 0,
       "source": "placeholder"
     },
     "founding": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "frictions": {
+      "default": {},
       "schema": {
         "type": "object"
       },
-      "default": {},
       "source": "placeholder"
     },
     "gestation": {
-      "schema": {
-        "type": "integer",
-        "description": "how long a pregnancy lasts (the world's birth physics: the standard 38 weeks from conception)"
-      },
       "default": 22982400,
+      "schema": {
+        "description": "how long a pregnancy lasts (the world's birth physics: the standard 38 weeks from conception)",
+        "type": "integer"
+      },
       "source": "placeholder"
     },
     "give_up_below_bps": {
+      "default": 5000,
       "schema": {
         "type": "integer"
       },
-      "unit": "bps",
-      "default": 5000,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "bps"
     },
     "give_up_months": {
+      "default": 6,
       "schema": {
         "type": "integer"
       },
-      "unit": "months",
-      "default": 6,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "months"
     },
     "goals": {
-      "schema": {
-        "type": "object"
-      },
       "default": {
-        "unmet_days": 60,
+        "cheaper_bps": 9000,
         "method_days": 90,
         "rest_days": 180,
         "security_bps": 3000,
         "social_bps": 4000,
         "spend_less_saving_bps": 2000,
-        "cheaper_bps": 9000
+        "unmet_days": 60
+      },
+      "schema": {
+        "type": "object"
       },
       "source": "placeholder"
     },
     "goods": {
+      "default": "goods",
       "schema": {
         "type": "string"
       },
-      "default": "goods",
       "source": "placeholder"
     },
     "in_labour_force": {
-      "schema": {
-        "type": "boolean",
-        "description": "false: not looking for work (studying, caring...), and not claiming support for being out of it"
-      },
       "default": true,
+      "schema": {
+        "description": "false: not looking for work (studying, caring...), and not claiming support for being out of it",
+        "type": "boolean"
+      },
       "source": "placeholder"
     },
     "income_window_days": {
-      "schema": {
-        "type": "integer",
-        "description": "income is what came in over this, a month's worth"
-      },
-      "unit": "days",
       "default": 90,
-      "source": "placeholder"
+      "schema": {
+        "description": "income is what came in over this, a month's worth",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
     },
     "initiative": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "inner": {
+      "default": {},
       "schema": {
         "type": "object"
       },
-      "default": {},
       "source": "placeholder"
     },
     "institutions": {
+      "default": {},
       "schema": {
         "type": "object"
       },
-      "default": {},
       "source": "placeholder"
     },
     "job_move": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "leave_after_homeless_days": {
+      "default": 90,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 90,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "leave_after_jobless_days": {
+      "default": 180,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 180,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "market": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "max_contacts": {
-      "schema": {
-        "type": "integer",
-        "description": "people remembered from homes and workplaces shared, most recent first (placeholder; Dunbar's ~15 \"sympathy group\")"
-      },
       "default": 15,
+      "schema": {
+        "description": "people remembered from homes and workplaces shared, most recent first (placeholder; Dunbar's ~15 \"sympathy group\")",
+        "type": "integer"
+      },
       "source": "people remembered from homes and workplaces shared, most recent first (placeholder; Dunbar's ~15 \"sympathy group\")"
     },
     "mind": {
+      "default": {},
       "schema": {
         "type": "object"
       },
-      "default": {},
       "source": "placeholder"
     },
     "news_days": {
+      "default": 90,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 90,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "occupancy": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "origin": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "outlook": {
+      "default": {},
       "schema": {
         "type": "object"
       },
-      "default": {},
       "source": "placeholder"
     },
     "outside_account": {
@@ -451,81 +462,81 @@
       "source": "the world gives it (no default)"
     },
     "own_values": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "own_work": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "paper": {
+      "default": null,
       "schema": {
         "description": "the local paper, whose news we read (the world says; none: no paper, and nothing is read as news)"
       },
-      "default": null,
       "source": "placeholder"
     },
     "participation_bps": {
+      "default": 10000,
       "schema": {
         "type": "integer"
       },
-      "unit": "bps",
-      "default": 10000,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "bps"
     },
     "pass_on_bps": {
-      "schema": {
-        "type": "integer",
-        "description": "chance a contact who can see a lead passes it on (placeholder)"
-      },
-      "unit": "bps",
       "default": 10000,
-      "source": "chance a contact who can see a lead passes it on (placeholder)"
+      "schema": {
+        "description": "chance a contact who can see a lead passes it on (placeholder)",
+        "type": "integer"
+      },
+      "source": "chance a contact who can see a lead passes it on (placeholder)",
+      "unit": "bps"
     },
     "petition_days": {
-      "schema": {
-        "type": "integer",
-        "description": "how long an organiser keeps a petition open"
-      },
-      "unit": "days",
       "default": 180,
-      "source": "placeholder"
+      "schema": {
+        "description": "how long an organiser keeps a petition open",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
     },
     "petition_start_bps": {
-      "schema": {
-        "type": "integer",
-        "description": "chance per wake that an aggrieved renter starts a petition, if none is open"
-      },
-      "unit": "bps",
       "default": 300,
-      "source": "placeholder"
+      "schema": {
+        "description": "chance per wake that an aggrieved renter starts a petition, if none is open",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
     },
     "petition_willing_bps": {
-      "schema": {
-        "type": "integer",
-        "description": "share of people who sign petitions at all (AES 2016: 44% had signed a written petition in the last five years)"
-      },
-      "unit": "bps",
       "default": 4400,
-      "source": "share of people who sign petitions at all (AES 2016: 44% had signed a written petition in the last five years)"
+      "schema": {
+        "description": "share of people who sign petitions at all (AES 2016: 44% had signed a written petition in the last five years)",
+        "type": "integer"
+      },
+      "source": "share of people who sign petitions at all (AES 2016: 44% had signed a written petition in the last five years)",
+      "unit": "bps"
     },
     "population": {
+      "default": 200,
       "schema": {
         "type": "integer"
       },
-      "default": 200,
       "source": "placeholder"
     },
     "possession": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "register": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "registry": {
@@ -533,91 +544,91 @@
       "source": "the world gives it (no default)"
     },
     "relief": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "rent_bearable_share_bps": {
+      "default": 5000,
       "schema": {
         "type": "integer"
       },
-      "unit": "bps",
-      "default": 5000,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "bps"
     },
     "rent_burden_grievance_bps": {
+      "default": 4000,
       "schema": {
         "type": "integer"
       },
-      "unit": "bps",
-      "default": 4000,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "bps"
     },
     "rent_share_bps": {
-      "schema": {
-        "type": "integer",
-        "description": "BoE: renters bid 33% of income"
-      },
-      "unit": "bps",
       "default": 3300,
-      "source": "BoE: renters bid 33% of income"
+      "schema": {
+        "description": "BoE: renters bid 33% of income",
+        "type": "integer"
+      },
+      "source": "BoE: renters bid 33% of income",
+      "unit": "bps"
     },
     "rest_days": {
       "schema": {},
-      "unit": "days",
-      "source": "the world gives it (no default)"
+      "source": "the world gives it (no default)",
+      "unit": "days"
     },
     "retirement_age": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "rise_bps": {
       "schema": {},
-      "unit": "bps",
-      "source": "the world gives it (no default)"
+      "source": "the world gives it (no default)",
+      "unit": "bps"
     },
     "round": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "sale_board": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "saving_bps": {
-      "schema": {
-        "type": "integer",
-        "description": "the household saving ratio"
-      },
-      "unit": "bps",
       "default": 500,
-      "source": "placeholder"
+      "schema": {
+        "description": "the household saving ratio",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
     },
     "savings_rent_months": {
-      "schema": {
-        "type": "integer",
-        "description": "without income, rent only if savings cover this many months"
-      },
-      "unit": "months",
       "default": 6,
-      "source": "placeholder"
+      "schema": {
+        "description": "without income, rent only if savings cover this many months",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "months"
     },
     "school": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "search_limit": {
-      "schema": {
-        "type": "integer",
-        "description": "how many listings or postings a search shows, best first"
-      },
       "default": 20,
+      "schema": {
+        "description": "how many listings or postings a search shows, best first",
+        "type": "integer"
+      },
       "source": "placeholder"
     },
     "shop_accounts": {
@@ -625,80 +636,80 @@
       "source": "the world gives it (no default)"
     },
     "shop_every_days": {
+      "default": 14,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "shop_search_bps": {
-      "schema": {
-        "type": "integer",
-        "description": "Lengnick 2013, Table 1: the monthly chance of looking at another seller's price (0.25)"
-      },
-      "unit": "bps",
       "default": 2500,
-      "source": "Lengnick 2013, Table 1: the monthly chance of looking at another seller's price (0.25)"
+      "schema": {
+        "description": "Lengnick 2013, Table 1: the monthly chance of looking at another seller's price (0.25)",
+        "type": "integer"
+      },
+      "source": "Lengnick 2013, Table 1: the monthly chance of looking at another seller's price (0.25)",
+      "unit": "bps"
     },
     "shops_known": {
-      "schema": {
-        "type": "integer",
-        "description": "Lengnick 2013, Table 1: sellers a household deals with (7): how many it looks up, knowing none"
-      },
       "default": 7,
+      "schema": {
+        "description": "Lengnick 2013, Table 1: sellers a household deals with (7): how many it looks up, knowing none",
+        "type": "integer"
+      },
       "source": "Lengnick 2013, Table 1: sellers a household deals with (7): how many it looks up, knowing none"
     },
     "started": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "stay": {
-      "schema": {
-        "type": "object"
-      },
       "default": {
         "ask": 5,
         "ask_again_days": 30,
         "willing_affinity_bps": 1500
       },
+      "schema": {
+        "type": "object"
+      },
       "source": "placeholder"
     },
     "stop_work_curve": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "stops_work_at": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "strike_vote_yes_bps": {
+      "default": 8500,
       "schema": {
         "type": "integer"
       },
-      "unit": "bps",
-      "default": 8500,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "bps"
     },
     "sway": {
-      "schema": {
-        "type": "object",
-        "description": "how far a person's values sway the cited rates (above)"
-      },
       "default": {
         "consult": 1,
-        "union_belief": 0.5,
-        "union_peers": 0.5,
-        "union_join": 0.3,
-        "turnout": 0.15,
-        "strike_vote": 0.08,
-        "patience_tradition": 0.2,
-        "patience_security": 0.1,
+        "enterprise_achievement": 0.3,
         "enterprise_openness": 0.4,
-        "enterprise_achievement": 0.3
+        "patience_security": 0.1,
+        "patience_tradition": 0.2,
+        "strike_vote": 0.08,
+        "turnout": 0.15,
+        "union_belief": 0.5,
+        "union_join": 0.3,
+        "union_peers": 0.5
+      },
+      "schema": {
+        "description": "how far a person's values sway the cited rates (above)",
+        "type": "object"
       },
       "source": "placeholder"
     },
@@ -707,40 +718,40 @@
       "source": "the world gives it (no default)"
     },
     "tell_on_leaving": {
+      "default": [],
       "schema": {
         "type": "array"
       },
-      "default": [],
       "source": "placeholder"
     },
     "tenancy_schedule": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "threshold_mean_bps": {
-      "schema": {
-        "type": "integer",
-        "description": "personal thresholds (share of the population already signed) are"
-      },
-      "unit": "bps",
       "default": 2500,
-      "source": "placeholder"
+      "schema": {
+        "description": "personal thresholds (share of the population already signed) are",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
     },
     "threshold_sd_bps": {
-      "schema": {
-        "type": "integer",
-        "description": "roughly normal with this mean and spread (Granovetter 1978)"
-      },
-      "unit": "bps",
       "default": 1000,
-      "source": "roughly normal with this mean and spread (Granovetter 1978)"
+      "schema": {
+        "description": "roughly normal with this mean and spread (Granovetter 1978)",
+        "type": "integer"
+      },
+      "source": "roughly normal with this mean and spread (Granovetter 1978)",
+      "unit": "bps"
     },
     "tribunal": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "tries": {
@@ -752,90 +763,79 @@
       "source": "the world gives it (no default)"
     },
     "union": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "union_join_bps": {
+      "default": {},
       "schema": {
         "type": "object"
       },
-      "unit": "bps",
-      "default": {},
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "bps"
     },
     "unmet_bps": {
       "schema": {},
-      "unit": "bps",
-      "source": "the world gives it (no default)"
+      "source": "the world gives it (no default)",
+      "unit": "bps"
     },
     "utilities": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "values": {
-      "schema": {
-        "type": "object"
-      },
       "default": {
         "values": {}
+      },
+      "schema": {
+        "type": "object"
       },
       "source": "placeholder"
     },
     "ventures": {
+      "default": [],
       "schema": {
         "type": "array"
       },
-      "default": [],
       "source": "placeholder"
     },
     "wants": {
+      "default": {},
       "schema": {
         "type": "object"
       },
-      "default": {},
       "source": "placeholder"
     },
     "wealth_effect_bps_per_year": {
-      "schema": {
-        "type": "integer",
-        "description": "consumption a year per unit of wealth"
-      },
       "default": 300,
+      "schema": {
+        "description": "consumption a year per unit of wealth",
+        "type": "integer"
+      },
       "source": "placeholder"
     },
     "welfare": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "work_board": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "year": {
-      "schema": {
-        "type": "integer",
-        "description": "the calendar: how long a year is, for ages"
-      },
       "default": 31536000,
+      "schema": {
+        "description": "the calendar: how long a year is, for ages",
+        "type": "integer"
+      },
       "source": "placeholder"
     }
   },
   "perceives": [],
-  "decisions": [
-    "home",
-    "job",
-    "practice",
-    "shop"
-  ],
-  "beliefs": [
-    {
-      "name": "agreement",
-      "about": "agreement"
-    }
-  ],
-  "state": "none"
+  "state": "none",
+  "version": "0.58.0"
 }

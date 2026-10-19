@@ -172,7 +172,12 @@ test("F6: law 2: a generated town sets no throughput or delay as a parameter (th
 // Law 5: an error arises from procedure, data and time, or from a slip at a sourced rate through `slip()`.
 // ---------------------------------------------------------------------------------------------------------------------
 
-const BEHAVIOUR = join(root, "participants/src/behaviour");
+/** What of the town's kinds is still read in TypeScript (their declarations, the helpers, the seat-side readers), and the engine's own actors, which are the ones that act. */
+const KIND_DIRS = ["participants/src/kinds", "participants/src/shared", "participants/src/readers"];
+const tsKindFiles = () => KIND_DIRS.flatMap((d) => readdirSync(join(root, d)).filter((n) => n.endsWith(".ts")).map((n) => `${d}/${n}`));
+const rustActorFiles = () => Bun.spawnSync(["git", "ls-files", "kernel/crates/actors/src/*.rs"], { cwd: root }).stdout.toString().trim().split("\n").filter((f) => f && !/(^|\/)(tests?|testkit|testkinds|stub)\.rs$|\/tests\//.test(f));
+/** The same, in Rust: `cx.rng("claim-error-...")`, `cx.rng(&format!("uphold-{x}"))`. */
+const CHANCE_OF_WRONG_RS = /\b(?:rng|chance)\(\s*&?(?:format!\(\s*)?"[^"]*(?:uphold|error|short-pay|wrong|mistake|slip)/;
 /** Streams named for a wrong decision drawn by chance: a purpose with `uphold`, `error`, `short-pay`, `wrong`, `mistake` or `slip` in it,
  * drawn by a behaviour module (`ctx.rng("claim-error-...")`, `bill-error-`, `uphold-`). The one place such a draw is made is `slip()`
  * (participants/src/slip.ts). (A thing that is faulty, or a house that wears, is a fact about the world and not a performer's decision.) */
@@ -181,11 +186,20 @@ const CHANCE_OF_WRONG = /\b(?:rng|chance)\(\s*[`"'][^`"']*(?:uphold|error|short-
 test("F7: law 5: no module makes a decision wrong by chance except through slip() (participants/src/slip.ts)", () => {
   expect(existsSync(join(root, "participants/src/slip.ts")), "the one helper").toBe(true);
   const drawn: string[] = [];
-  for (const f of readdirSync(BEHAVIOUR).filter((n) => n.endsWith(".ts"))) {
-    readFileSync(join(BEHAVIOUR, f), "utf8").split("\n").forEach((l, i) => {
-      if (CHANCE_OF_WRONG.test(l)) drawn.push(`participants/src/behaviour/${f}:${i + 1}`);
+  for (const f of tsKindFiles()) {
+    readFileSync(join(root, f), "utf8").split("\n").forEach((l, i) => {
+      if (CHANCE_OF_WRONG.test(l)) drawn.push(`${f}:${i + 1}`);
     });
   }
+  const rustFiles = rustActorFiles();
+  expect(rustFiles.length, "the engine's actors are read").toBeGreaterThan(100);
+  for (const f of rustFiles) {
+    readFileSync(join(root, f), "utf8").split("\n").forEach((l, i) => {
+      if (CHANCE_OF_WRONG_RS.test(l)) drawn.push(`${f}:${i + 1}`);
+    });
+  }
+  // (The Rust reader does catch one: a line that draws an error by chance.)
+  expect(CHANCE_OF_WRONG_RS.test('if cx.rng(&format!("claim-error-{id}")).below(10_000) < 5 {')).toBe(true);
   expect(drawn, "errors drawn outside slip()").toEqual([]);
   // And no module is handed a rate of error as a parameter: it is the world's table of slips (`orchestration.slip`), with its source.
   const c = town();
@@ -279,9 +293,8 @@ test("F8: law 5: the support office is shown the papers its claims wait for (the
 });
 
 test("F8: law 5: a decision of a kind with a review route is asked to be looked at again by the one request every grievance has, and no special kind is left for the review of a refused claim", () => {
-  const BEHAVIOUR = join(root, "participants/src/behaviour");
   const found: string[] = [];
-  for (const f of readdirSync(BEHAVIOUR).filter((n) => n.endsWith(".ts"))) readFileSync(join(BEHAVIOUR, f), "utf8").split("\n").forEach((l, i) => { if (l.includes('"remedy_request"')) found.push(`${f}:${i + 1}`); });
+  for (const f of [...tsKindFiles(), ...rustActorFiles()]) readFileSync(join(root, f), "utf8").split("\n").forEach((l, i) => { if (l.includes('"remedy_request"')) found.push(`${f}:${i + 1}`); });
   expect(found).toEqual([]);
 });
 

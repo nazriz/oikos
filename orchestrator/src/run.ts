@@ -606,13 +606,13 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const ways = new Map<string, { way: string; by?: string[]; board?: boolean }>(chans.filter((x) => x.ch.way).map((x) => [x.path, { way: x.ch.way, ...(x.ch.by ? { by: x.ch.by } : {}),
       ...(x.ch.way === "published" && !x.ch.from && (x.ch.match?.statement_kinds ?? []).some((k: string) => boards.has(k)) ? { board: true } : {}) }]));
     // An office that employs staff of its own (its module says so: `staffed`): whoever holds it knows its posts, who is
-    // in each and which are vacant, from the office's own papers (behaviour/roster.ts). Kept from what the seat is shown.
+    // in each and which are vacant, from the office's own papers (readers/roster.ts). Kept from what the seat is shown.
     const staffedBy = office ? mods[office.role_module?.code ?? ""]?.staffed?.(office.role_module?.params ?? {}) : undefined;
     const roster = office && staffedBy ? new Roster(ctxFor(p.id, office.id, entity, {}), entity, office.id, staffedBy, (mods[office.role_module?.code ?? ""]?.routines ?? []).map((r) => r.task)) : undefined;
     // A seat that keeps its body's ballots, or votes on them (the world says which: `ballot_count`), has the count of
-    // each ballot not yet declared, or its own vote on file, set out from the votes it has been shown (behaviour/tally.ts).
+    // each ballot not yet declared, or its own vote on file, set out from the votes it has been shown (readers/tally.ts).
     const tally = office && (pp.ballot_count === "keeper" || pp.ballot_count === "member") ? new Tally(entity, pp.ballot_count === "member" ? office.id : undefined) : undefined;
-    // And its diary (behaviour/diary.ts): how long its own work takes it and what its staff have in a week, the town's practice as the town states it.
+    // And its diary (readers/diary.ts): how long its own work takes it and what its staff have in a week, the town's practice as the town states it.
     const times: { [row: string]: number } = cfg.orchestration?.act_time?.person ?? {};
     const diary = (at: number) => office && Object.keys(times).length ? diaryText({ title: office.title ?? office.id, times, issues: mods[office.role_module?.code ?? ""]?.issues ?? [], ...(cfg.catalogue?.working_day ? { workday: cfg.catalogue.working_day } : {}), ...(roster ? { staff: roster.now(at) } : {}) }) : undefined;
     const setOut = (at: number) => [roster ? roster.text(at, office!.title ?? office!.id, (id: string) => whoIs(id)?.name) : "", tally ? tally.text(at, office!.title ?? office!.id) : "", diary(at) ?? ""].filter(Boolean).join("\n\n");
@@ -627,7 +627,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       // (Its organisation's only office, its own staff's post apart: what is addressed to the organisation is its post.)
       ...(office && [...positions.values()].filter((x: any) => x.entity === office.entity && !mine.some((m) => x.id === `${m.id}-staff`)).length === 1 ? { sole: true } : {}) };
     const ownAuthors = mine.flatMap((x) => { const staff = positions.get(`${x.id}-staff`)?.holder; return staff ? [staff] : []; });
-    // The office's own file (behaviour/daybook.ts): its own papers and payments, and what stands open on its books (its
+    // The office's own file (readers/daybook.ts): its own papers and payments, and what stands open on its books (its
     // module's `books`, read from what the seat is shown as its clerk reads it), set out at every sitting.
     const officeModule = office ? mods[office.role_module?.code ?? ""] : undefined;
     const dayBook = new DayBook({ entity, authors: [p.id, ...ownAuthors], name: (id: string) => whoIs(id)?.name,

@@ -1,149 +1,70 @@
 {
-  "name": "utility.energy",
-  "version": "0.4.0",
-  "doc": "docs/behaviour/utilities.md",
-  "params": {
-    "bill_every_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 30,
-      "source": "placeholder"
-    },
-    "billing_over_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 0,
-      "source": "placeholder"
-    },
-    "depot": {
-      "schema": {
-        "type": "string",
-        "description": "where it takes the grid's supply, and supplies from (the world must say)"
-      },
-      "default": "",
-      "required": true,
-      "source": "where it takes the grid's supply, and supplies from (the world must say)"
-    },
-    "grid": {
-      "schema": {
-        "type": "string",
-        "description": "whom it buys from (the outside's market)"
-      },
-      "default": "",
-      "required": true,
-      "source": "placeholder"
-    },
-    "kind": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "energy",
-      "source": "placeholder"
-    },
-    "part": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "price_per_unit": {
-      "schema": {
-        "type": "integer",
-        "description": "the tariff (cents)"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "respond": {
-      "schema": {
-        "type": "object",
-        "description": "how it answers a customer who asks for a bill to be put right"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "supply_per_day": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "task": {
-      "schema": {
-        "type": "string",
-        "description": "the work that supplies a unit, and the resource it uses"
-      },
-      "default": "supply_energy",
-      "source": "placeholder"
-    },
-    "units_per_customer_per_day": {
-      "schema": {
-        "type": "integer",
-        "description": "what a household uses (the world's figure)"
-      },
-      "default": 0,
-      "source": "placeholder"
-    }
+  "answers": {
+    "acts": "What it acts on: its customers' accounts, each billed each quarter; and notice that a customer has left or has died.",
+    "office": "the energy retailer"
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/utilities.md",
   "issues": [
     {
-      "form": "order",
-      "title": "An order to a supplier, paid with the order",
       "does": "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting. The seller delivers once an order is paid in full, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
       "fields": {
-        "seller": {
-          "type": "entity",
+        "account": {
+          "description": "The account the order is paid from.",
           "required": true,
-          "description": "Whom it is ordered from."
-        },
-        "kind": {
-          "type": "text",
-          "required": true,
-          "description": "What is ordered."
-        },
-        "quantity": {
-          "type": "count",
-          "required": true,
-          "description": "How many."
-        },
-        "unit_price": {
-          "type": "amount",
-          "required": true,
-          "description": "The price of each, as the seller advertises it."
-        },
-        "deliver_to": {
-          "type": "entity",
-          "required": true,
-          "description": "Who is to receive them."
+          "type": "account"
         },
         "at": {
-          "type": "structure",
+          "description": "Where they are to be delivered.",
           "required": true,
-          "description": "Where they are to be delivered."
+          "type": "structure"
         },
-        "account": {
-          "type": "account",
+        "deliver_to": {
+          "description": "Who is to receive them.",
           "required": true,
-          "description": "The account the order is paid from."
-        },
-        "retry_of": {
-          "type": "record",
-          "description": "An earlier order this one repeats."
+          "type": "entity"
         },
         "for_days": {
-          "type": "count",
-          "description": "How many days the order may be served over."
+          "description": "How many days the order may be served over.",
+          "type": "count"
+        },
+        "kind": {
+          "description": "What is ordered.",
+          "required": true,
+          "type": "text"
+        },
+        "quantity": {
+          "description": "How many.",
+          "required": true,
+          "type": "count"
+        },
+        "retry_of": {
+          "description": "An earlier order this one repeats.",
+          "type": "record"
+        },
+        "seller": {
+          "description": "Whom it is ordered from.",
+          "required": true,
+          "type": "entity"
+        },
+        "unit_price": {
+          "description": "The price of each, as the seller advertises it.",
+          "required": true,
+          "type": "amount"
         }
       },
+      "form": "order",
+      "title": "An order to a supplier, paid with the order",
       "writes": {
+        "data": {
+          "account": "=account",
+          "at": "=at",
+          "deliver_to": "=deliver_to",
+          "for_days": "=for_days",
+          "kind": "=kind",
+          "quantity": "=quantity",
+          "retry_of": "=retry_of",
+          "unit_price": "#unit_price"
+        },
         "kind": "order",
         "text": "Order: {quantity} {kind} at {unit_price} each, delivered to {deliver_to} at {at}. Paid with this order.",
         "to": [
@@ -152,134 +73,132 @@
         "visible": [
           "=self",
           "=seller"
-        ],
-        "data": {
-          "kind": "=kind",
-          "quantity": "=quantity",
-          "unit_price": "#unit_price",
-          "deliver_to": "=deliver_to",
-          "at": "=at",
-          "account": "=account",
-          "retry_of": "=retry_of",
-          "for_days": "=for_days"
-        }
+        ]
       }
     },
     {
-      "form": "remedy_answer",
-      "title": "Answer to a request to put something right",
       "does": "Answers someone who has asked the office in writing to put something right: yes or no, and where money is owed them and paid, how much. It does nothing by itself: what puts the thing right (a payment, a repair ordered, a paper withdrawn) is done besides.",
       "fields": {
-        "request": {
-          "type": "record",
-          "required": true,
-          "description": "The request answered."
+        "amount": {
+          "description": "Where money is owed them and paid: how much.",
+          "type": "amount"
         },
         "asker": {
-          "type": "entity",
+          "description": "Who asked.",
           "required": true,
-          "description": "Who asked."
-        },
-        "matter": {
-          "type": "text",
-          "required": true,
-          "description": "What it is about, in the word the request uses."
+          "type": "entity"
         },
         "granted": {
-          "type": "choice",
-          "required": true,
+          "description": "Whether it will be put right.",
           "options": [
             "yes",
             "no"
           ],
-          "description": "Whether it will be put right."
+          "required": true,
+          "type": "choice"
         },
-        "amount": {
-          "type": "amount",
-          "description": "Where money is owed them and paid: how much."
+        "matter": {
+          "description": "What it is about, in the word the request uses.",
+          "required": true,
+          "type": "text"
         },
         "reason": {
-          "type": "text",
-          "description": "Where it is refused: why."
+          "description": "Where it is refused: why.",
+          "type": "text"
+        },
+        "request": {
+          "description": "The request answered.",
+          "required": true,
+          "type": "record"
         }
       },
+      "form": "remedy_answer",
+      "title": "Answer to a request to put something right",
       "writes": {
+        "basis": "=request",
+        "data": {
+          "amount": "#amount",
+          "granted": "?granted",
+          "matter": "=matter",
+          "reason": "=reason",
+          "request": "=request"
+        },
         "kind": "remedy_answer",
         "text": "Answer to your request {request}: {granted}.",
-        "basis": "=request",
         "to": [
           "=asker"
         ],
         "visible": [
           "=asker",
           "=self"
-        ],
-        "data": {
-          "request": "=request",
-          "matter": "=matter",
-          "granted": "?granted",
-          "amount": "#amount",
-          "reason": "=reason"
-        }
+        ]
       }
     },
     {
+      "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+      "fields": {
+        "applicant": {
+          "description": "Who applied.",
+          "type": "entity"
+        },
+        "application": {
+          "description": "The application answered.",
+          "required": true,
+          "type": "record"
+        },
+        "done": {
+          "description": "For a thing to be put right: whether it is done.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "type": "choice"
+        },
+        "known": {
+          "description": "Whether the office's books say anything of it.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "type": "choice"
+        },
+        "owed": {
+          "description": "What the books show is owed the applicant (nought: nothing).",
+          "type": "amount"
+        },
+        "statement": {
+          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why).",
+          "type": "text"
+        },
+        "venue": {
+          "description": "The body that sent the notice.",
+          "required": true,
+          "type": "entity"
+        },
+        "wrong": {
+          "description": "For a paper complained of: whether it was wrong.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "type": "choice"
+        }
+      },
       "form": "complaint_answer",
       "title": "Answer to a desk's notice of an application against the office",
-      "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
-      "fields": {
-        "application": {
-          "type": "record",
-          "required": true,
-          "description": "The application answered."
-        },
-        "venue": {
-          "type": "entity",
-          "required": true,
-          "description": "The body that sent the notice."
-        },
-        "applicant": {
-          "type": "entity",
-          "description": "Who applied."
-        },
-        "known": {
-          "type": "choice",
-          "required": true,
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "Whether the office's books say anything of it."
-        },
-        "owed": {
-          "type": "amount",
-          "description": "What the books show is owed the applicant (nought: nothing)."
-        },
-        "done": {
-          "type": "choice",
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "For a thing to be put right: whether it is done."
-        },
-        "wrong": {
-          "type": "choice",
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "For a paper complained of: whether it was wrong."
-        },
-        "statement": {
-          "type": "text",
-          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
-        }
-      },
       "writes": {
+        "basis": "=application",
+        "data": {
+          "application": "=application",
+          "done": "?done",
+          "known": "?known",
+          "owed": "#owed",
+          "statement": "=statement",
+          "wrong": "?wrong"
+        },
         "kind": "complaint_response",
         "text": "Answer on {application}.",
-        "basis": "=application",
         "to": [
           "=venue"
         ],
@@ -287,74 +206,74 @@
           "=venue",
           "=self",
           "=applicant"
-        ],
-        "data": {
-          "application": "=application",
-          "owed": "#owed",
-          "done": "?done",
-          "wrong": "?wrong",
-          "known": "?known",
-          "statement": "=statement"
-        }
+        ]
       }
     },
     {
-      "form": "tribunal_answer",
-      "title": "Answer to the tribunal's notice of an application against the office",
       "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
       "fields": {
-        "application": {
-          "type": "record",
-          "required": true,
-          "description": "The application answered."
-        },
-        "venue": {
-          "type": "entity",
-          "required": true,
-          "description": "The body that sent the notice."
-        },
         "applicant": {
-          "type": "entity",
-          "description": "Who applied."
+          "description": "Who applied.",
+          "type": "entity"
         },
-        "known": {
-          "type": "choice",
+        "application": {
+          "description": "The application answered.",
           "required": true,
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "Whether the office's books say anything of it."
-        },
-        "owed": {
-          "type": "amount",
-          "description": "What the books show is owed the applicant (nought: nothing)."
+          "type": "record"
         },
         "done": {
-          "type": "choice",
+          "description": "For a thing to be put right: whether it is done.",
           "options": [
             "yes",
             "no"
           ],
-          "description": "For a thing to be put right: whether it is done."
+          "type": "choice"
         },
-        "wrong": {
-          "type": "choice",
+        "known": {
+          "description": "Whether the office's books say anything of it.",
           "options": [
             "yes",
             "no"
           ],
-          "description": "For a paper complained of: whether it was wrong."
+          "required": true,
+          "type": "choice"
+        },
+        "owed": {
+          "description": "What the books show is owed the applicant (nought: nothing).",
+          "type": "amount"
         },
         "statement": {
-          "type": "text",
-          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
+          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why).",
+          "type": "text"
+        },
+        "venue": {
+          "description": "The body that sent the notice.",
+          "required": true,
+          "type": "entity"
+        },
+        "wrong": {
+          "description": "For a paper complained of: whether it was wrong.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "type": "choice"
         }
       },
+      "form": "tribunal_answer",
+      "title": "Answer to the tribunal's notice of an application against the office",
       "writes": {
+        "basis": "=application",
+        "data": {
+          "application": "=application",
+          "done": "?done",
+          "known": "?known",
+          "owed": "#owed",
+          "statement": "=statement",
+          "wrong": "?wrong"
+        },
         "kind": "tribunal_response",
         "text": "Answer on {application}.",
-        "basis": "=application",
         "to": [
           "=venue"
         ],
@@ -362,33 +281,135 @@
           "=venue",
           "=self",
           "=applicant"
-        ],
-        "data": {
-          "application": "=application",
-          "owed": "#owed",
-          "done": "?done",
-          "wrong": "?wrong",
-          "known": "?known",
-          "statement": "=statement"
-        }
+        ]
       }
     }
   ],
+  "name": "utility.energy",
+  "params": {
+    "bill_every_days": {
+      "default": 30,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "billing_over_bps": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "depot": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "where it takes the grid's supply, and supplies from (the world must say)",
+        "type": "string"
+      },
+      "source": "where it takes the grid's supply, and supplies from (the world must say)"
+    },
+    "grid": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "whom it buys from (the outside's market)",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "kind": {
+      "default": "energy",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "part": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "price_elasticity_bps": {
+      "default": 0,
+      "schema": {
+        "description": "by how much use falls for each 100% the price stands over the reference price (to confirm); 0: use does not respond",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "price_per_unit": {
+      "default": 0,
+      "schema": {
+        "description": "the tariff (cents)",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "reference_price_per_unit": {
+      "default": 0,
+      "schema": {
+        "description": "the price use was reckoned at (in the smallest unit, a unit); 0: none, so no price response",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "respond": {
+      "default": {},
+      "schema": {
+        "description": "how it answers a customer who asks for a bill to be put right",
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "supply_per_day": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "task": {
+      "default": "supply_energy",
+      "schema": {
+        "description": "the work that supplies a unit, and the resource it uses",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "units_per_customer_per_day": {
+      "default": 0,
+      "schema": {
+        "description": "what a household uses (the world's figure)",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
   "routines": [
     {
-      "task": "supply_energy",
       "at": "depot",
       "every": 1,
+      "task": "supply_energy",
       "what": "Each day the network supplies what the customers use from what the retailer holds, and more is bought from the grid when it runs below a fortnight's use. Those who ask to be supplied are taken on, and those gone taken off."
     },
     {
-      "task": "bill",
       "at": "depot",
       "every": [
         "bill_every_days",
         30
       ],
+      "task": "bill",
       "what": "Each customer is sent a bill for the supply charge and what they used; one who has gone, their last. How often the bills go out is the order's."
     }
-  ]
+  ],
+  "state": "none",
+  "version": "0.4.0"
 }

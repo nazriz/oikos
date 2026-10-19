@@ -104,6 +104,17 @@ fn a_dearer_offer_stalls_adoption_and_the_same_offer_at_half_the_price_takes_it(
 }
 
 #[test]
+fn a_system_that_gets_half_its_units_wrong_or_does_a_sixtieth_of_the_task_is_not_worth_taking_at_the_list_price() {
+    // (Ported from participants/test/automation.test.ts: "the same system at twice the price, or a worse one, is not worth it".)
+    let a = AdoptionParams::default();
+    // (The figures are this fixture's: a list-price system is worth it; one that gets half its units wrong, or does a sixtieth of the
+    // task, is not.)
+    assert!(best(&terms(1), &task(), &a, 24).is_some(), "the list-price system is worth it");
+    assert!(best(&Terms { error_bps: 5_000, ..terms(1) }, &task(), &a, 24).is_none(), "it gets half its units wrong");
+    assert!(best(&Terms { scope_bps: 50, ..terms(1) }, &task(), &a, 24).is_none(), "it can do a sixtieth of the task");
+}
+
+#[test]
 fn each_known_client_eases_the_hurdle_never_below_nothing() {
     let a = AdoptionParams::default();
     let h = |refs: i64| appraise(&Terms { references: refs, ..terms(1) }, 1, &task(), &a, 24, false).hurdle_bps;

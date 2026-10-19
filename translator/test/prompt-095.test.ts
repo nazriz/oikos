@@ -4,7 +4,7 @@
 
 import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
-import { acceptGathering, acceptMembership } from "../../participants/src/behaviour/founding";
+import { rustRule } from "../../orchestrator/src/rust-world";
 import TABLE from "../../contracts/test/payments.json";
 import { CASES } from "../eval/cases";
 import { translatorSystem, TRANSLATOR_VERSION } from "../src/index";
@@ -70,14 +70,13 @@ test("0.9.5: the line resolves onto the payment, and a statement with a practice
   // The worked gathering and offer, as the translator would write them for the founding requests, resolve to a notice the module accepts.
   const gather = resolve(calls.parseProgram('statement(kind=notice, visible=public, text="The Circle gathers every fortnight.", on=cell.4.7, practice={"at":"apts-3/dwelling.2","every":"14 days","lasts":"90 minutes"})'), k, () => undefined, "finance", { written: true });
   expect(gather.ok ? [] : gather.questions).toEqual([]);
-  const g = acceptGathering("org-1", { at: "apts-3/dwelling.2", every_days: [14], lasts_minutes: [90], first: [0, 30 * 86_400], at_seconds: 68_400 });
+  // (What the founding module accepts is the engine's: kernel/crates/actors/src/mind/founding.rs, by the shared rules.)
   const blocks = (gather.ok ? gather.blocks : []).map((b: any) => ({ ...b, speaks_for: "org-1" }));
-  expect(typeof g(blocks as any)).not.toBe("string");
+  expect(rustRule("founding.accept_gathering", { me: "org-1", at: "apts-3/dwelling.2", every_days: [14], lasts_minutes: [90], first: [0, 30 * 86_400], at_seconds: 68_400, blocks })).toHaveProperty("ok");
   const join = resolve(calls.parseProgram('statement(kind=notice, visible=public, text="Anyone may join.", offer={"take_up":"join","terms":{"commitments":[{"who":"taker","does":{"outcome":{"money":{"to":"acc-9","amount":"20","for":"dues"}}},"every":"a month"}],"termination":[{"party":"taker","notice":"7 days"}]}})'), k, () => undefined, "finance", { written: true });
   expect(join.ok ? [] : join.questions).toEqual([]);
-  const m = acceptMembership("org-1", { account: "acc-9", dues: [2000], notice: 604800 });
   const offered = (join.ok ? join.blocks : []).map((b: any) => ({ ...b, speaks_for: "org-1" }));
-  expect(typeof m(offered as any)).not.toBe("string");
+  expect(rustRule("founding.accept_membership", { me: "org-1", account: "acc-9", dues: [2000], notice: 604800, blocks: offered })).toHaveProperty("ok");
 });
 
 test("0.9.5: a practice's and an offer's amounts and lengths of time are as the request wrote them, read in the world's money and in seconds; whole numbers pass as they are", () => {

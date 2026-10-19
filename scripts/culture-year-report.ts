@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { generate } from "../worlds/generator/generate";
 import { recordChanges } from "../orchestrator/src/records";
-import { normsRows } from "../participants/src/behaviour/culture";
+import { normsRows } from "../participants/src/shared/culture";
 
 const [log, profile, seed] = [process.argv[2]!, process.argv[3]!, Number(process.argv[4] ?? 1)];
 const DAY = 86_400;

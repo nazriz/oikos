@@ -1,336 +1,137 @@
 {
-  "name": "firm.builder",
-  "version": "0.14.0",
-  "doc": "docs/behaviour/institutions.md",
-  "params": {
-    "build_markup_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 2000,
-      "source": "placeholder"
-    },
-    "casual_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 0,
-      "source": "placeholder"
-    },
-    "day_wage": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "horizon_days": {
-      "schema": {
-        "type": "integer",
-        "description": "the crew it wants: enough to do the work in hand within this"
-      },
-      "unit": "days",
-      "default": 90,
-      "source": "placeholder"
-    },
-    "industry": {
-      "schema": {
-        "type": "string",
-        "description": "what the work is (its postings say)"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "let_go_every_days": {
-      "schema": {
-        "type": "integer",
-        "description": "at most one let go in this time"
-      },
-      "unit": "days",
-      "default": 7,
-      "source": "placeholder"
-    },
-    "look_at": {
-      "schema": {},
-      "source": "the world gives it (no default)"
-    },
-    "look_days": {
-      "schema": {},
-      "unit": "days",
-      "source": "the world gives it (no default)"
-    },
-    "max_crew": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 12,
-      "source": "placeholder"
-    },
-    "min_crew": {
-      "schema": {
-        "type": "integer",
-        "description": "a core crew, kept through quiet times"
-      },
-      "default": 2,
-      "source": "placeholder"
-    },
-    "notice_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
-    },
-    "notify": {
-      "schema": {
-        "type": "array"
-      },
-      "default": [],
-      "source": "placeholder"
-    },
-    "period": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 1209600,
-      "source": "placeholder"
-    },
-    "quote_valid_days": {
-      "schema": {
-        "type": "integer",
-        "description": "a published price is honoured this long (placeholder: a common term for a builder's quote)"
-      },
-      "unit": "days",
-      "default": 30,
-      "source": "a published price is honoured this long (placeholder: a common term for a builder's quote)"
-    },
-    "register": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "registered_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 10000,
-      "source": "placeholder"
-    },
-    "repair_first": {
-      "schema": {
-        "type": "boolean"
-      },
-      "default": true,
-      "source": "placeholder"
-    },
-    "repair_labour": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "repair_price": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "repair_task": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "sites": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "supplier": {
-      "schema": {
-        "type": "string",
-        "description": "whom it buys materials from (the world must say)"
-      },
-      "default": "",
-      "required": true,
-      "source": "whom it buys materials from (the world must say)"
-    },
-    "types": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "wage": {
-      "schema": {
-        "type": "integer",
-        "description": "the crew's pay, cents per period"
-      },
-      "default": 150000,
-      "source": "placeholder"
-    },
-    "work_days": {
-      "schema": {
-        "type": "integer",
-        "description": "of every 7 look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)"
-      },
-      "unit": "days",
-      "default": 5,
-      "source": "placeholder"
-    },
-    "working_day": {
-      "schema": {
-        "type": "integer",
-        "description": "seconds a worker works in a day"
-      },
-      "default": 28800,
-      "source": "placeholder"
-    },
-    "workplace": {
-      "schema": {
-        "type": "string",
-        "description": "the space in the yard its crew works in"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "yard": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    }
+  "answers": {
+    "acts": "What it acts on: a construction agreement signed with it, built once a permit for the site is in force and invoiced as agreed. Its prices are published.",
+    "office": "the builder's office",
+    "report": true
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/institutions.md",
   "issues": [
     {
-      "form": "job_advertisement",
-      "title": "Job advertisement",
       "does": "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
       "fields": {
-        "wage": {
-          "type": "amount",
-          "required": true,
-          "description": "The wage for each pay period."
+        "account": {
+          "description": "The account the wages are paid from, where the office itself pays them.",
+          "type": "account"
         },
         "period": {
-          "type": "duration",
+          "description": "The pay period: how often the wage is paid.",
           "required": true,
-          "description": "The pay period: how often the wage is paid."
+          "type": "duration"
         },
         "posts": {
-          "type": "count",
+          "description": "How many posts this advertisement is for.",
           "required": true,
-          "description": "How many posts this advertisement is for."
+          "type": "count"
         },
-        "account": {
-          "type": "account",
-          "description": "The account the wages are paid from, where the office itself pays them."
+        "wage": {
+          "description": "The wage for each pay period.",
+          "required": true,
+          "type": "amount"
         }
       },
+      "form": "job_advertisement",
+      "title": "Job advertisement",
       "writes": {
-        "kind": "job_posting",
-        "text": "Hiring: {wage} every {period}.",
         "data": {
-          "wage": "#wage",
+          "industry": "@industry",
           "period": "=period",
           "role": "@role",
-          "industry": "@industry",
-          "workplace": "@workplace_structure",
-          "space": "@workplace"
+          "space": "@workplace",
+          "wage": "#wage",
+          "workplace": "@workplace_structure"
         },
+        "kind": "job_posting",
         "offer": {
-          "by": "=self",
-          "to": {
-            "min_age_years": 18
-          },
-          "take_up": "apply",
           "available": "=posts",
+          "by": "=self",
+          "take_up": "apply",
           "terms": {
-            "template": "employment",
             "commitments": [
               {
-                "who": "=self",
                 "does": {
                   "outcome": {
                     "money": {
-                      "from": "=account",
                       "amount": "=wage",
-                      "for": "wages"
+                      "for": "wages",
+                      "from": "=account"
                     }
                   }
                 },
-                "every": "=period"
+                "every": "=period",
+                "who": "=self"
               },
               "@occupancy"
             ],
+            "template": "employment",
             "termination": "@termination"
+          },
+          "to": {
+            "min_age_years": 18
           }
-        }
+        },
+        "text": "Hiring: {wage} every {period}."
       }
     },
     {
-      "form": "order",
-      "title": "An order to a supplier, paid with the order",
       "does": "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting. The seller delivers once an order is paid in full, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
       "fields": {
-        "seller": {
-          "type": "entity",
+        "account": {
+          "description": "The account the order is paid from.",
           "required": true,
-          "description": "Whom it is ordered from."
-        },
-        "kind": {
-          "type": "text",
-          "required": true,
-          "description": "What is ordered."
-        },
-        "quantity": {
-          "type": "count",
-          "required": true,
-          "description": "How many."
-        },
-        "unit_price": {
-          "type": "amount",
-          "required": true,
-          "description": "The price of each, as the seller advertises it."
-        },
-        "deliver_to": {
-          "type": "entity",
-          "required": true,
-          "description": "Who is to receive them."
+          "type": "account"
         },
         "at": {
-          "type": "structure",
+          "description": "Where they are to be delivered.",
           "required": true,
-          "description": "Where they are to be delivered."
+          "type": "structure"
         },
-        "account": {
-          "type": "account",
+        "deliver_to": {
+          "description": "Who is to receive them.",
           "required": true,
-          "description": "The account the order is paid from."
-        },
-        "retry_of": {
-          "type": "record",
-          "description": "An earlier order this one repeats."
+          "type": "entity"
         },
         "for_days": {
-          "type": "count",
-          "description": "How many days the order may be served over."
+          "description": "How many days the order may be served over.",
+          "type": "count"
+        },
+        "kind": {
+          "description": "What is ordered.",
+          "required": true,
+          "type": "text"
+        },
+        "quantity": {
+          "description": "How many.",
+          "required": true,
+          "type": "count"
+        },
+        "retry_of": {
+          "description": "An earlier order this one repeats.",
+          "type": "record"
+        },
+        "seller": {
+          "description": "Whom it is ordered from.",
+          "required": true,
+          "type": "entity"
+        },
+        "unit_price": {
+          "description": "The price of each, as the seller advertises it.",
+          "required": true,
+          "type": "amount"
         }
       },
+      "form": "order",
+      "title": "An order to a supplier, paid with the order",
       "writes": {
+        "data": {
+          "account": "=account",
+          "at": "=at",
+          "deliver_to": "=deliver_to",
+          "for_days": "=for_days",
+          "kind": "=kind",
+          "quantity": "=quantity",
+          "retry_of": "=retry_of",
+          "unit_price": "#unit_price"
+        },
         "kind": "order",
         "text": "Order: {quantity} {kind} at {unit_price} each, delivered to {deliver_to} at {at}. Paid with this order.",
         "to": [
@@ -339,18 +140,222 @@
         "visible": [
           "=self",
           "=seller"
-        ],
-        "data": {
-          "kind": "=kind",
-          "quantity": "=quantity",
-          "unit_price": "#unit_price",
-          "deliver_to": "=deliver_to",
-          "at": "=at",
-          "account": "=account",
-          "retry_of": "=retry_of",
-          "for_days": "=for_days"
-        }
+        ]
       }
     }
-  ]
+  ],
+  "name": "firm.builder",
+  "params": {
+    "build_markup_bps": {
+      "default": 2000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "casual_bps": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "day_wage": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "horizon_days": {
+      "default": 90,
+      "schema": {
+        "description": "the crew it wants: enough to do the work in hand within this",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "industry": {
+      "default": "",
+      "schema": {
+        "description": "what the work is (its postings say)",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "let_go_every_days": {
+      "default": 7,
+      "schema": {
+        "description": "at most one let go in this time",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "look_at": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "look_days": {
+      "schema": {},
+      "source": "the world gives it (no default)",
+      "unit": "days"
+    },
+    "max_crew": {
+      "default": 12,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "min_crew": {
+      "default": 2,
+      "schema": {
+        "description": "a core crew, kept through quiet times",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "default": 14,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "notify": {
+      "default": [],
+      "schema": {
+        "type": "array"
+      },
+      "source": "placeholder"
+    },
+    "period": {
+      "default": 1209600,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "quote_valid_days": {
+      "default": 30,
+      "schema": {
+        "description": "a published price is honoured this long (placeholder: a common term for a builder's quote)",
+        "type": "integer"
+      },
+      "source": "a published price is honoured this long (placeholder: a common term for a builder's quote)",
+      "unit": "days"
+    },
+    "register": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "registered_bps": {
+      "default": 10000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "repair_first": {
+      "default": true,
+      "schema": {
+        "type": "boolean"
+      },
+      "source": "placeholder"
+    },
+    "repair_labour": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "repair_price": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "repair_task": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "sites": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "supplier": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "whom it buys materials from (the world must say)",
+        "type": "string"
+      },
+      "source": "whom it buys materials from (the world must say)"
+    },
+    "types": {
+      "default": {},
+      "schema": {
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "wage": {
+      "default": 150000,
+      "schema": {
+        "description": "the crew's pay, cents per period",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "work_days": {
+      "default": 5,
+      "schema": {
+        "description": "of every 7 look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "working_day": {
+      "default": 28800,
+      "schema": {
+        "description": "seconds a worker works in a day",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "workplace": {
+      "default": "",
+      "schema": {
+        "description": "the space in the yard its crew works in",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "yard": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.14.0"
 }

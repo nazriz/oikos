@@ -8,7 +8,7 @@
 // are the world's ("year 1, day 12"; the world has no calendar), the names are the world's entities'.
 
 import type { Currency } from "../money";
-import type { Standing } from "../behaviour/reading";
+import type { Standing } from "../shared/reading";
 
 export interface TagWorld {
   /** The world's names for people, offices and organisations. */

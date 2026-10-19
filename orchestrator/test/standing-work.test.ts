@@ -10,7 +10,8 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { calls as C, modules as builtin, type BehaviourModule } from "@oikos/participants";
+import { calls as C, type BehaviourModule } from "@oikos/participants";
+import { engine } from "../../participants/test/engine";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 import { holderIdOf, officeAt, officeBy, officesBy } from "./lib/offices";
@@ -19,13 +20,15 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 const HOLD = 14, LIFT = 21, END = 35;
+/** The town the run is of (the engine's office is made on it when the run asks for the seat's brain). */
+let town: any;
 
 /** The works manager's own code, and on three days an act of its own: a hold on the collection order, the hold's
  * withdrawal, and the order's. */
 const managing: BehaviourModule = {
   name: "test.works_managing", version: "0.0.1", doc: "orchestrator/test/standing-work.test.ts", cadence: () => DAY,
   create(ctx) {
-    const office = builtin["city.works"]!.create(ctx);
+    const office = engine("city.works", { config: () => town }).create(ctx);
     const done = new Set<string>();
     let order: string | undefined, hold: string | undefined;
     const act = (name: string, line: C.Call) => { done.add(name); return { type: "call" as const, call: C.program(line) }; };
@@ -59,6 +62,7 @@ test("office-holders set their staff's routine once; the staff do it; a hold sto
   const works = officeAt(config, "works").holder;
   works.controller.params.mock.brain = managing.name;
   // (Somebody ill enough to ask for care, so the doctors have patients.)
+  town = config;
   const s = await runWorld({ config, runId: "standing", outDir: mkdtempSync(join(tmpdir(), "oikos-standing-work-")), until: 45 * DAY, modules: { [managing.name]: managing } });
   expect(s.participantErrors).toBe(0);
   const lines = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));

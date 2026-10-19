@@ -1,191 +1,191 @@
 {
-  "name": "group.founded",
-  "version": "0.2.1",
   "doc": "docs/behaviour/founding.md",
+  "name": "group.founded",
   "params": {
     "at_seconds": {
+      "default": 68400,
       "schema": {
         "type": "integer"
       },
-      "unit": "seconds",
-      "default": 68400,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "seconds"
     },
     "bank": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "cause": {
+      "default": {
+        "answer_days": 14,
+        "case_hours": 6,
+        "hours_per_member_month": 2
+      },
       "schema": {
         "type": "object"
-      },
-      "default": {
-        "case_hours": 6,
-        "hours_per_member_month": 2,
-        "answer_days": 14
       },
       "source": "placeholder"
     },
     "composed": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "dues": {
-      "schema": {
-        "type": "array"
-      },
       "default": [
         0
       ],
-      "source": "placeholder"
-    },
-    "every_days": {
       "schema": {
         "type": "array"
       },
-      "unit": "days",
+      "source": "placeholder"
+    },
+    "every_days": {
       "default": [
         14
       ],
-      "source": "placeholder"
+      "schema": {
+        "type": "array"
+      },
+      "source": "placeholder",
+      "unit": "days"
     },
     "founded_at": {
+      "default": 0,
       "schema": {
         "type": "integer"
       },
-      "default": 0,
       "source": "placeholder"
     },
     "founder": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "fund": {
+      "default": {
+        "draw_months": 6,
+        "every_days": 180,
+        "qualify_days": 60
+      },
       "schema": {
         "type": "object"
-      },
-      "default": {
-        "qualify_days": 60,
-        "draw_months": 6,
-        "every_days": 180
       },
       "source": "placeholder"
     },
     "hall": {
-      "schema": {},
       "default": null,
+      "schema": {},
       "source": "placeholder"
     },
     "idea": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "lapse_days": {
+      "default": 120,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 120,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "lasts_minutes": {
-      "schema": {
-        "type": "array"
-      },
       "default": [
         90
       ],
-      "source": "placeholder"
-    },
-    "member_notice_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 7,
-      "source": "placeholder"
-    },
-    "min_members": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 2,
-      "source": "placeholder"
-    },
-    "name": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "place": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "place_on": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "place_room": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 4,
-      "source": "placeholder"
-    },
-    "purpose": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "shape": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "gathering",
-      "source": "placeholder"
-    },
-    "starts_in_days": {
       "schema": {
         "type": "array"
       },
-      "unit": "days",
+      "source": "placeholder"
+    },
+    "member_notice_days": {
+      "default": 7,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "min_members": {
+      "default": 2,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "name": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "place": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "place_on": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "place_room": {
+      "default": 4,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "purpose": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "shape": {
+      "default": "gathering",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "starts_in_days": {
       "default": [
         7
       ],
-      "source": "placeholder"
+      "schema": {
+        "type": "array"
+      },
+      "source": "placeholder",
+      "unit": "days"
     },
     "want": {
-      "schema": {
-        "type": "object"
-      },
       "default": {
         "about": "",
         "since": 0,
         "weight": 0
       },
+      "schema": {
+        "type": "object"
+      },
       "source": "placeholder"
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "version": "0.2.1"
 }

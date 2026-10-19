@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { canonical } from "../src/canon";
-import { Staffing } from "../src/behaviour/firms";
+import { Staffing } from "../src/readers/staffing";
 import { Randomness } from "../src/rng";
 
 const ctx: any = { participant: "works-system", entity: "city", rng: (k: string) => new Randomness(1n).stream([k]), world: { tickSeconds: 3600, runEnd: 0 }, params: {} };

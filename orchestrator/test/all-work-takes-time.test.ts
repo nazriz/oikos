@@ -19,7 +19,9 @@ import { loadProfile } from "@oikos/worlds/generator/profile";
 const root = join(import.meta.dir, "../..");
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 const profiles = readdirSync(join(root, "worlds/profiles")).filter((f) => f.endsWith(".json")).map((f) => f.replace(/\.json$/, ""));
-const BEHAVIOUR = join(root, "participants/src/behaviour");
+/** What of the town's kinds is still read in TypeScript (the actors themselves are the engine's, below). `shared` holds tax.ts, which the planted case below copies. */
+const BEHAVIOUR = join(root, "participants/src/shared");
+const TS_KIND_DIRS = ["participants/src/kinds", "participants/src/shared", "participants/src/readers"];
 
 /** The blocks the contract knows: every act is some of these, and each takes time. */
 const BLOCKS: string[] = (() => {
@@ -141,7 +143,7 @@ test("every profile's town, as code and with every office a model's, has no free
 
 test("no module draws an error except through slip(), and the foundations' special cases are gone", () => {
   expect(existsSync(join(root, "participants/src/slip.ts")), "the one helper").toBe(true);
-  expect(errorsDrawnOutsideSlip(BEHAVIOUR), "errors drawn outside slip()").toEqual([]);
+  for (const dir of TS_KIND_DIRS) expect(errorsDrawnOutsideSlip(join(root, dir)), `errors drawn outside slip() in ${dir}`).toEqual([]);
   // (The Rust world's actors and rules: a slip only through oikos_rules::slip, docs/port-guide.md section 2.)
   expect(existsSync(join(root, "kernel/crates/rules/src/slip.rs")), "the one helper, in Rust").toBe(true);
   for (const dir of ["kernel/crates/actors/src", "kernel/crates/rules/src"]) expect(errorsDrawnOutsideSlipRust(join(root, dir)), `errors drawn outside slip() in ${dir}`).toEqual([]);

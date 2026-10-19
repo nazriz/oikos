@@ -469,3 +469,232 @@ pub fn pay(to: &str, amount: i64, o: Pay, cx: &Cx) -> Call {
         ],
     )
 }
+
+/// The stepper's rules, each held here on a plan of its own (they were held in TypeScript by participants/test/stepper.test.ts, on
+/// `stepper`, which went with the TypeScript actors; the engine's offices show them only through their own acts). The TypeScript
+/// loop's allowance of twelve acts a wake was the host's, not the stepper's: here a wake is as many steps as are asked for.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::finance::kit::{picture, Stand};
+    use serde_json::json;
+
+    fn note<T>(i: i64) -> Step<T> {
+        because(format!("step {i}"), vec![call("message", vec![("to", Some(json(json!(["x"])))), ("text", Some(text(i.to_string())))])])
+    }
+    fn which(a: &Action) -> String {
+        match a {
+            Action::Wait { .. } => "wait".into(),
+            Action::Look { .. } => "look".into(),
+            Action::Call { reasoning, .. } => reasoning.clone().unwrap_or_default(),
+            other => format!("{other:?}"),
+        }
+    }
+    fn pic(t: i64) -> Picture {
+        picture("firm", t, json!({}))
+    }
+
+    // ---- what a wake did not get to is done first at the next, never dropped
+
+    #[derive(Serialize, Deserialize, Default)]
+    struct Twenty {
+        wake: u32,
+    }
+    impl Plan for Twenty {
+        type Then = ();
+        fn absorb(&mut self, _: &Picture, _: &mut Cx) {}
+        fn plan(&mut self, _: &Picture, _: &mut Cx) -> Vec<Step<()>> {
+            self.wake += 1;
+            if self.wake == 1 { (0..20).map(note).collect() } else { vec![note(100)] }
+        }
+    }
+
+    #[test]
+    fn what_a_wake_did_not_get_to_is_done_first_at_the_next_never_dropped() {
+        let mut stand = Stand::new("firm");
+        let mut s = Stepper::new(Twenty::default());
+        let first: Vec<String> = (0..12).map(|_| which(&s.step(&pic(0), &mut stand.cx(0)))).collect();
+        assert_eq!(first, (0..12).map(|i| format!("step {i}")).collect::<Vec<_>>());
+        // The next wake: the 8 left over, in order, then what it plans now; then nothing more.
+        let next: Vec<String> = (0..10).map(|_| which(&s.step(&pic(DAY), &mut stand.cx(DAY)))).collect();
+        let mut want: Vec<String> = (12..20).map(|i| format!("step {i}")).collect();
+        want.extend(["step 100".to_string(), "wait".to_string()]);
+        assert_eq!(next, want);
+    }
+
+    // ---- a day's work left undone when the day's over is dropped, and the plan hears it was not done
+
+    #[derive(Serialize, Deserialize, Default)]
+    struct Day {
+        wake: u32,
+        heard: Vec<u32>,
+    }
+    impl Plan for Day {
+        type Then = u32;
+        fn absorb(&mut self, _: &Picture, _: &mut Cx) {}
+        fn plan(&mut self, _: &Picture, _: &mut Cx) -> Vec<Step<u32>> {
+            self.wake += 1;
+            if self.wake == 1 {
+                let mut v: Vec<Step<u32>> = (0..12).map(note).collect();
+                v.push(because("work 50", vec![call("work", vec![("task", Some(text("serve"))), ("units", Some(text("1"))), ("at", Some(text("shop")))])]).then(50));
+                v.push(note(51));
+                v
+            } else {
+                vec![note(100)]
+            }
+        }
+        fn then(&mut self, token: &u32, done: Done, _: &mut Cx) -> Vec<Step<u32>> {
+            assert!(matches!(done, Done::NotDone(_)), "it was never sent");
+            self.heard.push(*token);
+            vec![]
+        }
+    }
+
+    #[test]
+    fn a_days_work_left_undone_when_the_day_is_over_is_dropped_and_the_plan_hears_it_was_not_done() {
+        let mut stand = Stand::new("firm");
+        let mut s = Stepper::new(Day::default());
+        for _ in 0..12 {
+            s.step(&pic(3_600), &mut stand.cx(3_600));
+        }
+        // The next day: the day's work is dropped (and told so); the other leftover step still comes first.
+        let t = DAY + 3_600;
+        let next: Vec<String> = (0..3).map(|_| which(&s.step(&pic(t), &mut stand.cx(t)))).collect();
+        assert_eq!(next, ["step 51", "step 100", "wait"]);
+        assert_eq!(s.plan.heard, vec![50]);
+    }
+
+    // ---- a step that counts from when it is done is made again if it is done later than planned
+
+    #[derive(Serialize, Deserialize, Default)]
+    struct Redo {
+        wake: u32,
+        made: Vec<i64>,
+    }
+    fn notice(at: i64) -> Step<()> {
+        let mut s = because(format!("notice from {}", at + 5), vec![call("message", vec![("to", Some(json(json!(["x"])))), ("text", Some(text("n")))])]);
+        s.redo = true;
+        s
+    }
+    impl Plan for Redo {
+        type Then = ();
+        fn absorb(&mut self, _: &Picture, _: &mut Cx) {}
+        fn plan(&mut self, _: &Picture, _: &mut Cx) -> Vec<Step<()>> {
+            self.wake += 1;
+            if self.wake == 1 {
+                self.made.push(0);
+                let mut v: Vec<Step<()>> = (0..12).map(note).collect();
+                v.push(notice(0));
+                v
+            } else {
+                vec![]
+            }
+        }
+        fn redo(&mut self, _: Step<()>, t: i64) -> Step<()> {
+            self.made.push(t);
+            notice(t)
+        }
+    }
+
+    #[test]
+    fn a_step_that_counts_from_when_it_is_done_is_made_again_if_it_is_done_later_than_planned() {
+        let mut stand = Stand::new("firm");
+        let mut s = Stepper::new(Redo::default());
+        for _ in 0..12 {
+            s.step(&pic(0), &mut stand.cx(0));
+        }
+        // Carried to the next wake, at 3600: remade for then.
+        assert_eq!(which(&s.step(&pic(3_600), &mut stand.cx(3_600))), "notice from 3605");
+        assert_eq!(s.plan.made, vec![0, 3_600]);
+    }
+
+    // ---- what a plan needs to look up is asked before it plans, one look after another
+
+    #[derive(Serialize, Deserialize, Default)]
+    struct Lookup {
+        known: Vec<String>,
+        planned: Vec<String>,
+    }
+    impl Plan for Lookup {
+        type Then = ();
+        fn absorb(&mut self, pic: &Picture, _: &mut Cx) {
+            for seen in pic.channels.values() {
+                if let oikos_sight::Seen::Records { records, .. } = seen {
+                    for r in records {
+                        if !self.known.contains(&r.id) {
+                            self.known.push(r.id.clone());
+                        }
+                    }
+                }
+            }
+        }
+        fn plan(&mut self, _: &Picture, _: &mut Cx) -> Vec<Step<()>> {
+            let mut k = self.known.clone();
+            k.sort();
+            self.planned = k;
+            vec![note(1)]
+        }
+        fn looks(&mut self, _: &Picture) -> Vec<LookRequest> {
+            let wanted = ["lot-1", "lot-2"].iter().find(|w| !self.known.iter().any(|k| k == *w));
+            wanted.map(|_| vec![serde_json::from_value(json!({ "channel": "lots" })).expect("a look")]).unwrap_or_default()
+        }
+    }
+    fn found(t: i64, id: &str) -> Picture {
+        picture("firm", t, json!({ "lots": { "kind": "records", "search": true, "records": [{ "id": id, "at": 0, "record": "statement", "author": "x", "speaks_for": "c", "visible_to": "public", "kind": "lot", "text": "A lot." }] } }))
+    }
+
+    #[test]
+    fn what_a_plan_needs_to_look_up_is_asked_before_it_plans_one_look_after_another() {
+        let mut stand = Stand::new("firm");
+        let mut s = Stepper::new(Lookup::default());
+        assert_eq!(which(&s.step(&pic(0), &mut stand.cx(0))), "look");
+        assert_eq!(which(&s.step(&found(0, "lot-1"), &mut stand.cx(0))), "look");
+        assert_eq!(which(&s.step(&found(0, "lot-2"), &mut stand.cx(0))), "step 1");
+        assert_eq!(s.plan.planned, vec!["lot-1", "lot-2"]);
+        assert_eq!(which(&s.step(&pic(0), &mut stand.cx(0))), "wait");
+    }
+
+    // ---- an act's outcome goes to the act it is of, however late
+
+    #[derive(Serialize, Deserialize, Default)]
+    struct Order {
+        wake: u32,
+        heard: Vec<String>,
+    }
+    impl Plan for Order {
+        type Then = u8;
+        fn absorb(&mut self, _: &Picture, _: &mut Cx) {}
+        fn plan(&mut self, _: &Picture, _: &mut Cx) -> Vec<Step<u8>> {
+            self.wake += 1;
+            if self.wake == 1 { vec![note(0).then(1), note(1).then(2)] } else { vec![] }
+        }
+        fn then(&mut self, token: &u8, done: Done, _: &mut Cx) -> Vec<Step<u8>> {
+            let Done::Outcome(o) = done else { return vec![] };
+            self.heard.push(format!("{}:{}", if *token == 1 { "long" } else { "short" }, if o.status == oikos_sight::OutcomeStatus::Applied { "applied" } else { "refused" }));
+            vec![]
+        }
+    }
+    fn outcome(action: &str, status: &str, t: i64) -> Outcome {
+        serde_json::from_value(json!({ "action": action, "t": t, "status": status })).expect("an outcome")
+    }
+
+    #[test]
+    fn an_acts_outcome_goes_to_the_act_it_is_of_however_late() {
+        // (Foundations F1, 2026-10-15. An office that sets a crew to work is free again before the crew is done, and an order that will not fit the
+        // crew's day is refused at once: its outcome comes before that of the long work sent earlier.)
+        let mut stand = Stand::new("firm");
+        let mut s = Stepper::new(Order::default());
+        s.step(&pic(0), &mut stand.cx(0));
+        s.sent("act.1");
+        s.step(&pic(2), &mut stand.cx(2));
+        s.sent("act.2");
+        // The short one is refused at once; the long one is applied hours later.
+        let mut p = pic(4);
+        p.outcomes = vec![outcome("act.2", "refused", 3)];
+        s.step(&p, &mut stand.cx(4));
+        let mut p = pic(20_000);
+        p.outcomes = vec![outcome("act.1", "applied", 18_000)];
+        s.step(&p, &mut stand.cx(20_000));
+        assert_eq!(s.plan.heard, vec!["short:refused", "long:applied"]);
+    }
+}

@@ -10,7 +10,7 @@
 // town that is used for research. It is shown the paper, what it answers, and the reader's standing (four codes), and
 // nothing of any person (13b). Two wordings: the second has every sentence reworded and the lines in reverse order.
 
-import { LINES, POLES, RANGE, wellFormed, type Line, type Reading, type Standing } from "../behaviour/reading";
+import { LINES, POLES, RANGE, wellFormed, type Line, type Reading, type Standing } from "../shared/reading";
 import type { LlmAdapter } from "./adapter";
 import type { ReadAnswer, Reader, ReadRequest } from "./reader";
 

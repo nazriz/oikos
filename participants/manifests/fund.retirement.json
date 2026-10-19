@@ -1,67 +1,71 @@
 {
-  "name": "fund.retirement",
-  "version": "0.1.0",
+  "answers": {
+    "acts": "What it acts on: its members' accounts and the pensions it pays from them, as its rules say.",
+    "office": "the retirement fund"
+  },
   "doc": "docs/behaviour/firm-ownership.md",
+  "name": "fund.retirement",
   "params": {
     "access_age": {
+      "default": null,
+      "required": true,
       "schema": {
         "description": "the age from which a member is paid (the world must say)"
       },
-      "default": null,
-      "required": true,
       "source": "the age from which a member is paid (the world must say)"
     },
     "administrator_account": {
-      "schema": {
-        "type": "string",
-        "description": "where its costs are paid: its administrator's account (the world must say)"
-      },
       "default": "",
       "required": true,
+      "schema": {
+        "description": "where its costs are paid: its administrator's account (the world must say)",
+        "type": "string"
+      },
       "source": "where its costs are paid: its administrator's account (the world must say)"
     },
     "cost_bps_of_income": {
-      "schema": {
-        "type": "integer",
-        "description": "none unless the world says"
-      },
       "default": 0,
+      "schema": {
+        "description": "none unless the world says",
+        "type": "integer"
+      },
       "source": "placeholder"
     },
     "drawdown_bps_by_age": {
-      "schema": {
-        "type": "array",
-        "description": "none unless the world says: only what comes in is paid"
-      },
       "default": [],
+      "schema": {
+        "description": "none unless the world says: only what comes in is paid",
+        "type": "array"
+      },
       "source": "placeholder"
     },
     "pay_every_days": {
-      "schema": {
-        "type": "integer",
-        "description": "placeholder"
-      },
-      "unit": "days",
       "default": 30,
-      "source": "placeholder"
+      "schema": {
+        "description": "placeholder",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
     },
     "report_every_days": {
-      "schema": {
-        "type": "integer",
-        "description": "never unless the world says"
-      },
-      "unit": "days",
       "default": 0,
-      "source": "placeholder"
+      "schema": {
+        "description": "never unless the world says",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
     },
     "year": {
+      "default": 31536000,
       "schema": {
         "type": "integer"
       },
-      "default": 31536000,
       "source": "placeholder"
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "version": "0.1.0"
 }

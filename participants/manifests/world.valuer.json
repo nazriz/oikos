@@ -1,54 +1,9 @@
 {
-  "name": "world.valuer",
-  "version": "0.2.0",
-  "doc": "docs/behaviour/public-finance.md",
-  "params": {
-    "builder": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "every_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 365,
-      "source": "placeholder"
-    },
-    "exempt": {
-      "schema": {
-        "type": "array"
-      },
-      "default": [],
-      "source": "placeholder"
-    },
-    "land_value": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "rating": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "roll": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "roll",
-      "source": "placeholder"
-    }
+  "answers": {
+    "acts": "What it acts on: a rating authority's request to value a property; and the notices it is given of land changing hands.",
+    "office": "the valuer's office"
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/public-finance.md",
   "keeps": [
     {
       "what": "property_roll",
@@ -58,5 +13,54 @@
       "what": "acquisition_notice",
       "why": "Each notice that land has changed hands is given to it, to keep its roll's owners by."
     }
-  ]
+  ],
+  "name": "world.valuer",
+  "params": {
+    "builder": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "every_days": {
+      "default": 365,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "exempt": {
+      "default": [],
+      "schema": {
+        "type": "array"
+      },
+      "source": "placeholder"
+    },
+    "land_value": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "rating": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "roll": {
+      "default": "roll",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.2.0"
 }

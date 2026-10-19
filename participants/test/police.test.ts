@@ -3,10 +3,12 @@
 // to the registry; a home nobody asked about is never gone to.
 
 import { expect, test } from "bun:test";
-import { station } from "../src/behaviour/police";
+
 import { inCurrency } from "../src/money";
 import { context, DAY, employment, signed, statement, wake } from "./stepping";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
+import { engine } from "./engine";
+const station = engine("police.station");
 
 inCurrency(PROFILE.values.currency);
 

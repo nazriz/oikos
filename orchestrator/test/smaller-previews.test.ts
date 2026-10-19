@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { calls } from "@oikos/participants";
 import { MockAdapter, type LlmRequest } from "@oikos/participants/llm";
-import { jobTerms } from "../../participants/src/behaviour/common";
+import { jobTerms } from "../../participants/src/shared/common";
 import { generate } from "@oikos/worlds/generator/generate";
 import { Knowledge, Preview, resolve } from "@oikos/translator";
 import HOLDS from "../../contracts/test/holds.json";

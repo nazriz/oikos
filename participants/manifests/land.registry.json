@@ -1,18 +1,12 @@
 {
-  "name": "land.registry",
-  "version": "0.1.0",
-  "doc": "docs/behaviour/ownership.md",
-  "params": {
-    "notify": {
-      "schema": {
-        "type": "array"
-      },
-      "default": [],
-      "source": "placeholder"
-    }
+  "capacity": {
+    "asks_per_1000_residents_year": 2000,
+    "seconds_per_answer": 600,
+    "sized_by": "oikos_rules::staffing::clerks_needed",
+    "source": "placeholder",
+    "why": "questions about a lot or a title, asked of the register, answered one at a time by its clerks"
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/ownership.md",
   "keeps": [
     {
       "what": "lot",
@@ -34,5 +28,18 @@
       "what": "records:withdrawal",
       "why": "The register of land it keeps: what has been struck from it."
     }
-  ]
+  ],
+  "name": "land.registry",
+  "params": {
+    "notify": {
+      "default": [],
+      "schema": {
+        "type": "array"
+      },
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.1.0"
 }

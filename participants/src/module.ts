@@ -13,7 +13,7 @@
 //   - memory is allowed (people remember), but must depend only on what the
 //     participant has observed and drawn.
 
-import type { PaperRead, Standing } from "./behaviour/reading";
+import type { PaperRead, Standing } from "./shared/reading";
 import type { Block, Observation, ParticipantAction } from "./contracts";
 import type { WorldCalendar } from "./calendar";
 import type { Currency } from "./money";
@@ -289,7 +289,7 @@ export interface BehaviourModule {
    * employment agreements name), which of its organisation's employees are this office's (`own`, as `Staffing` reads
    * it: several offices of one organisation may each employ), and how many posts it has: an establishment its funder
    * sets, or what a line of its organisation's adopted budget pays for at the office's rate of pay. Whoever holds the
-   * office knows this of it, as its own papers (the roster: participants/src/behaviour/roster.ts). */
+   * office knows this of it, as its own papers (the roster: participants/src/readers/roster.ts). */
   staffed?(params: { [k: string]: any }): { role: string; own?: "role" | "role_or_unnamed"; posts: { establishment: number } | { budget_line: string; wage: number; period: number } };
   /** The written directions it takes, each on a form its office publishes (docs/behaviour/directions.md). An office
    * follows only what is filed on its form by someone its organisation says may direct it. */

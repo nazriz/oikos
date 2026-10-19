@@ -1,160 +1,77 @@
 {
-  "name": "school.principal",
-  "version": "0.3.1",
-  "doc": "docs/behaviour/education.md",
-  "params": {
-    "account": {
-      "schema": {
-        "type": "string",
-        "description": "what it pays its staff from (its funding comes in there)"
-      },
-      "default": "",
-      "required": true,
-      "source": "placeholder"
-    },
-    "building": {
-      "schema": {
-        "type": "string",
-        "description": "the school, and where its teachers work (the world must say)"
-      },
-      "default": "",
-      "required": true,
-      "source": "the school, and where its teachers work (the world must say)"
-    },
-    "channel": {
-      "schema": {
-        "type": "string",
-        "description": "its view of the building, who is where in it"
-      },
-      "default": "premises",
-      "source": "placeholder"
-    },
-    "classrooms": {
-      "schema": {
-        "type": "array",
-        "description": "its classrooms (spaces of the building)"
-      },
-      "default": [],
-      "source": "placeholder"
-    },
-    "industry": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "education",
-      "source": "placeholder"
-    },
-    "lesson_seconds": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "seconds",
-      "default": 21600,
-      "source": "placeholder"
-    },
-    "notice_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
-    },
-    "part": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "period": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 1209600,
-      "source": "placeholder"
-    },
-    "role": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "teacher",
-      "source": "placeholder"
-    },
-    "school_ages": {
-      "schema": {
-        "type": "array",
-        "description": "from the year one turns the first, to the end of the year one is the second"
-      },
-      "default": [
-        5,
-        17
-      ],
-      "source": "placeholder"
-    },
-    "starts": {
-      "schema": {
-        "type": "integer",
-        "description": "when the school day starts (placeholder)"
-      },
-      "default": 30600,
-      "source": "when the school day starts (placeholder)"
-    },
-    "teach_task": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "teach",
-      "source": "placeholder"
-    },
-    "teachers": {
-      "schema": {
-        "type": "integer",
-        "description": "the establishment: how many teachers it keeps (its funder's)"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "term_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 70,
-      "source": "placeholder"
-    },
-    "wage": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "working_day": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 28800,
-      "source": "placeholder"
-    },
-    "workplace": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "required": true,
-      "source": "placeholder"
-    },
-    "year": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 31536000,
-      "source": "placeholder"
-    }
+  "answers": {
+    "acts": "It teaches the children who come to it on school days. It enrols nobody by letter.",
+    "office": "the school"
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/education.md",
+  "issues": [
+    {
+      "does": "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
+      "fields": {
+        "account": {
+          "description": "The account the wages are paid from, where the office itself pays them.",
+          "type": "account"
+        },
+        "period": {
+          "description": "The pay period: how often the wage is paid.",
+          "required": true,
+          "type": "duration"
+        },
+        "posts": {
+          "description": "How many posts this advertisement is for.",
+          "required": true,
+          "type": "count"
+        },
+        "wage": {
+          "description": "The wage for each pay period.",
+          "required": true,
+          "type": "amount"
+        }
+      },
+      "form": "job_advertisement",
+      "title": "Job advertisement",
+      "writes": {
+        "data": {
+          "industry": "@industry",
+          "period": "=period",
+          "role": "@role",
+          "space": "@workplace",
+          "wage": "#wage",
+          "workplace": "@workplace_structure"
+        },
+        "kind": "job_posting",
+        "offer": {
+          "available": "=posts",
+          "by": "=self",
+          "take_up": "apply",
+          "terms": {
+            "commitments": [
+              {
+                "does": {
+                  "outcome": {
+                    "money": {
+                      "amount": "=wage",
+                      "for": "wages",
+                      "from": "=account"
+                    }
+                  }
+                },
+                "every": "=period",
+                "who": "=self"
+              },
+              "@occupancy"
+            ],
+            "template": "employment",
+            "termination": "@termination"
+          },
+          "to": {
+            "min_age_years": 18
+          }
+        },
+        "text": "Hiring: {wage} every {period}."
+      }
+    }
+  ],
   "keeps": [
     {
       "what": "school_enrolment",
@@ -165,86 +82,173 @@
       "why": "The places it has given, each to a pupil on its own roll."
     }
   ],
-  "issues": [
-    {
-      "form": "job_advertisement",
-      "title": "Job advertisement",
-      "does": "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
-      "fields": {
-        "wage": {
-          "type": "amount",
-          "required": true,
-          "description": "The wage for each pay period."
-        },
-        "period": {
-          "type": "duration",
-          "required": true,
-          "description": "The pay period: how often the wage is paid."
-        },
-        "posts": {
-          "type": "count",
-          "required": true,
-          "description": "How many posts this advertisement is for."
-        },
-        "account": {
-          "type": "account",
-          "description": "The account the wages are paid from, where the office itself pays them."
-        }
+  "name": "school.principal",
+  "params": {
+    "account": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "what it pays its staff from (its funding comes in there)",
+        "type": "string"
       },
-      "writes": {
-        "kind": "job_posting",
-        "text": "Hiring: {wage} every {period}.",
-        "data": {
-          "wage": "#wage",
-          "period": "=period",
-          "role": "@role",
-          "industry": "@industry",
-          "workplace": "@workplace_structure",
-          "space": "@workplace"
-        },
-        "offer": {
-          "by": "=self",
-          "to": {
-            "min_age_years": 18
-          },
-          "take_up": "apply",
-          "available": "=posts",
-          "terms": {
-            "template": "employment",
-            "commitments": [
-              {
-                "who": "=self",
-                "does": {
-                  "outcome": {
-                    "money": {
-                      "from": "=account",
-                      "amount": "=wage",
-                      "for": "wages"
-                    }
-                  }
-                },
-                "every": "=period"
-              },
-              "@occupancy"
-            ],
-            "termination": "@termination"
-          }
-        }
-      }
+      "source": "placeholder"
+    },
+    "building": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "the school, and where its teachers work (the world must say)",
+        "type": "string"
+      },
+      "source": "the school, and where its teachers work (the world must say)"
+    },
+    "channel": {
+      "default": "premises",
+      "schema": {
+        "description": "its view of the building, who is where in it",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "classrooms": {
+      "default": [],
+      "schema": {
+        "description": "its classrooms (spaces of the building)",
+        "type": "array"
+      },
+      "source": "placeholder"
+    },
+    "industry": {
+      "default": "education",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "lesson_seconds": {
+      "default": 21600,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "seconds"
+    },
+    "notice_days": {
+      "default": 14,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "part": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "period": {
+      "default": 1209600,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "role": {
+      "default": "teacher",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "school_ages": {
+      "default": [
+        5,
+        17
+      ],
+      "schema": {
+        "description": "from the year one turns the first, to the end of the year one is the second",
+        "type": "array"
+      },
+      "source": "placeholder"
+    },
+    "starts": {
+      "default": 30600,
+      "schema": {
+        "description": "when the school day starts (placeholder)",
+        "type": "integer"
+      },
+      "source": "when the school day starts (placeholder)"
+    },
+    "teach_task": {
+      "default": "teach",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "teachers": {
+      "default": 0,
+      "schema": {
+        "description": "the establishment: how many teachers it keeps (its funder's)",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "term_days": {
+      "default": 70,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "wage": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "working_day": {
+      "default": 28800,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "workplace": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "year": {
+      "default": 31536000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
     }
-  ],
+  },
+  "perceives": [],
   "routines": [
     {
-      "task": "teach",
       "at": "building",
       "every": 1,
+      "task": "teach",
       "what": "Each school day, each classroom with pupils in it is taught by one of the teachers at work."
     },
     {
-      "task": "enrol",
       "at": "building",
       "every": 1,
+      "task": "enrol",
       "what": "The school office answers each enrolment: a place in the least full classroom for a child of school age, or a letter saying why not; and gives each leaver a certificate of their years."
     }
-  ]
+  ],
+  "state": "none",
+  "version": "0.3.1"
 }

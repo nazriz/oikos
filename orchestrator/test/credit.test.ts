@@ -5,7 +5,6 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { repayment } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 
@@ -13,12 +12,6 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
-
-test("repayments are the credit-foncier formula's, in cents, rounded up", () => {
-  expect(repayment(100_000, 1200, 12)).toBe(8885); // $1,000 at 12% over a year: $88.85 a month
-  expect(repayment(1_000_000, 0, 10)).toBe(100_000); // no interest: the principal in equal parts
-  expect(repayment(50_000_000, 739, 60)).toBe(999_286); // $500,000 at 7.39% over five years: $9,992.86 a month
-});
 
 test("loans follow applications on the bank's rules, are paid out once signed and repaid by standing order; arrears come before default", async () => {
   // Shops start with little money, so some borrow.

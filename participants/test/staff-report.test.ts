@@ -6,10 +6,11 @@
 // they did under each standing order, or why not, at once when it changes and each week otherwise.
 
 import { expect, test } from "bun:test";
-import { advertisedJob, Book, jobTerms, StandingWork } from "../src/behaviour/common";
+import { advertisedJob, Book, jobTerms, StandingWork } from "../src/shared/common";
 import { modules } from "../src/index";
 import { inCurrency } from "../src/money";
 import { context, DAY, statement, wake } from "./stepping";
+import { engine } from "./engine";
 
 inCurrency({ code: "XYZ", minor_units: 2 });
 
@@ -54,7 +55,7 @@ const shown = (at: string[], ...records: object[]) => ({
   round: { kind: "records", records: ["house-1", "house-2"].map((s) => statement(`round-${s}`, 0, "service_address", { visible_to: ["city"], data: { structure: s } })) },
   depot: { kind: "sites", cells: [{ cell: "cell.1.1", x: 1, y: 1, structure: { structure: "town-hall", type: "civic", at: "cell.1.1", complete: true, spaces: [{ space: "town-hall/workplace.1", kind: "workplace", capacity: 20, count: at.length, occupants: at }] } }] },
 });
-const staff = () => modules["city.works"]!.create(context("works-staff-system", "city", params, { position: "works-staff" }));
+const staff = () => engine("city.works").create(context("works-staff-system", "city", params, { position: "works-staff" }));
 const MONDAY = 7 * DAY + 8 * 3600;
 const reports = (w: ReturnType<typeof wake>) => w.of("statement", "staff_report");
 

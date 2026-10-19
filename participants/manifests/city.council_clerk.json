@@ -1,184 +1,202 @@
 {
-  "name": "city.council_clerk",
-  "version": "0.11.1",
+  "answers": {
+    "acts": "What it acts on: a proposal put to the council on the council proposal form (council_proposal) or on a law's amendment form, which it puts to a ballot of the councillors; and the votes cast in a councillor's post while a ballot is open.",
+    "forms": [
+      {
+        "about": [
+          "propos",
+          "motion",
+          "amend",
+          "resolution",
+          "put to the council",
+          "put to council"
+        ],
+        "say": "What you want the council to decide goes on the council proposal form (council_proposal); a change to a figure in a law in force goes on that law's amendment form."
+      }
+    ],
+    "office": "the council clerk's office",
+    "report": true
+  },
   "doc": "docs/behaviour/government.md",
+  "issues": [
+    {
+      "does": "Puts a proposal to the vote of the councillors, each in their own post, for as long as it says. The latest vote of each post cast while it is open is the one that counts.",
+      "fields": {
+        "open_for": {
+          "description": "How long the ballot stays open.",
+          "required": true,
+          "type": "duration"
+        },
+        "proposal": {
+          "description": "The proposal put to the vote.",
+          "required": true,
+          "type": "record"
+        },
+        "tags": {
+          "description": "What the proposal is about, a word each (budget, tenant_protection, development).",
+          "type": "list"
+        }
+      },
+      "form": "council_ballot",
+      "title": "A ballot of the council on a proposal",
+      "writes": {
+        "basis": "=proposal",
+        "data": {
+          "closes_at": "+open_for",
+          "electorate": "council",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "proposal": "=proposal",
+          "tags": "=tags"
+        },
+        "kind": "ballot",
+        "text": "Ballot of the council on {proposal}, open for {open_for}."
+      }
+    },
+    {
+      "does": "Declares how a ballot went, from the count of every vote on file, naming who voted which way. Declaring a result does not by itself change a law: a passed proposal made on a law's amendment form is written into that law by the office's drafters, under its standing work order for enact; a law proposed in words, or a budget, the clerk publishes.",
+      "fields": {
+        "ballot": {
+          "description": "The ballot counted.",
+          "required": true,
+          "type": "record"
+        },
+        "no": {
+          "description": "Votes against.",
+          "required": true,
+          "type": "count"
+        },
+        "passed": {
+          "description": "Whether it passed.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "type": "choice"
+        },
+        "voted_against": {
+          "description": "The councillors' posts that voted against.",
+          "type": "list"
+        },
+        "voted_for": {
+          "description": "The councillors' posts that voted for (a council's votes are public record).",
+          "type": "list"
+        },
+        "yes": {
+          "description": "Votes for.",
+          "required": true,
+          "type": "count"
+        }
+      },
+      "form": "council_result",
+      "title": "The result of a ballot of the council",
+      "writes": {
+        "basis": "=ballot",
+        "data": {
+          "ballot": "=ballot",
+          "no": "=no",
+          "passed": "?passed",
+          "voted_against": "=voted_against",
+          "voted_for": "=voted_for",
+          "yes": "=yes"
+        },
+        "kind": "ballot_result",
+        "text": "Result of {ballot}: {yes} for, {no} against."
+      }
+    },
+    {
+      "fields": {
+        "ballot": {
+          "description": "The ballot that adopted it.",
+          "required": true,
+          "type": "record"
+        },
+        "year": {
+          "description": "The year the budget is for.",
+          "required": true,
+          "type": "count"
+        }
+      },
+      "form": "adopted_budget",
+      "title": "The budget as the council adopted it",
+      "writes": {
+        "basis": "=ballot",
+        "data": {
+          "lines": {},
+          "year": "=year"
+        },
+        "kind": "budget",
+        "text": "The town's budget for year {year}."
+      }
+    }
+  ],
+  "name": "city.council_clerk",
   "params": {
     "electoral": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "members_every_days": {
+      "default": 30,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 30,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "members_role": {
+      "default": "councillor",
       "schema": {
         "type": "string"
       },
-      "default": "councillor",
       "source": "placeholder"
     },
     "office": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "part": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "vote_days": {
+      "default": 14,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "who": {
-      "schema": {
-        "type": "string",
-        "description": "its channel onto who's who, where it looks up its council's members (\"\": it knows them as it is shown them)"
-      },
       "default": "",
+      "schema": {
+        "description": "its channel onto who's who, where it looks up its council's members (\"\": it knows them as it is shown them)",
+        "type": "string"
+      },
       "source": "placeholder"
     }
   },
   "perceives": [],
-  "state": "none",
-  "issues": [
-    {
-      "form": "council_ballot",
-      "title": "A ballot of the council on a proposal",
-      "does": "Puts a proposal to the vote of the councillors, each in their own post, for as long as it says. The latest vote of each post cast while it is open is the one that counts.",
-      "fields": {
-        "proposal": {
-          "type": "record",
-          "required": true,
-          "description": "The proposal put to the vote."
-        },
-        "open_for": {
-          "type": "duration",
-          "required": true,
-          "description": "How long the ballot stays open."
-        },
-        "tags": {
-          "type": "list",
-          "description": "What the proposal is about, a word each (budget, tenant_protection, development)."
-        }
-      },
-      "writes": {
-        "kind": "ballot",
-        "text": "Ballot of the council on {proposal}, open for {open_for}.",
-        "basis": "=proposal",
-        "data": {
-          "proposal": "=proposal",
-          "options": [
-            "yes",
-            "no"
-          ],
-          "closes_at": "+open_for",
-          "electorate": "council",
-          "tags": "=tags"
-        }
-      }
-    },
-    {
-      "form": "council_result",
-      "title": "The result of a ballot of the council",
-      "does": "Declares how a ballot went, from the count of every vote on file, naming who voted which way. Declaring a result does not by itself change a law: a passed proposal made on a law's amendment form is written into that law by the office's drafters, under its standing work order for enact; a law proposed in words, or a budget, the clerk publishes.",
-      "fields": {
-        "ballot": {
-          "type": "record",
-          "required": true,
-          "description": "The ballot counted."
-        },
-        "yes": {
-          "type": "count",
-          "required": true,
-          "description": "Votes for."
-        },
-        "no": {
-          "type": "count",
-          "required": true,
-          "description": "Votes against."
-        },
-        "passed": {
-          "type": "choice",
-          "required": true,
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "Whether it passed."
-        },
-        "voted_for": {
-          "type": "list",
-          "description": "The councillors' posts that voted for (a council's votes are public record)."
-        },
-        "voted_against": {
-          "type": "list",
-          "description": "The councillors' posts that voted against."
-        }
-      },
-      "writes": {
-        "kind": "ballot_result",
-        "text": "Result of {ballot}: {yes} for, {no} against.",
-        "basis": "=ballot",
-        "data": {
-          "ballot": "=ballot",
-          "yes": "=yes",
-          "no": "=no",
-          "passed": "?passed",
-          "voted_for": "=voted_for",
-          "voted_against": "=voted_against"
-        }
-      }
-    },
-    {
-      "form": "adopted_budget",
-      "title": "The budget as the council adopted it",
-      "fields": {
-        "year": {
-          "type": "count",
-          "required": true,
-          "description": "The year the budget is for."
-        },
-        "ballot": {
-          "type": "record",
-          "required": true,
-          "description": "The ballot that adopted it."
-        }
-      },
-      "writes": {
-        "kind": "budget",
-        "text": "The town's budget for year {year}.",
-        "basis": "=ballot",
-        "data": {
-          "year": "=year",
-          "lines": {}
-        }
-      }
-    }
-  ],
   "routines": [
     {
-      "task": "enact",
       "at": "office",
       "every": 1,
+      "task": "enact",
       "what": "When the council has passed a proposal made on a law's amendment form and the clerk has declared the result, the office's drafters write the amended law out by the law's own schedule, with the figures the proposal gives and the rest as they stand, publish it in place of the law in force, and withdraw that one. Declaring a result does not by itself change a law: this does. A law proposed in free words, or a budget, is not theirs: the clerk publishes that."
     }
-  ]
+  ],
+  "state": "none",
+  "version": "0.11.1"
 }

@@ -292,12 +292,19 @@ test("a year with one office in a mock seat that sits at other hours and files p
 
 test("no module names a draw for a moment", () => {
   // A purpose with the time in it (`shop-${t}`) is a draw that falls differently in two towns that woke at other hours.
-  const dir = join(root, "participants/src/behaviour");
+  // What is still TypeScript (the kinds' declarations, helpers and readers) and the engine's actors, in Rust: `cx.rng(&format!("shop-{t}"))`.
   const found: string[] = [];
-  for (const f of new Bun.Glob("*.ts").scanSync(dir)) {
-    readFileSync(join(dir, f), "utf8").split("\n").forEach((l, i) => { if (/\brng\(`[^`]*\$\{(t|obs\.t|now|at)\}/.test(l)) found.push(`${f}:${i + 1}`); });
+  for (const d of ["participants/src/kinds", "participants/src/shared", "participants/src/readers"]) for (const f of new Bun.Glob("*.ts").scanSync(join(root, d))) {
+    readFileSync(join(root, d, f), "utf8").split("\n").forEach((l, i) => { if (/\brng\(`[^`]*\$\{(t|obs\.t|now|at)\}/.test(l)) found.push(`${d}/${f}:${i + 1}`); });
+  }
+  const RUST_TIMED = /\b(?:rng|chance)\(\s*&?(?:format!\(\s*)?"[^"]*\{(?:t|now|at|self\.t|cx\.t)(?::[^}]*)?\}/;
+  const actors = join(root, "kernel/crates/actors/src");
+  for (const f of new Bun.Glob("**/*.rs").scanSync(actors)) {
+    readFileSync(join(actors, f), "utf8").split("\n").forEach((l, i) => { if (RUST_TIMED.test(l)) found.push(`kernel/crates/actors/src/${f}:${i + 1}`); });
   }
   expect(found).toEqual([]);
+  // (The Rust reader does catch one.)
+  expect(RUST_TIMED.test('let r = cx.rng(&format!("shop-{t}"));')).toBe(true);
 });
 
 // Bug hunt 2026-10-17, finding 14: a draw about a lease (or any paper) is never keyed on the paper's number in the world's

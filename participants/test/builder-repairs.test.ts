@@ -2,10 +2,12 @@
 // its own hours, oldest order first, telling the orderer when it is done; with no repair task it knows of none.
 
 import { expect, test } from "bun:test";
-import { builder } from "../src/behaviour/institutions";
+
 import { inCurrency } from "../src/money";
 import { context, DAY, employment, signed, statement, wake } from "./stepping";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
+import { engine } from "./engine";
+const builder = engine("firm.builder");
 
 inCurrency(PROFILE.values.currency);
 

@@ -7,7 +7,7 @@
 import { expect, test } from "bun:test";
 import PROFILE from "../../worlds/profiles/ke-nakuru-2026.json";
 import type { Observation } from "../src/contracts";
-import { DayBook, DAYBOOK_MAX } from "../src/behaviour/daybook";
+import { DayBook, DAYBOOK_MAX } from "../src/readers/daybook";
 import type { OpenHeading } from "../src/module";
 import { inCurrency } from "../src/money";
 import type { ContentBlock, LlmRequest } from "../src/llm/adapter";

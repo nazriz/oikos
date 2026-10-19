@@ -8,6 +8,7 @@ import Ajv2020 from "ajv/dist/2020";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { calls, forms, modules } from "@oikos/participants";
+import { engine } from "../../participants/test/engine";
 import { onOwnForms } from "@oikos/participants/llm";
 import { inCurrency } from "../../participants/src/money";
 import { context, DAY, statement } from "../../participants/test/stepping";
@@ -25,7 +26,7 @@ function stationery(module: string, office: string, entity: string, params: obje
 
 /** Every program a module says in one wake on what it is shown. */
 function said(module: string, office: string, entity: string, params: object, t: number, records: object[], more: object = {}): string[] {
-  const m = modules[module]!.create(context(`${office}-system`, entity, params, { position: office, currency: CURRENCY }));
+  const m = engine(module).create(context(`${office}-system`, entity, params, { position: office, currency: CURRENCY }));
   const out: string[] = [];
   let obs: any = { t, entity, participant: `${office}-system`, channels: { all: { kind: "records", records }, ...more }, inbox: [], outcomes: [], woke_for: "cadence" };
   for (let i = 0; i < 50; i++) {

@@ -1049,4 +1049,46 @@ mod tests {
             assert_eq!(&rust[k], v, "{k}");
         }
     }
+
+    // A decision decided again from the file under the law's rule (ported from orchestrator/test/auditor.test.ts, the TypeScript
+    // `examineDecision` being gone): it agrees or it does not, and nothing is called good or bad.
+    #[test]
+    fn a_decision_is_decided_again_from_the_file_under_the_laws_rule_it_agrees_or_it_does_not_and_nothing_is_called_good_or_bad() {
+        let rule: PaymentRule = serde_json::from_value(json!({ "id": "pension", "payer": "outside", "account": "acc-outside", "every_days": 14, "who": { "from_age": 67 }, "amount": { "flat": 50_000 } })).expect("a rule");
+        let year = 365 * DAY;
+        let on = 400 * DAY;
+        let file = |born_years_ago: i64, granted: bool, amount: Option<i64>, lapsed: bool| -> DecisionFile {
+            let mut decision = json!({ "id": "rec.1", "at": on + 60, "on": on, "granted": granted });
+            if let Some(a) = amount {
+                decision["amount"] = json!(a);
+                decision["every"] = json!(14 * DAY);
+            }
+            if !granted {
+                decision["reason"] = json!("the claim could not be verified");
+            }
+            if lapsed {
+                decision["lapsed"] = json!(true);
+            }
+            serde_json::from_value(json!({ "decision": decision, "claim": { "id": "rec.0", "by": "c0001", "payment": "pension", "born_at": on - born_years_ago * year, "account": "acc-c0001", "declares": {} }, "reported": [], "pays_other": false })).expect("a file")
+        };
+        let book = Book::new();
+        let w = |c: i64| format!("${}", c / 100);
+        let look = |f: &DecisionFile, rule: Option<&PaymentRule>| examine_decision(f, rule, &book, year, None, &w);
+        assert_eq!(look(&file(70, true, Some(50_000), false), Some(&rule)).agrees, Some(true));
+        assert_eq!(look(&file(40, false, None, false), Some(&rule)).agrees, Some(true));
+        // Refused though the claim meets the law's conditions (the wrong refusal a slip makes).
+        let wrong_refusal = look(&file(70, false, None, false), Some(&rule));
+        assert_eq!(wrong_refusal.agrees, Some(false));
+        assert!(wrong_refusal.says.contains("meets the conditions the law states"), "{}", wrong_refusal.says);
+        // Granted though it does not.
+        assert_eq!(look(&file(40, true, Some(50_000), false), Some(&rule)).agrees, Some(false));
+        // Granted at another sum than the rule gives.
+        assert!(look(&file(70, true, Some(40_000), false), Some(&rule)).says.contains("the law's rule for the payment gives"));
+        // A refusal for papers that did not come is the procedure's wait, not the payment's conditions: not re-decided; no law on file: not re-decided.
+        assert_eq!(look(&file(70, false, None, true), Some(&rule)).agrees, None);
+        assert_eq!(look(&file(70, true, Some(50_000), false), None).agrees, None);
+        for word in ["good", "bad", "fault", "wrong"] {
+            assert!(!wrong_refusal.says.split(|c: char| !c.is_alphabetic()).any(|x| x == word), "{}", wrong_refusal.says);
+        }
+    }
 }

@@ -1,49 +1,350 @@
 {
-  "name": "world.transfers",
-  "version": "0.10.0",
-  "doc": "docs/behaviour/boundary.md",
-  "params": {
-    "account": {
-      "schema": {
-        "type": "string",
-        "description": "the account it pays from where a payment names none (the world must say)"
-      },
-      "default": "",
-      "required": true,
-      "source": "the account it pays from where a payment names none (the world must say)"
-    },
-    "part": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "publish_every_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 0,
-      "source": "placeholder"
-    },
-    "respond": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "year": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 31536000,
-      "source": "placeholder"
-    }
+  "answers": {
+    "acts": "What it acts on: a claim for a payment under the support law, made by the person it is for.",
+    "office": "the support office"
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/boundary.md",
+  "issues": [
+    {
+      "does": "Says what is decided on a claim, to the claimant. A claim granted on it is paid by the office's staff each period from then, at the sum and for the time the decision gives, while the office's standing order for paying claims is in force; a claim refused on it is not paid. It moves no money by itself.",
+      "fields": {
+        "amount": {
+          "description": "Where granted: the sum paid each period.",
+          "type": "amount"
+        },
+        "claim": {
+          "description": "The claim decided.",
+          "required": true,
+          "type": "record"
+        },
+        "claimant": {
+          "description": "Who made the claim.",
+          "required": true,
+          "type": "entity"
+        },
+        "every": {
+          "description": "Where granted: the period it is paid by.",
+          "type": "duration"
+        },
+        "granted": {
+          "description": "Whether it is granted.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "type": "choice"
+        },
+        "payment": {
+          "description": "Which payment of the support law the claim is for, as the claim names it.",
+          "required": true,
+          "type": "text"
+        },
+        "reason": {
+          "description": "Why not, where it is refused.",
+          "type": "text"
+        },
+        "until": {
+          "description": "Where granted for a time: the day the payment ends.",
+          "type": "date"
+        }
+      },
+      "form": "benefit_decision",
+      "title": "Decision on a claim for support",
+      "writes": {
+        "basis": "=claim",
+        "data": {
+          "amount": "#amount",
+          "claim": "=claim",
+          "every": "=every",
+          "granted": "?granted",
+          "payment": "=payment",
+          "reason": "=reason",
+          "until": "=until"
+        },
+        "kind": "benefit_decision",
+        "text": "Claim {claim}: granted {granted}.",
+        "to": [
+          "=claimant"
+        ],
+        "visible": [
+          "=claimant",
+          "=self"
+        ]
+      }
+    },
+    {
+      "does": "Answers someone who has asked the office in writing to put something right: yes or no, and where money is owed them and paid, how much. It does nothing by itself: what puts the thing right (a payment, a repair ordered, a paper withdrawn) is done besides.",
+      "fields": {
+        "amount": {
+          "description": "Where money is owed them and paid: how much.",
+          "type": "amount"
+        },
+        "asker": {
+          "description": "Who asked.",
+          "required": true,
+          "type": "entity"
+        },
+        "granted": {
+          "description": "Whether it will be put right.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "type": "choice"
+        },
+        "matter": {
+          "description": "What it is about, in the word the request uses.",
+          "required": true,
+          "type": "text"
+        },
+        "reason": {
+          "description": "Where it is refused: why.",
+          "type": "text"
+        },
+        "request": {
+          "description": "The request answered.",
+          "required": true,
+          "type": "record"
+        }
+      },
+      "form": "remedy_answer",
+      "title": "Answer to a request to put something right",
+      "writes": {
+        "basis": "=request",
+        "data": {
+          "amount": "#amount",
+          "granted": "?granted",
+          "matter": "=matter",
+          "reason": "=reason",
+          "request": "=request"
+        },
+        "kind": "remedy_answer",
+        "text": "Answer to your request {request}: {granted}.",
+        "to": [
+          "=asker"
+        ],
+        "visible": [
+          "=asker",
+          "=self"
+        ]
+      }
+    },
+    {
+      "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+      "fields": {
+        "applicant": {
+          "description": "Who applied.",
+          "type": "entity"
+        },
+        "application": {
+          "description": "The application answered.",
+          "required": true,
+          "type": "record"
+        },
+        "done": {
+          "description": "For a thing to be put right: whether it is done.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "type": "choice"
+        },
+        "known": {
+          "description": "Whether the office's books say anything of it.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "type": "choice"
+        },
+        "owed": {
+          "description": "What the books show is owed the applicant (nought: nothing).",
+          "type": "amount"
+        },
+        "statement": {
+          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why).",
+          "type": "text"
+        },
+        "venue": {
+          "description": "The body that sent the notice.",
+          "required": true,
+          "type": "entity"
+        },
+        "wrong": {
+          "description": "For a paper complained of: whether it was wrong.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "type": "choice"
+        }
+      },
+      "form": "complaint_answer",
+      "title": "Answer to a desk's notice of an application against the office",
+      "writes": {
+        "basis": "=application",
+        "data": {
+          "application": "=application",
+          "done": "?done",
+          "known": "?known",
+          "owed": "#owed",
+          "statement": "=statement",
+          "wrong": "?wrong"
+        },
+        "kind": "complaint_response",
+        "text": "Answer on {application}.",
+        "to": [
+          "=venue"
+        ],
+        "visible": [
+          "=venue",
+          "=self",
+          "=applicant"
+        ]
+      }
+    },
+    {
+      "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+      "fields": {
+        "applicant": {
+          "description": "Who applied.",
+          "type": "entity"
+        },
+        "application": {
+          "description": "The application answered.",
+          "required": true,
+          "type": "record"
+        },
+        "done": {
+          "description": "For a thing to be put right: whether it is done.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "type": "choice"
+        },
+        "known": {
+          "description": "Whether the office's books say anything of it.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "type": "choice"
+        },
+        "owed": {
+          "description": "What the books show is owed the applicant (nought: nothing).",
+          "type": "amount"
+        },
+        "statement": {
+          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why).",
+          "type": "text"
+        },
+        "venue": {
+          "description": "The body that sent the notice.",
+          "required": true,
+          "type": "entity"
+        },
+        "wrong": {
+          "description": "For a paper complained of: whether it was wrong.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "type": "choice"
+        }
+      },
+      "form": "tribunal_answer",
+      "title": "Answer to the tribunal's notice of an application against the office",
+      "writes": {
+        "basis": "=application",
+        "data": {
+          "application": "=application",
+          "done": "?done",
+          "known": "?known",
+          "owed": "#owed",
+          "statement": "=statement",
+          "wrong": "?wrong"
+        },
+        "kind": "tribunal_response",
+        "text": "Answer on {application}.",
+        "to": [
+          "=venue"
+        ],
+        "visible": [
+          "=venue",
+          "=self",
+          "=applicant"
+        ]
+      }
+    },
+    {
+      "does": "Answers the audit office's public request under the audit law, by the day it gives: the count of your decisions of a kind in a period, one of them by its number with its file, or your payments for the period against the bank's record. Say only what your books show. It does nothing else by itself.",
+      "fields": {
+        "ask": {
+          "description": "What was asked for.",
+          "options": [
+            "count",
+            "nth",
+            "statement"
+          ],
+          "required": true,
+          "type": "choice"
+        },
+        "audit": {
+          "description": "The audit's key, as the request gives it.",
+          "required": true,
+          "type": "text"
+        },
+        "auditor": {
+          "description": "The audit office.",
+          "required": true,
+          "type": "entity"
+        },
+        "count": {
+          "description": "For a count: how many.",
+          "type": "count"
+        },
+        "nth": {
+          "description": "For a decision by its number: which.",
+          "type": "count"
+        },
+        "request": {
+          "description": "The request this answers.",
+          "required": true,
+          "type": "record"
+        },
+        "statement": {
+          "description": "The books' entries asked for, in words.",
+          "type": "text"
+        }
+      },
+      "form": "audit_answer",
+      "title": "Answer to the audit office's request for a named item",
+      "writes": {
+        "basis": "=request",
+        "data": {
+          "ask": "=ask",
+          "audit": "=audit",
+          "count": "=count",
+          "nth": "=nth",
+          "request": "=request"
+        },
+        "kind": "audit_answer",
+        "text": "Answer to audit request {request}: {statement}",
+        "to": [
+          "=auditor"
+        ],
+        "visible": [
+          "=auditor",
+          "=self"
+        ]
+      }
+    }
+  ],
   "keeps": [
     {
       "what": "benefit_claim",
@@ -54,363 +355,66 @@
       "why": "Each decision on a claim is this office's own paper: it pays from them, and keeps every one it has made."
     }
   ],
-  "issues": [
-    {
-      "form": "benefit_decision",
-      "title": "Decision on a claim for support",
-      "does": "Says what is decided on a claim, to the claimant. A claim granted on it is paid by the office's staff each period from then, at the sum and for the time the decision gives, while the office's standing order for paying claims is in force; a claim refused on it is not paid. It moves no money by itself.",
-      "fields": {
-        "claim": {
-          "type": "record",
-          "required": true,
-          "description": "The claim decided."
-        },
-        "claimant": {
-          "type": "entity",
-          "required": true,
-          "description": "Who made the claim."
-        },
-        "payment": {
-          "type": "text",
-          "required": true,
-          "description": "Which payment of the support law the claim is for, as the claim names it."
-        },
-        "granted": {
-          "type": "choice",
-          "required": true,
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "Whether it is granted."
-        },
-        "reason": {
-          "type": "text",
-          "description": "Why not, where it is refused."
-        },
-        "amount": {
-          "type": "amount",
-          "description": "Where granted: the sum paid each period."
-        },
-        "every": {
-          "type": "duration",
-          "description": "Where granted: the period it is paid by."
-        },
-        "until": {
-          "type": "date",
-          "description": "Where granted for a time: the day the payment ends."
-        }
+  "name": "world.transfers",
+  "params": {
+    "account": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "the account it pays from where a payment names none (the world must say)",
+        "type": "string"
       },
-      "writes": {
-        "kind": "benefit_decision",
-        "text": "Claim {claim}: granted {granted}.",
-        "basis": "=claim",
-        "to": [
-          "=claimant"
-        ],
-        "visible": [
-          "=claimant",
-          "=self"
-        ],
-        "data": {
-          "claim": "=claim",
-          "payment": "=payment",
-          "granted": "?granted",
-          "reason": "=reason",
-          "amount": "#amount",
-          "every": "=every",
-          "until": "=until"
-        }
-      }
+      "source": "the account it pays from where a payment names none (the world must say)"
     },
-    {
-      "form": "remedy_answer",
-      "title": "Answer to a request to put something right",
-      "does": "Answers someone who has asked the office in writing to put something right: yes or no, and where money is owed them and paid, how much. It does nothing by itself: what puts the thing right (a payment, a repair ordered, a paper withdrawn) is done besides.",
-      "fields": {
-        "request": {
-          "type": "record",
-          "required": true,
-          "description": "The request answered."
-        },
-        "asker": {
-          "type": "entity",
-          "required": true,
-          "description": "Who asked."
-        },
-        "matter": {
-          "type": "text",
-          "required": true,
-          "description": "What it is about, in the word the request uses."
-        },
-        "granted": {
-          "type": "choice",
-          "required": true,
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "Whether it will be put right."
-        },
-        "amount": {
-          "type": "amount",
-          "description": "Where money is owed them and paid: how much."
-        },
-        "reason": {
-          "type": "text",
-          "description": "Where it is refused: why."
-        }
+    "part": {
+      "default": "",
+      "schema": {
+        "type": "string"
       },
-      "writes": {
-        "kind": "remedy_answer",
-        "text": "Answer to your request {request}: {granted}.",
-        "basis": "=request",
-        "to": [
-          "=asker"
-        ],
-        "visible": [
-          "=asker",
-          "=self"
-        ],
-        "data": {
-          "request": "=request",
-          "matter": "=matter",
-          "granted": "?granted",
-          "amount": "#amount",
-          "reason": "=reason"
-        }
-      }
+      "source": "placeholder"
     },
-    {
-      "form": "complaint_answer",
-      "title": "Answer to a desk's notice of an application against the office",
-      "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
-      "fields": {
-        "application": {
-          "type": "record",
-          "required": true,
-          "description": "The application answered."
-        },
-        "venue": {
-          "type": "entity",
-          "required": true,
-          "description": "The body that sent the notice."
-        },
-        "applicant": {
-          "type": "entity",
-          "description": "Who applied."
-        },
-        "known": {
-          "type": "choice",
-          "required": true,
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "Whether the office's books say anything of it."
-        },
-        "owed": {
-          "type": "amount",
-          "description": "What the books show is owed the applicant (nought: nothing)."
-        },
-        "done": {
-          "type": "choice",
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "For a thing to be put right: whether it is done."
-        },
-        "wrong": {
-          "type": "choice",
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "For a paper complained of: whether it was wrong."
-        },
-        "statement": {
-          "type": "text",
-          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
-        }
+    "publish_every_days": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
       },
-      "writes": {
-        "kind": "complaint_response",
-        "text": "Answer on {application}.",
-        "basis": "=application",
-        "to": [
-          "=venue"
-        ],
-        "visible": [
-          "=venue",
-          "=self",
-          "=applicant"
-        ],
-        "data": {
-          "application": "=application",
-          "owed": "#owed",
-          "done": "?done",
-          "wrong": "?wrong",
-          "known": "?known",
-          "statement": "=statement"
-        }
-      }
+      "source": "placeholder",
+      "unit": "days"
     },
-    {
-      "form": "tribunal_answer",
-      "title": "Answer to the tribunal's notice of an application against the office",
-      "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
-      "fields": {
-        "application": {
-          "type": "record",
-          "required": true,
-          "description": "The application answered."
-        },
-        "venue": {
-          "type": "entity",
-          "required": true,
-          "description": "The body that sent the notice."
-        },
-        "applicant": {
-          "type": "entity",
-          "description": "Who applied."
-        },
-        "known": {
-          "type": "choice",
-          "required": true,
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "Whether the office's books say anything of it."
-        },
-        "owed": {
-          "type": "amount",
-          "description": "What the books show is owed the applicant (nought: nothing)."
-        },
-        "done": {
-          "type": "choice",
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "For a thing to be put right: whether it is done."
-        },
-        "wrong": {
-          "type": "choice",
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "For a paper complained of: whether it was wrong."
-        },
-        "statement": {
-          "type": "text",
-          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
-        }
+    "respond": {
+      "default": {},
+      "schema": {
+        "type": "object"
       },
-      "writes": {
-        "kind": "tribunal_response",
-        "text": "Answer on {application}.",
-        "basis": "=application",
-        "to": [
-          "=venue"
-        ],
-        "visible": [
-          "=venue",
-          "=self",
-          "=applicant"
-        ],
-        "data": {
-          "application": "=application",
-          "owed": "#owed",
-          "done": "?done",
-          "wrong": "?wrong",
-          "known": "?known",
-          "statement": "=statement"
-        }
-      }
+      "source": "placeholder"
     },
-    {
-      "form": "audit_answer",
-      "title": "Answer to the audit office's request for a named item",
-      "does": "Answers the audit office's public request under the audit law, by the day it gives: the count of your decisions of a kind in a period, one of them by its number with its file, or your payments for the period against the bank's record. Say only what your books show. It does nothing else by itself.",
-      "fields": {
-        "request": {
-          "type": "record",
-          "required": true,
-          "description": "The request this answers."
-        },
-        "auditor": {
-          "type": "entity",
-          "required": true,
-          "description": "The audit office."
-        },
-        "audit": {
-          "type": "text",
-          "required": true,
-          "description": "The audit's key, as the request gives it."
-        },
-        "ask": {
-          "type": "choice",
-          "required": true,
-          "options": [
-            "count",
-            "nth",
-            "statement"
-          ],
-          "description": "What was asked for."
-        },
-        "nth": {
-          "type": "count",
-          "description": "For a decision by its number: which."
-        },
-        "count": {
-          "type": "count",
-          "description": "For a count: how many."
-        },
-        "statement": {
-          "type": "text",
-          "description": "The books' entries asked for, in words."
-        }
+    "year": {
+      "default": 31536000,
+      "schema": {
+        "type": "integer"
       },
-      "writes": {
-        "kind": "audit_answer",
-        "text": "Answer to audit request {request}: {statement}",
-        "basis": "=request",
-        "to": [
-          "=auditor"
-        ],
-        "visible": [
-          "=auditor",
-          "=self"
-        ],
-        "data": {
-          "request": "=request",
-          "audit": "=audit",
-          "ask": "=ask",
-          "nth": "=nth",
-          "count": "=count"
-        }
-      }
+      "source": "placeholder"
     }
-  ],
+  },
+  "perceives": [],
   "routines": [
     {
-      "task": "pay_claims",
       "at": "office",
       "every": 1,
-      "what": "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to look at a decision again comes to the office-holder. What a claim waits for before it is decided (papers from the claimant, a confirmation from their last employer, within so many days) is the law's: the staff ask for it and the claim stays on their file until it has come or its time has run.",
       "papers": [
         {
-          "kind": "benefit_claim",
-          "how": "decided by the support law's conditions: granted and paid if it meets them, put before the office-holder if it does not or could not be verified"
+          "how": "decided by the support law's conditions: granted and paid if it meets them, put before the office-holder if it does not or could not be verified",
+          "kind": "benefit_claim"
         },
         {
-          "kind": "benefit_change",
-          "how": "a claimant's own request to stop their payment: it is stopped"
+          "how": "a claimant's own request to stop their payment: it is stopped",
+          "kind": "benefit_change"
         }
-      ]
+      ],
+      "task": "pay_claims",
+      "what": "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to look at a decision again comes to the office-holder. What a claim waits for before it is decided (papers from the claimant, a confirmation from their last employer, within so many days) is the law's: the staff ask for it and the claim stays on their file until it has come or its time has run."
     }
-  ]
+  ],
+  "state": "none",
+  "version": "0.10.0"
 }

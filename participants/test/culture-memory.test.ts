@@ -3,82 +3,15 @@
 // no model, no clock.
 
 import { expect, test } from "bun:test";
-import { CATCHING_UP, citizen } from "../src/behaviour/citizen";
-import { cultureDial } from "../src/behaviour/culture";
-import { EVENT_KINDS, rowStrengthPct, TOWN_WORDS, TownMemory } from "../src/behaviour/townmemory";
+
+import { cultureDial } from "../src/shared/culture";
 import { RECORD } from "../src/module";
 import { DAY, person, statement } from "./stepping";
+import { engine } from "./engine";
+import { CATCHING_UP, TOWN_WORDS } from "./phrasing";
+const citizen = engine("citizen.default");
 
 const dial = () => cultureDial({ dials: { culture: {} } })!;
-const mem = () => new TownMemory(dial().params);
-
-test("never more than six; the weakest gives way to a stronger arrival and a weaker one is dropped", () => {
-  const m = mem();
-  for (let i = 0; i < 6; i++) expect(m.read("law", `maker-${i}`, i * DAY, 10 * DAY, 3_000 + i * 100)).toBe("fresh");
-  expect(m.size()).toBe(6);
-  expect(m.read("law", "weaker", 0, 10 * DAY, 2_000)).toBe("dropped");
-  expect(m.saw("put_out", "police", 9 * DAY, 10 * DAY)).toBe("fresh");
-  expect(m.size()).toBe(6);
-  expect(m.all().some((s) => s.about === "maker-0")).toBe(false);
-  for (let i = 0; i < 200; i++) m.saw("strike", `e-${i}`, i * DAY, 10 * DAY + i);
-  expect(m.size()).toBeLessThanOrEqual(6);
-});
-
-test("nothing is passed on past three hands; told, it is a part of the teller's strength, more for what is held against", () => {
-  const m = mem();
-  expect(m.heardFrom("put_out", "police", 5, 6 * DAY, 10_000, 3, false)).toBe("dropped"); // would be a fourth hand
-  expect(m.heardFrom("put_out", "police", 5, 6 * DAY, 10_000, 2, false)).toBe("fresh");
-  expect(m.all()[0]!.hops).toBe(3);
-  expect(m.all()[0]!.s0).toBe(6_000);
-  const n = mem();
-  n.heardFrom("put_out", "police", 5, 6 * DAY, 10_000, 0, true);
-  expect(n.all()[0]!.s0).toBe(8_000);
-});
-
-test("strength a year on is the formula's: halved in 365 days seen, in 180 read or told; hearing it again returns 30% of the way to what it first was", () => {
-  const m = mem();
-  m.saw("put_out", "police", 0, 0);
-  m.read("law", "town", 0, 0, 4_000);
-  const [seen, read] = [m.all()[0]!, m.all()[1]!];
-  expect(m.strength(seen, 365 * DAY)).toBe(5_000);
-  expect(m.strength(read, 180 * DAY)).toBe(2_000);
-  expect(m.strength(read, 360 * DAY)).toBe(1_000);
-  // Heard again after a year: from 5,000 toward 10,000 by 30%.
-  expect(m.heardFrom("put_out", "police", 0, 365 * DAY, 8_000, 0, false)).toBe("again");
-  expect(m.strength(seen, 365 * DAY)).toBe(6_500);
-  // The record's row says the same without storing the fading: the strength in the row is the day it last arrived.
-  const row = m.section()[0]!;
-  expect(row[0]).toBe(EVENT_KINDS.indexOf("put_out"));
-  expect(rowStrengthPct(row, 365 + 365, dial().params)).toBeCloseTo(32.5, 5);
-});
-
-test("the section is positional, small, the same array until something arrives, and is not changed by the days going", () => {
-  const m = mem();
-  expect(m.section()).toEqual([]);
-  m.saw("put_out", "police", 100 * DAY, 101 * DAY);
-  m.read("vote", "council", 90 * DAY, 101 * DAY, 4_000);
-  const a = m.section();
-  expect(JSON.stringify(a).length).toBeLessThan(120);
-  expect(m.section()).toBe(a);
-  m.tell("x", 400 * DAY);
-  expect(m.section()).toBe(a); // (telling changes no row)
-  m.saw("strike", "works", 500 * DAY, 501 * DAY);
-  expect(m.section()).not.toBe(a);
-});
-
-test("telling: the strongest above the line, one phrase, once to each who asks; nothing is drawn; the words round-trip", () => {
-  const m = mem();
-  m.read("law", "town", 10 * DAY, 11 * DAY, 3_000);
-  m.saw("put_out", "police", 20 * DAY, 21 * DAY);
-  const first = m.tell("a", 22 * DAY)!;
-  expect(TOWN_WORDS.heard(first)).toMatchObject({ kind: "put_out", about: "police", day: 20, hops: 0 });
-  expect(TOWN_WORDS.heard(m.tell("a", 22 * DAY)!)).toMatchObject({ kind: "law" });
-  expect(m.tell("a", 22 * DAY)).toBeUndefined();
-  expect(m.tell("b", 22 * DAY)).toBeDefined();
-  expect(m.tell("c", 3_000 * DAY)).toBeUndefined(); // faded below the line
-  expect(TOWN_WORDS.heard(`Much the same. ${first} Nothing else.`)).toMatchObject({ kind: "put_out" });
-  expect(TOWN_WORDS.heard("Talk of the town: a ruling by the moon, x, day 3; I hold it at 5 in 10, through 0 hands.")).toBeUndefined();
-});
 
 // ---- a citizen
 

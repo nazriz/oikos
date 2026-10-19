@@ -1,5 +1,5 @@
 // Writes the forms catalogue the Rust rules crate reads (kernel/crates/rules/forms/papers.json; docs/port-guide.md,
-// step 1b) from participants/src/behaviour/papers.ts: every exported form (an `Issued`, or a list of them), by its
+// step 1b) from participants/src/shared/papers.ts: every exported form (an `Issued`, or a list of them), by its
 // export's name, in the order the file has them. Until the cut-over the TS file is the source and
 // participants/test/port-forms.test.ts holds the two equal; after it, the JSON is the source and this script goes.
 //
@@ -8,7 +8,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import * as P from "../participants/src/behaviour/papers";
+import * as P from "../participants/src/shared/papers";
 
 export const OUT = join(import.meta.dir, "../kernel/crates/rules/forms/papers.json");
 

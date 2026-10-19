@@ -1,24 +1,25 @@
 {
-  "name": "city.tax_clerk",
-  "version": "0.4.2",
+  "answers": null,
   "doc": "docs/behaviour/government.md",
+  "name": "city.tax_clerk",
   "params": {
     "grace_days": {
+      "default": 45,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 45,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "law": {
+      "default": "law-tax",
       "schema": {
         "type": "string"
       },
-      "default": "law-tax",
       "source": "placeholder"
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "version": "0.4.2"
 }

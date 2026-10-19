@@ -14,9 +14,11 @@ import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
 import { ALLOWED, applyFraming, defaultReason, DISCLOSURES, framingOf, NEVER_SAID, openingSentence, saysWhatTheTownIs, SHOWS_THROUGH, SIMULATION_TAIL, UNSTATED_REASON, wayOut, wayOutAsked } from "../src/llm/framing";
 import { createLlmParticipant, systemPrompt, tools, type LlmParticipantConfig } from "../src/llm/participant";
 import { preamble, QUESTIONS, SCALES, stepsOf } from "../src/llm/debrief";
-import { literals } from "./literals";
+import { literals, rustLiterals } from "./literals";
 
 const root = join(import.meta.dir, "../..");
+/** The folders of participants/src that hold what the generator, the host and the seat-side readers read of the town's kinds. */
+const SEAT_SIDE_DIRS = ["participants/src/kinds", "participants/src/shared", "participants/src/readers"];
 const HOUR = 3_600;
 const seat = (disclosure: string, extra: object = {}): LlmParticipantConfig => ({ participant: "tribunal-member-system", entity: "tribunal", entityName: "Civil and Administrative Tribunal", title: "Tribunal member",
   framing: { disclosure, reason: "test", system: disclosure === "simulation" ? `You are the tribunal member of Civil and Administrative Tribunal, in Millbrook${SIMULATION_TAIL}.` : "You are the tribunal member of Civil and Administrative Tribunal, in Millbrook." },
@@ -70,22 +72,31 @@ test("every sentence the platform's own code can write to a seat: scanned in the
     "translator/src/preview.ts", "translator/src/resolver.ts", "translator/src/arrangement.ts", "translator/src/knowledge.ts",
     // (and the ways in to a model, which add how to answer to what a seat is sent)
     "participants/src/llm/claude-code.ts", "participants/src/llm/codex.ts", "participants/src/llm/answer.ts", "participants/src/llm/anthropic.ts", "participants/src/llm/openai.ts",
-    ...readdirSync(join(root, "participants/src/behaviour")).filter((f) => f.endsWith(".ts")).map((f) => `participants/src/behaviour/${f}`),
-    // (and what is still read of the kinds the engine runs, whose TypeScript actors were deleted at the cut-over)
-    "participants/src/engine-kinds.ts"];
+    // (what is still read of the kinds the engine runs, whose TypeScript actors were deleted at the cut-over: their
+    // declarations, and the helpers and readers the generator and the host use)
+    ...SEAT_SIDE_DIRS.flatMap((d) => readdirSync(join(root, d)).filter((f) => f.endsWith(".ts")).map((f) => `${d}/${f}`)), "participants/src/engine-kinds.ts"];
+  // And the engine's own actors, which write the letters, papers and reports of the town's offices and people now:
+  // every string literal of kernel/crates/actors/src (the test modules and the test doubles left out: they are not in a town).
+  const rustFiles = Bun.spawnSync(["git", "ls-files", "kernel/crates/actors/src/*.rs"], { cwd: root }).stdout.toString().trim().split("\n")
+    .filter((f) => f && !/(^|\/)(tests?|testkit|testkinds|stub)\.rs$|\/tests\//.test(f));
   // Named exceptions: a literal that is on the list and is never shown to a seat, each with why.
   const NOT_SHOWN: { file: string; has: string; why: string }[] = [
     { file: "participants/src/engine-kinds.ts", has: "A researcher's scripted shocks", why: "a module's declaration of what it sees and why (its manifest), read by tests and people, never by a seat" },
     { file: "participants/src/engine-kinds.ts", has: "The weather is fixed before the run", why: "the same: a module's declaration" },
+    { file: "kernel/crates/actors/src/boundary/trade.rs", has: "due on the researcher's schedule", why: "the reason a world-market boundary writes beside its orders, kept in the log; no seat reads another's reasons" },
+    { file: "kernel/crates/actors/src/boundary/weather.rs", has: "The weather is fixed before the run", why: "the weather kind's declaration of what it sees (its manifest text), read by tests and people, never by a seat" },
+    { file: "kernel/crates/actors/src/mind/founding.rs", has: "The translator did not answer.", why: "the reason recorded when a code founder's draft could not be had, kept in the log; nobody is sent it" },
     { file: "participants/src/llm/claude-code.ts", has: "the Claude plan's limit for claude -p was reached", why: "an error to whoever runs the pilot, which stops the run; no model is sent it" },
     { file: "participants/src/llm/codex.ts", has: "the Codex subscription's usage limit was reached", why: "the same" },
   ];
   const used = new Set<number>();
-  let scanned = 0;
-  for (const f of files) {
-    for (const l of literals(readFileSync(join(root, f), "utf8"))) {
+  let scanned = 0, scannedRust = 0;
+  for (const f of [...files, ...rustFiles]) {
+    const rust = f.endsWith(".rs");
+    for (const l of (rust ? rustLiterals : literals)(readFileSync(join(root, f), "utf8"))) {
       if (!/\s\S+\s/.test(l.text)) continue; // (a sentence, not a name: three words or more)
       scanned++;
+      if (rust) scannedRust++;
       const said = saysWhatTheTownIs(l.text);
       if (!said.length) continue;
       const i = NOT_SHOWN.findIndex((x) => x.file === f && l.text.includes(x.has));
@@ -93,7 +104,13 @@ test("every sentence the platform's own code can write to a seat: scanned in the
       throw new Error(`${f}:${l.line}: a sentence a seat may be shown says what unstated leaves unsaid (${said.map((x) => `"${x.found}": ${x.what}`).join("; ")}): ${l.text.replace(/\s+/g, " ").slice(0, 200)}`);
     }
   }
-  expect(scanned).toBeGreaterThan(3000); // (the reader of literals is reading: about 4,000 sentences)
+  expect(scanned).toBeGreaterThan(4000); // (the readers of literals are reading: about 5,000 sentences)
+  expect(rustFiles.length).toBeGreaterThan(100); // (the engine's actors: 112 files)
+  expect(scannedRust).toBeGreaterThan(2000); // (about 2,600 sentences)
+  // The Rust reader does read what it should: a sentence known to be there (the acknowledgement of a letter) is found, with its format hole.
+  const letters = rustLiterals(readFileSync(join(root, "kernel/crates/actors/src/common/letters.rs"), "utf8")).map((l) => l.text);
+  expect(letters.some((t) => t.startsWith("From {}: your letter is received. This office does not act on a letter's words."))).toBe(true);
+  expect(rustLiterals('let a = "x \\"quoted\\" y"; // "not this"\nlet b = r#"raw "text" here"#; let c = \'"\'; /* "nor this" */').map((l) => l.text)).toEqual(['x "quoted" y', 'raw "text" here']);
   expect([...used].sort()).toEqual(NOT_SHOWN.map((_, i) => i)); // (an exception no longer needed is taken out)
   // The reader does read what it should: sentences known to be there are found.
   const p = literals(readFileSync(join(root, "participants/src/llm/participant.ts"), "utf8")).map((l) => l.text);

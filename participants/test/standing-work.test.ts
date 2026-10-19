@@ -4,10 +4,11 @@
 // office-holder alone sets the orders, once, and does none of the round; the staff do the round only under an order.
 
 import { expect, test } from "bun:test";
-import { Book, StandingWork } from "../src/behaviour/common";
+import { Book, StandingWork } from "../src/shared/common";
 import { modules } from "../src/index";
 import { inCurrency } from "../src/money";
 import { context, DAY, statement, wake } from "./stepping";
+import { engine } from "./engine";
 
 inCurrency({ code: "XYZ", minor_units: 2 });
 
@@ -55,7 +56,7 @@ const shown = (...extra: object[]) => ({
   round: { kind: "records", records: ["house-1", "house-2"].map((s) => statement(`round-${s}`, 0, "service_address", { visible_to: ["city"], data: { structure: s } })) },
   depot: { kind: "sites", cells: [{ cell: "cell.1.1", x: 1, y: 1, structure: { structure: "town-hall", type: "civic", at: "cell.1.1", complete: true, spaces: [{ space: "town-hall/workplace.1", kind: "workplace", capacity: 20, count: 2, occupants: ["c0001", "c0002"] }] } }] },
 });
-const works = (part: string) => modules["city.works"]!.create(context(`works${part === "staff" ? "-staff" : ""}-system`, "city", { ...params, part }, { position: part === "staff" ? "works-staff" : "works" }));
+const works = (part: string) => engine("city.works").create(context(`works${part === "staff" ? "-staff" : ""}-system`, "city", { ...params, part }, { position: part === "staff" ? "works-staff" : "works" }));
 const collected = (w: ReturnType<typeof wake>) => w.of("work").filter((c) => c.args.task === "collect" && !c.args.every).map((c) => c.args.on).sort();
 const MONDAY = 7 * DAY + 8 * 3600;
 

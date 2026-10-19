@@ -4,7 +4,7 @@
 // and participants/test/port-rules.test.ts holds the TS to it.
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { chargesOn, dayPayPeriod, taxLawOf, withheld } from "../participants/src/behaviour/tax";
+import { chargesOn, dayPayPeriod, taxLawOf, withheld } from "../participants/src/shared/tax";
 
 const DAY = 86_400;
 const to = { collector: "outside", account: "a" };

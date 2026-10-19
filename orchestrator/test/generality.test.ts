@@ -142,7 +142,7 @@ test("platform code writes no currency: no sign and no words but those the world
     "const perDollar = 100n;", "say(`Dues: ${p.dues} cents a month.`)", 'const minor = unit === "cent";']) expect(currencyIn(line.includes("format!") ? "kernel/crates/x/src/y.rs" : "participants/src/x.ts", line)).toBeDefined();
   for (const line of ["const n = cents(a.balance); // in cents", "return `${symbol}${whole}`;", 'sql("select $run")', "const total = `${a} of ${b}`;"]) expect(currencyIn("participants/src/x.ts", line)).toBeUndefined();
   expect(currencyIn("translator/src/resolver.ts", '{ block: "sign_agreement", agreement: `$${ref}`, as: me }')).toBeUndefined();
-  expect(currencyIn("participants/src/behaviour/x.ts", "text: `pays $${ref}`")).toBeDefined();
+  expect(currencyIn("participants/src/shared/x.ts", "text: `pays $${ref}`")).toBeDefined();
 
   const found: string[] = [];
   for (const dir of MONEY_CODE) for (const f of statSync(join(root, dir)).isDirectory() ? files(join(root, dir)) : [join(root, dir)]) {

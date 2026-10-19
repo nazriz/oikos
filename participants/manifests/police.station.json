@@ -1,266 +1,135 @@
 {
-  "name": "police.station",
-  "version": "0.6.0",
-  "doc": "docs/behaviour/crime.md",
-  "params": {
-    "account": {
-      "schema": {
-        "type": "string",
-        "description": "what it pays its staff from (its funding comes in there)"
-      },
-      "default": "",
-      "required": true,
-      "source": "placeholder"
-    },
-    "building": {
-      "schema": {
-        "type": "string",
-        "description": "the station, and where its officers work (the world must say)"
-      },
-      "default": "",
-      "required": true,
-      "source": "the station, and where its officers work (the world must say)"
-    },
-    "calls_channel": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "channel": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "premises",
-      "source": "placeholder"
-    },
-    "industry": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "public_safety",
-      "source": "placeholder"
-    },
-    "look_at": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "look_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 5,
-      "source": "placeholder"
-    },
-    "notice_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
-    },
-    "officers": {
-      "schema": {
-        "type": "integer",
-        "description": "the establishment (its funder's)"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "part": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "period": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 1209600,
-      "source": "placeholder"
-    },
-    "registry": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "role": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "police officer",
-      "source": "placeholder"
-    },
-    "task": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "investigate",
-      "source": "placeholder"
-    },
-    "task_seconds": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "seconds",
-      "default": 14400,
-      "source": "placeholder"
-    },
-    "tribunal": {
-      "schema": {
-        "type": "string",
-        "description": "where charges go"
-      },
-      "default": "",
-      "required": true,
-      "source": "placeholder"
-    },
-    "wage": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "working_day": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 28800,
-      "source": "placeholder"
-    },
-    "workplace": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "required": true,
-      "source": "placeholder"
-    }
+  "answers": {
+    "acts": "What it acts on: a report of a crime, which it investigates; and a request to call at a home where nobody has been seen.",
+    "office": "the police station"
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/crime.md",
   "issues": [
     {
-      "form": "job_advertisement",
-      "title": "Job advertisement",
       "does": "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
       "fields": {
-        "wage": {
-          "type": "amount",
-          "required": true,
-          "description": "The wage for each pay period."
+        "account": {
+          "description": "The account the wages are paid from, where the office itself pays them.",
+          "type": "account"
         },
         "period": {
-          "type": "duration",
+          "description": "The pay period: how often the wage is paid.",
           "required": true,
-          "description": "The pay period: how often the wage is paid."
+          "type": "duration"
         },
         "posts": {
-          "type": "count",
+          "description": "How many posts this advertisement is for.",
           "required": true,
-          "description": "How many posts this advertisement is for."
+          "type": "count"
         },
-        "account": {
-          "type": "account",
-          "description": "The account the wages are paid from, where the office itself pays them."
+        "wage": {
+          "description": "The wage for each pay period.",
+          "required": true,
+          "type": "amount"
         }
       },
+      "form": "job_advertisement",
+      "title": "Job advertisement",
       "writes": {
-        "kind": "job_posting",
-        "text": "Hiring: {wage} every {period}.",
         "data": {
-          "wage": "#wage",
+          "industry": "@industry",
           "period": "=period",
           "role": "@role",
-          "industry": "@industry",
-          "workplace": "@workplace_structure",
-          "space": "@workplace"
+          "space": "@workplace",
+          "wage": "#wage",
+          "workplace": "@workplace_structure"
         },
+        "kind": "job_posting",
         "offer": {
-          "by": "=self",
-          "to": {
-            "min_age_years": 18
-          },
-          "take_up": "apply",
           "available": "=posts",
+          "by": "=self",
+          "take_up": "apply",
           "terms": {
-            "template": "employment",
             "commitments": [
               {
-                "who": "=self",
                 "does": {
                   "outcome": {
                     "money": {
-                      "from": "=account",
                       "amount": "=wage",
-                      "for": "wages"
+                      "for": "wages",
+                      "from": "=account"
                     }
                   }
                 },
-                "every": "=period"
+                "every": "=period",
+                "who": "=self"
               },
               "@occupancy"
             ],
+            "template": "employment",
             "termination": "@termination"
+          },
+          "to": {
+            "min_age_years": 18
           }
-        }
+        },
+        "text": "Hiring: {wage} every {period}."
       }
     },
     {
-      "form": "charge",
-      "title": "A charge laid before the tribunal",
       "does": "Lays a charge before the tribunal against someone, on a report of a crime and the evidence found.",
       "fields": {
+        "account": {
+          "description": "The account the victim is to be paid into.",
+          "required": true,
+          "type": "account"
+        },
         "against": {
-          "type": "entity",
+          "description": "Who is charged.",
           "required": true,
-          "description": "Who is charged."
-        },
-        "victim": {
-          "type": "entity",
-          "required": true,
-          "description": "Who was wronged."
-        },
-        "report": {
-          "type": "record",
-          "required": true,
-          "description": "The report it comes from."
+          "type": "entity"
         },
         "amount": {
-          "type": "amount",
+          "description": "The value of what was taken.",
           "required": true,
-          "description": "The value of what was taken."
-        },
-        "account": {
-          "type": "account",
-          "required": true,
-          "description": "The account the victim is to be paid into."
+          "type": "amount"
         },
         "found": {
-          "type": "entity",
-          "description": "The evidence: who was found with the goods."
+          "description": "The evidence: who was found with the goods.",
+          "type": "entity"
         },
         "found_at": {
-          "type": "structure",
-          "description": "The evidence: where."
+          "description": "The evidence: where.",
+          "type": "structure"
         },
         "goods": {
-          "type": "text",
-          "description": "The evidence: what goods."
+          "description": "The evidence: what goods.",
+          "type": "text"
+        },
+        "report": {
+          "description": "The report it comes from.",
+          "required": true,
+          "type": "record"
+        },
+        "victim": {
+          "description": "Who was wronged.",
+          "required": true,
+          "type": "entity"
         }
       },
+      "form": "charge",
+      "title": "A charge laid before the tribunal",
       "writes": {
+        "basis": "=report",
+        "data": {
+          "account": "=account",
+          "against": "=against",
+          "amount": "#amount",
+          "evidence": {
+            "at": "=found_at",
+            "found": "=found",
+            "goods": "=goods"
+          },
+          "kind": "charge",
+          "report": "=report",
+          "victim": "=victim"
+        },
+        "kind": "tribunal_application",
         "sends": [
           {
             "to": [
@@ -269,9 +138,7 @@
             "why": "The tribunal hears the charge."
           }
         ],
-        "kind": "tribunal_application",
         "text": "Charge against {against}, on report {report}.",
-        "basis": "=report",
         "to": [
           "@tribunal"
         ],
@@ -279,38 +146,30 @@
           "=self",
           "@tribunal",
           "=against"
-        ],
-        "data": {
-          "kind": "charge",
-          "against": "=against",
-          "victim": "=victim",
-          "report": "=report",
-          "amount": "#amount",
-          "account": "=account",
-          "evidence": {
-            "found": "=found",
-            "at": "=found_at",
-            "goods": "=goods"
-          }
-        }
+        ]
       }
     },
     {
-      "form": "death_notification",
-      "title": "Notification of a death, to the registrar",
       "does": "Tells the registrar of a death the police have found, so that it can be registered.",
       "fields": {
         "deceased": {
-          "type": "entity",
+          "description": "Who has died.",
           "required": true,
-          "description": "Who has died."
+          "type": "entity"
         },
         "found_at": {
-          "type": "space",
-          "description": "Where they were found."
+          "description": "Where they were found.",
+          "type": "space"
         }
       },
+      "form": "death_notification",
+      "title": "Notification of a death, to the registrar",
       "writes": {
+        "data": {
+          "deceased": "=deceased",
+          "found_at": "=found_at"
+        },
+        "kind": "death_notification",
         "sends": [
           {
             "to": [
@@ -319,62 +178,65 @@
             "why": "The registrar registers deaths, on a notification."
           }
         ],
-        "kind": "death_notification",
         "text": "Notification of a death: {deceased}.",
         "to": [
           "@registry"
-        ],
-        "data": {
-          "deceased": "=deceased",
-          "found_at": "=found_at"
-        }
+        ]
       }
     },
     {
-      "form": "warrant_executed",
-      "title": "A warrant of possession carried out",
       "does": "Says, to the tenant and the landlord, that a warrant of the tribunal has been carried out and possession is the landlord's, and how many of the household were there and were put out (none, where nobody was there: possession is given all the same, and nobody was removed). It is the paper of what officers have done at the home, not the doing of it.",
       "fields": {
-        "warrant": {
-          "type": "record",
-          "required": true,
-          "description": "The warrant."
-        },
-        "lease": {
-          "type": "record",
-          "required": true,
-          "description": "The lease."
-        },
-        "tenant": {
-          "type": "entity",
-          "required": true,
-          "description": "The tenant."
-        },
-        "landlord": {
-          "type": "entity",
-          "required": true,
-          "description": "The landlord."
-        },
         "home": {
-          "type": "space",
+          "description": "The home.",
           "required": true,
-          "description": "The home."
+          "type": "space"
         },
         "household": {
-          "type": "list",
+          "description": "The household the warrant names.",
           "required": true,
-          "description": "The household the warrant names."
+          "type": "list"
+        },
+        "landlord": {
+          "description": "The landlord.",
+          "required": true,
+          "type": "entity"
+        },
+        "lease": {
+          "description": "The lease.",
+          "required": true,
+          "type": "record"
         },
         "removed": {
-          "type": "count",
+          "description": "How many of the household were there and were put out (nobody there: 0).",
           "required": true,
-          "description": "How many of the household were there and were put out (nobody there: 0)."
+          "type": "count"
+        },
+        "tenant": {
+          "description": "The tenant.",
+          "required": true,
+          "type": "entity"
+        },
+        "warrant": {
+          "description": "The warrant.",
+          "required": true,
+          "type": "record"
         }
       },
+      "form": "warrant_executed",
+      "title": "A warrant of possession carried out",
       "writes": {
+        "basis": "=warrant",
+        "data": {
+          "household": "=household",
+          "lease": "=lease",
+          "removed": "=removed",
+          "space": "=home",
+          "tenant": "=tenant",
+          "warrant": "=warrant"
+        },
         "kind": "warrant_executed",
         "text": "Warrant {warrant} has been carried out at {home}: of {tenant} and their household, {removed} were there and were put out. Possession is {landlord}'s.",
-        "basis": "=warrant",
         "to": [
           "=tenant",
           "=landlord"
@@ -384,116 +246,258 @@
           "=tenant",
           "=landlord",
           "=household"
-        ],
-        "data": {
-          "warrant": "=warrant",
-          "lease": "=lease",
-          "tenant": "=tenant",
-          "space": "=home",
-          "household": "=household",
-          "removed": "=removed"
-        }
+        ]
       }
     },
     {
-      "form": "warrant_lapsed",
-      "title": "A warrant of possession not carried out in its time",
       "does": "Tells the landlord that a warrant ran out before an officer could carry it out, and has lapsed: the landlord may ask the tribunal's registrar for another.",
       "fields": {
-        "warrant": {
-          "type": "record",
+        "landlord": {
+          "description": "The landlord.",
           "required": true,
-          "description": "The warrant."
+          "type": "entity"
         },
         "lease": {
-          "type": "record",
+          "description": "The lease.",
           "required": true,
-          "description": "The lease."
+          "type": "record"
         },
-        "landlord": {
-          "type": "entity",
+        "warrant": {
+          "description": "The warrant.",
           "required": true,
-          "description": "The landlord."
+          "type": "record"
         }
       },
+      "form": "warrant_lapsed",
+      "title": "A warrant of possession not carried out in its time",
       "writes": {
+        "basis": "=warrant",
+        "data": {
+          "lease": "=lease",
+          "warrant": "=warrant"
+        },
         "kind": "warrant_lapsed",
         "text": "Warrant {warrant} was not carried out by its last day, and has lapsed.",
-        "basis": "=warrant",
         "to": [
           "=landlord"
         ],
         "visible": [
           "=self",
           "=landlord"
-        ],
-        "data": {
-          "warrant": "=warrant",
-          "lease": "=lease"
-        }
+        ]
       }
     },
     {
-      "form": "investigation_closed",
-      "title": "An investigation closed",
       "does": "Tells whoever reported a crime that its investigation is closed, and whether it was solved.",
       "fields": {
         "report": {
-          "type": "record",
+          "description": "The report.",
           "required": true,
-          "description": "The report."
+          "type": "record"
         },
         "reporter": {
-          "type": "entity",
+          "description": "Who reported it.",
           "required": true,
-          "description": "Who reported it."
+          "type": "entity"
         },
         "solved": {
-          "type": "choice",
-          "required": true,
+          "description": "Whether it was solved.",
           "options": [
             "yes",
             "no"
           ],
-          "description": "Whether it was solved."
+          "required": true,
+          "type": "choice"
         }
       },
+      "form": "investigation_closed",
+      "title": "An investigation closed",
       "writes": {
+        "basis": "=report",
+        "data": {
+          "report": "=report",
+          "solved": "?solved"
+        },
         "kind": "investigation_closed",
         "text": "Report {report}: closed; solved {solved}.",
-        "basis": "=report",
         "to": [
           "=reporter"
         ],
         "visible": [
           "=self",
           "=reporter"
-        ],
-        "data": {
-          "report": "=report",
-          "solved": "?solved"
-        }
+        ]
       }
     }
   ],
+  "name": "police.station",
+  "params": {
+    "account": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "what it pays its staff from (its funding comes in there)",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "building": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "the station, and where its officers work (the world must say)",
+        "type": "string"
+      },
+      "source": "the station, and where its officers work (the world must say)"
+    },
+    "calls_channel": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "channel": {
+      "default": "premises",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "industry": {
+      "default": "public_safety",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "look_at": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "look_days": {
+      "default": 5,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "notice_days": {
+      "default": 14,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "officers": {
+      "default": 0,
+      "schema": {
+        "description": "the establishment (its funder's)",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "part": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "period": {
+      "default": 1209600,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "registry": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "role": {
+      "default": "police officer",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "task": {
+      "default": "investigate",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "task_seconds": {
+      "default": 14400,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "seconds"
+    },
+    "tribunal": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "where charges go",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "wage": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "working_day": {
+      "default": 28800,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "workplace": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
   "routines": [
     {
-      "task": "carry_out_warrants",
       "at": "workplace",
       "every": 1,
+      "task": "carry_out_warrants",
       "what": "On each working day an officer at the station carries out the tribunal's warrants of possession that have come to it, in the order they came and once the day each gives has come: the officer goes to the home and puts out whoever of the household is there, and the tenant and the landlord are told it is done and how many were there. A warrant its registrar has withdrawn is not gone on; one not carried out by its last day lapses and the landlord is told, and must ask again."
     },
     {
-      "task": "look_into_reports",
       "at": "workplace",
       "every": 1,
+      "task": "look_into_reports",
       "what": "Each working day the officers at the station look into the reports of goods taken that have been made to it, in the order they came, as many as their hours allow (four hours each). Where they find who took them, they lay a charge before the tribunal with what they found as evidence; where they do not, the report is closed unsolved and the person who made it is told."
     },
     {
-      "task": "call_at_homes",
       "at": "workplace",
       "every": 1,
+      "task": "call_at_homes",
       "what": "Each working day an officer goes to each home the station has been asked to call at, where a neighbour has seen nobody come out; if someone is found dead there who is not yet registered as dead, the death is reported to the registry."
     }
-  ]
+  ],
+  "state": "none",
+  "version": "0.6.0"
 }

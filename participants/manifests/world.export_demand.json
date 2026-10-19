@@ -1,7 +1,6 @@
 {
-  "name": "world.export_demand",
-  "version": "0.2.0",
   "doc": "docs/behaviour/boundary.md",
+  "name": "world.export_demand",
   "params": {
     "amount": {
       "schema": {},
@@ -16,10 +15,10 @@
       "source": "the world gives it (no default)"
     },
     "purchases": {
+      "default": [],
       "schema": {
         "type": "array"
       },
-      "default": [],
       "source": "placeholder"
     },
     "to": {
@@ -28,5 +27,6 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "version": "0.2.0"
 }

@@ -26,7 +26,7 @@ export function callsOf(action: { type: string; call?: string; reasoning?: strin
 
 /** A participant's context: its randomness from a seed, keyed by participant and purpose as the kernel's streams are. */
 export const context = (participant: string, entity: string, params: object, o: { position?: string; seed?: bigint; currency?: object; dials?: object } = {}): any => ({
-  participant, entity, position: o.position, params,
+  participant, entity, position: o.position, params, seed: Number(o.seed ?? 1n),
   rng: (purpose: string) => new Randomness(o.seed ?? 1n).stream([participant, purpose]),
   chance: (purpose: string) => new Randomness(o.seed ?? 1n).stream(["chance", purpose]),
   world: { tickSeconds: 3600, runEnd: 4000 * DAY, currency: o.currency, ...(o.dials ? { dials: o.dials } : {}) },

@@ -1,42 +1,46 @@
 {
-  "name": "world.statistics",
-  "version": "0.2.0",
+  "answers": {
+    "acts": "It publishes its figures as it makes them. It takes no requests.",
+    "office": "the statistician's office"
+  },
   "doc": "docs/behaviour/boundary.md",
+  "name": "world.statistics",
   "params": {
     "adverts": {
-      "schema": {
-        "type": "string",
-        "description": "its channel onto what sellers advertise, searched (the world must say)"
-      },
       "default": "",
       "required": true,
+      "schema": {
+        "description": "its channel onto what sellers advertise, searched (the world must say)",
+        "type": "string"
+      },
       "source": "its channel onto what sellers advertise, searched (the world must say)"
     },
     "every_days": {
+      "default": 30,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 30,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "population": {
-      "schema": {
-        "type": "integer",
-        "description": "how many lived in the town at the last census (a count; none: no estimate is published)"
-      },
       "default": 0,
+      "schema": {
+        "description": "how many lived in the town at the last census (a count; none: no estimate is published)",
+        "type": "integer"
+      },
       "source": "how many lived in the town at the last census (a count; none: no estimate is published)"
     },
     "sample": {
-      "schema": {
-        "type": "integer",
-        "description": "outlets priced a month, at most (placeholder: what one search reads)"
-      },
       "default": 200,
+      "schema": {
+        "description": "outlets priced a month, at most (placeholder: what one search reads)",
+        "type": "integer"
+      },
       "source": "outlets priced a month, at most (placeholder: what one search reads)"
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "version": "0.2.0"
 }

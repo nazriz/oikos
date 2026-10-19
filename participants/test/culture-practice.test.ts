@@ -5,9 +5,9 @@
 import { expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { CULTURE_DEFAULTS } from "../src/behaviour/culture";
-import { Org, characterOf } from "../src/behaviour/orgwants";
-import { Practice } from "../src/behaviour/practice";
+import { CULTURE_DEFAULTS } from "../src/shared/culture";
+import { Org } from "../src/shared/orgwants";
+import { Practice } from "../src/shared/practice";
 import { Randomness } from "../src/rng";
 
 const DAY = 86_400;
@@ -78,10 +78,10 @@ test("the section is bounded: at most six rows and under 500 bytes however long 
 test("a seat is not handed the practice: no part of what a seat is shown reads it", () => {
   // (The owner's ruling of 2026-10-13: a seat looks through its office's own papers. Nothing under llm/ nor the books' readers reads it.)
   const dir = join(import.meta.dir, "../src");
-  const files = [...readdirSync(join(dir, "llm")).map((f) => join(dir, "llm", f)), ...readdirSync(join(dir, "behaviour")).filter((f) => /^(openbooks|books|daybook)/.test(f)).map((f) => join(dir, "behaviour", f))];
+  const files = [...readdirSync(join(dir, "llm")).map((f) => join(dir, "llm", f)), ...readdirSync(join(dir, "readers")).map((f) => join(dir, "readers", f))];
   for (const f of files.filter((f) => f.endsWith(".ts"))) {
     const text = readFileSync(f, "utf8");
-    expect(text.includes("behaviour/practice") || text.includes('"./practice"')).toBe(false);
+    expect(text.includes("shared/practice") || text.includes('"./practice"')).toBe(false);
     expect(/\bPractice\b/.test(text.replace(/the practice|a practice|practice of|its practice|practice\)/gi, ""))).toBe(false);
   }
 });

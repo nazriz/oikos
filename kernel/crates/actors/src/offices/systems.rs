@@ -403,3 +403,73 @@ impl OfficeDesk {
         self.adoption.as_ref().map_or(0, |a| a.share(&self.fleet, kinds))
     }
 }
+
+/// An office's tender (docs/behaviour/automation.md), as participants/test/automation.test.ts held it on the TypeScript `OfficeAdoption`
+/// (gone): the figures are the test's own.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::finance::kit::{book_of, statement, Stand};
+    use crate::market::automation::{AdoptionParams, Fleet};
+    use oikos_sight::calls::program_text;
+    use serde_json::json;
+
+    fn offer_data(id: &str, setup: i64, fee: i64) -> Value {
+        json!({ "id": id, "title": id, "for": "offices", "kinds": ["rates_notice"], "template": id, "seconds": 20, "speed_bps": 1_500, "scope_bps": 6_000, "setup": setup,
+            "fee_per_year": fee * 12, "exit": 0, "term_days": 365, "notice_days": 30, "oversight_hours_per_month": 0, "error_bps": 0, "account": format!("acc-{id}"), "fee_month": fee, "references": 0 })
+    }
+    fn offer(id: &str, vendor: &str, setup: i64, fee: i64) -> Value {
+        statement(&format!("offer-{id}"), 0, "system_offer", json!({ "speaks_for": vendor }), offer_data(id, setup, fee))
+    }
+    fn bid(id: &str, vendor: &str, setup: i64, fee: i64) -> Value {
+        let mut d = offer_data(id, setup, fee);
+        d["tender"] = json!("tender-1");
+        statement(&format!("bid-{id}"), 45 * DAY, "bid", json!({ "speaks_for": vendor, "addressed_to": ["city"] }), d)
+    }
+    fn casework() -> Casework {
+        Casework { kinds: vec!["rates_notice".into()], person_seconds: [("rates_notice".to_string(), 120)].into(), wage_month: 450_000, seconds_per_worker_month: 160 * 3600, utilisation_bps: 8_000 }
+    }
+    fn review(o: &mut OfficeAdoption, stand: &mut Stand, records: Vec<Value>, t: i64, volume: i64) -> Vec<Step<DeskThen>> {
+        let c = casework();
+        let mut book = book_of("city", records);
+        let mut fleet = Fleet::new("city");
+        let ask = OfficeReview { casework: &c, volume, account: "acc-city", balance: 10_000_000_000, keep: 0, staff: 1 };
+        o.review::<DeskThen>(&mut fleet, &mut book, t, &ask, &mut stand.cx(t))
+    }
+    fn said(steps: &[Step<DeskThen>]) -> String {
+        steps.iter().map(|s| program_text(&s.program())).collect::<Vec<_>>().join("\n")
+    }
+
+    #[test]
+    fn an_office_puts_a_large_contract_to_tender_as_the_law_asks_waits_for_the_bids_and_awards_it_to_the_one_that_costs_least() {
+        let mut stand = Stand::new("city");
+        let offers = vec![offer("sys-a", "vendor-a", 10_000_000, 400_000), offer("sys-b", "vendor-b", 7_500_000, 300_000)];
+        // A large office: 40,000 notices a month (a city of a million), so a clerk's days are worth a system. Under the law's threshold: ordered at once.
+        let mut small = OfficeAdoption::new("city", AdoptionParams::default(), Some(Procurement { threshold: 10_000_000_000_000, bid_days: 30 }));
+        let direct = said(&review(&mut small, &mut stand, offers.clone(), 40 * DAY, 40_000));
+        assert!(direct.contains("kind=order") && !direct.contains("kind=tender"), "{direct}");
+        // Above it: a tender, and nothing decided while it is open.
+        let mut o = OfficeAdoption::new("city", AdoptionParams::default(), Some(Procurement { threshold: 1_000_000, bid_days: 30 }));
+        let first = said(&review(&mut o, &mut stand, offers.clone(), 40 * DAY, 40_000));
+        assert!(first.contains("kind=tender") && !first.contains("kind=order"), "{first}");
+        assert!(review(&mut o, &mut stand, offers.clone(), 50 * DAY, 40_000).is_empty());
+        // Closed, with two bids: the dearer is passed over. (The tender's id as the world gave it.)
+        o.tender.as_mut().expect("a tender out").id = Some("tender-1".into());
+        let mut all = offers.clone();
+        all.extend([bid("sys-a", "vendor-a", 10_000_000, 400_000), bid("sys-b", "vendor-b", 7_500_000, 300_000)]);
+        let awarded = said(&review(&mut o, &mut stand, all, 75 * DAY, 40_000));
+        assert!(awarded.contains("system:sys-b") && !awarded.contains("system:sys-a"), "{awarded}");
+        // With no bids it awards nothing.
+        let mut none = OfficeAdoption::new("city", AdoptionParams::default(), Some(Procurement { threshold: 1_000_000, bid_days: 30 }));
+        review(&mut none, &mut stand, offers.clone(), 40 * DAY, 40_000);
+        none.tender.as_mut().expect("a tender out").id = Some("tender-9".into());
+        assert!(review(&mut none, &mut stand, offers, 75 * DAY, 40_000).is_empty());
+    }
+
+    #[test]
+    fn a_small_office_whose_papers_cost_its_staff_little_takes_none_at_any_of_these_prices() {
+        let mut stand = Stand::new("city");
+        let mut o = OfficeAdoption::new("city", AdoptionParams::default(), Some(Procurement { threshold: 1_000_000, bid_days: 30 }));
+        assert!(review(&mut o, &mut stand, vec![offer("sys-a", "vendor-a", 2_325_000, 31_000)], 40 * DAY, 400).is_empty());
+    }
+}

@@ -1,11 +1,11 @@
-// The days returns of tax withheld from wages fall due (participants/src/behaviour/returns.ts): the calendar function on a
+// The days returns of tax withheld from wages fall due (participants/src/shared/returns.ts): the calendar function on a
 // shared table of cases, each profile's rule against its charges, and what a law lists.
 
 import { expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { dueFrom, nextReturn, returnsOf, returnRulesOf } from "../src/behaviour/returns";
-import { taxLawOf } from "../src/behaviour/tax";
+import { dueFrom, nextReturn, returnsOf, returnRulesOf } from "../src/shared/returns";
+import { taxLawOf } from "../src/shared/tax";
 
 const DAY = 86_400;
 const root = join(import.meta.dir, "../..");

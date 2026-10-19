@@ -4,13 +4,11 @@
 // brain), with no actor behind it. A world names the kind and the engine runs it; `create` here only says so. Each
 // entry is the deleted module's own, word for word (the generated town is the same to the byte: worlds/test).
 
-import type { BehaviourModule, Controller } from "./module";
-import * as P from "./behaviour/papers";
+import type { BehaviourModule } from "./module";
+import { inEngine } from "./in-engine";
+import * as P from "./shared/papers";
 
 const DAY = 86_400;
-const inEngine = (name: string) => (): Controller => {
-  throw new Error(`${name} runs in the engine (kernel/crates/actors); its TypeScript actor was deleted at the cut-over`);
-};
 
 /** bank.payment_system, as the deleted participants/src/behaviour/bank.ts had it. */
 export const bankPaymentSystem: BehaviourModule = {
@@ -19,7 +17,7 @@ export const bankPaymentSystem: BehaviourModule = {
     { what: "request", why: "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it." },
     { what: "accounts", why: "The ledger is the bank's own book: it keeps its customers' accounts, and pays from them as they instruct." },
   ],
-  version: "0.17.1", // 0.17.1: the payer of a standing order into a dead person's account is told at each payment, not once (a letter to an office nobody held was lost, and the wage went on for good: foundations F6); 0.17.0: 0.17.0: each payment carries what its payer said it was for (the line on a statement: docs/behaviour/firms.md, "Wages owed"); 0.16.0: a withdrawal of a standing instruction, of a hold, or an instruction that replaces another, is acted on only from whoever may instruct on the paying account; anyone else is answered and the instruction stands. 0.15.0: its list of a customer's standing instructions says of each who gave it, when, and what it cites. 0.14.0: it keeps a ledger of what it has paid in and out of each account, and a letter is answered with a statement from it (until then, with the payments new at that look: nearly always none)
+  version: "0.18.0", // 0.17.1: the payer of a standing order into a dead person's account is told at each payment, not once (a letter to an office nobody held was lost, and the wage went on for good: foundations F6); 0.17.0: 0.17.0: each payment carries what its payer said it was for (the line on a statement: docs/behaviour/firms.md, "Wages owed"); 0.16.0: a withdrawal of a standing instruction, of a hold, or an instruction that replaces another, is acted on only from whoever may instruct on the paying account; anyone else is answered and the instruction stands. 0.15.0: its list of a customer's standing instructions says of each who gave it, when, and what it cites. 0.14.0: it keeps a ledger of what it has paid in and out of each account, and a letter is answered with a statement from it (until then, with the payments new at that look: nearly always none)
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -56,7 +54,7 @@ export const newspaper: BehaviourModule = {
   answers: {"office": "the paper's editor", "acts": "The paper reports the public record. It prints no letters."},
   issues: P.EDITOR,
   issuesWith: (p) => ({ town: p.town }),
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/news.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3600 + ctx.rng("first-wake").below(3600),
@@ -166,7 +164,7 @@ export const trade: BehaviourModule = {
     { what: "future", why: "A researcher's scripted shocks to world prices and demand are a scenario's boundary condition: this module is the world market and applies each from its day, publishing nothing of one before it comes." },
     { what: "every:factory", why: "The outside world's demand for the town's goods is a boundary condition, split when the world is made among the factories that export." },
   ],
-  version: "0.3.0", // 0.3.0: sells to a factory on terms (pay within some days of delivery) where its world gives them, stops supplying one that has not paid, and records the debt against it later (docs/behaviour/trade.md, "Trade credit"); 0.2.1: a month's world price is drawn for the good and the month from the seed, never for the hour this office wakes in (a town and its twin see the same prices);
+  version: "0.4.0", // 0.3.0: sells to a factory on terms (pay within some days of delivery) where its world gives them, stops supplying one that has not paid, and records the debt against it later (docs/behaviour/trade.md, "Trade credit"); 0.2.1: a month's world price is drawn for the good and the month from the seed, never for the hour this office wakes in (a town and its twin see the same prices);
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,

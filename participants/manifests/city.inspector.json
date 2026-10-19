@@ -1,120 +1,47 @@
 {
-  "name": "city.inspector",
-  "version": "0.7.0",
-  "doc": "docs/behaviour/institutions.md",
-  "params": {
-    "compliance_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 10000,
-      "source": "placeholder"
-    },
-    "directed_under": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "direction_compliance_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 10000,
-      "source": "placeholder"
-    },
-    "fine": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 5000000,
-      "source": "placeholder"
-    },
-    "register": {
-      "schema": {
-        "type": "object",
-        "description": "the land register, asked about one lot"
-      },
-      "default": {
-        "lots": "lots",
-        "titles": "titles",
-        "dealings": "dealings"
-      },
-      "source": "placeholder"
-    },
-    "sites": {
-      "schema": {
-        "type": "string",
-        "description": "the channel it goes to a site through (a visit)"
-      },
-      "default": "sites",
-      "source": "placeholder"
-    },
-    "valuer": {
-      "schema": {
-        "type": "string",
-        "description": "whom it tells of what was built or brought down (none: nobody)"
-      },
-      "default": "",
-      "source": "placeholder"
-    }
+  "answers": {
+    "acts": "What it acts on: a notice of building work given to the town, whose site it goes to see; and a direction on its enforcement form (inspector_enforcement) from those the town's rule on directions names.",
+    "office": "the building inspector's office",
+    "report": true
   },
-  "perceives": [],
-  "state": "none",
-  "takes": [
-    {
-      "form": "inspector_enforcement",
-      "title": "Enforcement direction to the building inspector",
-      "fields": {
-        "fines": {
-          "type": "choice",
-          "options": [
-            "yes",
-            "no"
-          ],
-          "required": true,
-          "description": "Whether a breach the inspector finds is fined and ordered demolished: yes, as the office does of its own accord; no, it is recorded and nothing more."
-        },
-        "fine": {
-          "type": "amount",
-          "description": "The fine for a breach, where it is to be other than the office's usual one."
-        }
-      },
-      "follows": "While a direction with fines no stands, the inspector still goes to the sites it is told of and still tells the valuer what was built, but lays no fine and makes no demolition order on a breach: it records the breach in its report. With fines yes, it fines and orders as before, at the amount given if one is."
-    }
-  ],
+  "doc": "docs/behaviour/institutions.md",
   "issues": [
     {
-      "form": "valuation_request",
-      "title": "Request to the valuer for a supplementary valuation",
       "does": "Asks the valuer to value a lot again after building work, so that its rates follow what now stands on it.",
       "fields": {
-        "notice": {
-          "type": "record",
-          "required": true,
-          "description": "The notice of building work it follows from."
-        },
         "lot": {
-          "type": "lot",
-          "description": "The lot."
+          "description": "The lot.",
+          "type": "lot"
         },
-        "structure": {
-          "type": "structure",
-          "description": "What was built."
-        },
-        "structure_type": {
-          "type": "structure_type",
-          "description": "The kind of building."
+        "notice": {
+          "description": "The notice of building work it follows from.",
+          "required": true,
+          "type": "record"
         },
         "removed": {
-          "type": "structure",
-          "description": "What was demolished."
+          "description": "What was demolished.",
+          "type": "structure"
+        },
+        "structure": {
+          "description": "What was built.",
+          "type": "structure"
+        },
+        "structure_type": {
+          "description": "The kind of building.",
+          "type": "structure_type"
         }
       },
+      "form": "valuation_request",
+      "title": "Request to the valuer for a supplementary valuation",
       "writes": {
+        "basis": "=notice",
+        "data": {
+          "lot": "=lot",
+          "removed": "=removed",
+          "structure": "=structure",
+          "structure_type": "=structure_type"
+        },
+        "kind": "valuation_request",
         "sends": [
           {
             "to": [
@@ -123,58 +50,136 @@
             "why": "The valuer values the town's lots: the request is the valuer's to act on."
           }
         ],
-        "kind": "valuation_request",
         "text": "Supplementary valuation asked for, on notice {notice}.",
-        "basis": "=notice",
         "to": [
           "@valuer"
-        ],
-        "data": {
-          "lot": "=lot",
-          "structure": "=structure",
-          "structure_type": "=structure_type",
-          "removed": "=removed"
-        }
+        ]
       }
     },
     {
-      "form": "demolition_order",
-      "title": "Order to demolish a building",
       "does": "Orders an owner to take down a building put up in breach of a law.",
       "fields": {
-        "owner": {
-          "type": "entity",
-          "required": true,
-          "description": "The owner ordered to demolish it."
-        },
-        "structure": {
-          "type": "structure",
-          "required": true,
-          "description": "The building."
-        },
         "law": {
-          "type": "record",
+          "description": "The law it was built in breach of.",
           "required": true,
-          "description": "The law it was built in breach of."
+          "type": "record"
         },
         "lot": {
-          "type": "lot",
-          "description": "The lot it stands on."
+          "description": "The lot it stands on.",
+          "type": "lot"
+        },
+        "owner": {
+          "description": "The owner ordered to demolish it.",
+          "required": true,
+          "type": "entity"
+        },
+        "structure": {
+          "description": "The building.",
+          "required": true,
+          "type": "structure"
         }
       },
+      "form": "demolition_order",
+      "title": "Order to demolish a building",
       "writes": {
+        "basis": "=law",
+        "data": {
+          "law": "=law",
+          "lot": "=lot",
+          "structure": "=structure"
+        },
         "kind": "demolition_order",
         "text": "Order: demolish {structure}, built in breach of {law}.",
-        "basis": "=law",
         "to": [
           "=owner"
-        ],
-        "data": {
-          "structure": "=structure",
-          "lot": "=lot",
-          "law": "=law"
-        }
+        ]
       }
     }
-  ]
+  ],
+  "name": "city.inspector",
+  "params": {
+    "compliance_bps": {
+      "default": 10000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "directed_under": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "direction_compliance_bps": {
+      "default": 10000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "fine": {
+      "default": 5000000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "register": {
+      "default": {
+        "dealings": "dealings",
+        "lots": "lots",
+        "titles": "titles"
+      },
+      "schema": {
+        "description": "the land register, asked about one lot",
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "sites": {
+      "default": "sites",
+      "schema": {
+        "description": "the channel it goes to a site through (a visit)",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "valuer": {
+      "default": "",
+      "schema": {
+        "description": "whom it tells of what was built or brought down (none: nobody)",
+        "type": "string"
+      },
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "takes": [
+    {
+      "fields": {
+        "fine": {
+          "description": "The fine for a breach, where it is to be other than the office's usual one.",
+          "type": "amount"
+        },
+        "fines": {
+          "description": "Whether a breach the inspector finds is fined and ordered demolished: yes, as the office does of its own accord; no, it is recorded and nothing more.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "type": "choice"
+        }
+      },
+      "follows": "While a direction with fines no stands, the inspector still goes to the sites it is told of and still tells the valuer what was built, but lays no fine and makes no demolition order on a breach: it records the breach in its report. With fines yes, it fines and orders as before, at the amount given if one is.",
+      "form": "inspector_enforcement",
+      "title": "Enforcement direction to the building inspector"
+    }
+  ],
+  "version": "0.7.0"
 }

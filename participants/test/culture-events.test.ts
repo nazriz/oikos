@@ -3,76 +3,16 @@
 // and no size of its own; and by no route but the three. Arithmetic and a citizen's ears only: no model, no clock.
 
 import { expect, test } from "bun:test";
-import { citizen } from "../src/behaviour/citizen";
-import { Culture, CULTURE_DEFAULTS, cultureDial, standardNormal, type Conduct, type CultureEnv } from "../src/behaviour/culture";
-import { EVENT_CONDUCTS, EVENT_KINDS, TOWN_WORDS, TownMemory } from "../src/behaviour/townmemory";
+
+import { cultureDial, type Conduct } from "../src/shared/culture";
 import { RECORD } from "../src/module";
-import { Randomness } from "../src/rng";
 import { DAY, person } from "./stepping";
+import { engine } from "./engine";
+import { TOWN_WORDS } from "./phrasing";
+const citizen = engine("citizen.default");
 
 const RATES: { [c in Conduct]?: number } = { strike: 8_500, join_union: 3_500, apply_possession: 5_000, stay_past_notice: 2_000 };
 const dial = () => cultureDial({ dials: { culture: {} } })!;
-const mk = (i = 1) => {
-  const d = dial();
-  const env: CultureEnv = { z: () => 0, conformity: () => 0.5, belonging: () => 0.5, integrity: () => 0.5, draw: (c) => standardNormal(new Randomness(3n).stream([`q${i}`, c])) };
-  return new Culture(d.params, d, env, RATES, undefined, 0);
-};
-
-test("an event is one sighting by the rule that exists: the route's weight times how strongly it is held; a retold event counts for less", () => {
-  const P = CULTURE_DEFAULTS;
-  const seen = mk(), one = mk(), two = mk(), three = mk(), close = mk(), ref = mk();
-  const start = ref.read("strike", 0)!.does;
-  seen.sawEvent("strike", "here", 10_000);
-  ref.seeAct("strike", true, "here");
-  expect(seen.read("strike", 0)!.does).toBe(ref.read("strike", 0)!.does); // (seen, full strength: exactly a sighting by being there)
-  one.sawEvent("strike", "tie", 6_000);   // told by a witness: 60% of theirs
-  two.sawEvent("strike", "tie", 3_600);   // one hand further
-  three.sawEvent("strike", "tie", 2_160); // and one more
-  const gain = (c: Culture) => c.read("strike", 0)!.does - start;
-  expect(gain(seen)).toBeGreaterThan(gain(one));
-  expect(gain(one)).toBeGreaterThan(gain(two));
-  expect(gain(two)).toBeGreaterThan(gain(three));
-  expect(gain(three)).toBeGreaterThan(0);
-  // By the rule, written out: does += (10,000 - does) * w / (n + w), w = weight x strength, n = the prior's weight.
-  const w = P.known_weight * 0.6;
-  expect(one.read("strike", 0)!.does).toBe(Math.round(start + ((10_000 - start) * w) / (P.prior_weight + w)));
-  close.sawEvent("strike", "close_tie", 6_000);
-  expect(gain(close)).toBeGreaterThan(gain(one)); // (a close tie's telling weighs more, as any hearing does)
-});
-
-test("the teller's said view is one hearing of approval at the same weight; no view, no hearing; a conduct the person does not hold moves nothing", () => {
-  const a = mk(), b = mk(), c = mk();
-  const start = a.read("strike", 0)!.approves;
-  a.sawEvent("strike", "tie", 6_000, 1_000); // told by one who says it is plainly wrong
-  b.sawEvent("strike", "tie", 6_000);
-  expect(a.read("strike", 0)!.approves).toBeLessThan(start);
-  expect(b.read("strike", 0)!.approves).toBe(start);
-  const w = 0.6;
-  expect(a.read("strike", 0)!.approves).toBe(Math.round(start + ((1_000 - start) * w) / (CULTURE_DEFAULTS.prior_weight + w + w))); // (the sighting is counted first, as for any act heard with its judgement)
-  c.sawEvent("take_in", "tie", 10_000, 1_000); // (not held here: nothing)
-  expect(c.has("take_in")).toBe(false);
-});
-
-test("no route but the three: an event cannot reach a picture by a register, a directory or a count", () => {
-  const c = mk();
-  const before = JSON.stringify(c.section(0));
-  for (const route of ["register", "directory", "town", "census", "everyone", ""]) expect(() => c.sawEvent("strike", route as any, 10_000, 1_000)).toThrow(/along a tie, by being there, or by what is published/);
-  expect(JSON.stringify(c.section(0))).toBe(before);
-});
-
-test("only a removal and a walk-out show a conduct a person holds; the words carry the teller's said view and round-trip", () => {
-  expect(Object.keys(EVENT_CONDUCTS).sort()).toEqual(["put_out", "strike"]);
-  expect(EVENT_KINDS.filter((k) => !EVENT_CONDUCTS[k])).toEqual(["ruling", "law", "vote", "founded"]);
-  const t = TOWN_WORDS.say("strike", "works", 5, 6_000, 1, 1_000);
-  expect(t).toContain("Of that, I say it is plainly wrong.");
-  expect(TOWN_WORDS.heard(`Much the same. ${t} Nothing else.`)).toMatchObject({ kind: "strike", about: "works", hops: 1, says: 1_000 });
-  expect(TOWN_WORDS.heard(TOWN_WORDS.say("strike", "works", 5, 6_000, 1))!.says).toBeUndefined();
-  expect(TOWN_WORDS.heard(TOWN_WORDS.say("put_out", "police", 5, 6_000, 1, 5_000))!.says).toBe(5_000);
-  const m = new TownMemory(dial().params);
-  m.saw("strike", "works", 5 * DAY, 6 * DAY);
-  expect(m.tell("a", 7 * DAY, () => 3_000)).toContain("I say it is wrong.");
-  expect(m.tell("b", 7 * DAY)).not.toContain("Of that");
-});
 
 // ---- a citizen
 

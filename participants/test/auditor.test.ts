@@ -1,10 +1,12 @@
 // The audit office (docs/behaviour/auditor.md) as a module: what it asks, of whom, when; what a new holder of its post does with the office's papers; and what an
 // audited body answers, and to whom. Laws of no place.
 import { expect, test } from "bun:test";
-import { auditor, Audited, KIND } from "../src/behaviour/auditor";
-import { Book } from "../src/behaviour/common";
+// (The papers the office runs on, as the deleted TypeScript module named them.)
+const KIND = { request: "audit_request", answer: "audit_answer", finding: "audit_finding", report: "audit_report" } as const;
 import { inCurrency } from "../src/money";
 import { context, DAY, statement, wake } from "./stepping";
+import { engine } from "./engine";
+const auditor = engine("office.auditor");
 
 inCurrency({ code: "XTS", minor_units: 2 });
 const law = statement("law-audit", 0, "law", { speaks_for: "outside", data: { audit: { auditor: "auditor", office: "the audit office", answer_within_days: 28, report_within_days: 120,
@@ -59,14 +61,6 @@ test("it reports only when every number asked has been answered or its days have
   expect(late[0]!.args.visible).toBe("public");
 });
 
-test("a body answers the auditor the law names, once, for the thing asked, and nobody else", () => {
-  const body = new Audited("outside");
-  const ask = (id: string, who: string, data: object) => statement(id, 91 * DAY, KIND.request, { speaks_for: who, visible_to: "public", data });
-  const book = new Book();
-  book.absorb({ t: 92 * DAY, entity: "outside", participant: "x", inbox: [], outcomes: [], woke_for: "cadence", channels: { book: { kind: "records", records: [law, ask("q1", "auditor", { audit: KEY, body: "support", ask: "count", kind: "benefit_decision", from: 0, to: 90 * DAY }),
-    ask("q2", "someone-else", { audit: KEY, body: "support", ask: "count", kind: "benefit_decision", from: 0, to: 90 * DAY }), ask("q3", "auditor", { audit: "town_finance|accounts|1", body: "town_finance", ask: "statement", from: 0, to: 90 * DAY })] } } } as any);
-  const said = body.steps(book, { count: () => 17, statement: () => ({ books: [], bank: [] }) });
-  // (q3 names a role this body is not; q2 is not the auditor's)
-  expect(said.length).toBe(1);
-  expect(body.steps(book, { count: () => 17 }).length).toBe(0);
-});
+// (The case "a body answers the auditor the law names, once, for the thing asked, and nobody else" exercised the deleted TypeScript
+// `Audited` class as a library; the engine's own test of it is `an_audited_body_answers_what_is_asked_once_from_its_own_books_and_nothing_else`
+// in kernel/crates/actors/src/offices/auditor.rs.)

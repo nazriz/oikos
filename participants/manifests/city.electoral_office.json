@@ -1,92 +1,48 @@
 {
-  "name": "city.electoral_office",
-  "version": "0.7.0",
   "doc": "docs/behaviour/elections.md",
-  "params": {
-    "first_poll_day": {
-      "schema": {
-        "type": "integer",
-        "description": "the first polling day (the world gives it)"
+  "issues": [
+    {
+      "fields": {
+        "method": {
+          "description": "How the votes are counted.",
+          "options": [
+            "preferential",
+            "plurality"
+          ],
+          "required": true,
+          "type": "choice"
+        },
+        "nominations_close_at": {
+          "description": "When nominations close.",
+          "required": true,
+          "type": "date"
+        },
+        "office": {
+          "description": "The office to be filled (the post, by its id).",
+          "required": true,
+          "type": "entity"
+        },
+        "poll_at": {
+          "description": "Polling day.",
+          "required": true,
+          "type": "date"
+        }
       },
-      "default": 365,
-      "source": "the first polling day (the world gives it)"
-    },
-    "method": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "preferential",
-      "source": "placeholder"
-    },
-    "nominations_close_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 30,
-      "source": "placeholder"
-    },
-    "nominations_open_days": {
-      "schema": {
-        "type": "integer",
-        "description": "before polling day"
-      },
-      "unit": "days",
-      "default": 60,
-      "source": "placeholder"
-    },
-    "office": {
-      "schema": {
-        "type": "string",
-        "description": "the position elected (the world must say)"
-      },
-      "default": "",
-      "required": true,
-      "source": "the position elected (the world must say)"
-    },
-    "office_title": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "seats": {
-      "schema": {
-        "type": "boolean"
-      },
-      "default": true,
-      "source": "placeholder"
-    },
-    "term_days": {
-      "schema": {
-        "type": "integer",
-        "description": "the charter's term (the world gives it)"
-      },
-      "unit": "days",
-      "default": 1460,
-      "source": "the charter's term (the world gives it)"
-    },
-    "town": {
-      "schema": {
-        "type": "string",
-        "description": "with whom electors enrol and candidates nominate: the electoral body itself"
-      },
-      "default": "e",
-      "source": "placeholder"
-    },
-    "voting_days": {
-      "schema": {
-        "type": "integer",
-        "description": "the ballot is open this long, ending on polling day"
-      },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
+      "form": "election_notice",
+      "title": "Notice of an election",
+      "writes": {
+        "data": {
+          "method": "=method",
+          "nominations_close_at": "=nominations_close_at",
+          "office": "=office",
+          "poll_at": "=poll_at"
+        },
+        "kind": "election_notice",
+        "text": "Election for {office}: nominations close {nominations_close_at}; polling {poll_at}.",
+        "visible": "public"
+      }
     }
-  },
-  "perceives": [],
-  "state": "none",
+  ],
   "keeps": [
     {
       "what": "enrolment",
@@ -97,47 +53,91 @@
       "why": "The roll it publishes at each election is its own."
     }
   ],
-  "issues": [
-    {
-      "form": "election_notice",
-      "title": "Notice of an election",
-      "fields": {
-        "office": {
-          "type": "entity",
-          "required": true,
-          "description": "The office to be filled (the post, by its id)."
-        },
-        "poll_at": {
-          "type": "date",
-          "required": true,
-          "description": "Polling day."
-        },
-        "nominations_close_at": {
-          "type": "date",
-          "required": true,
-          "description": "When nominations close."
-        },
-        "method": {
-          "type": "choice",
-          "required": true,
-          "options": [
-            "preferential",
-            "plurality"
-          ],
-          "description": "How the votes are counted."
-        }
+  "name": "city.electoral_office",
+  "params": {
+    "first_poll_day": {
+      "default": 365,
+      "schema": {
+        "description": "the first polling day (the world gives it)",
+        "type": "integer"
       },
-      "writes": {
-        "kind": "election_notice",
-        "text": "Election for {office}: nominations close {nominations_close_at}; polling {poll_at}.",
-        "visible": "public",
-        "data": {
-          "office": "=office",
-          "poll_at": "=poll_at",
-          "nominations_close_at": "=nominations_close_at",
-          "method": "=method"
-        }
-      }
+      "source": "the first polling day (the world gives it)"
+    },
+    "method": {
+      "default": "preferential",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "nominations_close_days": {
+      "default": 30,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "nominations_open_days": {
+      "default": 60,
+      "schema": {
+        "description": "before polling day",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "office": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "the position elected (the world must say)",
+        "type": "string"
+      },
+      "source": "the position elected (the world must say)"
+    },
+    "office_title": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "seats": {
+      "default": true,
+      "schema": {
+        "type": "boolean"
+      },
+      "source": "placeholder"
+    },
+    "term_days": {
+      "default": 1460,
+      "schema": {
+        "description": "the charter's term (the world gives it)",
+        "type": "integer"
+      },
+      "source": "the charter's term (the world gives it)",
+      "unit": "days"
+    },
+    "town": {
+      "default": "e",
+      "schema": {
+        "description": "with whom electors enrol and candidates nominate: the electoral body itself",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "voting_days": {
+      "default": 14,
+      "schema": {
+        "description": "the ballot is open this long, ending on polling day",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
     }
-  ]
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.7.0"
 }

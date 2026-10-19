@@ -6,7 +6,7 @@
 // (`StandingWork.order`), from what the seat already has.
 
 import type { Observation, Record } from "../contracts";
-import { Book, StandingWork } from "../behaviour/common";
+import { Book, StandingWork } from "../shared/common";
 
 export interface CounterView {
   /** Whether a paper that has come is the counter's (not the seat's): of a kind the procedure lists, while the order is

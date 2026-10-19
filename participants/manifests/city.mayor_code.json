@@ -1,199 +1,91 @@
 {
-  "name": "city.mayor_code",
-  "version": "0.12.1",
-  "doc": "docs/behaviour/government.md",
-  "params": {
-    "administration_budget": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "budget_lead_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 0,
-      "source": "placeholder"
-    },
-    "builder": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "required": true,
-      "source": "placeholder"
-    },
-    "electoral": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "environment_budget": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "park_budget": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 8000000,
-      "source": "placeholder"
-    },
-    "park_type": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "park",
-      "source": "placeholder"
-    },
-    "petition_threshold_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 1500,
-      "source": "placeholder"
-    },
-    "population": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 200,
-      "source": "placeholder"
-    },
-    "responsiveness_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 7000,
-      "source": "placeholder"
-    },
-    "road_budget": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "road_type": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "road",
-      "source": "placeholder"
-    },
-    "road_within": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 3,
-      "source": "placeholder"
-    },
-    "services_budget": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "sight_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 30,
-      "source": "placeholder"
-    },
-    "staff_budget": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "stands_again": {
-      "schema": {
-        "type": "boolean",
-        "description": "false: it doesn't stand at the next election (retiring)"
-      },
-      "default": true,
-      "source": "placeholder"
-    },
-    "visits": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    }
+  "answers": {
+    "acts": "What it acts on: a petition once its organiser's published count reaches the town's threshold; an invoice for work this office commissioned, which it approves in writing; and each year's budget, which it puts to the council. It gives no direction by letter.",
+    "forms": [
+      {
+        "about": [
+          "direction",
+          "direct ",
+          "staff",
+          "recruit",
+          "hire",
+          "hiring",
+          "crew",
+          "vacanc",
+          "posts"
+        ],
+        "say": "If your letter asks for a direction: this office has given none on the matter, and an office needs none to act within its own powers and its budget line."
+      }
+    ],
+    "office": "the mayor's office"
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/government.md",
   "issues": [
     {
-      "form": "invoice_approval",
-      "title": "The mayor's written approval of an invoice",
       "fields": {
         "invoice": {
-          "type": "record",
+          "description": "The invoice approved for payment.",
           "required": true,
-          "description": "The invoice approved for payment."
+          "type": "record"
         }
       },
+      "form": "invoice_approval",
+      "title": "The mayor's written approval of an invoice",
       "writes": {
-        "kind": "approval",
-        "text": "Approved for payment: {invoice}.",
         "basis": "=invoice",
-        "to": [
-          "=self"
-        ],
         "data": {
           "invoice": "=invoice"
-        }
+        },
+        "kind": "approval",
+        "text": "Approved for payment: {invoice}.",
+        "to": [
+          "=self"
+        ]
       }
     },
     {
-      "form": "nomination",
-      "title": "Nomination for an office at an election",
       "fields": {
-        "office": {
-          "type": "entity",
-          "required": true,
-          "description": "The office stood for (the post, by its id)."
-        },
-        "name": {
-          "type": "text",
-          "required": true,
-          "description": "The name to go on the ballot."
-        },
-        "platform": {
-          "type": "text",
-          "required": true,
-          "description": "What the candidate puts to the electors."
-        },
         "incumbent": {
-          "type": "choice",
+          "description": "Whether the candidate holds the office now.",
           "options": [
             "yes",
             "no"
           ],
-          "description": "Whether the candidate holds the office now."
+          "type": "choice"
+        },
+        "name": {
+          "description": "The name to go on the ballot.",
+          "required": true,
+          "type": "text"
+        },
+        "office": {
+          "description": "The office stood for (the post, by its id).",
+          "required": true,
+          "type": "entity"
+        },
+        "platform": {
+          "description": "What the candidate puts to the electors.",
+          "required": true,
+          "type": "text"
         },
         "values": {
-          "type": "list",
-          "description": "What the candidate stands for, in a word or two each."
+          "description": "What the candidate stands for, in a word or two each.",
+          "type": "list"
         }
       },
+      "form": "nomination",
+      "title": "Nomination for an office at an election",
       "writes": {
+        "assertion": {
+          "that": "=platform"
+        },
+        "data": {
+          "incumbent": "?incumbent",
+          "name": "=name",
+          "office": "=office",
+          "values": "=values"
+        },
+        "kind": "nomination",
         "sends": [
           {
             "to": [
@@ -202,56 +94,191 @@
             "why": "The body that runs the election takes the nominations and puts the names on the ballot paper."
           }
         ],
-        "kind": "nomination",
         "text": "Nomination for {office}: {name}. {platform}",
         "to": [
           "@electoral"
         ],
-        "visible": "public",
-        "assertion": {
-          "that": "=platform"
-        },
-        "data": {
-          "office": "=office",
-          "name": "=name",
-          "incumbent": "?incumbent",
-          "values": "=values"
-        }
+        "visible": "public"
       }
     },
     {
-      "form": "petition_response",
-      "title": "Answer to a petition",
       "does": "Answers a petition publicly, to its organiser: what has been done about what it asks (put to the council, or not, and why). The answer is written in full on the form (`answer`): what has been done about what the petition asks, or why not, in the mayor's own words; it is the paper's text. It puts nothing to the council by itself: that is the council proposal form, or a law's amendment form.",
       "fields": {
-        "petition": {
-          "type": "record",
+        "answer": {
+          "description": "What is answered, in full: what has been done about what the petition asks, or why not.",
           "required": true,
-          "description": "The petition answered."
+          "type": "text"
         },
         "organiser": {
-          "type": "entity",
-          "description": "Its organiser."
+          "description": "Its organiser.",
+          "type": "entity"
         },
-        "answer": {
-          "type": "text",
+        "petition": {
+          "description": "The petition answered.",
           "required": true,
-          "description": "What is answered, in full: what has been done about what the petition asks, or why not."
+          "type": "record"
         }
       },
+      "form": "petition_response",
+      "title": "Answer to a petition",
       "writes": {
+        "basis": "=petition",
+        "data": {
+          "answer": "=answer",
+          "petition": "=petition"
+        },
         "kind": "petition_response",
         "text": "Answer to petition {petition}: {answer}",
-        "basis": "=petition",
         "to": [
           "=organiser"
         ],
-        "visible": "public",
-        "data": {
-          "petition": "=petition",
-          "answer": "=answer"
-        }
+        "visible": "public"
       }
     }
-  ]
+  ],
+  "name": "city.mayor_code",
+  "params": {
+    "administration_budget": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "budget_lead_days": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "builder": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "electoral": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "environment_budget": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "park_budget": {
+      "default": 8000000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "park_tries": {
+      "default": 3,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "park_type": {
+      "default": "park",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "petition_threshold_bps": {
+      "default": 1500,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "population": {
+      "default": 200,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "responsiveness_bps": {
+      "default": 7000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "road_budget": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "road_type": {
+      "default": "road",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "road_within": {
+      "default": 3,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "services_budget": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "sight_days": {
+      "default": 30,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "staff_budget": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "stands_again": {
+      "default": true,
+      "schema": {
+        "description": "false: it doesn't stand at the next election (retiring)",
+        "type": "boolean"
+      },
+      "source": "placeholder"
+    },
+    "visits": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.12.1"
 }

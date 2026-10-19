@@ -7,7 +7,8 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { ASKING, View } from "@oikos/participants";
+import { View } from "@oikos/participants";
+import { ASKING } from "../../participants/test/phrasing";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 

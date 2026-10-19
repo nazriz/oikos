@@ -2,7 +2,7 @@
 // paper the worlds' own offices issue with every field filled, and the wide kinds of refusal brief.
 import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
-import * as PAPERS from "../../participants/src/behaviour/papers";
+import * as PAPERS from "../../participants/src/shared/papers";
 import { ASKERS, askerFor, BROAD_DEAL, DATA_VERSION, DEAL, fromWritten, PAPER_ASKERS, planOf, refusalBriefs, REGISTERS, STYLES, sampler, whyNot, type PlanItem } from "../train/data";
 import { payments, synthetic, worldForms } from "../train/synthetic";
 

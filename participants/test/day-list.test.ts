@@ -12,8 +12,8 @@
 import { expect, test } from "bun:test";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import type { Observation } from "../src/contracts";
-import { booksPaper, Clerk } from "../src/behaviour/books";
-import { tribunalMemberBooks } from "../src/behaviour/openbooks-venues";
+import { booksPaper, Clerk } from "../src/readers/books";
+import { tribunalMemberBooks } from "../src/readers/openbooks-venues";
 import type { OpenHeading } from "../src/module";
 import { inCurrency } from "../src/money";
 import { parseProgram } from "../src/calls";

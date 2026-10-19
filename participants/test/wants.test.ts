@@ -3,7 +3,7 @@
 // bounded list, growing and giving up; and the symmetric sway.
 
 import { expect, test } from "bun:test";
-import { bringsOf, meets, swayed, Wants, WANT_DEFAULTS, type Opening, type Want } from "../src/behaviour/wants";
+import { swayed, Wants, WANT_DEFAULTS, type Want } from "../src/shared/wants";
 
 const DAY = 86_400, MONTH = 30 * DAY;
 const posting = { terms: { commitments: [
@@ -16,30 +16,6 @@ const membership = { terms: { commitments: [
   { who: "union", does: { text: "Represents the member at work, and bargains for them." } },
   { who: "taker", does: { outcome: { money: { to: "acc-union", amount: "2000" } } }, every: MONTH }] } };
 const want = (x: Partial<Want>): Want => ({ about: "x", seeks: [], weight: 5_000, since: 0, from: "event", tried: 0, grown: 0, ...x });
-
-test("what an offer brings is read from its typed terms: a posting brings money and asks work; a listing a home, and money kept if it asks less than is paid now; words bring nothing typed", () => {
-  expect(bringsOf(posting)).toEqual(["money.to", "work"]);
-  expect(bringsOf(listing(100_000))).toEqual(["occupancy"]);
-  expect(bringsOf(listing(90_000), 100_000)).toEqual(["money.from", "occupancy"]);
-  expect(bringsOf(listing(110_000), 100_000)).toEqual(["occupancy"]);
-  expect(bringsOf(membership)).toEqual([]);
-  expect(bringsOf(undefined)).toEqual([]);
-});
-
-test("a want and an opening meet by the outcome sought, by the paper in the way, or by whom the want concerns; and by nothing else", () => {
-  const board: Opening = { key: "offer:employment", kind: "offer:employment", brings: ["money.to", "work"] };
-  const landlord: Opening = { key: "ask:landlord-1", kind: "ask", brings: [], undoes: { record: "inc-1" }, bears: ["landlord-1"] };
-  const desk: Opening = { key: "desk:tribunal", kind: "desk", brings: [], undoes: { kinds: ["rent_increase", "debt"] } };
-  const union: Opening = { key: "join:union", kind: "join", brings: [], bears: ["factory-1"] };
-  const rise = want({ about: "rent_increase", seeks: ["money.from"], whom: "landlord-1", against: { record: "inc-1", kind: "rent_increase", by: "landlord-1" } });
-  expect([board, landlord, desk, union].map((o) => meets(rise, o))).toEqual([false, true, true, false]);
-  expect(meets(want({ seeks: ["work", "money.to"] }), board)).toBe(true);
-  // A grievance that seeks nothing typed: only what bears on whom it is about answers it.
-  const grievance = want({ about: "unpaid", whom: "factory-1" });
-  expect([board, landlord, desk, union].map((o) => meets(grievance, o))).toEqual([false, false, false, true]);
-  // And one nothing bears on meets nothing: it sits in the record.
-  expect([board, landlord, desk, union].some((o) => meets(want({ about: "slight", whom: "st-marks" }), o))).toBe(false);
-});
 
 test("a record keeps six wants: the lightest gives way, and what became of each is told once", () => {
   const w = new Wants();

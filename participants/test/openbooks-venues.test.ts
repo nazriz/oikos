@@ -1,4 +1,4 @@
-// The books of the venues and the lender (participants/src/behaviour/openbooks-venues.ts): what stands open at the
+// The books of the venues and the lender (participants/src/readers/openbooks-venues.ts): what stands open at the
 // tribunal's member and registrar, a complaints desk, a union's organiser and a bank's lending office, read from papers
 // on hand-built observations. For each: the state stands open and its item appears (id, since, amount); settled, it is
 // gone; and nothing changed, its line is the same on the next day.
@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import type { Observation } from "../src/contracts";
 import type { OfficeBooks, OpenHeading } from "../src/module";
 import { inCurrency } from "../src/money";
-import { deskBooks, lendingBooks, tribunalMemberBooks, tribunalRegistrarBooks, unionBooks } from "../src/behaviour/openbooks-venues";
+import { deskBooks, lendingBooks, tribunalMemberBooks, tribunalRegistrarBooks, unionBooks } from "../src/readers/openbooks-venues";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 
 inCurrency(PROFILE.values.currency);

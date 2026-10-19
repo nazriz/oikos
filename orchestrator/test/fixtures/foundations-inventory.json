@@ -25,8 +25,8 @@
     },
     {
       "what": "faulty goods stay a product fact, not a slip",
-      "file": "participants/src/behaviour/citizen.ts",
-      "find": "faulty-${d.order}"
+      "file": "kernel/crates/actors/src/citizen/money.rs",
+      "find": "faulty-{oid}"
     },
     {
       "what": "goods move instantly (a documented liberty; revisited after F10)",

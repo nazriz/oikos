@@ -2,7 +2,7 @@
 // decision again. Each, filled in, writes the paper the code citizen or the employer's own books write, word for word and field for field: so a model
 // in a claimant's, an employer's or any person's chair can do what code does (docs/decisions.md, "Foundations F9").
 import { expect, test } from "bun:test";
-import { CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST } from "../src/behaviour/papers";
+import { CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST } from "../src/shared/papers";
 import { writePaper } from "../src/forms";
 
 const money = (a: string) => `$${a}`;

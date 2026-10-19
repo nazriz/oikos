@@ -1,21 +1,49 @@
 {
-  "name": "city.councillor",
-  "version": "0.6.0",
+  "answers": {
+    "acts": "A councillor acts by voting on the council's open ballots, and a letter does not change a vote. What you want the council to decide goes to the council clerk on the council proposal form (council_proposal).",
+    "office": "a councillor",
+    "report": true
+  },
   "doc": "docs/behaviour/government.md",
+  "name": "city.councillor",
   "params": {
     "budget_yes_bps": {
+      "default": 9000,
       "schema": {
         "type": "integer"
       },
-      "unit": "bps",
-      "default": 9000,
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "colleague_deference": {
+      "default": 15,
+      "schema": {
+        "description": "points added for a fellow councillor's proposal (Matthews 1960, reciprocity; to confirm)",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "deference": {
+      "default": 40,
+      "schema": {
+        "description": "points added for a proposal put by the mayor or an officer (Kingdon 1973 cue-taking; Krehbiel 1991; to confirm)",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "inertia": {
+      "default": 5,
+      "schema": {
+        "description": "points against any change from the status quo (Samuelson & Zeckhauser 1988)",
+        "type": "integer"
+      },
       "source": "placeholder"
     },
     "leaning": {
+      "default": 0,
       "schema": {
         "type": "integer"
       },
-      "default": 0,
       "source": "placeholder"
     },
     "motion": {
@@ -23,14 +51,30 @@
       "source": "the world gives it (no default)"
     },
     "noise_bps": {
+      "default": 1500,
       "schema": {
         "type": "integer"
       },
-      "unit": "bps",
-      "default": 1500,
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "role": {
+      "default": "councillor",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "values": {
+      "default": {},
+      "schema": {
+        "description": "the councillor's own values: points for a proposal bearing a tag",
+        "type": "object"
+      },
       "source": "placeholder"
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "version": "0.6.0"
 }

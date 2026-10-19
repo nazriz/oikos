@@ -5,15 +5,19 @@
 
 import { expect, test } from "bun:test";
 import type { Observation } from "../src/contracts";
-import { councilClerk, councillor, mayorCode } from "../src/behaviour/government";
+
 import { Randomness } from "../src/rng";
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
+import { engine } from "./engine";
+const councilClerk = engine("city.council_clerk");
+const councillor = engine("city.councillor");
+const mayorCode = engine("city.mayor_code");
 
 inCurrency(PROFILE.values.currency);
 
 const DAY = 86_400;
-const ctx = (participant: string, params: object, position?: string, seed = 1n): any => ({ participant, entity: "city", position, rng: (k: string) => new Randomness(seed).stream([participant, k]), world: { tickSeconds: 3600, runEnd: 800 * DAY }, params });
+const ctx = (participant: string, params: object, position?: string, seed = 1n): any => ({ participant, entity: "city", position, seed: Number(seed), rng: (k: string) => new Randomness(seed).stream([participant, k]), world: { tickSeconds: 3600, runEnd: 800 * DAY }, params });
 const SEATS = [1, 2, 3, 4, 5].map((i) => `councillor-${i}`);
 const council = { kind: "directory", entities: [], positions: [...SEATS.map((position) => ({ position, entity: "city", role: "councillor" })),
   { position: "mayor", entity: "city", role: "mayor" }, { position: "councillor-9", entity: "other-town", role: "councillor" }] };
@@ -26,7 +30,8 @@ const acts = (m: { step: (o: Observation, x: any) => any }, o: Observation) => {
     const a: any = m.step(o, undefined as any);
     if (a.type === "wait") break;
     out.push({ call: a.call, why: a.reasoning ?? "" });
-    o = { ...o, channels: Object.fromEntries(Object.entries(o.channels).map(([k, c]: [string, any]) => [k, c.kind === "records" ? { ...c, records: [] } : c])), inbox: [] } as Observation;
+    // (What it has done is done: the world's answer to each act comes back at its next step.)
+    o = { ...o, woke_for: "done", outcomes: [{ action: `act.${i}`, t: o.t, status: "applied" }], channels: Object.fromEntries(Object.entries(o.channels).map(([k, c]: [string, any]) => [k, c.kind === "records" ? { ...c, records: [] } : c])), inbox: [] } as unknown as Observation;
   }
   return out;
 };
@@ -54,43 +59,48 @@ test("a councillor votes yes when the proposal's place (tenant protection +60, d
   expect([-80, -40, 0, 40, 80].map((l) => voteOf(l, ["development"]).choice)).toEqual(["yes", "yes", "no", "no", "no"]);
   // Nearer, not merely on the same side: at +30 the proposal (+60) and the status quo (0) are equally far, and a tie is no;
   // at +31 the proposal is nearer.
+  // (The engine's councillor, docs/behaviour/government.md "city.councillor": a status-quo bias of 5 points is held against any
+  // change, so the proposal must be nearer by more than that: it is yes from +33, where it was +31 in the TypeScript rule.)
   expect(voteOf(30, ["tenant_protection"]).choice).toBe("no");
-  expect(voteOf(31, ["tenant_protection"]).choice).toBe("yes");
-  expect(voteOf(-31, ["development"]).choice).toBe("yes");
+  expect(voteOf(32, ["tenant_protection"]).choice).toBe("no");
+  expect(voteOf(33, ["tenant_protection"]).choice).toBe("yes");
+  expect(voteOf(-33, ["development"]).choice).toBe("yes");
   const v = voteOf(80, ["tenant_protection"]);
   expect(v.call).toBe("vote(ballot=b1, choice=yes)");
-  expect(v.why).toBe("Voting by our leaning (80) against the proposal's place on the tenants-development axis (60).");
+  expect(v.why).toBe("Voting yes: our leaning (80) against the proposal's place on the tenants-development axis (60): 60 points, against change -5 points (in all 55).");
 });
 
 test("a proposal marked for neither side sits at the status quo, so no councillor finds it nearer: every one votes no, whatever its leaning", () => {
   // (As the documentation's rule reads: yes only when the proposal is closer than the status quo. A proposal with no
   // place on the axis is at 0, where the status quo is, so it's never closer: it can pass only by the noise. Reported.)
   for (const tags of [[], ["something_else"], ["tenant_protection", "development"]]) expect([-80, -40, 0, 40, 80].map((l) => voteOf(l, tags).choice)).toEqual(["no", "no", "no", "no", "no"]);
-  expect(voteOf(40, []).why).toBe("Voting by our leaning (40) against the proposal's place on the tenants-development axis (0).");
+  // (The reason is the engine's, which gives each cause in points: government.md "city.councillor".)
+  expect(voteOf(40, []).why).toBe("Voting no: our leaning (40) against the proposal's place on the tenants-development axis (0): 0 points, against change -5 points (in all -5).");
 });
 
 test("the noise flips a councillor's vote with the chance noise_bps, and says so; a budget passes on budget_yes_bps, whatever the leaning", () => {
-  // Always flipped: the pro-tenant councillor votes no on tenant protection, the pro-development one yes.
-  const flipped = voteOf(80, ["tenant_protection"], { noise_bps: 10_000 });
-  expect(flipped.choice).toBe("no");
-  expect(flipped.why).toBe("Voting by our leaning (80) against the proposal's place on the tenants-development axis (60), this time the other way (noise).");
-  expect(voteOf(-80, ["tenant_protection"], { noise_bps: 10_000 }).choice).toBe("yes");
-  expect(voteOf(0, [], { noise_bps: 10_000 }).choice).toBe("yes");
-  // At the documented 15%: about that share of many councillors' votes go the other way (400 draws: between 10% and 20%).
+  // (The engine's councillor, docs/behaviour/government.md "city.councillor": the noise is a taste shock of up to noise_bps/100 points
+  // that can decide only a near-tie, never turn a conviction; and a budget is a disposition of (budget_yes_bps - 5000)/100 points
+  // beside the others, not a coin. The cases below hold what the TypeScript rule's did: the shock's reach, and the budget's share.)
+  // A strong conviction (60 points, less 5) is never turned by the default noise (15 points): of many councillors, none goes the other way.
   let other = 0;
   for (let i = 0; i < 400; i++) if (voteOf(80, ["tenant_protection"], { noise_bps: 1500 }, BigInt(i + 1)).choice === "no") other++;
-  expect(other).toBeGreaterThan(40);
-  expect(other).toBeLessThan(80);
-  // A budget: the base propensity alone (the leaning and the noise play no part).
+  expect(other).toBe(0);
+  // A near-tie it can decide: the councillor at +33 (one point past the status quo's bias) votes either way across draws.
+  let yesNear = 0;
+  for (let i = 0; i < 400; i++) if (voteOf(33, ["tenant_protection"], { noise_bps: 1500 }, BigInt(i + 1)).choice === "yes") yesNear++;
+  expect(yesNear).toBeGreaterThan(40);
+  expect(yesNear).toBeLessThan(360);
+  // A budget: the disposition's points alone (the leaning plays no part: a budget has no place on the axis).
   for (const leaning of [-80, 0, 80]) {
-    expect(voteOf(leaning, ["budget"], { budget_yes_bps: 10_000, noise_bps: 10_000 }).choice).toBe("yes");
+    expect(voteOf(leaning, ["budget"], { budget_yes_bps: 10_000 }).choice).toBe("yes");
     expect(voteOf(leaning, ["budget"], { budget_yes_bps: 0 }).choice).toBe("no");
   }
-  expect(voteOf(0, ["budget"], { budget_yes_bps: 10_000 }).why).toBe("A budget: voting on our usual propensity to pass budgets.");
+  expect(voteOf(0, ["budget"], { budget_yes_bps: 10_000 }).why).toContain("our disposition to budgets 50 points");
+  // At 90% the disposition (+40, less 5) outweighs the default noise: every councillor passes it.
   let yes = 0;
-  for (let i = 0; i < 400; i++) if (voteOf(0, ["budget"], { budget_yes_bps: 9000 }, BigInt(i + 1)).choice === "yes") yes++;
-  expect(yes).toBeGreaterThan(340);
-  expect(yes).toBeLessThan(380);
+  for (let i = 0; i < 400; i++) if (voteOf(0, ["budget"], { budget_yes_bps: 9000, noise_bps: 1500 }, BigInt(i + 1)).choice === "yes") yes++;
+  expect(yes).toBe(400);
 });
 
 test("a councillor votes once on each council ballot while it's open, and never on a ballot that has closed or that isn't the council's", () => {
@@ -128,7 +138,7 @@ test("the clerk puts each proposal addressed to the town to a council ballot, op
 });
 
 /** A clerk with one ballot (b1, on a law in free words, closing on day 15), the votes cast, and what it does at the close. */
-const count = (votes: any[], x: { closeAt?: number; extra?: any[] } = {}) => {
+const count = (votes: any[], x: { closeAt?: number; extra?: any[]; /** The test shows the result itself: the clerk is not shown its own. */ own?: boolean } = {}) => {
   const clerk = councilClerk.create(ctx("clerk", {}, "council-clerk"));
   const p1 = proposal("p-b1", DAY, { text: "Cap rent rises.", data: { enact: { kind: "law", text: "Rent rises are capped." }, tags: ["tenant_protection"] } });
   run(clerk, obs(DAY, [p1]));
@@ -137,8 +147,13 @@ const count = (votes: any[], x: { closeAt?: number; extra?: any[] } = {}) => {
   expect(early.split("\n").filter((l) => l && !l.startsWith("message(")).length).toBe(0);
   // (Not before it closes.)
   expect(run(clerk, obs(15 * DAY - 1, []))).toBe("");
-  const closed = run(clerk, obs(x.closeAt ?? 15 * DAY, []));
-  const result = lines(closed, "ballot_result")[0]!;
+  const at = x.closeAt ?? 15 * DAY;
+  const declared = run(clerk, obs(at, []));
+  const result = lines(declared, "ballot_result")[0]!;
+  // (What a passed ballot enacts is published from the result on file, at the clerk's next step, not in the step that declares it:
+  // the result is shown back to the clerk as the world would, and what it then publishes is what the close brought.)
+  const filed = { id: "res-b1", at, record: "statement", author: "clerk-system", in_position: "council-clerk", speaks_for: "city", visible_to: "public", kind: "ballot_result", basis: "b1", text: /text="([^"]*)"/.exec(result)![1]!, data: dataOf(result) };
+  const closed = [declared, run(clerk, obs(at + 3600, x.own ? [] : [filed]))].filter((l) => l).join("\n");
   // (The count, and beside it who voted which way: the result names them.)
   const { voted_for, voted_against, ...counted } = dataOf(result);
   return { closed, early, result: counted, voted: { for: voted_for, against: voted_against }, text: /text="([^"]*)"/.exec(result)![1]!, law: lines(closed, "law").find((l) => !l.includes("kind=ballot_result")), clerk };
@@ -213,7 +228,7 @@ test("the ballot closes at its closing time: a vote made at or after it isn't co
 test("the clerk counts only the council's ballots, each once, and reports what's open and what was decided", () => {
   const election = stmt("b-roll", DAY, "ballot", { author: "electoral-system", data: { office: "mayor", electorate: "roll", closes_at: 10 * DAY, options: ["1", "2"] } });
   const elsewhere = stmt("b-other", DAY, "ballot", { author: "x", speaks_for: "other-town", data: { proposal: "p", electorate: "council", closes_at: 10 * DAY, options: ["yes", "no"] } });
-  const { closed, clerk } = count(SEATS.map((s, i) => cast(`v${i}`, "b1", 2 * DAY, s, "yes")), { extra: [election, elsewhere] });
+  const { closed, clerk } = count(SEATS.map((s, i) => cast(`v${i}`, "b1", 2 * DAY, s, "yes")), { extra: [election, elsewhere], own: true });
   expect(lines(closed, "ballot_result").length).toBe(1);
   expect(run(clerk, obs(16 * DAY, []))).toBe("");
   const letter = { ...obs(17 * DAY, [stmt("res-1", 15 * DAY, "ballot_result", { author: "clerk", data: { ballot: "b1", yes: 5, no: 0, passed: true } })]), inbox: [{ id: "m1", from: "mayor-system", text: "What happened?" }] } as unknown as Observation;
@@ -295,7 +310,7 @@ test("a vote on a ballot that is closed is not counted, and the clerk tells whoe
   const member = councillor.create(ctx("councillor-2-system", { leaning: 0 }, "councillor-2"));
   expect(acts(member, obs(0, [opening]))).toEqual([]);
   // An ordinary ballot: a vote after its closing time, counted late, is answered too, and is not in the count.
-  const late = count([cast("v1", "b1", 2 * DAY, "councillor-1", "yes"), cast("v2", "b1", 2 * DAY, "councillor-2", "yes"), cast("v3", "b1", 15 * DAY, "councillor-3", "yes")], { closeAt: 16 * DAY });
+  const late = count([cast("v1", "b1", 2 * DAY, "councillor-1", "yes"), cast("v2", "b1", 2 * DAY, "councillor-2", "yes"), cast("v3", "b1", 15 * DAY, "councillor-3", "yes")], { closeAt: 16 * DAY, own: true });
   expect(late.result).toEqual({ ballot: "b1", yes: 2, no: 0, passed: false });
   expect(late.voted).toEqual({ for: ["councillor-1", "councillor-2"], against: [] });
   expect(late.early).toContain("From the council clerk: your vote on b1 is not counted. That ballot closed on year 1, day 16. A vote counts only when it is cast in a councillor's post while the ballot is open.");

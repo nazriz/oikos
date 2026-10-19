@@ -1,90 +1,4 @@
 {
-  "name": "world.trade",
-  "version": "0.3.0",
-  "doc": "docs/behaviour/boundary.md",
-  "params": {
-    "account": {
-      "schema": {
-        "type": "string",
-        "description": "the outside's account it pays from and is paid into (the world must say)"
-      },
-      "default": "",
-      "required": true,
-      "source": "the outside's account it pays from and is paid into (the world must say)"
-    },
-    "buys": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "min_order": {
-      "schema": {
-        "type": "integer",
-        "description": "the least it sells in one order (it sells wholesale)"
-      },
-      "default": 100,
-      "source": "placeholder"
-    },
-    "price_process": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "sells": {
-      "schema": {
-        "type": "object",
-        "description": "unit prices, cents"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "shocks": {
-      "schema": {
-        "type": "array"
-      },
-      "default": [],
-      "source": "placeholder"
-    },
-    "terms_claim_after_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 30,
-      "source": "placeholder"
-    },
-    "terms_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 0,
-      "source": "placeholder"
-    },
-    "terms_stop_after_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 7,
-      "source": "placeholder"
-    },
-    "wait_days": {
-      "schema": {
-        "type": "integer",
-        "description": "how long an invoice waits for its goods before it's declined"
-      },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
-    }
-  },
-  "perceives": [],
-  "state": "none",
   "boundary": [
     {
       "what": "future",
@@ -94,5 +8,91 @@
       "what": "every:factory",
       "why": "The outside world's demand for the town's goods is a boundary condition, split when the world is made among the factories that export."
     }
-  ]
+  ],
+  "doc": "docs/behaviour/boundary.md",
+  "name": "world.trade",
+  "params": {
+    "account": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "the outside's account it pays from and is paid into (the world must say)",
+        "type": "string"
+      },
+      "source": "the outside's account it pays from and is paid into (the world must say)"
+    },
+    "buys": {
+      "default": {},
+      "schema": {
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "min_order": {
+      "default": 100,
+      "schema": {
+        "description": "the least it sells in one order (it sells wholesale)",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "price_process": {
+      "default": {},
+      "schema": {
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "sells": {
+      "default": {},
+      "schema": {
+        "description": "unit prices, cents",
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "shocks": {
+      "default": [],
+      "schema": {
+        "type": "array"
+      },
+      "source": "placeholder"
+    },
+    "terms_claim_after_days": {
+      "default": 30,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "terms_days": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "terms_stop_after_days": {
+      "default": 7,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "wait_days": {
+      "default": 14,
+      "schema": {
+        "description": "how long an invoice waits for its goods before it's declined",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.4.0"
 }

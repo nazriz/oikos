@@ -1,95 +1,9 @@
 {
-  "name": "utility.water",
-  "version": "0.3.0",
-  "doc": "docs/behaviour/utilities.md",
-  "params": {
-    "bill_every_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 91,
-      "source": "placeholder"
-    },
-    "litres_per_person_per_day": {
-      "schema": {
-        "type": "integer",
-        "description": "what a person uses (the world's figure)"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "meter": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "water_used",
-      "source": "placeholder"
-    },
-    "meters": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "part": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "price_per_kl": {
-      "schema": {
-        "type": "integer",
-        "description": "the tariff (cents)"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "read_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 21,
-      "source": "placeholder"
-    },
-    "roll": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "roll",
-      "source": "placeholder"
-    },
-    "service_per_quarter": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "task": {
-      "schema": {
-        "type": "string",
-        "description": "the work that draws a kilolitre"
-      },
-      "default": "draw_water",
-      "source": "placeholder"
-    },
-    "works": {
-      "schema": {
-        "type": "string",
-        "description": "the water works (the world must say): where it draws from the river"
-      },
-      "default": "",
-      "required": true,
-      "source": "the water works (the world must say): where it draws from the river"
-    }
+  "answers": {
+    "acts": "What it acts on: its roll of properties, each billed by its meter each quarter; and the notices it is given of land changing hands and of building work.",
+    "office": "the water corporation"
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/utilities.md",
   "keeps": [
     {
       "what": "property_roll",
@@ -100,21 +14,146 @@
       "why": "Its customer roll: each notice that land it supplies has changed hands is given to it."
     }
   ],
+  "name": "utility.water",
+  "params": {
+    "bill_every_days": {
+      "default": 91,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "litres_per_person_per_day": {
+      "default": 0,
+      "schema": {
+        "description": "what a person uses (the world's figure)",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "meter": {
+      "default": "water_used",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "meters": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "part": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "price_elasticity_bps": {
+      "default": 0,
+      "schema": {
+        "description": "by how much use falls for each 100% the price stands over the reference price (Dalhuisen et al. 2003: about 4000; to confirm); 0: use does not respond",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "price_per_kl": {
+      "default": 0,
+      "schema": {
+        "description": "the tariff (cents)",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "read_days": {
+      "default": 21,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "reference_price_per_kl": {
+      "default": 0,
+      "schema": {
+        "description": "the price use was reckoned at (in the smallest unit, a kilolitre); 0: none, so no price response",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "restriction_cut_bps": {
+      "default": 0,
+      "schema": {
+        "description": "by how much use falls while restrictions stand (a published restriction asks for less); 0: none",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "restriction_review_days": {
+      "default": 7,
+      "schema": {
+        "description": "while restrictions stand with a cut, how often it draws the usual amount to see whether the river can give it",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "roll": {
+      "default": "roll",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "service_per_quarter": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "task": {
+      "default": "draw_water",
+      "schema": {
+        "description": "the work that draws a kilolitre",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "works": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "the water works (the world must say): where it draws from the river",
+        "type": "string"
+      },
+      "source": "the water works (the world must say): where it draws from the river"
+    }
+  },
+  "perceives": [],
   "routines": [
     {
-      "task": "draw_water",
       "at": "works",
       "every": 1,
+      "task": "draw_water",
       "what": "Each day the works draws from the river what the town uses, by the published estimate of how many live in it, and says so when the river cannot give it."
     },
     {
-      "task": "bill",
       "at": "works",
       "every": [
         "bill_every_days",
         91
       ],
+      "task": "bill",
       "what": "Before each round of bills a reader goes round the meters; then each property's owner is sent a bill for the service charge and what its meter shows was used. How often the bills go out is the order's."
     }
-  ]
+  ],
+  "state": "none",
+  "version": "0.3.0"
 }

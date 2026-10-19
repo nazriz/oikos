@@ -11,53 +11,52 @@ export * from "./identity";
 export * as calls from "./calls";
 export * as forms from "./forms";
 export { View } from "./view";
-export { ASKING, CONSULT_THINGS } from "./behaviour/citizen";
-export { drawPerson, drawValues, NEEDS, VALUES, type PopulationValues } from "./behaviour/mind";
-export { Inner, innerParams, INNER_DEFAULTS, raisedValues, UPBRINGING, type InnerParams, type Outlook } from "./behaviour/inner";
-export { MOURNING } from "./behaviour/citizen";
-export { repayment } from "./behaviour/credit";
-export { draftLaw, figureGiven, figureWords, heldIn, heldValue, type LawFigure, type LawFigures, type LawSchedule } from "./behaviour/common";
-export { annualTax, chargesInWords, chargesOn, dayPayPeriod, returnsInWords, taxLawOf, withheld, withholding, withholdingInWords, type Band, type Charge, type IncomeTaxLaw } from "./behaviour/tax";
-export { dueFrom, nextReturn, returnDayWords, returnRuleInWords, returnRulesOf, returnsOf, MONTH_WORDS, type ReturnDue, type ReturnRule } from "./behaviour/returns";
-export { declarationFor, forAge, forHousehold, forOutOfWork, paymentsInWords, stopsWorkAt, supportLaw, type Declared, type PaymentRule } from "./behaviour/payments";
-export { adultAgeBands, drawHousehold, drawSavings, bedroomsNeeded, OCCUPANCY, type DrawnHousehold, type Extension, type HouseholdSpec, type OccupancyStandard } from "./behaviour/household";
-export { yearsOfSchooling, type SchoolingSpec } from "./behaviour/school";
-export { linesInWords, tabledLines, votedWords, yearInDays } from "./behaviour/government";
-export { Roster, type RosterNow } from "./behaviour/roster";
-export { Tally, type BallotCount } from "./behaviour/tally";
-export { DayBook, DAYBOOK_MAX, LISTED_DAYS } from "./behaviour/daybook";
-export { decisionLaw, decisionsInWords, KIND as DECISION_KIND, Reconsiderations, Waits, type DecisionLaw, type Need as DecisionNeed } from "./behaviour/decisions";
-export { particularsOf } from "./behaviour/frictions";
-export { diaryText } from "./behaviour/diary";
-export { planLaw, planLawWords, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, possessionOrderFor } from "./behaviour/papers";
+export { CONSULT_THINGS } from "./shared/citizen";
+export { drawPerson, drawValues, NEEDS, VALUES, type PopulationValues } from "./shared/mind";
+export { raisedValues, UPBRINGING  } from "./shared/inner";
+
+export { draftLaw, figureGiven, figureWords, heldIn, type LawFigure, type LawFigures, type LawSchedule } from "./shared/common";
+export { annualTax, chargesInWords, chargesOn, dayPayPeriod, returnsInWords, taxLawOf, withheld, withholding, withholdingInWords, type Band, type Charge, type IncomeTaxLaw } from "./shared/tax";
+export { dueFrom, nextReturn, returnRuleInWords, returnRulesOf, returnsOf, MONTH_WORDS, type ReturnDue, type ReturnRule } from "./shared/returns";
+export { declarationFor, forAge, forHousehold, forOutOfWork, paymentsInWords, stopsWorkAt, type Declared, type PaymentRule } from "./shared/payments";
+export { adultAgeBands, drawHousehold, drawSavings, bedroomsNeeded, OCCUPANCY, type DrawnHousehold, type Extension, type HouseholdSpec, type OccupancyStandard } from "./shared/household";
+export { yearsOfSchooling, type SchoolingSpec } from "./shared/school";
+export { linesInWords, tabledLines, votedWords, yearInDays } from "./shared/government";
+export { Roster, type RosterNow } from "./readers/roster";
+export { Tally, type BallotCount } from "./readers/tally";
+export { DayBook, LISTED_DAYS } from "./readers/daybook";
+export { decisionsInWords, KIND as DECISION_KIND, type DecisionLaw, type Need as DecisionNeed } from "./shared/decisions";
+export { particularsOf } from "./shared/frictions";
+export { diaryText } from "./readers/diary";
+export { planLaw, planLawWords, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, possessionOrderFor } from "./shared/papers";
 import type { BehaviourModule } from "./module";
-import { answering } from "./behaviour/common";
 // (The kinds whose TypeScript actors were deleted at the cut-over: what is still read of each, the engine runs them.)
 import { bankPaymentSystem, bodyPayroll, disposal, electoralOffice, energy, exportDemand, founded, funding, grants, idle, migration, newspaper, producer, retailer, retirementFund, statistics, trade, transfers, valuer, water, weather } from "./engine-kinds";
-import { lending } from "./behaviour/credit";
-import { organiser } from "./behaviour/union";
-import { citizen } from "./behaviour/citizen";
-import { employer, landlord } from "./behaviour/firms";
-import { vendor } from "./behaviour/automation";
-import { builder, childProtection, inspector, landRegistry, planningOfficer, registry } from "./behaviour/institutions";
-import { councilClerk, councillor, financeOfficer, mayorCode, ratesOfficer, taxClerk, works } from "./behaviour/government";
-import { environment } from "./behaviour/environment";
-import { principal } from "./behaviour/school";
-import { practice } from "./behaviour/health";
-import { member, registrar } from "./behaviour/tribunal";
-import { desk } from "./behaviour/desk";
-import { auditor } from "./behaviour/auditor";
-import { station } from "./behaviour/police";
-import { booked, clerk, Clerk, keepers, officeOf } from "./behaviour/books";
-import * as openbooks from "./behaviour/openbooks";
-import * as venueBooks from "./behaviour/openbooks-venues";
-import * as townBooks from "./behaviour/openbooks-townhall";
-export { firstDueOf } from "./behaviour/openbooks";
-export { BOOKS, booksPaper, Clerk, officeOf } from "./behaviour/books";
+import { lending } from "./kinds/credit";
+import { organiser } from "./kinds/union";
+import { citizen } from "./kinds/citizen";
+import { employer, landlord } from "./kinds/firms";
+import { vendor } from "./kinds/automation";
+import { builder, childProtection, inspector, landRegistry, planningOfficer, registry } from "./kinds/institutions";
+import { councilClerk, councillor, financeOfficer, mayorCode, ratesOfficer, taxClerk, works } from "./kinds/government";
+import { environment } from "./kinds/environment";
+import { principal } from "./kinds/school";
+import { practice } from "./kinds/health";
+import { member, registrar } from "./kinds/tribunal";
+import { desk } from "./kinds/desk";
+import { auditor } from "./kinds/auditor";
+import { station } from "./kinds/police";
+import { clerk } from "./kinds/books";
+import { keepers  } from "./readers/books";
+import * as openbooks from "./readers/openbooks";
+import * as venueBooks from "./readers/openbooks-venues";
+import * as townBooks from "./readers/openbooks-townhall";
+export { firstDueOf } from "./readers/openbooks";
+export { BOOKS  } from "./readers/books";
 
 /** A module that keeps books (`books`), run as its office's staff (`part: "staff"`): the staff's clerk keeps them too,
  * and files what has changed when the staff's own work for the wake is done (docs/behaviour/office-books.md). */
-/** Each office's books, by the module that runs it (behaviour/openbooks.ts): what its clerk reads. */
+/** Each office's books, by the module that runs it (readers/openbooks.ts): what its clerk reads. */
 const BOOKS_OF: { [module: string]: BehaviourModule["books"] } = {
   "firm.landlord": openbooks.landlordBooks,
   "world.transfers": openbooks.supportBooks,
@@ -75,11 +74,7 @@ const BOOKS_OF: { [module: string]: BehaviourModule["books"] } = {
 };
 function keepingBooks<M extends BehaviourModule>(given: M): M {
   const m = BOOKS_OF[given.name] ? { ...given, books: BOOKS_OF[given.name] } : given;
-  if (!m.books) return m;
-  return { ...m, create: (ctx) => {
-    const c = m.create(ctx);
-    return ctx.params?.part === "staff" ? booked(c, new Clerk(ctx.entity, officeOf(ctx.position), m.books!({ ...ctx, position: officeOf(ctx.position) }))) : c;
-  } };
+  return m;
 }
 
 /** Every behaviour module available to worlds, by the name used in controller.impl. */
@@ -98,48 +93,48 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [statistics, "engine-kinds.ts"],
       [grants, "engine-kinds.ts"],
       [disposal, "engine-kinds.ts"],
-      [lending, "behaviour/credit.ts"],
-      [organiser, "behaviour/union.ts"],
-      [citizen, "behaviour/citizen.ts"],
-      [landlord, "behaviour/firms.ts"],
-      [employer, "behaviour/firms.ts"],
+      [lending, "kinds/credit.ts"],
+      [organiser, "kinds/union.ts"],
+      [citizen, "kinds/citizen.ts"],
+      [landlord, "kinds/firms.ts"],
+      [employer, "kinds/firms.ts"],
       [producer, "engine-kinds.ts"],
       [retailer, "engine-kinds.ts"],
-      [vendor, "behaviour/automation.ts"],
-      [planningOfficer, "behaviour/institutions.ts"],
-      [inspector, "behaviour/institutions.ts"],
-      [builder, "behaviour/institutions.ts"],
-      [registry, "behaviour/institutions.ts"],
-      [landRegistry, "behaviour/institutions.ts"],
-      [childProtection, "behaviour/institutions.ts"],
-      [mayorCode, "behaviour/government.ts"],
-      [councilClerk, "behaviour/government.ts"],
-      [councillor, "behaviour/government.ts"],
-      [financeOfficer, "behaviour/government.ts"],
-      [taxClerk, "behaviour/government.ts"],
-      [ratesOfficer, "behaviour/government.ts"],
-      [works, "behaviour/government.ts"],
-      [environment, "behaviour/environment.ts"],
+      [vendor, "kinds/automation.ts"],
+      [planningOfficer, "kinds/institutions.ts"],
+      [inspector, "kinds/institutions.ts"],
+      [builder, "kinds/institutions.ts"],
+      [registry, "kinds/institutions.ts"],
+      [landRegistry, "kinds/institutions.ts"],
+      [childProtection, "kinds/institutions.ts"],
+      [mayorCode, "kinds/government.ts"],
+      [councilClerk, "kinds/government.ts"],
+      [councillor, "kinds/government.ts"],
+      [financeOfficer, "kinds/government.ts"],
+      [taxClerk, "kinds/government.ts"],
+      [ratesOfficer, "kinds/government.ts"],
+      [works, "kinds/government.ts"],
+      [environment, "kinds/environment.ts"],
       [bodyPayroll, "engine-kinds.ts"],
       [electoralOffice, "engine-kinds.ts"],
       [newspaper, "engine-kinds.ts"],
-      [principal, "behaviour/school.ts"],
-      [practice, "behaviour/health.ts"],
-      [member, "behaviour/tribunal.ts"],
-      [registrar, "behaviour/tribunal.ts"],
-      [desk, "behaviour/desk.ts"],
-      [auditor, "behaviour/auditor.ts"],
+      [principal, "kinds/school.ts"],
+      [practice, "kinds/health.ts"],
+      [member, "kinds/tribunal.ts"],
+      [registrar, "kinds/tribunal.ts"],
+      [desk, "kinds/desk.ts"],
+      [auditor, "kinds/auditor.ts"],
       [founded, "engine-kinds.ts"],
       [water, "engine-kinds.ts"],
       [energy, "engine-kinds.ts"],
-      [station, "behaviour/police.ts"],
+      [station, "kinds/police.ts"],
       [retirementFund, "engine-kinds.ts"],
-      [clerk, "behaviour/books.ts"],
+      [clerk, "kinds/books.ts"],
     ] as const
   // (An office that says how it answers a letter, and has no standing report of its own, acknowledges each: `answering`.)
-  ).map(([m, src]) => [m.name, { ...keepingBooks(answering(m)), source: new URL(`./${src}`, import.meta.url).pathname }]),
+  ).map(([m, src]) => [m.name, { ...keepingBooks(m), source: new URL(`./${src}`, import.meta.url).pathname }]),
 );
 for (const m of Object.values(modules)) if (m.books) keepers.set(m.name, m);
-export * as reading from "./behaviour/reading";
-export * as culture from "./behaviour/culture";
-export * as townmemory from "./behaviour/townmemory";
+export * as reading from "./shared/reading";
+export * as culture from "./shared/culture";
+export * as townmemory from "./shared/townmemory";

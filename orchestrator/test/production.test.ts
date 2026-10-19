@@ -180,7 +180,7 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // (Seven months where it was five, 2026-10-12, "Returns on the law's days": a payroll now holds what it withheld until the law's day, some days longer, so the cash probably runs out later (not traced).)
   // (Traced, review of foundations finding 10, 2026-10-16: the "redundancy the rule's two reasons do not account for" in seeds 2 and 5 is
   // a third reason, not a fault: a firm wound up (insolvent, or closed by its owners) lets everyone go "Redundancy: the business is being wound up."
-  // (participants/src/behaviour/firms.ts, `letGoAll` after "Winding up", docs/behaviour/insolvency.md). The test counted the two reasons of the
+  // (participants/src/readers/staffing.ts, `letGoAll` after "Winding up", docs/behaviour/insolvency.md). The test counted the two reasons of the
   // rule of labour only. In the generated seed's run on this code nobody is let go by the rule in seven months, and factory-2 is wound up at
   // day 154; so the town is held to it as it is drawn, every notice accounted for, and the rule itself is held in seed 2 below, where factory-2
   // lets two go for want of wages before it is wound up. Seed 3, then 5, had been chosen to find a run with a layoff by the rule.)

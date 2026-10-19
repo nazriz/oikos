@@ -16,6 +16,7 @@ import { modules } from "../src/index";
 import { renderObservation } from "../src/llm/render";
 import { inCurrency } from "../src/money";
 import { context, DAY, statement, wake } from "./stepping";
+import { engine } from "./engine";
 
 inCurrency({ code: "XYZ", minor_units: 2 });
 const HOUR = 3_600;
@@ -34,7 +35,7 @@ const shown = (...extra: object[]) => ({
   round: { kind: "records", records: ["house-1", "house-2"].map((s) => statement(`round-${s}`, 0, "service_address", { visible_to: ["city"], data: { structure: s } })) },
   depot: { kind: "sites", cells: [{ cell: "cell.1.1", x: 1, y: 1, structure: { structure: "town-hall", type: "civic", at: "cell.1.1", complete: true, spaces: [{ space: "town-hall/workplace.1", kind: "workplace", capacity: 20, count: 2, occupants: ["c0001", "c0002"] }] } }] },
 });
-const works = (part: string, counter: boolean) => modules["city.works"]!.create(context(`works${part === "staff" ? "-staff" : ""}-system`, "city", { ...worksParams, part, ...(counter ? { counter: true } : {}) }, { position: part === "staff" ? "works-staff" : "works" }));
+const works = (part: string, counter: boolean) => engine("city.works").create(context(`works${part === "staff" ? "-staff" : ""}-system`, "city", { ...worksParams, part, ...(counter ? { counter: true } : {}) }, { position: part === "staff" ? "works-staff" : "works" }));
 const MONDAY = 7 * DAY + 8 * 3600;
 const reportOf = (w: ReturnType<typeof wake>) => w.of("statement", "staff_report")[0]?.args.text as string | undefined;
 const answered = (w: ReturnType<typeof wake>) => /answered at the counter: ([^;.]+)/.exec(reportOf(w) ?? "")?.[1];
@@ -63,7 +64,7 @@ test("the works seat does not answer the counter's post; the whole office does, 
   expect(reportOf(staff)).not.toContain("answered at the counter");
 });
 
-const registryOf = (part: string, counter: boolean) => modules["city.registry"]!.create(context(`registry${part === "staff" ? "-staff" : ""}-system`, "city", { part, ...(counter ? { counter: true } : {}) }, { position: part === "staff" ? "registry-staff" : "registry" }));
+const registryOf = (part: string, counter: boolean) => engine("city.registry").create(context(`registry${part === "staff" ? "-staff" : ""}-system`, "city", { part, ...(counter ? { counter: true } : {}) }, { position: part === "staff" ? "registry-staff" : "registry" }));
 const notification = (id: string, kind: string, data: object) => statement(id, 100, kind, { author: "c0002-self", speaks_for: "c0002", addressed_to: ["city"], visible_to: ["city"], data });
 const posts = [notification("rec.5", "death_notification", { deceased: "c0001" }), notification("rec.6", "birth_notification", { child: "c0009", born_at: 90, mother: "c0002" })];
 const regOrder = (id: string) => statement(id, DAY, "work_order", { author: "registry-system", in_position: "registry", addressed_to: ["city"], visible_to: ["city"], data: { work: { task: "answer", at: "registry" }, every: DAY } });

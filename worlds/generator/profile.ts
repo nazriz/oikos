@@ -253,7 +253,7 @@ export interface Profile {
     /** How fast a belief not kept up fades, a month, in a living town: fitted to the place's trend in stated affiliation (docs/behaviour/citizen.md, "Belief"). */
     belief?: { living_fade_bps_per_month?: number };
     /** What a town holds in common (docs/behaviour/culture.md), read only for a living town that turns the culture dial on:
-     * for the conducts the build lists (participants/src/behaviour/culture.ts), the share who do each (`does_bps`) and the
+     * for the conducts the build lists (participants/src/shared/culture.ts), the share who do each (`does_bps`) and the
      * share who approve of it (`approves_bps`), each figure with its source in `sources["culture.conducts"]` or marked a
      * placeholder; a conduct with no figure runs on the world's own rate and a marked placeholder. `origin`: where people
      * come from, as groups the place's own statistics name: `groups` (an id, a name, a share of the people, in basis

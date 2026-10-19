@@ -1,14 +1,23 @@
 {
-  "name": "world.vendor",
-  "version": "0.1.0",
+  "answers": {
+    "acts": "It publishes what it sells, delivers a system once its set-up is paid with an order, offers the licence, bids on a tender, and switches a system off when the licence ends or is not paid for. It takes no requests.",
+    "office": "the vendor of systems"
+  },
+  "boundary": [
+    {
+      "what": "technology on offer",
+      "why": "The technology on offer is the outside world's: which tasks systems can do, at what price, in what time, with what error and what terms, as vendors beyond the town sell them. It is a fact about the world beyond the town, as world prices are, held in the profile with its source; this module stands for it at the world's edge. Nothing in the town can know or change it otherwise, and nothing here sets an adoption rate."
+    }
+  ],
   "doc": "docs/behaviour/automation.md",
+  "name": "world.vendor",
   "params": {
     "account": {
-      "schema": {
-        "type": "string",
-        "description": "the outside's account it is paid into (the world must say)"
-      },
       "default": "",
+      "schema": {
+        "description": "the outside's account it is paid into (the world must say)",
+        "type": "string"
+      },
       "source": "the outside's account it is paid into (the world must say)"
     },
     "automation": {
@@ -20,35 +29,35 @@
       "source": "the world gives it (no default)"
     },
     "change_bps_per_year": {
-      "schema": {
-        "type": "integer",
-        "description": "how its prices move a year (negative: fall); 0: today's prices held"
-      },
       "default": 0,
+      "schema": {
+        "description": "how its prices move a year (negative: fall); 0: today's prices held",
+        "type": "integer"
+      },
       "source": "placeholder"
     },
     "grace_days": {
-      "schema": {
-        "type": "integer",
-        "description": "a licence unpaid this long (two months' fees and a fortnight) lets the vendor switch the system off"
-      },
-      "unit": "days",
       "default": 75,
-      "source": "placeholder"
+      "schema": {
+        "description": "a licence unpaid this long (two months' fees and a fortnight) lets the vendor switch the system off",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
     },
     "most_systems": {
-      "schema": {
-        "type": "integer",
-        "description": "the most it delivers to one order"
-      },
       "default": 40,
+      "schema": {
+        "description": "the most it delivers to one order",
+        "type": "integer"
+      },
       "source": "placeholder"
     },
     "offers": {
+      "default": [],
       "schema": {
         "type": "array"
       },
-      "default": [],
       "source": "placeholder"
     },
     "procurement": {
@@ -56,24 +65,25 @@
       "source": "the world gives it (no default)"
     },
     "sign_days": {
-      "schema": {
-        "type": "integer",
-        "description": "a system whose licence its client has not signed this long is switched off"
-      },
-      "unit": "days",
       "default": 30,
-      "source": "placeholder"
+      "schema": {
+        "description": "a system whose licence its client has not signed this long is switched off",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
     },
     "unpaid_days": {
-      "schema": {
-        "type": "integer",
-        "description": "an order unpaid this long is declined"
-      },
-      "unit": "days",
       "default": 7,
-      "source": "placeholder"
+      "schema": {
+        "description": "an order unpaid this long is declined",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "version": "0.1.0"
 }

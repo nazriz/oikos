@@ -7,7 +7,7 @@
 // This file holds the interface and the deterministic mock readers the tests and the extreme-reader runs use. No
 // reader in this build calls a model.
 
-import { LINES, NEUTRAL, POLES, type Line, type Reading, type Standing } from "../behaviour/reading";
+import { LINES, NEUTRAL, POLES, type Line, type Reading, type Standing } from "../shared/reading";
 
 /** The prompt's version, said on every reading. Bumped when the prompt (step 5) or this interface's meaning changes. */
 export const READING_VERSION = "0.1.0";

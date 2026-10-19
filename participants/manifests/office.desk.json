@@ -1,145 +1,70 @@
 {
-  "name": "office.desk",
-  "version": "0.2.0",
   "doc": "docs/behaviour/frictions.md",
-  "params": {
-    "account": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "answer_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
-    },
-    "counter": {
-      "schema": {
-        "type": "boolean"
-      },
-      "default": false,
-      "source": "placeholder"
-    },
-    "fee": {
-      "schema": {
-        "type": "integer",
-        "description": "what applying costs (none: nothing), paid into `account`"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "hears": {
-      "schema": {
-        "type": "array"
-      },
-      "default": [],
-      "source": "placeholder"
-    },
-    "members_of": {
-      "schema": {
-        "type": "string",
-        "description": "heard only for members of this organisation (none: anyone)"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "office": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "part": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "refer_to": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "title": {
-      "schema": {
-        "type": "string",
-        "description": "what it calls itself in its notice"
-      },
-      "default": "desk",
-      "source": "placeholder"
-    },
-    "within_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 28,
-      "source": "placeholder"
-    }
-  },
-  "perceives": [],
-  "state": "none",
   "issues": [
     {
-      "form": "complaint_notice",
-      "title": "Notice of an application to the one it is against",
       "does": "Tells the one an application is against what is said of them, and by when they may answer. It decides nothing.",
       "fields": {
-        "application": {
-          "type": "record",
-          "required": true,
-          "description": "The application."
-        },
-        "matter": {
-          "type": "text",
-          "required": true,
-          "description": "What it is about, in the word the application uses."
-        },
-        "applicant": {
-          "type": "entity",
-          "required": true,
-          "description": "Who applied."
+        "about": {
+          "description": "The paper the application is about, where it names one.",
+          "type": "record"
         },
         "against": {
-          "type": "entity",
+          "description": "Whom it is against.",
           "required": true,
-          "description": "Whom it is against."
-        },
-        "answer_by": {
-          "type": "date",
-          "required": true,
-          "description": "The day they may answer by."
-        },
-        "about": {
-          "type": "record",
-          "description": "The paper the application is about, where it names one."
+          "type": "entity"
         },
         "amount": {
-          "type": "amount",
-          "description": "The sum the application seeks, where it gives one."
+          "description": "The sum the application seeks, where it gives one.",
+          "type": "amount"
         },
-        "structure": {
-          "type": "structure",
-          "description": "The building, where the application names one."
+        "answer_by": {
+          "description": "The day they may answer by.",
+          "required": true,
+          "type": "date"
+        },
+        "applicant": {
+          "description": "Who applied.",
+          "required": true,
+          "type": "entity"
+        },
+        "application": {
+          "description": "The application.",
+          "required": true,
+          "type": "record"
+        },
+        "matter": {
+          "description": "What it is about, in the word the application uses.",
+          "required": true,
+          "type": "text"
         },
         "seeks": {
-          "type": "text",
-          "description": "What the application seeks, where it says."
+          "description": "What the application seeks, where it says.",
+          "type": "text"
+        },
+        "structure": {
+          "description": "The building, where the application names one.",
+          "type": "structure"
         }
       },
+      "form": "complaint_notice",
+      "title": "Notice of an application to the one it is against",
       "writes": {
+        "basis": "=application",
+        "data": {
+          "about": "=about",
+          "against": "=against",
+          "amount": "#amount",
+          "answer_by": "=answer_by",
+          "applicant": "=applicant",
+          "application": "=application",
+          "hearing_at": "=answer_by",
+          "kind": "=matter",
+          "matter": "=matter",
+          "seeks": "=seeks",
+          "structure": "=structure"
+        },
         "kind": "complaint_notice",
         "text": "{applicant} has applied to us about {matter} (application {application}). You may answer by {answer_by}.",
-        "basis": "=application",
         "to": [
           "=applicant",
           "=against"
@@ -148,49 +73,49 @@
           "=applicant",
           "=against",
           "=self"
-        ],
-        "data": {
-          "application": "=application",
-          "kind": "=matter",
-          "matter": "=matter",
-          "applicant": "=applicant",
-          "against": "=against",
-          "answer_by": "=answer_by",
-          "hearing_at": "=answer_by",
-          "about": "=about",
-          "amount": "#amount",
-          "structure": "=structure",
-          "seeks": "=seeks"
-        }
+        ]
       }
     },
     {
-      "form": "venue_decision",
-      "title": "Decision on an application",
       "does": "Says what is decided on an application, to both sides. It moves no money and does nothing by itself: an order or a recommendation is words, which the other side follows or does not.",
       "fields": {
-        "application": {
-          "type": "record",
-          "required": true,
-          "description": "The application decided."
-        },
-        "matter": {
-          "type": "text",
-          "required": true,
-          "description": "What it was about, in the word the application uses."
-        },
-        "applicant": {
-          "type": "entity",
-          "required": true,
-          "description": "Who applied."
+        "about": {
+          "description": "The paper the application is about, where it names one.",
+          "type": "record"
         },
         "against": {
-          "type": "entity",
-          "description": "Whom it was against."
+          "description": "Whom it was against.",
+          "type": "entity"
+        },
+        "amount": {
+          "description": "For pay: how much.",
+          "type": "amount"
+        },
+        "applicant": {
+          "description": "Who applied.",
+          "required": true,
+          "type": "entity"
+        },
+        "application": {
+          "description": "The application decided.",
+          "required": true,
+          "type": "record"
+        },
+        "binding": {
+          "description": "Whether it is an order (yes) or a recommendation (no).",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "type": "choice"
+        },
+        "due": {
+          "description": "For pay or do: the day it is due by.",
+          "type": "date"
         },
         "finding": {
-          "type": "choice",
-          "required": true,
+          "description": "What is decided: pay (money to the applicant), do (put it right), set_aside (a paper), settled (the two agreed), dismissed, rejected (not something heard here), referred (passed to whoever must act).",
           "options": [
             "pay",
             "do",
@@ -200,54 +125,58 @@
             "rejected",
             "referred"
           ],
-          "description": "What is decided: pay (money to the applicant), do (put it right), set_aside (a paper), settled (the two agreed), dismissed, rejected (not something heard here), referred (passed to whoever must act)."
-        },
-        "binding": {
-          "type": "choice",
           "required": true,
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "Whether it is an order (yes) or a recommendation (no)."
+          "type": "choice"
         },
-        "amount": {
-          "type": "amount",
-          "description": "For pay: how much."
+        "matter": {
+          "description": "What it was about, in the word the application uses.",
+          "required": true,
+          "type": "text"
         },
         "pay_into": {
-          "type": "account",
-          "description": "For pay: the account it is paid into."
-        },
-        "due": {
-          "type": "date",
-          "description": "For pay or do: the day it is due by."
-        },
-        "about": {
-          "type": "record",
-          "description": "The paper the application is about, where it names one."
-        },
-        "structure": {
-          "type": "structure",
-          "description": "The building, where the application names one."
-        },
-        "seeks": {
-          "type": "text",
-          "description": "What the application sought, where it said."
-        },
-        "waited_days": {
-          "type": "count",
-          "description": "Days from the application to this decision, for the office's own figures."
+          "description": "For pay: the account it is paid into.",
+          "type": "account"
         },
         "reason": {
-          "type": "text",
-          "description": "The reasons for the decision, in words."
+          "description": "The reasons for the decision, in words.",
+          "type": "text"
+        },
+        "seeks": {
+          "description": "What the application sought, where it said.",
+          "type": "text"
+        },
+        "structure": {
+          "description": "The building, where the application names one.",
+          "type": "structure"
+        },
+        "waited_days": {
+          "description": "Days from the application to this decision, for the office's own figures.",
+          "type": "count"
         }
       },
+      "form": "venue_decision",
+      "title": "Decision on an application",
       "writes": {
+        "basis": "=application",
+        "data": {
+          "about": "=about",
+          "against": "=against",
+          "amount": "#amount",
+          "applicant": "=applicant",
+          "application": "=application",
+          "binding": "?binding",
+          "due": "=due",
+          "finding": "=finding",
+          "kind": "=matter",
+          "matter": "=matter",
+          "reason": "=reason",
+          "seeks": "=seeks",
+          "structure": "=structure",
+          "to": "=pay_into",
+          "waited_days": "=waited_days"
+        },
         "kind": "venue_decision",
         "text": "Decision on {application}: {finding}.",
-        "basis": "=application",
         "to": [
           "=applicant",
           "=against"
@@ -256,43 +185,114 @@
           "=applicant",
           "=against",
           "=self"
-        ],
-        "data": {
-          "application": "=application",
-          "kind": "=matter",
-          "matter": "=matter",
-          "applicant": "=applicant",
-          "against": "=against",
-          "finding": "=finding",
-          "binding": "?binding",
-          "waited_days": "=waited_days",
-          "about": "=about",
-          "structure": "=structure",
-          "seeks": "=seeks",
-          "amount": "#amount",
-          "to": "=pay_into",
-          "due": "=due",
-          "reason": "=reason"
-        }
+        ]
       }
     }
   ],
+  "name": "office.desk",
+  "params": {
+    "account": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "answer_days": {
+      "default": 14,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "counter": {
+      "default": false,
+      "schema": {
+        "type": "boolean"
+      },
+      "source": "placeholder"
+    },
+    "fee": {
+      "default": 0,
+      "schema": {
+        "description": "what applying costs (none: nothing), paid into `account`",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "hears": {
+      "default": [],
+      "schema": {
+        "type": "array"
+      },
+      "source": "placeholder"
+    },
+    "members_of": {
+      "default": "",
+      "schema": {
+        "description": "heard only for members of this organisation (none: anyone)",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "office": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "part": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "refer_to": {
+      "default": {},
+      "schema": {
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "title": {
+      "default": "desk",
+      "schema": {
+        "description": "what it calls itself in its notice",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "within_days": {
+      "default": 28,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    }
+  },
+  "perceives": [],
   "routines": [
     {
-      "task": "answer",
       "at": "office",
       "every": 1,
-      "what": "The desk's staff take in each application, tell the one it is against and give them time to answer, and decide what the record settles: the other side's own answer, no answer at all, or a paper the applicant can show. A case the record cannot settle is put before the office-holder.",
       "papers": [
         {
-          "kind": "application",
-          "how": "taken in; the one it is against is told and given time to answer; decided on the record when that time has run, or put before the office-holder"
+          "how": "taken in; the one it is against is told and given time to answer; decided on the record when that time has run, or put before the office-holder",
+          "kind": "application"
         },
         {
-          "kind": "complaint_response",
-          "how": "filed with its application, which is decided on it when the time to answer has run"
+          "how": "filed with its application, which is decided on it when the time to answer has run",
+          "kind": "complaint_response"
         }
-      ]
+      ],
+      "task": "answer",
+      "what": "The desk's staff take in each application, tell the one it is against and give them time to answer, and decide what the record settles: the other side's own answer, no answer at all, or a paper the applicant can show. A case the record cannot settle is put before the office-holder."
     }
-  ]
+  ],
+  "state": "none",
+  "version": "0.2.0"
 }

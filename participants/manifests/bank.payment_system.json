@@ -1,7 +1,16 @@
 {
-  "name": "bank.payment_system",
-  "version": "0.17.1",
   "doc": "docs/behaviour/bank-payment-system.md",
+  "keeps": [
+    {
+      "what": "request",
+      "why": "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it."
+    },
+    {
+      "what": "accounts",
+      "why": "The ledger is the bank's own book: it keeps its customers' accounts, and pays from them as they instruct."
+    }
+  ],
+  "name": "bank.payment_system",
   "params": {
     "amount": {
       "schema": {},
@@ -18,10 +27,10 @@
       "source": "the world gives it (no default)"
     },
     "hold_notice": {
+      "default": 86400,
       "schema": {
         "type": "integer"
       },
-      "default": 86400,
       "source": "placeholder"
     },
     "instruction": {
@@ -29,10 +38,10 @@
       "source": "the world gives it (no default)"
     },
     "letter_lists": {
+      "default": 40,
       "schema": {
         "type": "integer"
       },
-      "default": 40,
       "source": "placeholder"
     },
     "line": {
@@ -40,10 +49,10 @@
       "source": "the world gives it (no default)"
     },
     "max_batch": {
+      "default": 32,
       "schema": {
         "type": "integer"
       },
-      "default": 32,
       "source": "placeholder"
     },
     "memo": {
@@ -51,10 +60,10 @@
       "source": "the world gives it (no default)"
     },
     "review_all": {
+      "default": false,
       "schema": {
         "type": "boolean"
       },
-      "default": false,
       "source": "placeholder"
     },
     "settles": {
@@ -62,10 +71,10 @@
       "source": "the world gives it (no default)"
     },
     "statement_lists": {
+      "default": 40,
       "schema": {
         "type": "integer"
       },
-      "default": 40,
       "source": "placeholder"
     },
     "to": {
@@ -73,17 +82,17 @@
       "source": "the world gives it (no default)"
     },
     "town": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "verify_author": {
+      "default": true,
       "schema": {
         "type": "boolean"
       },
-      "default": true,
       "source": "placeholder"
     },
     "who": {
@@ -93,14 +102,5 @@
   },
   "perceives": [],
   "state": "none",
-  "keeps": [
-    {
-      "what": "request",
-      "why": "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it."
-    },
-    {
-      "what": "accounts",
-      "why": "The ledger is the bank's own book: it keeps its customers' accounts, and pays from them as they instruct."
-    }
-  ]
+  "version": "0.18.0"
 }

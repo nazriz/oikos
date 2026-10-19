@@ -5,16 +5,21 @@
 // seat in the payroll office was never told, and a new hire was never paid (the live check of that day, finding 9).
 
 import { expect, test } from "bun:test";
-import { Book, callAction, type Step } from "../src/behaviour/common";
-import { Staffing } from "../src/behaviour/firms";
-import { financeOfficer } from "../src/behaviour/government";
+import { Book, type Step } from "../src/shared/common";
+import { program } from "../src/calls";
+import { Staffing } from "../src/readers/staffing";
+
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { callsOf, context, DAY, signed, statement, wake } from "./stepping";
+import { engine } from "./engine";
+const financeOfficer = engine("city.finance_officer");
 
 inCurrency(PROFILE.values.currency);
 
 const PERIOD = 14 * DAY, WAGE = 300_000;
+// (A step as the action the world would be sent: the helper the shared module had is not there now.)
+const callAction = (s: Step) => ({ type: "call", call: program(...s), reasoning: s.why });
 const said = (steps: Step[], t = 0) => steps.flatMap((s) => callsOf(callAction(s), t));
 const obsOf = (t: number, records: any[], readings: object = {}): any => ({ t, entity: "city", participant: "x", inbox: [], outcomes: [], readings,
   channels: { papers: { kind: "records", records }, treasury: { kind: "accounts", transactions: [], accounts: [{ account: "acc-city", holder: "city", custodian: "bank", currency: "AUD", balance: "900000000" }] } } });

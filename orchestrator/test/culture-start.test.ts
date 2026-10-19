@@ -5,8 +5,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { PROFILE_DIR } from "@oikos/worlds/generator/profile";
-import { Culture, cultureDial, standardNormal, type CultureEnv } from "../../participants/src/behaviour/culture";
-import { Randomness } from "../../participants/src/rng";
+import { cultureDial } from "../../participants/src/shared/culture";
 
 const root = join(import.meta.dir, "../..");
 const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
@@ -31,15 +30,5 @@ test("a dial-on town carries the figures, a dial-off town does not, and people s
   const d = cultureDial(on)!;
   expect(d.figures.answer_tribunal!.approves_bps).toBe(5_890);
   expect(d.figures.join_union!.approves_bps).toBe(2_900);
-  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-  const people = Array.from({ length: 400 }, (_, i) => {
-    const rng = new Randomness(7n).stream([`p${i}`, "x"]);
-    const env: CultureEnv = { z: () => standardNormal(rng) * 0.5, conformity: () => 0.5, belonging: () => 0.5, integrity: () => 0.5, draw: () => standardNormal(rng) };
-    return new Culture(d.params, d, env, { answer_tribunal: 6_000, join_union: 3_000, strike: 4_000 });
-  });
-  const at = (c: any, f: "approves" | "own") => mean(people.map((p) => p.read(c, 0)![f]));
-  expect(at("join_union", "approves")).toBe(2_900); // the picture everyone starts with
-  expect(Math.abs(at("join_union", "own") - 2_900)).toBeLessThan(250); // the lean is spread around it
-  expect(at("answer_tribunal", "approves")).toBe(5_890);
-  expect(at("strike", "approves")).toBe(5_000); // no figure: values alone, as before
+  // (What a person starts with, the picture and the lean around it, is the engine's: kernel/crates/actors/src/mind/culture.rs, `a_person_starts_with_the_profiles_picture`.)
 });

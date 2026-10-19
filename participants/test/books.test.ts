@@ -1,5 +1,5 @@
-// The clerk's paper (participants/src/behaviour/books.ts) and two offices' books read from papers made by hand
-// (participants/src/behaviour/openbooks.ts): a landlord's rent book counts each lease from its own rent day; the
+// The clerk's paper (participants/src/readers/books.ts) and two offices' books read from papers made by hand
+// (participants/src/readers/openbooks.ts): a landlord's rent book counts each lease from its own rent day; the
 // support office's books hold what its staff put before the office-holder. And a direction filed on an office's form
 // reaches its staff's post (`Directions`), which looked for it under its own post's name until 2026-10-11.
 
@@ -8,9 +8,9 @@ import type { Observation } from "../src/contracts";
 import type { OpenHeading, ParticipantContext } from "../src/module";
 import { inCurrency } from "../src/money";
 import { Randomness } from "../src/rng";
-import { booksPaper, Clerk } from "../src/behaviour/books";
-import { Book, Directions } from "../src/behaviour/common";
-import { firstDueOf, landlordBooks, supportBooks } from "../src/behaviour/openbooks";
+import { booksPaper, Clerk } from "../src/readers/books";
+import { Book, Directions } from "../src/shared/common";
+import { firstDueOf, landlordBooks, supportBooks } from "../src/readers/openbooks";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 
 inCurrency(PROFILE.values.currency);

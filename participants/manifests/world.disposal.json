@@ -1,38 +1,42 @@
 {
-  "name": "world.disposal",
-  "version": "0.1.0",
+  "answers": {
+    "acts": "What it acts on: a docket for what is brought to it, invoiced every month at the charge it has notified.",
+    "office": "the landfill's office"
+  },
   "doc": "docs/behaviour/services.md",
+  "name": "world.disposal",
   "params": {
     "account": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "every_days": {
+      "default": 30,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 30,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "kind": {
+      "default": "waste",
       "schema": {
         "type": "string"
       },
-      "default": "waste",
       "source": "placeholder"
     },
     "price_per_tonne": {
+      "default": 0,
       "schema": {
         "type": "integer"
       },
-      "default": 0,
       "source": "placeholder"
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "version": "0.1.0"
 }

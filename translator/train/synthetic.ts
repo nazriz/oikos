@@ -37,7 +37,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { calls, groupDigits, type Currency } from "@oikos/participants";
 // (The papers offices issue, as their modules declare them: read for their names, fields and types only.)
-import * as PAPERS from "../../participants/src/behaviour/papers";
+import * as PAPERS from "../../participants/src/shared/papers";
 import { amountWritings, FIELD_TYPES, goldText, howOften, implausible, literals, sampler, shapeOf, shuffled, whyNot, type FormField, type FormSpec, type Gold, type WrittenCurrency } from "./data";
 
 /**

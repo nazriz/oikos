@@ -1,83 +1,51 @@
 {
-  "name": "tribunal.registrar",
-  "version": "0.3.0",
   "doc": "docs/behaviour/justice.md",
-  "params": {
-    "banks": {
-      "schema": {
-        "type": "array"
-      },
-      "default": [],
-      "required": true,
-      "source": "placeholder"
-    },
-    "enforcer": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "eviction_notice_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 0,
-      "source": "placeholder"
-    },
-    "part": {
-      "schema": {},
-      "source": "the world gives it (no default)"
-    },
-    "warrant_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
-    }
-  },
-  "perceives": [],
-  "state": "none",
   "issues": [
     {
-      "form": "garnishee_order",
-      "title": "Order to a debtor's bank to pay an unpaid order of the tribunal",
       "does": "Has the banks pay an order of the tribunal left unpaid, from what the debtor holds with them.",
       "fields": {
-        "order": {
-          "type": "record",
-          "required": true,
-          "description": "The tribunal's order left unpaid."
-        },
-        "debtor": {
-          "type": "entity",
-          "required": true,
-          "description": "Who owes."
-        },
-        "creditor": {
-          "type": "entity",
-          "required": true,
-          "description": "Who is owed."
-        },
         "amount": {
-          "type": "amount",
+          "description": "How much.",
           "required": true,
-          "description": "How much."
-        },
-        "pay_into": {
-          "type": "account",
-          "required": true,
-          "description": "The account it is to be paid into."
+          "type": "amount"
         },
         "claim": {
-          "type": "record",
-          "description": "The claim it settles, if the order names one."
+          "description": "The claim it settles, if the order names one.",
+          "type": "record"
+        },
+        "creditor": {
+          "description": "Who is owed.",
+          "required": true,
+          "type": "entity"
+        },
+        "debtor": {
+          "description": "Who owes.",
+          "required": true,
+          "type": "entity"
+        },
+        "order": {
+          "description": "The tribunal's order left unpaid.",
+          "required": true,
+          "type": "record"
+        },
+        "pay_into": {
+          "description": "The account it is to be paid into.",
+          "required": true,
+          "type": "account"
         }
       },
+      "form": "garnishee_order",
+      "title": "Order to a debtor's bank to pay an unpaid order of the tribunal",
       "writes": {
+        "basis": "=order",
+        "data": {
+          "amount": "#amount",
+          "claim": "=claim",
+          "debtor": "=debtor",
+          "order": "=order",
+          "to": "=pay_into"
+        },
+        "kind": "garnishee_order",
         "sends": [
           {
             "to": [
@@ -86,9 +54,7 @@
             "why": "The banks hold what the debtor has: the order is theirs to pay."
           }
         ],
-        "kind": "garnishee_order",
         "text": "Order to pay {amount} from what {debtor} holds, into {pay_into}, under {order}.",
-        "basis": "=order",
         "to": [
           "@banks"
         ],
@@ -97,67 +63,73 @@
           "=self",
           "=debtor",
           "=creditor"
-        ],
-        "data": {
-          "order": "=order",
-          "debtor": "=debtor",
-          "amount": "#amount",
-          "to": "=pay_into",
-          "claim": "=claim"
-        }
+        ]
       }
     },
     {
-      "form": "warrant",
-      "title": "Warrant of possession",
       "does": "Issued on a landlord's request, on an order of the tribunal for possession whose day has passed with the tenant still there: it names the home, the tenant and the household, and the days between which it is to be carried out. It goes to whoever carries the tribunal's warrants out, and the tenant and the landlord see it. It moves nobody by itself: someone must go, and a warrant not carried out by its last day lapses. How much notice of the day the tenant must have, and how long a warrant runs, are in the law on possession.",
       "fields": {
-        "order": {
-          "type": "record",
-          "required": true,
-          "description": "The tribunal's order for possession."
-        },
-        "lease": {
-          "type": "record",
-          "required": true,
-          "description": "The lease."
-        },
-        "tenant": {
-          "type": "entity",
-          "required": true,
-          "description": "The tenant."
-        },
-        "landlord": {
-          "type": "entity",
-          "required": true,
-          "description": "The landlord."
+        "building": {
+          "description": "The building it is in.",
+          "type": "structure"
         },
         "home": {
-          "type": "space",
+          "description": "The home.",
           "required": true,
-          "description": "The home."
-        },
-        "building": {
-          "type": "structure",
-          "description": "The building it is in."
+          "type": "space"
         },
         "household": {
-          "type": "list",
+          "description": "Who is to be removed: the tenant and those living there by the lease.",
           "required": true,
-          "description": "Who is to be removed: the tenant and those living there by the lease."
+          "type": "list"
+        },
+        "landlord": {
+          "description": "The landlord.",
+          "required": true,
+          "type": "entity"
+        },
+        "lease": {
+          "description": "The lease.",
+          "required": true,
+          "type": "record"
         },
         "not_before": {
-          "type": "date",
+          "description": "The first day it may be carried out (after the notice of the day the law gives the tenant).",
           "required": true,
-          "description": "The first day it may be carried out (after the notice of the day the law gives the tenant)."
+          "type": "date"
+        },
+        "order": {
+          "description": "The tribunal's order for possession.",
+          "required": true,
+          "type": "record"
+        },
+        "tenant": {
+          "description": "The tenant.",
+          "required": true,
+          "type": "entity"
         },
         "until": {
-          "type": "date",
+          "description": "Its last day: after it, it has lapsed.",
           "required": true,
-          "description": "Its last day: after it, it has lapsed."
+          "type": "date"
         }
       },
+      "form": "warrant",
+      "title": "Warrant of possession",
       "writes": {
+        "basis": "=order",
+        "data": {
+          "household": "=household",
+          "landlord": "=landlord",
+          "lease": "=lease",
+          "not_before": "=not_before",
+          "order": "=order",
+          "space": "=home",
+          "structure": "=building",
+          "tenant": "=tenant",
+          "until": "=until"
+        },
+        "kind": "warrant",
         "sends": [
           {
             "to": [
@@ -166,9 +138,7 @@
             "why": "They carry the tribunal's warrants out: nobody else may."
           }
         ],
-        "kind": "warrant",
         "text": "Warrant of possession under order {order}: {tenant} and their household are to be removed from {home}, and possession given to {landlord}. To be carried out no sooner than {not_before} and by {until}.",
-        "basis": "=order",
         "to": [
           "@enforcer"
         ],
@@ -177,40 +147,29 @@
           "=self",
           "=tenant",
           "=landlord"
-        ],
-        "data": {
-          "order": "=order",
-          "lease": "=lease",
-          "tenant": "=tenant",
-          "landlord": "=landlord",
-          "space": "=home",
-          "structure": "=building",
-          "household": "=household",
-          "not_before": "=not_before",
-          "until": "=until"
-        }
+        ]
       }
     },
     {
-      "form": "enforcement_decline",
-      "title": "A request to enforce, declined",
       "does": "Tells whoever asked for an order to be enforced, or for a warrant, that it is declined: there is no such order to them to enforce. It does nothing else.",
       "fields": {
-        "request": {
-          "type": "record",
-          "required": true,
-          "description": "The request declined."
-        },
         "asker": {
-          "type": "entity",
+          "description": "Who asked.",
           "required": true,
-          "description": "Who asked."
+          "type": "entity"
+        },
+        "request": {
+          "description": "The request declined.",
+          "required": true,
+          "type": "record"
         }
       },
+      "form": "enforcement_decline",
+      "title": "A request to enforce, declined",
       "writes": {
+        "basis": "=request",
         "kind": "enforcement_decline",
         "text": "Declined: no such order to you to enforce (request {request}).",
-        "basis": "=request",
         "to": [
           "=asker"
         ],
@@ -220,5 +179,46 @@
         ]
       }
     }
-  ]
+  ],
+  "name": "tribunal.registrar",
+  "params": {
+    "banks": {
+      "default": [],
+      "required": true,
+      "schema": {
+        "type": "array"
+      },
+      "source": "placeholder"
+    },
+    "enforcer": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "eviction_notice_days": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "part": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "warrant_days": {
+      "default": 14,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.3.0"
 }

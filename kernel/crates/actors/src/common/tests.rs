@@ -304,3 +304,19 @@ fn dates_and_notices() {
     assert_eq!(next_working(&cal, 0, 9 * 3600), 9 * 3600);
     assert_eq!(next_working(&cal, DAY + 10 * 3600, 9 * 3600), 4 * DAY + 9 * 3600, "Friday after nine: Monday");
 }
+
+/// A notice counts from when it is on the record, which is after it is sent (foundations F7, 2026-10-16): a date counted from the moment
+/// of sending was short of the law's notice for one sent in the last minutes of a day (a landlord's notice of 29 days, 23 hours and 34
+/// minutes, where the law asks 30 days). Ported from participants/test/notice-lag.test.ts (the TypeScript helper is gone).
+#[test]
+fn a_notice_sent_at_any_moment_of_a_day_runs_its_days_before_the_change_begins() {
+    let lead = 30 * DAY;
+    for sent in [0, 3_600, 12 * 3_600, DAY - 3_600, DAY - 901, DAY - 60, DAY - 1] {
+        let from = starts_on(sent, lead);
+        assert_eq!(from % DAY, 0, "an increase begins with a day");
+        assert!(from - (sent + NOTICE_LAG) >= lead, "sent at {sent}");
+        assert!(from - sent <= lead + DAY + NOTICE_LAG, "sent at {sent}");
+    }
+    // (And what takes a quarter of an hour and waits half an hour more is within the lag.)
+    assert!(starts_on(DAY - 60, lead) - (DAY - 60 + 900 + 1_800) >= lead);
+}

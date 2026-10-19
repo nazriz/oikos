@@ -1,52 +1,56 @@
 {
-  "name": "world.grants",
-  "version": "0.3.0",
+  "answers": {
+    "acts": "It pays by its determination, which is on file with whoever it pays: so much a year for each resident, by the published estimate of the population. A letter changes nothing in a determination.",
+    "office": "the grants office"
+  },
   "doc": "docs/behaviour/public-finance.md",
+  "name": "world.grants",
   "params": {
     "account": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "every_days": {
+      "default": 91,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 91,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "first_day": {
+      "default": 30,
       "schema": {
         "type": "integer"
       },
-      "default": 30,
       "source": "placeholder"
     },
     "per_resident_per_year": {
+      "default": 0,
       "schema": {
         "type": "integer"
       },
-      "default": 0,
       "source": "placeholder"
     },
     "to": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "to_account": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "version": "0.3.0"
 }

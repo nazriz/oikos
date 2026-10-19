@@ -4,7 +4,7 @@
 
 import { expect, test } from "bun:test";
 import { ClaudeCodeAdapter, type ClaudeCodeRunner } from "../src/llm/claude-code";
-import { LINES } from "../src/behaviour/reading";
+import { LINES } from "../src/shared/reading";
 import { modelReader, readerSchema, readerSystem, readerUser, READING_PROMPT_VERSION, type ReadingRecord } from "../src/llm/reader-model";
 import type { ReadRequest, Reader } from "../src/llm/reader";
 

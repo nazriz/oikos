@@ -1,193 +1,206 @@
 {
-  "name": "city.finance_officer",
-  "version": "0.10.1",
-  "doc": "docs/behaviour/government.md",
-  "params": {
-    "budget_lines": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "compliance_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 10000,
-      "source": "placeholder"
-    },
-    "lines_by_position": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "lines_by_structure": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "notice_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
-    },
-    "part": {
-      "schema": {},
-      "source": "the world gives it (no default)"
-    },
-    "payroll_wait_days": {
-      "schema": {
-        "type": "integer",
-        "description": "how long it waits for the hiring office's notice of a new starter before setting the wage up from the agreement on file"
-      },
-      "unit": "days",
-      "default": 3,
-      "source": "placeholder"
-    },
-    "period": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 1209600,
-      "source": "placeholder"
-    },
-    "procedure": {
-      "schema": {
-        "type": "string",
-        "description": "the record its approval rule comes from (who approves a payment over what sum: its `data.approval`); withdrawn, or none, and no approval is asked"
-      },
-      "default": "",
-      "source": "placeholder"
-    }
+  "answers": {
+    "acts": "What it acts on: an invoice addressed to the town, paid within the adopted budget (over the payments procedure's figure, once the mayor's written approval is on file); a payroll notice from an office that has taken someone on or is losing someone; and the tax withheld from wages, paid over each month. It does not start, stop or change a payment on a letter.",
+    "forms": [
+      {
+        "about": [
+          "approv"
+        ],
+        "say": "An approval of an invoice is the mayor's to give, in writing, naming the invoice."
+      }
+    ],
+    "office": "the finance office",
+    "report": true
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/government.md",
   "issues": [
     {
-      "form": "withholding_return",
-      "title": "Return of tax withheld from wages, to a collector",
       "does": "Reports to a collector what has been withheld from the wages paid in a period and what is paid over with it. It moves no money: what is paid over is paid besides, by a payment to each collector's account. The office's books count what is withheld and not yet paid over from the day of the last return. The law on tax from pay lists its returns and the day each falls due by; one return reports the charges the law names for it, and the books say which return falls due next.",
       "fields": {
-        "collector": {
-          "type": "entity",
-          "required": true,
-          "description": "The collector reported to."
-        },
         "account": {
-          "type": "account",
+          "description": "The account the wages were paid from.",
           "required": true,
-          "description": "The account the wages were paid from."
+          "type": "account"
         },
-        "period_end": {
-          "type": "date",
+        "collector": {
+          "description": "The collector reported to.",
           "required": true,
-          "description": "The day the period ended."
-        },
-        "withheld": {
-          "type": "amount",
-          "required": true,
-          "description": "What was withheld in the period, in all."
-        },
-        "paid": {
-          "type": "amount",
-          "required": true,
-          "description": "What is paid over now, in all."
+          "type": "entity"
         },
         "law": {
-          "type": "record",
-          "description": "The law it is withheld under: the tax law that lists the return (it names the charges each return reports; report them in that return, not in another)."
+          "description": "The law it is withheld under: the tax law that lists the return (it names the charges each return reports; report them in that return, not in another).",
+          "type": "record"
+        },
+        "paid": {
+          "description": "What is paid over now, in all.",
+          "required": true,
+          "type": "amount"
+        },
+        "period_end": {
+          "description": "The day the period ended.",
+          "required": true,
+          "type": "date"
+        },
+        "withheld": {
+          "description": "What was withheld in the period, in all.",
+          "required": true,
+          "type": "amount"
         }
       },
+      "form": "withholding_return",
+      "title": "Return of tax withheld from wages, to a collector",
       "writes": {
+        "basis": "=law",
+        "data": {
+          "account": "=account",
+          "paid": "#paid",
+          "period_end": "=period_end",
+          "withheld": "#withheld"
+        },
         "kind": "withholding_report",
         "text": "Withheld from wages, owed: {withheld}; paid now: {paid}.",
-        "basis": "=law",
         "to": [
           "=collector"
         ],
         "visible": [
           "=self",
           "=collector"
-        ],
-        "data": {
-          "account": "=account",
-          "paid": "#paid",
-          "period_end": "=period_end",
-          "withheld": "#withheld"
-        }
+        ]
       }
     },
     {
-      "form": "audit_answer",
-      "title": "Answer to the audit office's request for a named item",
       "does": "Answers the audit office's public request under the audit law, by the day it gives: the count of your decisions of a kind in a period, one of them by its number with its file, or your payments for the period against the bank's record. Say only what your books show. It does nothing else by itself.",
       "fields": {
-        "request": {
-          "type": "record",
-          "required": true,
-          "description": "The request this answers."
-        },
-        "auditor": {
-          "type": "entity",
-          "required": true,
-          "description": "The audit office."
-        },
-        "audit": {
-          "type": "text",
-          "required": true,
-          "description": "The audit's key, as the request gives it."
-        },
         "ask": {
-          "type": "choice",
-          "required": true,
+          "description": "What was asked for.",
           "options": [
             "count",
             "nth",
             "statement"
           ],
-          "description": "What was asked for."
+          "required": true,
+          "type": "choice"
         },
-        "nth": {
-          "type": "count",
-          "description": "For a decision by its number: which."
+        "audit": {
+          "description": "The audit's key, as the request gives it.",
+          "required": true,
+          "type": "text"
+        },
+        "auditor": {
+          "description": "The audit office.",
+          "required": true,
+          "type": "entity"
         },
         "count": {
-          "type": "count",
-          "description": "For a count: how many."
+          "description": "For a count: how many.",
+          "type": "count"
+        },
+        "nth": {
+          "description": "For a decision by its number: which.",
+          "type": "count"
+        },
+        "request": {
+          "description": "The request this answers.",
+          "required": true,
+          "type": "record"
         },
         "statement": {
-          "type": "text",
-          "description": "The books' entries asked for, in words."
+          "description": "The books' entries asked for, in words.",
+          "type": "text"
         }
       },
+      "form": "audit_answer",
+      "title": "Answer to the audit office's request for a named item",
       "writes": {
+        "basis": "=request",
+        "data": {
+          "ask": "=ask",
+          "audit": "=audit",
+          "count": "=count",
+          "nth": "=nth",
+          "request": "=request"
+        },
         "kind": "audit_answer",
         "text": "Answer to audit request {request}: {statement}",
-        "basis": "=request",
         "to": [
           "=auditor"
         ],
         "visible": [
           "=auditor",
           "=self"
-        ],
-        "data": {
-          "request": "=request",
-          "audit": "=audit",
-          "ask": "=ask",
-          "nth": "=nth",
-          "count": "=count"
-        }
+        ]
       }
     }
-  ]
+  ],
+  "name": "city.finance_officer",
+  "params": {
+    "budget_lines": {
+      "default": {},
+      "schema": {
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "compliance_bps": {
+      "default": 10000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "lines_by_position": {
+      "default": {},
+      "schema": {
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "lines_by_structure": {
+      "default": {},
+      "schema": {
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "default": 14,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "part": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "payroll_wait_days": {
+      "default": 3,
+      "schema": {
+        "description": "how long it waits for the hiring office's notice of a new starter before setting the wage up from the agreement on file",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "period": {
+      "default": 1209600,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "procedure": {
+      "default": "",
+      "schema": {
+        "description": "the record its approval rule comes from (who approves a payment over what sum: its `data.approval`); withdrawn, or none, and no approval is asked",
+        "type": "string"
+      },
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.10.1"
 }

@@ -3,11 +3,13 @@
 // at home tells one, who reports it from wherever they are and learns from it where the household lives.
 
 import { expect, test } from "bun:test";
-import { citizen } from "../src/behaviour/citizen";
-import { SAYING } from "../src/behaviour/household";
+
+import { SAYING } from "./sayings";
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { DAY, employment, lease, person, signed, statement, type Said } from "./stepping";
+import { engine } from "./engine";
+const citizen = engine("citizen.default");
 
 inCurrency(PROFILE.values.currency);
 

@@ -1,4 +1,4 @@
-// A book's lookups (participants/src/behaviour/common.ts): what it keeps so as not to look through everything it has
+// A book's lookups (participants/src/shared/common.ts): what it keeps so as not to look through everything it has
 // seen each time it's asked (a lot by a cell, claims by who holds them, a seller's latest list) must answer exactly
 // as looking through everything does, whatever arrives in whatever order. Checked against the plain way, over a
 // seeded stream of records with everything that makes the two differ if one is wrong: lots that overlap, records
@@ -6,9 +6,7 @@
 
 import { expect, test } from "bun:test";
 import type { Observation, Record, StatementRecord } from "../src/contracts";
-import { Book, lotOf, SHELF } from "../src/behaviour/common";
-import { ownerOf } from "../src/behaviour/institutions";
-import { goodsPrices, offerOf } from "../src/behaviour/trade";
+import { Book, SHELF } from "../src/shared/common";
 import { standingClaims } from "../src/law";
 import { Randomness } from "../src/rng";
 
@@ -75,17 +73,13 @@ function stream(seed: bigint, n: number): any[][] {
 /** Every answer the kept lookups give, beside the plain way's, for a book as it stands. */
 function compare(book: Book, asked: { cells: string[]; people: string[]; ids: string[] }) {
   for (const kind of ["lot", "price_list", "notice", "none-of-these"]) expect(book.open(kind)).toEqual(plain.open(book, kind));
-  for (const cell of asked.cells) expect(lotOf(book, cell)).toBe(plain.lotOf(book, cell));
   for (const who of asked.people) {
     expect([...book.claimsBy("holder", who)]).toEqual(book.ofType("claim").filter((c) => c.holder === who));
     expect([...book.claimsBy("counterparty", who)]).toEqual(book.ofType("claim").filter((c) => c.counterparty === who));
     const list = plain.goods(book, who);
-    expect(goodsPrices(book, who)).toEqual({ prices: (list?.data?.goods as any) ?? {}, account: list?.data?.account, min_order: list?.data?.min_order, at: list?.data?.at });
-    expect(offerOf(book, who)).toBe(plain.offer(book, who) as any);
   }
   for (const id of asked.ids) {
     expect([...book.claimsBy("object", id)]).toEqual(book.ofType("claim").filter((c) => (c.about as any)?.object === id));
-    expect(ownerOf(book, id)).toBe(plain.ownerOf(book, id));
   }
 }
 
@@ -230,18 +224,14 @@ function agree(book: Book, twin: Plain, who: string) {
     expect(ids(book.standingOf(kind)), say(`standing ${kind}`)).toEqual(ids(twin.open(kind)));
   }
   for (const type of TYPES) expect(ids(book.ofType(type as any)), say(`of type ${type}`)).toEqual(ids(twin.ofType(type)));
-  for (const cell of CELLS) expect(lotOf(book, cell), say(`the lot over ${cell}`)).toBe(twin.lotOf(cell));
   for (const who of PEOPLE) {
     expect(ids(book.claimsBy("holder", who)), say(`claims held by ${who}`)).toEqual(ids(twin.ofType("claim").filter((c) => c.holder === who)));
     expect(ids(book.claimsBy("counterparty", who))).toEqual(ids(twin.ofType("claim").filter((c) => c.counterparty === who)));
     const lists = twin.open("price_list").filter((r) => r.speaks_for === who);
     const goods = lists.filter((r) => r.data?.goods).sort((a, b) => b.at - a.at)[0];
-    expect(goodsPrices(book, who), say(`the prices of ${who}`)).toEqual({ prices: goods?.data?.goods ?? {}, account: goods?.data?.account, min_order: goods?.data?.min_order, at: goods?.data?.at });
-    expect(offerOf(book, who)).toBe(lists.filter((l) => l.offer).sort((a, b) => b.at - a.at)[0]?.offer);
   }
   for (const id of [...twin.ids.keys()].filter((_, i) => i % 5 === 0)) {
     expect(ids(book.claimsBy("object", id)), say(`claims about ${id}`)).toEqual(ids(twin.ofType("claim").filter((c) => c.about?.object === id)));
-    expect(ownerOf(book, id), say(`the owner of ${id}`)).toBe(twin.ownerOf(id));
     expect(book.current(id), say(`what stands for ${id}`)).toBe(twin.current(id));
     expect(book.repealed(id)).toBe(twin.withdrawn.has(id) && !twin.current(id));
   }
@@ -308,16 +298,6 @@ test("books that read a list from one shelf answer as books that each took it in
     expect(held("piecemeal")).toEqual({ own: register.length + then.length, shared: 0, shelves: 0 });
   }
 }, 180_000);
-
-test("a lot whose cells aren't a list is still found as looking through the lots finds it", () => {
-  const book = new Book();
-  const lot = (id: string, cells: unknown): StatementRecord => ({ id, at: 0, author: "genesis", record: "statement", kind: "lot", speaks_for: "city", visible_to: "public", text: "A lot.", data: { cells } }) as unknown as StatementRecord;
-  book.absorb(obs(0, [lot("lot-1", ["cell.1.1"]), lot("lot-2", "cell.2.2 and cell.3.3")]));
-  for (const cell of ["cell.1.1", "cell.2.2", "cell.3.3", "cell.9.9"]) expect(lotOf(book, cell)).toBe(plain.lotOf(book, cell));
-  expect(lotOf(book, "cell.2.2")).toBe("lot-2");
-  book.absorb(obs(1, [lot("lot-3", ["cell.9.9"])]));
-  expect(lotOf(book, "cell.9.9")).toBe("lot-3");
-});
 
 test("what a book hands out as a copy can be sorted without changing what it hands out next", () => {
   const book = new Book();

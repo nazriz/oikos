@@ -1,103 +1,108 @@
 {
-  "name": "city.rates_officer",
-  "version": "0.4.3",
-  "doc": "docs/behaviour/public-finance.md",
-  "params": {
-    "automation": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "casework": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "directed_under": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "direction_compliance_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 10000,
-      "source": "placeholder"
-    },
-    "first_day": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 30,
-      "source": "placeholder"
-    },
-    "law": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "law-rates",
-      "source": "placeholder"
-    },
-    "office": {
-      "schema": {
-        "type": "string",
-        "description": "where its clerks work, as a standing order names it (none given: the office itself)"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "part": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "procurement": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    }
+  "answers": {
+    "acts": "What it acts on: the valuer's valuations, on which it levies under the rating law; a payment that names the rates it pays; and a direction on its recovery form (rates_recovery) from those the town's rule on directions names.",
+    "office": "the rates office",
+    "report": true
   },
-  "perceives": [],
-  "state": "none",
+  "doc": "docs/behaviour/public-finance.md",
   "keeps": [
     {
       "what": "valuation",
       "why": "The rating authority keeps the rate book: the valuer sends it the valuation of every rateable lot, which is what it levies on."
     }
   ],
-  "takes": [
-    {
-      "form": "rates_recovery",
-      "title": "Recovery direction to the rates officer",
-      "fields": {
-        "interest": {
-          "type": "choice",
-          "options": [
-            "yes",
-            "no"
-          ],
-          "required": true,
-          "description": "Whether rates left unpaid after their due date are charged the law's penalty interest: yes, as the office does of its own accord; no, none is added."
-        }
+  "name": "city.rates_officer",
+  "params": {
+    "automation": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "casework": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "directed_under": {
+      "default": "",
+      "schema": {
+        "type": "string"
       },
-      "follows": "While a direction with interest no stands, the rates officer adds no penalty interest to overdue rates and writes to nobody about them. The rates themselves are still levied and still owed, and interest already recorded stays on record."
+      "source": "placeholder"
+    },
+    "direction_compliance_bps": {
+      "default": 10000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "first_day": {
+      "default": 30,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "law": {
+      "default": "law-rates",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "office": {
+      "default": "",
+      "schema": {
+        "description": "where its clerks work, as a standing order names it (none given: the office itself)",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "part": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "procurement": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
     }
-  ],
+  },
+  "perceives": [],
   "routines": [
     {
-      "task": "levy",
       "at": "office",
       "follows": [
         "law",
         "law-rates"
       ],
+      "task": "levy",
       "what": "At each instalment the rating law sets, the rates clerks send every owner on the rate book a notice of their share and record it as owed to the town; each month they add the law's penalty interest to what is overdue and write to the owner. When the notices go out is the law's: the first once the valuer has valued the town's properties and not before the office's first levy day, then one for each instalment the law sets, evenly through the year (two instalments a year are 182 days apart, four are 91). The order says only that they are to be sent."
     }
-  ]
+  ],
+  "state": "none",
+  "takes": [
+    {
+      "fields": {
+        "interest": {
+          "description": "Whether rates left unpaid after their due date are charged the law's penalty interest: yes, as the office does of its own accord; no, none is added.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "type": "choice"
+        }
+      },
+      "follows": "While a direction with interest no stands, the rates officer adds no penalty interest to overdue rates and writes to nobody about them. The rates themselves are still levied and still owed, and interest already recorded stays on record.",
+      "form": "rates_recovery",
+      "title": "Recovery direction to the rates officer"
+    }
+  ],
+  "version": "0.4.3"
 }

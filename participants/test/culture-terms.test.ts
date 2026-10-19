@@ -2,10 +2,13 @@
 // right direction; the same draw meets a shifted rate; with the dial off, the decision is the one it was. No model.
 
 import { expect, test } from "bun:test";
-import { citizen } from "../src/behaviour/citizen";
-import { CULTURE_WORDS } from "../src/behaviour/culture";
+
+
 import { OUTCOMES } from "../src/module";
 import { DAY, employment, lease, person, signed, standingOrder, statement } from "./stepping";
+import { engine } from "./engine";
+import { CULTURE_WORDS } from "./phrasing";
+const citizen = engine("citizen.default");
 
 const HOME = "apts-1/dwelling.1", WAGE = 120_000, RENT = 100_000;
 const tenancy = () => [...signed(lease("L1", 0, "landlord-1", "c1", HOME, RENT)), standingOrder("so-1", 0, "c1", "acc-landlord-1", RENT, { basis: "L1", first: 0 }), ...signed(employment("J1", 0, "factory-1", "c1", WAGE))];

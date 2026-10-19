@@ -5,10 +5,12 @@
 // looking for one to rent.
 
 import { expect, test } from "bun:test";
-import { citizen } from "../src/behaviour/citizen";
+
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { DAY, employment, person, signed, statement } from "./stepping";
+import { engine } from "./engine";
+const citizen = engine("citizen.default");
 
 inCurrency(PROFILE.values.currency);
 

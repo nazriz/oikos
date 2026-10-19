@@ -1,649 +1,132 @@
 {
-  "name": "firm.retailer",
-  "version": "0.18.0",
   "doc": "docs/behaviour/retailer.md",
-  "params": {
-    "adjust": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {
-        "smooth_months": 3,
-        "hiring_cost_weeks": 8
-      },
-      "source": "placeholder"
-    },
-    "automation": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "bank": {
-      "schema": {
-        "type": "string",
-        "description": "a shop just founded opens its account here (the world must say, for one); closed, our premises are offered at this share of what building them new costs (placeholder)"
-      },
-      "default": "",
-      "required": true,
-      "source": "a shop just founded opens its account here (the world must say, for one); closed, our premises are offered at this share of what building them new costs (placeholder)"
-    },
-    "borrow_again_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 30,
-      "source": "placeholder"
-    },
-    "builder": {
-      "schema": {
-        "type": "string",
-        "description": "whose published prices say what our premises are worth (none: closed, they're not sold)"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "capital": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "casual_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 0,
-      "source": "placeholder"
-    },
-    "chi_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 1000,
-      "source": "placeholder"
-    },
-    "credit": {
-      "schema": {
-        "type": "boolean"
-      },
-      "default": true,
-      "source": "placeholder"
-    },
-    "day_wage": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "delta_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 190,
-      "source": "placeholder"
-    },
-    "demand": {
-      "schema": {
-        "type": "integer",
-        "description": "what it expects to sell in a month, before it knows"
-      },
-      "default": 250,
-      "source": "placeholder"
-    },
-    "draw_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 0,
-      "source": "placeholder"
-    },
-    "founder": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "gamma_months": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "months",
-      "default": 24,
-      "source": "placeholder"
-    },
-    "idle_days": {
-      "schema": {
-        "type": "integer",
-        "description": "nobody working for us this long, our owners close us (placeholder)"
-      },
-      "unit": "days",
-      "default": 90,
-      "source": "nobody working for us this long, our owners close us (placeholder)"
-    },
-    "industry": {
-      "schema": {
-        "type": "string",
-        "description": "what the work is (its postings say; the world's vocabulary, e.g. its profile's industries)"
-      },
-      "default": "",
-      "source": "what the work is (its postings say; the world's vocabulary, e.g. its profile's industries)"
-    },
-    "initiative": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "kind": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "goods",
-      "source": "placeholder"
-    },
-    "lender": {
-      "schema": {
-        "type": "string",
-        "description": "whom it borrows from (none: it doesn't)"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "listing": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "look_at": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "look_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 5,
-      "source": "placeholder"
-    },
-    "max_staff": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 6,
-      "source": "placeholder"
-    },
-    "min_staff": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 1,
-      "source": "placeholder"
-    },
-    "notice_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
-    },
-    "open_from": {
-      "schema": {
-        "type": "integer",
-        "description": "the hours of a working day its owner is there (seconds into the day; both 0: whenever, as at home)"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "open_until": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
-      "source": "placeholder"
-    },
-    "operator": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "org": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "owner_values": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "period": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 1209600,
-      "source": "placeholder"
-    },
-    "phi_high_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 10000,
-      "source": "placeholder"
-    },
-    "phi_low_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 2500,
-      "source": "placeholder"
-    },
-    "police": {
-      "schema": {
-        "type": "string",
-        "description": "whom it reports goods missing to, at its monthly stocktake (\"\": no stocktake)"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "premises": {
-      "schema": {
-        "type": "string",
-        "description": "the shop: where it keeps and sells things"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "premises_cell": {
-      "schema": {
-        "type": "string",
-        "description": "where its prices are put up (it is not shown the ground: a home or a market is not one business's premises)"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "premises_sale_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 5000,
-      "source": "placeholder"
-    },
-    "price": {
-      "schema": {
-        "type": "integer",
-        "description": "its opening retail price, cents each"
-      },
-      "default": 9000,
-      "source": "placeholder"
-    },
-    "price_down_bound_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 10250,
-      "source": "placeholder"
-    },
-    "price_up_bound_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 11500,
-      "source": "placeholder"
-    },
-    "registered_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 10000,
-      "source": "placeholder"
-    },
-    "reprice_bps": {
-      "schema": {
-        "type": "integer",
-        "description": "by this much (placeholder)"
-      },
-      "unit": "bps",
-      "default": 1000,
-      "source": "by this much (placeholder)"
-    },
-    "reprice_days": {
-      "schema": {
-        "type": "integer",
-        "description": "closed, our premises unsold this long: the asking price comes down (placeholder)"
-      },
-      "unit": "days",
-      "default": 30,
-      "source": "closed, our premises unsold this long: the asking price comes down (placeholder)"
-    },
-    "respond": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "role": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "shop assistant",
-      "source": "placeholder"
-    },
-    "sale_board": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "search_limit": {
-      "schema": {
-        "type": "integer",
-        "description": "how many lists or listings a search reads"
-      },
-      "default": 20,
-      "source": "placeholder"
-    },
-    "serve_labour": {
-      "schema": {
-        "type": "integer",
-        "description": "seconds of work to serve an item"
-      },
-      "default": 5400,
-      "source": "placeholder"
-    },
-    "serve_task": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "serve",
-      "source": "placeholder"
-    },
-    "serve_within_days": {
-      "schema": {
-        "type": "integer",
-        "description": "what isn't served within this (or the days the order says it's for) is refunded (the customer goes elsewhere)"
-      },
-      "unit": "days",
-      "default": 3,
-      "source": "placeholder"
-    },
-    "shopfront": {
-      "schema": {
-        "type": "boolean"
-      },
-      "default": false,
-      "source": "placeholder"
-    },
-    "short_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 60,
-      "source": "placeholder"
-    },
-    "short_pay": {
-      "schema": {},
-      "default": null,
-      "source": "placeholder"
-    },
-    "sold_board": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "stock_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 30,
-      "source": "placeholder"
-    },
-    "stocktake_days": {
-      "schema": {
-        "type": "integer",
-        "description": "when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)"
-      },
-      "unit": "days",
-      "default": 30,
-      "source": "placeholder"
-    },
-    "suppliers": {
-      "schema": {
-        "type": "array",
-        "description": "whom it may buy from (their price lists)"
-      },
-      "default": [],
-      "source": "placeholder"
-    },
-    "theta_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 7500,
-      "source": "placeholder"
-    },
-    "trade_board": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
-      "source": "placeholder"
-    },
-    "unpaid_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 7,
-      "source": "placeholder"
-    },
-    "utilisation_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 8000,
-      "source": "placeholder"
-    },
-    "values": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
-    "vartheta_bps": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "bps",
-      "default": 200,
-      "source": "placeholder"
-    },
-    "wage": {
-      "schema": {
-        "type": "integer",
-        "description": "the wage it offers new hires, cents per period"
-      },
-      "default": 120000,
-      "source": "placeholder"
-    },
-    "wind_up_days": {
-      "schema": {
-        "type": "integer"
-      },
-      "unit": "days",
-      "default": 60,
-      "source": "placeholder"
-    },
-    "work_days": {
-      "schema": {
-        "type": "integer",
-        "description": "of every 7: shops open on Saturdays"
-      },
-      "unit": "days",
-      "default": 6,
-      "source": "placeholder"
-    },
-    "working_day": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 28800,
-      "source": "placeholder"
-    },
-    "workplace": {
-      "schema": {
-        "type": "string",
-        "description": "the space its staff work in"
-      },
-      "default": "",
-      "source": "placeholder"
-    }
-  },
-  "perceives": [],
-  "state": "none",
   "issues": [
     {
-      "form": "job_advertisement",
-      "title": "Job advertisement",
       "does": "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
       "fields": {
-        "wage": {
-          "type": "amount",
-          "required": true,
-          "description": "The wage for each pay period."
+        "account": {
+          "description": "The account the wages are paid from, where the office itself pays them.",
+          "type": "account"
         },
         "period": {
-          "type": "duration",
+          "description": "The pay period: how often the wage is paid.",
           "required": true,
-          "description": "The pay period: how often the wage is paid."
+          "type": "duration"
         },
         "posts": {
-          "type": "count",
+          "description": "How many posts this advertisement is for.",
           "required": true,
-          "description": "How many posts this advertisement is for."
+          "type": "count"
         },
-        "account": {
-          "type": "account",
-          "description": "The account the wages are paid from, where the office itself pays them."
+        "wage": {
+          "description": "The wage for each pay period.",
+          "required": true,
+          "type": "amount"
         }
       },
+      "form": "job_advertisement",
+      "title": "Job advertisement",
       "writes": {
-        "kind": "job_posting",
-        "text": "Hiring: {wage} every {period}.",
         "data": {
-          "wage": "#wage",
+          "industry": "@industry",
           "period": "=period",
           "role": "@role",
-          "industry": "@industry",
-          "workplace": "@workplace_structure",
-          "space": "@workplace"
+          "space": "@workplace",
+          "wage": "#wage",
+          "workplace": "@workplace_structure"
         },
+        "kind": "job_posting",
         "offer": {
-          "by": "=self",
-          "to": {
-            "min_age_years": 18
-          },
-          "take_up": "apply",
           "available": "=posts",
+          "by": "=self",
+          "take_up": "apply",
           "terms": {
-            "template": "employment",
             "commitments": [
               {
-                "who": "=self",
                 "does": {
                   "outcome": {
                     "money": {
-                      "from": "=account",
                       "amount": "=wage",
-                      "for": "wages"
+                      "for": "wages",
+                      "from": "=account"
                     }
                   }
                 },
-                "every": "=period"
+                "every": "=period",
+                "who": "=self"
               },
               "@occupancy"
             ],
+            "template": "employment",
             "termination": "@termination"
+          },
+          "to": {
+            "min_age_years": 18
           }
-        }
+        },
+        "text": "Hiring: {wage} every {period}."
       }
     },
     {
-      "form": "order",
-      "title": "An order to a supplier, paid with the order",
       "does": "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting. The seller delivers once an order is paid in full, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
       "fields": {
-        "seller": {
-          "type": "entity",
+        "account": {
+          "description": "The account the order is paid from.",
           "required": true,
-          "description": "Whom it is ordered from."
-        },
-        "kind": {
-          "type": "text",
-          "required": true,
-          "description": "What is ordered."
-        },
-        "quantity": {
-          "type": "count",
-          "required": true,
-          "description": "How many."
-        },
-        "unit_price": {
-          "type": "amount",
-          "required": true,
-          "description": "The price of each, as the seller advertises it."
-        },
-        "deliver_to": {
-          "type": "entity",
-          "required": true,
-          "description": "Who is to receive them."
+          "type": "account"
         },
         "at": {
-          "type": "structure",
+          "description": "Where they are to be delivered.",
           "required": true,
-          "description": "Where they are to be delivered."
+          "type": "structure"
         },
-        "account": {
-          "type": "account",
+        "deliver_to": {
+          "description": "Who is to receive them.",
           "required": true,
-          "description": "The account the order is paid from."
-        },
-        "retry_of": {
-          "type": "record",
-          "description": "An earlier order this one repeats."
+          "type": "entity"
         },
         "for_days": {
-          "type": "count",
-          "description": "How many days the order may be served over."
+          "description": "How many days the order may be served over.",
+          "type": "count"
+        },
+        "kind": {
+          "description": "What is ordered.",
+          "required": true,
+          "type": "text"
+        },
+        "quantity": {
+          "description": "How many.",
+          "required": true,
+          "type": "count"
+        },
+        "retry_of": {
+          "description": "An earlier order this one repeats.",
+          "type": "record"
+        },
+        "seller": {
+          "description": "Whom it is ordered from.",
+          "required": true,
+          "type": "entity"
+        },
+        "unit_price": {
+          "description": "The price of each, as the seller advertises it.",
+          "required": true,
+          "type": "amount"
         }
       },
+      "form": "order",
+      "title": "An order to a supplier, paid with the order",
       "writes": {
+        "data": {
+          "account": "=account",
+          "at": "=at",
+          "deliver_to": "=deliver_to",
+          "for_days": "=for_days",
+          "kind": "=kind",
+          "quantity": "=quantity",
+          "retry_of": "=retry_of",
+          "unit_price": "#unit_price"
+        },
         "kind": "order",
         "text": "Order: {quantity} {kind} at {unit_price} each, delivered to {deliver_to} at {at}. Paid with this order.",
         "to": [
@@ -652,225 +135,223 @@
         "visible": [
           "=self",
           "=seller"
-        ],
-        "data": {
-          "kind": "=kind",
-          "quantity": "=quantity",
-          "unit_price": "#unit_price",
-          "deliver_to": "=deliver_to",
-          "at": "=at",
-          "account": "=account",
-          "retry_of": "=retry_of",
-          "for_days": "=for_days"
-        }
+        ]
       }
     },
     {
-      "form": "delivery_note",
-      "title": "A delivery note for an order served",
       "fields": {
-        "order": {
-          "type": "record",
-          "required": true,
-          "description": "The order."
-        },
         "buyer": {
-          "type": "entity",
+          "description": "Who ordered.",
           "required": true,
-          "description": "Who ordered."
-        },
-        "kind": {
-          "type": "text",
-          "required": true,
-          "description": "What was ordered."
-        },
-        "ordered": {
-          "type": "count",
-          "required": true,
-          "description": "How many were ordered."
-        },
-        "delivered": {
-          "type": "count",
-          "required": true,
-          "description": "How many were delivered."
-        },
-        "refund": {
-          "type": "amount",
-          "required": true,
-          "description": "What was refunded for those not delivered."
+          "type": "entity"
         },
         "declined": {
-          "type": "choice",
+          "description": "Where nothing was delivered because it was not paid for.",
           "options": [
             "unpaid"
           ],
-          "description": "Where nothing was delivered because it was not paid for."
+          "type": "choice"
+        },
+        "delivered": {
+          "description": "How many were delivered.",
+          "required": true,
+          "type": "count"
+        },
+        "kind": {
+          "description": "What was ordered.",
+          "required": true,
+          "type": "text"
+        },
+        "order": {
+          "description": "The order.",
+          "required": true,
+          "type": "record"
+        },
+        "ordered": {
+          "description": "How many were ordered.",
+          "required": true,
+          "type": "count"
+        },
+        "refund": {
+          "description": "What was refunded for those not delivered.",
+          "required": true,
+          "type": "amount"
         }
       },
+      "form": "delivery_note",
+      "title": "A delivery note for an order served",
       "writes": {
+        "basis": "=order",
+        "data": {
+          "declined": "=declined",
+          "delivered": "=delivered",
+          "kind": "=kind",
+          "order": "=order",
+          "ordered": "=ordered",
+          "refund": "#refund"
+        },
         "kind": "delivery_note",
         "text": "Delivered: {delivered} of {ordered} {kind} (order {order}).",
-        "basis": "=order",
         "to": [
           "=buyer"
         ],
         "visible": [
           "=buyer",
           "=self"
-        ],
-        "data": {
-          "order": "=order",
-          "kind": "=kind",
-          "ordered": "=ordered",
-          "delivered": "=delivered",
-          "refund": "#refund",
-          "declined": "=declined"
-        }
+        ]
       }
     },
     {
-      "form": "wage_offer",
-      "title": "An answer to a union's wage claim",
       "fields": {
-        "union": {
-          "type": "entity",
-          "required": true,
-          "description": "The union that made the claim."
-        },
         "claim": {
-          "type": "record",
+          "description": "The claim answered.",
           "required": true,
-          "description": "The claim answered."
+          "type": "record"
         },
         "rise_bps": {
-          "type": "count",
+          "description": "The rise offered, in hundredths of a percent.",
           "required": true,
-          "description": "The rise offered, in hundredths of a percent."
+          "type": "count"
+        },
+        "union": {
+          "description": "The union that made the claim.",
+          "required": true,
+          "type": "entity"
         },
         "why": {
-          "type": "text",
-          "description": "Why that much."
+          "description": "Why that much.",
+          "type": "text"
         }
       },
+      "form": "wage_offer",
+      "title": "An answer to a union's wage claim",
       "writes": {
-        "kind": "wage_offer",
-        "text": "We offer a rise of {rise_bps} hundredths of a percent, in answer to {claim}.",
         "basis": "=claim",
-        "to": [
-          "=union"
-        ],
-        "visible": [
-          "=self",
-          "=union"
-        ],
         "data": {
-          "employer": "=self",
           "claim": "=claim",
+          "employer": "=self",
           "rise_bps": "=rise_bps",
           "why": "=why"
-        }
+        },
+        "kind": "wage_offer",
+        "text": "We offer a rise of {rise_bps} hundredths of a percent, in answer to {claim}.",
+        "to": [
+          "=union"
+        ],
+        "visible": [
+          "=self",
+          "=union"
+        ]
       }
     },
     {
-      "form": "export_invoice",
-      "title": "An invoice for goods sent to a buyer",
       "fields": {
-        "buyer": {
-          "type": "entity",
+        "account": {
+          "description": "The account it is to be paid into.",
           "required": true,
-          "description": "Who is invoiced."
-        },
-        "offer": {
-          "type": "record",
-          "description": "The buyer's standing offer it is sent under."
-        },
-        "kind": {
-          "type": "text",
-          "required": true,
-          "description": "What was sent."
-        },
-        "quantity": {
-          "type": "count",
-          "required": true,
-          "description": "How many."
-        },
-        "from_at": {
-          "type": "structure",
-          "required": true,
-          "description": "Where they were sent from."
+          "type": "account"
         },
         "amount": {
-          "type": "amount",
+          "description": "The sum invoiced.",
           "required": true,
-          "description": "The sum invoiced."
+          "type": "amount"
         },
-        "account": {
-          "type": "account",
+        "buyer": {
+          "description": "Who is invoiced.",
           "required": true,
-          "description": "The account it is to be paid into."
+          "type": "entity"
+        },
+        "from_at": {
+          "description": "Where they were sent from.",
+          "required": true,
+          "type": "structure"
+        },
+        "kind": {
+          "description": "What was sent.",
+          "required": true,
+          "type": "text"
         },
         "memo": {
-          "type": "text",
+          "description": "What the payment is for, in a few words.",
           "required": true,
-          "description": "What the payment is for, in a few words."
+          "type": "text"
+        },
+        "offer": {
+          "description": "The buyer's standing offer it is sent under.",
+          "type": "record"
+        },
+        "quantity": {
+          "description": "How many.",
+          "required": true,
+          "type": "count"
         }
       },
+      "form": "export_invoice",
+      "title": "An invoice for goods sent to a buyer",
       "writes": {
+        "basis": "=offer",
+        "data": {
+          "from_at": "=from_at",
+          "kind": "=kind",
+          "outcome": {
+            "money": {
+              "amount": "=amount",
+              "for": "=memo",
+              "to": "=account"
+            }
+          },
+          "quantity": "=quantity"
+        },
         "kind": "invoice",
         "text": "Invoice: {quantity} {kind}, {amount}.",
-        "basis": "=offer",
         "to": [
           "=buyer"
         ],
         "visible": [
           "=self",
           "=buyer"
-        ],
-        "data": {
-          "kind": "=kind",
-          "quantity": "=quantity",
-          "from_at": "=from_at",
-          "outcome": {
-            "money": {
-              "to": "=account",
-              "amount": "=amount",
-              "for": "=memo"
-            }
-          }
-        }
+        ]
       }
     },
     {
-      "form": "crime_report",
-      "title": "A report of goods taken, to the police",
       "fields": {
-        "kind": {
-          "type": "text",
+        "account": {
+          "description": "The account to be paid into if it is recovered.",
           "required": true,
-          "description": "What was taken."
-        },
-        "quantity": {
-          "type": "count",
-          "required": true,
-          "description": "How many."
+          "type": "account"
         },
         "at": {
-          "type": "structure",
+          "description": "Where from.",
           "required": true,
-          "description": "Where from."
+          "type": "structure"
+        },
+        "kind": {
+          "description": "What was taken.",
+          "required": true,
+          "type": "text"
+        },
+        "quantity": {
+          "description": "How many.",
+          "required": true,
+          "type": "count"
         },
         "value": {
-          "type": "amount",
+          "description": "What it was worth.",
           "required": true,
-          "description": "What it was worth."
-        },
-        "account": {
-          "type": "account",
-          "required": true,
-          "description": "The account to be paid into if it is recovered."
+          "type": "amount"
         }
       },
+      "form": "crime_report",
+      "title": "A report of goods taken, to the police",
       "writes": {
+        "data": {
+          "account": "=account",
+          "at": "=at",
+          "kind": "=kind",
+          "quantity": "=quantity",
+          "value": "#value"
+        },
+        "kind": "crime_report",
         "sends": [
           {
             "to": [
@@ -879,7 +360,6 @@
             "why": "The police investigate what is reported to them."
           }
         ],
-        "kind": "crime_report",
         "text": "Report: {quantity} {kind} taken from {at}.",
         "to": [
           "@police"
@@ -887,131 +367,132 @@
         "visible": [
           "=self",
           "@police"
-        ],
-        "data": {
-          "kind": "=kind",
-          "quantity": "=quantity",
-          "at": "=at",
-          "value": "#value",
-          "account": "=account"
-        }
+        ]
       }
     },
     {
-      "form": "remedy_answer",
-      "title": "Answer to a request to put something right",
       "does": "Answers someone who has asked the office in writing to put something right: yes or no, and where money is owed them and paid, how much. It does nothing by itself: what puts the thing right (a payment, a repair ordered, a paper withdrawn) is done besides.",
       "fields": {
-        "request": {
-          "type": "record",
-          "required": true,
-          "description": "The request answered."
+        "amount": {
+          "description": "Where money is owed them and paid: how much.",
+          "type": "amount"
         },
         "asker": {
-          "type": "entity",
+          "description": "Who asked.",
           "required": true,
-          "description": "Who asked."
-        },
-        "matter": {
-          "type": "text",
-          "required": true,
-          "description": "What it is about, in the word the request uses."
+          "type": "entity"
         },
         "granted": {
-          "type": "choice",
-          "required": true,
+          "description": "Whether it will be put right.",
           "options": [
             "yes",
             "no"
           ],
-          "description": "Whether it will be put right."
+          "required": true,
+          "type": "choice"
         },
-        "amount": {
-          "type": "amount",
-          "description": "Where money is owed them and paid: how much."
+        "matter": {
+          "description": "What it is about, in the word the request uses.",
+          "required": true,
+          "type": "text"
         },
         "reason": {
-          "type": "text",
-          "description": "Where it is refused: why."
+          "description": "Where it is refused: why.",
+          "type": "text"
+        },
+        "request": {
+          "description": "The request answered.",
+          "required": true,
+          "type": "record"
         }
       },
+      "form": "remedy_answer",
+      "title": "Answer to a request to put something right",
       "writes": {
+        "basis": "=request",
+        "data": {
+          "amount": "#amount",
+          "granted": "?granted",
+          "matter": "=matter",
+          "reason": "=reason",
+          "request": "=request"
+        },
         "kind": "remedy_answer",
         "text": "Answer to your request {request}: {granted}.",
-        "basis": "=request",
         "to": [
           "=asker"
         ],
         "visible": [
           "=asker",
           "=self"
-        ],
-        "data": {
-          "request": "=request",
-          "matter": "=matter",
-          "granted": "?granted",
-          "amount": "#amount",
-          "reason": "=reason"
-        }
+        ]
       }
     },
     {
+      "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+      "fields": {
+        "applicant": {
+          "description": "Who applied.",
+          "type": "entity"
+        },
+        "application": {
+          "description": "The application answered.",
+          "required": true,
+          "type": "record"
+        },
+        "done": {
+          "description": "For a thing to be put right: whether it is done.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "type": "choice"
+        },
+        "known": {
+          "description": "Whether the office's books say anything of it.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "type": "choice"
+        },
+        "owed": {
+          "description": "What the books show is owed the applicant (nought: nothing).",
+          "type": "amount"
+        },
+        "statement": {
+          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why).",
+          "type": "text"
+        },
+        "venue": {
+          "description": "The body that sent the notice.",
+          "required": true,
+          "type": "entity"
+        },
+        "wrong": {
+          "description": "For a paper complained of: whether it was wrong.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "type": "choice"
+        }
+      },
       "form": "complaint_answer",
       "title": "Answer to a desk's notice of an application against the office",
-      "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
-      "fields": {
-        "application": {
-          "type": "record",
-          "required": true,
-          "description": "The application answered."
-        },
-        "venue": {
-          "type": "entity",
-          "required": true,
-          "description": "The body that sent the notice."
-        },
-        "applicant": {
-          "type": "entity",
-          "description": "Who applied."
-        },
-        "known": {
-          "type": "choice",
-          "required": true,
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "Whether the office's books say anything of it."
-        },
-        "owed": {
-          "type": "amount",
-          "description": "What the books show is owed the applicant (nought: nothing)."
-        },
-        "done": {
-          "type": "choice",
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "For a thing to be put right: whether it is done."
-        },
-        "wrong": {
-          "type": "choice",
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "For a paper complained of: whether it was wrong."
-        },
-        "statement": {
-          "type": "text",
-          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
-        }
-      },
       "writes": {
+        "basis": "=application",
+        "data": {
+          "application": "=application",
+          "done": "?done",
+          "known": "?known",
+          "owed": "#owed",
+          "statement": "=statement",
+          "wrong": "?wrong"
+        },
         "kind": "complaint_response",
         "text": "Answer on {application}.",
-        "basis": "=application",
         "to": [
           "=venue"
         ],
@@ -1019,74 +500,74 @@
           "=venue",
           "=self",
           "=applicant"
-        ],
-        "data": {
-          "application": "=application",
-          "owed": "#owed",
-          "done": "?done",
-          "wrong": "?wrong",
-          "known": "?known",
-          "statement": "=statement"
-        }
+        ]
       }
     },
     {
-      "form": "tribunal_answer",
-      "title": "Answer to the tribunal's notice of an application against the office",
       "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
       "fields": {
-        "application": {
-          "type": "record",
-          "required": true,
-          "description": "The application answered."
-        },
-        "venue": {
-          "type": "entity",
-          "required": true,
-          "description": "The body that sent the notice."
-        },
         "applicant": {
-          "type": "entity",
-          "description": "Who applied."
+          "description": "Who applied.",
+          "type": "entity"
         },
-        "known": {
-          "type": "choice",
+        "application": {
+          "description": "The application answered.",
           "required": true,
-          "options": [
-            "yes",
-            "no"
-          ],
-          "description": "Whether the office's books say anything of it."
-        },
-        "owed": {
-          "type": "amount",
-          "description": "What the books show is owed the applicant (nought: nothing)."
+          "type": "record"
         },
         "done": {
-          "type": "choice",
+          "description": "For a thing to be put right: whether it is done.",
           "options": [
             "yes",
             "no"
           ],
-          "description": "For a thing to be put right: whether it is done."
+          "type": "choice"
         },
-        "wrong": {
-          "type": "choice",
+        "known": {
+          "description": "Whether the office's books say anything of it.",
           "options": [
             "yes",
             "no"
           ],
-          "description": "For a paper complained of: whether it was wrong."
+          "required": true,
+          "type": "choice"
+        },
+        "owed": {
+          "description": "What the books show is owed the applicant (nought: nothing).",
+          "type": "amount"
         },
         "statement": {
-          "type": "text",
-          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
+          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why).",
+          "type": "text"
+        },
+        "venue": {
+          "description": "The body that sent the notice.",
+          "required": true,
+          "type": "entity"
+        },
+        "wrong": {
+          "description": "For a paper complained of: whether it was wrong.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "type": "choice"
         }
       },
+      "form": "tribunal_answer",
+      "title": "Answer to the tribunal's notice of an application against the office",
       "writes": {
+        "basis": "=application",
+        "data": {
+          "application": "=application",
+          "done": "?done",
+          "known": "?known",
+          "owed": "#owed",
+          "statement": "=statement",
+          "wrong": "?wrong"
+        },
         "kind": "tribunal_response",
         "text": "Answer on {application}.",
-        "basis": "=application",
         "to": [
           "=venue"
         ],
@@ -1094,16 +575,614 @@
           "=venue",
           "=self",
           "=applicant"
-        ],
-        "data": {
-          "application": "=application",
-          "owed": "#owed",
-          "done": "?done",
-          "wrong": "?wrong",
-          "known": "?known",
-          "statement": "=statement"
-        }
+        ]
       }
     }
-  ]
+  ],
+  "name": "firm.retailer",
+  "params": {
+    "adjust": {
+      "default": {
+        "hiring_cost_weeks": 8,
+        "smooth_months": 3
+      },
+      "schema": {
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "automation": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "bank": {
+      "default": "",
+      "required": true,
+      "schema": {
+        "description": "a shop just founded opens its account here (the world must say, for one); closed, our premises are offered at this share of what building them new costs (placeholder)",
+        "type": "string"
+      },
+      "source": "a shop just founded opens its account here (the world must say, for one); closed, our premises are offered at this share of what building them new costs (placeholder)"
+    },
+    "borrow_again_days": {
+      "default": 30,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "builder": {
+      "default": "",
+      "schema": {
+        "description": "whose published prices say what our premises are worth (none: closed, they're not sold)",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "capital": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "casual_bps": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "chi_bps": {
+      "default": 1000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "clearance_cover_bps": {
+      "default": 30000,
+      "schema": {
+        "description": "stock beyond this share of a month's demand is cleared at a discount",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "clearance_floor_bps": {
+      "default": 8000,
+      "schema": {
+        "description": "the lowest a clearance sale takes a price, as a share of marginal cost",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "credit": {
+      "default": true,
+      "schema": {
+        "type": "boolean"
+      },
+      "source": "placeholder"
+    },
+    "day_wage": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "delta_bps": {
+      "default": 190,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "demand": {
+      "default": 250,
+      "schema": {
+        "description": "what it expects to sell in a month, before it knows",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "draw_days": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "founder": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "gamma_months": {
+      "default": 24,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "months"
+    },
+    "idle_days": {
+      "default": 90,
+      "schema": {
+        "description": "nobody working for us this long, our owners close us (placeholder)",
+        "type": "integer"
+      },
+      "source": "nobody working for us this long, our owners close us (placeholder)",
+      "unit": "days"
+    },
+    "industry": {
+      "default": "",
+      "schema": {
+        "description": "what the work is (its postings say; the world's vocabulary, e.g. its profile's industries)",
+        "type": "string"
+      },
+      "source": "what the work is (its postings say; the world's vocabulary, e.g. its profile's industries)"
+    },
+    "initiative": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "kind": {
+      "default": "goods",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "lender": {
+      "default": "",
+      "schema": {
+        "description": "whom it borrows from (none: it doesn't)",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "listing": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "look_at": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "look_days": {
+      "default": 5,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "max_staff": {
+      "default": 6,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "min_staff": {
+      "default": 1,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "default": 14,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "open_from": {
+      "default": 0,
+      "schema": {
+        "description": "the hours of a working day its owner is there (seconds into the day; both 0: whenever, as at home)",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "open_until": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "operator": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "org": {
+      "default": {},
+      "schema": {
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "owner_values": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "period": {
+      "default": 1209600,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "phi_high_bps": {
+      "default": 10000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "phi_low_bps": {
+      "default": 2500,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "police": {
+      "default": "",
+      "schema": {
+        "description": "whom it reports goods missing to, at its monthly stocktake (\"\": no stocktake)",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "premises": {
+      "default": "",
+      "schema": {
+        "description": "the shop: where it keeps and sells things",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "premises_cell": {
+      "default": "",
+      "schema": {
+        "description": "where its prices are put up (it is not shown the ground: a home or a market is not one business's premises)",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "premises_sale_bps": {
+      "default": 5000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "price": {
+      "default": 9000,
+      "schema": {
+        "description": "its opening retail price, cents each",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "price_adjust_bps": {
+      "default": 5000,
+      "schema": {
+        "description": "how much of the imbalance of supply and demand a month's price step answers (docs/behaviour/prices.md)",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "price_down_bound_bps": {
+      "default": 10250,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "price_up_bound_bps": {
+      "default": 11500,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "registered_bps": {
+      "default": 10000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "reprice_bps": {
+      "default": 1000,
+      "schema": {
+        "description": "by this much (placeholder)",
+        "type": "integer"
+      },
+      "source": "by this much (placeholder)",
+      "unit": "bps"
+    },
+    "reprice_days": {
+      "default": 30,
+      "schema": {
+        "description": "closed, our premises unsold this long: the asking price comes down (placeholder)",
+        "type": "integer"
+      },
+      "source": "closed, our premises unsold this long: the asking price comes down (placeholder)",
+      "unit": "days"
+    },
+    "respond": {
+      "default": {},
+      "schema": {
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "rival_days": {
+      "default": 60,
+      "schema": {
+        "description": "how old a rival's price list may be and still count",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "rival_weight_bps": {
+      "default": 2500,
+      "schema": {
+        "description": "how much of the gap to rivals' median price a month's step closes",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "rivals_board": {
+      "default": "",
+      "schema": {
+        "description": "what sellers advertise to households, searched monthly for the prices a shop is compared with (none: only the lists it has been shown)",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "role": {
+      "default": "shop assistant",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "sale_board": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "search_limit": {
+      "default": 20,
+      "schema": {
+        "description": "how many lists or listings a search reads",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "serve_labour": {
+      "default": 5400,
+      "schema": {
+        "description": "seconds of work to serve an item",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "serve_task": {
+      "default": "serve",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "serve_within_days": {
+      "default": 3,
+      "schema": {
+        "description": "what isn't served within this (or the days the order says it's for) is refunded (the customer goes elsewhere)",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "shopfront": {
+      "default": false,
+      "schema": {
+        "type": "boolean"
+      },
+      "source": "placeholder"
+    },
+    "short_days": {
+      "default": 60,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "short_pay": {
+      "default": null,
+      "schema": {},
+      "source": "placeholder"
+    },
+    "sold_board": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "stock_days": {
+      "default": 30,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "stocktake_days": {
+      "default": 30,
+      "schema": {
+        "description": "when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "supplier_fill_weight_bps": {
+      "default": 2500,
+      "schema": {
+        "description": "how much a new delivery weighs in a supplier's delivery record",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "supplier_price_power": {
+      "default": 10,
+      "schema": {
+        "description": "the power on a supplier's price relative to the cheapest in the share of a restock it is given (docs/behaviour/sourcing.md; to be sourced)",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "supplier_recover_bps": {
+      "default": 1250,
+      "schema": {
+        "description": "how much of the way back to a full record a supplier not ordered from comes at each restock",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "suppliers": {
+      "default": [],
+      "schema": {
+        "description": "whom it may buy from (their price lists)",
+        "type": "array"
+      },
+      "source": "placeholder"
+    },
+    "theta_bps": {
+      "default": 7500,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "trade_board": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "unpaid_days": {
+      "default": 7,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "utilisation_bps": {
+      "default": 8000,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "values": {
+      "default": {},
+      "schema": {
+        "type": "object"
+      },
+      "source": "placeholder"
+    },
+    "vartheta_bps": {
+      "default": 200,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
+    },
+    "wage": {
+      "default": 120000,
+      "schema": {
+        "description": "the wage it offers new hires, cents per period",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "wind_up_days": {
+      "default": 60,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "work_days": {
+      "default": 6,
+      "schema": {
+        "description": "of every 7: shops open on Saturdays",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "working_day": {
+      "default": 28800,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
+    "workplace": {
+      "default": "",
+      "schema": {
+        "description": "the space its staff work in",
+        "type": "string"
+      },
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.18.0"
 }

@@ -1,60 +1,85 @@
 {
-  "name": "firm.employer",
-  "version": "0.6.5",
   "doc": "docs/behaviour/firms.md",
+  "name": "firm.employer",
   "params": {
     "buffer_periods": {
+      "default": 2,
       "schema": {
         "type": "integer"
       },
-      "default": 2,
+      "source": "placeholder"
+    },
+    "hiring_cost_weeks": {
+      "default": 0,
+      "schema": {
+        "description": "what taking someone on costs, in weeks of their pay",
+        "type": "number"
+      },
       "source": "placeholder"
     },
     "notice_days": {
+      "default": 14,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "outside_account": {
       "schema": {},
       "source": "the world gives it (no default)"
     },
     "period": {
+      "default": 1209600,
       "schema": {
         "type": "integer"
       },
-      "default": 1209600,
       "source": "placeholder"
+    },
+    "required_margin_bps": {
+      "default": 0,
+      "schema": {
+        "description": "the margin over a worker's pay their trade must clear before one is taken on",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
     },
     "role": {
       "schema": {},
       "source": "the world gives it (no default)"
     },
-    "supplier_share_bps": {
+    "smooth_months": {
+      "default": 3,
       "schema": {
-        "type": "integer",
-        "description": "cost of goods bought from outside, as a share of revenue"
+        "description": "the horizon trade is expected over",
+        "type": "integer"
       },
-      "unit": "bps",
+      "source": "placeholder",
+      "unit": "months"
+    },
+    "supplier_share_bps": {
       "default": 4000,
-      "source": "placeholder"
+      "schema": {
+        "description": "cost of goods bought from outside, as a share of revenue",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "bps"
     },
     "target_staff": {
+      "default": 5,
       "schema": {
         "type": "integer"
       },
-      "default": 5,
       "source": "placeholder"
     },
     "wage": {
-      "schema": {
-        "type": "integer",
-        "description": "cents per period"
-      },
       "default": 140000,
+      "schema": {
+        "description": "cents per period",
+        "type": "integer"
+      },
       "source": "placeholder"
     },
     "workplace": {
@@ -63,5 +88,6 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "version": "0.7.0"
 }

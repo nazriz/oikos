@@ -57,6 +57,27 @@ pub const RULES: &[(&str, Rule, &str)] = &[
         "{schedule_id, schedule, values}: a law written from figures by its schedule (law.ts draftLaw)",
     ),
     ("law.violations", |a| to(law::violations(&arg::<String>(a, "condition")?)?), "{condition}: what a CEL condition cannot say"),
+    (
+        "founding.accept_gathering",
+        |a| {
+            use oikos_actors::mind::founding::{accept_gathering, GatherBounds};
+            let (from, to): (i64, i64) = arg(a, "first")?;
+            let bounds = GatherBounds { at: arg(a, "at")?, every_days: arg(a, "every_days")?, lasts_minutes: arg(a, "lasts_minutes")?, first: (from, to), at_seconds: arg(a, "at_seconds")? };
+            let blocks: Vec<oikos_contracts::blocks::Block> = arg(a, "blocks")?;
+            Ok(match accept_gathering(&arg::<String>(a, "me")?, &bounds, &blocks) { Ok(done) => json!({ "ok": done }), Err(why) => json!({ "refused": why }) })
+        },
+        "{me, at, every_days, lasts_minutes, first: [from, to], at_seconds, blocks}: a founder's draft of its gathering, accepted ({ok: blocks}) or refused ({refused: why})",
+    ),
+    (
+        "founding.accept_membership",
+        |a| {
+            use oikos_actors::mind::founding::{accept_membership, MembershipBounds};
+            let bounds = MembershipBounds { account: arg(a, "account")?, dues: arg(a, "dues")?, notice: arg(a, "notice")? };
+            let blocks: Vec<oikos_contracts::blocks::Block> = arg(a, "blocks")?;
+            Ok(match accept_membership(&arg::<String>(a, "me")?, &bounds, &blocks) { Ok(done) => json!({ "ok": done }), Err(why) => json!({ "refused": why }) })
+        },
+        "{me, account, dues, notice, blocks}: a founder's draft of its offer of membership, accepted ({ok: blocks}) or refused ({refused: why})",
+    ),
     ("actors.manifests", |_| Ok(manifests()), "every actor kind's manifest (contracts/module.schema.json), by name"),
 ];
 

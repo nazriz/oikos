@@ -9,7 +9,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { culture, DayBook, modules, townmemory } from "@oikos/participants";
+import { culture, DayBook, modules } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { PUBLISHED } from "@oikos/worlds/generator/knowing";
 import { wholeViews, type WholeView } from "../src/views";
@@ -39,7 +39,7 @@ const said = (field: "keeps" | "boundary") => Object.values(modules).flatMap((m)
 /**
  * Every keeper: a kind of participant that holds a whole register because it is the office that keeps it. The reason
  * for each is beside the module (its `keeps`, and in its manifest). To add one, declare it there and add it here; a
- * register someone else keeps is never declared: it is asked for (`ask`, participants/src/behaviour/common.ts).
+ * register someone else keeps is never declared: it is asked for (`ask`, participants/src/shared/common.ts).
  */
 const KEEPERS = [
   "bank.lending: accounts",
@@ -219,11 +219,7 @@ test("culture adds no whole view, no channel and no register: a town with the di
   expect(channelsOf(on)).toBe(channelsOf(off)); // (no channel is added)
   // What a person holds is in their own params and record: nobody's params list another's group or picture.
   for (const x of on.participants.filter((p: any) => p.kind === "person")) expect(x.controller.params.origin === undefined || typeof x.controller.params.origin === "string").toBe(true);
-  // The arithmetic refuses every route but the three; a test of each is in participants/test/culture-learning.test.ts.
-  expect(culture.ROUTES).toEqual(["tie", "close_tie", "here", "published"]);
-  const dial = culture.cultureDial({ dials: { culture: {} } })!;
-  const c = new culture.Culture(dial.params, dial, { z: () => 0, conformity: () => 0.5, belonging: () => 0.5, integrity: () => 0.5, draw: () => 0 }, { complain: 3_000 });
-  for (const route of ["register", "directory", "population", "town"]) expect(() => c.seeAct("complain", true, route as any)).toThrow(/by what is published/);
+  // The arithmetic refuses every route but the three: held by kernel/crates/actors/src/mind/culture.rs, `a_route_outside_the_three_is_refused`.
 });
 
 // Town memory (docs/behaviour/culture.md; design 14e): what a person remembers of what was public reaches them only by being there (the world shows
@@ -233,21 +229,15 @@ test("town memory adds no channel and no register: events come in only seen, rea
   const base = { ...spec, factories: 5 };
   const channelsOf = (town: any) => JSON.stringify([town.positions.map((p: any) => p.channels), town.participants.map((p: any) => p.channels)]);
   expect(channelsOf(generate({ ...base, living: { culture: true } }))).toBe(channelsOf(generate({ ...base, living: { culture: false } })));
-  const dial = culture.cultureDial({ dials: { culture: {} } })!;
-  const m = new townmemory.TownMemory(dial.params);
-  expect(Object.getOwnPropertyNames(Object.getPrototypeOf(m)).filter((k) => ["saw", "read", "heardFrom", "take"].includes(k)).sort()).toEqual(["heardFrom", "read", "saw", "take"]);
-  for (let i = 0; i < 20; i++) m.saw("put_out", `by-${i}`, i * 86_400, 30 * 86_400);
-  expect(m.size()).toBeLessThanOrEqual(6);
-  expect(m.heardFrom("strike", "e", 3, 40 * 86_400, 9_000, dial.params.max_hops, false)).toBe("dropped"); // a fourth hand
+  // Events come in only seen, read or told, a few are held, and none is passed far: kernel/crates/actors/src/mind/townmemory.rs,
+  // `never_more_than_six_the_weakest_gives_way` and `nothing_past_three_hands_and_told_is_a_part_of_the_tellers_strength`.
 });
 
 // Events join the picture (docs/behaviour/culture.md): an event that is an instance of a conduct moves a picture only by the three routes, once, and only
 // the two kinds that show a conduct do it; a register, a directory or a count cannot.
 test("an event moves a picture only along a tie, by being there or by what is published, and only a removal and a walk-out show a conduct", () => {
-  const dial = culture.cultureDial({ dials: { culture: {} } })!;
-  const c = new culture.Culture(dial.params, dial, { z: () => 0, conformity: () => 0.5, belonging: () => 0.5, integrity: () => 0.5, draw: () => 0 }, { strike: 8_500 });
-  for (const route of ["register", "directory", "population", "town"]) expect(() => c.sawEvent("strike", route as any, 10_000, 1_000)).toThrow(/by what is published/);
-  expect(Object.keys(townmemory.EVENT_CONDUCTS).sort()).toEqual(["put_out", "strike"]);
+  // (The routes are refused by kernel/crates/actors/src/mind/culture.rs, `a_route_outside_the_three_is_refused`; only a removal and a walk-out show a conduct:
+  // mind/townmemory.rs, `only_a_removal_and_a_walk_out_show_a_conduct_and_trust_goes_by_ones_own_view`.)
 });
 
 // Ordinary talk about others' conduct (docs/behaviour/culture.md, "Ordinary talk"): a person tells of a third person's act only if that person told it to
@@ -257,17 +247,6 @@ test("ordinary talk adds no channel and no register: a person can tell only of w
   const base = { ...spec, factories: 5 };
   const channelsOf = (town: any) => JSON.stringify([town.positions.map((p: any) => p.channels), town.participants.map((p: any) => p.channels)]);
   expect(channelsOf(generate({ ...base, living: { culture: true } }))).toBe(channelsOf(generate({ ...base, living: { culture: false } })));
-  const dial = culture.cultureDial({ dials: { culture: { step: { gossip_bps: 10_000 } } } })!;
-  const mk = () => new culture.Culture(dial.params, dial, { z: () => 0, conformity: () => 0.5, belonging: () => 0.5, integrity: () => 0.5, draw: () => 0 }, { complain: 3_000 });
-  const teller = mk();
-  // Nobody told them anything: they have nothing to tell, however many ask, and the draw is never made.
-  let draws = 0;
-  for (const asker of ["a", "b", "c"]) expect(teller.gossip(asker, 0, () => (draws++, 0))).toBeUndefined();
-  expect(draws).toBe(0);
-  // One tie told them of themself: they can tell of that tie and of no one else.
-  teller.learnOf("tie-1", "complain", true, 0);
-  const phrases = ["a", "b", "tie-1", "c"].map((asker) => teller.gossip(asker, 1, () => 0)).filter(Boolean) as string[];
-  expect(phrases.map((x) => culture.CULTURE_WORDS.aboutHeard(x)!.who)).toEqual(["tie-1", "tie-1", "tie-1"]); // (to a, b and c; not to tie-1 about themself)
-  // The hearer's picture moves only by a tie's route; any other is refused.
-  for (const route of ["register", "directory", "population", "town"]) expect(() => mk().hearAbout("tie-1", "complain", true, 1_000, 1, route as any)).toThrow(/by what is published/);
+  // What a person can tell, and to whom, is the engine's: kernel/crates/actors/src/mind/culture.rs, `gossip_only_of_what_a_tie_told_me_once_to_each_not_past_gossip_days`
+  // (nothing told, nothing to tell, the draw never made; a hearer learns along a tie only: `a_route_outside_the_three_is_refused`).
 });

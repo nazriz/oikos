@@ -8,7 +8,7 @@
 // "extreme readers" (design 13h step 7). They are listed in the report as pending here, so a report is never read as
 // more than it is.
 
-import { combineAskings, LINES, NEUTRAL, wellFormed, type Line, type Reading } from "../behaviour/reading";
+import { combineAskings, LINES, NEUTRAL, wellFormed, type Line, type Reading } from "../shared/reading";
 import type { Reader, ReadAnswer, ReadRequest } from "./reader";
 import { Tagger, type TagWorld } from "./reading-tags";
 

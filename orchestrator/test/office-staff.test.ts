@@ -1,4 +1,4 @@
-// An office knows its own staff (participants/src/behaviour/roster.ts; live check 2 of 2026-10-09, finding 5). A works
+// An office knows its own staff (participants/src/readers/roster.ts; live check 2 of 2026-10-09, finding 5). A works
 // manager with no crew set two standing work orders and watched a month of complaints: nothing it was shown said it had
 // nobody, and its own job advertisement form did not say what it was for. Here the mock holds a works office that starts
 // with no crew: it is shown its posts and that nobody is in them, the standing work order's preview and result say

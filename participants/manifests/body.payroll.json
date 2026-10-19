@@ -1,123 +1,127 @@
 {
-  "name": "body.payroll",
-  "version": "0.5.0",
+  "answers": {
+    "acts": "What it acts on: the employment agreements of its organisation's staff and the standing payments that pay them; the tax withheld from wages, paid over on the law's days; and a member of staff who has died.",
+    "office": "the payroll office"
+  },
   "doc": "docs/behaviour/staffing.md",
+  "name": "body.payroll",
   "params": {
     "after_days": {
-      "schema": {
-        "type": "integer",
-        "description": "an appointer: how long a post has stood vacant before the authority fills it (the body's own deputy has its few days first)"
-      },
-      "unit": "days",
       "default": 14,
-      "source": "placeholder"
+      "schema": {
+        "description": "an appointer: how long a post has stood vacant before the authority fills it (the body's own deputy has its few days first)",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
     },
     "industry": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "notice_days": {
+      "default": 14,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "own": {
-      "schema": {
-        "type": "array",
-        "description": "an appointer: the posts of its own body (no deputy keeps them filled, so it need not wait for one)"
-      },
       "default": [],
+      "schema": {
+        "description": "an appointer: the posts of its own body (no deputy keeps them filled, so it need not wait for one)",
+        "type": "array"
+      },
       "source": "placeholder"
     },
     "owner": {
-      "schema": {
-        "type": "string",
-        "description": "an owner's appointer (a firm's): the owner, who fills a post themselves where none of the staff is left, wherever they live"
-      },
       "default": "",
+      "schema": {
+        "description": "an owner's appointer (a firm's): the owner, who fills a post themselves where none of the staff is left, wherever they live",
+        "type": "string"
+      },
       "source": "placeholder"
     },
     "owner_participant": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "part": {
-      "schema": {
-        "type": "string",
-        "description": "the officer runs the payroll; the deputy keeps the officer's post filled; the appointer is the authority a body's constitution names, which fills a post of that body when none of its own staff is left to"
-      },
       "default": "officer",
+      "schema": {
+        "description": "the officer runs the payroll; the deputy keeps the officer's post filled; the appointer is the authority a body's constitution names, which fills a post of that body when none of its own staff is left to",
+        "type": "string"
+      },
       "source": "placeholder"
     },
     "payroll_office": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "period": {
+      "default": 1209600,
       "schema": {
         "type": "integer"
       },
-      "default": 1209600,
       "source": "placeholder"
     },
     "role": {
-      "schema": {
-        "type": "string",
-        "description": "when the organisation's own module employs others (the clinic's doctors), the role of the staff this payroll pays: absent, all of the organisation's"
-      },
       "default": "",
+      "schema": {
+        "description": "when the organisation's own module employs others (the clinic's doctors), the role of the staff this payroll pays: absent, all of the organisation's",
+        "type": "string"
+      },
       "source": "when the organisation's own module employs others (the clinic's doctors), the role of the staff this payroll pays: absent, all of the organisation's"
     },
     "staff_line": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "wage": {
+      "default": 0,
       "schema": {
         "type": "integer"
       },
-      "default": 0,
       "source": "placeholder"
     },
     "watch": {
-      "schema": {
-        "type": "array",
-        "description": "the organisation's posts a person holds, which this post keeps filled"
-      },
       "default": [],
+      "schema": {
+        "description": "the organisation's posts a person holds, which this post keeps filled",
+        "type": "array"
+      },
       "source": "placeholder"
     },
     "who": {
-      "schema": {
-        "type": "string",
-        "description": "its channel onto who's who"
-      },
       "default": "who",
+      "schema": {
+        "description": "its channel onto who's who",
+        "type": "string"
+      },
       "source": "placeholder"
     },
     "workplace": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "version": "0.5.0"
 }

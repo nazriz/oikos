@@ -41,6 +41,31 @@
       },
       "maxItems": 256
     },
+    "answers": {
+      "type": ["object", "null"],
+      "description": "How the office answers a letter: its name in words, what it acts on (the sentence it sends after its report or acknowledgement), whether it has a standing report of its own, and, where a letter plainly concerns something it has a form for, what it says of that (docs/behaviour/letters.md).",
+      "required": ["office", "acts"],
+      "additionalProperties": false,
+      "properties": {
+        "office": { "type": "string" },
+        "acts": { "type": "string" },
+        "report": { "type": "boolean" },
+        "forms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["about", "say"],
+            "additionalProperties": false,
+            "properties": { "about": { "type": "array", "items": { "type": "string" } }, "say": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "capacity": {
+      "type": "object",
+      "description": "What sizes the office's staff, where the engine's kind states it: its asks per thousand residents a year, the seconds one answer takes, the rule that sizes the staff, and the figure's source and reason (docs/behaviour/staffing.md).",
+      "additionalProperties": true
+    },
     "beliefs": {
       "type": "array",
       "description": "Beliefs it reports each wake for truth audits (docs/design/rebuild.md 8.2).",

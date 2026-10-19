@@ -5,11 +5,13 @@
 
 import { expect, test } from "bun:test";
 import type { Observation } from "../src/contracts";
-import { member, registrar } from "../src/behaviour/tribunal";
-import { Book, breaches } from "../src/behaviour/common";
+
 import { inCurrency } from "../src/money";
 import { Randomness } from "../src/rng";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
+import { engine } from "./engine";
+const member = engine("tribunal.member");
+const registrar = engine("tribunal.registrar");
 
 // The world these tests are in writes its money as the profile says (the platform has no money of its own).
 inCurrency(PROFILE.values.currency);
@@ -79,18 +81,8 @@ test("a law whose condition can't be read against an act doesn't bind it, and th
   const t0 = 400 * DAY;
   const short = notice("rec.1", t0 - 10 * DAY, t0 + 20 * DAY, t0 - 400 * DAY); // breaks the 60-day law
   const fine = notice("rec.2", t0 - 10 * DAY, t0 + 60 * DAY, t0 - 400 * DAY); // breaks none that can be read
-  const book = new Book();
-  book.absorb(obs(t0, [law, cap]));
-  const act = (n: any) => ({ block: "publish", kind: "rent_increase", data: n.data });
-  expect(breaches(book, act(short), "landlord-1", short.at).map((l) => l.id)).toEqual(["law-rent"]);
-  expect(breaches(book, act(fine), "landlord-1", fine.at)).toEqual([]);
-  expect([...book.unread]).toEqual([["law-cap", 2]]);
-  const said1 = book.takeUnread()!;
-  expect(said1).toMatch(/law-cap couldn't be read against publish rent_increase \(.+\), so it wasn't applied/);
-  expect(said1).not.toContain("law-rent");
-  breaches(book, act(fine), "landlord-1", fine.at);
-  expect(book.unread.get("law-cap")).toBe(3);
-  expect(book.takeUnread()).toBeUndefined(); // said once
+  // (The reader's half of this case, `breaches` and the book's count of what it could not read, was the deleted TypeScript library's:
+  // the engine's is covered by `a_prohibition_binds_an_act_it_is_true_of_and_says_when_it_cannot_be_read`, in kernel/crates/actors/src/common/tests.rs.)
 
   // Through a module: the tribunal's orders are what they were (invalid under the law that reads; valid otherwise), and
   // the reasons of its first act after weighing the cap say that the cap couldn't be read. Nowhere else.

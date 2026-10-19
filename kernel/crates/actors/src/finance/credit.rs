@@ -1015,6 +1015,8 @@ mod tests {
         assert_eq!(repayment(50_000_000, 600, 360), 299_776, "$500,000 at 6% over thirty years");
         assert_eq!(repayment(120_000, 0, 12), 10_000);
         assert_eq!(repayment(100_001, 0, 12), 8_334, "rounded up");
+        assert_eq!(repayment(1_000_000, 0, 10), 100_000, "no interest: the principal in equal parts");
+        assert_eq!(repayment(50_000_000, 739, 60), 999_286, "$500,000 at 7.39% over five years: $9,992.86 a month");
         assert_eq!(repayment(777, 900, 0), 777);
         // Whole of the loan paid back, with its interest, and a little over (the round up).
         for (p, r, m) in [(100_000, 1200, 12), (4_500_000, 780, 60), (40_000_000, 620, 360)] {
@@ -1242,5 +1244,30 @@ mod tests {
         let mut firm = Borrowing::new(WHO, ME, Some(30), Some(90));
         firm.steps::<()>(&book, 3 * DAY, Some("acc-ann"), &cx);
         assert!(!firm.can_apply(50 * DAY) && firm.can_apply(94 * DAY));
+    }
+
+    /// A loan granted is waited for: from the decision and from signing, for a day, as an application is (found in the 1,000-person town's
+    /// logs, decisions log 2026-10-08: a shop signed for a loan and let someone go "with no loan to be had" two seconds before the bank paid it
+    /// out). Ported from participants/test/pay-period.test.ts (the TypeScript `Borrowing` is gone).
+    #[test]
+    fn a_loan_granted_is_waited_for_from_the_decision_and_from_signing_for_a_day_as_an_application_is() {
+        let mut stand = Stand::new("ann");
+        let mut b = Borrowing::new(WHO, ME, None, None);
+        let t = 20 * DAY;
+        let _: Step<()> = b.apply(t, "acc-ann", 4_600_000, 12, "working capital", "Short of the next pay period.", json!({}), &stand.cx(t));
+        assert!(b.waiting(t));
+        // The bank's offer, and its decision, as the shop is shown them.
+        let mut loan = the_loan();
+        loan["at"] = json!(t + 60);
+        let decision = statement("dec-1", t + 60, "loan_decision", json!({ "speaks_for": ME, "addressed_to": [WHO], "visible_to": [WHO, ME] }), json!({ "approved": true, "months": 12 }));
+        let book = crate::finance::kit::book_of(WHO, vec![loan, decision]);
+        let cx = stand.cx(t + 60);
+        let steps = b.steps::<()>(&book, t + 60, Some("acc-ann"), &cx);
+        assert_eq!(steps.len(), 1, "signing, and the repayments' standing order");
+        // Signed, and the money not yet here: still waiting, where it used to say "no loan to be had".
+        assert!(b.waiting(t + 62));
+        assert!(!b.can_apply(t + 62));
+        // A day on, it is no longer waited for (it has come, or it never will).
+        assert!(!b.waiting(t + 60 + DAY));
     }
 }

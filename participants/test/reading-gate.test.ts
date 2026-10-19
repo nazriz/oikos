@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { NEUTRAL } from "../src/behaviour/reading";
+import { NEUTRAL } from "../src/shared/reading";
 import { BROKEN, familyBiased, lexiconReader } from "../src/llm/reader-mock";
 import { curtestReader, kindestReader } from "../src/llm/reader";
 import { canonTags, filled, GATE_TAG_WORLD, padded, politely, runGate, THRESHOLDS, weightedKappa, type Pair } from "../src/llm/reading-gate";

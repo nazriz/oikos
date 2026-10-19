@@ -9,11 +9,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { loadProfile } from "@oikos/worlds/generator/profile";
-import { Book } from "../../participants/src/behaviour/common";
-import { drawSample, examineDecision, reconcile, sampleSize, type DecisionFile } from "../../participants/src/behaviour/auditor";
-import type { PaymentRule } from "../../participants/src/behaviour/payments";
-import { Rng } from "../../participants/src/rng";
-import { inCurrency } from "../../participants/src/money";
+import type { PaymentRule } from "../../participants/src/shared/payments";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -22,69 +18,7 @@ const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 
 // ---- the functions
 
-test("a sample is the law's share of the period's decisions, no fewer than the least, no more than the most, never more than there are", () => {
-  const s = { share_bps: 1_500, least: 6, most: 25 };
-  expect(sampleSize(0, s)).toBe(0);
-  expect(sampleSize(4, s)).toBe(4);
-  expect(sampleSize(20, s)).toBe(6);
-  expect(sampleSize(100, s)).toBe(15);
-  expect(sampleSize(1_000, s)).toBe(25);
-});
-
-test("the numbers drawn are distinct, in range, and the same whenever they are drawn", () => {
-  const stream = (key: string) => {
-    // (A stream is named, as the kernel's are: the same name gives the same numbers.)
-    const r = new Rng([BigInt(key.length) + 1n, 2n, 3n, 5n]);
-    return { below: (n: number) => r.below(n) };
-  };
-  for (const [n, k] of [[51, 8], [10, 10], [200, 25], [3, 1], [1, 1]] as const) {
-    const a = drawSample(stream("a"), n, k), b = drawSample(stream("a"), n, k);
-    expect(a).toEqual(b);
-    expect(a.length).toBe(k);
-    expect(new Set(a).size).toBe(k);
-    expect(a.every((x) => Number.isInteger(x) && x >= 1 && x <= n)).toBe(true);
-    expect([...a].sort((x, y) => x - y)).toEqual(a);
-  }
-});
-
 const rule: PaymentRule = { id: "pension", payer: "outside", account: "acc-outside", every_days: 14, who: { from_age: 67 }, amount: { flat: 50_000 } };
-const file = (o: { born_years_ago: number; granted: boolean; amount?: number; lapsed?: boolean }): DecisionFile => {
-  const on = 400 * DAY, year = 365 * DAY;
-  return {
-    decision: { id: "rec.1", at: on + 60, on, granted: o.granted, ...(o.amount !== undefined ? { amount: o.amount, every: 14 * DAY } : {}), ...(o.granted ? {} : { reason: "the claim could not be verified" }), ...(o.lapsed ? { lapsed: true } : {}) },
-    claim: { id: "rec.0", by: "c0001", payment: "pension", born_at: on - o.born_years_ago * year, account: "acc-c0001", declares: {} }, reported: [], pays_other: false,
-  };
-};
-
-test("a decision is decided again from the file under the law's rule: it agrees or it does not, and nothing is called good or bad", () => {
-  inCurrency((generate({ ...base, citizens: 50, profile: "au-vic-2026" }) as any).world.currencies[0]);
-  const book = new Book();
-  const year = 365 * DAY;
-  expect(examineDecision(file({ born_years_ago: 70, granted: true, amount: 50_000 }), rule, book, year)).toMatchObject({ agrees: true });
-  expect(examineDecision(file({ born_years_ago: 40, granted: false }), rule, book, year)).toMatchObject({ agrees: true });
-  // refused though the claim meets the law's conditions (the wrong refusal a slip makes)
-  const wrongRefusal = examineDecision(file({ born_years_ago: 70, granted: false }), rule, book, year);
-  expect(wrongRefusal.agrees).toBe(false);
-  expect(wrongRefusal.says).toContain("meets the conditions the law states");
-  // granted though it does not
-  expect(examineDecision(file({ born_years_ago: 40, granted: true, amount: 50_000 }), rule, book, year)).toMatchObject({ agrees: false });
-  // granted at another sum than the rule gives
-  expect(examineDecision(file({ born_years_ago: 70, granted: true, amount: 40_000 }), rule, book, year).says).toContain("the law's rule for the payment gives");
-  // a refusal for papers that did not come is the procedure's wait, not the payment's conditions: not re-decided; no law on file: not re-decided
-  expect(examineDecision(file({ born_years_ago: 70, granted: false, lapsed: true }), rule, book, year).agrees).toBeNull();
-  expect(examineDecision(file({ born_years_ago: 70, granted: true, amount: 50_000 }), undefined, book, year).agrees).toBeNull();
-  for (const f of [wrongRefusal]) expect(f.says).not.toMatch(/\b(good|bad|fault|wrong)\b/);
-});
-
-test("accounts reconcile when each payment in the books is in the bank's record at the same sum", () => {
-  const s = { books: [{ id: "i1", amount: 100, at: 10 * DAY }, { id: "i2", amount: 200, at: 20 * DAY }, { id: "i3", amount: 300, at: 30 * DAY }, { id: "i4", amount: 5, at: 89.5 * DAY }],
-    bank: [{ id: "i1", amount: 100, t: 10 * DAY }, { id: "i2", amount: 250, t: 20 * DAY }, { id: "x9", amount: 70, t: 40 * DAY }] };
-  const r = reconcile(s, 0, 90 * DAY, 2 * DAY);
-  expect(r.matched).toBe(1);
-  expect(r.differ).toEqual([{ id: "i2", books: 200, bank: 250 }]);
-  expect(r.inBooksNotBank).toEqual([{ id: "i3", amount: 300 }]); // (i4 was paid within two days of the period's end: the bank's record may not show it yet)
-  expect(r.inBankNotBooks).toEqual([{ id: "x9", amount: 70 }]);
-});
 
 // ---- the town it makes
 

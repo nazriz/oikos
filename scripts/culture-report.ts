@@ -8,8 +8,8 @@ import { readFileSync } from "node:fs";
 import { generate } from "../worlds/generator/generate";
 import { logLines } from "../orchestrator/src/logs";
 import { recordChanges } from "../orchestrator/src/records";
-import { CONDUCTS, normsRows } from "../participants/src/behaviour/culture";
-import { EVENT_KINDS } from "../participants/src/behaviour/townmemory";
+import { CONDUCTS, normsRows } from "../participants/src/shared/culture";
+import { EVENT_KINDS } from "../participants/src/shared/townmemory";
 
 const DAY = 86_400;
 const CHECK = [7, 30, 90, 180, 270, 364]; // (day 7: everyone has written their record by then; the first record change is at the start)

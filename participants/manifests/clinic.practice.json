@@ -1,239 +1,239 @@
 {
-  "name": "clinic.practice",
-  "version": "0.3.1",
   "doc": "docs/behaviour/health.md",
+  "issues": [
+    {
+      "does": "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
+      "fields": {
+        "account": {
+          "description": "The account the wages are paid from, where the office itself pays them.",
+          "type": "account"
+        },
+        "period": {
+          "description": "The pay period: how often the wage is paid.",
+          "required": true,
+          "type": "duration"
+        },
+        "posts": {
+          "description": "How many posts this advertisement is for.",
+          "required": true,
+          "type": "count"
+        },
+        "wage": {
+          "description": "The wage for each pay period.",
+          "required": true,
+          "type": "amount"
+        }
+      },
+      "form": "job_advertisement",
+      "title": "Job advertisement",
+      "writes": {
+        "data": {
+          "industry": "@industry",
+          "period": "=period",
+          "role": "@role",
+          "space": "@workplace",
+          "wage": "#wage",
+          "workplace": "@workplace_structure"
+        },
+        "kind": "job_posting",
+        "offer": {
+          "available": "=posts",
+          "by": "=self",
+          "take_up": "apply",
+          "terms": {
+            "commitments": [
+              {
+                "does": {
+                  "outcome": {
+                    "money": {
+                      "amount": "=wage",
+                      "for": "wages",
+                      "from": "=account"
+                    }
+                  }
+                },
+                "every": "=period",
+                "who": "=self"
+              },
+              "@occupancy"
+            ],
+            "template": "employment",
+            "termination": "@termination"
+          },
+          "to": {
+            "min_age_years": 18
+          }
+        },
+        "text": "Hiring: {wage} every {period}."
+      }
+    }
+  ],
+  "name": "clinic.practice",
   "params": {
     "account": {
-      "schema": {
-        "type": "string",
-        "description": "what it pays its staff from (its funding comes in there)"
-      },
       "default": "",
       "required": true,
+      "schema": {
+        "description": "what it pays its staff from (its funding comes in there)",
+        "type": "string"
+      },
       "source": "placeholder"
     },
     "building": {
-      "schema": {
-        "type": "string",
-        "description": "the clinic, where its doctors work, and its waiting room (the world must say)"
-      },
       "default": "",
       "required": true,
+      "schema": {
+        "description": "the clinic, where its doctors work, and its waiting room (the world must say)",
+        "type": "string"
+      },
       "source": "the clinic, where its doctors work, and its waiting room (the world must say)"
     },
     "channel": {
-      "schema": {
-        "type": "string",
-        "description": "its view of the building, who is where in it"
-      },
       "default": "premises",
+      "schema": {
+        "description": "its view of the building, who is where in it",
+        "type": "string"
+      },
       "source": "placeholder"
     },
     "closes": {
+      "default": 64800,
       "schema": {
         "type": "integer"
       },
-      "default": 64800,
       "source": "placeholder"
     },
     "consult_seconds": {
+      "default": 1800,
       "schema": {
         "type": "integer"
       },
-      "unit": "seconds",
-      "default": 1800,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "seconds"
     },
     "consults": {
+      "default": [],
       "schema": {
         "type": "array"
       },
-      "default": [],
       "source": "placeholder"
     },
     "doctors": {
-      "schema": {
-        "type": "integer",
-        "description": "the establishment (its funder's)"
-      },
       "default": 0,
+      "schema": {
+        "description": "the establishment (its funder's)",
+        "type": "integer"
+      },
       "source": "placeholder"
     },
     "give_up_days": {
-      "schema": {
-        "type": "integer",
-        "description": "a patient who asked and isn't here after this long is dropped from the list"
-      },
-      "unit": "days",
       "default": 3,
-      "source": "placeholder"
+      "schema": {
+        "description": "a patient who asked and isn't here after this long is dropped from the list",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
     },
     "industry": {
+      "default": "health_care",
       "schema": {
         "type": "string"
       },
-      "default": "health_care",
       "source": "placeholder"
     },
     "notice_days": {
+      "default": 14,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 14,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "opens": {
-      "schema": {
-        "type": "integer",
-        "description": "the hours it sees patients (placeholder)"
-      },
       "default": 28800,
+      "schema": {
+        "description": "the hours it sees patients (placeholder)",
+        "type": "integer"
+      },
       "source": "the hours it sees patients (placeholder)"
     },
     "part": {
+      "default": "",
       "schema": {
         "type": "string"
       },
-      "default": "",
       "source": "placeholder"
     },
     "period": {
+      "default": 1209600,
       "schema": {
         "type": "integer"
       },
-      "default": 1209600,
       "source": "placeholder"
     },
     "role": {
+      "default": "doctor",
       "schema": {
         "type": "string"
       },
-      "default": "doctor",
       "source": "placeholder"
     },
     "treat_task": {
+      "default": "treat",
       "schema": {
         "type": "string"
       },
-      "default": "treat",
       "source": "placeholder"
     },
     "wage": {
+      "default": 0,
       "schema": {
         "type": "integer"
       },
-      "default": 0,
       "source": "placeholder"
     },
     "waiting": {
+      "default": "",
+      "required": true,
       "schema": {
         "type": "string"
       },
-      "default": "",
-      "required": true,
       "source": "placeholder"
     },
     "work_days": {
+      "default": 5,
       "schema": {
         "type": "integer"
       },
-      "unit": "days",
-      "default": 5,
-      "source": "placeholder"
+      "source": "placeholder",
+      "unit": "days"
     },
     "working_day": {
+      "default": 28800,
       "schema": {
         "type": "integer"
       },
-      "default": 28800,
       "source": "placeholder"
     },
     "workplace": {
+      "default": "",
+      "required": true,
       "schema": {
         "type": "string"
       },
-      "default": "",
-      "required": true,
       "source": "placeholder"
     }
   },
   "perceives": [],
-  "state": "none",
-  "issues": [
-    {
-      "form": "job_advertisement",
-      "title": "Job advertisement",
-      "does": "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
-      "fields": {
-        "wage": {
-          "type": "amount",
-          "required": true,
-          "description": "The wage for each pay period."
-        },
-        "period": {
-          "type": "duration",
-          "required": true,
-          "description": "The pay period: how often the wage is paid."
-        },
-        "posts": {
-          "type": "count",
-          "required": true,
-          "description": "How many posts this advertisement is for."
-        },
-        "account": {
-          "type": "account",
-          "description": "The account the wages are paid from, where the office itself pays them."
-        }
-      },
-      "writes": {
-        "kind": "job_posting",
-        "text": "Hiring: {wage} every {period}.",
-        "data": {
-          "wage": "#wage",
-          "period": "=period",
-          "role": "@role",
-          "industry": "@industry",
-          "workplace": "@workplace_structure",
-          "space": "@workplace"
-        },
-        "offer": {
-          "by": "=self",
-          "to": {
-            "min_age_years": 18
-          },
-          "take_up": "apply",
-          "available": "=posts",
-          "terms": {
-            "template": "employment",
-            "commitments": [
-              {
-                "who": "=self",
-                "does": {
-                  "outcome": {
-                    "money": {
-                      "from": "=account",
-                      "amount": "=wage",
-                      "for": "wages"
-                    }
-                  }
-                },
-                "every": "=period"
-              },
-              "@occupancy"
-            ],
-            "termination": "@termination"
-          }
-        }
-      }
-    }
-  ],
   "routines": [
     {
-      "task": "treat",
       "at": "building",
       "every": 1,
+      "task": "treat",
       "what": "Each working day, in the hours the clinic is open, its doctors see those who have asked for care and are waiting, in the order they asked, as far as the doctors' hours go, and each patient is told they have been seen."
     }
-  ]
+  ],
+  "state": "none",
+  "version": "0.3.1"
 }
