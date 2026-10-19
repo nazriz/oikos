@@ -7038,6 +7038,8 @@ and reported now, so its survivors keep their tenancy: in the same runs unhoused
 au-vic unemployment by agreement (4.1 SE to 2.1), ke-nakuru employed 5.0 to 3.5 and labour force 6.9 to 4.5. Health breaches in kind: au-vic loses the TS world's business entry breach, as before. The threads
 half of the gate (1 and 14 threads) was not re-run: nothing of the engine changed.
 
+**Suites.** `bun run test:all` (the kernel's cargo tests with it) on the branch: 1,590 pass, 1 fail across 273 files: tmp-preload, whose folders were other running tests' (it passes alone, and passed in the run before: the leftover-temp-folder fault noted at the cut-over). The first run found seven more failures in four files (standing-work, holds-seat and office-papers still called the TypeScript office; the module schema had no `answers`): mended as written above.
+
 **Risks** (docs/risks.md): PC-15, PB-21 and MT-18 added; MT-16 notes the re-run.
 
 **Revisit if** a generated town differs from the one before this change; or when PC-15, PB-21 or MT-18's cases are mended (flip their `test.failing`); or when the tax, payments, returns and household
