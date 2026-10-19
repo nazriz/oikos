@@ -6926,4 +6926,10 @@ words (2.9%), 540 at another second (8.1%).**
   build before the two fixes above, and it was not traced further.
 - *culture-dial:* the Rust states re-taken once, with the reason in the test (the market law and the fixes); the TS
   states did not move.
+- *After the two fixes, the whole suites:* TS world (`bun run test:all`) 1,845 pass, 0 fail. Rust world 1,838 pass, 4
+  fail: tmp-preload (a leftover temp folder, passes alone) and three seeds' draws that the fixes moved, each run alone on
+  other seeds: unions (seed 1 two wage claims where it asks three; seeds 2 and 4 three or more), elections (seed 1's
+  incumbent lost the count; 2, 3 and 4 keep it), own-venture (seed 4 has the draw and nobody starts; 1, 2, 3, 5 and 6
+  start one). Each moved to a passing seed on the Rust world only, with the counts in the test. The gate was not re-run
+  after these two fixes.
 

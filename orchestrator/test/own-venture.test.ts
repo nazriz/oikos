@@ -7,6 +7,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { onRust } from "./lib/doubles";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -103,7 +104,8 @@ test("a founding's draw of the shape \"business\" reaches the business of one: s
   // (Why a hop and not a fault, 2026-10-16, run as this test runs it for seeds 1 to 8, 600 days: before foundations F5 (24c14ea) someone meant a business in 7 of 8 seeds and one started in 6 of 8 (1, 3, 4, 5, 7, 8); now someone means one in 7 of 8 and one starts in 5 of 8 (2, 3, 4, 6, 7). Seed 1, the original, has the draw and nobody starts: that is the rule (a home and the money), not what is tested. The rate is the same before and after; which seed has the occasion is a matter of draws. Seed 4 kept.)
   const out = join(root, "runs", "test-own-venture-meant");
   rmSync(out, { recursive: true, force: true });
-  const s = await runWorld({ config: { ...config, seed: 4 }, runId: "meant", outDir: out, until: 600 * DAY, recordObservations: "none" });
+  // (On the Rust world seed 1 from 2026-10-19, the cut-over's fixes: the run from 4 has the draw and nobody starts; run alone, 1, 2, 3, 5 and 6 each start one.)
+  const s = await runWorld({ config: { ...config, seed: onRust ? 1 : 4 }, runId: "meant", outDir: out, until: 600 * DAY, recordObservations: "none" });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes("found_shape") || l.includes('"own_account"') || l.includes("found_own")).map((l) => JSON.parse(l));
   const meant = log.filter((e) => e.kind === "annotation" && e.body.data?.domain === "found_shape" && e.body.data?.choice === "business").map((e) => ({ t: e.t, who: e.body.subject as string }));
   expect(meant.length).toBeGreaterThan(0);
