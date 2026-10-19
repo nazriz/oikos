@@ -6933,3 +6933,39 @@ words (2.9%), 540 at another second (8.1%).**
   start one). Each moved to a passing seed on the Rust world only, with the counts in the test. The gate was not re-run
   after these two fixes.
 
+
+## 2026-10-19 · The cut-over (branch `cutover`; tag `pre-cutover` is the commit before; no model called)
+
+Both whole suites passed first (TS world 1,845 of 1,845; Rust world all but four, fixed or moved above, each run again).
+
+**What changed:**
+- **The Rust world is the only world.** `orchestrator/src/run.ts` no longer reads `OIKOS_WORLD`: the engine runs every
+  built-in actor and the host runs the seats; the host's path that made code units in TS is gone. The generator calls
+  the Rust rules whenever the engine's native module is built (`worlds/generator/rules.ts`; the TS rules only without
+  it, or when a test asks, `OIKOS_TS_RULES`, to hold the two equal). Tests' `onRust` is always true.
+- **Deleted: ten TS actor files** (`participants/src/behaviour/` bank, world, producer, retailer, payroll, elections,
+  news, founded, utilities, fund: about 4,900 lines) and the 20 tests that only exercised them, each with its Rust
+  equivalent named in the session's inventory (bank-holds, bank-statement, bank, bill-errors, citizen-rent, decisions,
+  elections, firm-side, firm-wants, founded-fund, founded-place-on, frictions, fund, holder-swap, hours, news,
+  producer-inputs, retailer-suppliers, support-load, trade-credit); payments.test lost its six paying-office cases
+  (boundary/support.rs) and keeps the citizen's and the law's words. The instant-runoff case was ported into
+  `offices/elections.rs`. What the generator and host still read of those kinds (what each keeps and issues, its
+  routines, answers, cadence and first wake) is `participants/src/engine-kinds.ts`, word for word: the generated towns
+  are the same to the byte (five profiles, three town specs, hashed before and after). Their manifests are the
+  engine's now (the manifest script no longer writes them).
+- **Deleted: TS-world-only tests and scripts:** the TS views against the kernel's picture (perception; the engine's are
+  held by kernel/tests/perception.rs), both resolvers over the TS world's code units (resolver-shadow), the TS world's
+  draw names (twin-draws; the engine's are held by kernel/tests/determinism_lint.rs), the TS-against-Rust run
+  (rust-world.test); scripts institutions-demo, office-seats-demo, port-law-cases and port-support-cases (one-off
+  writers, or TS-world only). reliability.test reads only the engine's diagnosis.
+- **Kept, and why:** 31 behaviour files (citizen, firms, government, institutions, the offices, mind, culture, tax,
+  payments, papers, the seat-side readers and their helpers). The generator imports their draws and words (household,
+  mind and inner draws, tax, payments, returns, papers, decisions law), the host reads `staffed`, `books`, `issuesWith`
+  and `opens` from their modules, and the readers (`roster`, `openbooks-townhall`) use `Staffing` from firms.ts. Their
+  actor code no longer runs. Moving those helpers and that metadata out (as engine-kinds.ts does for ten kinds) and
+  deleting the rest is the next step; until then the mutation catalogue's TS-actor bugs aim at dead code
+  (docs/testing.md).
+- `CLAUDE.md`'s stack line and `docs/handover.md` say so.
+
+**Revisit if** a TS module passed with `--modules` is expected to run (it cannot: the engine runs only its own kinds and
+test doubles), or a generated town differs from the one before the cut-over.

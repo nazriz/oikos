@@ -26,7 +26,7 @@ A wind tunnel for AI stewardship: a configurable, living, visual simulated world
 - **All work takes time: every act costs its performers' time, and only a person or a system someone supplied does work.** The time is read from what the act makes, in the world's table of work, and charged to who does it; a backlog comes from hours, never from a dial; an error is a slip at a sourced rate. A gap is a missing law, never a per-case patch: ask who does it, how, at what cost, and make the world say it (docs/all-work-takes-time.md, docs/design/foundations.md). `orchestrator/test/all-work-takes-time.test.ts` is the backstop.
 
 ## Stack
-Rust (kernel) · TypeScript on **Bun, not Node** (participants, translator, orchestrator) · Three.js on WebGPU (renderer) · Apache-2.0.
+Rust (kernel and the built-in actors: `kernel/crates/actors`) · TypeScript on **Bun, not Node** (seats, translator, orchestration, tools) · Three.js on WebGPU (renderer) · Apache-2.0.
 
 ## Partnership
 Naz values honest pushback over agreement. Have opinions, flag trade-offs, and say when something is a bad idea.

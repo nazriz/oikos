@@ -1,6 +1,6 @@
-// The shared rules the generator calls (docs/design/rust-port.md 1.1): in the Rust world (OIKOS_WORLD=rust) they are
-// the Rust rules (kernel/src/rules_api.rs, served by the engine's native module), so nothing is written twice; until
-// the cut-over, the TS ones otherwise. Each is held equal to its TS twin (orchestrator/test/rust-world.test.ts and
+// The shared rules the generator calls (docs/design/rust-port.md 1.1): the Rust rules (kernel/src/rules_api.rs, served
+// by the engine's native module), so nothing is written twice; the TS ones where the module is not built, or a test
+// asks for them (OIKOS_TS_RULES) to hold the two equal. Each is held equal to its TS twin (orchestrator/test/rust-world.test.ts and
 // contracts/test/law-drafts.json). A lane that ports a rule the generator uses adds it here and in rules_api.rs.
 
 import { existsSync } from "node:fs";
@@ -21,7 +21,9 @@ function native(): Native | undefined {
   return (g.__oikosNative = m.exports);
 }
 
-const rust = (): Native | undefined => (process.env.OIKOS_WORLD === "rust" ? native() : undefined);
+// (Since the cut-over, 2026-10-19, the Rust rules whenever the engine's native module is built; the TS ones only where it is not, as for a
+// checkout that has not built the kernel.)
+const rust = (): Native | undefined => (process.env.OIKOS_TS_RULES ? undefined : native());
 const call = <T>(n: Native, name: string, args: object): T => JSON.parse(n.rules(name, JSON.stringify(args)));
 /** Without the absent parts (Rust writes them as null; TS leaves them out). */
 const present = <T extends object>(x: T): T => Object.fromEntries(Object.entries(x).filter(([, v]) => v !== null && v !== undefined)) as T;

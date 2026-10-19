@@ -506,6 +506,14 @@ mod tests {
         assert_eq!(w.as_deref(), Some("3"), "{rounds:?}");
         assert_eq!(rounds.len(), 2);
         assert_eq!(instant_runoff(&c(&["1", "2"]), &[]).0, None);
+        // (Ported at the cut-over from orchestrator/test/elections.test.ts, "instant runoff": a 4, b 3, c 2 first
+        // preferences; c's go to b: b wins 5 to 4.)
+        let r: Vec<Vec<String>> = [vec![c(&["a", "b"]); 4], vec![c(&["b", "a"]); 3], vec![c(&["c", "b"]); 2]].concat();
+        let (w, rounds) = instant_runoff(&c(&["a", "b", "c"]), &r);
+        assert_eq!(w.as_deref(), Some("b"));
+        assert_eq!(rounds.len(), 2);
+        assert_eq!((rounds[0].get("a"), rounds[0].get("b"), rounds[0].get("c")), (Some(&4), Some(&3), Some(&2)));
+        assert_eq!((rounds[1].get("a"), rounds[1].get("b"), rounds[1].get("c")), (Some(&4), Some(&5), None));
     }
 
     #[test]

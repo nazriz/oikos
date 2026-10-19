@@ -7,7 +7,6 @@ import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
-import { instantRunoff } from "../../participants/src/behaviour/elections";
 import { runWorld } from "../src/run";
 import { officesBy } from "./lib/offices";
 import { onRust } from "./lib/doubles";
@@ -49,13 +48,7 @@ async function town(name: string, negligent: boolean, days: number, standBps?: n
   return { recs, result, incumbent, approval, places, appointed: ev.filter((e) => e.event === "appointed" && e.position === "mayor") };
 }
 
-test("instant runoff: the last is out until someone has a majority", () => {
-  // a 4, b 3, c 2 first preferences; c's go to b: b wins 5 to 4.
-  const r = [...Array(4).fill(["a", "b"]), ...Array(3).fill(["b", "a"]), ...Array(2).fill(["c", "b"])];
-  expect(instantRunoff(["a", "b", "c"], r)).toEqual({ winner: "b", rounds: [{ a: 4, b: 3, c: 2 }, { a: 4, b: 5 }] });
-  expect(instantRunoff(["a"], []).winner).toBeUndefined();
-});
-
+// (The instant runoff's own case is the engine's since the cut-over: kernel/crates/actors/src/offices/elections.rs.)
 test("an election in a town run well, and in a town whose mayor funds no works crew", async () => {
   const kept = await town("kept", false, POLL + 5, 1000);
   // The office's records, in order: a notice, nominations (the incumbent among them), the roll and the ballot, then

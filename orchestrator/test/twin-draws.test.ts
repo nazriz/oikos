@@ -304,28 +304,6 @@ test("no module names a draw for a moment", () => {
 // file, whether it is drawn on the participant's stream or on the run's stream for one thing (`ctx.chance`).
 // (TS world only: the draw trace (`drawTrace`) is the TS loop's. On the Rust world the keys are `actors/src/draws.rs`'s, and its
 // own unit tests hold the same rule: a record's number is never in a key, `paper#n` is.)
-const tsOnly = process.env.OIKOS_WORLD === "rust" ? test.skip : test;
-tsOnly("a draw on the run's stream for one thing is named for which paper it is, never for the paper's number", async () => {
-  const probing = (inner: string): BehaviourModule => ({
-    ...builtin[inner]!,
-    name: `test.probing.${inner.replace(/\./g, "_")}`,
-    create(ctx) {
-      ctx.chance!("probe-rec.77777").below(100);
-      ctx.rng("probe-rec.88888").below(100);
-      return builtin[inner]!.create(ctx);
-    },
-  });
-  const dir = mkdtempSync(join(tmpdir(), "oikos-chance-keys-"));
-  try {
-    const config = generate({ ...living, citizens: 60 });
-    const part = officeAt(config, "mayor");
-    const wrapped = probing(part.impl);
-    part.run(wrapped.name);
-    const keys: string[] = [];
-    await runWorld({ config, runId: "chance-keys", outDir: dir, until: 2 * DAY, logDetail: "lean", recordObservations: "none", drawTrace: (k: readonly string[]) => { keys.push(k.join("|")); }, modules: { [wrapped.name]: wrapped } } as any);
-    const probes = keys.filter((k) => k.includes("probe-"));
-    expect(probes.length).toBeGreaterThanOrEqual(2);
-    expect(probes.filter((k) => /rec\.[0-9]+/.test(k))).toEqual([]);
-    expect(probes.some((k) => k.startsWith("chance|") && k.includes("probe-paper#1"))).toBe(true);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
-}, 300_000);
+// (The TS world's draw names, read from its run streams: deleted with the TS actors at the cut-over, 2026-10-19. The engine's draws are
+// keyed on stable identities by construction and held so by kernel/tests/determinism_lint.rs.)
+

@@ -45,14 +45,12 @@ test("a run stuck in a module is stopped by its watchdog, with a diagnosis of wh
   expect(out).toContain("didn't finish");
   const diagnosis = JSON.parse(readFileSync(join(d, "world.seed1.failure.json"), "utf8"));
   expect(diagnosis.reason).toBe("stalled");
-  if (process.env.OIKOS_WORLD === "rust") {
+  {
     // (The engine decides for its code actors inside one call, which the host's breadcrumbs cannot see into: the host
     // was waiting on the engine's `next` at the moment the run was in, and the engine's own note, read by the watchdog's
     // thread, says whom it was deciding for.)
     expect(diagnosis.doing).toMatchObject({ doing: "kernel request", request: "next" });
     expect(diagnosis.deciding).toContain(unit);
-  } else {
-    expect(diagnosis.doing).toMatchObject({ doing: "deciding", participant: unit });
   }
   expect(diagnosis.doing.t).toBeGreaterThanOrEqual(5 * DAY);
 }, 120_000);
@@ -267,7 +265,7 @@ test("a run whose log can no longer be written stops there, saying so", async ()
   const run = runWorld({ config: generate({ ...spec, citizens: 40, nature: false }), runId: "full", outDir: d, until: 30 * DAY, kernel: new Kernel(kernelBinary()),
     inspect: async () => {
       // (The TS world looks at every wake of every code actor; the Rust world's inspector is called once a day.)
-      if (++looks === (process.env.OIKOS_WORLD === "rust" ? 10 : 50)) await pipe.break();
+      if (++looks === 10) await pipe.break();
     } });
   const failed = await run.catch((e) => e);
   expect(failed).toBeInstanceOf(KernelLogFailed);

@@ -229,7 +229,7 @@ test("it fails, naming the post, on a special case of each kind the foundations 
   } finally { rmSync(dir, { recursive: true, force: true }); }
   // A special case of the inventory's kind, standing: an entry that points at a line that is there.
   const fixture = join(mkdtempSync(join(tmpdir(), "oikos-all-work-inv-")), "inventory.json");
-  writeFileSync(fixture, JSON.stringify({ entries: [{ id: "planted", step: "F6", kind: "delete", file: "participants/src/behaviour/world.ts", find: 'name: "world.transfers"' }] }));
-  expect(specialCasesLeft(fixture).map((x) => x.replace(/:\d+$/, ""))).toEqual(["planted (F6): participants/src/behaviour/world.ts"]);
+  writeFileSync(fixture, JSON.stringify({ entries: [{ id: "planted", step: "F6", kind: "delete", file: "participants/src/engine-kinds.ts", find: 'name: "world.transfers"' }] }));
+  expect(specialCasesLeft(fixture).map((x) => x.replace(/:\d+$/, ""))).toEqual(["planted (F6): participants/src/engine-kinds.ts"]);
   rmSync(join(fixture, ".."), { recursive: true, force: true });
 });

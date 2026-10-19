@@ -1124,6 +1124,7 @@ The mechanism:
 - **L / I:** high / medium · **Status:** partly fixed (decisions 2026-10-18, "Port step 3, second pass"; 2026-10-19, "Port step 3, finished"): the faults found are fixed; on the final gate 9 measures are beyond 3 SE (gatherings and union belief in au-vic, gatherings' size in gb-eng, ke-nakuru's work: more jobs, unemployment 2.1% against the profile's 5.4%), each explained there; households going without (11.3% in au-vic, 6.9% in ke-nakuru) is a new breach, ME-20's cobweb, and its rise since the second pass is not traced. Threads and twins hold. **The cut-over's gate (2026-10-19, decisions "The cut-over"):** 13 measures beyond 3 SE (au-vic 3, gb-eng 3, ke-nakuru 7), each explained there and none from a fault; households going without is no longer a breach (au-vic 2.7%, ke-nakuru 3.1%); threads hold; twin-draws' registry case (MT-17) still fails, so phase 4 waits.
 - **Notice by:** `bun scripts/port-gate.ts` (runs/port-gate/gate.json).
 - **Fix when:** Before phase 4 (deleting the TS actors) and before any pilot on the Rust world.
+- **Cut-over, 2026-10-19:** the Rust world is the only one; ten TS actor files deleted, the rest kept for the helpers the generator, host and readers import (decisions, "The cut-over").
 
 ### MT-17 · How far a seated person's time spreads through the Rust world
 - **Gap:** twin-draws' case of the registry held by a person of the town: the holder's entries take their time, and what

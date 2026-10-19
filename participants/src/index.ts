@@ -32,30 +32,22 @@ export { diaryText } from "./behaviour/diary";
 export { planLaw, planLawWords, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, possessionOrderFor } from "./behaviour/papers";
 import type { BehaviourModule } from "./module";
 import { answering } from "./behaviour/common";
-import { bankPaymentSystem } from "./behaviour/bank";
-import { disposal, exportDemand, funding, grants, idle, migration, statistics, trade, transfers, valuer, weather } from "./behaviour/world";
+// (The kinds whose TypeScript actors were deleted at the cut-over: what is still read of each, the engine runs them.)
+import { bankPaymentSystem, bodyPayroll, disposal, electoralOffice, energy, exportDemand, founded, funding, grants, idle, migration, newspaper, producer, retailer, retirementFund, statistics, trade, transfers, valuer, water, weather } from "./engine-kinds";
 import { lending } from "./behaviour/credit";
 import { organiser } from "./behaviour/union";
 import { citizen } from "./behaviour/citizen";
 import { employer, landlord } from "./behaviour/firms";
-import { producer } from "./behaviour/producer";
-import { retailer } from "./behaviour/retailer";
 import { vendor } from "./behaviour/automation";
 import { builder, childProtection, inspector, landRegistry, planningOfficer, registry } from "./behaviour/institutions";
 import { councilClerk, councillor, financeOfficer, mayorCode, ratesOfficer, taxClerk, works } from "./behaviour/government";
 import { environment } from "./behaviour/environment";
-import { bodyPayroll } from "./behaviour/payroll";
-import { electoralOffice } from "./behaviour/elections";
-import { newspaper } from "./behaviour/news";
 import { principal } from "./behaviour/school";
 import { practice } from "./behaviour/health";
 import { member, registrar } from "./behaviour/tribunal";
 import { desk } from "./behaviour/desk";
 import { auditor } from "./behaviour/auditor";
-import { founded } from "./behaviour/founded";
-import { energy, water } from "./behaviour/utilities";
 import { station } from "./behaviour/police";
-import { retirementFund } from "./behaviour/fund";
 import { booked, clerk, Clerk, keepers, officeOf } from "./behaviour/books";
 import * as openbooks from "./behaviour/openbooks";
 import * as venueBooks from "./behaviour/openbooks-venues";
@@ -94,25 +86,25 @@ function keepingBooks<M extends BehaviourModule>(given: M): M {
 export const modules: { [name: string]: BehaviourModule & { source: string } } = Object.fromEntries(
   (
     [
-      [bankPaymentSystem, "behaviour/bank.ts"],
-      [exportDemand, "behaviour/world.ts"],
-      [idle, "behaviour/world.ts"],
-      [migration, "behaviour/world.ts"],
-      [trade, "behaviour/world.ts"],
-      [transfers, "behaviour/world.ts"],
-      [funding, "behaviour/world.ts"],
-      [weather, "behaviour/world.ts"],
-      [valuer, "behaviour/world.ts"],
-      [statistics, "behaviour/world.ts"],
-      [grants, "behaviour/world.ts"],
-      [disposal, "behaviour/world.ts"],
+      [bankPaymentSystem, "engine-kinds.ts"],
+      [exportDemand, "engine-kinds.ts"],
+      [idle, "engine-kinds.ts"],
+      [migration, "engine-kinds.ts"],
+      [trade, "engine-kinds.ts"],
+      [transfers, "engine-kinds.ts"],
+      [funding, "engine-kinds.ts"],
+      [weather, "engine-kinds.ts"],
+      [valuer, "engine-kinds.ts"],
+      [statistics, "engine-kinds.ts"],
+      [grants, "engine-kinds.ts"],
+      [disposal, "engine-kinds.ts"],
       [lending, "behaviour/credit.ts"],
       [organiser, "behaviour/union.ts"],
       [citizen, "behaviour/citizen.ts"],
       [landlord, "behaviour/firms.ts"],
       [employer, "behaviour/firms.ts"],
-      [producer, "behaviour/producer.ts"],
-      [retailer, "behaviour/retailer.ts"],
+      [producer, "engine-kinds.ts"],
+      [retailer, "engine-kinds.ts"],
       [vendor, "behaviour/automation.ts"],
       [planningOfficer, "behaviour/institutions.ts"],
       [inspector, "behaviour/institutions.ts"],
@@ -128,20 +120,20 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [ratesOfficer, "behaviour/government.ts"],
       [works, "behaviour/government.ts"],
       [environment, "behaviour/environment.ts"],
-      [bodyPayroll, "behaviour/payroll.ts"],
-      [electoralOffice, "behaviour/elections.ts"],
-      [newspaper, "behaviour/news.ts"],
+      [bodyPayroll, "engine-kinds.ts"],
+      [electoralOffice, "engine-kinds.ts"],
+      [newspaper, "engine-kinds.ts"],
       [principal, "behaviour/school.ts"],
       [practice, "behaviour/health.ts"],
       [member, "behaviour/tribunal.ts"],
       [registrar, "behaviour/tribunal.ts"],
       [desk, "behaviour/desk.ts"],
       [auditor, "behaviour/auditor.ts"],
-      [founded, "behaviour/founded.ts"],
-      [water, "behaviour/utilities.ts"],
-      [energy, "behaviour/utilities.ts"],
+      [founded, "engine-kinds.ts"],
+      [water, "engine-kinds.ts"],
+      [energy, "engine-kinds.ts"],
       [station, "behaviour/police.ts"],
-      [retirementFund, "behaviour/fund.ts"],
+      [retirementFund, "engine-kinds.ts"],
       [clerk, "behaviour/books.ts"],
     ] as const
   // (An office that says how it answers a letter, and has no standing report of its own, acknowledges each: `answering`.)

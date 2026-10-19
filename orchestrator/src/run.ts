@@ -367,11 +367,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // The Rust world (OIKOS_WORLD=rust; docs/design/rust-port.md, lane F): the engine runs every built-in actor, and this
   // host its seats exactly as on the TS world, through the same requests (kernel/src/engine/hosted.rs). No code unit
   // is made here. Until the cut-over a kind the engine lacks stands idle where OIKOS_STAND_IN (or `standIn`) says so.
-  const rustWorld = process.env.OIKOS_WORLD === "rust";
+  // (The only world since the cut-over, 2026-10-19: the TS actors were deleted, and OIKOS_WORLD no longer chooses.)
   const standIn = o.standIn ?? process.env.OIKOS_STAND_IN;
   // (On the Rust world the actors read the sparse mind's dial from the world, as they read the others: said there.)
-  await k.request({ op: "start", config: rustWorld && o.consult ? { ...cfg, dials: { ...(cfg.dials ?? {}), consult: true } } : cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath,
-    ...(rustWorld ? { engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(o.recordDecisions === "none" ? { record_decisions: false } : o.recordDecisions !== undefined && o.recordDecisions !== "full" ? { decision_areas: o.recordDecisions.split(",").map((x) => x.trim()).filter((x) => x) } : {}), ...(recordObs === "all" || recordObs === "code" ? { record_observations: true } : Array.isArray(recordObs) ? { record_observations: recordObs } : {}) } } : {}) });
+  await k.request({ op: "start", config: o.consult ? { ...cfg, dials: { ...(cfg.dials ?? {}), consult: true } } : cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath,
+    ...({ engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(o.recordDecisions === "none" ? { record_decisions: false } : o.recordDecisions !== undefined && o.recordDecisions !== "full" ? { decision_areas: o.recordDecisions.split(",").map((x) => x.trim()).filter((x) => x) } : {}), ...(recordObs === "all" || recordObs === "code" ? { record_observations: true } : Array.isArray(recordObs) ? { record_observations: recordObs } : {}) } }) });
   if (o.perturb) await k.request({ op: "perturb", extra_wakes_bps: o.perturb.extraWakesBps, seed: o.perturb.seed });
 
   // Every model call (participants, translator, debriefs) is recorded as it happens.
@@ -654,7 +654,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         const bctx = asPerson ? ctxFor(asPerson, office!.id, entity, pp.mock?.params ?? {}) : { ...ctx, params: sortedKeys(pp.mock?.params ?? {}) as any };
         // (In the Rust world a brain the engine has is the engine's own kind, run detached: the same code as the post's
         // code unit, so a twin is exact.)
-        const rustBrain = rustWorld && rustKinds().has(b) ? new DetachedActor({ kind: b, participant: asPerson ?? p.id, capacity: office?.id ?? "self", entity, system: p.kind === "system", params: pp.mock?.params ?? {}, config: cfg }) : undefined;
+        const rustBrain = rustKinds().has(b) ? new DetachedActor({ kind: b, participant: asPerson ?? p.id, capacity: office?.id ?? "self", entity, system: p.kind === "system", params: pp.mock?.params ?? {}, config: cfg }) : undefined;
         // (The mock hands its brain its capacity's slice, the channels named without the post; the engine's actor reads a
         // post's channels by their paths, "<post>/<channel>", as the engine hands them: put back.)
         const cap = office?.id;
@@ -693,10 +693,6 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const want = new Set<string>();
     if (!p.ended) {
       if (isLlm(p)) want.add(pid);
-      else if (!rustWorld) {
-        if (p.kind === "person") want.add(`${pid}|self`);
-        for (const x of held(pid)) want.add(`${pid}|${x.id}`);
-      }
     }
     const gone = [...units.keys()].filter((key) => (key === pid || key.startsWith(`${pid}|`)) && !want.has(key));
     for (const key of gone) units.delete(key);
@@ -1029,7 +1025,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     if (u.llm || RESOLVER_MODE !== "engine") u.knowledge.absorb(raw);
     const obs: Observation = { ...u.view.apply(raw), woke_for: u.wokeFor, since: u.since };
     // (What the kernel sent, kept beside the picture for a mock seat's brain run detached on the Rust world: rust-world.ts.)
-    if (u.llm && rustWorld) (obs as any)[RAW] = raw;
+    if (u.llm) (obs as any)[RAW] = raw;
     // (A seat's roster of its own staff, and what a draft's preview may say of it: read from what it is shown.)
     u.llm?.tally?.absorb(obs);
     u.llm?.dayBook?.absorb(obs);
@@ -1089,7 +1085,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         // The stand-in carries the participant on, in the same capacities.
         p.controller = { type: "code", impl: after.code, params: after.params ?? {} };
         // (On the Rust world the engine runs it: it is told the participant's code now.)
-        if (rustWorld) await k.request({ op: "stand_in", participant: u.participant, controller: p.controller });
+        await k.request({ op: "stand_in", participant: u.participant, controller: p.controller });
         await syncUnits(u.participant, t);
         await k.request({ op: "to_cadence", participant: u.participant });
       } else p.ended = true;
@@ -1406,8 +1402,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       try {
         // (On the Rust world the engine runs everything between seats' wakes itself: it is asked a day at a time, so this
         // process's other runs and its watchdog are heard. Nothing the world does depends on it.)
-        if (rustWorld) askedBy = Math.max(askedBy, t) + DAY; // (each ask a day further than the last, whatever the clock says)
-        due = await k.request(rustWorld ? { op: "next", until, by: askedBy } : { op: "next", until });
+        askedBy = Math.max(askedBy, t) + DAY; // (each ask a day further than the last, whatever the clock says)
+        due = await k.request({ op: "next", until, by: askedBy });
       } catch (e) {
         if (e instanceof Error && /kept waking each other/.test(e.message)) throw new RunStuck(e.message);
         throw e;
@@ -1416,18 +1412,17 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       // desk) through the host, which answers those it has the model for, by their next wake: kernel/src/protocol.rs.)
       // (The engine's own events come first, in an `advanced` reply: they are taken in before its questions are answered,
       // so a decision recorded in the moment is on the reading desk's file when its addressee's question is answered.)
-      if (rustWorld && due.advanced !== undefined) { t = due.advanced; await absorb(due); }
-      if (rustWorld && (consult || composer || desk) && !due.end) {
+      if (due.advanced !== undefined) { t = due.advanced; await absorb(due); }
+      if ((consult || composer || desk) && !due.end) {
         t = due.t ?? due.advanced ?? t; // (the moment they were asked at: a composer's month is counted from it)
         await answerQuestions();
       }
       if (due.end) break;
       if (due.advanced !== undefined) {
         t = due.advanced;
-        if (!rustWorld) await absorb(due); // (the advance's events: who's come or gone while time passed)
         // (On the Rust world the engine's own actors are not observed here: a test's inspector is called once a day
         // instead, with the moment and the kernel, so what it asks of the live engine it still can.)
-        if (rustWorld && o.inspect) await o.inspect("", { t } as any, k, undefined, undefined as any);
+        if (o.inspect) await o.inspect("", { t } as any, k, undefined, undefined as any);
         continue;
       }
       t = due.t;
@@ -1557,7 +1552,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
             if (x.u.hears && (r.value as ParticipantAction)?.type === "propose") next.push(...(await round([{ u: x.u, n: x.n + 1 }], true)));
             // (On the Rust world a seat that sits as its code twin takes its next round in the engine's, with every code
             // unit that looked, in key order: as its twin does. Taken here at once, it acted before them.)
-            else if (rustWorld && x.u.hears) await k.request({ op: "goes_on", key: x.u.key });
+            else if (x.u.hears) await k.request({ op: "goes_on", key: x.u.key });
             else next.push({ u: x.u, n: x.n + 1 });
           } else await k.request({ op: "finished", key: x.u.key, ...(x.u.waitUntil !== undefined ? { until: x.u.waitUntil } : {}) });
         }

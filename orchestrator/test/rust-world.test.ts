@@ -1,4 +1,4 @@
-// The Rust world's host (orchestrator/src/rust-world.ts, OIKOS_WORLD=rust): `runWorld` handed to the engine gives the
+// The Rust world's host (orchestrator/src/rust-world.ts; the only world since the cut-over): `runWorld` handed to the engine gives the
 // TS world's run of a module ported faithfully (world.weather, everything else idle), to the state hash; forks of one
 // moment run side by side, their seats out at once, and alike when given the same; a mock seat sitting as its code
 // twin is decided by the Rust kind run detached and warns as the code does; the manifests and the shared rules are
@@ -31,26 +31,7 @@ function weatherOnly(): any {
 const warnings = (lines: any[]) => lines.filter((e) => e.kind === "event" && e.body.event === "recorded" && e.body.record.kind === "weather_warning").map((e) => ({ at: e.body.record.at, text: e.body.record.text }));
 const read = (path: string) => readFileSync(path, "utf8").trim().split("\n").map((l) => JSON.parse(l));
 
-test("runWorld on the Rust world (OIKOS_WORLD=rust) is the TS world's run, to the state hash", async () => {
-  const config = weatherOnly();
-  const until = 40 * DAY;
-  const out = join(root, "runs", "test-rust-world");
-  rmSync(out, { recursive: true, force: true });
-  mkdirSync(out, { recursive: true });
-  const ts = await runWorld({ config: structuredClone(config), runId: "ts", outDir: out, until });
-  const was = process.env.OIKOS_WORLD;
-  process.env.OIKOS_WORLD = "rust";
-  try {
-    const rust = await runWorld({ config: structuredClone(config), runId: "rust", outDir: out, until });
-    expect(rust.stateHash).toBe(ts.stateHash);
-    expect(warnings(read(rust.logPath))).toEqual(warnings(read(ts.logPath)));
-    expect(rust.end.reason).toBe("aborted");
-  } finally {
-    if (was === undefined) delete process.env.OIKOS_WORLD;
-    else process.env.OIKOS_WORLD = was;
-  }
-  rmSync(out, { recursive: true, force: true });
-}, 120_000);
+// (The Rust world's run against the TS world's, to the state hash: the TS world was deleted at the cut-over, 2026-10-19.)
 
 test("forks of one moment run side by side with their seats out at once, and a twin seat warns as the code does", async () => {
   const code = weatherOnly();
@@ -106,19 +87,17 @@ test("the manifests and the shared rules are read from Rust", () => {
 });
 
 // (Compared as canonical JSON, as the kernel reads a config: the order of an object's keys is never meant.)
-test("the generator calling the Rust rules (OIKOS_WORLD=rust) makes the same towns, word for word", () => {
+test("the generator calling the Rust rules makes the same towns, word for word, as with the TS rules it falls back on where the engine is not built", () => {
   for (const profile of ["au-vic-2026", "gb-eng-2026", "ke-nakuru-2026"]) {
     const s = { ...spec, profile, years: 1 };
-    const was = process.env.OIKOS_WORLD;
-    delete process.env.OIKOS_WORLD;
-    const tsTown = canonical(generate(s));
-    process.env.OIKOS_WORLD = "rust";
+    process.env.OIKOS_TS_RULES = "1";
+    let tsTown: string;
     try {
-      expect(canonical(generate(s))).toBe(tsTown);
+      tsTown = canonical(generate(s));
     } finally {
-      if (was === undefined) delete process.env.OIKOS_WORLD;
-      else process.env.OIKOS_WORLD = was;
+      delete process.env.OIKOS_TS_RULES;
     }
+    expect(canonical(generate(s))).toBe(tsTown);
   }
 }, 120_000);
 
@@ -131,8 +110,6 @@ test("on the Rust world, a mock seat sitting as its code twin (its brain the eng
   const out = join(root, "runs", "test-rust-twin");
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
-  const was = process.env.OIKOS_WORLD;
-  process.env.OIKOS_WORLD = "rust";
   try {
     const a = await runWorld({ config: code, runId: "code", outDir: out, until });
     const b = await runWorld({ config: twin, runId: "twin", outDir: out, until });
@@ -144,8 +121,6 @@ test("on the Rust world, a mock seat sitting as its code twin (its brain the eng
     expect(lines.some((l) => l.body?.annotation === "usage" && l.body.subject === holder.id)).toBe(true);
     expect(b.debriefs?.[holder.id]).toBeDefined();
   } finally {
-    if (was === undefined) delete process.env.OIKOS_WORLD;
-    else process.env.OIKOS_WORLD = was;
     rmSync(out, { recursive: true, force: true });
   }
 }, 180_000);

@@ -46,6 +46,8 @@ are behaviours, held by the tests of the module that does them. See "The gaps" b
 
 ## Mutation testing
 
+**Since the cut-over (2026-10-19)** the catalogue's bugs planted in `participants/src/behaviour` actors aim at code that no longer runs (the engine's actors are Rust): they are to be rewritten against `kernel/crates/actors`; the kernel's own mutations stand.
+
 `scripts/mutate.ts` plants one realistic bug at a time (`scripts/mutations.ts`: each one exact replacement in one file,
 of a kind that has happened here or would corrupt results) in a scratch copy of the repo, runs the tests, records
 which failed, and puts the source back. The repo itself is never touched.

@@ -70,12 +70,13 @@ test("every sentence the platform's own code can write to a seat: scanned in the
     "translator/src/preview.ts", "translator/src/resolver.ts", "translator/src/arrangement.ts", "translator/src/knowledge.ts",
     // (and the ways in to a model, which add how to answer to what a seat is sent)
     "participants/src/llm/claude-code.ts", "participants/src/llm/codex.ts", "participants/src/llm/answer.ts", "participants/src/llm/anthropic.ts", "participants/src/llm/openai.ts",
-    ...readdirSync(join(root, "participants/src/behaviour")).filter((f) => f.endsWith(".ts")).map((f) => `participants/src/behaviour/${f}`)];
+    ...readdirSync(join(root, "participants/src/behaviour")).filter((f) => f.endsWith(".ts")).map((f) => `participants/src/behaviour/${f}`),
+    // (and what is still read of the kinds the engine runs, whose TypeScript actors were deleted at the cut-over)
+    "participants/src/engine-kinds.ts"];
   // Named exceptions: a literal that is on the list and is never shown to a seat, each with why.
   const NOT_SHOWN: { file: string; has: string; why: string }[] = [
-    { file: "participants/src/behaviour/world.ts", has: "on the researcher's schedule", why: "the reason a code module records for its own act, kept in the log; no report shows another's reason" },
-    { file: "participants/src/behaviour/world.ts", has: "A researcher's scripted shocks", why: "a module's declaration of what it sees and why (its manifest), read by tests and people, never by a seat" },
-    { file: "participants/src/behaviour/world.ts", has: "The weather is fixed before the run", why: "the same: a module's declaration" },
+    { file: "participants/src/engine-kinds.ts", has: "A researcher's scripted shocks", why: "a module's declaration of what it sees and why (its manifest), read by tests and people, never by a seat" },
+    { file: "participants/src/engine-kinds.ts", has: "The weather is fixed before the run", why: "the same: a module's declaration" },
     { file: "participants/src/llm/claude-code.ts", has: "the Claude plan's limit for claude -p was reached", why: "an error to whoever runs the pilot, which stops the run; no model is sent it" },
     { file: "participants/src/llm/codex.ts", has: "the Codex subscription's usage limit was reached", why: "the same" },
   ];

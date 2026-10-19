@@ -125,7 +125,9 @@ if (import.meta.main) {
   mkdirSync(OUT, { recursive: true });
   let stale = 0;
   // (Every module but the do-nothing stand-in tests use, `idle`: it takes no parameters and isn't a behaviour.)
-  for (const name of Object.keys(modules).filter((n) => n.includes(".")).sort()) {
+  // (A kind whose TypeScript actor was deleted at the cut-over (participants/src/engine-kinds.ts) has its manifest as it was written last,
+  // from that actor: the engine's kind compiles it in (kernel/crates/actors) and owns it now. Nothing here writes it.)
+  for (const name of Object.keys(modules).filter((n) => n.includes(".") && !modules[n]!.source.endsWith("/engine-kinds.ts")).sort()) {
     const path = join(OUT, `${name}.json`);
     const text = JSON.stringify(manifest(name), null, 2) + "\n";
     if (check) {
