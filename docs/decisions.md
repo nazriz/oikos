@@ -6867,8 +6867,16 @@ ke-nakuru 1738, us-oh 3259, jp-akita 109). Mechanism unchanged. Founding is clum
   population 67.5% (profile 63.8%) stay breaches, as at the last gate.
 - *Health breaches in kind:* au-vic loses the TS world's business entry breach; households going without is no
   longer a breach anywhere; ke-nakuru's unemployment and employment, as before.
-- *Scenario tests on the Rust world:* twin-draws' registry case fails (above); see the fast tier below.
-- *Backstops:* in the fast tier.
+- *Scenario tests on the Rust world* (`OIKOS_WORLD=rust bun scripts/test.ts`): 1,835 pass, 7 fail. twin-draws' registry
+  case (above). production: the outside paid an export invoice at this month's offer price where it was shipped under
+  last month's (an invoice can come after the next offer): **fixed**, it pays at the invoice's own offer's price, and the
+  test passes. Not traced, each passing at integ-final and moved by the market law or the refit: culture-dial (its Rust
+  state pin; to re-take with the reason once the rest is settled), invariants (ke-nakuru seed 1: a household record
+  still names an arrival dead since day 122: a fault on a path this trajectory reaches), founding (the code-founding
+  case founded one where it asks two), entry (a failed shop's premises listed and never bought), gatherings (someone in
+  a hall outside a gathering's hours).
+- *Backstops:* generality, no-god-view and all-work-takes-time pass, in the same run. TS world: the fast tier passes
+  (890 tests, the kernel's cargo tests with them).
 
 **Observations in the log** (the coordinator's addition; docs/reliability.md, "Observations in the log";
 contracts/README.md): `log.observations: seats | all`. With `seats` (what the host writes into a new run's config)

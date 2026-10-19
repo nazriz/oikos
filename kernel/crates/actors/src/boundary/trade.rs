@@ -325,7 +325,10 @@ impl Plan for Market {
             let room = offer.1 - self.bought.get(&kind).copied().unwrap_or(0);
             let take = q.min(room).max(0);
             *self.bought.entry(kind.clone()).or_insert(0) += take;
-            let amount = owed.as_ref().and_then(|o| o.i("amount")).map_or(0, cents_of).min(take * offer.0);
+            // (At the price of the offer the goods were shipped and invoiced under, which may be last month's: an
+            // invoice can come after the next offer. At this month's, a payment was not the goods' price times any number.)
+            let unit = crate::common::bases_of(&inv).first().and_then(|b| self.book.get(b)).and_then(|o| data(o).i("unit_price")).filter(|u| *u > 0).unwrap_or(offer.0);
+            let amount = owed.as_ref().and_then(|o| o.i("amount")).map_or(0, cents_of).min(take * unit);
             let back = q - take;
             let return_to = d.s("from_at").unwrap_or_default().to_string();
             let mut calls = vec![];
