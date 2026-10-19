@@ -445,9 +445,18 @@ The mechanism:
   choice), `market/producer.rs`.
 - **Effect:** Construction and building jobs too high in every town; employment more volatile across seeds than a real
   town's.
-- **L / I:** high / medium · **Status:** to fix (building by expected return on the market's rents; buyers splitting
-  orders across suppliers or holding standing contracts)
-- **Notice by:** town/economy construction against net additions; economy/summary unemployment's spread over seeds.
+- **L / I:** high / medium · **Status:** shops' half fixed (decisions 2026-10-19, "The cut-over"): shops spread their
+  restocking across suppliers by price and delivery record (docs/behaviour/sourcing.md), a factory's clearance is
+  stated and weighed at its regular price, prices read the month's evidence with a least change and price points. The
+  largest supplier's share of shops' orders went from 55 to 88% a month to about 22%; households going without in
+  au-vic 11.3% to under 3% (gate, five seeds), no breach in any profile. Its rise from 6% to 11% was a5ef66d0 (a
+  household with no home asks the people it knows): more households stayed, and the cobweb shorted more of them.
+  Landlords' half open: at the profiles' figures a house returns about 7% a year on its build cost against a 6.2%
+  mortgage rate, so a test of expected return would not bind; the lever is the rule that builds whenever homes have
+  been let 90 days, to be sourced. The sourcing figures (`supplier_price_power` 10 and the record's weights) are
+  placeholders.
+- **Notice by:** town/economy construction against net additions; economy/summary unemployment's spread over seeds;
+  the largest supplier's share of shops' orders a month.
 - **Fix when:** Before a study of housing supply or employment; with ME-14's rents.
 
 ---
@@ -686,7 +695,10 @@ The mechanism:
 - **Fix when:** founding or the composer is the question.
 - **Rust world (2026-10-19):** at the fitted chance four 1,000-person au-vic years founded 1 thing in all (0.25 a year,
   the source's target about 1.5): the chance was fitted on the TS world's occasions, mostly lost work from a firm-side
-  fault the native hiring removed. Refit on the Rust world before founding is measured (decisions, "Port step 3, finished").
+  fault the native hiring removed. **Refitted (2026-10-19, decisions "The cut-over"):** au-vic's chance is 3150 (was
+  420), the others scaled by their registered rate as before; ten Rust-world years founded 0, 1, 3, 0, 0, 6, 3, 0, 0,
+  1 (1.4 a year against about 1.5). `informal_multiple` is still a placeholder; founding is clumped (half the years
+  found nothing), so a pilot that studies it needs many seeds.
 
 ### PC-5 · The everyday model failed its gate
 - **Gap:** No large model passed as a teacher for ordinary decisions (they moved people toward doing nothing and
@@ -1109,7 +1121,7 @@ The mechanism:
   `market/` (hiring, construction, shops' supply); `scripts/port-gate.ts`.
 - **Effect:** Any run on the Rust world is not comparable with the TS world's baselines and calibration notes; a steward
   experiment would read the port's differences as the steward's.
-- **L / I:** high / medium · **Status:** partly fixed (decisions 2026-10-18, "Port step 3, second pass"; 2026-10-19, "Port step 3, finished"): the faults found are fixed; on the final gate 9 measures are beyond 3 SE (gatherings and union belief in au-vic, gatherings' size in gb-eng, ke-nakuru's work: more jobs, unemployment 2.1% against the profile's 5.4%), each explained there; households going without (11.3% in au-vic, 6.9% in ke-nakuru) is a new breach, ME-20's cobweb, and its rise since the second pass is not traced. Threads and twins hold.
+- **L / I:** high / medium · **Status:** partly fixed (decisions 2026-10-18, "Port step 3, second pass"; 2026-10-19, "Port step 3, finished"): the faults found are fixed; on the final gate 9 measures are beyond 3 SE (gatherings and union belief in au-vic, gatherings' size in gb-eng, ke-nakuru's work: more jobs, unemployment 2.1% against the profile's 5.4%), each explained there; households going without (11.3% in au-vic, 6.9% in ke-nakuru) is a new breach, ME-20's cobweb, and its rise since the second pass is not traced. Threads and twins hold. **The cut-over's gate (2026-10-19, decisions "The cut-over"):** 13 measures beyond 3 SE (au-vic 3, gb-eng 3, ke-nakuru 7), each explained there and none from a fault; households going without is no longer a breach (au-vic 2.7%, ke-nakuru 3.1%); threads hold; twin-draws' registry case (MT-17) still fails, so phase 4 waits.
 - **Notice by:** `bun scripts/port-gate.ts` (runs/port-gate/gate.json).
 - **Fix when:** Before phase 4 (deleting the TS actors) and before any pilot on the Rust world.
 
@@ -1121,10 +1133,17 @@ The mechanism:
 - **Where:** `orchestrator/test/twin-draws.test.ts`; `kernel/crates/actors/src/market/` (prices, retail stock).
 - **Effect:** A seat's difference from its twin is noisier on the Rust world: small timing moves spread through the town's
   shops, so more of a seat-against-twin difference is the economy's sensitivity, not the seat.
-- **L / I:** high / medium · **Status:** open (decisions 2026-10-19, "Port step 3, finished"); the test fails, not loosened
+- **L / I:** high / medium · **Status:** open, reduced (decisions 2026-10-19, "The cut-over"): 517 to 342 papers with other
+  words (139 allowed) with the market law (price points, a least change, the month's mean stock, multi-sourcing, a
+  customer served at the shop's price). Traced past the market: the first word to differ is now a hire a day apart
+  (two applications 30 minutes later, the builder looking between them), then a loan applied for six days apart (a
+  refusal of day 0's applications remembered from when it was read, the bank's officer working through the opening
+  day's queue in another order), then small businesses' stock-outs. Tried and taken back: hiring after a week's
+  closing date (178 papers; it moved migration, which reads standing postings monthly: ke-nakuru arrivals 47 to 176 a
+  year); back-orders (893: worse). The test fails, not loosened.
 - **Notice by:** twin-draws' registry test; papers moved per seat-day in a seated twin pair.
-- **Fix when:** Before phase 4, by a sourced reason for the market to be less sensitive (price points, menu costs) or the
-  owner's word that the bound encodes the TS world.
+- **Fix when:** Before phase 4. The owner's call whether the remaining knife-edges (hiring at the next look, a balance
+  read at one hour) are faults to fix, each with a sourced rule, or the bound encodes the TS world.
 
 ---
 

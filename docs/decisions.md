@@ -6801,3 +6801,93 @@ rise); the founding chance refitted on the Rust world (PC-4); the seat-side read
 
 **Revisit if** a reading arrives after its paper lands (the held round is the place to look), a part of a founder's
 words is left waiting, or the gate's ke-nakuru work measures are judged against real hiring figures and found wrong.
+
+## 2026-10-19 · The cut-over, attempted: a market law, founding refitted, the gate again, observations in the log (branch `cutover`; no model called)
+
+The owner (2026-10-19): fix ME-20 by a general market law, refit founding's chance on the Rust world (PC-4), re-run the
+gate, and cut over if it passes; then make observations in the log a toggle. **The gate does not pass on one item
+(twin-draws' registry case, MT-17), so the cut-over is not made**: the TS world stays selectable and the TS actors stay.
+
+**The market law** (docs/behaviour/sourcing.md, prices.md, retailer.md; `market::sourcing`, `prices`, `retailer`,
+`producer`). Traced in a kept log first: in au-vic each month shops' restocking piled onto one to three of ten factories
+(the largest took 55 to 88% of all shops' orders); it could fill few, the others' trade fell to nothing. Households'
+shortfalls were a third each out of stock, orders at a price since raised (refunded whole), and orders not served in
+time.
+- *Shops multi-source:* a restock is split among the shop's suppliers by attraction, its delivery record times (cheapest
+  price / its price)^10 (Bell, Keeney and Little 1975; Cooper and Nakanishi 1988; multiple sourcing: Elmaghraby 2000,
+  Burke et al. 2007; price and delivery first: Dickson 1966). A share under a supplier's least order goes to the others.
+  The 1% switching threshold of 2026-10-18 is gone. The power and the record's weights are placeholders (ME-20).
+- *A clearance says so:* a factory below its cost states `clearance: { quantity, regular }`; buyers and rivals weigh
+  it at the regular price. Forward buying on a deal is not modelled.
+- *Prices on accumulated evidence:* the stock the rule reads is the month's mean, a reading a day; a change under 1%
+  is not made (menu costs: Levy et al. 1997; (S, s): Sheshinski and Weiss 1977), and one made is in whole steps of it
+  (price points: Kashyap 1995; Levy et al. 2011).
+- *The price on the shelf:* an order at a price the shop has since raised is served what its money buys at the shop's
+  price, the rest refunded with the note (refunded whole only if it buys none).
+- Effect: the largest supplier's share of shops' orders about 22% a month in au-vic (45% in ke-nakuru, fewer factories
+  per shop); households going without (gate, five seeds) au-vic 11.3% to 2.7%, ke-nakuru 6.9% to 3.1%, gb-eng 2.6%
+  (TS world 2.2 to 2.6%); no breach anywhere. Shop price lists from about 8 a year to 6.
+- *Tried and taken back:* back-orders (an order waits for goods on their way; it made the twin worse, 893 papers);
+  a least change of 2% (no better than 1%).
+- *Landlords' building by expected return (the other half of ME-20): not made.* At au-vic's figures a house costs
+  $369,504 to build and lets for about $2,225 a month, 7.2% a year on its cost against a 6.2% mortgage rate: a return
+  test would not bind. The lever is the rule that builds whenever homes have been let 90 days, which needs a source.
+
+**Why households going without rose from 6% to 11%** (a helper bisected main, five seeds a commit): one commit,
+a5ef66d0, "a household with no home asks the people it has come to know", 5.4% to 11.1%; nothing else moved it.
+Households taken in stay in town, demand rises, and the cobweb shorted more of it (out-of-stock units doubled). A fix,
+not a fault; the cobweb was the fault.
+
+**MT-17, the registry twin: 517 to 342 papers with other words, against 139 allowed. Not passed.** Each remaining root
+was traced (a diagnostic copy of the test, not committed): the first paper to differ in words is now a hire a day
+apart (two applicants' letters came 30 minutes later, and the builder looked between them); then a household's loan
+applied for six days apart (a refusal of the opening day's applications is remembered from when it is read, and the
+bank's officer worked through that queue in another order), then small businesses' stock-outs and households' shop
+choices. None is the market's. *Tried:* an employer that chooses among a posting's applicants after a week's closing
+date (van Ours and Ridder 1992) took it to 178, but migration reads the standing postings monthly, so in ke-nakuru
+newcomers came at 176 a year against the TS world's 47 and unemployment rose to 7.9% against the profile's 5.4%
+(kept: runs/port-gate/gate-with-closing-date.json in the worktree); taken back. A letting closing date changed nothing.
+The test is not loosened. **For the owner:** whether hiring at the next look and a balance read at one hour are faults
+to fix (each needs a rule with a source, and migration would have to read vacancies as a flow), or the 2% bound
+encodes the TS world, which shows no word differences at all.
+
+**Founding refitted (PC-4).** As the original fit: the chance set so a 1,000-person au-vic town founds about the
+source's 1.5 groups a year. Ten years at six times 420 founded 12 (1.2 a year), so 420 x 7.5: 3150; ten years at it
+founded 0, 1, 3, 0, 0, 6, 3, 0, 0, 1 (1.4 a year). Other profiles scaled by their registered rate (gb-eng 978,
+ke-nakuru 1738, us-oh 3259, jp-akita 109). Mechanism unchanged. Founding is clumped: half the years found nothing.
+
+**The gate** (runs/port-gate/gate.json in the worktree; TS side reused from `integrate`'s, its checkout 961e737a):
+- *Threads:* the same state hash on 1 and 14 threads in all three profiles.
+- *Measures beyond 3 SE* (the owner's rule of 2026-10-18: none from a fault, each explained against real figures):
+  au-vic 3: taking part in gatherings 46.3% to 48.8% and last month's 39.6% to 42.3% (the gatherings fix, toward the
+  profile's 50%); unemployment by agreement 0.6% to 1.6% (toward the profile's 4.6%). gb-eng 3: gatherings 169 to 165,
+  each fuller (as at the last gate); people 859 to 865 (more stay, as the second pass found). ke-nakuru 7, one cause:
+  more adults stay and work (adults 630 to 648, labour force 435 to 451, employed 414 to 437), the native hiring by
+  need, as the last gate found (it had employed 441); unemployment 3.1% (TS 5.0%, profile 5.4%) and employment to
+  population 67.5% (profile 63.8%) stay breaches, as at the last gate.
+- *Health breaches in kind:* au-vic loses the TS world's business entry breach; households going without is no
+  longer a breach anywhere; ke-nakuru's unemployment and employment, as before.
+- *Scenario tests on the Rust world:* twin-draws' registry case fails (above); see the fast tier below.
+- *Backstops:* in the fast tier.
+
+**Observations in the log** (the coordinator's addition; docs/reliability.md, "Observations in the log";
+contracts/README.md): `log.observations: seats | all`. With `seats` (what the host writes into a new run's config)
+no `observation` event is logged for a code actor; seats' are kept and recorded in full; `observe` and `look` stay (replay's
+inputs). `oikos view <log> <seq>` and the explorer's `/api/r/<run>/view/<seq>` regenerate a code actor's view by
+replaying to it. Proved in kernel/tests/observations.rs (same state hash, same acts, both logs replay, seven sampled
+views equal what `all` recorded). 1,000-person year 2.28 GB to 1.75 GB; 10,000-person month 2.33 GB to 2.04 GB; no
+time gained (the hashes were made on the engine's threads). Replay from the nearest snapshot is not done (from the
+start; about two seconds for an early entry).
+
+**Speed** (au-vic, seed 1, the machine otherwise quiet): a 1,000-person year 110 to 112 s, a 10,000-person month 65
+to 67 s, 8.0 GB peak.
+
+**Not done, and why:** the cut-over (deleting the TS actors, the Rust world as the only one, CLAUDE.md's stack line,
+the `pre-cutover` tag): the gate did not pass. A helper's inventory of what the deletion entails is in the session's
+notes: 14 behaviour files delete outright, 21 hold helpers that the generator, the host or the seat-side readers still
+use (the host reads `staffed`, `books`, `issuesWith` and `opens` from the TS registry, which no Rust manifest carries),
+16 stay; of 106 participants tests, 47 have Rust equivalents, 7 checks have none and would need porting
+(stepper, citizen-civic, citizen-voice, citizen-land, offer-withdrawal, builder-repairs, budget-year).
+
+**Revisit if** a shop's supplier shares swing again (the power of 10 is a placeholder), factories' clearance stock
+lingers (forward buying), founding is studied (more seeds), or the owner rules on MT-17.
