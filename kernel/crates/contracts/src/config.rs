@@ -82,6 +82,11 @@ pub struct LogParams {
     /// state, entry by entry, through the chain and the checkpoints).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+    /// Whose observations the log keeps: `seats` (only those not run by code: the hashes of a seat's, and the
+    /// orchestrator records it in full) or `all` (absent: all, as logs made before the field). A code actor's
+    /// observation is regenerated on demand by replaying the log to it (`oikos_kernel::run::observation_at`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observations: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

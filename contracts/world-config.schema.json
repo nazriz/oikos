@@ -86,6 +86,13 @@
             "full",
             "lean"
           ]
+        },
+        "observations": {
+          "description": "Whose observations the log keeps (with detail full): seats (a model's or a host's seat: its observation's hash, and the orchestrator records its full observation, as experiment data) or all (every participant's, code actors too, as before this field). A code actor's observation is the deterministic world's and is regenerated on demand by replaying the log to that moment (oikos-kernel view; docs/reliability.md, \"Observations in the log\"). Absent: all (logs made before the field).",
+          "enum": [
+            "seats",
+            "all"
+          ]
         }
       }
     },

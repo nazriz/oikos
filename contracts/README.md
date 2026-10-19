@@ -651,3 +651,15 @@ No JSON Schema changed.
 
 - **Additive, host protocol (not a schema):** a unit the host registers (`units_add`) may carry `post` (the post a `hears` seat sits in). A seat is woken by papers for that post, as its person's own unit for the post is, and no longer by papers for another post its person holds (a person who kept the builder's yard and a shop was seen by the seat of the shop woken at the yard's papers, and it paid an invoice 1,800 s before its code twin did). A seat with no `post` is woken for any post of its person's, as before.
 - **Breaking, kernel (a refusal's code, narrow):** an act by a participant that no longer acts, in a post it no longer holds, whose person has left the world (alive, not present) is refused `not_in_position` ("X doesn't hold P"), as the person's own participant (which lives on abroad) is, and not `participant_inactive`: the seat that ended with the departure said the second. A death, and every other case, is refused as before.
+
+## Changes at the cut-over (2026-10-19: observations in the log; docs/decisions.md, "The cut-over"; under the owner's blanket approval of contract changes, 2026-10-11, and his instruction of 2026-10-19)
+
+- **Additive, world config and log (breaking for replay of a run that names it):** `log.observations`, `seats` or
+  `all` (contracts/world-config.schema.json). With `seats`, a participant whose controller is `code` has no
+  `observation` event in the log (no hash of its observation); its `observe` and `look` commands are logged as before.
+  A config without the field keeps every observation, as every log made before it. The orchestrator writes `seats` into
+  a new run's config unless every observation is to be recorded; a resumed run uses its log's config unchanged. A code
+  actor's observation is regenerated from the log by replaying to its command (`oikos-kernel view <log> <seq>`; the
+  explorer's `/api/r/<run>/view/<seq>`), in a recorded observation's shape (channels as a list with `path`; the
+  recorded one also says the entity and capacity it was shown for). docs/reliability.md, "Observations in the log".
+

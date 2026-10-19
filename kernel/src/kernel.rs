@@ -393,8 +393,8 @@ struct Ready {
     obs: Observation,
     looks: Vec<(Id, crate::state::Look)>,
     drained: Vec<Id>,
-    encoded: Encoded,
-    hash: String,
+    /// Encoded and hashed for the log, where the log keeps this participant's observations.
+    encoded: Option<(Encoded, String)>,
 }
 
 /// How many observations are made ready at once: enough to keep every core busy, few enough that a town's first
@@ -513,10 +513,22 @@ impl Kernel {
     /// if something else is asked first, what was planned is let go. Results never depend on it.
     pub fn plan(&mut self, observations: Vec<(Id, Option<Id>)>) {
         self.unplan();
-        // (A lean log keeps no observation hashes, and an observation isn't encoded for it.)
+        // (A lean log keeps no observation hashes, and an observation isn't encoded for it. Where the log keeps only
+        // seats' observations, a code actor's is still built ahead, on the threads, and only not encoded or hashed.)
         if self.threads > 1 && observations.len() >= self.worth_sharing && self.world.statics().config.log.detail.as_deref() != Some("lean") {
             self.planned = observations;
         }
+    }
+
+    /// Whether the log keeps this participant's observations (their hashes): not in a lean log, and, where the log keeps
+    /// only seats' (`log.observations: seats`), not a code actor's, which the deterministic world regenerates on replay.
+    pub fn keeps_observation(&self, participant: &str) -> bool {
+        let log = &self.world.statics().config.log;
+        if log.detail.as_deref() == Some("lean") {
+            return false;
+        }
+        log.observations.as_deref() != Some("seats")
+            || !self.world.state().participants.get(participant).is_some_and(|p| p.def.controller.get("type").and_then(serde_json::Value::as_str) == Some("code"))
     }
 
     fn unplan(&mut self) {
@@ -568,16 +580,21 @@ impl Kernel {
         if wanted.len() < self.worth_sharing {
             return;
         }
+        let keeps: Vec<(&(Id, Option<Id>), bool)> = wanted.iter().map(|w| (*w, self.keeps_observation(&w.0))).collect();
+        let (s, st) = (self.world.statics(), self.world.state());
         observe::prepare(st, &mut self.index, wanted.iter().map(|(p, only)| (p.as_str(), only.as_deref())));
         let (index, delivered) = (&self.index, &self.delivered);
-        let made = each(&wanted, self.threads, |(p, only)| {
+        let made = each(&keeps, self.threads, |((p, only), keep)| {
             let (obs, looks, drained) = observe::observe_prepared(s, st, index, p, only.as_deref());
             let (outcomes, inbox) = oikos_world::World::waiting(st, p, only.as_deref());
             let mut obs = Observation { outcomes, inbox, ..obs };
+            if !*keep {
+                return Some(Ready { obs, looks, drained, encoded: None });
+            }
             // (One that can't be encoded is left for when it's asked for, which says so.)
             let encoded = Encoded::of(&mut obs, delivered).ok()?;
             let hash = canon::hash_with_domain(canon::DOMAIN_OBSERVATION, &encoded.canonical);
-            Some(Ready { obs, looks, drained, encoded, hash })
+            Some(Ready { obs, looks, drained, encoded: Some((encoded, hash)) })
         });
         for (key, ready) in wanted.into_iter().zip(made) {
             if let Some(ready) = ready {
@@ -681,10 +698,11 @@ impl Kernel {
         // One made ready for exactly this (an observation with nothing asked for) is delivered as it is; a look with
         // something asked for is built now, and whatever was made ready for the participant is let go.
         let ready = self.take_ready(participant, only).filter(|_| looks.is_empty());
-        if let Some(Ready { obs, looks, drained, encoded, hash }) = ready {
+        if let Some(Ready { obs, looks, drained, encoded }) = ready {
             let (outcomes, inbox, visits) = self.world.deliver(participant, only, looks, drained);
             debug_assert!(outcomes == obs.outcomes && inbox == obs.inbox && visits.is_empty(), "what was waiting for {participant} isn't what was delivered to it");
             self.from_ready += 1;
+            let Some((encoded, hash)) = encoded else { return Output { events: vec![], observation: Some(obs), observed: None } };
             let observed = encoded.deliver(&self.delivered, self.handed.as_mut());
             return Output { events: vec![Timed::new(self.world.t(), EventBody::Observation { participant: participant.into(), observation_hash: hash })], observation: Some(obs), observed: Some(observed) };
         }
@@ -706,7 +724,8 @@ impl Kernel {
             }
         }
         // A lean log keeps no observation hashes (the log's `detail`): hashing a whole observation is much of the cost.
-        if self.world.statics().config.log.detail.as_deref() == Some("lean") {
+        // Nor does one that keeps only seats' observations, for a code actor (`log.observations`).
+        if !self.keeps_observation(participant) {
             return Output { events: vec![], observation: Some(obs), observed: None };
         }
         // (Exactly `canon::hash_value` of the observation, its JSON kept for whoever delivers it.)

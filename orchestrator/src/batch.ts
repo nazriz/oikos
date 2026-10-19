@@ -192,7 +192,7 @@ export async function runOne(o: { debriefWording?: string; world?: string; seed?
   const watchdog = new Watchdog({ stallMs: stallMs(), diagnosisPath, runId });
   let s: RunSummary;
   try {
-    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(debriefWording ? { debriefWording } : {}), ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions !== undefined && recordDecisions !== "full" ? { recordDecisions } : {}),
+    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.resume ? { resumed: true } : {}), ...(debriefWording ? { debriefWording } : {}), ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions !== undefined && recordDecisions !== "full" ? { recordDecisions } : {}),
       ...(real ? { adapter: serve(real.adapter), prices: { ...real.prices, ...(tr?.prices ?? {}), ...(first?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : first ? { prices: first.prices } : {}),
       ...(tr ? { translatorAdapter: serve(tr.adapter) } : {}),
       ...(first ? { translatorFirst: serve(first.adapter), translatorArrangement: arrangement } : {}),

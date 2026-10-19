@@ -82,6 +82,8 @@ export interface RunOptions {
   /** Whose observations are recorded in full (training data): by default, language-model participants' ("models");
    * "none" for no one. */
   recordObservations?: string[] | "models" | "code" | "all" | "none";
+  /** A run resumed from its log (resume.ts): its config is used as the log has it, nothing added. */
+  resumed?: boolean;
   /** Code citizens' decisions as their minds made them (docs/design/ai-citizens.md 7; training data for citizen models):
    * "full" (the default: every one, in a log that is not lean) or "none". */
   recordDecisions?: string; // "full", "none", or a list of areas ("want,found,found_shape"): those decisions only, kept in a lean log too, with no outcomes
@@ -307,7 +309,14 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
 async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const log = o.log ?? (() => {});
   const mods = { ...builtin, ...(o.modules ?? {}) };
-  const cfg = o.config;
+  // Whose observations the log keeps (`log.observations`; docs/reliability.md, "Observations in the log"): by default
+  // only seats' (a model's, which are its experiment data); a code actor's is the deterministic world's, regenerated
+  // on demand by replaying the log to it (`oikos-kernel view`). Recording every participant's observation in full
+  // (`--record-observations all`), or a world that says `all`, keeps every one.
+  const wholeLog = o.recordObservations === "all" || o.recordObservations === "code" || o.config.log?.observations === "all";
+  // (A resumed run is its own config again, as its log has it: one made before the field kept every observation.)
+  const cfg = o.config.log?.observations || o.resumed ? o.config : { ...o.config, log: { ...o.config.log, observations: wholeLog ? "all" : "seats" } };
+  const recordObs = o.recordObservations ?? (o.config.log?.observations === "all" ? "all" : "models");
   const tick: number = cfg.clock.tick_seconds;
   const runEnd = ceilTo(cfg.clock.run_seconds, tick);
   const until = Math.min(o.until ?? runEnd, runEnd);
@@ -362,7 +371,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const standIn = o.standIn ?? process.env.OIKOS_STAND_IN;
   // (On the Rust world the actors read the sparse mind's dial from the world, as they read the others: said there.)
   await k.request({ op: "start", config: rustWorld && o.consult ? { ...cfg, dials: { ...(cfg.dials ?? {}), consult: true } } : cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath,
-    ...(rustWorld ? { engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(o.recordDecisions === "none" ? { record_decisions: false } : o.recordDecisions !== undefined && o.recordDecisions !== "full" ? { decision_areas: o.recordDecisions.split(",").map((x) => x.trim()).filter((x) => x) } : {}), ...(o.recordObservations === "all" || o.recordObservations === "code" ? { record_observations: true } : Array.isArray(o.recordObservations) ? { record_observations: o.recordObservations } : {}) } } : {}) });
+    ...(rustWorld ? { engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(o.recordDecisions === "none" ? { record_decisions: false } : o.recordDecisions !== undefined && o.recordDecisions !== "full" ? { decision_areas: o.recordDecisions.split(",").map((x) => x.trim()).filter((x) => x) } : {}), ...(recordObs === "all" || recordObs === "code" ? { record_observations: true } : Array.isArray(recordObs) ? { record_observations: recordObs } : {}) } } : {}) });
   if (o.perturb) await k.request({ op: "perturb", extra_wakes_bps: o.perturb.extraWakesBps, seed: o.perturb.seed });
 
   // Every model call (participants, translator, debriefs) is recorded as it happens.
@@ -767,9 +776,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { welfare: "this world lets language-model people physically harm others (life.harm is set)", participants: modelPeople } } });
 
   // What is recorded beyond the default, said at the start (a resumed run reads it back and records the same).
-  if ((o.recordObservations ?? "models") !== "models" || (o.recordDecisions !== undefined && o.recordDecisions !== "full"))
+  if (recordObs !== "models" || (o.recordDecisions !== undefined && o.recordDecisions !== "full"))
     await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { recording: {
-      ...((o.recordObservations ?? "models") !== "models" ? { observations: Array.isArray(o.recordObservations) ? o.recordObservations.join(",") : o.recordObservations } : {}),
+      ...(recordObs !== "models" ? { observations: Array.isArray(recordObs) ? recordObs.join(",") : recordObs } : {}),
       ...(o.recordDecisions !== undefined && o.recordDecisions !== "full" ? { decisions: o.recordDecisions } : {}) } } } });
 
   // The wording of the debrief's questions, where it is not the usual one (a rewording check): said at the start, so a
@@ -1032,7 +1041,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     platformMs += performance.now() - p00;
     if (o.inspect) await o.inspect(u.participant, obs, k, u.capacity, raw);
     // Recorded in full, if asked: what it received (what's new since its last observation), for training data.
-    const rec = o.recordObservations ?? "models";
+    const rec = recordObs;
     if (rec !== "none" && (rec === "all" || (rec === "models" && u.llm) || (rec === "code" && !u.llm) || (Array.isArray(rec) && rec.includes(u.participant))))
       // (Its channels as a list, each with its path: a position's channel paths have a "/", which the log's free-form
       // data doesn't allow in a key.)

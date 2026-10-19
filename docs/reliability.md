@@ -123,6 +123,33 @@ Where a run's time goes: each run's `<run>.summary.json` has a `profile`: each b
 - **`--keep measures`** (for test runs): once measured, a run keeps its measurement tables, its summary and a recipe (`<run>.recipe.json`: the `run-one` command, the commit, the kernel's version, the final state hash), not its log. Running the command at the commit regenerates the log exactly, and the hash says so. About 150 MB for three 5-year runs' tables together, against 1 GB of compressed logs. Refused (the log is kept, and it says why) for a run with a language-model participant (a model's answers can't be regenerated, and they're training data), with uncommitted changes, or with modules from outside the repository.
 - **A more compact log** (dropping what replay regenerates) is proposed in docs/design/compact-logs.md: it changes the log contract.
 
+## Observations in the log (2026-10-19)
+
+The owner, 2026-10-19: record full observations only for model seats (their experiment data); a code actor's only
+what replay needs, since the deterministic world regenerates it.
+
+- **`log.observations`** in the world's config: `seats` (the host writes it into a new run's config by default) or
+  `all`. With `seats` the kernel logs no `observation` event (the observation's hash) for a participant whose
+  controller is `code`, and the orchestrator records full observations for model seats only, as before. A seat's are
+  hashed and kept. The `observe` and `look` commands stay in the log for everyone: they are replay's inputs (an
+  observation delivers what was waiting, and the world changes by it). `all` keeps every participant's hash and, with
+  it, every participant's full observation (`--record-observations all` asks for the same). A config without the field
+  is a log made before it, and keeps them all; a resumed run is its log's config again, nothing added.
+- **A code actor's view, on demand:** `oikos view <log> <seq>` (`oikos-kernel view`; `run::observation_at`) replays the
+  log to the observe or look at entry `seq` and prints what it gave, in a recorded observation's shape. The explorer
+  serves it at `/api/r/<run>/view/<seq>` (the kernel beside it does the replay, in its own process). It replays from the
+  start; replaying from the nearest snapshot (docs/rust-port lane F) is the next step where it is slow.
+- **Proved** (kernel/tests/observations.rs, ten days of the generated town): with `seats` and with `all` the same run
+  reaches the same state hash and makes the same acts at the same times; both logs replay byte for byte; seven sampled
+  code actors' views regenerated from the `seats` log equal what `all` recorded. The 1,000-person year and the
+  10,000-person month ended at the same state hashes both ways.
+- **Measured** (au-vic, seed 1, against the log before the field: every hash kept, full text for models): the
+  1,000-person year 2.28 GB to 1.75 GB (23% smaller), the 10,000-person month 2.33 GB to 2.04 GB (13%), both plain.
+  No time gained: 110 s against 112 s, 67 s against 65 s, within the machine's noise; the hashes were already made on
+  the engine's threads, and a code actor's observation is still built there, only not encoded or hashed.
+- **Revisit if** a study needs code actors' observations in bulk (set `all`), or regenerating them one at a time is too
+  slow for the explorer (replay from a snapshot).
+
 ## Soak runs (2026-10-01)
 
 A soak is a batch run to find trouble: many seeds over several years, read for the signs above (`oikos run ...`
