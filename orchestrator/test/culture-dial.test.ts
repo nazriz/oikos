@@ -72,10 +72,14 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
   ? { "au-vic-2026": "ba713978250e9748", "gb-eng-2026": "b1dc67013806a78c", "ke-nakuru-2026": "6597ecc38406bd1b" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
+// (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
+// evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
+// invoice's price, a household's death away from home is seen by those of it there, nobody sets off for a gathering from their work;
+// 2d57339d..., 44f157a8... and 072c2a5e... until then. The TS states did not move.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "2d57339dcbfb9501db2ed149a4be2cd7af9d0da4256af7aabc3b676fb8e511c8",
-  "gb-eng-2026": "44f157a88a8ee9870f49168dc8a28f4f85966a00c795d3c109dfcef9106d7c37",
-  "ke-nakuru-2026": "072c2a5eb2ed47a509b902bfa1aac3c82d52dec1a660e603d10beabd99014d55",
+  "au-vic-2026": "8b9a1e902ee0fa843a6c4d67b73fd40b20d464caedac4c5445cb4a0782543a10",
+  "gb-eng-2026": "eac6c4b443f22bc7bf48b2c9645745ccb19975f82e98b8ee71c51782f6dddea0",
+  "ke-nakuru-2026": "443b8875f14438093e39eea5814d2a8f8b1e0519bbcb73619c642b181b595b56",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

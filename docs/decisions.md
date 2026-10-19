@@ -6899,3 +6899,31 @@ use (the host reads `staffed`, `books`, `issuesWith` and `opens` from the TS reg
 
 **Revisit if** a shop's supplier shares swing again (the power of 10 is a placeholder), factories' clearance stock
 lingers (forward buying), founding is studied (more seeds), or the owner rules on MT-17.
+
+## 2026-10-19 · The cut-over, after the owner's ruling on MT-17 (branch `cutover`; no model called)
+
+**MT-17: the owner's call** (2026-10-19, through the coordinator), on the evidence above (517 to 342 papers, the remaining
+roots traced to first-look hiring and a remembered refusal, a closing date tried and taken back): the strict twin tests
+(the same decisions, an identical world: twin-seat-year and twin-draws' other cases) stay exact and must pass. The
+registry case measures something else, how far a small difference in what a seat does spreads through the town, a
+property of the world (real towns have such knife-edges), not a correctness fault; the 2% bound was calibrated on the TS
+world, which damped it. So the case now records its spread in its output and in the register (MT-17's number) and has
+no bound on it; its structural checks stay (nothing moves before the entries, the first paper to move is the city's,
+late by no more than they took). Hiring and loans are not changed for it. **Measured now: 191 of 6,670 papers in other
+words (2.9%), 540 at another second (8.1%).**
+
+**The other Rust-world failures, each traced:**
+- *invariants, a fault, fixed:* a household's leaseholder (an arrival, ke-nakuru seed 1) died at an evening gathering in
+  the hall with her son beside her; only the home was looked at for a household's death, so nobody reported it and the
+  household's record named her for the rest of the year. A death of one of the household where we are, away from home,
+  is now seen as one at home is (docs/behaviour/deaths.md).
+- *gatherings, a fault, fixed:* a builder's hand at the yard at 19:00, with work in hand till 23:46, set off for a
+  gathering; the move waited behind the work and put them in the hall at midnight, three hours after it ended. Nobody
+  sets off for a gathering from their work while at it; they go when the work is done, if it is still on.
+- *founding (in code), a seed's draw:* the case needs two who share the want behind the first thing founded; seed 15 has
+  one now. Of seeds 1, 2, 8, 9, 10 and 15 on this build, 2 and 9 have two: seed 2, with the reason in the test.
+- *entry:* passes on this build (the premises are bought on day 85 and the new shop trades); the failing run was on the
+  build before the two fixes above, and it was not traced further.
+- *culture-dial:* the Rust states re-taken once, with the reason in the test (the market law and the fixes); the TS
+  states did not move.
+

@@ -1656,7 +1656,14 @@ impl CitizenMind {
                 // only at 20:50 for a gathering over at 21:00, 26 minutes away, nobody who knows the way goes. Until
                 // 2026-10-18 we went whenever it was still on, as citizen.ts does, and arrived after it had ended.)
                 let too_late = !inside(&at) && self.s.way_to.get(&at).is_some_and(|d| t + d >= start + lasts);
-                if self.s.going.get(&r.id) == Some(&start) && self.s.attending.is_none() && too_late {
+                // (Nor from our work while we are at it: someone kept at work goes when the work is done, if the gathering
+                // is still on, as the daily round brings them out. Until 2026-10-19 a builder's hand at the yard at 19:00 with
+                // work in hand till 23:46 set off then, and the move, behind the work, put them in the hall at midnight,
+                // three hours after it ended: gatherings.test on the Rust world, after the cut-over's market law.)
+                let at_work = life.workplace.is_some() && pic.body.as_ref().and_then(|b| b.in_space.as_deref()) == life.workplace.as_deref();
+                if at_work {
+                    // (kept: we go once out of work, if it is still on)
+                } else if self.s.going.get(&r.id) == Some(&start) && self.s.attending.is_none() && too_late {
                     self.s.going.remove(&r.id);
                 } else if self.s.going.get(&r.id) == Some(&start) && self.s.attending.is_none() {
                     self.s.going.remove(&r.id);

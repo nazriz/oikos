@@ -1125,26 +1125,20 @@ The mechanism:
 - **Notice by:** `bun scripts/port-gate.ts` (runs/port-gate/gate.json).
 - **Fix when:** Before phase 4 (deleting the TS actors) and before any pilot on the Rust world.
 
-### MT-17 · A seated person's time moves more of the Rust world than the twin test allows
-- **Gap:** twin-draws' case of the registry held by a person of the town: on the Rust world 517 of 7,140 papers have
-  other words (the test allows 2%; TS within it). All of it is downstream of the holder's offices (the city's papers
-  come later, those who answer them later, then small businesses' deliveries in another order, stock, refunds, prices).
-  No fault found; the native market passes the order of arrival into stock and prices where TS's damped it.
-- **Where:** `orchestrator/test/twin-draws.test.ts`; `kernel/crates/actors/src/market/` (prices, retail stock).
-- **Effect:** A seat's difference from its twin is noisier on the Rust world: small timing moves spread through the town's
-  shops, so more of a seat-against-twin difference is the economy's sensitivity, not the seat.
-- **L / I:** high / medium · **Status:** open, reduced (decisions 2026-10-19, "The cut-over"): 517 to 342 papers with other
-  words (139 allowed) with the market law (price points, a least change, the month's mean stock, multi-sourcing, a
-  customer served at the shop's price). Traced past the market: the first word to differ is now a hire a day apart
-  (two applications 30 minutes later, the builder looking between them), then a loan applied for six days apart (a
-  refusal of day 0's applications remembered from when it was read, the bank's officer working through the opening
-  day's queue in another order), then small businesses' stock-outs. Tried and taken back: hiring after a week's
-  closing date (178 papers; it moved migration, which reads standing postings monthly: ke-nakuru arrivals 47 to 176 a
-  year); back-orders (893: worse). The test fails, not loosened.
-- **Notice by:** twin-draws' registry test; papers moved per seat-day in a seated twin pair.
-- **Fix when:** Before phase 4. The owner's call whether the remaining knife-edges (hiring at the next look, a balance
-  read at one hour) are faults to fix, each with a sourced rule, or the bound encodes the TS world.
-
+### MT-17 · How far a seated person's time spreads through the Rust world
+- **Gap:** twin-draws' case of the registry held by a person of the town: the holder's entries take their time, and what
+  follows spreads through the town (hiring at the next look, a refusal remembered from when it was read, the last of a
+  shop's stock). The TS world damped it; the 2% bound on it was calibrated there.
+- **Where:** `orchestrator/test/twin-draws.test.ts` (the registry's holder); the town's knife-edges named above.
+- **Effect:** A seat's difference from its twin includes the town's sensitivity to small timings; read a seat-against-twin
+  comparison with this measure beside it.
+- **L / I:** high / low · **Status:** measured, not bounded (the owner's ruling, 2026-10-19, decisions "The cut-over"):
+  the case prints its spread; the strict twin tests (the same decisions, the same world) stay exact and pass.
+  **MT-17's number, 2026-10-19 (Rust world, 120 days, ke-nakuru, 300 people): 191 of 6,670 papers in other words
+  (2.9%), 540 at another second (8.1%).** It was 517 of 7,140 (7.2%) before the cut-over's market law.
+- **Notice by:** the measure in twin-draws' output; a seat study's twin pair.
+- **Fix when:** a study needs a seat's effect smaller than this spread (then more twin seeds, or a sourced rule at a
+  knife-edge).
 ---
 
 ## Profiles and sources

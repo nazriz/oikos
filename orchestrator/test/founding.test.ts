@@ -143,7 +143,9 @@ test("founding in code: with the composer off no model is called; a founded thin
     // (Seed 39 from 2026-10-17, adoption, the auditor and strikes by cost: the world differs again; of run seeds 1 to 45 only 22, 26, 34, 39, 42 and 43 had two who share the want that founds in 205 days before the shop's serving was held to the day (seed 22 then, 39 after). Which seed has two is a matter of draws, not of the rule.)
     // (On the Rust world, seed 15, 2026-10-18: of its seeds 1 to 24 only 15 has two who share the want behind the first thing founded. It founds
     // four to sixteen things in these 205 days where the TS world founds about one: recorded in the decisions log, not yet traced.)
-    const s = await runWorld({ config: { ...config, seed: onRust ? 15 : 39 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
+    // (On the Rust world, seed 2 from 2026-10-19, the cut-over's market law and founding refit: the world differs again; of seeds 1, 2, 8,
+    // 9, 10 and 15, 2 and 9 have two who share the want behind the first thing founded, 15 has one. Which seed has two is a matter of draws.)
+    const s = await runWorld({ config: { ...config, seed: onRust ? 2 : 39 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
     expect(s.composer).toBeUndefined();
     const log = readFileSync(s.logPath, "utf8");
     // No model anywhere: not a usage entry, not a transcript.

@@ -291,6 +291,15 @@ impl Person {
             Some(h) if sites => spaces(w.pic).filter(|sp| &sp.space == h).cloned().collect(),
             _ => vec![],
         };
+        // (A death of one of our household where we are, away from home (a gathering in the hall), is seen as one at
+        // home is: those of the household there know it. Until 2026-10-19 only the home was looked at, so a member who
+        // died at a gathering with another of the household beside them was never reported, and the household's record
+        // named the dead for good: the invariants' one_household, ke-nakuru seed 1.)
+        let away: Vec<SiteSpace> = if sites {
+            spaces(w.pic).filter(|sp| Some(&sp.space) != our_home.as_ref() && has(sp, &me) && sp.left.iter().flatten().any(|l| died(l.reason) && self.of_household(&l.occupant))).cloned().collect()
+        } else {
+            vec![]
+        };
         // Someone who died in the home we live in and is not of our household (a home let again over our heads, a
         // lodger): an adult living there says so to the registry. We can't say who their family is: the report names none.
         if let (Some(home), Some(registry), true) = (&our_home, self.p.registry.clone(), self.adult_body(w.pic, t)) {
@@ -318,9 +327,9 @@ impl Person {
             self.absorbed.told_dead.clear();
             return;
         };
-        let at_home: BTreeSet<String> = here.iter().flat_map(|sp| sp.occupants.iter().flatten().cloned()).collect();
+        let at_home: BTreeSet<String> = here.iter().chain(away.iter()).flat_map(|sp| sp.occupants.iter().flatten().cloned()).collect();
         // (Seen ourselves; or told by a child of the household, who tells one adult when none is at home: ours to report.)
-        let mut deaths: Vec<(String, Option<String>)> = here.iter().flat_map(|sp| sp.left.iter().flatten()).filter(|l| died(l.reason)).map(|l| (l.occupant.clone(), None)).collect();
+        let mut deaths: Vec<(String, Option<String>)> = here.iter().chain(away.iter()).flat_map(|sp| sp.left.iter().flatten()).filter(|l| died(l.reason)).map(|l| (l.occupant.clone(), None)).collect();
         deaths.extend(std::mem::take(&mut self.absorbed.told_dead).into_iter().map(|(p, s)| (p, Some(s))));
         for (who, told) in deaths {
             if self.s.mourned.contains(&who) {

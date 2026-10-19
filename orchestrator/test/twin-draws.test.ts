@@ -174,11 +174,13 @@ test("papers of no effect, filed by the registry's holder, a person of the town,
   expect(shift).toBeGreaterThan(0);
   expect(shift).toBeLessThanOrEqual(takes);
   expect(moved[0]![0].split("|")[1]).toBe("city");
-  // The same words come, at nearly the same count; a consequence on another day may be one paper more or fewer.
-  expect([...A.keys()].filter((k) => !B.has(k)).length).toBeLessThanOrEqual(Math.ceil(A.size * 0.02));
-  expect(Math.abs(A.size - B.size)).toBeLessThanOrEqual(Math.ceil(A.size * 0.02));
-  // A part of the town, not the town: under 10% of its papers are at another second (4.8% when traced).
-  expect(moved.length / A.size).toBeLessThan(0.1);
+  // How far the difference spreads is measured, not bounded (the owner's ruling, 2026-10-19; docs/risks.md MT-17;
+  // docs/decisions.md, "The cut-over"): what follows from a holder's time spent is the town's sensitivity, a property
+  // of the world (first-look hiring, a refusal remembered from when it is read, the last of a shop's stock), not a
+  // fault. Until then the words were bounded at 2% and the timing at 10%, figures calibrated on the TS world, which
+  // damped it. The strict twin tests (the same decisions, the same world: twin-seat-year, the cases above) stay exact.
+  const words = [...A.keys()].filter((k) => !B.has(k)).length;
+  console.log(`MT-17's measure, a person at the registry: ${words} of ${A.size} papers in other words (${(100 * words / A.size).toFixed(1)}%), ${moved.length} at another second (${(100 * moved.length / A.size).toFixed(1)}%), ${B.size - A.size} more papers with the entries`);
 }, 900_000);
 
 test("with an office in a mock seat, the same requests still get the same answers from those the seat did not deal with", async () => {
