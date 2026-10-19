@@ -97,16 +97,6 @@ fn with_take_up_at_nothing_nobody_claims_support() {
             p["controller"]["params"]["take_up_bps"] = json!(0);
         }
     }
-    // (And those who arrive in the run, from the templates they are made from: until the cut-over nobody who arrived
-    // was out of work long enough to claim in 60 days; since a posting takes applications for a week before the
-    // employer chooses, two arrivals were, and claimed at the template's take-up.)
-    if let Some(ts) = c["templates"].as_array_mut() {
-        for t in ts {
-            if t["controller"]["impl"] == "citizen.default" {
-                t["controller"]["params"]["take_up_bps"] = json!(0);
-            }
-        }
-    }
     let (_, e) = run_code_world(c, "a1-takeup", Vec::new(), opts(4, 60 * DAY)).unwrap();
     let log = lines(&e.into_log());
     assert!(statements(&log, "benefit_claim").is_empty());
