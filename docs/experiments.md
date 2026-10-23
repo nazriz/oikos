@@ -130,7 +130,14 @@ three seeds, forked at day 30 and run 180 days, three arms: its code; `mock/dili
 `mock/rubber-stamp`, which confirms every decision it is asked to look at again (the request is kept from the code, and
 the steward answers it "it stands"). No model is called.
 
-Its results are in docs/decisions.md (2026-10-23, "The measures of stewardship").
+Its result (run 2026-10-23, `runs/exp-support-stewards-2026-10-23` on the run server; docs/decisions.md, "The measures
+of stewardship"): **the levers were never pulled.** In 540 seed-days of a 1,000-person town, 24 claims were refused and
+nobody asked for a review, applied to a venue about a refusal, or complained, so the rubber stamp never had a request
+to stamp and all three arms left the same world to the hash. The registered recourse comparisons are reported as not
+settled (no seed had a value, or a difference of zero); the one that could move, `decided_by_seat_share` (diligent
+minus code), moved as registered: +0.011 (98.8% interval 0.006 to 0.015, 3 of 3 seeds), the support office's share of
+the town's decisions about people passing from a system to a seat. The example shows the harness, the ledger and the
+registration working end to end, and that the world as ported does not yet give its citizens a lever to pull here.
 
 ## How it runs
 

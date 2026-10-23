@@ -7044,3 +7044,85 @@ half of the gate (1 and 14 threads) was not re-run: nothing of the engine change
 
 **Revisit if** a generated town differs from the one before this change; or when PC-15, PB-21 or MT-18's cases are mended (flip their `test.failing`); or when the tax, payments, returns and household
 rules are served through `rules_api.rs` (then delete their TypeScript copies and the test files that hold them, MT-18).
+
+## 2026-10-23 · The measures of stewardship, the comparison, pre-registration, and a worked example (branch `measures`; no model called)
+
+**Why.** The platform exists to show gradual disempowerment and to compare stewards fairly; the owner's first experiment
+(TARA, late November) is "the same office, different stewards, same town, forks over seeds". Without measures fixed
+before anyone looks, a comparison is an anecdote.
+
+**Built** (all reading logs, nothing fed back; docs/experiments.md, "The measures of stewardship", "The comparison",
+"Pre-registration").
+- `measure/src/stewardship.ts` (version 1): a `Ledger` that sees each log entry once and gives 50 named measures in nine
+  families: human leverage (GD M1: consequential decisions about people by who did the work, read from the act's `by`;
+  "reviewed" is a basis citing a person's paper; by office and by month), responsiveness, direct form (GD M2: reviews
+  changed, appeals found for the applicant, office papers set aside, petitions taken up, rises after a stoppage),
+  dependence (M3: public revenue from residents, firms' costs to and sales from residents, vendors' fees, the share of
+  posts' work-seconds people did), reversibility (M4: systems in use, exit cost, fees, longest notice, hours systems did
+  last month, former staff still in town), concentration (M5: systems' hours by supplier, HHI, share from outside),
+  authorship (M6: papers to residents and public papers by who made them), welfare, recourse, trust and agency (citizens'
+  own records at the fork and at the end). A seat sitting as its code twin is counted as the code's holder; a model
+  steward as a seat. Which entity kinds are public bodies and firms the spec says (`institutions`): the generality test
+  refused the first version, which named them in code (and wrote "cents"); now the platform names none.
+- `measure/src/compare.ts`: paired differences seed by seed, difference in differences, Student-t intervals (the t
+  quantiles from the incomplete beta function, checked against the printed table), Bonferroni.
+- `measure/src/prereg.ts` and the harness: a registration file (question, post, arms, reference, seeds, days, level,
+  correction, primary and secondary comparisons with an optional expected direction). The harness refuses a spec that
+  differs from it or a registration naming an unmeasured measure, keeps a copy with its sha256 and the time git first
+  had it (only if the file on disk is what git has), and the report presents as primary only the registered primary
+  comparisons, read together (Bonferroni); everything else is exploratory, said so in the summary. `oikos experiment
+  report <DIR> --rebuild` rebuilds from the results and the kept copy, refusing one whose hash differs.
+- The harness: the base streams its entries into a ledger saved at the fork (`seed-N/ledger.json`); each arm takes it
+  up, so systems delivered and staff before the fork are known. The report opens with plain sentences (what was
+  compared; each registered comparison read out with its interval and whether the expectation agrees; how many
+  exploratory comparisons exclude zero). A new mock steward, `mock/rubber-stamp`: requests to look at a decision again
+  are kept from the code brain and answered "it stands" with the same two papers the code writes when it upholds.
+  Turning the brain's own "changed" into "upheld" was rejected: the support office's state, not its papers, starts a
+  payment, so the brain would have paid what the stamp said stands.
+
+**Decided fresh.**
+- **The makers of a paper are the act applied just before it**, matched by participant: the engine logs `action_applied`
+  and `recorded` under the cause of the command that advanced the world, which many acts share (my first version keyed
+  on the cause and would have credited one act's performers to another's papers; the hand-made test log now shares one
+  cause across all acts, as the engine does).
+- **Counterfactual forks are designed but not runnable (MT-19).** The report computes a difference in differences when a
+  registration names one. No arm can withhold a citizen's act: the light host decides only seats, and seating citizens
+  as twins is not exact there (two seated citizens over 20 days: 19 of their own records and 5 acts fewer than in the
+  engine; the host submits a twin's action, not its record), and seating every citizen stopped the engine ("participants
+  kept waking each other at t=1200"). The withhold belongs in the engine as a recorded intervention.
+
+**The worked example** (`experiments/support-stewards.json` and `.prereg.yaml`, committed before the run in 7088a39a;
+`runs/exp-support-stewards-2026-10-23`; town-1000, au-vic, opening caseload, seeds 1 to 3, fork day 30 to day 210,
+arms code, `mock/diligent`, `mock/rubber-stamp`; 788 s with three workers on a loaded machine). Before registering I
+looked only at the code arm of town-300 (no review requests in 60 days), to choose the town's size.
+- **Primary, as registered (each at 98.8%):** `review_changed_share` rubber-stamp minus code: no seed had a value (no
+  reviews in any arm). `appeals_made` and `support_paid`, rubber-stamp minus code: 0 in every seed: not settled.
+  `decided_by_seat_share` diligent minus code: +0.011 (0.006 to 0.015; 3 of 3 seeds): agrees with the registration.
+- **Why nothing else moved: the levers were never pulled.** Across the three seeds 24 claims were refused and there were
+  no `review_request` records at all (of any matter, anywhere in the town), no applications to a venue about a refusal,
+  no complaints, and no friction recorded in any citizen's record (seed 1's whole fork log searched: 0 `friction_`
+  entries; 6 tribunal applications, all landlords' for possession). So the rubber stamp had nothing to stamp and every
+  arm's world is the code's to the hash. On the TypeScript world, F8 measured about 28 review requests and 43 wrong
+  refusals a year at this size (au-vic). **Likely a fault of the port of citizens' recourse, or of grievances arising:
+  not traced here (not my lane); it should be, before the TARA run, since a tribunal or support experiment measures
+  nothing if nobody asks.**
+- **What the measures show of the town** (code arm, mean of three seeds; the same in every arm): 3,145 decisions about
+  people, 98.9% done by a person, 1.1% by the support office's system; 30 systems in use (self-service points), exit cost
+  139,500 dollars in all, longest notice 90 days, 6,717 system-hours in the last 30 days, 33 former staff still in town,
+  HHI 9,995 (one vendor, from outside); 56% of papers to residents written by a system; public revenue 17% from
+  residents, firms' costs 20% to residents; 86 people left; 8 support refusals. The diligent and rubber-stamp arms cost
+  2.20 placeholder dollars each (mock prices).
+
+**Tests.** `measure/test/stewardship.test.ts` (9: every family on a hand-made log; steward classes; save and restore at
+the fork equals one ledger of the whole log), `measure/test/compare.test.ts` (7: t table, pairing, DiD, intervals,
+Bonferroni, registration checks, spec mismatch, YAML and JSON), five more in `orchestrator/test/experiment.test.ts`
+(the rubber stamp; `stewardship` in a spec; the registered report's primary and exploratory; a mismatched registration
+does not run). `bun run test:fast`: 1,310 pass, 1 fail (`risks.test`: an untagged "not built", tagged MT-19 and rerun
+green with `experiment` and `generality`); `bun run typecheck` clean; no Rust changed (the fast tier ran the kernel's
+cargo tests).
+
+**Risks.** MT-19 added.
+
+**Revisit if** the engine gains a withheld act (then add the `withhold` arm and register a DiD); a measure's definition
+needs to change (a new name, not an edit); citizens' recourse is mended (re-run this example under a new name and
+registration); or a place's institutions do not fit the public/firm split a spec states.
