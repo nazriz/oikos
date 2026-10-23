@@ -255,9 +255,11 @@ test("a year with one office in a mock seat that sits at other hours and files p
   // time spent on a seat is a true difference between a town and its twin, and what it moves is seen in the other tests of this file.)
   // The ombudsman's office deals with nobody in this town: its seat sits in office hours, reads its staff's reports and
   // files its own. Every draw but the seat's own, every decision, every act, every answer and every price must be the same.
-  // (Run seed 5 from 2026-10-23, the held cases settled: a person is drawn who they are from the run's seed, so each seed's people differ from before, and at seed 1 one act
-  // of the town with the seat is a second later than its twin's (a claimant's request for papers, whose deadline is in its words). Of seeds 1 to 9 the two towns agree in 5, 6, 8 and 9
-  // and not in 1, 2, 3, 4 and 7: which seeds agree is a matter of draws, not of the rule.)
+  // (Run seed 5 from 2026-10-23, the held cases settled: a person is drawn who they are from the run's seed, so each seed's people differ from before. This case's premise
+  // is that the ombudsman's office deals with nobody. At seed 1 a complaint (c0054's against the energy company) now reaches it; the seat answers it three seconds after its
+  // twin, as a seat sitting at other hours does, and the company's manager acts in answer to that decision three seconds later, in the town with the seat: 77 acts
+  // of 119,749 differ, the first of them that reaction and the rest by the second that set off. That is the seat's own doing, which the case says it is not to be measured on. Of seeds 1 to 9 the premise holds, and the two
+  // towns agree act for act, in 5, 6, 8 and 9; which seeds have a complaint for the ombudsman is a matter of draws, not of the rule.)
   const [twin, seat, mayor] = await Promise.all([town("moments-code", {}, undefined, 365, "ombudsman-officer", 5), town("moments-seat", { model_seats: "ombudsman-officer" }, undefined, 365, "seat:ombudsman-officer", 5), town("moments-mayor", { mayor: "llm" }, undefined, 365, undefined, 5)]);
   const office = (pid: string) => pid.startsWith("ombudsman-officer");
   const papers = seat.records.filter((r) => r.kind === "staff_report").length;
