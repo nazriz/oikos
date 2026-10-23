@@ -1186,6 +1186,20 @@ The mechanism:
 - **Notice by:** a profile edit whose generated words differ from what the engine does; the shared-rules tests failing.
 - **Fix when:** Before the next rule in this list changes.
 
+### MT-19 · No arm withholds a citizen's act, so responsiveness is measured only directly
+- **Gap:** The GD plan's counterfactual form of responsiveness (M2: the same town and seed with one act of a citizen
+  withheld) needs an arm that removes that act. Citizens are the engine's own actors and the light host decides only
+  seats; seating a citizen as its twin to withhold its act is not exact there (two seated citizens over 20 days lost 19
+  of their own records and 5 acts), and seating every citizen stops the engine (a wake loop). The report computes a
+  difference in differences when a registration names one; no spec can make the withheld arms yet.
+- **Where:** `orchestrator/src/experiment.ts`; `docs/experiments.md` "The comparison"; decisions 2026-10-23 "The measures of stewardship".
+- **Effect:** Whether a lever still bites is read only from what the log names (reviews changed, appeals found for the
+  applicant, petitions taken up), not as the effect of the act on the outcome.
+- **L / I:** high / medium · **Status:** to fix (an engine intervention: a withheld act named in the run's config, applied
+  at submission, recorded in the log; then a spec's arm names it)
+- **Notice by:** a claim that a lever "no longer bites" made from direct counts alone.
+- **Fix when:** Before a TARA result about responsiveness is reported.
+
 ---
 
 ## Profiles and sources
