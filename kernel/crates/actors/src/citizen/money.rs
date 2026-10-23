@@ -1089,6 +1089,22 @@ impl Person {
                     }
                     b.deferred += refund.max(0);
                 }
+                // What was bought of this kind and is faulty, at the rate the place has for the kind (a hairdresser's work found
+                // wanting is not a shirt's seam), found and complained of as goods found faulty are.
+                if let Some(rate) = self.p.frictions.faulty_by_kind.get(&k).copied().filter(|r| *r > 0) {
+                    let since = ((t - self.money.fault_seen) / DAY).min(self.p.shop_every_days).max(0);
+                    let oid = order.clone().unwrap_or_default();
+                    if dial > 0 && delivered > 0 && (w.cx.rng(&format!("faulty-{k}-{oid}")).below(1_000_000) as i64) < chance_ppm(rate, since, dial) {
+                        let bad = half_up(delivered * self.p.frictions.faulty_share_bps.unwrap_or(2_500), 10_000).max(1);
+                        let price = shops(&self.book, &k).iter().find(|x| x.shop == seller).map_or(0, |s| s.price);
+                        let facts: BTreeMap<String, Value> = [("delivered".to_string(), json!(delivered)), ("faulty".to_string(), json!(bad)), ("order".to_string(), json!(oid)), ("kind".to_string(), json!(k))].into();
+                        self.tell(w, Outcome { domain: "shop".into(), option: seller.clone(), kind: "faulty".into(), way: Way::Mine, facts, payoff: Some(half_up(served * (delivered - bad).max(0), delivered)), of, ..Default::default() });
+                        if price > 0 {
+                            let g = self.grieve(w, "goods", &seller, order.as_deref(), Some(bad * price), None, 4_000, "subsistence", Some("faulty"));
+                            g.evidence = Some(json!({ "order": order, "delivered": delivered, "faulty": bad, "kind": k }));
+                        }
+                    }
+                }
                 continue;
             }
             if d.s("kind") != Some(self.p.goods.as_str()) || ordered <= 0 {
@@ -1650,6 +1666,31 @@ mod tests {
         // A richer household (twice the budget) puts a larger share into the luxury.
         let (g3, sv3) = two_kinds(1_000, 2_000, 1_000_000, 80_000);
         assert!(sv3 * 10_000 / (g3 + sv3) > sv * 10_000 / (g + sv));
+    }
+
+    #[test]
+    fn what_is_bought_of_another_kind_is_found_faulty_at_that_kinds_rate_and_complained_of_like_goods() {
+        let demand = json!({ "kinds": [{ "kind": "goods", "share_bps": 6_000, "income_elasticity_bps": 7_000 }, { "kind": "services", "share_bps": 4_000, "income_elasticity_bps": 14_500 }],
+            "frisch_bps": -20_000, "reference_budget": 40_000, "reference_prices": { "goods": 1_000, "services": 2_000 } });
+        let after = |rates: Value| {
+            let mut c = ctx(json!({ "saving_bps": 0, "wealth_effect_bps_per_year": 0, "shop_every_days": 14, "income_window_days": 90, "demand": demand,
+                "frictions": { "faulty_by_kind": rates, "faulty_share_bps": 5_000 } }));
+            c.world = Arc::new(WorldInfo { dials: json!({ "friction_bps": 10_000 }), ..Default::default() });
+            let mut p = Person::new(&c).unwrap();
+            p.money.next_shop = 0;
+            let seen = [list_of("rec.1", "s1", "goods", 1_000), list_of("rec.2", "h1", "services", 2_000)];
+            let trip = run(&mut p, &c, DAY, 40, 1_000_000, &seen, Person::shopping);
+            let q = said(&trip, "order").iter().find(|o| o["kind"] == json!("services")).unwrap()["quantity"].as_i64().unwrap();
+            let note = st("rec.9", 2 * DAY, "delivery_note", "h1", &["c1"], json!({ "order": "rec.8", "kind": "services", "ordered": q, "delivered": q, "refund": 0 }));
+            run(&mut p, &c, 3 * DAY, 40, 1_000_000, &[note], Person::shopping);
+            p.recourse.grievances.values().filter(|g| g.party == "h1").map(|g| (g.matter.clone(), g.amount.unwrap_or(0))).collect::<Vec<_>>()
+        };
+        let sure = after(json!({ "services": 1_000_000 }));
+        assert_eq!(sure.len(), 1, "a service found wanting is complained of: {sure:?}");
+        assert_eq!(sure[0].0, "goods", "(the consumer desk hears one matter for what is bought)");
+        assert!(sure[0].1 > 0);
+        assert!(after(json!({})).is_empty(), "no rate for the kind, no fault found");
+        assert!(after(json!({ "food": 1_000_000 })).is_empty(), "another kind's rate is not this kind's");
     }
 
     #[test]

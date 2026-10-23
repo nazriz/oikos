@@ -309,6 +309,10 @@ pub struct Frictions {
     pub faulty_bps_per_year: Option<i64>,
     #[serde(default)]
     pub faulty_share_bps: Option<i64>,
+    /// The rate a year at which what is bought of another kind than goods is found faulty (basis points of the custom
+    /// a year), by kind: the place's, kind by kind (docs/behaviour/frictions.md).
+    #[serde(default)]
+    pub faulty_by_kind: std::collections::BTreeMap<String, i64>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Disrepair {

@@ -1,6 +1,6 @@
 // MT-18: the generator calls the Rust rules (worlds/generator/rules.ts), and they give the town the TypeScript copies gave:
 // the same generated config, to the byte, in every profile, with the household draws, the tax withheld, the payments' declarations
-// and the age of stopping work all taken from the Rust module. (The TypeScript copies stay for the seat-side readers until they go.)
+// and the age of stopping work all taken from the Rust module. (The TypeScript copies stay for the seat-side readers until they go. The words of the laws have no copy: the engine writes them on both sides.)
 import { expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";

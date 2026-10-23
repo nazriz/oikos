@@ -217,3 +217,17 @@ fn the_shared_rules_are_served_by_name() {
     assert!(m["world.weather"].is_object());
     assert!(oikos_kernel::rules_api::call("no.such", &json!({})).is_err());
 }
+
+/// The laws' words are written once, here, with the town's currency served as data (MT-18): the sum of a budget's lines
+/// written as the town writes its money, whole units without decimals where the sum is round.
+#[test]
+fn the_words_of_the_laws_are_written_in_the_towns_currency() {
+    let currency = json!({ "code": "ZZZ", "minor_units": 2, "symbol": "z", "symbol_after": true, "symbol_spaced": true, "unit_words": ["zed"], "minor_words": ["zeds"] });
+    let lines = oikos_kernel::rules_api::call("words.lines", &json!({ "lines": [["parks", 15_000_000], ["staff", 46_928_568]], "currency": currency })).unwrap();
+    assert_eq!(lines.as_str().unwrap(), "parks 150,000 z, staff 469,285.68 z; 619,285.68 z in all");
+    let tax = oikos_kernel::rules_api::call("words.withholding", &json!({ "period_days": 30 })).unwrap();
+    assert!(tax.as_str().unwrap().contains("a pay for 30 days is 30/365 of a year's pay"));
+    let none = oikos_kernel::rules_api::call("words.payments", &json!({ "payments": [], "currency": currency })).unwrap();
+    assert_eq!(none.as_str().unwrap(), "");
+    assert!(oikos_kernel::rules_api::call("words.lines", &json!({ "lines": [] })).is_err(), "no currency, no words");
+}

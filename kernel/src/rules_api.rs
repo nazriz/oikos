@@ -21,6 +21,28 @@ fn to<T: serde::Serialize>(x: T) -> Result<Value, String> {
     serde_json::to_value(x).map_err(|e| e.to_string())
 }
 
+
+/// An amount as the town writes its money in a law's words: the currency's sign, grouping and decimal places, but whole
+/// units without their decimals when the sum is a round one (the generator's `asWritten`; the kernel's `format_money`).
+fn written_in(cur: &oikos_sight::calls::Currency, n: i64) -> String {
+    let per = 10_i64.pow(u32::from(cur.minor_units));
+    if cur.minor_units > 0 && n % per == 0 {
+        let whole = oikos_sight::calls::Currency { minor_units: 0, ..cur.clone() };
+        oikos_sight::calls::format_money(&(n / per).to_string(), &whole)
+    } else {
+        oikos_sight::calls::format_money(&n.to_string(), cur)
+    }
+}
+
+fn currency_arg(a: &Value) -> Result<oikos_sight::calls::Currency, String> {
+    oikos_sight::calls::Currency::from_config(a.get("currency").ok_or("argument currency")?).ok_or_else(|| "argument currency: not a currency".to_string())
+}
+
+/// `{ "<account>": "<name>" }` as a way to say whom a charge or a payment goes to: `<name> (<account>)`.
+fn payees_arg(a: &Value) -> BTreeMap<String, String> {
+    a.get("payees").and_then(Value::as_object).map(|m| m.iter().filter_map(|(k, v)| v.as_str().map(|n| (k.clone(), format!("{n} ({k})")))).collect()).unwrap_or_default()
+}
+
 /// Every rule served, in name order.
 pub const RULES: &[(&str, Rule, &str)] = &[
     ("forms.catalogue", |_| to(forms::catalogue()), "every office's forms, by group (papers.ts's exports)"),
@@ -150,6 +172,47 @@ pub const RULES: &[(&str, Rule, &str)] = &[
             Ok(json!({ "adult_age_bands": bands, "households": out }))
         },
         "{spec, seed, citizens}: the town's households, drawn on the generator's keyed streams (age-bands, households) until the people are counted (household.ts adultAgeBands, drawHousehold)",
+    ),
+    (
+        "words.charges",
+        |a| {
+            let cur = currency_arg(a)?;
+            let payees = payees_arg(a);
+            let charges: Vec<withholding::Charge> = arg(a, "charges")?;
+            Ok(json!(withholding::charges_in_words(&charges, &|n| written_in(&cur, n), &|c| payees.get(&c.account).cloned().unwrap_or_else(|| c.account.clone()))))
+        },
+        "{charges, currency, payees?: {account: name}}: a tax law's charges in words (tax.ts chargesInWords), sums written in the currency",
+    ),
+    ("words.withholding", |a| Ok(json!(withholding::withholding_in_words(arg(a, "period_days")?, arg(a, "work_days")?))), "{period_days, work_days?}: how a pay's withholding is reckoned, in words (tax.ts withholdingInWords)"),
+    ("words.returns", |a| Ok(json!(withholding::returns_in_words(&arg(a, "law")?))), "{law: IncomeTaxLaw}: when the returns fall due, in words (tax.ts returnsInWords)"),
+    (
+        "words.payments",
+        |a| {
+            let cur = currency_arg(a)?;
+            let payees = payees_arg(a);
+            let payments: Vec<support::PaymentRule> = arg(a, "payments")?;
+            Ok(json!(support::payments_in_words(&payments, &|n| written_in(&cur, n), &|r| payees.get(&r.account).cloned().unwrap_or_else(|| r.account.clone()))))
+        },
+        "{payments, currency, payees?: {account: name}}: the support law's payments in words (payments.ts paymentsInWords)",
+    ),
+    (
+        "words.decisions",
+        |a| {
+            let cur = currency_arg(a)?;
+            let rules: Vec<oikos_rules::decisions::DecisionLaw> = arg(a, "rules")?;
+            Ok(json!(oikos_rules::decisions::decisions_in_words(&rules, |n| written_in(&cur, n))))
+        },
+        "{rules, currency}: the decision law in words (decisions.ts decisionsInWords)",
+    ),
+    (
+        "words.lines",
+        |a| {
+            let cur = currency_arg(a)?;
+            let lines: Vec<(String, i64)> = arg(a, "lines")?;
+            let pairs: Vec<(&str, i64)> = lines.iter().map(|(k, v)| (k.as_str(), *v)).collect();
+            Ok(json!(oikos_actors::offices::council::lines_in_words(&pairs, &|n| written_in(&cur, n))))
+        },
+        "{lines: [[line, sum]], currency}: a budget's lines in words (government.ts linesInWords)",
     ),
     ("actors.manifests", |_| Ok(manifests()), "every actor kind's manifest (contracts/module.schema.json), by name"),
 ];

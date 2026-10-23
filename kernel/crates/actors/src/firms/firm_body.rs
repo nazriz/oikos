@@ -223,8 +223,9 @@ impl Answerer<BodyThen> for Pay<'_> {
 }
 
 impl Body for FirmBody {
-    fn absorb(&mut self, pic: &Picture, _book: &Book, cx: &mut Cx) {
+    fn absorb(&mut self, pic: &Picture, book: &Book, cx: &mut Cx) {
         self.ensure_org(cx);
+        self.winding.recover(book);
         self.staffing.absorb(pic);
         let own = own_account(pic);
         self.winding.absorb(pic, own.as_ref().map(|a| a.account.as_str()));

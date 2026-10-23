@@ -7,7 +7,7 @@
 import { expect, test } from "bun:test";
 import type { Observation } from "../src/contracts";
 
-import { linesInWords, tabledLines, yearInDays } from "../src/shared/government";
+import { tabledLines, yearInDays } from "../src/shared/government";
 import { Randomness } from "../src/rng";
 import { formatMoney, inCurrency } from "../src/money";
 import { engine } from "./engine";
@@ -42,10 +42,9 @@ const budget = (year: number, at: number, of: Record<string, number>, id = `budg
 const account = (balance: number) => ({ treasury: { kind: "accounts", accounts: [{ account: "acc-city", holder: "city", custodian: "bank", currency: "ZZZ", balance: String(balance) }], transactions: [] } });
 const invoice = (id: string, at: number, amount: number) => stmt(id, at, "invoice", { author: "builder", speaks_for: "builder", addressed_to: ["city"], data: { outcome: { money: { to: "acc-builder", amount: String(amount) } } } });
 
-test("the lines the mayor's office tables: parks always, the others where it is given something for them; and their words, with the sum", () => {
+test("the lines the mayor's office tables: parks always, the others where it is given something for them; (their words, with the sum, are the engine's: council.rs)", () => {
   expect(tabledLines({ park_budget: 0 })).toEqual({ parks: 0 });
   expect(tabledLines({ park_budget: 500, road_budget: 0, staff_budget: 300, services_budget: 200, environment_budget: 100 })).toEqual({ parks: 500, staff: 300, services: 200, environment: 100 });
-  expect(linesInWords({ parks: 150_000_00, staff: 46_928_568 }, written)).toBe("parks 150,000.00 z, staff 469,285.68 z; 619,285.68 z in all");
   expect(yearInDays(1)).toBe("day 0 to day 364");
   expect(yearInDays(3)).toBe("day 730 to day 1094");
 });

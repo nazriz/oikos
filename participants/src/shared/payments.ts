@@ -79,28 +79,6 @@ export function declarationFor(r: PaymentRule, facts: { household_income: number
   return Object.keys(d).length ? d : undefined;
 }
 
-/** A sum for one payment in words a law's text can carry. */
-export function paymentsInWords(payments: PaymentRule[], written: (amount: number) => string, payer: (r: PaymentRule) => string = (r) => `${r.payer} from ${r.account}`): string {
-  const pct = (bps: number) => `${bps / 100}%`;
-  return payments.map((r) => {
-    const w = r.who ?? {};
-    const who = [
-      w.from_age !== undefined && w.to_age !== undefined ? `aged ${w.from_age} to ${w.to_age}` : w.from_age !== undefined ? `aged ${w.from_age} or over` : w.to_age !== undefined ? `aged ${w.to_age} or under` : "",
-      w.out_of_work ? "out of work and looking for it" : "",
-      w.record ? `with contributions reported for them in at least ${w.record.months ?? 1} month${(w.record.months ?? 1) === 1 ? "" : "s"}${w.record.within_months ? ` of the last ${w.record.within_months}` : ""}` : "",
-      w.income_under ? `whose household's income for a month is under ${written(w.income_under.amount)}${w.income_under.per === "head" ? " a head" : ""}` : "",
-      w.no_other_pension ? "paid no other pension" : "",
-      w.children ? `with at least ${w.children.least} child${w.children.least === 1 ? "" : "ren"} under ${w.children.under_age} in the household` : "",
-    ].filter(Boolean).join(", ");
-    const a = r.amount;
-    const much = "flat" in a ? written(a.flat)
-      : "share_bps" in a ? `${pct(a.share_bps)}${a.with_child_bps !== undefined ? ` (${pct(a.with_child_bps)} with a child)` : ""} of their previous pay${a.of === "net" ? " after what is withheld from it" : ""}${a.least !== undefined ? `, at least ${written(a.least)}` : ""}${a.most === undefined ? "" : typeof a.most === "number" ? `, at most ${written(a.most)}` : `, at most ${a.most.map((m) => `${written(m.amount)} from age ${m.from_age}`).join(", ")}`}`
-      : `${written(a.household)} a household${a.per_member ? `, and ${written(a.per_member)} for each member` : ""}${a.per_child ? `, and ${written(a.per_child.amount)} for each child under ${a.per_child.under_age}` : ""}`;
-    const long = r.lasts ? [r.lasts.days !== undefined ? `for ${r.lasts.days} days` : "", r.lasts.until_age !== undefined ? `until the age of ${r.lasts.until_age}` : "", r.lasts.then ? `after which ${payments.find((x) => x.id === r.lasts!.then)?.name ?? r.lasts.then} may be claimed` : ""].filter(Boolean).join(", ") : "";
-    return `${r.name ?? r.id}: to a person ${who || "who claims it"}, ${much} every ${r.every_days} days${long ? `, ${long}` : ""}; paid by ${payer(r)}`;
-  }).join(". ");
-}
-
 /**
  * The age at which someone in the labour force stops work, from the share of people in the labour force by age
  * (`curve`: bands in order of age, the first the reference; docs/behaviour/citizen.md, "Stopping work"). Of those in
