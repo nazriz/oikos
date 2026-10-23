@@ -1728,8 +1728,10 @@ impl Plan for FinPlan {
             let spent = self.spent(year);
             let within_budget = spent + wages + amount <= limit;
             let within_procedure = within_budget && rule.as_ref().is_none_or(|(_, over)| amount <= *over || approved);
-            let follows = (cx.rng(&format!("procedure-{}", inv.id)).below(10_000) as i64) < self.compliance_bps;
-            if !within_procedure && follows {
+            // (PB-16: the office keeps the payments procedure it can read; it pays outside it only where none is stated or it has
+            // been withdrawn, which `rule` already says. No draw: `compliance_bps` is accepted and unused.)
+            let _ = self.compliance_bps;
+            if !within_procedure {
                 // Within the budget and over the procedure's figure, with no approval on file: the post is asked for
                 // one, once (nobody else tells it that a payment is waiting on it).
                 if let Some((by, over)) = &rule {

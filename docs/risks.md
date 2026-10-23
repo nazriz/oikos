@@ -612,7 +612,7 @@ The mechanism:
   at `compliance_bps` (50% for landlords in the example town). The laws of time say an error has a cause, never a per-case dial; compliance escaped that rule.
 - **Where:** `institutions.ts`, `firms.ts`, `union.ts`, `common.ts`.
 - **Effect:** Deterrence cannot change behaviour; enforcement experiments see a fixed rate whatever is enforced.
-- **L / I:** high / high (enforcement) · **Status:** the union's part fixed in the Rust port (2026-10-17: `compliance_bps` is gone; it weighs the gain of acting against the chance it is pursued, learnt from what it has seen, times the penalty, and keeps to the law where it has no measure: docs/behaviour/unions.md); planning, the inspector, landlords and directions remain (lanes E and C1), to fix (non-compliance from detection, gain and history)
+- **L / I:** high / high (enforcement) · **Status:** the union's part fixed in the Rust port (2026-10-17: `compliance_bps` is gone; it weighs the gain of acting against the chance it is pursued, learnt from what it has seen, times the penalty, and keeps to the law where it has no measure: docs/behaviour/unions.md); planning (already, lane E: a ceiling of looks, authority and holds), directions and the finance officer's payments procedure (2026-10-23: no draw; a standing direction from a post the rule names is followed unless held, the procedure is kept where it can be read) are mended; **landlords** (six draws in `firms/landlord.rs`: rent law, tax, refusal, fine, order, tribunal) and **system adoption** (`market/automation.rs`, `offices/systems.rs`) remain, to fix (non-compliance from the gain at stake against the chance it is pursued times the penalty, as the union's; needs per-profile penalty and pursuit figures to source, and the scenario knob `landlord_compliance_bps` replaced)
 - **Notice by:** Compliance rates identical across offices and cases; none depends on detection or history.
 - **Fix when:** Before enforcement or deterrence is studied; replace each coin with a cause (detection, gain, history).
 
@@ -668,6 +668,22 @@ The mechanism:
 - **L / I:** medium / low · **Status:** to fix (found at the cut-over's test port, 2026-10-19)
 - **Notice by:** the cases flip from `test.failing` to a failure the day one is mended.
 - **Fix when:** Before a seat holds the landlord's or the clerk's office in a study of bereavement or amendment.
+
+### PB-22 · Anyone could take anyone out of the town
+- **Gap:** The kernel's `leave` took a `person` and the resolver passed any named person through, so any seat (a mayor, an
+  officer, a model in a lender's chair) could take any person out of the world. Fixed in the kernel 2026-10-23: a person
+  leaves by their own act; a minor (below `life.majority`) may also be taken by a parent or grandparent on record or a
+  position in `life.guardians` (child protection); an adult by nobody else; a world with no majority lets nobody take
+  another. **Left:** a newcomer's children arrive with no parentage on record, so a minor with no parent on record can
+  still be taken by any person (as before, to keep households leaving together); the fix is a `parents` field on
+  `arrive`, which needs the census to create parents before children (it creates children first, and changing the order
+  moves every id).
+- **Where:** `kernel/crates/world/src/exec.rs` (`may_take_out`); `Life.majority`, `Life.guardians`; `docs/behaviour/life.md`.
+- **Effect:** An experiment on who holds power over people would otherwise measure a seat's ability to do what no office
+  may do; the remainder exposes only children of newcomers.
+- **L / I:** low (after the fix) / high · **Status:** to fix (the newcomers' children; the rest fixed, decisions 2026-10-23, "Debt: the risk register, guardianship and compliance")
+- **Notice by:** a `leave` of a person other than the actor in the log; a refusal `not_theirs` on `leave`.
+- **Fix when:** the census creates parents before children, or before a seat is given a wide remit over households.
 
 ## People and culture
 

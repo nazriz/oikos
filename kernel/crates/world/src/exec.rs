@@ -942,6 +942,30 @@ impl<'a> Exec<'a> {
     }
 
     /// The acting person (acting as itself), for acts only a body can do on its own behalf.
+    /// Who may take a person out of the world: they themselves; for a minor (below the world's `life.majority`) also a
+    /// parent or grandparent on record, a position the world names a guardian, and, for a minor with no parent on record
+    /// (a newcomer's child: arrivals carry no parentage yet, risk PB-22), any person. An adult is taken out by nobody
+    /// else: a seat's authority over a person is physics (a guardianship), never a law.
+    fn may_take_out(&self, who: &str) -> R<()> {
+        if who == self.entity {
+            return Ok(());
+        }
+        let no = |why: &str| Err(refuse(RefusalCode::NotTheirs, format!("{who} {why}")));
+        let Some(majority) = self.s.life().and_then(|l| l.majority) else { return no("is not the acting person's to take out of the world") };
+        let life = self.s.life().unwrap();
+        let b = self.st.body(who).unwrap();
+        if (self.now() - b.born_at) / life.year >= majority as i64 {
+            return no("decides for themselves: nobody else can take them out of the world");
+        }
+        let kin = b.parents.iter().any(|p| *p == self.entity || self.st.body(p).is_some_and(|pb| pb.parents.iter().any(|g| *g == self.entity)));
+        let guardian = self.position.is_some_and(|p| life.guardians.iter().any(|g| g == p));
+        if kin || guardian || (b.parents.is_empty() && self.position.is_none()) {
+            Ok(())
+        } else {
+            no("is a child in someone else's care")
+        }
+    }
+
     fn acting_person(&self) -> R<Id> {
         match self.position {
             None => Ok(self.entity.clone()),
@@ -1957,6 +1981,7 @@ impl<'a> Exec<'a> {
                     None => self.s.boundary().to_string(),
                 };
                 self.living_present(&who)?;
+                self.may_take_out(&who)?;
                 let own = self.st.body(&who).and_then(|b| b.participant.clone());
                 let seats = seats_of(self.st, &who, own.as_deref());
                 let events = vacate_all(self.s, self.st, &who, VacateReason::Departed, Some(self.participant));
