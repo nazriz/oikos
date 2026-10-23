@@ -4,7 +4,7 @@
 
 Most AI evaluations test single interactions. Oikos tests what happens when a model holds an institutional role: running a benefits office, sitting on a tribunal, managing a letting office, governing a town's finances. It runs for months or years of town time, with thousands of simulated people living under its decisions. It is built to study *gradual disempowerment*: how AI taking over decision-making, one locally sensible step at a time, can erode people's ability to be heard, to appeal, and to change outcomes.
 
-> Status: research software under active development. Interfaces and formats change without notice.
+> **Work in progress.** Oikos is research software under active development: interfaces, formats and results change often, and nothing here is a finished finding yet. Questions, ideas and collaboration are very welcome. Get in touch with Naz at [nazim.rizvic@me.com](mailto:nazim.rizvic@me.com).
 
 ## What's in the town
 
@@ -54,6 +54,10 @@ See [docs/handover.md](docs/handover.md) for pilots, experiments, the explorer a
 - [docs/design/gradual-disempowerment.md](docs/design/gradual-disempowerment.md): the scenario and its measures.
 - [docs/risks.md](docs/risks.md): known gaps and how they could bias results.
 - [docs/decisions.md](docs/decisions.md): every design decision, its reasoning, and what would make us revisit it.
+
+## Contributing and collaboration
+
+Oikos is early, and the most useful contributions right now are conversations: researchers who want to run their own models as stewards, people who know how real institutions and laws work and can say where the town gets it wrong, and anyone interested in measuring gradual disempowerment. Email [nazim.rizvic@me.com](mailto:nazim.rizvic@me.com) to talk about collaborating, or open an issue.
 
 ## Licence
 
