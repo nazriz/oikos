@@ -76,10 +76,12 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
 // invoice's price, a household's death away from home is seen by those of it there, nobody sets off for a gathering from their work;
 // 2d57339d..., 44f157a8... and 072c2a5e... until then. The TS states did not move.)
+// (Re-taken once more on 2026-10-23, the held cases settled: a person is drawn who they are from the run's seed, not from seed 0, so the same town on seed 1 has
+// other people than it had; a refusal lowers the sense of agency and moves the tie; 8b9a1e90..., eac6c4b4... and 443b8875... until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "8b9a1e902ee0fa843a6c4d67b73fd40b20d464caedac4c5445cb4a0782543a10",
-  "gb-eng-2026": "eac6c4b443f22bc7bf48b2c9645745ccb19975f82e98b8ee71c51782f6dddea0",
-  "ke-nakuru-2026": "443b8875f14438093e39eea5814d2a8f8b1e0519bbcb73619c642b181b595b56",
+  "au-vic-2026": "698cd38ce10338072cefa95ba5d4b955a1e989200027e037b20bd61b6b861096",
+  "gb-eng-2026": "895b9324e9433498cca5e612e3df6c420a756aa5fee0f87e85061b320c5955f8",
+  "ke-nakuru-2026": "2604b9c5ead152bb3908337bac07e2d70cf2b44afb1b08f2a5ab0fa976de226e",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
