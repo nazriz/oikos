@@ -87,7 +87,7 @@ impl<W: Write> Engine<W> {
     pub fn host_stand_in(&mut self, participant: &str, controller: serde_json::Value) -> Result<(), String> {
         let t = self.run.kernel().t();
         let Some(p) = self.parts.get_mut(participant) else { return Err(format!("no participant {participant}")) };
-        p.controller = controller;
+        p.controller = std::sync::Arc::new(controller);
         self.sync_units(participant, Some(t))
     }
     pub fn host_to_cadence(&mut self, participant: &str) {

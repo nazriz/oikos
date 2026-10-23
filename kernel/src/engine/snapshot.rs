@@ -256,7 +256,7 @@ impl<W: Write> Engine<W> {
                         system: c.performer == Performer::System,
                         entity: c.entity.clone(),
                         position: c.position.clone(),
-                        params: c.params.clone(),
+                        params: (*c.params).clone(),
                     }),
                     actor: u.actor.as_ref().map(|a| a.save()).transpose().map_err(|e| format!("{}: {e}", u.key))?,
                     draws: u.draws.clone(),
@@ -279,8 +279,8 @@ impl<W: Write> Engine<W> {
                 .iter()
                 .map(|(k, d)| {
                     let d = match d {
-                        Decided::Code(Ok((a, kept))) => DecidedSaved::Code(Ok((action_saved(a), kept.clone()))),
-                        Decided::Code(Err(e)) => DecidedSaved::Code(Err(e.clone())),
+                        Decided::Code(Ok((a, kept)), _) => DecidedSaved::Code(Ok((action_saved(a), kept.clone()))),
+                        Decided::Code(Err(e), _) => DecidedSaved::Code(Err(e.clone())),
                         Decided::Seat(a) => DecidedSaved::Seat(a.as_ref().map(action_saved)),
                     };
                     (k.clone(), d)
@@ -367,7 +367,7 @@ impl<W: Write> Engine<W> {
                         performer: if c.system { Performer::System } else { Performer::Person },
                         entity: c.entity.clone(),
                         position: c.position.clone(),
-                        params: c.params.clone(),
+                        params: c.params.clone().into(),
                         world: world.clone(),
                     };
                     let actor = oikos_actors::offices::books::restore(kind, &ctx, saved).map_err(|e| format!("{}: {e}", u.key))?;
@@ -400,8 +400,8 @@ impl<W: Write> Engine<W> {
             let mut decided = BTreeMap::new();
             for (k, d) in &r.decided {
                 let d = match d {
-                    DecidedSaved::Code(Ok((a, kept))) => Decided::Code(Ok((Action::from_json(a)?, kept.clone()))),
-                    DecidedSaved::Code(Err(x)) => Decided::Code(Err(x.clone())),
+                    DecidedSaved::Code(Ok((a, kept))) => Decided::Code(Ok((Action::from_json(a)?, kept.clone())), None),
+                    DecidedSaved::Code(Err(x)) => Decided::Code(Err(x.clone()), None),
                     DecidedSaved::Seat(a) => Decided::Seat(a.as_ref().map(Action::from_json).transpose()?),
                 };
                 decided.insert(k.clone(), d);

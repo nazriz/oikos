@@ -888,7 +888,7 @@ mod tests {
     fn the_statistician_needs_a_channel_and_saves_its_memory() {
         let mut p = serde_json::Map::new();
         p.insert("sample".into(), json!(3));
-        let ctx = Ctx { participant: "s".into(), performer: Default::default(), entity: "e".into(), position: None, params: p, world: Default::default() };
+        let ctx = Ctx { participant: "s".into(), performer: Default::default(), entity: "e".into(), position: None, params: p.into(), world: Default::default() };
         assert!(Statistics.create(&ctx).err().unwrap().contains("adverts"));
         let mut r = Rig::new(&Statistics, "stats", json!({ "adverts": "adverts", "population": 100 }));
         let mut twin = Rig::new(&Statistics, "stats", json!({ "adverts": "adverts", "population": 100 }));
@@ -1034,7 +1034,7 @@ mod tests {
         assert!(statements(&r.wake(60 * DAY, vec![("dockets", records(dockets(), false))])).is_empty(), "a restored landfill remembers what it billed");
         let mut p = serde_json::Map::new();
         p.insert("price_per_tonne".into(), json!(5));
-        let ctx = Ctx { participant: "s".into(), performer: Default::default(), entity: "e".into(), position: None, params: p, world: Default::default() };
+        let ctx = Ctx { participant: "s".into(), performer: Default::default(), entity: "e".into(), position: None, params: p.into(), world: Default::default() };
         assert!(Disposal.create(&ctx).err().unwrap().contains("account"));
     }
 }
