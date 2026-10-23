@@ -152,7 +152,26 @@ to stamp and all three arms left the same world to the hash. The registered reco
 settled (no seed had a value, or a difference of zero); the one that could move, `decided_by_seat_share` (diligent
 minus code), moved as registered: +0.011 (98.8% interval 0.006 to 0.015, 3 of 3 seeds), the support office's share of
 the town's decisions about people passing from a system to a seat. The example shows the harness, the ledger and the
-registration working end to end, and that the world as ported does not yet give its citizens a lever to pull here.
+registration working end to end. **Why nobody asked** (traced 2026-10-24, docs/decisions.md "Citizens' recourse in the
+experiments"): the town was not a living one (no `living` in its sets), so its friction and initiative dials were 0 and
+by design nothing went wrong for anyone and nobody took initiative; the port of citizens' recourse is sound (in a
+living town it asks at the TypeScript world's rate). The harness now refuses such a registration (MT-20).
+
+**Again, in a living town** (`experiments/support-stewards-living.json` and `.prereg.yaml`, registered and committed
+before the run; `living.initiative_bps` and `living.friction_bps` 10,000, the rates as sourced; five arms: the three
+above, and code and rubber stamp each with the seed's first request to look at a refused claim withheld; run
+2026-10-24, `runs/exp-support-stewards-living-2026-10-24`, 553 s with five workers). **The levers are pulled now**:
+per seed, about 38 requests to put something right (all matters), 7.3 reviews decided by the office, 10 applications to
+a venue. `review_changed_share` is 0.32 under the code (0, 0.4 and 0.57 by seed: seed 2 had nothing wrong to change)
+and 0 under the rubber stamp in every seed; support granted 36.7 against 32.3. Of the registered primary comparisons,
+only `decided_by_seat_share` (diligent minus code, +0.019, 98.8% interval 0.007 to 0.031) is settled: with three seeds
+and a Bonferroni correction (t about 9 at 2 degrees of freedom) the review comparison (-0.32, sd 0.29) needs about a
+dozen seeds. `appeals_made` and `support_paid` move little and in both directions: six claimants were wrongly upheld by
+the stamp across the seeds and one of them appealed (under the code about one in three upheld appealed), and a
+town-wide count of payments over 180 days varies more between diverging forks than one claim moves it. The withheld
+arms withheld exactly one request per seed (`withheld` 1); the counterfactual DiD on `support_paid` is swamped by the
+same town-wide noise: a measure of what reached the people who asked is what such a question needs. Each withheld
+claimant, never answered, went no further (MT-21).
 
 ## How it runs
 

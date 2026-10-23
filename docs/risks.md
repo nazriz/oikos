@@ -1217,6 +1217,21 @@ The mechanism:
 - **Notice by:** `reviews_asked` and `appeals_made` at 0 in every arm.
 - **Fix when:** Done; revisit if a third dial comes to govern whether people act.
 
+### MT-21 · A request for a review that is never answered leads nowhere
+- **Gap:** Where the law requires a review before an appeal (`review.required`: au-vic's support decisions), the appeal
+  clock runs from the review's answer. A request never answered is deemed `ignored` after `answer_days`, but has no
+  `answered_at`, so the claimant may not appeal, does not ask again (`asked` is set) and nothing else follows. Found by
+  the withheld arms of 2026-10-24 (three claimants, none went further in 160 days), and it is what an office that
+  sits on its requests would do to its claimants.
+- **Where:** `kernel/crates/actors/src/citizen/recourse.rs` (`disrepair`'s "ignored", `Ways::for_want`'s `may_apply`).
+- **Effect:** A steward that does not answer requests for review shuts the appeal route for good: the sim makes
+  silence a stronger lever than the place's law and its other bodies would.
+- **L / I:** medium / high · **Status:** open. What a real claimant does about an unanswered review is the place's (ask
+  again, complain to an ombudsman, a deemed refusal where the law has one): to be sourced, then law data, not a rule
+  in code.
+- **Notice by:** `withheld` arms whose claimant never acts again; a model steward that leaves requests unanswered.
+- **Fix when:** Before a TARA arm in which the steward may leave requests unanswered.
+
 ---
 
 ## Profiles and sources

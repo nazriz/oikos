@@ -7188,3 +7188,28 @@ checked; the guard; a whole experiment where an arm withholds the bureau's first
 naming a ninth is the code arm to the hash).
 
 **Risks.** MT-19 fixed; MT-20 added (mitigated).
+
+**The worked example again** (`experiments/support-stewards-living.json`, registration committed in 0c0eabee before
+the run; `runs/exp-support-stewards-living-2026-10-24`; town-1000, living at the rates as sourced, seeds 1 to 3, fork at
+day 30 to day 210, five arms; 553 s, five workers, 15 forks, none failed).
+- **The levers are pulled.** Per seed: about 38 requests to put something right, 7.3 office reviews, 10 applications
+  to a venue, 10.3 refusals. `withheld` 1 in each withheld arm, 0 elsewhere.
+- **Primary, as registered (98.8% each):** `decided_by_seat_share` diligent minus code +0.019 (0.007 to 0.031; 3 of 3):
+  agrees. `review_changed_share` rubber-stamp minus code -0.32 (-1.82 to 1.18; 2 seeds below, seed 2 had no wrong
+  refusal to change): the direction registered, not settled. `appeals_made` -0.33 and `support_paid` +19.7m cents: not
+  settled, both signs.
+- **Why those two hardly move, read from the logs:** across the seeds six claimants were wrongly upheld by the stamp
+  and one appealed in the window (under the code 5 of 16 upheld appealed); `appeals_made` counts every matter and
+  moves by 1 or 2 either way as the forks diverge. `support_paid` is the town's whole support over 180 days and varies
+  more between diverging forks than one claim moves it; the DiD on it (-13.2m, -88.9m to 62.4m) is the same noise.
+  Exploratory: support granted 36.7 under the code, 32.3 under the stamp; slips caught 5 against 3.3.
+- **For TARA:** about a dozen seeds for the review comparison at this size; a measure of what reached the people who
+  asked (their payments, their appeals) for the counterfactual, under a new name; MT-21 before a steward may leave
+  requests unanswered.
+- **Found by the withheld arms (MT-21, open):** a claimant whose request is never answered goes no further: the appeal
+  clock waits for an answer that never comes, and nothing else follows. What a real claimant does then is the place's,
+  to be sourced.
+
+**Revisit if** a living town's recourse rates move away from the TypeScript world's; a withheld arm's `withheld` is 0
+(the act never came); MT-21 is sourced; or a host's seats must be withheld too.
+
