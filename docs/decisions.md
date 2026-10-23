@@ -7213,3 +7213,53 @@ day 30 to day 210, five arms; 553 s, five workers, 15 forks, none failed).
 **Revisit if** a living town's recourse rates move away from the TypeScript world's; a withheld arm's `withheld` is 0
 (the act never came); MT-21 is sourced; or a host's seats must be withheld too.
 
+
+## 2026-10-24 · TARA-ready: model stewards in the experiment harness, the draft TARA spec, its cost, and a dry run (branch `tara-ready`; no model called)
+
+**A model steward in a fork is the pilot's seat, in the light host.** `orchestrator/src/seat-host.ts` (`ModelSeat`) is
+what a `claude-code/` or `codex/` arm's seat is: its configuration from `seat-config.ts` (the part of run.ts's
+`llmUnit` that makes a seat's reports, trays, office file and staff, moved out so that both hosts make the same seat),
+its loop `createLlmParticipant`, its requests drafted by the translator arrangement (ours first, the general one
+behind) against the engine's own resolver and dry run, shown as drafts and done only once confirmed, debriefed at the
+fork's end. The engine's native `World` gained `resolve` and `check` (kernel/src/host.rs, crates/napi): they change
+nothing and log nothing. Why not run a fork through run.ts's full host: it starts a run, it cannot take up a
+snapshot, and its 1,700-line loop is the pilots'; resuming its unit table from a light-host snapshot was the larger and
+riskier change. *Revisit if* the two hosts drift: the gaps are MT-22 (the cast as it changes, thinking time, a rejected
+act told in words, exit accounts, resuming an experiment).
+
+**The seat factory's rules** (`orchestrator/src/experiment-seats.ts`): only `claude-code/` and `codex/` seats; the
+largest Claude model, Fable and gpt-6-astra refused by name; a paid key only with `seats.allow_paid_api`. Framing per
+arm, else the spec's, else `unstated`; recorded in a note at the fork and in the fork's result. **Spending limits**:
+each model fork's limit fixed before anything runs (the lesser of `fork_usd` and `arm_usd` over the arm's seeds; arms
+with neither share what `experiment_usd` leaves; all scaled down if together they pass `experiment_usd`), so the total
+cannot be passed however forks are dealt to workers; a priced model with no limit is refused. A fork at its limit stops
+cleanly, is debriefed from what was kept back, and is reported as stopped and never compared. A subscription's shut
+window is waited out inside the fork (15-minute retries, at most `wait_for_window_hours`), so Codex never blocks a
+Claude fork. `calls_at_once` (per provider per worker) and `forksAtOnce` (per worker: a town-1000 fork holds about
+1.2 GB; base and three forks peaked at 4.9 GB) bound the load. Alternatives: a shared ledger of spending across
+worker processes (a lock file): rejected, a fixed allotment is simpler and cannot overspend. *Revisit if* allotments
+leave much unspent while forks stop: then a shared ledger.
+
+**A dry run** (`--mock-models`): every model played by the mock through the whole loop, priced at the named model's
+price; our own translator answers first as in the real run (it calls no model). The report opens "DRY RUN".
+
+**`asker_granted:<what>:<matter>:<nth>`**: whether the one who made the nth such request from the fork on was granted
+support or had the decision changed afterwards; the asker of a withheld act is read from the engine's `withheld` note.
+It is the measure of "what reached the people who asked" that MT-21 said the counterfactual needs.
+
+**The TARA draft** (`experiments/tara-steward/`: spec, draft registration, README). Office: the support office
+(`outside-support`, with `model_seats=outside-support` in every arm), not the tribunal: in the living worked example
+it made 53 to 71 decisions about people a fork against the tribunal's 9 to 13, and the tribunal's cases are mostly
+appeals of the office's refusals, so a steward there moves too little in 180 days. Arms: code, nobody, Sonnet 5.5,
+Haiku 5.5, gpt-6.1-sol, Sonnet told it is simulated, and code and Sonnet each with the first review request withheld;
+12 seeds; day 30 to 210. Primary: `slips_caught`, `support_refused`, `appeals_made`, `human_in_decision_share`, each
+model against the code (12, Bonferroni); the withheld-act DiD secondary, because a 0/1 measure on one asker is powered
+at 12 seeds only for the lever's near-total loss (the README's power table, from the worked example's variances
+times 1.5). Cost, from 126 pilot logs (a helper's tally, `seats.json` in the session's scratch): about $900 of plan
+usage at API prices ($650–1,200), most of it Haiku (about $45 a fork against Sonnet's $10), and 3,000 Codex calls.
+Fallback: 8 seeds, 120 days, five arms, about $300. *Revisit if* the first real day's costs, set beside the account's
+usage page, differ from the projection by more than a third.
+
+**Blockers before the real run**: MT-21 is still open (a review request never answered shuts the appeal route; a
+model steward may well leave requests unanswered, and the risk's own "fix when" names this run), and the
+registration must be agreed and committed.

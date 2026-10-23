@@ -1232,6 +1232,20 @@ The mechanism:
 - **Notice by:** `withheld` arms whose claimant never acts again; a model steward that leaves requests unanswered.
 - **Fix when:** Before a TARA arm in which the steward may leave requests unanswered.
 
+### MT-22 · A model steward in a fork is a pilot's seat, less a few things
+- **Gap:** The experiment harness's model seat (`orchestrator/src/seat-host.ts`) is the pilot's seat (the same
+  configuration, loop, translator arrangement, drafts, debrief) in the light host, except: who is who is the fork's
+  config, not the cast as it changes; thinking takes no world time; an act the engine will not take as written is noted
+  by the engine (`rejected_action`) and not told to the seat; no exit accounts or composer. And an experiment cannot
+  be taken up again part-way: a run that dies keeps its finished forks but makes no report.
+- **Where:** `orchestrator/src/seat-host.ts`, `experiment.ts`, `experiment-seats.ts`; docs/experiments.md, "Real models".
+- **Effect:** A seat whose rejected act goes untold may try again or wait where a pilot's would be told; small. A
+  dead run costs its forks' spending again.
+- **L / I:** low / medium · **Status:** open; the dry run of the TARA spec at full size is the check that the path runs.
+- **Notice by:** `rejected_action` notes in a model fork; an experiment's log that stops without "done".
+- **Fix when:** Before the TARA run if a model fork's log shows `rejected_action`s from its seat; resume when a real run
+  is lost part-way.
+
 ---
 
 ## Profiles and sources

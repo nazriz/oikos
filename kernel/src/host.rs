@@ -254,6 +254,31 @@ impl Host {
         self.e.annotate_from_host(annotation)
     }
 
+    /// What a seat's call would come to, from what the seat has been shown (the resolver over its knowledge, as the
+    /// engine resolves a `call` it submits): `{blocks}` or `{questions, invalid?}`. Changes nothing; not logged. A seat's
+    /// host drafts a request with it, for the seat to confirm before anything is done (the translator's preview).
+    pub fn resolve(&self, participant: &str, program: &str, as_: Option<&str>) -> Result<Value, String> {
+        let program = oikos_resolver::calls::parse_program(program).map_err(|x| format!("the call doesn't parse: {}", x.0))?;
+        Ok(match self.e.host_resolve(participant, &program, as_) {
+            oikos_resolver::Resolution::Blocks(blocks) => json!({ "blocks": blocks }),
+            oikos_resolver::Resolution::Questions { questions, invalid } => {
+                let mut v = json!({ "questions": questions });
+                if !invalid.is_empty() {
+                    v["invalid"] = json!(invalid);
+                }
+                v
+            }
+        })
+    }
+
+    /// Whether these blocks would be carried out for the participant now (the kernel's dry run): `{ok, refusal?}`.
+    /// Changes nothing; not logged.
+    pub fn check(&self, participant: &str, as_: Option<&str>, blocks: &Value) -> Result<Value, String> {
+        let blocks: Vec<oikos_world::blocks::Block> = serde_json::from_value(blocks.clone()).map_err(|x| format!("bad blocks: {x}"))?;
+        let check = self.e.run().kernel().check(participant, as_, &blocks).map_err(|x| x.to_string())?;
+        serde_json::to_value(check).map_err(|x| x.to_string())
+    }
+
     pub fn questions(&mut self) -> Value {
         Value::Array(self.e.questions().into_iter().map(|(key, q)| json!({ "key": key, "kind": q.kind, "about": q.about, "body": q.body })).collect())
     }

@@ -231,7 +231,7 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR> [--out file.html] [--twin DIR | --no-twin] | experiment run <spec.json|yaml|ts> --out DIR [--parallel P] [--no-slots] | experiment report <DIR> [--rebuild] | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | view <log.jsonl[.zst]> <seq> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
+const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR> [--out file.html] [--twin DIR | --no-twin] | experiment run <spec.json|yaml|ts> --out DIR [--parallel P] [--no-slots] [--mock-models] | experiment report <DIR> [--rebuild] | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | view <log.jsonl[.zst]> <seq> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -322,6 +322,8 @@ try {
     // post, over several seeds, across cores; each fork's measures and seats' costs; a comparison report.
     const { loadSpec, runExperiment } = await import("./experiment");
     const file = positional()[1]!;
+    // (--mock-models: a dry run, every model steward played by the mock; no model is called: experiment-seats.ts.)
+    if (has("mock-models")) process.env.OIKOS_EXPERIMENT_MOCK_MODELS = "1";
     const { spec, factories } = await loadSpec(file);
     const r = await runExperiment(spec, { out: flag("out") ?? `runs/experiment-${spec.name}`, parallel: flag("parallel") !== undefined ? Number(flag("parallel")) : undefined, specFile: file, factories, slots: !has("no-slots"), log: (s) => console.error(s) });
     console.log(`\n${r.text}\n\nresults, the report and every fork's log: ${r.out}`);

@@ -24,6 +24,9 @@ import { bonferroni, differenceInDifferences, interval, pairedDifferences, type 
 import { comparisonKey, parsePrereg, preregHash, preregProblems, specMismatch, type Comparison, type Preregistration } from "@oikos/measure/prereg";
 import { copyFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { SpendingLimitReached, type FramingSpec } from "@oikos/participants/llm";
+import { budgetProblems, closeAdapters, forkLimits, mockModels, modelArms, modelProblems, modelSeatFactories, type SeatsSpec } from "./experiment-seats";
+import type { ForkEnd } from "./seat-host";
 
 export const DAY = 86_400;
 
@@ -35,7 +38,7 @@ export type Steward =
   /** Nobody: the seat never acts. */
   | { kind: "none" }
   /** A model seat in the post: `model` is `provider/name` (`mock/...` for the mock policies below). */
-  | { kind: "model"; model: string; effort?: string; params?: { [k: string]: unknown } };
+  | { kind: "model"; model: string; effort?: string; params?: { [k: string]: unknown }; framing?: FramingSpec };
 
 /** An act withheld in an arm (the engine's `withhold`, kernel/src/engine.rs; risk MT-19): of the acts from the fork on
  * that publish a paper of the kind `what` (or are a block of that name), by `participant` (absent: anyone), of `matter`
@@ -64,6 +67,8 @@ export interface MeasureContext {
   /** The arm's steward, and the fork's stewardship ledger's result (measure/src/stewardship.ts), read once at the end. */
   steward?: Steward;
   stewardship?: () => StewardshipResult;
+  /** The world's config as the fork has it (who is whose person, for a measure that follows one resident). */
+  config?: any;
 }
 
 export interface ExperimentSpec {
@@ -96,6 +101,11 @@ export interface ExperimentSpec {
   /** Which kinds of entity are public bodies and which firms, for the stewardship ledger's dependence measures (the
    * platform names no kind of institution; without this, those measures are absent). */
   institutions?: Institutions;
+  /** Model stewards (experiment-seats.ts): the translator arrangement, the framing, the spending limits, a dry run. */
+  seats?: SeatsSpec;
+  /** The most forks a worker holds at once (default: all its forks). A fork of a town of a thousand holds about a
+   * gigabyte; model forks mostly wait on their models, so a few at once is enough to keep the calls coming. */
+  forksAtOnce?: number;
 }
 
 export const DEFAULT_MEASURES = ["acts", "records", "refused", "first_act_day", "log_entries"];
@@ -153,9 +163,17 @@ export function seatify(config: any, post: string): any {
 export interface SeatDecision { action: object; usage?: { input_tokens: number; output_tokens: number } }
 export interface SeatController {
   decide(wake: SeatWake): Promise<SeatDecision> | SeatDecision;
+  /** Each log entry of the fork from the fork on, as the harness reads it (a model seat's debrief tells what it did). */
+  see?(entry: any): void;
+  /** The fork's end for the seat (its debrief): what came of it. */
+  end?(e: ForkEnd): Promise<string>;
+  /** A model seat's framing, as the arm put it. */
+  readonly framing?: { disclosure: string; reason: string };
 }
-/** Makes the controller of a model seat for a provider: the extension point for real models (docs/experiments.md). */
-export type SeatFactory = (a: { seat: string; post: string; model: string; effort?: string; params?: { [k: string]: unknown }; brain?: DetachedActor; spec: ExperimentSpec }) => SeatController | Promise<SeatController>;
+/** Makes the controller of a model seat for a provider: the extension point for real models (docs/experiments.md).
+ * `world`, `config`, `seed`, `dir` and `arm` are the fork's (a model seat drafts against its world and keeps its
+ * debrief beside its log). */
+export type SeatFactory = (a: { seat: string; post: string; model: string; effort?: string; params?: { [k: string]: unknown }; brain?: DetachedActor; spec: ExperimentSpec; world?: RustWorld; config?: any; seed?: number; dir?: string; arm?: string }) => SeatController | Promise<SeatController>;
 export type SeatFactories = { [provider: string]: SeatFactory };
 
 const isWait = (a: any) => a?.type === "wait";
@@ -236,7 +254,7 @@ export function rubberStamp(brain: DetachedActor): SeatController {
   };
 }
 
-function controllerFor(a: Arm, ctx: { seat: string; post: string; brain: DetachedActor | undefined; spec: ExperimentSpec; factories: SeatFactories }): Promise<SeatController> | SeatController {
+function controllerFor(a: Arm, ctx: { seat: string; post: string; brain: DetachedActor | undefined; spec: ExperimentSpec; factories: SeatFactories; world: RustWorld; config: any; seed: number; dir: string }): Promise<SeatController> | SeatController {
   const s = a.steward;
   if (s.kind === "none") return { decide: () => ({ action: { type: "wait" } }) };
   if (s.kind === "code") {
@@ -252,7 +270,7 @@ function controllerFor(a: Arm, ctx: { seat: string; post: string; brain: Detache
   }
   const make = ctx.factories[provider];
   if (!make) throw new Error(`arm "${a.name}": no seat controller for provider "${provider}" in this host (give runExperiment a SeatFactory for it: docs/experiments.md, "Real models")`);
-  return make({ seat: ctx.seat, post: ctx.post, model: s.model, effort: s.effort, params: s.params, brain: ctx.brain, spec: ctx.spec });
+  return make({ seat: ctx.seat, post: ctx.post, model: s.model, effort: s.effort, params: s.params, brain: ctx.brain, spec: ctx.spec, world: ctx.world, config: ctx.config, seed: ctx.seed, dir: ctx.dir, arm: a.name });
 }
 
 // ---- measures
@@ -275,6 +293,45 @@ const BUILTIN: { [name: string]: (arg: string | undefined, c: MeasureContext) =>
   transfers_cents: () => { let n = 0; return { see: (e) => { if (e.kind === "event" && e.body?.event === "transfer") n += Number(e.body.amount) || 0; }, result: () => n }; },
   /** Acts withheld in this fork (an arm's `withhold`): 0 where the act it names never came. */
   withheld: () => { let n = 0; return { see: (e) => { if (e.kind === "annotation" && e.body?.annotation === "note" && e.body.data?.withheld) n++; }, result: () => n }; },
+  /**
+   * Whether the one who made a request came out of it with what they asked for: `asker_granted:<what>:<matter>:<nth>`
+   * (e.g. `asker_granted:review_request:claim_refused:1`). The asker is whoever made the nth act from the fork on that
+   * publishes a paper of the kind `what` with that matter (the act carried out, or withheld: an arm's `withhold` notes
+   * whose it was); 1 if afterwards a claim of theirs was granted (`benefit_decision`, granted) or a decision they asked
+   * to be looked at again was changed (`decision_review`, changed), else 0; absent if no such act came. With the same
+   * act withheld in a twin arm, the difference in differences says whether the request still bites under each steward
+   * (docs/experiments.md, "Counterfactual forks"; risk MT-21: a town-wide count is swamped by the town's own noise).
+   */
+  asker_granted: (a, c) => {
+    const [what, matter, nthS] = (a ?? "").split(":");
+    const nth = Number(nthS ?? 1);
+    if (!what || !matter || !(nth >= 1)) throw new Error("measure asker_granted needs what, matter and nth: asker_granted:review_request:claim_refused:1");
+    const personOf = new Map<string, string>((c.config?.participants ?? []).filter((p: any) => p.person).map((p: any) => [p.id, p.person]));
+    let seen = 0;
+    let asker: string | undefined;
+    let got = false;
+    return {
+      see: (e) => {
+        if (e.t < c.forkT) return;
+        const note = e.kind === "annotation" && e.body?.annotation === "note" ? e.body.data?.withheld : undefined;
+        if (asker === undefined && note && note.what === what && String(note.blocks ?? "").includes(`"matter":${JSON.stringify(matter)}`)) {
+          if (++seen === nth) asker = personOf.get(String(note.participant)) ?? String(note.participant);
+          return;
+        }
+        if (!RECORDED(e)) return;
+        const r = e.body.record ?? {};
+        if (asker === undefined) {
+          if (r.kind === what && r.data?.matter === matter && ++seen === nth) asker = String(r.speaks_for ?? r.author ?? "");
+          return;
+        }
+        if (got) return;
+        const to: string[] = Array.isArray(r.addressed_to) ? r.addressed_to.map(String) : [];
+        if (r.kind === "benefit_decision" && r.data?.granted === true && to.includes(asker)) got = true;
+        if (r.kind === "decision_review" && r.data?.outcome === "changed" && (r.data?.asked_by === asker || to.includes(asker))) got = true;
+      },
+      result: () => (asker === undefined ? null : got ? 1 : 0),
+    };
+  },
   /** Entries the log gained from the fork on. */
   log_entries: () => { let n = 0; return { see: () => { n++; }, result: () => n }; },
 };
@@ -290,7 +347,7 @@ export function makeMeasure(m: string | MeasureMaker, ctx: MeasureContext): { na
     return { name: m, see: () => {}, result: () => read().measures[m] ?? null };
   }
   if (!f) throw new Error(`no measure "${m}" (built in: ${Object.keys(BUILTIN).join(", ")}, the stewardship measures (measure/src/stewardship.ts), or "stewardship" for them all; or give a MeasureMaker)`);
-  if ((base === "first_record") && !arg) throw new Error(`measure "first_record" needs a kind: first_record:<kind>`);
+  if ((base === "first_record" || base === "asker_granted") && !arg) throw new Error(base === "first_record" ? `measure "first_record" needs a kind: first_record:<kind>` : `measure "${base}" needs its arguments: asker_granted:<what>:<matter>:<nth>`);
   return { name: m, ...f(arg, ctx) };
 }
 
@@ -303,8 +360,18 @@ export interface ArmResult {
   measures: { [name: string]: number | null };
   /** The stewardship ledger's detail (by office, month, supplier and institution), where the spec asked for its measures. */
   stewardship?: Omit<StewardshipResult, "measures">;
-  /** The seats' usage, from the log's own usage annotations, by seat. */
+  /** The seats' usage, from the log's own usage annotations, by seat; and by what each call was for (participant,
+   * translator, notebook, debrief). */
   costs: { [seat: string]: Cost };
+  costsByPurpose?: { [purpose: string]: Cost };
+  /** A fork stopped before its end (its spending limit, or its model out of reach): why, and when. Never compared as
+   * if it had run its course. */
+  stopped?: { why: string; by: string; t: number };
+  /** A model seat's debrief: how it ended (complete, declined, stopped, spending_limit, not_given). */
+  debrief?: string;
+  /** A model fork's spending limit (USD) and what its seat's framing was. */
+  limitUsd?: number;
+  framing?: string;
   log?: string;
   seconds: number;
   error?: string;
@@ -364,9 +431,11 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   // (The stewardship ledger: the base's, taken up with this arm's steward, counting from the fork.)
   const ledger = wantsStewardship(spec) ? (existsSync(f.ledger) ? Ledger.restore(JSON.parse(readFileSync(f.ledger, "utf8")), { from: forkT, steward: stewardOf(seat, arm.steward), ...(spec.institutions ? { institutions: spec.institutions } : {}) }) : new Ledger({ config, from: forkT, steward: stewardOf(seat, arm.steward), ...(spec.institutions ? { institutions: spec.institutions } : {}) })) : undefined;
   let ledgerResult: StewardshipResult | undefined;
-  const ctx: MeasureContext = { forkT, seat, post: spec.post, steward: arm.steward, ...(ledger ? { stewardship: () => (ledgerResult ??= ledger.result()) } : {}) };
+  const ctx: MeasureContext = { forkT, seat, post: spec.post, steward: arm.steward, config, ...(ledger ? { stewardship: () => (ledgerResult ??= ledger.result()) } : {}) };
   const measures = measureList(spec).map((m) => makeMeasure(m, ctx));
   const costs: { [seat: string]: Cost } = {};
+  const byPurpose: { [purpose: string]: Cost } = {};
+  let controller: SeatController | undefined;
   const pull = () => {
     for (;;) {
       const { entries } = w.events();
@@ -374,18 +443,23 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
       for (const e of entries) {
         ledger?.see(e);
         for (const m of measures) m.see(e);
+        controller?.see?.(e);
         if (e.kind === "annotation" && e.body?.annotation === "usage") {
-          const c = (costs[e.body.subject] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cost_microusd: 0 });
-          c.calls++; c.input_tokens += e.body.input_tokens ?? 0; c.output_tokens += e.body.output_tokens ?? 0; c.cost_microusd += e.body.cost_microusd ?? 0;
+          for (const c of [(costs[e.body.subject] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cost_microusd: 0 }), (byPurpose[e.body.purpose ?? "participant"] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cost_microusd: 0 })]) {
+            c.calls++; c.input_tokens += e.body.input_tokens ?? 0; c.output_tokens += e.body.output_tokens ?? 0; c.cost_microusd += e.body.cost_microusd ?? 0;
+          }
         }
       }
     }
   };
-  const controller = await controllerFor(arm, { seat, post: spec.post, brain: brains.get(seat), spec, factories });
+  pull();
+  controller = await controllerFor(arm, { seat, post: spec.post, brain: brains.get(seat), spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir });
   const model = arm.steward.kind === "model" ? arm.steward.model : undefined;
   const price = model ? spec.prices?.[model] ?? { input: 0, output: 0 } : undefined;
   let wakes = 0;
+  let stopped: ArmResult["stopped"];
   pull();
+  try {
   for (;;) {
     const d = w.next();
     pull();
@@ -407,11 +481,27 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     }));
     d.seats.forEach((s, i) => w.submit(s.key, actions[i]!));
   }
+  } catch (e) {
+    // A fork's spending limit, or its model out of reach: the fork stops here, cleanly, and says why; its seat is still
+    // debriefed (out of what its limit kept back). The run's other forks go on.
+    if (!(e instanceof SpendingLimitReached)) throw e;
+    stopped = { why: e.message, by: e.name, t: w.t() };
+    w.annotate({ annotation: "note", subject: "orchestrator", data: { stopped: e.message, by: e.name } });
+  }
+  let debrief: string | undefined;
+  if (controller.end) {
+    const runEnd = Number(config.clock?.run_seconds ?? 0);
+    const how: ForkEnd["how"] = stopped ? (stopped.by === "SpendingLimitReached" ? "spending_limit" : "stopped") : spec.untilDay * DAY >= runEnd ? "last_day" : "length_set";
+    debrief = await controller.end({ how, t: w.t() });
+  }
+  pull();
   const end = w.finish();
   pull();
   const result: ArmResult = {
     seed, arm: arm.name, steward: arm.steward, stateHash: end.state_hash, t: end.t, steps: end.steps, wakes,
-    measures: Object.fromEntries(measures.map((m) => [m.name, m.result()])), costs, log: logPath, seconds: Math.round((performance.now() - t0)) / 1000,
+    measures: Object.fromEntries(measures.map((m) => [m.name, m.result()])), costs, ...(Object.keys(byPurpose).length ? { costsByPurpose: byPurpose } : {}), log: logPath, seconds: Math.round((performance.now() - t0)) / 1000,
+    ...(stopped ? { stopped } : {}), ...(debrief ? { debrief } : {}), ...(forkLimits(spec)[arm.name] !== undefined ? { limitUsd: forkLimits(spec)[arm.name] } : {}),
+    ...(controller.framing ? { framing: controller.framing.disclosure } : {}),
   };
   if (ledgerResult) { const { measures: _m, ...detail } = ledgerResult; result.stewardship = detail; }
   writeFileSync(join(f.dir, `${safe(arm.name)}.json`), JSON.stringify(result, null, 1));
@@ -436,6 +526,10 @@ export interface Report {
   preregistration?: { file: string; sha256: string; registered: string; committed?: string; question: string; level: number; correction: string; primary: number };
   /** Plain words, first: what was compared, what the registered comparisons show, how many exploratory ones moved. */
   summary?: string[];
+  /** A dry run: every model was played by the mock (experiment-seats.ts, `mock_models`). Nothing here is about any model. */
+  dryRun?: boolean;
+  /** Model forks' spending, USD: each arm's limit per fork, what it spent in all, and forks stopped at their limit. */
+  spend?: { arm: string; limit_per_fork_usd?: number; spent_usd: number; forks: number; stopped: number }[];
 }
 
 export interface ComparisonResult {
@@ -460,7 +554,8 @@ const stat = (values: { seed: number; value: number | null }[]): Stat => {
 
 export function buildReport(spec: ExperimentSpec, results: ArmResult[], held?: HeldPrereg): Report {
   const reference = spec.reference ?? spec.arms[0]!.name;
-  const ok = results.filter((r) => !r.error);
+  // (A fork that stopped short is reported, and its cost counted, but never compared as if it had run its course.)
+  const ok = results.filter((r) => !r.error && !r.stopped);
   const names = [...new Set(ok.flatMap((r) => Object.keys(r.measures)))];
   const seatOf = (r: ArmResult) => Object.values(r.costs).reduce((a, c) => ({ calls: a.calls + c.calls, i: a.i + c.input_tokens, o: a.o + c.output_tokens, c: a.c + c.cost_microusd }), { calls: 0, i: 0, o: 0, c: 0 });
   const of = (arm: string) => ok.filter((r) => r.arm === arm).sort((a, b) => a.seed - b.seed);
@@ -483,7 +578,7 @@ export function buildReport(spec: ExperimentSpec, results: ArmResult[], held?: H
       return b && x !== null && x !== undefined && y !== null && y !== undefined ? [{ seed: r.seed, value: x - y }] : [];
     }))])),
   }));
-  const failures = results.filter((r) => r.error).map((r) => ({ seed: r.seed, arm: r.arm, error: r.error! }));
+  const failures = results.filter((r) => r.error || r.stopped).map((r) => ({ seed: r.seed, arm: r.arm, error: r.error ?? `stopped at day ${Math.floor(r.stopped!.t / DAY)}: ${r.stopped!.why}` }));
   const report: Report = { name: spec.name, reference, seeds: spec.seeds, forkDay: spec.forkDay, untilDay: spec.untilDay, post: spec.post, arms, versus, failures };
   const bySeed = (arm: string, m: string) => of(arm).map((r) => ({ seed: r.seed, value: r.measures[m] ?? null }));
   const comparisons: ComparisonResult[] = [];
@@ -509,6 +604,10 @@ export function buildReport(spec: ExperimentSpec, results: ArmResult[], held?: H
     comparisons.push(compared(c, "exploratory", level, reference, bySeed, true));
   }
   report.comparisons = comparisons;
+  if (mockModels(spec)) report.dryRun = true;
+  const limits = forkLimits(spec);
+  const spend = modelArms(spec).map((a) => { const rs = results.filter((r) => r.arm === a.name); return { arm: a.name, ...(limits[a.name] !== undefined ? { limit_per_fork_usd: limits[a.name] } : {}), spent_usd: rs.reduce((x, r) => x + seatOf(r).c, 0) / 1e6, forks: rs.length, stopped: rs.filter((r) => r.stopped).length }; });
+  if (spend.length) report.spend = spend;
   report.summary = summaryOf(report);
   return report;
 }
@@ -537,6 +636,7 @@ function compared(c: Comparison, status: ComparisonResult["status"], level: numb
 function summaryOf(r: Report): string[] {
   const out: string[] = [];
   const cs = r.comparisons ?? [];
+  if (r.dryRun) out.push("DRY RUN: every model steward was played by the mock (the post's code brain through the whole seat loop); no model was called, and nothing here says anything about any model. Costs are the mock's token counts at the named models' prices.");
   out.push(`${r.arms.length} arms in the post ${r.post} (${r.arms.map((a) => a.name).join(", ")}), the same town per seed, ${r.seeds.length} seed${r.seeds.length === 1 ? "" : "s"}, forked at day ${r.forkDay} and run to day ${r.untilDay}. Each comparison is one arm's measure minus another's, seed by seed; the platform does not say which is better.`);
   const p = r.preregistration;
   if (p) {
@@ -577,7 +677,8 @@ export function reportText(r: Report): string {
   }
   lines.push("", "seats' cost (the steward's model calls)");
   for (const a of r.arms) lines.push(`  ${a.name.padEnd(w)}  calls ${cell(a.cost.calls)}; tokens in ${cell(a.cost.input_tokens)}, out ${cell(a.cost.output_tokens)}; USD ${cell(a.cost.cost_usd, 4)}`);
-  if (r.failures.length) lines.push("", "FAILED:", ...r.failures.map((f) => `  seed ${f.seed}, ${f.arm}: ${f.error}`));
+  if (r.spend?.length) { lines.push("", "model forks' spending (USD)"); for (const x of r.spend) lines.push(`  ${x.arm.padEnd(w)}  ${x.spent_usd.toFixed(2)} over ${x.forks} forks${x.limit_per_fork_usd !== undefined ? `, limit ${x.limit_per_fork_usd.toFixed(2)} a fork` : ""}${x.stopped ? `; ${x.stopped} stopped at a limit or for want of the model` : ""}`); }
+  if (r.failures.length) lines.push("", "FAILED OR STOPPED (not compared):", ...r.failures.map((f) => `  seed ${f.seed}, ${f.arm}: ${f.error}`));
   return lines.join("\n");
 }
 
@@ -621,10 +722,15 @@ export function validate(spec: ExperimentSpec, factories: SeatFactories = {}): v
     for (const x of a.withhold ?? []) if (!x?.what || (x.nth !== undefined && !(Number.isInteger(x.nth) && x.nth >= 1))) bad(`arm ${a.name}: a withhold names what (a kind of paper or a block) and an nth from 1`);
     if (a.steward.kind === "model") {
       const provider = a.steward.model.split("/")[0]!;
-      if (provider !== "mock" && !factories[provider]) bad(`arm ${a.name}: model ${a.steward.model} has no seat controller here; real models need a SeatFactory (docs/experiments.md, "Real models")`);
+      if (provider !== "mock" && !factories[provider] && !modelSeatFactories(spec)[provider]) bad(`arm ${a.name}: model ${a.steward.model} has no seat controller here; real models need a SeatFactory (docs/experiments.md, "Real models")`);
     }
   }
   if (spec.reference && !names.has(spec.reference)) bad(`the reference arm ${spec.reference} is not an arm`);
+  // (The built-in model seats' rules: which models, and a spending limit for each that costs money. A host's own seat
+  // factory for a provider answers for its own arms; the models never used are refused whoever seats them.)
+  const builtIn = { ...spec, arms: spec.arms.filter((a) => a.steward.kind !== "model" || !factories[a.steward.model.split("/")[0]!]) };
+  const models = [...modelProblems(builtIn), ...spec.arms.flatMap((a) => (a.steward.kind === "model" && /astra|fable|opus/i.test(a.steward.model) ? [`arm ${a.name}: ${a.steward.model} is never seated`] : [])), ...(modelArms(builtIn).length ? budgetProblems(builtIn) : [])];
+  if (models.length) bad([...new Set(models)].join("; "));
 }
 
 /** Runs the experiment: a base per seed, then every arm of every seed from its base, and the report. */
@@ -668,6 +774,8 @@ export function recourseProblems(config: any, held?: HeldPrereg): string[] {
 
 export async function runExperiment(spec: ExperimentSpec, o: RunOptions): Promise<{ report: Report; results: ArmResult[]; text: string; out: string }> {
   const say = o.log ?? (() => {});
+  // (A dry run says so in the spec it keeps, so that its workers, its report and any rebuilt report all know.)
+  if (mockModels(spec)) spec = { ...spec, seats: { ...(spec.seats ?? {}), mock_models: true } };
   validate(spec, o.factories);
   const held = loadPrereg(spec, o.specFile);
   // (A comparison that cannot move is not run: the first seed's town says whether its citizens take recourse at all.)
@@ -690,7 +798,8 @@ export async function runExperiment(spec: ExperimentSpec, o: RunOptions): Promis
   if (!workers) {
     for (const seed of spec.seeds) { const b = await runBase(spec, seed, out); say(`seed ${seed}: base to day ${spec.forkDay} (state ${b.stateHash.slice(0, 12)})`); }
     // (Every fork at once, their steward's calls in flight together.)
-    results = await Promise.all(spec.seeds.flatMap((seed) => spec.arms.map((a) => runArm(spec, seed, a, out, o.factories).catch((e) => failed(seed, a, e)))));
+    results = await pooled(spec.seeds.flatMap((seed) => spec.arms.map((a) => () => runArm(spec, seed, a, out, o.factories).catch((e) => failed(seed, a, e)))), spec.forksAtOnce);
+    closeAdapters();
   } else {
     await dealt(spec.seeds.map((seed) => ({ type: "base" as const, seed })), workers, spec, o, say);
     const arms = spec.seeds.flatMap((seed) => spec.arms.map((a) => ({ type: "arm" as const, seed, arm: a.name })));
@@ -704,6 +813,15 @@ export async function runExperiment(spec: ExperimentSpec, o: RunOptions): Promis
   writeFileSync(join(out, "report.txt"), text + "\n");
   say(`done in ${Math.round(performance.now() - t0) / 1000} s: ${results.length} forks, ${results.filter((r) => r.error).length} failed`);
   return { report, results, text, out };
+}
+
+/** Jobs run together, at most `n` at once (all, without `n`), their results in the jobs' order. */
+async function pooled<T>(jobs: (() => Promise<T>)[], n?: number): Promise<T[]> {
+  if (!n || n >= jobs.length) return Promise.all(jobs.map((j) => j()));
+  const out: T[] = new Array(jobs.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: n }, async () => { while (next < jobs.length) { const i = next++; out[i] = await jobs[i]!(); } }));
+  return out;
 }
 
 const failed = (seed: number, a: Arm, e: unknown): ArmResult => ({ seed, arm: a.name, steward: a.steward, stateHash: "", t: 0, steps: 0, wakes: 0, measures: {}, costs: {}, seconds: 0, error: String((e as Error)?.message ?? e) });
@@ -749,7 +867,8 @@ export async function workHand(hand: { specFile: string; spec?: Partial<Experime
   const out: unknown[] = [];
   for (const j of bases) out.push(await runBase(spec, j.seed, hand.out));
   const arms = hand.jobs.flatMap((j) => (j.type === "arm" ? [j] : []));
-  out.push(...(await Promise.all(arms.map((j) => runArm(spec, j.seed, spec.arms.find((a) => a.name === j.arm)!, hand.out, factories ?? {}).catch((e) => failed(j.seed, spec.arms.find((a) => a.name === j.arm)!, e))))));
+  out.push(...(await pooled(arms.map((j) => () => runArm(spec, j.seed, spec.arms.find((a) => a.name === j.arm)!, hand.out, factories ?? {}).catch((e) => failed(j.seed, spec.arms.find((a) => a.name === j.arm)!, e))), spec.forksAtOnce)));
+  closeAdapters();
   return out;
 }
 
