@@ -403,7 +403,7 @@ mod tests {
             performer: Performer::default(),
             entity: "shop-1".into(),
             position: None,
-            params: Map::new(),
+            params: Map::new().into(),
             world: Arc::new(WorldInfo { dials: json!({ "initiative_bps": dial }), ..Default::default() }),
         }
     }

@@ -37,6 +37,7 @@ mimalloc = { version = "0.1", default-features = false }
 # Snapshots and the binary log are compressed (kernel/src/engine/snapshot.rs, kernel/src/blog.rs): zstd, whose output is
 # the same for the same input and level.
 zstd = { version = "0.13", default-features = false }
+rayon = "1.12"
 
 # On ARM (Apple silicon), SHA-256 uses the CPU's SHA instructions (the same hashes, several times faster).
 [target.'cfg(target_arch = "aarch64")'.dependencies]

@@ -61,3 +61,49 @@ pub fn check(v: &jsonschema::Validator, instance: &Value) -> Result<(), String> 
         Err(format!("violates the contract: {}", errors.join("; ")))
     }
 }
+
+/// The largest integer every JSON consumer reads exactly (common.schema.json `SafeInt`).
+const SAFE_INT: i64 = 9_007_199_254_740_991;
+
+/// Whether a value is the contract's `Opaque` (common.schema.json): null, a boolean, a safe integer, a string of at most
+/// 1,048,576 characters, or arrays and objects of those, each object's keys matching `^[A-Za-z_][A-Za-z0-9_.-]{0,63}$`.
+/// `true` only where the schema says valid; `false` where it isn't, or where this is not sure (the schema decides then).
+pub fn opaque(v: &Value) -> bool {
+    match v {
+        Value::Null | Value::Bool(_) => true,
+        Value::Number(n) => n.as_i64().is_some_and(|i| (-SAFE_INT..=SAFE_INT).contains(&i)),
+        // (Bytes are at least characters: a string this short in bytes is short enough.)
+        Value::String(s) => s.len() <= 1_048_576,
+        Value::Array(a) => a.iter().all(opaque),
+        Value::Object(m) => m.iter().all(|(k, x)| key(k) && opaque(x)),
+    }
+}
+
+/// `^[A-Za-z_][A-Za-z0-9_.-]{0,63}$`, the `Opaque` object's property names.
+fn key(k: &str) -> bool {
+    let b = k.as_bytes();
+    !b.is_empty() && b.len() <= 64 && (b[0].is_ascii_alphabetic() || b[0] == b'_') && b[1..].iter().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'.' | b'-'))
+}
+
+/// The kinds of annotation whose shape is `{annotation, subject, data}` (log.schema.json, Annotation's fourth branch).
+const SUBJECT_DATA: [&str; 10] = ["transcript", "model_call_failed", "translation_failure", "debrief", "orchestrator", "note", "observation", "decision", "outcome", "audit"];
+
+/// Whether the annotation `{annotation: kind, subject, data}` would be `plain_annotation`, asked of its parts (for one
+/// written straight from them, without the annotation's own value).
+pub fn plain_subject_data(kind: &str, subject: &str, data: &Value) -> bool {
+    SUBJECT_DATA.contains(&kind) && subject.len() <= 128 && opaque(data)
+}
+
+/// Whether an annotation plainly keeps to the contract (`check(&contracts().annotation, ..)` would pass it, and every
+/// integer in it is safe): the commonest shape, a subject and its data (decisions, outcomes, notes, observations), with
+/// data that is plainly `Opaque`. Every other branch of the Annotation's `oneOf` names other kinds, so one that keeps
+/// to the fourth keeps to the contract. `false` says only that the schema must decide.
+pub fn plain_annotation(instance: &Value) -> bool {
+    let Value::Object(m) = instance else { return false };
+    let plain = m.len() == 3
+        && m.get("annotation").and_then(Value::as_str).is_some_and(|a| SUBJECT_DATA.contains(&a))
+        && m.get("subject").and_then(Value::as_str).is_some_and(|s| s.len() <= 128)
+        && m.get("data").is_some_and(opaque);
+    debug_assert!(!plain || contracts().annotation.is_valid(instance), "an annotation passed as plainly valid is not: {instance}");
+    plain
+}

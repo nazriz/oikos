@@ -27,7 +27,7 @@ pub fn ctx(entity: &str, params: Value) -> Ctx {
         performer: Performer::default(),
         entity: entity.into(),
         position: None,
-        params: params.as_object().cloned().unwrap_or_default(),
+        params: params.as_object().cloned().unwrap_or_default().into(),
         world: Arc::new(world()),
     }
 }

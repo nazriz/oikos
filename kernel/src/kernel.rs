@@ -13,7 +13,6 @@ use crate::statics::Statics;
 use oikos_resolver::knowledge::{CellFacts, RecordFacts, StructureFact, Seen, SeenAccount, SeenChannel, SeenEntity, SeenHolding, SeenPosition, Shown};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 
 pub use oikos_world::kernel::{Check, Command, ProtocolError};
@@ -126,6 +125,15 @@ impl Delivered {
         ways.insert(0, (x.clone(), bytes.clone(), fact.clone()));
         ways.truncate(WAYS);
         Ok((bytes, fact))
+    }
+
+    /// What's known of a building a sites channel shows, without its bytes: the one kept for it where this very
+    /// building was shown before, else made now (the same facts as `structure` gives: its type, where it is, its spaces).
+    fn structure_fact(&self, x: &Arc<SiteStructure>) -> Arc<StructureFact> {
+        if let Some(fact) = held(self.structures.read()).get(&x.structure).and_then(|ways| ways.iter().find(|(shown, _, _)| Arc::ptr_eq(shown, x)).map(|(_, _, f)| f.clone())) {
+            return fact;
+        }
+        Arc::new(StructureFact { type_: x.structure_type.clone(), at: x.at.clone(), spaces: x.spaces.iter().map(|sp| sp.space.clone()).collect() })
     }
 
     /// A cell as a sites channel shows it: its canonical bytes (exactly `canon::canonical` of it, written here member
@@ -410,33 +418,7 @@ const WORTH_SHARING: usize = 16;
 /// `f` of each item, in the items' order, worked out on up to `threads` threads. Each thread takes the next item not
 /// yet taken; every result is put where its item stands, so the list is the same however the work fell out.
 fn each<T: Sync, R: Send>(items: &[T], threads: usize, f: impl Fn(&T) -> R + Sync) -> Vec<R> {
-    let threads = threads.min(items.len());
-    if threads < 2 {
-        return items.iter().map(f).collect();
-    }
-    let next = AtomicUsize::new(0);
-    let done: Vec<Vec<(usize, R)>> = std::thread::scope(|scope| {
-        let workers: Vec<_> = (0..threads)
-            .map(|_| {
-                scope.spawn(|| {
-                    let mut mine = vec![];
-                    loop {
-                        let i = next.fetch_add(1, Ordering::Relaxed);
-                        if i >= items.len() {
-                            break mine;
-                        }
-                        mine.push((i, f(&items[i])));
-                    }
-                })
-            })
-            .collect();
-        workers.into_iter().map(|w| w.join().unwrap_or_else(|e| std::panic::resume_unwind(e))).collect()
-    });
-    let mut slots: Vec<Option<R>> = items.iter().map(|_| None).collect();
-    for (i, r) in done.into_iter().flatten() {
-        slots[i] = Some(r);
-    }
-    slots.into_iter().map(|r| r.expect("every item was worked out")).collect()
+    crate::pool::each(items, threads, f)
 }
 
 /// How many threads observations are made ready on: `OIKOS_KERNEL_THREADS` if set (1: one at a time, as they're asked
@@ -493,6 +475,57 @@ impl Kernel {
     /// An observation this kernel returned (of the state as it is), in JSON.
     pub fn observed(&mut self, obs: &mut Observation) -> Result<Observed, canon::CanonError> {
         Ok(Encoded::of(obs, &self.delivered)?.deliver(&self.delivered, self.handed.as_mut()))
+    }
+
+    /// What an observation's records and cells add to a seat's knowledge, by channel path: `observed(obs).shown`, without
+    /// writing the observation's JSON, for whoever wants only that (a code actor's knowledge, where the log keeps no
+    /// hash of its observation). (A cell whose place is past what JSON carries exactly is left to `observed`, which
+    /// says so as it always has.)
+    pub fn shown(&mut self, obs: &mut Observation) -> Result<BTreeMap<Id, Shown>, canon::CanonError> {
+        let safe = |i: i64| (-canon::MAX_SAFE..=canon::MAX_SAFE).contains(&i);
+        let unsafe_cell = obs.channels.values().any(|ch| matches!(ch, ChannelData::Sites { cells, .. } if cells.iter().any(|c| !safe(c.x) || !safe(c.y))));
+        if unsafe_cell {
+            return Ok(self.observed(obs)?.shown);
+        }
+        let delivered = &self.delivered;
+        let mut shown: BTreeMap<Id, Shown> = BTreeMap::new();
+        // (The buildings met so far in this observation, by where each is in memory: one building is on many cells.)
+        let mut buildings: Vec<(usize, Arc<StructureFact>)> = vec![];
+        for (path, ch) in &obs.channels {
+            match ch {
+                ChannelData::Records { records, .. } if !records.is_empty() => {
+                    let facts = shown.entry(path.clone()).or_default();
+                    for r in records {
+                        facts.records.push(delivered.record(r)?.1);
+                    }
+                }
+                ChannelData::Sites { cells, .. } if !cells.is_empty() => {
+                    let facts = shown.entry(path.clone()).or_default();
+                    for c in cells {
+                        let structure = c.structure.as_ref().map(|x| {
+                            let at = Arc::as_ptr(x) as usize;
+                            let fact = match buildings.iter().rev().find(|(p, _)| *p == at) {
+                                Some((_, f)) => f.clone(),
+                                None => {
+                                    let f = delivered.structure_fact(x);
+                                    buildings.push((at, f.clone()));
+                                    f
+                                }
+                            };
+                            (x.structure.as_str(), fact)
+                        });
+                        facts.cells.push(Arc::new(CellFacts::new(&c.cell, c.x, c.y, c.terrain.as_deref(), structure)));
+                    }
+                }
+                _ => {}
+            }
+        }
+        #[cfg(debug_assertions)]
+        {
+            let full = Encoded::of(obs, delivered).expect("an observation shown is encodable").shown;
+            assert_eq!(format!("{shown:?}"), format!("{full:?}"), "what an observation adds, read without its JSON, is not what its JSON adds");
+        }
+        Ok(shown)
     }
 
     /// How many threads observations are made ready on (see `plan`; 1: none are made ready ahead), and how many

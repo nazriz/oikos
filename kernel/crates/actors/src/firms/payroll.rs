@@ -443,7 +443,7 @@ mod tests {
         if let Value::Object(m) = extra {
             params.extend(m);
         }
-        c.params = params;
+        c.params = params.into();
         c
     }
 
