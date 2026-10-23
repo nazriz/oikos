@@ -34,7 +34,7 @@ import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
-const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+const spec = { ...(Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any), shop_mix: false /* the single-goods town: this test holds a mechanism of it (docs/risks.md ME-19) */ };
 const SEATS = ["councillor-4", "land-registrar"];
 
 /** Posts with work whose office is the same office with a seat in it (no clerk, no staff, no standing orders of its own). */

@@ -12,7 +12,7 @@ import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
-const base = { ...(Bun.YAML.parse(readFileSync(join(root, "worlds/town-300.yaml"), "utf8")) as any) };
+const base = { ...({ ...(Bun.YAML.parse(readFileSync(join(root, "worlds/town-300.yaml"), "utf8")) as any), shop_mix: false /* the single-goods town: this test holds a mechanism of it (docs/risks.md ME-19) */ }) };
 
 /** The town with its profile\'s offers priced as `times` of today\'s (and optionally a law against serving by systems), run `days`. */
 async function run(name: string, days: number, o: { times?: number; fall?: number; law?: boolean; tweak?: (P: any) => void } = {}) {
