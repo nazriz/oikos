@@ -1702,6 +1702,32 @@ mod tests {
     }
 
     #[test]
+    fn a_refused_claim_is_a_grievance_against_the_office_only_where_things_go_wrong_at_all() {
+        // (2026-10-24: the worked example's town had no `living`, so its friction dial was nought and nobody refused
+        // took it further; with the dial on, a refusal is a wrong to be looked at again, whether or not it was one.)
+        let rules = json!([{ "id": "basic", "payer": "outside", "account": "o", "every_days": 30, "who": { "out_of_work": true }, "amount": { "flat": 4_000 } }]);
+        for dial in [0, 10_000] {
+            let mut c = ctx(json!({}));
+            c.world = Arc::new(WorldInfo { dials: json!({ "friction_bps": dial }), ..WorldInfo::default() });
+            let mut p = Person::new(&c).unwrap();
+            run(&mut p, &c, DAY, 40, 500_000, &[law(rules.clone())], Person::claims);
+            run(&mut p, &c, 2 * DAY, 40, 500_000, &[decision("rec.3", 2 * DAY, "rec.2", "basic", false, json!({ "reason": "the claim could not be verified" }))], Person::claims);
+            if dial == 0 {
+                assert!(p.recourse.grievances.is_empty(), "nothing goes wrong in a town without frictions");
+                continue;
+            }
+            let g = &p.recourse.grievances["claim_refused:rec.3"];
+            assert_eq!((g.party.as_str(), g.seeks.as_deref()), ("outside", Some("basic")));
+            assert_eq!(g.evidence.as_ref().unwrap()["id"], json!("rec.3"));
+            // A refusal that was itself a review's answer is not grieved again.
+            let mut q = Person::new(&c).unwrap();
+            run(&mut q, &c, DAY, 40, 500_000, &[law(rules.clone())], Person::claims);
+            run(&mut q, &c, 2 * DAY, 40, 500_000, &[decision("rec.3", 2 * DAY, "rec.2", "basic", false, json!({ "reviewed": true }))], Person::claims);
+            assert!(q.recourse.grievances.is_empty());
+        }
+    }
+
+    #[test]
     fn a_bill_well_over_the_usual_is_a_grievance_of_ours_with_the_bill_as_evidence() {
         // (Until 2026-10-18 only the mind heard of it: life held no grievance, so the want it bore had nothing to answer
         // it, not even telling those we know.)

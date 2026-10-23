@@ -37,7 +37,12 @@ export type Steward =
   /** A model seat in the post: `model` is `provider/name` (`mock/...` for the mock policies below). */
   | { kind: "model"; model: string; effort?: string; params?: { [k: string]: unknown } };
 
-export interface Arm { name: string; steward: Steward }
+/** An act withheld in an arm (the engine's `withhold`, kernel/src/engine.rs; risk MT-19): of the acts from the fork on
+ * that publish a paper of the kind `what` (or are a block of that name), by `participant` (absent: anyone), of `matter`
+ * (its data's) and addressed `to` whom where given, the `nth`
+ * (from 1) is not carried out; its actor believes it sent it. The arm is then "the same arm without that act". */
+export interface Withhold { what: string; participant?: string; nth?: number; matter?: string; to?: string }
+export interface Arm { name: string; steward: Steward; withhold?: Withhold[] }
 
 /** How a seed's town is made: a world file (a generator spec or a config, as `oikos run` takes it), a generator spec, or a config; then `prepare`. */
 export interface WorldSource {
@@ -268,6 +273,8 @@ const BUILTIN: { [name: string]: (arg: string | undefined, c: MeasureContext) =>
   first_record: (a, c) => { let t: number | null = null; return { see: (e) => { if (t === null && RECORDED(e) && e.body.record?.kind === a) t = e.t; }, result: () => (t === null ? null : Math.floor((t - c.forkT) / DAY)) }; },
   /** Money that moved between accounts, in cents, summed. */
   transfers_cents: () => { let n = 0; return { see: (e) => { if (e.kind === "event" && e.body?.event === "transfer") n += Number(e.body.amount) || 0; }, result: () => n }; },
+  /** Acts withheld in this fork (an arm's `withhold`): 0 where the act it names never came. */
+  withheld: () => { let n = 0; return { see: (e) => { if (e.kind === "annotation" && e.body?.annotation === "note" && e.body.data?.withheld) n++; }, result: () => n }; },
   /** Entries the log gained from the fork on. */
   log_entries: () => { let n = 0; return { see: () => { n++; }, result: () => n }; },
 };
@@ -352,7 +359,7 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   const brainOf = (id: string) => { const s = twinSpecs(config).get(id); return s && saved[id] ? new DetachedActor({ ...s, saved: saved[id]! }) : undefined; };
   const brains = new Map([...twinSpecs(config).keys()].map((id) => [id, brainOf(id)!]));
   const logPath = join(f.dir, `${safe(arm.name)}.oklog`);
-  const w = RustWorld.resume(readFileSync(f.snapshot), { log: logPath, parent: "base.oklog", label: arm.name, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stream: { cap: 4_000_000 } });
+  const w = RustWorld.resume(readFileSync(f.snapshot), { log: logPath, parent: "base.oklog", label: arm.name, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stream: { cap: 4_000_000 }, ...(arm.withhold?.length ? { withhold: arm.withhold } : {}) });
   const forkT = w.t();
   // (The stewardship ledger: the base's, taken up with this arm's steward, counting from the fork.)
   const ledger = wantsStewardship(spec) ? (existsSync(f.ledger) ? Ledger.restore(JSON.parse(readFileSync(f.ledger, "utf8")), { from: forkT, steward: stewardOf(seat, arm.steward), ...(spec.institutions ? { institutions: spec.institutions } : {}) }) : new Ledger({ config, from: forkT, steward: stewardOf(seat, arm.steward), ...(spec.institutions ? { institutions: spec.institutions } : {}) })) : undefined;
@@ -611,6 +618,7 @@ export function validate(spec: ExperimentSpec, factories: SeatFactories = {}): v
   for (const a of spec.arms) {
     if (names.has(a.name)) bad(`two arms are called ${a.name}`);
     names.add(a.name);
+    for (const x of a.withhold ?? []) if (!x?.what || (x.nth !== undefined && !(Number.isInteger(x.nth) && x.nth >= 1))) bad(`arm ${a.name}: a withhold names what (a kind of paper or a block) and an nth from 1`);
     if (a.steward.kind === "model") {
       const provider = a.steward.model.split("/")[0]!;
       if (provider !== "mock" && !factories[provider]) bad(`arm ${a.name}: model ${a.steward.model} has no seat controller here; real models need a SeatFactory (docs/experiments.md, "Real models")`);
@@ -644,10 +652,27 @@ function committedAt(file: string): { committed?: string } {
   return first ? { committed: first } : {};
 }
 
+/** The registered comparisons that need citizens who take recourse (the responsiveness and recourse families), where
+ * the town's citizens take none: a town without `living` has `dials.initiative_bps` and `dials.friction_bps` at 0, so
+ * nothing goes wrong for anyone and nobody asks, appeals, complains or petitions (docs/behaviour/frictions.md; the
+ * worked example of 2026-10-23 measured exactly that). Empty: nothing to say. */
+export function recourseProblems(config: any, held?: HeldPrereg): string[] {
+  const dial = (k: string) => Number(config?.dials?.[k] ?? 0) > 0;
+  if (dial("initiative_bps") && dial("friction_bps")) return [];
+  const needs = new Set(STEWARDSHIP_MEASURES.filter((m) => m.family === "responsiveness" || m.family === "recourse").map((m) => m.name));
+  const registered = held ? [...(held.prereg.primary ?? []), ...(held.prereg.secondary ?? [])].map((c) => c.measure) : [];
+  const named = [...new Set(registered.filter((m) => needs.has(m)))];
+  if (!named.length) return [];
+  return [`it registers ${named.join(", ")}, but its town's citizens take no recourse (dials.initiative_bps ${config?.dials?.initiative_bps ?? 0}, dials.friction_bps ${config?.dials?.friction_bps ?? 0}: a town without \`living\`; set living.initiative_bps and living.friction_bps)`];
+}
+
 export async function runExperiment(spec: ExperimentSpec, o: RunOptions): Promise<{ report: Report; results: ArmResult[]; text: string; out: string }> {
   const say = o.log ?? (() => {});
   validate(spec, o.factories);
   const held = loadPrereg(spec, o.specFile);
+  // (A comparison that cannot move is not run: the first seed's town says whether its citizens take recourse at all.)
+  const lever = held ? recourseProblems(await buildConfig(spec, spec.seeds[0]!), held) : [];
+  if (lever.length) throw new Error(`experiment ${spec.name}: ${lever.join("; ")}`);
   const out = resolve(o.out);
   if (existsSync(join(out, "results.json"))) throw new Error(`${out} already holds an experiment's results: a run is training data and is never overwritten; name another folder`);
   mkdirSync(out, { recursive: true });

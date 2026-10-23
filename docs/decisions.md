@@ -7117,7 +7117,7 @@ looked only at the code arm of town-300 (no review requests in 60 days), to choo
 the fork equals one ledger of the whole log), `measure/test/compare.test.ts` (7: t table, pairing, DiD, intervals,
 Bonferroni, registration checks, spec mismatch, YAML and JSON), five more in `orchestrator/test/experiment.test.ts`
 (the rubber stamp; `stewardship` in a spec; the registered report's primary and exploratory; a mismatched registration
-does not run). `bun run test:fast`: 1,310 pass, 1 fail (`risks.test`: an untagged "not built", tagged MT-19 and rerun
+does not run). `bun run test:fast`: 1,310 pass, 1 fail (`risks.test`: an untagged gap marker, tagged MT-19 and rerun
 green with `experiment` and `generality`); `bun run typecheck` clean; no Rust changed (the fast tier ran the kernel's
 cargo tests).
 
@@ -7126,3 +7126,65 @@ cargo tests).
 **Revisit if** the engine gains a withheld act (then add the `withhold` arm and register a DiD); a measure's definition
 needs to change (a new name, not an edit); citizens' recourse is mended (re-run this example under a new name and
 registration); or a place's institutions do not fit the public/firm split a spec states.
+
+## 2026-10-24 · Citizens' recourse in the experiments: why nobody asked, the withheld act (MT-19), and the worked example again (branch `fix-recourse`; no model called)
+
+**Why.** The worked example of 2026-10-23 found no request for a review, no appeal and no complaint in 540 seed-days of a
+1,000-person town (24 refusals), against about 28 requests a year on the TypeScript world, and flagged a likely fault of
+the port. The owner's first experiment (TARA) is a support office or tribunal held by different stewards: if nobody asks,
+it measures nothing.
+
+**Traced: not a fault of the port; the worked example's town was not a living one.** `experiments/support-stewards.json`
+ran `worlds/town-1000.yaml` with `years=1` and `opening_caseload=true` only. Without `living` the generator writes
+`dials.friction_bps` 0 and `dials.initiative_bps` 0 (docs/behaviour/frictions.md: "absent or 0, nothing of the kind
+arises"). With the friction dial at 0: no slip of the office's (every slip row of a decision is scaled by it, so the 24
+refusals were all of claims that did not qualify), and a refused claim is no grievance (`citizen/money.rs`, the
+`dial > 0` gate, as `citizen.ts:3645` at `pre-cutover` had `fdial > 0`). With initiative at 0 no want is born
+(`mind/citizen.rs` `want_born`), so nothing is asked, applied for, complained of or petitioned, by design: the town is
+step 1's. The TypeScript figure it was set against (F8's, about 28 a year) was measured with "the living flags of the
+culture batches" (`initiative_bps` 10,000, `friction_bps` 30,000, `culture`). Every link was read: the refusal's
+grievance (`money.rs`), the mind's `Grieved` (`voice.rs`) and want, the openings for a want (`recourse.rs` `Ways`: ask
+the party, the law's review and appeal routes from `law-decisions`, a venue that says it hears the matter), the request
+(`AskPutRight`), the office's answer (`boundary/support_law.rs`), the venue's.
+- **Measured on the Rust world, living** (town-1000, au-vic, seed 1, `opening_caseload`): *as sourced* (`friction_bps`
+  10,000), 210 days: 20 refusals, 21 refusals grieved, 8 requests to the office about a refused claim (6 after day 30),
+  8 reviews decided (4 changed), 2 applications to a venue about a refusal and 3 venue decisions; besides, 41 requests to
+  put something right in all (bills 11, goods 9, underpaid 11, disrepair 1, arrears 1), 8 complaints, 6 tribunal
+  applications (3 of them landlords' for possession), 16 wage claims, 2 petitions and 49 signatures. *At F8's flags* (`friction_bps` 30,000, `culture`), a
+  year: 68 refusals, 29 requests about a refused claim (TS F8: 28 a year, mean of three seeds), 29 reviews decided, 6
+  applications to a venue about a refusal (TS: 6.7), 1 to the tribunal. **The Rust citizen's recourse is the TypeScript
+  one's within one seed's noise**; recorded, not chased.
+- **Related acts checked in the same runs**: tribunal applications by tenants (disrepair, bills, goods, underpaid),
+  petitions and signatures, wage claims (the union's grievance route), complaints and the decisions of the
+  desks that hear them (`complaint_notice`, `venue_decision`): all occur in a living town, none in a town without it
+  (a debt owed to someone is still pursued at the tribunal: life's, not a friction's).
+
+**Built.**
+- **A comparison that cannot move is not run (MT-20).** `recourseProblems` (`orchestrator/src/experiment.ts`): a
+  registration naming a measure of the responsiveness or recourse families, in a town whose `initiative_bps` or
+  `friction_bps` is 0, is refused before anything runs, saying which dials to set. An unregistered spec is not refused.
+- **The withheld act (MT-19).** The engine's option `withhold` (`kernel/src/engine.rs` `Withhold`; host, protocol and
+  the N-API module take it with a run's or a fork's options): of the acts carried out from the start of the run or
+  fork, those that publish a paper of the kind `what` (or are a block of that name), by `participant`, of a `matter`, to
+  an addressee `to` (each only where given), the `nth` is not carried out: no time, no paper, no money; a `note`
+  `withheld` in the log. The actor is told nothing and believes it sent it (a letter lost before the post). An arm of an
+  experiment names it (`withhold`), and the measure `withheld` counts it.
+- **Decided fresh.** *Lost, not unchosen:* the act is dropped after the actor decided it, so the fork is the parent to
+  the hash until that act; changing the actor's choice would need a per-actor override of a draw and would move the
+  actor's own memory before the act. *Counted from the fork, in the engine's order:* the order acts are carried out is
+  the run's own, so the nth is the same act on any number of threads. *Its actor's wake ends as after an act:* a
+  refused act would wake it again at the same moment and change its rhythm. *A host's seat acting through its own
+  commands (`host_seats`) is not reached.* Rejected: seating the citizen as its twin and dropping its action (not exact
+  in the light host, MT-19's first finding).
+
+**Tests.** `kernel/tests/host.rs` (a fork withholding the bureau's first warning is the parent without it; the same
+twice is the same hash; the second rather than the first; a ninth, another's, an unknown kind, a matter or an addressee
+never met: the parent to the hash with no note; nothing named is refused). `citizen/money.rs` (a refusal is a
+grievance with the decision as evidence only where the friction dial is on; a review's own refusal is not grieved
+again). `orchestrator/test/recourse-town.test.ts` (town-300, 300 days: living, residents ask the office about refused
+claims and the office reviews, other wrongs are asked about and taken to venues; the same town without `living`: no
+request, no application about a friction's matter). `orchestrator/test/experiment.test.ts` (an arm's withholding is
+checked; the guard; a whole experiment where an arm withholds the bureau's first warning, a model arm too, and one
+naming a ninth is the code arm to the hash).
+
+**Risks.** MT-19 fixed; MT-20 added (mitigated).

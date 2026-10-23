@@ -6,7 +6,7 @@
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { buildReport, DAY, loadPrereg, loadSpec, makeMeasure, measureList, mockModel, reportText, runExperiment, seatify, validate, type ArmResult, type ExperimentSpec } from "../src/experiment";
+import { buildReport, DAY, loadPrereg, loadSpec, makeMeasure, measureList, mockModel, recourseProblems, reportText, runExperiment, seatify, validate, type ArmResult, type ExperimentSpec } from "../src/experiment";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { DetachedActor, SeatWake } from "../src/rust-world";
@@ -167,6 +167,20 @@ test("an experiment whose spec differs from its registration does not run", () =
   rmSync(dir, { recursive: true, force: true });
 });
 
+test("an arm's withholding is checked, and a registered comparison that needs citizens' recourse is refused in a town where they take none", () => {
+  expect(() => validate(base({ arms: [{ name: "a", steward: { kind: "code" }, withhold: [{ what: "" }] }] }))).toThrow(/withhold names what/);
+  expect(() => validate(base({ arms: [{ name: "a", steward: { kind: "code" }, withhold: [{ what: "review_request", nth: 0 }] }] }))).toThrow(/nth from 1/);
+  validate(base({ arms: [{ name: "a", steward: { kind: "code" }, withhold: [{ what: "review_request", matter: "claim_refused", to: "outside" }] }] }));
+  const held = (measure: string) => ({ file: "x.yaml", sha256: "h", prereg: { preregistration: 1 as const, experiment: "t", registered: "2026-10-24", question: "q", post: "p", arms: ["a", "b"], reference: "a", seeds: [1, 2, 3], forkDay: 1, untilDay: 5, primary: [{ measure, arm: "b" }] } });
+  const plain = { dials: { initiative_bps: 0, friction_bps: 0 } }, living = { dials: { initiative_bps: 10_000, friction_bps: 10_000 } };
+  // (The worked example of 2026-10-23: a town without `living`, so nothing went wrong for anyone and nobody asked.)
+  expect(recourseProblems(plain, held("appeals_made")).join()).toMatch(/registers appeals_made, but its town's citizens take no recourse/);
+  expect(recourseProblems({}, held("review_changed_share")).join()).toMatch(/living\.friction_bps/);
+  expect(recourseProblems(plain, held("decided_by_seat_share"))).toEqual([]);
+  expect(recourseProblems(living, held("appeals_made"))).toEqual([]);
+  expect(recourseProblems(plain)).toEqual([]);
+});
+
 // ---- a whole experiment on the engine
 
 const kernel = join(root, "kernel/target/release/oikos-kernel");
@@ -218,6 +232,29 @@ test.skipIf(!have)("a whole experiment: the weather bureau's steward, four arms,
   expect(lines.some((l) => l.includes('"annotation":"usage"'))).toBe(true);
   const v = Bun.spawnSync([kernel, "verify", jsonl]);
   expect(v.exitCode).toBe(0);
+  rmSync(out, { recursive: true, force: true });
+}, 600_000);
+
+test.skipIf(!have)("an arm that withholds one named act is its parent's fork without it: the act never comes, the log says so, and one never made changes nothing", async () => {
+  const { spec, factories } = await loadSpec(specFile);
+  const one: ExperimentSpec = { ...spec, name: "withhold", seeds: [1], untilDay: 40, measures: ["records:weather_warning", "withheld"], arms: [
+    { name: "code", steward: { kind: "code" } },
+    { name: "code-without-the-first", steward: { kind: "code" }, withhold: [{ what: "weather_warning" }] },
+    { name: "code-without-a-ninth", steward: { kind: "code" }, withhold: [{ what: "weather_warning", nth: 9 }] },
+    { name: "diligent-without-the-first", steward: { kind: "model", model: "mock/diligent" }, withhold: [{ what: "weather_warning", nth: 1 }] },
+  ] };
+  delete (one as any).preregistration;
+  const out = join(root, "runs", "test-experiment-withhold");
+  rmSync(out, { recursive: true, force: true });
+  const r = await runExperiment(one, { out, parallel: 0, factories });
+  expect(r.results.filter((x) => x.error)).toEqual([]);
+  const get = (arm: string) => r.results.find((x) => x.arm === arm)!;
+  expect(get("code").measures).toEqual({ "records:weather_warning": 2, withheld: 0 });
+  expect(get("code-without-the-first").measures).toEqual({ "records:weather_warning": 1, withheld: 1 });
+  expect(get("code-without-the-first").stateHash).not.toBe(get("code").stateHash);
+  expect(get("code-without-a-ninth")).toMatchObject({ stateHash: get("code").stateHash, measures: { withheld: 0 } });
+  // (The bureau is the seat's in a model arm: the withholding is of the act, whoever decided it.)
+  expect(get("diligent-without-the-first").measures).toEqual({ "records:weather_warning": 1, withheld: 1 });
   rmSync(out, { recursive: true, force: true });
 }, 600_000);
 

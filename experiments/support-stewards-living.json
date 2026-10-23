@@ -1,0 +1,112 @@
+{
+  "name": "support-stewards-living",
+  "world": {
+    "file": "worlds/town-1000.yaml",
+    "sets": [
+      "years=1",
+      "opening_caseload=true",
+      "living.initiative_bps=10000",
+      "living.friction_bps=10000"
+    ]
+  },
+  "post": "outside-support",
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "forkDay": 30,
+  "untilDay": 210,
+  "arms": [
+    {
+      "name": "code",
+      "steward": {
+        "kind": "code"
+      }
+    },
+    {
+      "name": "diligent",
+      "steward": {
+        "kind": "model",
+        "model": "mock/diligent"
+      }
+    },
+    {
+      "name": "rubber-stamp",
+      "steward": {
+        "kind": "model",
+        "model": "mock/rubber-stamp"
+      }
+    },
+    {
+      "name": "code-without-first-review",
+      "steward": {
+        "kind": "code"
+      },
+      "withhold": [
+        {
+          "what": "review_request",
+          "matter": "claim_refused",
+          "to": "outside",
+          "nth": 1
+        }
+      ]
+    },
+    {
+      "name": "stamp-without-first-review",
+      "steward": {
+        "kind": "model",
+        "model": "mock/rubber-stamp"
+      },
+      "withhold": [
+        {
+          "what": "review_request",
+          "matter": "claim_refused",
+          "to": "outside",
+          "nth": 1
+        }
+      ]
+    }
+  ],
+  "reference": "code",
+  "measures": [
+    "acts",
+    "records:decision_review",
+    "records:review_request",
+    "withheld",
+    "stewardship"
+  ],
+  "prices": {
+    "mock/diligent": {
+      "input": 3000000,
+      "output": 15000000
+    },
+    "mock/rubber-stamp": {
+      "input": 3000000,
+      "output": 15000000
+    }
+  },
+  "preregistration": "support-stewards-living.prereg.yaml",
+  "threads": 1,
+  "institutions": {
+    "public": [
+      "government",
+      "tribunal",
+      "police",
+      "school",
+      "health_service",
+      "electoral_commission",
+      "registry",
+      "audit_office"
+    ],
+    "firms": [
+      "shop",
+      "factory",
+      "landlord",
+      "builder",
+      "firm",
+      "utility",
+      "bank"
+    ]
+  }
+}

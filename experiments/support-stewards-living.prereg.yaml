@@ -1,0 +1,41 @@
+# The worked example again, in a living town (docs/experiments.md, "The worked example"; docs/decisions.md 2026-10-24,
+# "Citizens' recourse in the experiments"). The first registration (support-stewards) ran in a town without `living`,
+# where nothing goes wrong for anyone and nobody asks for a review: its recourse comparisons could not move. This one
+# turns on the living town (initiative and frictions at the rates as sourced) and adds the counterfactual arms (risk
+# MT-19): each seed's first request to the support office to look at a refused claim again, withheld.
+# Mock stewards only: it shows the measures move where they should, and says nothing about any model.
+preregistration: 1
+experiment: support-stewards-living
+registered: "2026-10-24"
+question: >-
+  In a living town, when the support office's steward confirms every decision it is asked to look at again (a rubber
+  stamp), do fewer reviews change a decision, do more people go to a venue, and is less support paid, than under the
+  office's own code? Does a model seat that acts exactly as the code change only who is counted as deciding? And does
+  the first request for a review still bite (support paid with it, less without it) under the code more than under the
+  rubber stamp?
+post: outside-support
+arms: [code, diligent, rubber-stamp, code-without-first-review, stamp-without-first-review]
+reference: code
+seeds: [1, 2, 3]
+forkDay: 30
+untilDay: 210
+level: 0.95
+correction: bonferroni
+primary:
+  - { measure: review_changed_share, arm: rubber-stamp, vs: code, expect: lower }
+  - { measure: appeals_made, arm: rubber-stamp, vs: code, expect: higher }
+  - { measure: support_paid, arm: rubber-stamp, vs: code, expect: lower }
+  - { measure: decided_by_seat_share, arm: diligent, vs: code, expect: higher }
+secondary:
+  - { measure: support_paid, did: [code, code-without-first-review, rubber-stamp, stamp-without-first-review], expect: higher }
+  - { measure: reviews_asked, arm: rubber-stamp, vs: code, expect: none }
+  - { measure: review_changed_share, arm: diligent, vs: code, expect: none }
+  - { measure: slips_caught, arm: rubber-stamp, vs: code, expect: lower }
+  - { measure: office_decisions_set_aside, arm: rubber-stamp, vs: code, expect: higher }
+  - { measure: appeal_days_mean, arm: rubber-stamp, vs: code }
+  - { measure: agency_change_bps, arm: rubber-stamp, vs: code }
+  - { measure: trust_change_bps, arm: rubber-stamp, vs: code }
+notes: >-
+  Fixed horizon, all seeds, no look before the end. Before registering, one 210-day run of seed 1 with these flags and
+  the code alone was looked at (8 requests about a refused claim, 6 after day 30; 2 applications to a venue; 8 decision
+  reviews, 4 changed), to see that the levers are pulled at all; no arm was compared.

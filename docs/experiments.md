@@ -96,11 +96,26 @@ leaves the code arm's world to the hash, so every difference but who decided is 
 
 **Counterfactual forks (difference in differences).** Whether a lever still bites under a steward is the difference in
 differences `(A - A without the act) - (B - B without the act)`: a registration names it as `did: [A, A0, B, B0]`, and
-the report computes it seed by seed. What is not built (MT-19) is the arm that withholds a citizen's act: citizens are the
-engine's own actors, and the light host decides only seats. Seating a citizen as its code twin to withhold its act is
-not exact in this host (two seated citizens over 20 days lost 19 of their own records and 5 acts: the host submits a
-twin's action and not its record), and seating every citizen stopped the engine (a wake loop). The withhold belongs in
-the engine, as a researcher's intervention named in the run's config and recorded in the log (the GD plan's step M2).
+the report computes it seed by seed. An arm without the act names it (`withhold`, risk MT-19):
+
+```json
+{ "name": "code-without-first-review", "steward": { "kind": "code" },
+  "withhold": [{ "what": "review_request", "matter": "claim_refused", "to": "outside", "nth": 1 }] }
+```
+
+The engine (`kernel/src/engine.rs`, `Withhold`; an option of the run or the fork) counts, from the fork on and in the
+order it carries acts out, the acts that publish a paper of the kind `what` (or are a block of that name: `vote`,
+`transfer`), by `participant` if given, whose data's `matter` and whose addressee `to` are those given, and does not
+carry out the `nth`: no time charged, no paper, no money. Its actor is told nothing and believes it sent it (a letter
+lost before the post), so the fork is its parent to the hash until that act. The log says so (a `note` whose data is
+`withheld`); the measure `withheld` counts them, and is 0 where the act never came. Deterministic: tested at the engine
+(`kernel/tests/host.rs`) and through the harness (`orchestrator/test/experiment.test.ts`). It withholds whoever's act it
+names, a citizen's or an office's; it does not reach an act a host's own seat makes through its own commands.
+
+**A comparison that cannot move is not run.** A town without `living` has `dials.initiative_bps` and
+`dials.friction_bps` at 0: nothing goes wrong for anyone, and nobody asks for a review, appeals, complains or petitions
+(docs/behaviour/frictions.md). The harness refuses a registration that names a measure of the responsiveness or recourse
+families in such a town (MT-20). Set `living.initiative_bps` and `living.friction_bps` in the world's `sets`.
 
 ## Pre-registration
 

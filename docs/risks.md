@@ -1190,15 +1190,32 @@ The mechanism:
 - **Gap:** The GD plan's counterfactual form of responsiveness (M2: the same town and seed with one act of a citizen
   withheld) needs an arm that removes that act. Citizens are the engine's own actors and the light host decides only
   seats; seating a citizen as its twin to withhold its act is not exact there (two seated citizens over 20 days lost 19
-  of their own records and 5 acts), and seating every citizen stops the engine (a wake loop). The report computes a
-  difference in differences when a registration names one; no spec can make the withheld arms yet.
-- **Where:** `orchestrator/src/experiment.ts`; `docs/experiments.md` "The comparison"; decisions 2026-10-23 "The measures of stewardship".
-- **Effect:** Whether a lever still bites is read only from what the log names (reviews changed, appeals found for the
+  of their own records and 5 acts), and seating every citizen stops the engine (a wake loop).
+- **Where:** `kernel/src/engine.rs` (`Withhold`), `orchestrator/src/experiment.ts` (an arm's `withhold`); `docs/experiments.md` "The comparison"; decisions 2026-10-23 "The measures of stewardship" and 2026-10-24 "Citizens' recourse in the experiments".
+- **Effect:** Whether a lever still bites was read only from what the log names (reviews changed, appeals found for the
   applicant, petitions taken up), not as the effect of the act on the outcome.
-- **L / I:** high / medium · **Status:** to fix (an engine intervention: a withheld act named in the run's config, applied
-  at submission, recorded in the log; then a spec's arm names it)
-- **Notice by:** a claim that a lever "no longer bites" made from direct counts alone.
+- **L / I:** high / medium · **Status:** fixed (decisions 2026-10-24, "Citizens' recourse in the experiments"): the
+  engine withholds the nth act that publishes a named kind of paper (or is a named block), by a participant, of a matter,
+  to an addressee, as an option of the run or fork, recorded in the log (`note` `withheld`); an arm names it, and a
+  registration's `did` reads it. What stays open: the actor believes it sent the act (a letter lost before the post), so
+  this is "the act never arrived", not "the citizen chose otherwise"; an act a host's seat makes through its own commands
+  (`host_seats`) is not withheld.
+- **Notice by:** a claim that a lever "no longer bites" made from direct counts alone; a `withheld` measure of 0 in an arm
+  that names a withholding (the act never came).
 - **Fix when:** Before a TARA result about responsiveness is reported.
+
+### MT-20 · An experiment registered on recourse in a town where nobody takes any
+- **Gap:** A town without `living` has `dials.initiative_bps` and `dials.friction_bps` at 0 (docs/behaviour/frictions.md):
+  nothing goes wrong for anyone, no want is born, and nobody asks for a review, appeals, complains, petitions or applies
+  to a tribunal. The first worked example (2026-10-23) registered recourse comparisons in such a town and read them as
+  unsettled; it was taken for a fault of the port.
+- **Where:** `orchestrator/src/experiment.ts` (`recourseProblems`); `experiments/`; decisions 2026-10-24.
+- **Effect:** A registered comparison that cannot move, run and read as "no difference".
+- **L / I:** medium / high · **Status:** mitigated: the harness refuses to run a registration that names a measure of
+  the responsiveness or recourse families in a town whose citizens take no recourse. An unregistered spec is not refused
+  (its report shows the zeros).
+- **Notice by:** `reviews_asked` and `appeals_made` at 0 in every arm.
+- **Fix when:** Done; revisit if a third dial comes to govern whether people act.
 
 ---
 
