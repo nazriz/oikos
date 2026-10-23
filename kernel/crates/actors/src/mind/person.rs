@@ -772,6 +772,13 @@ impl Mind {
         self.domains.get(domain).map_or(false, |a| a.known(option))
     }
 
+    /// What was learned of options gone from mind (a gathering whose notice was let go) is let go too.
+    pub fn forget_options(&mut self, domain: &str, keep: impl Fn(&str) -> bool) {
+        if let Some(a) = self.domains.get_mut(domain) {
+            a.a.retain(|o, _| keep(o));
+        }
+    }
+
     pub fn learn(&mut self, domain: &str, chosen: &str, payoff_bps: i64, forgone: &BTreeMap<String, i64>) {
         self.learned(domain).update(chosen, payoff_bps, forgone);
     }

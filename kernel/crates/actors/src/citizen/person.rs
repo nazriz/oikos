@@ -36,7 +36,7 @@ impl Kind for Citizen {
     fn version(&self) -> &'static str {
         // (Held equal to the TS manifest until the cut-over, docs/port-guide.md section 2; the integration step bumps
         // it with the Rust's own changes, listed in the decisions entry.)
-        "0.58.0"
+        "0.59.0"
     }
     fn doc(&self) -> &'static str {
         "docs/behaviour/citizen.md"
@@ -167,6 +167,9 @@ impl From<Step<()>> for Todo {
 /// snapshot.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct State {
+    /// When what is kept of public goings-on was last gone through (citizen/memory.rs).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_at: Option<i64>,
     // ---- home and household
     pub home: Option<Home>,
     pub homeless_since: Option<i64>,
@@ -688,6 +691,22 @@ impl Actor for Person {
         };
         serde_json::to_value(v).map_err(|e| e.to_string())
     }
+    fn kept(&self) -> Option<std::collections::BTreeMap<String, u64>> {
+        let mut out = std::collections::BTreeMap::new();
+        for (k, n) in self.book.counts() {
+            out.insert(format!("book.{k}"), n);
+        }
+        out.insert("book".into(), self.book.len() as u64);
+        let life = serde_json::json!({ "s": self.s, "housing": self.housing, "work": self.work, "money": self.money, "lifecycle": self.lifecycle, "recourse": self.recourse, "absorbed": self.absorbed });
+        crate::kept_sizes("", &life, &mut out);
+        out.insert("bytes.life".into(), serde_json::to_vec(&life).map_or(0, |v| v.len() as u64));
+        if let Ok(m) = self.mind.save() {
+            crate::kept_sizes("mind", &m, &mut out);
+            out.insert("bytes.mind".into(), serde_json::to_vec(&m).map_or(0, |v| v.len() as u64));
+        }
+        out.insert("people".into(), 1);
+        Some(out)
+    }
 }
 
 impl Person {
@@ -719,6 +738,7 @@ impl Person {
             }
         }
         self.s.last_seen_t = t;
+        self.remember(t, &cx.ctx.participant.clone());
         self.absorb(pic, cx);
         {
             let life = self.life(pic, t, None);

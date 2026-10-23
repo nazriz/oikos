@@ -1233,7 +1233,7 @@ The mechanism:
 - **Notice by:** `reviews_asked` and `appeals_made` at 0 in every arm.
 - **Fix when:** Done; revisit if a third dial comes to govern whether people act.
 
-### MT-21 · A request for a review that is never answered leads nowhere
+### MT-21 · A request for a review that is never answered leads nowhere (where the law has no deemed refusal)
 - **Gap:** Where the law requires a review before an appeal (`review.required`: au-vic's support decisions), the appeal
   clock runs from the review's answer. A request never answered is deemed `ignored` after `answer_days`, but has no
   `answered_at`, so the claimant may not appeal, does not ask again (`asked` is set) and nothing else follows. Found by
@@ -1242,11 +1242,16 @@ The mechanism:
 - **Where:** `kernel/crates/actors/src/citizen/recourse.rs` (`disrepair`'s "ignored", `Ways::for_want`'s `may_apply`).
 - **Effect:** A steward that does not answer requests for review shuts the appeal route for good: the sim makes
   silence a stronger lever than the place's law and its other bodies would.
-- **L / I:** medium / high · **Status:** open. What a real claimant does about an unanswered review is the place's (ask
-  again, complain to an ombudsman, a deemed refusal where the law has one): to be sourced, then law data, not a rule
-  in code.
-- **Notice by:** `withheld` arms whose claimant never acts again; a model steward that leaves requests unanswered.
-- **Fix when:** Before a TARA arm in which the steward may leave requests unanswered.
+- **L / I:** medium / high · **Status:** mitigated (2026-10-24, branch `fix-memory-appeal`). A deemed refusal is law
+  data (`review.deemed_refused_days`): where a place's law has one, a review unanswered that long is taken as refused
+  and the claimant's appeal runs from then (de-ni: 91 days, SGG s 88(2), to confirm; held at citizen level and in a
+  living town whose office's answers are withheld). Still open where the law has none: au-vic (the TARA town), gb-eng,
+  us-oh's pension recall none (to confirm); what their claimants do instead (ask again, the ombudsman, judicial review)
+  is not built.
+- **Notice by:** `withheld` arms whose claimant never acts again in a town whose law has no deemed refusal; a model
+  steward that leaves requests unanswered there.
+- **Fix when:** Before a TARA arm in au-vic in which the steward may leave requests unanswered: source what an
+  Australian claimant does (a complaint to the Commonwealth Ombudsman, asking again) and give it to them as law data.
 
 ---
 

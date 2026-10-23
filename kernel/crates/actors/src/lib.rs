@@ -347,6 +347,29 @@ pub trait Actor: Send {
     /// Its whole memory, as JSON (snapshot and fork: docs/port-guide.md, "Snapshots"). `Kind::restore` of this must
     /// give an actor that steps exactly as this one would from here. Required: every actor's memory is saved.
     fn save(&self) -> Result<Value, String>;
+    /// How much it keeps, counted by what (for whoever measures memory: `oikos-kernel world` with `OIKOS_KEPT` set
+    /// sums these over a run's actors at its end). None: not counted.
+    fn kept(&self) -> Option<std::collections::BTreeMap<String, u64>> {
+        None
+    }
+}
+
+/// Entries of each collection in a saved memory, by path (`s.read_news`), two levels down: for `Actor::kept`.
+pub fn kept_sizes(prefix: &str, v: &Value, out: &mut std::collections::BTreeMap<String, u64>) {
+    let Value::Object(m) = v else { return };
+    for (k, x) in m {
+        let path = if prefix.is_empty() { k.clone() } else { format!("{prefix}.{k}") };
+        match x {
+            Value::Array(a) => *out.entry(path).or_default() += a.len() as u64,
+            Value::Object(o) => {
+                *out.entry(path.clone()).or_default() += o.len() as u64;
+                if prefix.split('.').count() < 3 {
+                    kept_sizes(&path, x, out);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 /// A kind of actor (what a world names in `controller.impl` or a position's `role_module.code`).

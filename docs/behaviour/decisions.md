@@ -68,6 +68,26 @@ tribunal hears for each fee). An application's days are counted from the decisio
 (`decided_on`, `reviewed_on`). A venue that can order reads the law and turns away an application that is out of time (finding `rejected`, with the days), or that
 lacks the review the law asks for first. The ombudsman (recommend only) is not an appeal and keeps its own terms.
 
+## Deemed refusal: a review never answered (risk MT-21)
+
+Where the law requires a review before an appeal, a review asked for and never answered left the claimant nowhere: the
+appeal's days ran from the answer, and none came. Much administrative law has a rule for that: no decision within the
+time the law gives is taken as a refusal, which can be appealed (a deemed refusal; in Germany an action for failure to
+act, in Mexico a *negativa ficta*). Where a place's law says so it is the review route's `deemed_refused_days`: a
+review asked for and not answered within so many days of the asking is taken as refused, and the appeal's days run from
+then, as from an answer. The claimant's appeal opens on that day (`citizen/recourse.rs`, `Ways::for_want`), its
+application says when the review was asked (`review_asked_on`), and the venue counts the days from the deemed refusal
+(`offices/hearing.rs`); before then it turns the appeal away as wanting the review, as before. The law's words say it.
+An answer that comes later is an answer like any other. A place whose law has no such rule leaves the route shut, as
+the real one does: what its claimants do instead (ask again, complain to an ombudsman, seek judicial review) is not
+built (MT-21's remainder).
+
+| Profile | Deemed refusal | Source |
+|---|---|---|
+| de-ni | 91 days (three months) after the objection, then the month to go to the social court | SGG s 88(2), the action for failure to act (*Untätigkeitsklage*), recalled, **to confirm**; the real action has no month's limit after the three months: ours is the stricter reading |
+| au-vic, gb-eng, us-oh (pension) | none | no deemed refusal recalled for the internal review of a benefit decision, **to confirm** (Australia's FOI Act has one, s 15AC, for access requests, not here) |
+| mx-jal | not stated | the review is optional, so the appeal runs from the decision anyway; Mexican administrative law's *negativa ficta* (to confirm) would matter only if it were required |
+
 ## The places' routes
 
 All recalled from the law of each place, **not opened**, and flagged in each profile's `sources` ("recalled, to confirm"; a figure with no source is a PLACEHOLDER). Confidence is mine: **M** (medium, a statute or guidance recalled with its section), **L** (low, a placeholder or an analogy).

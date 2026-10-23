@@ -284,13 +284,14 @@ export interface Profile {
      * decision (the kind of statement the office makes: `benefit_decision`) and, where the place's law differs by payment, for named payments only.
      * `needs`: what the decision waits for before it is made (papers from the claimant, a confirmation from their last employer), within so many days,
      * and `else` what comes of it when they do not come (`refuse`, or `decide` on what is on hand). `review`: the office looks at its own decision again
-     * if asked within so many days, on what grounds, and whether an appeal lies only after it (`required`). `appeal`: the matter a venue that can set the
+     * if asked within so many days, on what grounds, whether an appeal lies only after it (`required`), and, where the law takes silence as a
+     * refusal, after how many days of asking an unanswered review counts as refused (`deemed_refused_days`; the appeal's days run from then). `appeal`: the matter a venue that can set the
      * decision aside hears (`claim_refused`), within so many days, on what grounds, and its fee in hours of ordinary pay (0: none). `refused_by`: where the
      * office is a head and staff, whether the head alone may refuse. Each with its source (`sources["decisions.<kind>.<payment or all>"]`), or marked
      * "PLACEHOLDER" or "(to confirm)". A route a place's law lacks is left out (no `review`: no internal reconsideration). */
     decisions?: { kind: string; name: string; payments?: string[]; refused_by?: "office-holder" | "staff";
       needs?: { id: string; from: "claimant" | "employer"; what: string; within_days: number; else: "refuse" | "decide" }[];
-      review?: { within_days: number; grounds: string; required?: boolean };
+      review?: { within_days: number; grounds: string; required?: boolean; deemed_refused_days?: number };
       appeal?: { matter: string; within_days: number; grounds: string; fee_hours_of_pay: number } }[];
     /** Founding (docs/behaviour/founding.md), read only for a living town that turns it on: how often new associations
      * are registered here (`registered_per_100000_per_year`, with its source; code never reads it) and how many more

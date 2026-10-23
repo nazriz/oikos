@@ -243,6 +243,29 @@ mod tests {
     }
 
     #[test]
+    fn an_appeal_whose_review_was_never_answered_is_heard_once_the_law_takes_it_as_refused_and_not_before() {
+        // The law: a review first, taken as refused 91 days after it was asked for unanswered; then 30 days to appeal (MT-21).
+        let law = |deemed: bool| {
+            let mut review = json!({ "within_days": 30, "grounds": "any", "required": true });
+            if deemed {
+                review["deemed_refused_days"] = json!(91);
+            }
+            st("law-decisions", 0, "law", "outside", &["desk"], json!({ "decisions": [{ "kind": "benefit_decision", "name": "Support", "review": review,
+                "appeal": { "matter": "claim_refused", "within_days": 30, "grounds": "any error" } }] }))
+        };
+        let appeal = |id: &str, at: i64| apply(id, at, json!({ "matter": "claim_refused", "against": "support", "about": "dec-1", "decided_on": 5 * DAY, "review_asked_on": 10 * DAY, "evidence": { "id": "dec-1" } }));
+        let rig = || rig(json!({ "hears": [{ "about": "claim_refused", "can": ["order", "set_aside"] }] }));
+        let early = rig().day(100 * DAY, &[law(true), appeal("rec.1", 100 * DAY)]).join("\n");
+        assert!(early.contains("\"finding\":\"rejected\"") && early.contains("no answer to that on the papers"), "day 100: not yet taken as refused: {early}");
+        let heard = rig().day(101 * DAY, &[law(true), appeal("rec.1", 101 * DAY)]).join("\n");
+        assert!(!heard.contains("\"finding\":\"rejected\"") && heard.contains("kind=complaint_notice"), "day 101: taken as refused, heard: {heard}");
+        let late = rig().day(132 * DAY, &[law(true), appeal("rec.1", 132 * DAY)]).join("\n");
+        assert!(late.contains("out_of_time") && late.contains("the day the review was taken as refused"), "day 132: out of time: {late}");
+        let never = rig().day(200 * DAY, &[law(false), appeal("rec.1", 200 * DAY)]).join("\n");
+        assert!(never.contains("no answer to that on the papers"), "no deemed refusal in the law: {never}");
+    }
+
+    #[test]
     fn the_manifest_is_the_one_the_ts_module_wrote() {
         let ts: Value = crate::offices::testing::ts_manifest("office.desk");
         let rust = Desk.manifest();
