@@ -50,6 +50,9 @@ pub const DAY: i64 = 86_400;
 /// its table of slips. Nothing about the world: that it knows only by perceiving (P14).
 #[derive(Debug, Clone, Default)]
 pub struct WorldInfo {
+    /// The run's seed (the config's): the one that every stream a unit draws from is made from. A person is drawn
+    /// who they are from it too, so that runs of one town on different seeds are not the same people.
+    pub seed: u64,
     pub tick: i64,
     pub run_end: i64,
     /// How the world's money is written (its config's first currency).
@@ -173,6 +176,9 @@ pub struct Cx<'a> {
     pub(crate) record: Option<Value>,
     pub(crate) questions: Vec<Question>,
     pub(crate) worded: Vec<Worded>,
+    /// The purposes of the draws made in the step, in order, where the caller asked to see them (a detached actor
+    /// stepped by a test; `Cx::keep_draws`). `None` in a run: nothing is kept.
+    drawn: Option<Vec<String>>,
 }
 
 /// What a step left beside its action.
@@ -188,6 +194,9 @@ pub struct Kept {
     /// Drafts of its words it decided on, or whose acts it sends with this action (the engine writes their signoffs and notes).
     #[serde(default)]
     pub worded: Vec<Worded>,
+    /// The purposes of the draws it made, in order (`Cx::keep_draws`; empty unless asked for): `chance:` marks a draw about one thing.
+    #[serde(default)]
+    pub drawn: Vec<String>,
 }
 
 impl<'a> Cx<'a> {
@@ -203,17 +212,28 @@ impl<'a> Cx<'a> {
             record: None,
             questions: vec![],
             worded: vec![],
+            drawn: None,
         }
+    }
+    /// Keep the purpose of each draw made from here (for a test that holds draws to their names).
+    pub fn keep_draws(&mut self) {
+        self.drawn.get_or_insert_with(Vec::new);
     }
     /// A deterministic stream for this participant, this matter or day, and this purpose (docs/reliability.md, "Draws
     /// and the moment"): the same however many threads run and in whatever order actors step.
     pub fn rng(&mut self, purpose: &str) -> Rng {
+        if let Some(d) = self.drawn.as_mut() {
+            d.push(purpose.to_string());
+        }
         let key = self.draws.key(self.t, purpose);
         let parts: Vec<&str> = key.iter().map(String::as_str).collect();
         self.randomness.stream(&parts)
     }
     /// A stream for a purpose alone: the same for whoever draws it (a fact about a thing, not about who meets it).
     pub fn chance(&mut self, purpose: &str) -> Rng {
+        if let Some(d) = self.drawn.as_mut() {
+            d.push(format!("chance:{purpose}"));
+        }
         let purpose = self.draws.chance_purpose(purpose);
         self.randomness.stream(&["chance", &purpose])
     }
@@ -235,7 +255,7 @@ impl<'a> Cx<'a> {
     }
     /// What the step left beside its action (the engine's).
     pub fn into_kept(self) -> Kept {
-        Kept { decisions: self.decisions, outcomes: self.outcomes, record: self.record, questions: self.questions, worded: self.worded }
+        Kept { decisions: self.decisions, outcomes: self.outcomes, record: self.record, questions: self.questions, worded: self.worded, drawn: self.drawn.unwrap_or_default() }
     }
 }
 

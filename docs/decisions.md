@@ -7044,3 +7044,44 @@ half of the gate (1 and 14 threads) was not re-run: nothing of the engine change
 
 **Revisit if** a generated town differs from the one before this change; or when PC-15, PB-21 or MT-18's cases are mended (flip their `test.failing`); or when the tax, payments, returns and household
 rules are served through `rules_api.rs` (then delete their TypeScript copies and the test files that hold them, MT-18).
+
+## 2026-10-23 · The held cases, settled: the engine's citizen and three offices, the reading harness, two ported checks, the plot of land (branch `debt-behaviour`; no model called)
+
+The cut-over left 10 cases held as `test.failing` (PC-15, PB-21), 4 held for a harness limit and 2 skipped with no Rust test (MT-18), and a lot-of-land bug. Every case was judged fault (the Rust
+is mended, the test passes unchanged) or a native rule that is better (the test is changed, with its reason). None is held now; no `test.failing` or `test.skip` is left in `participants/test`.
+
+**The cause of most of the citizen's cases was one fault, not seven.** `Person::new` drew who a person is (values' offsets, temperament, trust lean, willingness to petition, threshold, whether they read
+the news, the age they stop work) with seed 0 whatever the run's seed. Persons differ by their participant id (the stream is keyed by it), so a town was full of different people, but **two runs of one
+town on different seeds had the same people**, and a case that loops over seeds to meet "fifty different tenants" met one tenant fifty times: nobody asked at trust 100,000 (the same z, -0.89, every seed), nobody
+was willing in 300, the thresholds' mean was one person's, and every reader read. `WorldInfo` now carries the run's seed (the engine's, the detached actor's from its spec) and `Person::new` uses it.
+Why it matters beyond the tests: replicates of a study on different seeds were less different than they should be (the same dispositions, different events). Every Rust-world state hash with people in it moved once
+(pins re-taken with this reason, below). Hard rule kept: one seeded PRNG owned by the kernel; this is the rule being kept, not changed.
+
+**Faults mended (the case unchanged):**
+- *A refusal did not lower the sense of agency, and moved no tie.* The three sites that land a decision on a person who asked or applied (a request to a landlord or employer; a grievance asked of its keeper; a desk's finding)
+  passed `tried` as "it worked", so a refusal was "not tried" (trust moved, agency did not); and the tie (+1,500 granted, -500 refused for a request; +1,000 and -1,000 for a grievance) citizen.ts added after the landing was lost.
+  `treat_landing` says "tried" always, with the worked or failed in `good`, and `Treated.tie` carries the tie. (citizen-wants case 1; the reading cases.)
+- *The citizen's landing is not worn down for the days before it came.* `Mind::treated` settles trust and agency to now first, as citizen.ts's wake did (idempotent): the figure a reading says the plain paper would have made is the figure the dial-off record shows, to the point.
+- *The landlord on a registered death.* It gave the notice and stopped. Now, as the TypeScript did, from papers only: the tenancy is offered to the household member the lease names (else the partner the entry names) who is not registered dead, a new lease at the rent then
+  from when the old one ends (`succeed-<who>` draw for the term), and a possession application of ours against the dead tenant's lease is withdrawn ("nothing is asked of the dead").
+- *The mayor acknowledged no letter.* Its manifest says how it answers (`answers`, no report of its own) and its create did not wrap it in `Answering`; it is wrapped now (a mayor saved before this restores as the plain office, wrapped, no letter waiting).
+- *A lot whose `cells` is one name.* `Book`'s index of lots by cell read only a list; a lot written as a single cell id is over that cell now, by the name (not by a part of it, as JavaScript's `includes` on a string did), as `cells_of` already read it.
+
+**Native rules that are better (the case changed, its assertion kept in a form the engine can meet):**
+- *The tenants' petition's wording* (citizen-voice case 1). The engine asks for what the world's `petition_demand` says (PC-8, docs/profiles.md): the TypeScript citizen wrote Victoria's 90 days and 5% into every town. The case now gives the world those
+  figures and asserts the same words; a new case holds the general wording of a world that gives none (no figure, no amendment) and a world that gives one.
+- *The order of a law's figures in the clerk's report* (drafting). By name (alone, dogs, share), not as the schedule was typed (dogs, alone, share): a schedule is a keyed record and the kernel keeps keys sorted so that a state hash does not depend on how a file was typed.
+  Nothing real reads the order. Revisit if a study reads the report as the schedule's own order.
+
+**The harness limit lifted (MT-18, 4 cases).** The detached actor now reports the purposes of the draws it made (`Cx::keep_draws`, `draws` beside `action`, kept in a run: nothing), and `participants/test/engine.ts` takes a `ctx.read` as the reading desk (asked about each paper addressed to the
+person that is new to them; its filing, or none, goes back as the answer in the step that sees the paper, as the host's does) and puts the draws on the act (`DRAWS`). The four cases run on the engine; the fourth was arithmetic (`recourseScore`, whose TypeScript is gone) and is
+`mind/reading.rs`'s `a_step_of_recourse_is_five_hundred_on_the_score_of_asking_again`; its "same draw is made" half is the third case.
+
+**The two skipped checks are Rust tests:** `common/tests.rs` `an_act_is_judged_by_the_amended_law_from_when_it_was_made_and_by_the_law_as_it_stood_when_the_act_was_made` (drafting, from a dog law made by `draft_law`, amended by a law that replaces it);
+`offices/land.rs` `a_titles_transfer_counts_only_from_its_holder_or_from_whoever_issued_it` (registry); and `common/tests.rs` `a_lot_whose_cells_are_one_name_is_over_that_cell`.
+
+**Revisit if** a study needs the run's seed NOT to move who the people are (it would then take the generator's draws, not the engine's); or the clerk's report is read for the schedule's order; or the landlord's succession needs the law of the place (the profile has none: it follows
+the town's succession of tenancy, as the TypeScript did).
+
+**Suites.** `cargo test` (the kernel's, 727 in the actors crate with the four new) and the fast tier (1,307 files' worth: 0 fail) on the branch. The tests that simulate towns are the merge's full suite and were **not** run here
+(working agreements): the run's seed now moves who the people are, so the pinned state hashes of towns with people in them (worlds/test living, culture-dial, living-dial, founding and the seed-bound cases) are expected to move once; whoever merges re-takes each with this entry as its reason.

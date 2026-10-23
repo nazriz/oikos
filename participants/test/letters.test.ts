@@ -18,8 +18,7 @@ const papers = (records: any[] = []) => ({ papers: { kind: "records", records } 
 const letter = (id: string, from: string, text: string, as?: string) => ({ id, t: DAY, from, ...(as ? { as, from_entity: "city" } : {}), to: ["x"], text });
 const messages = (said: any[]) => said.filter((c) => c.fn === "message").map((c) => ({ to: c.args.to, re: c.args.re, text: c.args.text as string }));
 
-// DIVERGENCE (cut-over, held as test.failing): run on the engine's mayor the letter is not acknowledged (kernel/crates/actors/src/common/letters.rs, Answering): not yet traced whether the engine's mayor has a report of its own now or the harness drops the letter (docs/risks.md, PB-21).
-test.failing("an office with no report of its own acknowledges a letter once, saying what it acts on; a letter that asks for a direction is told there is none to wait for", () => {
+test("an office with no report of its own acknowledges a letter once, saying what it acts on; a letter that asks for a direction is told there is none to wait for", () => {
   const mayor = engine("city.mayor_code").create(context("mayor-system", "city", { population: 1000, park_budget: 0, builder: "builder" }, { position: "mayor" }));
   const said = wake(mayor, DAY, papers(), { entity: "city", inbox: [
     letter("msg.1", "works-seat", "Please give the works office a staffing direction: may I recruit two crew?", "works"),

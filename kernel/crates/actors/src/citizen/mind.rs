@@ -295,6 +295,8 @@ pub struct Treated {
     pub done_to: bool,
     /// The paper it came by, whose words may have been read (reading.ts `landing`).
     pub paper: Option<String>,
+    /// The tie with them moves too, by this much and for this reason (after the words read have moved it: `ties.add` after `landing`).
+    pub tie: Option<(i64, &'static str)>,
 }
 
 /// A thing that happened to the person or those close that is **not** an `Outcome` (inner.ts `happened`, citizen.ts

@@ -39,6 +39,7 @@
 use super::land::own_land;
 use crate::common::work::{ReportOf, Routine};
 use crate::common::{
+    Answering,
     bases_of, data, filed_before, go_see, is_kind, look_up, message, money_words, published_count, published_price, visited, vote, withdraw,
     addressed_to, own_account, text as record_text, Book, Fields, Letters, Part, StandingWork, DAY, VISIT_MAX, YEAR,
 };
@@ -256,6 +257,19 @@ fn string() -> Value {
     json!({ "type": "string" })
 }
 
+/// How the mayor's office answers a letter (it has no report of its own).
+fn mayor_answers() -> Answers {
+    Answers {
+        office: "the mayor's office".into(),
+        acts: "What it acts on: a petition once its organiser's published count reaches the town's threshold; an invoice for work this office commissioned, which it approves in writing; and each year's budget, which it puts to the council. It gives no direction by letter.".into(),
+        forms: vec![AnswerForm {
+            about: ["direction", "direct ", "staff", "recruit", "hire", "hiring", "crew", "vacanc", "posts"].iter().map(|x| s(x)).collect(),
+            say: "If your letter asks for a direction: this office has given none on the matter, and an office needs none to act within its own powers and its budget line.".into(),
+        }],
+        report: false,
+    }
+}
+
 impl Kind for MayorCode {
     fn name(&self) -> &'static str {
         "city.mayor_code"
@@ -310,7 +324,8 @@ impl Kind for MayorCode {
         if p.builder.is_empty() {
             return Err("city.mayor_code: the world must say builder (whom it deals with; no module assumes a world's names)".into());
         }
-        Ok(Box::new(Stepper::new(Mayor {
+        // (The mayor has no report of its own: a letter is acknowledged in the words its manifest gives, as every such office's is.)
+        Ok(Box::new(Answering::new(Stepper::new(Mayor {
             p,
             position: ctx.position.clone(),
             participant: ctx.participant.clone(),
@@ -326,10 +341,14 @@ impl Kind for MayorCode {
             stood_free: BTreeMap::new(),
             not_as_papered: BTreeSet::new(),
             asked_to_see: BTreeMap::new(),
-        })))
+        }), mayor_answers())))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
-        Ok(Box::new(Stepper::<Mayor>::restore(saved)?))
+        // (One saved before the mayor acknowledged letters is the plain office's: wrapped, with no letter waiting.)
+        match saved.get("inner") {
+            Some(inner) => Ok(Box::new(Answering::restore(Stepper::<Mayor>::restore(inner.clone())?, mayor_answers(), &saved)?)),
+            None => Ok(Box::new(Answering::new(Stepper::<Mayor>::restore(saved)?, mayor_answers()))),
+        }
     }
 }
 

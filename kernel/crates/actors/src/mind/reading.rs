@@ -791,6 +791,19 @@ mod tests {
         assert_eq!(public_effect(&NO_SHIFT, Standing::Raised, &p), None);
     }
 
+    /// Ported from participants/test/reading-citizen.test.ts ("the odds of appealing follow the recourse a refusal gave"): a step of
+    /// recourse in a paper read is 500 on the score of the ways that answer it; a paper that names no way on adds nothing.
+    #[test]
+    fn a_step_of_recourse_is_five_hundred_on_the_score_of_asking_again() {
+        let plain = rd(0, 1, Some(1), 0, 0);
+        let humane = rd(1, 2, Some(2), 2, 0);
+        let curt = rd(-2, 0, Some(0), 0, 1);
+        let p = READING_DEFAULTS;
+        assert_eq!(recourse_score(&shift_of(&humane, &plain), &p), 1_000);
+        assert_eq!(recourse_score(&shift_of(&curt, &plain), &p), 0);
+        assert_eq!(recourse_score(&shift_of(&plain, &plain), &p), 0);
+    }
+
     #[test]
     fn every_multiplier_stays_within_its_bounds() {
         let p = READING_DEFAULTS;

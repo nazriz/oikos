@@ -292,8 +292,7 @@ test("an invoice that comes when the landlord is short stays open, and is paid w
 
 // Bug hunt 2026-10-17, finding 3: a tenant who dies, and the household still living there. Read from the papers the landlord has, not from who
 // was seen where when it looked.
-// DIVERGENCE (cut-over, held as test.failing): the engine's landlord does not offer the tenancy to the one still there after a registered death (see docs/risks.md, PB-21).
-test.failing("a tenant whose death is registered: notice on the lease, the tenancy offered to the household member, and no possession sought against the dead", () => {
+test("a tenant whose death is registered: notice on the lease, the tenancy offered to the household member, and no possession sought against the dead", () => {
   const m = landlord.create(ctx({ develop: false, renew: true, min_term_months: 12, max_term_months: 12, arrears_months_before_notice: 2, spend_share_bps: 0, upkeep_share_bps: 0, base_rent: { house: RENT }, landlord_notice_days: 60,
     possession: { tribunal: "tribunal" } }));
   const base = lease("L1-a", 0, "ann", "s1/home");
