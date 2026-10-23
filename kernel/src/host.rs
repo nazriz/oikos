@@ -56,7 +56,8 @@ impl Write for Out {
 
 /// The options a host gives (all optional): `run_id`, `log` (a path: `.jsonl` is the JSONL log, anything else the
 /// binary log; absent: kept in memory), `anchors` (a path), `threads`, `until`, `stand_in`, `record_decisions`,
-/// `audit`, `snapshot_every_days` (binary log only), `stream: {cap, kinds}`, `label` (a fork's).
+/// `audit`, `snapshot_every_days` (binary log only), `stream: {cap, kinds}`, `label` (a fork's), `withhold` (acts not
+/// carried out: a researcher's intervention, `engine::Withhold`).
 #[derive(Debug, Clone, Default)]
 struct Options {
     run_id: Option<String>,
@@ -79,6 +80,7 @@ fn options(v: &Value) -> Result<Options, String> {
         engine.record_decisions = b;
     }
     engine.audit = v["audit"].as_bool() == Some(true);
+    engine.withhold = crate::engine::withholds(&v["withhold"])?;
     if let Some(n) = v["share_at"].as_u64() {
         engine.share_at = n as usize;
     }

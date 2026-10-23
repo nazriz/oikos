@@ -217,3 +217,57 @@ fn the_shared_rules_are_served_by_name() {
     assert!(m["world.weather"].is_object());
     assert!(oikos_kernel::rules_api::call("no.such", &json!({})).is_err());
 }
+
+/// The papers of a kind a run's log (JSONL, kept in memory) recorded, with when; and its `withheld` notes.
+fn papers(log: &[u8], kind: &str) -> (Vec<i64>, Vec<Value>) {
+    let lines: Vec<Value> = log.split(|b| *b == b'\n').filter(|l| !l.is_empty()).map(|l| serde_json::from_slice::<Value>(l).unwrap()).collect();
+    let at = lines.iter().filter(|l| l["body"]["record"]["kind"] == kind).map(|l| l["body"]["record"]["at"].as_i64().unwrap()).collect();
+    let notes = lines.iter().filter(|l| l["body"]["annotation"] == "note" && l["body"]["data"]["withheld"].is_object()).map(|l| l["body"]["data"]["withheld"].clone()).collect();
+    (at, notes)
+}
+
+#[test]
+fn a_fork_can_withhold_one_named_act_and_is_otherwise_its_parent_to_the_hash() {
+    // (Risk MT-19: the counterfactual arm. The weather bureau's two warnings; a fork at day 1 that withholds the first.)
+    let mut straight = Host::start(world(), &json!({ "stand_in": "idle" })).unwrap();
+    let end = drive(&mut straight, 0, "quiet");
+    let (warned, none) = papers(&straight.log_bytes().unwrap(), "weather_warning");
+    assert_eq!((warned.len(), none.len()), (2, 0));
+    let mut h = Host::start(world(), &json!({ "stand_in": "idle" })).unwrap();
+    loop {
+        let due = h.next_by(DAY).unwrap();
+        if due["due"] == "paused" {
+            break;
+        }
+        for s in due["seats"].as_array().unwrap() {
+            h.submit(s["key"].as_str().unwrap(), &json!({ "type": "wait" })).unwrap();
+        }
+    }
+    let run = |h: &mut Host, withhold: Value| -> (Value, Vec<i64>, Vec<Value>) {
+        let mut f = h.fork(&json!({ "stand_in": "idle", "withhold": withhold })).unwrap();
+        let end = drive(&mut f, 0, "quiet");
+        let (at, notes) = papers(&f.log_bytes().unwrap(), "weather_warning");
+        (end["state_hash"].clone(), at, notes)
+    };
+    // Withheld: the first warning never reaches the town; the second does, when it did; the log says which was withheld.
+    let (hash, at, notes) = run(&mut h, json!([{ "what": "weather_warning", "participant": "inspector-system" }]));
+    assert_ne!(hash, end["state_hash"]);
+    assert_eq!(at, warned[1..].to_vec());
+    assert_eq!(notes.len(), 1);
+    assert_eq!((notes[0]["what"].as_str(), notes[0]["nth"].as_u64(), notes[0]["participant"].as_str()), (Some("weather_warning"), Some(1), Some("inspector-system")));
+    assert!(notes[0]["t"].as_i64().unwrap() <= warned[0]);
+    // Deterministic: the same withholding twice is the same world.
+    assert_eq!(run(&mut h, json!([{ "what": "weather_warning", "participant": "inspector-system", "nth": 1 }])).0, hash);
+    // The second, not the first.
+    let (second, at, _) = run(&mut h, json!([{ "what": "weather_warning", "nth": 2 }]));
+    assert_eq!(at, warned[..1].to_vec());
+    assert_ne!(second, hash);
+    // Nothing named that comes (a third warning; another's; a kind never made): the parent's world to the hash, no note.
+    for w in [json!([{ "what": "weather_warning", "nth": 3 }]), json!([{ "what": "weather_warning", "participant": "alice-self" }]), json!([{ "what": "no_such_paper" }]), json!([{ "what": "weather_warning", "matter": "no_such_matter" }]), json!([{ "what": "weather_warning", "to": "nobody" }]), json!([])] {
+        let (h2, at, notes) = run(&mut h, w.clone());
+        assert_eq!((h2, at, notes.len()), (end["state_hash"].clone(), warned.clone(), 0), "{w}");
+    }
+    // A withholding that names nothing is refused.
+    assert!(Host::start(world(), &json!({ "stand_in": "idle", "withhold": [{ "what": "weather_warning", "nth": 0 }] })).is_err());
+    assert!(Host::start(world(), &json!({ "stand_in": "idle", "withhold": [{ "nth": 1 }] })).is_err());
+}

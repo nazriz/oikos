@@ -1,6 +1,8 @@
 {
  "contracts/test/contracts.test.ts": 1.8,
  "docs/research/cel-check/cel-check.test.ts": 0.4,
+ "measure/test/compare.test.ts": 0.1,
+ "measure/test/stewardship.test.ts": 0.1,
  "orchestrator/test/act-ends.test.ts": 0.3,
  "orchestrator/test/all-work-takes-time.test.ts": 7.4,
  "orchestrator/test/auditor.test.ts": 86.3,

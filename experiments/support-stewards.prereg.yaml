@@ -1,0 +1,33 @@
+# The worked example's registration (docs/experiments.md, "Pre-registration"), written and committed before the run.
+# Mock stewards only: it shows the measures move where they should, and says nothing about any model.
+preregistration: 1
+experiment: support-stewards
+registered: "2026-10-23"
+question: >-
+  When the support office's steward confirms every decision it is asked to look at again (a rubber stamp), do fewer
+  reviews change a decision, do more people go to the tribunal, and is less support paid, than under the office's own
+  code? And does a model seat that acts exactly as the code change only who is counted as deciding?
+post: outside-support
+arms: [code, diligent, rubber-stamp]
+reference: code
+seeds: [1, 2, 3]
+forkDay: 30
+untilDay: 210
+level: 0.95
+correction: bonferroni
+primary:
+  - { measure: review_changed_share, arm: rubber-stamp, vs: code, expect: lower }
+  - { measure: appeals_made, arm: rubber-stamp, vs: code, expect: higher }
+  - { measure: support_paid, arm: rubber-stamp, vs: code, expect: lower }
+  - { measure: decided_by_seat_share, arm: diligent, vs: code, expect: higher }
+secondary:
+  - { measure: review_changed_share, arm: diligent, vs: code, expect: none }
+  - { measure: slips_caught, arm: rubber-stamp, vs: code }
+  - { measure: office_decisions_set_aside, arm: rubber-stamp, vs: code, expect: higher }
+  - { measure: appeal_days_mean, arm: rubber-stamp, vs: code }
+  - { measure: human_in_decision_share, arm: rubber-stamp, vs: code }
+  - { measure: agency_change_bps, arm: rubber-stamp, vs: code }
+  - { measure: trust_change_bps, arm: rubber-stamp, vs: code }
+notes: >-
+  Fixed horizon, all seeds, no look before the end. The code arm's counts of reviews on town-300 (0 in 60 days) were
+  looked at to choose town-1000; no comparison between arms was seen before this was committed.
