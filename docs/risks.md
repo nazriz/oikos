@@ -433,19 +433,17 @@ The mechanism:
 - **Fix when:** the other six profiles are given the table; business counts by industry are sourced for the three; a wage by kind of shop is sourced.
 
 ### ME-21 · In the mix town a closed shop's sale does not complete, and tests that hold town mechanisms still run in the single-goods town
-- **Gap:** With the mix of shops the default (2026-10-23, branch `debt-generic`), `orchestrator/test/entry.test.ts` fails in all six run seeds tried
-  (1 to 6): a founder buys a closed shop's premises (the capital is called and paid, the price paid to the closed shop's account) but the
-  seller never records the sale (`property_sold`), the premises are listed again at a lower price, and households keep ordering from and
-  paying the closed shop. With `shop_mix: false` the same scenario sells and trades (seed 4; byte-for-byte as before the change). Not traced:
-  it may be the scenario (the test closes `shop-1` by hand and gives it no credit), the closed firm's handling in a town where households
-  split their spending by kind, or a fault in the sale. Because of it, and of thresholds that count events in a goods-only chain (factories
-  ordering inputs after day 90, `taken` over 5), these fifteen tests set `shop_mix: false` in their own spec, assertions unchanged: entry, own-venture,
-  founding, prices, hazards, retail, deaths, automation-run, twin-seat-year, twin-draws, own-account, gatherings, consult-audit, public-finance, and one case of places (the pay-period equivalence: with the mix a price is whole cents from the wage, so restating the wage moves a shop's demand by a unit and, now that a shop is staffed to its sales, its staff by one) (`orchestrator/test/`). Seen in them, not traced: with shops staffed to their kinds' sales a small town's opening jobs can leave a factory with no staff (own-account); people were still at a gathering an hour after it should have ended (gatherings); a wage paid net differed from the TypeScript withholding of the agreed wage (public-finance); the world's questions to a consulted seat gain one `found:shop-<kind>` for each kind of premises (consult-audit: expected, the list is the world's).
+- **Gap:** (Traced and fixed 2026-10-24, branch `debt-generic-2-me21`: the sale did not complete because the closed shop's manager left town
+  while the premises were on the market; a new holder of the post started the firm's actor afresh, as a trading shop, and so nothing watched
+  for the buyer's payment. Not the mix, the scenario or the sale; the mix only made the manager more likely to leave. Now `WindingUp::recover`
+  reads closing, closure and the listing back from the firm's own public papers; `entry.test.ts` passes with the mix on.) Still open: the
+  other fourteen tests keep `shop_mix: false`, assertions unchanged: own-venture, founding, prices, hazards, retail, deaths, automation-run,
+  twin-seat-year, twin-draws, own-account, gatherings, consult-audit, public-finance, and one case of places (the pay-period equivalence: with the mix a price is whole cents from the wage, so restating the wage moves a shop's demand by a unit and, now that a shop is staffed to its sales, its staff by one). Tried with the mix on after the fix and still failing, so not about the sale: own-account (the share of businesses of one at the start; the businesses of one's sales), own-venture (the founding's draw of a business of one), consult-audit (the world's questions to a consulted seat gain one `found:shop-<kind>` per kind: expected, the list is the world's), public-finance (a wage paid net differed from the TypeScript withholding of the agreed wage), gatherings (people still at a gathering an hour after it should have ended); the rest are thresholds that count events in a goods-only chain (factories ordering inputs after day 90, `taken` over 5) and were not retried. Also seen, not fixed: households kept ordering from and paying a shop that had closed (days 79 to 85 in the entry run), and with the mix a small town's opening jobs can leave a factory with no staff.
 - **Where:** `worlds/generator/generate.ts` (shop types, ventures); the retailer's wind-up and the sale of premises in `kernel/crates/actors`.
 - **Effect:** Founding a business in a premises that a closed shop leaves may not work in a mix town; the mechanisms those fifteen tests hold are
   not tested in the mix town.
-- **L / I:** medium / medium · **Status:** to investigate (found, not fixed: the engine's files are other lanes')
-- **Notice by:** the fifteen tests above passing with `shop_mix` on; a closed shop in a mix run whose `property_sold` never appears.
+- **L / I:** medium / medium · **Status:** the sale fixed; the opt-outs and the households' orders to a closed shop remain
+- **Notice by:** the fourteen tests above passing with `shop_mix` on; a closed shop in a mix run whose `property_sold` never appears.
 - **Fix when:** before a study of firms entering or leaving in a mix town.
 
 ### ME-20 · Landlords build whenever their homes are fully let, and shops chase the cheapest factory
