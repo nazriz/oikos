@@ -37,14 +37,13 @@ rich countries, larger in poorer ones).
 
 Shares are renormalised over the kinds on offer to this household. A town whose sellers sell one kind gives that kind
 the whole budget, as before the rule; a test asserts this (`with_only_goods_on_offer_the_demand_system_changes_nothing`).
-Generated towns sell only `goods` unless the spec sets `shop_mix` (below), so the rule takes effect when a world offers a
+Generated towns sell only `goods` where the spec sets `shop_mix: false` or the profile has no table (below), so the rule takes effect when a world offers a
 second kind: a seller whose price list names it. Every other kind has its own shop choice, carried money and use, and the world must define a
 task `consume-<kind>` for it.
 
 ## A town's mix of shops
 
-A real town does not have one kind of shop. With the generator's `shop_mix` on (a flag of the spec, off unless set; the
-TS world's modules buy only `goods`, so it is for the Rust world), and a profile that has the table, the town's shops
+A real town does not have one kind of shop. With the generator's `shop_mix` on (a flag of the spec, on unless set false since 2026-10-23), and a profile that has the table, the town's shops
 are divided among the kinds of the profile's `spending.demand`, and each sells its kind (`firm.retailer`'s `kind`).
 
 - **The table.** Each kind in `spending.demand.kinds` has its survey `share_bps` and `income_elasticity_bps`, and a kind
@@ -63,7 +62,7 @@ are divided among the kinds of the profile's `spending.demand`, and each sells i
   shop of goods is.
 - **Using a kind up.** The world's work table has a task `consume-<kind>` for each kind, and a resource of the kind.
 - **What stays one kind.** The factories make `goods`, which stands for household goods and other goods; people trading
-  on their own account and a shop founded in the run sell `goods` (ME-13, ME-19).
+  on their own account sell `goods`. A shop founded in the run sells the kind of the premises it buys (ME-13, ME-19).
 - **Who knows what.** A household sees the prices posted at shops near it and looks up others, as before; a kind none of
   its known shops sells gets no spending that trip, and the shares are renormalised over those it can buy.
 

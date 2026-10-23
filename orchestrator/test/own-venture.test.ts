@@ -11,7 +11,7 @@ import { onRust } from "./lib/doubles";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
-const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+const base = { ...(Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any), shop_mix: false /* the single-goods town: this test holds a mechanism of it (docs/risks.md ME-19) */ };
 
 async function run(name: string, days: number, change: (params: any) => void, seed?: number) {
   const config = generate(seed === undefined ? base : { ...base, seed });
@@ -79,7 +79,7 @@ test("a founding's draw of the shape \"business\" reaches the business of one: s
   // (Step 3's founding, with only that shape to found and the chance made sure, as its own tests do. The town's own
   // monthly chance of a business of one is turned off, so that every one started here follows a draw.)
   const { loadWorld } = await import("../src/batch");
-  const { config } = await loadWorld(join(root, "worlds/town.yaml"), ["living.initiative_bps=10000", 'living.founding.shapes=["business"]', "living.founding.scale_bps=600000"]);
+  const { config } = await loadWorld(join(root, "worlds/town.yaml"), ["shop_mix=false", "living.initiative_bps=10000", 'living.founding.shapes=["business"]', "living.founding.scale_bps=600000"]);
   for (const p of config.participants) if (p.controller?.impl === "citizen.default") p.controller = { ...p.controller, params: { ...p.controller.params, found_own_ppm: 0 } };
   // (And everyone in the labour force is given the money for one: in the town as drawn, whoever comes to mean a
   // business may have a tenth of it, and then nothing comes of the draw, which is the rule and not what is tested.)
