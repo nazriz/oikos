@@ -6,10 +6,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "0 3 * * *" # nightly, on main
 
 # A newer push to the same branch or PR replaces the one still running.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'schedule' && 'nightly' || github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -27,3 +29,7 @@ jobs:
         run: bun scripts/slots.ts --weight half --what "ci cargo test" -- cargo test --release --manifest-path kernel/Cargo.toml --workspace -q
       - name: Whole suite
         run: bun run test:all
+      # What the merge script reads: while the latest result on main is a failure, it merges nothing but the fix.
+      - name: Record the result for the merge script
+        if: always() && github.event_name != 'pull_request'
+        run: bun scripts/main-status.ts record "$GITHUB_SHA" "${{ job.status }}"

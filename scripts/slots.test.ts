@@ -125,3 +125,26 @@ test("the wrapper passes on its command's exit code", async () => {
     expect((await sh(["bun", slots, "--", "sh", "-c", "exit 7"], env(dir, 2))).code).toBe(7);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 120_000);
+
+test("a job with priority high goes ahead of earlier waiters without it", async () => {
+  const dir = pool(), order = join(dir, "order");
+  try {
+    const mark = (name: string) => ["sh", "-c", `echo ${name} >> ${order}; sleep 0.2`];
+    const holder = sh(["bun", slots, "--", "sleep", "1.5"], env(dir, 1));
+    await Bun.sleep(600);
+    const normal = sh(["bun", slots, "--", ...mark("normal")], env(dir, 1));
+    await Bun.sleep(600);
+    const high = sh(["bun", slots, "--priority", "high", "--", ...mark("high")], env(dir, 1));
+    const done = await Promise.all([holder, normal, high]);
+    expect(done.map((d) => d.code)).toEqual([0, 0, 0]);
+    expect(readFileSync(order, "utf8").trim().split("\n")).toEqual(["high", "normal"]);
+    const bad = await sh(["bun", slots, "--priority", "urgent", "--", "true"], env(dir, 1));
+    expect(bad.code).toBe(2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}, 60_000);
+
+test("queueOrder: priority first, then the oldest", async () => {
+  const { queueOrder } = await import("./slots");
+  const w = (file: string, since: number, priority?: number) => ({ file, since, pid: 1, ...(priority ? { priority } : {}) });
+  expect([w("a", 1), w("b", 2, 1), w("c", 0)].sort(queueOrder).map((x) => x.file)).toEqual(["b", "c", "a"]);
+});

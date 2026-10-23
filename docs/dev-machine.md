@@ -94,8 +94,20 @@ Not touched: caches in the home folder (huggingface models) and `/private/tmp/cl
 ## Merging a branch: `scripts/merge.ts`
 
 ```
-bun scripts/merge.ts <branch> [--message "..."] [--no-push]
+bun scripts/merge.ts <branch>... [--message "..."] [--no-push] [--full] [--fix-main]
 ```
+
+**Fast merge (2026-10-24).** The merge gate is `bun scripts/test.ts --affected` (the fast tier, what the branch can reach, the
+invariants and backstops; a kernel change selects everything), not the whole suite: the whole suite runs on every push to main
+in CI and nightly (`--full` here forces it). The kernel is built only when `kernel/` differs from the last build in the merge
+worktree (stamp `kernel/target/.merge-kernel-tree`); the typecheck runs alongside the tests; the separate cargo test is gone
+(the selection runs the kernel's tests when `kernel/` changed). Everything the merge starts has **slot priority**
+(`OIKOS_SLOT_PRIORITY=high`, or `bun scripts/slots.ts --priority high -- ...`): it stands ahead of every waiting job without it
+and nothing without it takes tokens past it (running jobs are not stopped). **Batch:** `merge.ts a b c` merges the branches in
+order into the one worktree, tests once, pushes all or none; if that fails it bisects on prefixes (`settle` in merge.ts: the
+shortest failing prefix ends in the branch at fault, which is left out) and pushes the rest, exit 1 if any was left out.
+**Red main:** CI's last step writes the result to `~/.oikos/main-ci.json` (`scripts/main-status.ts`; `gh run list` is asked first
+when it works); while the latest result is a failure on a commit in origin/main, `merge.ts` refuses everything but `--fix-main`.
 
 What the maintainer does by hand, in a clean worktree of its own (`.claude/worktrees/merge-bot`, made if missing; never
 `merge-main`): fetch; reset to `origin/main`; `git merge --no-ff <branch>`; then the worktree warm-up
