@@ -192,7 +192,8 @@ impl Unit {
 enum Decided {
     /// (With its decisions and outcomes made ready for the log where they were made: `prepare_kept`. Not kept in a
     /// snapshot: one restored logs them from `Kept`, the same bytes.)
-    Code(Result<(Action, Kept), String>, Option<Vec<Option<Vec<u8>>>>),
+    /// (Where every one was written, and the round has no seat, `Kept` no longer holds them: `true`.)
+    Code(Result<(Action, Kept), String>, Option<(Vec<Option<Vec<u8>>>, bool)>),
     Seat(Option<Action>),
 }
 
@@ -1098,6 +1099,9 @@ impl<W: Write> Engine<W> {
         // Decide, all at once.
         let seed = self.seed;
         let (areas, record, lean) = (self.opts.decision_areas.as_ref(), self.opts.record_decisions, self.lean);
+        // (A round no seat waits in is carried out before anything can save it: its decisions, once written for the
+        // log, need not be kept as values till then. One with seats may be saved while they think, values and all.)
+        let strip = seats.is_empty();
         let results = each_mut(&mut stepping, self.opts.threads, self.opts.share_at, |(u, obs, only)| {
             let obs = obs.take().expect("each unit is stepped once");
             let pic = u.view.apply(obs, only.as_deref(), &u.entity, &u.woke_for, u.since);
@@ -1108,9 +1112,15 @@ impl<W: Write> Engine<W> {
             let mut cx = Cx::new(pic.t, ctx, &mut u.draws, seed, answers);
             match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| actor.step(pic, &mut cx))) {
                 Ok(a) => {
-                    let kept = cx.into_kept();
+                    let mut kept = cx.into_kept();
                     let prepared = prepare_kept(&kept, &u.participant, areas, record, lean);
-                    Ok((a, kept, prepared))
+                    let stripped = strip && prepared.iter().all(Option::is_some);
+                    if stripped {
+                        // (Let go here, on this thread, beside the others: what the log needs of them is written.)
+                        kept.decisions = vec![];
+                        kept.outcomes = vec![];
+                    }
+                    Ok((a, kept, (prepared, stripped)))
                 }
                 Err(p) => Err(p
                     .downcast_ref::<String>()
@@ -1237,13 +1247,18 @@ impl<W: Write> Engine<W> {
     /// to its own record (the kernel holds it), its questions (queued for the host), and what it made of drafts of its
     /// words: each signoff, a `words` note for one not done, and those its action carries out (returned, for their
     /// note once the action is applied).
-    fn keep(&mut self, key: &str, kept: Kept, prepared: Option<Vec<Option<Vec<u8>>>>) -> Result<Vec<oikos_actors::Worded>, String> {
+    fn keep(&mut self, key: &str, kept: Kept, prepared: Option<(Vec<Option<Vec<u8>>>, bool)>) -> Result<Vec<oikos_actors::Worded>, String> {
         let u = &self.units[key];
         let (pid, cap) = (u.participant.clone(), u.capacity.clone());
         // (Each annotation from the bytes made ready for it where it was decided, or from its value: the same entry.)
-        let mut prepared = prepared.map(Vec::into_iter);
+        let stripped = prepared.as_ref().is_some_and(|p| p.1);
+        let mut prepared = prepared.map(|p| p.0.into_iter());
         let mut ready = move || prepared.as_mut().and_then(Iterator::next).flatten();
-        if let Some(areas) = &self.opts.decision_areas {
+        if stripped {
+            while let Some(b) = ready() {
+                self.annotate_canonical(&b)?;
+            }
+        } else if let Some(areas) = &self.opts.decision_areas {
             let areas = areas.clone();
             for d in kept.decisions.into_iter().filter(|d| d["domain"].as_str().is_some_and(|x| areas.contains(x))) {
                 match ready() {
