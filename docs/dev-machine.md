@@ -7,13 +7,10 @@ and the measurements are in docs/decisions.md ("A shared machine that stays usab
 
 ## The rule
 
-**One full suite per merge.** `bun run test:all` is run once, on the merge, by whoever merges. Work on a branch runs
-
-- `bun run test:changed`: the fast tier, and every other test file that is changed, imports a changed file (however
-  far down) or names a changed data file, compared with `origin/main` (`--base REF` for another). It prints what it
-  chose and why. A change to the kernel's sources adds the kernel's own tests, not the tests that simulate towns:
-  those are the merge's.
-- or `bun scripts/test.ts <filter>...` for the tests you know cover the change, and `bun run test:fast`.
+**The merge gate, not the whole suite.** The suite is in two tiers (`scripts/test-tiers.json`, "Tiers" below). Work on a
+branch runs `bun run test:changed`, which is the merge gate itself (`bun scripts/test.ts --gate`): about a minute and a half
+at most on this machine, seconds for a document. `scripts/merge.ts` runs the same gate, and only it merges to main. CI
+runs both tiers whole on every push to main and nightly, so every assertion runs on every push. Or run `bun scripts/test.ts <filter>...` for the tests you know cover the change; `bun run test:slow` for the slow tier.
 
 **Never kill by pattern** (`pkill -f`, `killall`): another agent's suite or run matches the same pattern. Kill only a
 process id you started.
@@ -25,7 +22,7 @@ process id you started.
 
 | job | tokens |
 |---|---|
-| the test runner (`scripts/test.ts`) | one for each test file running; half the cores for the kernel's tests |
+| the test runner (`scripts/test.ts`) | one for each test file running (borrowed: see the cap); four for the kernel's tests |
 | `bun test <file>` by hand, from the repo's root | one for the process (`scripts/slots-preload.ts`, in `bunfig.toml`) |
 | `oikos run` | one for each run under way (`--parallel P`: up to P, fewer while the machine is busy). A run that asks a model takes none: it waits for answers, not for a core |
 | `bun run kernel` | half the cores |
@@ -91,28 +88,81 @@ day); an old agent lock is lifted only with `--unlock-pid PID` for that pid. It 
 `forms-trained*` and `sz-*` folders older than a day. Tests no longer leave those: `scripts/tmp-preload.ts` (in
 `bunfig.toml`) points TMPDIR at one folder per test process and a reaper removes it when the process ends, killed or not.
 Not touched: caches in the home folder (huggingface models) and `/private/tmp/claude-*`.
+## Tiers (2026-10-24)
+
+- **The gate tier** is every test file not named in `scripts/test-tiers.json`. `bun scripts/test.ts --gate [--base REF]`
+  (`test:changed`, and the merge's) chooses from it only: for a change to the kernel, the contracts, the manifests or
+  the runner (`FULL_ON`), all of it, with the kernel's own tests of the crates the change reaches (from `cargo
+  metadata`: each changed crate and every crate above it); for documents only, the tests that read documents; for
+  anything else, the fast tier (under 10 s), the tests that reach the change, and always the backstops (`BACKSTOPS`:
+  generality, no-god-view, contracts, `invariants-gate`, all-work-takes-time, risks, unstated-run, tiers). `--list`
+  prints the choice.
+- **The slow tier** is named file by file in `scripts/test-tiers.json`, each with why: towns of a year or more, several
+  seeds, the 1,000-person town, anything over about 30 s. `bun scripts/test.ts --tier slow`. CI runs it on every push
+  to main and nightly. The year of invariants on several seeds is here (`invariants.test.ts`); the gate has its own
+  check of every invariant on 90 days of each main profile (`invariants-gate.test.ts`).
+- Every run of `scripts/test.ts` leaves a record in `~/.oikos/test-runs/` (`OIKOS_TEST_RUNS`; the last 200): when, the
+  checkout and commit, the mode (gate, tier, all, filtered), and each file's wall seconds, pass or fail and test count.
+  `OIKOS_RUN_TRACE=<file>` adds a line per town run (test file, a hash of its options, seconds): it showed the slow tier
+  repeats only 1 to 3% of its run time, so no cache of runs was built (docs/decisions.md).
+- `scripts/tiers.test.ts` (a backstop) holds that every test file is in exactly one tier, that the slow tier's files
+  exist and say why, that every gate file took at most 90 s (by `test-times.json`), and that CI runs both tiers.
+- **The kernel in the gate.** Where the release build is current, the gate uses it. Where it is not (a kernel change, or a
+  checkout last built at another commit), it builds the `gate` profile (`kernel/Cargo.toml`: release's optimisation and
+  overflow checks, no fat LTO, 16 codegen units, incremental): 11 s after a one-file change where the release build
+  takes minutes; the tests are pointed at it by `OIKOS_KERNEL`, `OIKOS_ENGINE_MODULE` and `OIKOS_LAW_MODULE`. The
+  kernel's tests run in the same profile, under `cargo-nextest` (test programs side by side: 28 s for the workspace,
+  against 87 s for `cargo test` in the same profile and half an hour for `cargo test --release`), then its doc tests.
+  CI builds and runs on the release kernel.
+
+## Coordination
+
+- **One merge at a time.** `scripts/merge.ts` takes the merge lock (`scripts/merge-lock.ts`: `~/.oikos/merge/lock`,
+  `OIKOS_MERGE_DIR`); a second merge waits in line and says so once a minute. **Only it pushes to main:** the pre-push
+  hook (`scripts/hooks/pre-push`, put in the repository's shared hooks folder by merge.ts and `scripts/setup-mini.sh`;
+  `bun scripts/merge-lock.ts install-hook`) refuses a push to main unless the pusher holds the lock.
+- **A cap per agent.** No checkout (a worktree; `OIKOS_SLOT_OWNER` names another) holds more than a quarter of the slots
+  (`OIKOS_SLOT_CAP=N` or `none`): a job asking more gets the cap. The cap is held by tokens of the checkout's own, so two
+  jobs starting at once cannot both slip under it. Past it: the merge (priority high), and a job that borrows (the test
+  runner's tokens and `bun test` by hand, held a test file each), only while no other checkout waits; once one waits, the
+  borrower takes nothing more until it is back under its cap, and gets back what it lent as its files end.
+- **`bun scripts/status.ts`**: one screen. Who is working (worktrees with a running process: branch, last commit and its
+  age, processes, slots held), the merge lock and queue, the slots, the disk, CI's last results on main.
+- **Disk:** `scripts/disk-tidy.ts` also removes `.claude/target-*` build folders nothing was built in for a day
+  (`--target-hours`) and that no running process uses (no file open in one, no working folder there, no command line or
+  environment naming it).
+
 ## Merging a branch: `scripts/merge.ts`
 
 ```
-bun scripts/merge.ts <branch> [--message "..."] [--no-push]
+bun scripts/merge.ts <branch>... [--message "..."] [--no-push] [--full] [--fix-main]
 ```
 
-What the maintainer does by hand, in a clean worktree of its own (`.claude/worktrees/merge-bot`, made if missing; never
-`merge-main`): fetch; reset to `origin/main`; `git merge --no-ff <branch>`; then the worktree warm-up
-(`scripts/worktree-warm.ts`: installs, including cel-check, and `bun run kernel`), `bun run typecheck`, `cargo test` for the kernel, and `bun run test:all` (output in `merge-bot/merge-test.log`); restores
-`scripts/test-times.json`; pushes to `origin main` only if all passed; prints tests passed, time and the pushed sha.
+It takes the merge lock, then in its own clean worktree (`.claude/worktrees/merge-bot`, made if missing; never
+`merge-main`): fetch; reset to `origin/main`; `git merge --no-ff` each branch in order; the worktree warm-up
+(`scripts/worktree-warm.ts --no-build`, installs); the typecheck alongside **the gate** (`bun scripts/test.ts --gate`, output
+in `merge-bot/merge-test.log`); restores `scripts/test-times.json`; pushes to `origin main` only if all passed. `--full` runs
+the whole suite on the release kernel instead. Everything it starts has slot priority (`OIKOS_SLOT_PRIORITY=high`): it
+stands ahead of every waiting job and is not capped.
 
+- **Batch:** `merge.ts a b c` merges the branches in order, tests once, pushes all or none; if that fails it bisects on
+  prefixes (`settle`: the shortest failing prefix ends in the branch at fault, which is left out), pushes the rest, and
+  exits 1 naming what it left out.
+- **Red main:** CI's last step writes its result to `~/.oikos/main-ci.json` (`scripts/main-status.ts`; `gh run list` is asked
+  first when it works); while the latest result is a failure on a commit in origin/main, `merge.ts` refuses everything but
+  `--fix-main`.
 - **Conflicts:** only `docs/decisions.md` and `docs/research/references.md` are resolved (both sides kept, markers
-  stripped, the tree checked for any left). A conflict anywhere else aborts the merge and says which files.
-- **Flakes:** if the suite fails with exactly one failed test file and it is `scripts/slots.test.ts` or
+  stripped, the tree checked for any left). A conflict anywhere else leaves that branch out and says which files.
+- **Flakes:** if the gate fails with exactly one failed test file and it is `scripts/slots.test.ts` or
   `orchestrator/test/pilot-wave.test.ts` (timing under load), that file is rerun alone and accepted only if it passes.
-  Any other failure (a different file, two files, the kernel) stops it, with no push.
-- The merge commit message ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-- `--no-push` does everything but the push: the merge stays in the merge-bot worktree for inspection.
-- It waits for slots like any heavy job, so on a busy machine it is slow; run it once per merge (the rule above).
-- Pure parts (keep-both, marker check, failure reading) are tested in `scripts/merge.test.ts`.
-- `.github/workflows/ci.yml` also runs the suite on every push and pull request, on a self-hosted runner: `docs/ci-runner.md`.
+- The merge commit message ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. `--no-push` does
+  everything but the push. Pure parts are tested in `scripts/merge.test.ts`, the lock and hook in `scripts/merge-lock.test.ts`.
+- `.github/workflows/ci.yml` runs both tiers on every push to main and nightly on the self-hosted runner (`docs/ci-runner.md`);
+  no pull-request trigger, since the repository is public and the runner is this machine.
 ## Time-saving (2026-10-17)
+
+(History: the tiers above replaced the choice below, 2026-10-24. `--affected` is now `--gate`, and chooses within the gate tier.)
+
 
 - **`bun scripts/test.ts --affected [--base REF] [--list]`** is the merge's selection (`--list` prints the choice and stops). The whole suite when
   the change touches `kernel/`, the contracts (not their notes), `package.json`, `bun.lock`, `bunfig.toml`, a tsconfig, the runner or the
