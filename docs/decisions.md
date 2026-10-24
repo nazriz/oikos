@@ -7563,6 +7563,49 @@ support office and nothing in the tribunal (no review requests reach it). So the
 changed, not its papers (the rubber stamp's note); `careless` and `slow` stand in. *Revisit if* a real model's
 forks in the support office show it doing something no mock steward does that the tribunal would see first (appeals
 decided, possession orders).
+
+## 2026-10-24 · Citizen data: the capture (step 1 of the citizen model; branch `citizen-capture`; no model called)
+
+**What:** every decision a citizen's mind records, in every run that asks, is written while the run runs to
+`<run>.citizens.jsonl.zst` beside the log (docs/citizen-data.md; contract `contracts/citizen-data.schema.json`, new
+and additive under the blanket approval): each turn as the mind recorded it (exactly the `decision` annotation's data),
+the person's count `n`, and its draws (the key of every stream of the kernel's the person opened since their decision
+before it, with every value the decision took where the mind says which stream it chose with, else the stream's first
+value); what the person came to know of how things went (`outcome`, each naming its turn by `of`); and each change to
+their record the kernel took. `oikos citizen-data` turns a capture into one training example a turn, the record folded
+as it stood and the turn's outcomes under it, and marks turns on a test case's run and day `exclude_from_training`.
+`--capture-citizens on|off`; **on by default with a real model** (a pilot), off for code runs, and a resumed run goes
+on capturing if its capture is there.
+
+**Why this way:**
+- *Written during the run, not by replay* (the design's reasoning, section 1): the draws and the record at the moment
+  are not in the log, and a lean log keeps no decisions; replay ties the data to one commit.
+- *An engine option, not a world setting.* The design named `capture.citizens` in the world config; a world setting
+  sits in the log's config and would change the log. As an option of the engine's (`capture_citizens: <path>`), the
+  log is the same byte for byte with it on, and the state hash too (`orchestrator/test/citizen-data.test.ts`; on the
+  1,000-person year the two 2.65 GB logs compared equal with `cmp`). The actors read nothing of it; `Cx::rng` notes
+  the streams it opens only while it is on. A snapshot leaves the capture's draws out, so it is the same either way.
+- *One stream, rows typed, in the engine's order*, not the design's four files with records by `{n, sha256}`: a
+  person's record at a turn is then simply the fold of their record rows above it (no hashing in the run), and the
+  file is the same bytes for the same run. Checked: the record rows equal the kernel's record changes, one for one.
+- *Built from `Kept` alone* (`capture::rows` takes what the person's unit left beside its action, its id and the
+  moment): no world state reaches a row, and the actors crate cannot name it (docs/no-god-view.md).
+- *Content, not prose:* letters are code's words in the first round (Naz, 2026-10-24); nothing chooses a letter's
+  content yet, so the content decision captured is the decision's typed choice. Whether offices weigh stated grounds is
+  undecided and nothing here builds it.
+- *Compression on a thread of its own:* with it on the run's thread the 10,000-person month was 4 to 30% slower.
+
+**Cost** (release kernel, town-1000 au-vic seed 1, lean log, quiet machine, pairs in alternating order): a 1,000-person
+year 178 and 175 s off, 165 and 188 s on; a 10,000-person month 79 and 85 s off, 76 and 82 s on: no difference beyond
+the noise. The year's capture is 25.6 MB (298 MB of rows, 232,706 turns: about 640 a day per 1,000 people, three times
+the design's estimate); the month's at 10,000 people 52.7 MB. Two runs wrote the same capture, byte for byte. Under the
+day's load (load averages 15 to 90) single pairs differed by up to 40% either way, so those figures were discarded.
+
+**Not done** (risk MT-24): the typed situation for every domain, the papers a person held and wrote, the `dealings`
+join, firms' decisions, a size stop. *Revisit if* a pilot's capture passes 2 GB (the design's bound), if a profile's
+town shows the capture costing more than 5% of a run's time (then default it off for code runs, as now, and look at
+the turn rows' size), or when step 2's input builder needs a field the turns do not carry.
+
 ## 2026-10-24 · The citizen model: a small model of our own that people act through; a plan, awaiting the owner (docs only; no code, no model called, no training)
 
 **What was asked.** The owner, 2026-10-24: a bespoke model shared by every citizen, like the translator ("as empowered and as close to real economic actors as possible, but within the constraints of a tiny model that can run in ms"): record, situation and a kernel draw in; a decision out that changes what the person does. Later the same day: the Mac mini's CPU is not a limit, and **the first priority is capturing data from the pilots about to run**. The plan is `docs/design/citizen-model.md`; it decides and gives reasons.

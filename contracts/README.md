@@ -25,6 +25,7 @@ These schemas are the constitution. Humans review them and the invariant tests; 
 | [`calls.md`](calls.md), [`calls.schema.json`](calls.schema.json) | The call language: structured intents the resolver turns into a participant's own acts |
 | [`entity-record.schema.json`](entity-record.schema.json) | A person's own record: its sections, every list bounded (the kernel holds it and reads none of it) |
 | [`outcomes.schema.json`](outcomes.schema.json) | Shared encodings: requests, commitments as outcomes, forms |
+| [`citizen-data.schema.json`](citizen-data.schema.json) | Citizens' decisions captured while a run runs (beside its log, never in it), and the training rows made from them (docs/citizen-data.md). Added 2026-10-24, additive, under the blanket approval of 2026-10-11 |
 
 `bun test` checks that every schema compiles under JSON Schema 2020-12 strict mode, every valid example passes, and every invalid example is rejected (187 tests; `examples/refused/` holds worlds that are well formed and that the kernel refuses to load, checked by `kernel/tests/knowing.rs`). The examples include Riverbend rebuilt for v0.4 and a valid empty world.
 
