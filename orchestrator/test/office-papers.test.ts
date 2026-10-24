@@ -91,12 +91,13 @@ test("the works office's advertisement for crew, on its form, is the advertiseme
   expect(r).toHaveLength(1);
   expect(r[0]!.turned).toMatchObject({ turned: 1, kept: [] });
   expect(r[0]!.form).toEqual(r[0]!.module);
-  expect(r[0]!.turned.program).toBe('form(form=job_advertisement, period="14 days", posts="1", to=works, wage="XYZ 3000.00")');
-  expect(r[0]!.form[0]).toMatchObject({ kind: "job_posting", data: { wage: WAGE, period: PERIOD, role: "works crew", industry: "public_administration", workplace: "town-hall", space: "town-hall/workplace.1" },
-    offer: { by: "city", take_up: "apply", available: 1, terms: { template: "employment" } } });
+  // (One advertisement for the three posts the budget pays for: docs/design/market-realism.md, ME-2.)
+  expect(r[0]!.turned.program).toBe('form(form=job_advertisement, period="14 days", posts="3", to=works, wage="XYZ 3000.00")');
+  expect(r[0]!.form[0]).toMatchObject({ kind: "job_posting", data: { wage: WAGE, period: PERIOD, openings: 3, role: "works crew", industry: "public_administration", workplace: "town-hall", space: "town-hall/workplace.1" },
+    offer: { by: "city", take_up: "apply", available: 3, terms: { template: "employment" } } });
   // A seat that fills it in with only what the form requires gets the same paper, in the form's own words.
   const k = seat("works", "city", 10 * DAY, papers);
-  const plainly = resolve(calls.parseProgram('form(form=job_advertisement, wage="3,000", period="14 days", posts="1")'), k, () => undefined, "works");
+  const plainly = resolve(calls.parseProgram('form(form=job_advertisement, wage="3,000", period="14 days", posts="3")'), k, () => undefined, "works");
   expect(plainly.ok && plainly.blocks[0]).toEqual({ ...r[0]!.module[0]!, text: "Hiring: XYZ 3,000.00 every 14 days." });
   // Eight posts in one advertisement: what pilot 12's works manager asked for and could not say.
   const eight = resolve(calls.parseProgram('form(form="job advertisement", to=works, wage="3,000", period="fortnightly", posts="8")'), k, () => undefined, "works");

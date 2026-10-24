@@ -38,6 +38,15 @@ test("the generator refuses a share that is not one", () => {
 test("an unregistered job is paid whole and reported to nobody; a registered one is withheld from and reported", async () => {
   // No shop registers anyone; factories register half their jobs; the builder all of its.
   const config = town({ shop: 0, factory: 5_000 });
+  // (One shop opens a hand short, so that someone is taken on in the run: whether anyone leaves a shop in 100 days is the
+  // town's draw, and since 2026-10-24 (who works drawn with their household, ME-17) nobody does in this one.)
+  {
+    const recs = config.world.records as any[];
+    const job = recs.find((r) => r.record === "agreement" && r.terms?.template === "employment" && String(r.terms.parties[0]).startsWith("shop-"));
+    const worker = job.terms.parties[1];
+    config.world.records = recs.filter((r) => r.id !== job.id && r.agreement !== job.id && r.basis !== job.id);
+    config.world.occupancy = config.world.occupancy.filter((o: any) => !(o.occupant === worker && String(o.space).startsWith(job.terms.parties[0])));
+  }
   const out = join(root, "runs", "test-unregistered-jobs");
   rmSync(out, { recursive: true, force: true });
   const s = await runWorld({ config, runId: "unregistered-jobs", outDir: out, until: 100 * DAY });

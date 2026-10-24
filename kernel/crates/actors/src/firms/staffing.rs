@@ -530,9 +530,6 @@ pub struct Staffing {
     failed: Vec<(String, i64)>,
     unpaid: Vec<Unpaid>,
     asked_answered: BTreeSet<String>,
-    /// posting -> the offers made on it (a posting is for as many hands as it says: `openings`).
-    #[serde(default)]
-    post_offers: BTreeMap<String, i64>,
 }
 
 impl Staffing {
@@ -578,7 +575,6 @@ impl Staffing {
             failed: vec![],
             unpaid: vec![],
             asked_answered: BTreeSet::new(),
-            post_offers: BTreeMap::new(),
         }
     }
 
@@ -628,9 +624,7 @@ impl Staffing {
             None => self.posts_by_the_day(cx),
         };
         let mut data = serde_json::Map::new();
-        if openings > 1 {
-            data.insert("openings".into(), json!(openings));
-        }
+        data.insert("openings".into(), json!(openings.max(1)));
         if by_day {
             data.insert("wage".into(), json!(self.day_wage(wage)));
             data.insert("period".into(), json!(DAY));
@@ -1395,6 +1389,13 @@ impl Staffing {
             let was = book.get(&named).filter(|r| r.speaks_for.as_deref() == Some(me.as_str()))?;
             posts.iter().find(|p| kind_of(p) == kind_of(was)).map(|p| p.id.clone())
         };
+        // (The offers made on each posting, as our own file shows them: those made since it went up, to someone whose
+        // application stands for it. An offer the world refused was never made.)
+        let made_on: BTreeMap<String, i64> = posts
+            .iter()
+            .map(|p| (p.id.clone(), contracts.iter().filter(|a| a.at >= p.at && a.basis.as_ref().and_then(|b| book.get(b.first())).is_some_and(|app| applied_for(app).as_deref() == Some(p.id.as_str()))).count() as i64))
+            .collect();
+        let mut made_now: BTreeMap<String, i64> = BTreeMap::new();
         for post in if does_hire { posts.clone() } else { vec![] } {
             // (An advertisement of ours that we have put on hold: nobody is offered the post while the hold stands.)
             if book.on_hold(&post.id, Some(std::slice::from_ref(&me))) {
@@ -1411,7 +1412,7 @@ impl Staffing {
                 continue;
             }
             let openings = data(post).get("openings").and_then(Value::as_i64).unwrap_or(1).max(1);
-            let made = self.post_offers.get(&post.id).copied().unwrap_or(0);
+            let made = made_on.get(&post.id).copied().unwrap_or(0);
             let take = ((openings - made).max(0) as usize).min(mine.len());
             let considered = mine.len();
             for (k, chosen) in mine.into_iter().take(take).enumerate() {
@@ -1424,7 +1425,7 @@ impl Staffing {
                 &format!("Interview for our posting, with {worker}."),
                 Say { to: Some(vec![worker.clone()]), visible: Some(Visible::Only(vec![me.clone(), worker.clone()])), basis: Some(chosen.id.clone()), data: Some(json!({ "posting": post.id, "application": chosen.id })), ..Default::default() },
             );
-            *self.post_offers.entry(post.id.clone()).or_insert(0) += 1;
+            *made_now.entry(post.id.clone()).or_insert(0) += 1;
             let wage = data(post).get("wage").and_then(Value::as_i64).unwrap_or(want.wage);
             let account_to = data(chosen).get("account").and_then(Value::as_str).unwrap_or(&worker).to_string();
             let occupancy = self.o.workplace.as_ref().map(|w| call("occupancy", vec![("who", Some(arg(&worker))), ("in", Some(arg(w)))]));
@@ -1482,7 +1483,7 @@ impl Staffing {
                 let now = if by_day { self.day_wage(want.wage) } else { want.wage };
                 if !apps.iter().any(|a| data(a).get("posting").and_then(Value::as_str) == Some(post.id.as_str())) && was != now && want.can_post {
                     // (For the hands it was still for: its applicants carry over, above.)
-                    let left = (d.get("openings").and_then(Value::as_i64).unwrap_or(1) - self.post_offers.get(&post.id).copied().unwrap_or(0)).max(1);
+                    let left = (d.get("openings").and_then(Value::as_i64).unwrap_or(1) - made_on.get(&post.id).copied().unwrap_or(0)).max(1);
                     let c = self.posting(cx, want.wage, account, Some(by_day), left);
                     steps.push(step(
                         format!("Our posting is still open, at {}; we offer {} now: posting it again at that.", usd(was), usd(now)),
@@ -1501,7 +1502,7 @@ impl Staffing {
         }
         // (A posting for more hands than we now need, once those we need are taken on or offered the post: taken down.)
         if does_hire && have >= want.target && offers_now == 0 {
-            let up: Vec<&Arc<Record>> = posts.iter().filter(|p| self.post_offers.get(&p.id).copied().unwrap_or(0) > 0).copied().collect();
+            let up: Vec<&Arc<Record>> = posts.iter().filter(|p| made_on.get(&p.id).copied().unwrap_or(0) + made_now.get(&p.id).copied().unwrap_or(0) > 0).copied().collect();
             if !up.is_empty() {
                 steps.push(step(format!("We have the staff we need ({have}): taking down our posting."), up.iter().map(|p| withdraw(&p.id, Some("No longer needed."))).collect()));
             }
@@ -2859,9 +2860,12 @@ mod tests {
         let (c, mut s, mut book) = (shop_ctx(), Staffing::new("shop", StaffingOpts::new(PERIOD, 14, "staff")), Book::new());
         // Our posting for three, one offered already, taken down for a new wage and published again.
         let old = statement("post-1", DAY, "job_posting", json!({ "wage": SHOP_WAGE - 1_000, "period": PERIOD, "role": "staff", "openings": 3 }), "shop");
-        s.post_offers.insert("post-1".into(), 1);
+        let zed = rec(json!({ "id": "app-0", "record": "statement", "author": "zed-self", "speaks_for": "zed", "at": DAY + 5, "visible_to": ["shop", "zed"], "kind": "job_application", "text": "I apply.", "addressed_to": ["shop"], "data": { "posting": "post-1", "account": "acc-zed" } }));
+        s.handled.insert("app-0".into()); // (considered when it came in)
+        let offered = rec(json!({ "id": "ag-0", "record": "agreement", "author": "shop-self", "at": DAY + 10, "visible_to": ["shop", "zed"], "basis": "app-0", "terms": { "template": "employment", "parties": ["shop", "zed"], "commitments": [
+            { "who": "shop", "does": { "outcome": { "money": { "to": "acc-zed", "amount": SHOP_WAGE - 1_000 } } }, "every": PERIOD } ] } }));
         let steps = with_cx(&c, 2 * DAY, |cx| {
-            let p = picture(2 * DAY, "shop", vec![old.clone()], &[("acc-shop", "shop", 900_000_000)], vec![]);
+            let p = picture(2 * DAY, "shop", vec![old.clone(), zed.clone(), offered.clone()], &[("acc-shop", "shop", 900_000_000)], vec![]);
             book.absorb(&p);
             s.absorb(&p);
             s.routine::<()>(&p, &book, cx, "acc-shop", &Want { target: 3, wage: SHOP_WAGE, can_post: true, ..Default::default() })

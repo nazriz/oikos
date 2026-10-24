@@ -57,7 +57,7 @@ test("a seat that looks into its office's papers at every sitting is shown lists
   // characters (docs/decisions.md, "What a seat carries between sittings"); the largest finance prompt was 52,193.)
   // (63,000 since 2026-10-16, foundations F8, where it was 56,000: the finance office reads the payments procedure for who approves a payment over what sum, no longer a
   // parameter, and is shown the town's procedures to do it (4,648 characters), and the town's law on decisions is in the laws it is shown (3,581); the largest finance prompt was 61,229.)
-  expect(Math.max(...finance.map((p) => p.size))).toBeLessThan(66_000); // (66,000 since 2026-10-17, foundations F9, where it was 63,000: the same three forms and the diary; the largest finance prompt was 64,654, and 61,615 without them.)
+  expect(Math.max(...finance.map((p) => p.size))).toBeLessThan(68_000); // (68,000 since 2026-10-24, market realism, where it was 66,000: who is in work is drawn with their household (ME-17), so another person holds the finance post, and what a seat is told of its own person (age, children, home) and its file differ; the largest was 67,329 against 65,289 on main the same day, the difference in what it is told of its person and the names on its file. 66,000 since 2026-10-17, foundations F9, where it was 63,000: the same three forms and the diary; the largest finance prompt was 64,654, and 61,615 without them.)
   // The folder named for payroll holds the employment agreements, a line each; the files, everything, as a list.
   const second = finance[1]!.text;
   expect(second).toContain("## Finance officer: Payroll: what you looked up (");
