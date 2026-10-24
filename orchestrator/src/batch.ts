@@ -234,7 +234,8 @@ function noteMeasureFailed(out: string, why: string): void {
  * p95, max, total) and errors. Unchanged when no call was recorded (a mock run, or a run from before 2026-10-24).
  */
 export function withCalls<T extends object>(json: T, out: string): T & { calls?: unknown } {
-  const files = existsSync(out) ? readdirSync(out).filter((f) => f.endsWith(".calls.jsonl")).sort() : [];
+  // (Not the adapters' own ledgers, `decide.calls.jsonl` and `claude-code.calls.jsonl`, which hold other fields.)
+  const files = existsSync(out) ? readdirSync(out).filter((f) => f.endsWith(".calls.jsonl") && !/^(decide|claude-code|codex)\.calls\.jsonl$/.test(f)).sort() : [];
   const lines: any[] = files.flatMap((f) => readFileSync(join(out, f), "utf8").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return undefined; } }).filter(Boolean));
   if (!lines.length) return json;
   const q = (xs: number[], p: number) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(p * xs.length))]! : null);

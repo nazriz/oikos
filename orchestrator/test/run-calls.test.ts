@@ -2,7 +2,7 @@
 // cost.json by model, purpose and subject, with wall time and errors; the calls file is never taken for a log.
 
 import { expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { LlmAdapter } from "@oikos/participants/llm";
@@ -35,6 +35,8 @@ test("a run's calls file sums into cost.json, errors apart, and is not a log", a
     await a.complete({ subject: "finance", purpose: "participant" } as any);
     await a.complete({ subject: "translator", purpose: "translate" } as any);
     await b.complete({ subject: "finance", purpose: "participant" } as any).catch(() => {});
+    // (The trained translator's own ledger beside it is not counted.)
+    writeFileSync(join(dir, "decide.calls.jsonl"), `${JSON.stringify({ subject: "translator", ms: 400 })}\n`);
     const j = withCalls({ text: undefined }, dir) as any;
     expect(j.calls.total.calls).toBe(2);
     expect(j.calls.total.errors).toBe(1);
