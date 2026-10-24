@@ -84,9 +84,9 @@ built (MT-21's remainder).
 
 | Profile | Deemed refusal | Source |
 |---|---|---|
-| de-ni | 91 days (three months) after the objection, then the month to go to the social court | SGG s 88(2), the action for failure to act (*Untätigkeitsklage*), recalled, **to confirm**; the real action has no month's limit after the three months: ours is the stricter reading |
-| au-vic, gb-eng, us-oh (pension) | none | no deemed refusal recalled for the internal review of a benefit decision, **to confirm** (Australia's FOI Act has one, s 15AC, for access requests, not here) |
-| mx-jal | not stated | the review is optional, so the appeal runs from the decision anyway; Mexican administrative law's *negativa ficta* (to confirm) would matter only if it were required |
+| de-ni | 91 days (three months) after the objection, then the month to go to the social court | SGG s 88(2), the action for failure to act (*Untätigkeitsklage*), recalled, **to confirm**; the real action has no month's limit after the three months: ours is the stricter reading (MT-21) |
+| au-vic, gb-eng, us-oh (pension) | none | no deemed refusal recalled for the internal review of a benefit decision, **to confirm** (Australia's FOI Act has one, s 15AC, for access requests, not here; MT-21) |
+| mx-jal | not stated | the review is optional, so the appeal runs from the decision anyway; Mexican administrative law's *negativa ficta* (to confirm) would matter only if it were required (MT-21) |
 
 ## The places' routes
 
