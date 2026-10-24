@@ -68,13 +68,28 @@ test("someone out of work with savings and a home starts a business of one, puts
 }, 600_000);
 
 test("a business of one that does not pay its owner a living is given up: it closes, and its owner looks for work again", async () => {
-  // (Judged after two months, against a living nobody's trade from home could clear: for the test.)
-  const { person, ev, recs } = await run("own-venture-given-up", 300, (p) => Object.assign(p, { give_up_months: 2, give_up_below_bps: 1_000_000 }), 2);
-  const firm = ev.find((e) => e.event === "position_created" && e.role_module?.params?.operator === person)!.entity as string;
+  // (A business of one the town opens with, as orchestrator/test/own-account.test.ts draws them: whether anyone starts one
+  // in a run is now theirs, by its expected profit (docs/behaviour/entry.md, "Entry by expected profit"), and this test is
+  // of giving one up. Judged after two months, against a living nobody's trade from home could clear: for the test.)
+  const { loadProfile } = await import("@oikos/worlds/generator/profile");
+  const { generateFrom } = await import("@oikos/worlds/generator/generate");
+  const P = structuredClone(loadProfile("au-vic-2026")) as any;
+  P.values.employment = { ...(P.values.employment ?? {}), own_account: { share_bps: 3_000, kinds: [{ id: "home-trade", name: "Trader at home", does: "trade", share_bps: 10_000, from: "home", stock_days: 7 }] } };
+  const config = generateFrom({ ...base, profile: "au-vic-2026" }, P);
+  const one = config.participants.find((p: any) => p.controller?.impl === "citizen.default" && p.controller.params.own_work?.home)!;
+  expect(one).toBeDefined();
+  Object.assign(one.controller.params, { give_up_months: 2, give_up_below_bps: 1_000_000 });
+  const person = one.person as string, firm = one.controller.params.own_work.firm as string;
+  const out = join(root, "runs", "test-own-venture-given-up");
+  rmSync(out, { recursive: true, force: true });
+  const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "given-up", outDir: out, until: 150 * DAY, recordObservations: "none" });
+  const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
   const closure = recs.find((r) => r.kind === "closure" && r.speaks_for === firm);
   expect(closure).toBeDefined();
   expect(closure.data.given_up).toBe(true);
   expect(recs.some((r) => r.kind === "job_application" && r.speaks_for === person && r.at > closure.at)).toBe(true);
+  rmSync(out, { recursive: true, force: true });
 }, 600_000);
 
 test("a founding's draw of the shape \"business\" reaches the business of one: someone who has meant to start a business does, when they have a home and the money", async () => {

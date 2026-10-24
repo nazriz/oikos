@@ -303,8 +303,9 @@ impl Person {
     /// venture's), and nothing for premises (a home, or premises bought outright). `hires`: whether hands may be taken
     /// on. None where we know no price for it.
     pub fn venture_prospect(&self, pic: &Picture, v: &super::params::Venture, hires: bool) -> Option<oikos_rules::entry::Prospect> {
-        // (The custom in reach: the homes around us, as we see them by being there; a business worked from home sells to
-        // its neighbourhood first, and its rivals are the sellers we, like our neighbours, know.)
+        // (The custom in reach: for a business worked from home, the homes around us, as we see them by being there (it sells
+        // to its neighbourhood first, and its rivals are the sellers we, like our neighbours, know); for a shop in premises
+        // on the street, the town's adults, as the census publishes them, against the sellers of its kind we know.)
         let mut homes: BTreeSet<String> = BTreeSet::new();
         for c in pic.channels.values() {
             if let Seen::Sites { cells, .. } = c {
@@ -354,7 +355,7 @@ impl Person {
             .max();
         let wage = if hires { posted.or_else(|| g("wage").map(|w| div_round(w * MONTH, period))).unwrap_or(0) } else { 0 };
         let opportunity = self.s.job.as_ref().map_or(0, |j| div_round(j.wage * MONTH, j.period.max(DAY)));
-        Some(oikos_rules::entry::Prospect { price, unit_cost, units_per_household, households_reached: homes.len() as i64, sellers_known: known.len() as i64, units_per_worker, wage, fixed: 0, opportunity })
+        Some(oikos_rules::entry::Prospect { price, unit_cost, units_per_household, households_reached: if v.own { homes.len() as i64 } else { self.p.population }, sellers_known: known.len() as i64, units_per_worker, wage, fixed: 0, opportunity })
     }
 
     /// Whether to start it (docs/behaviour/entry.md, "Entry by expected profit"): the mind's decision between the
