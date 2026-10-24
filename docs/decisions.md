@@ -7787,3 +7787,27 @@ the owner's API credit; ours first, Sonnet 5.5 behind. All six reached day 120; 
   police forms (new forms with real cases now, in a test pilot).
 - **Revisit if** a code actor is found to need a second identical unresolved call in one moment (none should: its view
   is the same), or the fault behind it (a work site that is not a space) is refused at the kernel's check.
+
+## 2026-10-25 · A look's result reaches the next prompt (branch `pilot-faults`, fault 1 of the six pilots)
+
+- **What happened.** In lv-08 and lv-09 every look the lending seat made was replaced, at its very next prompt, by
+  "What this look showed is no longer set out here" (163 trimmed prompts in lv-09, 86 in lv-08, each removing one look
+  of about 128,000 characters). It decided no loan in either town and declined all 16 of its drafts in lv-08; lv-09's
+  seat reported distress at a backlog it could not read.
+- **Cause.** The seat's view keeps an accounts channel as its whole current picture (`participants/src/view.ts`), and the
+  bank's ledger is every customer's account: about 3,000, 127,000 characters. `renderObservation` set the whole ledger
+  out in every report, including each look's result, so a look for one paper came back at 130,000 characters, nearly
+  all of it the ledger. `fitPrompt` leaves a long part not looked up out first (SF-2, 2026-10-17), but only in text: a
+  look's result is a tool result, so its next step left out looks, oldest first, and the newest look was the only one.
+- **Fix, at both ends.** (1) `render.ts`: having looked at something else, an accounts list longer than a report's
+  list (40) is not set out again whole (as sites and the directory already were not): its own accounts and money in
+  and out still are, and a line says how many it keeps for others and that they come with its next report. On the
+  logged lv-08 look this is 4,210 characters where it was 130,773. A short list (a mayor's books) is as it was.
+  (2) `fitPrompt`'s first step reads tool results too: a long part a result carries that is not what was looked up
+  goes before the result does. Test: `seat-papers.test.ts`, "a seat's look results reach its next prompt" (a 3,000
+  account ledger; the look's result whole at the next two calls; fails on the old code).
+- **Not changed:** the opening of a sitting still sets the ledger out and the ceiling still leaves it out there (a
+  long part, with a line saying so); a lender sees one customer's balance only through its papers. Paging the ledger
+  is SF-8's work.
+- **Revisit if** a seat needs balances after a look within a sitting (they come with its next report), or a lender
+  seat's `prompt_trimmed` notes show `looks` above 0 again.

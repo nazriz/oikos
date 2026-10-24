@@ -907,6 +907,7 @@ The mechanism:
 - **Notice by:** A lender seat's prompt over the ceiling; its own look-ups cut.
 - **Fix when:** Before any lender is seated; the ledger on request, not in the prompt.
 - **Evidence:** `fitPrompt` (participants/src/llm/participant.ts) leaves out a standing part longer than `BULK_PART` (20,000 characters) before any of the seat's own look-ups, longest first, with a line saying so; test in `participants/test/seat-papers.test.ts`. A lender seat is still not run against the real ledger: check the first one.
+- **Came back (pilots lv-08, lv-09, 2026-10-24), fixed again 2026-10-25** (decisions "A look's result reaches the next prompt"): the 2026-10-17 fix reached only text, and the whole ledger (127,000 characters) was set out again inside every look's result, so the look's result was what went. Now the accounts it keeps for others are not set out with a look's result (its own, and money in and out, still are), and a long part inside a result goes before the result does; test "a seat's look results reach its next prompt". Check the next lender seat's `prompt_trimmed` notes: `looks` should be 0.
 
 ### SF-3 · Initiative depends on wording
 - **Gap:** Seats read "not bound to act" and the absence of a trigger as absence of duty; nothing prompts a seat to
