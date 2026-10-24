@@ -115,7 +115,7 @@ pub mod rig {
                 performer: Default::default(),
                 entity: entity.into(),
                 position: position.map(String::from),
-                params: params.as_object().cloned().unwrap_or_default(),
+                params: params.as_object().cloned().unwrap_or_default().into(),
                 world,
             };
             let actor = kind.create(&ctx).expect("created");

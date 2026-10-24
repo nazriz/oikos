@@ -1346,14 +1346,18 @@ The mechanism:
 
 ## Performance and scale
 
-### SC-1 · Untested past a 10,000-person month
-- **Gap:** A year at 10,000 and a ten-year run were never made (15 to 25 hours and about 240 GB are projections);
-  memory for the same month grew from 5 to 7 GB to 8 to 12 GB in a week of changes; 100,000 never generated; the host's one thread is over half the run.
+### SC-1 · Untested past a 10,000-person year; 50,000 grows by the square
+- **Gap:** A ten-year run was never made. A 10,000-person year runs (2026-10-23, Rust world: 29 minutes, 7.8 GB, 9 GB of
+  log), but at 50,000 people memory grows about 2.8 GB a simulated day and the log 1.9 GB (some 30 to 40 times 10,000's for
+  five times the people), so a month does not fit this machine (stopped at day 16 at 45 GB); 100,000 is generated (1.56 GB
+  of config) and never run. Cause not yet confirmed by a heap profile: most likely each citizen keeping and weighing every
+  published record and gathering (docs/design/performance.md, "50,000 and 100,000 people").
 - **Where:** `docs/design/gradual-disempowerment.md` §2.6, §7; `docs/design/foundation-for-scale.md`.
 - **Effect:** Any study planned "at scale" rests on estimates.
 - **L / I:** high / medium · **Status:** to fix (probes R1 to R4)
 - **Notice by:** A run past 10,000 people slowing or running out of memory.
-- **Fix when:** Before a study at that scale; run the probes R1 to R4.
+- **Fix when:** Before a study at that scale: a heap profile at 20,000 to 50,000, then bound what a citizen keeps (behaviour),
+  and read the config participant by participant (performance.md's ranked list, 1 and 2); run the probes R1 to R4.
 
 ### SC-2 · Resume replays from the start
 - **Gap:** No mid-run checkpoint; resume replays the whole log; resume against a real model is untested.

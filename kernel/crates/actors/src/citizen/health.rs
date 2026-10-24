@@ -47,7 +47,7 @@ impl Kind for Practice {
         8 * HOUR
     }
     fn create(&self, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
-        let p: Params = serde_json::from_value(Value::Object(ctx.params.clone())).map_err(|e| format!("clinic.practice's parameters: {e}"))?;
+        let p: Params = serde_json::from_value(Value::Object((*ctx.params).clone())).map_err(|e| format!("clinic.practice's parameters: {e}"))?;
         for (k, v) in [("building", &p.building), ("workplace", &p.workplace), ("waiting", &p.waiting), ("account", &p.account)] {
             if v.is_empty() {
                 return Err(format!("clinic.practice: the world must say {k} (whom it deals with; no module assumes a world's names)"));

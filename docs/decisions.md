@@ -7300,3 +7300,50 @@ day 30 to day 210, five arms; 553 s, five workers, 15 forks, none failed).
 **Revisit if** a living town's recourse rates move away from the TypeScript world's; a withheld arm's `withheld` is 0
 (the act never came); MT-21 is sourced; or a host's seats must be withheld too.
 
+## 2026-10-23 · The Rust world made faster and smaller, each change result-identical (branch `perf-2`; no model called)
+
+**Why.** The owner asked for speed above all after the cut-over: profile the Rust world again, fix the biggest costs without
+changing a result, and say whether a 10,000-person year and a 50,000 to 100,000-person month are within this machine.
+
+**Found** (macOS `sample` of the running engine; docs/design/performance.md, "The Rust world"): at 10,000 people almost half
+of the run's own thread was keeping a step's results: every decision annotation checked against the JSON schema and copied
+whole by `json!`, and every write of a person's record searching the config's 10,000 participants for its bookkeeper. A
+code actor's observation was still written out as JSON under `log.observations: seats`, only to read what it adds to its
+knowledge. The support office was the slowest actor of every parallel round (it searched its whole file for each claim's
+employer). Memory: a copy of the people's params is 2.4 GB at 10,000 (`serde_json` values are about 24 times their JSON);
+the engine held two besides the kernel's. Starting a town was quadratic (each participant's units looked for among all units).
+
+**Changed** (kernel, engine, contracts, one actor office, the actors' `Ctx`; no behaviour): the config's participants and
+record-keeping posts indexed; a plain annotation (a subject and its data of the contract's `Opaque`) passed without the
+schema, which still decides everything else and gives its messages (debug builds assert it agrees); no `json!` copies; a code
+actor's knowledge read from its observation without writing its JSON (`Kernel::shown`, compared with the encoder in debug
+builds); the log written on its own thread (`spool.rs`); a thread pool kept for the process (`pool.rs`, rayon), in place of
+threads started each round; the support office's employers read on from where it left off and checked against the full
+search in debug builds, and its laws parsed in place; decisions written for the log (canonical bytes, contract check) on the
+thread the actor decided on, and their values let go there when no seat is in the round; participants' controllers shared
+with the kernel's config, and an actor's params a view of them (`oikos_actors::Params`, a `Deref` to the map it was; tests that
+build a `Ctx` from a map say `.into()`); a participant's units found by key range at start. `oikos-kernel world` prints its own
+thread's CPU time; `OIKOS_SHARE_AT` sets the smallest round shared over threads, for measuring (default 16, unchanged: at 4,
+the main thread fell 10% at 1,000 people and the machine's instructions rose 22%, with no wall time gained on a loaded machine).
+
+**Proof, each step.** The same final state hash and the same log after the header (entry hashes stripped) as the cut-over's
+build, at 1,000 people for 30 days under `log.observations: seats` and `all`, at 1,000 for a year, at 10,000 for 30 days and at
+50,000 to the first minute: digests and hashes in performance.md. `cargo test` (debug, so with the assertions above),
+`bun run typecheck`, `bun run test:fast`.
+
+**Measured** (LTO builds, `oikos-kernel world`, machine load 12 to 28 on 14 cores): 1,000 people for 30 days 20.1 to 16.6 s
+(-11% instructions); a year 1,238 to 1,054 G instructions (-15%); 10,000 for 30 days 214 to 135 s, 6.8 to 5.3 GB (-21%
+instructions); 50,000's start and first moment 243 to 110 s, 26 to 17 GB. **A 10,000-person year: 28.7 minutes, 7.8 GB peak,
+9.1 GB of log (1.0 GB compressed).** 50,000 and 100,000: 50,000 people start in 110 s and run about a simulated day a minute, but their memory grows 2.8 GB a day (about the square of the town: each citizen keeps and weighs every published record and gathering, not yet confirmed by a heap profile: SC-1), so the run was stopped at day 16 at 45 GB; a month does not fit on this machine, and 100,000 cannot start in it (its config alone is about 14 GB as values). Bounding what a citizen keeps, and reading the config participant by participant, are the two things between this machine and those towns (performance.md, ranked).
+
+**Risks** (docs/risks.md): SC-1 rewritten with these measures.
+
+**What is left** is ranked in performance.md with its share. The largest are not the engine's: at 50,000 people the citizen's
+mind (`CitizenMind::gatherings`, 12% of all CPU, and `decide_rec`) works through every gathering in town at each step, so a
+day costs more than in proportion to the people, and its decision annotations grow with the town (hashing and copying them is
+19% of the run's own thread at 50,000, 2% at 10,000). Those are behaviour (the mind's), for its owners.
+
+**Revisit if** a run's result differs between this branch and the cut-over's build (the debug assertions name the place);
+the Annotation or `Opaque` schema changes (`plain_annotation` must follow it: the debug assertion catches a divergence in
+tests); a round with seats is ever saved after its decisions are let go (it cannot be now: they are kept when a seat is in it);
+or the machine is quiet enough to measure wall time, which these numbers could not.

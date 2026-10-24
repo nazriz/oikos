@@ -149,7 +149,7 @@ impl Default for EngineOptions {
             record_decisions: true,
             decision_areas: None,
             audit: false,
-            share_at: WORTH_SHARING,
+            share_at: std::env::var("OIKOS_SHARE_AT").ok().and_then(|x| x.parse::<usize>().ok()).filter(|n| *n > 0).unwrap_or(WORTH_SHARING),
             mock_seats: true,
             host_seats: false,
             record_observations: false,
@@ -204,7 +204,8 @@ pub enum Due {
 struct Part {
     kind: String,
     person: Option<String>,
-    controller: Value,
+    /// (Shared with the kernel's config, or the template it was made from: a town's people have large params.)
+    controller: Arc<Value>,
     traits: Value,
     /// A model's seat in one post of a person (foundations F5): it acts through their body.
     #[serde(default)]
@@ -248,7 +249,10 @@ impl Unit {
 
 /// What a unit decided this round.
 enum Decided {
-    Code(Result<(Action, Kept), String>),
+    /// (With its decisions and outcomes made ready for the log where they were made: `prepare_kept`. Not kept in a
+    /// snapshot: one restored logs them from `Kept`, the same bytes.)
+    /// (Where every one was written, and the round has no seat, `Kept` no longer holds them: `true`.)
+    Code(Result<(Action, Kept), String>, Option<(Vec<Option<Vec<u8>>>, bool)>),
     Seat(Option<Action>),
 }
 
@@ -371,6 +375,68 @@ pub struct Engine<W: Write> {
     withheld: Vec<u32>,
 }
 
+/// The canonical bytes of `subject_data(kind, subject, data)`, written from its parts, where the annotation plainly keeps
+/// to the contract (`plain_subject_data`); `None` where the contract's check is to decide (then logged from its value).
+fn plain_bytes(kind: &str, subject: &str, data: &Value) -> Option<Vec<u8>> {
+    if !crate::contracts::plain_subject_data(kind, subject, data) {
+        return None;
+    }
+    let mut b = Vec::with_capacity(512);
+    b.extend_from_slice(b"{\"annotation\":");
+    crate::canon::write_string(kind, &mut b);
+    b.extend_from_slice(b",\"data\":");
+    crate::canon::write_value(data, &mut b);
+    b.extend_from_slice(b",\"subject\":");
+    crate::canon::write_string(subject, &mut b);
+    b.push(b'}');
+    debug_assert_eq!(Some(&b), crate::canon::canonical_value(&subject_data(kind, subject, data.clone())).ok().as_ref());
+    Some(b)
+}
+
+/// The decisions and outcomes a step's `Kept` puts in the log (as `Engine::keep` logs them), each made ready as
+/// canonical bytes where it plainly keeps to the contract: done on the thread the actor decided on, beside the others.
+fn prepare_kept(kept: &Kept, pid: &str, areas: Option<&BTreeSet<String>>, record: bool, lean: bool) -> Vec<Option<Vec<u8>>> {
+    let mut out = vec![];
+    if let Some(areas) = areas {
+        for d in kept.decisions.iter().filter(|d| d["domain"].as_str().is_some_and(|x| areas.contains(x))) {
+            out.push(plain_bytes("decision", pid, d));
+        }
+    } else if record && !lean {
+        for d in &kept.decisions {
+            out.push(plain_bytes("decision", pid, d));
+        }
+        if !kept.outcomes.is_empty() {
+            let plain = crate::contracts::plain_subject_data("outcome", pid, &Value::Null) && kept.outcomes.iter().all(crate::contracts::opaque);
+            out.push(plain.then(|| {
+                let mut b = Vec::with_capacity(512);
+                b.extend_from_slice(b"{\"annotation\":\"outcome\",\"data\":{\"outcomes\":[");
+                for (i, o) in kept.outcomes.iter().enumerate() {
+                    if i > 0 {
+                        b.push(b',');
+                    }
+                    crate::canon::write_value(o, &mut b);
+                }
+                b.extend_from_slice(b"]},\"subject\":");
+                crate::canon::write_string(pid, &mut b);
+                b.push(b'}');
+                debug_assert_eq!(Some(&b), crate::canon::canonical_value(&subject_data("outcome", pid, json!({ "outcomes": kept.outcomes }))).ok().as_ref());
+                b
+            }));
+        }
+    }
+    out
+}
+
+/// An annotation of a subject and its data (`json!({ "annotation": kind, "subject": subject, "data": data })`, without
+/// the macro's copy of the data: it serialises a value it is given into a new one).
+fn subject_data(kind: &str, subject: &str, data: Value) -> Value {
+    let mut m = Map::new();
+    m.insert("annotation".into(), Value::String(kind.into()));
+    m.insert("subject".into(), Value::String(subject.into()));
+    m.insert("data".into(), data);
+    Value::Object(m)
+}
+
 fn ceil_to(t: i64, tick: i64) -> i64 {
     if tick <= 0 {
         return t;
@@ -382,32 +448,10 @@ fn ceil_to(t: i64, tick: i64) -> i64 {
 /// (one actor's step can take a hundred times another's, so even chunks left most threads waiting on one), and each
 /// result goes in its item's place. The same results however the work falls out.
 pub fn each_mut<T: Send, R: Send>(items: &mut [T], threads: usize, share_at: usize, f: impl Fn(&mut T) -> R + Sync) -> Vec<R> {
-    let threads = threads.min(items.len()).max(1);
     if threads < 2 || items.len() < share_at.max(1) {
         return items.iter_mut().map(f).collect();
     }
-    let n = items.len();
-    let next = std::sync::Mutex::new(items.iter_mut().enumerate());
-    let (f, next) = (&f, &next);
-    let done: Vec<Vec<(usize, R)>> = std::thread::scope(|scope| {
-        let handles: Vec<_> = (0..threads)
-            .map(|_| {
-                scope.spawn(move || {
-                    let mut mine = vec![];
-                    loop {
-                        let Some((i, item)) = next.lock().unwrap_or_else(|e| e.into_inner()).next() else { break mine };
-                        mine.push((i, f(item)));
-                    }
-                })
-            })
-            .collect();
-        handles.into_iter().map(|h| h.join().expect("an actor's thread does not panic: steps are caught")).collect()
-    });
-    let mut slots: Vec<Option<R>> = (0..n).map(|_| None).collect();
-    for (i, r) in done.into_iter().flatten() {
-        slots[i] = Some(r);
-    }
-    slots.into_iter().map(|r| r.expect("every item was worked out")).collect()
+    crate::pool::each_mut(items, threads, f)
 }
 
 impl<W: Write> Engine<W> {
@@ -422,7 +466,8 @@ impl<W: Write> Engine<W> {
                 Part {
                     kind: p["kind"].as_str().unwrap_or("person").into(),
                     person: p["person"].as_str().map(String::from),
-                    controller: p["controller"].clone(),
+                    // (Its controller is the kernel's own, put in once the run is started: not a copy of it.)
+                    controller: Arc::new(Value::Null),
                     traits: p["traits"].clone(),
                     shares_body: p["shares_body"].as_bool() == Some(true),
                     ended: false,
@@ -444,6 +489,12 @@ impl<W: Write> Engine<W> {
         }
         let thinking_time = config["orchestration"]["thinking_time"].clone();
         let run = Run::start(config, run_id, out, anchors).map_err(|e| e.to_string())?;
+        let statics = run.kernel().statics();
+        for (id, part) in parts.iter_mut() {
+            if let Some(i) = statics.participant_at.get(id) {
+                part.controller = statics.config.participants[*i].controller.clone();
+            }
+        }
         let mut e = Engine::assemble(run, base, opts, Scheduler::new(0));
         e.sched = Scheduler::new(e.tick);
         e.parts = parts;
@@ -467,7 +518,7 @@ impl<W: Write> Engine<W> {
         // default (one) is for a host that decides itself. OIKOS_KERNEL_THREADS, where it is set, still says how many.
         // Nothing depends on it (`Kernel::plan`).
         if std::env::var_os("OIKOS_KERNEL_THREADS").is_none() {
-            run.share(opts.threads, None);
+            run.share(opts.threads, Some(opts.share_at));
         }
         let until = opts.until.map_or(base.run_end, |u| u.min(base.run_end));
         Engine {
@@ -542,22 +593,36 @@ impl<W: Write> Engine<W> {
         self.run.annotate(a).map(|_| ()).map_err(|e| e.to_string())
     }
 
+    fn annotate_canonical(&mut self, bytes: &[u8]) -> Result<(), String> {
+        self.run.annotate_canonical(bytes).map(|_| ()).map_err(|e| e.to_string())
+    }
+
     fn note(&mut self, subject: &str, data: Value) -> Result<(), String> {
-        self.annotate(json!({ "annotation": "note", "subject": subject, "data": data }))
+        self.annotate(subject_data("note", subject, data))
     }
 
     /// A command through the kernel, as the session's `command` takes one: logged, the seat's knowledge kept from what
     /// it was shown, the schedule told, the cast changed. `Err`: off-contract (never logged).
     fn command(&mut self, cmd: &Command) -> Result<crate::run::Response, String> {
-        self.command_seen(cmd).map(|x| x.0)
+        self.command_with(cmd, false).map(|x| x.0)
     }
 
     /// `command`, with the observation as it was delivered (its JSON, for a host's reply).
     fn command_seen(&mut self, cmd: &Command) -> Result<(crate::run::Response, Option<crate::kernel::Observed>), String> {
+        self.command_with(cmd, true)
+    }
+
+    /// `command`, with the observation as it was delivered where `json` (else only what it adds to its looker's
+    /// knowledge is worked out: a code actor's observation is never written out, unless the log keeps its hash).
+    fn command_with(&mut self, cmd: &Command, json: bool) -> Result<(crate::run::Response, Option<crate::kernel::Observed>), String> {
         let mut resp = self.run.command(cmd).map_err(|e| e.to_string())?;
         let mut seen = None;
         if let Some(obs) = resp.observation.as_mut() {
-            let o = self.run.observed(obs).map_err(|e| e.to_string())?;
+            let o = if json {
+                self.run.observed(obs).map_err(|e| e.to_string())?
+            } else {
+                crate::kernel::Observed { canonical: vec![], shown: self.run.shown(obs).map_err(|e| e.to_string())?, wire: None }
+            };
             if let Command::Observe { participant, only } | Command::Look { participant, only, .. } = cmd {
                 let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
                 let cur = self.currency.clone();
@@ -568,7 +633,7 @@ impl<W: Write> Engine<W> {
                     &mut self.registers,
                 );
             }
-            seen = Some(o);
+            seen = json.then_some(o);
         }
         let t = self.run.kernel().t();
         self.sched.note_events(Some(self.run.kernel().state()), &resp.events, t);
@@ -615,7 +680,7 @@ impl<W: Write> Engine<W> {
                         Part {
                             kind,
                             person: person.clone(),
-                            controller: tpl.map_or(Value::Null, |t| t["controller"].clone()),
+                            controller: Arc::new(tpl.map_or(Value::Null, |t| t["controller"].clone())),
                             traits: traits.clone().unwrap_or(Value::Null),
                             shares_body: false,
                             ended: false,
@@ -677,8 +742,19 @@ impl<W: Write> Engine<W> {
                 }
             }
         }
-        let gone: Vec<String> =
-            self.units.keys().filter(|k| (k.as_str() == pid || k.starts_with(&format!("{pid}|"))) && !want.contains(*k)).cloned().collect();
+        // (Its own units are the key `pid` and those from `pid|` on, in that order: looked up, not searched for among
+        // everyone's, which made a town's start quadratic: 84% of a 50,000-person start.)
+        let prefix = format!("{pid}|");
+        let gone: Vec<String> = self
+            .units
+            .get_key_value(pid)
+            .map(|(k, _)| k)
+            .into_iter()
+            .chain(self.units.range::<str, _>((std::ops::Bound::Included(prefix.as_str()), std::ops::Bound::Unbounded)).map(|(k, _)| k).take_while(|k| k.starts_with(&prefix)))
+            .filter(|k| !want.contains(*k))
+            .cloned()
+            .collect();
+        debug_assert_eq!(gone, self.units.keys().filter(|k| (k.as_str() == pid || k.starts_with(&prefix)) && !want.contains(*k)).cloned().collect::<Vec<_>>());
         for k in &gone {
             self.units.remove(k);
         }
@@ -733,7 +809,7 @@ impl<W: Write> Engine<W> {
                 performer: if p.kind == "system" { Performer::System } else { Performer::Person },
                 entity: entity.clone(),
                 position: office.clone(),
-                params: pp["mock"]["params"].as_object().cloned().unwrap_or_default(),
+                params: pp["mock"]["params"].as_object().cloned().unwrap_or_default().into(),
                 world: self.world.clone(),
             };
             cadence = ceil_to(b.cadence(&ctx), self.tick);
@@ -770,7 +846,7 @@ impl<W: Write> Engine<W> {
         let (impl_, params, entity) = if cap == "self" {
             (
                 p.controller["impl"].as_str().or(p.controller["code"].as_str()).map(String::from),
-                p.controller["params"].clone(),
+                oikos_actors::Params::member_of(p.controller.clone(), "params"),
                 p.person.clone().unwrap_or_default(),
             )
         } else {
@@ -778,7 +854,7 @@ impl<W: Write> Engine<W> {
             if p.kind == "system" {
                 (
                     p.controller["impl"].as_str().or(p.controller["code"].as_str()).map(String::from),
-                    p.controller["params"].clone(),
+                    oikos_actors::Params::member_of(p.controller.clone(), "params"),
                     x.entity.clone(),
                 )
             } else {
@@ -787,7 +863,7 @@ impl<W: Write> Engine<W> {
                 for (k, v) in p.traits.as_object().into_iter().flatten() {
                     params.insert(k.clone(), v.clone());
                 }
-                (x.role_module["code"].as_str().map(String::from), Value::Object(params), x.entity.clone())
+                (x.role_module["code"].as_str().map(String::from), params.into(), x.entity.clone())
             }
         };
         let Some(name) = impl_.filter(|n| n != "test") else { return Ok(None) };
@@ -804,7 +880,7 @@ impl<W: Write> Engine<W> {
             performer: if p.kind == "system" { Performer::System } else { Performer::Person },
             entity: entity.clone(),
             position: (cap != "self").then(|| cap.to_string()),
-            params: params.as_object().cloned().unwrap_or_default(),
+            params,
             world: self.world.clone(),
         };
         let actor = oikos_actors::offices::books::create(kind, &ctx)
@@ -1076,7 +1152,7 @@ impl<W: Write> Engine<W> {
                     if let Some(c) = as_ {
                         data["as"] = json!(c);
                     }
-                    self.annotate(json!({ "annotation": "observation", "subject": u.participant, "data": data }))?;
+                    self.annotate(subject_data("observation", &u.participant, data))?;
                 }
                 stepping.push((u, Some(obs), only));
             }
@@ -1084,6 +1160,10 @@ impl<W: Write> Engine<W> {
         }
         // Decide, all at once.
         let seed = self.seed;
+        let (areas, record, lean) = (self.opts.decision_areas.as_ref(), self.opts.record_decisions, self.lean);
+        // (A round no seat waits in is carried out before anything can save it: its decisions, once written for the
+        // log, need not be kept as values till then. One with seats may be saved while they think, values and all.)
+        let strip = seats.is_empty();
         let results = each_mut(&mut stepping, self.opts.threads, self.opts.share_at, |(u, obs, only)| {
             let obs = obs.take().expect("each unit is stepped once");
             let pic = u.view.apply(obs, only.as_deref(), &u.entity, &u.woke_for, u.since);
@@ -1093,7 +1173,17 @@ impl<W: Write> Engine<W> {
             let actor = u.actor.as_mut().expect("a code unit has its actor");
             let mut cx = Cx::new(pic.t, ctx, &mut u.draws, seed, answers);
             match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| actor.step(pic, &mut cx))) {
-                Ok(a) => Ok((a, cx.into_kept())),
+                Ok(a) => {
+                    let mut kept = cx.into_kept();
+                    let prepared = prepare_kept(&kept, &u.participant, areas, record, lean);
+                    let stripped = strip && prepared.iter().all(Option::is_some);
+                    if stripped {
+                        // (Let go here, on this thread, beside the others: what the log needs of them is written.)
+                        kept.decisions = vec![];
+                        kept.outcomes = vec![];
+                    }
+                    Ok((a, kept, (prepared, stripped)))
+                }
                 Err(p) => Err(p
                     .downcast_ref::<String>()
                     .cloned()
@@ -1104,7 +1194,11 @@ impl<W: Write> Engine<W> {
         self.steps += results.len() as u64;
         let mut decided = BTreeMap::new();
         for ((u, _, _), r) in stepping.into_iter().zip(results) {
-            decided.insert(u.key.clone(), Decided::Code(r));
+            let d = match r {
+                Ok((a, kept, prepared)) => Decided::Code(Ok((a, kept)), Some(prepared)),
+                Err(e) => Decided::Code(Err(e), None),
+            };
+            decided.insert(u.key.clone(), d);
             self.units.insert(u.key.clone(), u);
         }
         for s in &seats {
@@ -1142,7 +1236,7 @@ impl<W: Write> Engine<W> {
                     continue;
                 }
                 Decided::Seat(a) => a.expect("checked: every seat answered"),
-                Decided::Code(Err(e)) => {
+                Decided::Code(Err(e), _) => {
                     let u = self.units.get_mut(&key).expect("checked");
                     u.failures += 1;
                     let (pid, in_a_row) = (u.participant.clone(), u.failures);
@@ -1156,9 +1250,9 @@ impl<W: Write> Engine<W> {
                     }
                     continue;
                 }
-                Decided::Code(Ok((action, kept))) => {
+                Decided::Code(Ok((action, kept)), prepared) => {
                     self.units.get_mut(&key).expect("checked").failures = 0;
-                    sending = self.keep(&key, kept)?;
+                    sending = self.keep(&key, kept, prepared)?;
                     action
                 }
             };
@@ -1215,20 +1309,41 @@ impl<W: Write> Engine<W> {
     /// to its own record (the kernel holds it), its questions (queued for the host), and what it made of drafts of its
     /// words: each signoff, a `words` note for one not done, and those its action carries out (returned, for their
     /// note once the action is applied).
-    fn keep(&mut self, key: &str, kept: Kept) -> Result<Vec<oikos_actors::Worded>, String> {
+    fn keep(&mut self, key: &str, kept: Kept, prepared: Option<(Vec<Option<Vec<u8>>>, bool)>) -> Result<Vec<oikos_actors::Worded>, String> {
         let u = &self.units[key];
         let (pid, cap) = (u.participant.clone(), u.capacity.clone());
-        if let Some(areas) = &self.opts.decision_areas {
+        // (Each annotation from the bytes made ready for it where it was decided, or from its value: the same entry.)
+        let stripped = prepared.as_ref().is_some_and(|p| p.1);
+        let mut prepared = prepared.map(|p| p.0.into_iter());
+        let mut ready = move || prepared.as_mut().and_then(Iterator::next).flatten();
+        if stripped {
+            while let Some(b) = ready() {
+                self.annotate_canonical(&b)?;
+            }
+        } else if let Some(areas) = &self.opts.decision_areas {
             let areas = areas.clone();
             for d in kept.decisions.into_iter().filter(|d| d["domain"].as_str().is_some_and(|x| areas.contains(x))) {
-                self.annotate(json!({ "annotation": "decision", "subject": pid, "data": d }))?;
+                match ready() {
+                    Some(b) => self.annotate_canonical(&b)?,
+                    None => self.annotate(subject_data("decision", &pid, d))?,
+                }
             }
         } else if self.opts.record_decisions && !self.lean {
             for d in kept.decisions {
-                self.annotate(json!({ "annotation": "decision", "subject": pid, "data": d }))?;
+                match ready() {
+                    Some(b) => self.annotate_canonical(&b)?,
+                    None => self.annotate(subject_data("decision", &pid, d))?,
+                }
             }
             if !kept.outcomes.is_empty() {
-                self.annotate(json!({ "annotation": "outcome", "subject": pid, "data": { "outcomes": kept.outcomes } }))?;
+                match ready() {
+                    Some(b) => self.annotate_canonical(&b)?,
+                    None => {
+                        let mut data = Map::new();
+                        data.insert("outcomes".into(), Value::Array(kept.outcomes));
+                        self.annotate(subject_data("outcome", &pid, Value::Object(data)))?;
+                    }
+                }
             }
         }
         if let Some(change) = kept.record {

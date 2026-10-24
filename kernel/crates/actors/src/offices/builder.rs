@@ -1077,7 +1077,7 @@ mod tests {
         if let (Some(p), Some(e)) = (params.as_object_mut(), extra.as_object()) {
             p.extend(e.clone());
         }
-        Ctx { participant: "b-system".into(), performer: Default::default(), entity: "builder".into(), position: None, params: params.as_object().cloned().unwrap_or_default(), world: Arc::new(WorldInfo::default()) }
+        Ctx { participant: "b-system".into(), performer: Default::default(), entity: "builder".into(), position: None, params: params.as_object().cloned().unwrap_or_default().into(), world: Arc::new(WorldInfo::default()) }
     }
     fn st(id: &str, at: i64, kind: &str, who: &str, data: Value, to: Value) -> Value {
         j!({ "id": id, "record": "statement", "author": "p.1", "speaks_for": who, "at": at, "visible_to": "public", "kind": kind, "text": kind, "data": data, "addressed_to": to })
