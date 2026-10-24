@@ -37,7 +37,7 @@ Close behind: placeholders shared by all nine profiles that make places look ali
 (PS-1, PB-1); possession cases in which the tribunal has no real choice (PB-3); words a seat writes that nobody reads
 (PC-1).
 
-**Counts (2026-10-17):** 112 risk entries and 3 planned. World mechanics 13, markets and economy 17, public bodies and law 19, people
+**Counts (2026-10-17):** 112 risk entries and 4 planned. World mechanics 13, markets and economy 17, public bodies and law 19, people
 and culture 14, seats and framing 13, translator 6, measurement and twins 15, profiles and sources 10, performance and
 scale 5. Assumptions audit: 31, of which 8 are outcomes built in.
 
@@ -1419,6 +1419,28 @@ set the status to `fixed (commit abc1234)` (or the decisions entry), and let a r
 - **Where:** `translator/`; `docs/translator-pipeline.md`; `docs/design/translator-v2.md`; touches TR-2, TR-3 and TR-6.
 - **Why:** Forms still change, and a translator trained on a fixed list falls behind each time; reading by name keeps it current without retraining.
 - **Status:** planned (after forms settle) · **Do when:** The set of forms stops changing between pilot rounds.
+
+### PL-4 · The test pipeline's next steps: elastic slots, Linux, fewer Rust test programs
+- **What:** Three pieces left from the pipeline work of 2026-10-24 (docs/decisions.md, "The pipeline"). (1) Elastic
+  slots: an agent alone may take all 12 slots, and the per-agent cap (a quarter) applies only while another checkout
+  waits, a holder giving tokens back at its next file boundary; today only the test runner and `bun test` borrow past the
+  cap, and builds and runs are held to it. (2) Platform-agnostic: Oikos and its gate build and pass on Linux x86_64 (Mac-only
+  pieces such as caffeinate, launchd and `scripts/mini` skipped where absent), with a nightly hosted `ubuntu-latest` job
+  holding no secrets; any golden-hash or byte-identity difference across platforms is a reproducibility fault to report,
+  not to skip. Then a trial of sharding the slow tier on hosted runners (setup cold and warm, per-file time against the
+  Mini, how much of a merge's slow tier still runs) before building it. (3) Fewer Rust test programs: the ~50 files in
+  `kernel/tests/` each build and link their own program; one harness (`autotests = false`, a `tests/main.rs` that brings
+  in each file as a module, `mod common` once) would link once.
+- **Where:** `scripts/slots.ts`; `.github/workflows/`; `scripts/test.ts`; `kernel/Cargo.toml` and `kernel/tests/` (the TS
+  tests that name `kernel/tests/<file>.rs` by path: `orchestrator/test/foundations-laws.test.ts` and others).
+- **Why:** Measured 2026-10-24 on the Mini: the gate for a kernel change is about 215 s (the owner: good enough for now),
+  of which a one-function change in `oikos-actors` costs 81 s to rebuild the gate profile at 4 jobs, 89 s to rebuild the
+  test programs of the three crates it reaches, and 34 s to run their 980 tests under nextest; the test programs' rebuild is
+  the part (3) would cut. A documents-only gate is 15 s, TypeScript only 85-100 s, the slow tier 660 s on 12 slots. A lone
+  agent's gate is held to 3 slots for builds and runs today, which (1) would lift. The code has run only on macOS arm64,
+  so nothing yet says its logs are the same elsewhere, which (2) would.
+- **Status:** planned (after feature work resumes) · **Do when:** The kernel gate grows past about 4 minutes or agents
+  wait on the cap for (1) and (3); before any result is claimed to reproduce on another machine, for (2).
 
 ---
 
