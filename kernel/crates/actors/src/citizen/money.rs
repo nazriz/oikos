@@ -436,7 +436,7 @@ impl Person {
     }
 
     /// What kind of institution someone is to us (citizen.ts `kindOf`).
-    fn money_kind_of(&self, who: &str, params: &serde_json::Map<String, Value>) -> &'static str {
+    fn money_kind_of(&self, who: &str, params: &crate::Params) -> &'static str {
         if let Some(k) = params.get("institutions").and_then(|i| i.get(who)).and_then(Value::as_str) {
             return match k {
                 "banks" => "banks",

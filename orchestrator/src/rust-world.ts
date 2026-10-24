@@ -17,8 +17,9 @@
 // says once that it was not hosted. (Wiring the model seats' controllers, the translator's drafts and the debriefs
 // into this host is the integration step's: docs/port-guide.md section 8.)
 
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { nativeEngine } from "./kernel";
 import type { RunOptions, RunSummary } from "./run";
 
@@ -54,10 +55,62 @@ const need = () => {
   return n;
 };
 
+/** How many participants make a config large enough to go to the engine as a file (`RustWorld.start`). */
+export const LARGE_CONFIG = 10_000;
+
+/**
+ * A config written as JSON text to `path` without making it one string: its members one at a time, and the elements
+ * of its long lists (participants, positions, the world's entities and records) one at a time. The same text as
+ * `JSON.stringify(config)` (key order and all), so the same config.
+ */
+export function writeConfigFile(config: object, path: string): void {
+  const fd = openSync(path, "w");
+  let buf = "";
+  const put = (s: string) => {
+    buf += s;
+    if (buf.length >= 1 << 20) { writeSync(fd, buf); buf = ""; }
+  };
+  const value = (v: unknown, depth: number) => {
+    if (Array.isArray(v) && v.length > 100) {
+      put("[");
+      v.forEach((x, i) => put((i ? "," : "") + (JSON.stringify(x) ?? "null")));
+      put("]");
+    } else if (depth < 2 && v !== null && typeof v === "object" && !Array.isArray(v) && typeof (v as any).toJSON !== "function") {
+      put("{");
+      let first = true;
+      for (const [k, x] of Object.entries(v)) {
+        if (x === undefined || typeof x === "function" || typeof x === "symbol") continue;
+        put((first ? "" : ",") + JSON.stringify(k) + ":");
+        first = false;
+        value(x, depth + 1);
+      }
+      put("}");
+    } else put(JSON.stringify(v) ?? "null");
+  };
+  try {
+    value(config, 0);
+    if (buf) writeSync(fd, buf);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 /** The engine's world, as the host holds it. */
 export class RustWorld {
   private constructor(private w: any) {}
-  static start(config: object, opts: RustOptions = {}): RustWorld {
+  static start(config: object, opts: RustOptions = {}, viaFile = ((config as any).participants?.length ?? 0) >= LARGE_CONFIG): RustWorld {
+    // A large town's config is over a gigabyte of JSON (1.39 GB at 50,000 people), past what one string may hold at
+    // 100,000: it goes to the engine as a file written member by member and participant by participant, which the
+    // engine reads the same way (kernel config::load_from). The same text either way, so the same run.
+    if (viaFile) {
+      const file = join(mkdtempSync(join(tmpdir(), "oikos-config-")), "config.json");
+      try {
+        writeConfigFile(config, file);
+        return new RustWorld(new (need().World)("", JSON.stringify({ ...opts, config_file: file })));
+      } finally {
+        rmSync(dirname(file), { recursive: true, force: true });
+      }
+    }
     return new RustWorld(new (need().World)(JSON.stringify(config), JSON.stringify(opts)));
   }
   /** A run taken up again from a snapshot's bytes. */

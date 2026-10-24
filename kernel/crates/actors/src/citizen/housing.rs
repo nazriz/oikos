@@ -236,7 +236,7 @@ impl Person {
             .unwrap_or(-1)
     }
     /// What kind of institution someone is to us (citizen.ts `kindOf`).
-    fn kind_of(&self, who: &str, ctx_params: &serde_json::Map<String, Value>) -> String {
+    fn kind_of(&self, who: &str, ctx_params: &crate::Params) -> String {
         if let Some(k) = ctx_params.get("institutions").and_then(|i| i.get(who)).and_then(Value::as_str) {
             return k.into();
         }

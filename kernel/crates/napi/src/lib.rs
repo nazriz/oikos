@@ -75,11 +75,22 @@ pub struct World {
 
 #[napi]
 impl World {
-    /// `config`: the world's config; `options`: see kernel/src/host.rs (`run_id`, `log`, `threads`, `until`,
-    /// `stand_in`, `snapshot_every_days`, `stream`...).
+    /// `config`: the world's config (its JSON text; or empty, and `config_file` in the options names a file holding
+    /// it); `options`: see kernel/src/host.rs (`run_id`, `log`, `threads`, `until`, `stand_in`,
+    /// `snapshot_every_days`, `stream`...). Either way it is read participant by participant (`config::load_from`),
+    /// never held whole as JSON.
     #[napi(constructor)]
     pub fn new(config: String, options: String) -> napi::Result<Self> {
-        Ok(World { host: Host::start(parse(&config, "config")?, &parse(&options, "options")?).map_err(err)? })
+        let opts = parse(&options, "options")?;
+        let read = match opts["config_file"].as_str() {
+            Some(path) if config.is_empty() => {
+                oikos_kernel::config::load_from(std::fs::File::open(path).map_err(|e| err(format!("config_file {path}: {e}")))?)
+            }
+            _ => oikos_kernel::config::load_from(config.as_bytes()),
+        };
+        let (loaded, rest) = read.map_err(|e| err(format!("invalid config: {e}")))?;
+        drop(config);
+        Ok(World { host: Host::start_loaded(loaded, rest, &opts).map_err(err)? })
     }
 
     /// A run taken up again from a snapshot's bytes, with its own options (its log, `parent`, threads).
