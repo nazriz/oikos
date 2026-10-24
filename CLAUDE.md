@@ -41,12 +41,12 @@ Naz values honest pushback over agreement. Have opinions, flag trade-offs, and s
 - **The platform is invisible to seats:** participants see the world's terms only; the kernel, translator and resolver have no in-world identity.
 - **Models:** the mock as long as possible. Real-model runs go through the Codex CLI on Naz's subscription until the translator is trained and the platform is mature; paid APIs need his go-ahead. The driver seat is `gpt-6.1-sol`, simple narrow work (the translator) `gpt-6-luna`, never `gpt-6-astra`; always name the model.
 - **Model runs are training data:** never delete one; keep every run's log. Translator training data is mostly generated (from code participants' calls, requests written in several styles by several models, not one steward's voice); real pilot requests and seats’ real situations may be used for training too (Naz, 2026-10-06), except the real test cases (`translator/eval/pilot-cases.ts`) and the seat-days they come from; the held-out test cases stay out of all of it.
-- **Never commit with failing tests.** `bun run test:fast` after a change, `bun run test:all` before a merge.
-- **One full suite per merge.** `bun run test:all` is run once, on the merge, by whoever merges; work on a branch runs the fast tier and the tests of what it touched (`bun run test:changed`). Heavy jobs go through the slots (`scripts/slots.ts`, docs/dev-machine.md). Never kill processes by pattern, only a process id you started.
+- **Never commit with failing tests.** `bun run test:changed` (the merge gate) after a change.
+- **The gate merges; CI runs everything.** Only `scripts/merge.ts` merges to main, and it runs the gate (seconds to a few minutes); CI runs both tiers whole on every push to main and nightly (docs/dev-machine.md). Development speed comes first: a red main is fixed before anything else lands. Heavy jobs go through the slots (`scripts/slots.ts`, docs/dev-machine.md). Never kill processes by pattern, only a process id you started.
 - **Nothing references the project's old name** (renamed Oikos, 2026-10-05).
 
 ## Where things run
-- The repo is `nazriz/oikos` (private). Run logs live on the run server, in `runs/`, and nowhere in git.
+- The repo is `nazriz/oikos` (public; CI never runs a fork's code on the run server). Run logs live on the run server, in `runs/`, and nowhere in git.
 - Runs and the whole test suite belong on the run server (an always-on Mac). A session opened through Remote Control is already on it: run things there directly. From another machine, drive it with `scripts/mini` (set `OIKOS_MINI=user@host`; after a push, `scripts/mini sync`).
 - A long run is started detached (`nohup`, with `caffeinate -i -w <pid>`), never as a session's background command: those are stopped after about half an hour.
 - Start here in a new session: `docs/handover.md`.
