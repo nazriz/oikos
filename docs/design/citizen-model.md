@@ -121,7 +121,7 @@ change code offices' findings as they do now.
 
 | Decides (round 1) | Why here first |
 |---|---|
-| Whether to contest, and where (ask the other side, a desk, a venue, an appeal of a decision, leave it, give up), as a shift on the code mind | Recourse is where stewards' decisions land on people, and where the code mind is a few placeholder sways |
+| Whether to contest, and where (ask the other side, a desk, a venue, an appeal of a decision, leave it, give up), as a shift on the code mind | Recourse is where stewards' decisions land on people, and where the code mind is a few placeholder sways (PC-5) |
 | What to ask for, how much, on what grounds, with what evidence, how firmly | Code has nothing: today every application states every fact and attaches one paper |
 | Whether to take up an opening nobody scored (a founded group, a steward's new offer) | B's (2); today one constant and belief |
 
