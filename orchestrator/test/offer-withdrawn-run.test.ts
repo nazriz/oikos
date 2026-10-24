@@ -31,7 +31,9 @@ test("a signature on an offer its maker has withdrawn is refused by the kernel, 
     const rest = done === undefined ? [] : ((await k.request({ op: "command", command: { command: "advance", to: (now = Math.max(now, done)) } })).events as any[]);
     return [...begun, ...rest];
   };
-  const terms = { template: "employment", parties: [me, you], commitments: [{ who: you, does: { outcome: { occupancy: { in: "nowhere" } } } }] };
+  // (Where the taker commits to be is a place: a building of the town; the kernel refuses one that is not, not_a_place.)
+  const site = (config.world.structures as any[])[0].id;
+  const terms = { template: "employment", parties: [me, you], commitments: [{ who: you, does: { outcome: { occupancy: { in: site } } } }] };
   const offered = await act(maker.id, [{ block: "propose_agreement", terms, ref: "o" }]);
   const agreement = offered.find((e) => e.event === "action_applied")?.created?.o ?? offered.find((e) => e.event === "recorded")?.record.id;
   expect(agreement).toBeDefined();
