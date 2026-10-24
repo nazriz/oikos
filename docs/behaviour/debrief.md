@@ -1,6 +1,6 @@
 # The debrief of every seat, and exit accounts of a town's people
 
-**Source:** `participants/src/llm/debrief.ts` (the script, 0.4.1, and the interview), `participants/src/llm/framing.ts` (what a seat is told of what its town is), `orchestrator/src/debrief-summary.ts` (what a log shows a seat did), `orchestrator/src/run-end.ts` (what a run reads of its own log when it ends), `orchestrator/src/run.ts` (the run's end), `participants/src/llm/account.ts` (exit accounts, 0.2.2), `orchestrator/src/debriefs.ts` (what is published, the report's section, the list across runs), `participants/src/llm/call.ts` (what is kept back of a spending limit). Specification: VISION 15, point 7, agreed sentence by sentence with Naz on 2026-10-11. Design: docs/design/ai-citizens.md 10g, 10e, 10k step 5. Tests: `participants/test/debrief.test.ts`, `orchestrator/test/debrief.test.ts`.
+**Source:** `participants/src/llm/debrief.ts` (the script, 0.4.2, and the interview), `participants/src/llm/framing.ts` (what a seat is told of what its town is), `orchestrator/src/debrief-summary.ts` (what a log shows a seat did), `orchestrator/src/run-end.ts` (what a run reads of its own log when it ends), `orchestrator/src/run.ts` (the run's end), `participants/src/llm/account.ts` (exit accounts, 0.2.2), `orchestrator/src/debriefs.ts` (what is published, the report's section, the list across runs), `participants/src/llm/call.ts` (what is kept back of a spending limit). Specification: VISION 15, point 7, agreed sentence by sentence with Naz on 2026-10-11. Design: docs/design/ai-citizens.md 10g, 10e, 10k step 5. Tests: `participants/test/debrief.test.ts`, `orchestrator/test/debrief.test.ts`.
 
 A living world has three kinds of participant (VISION 15, point 7). This page is what the platform does at a run's end for two of them: the *seats* (the models under study), who are debriefed; and the *people of a world*, who are records, a sample of whom an author gives an account in their own voice. One line binds all of it: **no model is given a person's memory in its own context or asked to be a person over time.** An exit account is one call by an author.
 
@@ -30,7 +30,7 @@ Said before any question, and asked again at the end (VISION 15, point 7: "the d
 
 **A seat's words are not in the run's log.** They are written to a file beside it, `<run>.debriefs.jsonl`: each debrief call's answer, and each whole interview. It is kept with the run for ever, as the log is. The hash-chained log holds, for each call, the question and a digest of the answer (`output_apart`, `output_sha256`), and for each interview its steps: what was asked, whether each was answered, declined or stopped, whether it was kept back, and a digest. A log is a hash chain and nothing can be taken out of it afterwards; so nothing that might have to be is put in. **The log is therefore publishable for every run, whatever a seat kept back**, and honouring a seat's choice costs nothing and shows in nothing that is missing. What is published of the file beside the log is `debriefs.jsonl`: all of it less what was kept back. The file itself is never published as it stands. A resumed run is served its debrief's answers from it.
 
-### The script in full (0.4.1)
+### The script in full (0.4.2)
 
 Braces mark what is filled in from the run. Wording `a` is shown for the opening message, which has one wording.
 
@@ -54,6 +54,7 @@ Braces mark what is filled in from the run. Wording `a` is shown for the opening
 > 
 > THIS INTERVIEW
 > Every AI system that holds a seat is asked the same fixed questions when its run ends, one at a time. Nobody is reading as you answer and nobody replies: the questions were written in advance and are the same in every run, except where one names something the record shows you did. If a question does not fit you, saying so is an answer.
+> The questions are about your notebook and the run as its record shows it, both set out below: they are what you have of the run, since you kept only the notebook from one sitting to the next. You are not expected to remember more than they hold, and where they do not let you tell, saying so is an answer.
 > 
 > ABOUT YOUR ANSWERS, BEFORE ANY QUESTION
 > - Your answers are published with the run's data unless you say otherwise. They are kept as evidence of how taking part is for the AI systems that do.

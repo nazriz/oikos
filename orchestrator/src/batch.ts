@@ -31,6 +31,9 @@ import { ORCHESTRATOR_VERSION, runWorld, RunStuck, type RunOptions, type RunSumm
 import type { LlmAdapter } from "@oikos/participants/llm";
 import { stallMs, Watchdog } from "./watchdog";
 import { callRecorder } from "./experiment-seats";
+import { refuseUnframed, refuseUnready, seatReadiness } from "./seat-ready";
+import { framingNotChosen } from "@oikos/participants/llm";
+import { modules as builtinModules } from "@oikos/participants";
 
 /** A world file (JSON or YAML), with `--set path=value` overrides applied, generated if it's a spec. */
 export async function loadWorld(path: string, sets: string[] = []): Promise<{ config: any; spec?: any; generator?: string }> {
@@ -160,7 +163,12 @@ export async function runOne(o: { debriefWording?: string; world?: string; seed?
     consultAvoid = r.consultAvoid;
     serving = new Serving(recordedCalls(r.stoppedLog));
   } else {
-    config = { ...(await loadWorld(o.world!, townSets(o.sets, o.town))).config, seed: o.seed };
+    const loaded = await loadWorld(o.world!, townSets(o.sets, o.town));
+    config = { ...loaded.config, seed: o.seed };
+    // A seat is seated with a real model only where its office can do its work, and with a framing chosen for it
+    // (seat-ready.ts): refused here, before anything is written or spent. (A resumed run was checked when it began.)
+    if (o.model && !o.model.startsWith("mock")) refuseUnframed(framingNotChosen(loaded.config, loaded.spec));
+    if (o.model && !o.model.startsWith("mock")) refuseUnready(seatReadiness(config, { ...builtinModules, ...((await loadModules(o.modules)) ?? {}) }));
     // How much the log keeps (docs/reliability.md): lean for quick test runs, full (the default) when the data matters.
     if (o.logDetail) config.log = { ...config.log, detail: o.logDetail };
     runId = runIdFor(o.world!, o.seed!, o.town);
@@ -417,6 +425,10 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const { config, spec, generator } = await loadWorld(o.world, sets);
   const perRunUsd = o.budgetUsd ?? o.batchBudgetUsd;
   if (o.model) chooseModel(o.model, { budgetUsd: perRunUsd, baseUrl: o.baseUrl }); // fail early: a price, a limit and a key
+  // (And whether every seat has a framing chosen and an office ready for a model to hold it: seat-ready.ts. Refused
+  // before any run starts.)
+  if (o.model && !o.model.startsWith("mock")) refuseUnframed(framingNotChosen(config, spec));
+  if (o.model && !o.model.startsWith("mock")) refuseUnready(seatReadiness(config, { ...builtinModules, ...((await loadModules(o.modules)) ?? {}) }));
   if (o.model && o.translatorModel) chooseModel(o.translatorModel, { budgetUsd: perRunUsd, baseUrl: o.baseUrl });
   translatorArrangement(o);
   if (o.translatorFirst) (chooseModel(o.translatorFirst, { budgetUsd: perRunUsd, baseUrl: o.baseUrl, first: true }).adapter as { check?: () => void }).check?.();

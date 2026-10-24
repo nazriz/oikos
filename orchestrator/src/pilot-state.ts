@@ -260,7 +260,9 @@ export function framingSets(p: { framing?: string | { disclosure: string; reason
   if (p.framing !== undefined) return { sets: [`framing=${typeof p.framing === "string" ? p.framing : JSON.stringify(p.framing)}`], said: `framing ${typeof p.framing === "string" ? p.framing : p.framing.disclosure}` };
   if (world && !world.generate) return { sets: [], said: "framing as its world's participants have it" };
   if (world?.framing !== undefined) return { sets: [], said: `framing ${typeof world.framing === "string" ? world.framing : world.framing?.disclosure} (its world's own)` };
-  return { sets: [`framing=${STEWARD_FRAMING}`], said: `framing ${STEWARD_FRAMING} (the default for steward pilots)` };
+  // (Not framed by default: every pilot chooses what its seats are told, and a run with a real model whose seats have
+  // no framing chosen is refused before it starts: seat-ready.ts, `refuseUnframed`. Naz, 2026-10-25.)
+  return { sets: [], said: `NO FRAMING CHOSEN: a run with a model is refused (write "framing": "${STEWARD_FRAMING}" or "simulation", or per seat)` };
 }
 
 /** A world file as parsed (YAML or JSON), or undefined if it cannot be read: only to see whether it is generated and
