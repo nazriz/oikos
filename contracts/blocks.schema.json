@@ -1207,7 +1207,7 @@
       }
     },
     "Outcome": {
-      "description": "What a commitment comes to, in the world's own terms (VISION 15): one of these. The same vocabulary for agreements, offers and practices, and the one the call language already writes. The kernel executes none of it.",
+      "description": "What a commitment comes to, in the world's own terms (VISION 15): one of these. The same vocabulary for agreements, offers and practices, and the one the call language already writes. The kernel executes none of it; of an agreement it checks only that a place named to be or to work at is one (`not_a_place`).",
       "type": "object",
       "minProperties": 1,
       "maxProperties": 1,
@@ -1279,6 +1279,7 @@
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
             },
             "in": {
+              "description": "A building, or a space in one. An agreement that names anything else here is refused at the act (`not_a_place`).",
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
             },
             "leave": {
@@ -1324,6 +1325,7 @@
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
             },
             "at": {
+              "description": "Where the work is done: a building, or a space in one. An agreement that names anything else here is refused at the act (`not_a_place`).",
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
             },
             "hours": {

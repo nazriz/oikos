@@ -2000,6 +2000,7 @@
         "unknown_structure",
         "structure_incomplete",
         "unknown_space",
+        "not_a_place",
         "capacity_exceeded",
         "not_present",
         "already_present",
