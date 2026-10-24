@@ -257,7 +257,7 @@ Every check on people, towns and profiles never trained on; thresholds go into c
 
 **Cost.** Teacher calls on the Batch API: an author call about 2,500 tokens in and 500 out: Sonnet 5.5 about 0.005 USD,
 Opus 5.5 about 0.01. 4,000 situations, six letters each, a family a half: about 120 USD Sonnet, 240 Opus; the estimator
-shifts and pairs about 120; the second family about 150 at its own batch rates (to confirm). **About 630 USD, limit
+shifts and pairs about 120; the second family about 150 at its own batch rates (rates as listed when this was written; check them before the run). **About 630 USD, limit
 800.** Training: under 10 USD of GPU, or none. Pilots: as the translator's plan, plan usage, shared.
 
 **We stop if:** the base model on the code mind alone cannot keep its spread (scrambled records under 0.7 of the code
