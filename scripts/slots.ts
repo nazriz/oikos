@@ -73,6 +73,19 @@ export function eligible(w: { pid: number; since: number; weight: number; owner?
 }
 /** The weight of the slot this process was started inside (0: none). */
 export const heldByParent = () => Number(process.env.OIKOS_SLOT_HELD) || 0;
+/**
+ * The head of the queue: the first waiter the cap lets take. A waiter written by a checkout on an older slots.ts (no
+ * `cap` in its file: from before the cap, 2026-10-24) is passed over: it waits for the strict oldest itself, and a
+ * capped job ahead of it would otherwise hold every waiter of both versions for ever (seen 2026-10-24, 41 waiting with
+ * 3 tokens free). It takes its turn once it is the oldest and nobody ahead of it is held back.
+ */
+export function headOf<W extends Parameters<typeof eligible>[0]>(waiters: W[], holders: Parameters<typeof eligible>[1], defaultCap: number): W | undefined {
+  return waiters.find((w) => "cap" in w && eligible(w, holders, waiters, defaultCap));
+}
+
+/** Cargo jobs for a build holding `tokens`: half, since one rustc uses several cores (2026-10-24, load 30 on 14 cores). */
+export const buildJobs = (tokens: number) => Math.max(1, Math.ceil(tokens / 2));
+
 /** The environment for a child started inside a slot of this weight. */
 export const insideSlot = (weight: number, env: Record<string, string | undefined> = process.env) => ({ ...env, OIKOS_SLOT_HELD: String(Math.max(weight, heldByParent(), 1)) });
 
@@ -208,7 +221,7 @@ export async function take(weight = 1, what = process.argv.slice(1, 3).join(" ")
     if (!s.waiters.some((w) => w.file === waitName)) { mkdirSync(dir, { recursive: true }); claim(dir, waitName, { ...body, weight: want }); await Bun.sleep(o.pollMs ?? 250); continue; }
     // Only the head of the queue takes tokens (it may hold some while it waits for the rest: nobody else is taking). The
     // head is the first waiter the cap lets take; a waiter held back by its agent's cap lets the next one go.
-    const head = s.waiters.find((w) => eligible(w, s.holders, s.waiters, cap));
+    const head = headOf(s.waiters, s.holders, cap);
     if (head?.file === waitName && grab(s)) { leave(); return { weight: want, release }; }
     // (Another is the head now, a merge or an agent under its cap: the tokens we held while we were the head go back.)
     if (head?.file !== waitName && got.length) release();
@@ -254,7 +267,7 @@ if (import.meta.main) {
   const high = opt("priority") === "high" || (opt("priority") === undefined && defaultPriority() === 1);
   const slot = await take(weight, opt("what") ?? cmd.join(" ").slice(0, 80), { priority: high ? 1 : 0 });
   // (A build given K tokens compiles K at a time: cargo's own default is every core, whatever else is running.)
-  const env = { ...insideSlot(weight), ...(high ? { OIKOS_SLOT_PRIORITY: "high" } : {}), ...(slot?.weight && slot.weight > 1 && !process.env.CARGO_BUILD_JOBS ? { CARGO_BUILD_JOBS: String(slot.weight) } : {}) };
+  const env = { ...insideSlot(weight), ...(high ? { OIKOS_SLOT_PRIORITY: "high" } : {}), ...(slot?.weight && slot.weight > 1 && !process.env.CARGO_BUILD_JOBS ? { CARGO_BUILD_JOBS: String(buildJobs(slot.weight)) } : {}) };
   const child = Bun.spawn(cmd, { stdin: "inherit", stdout: "inherit", stderr: "inherit", env });
   for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"] as const) process.on(sig, () => child.kill(sig));
   const code = await child.exited;
