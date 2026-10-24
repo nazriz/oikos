@@ -364,7 +364,7 @@ export function askAgain(what: string, form?: { name: string; fields: { [field: 
 /** What a translator's model said with its last answer, beside the program, where it says how sure it is (our own
  * trained model answering first, translator/model/adapter.ts): its sureness of the whole answer (parts per million), the time it took (milliseconds), why
  * it offers no draft where that is its adapter's doing, and what it had written then. Never shown to anyone. */
-export interface Answered { sure_ppm: number; ms?: number; withheld?: string; wrote?: string; unsure?: unknown; forms_shown?: string[]; forms_of?: number }
+export interface Answered { sure_ppm: number; ms?: number; withheld?: string; wrote?: string; unsure?: unknown; forms_shown?: string[]; forms_of?: number; /** forms in their trial (withheld `probation`) */ trial?: string[] }
 
 /** What is said of each form beside its line, in the order `translatorContext` lists them, to a translator that can
  * read only so many (translator/model/subset.ts): whether it is the asker's own (a form of a post they hold, or of

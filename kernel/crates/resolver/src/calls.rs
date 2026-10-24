@@ -6,7 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
 pub const FUNCTIONS: [&str; 19] = ["money", "goods", "work", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system", "take"];
-pub const LABELS: [&str; 8] = ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form", "not_an_act", "no_such_act", "look_first"];
+/// (The last, `ambiguous`, is the resolver's answer and never a translator's: contracts/calls.md.)
+pub const LABELS: [&str; 9] = ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form", "not_an_act", "no_such_act", "look_first", "ambiguous"];
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {

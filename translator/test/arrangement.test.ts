@@ -19,9 +19,9 @@ function knows(): Knowledge {
 }
 
 /** What the first says for a request: a program, and what our own model's adapter says with it. */
-type Said = { program: string; sure_ppm?: number; ms?: number; withheld?: string; wrote?: string; unsure?: object } | Error;
+type Said = { program: string; sure_ppm?: number; ms?: number; withheld?: string; wrote?: string; unsure?: object; trial?: string[] } | Error;
 /** The two as one, each answering by the request's own words; every model call is counted, and every annotation kept. */
-function two(first: (request: string) => Said, behind: (request: string) => string | Error, o: { arrangement?: "then" | "beside"; check?: () => Promise<{ ok: boolean; error?: string }> } = {}) {
+function two(first: (request: string) => Said, behind: (request: string) => string | Error, o: { arrangement?: "then" | "beside"; check?: () => Promise<{ ok: boolean; error?: string }>; probation?: { probationOutcome(form: string, agree: boolean): void } } = {}) {
   const calls = { first: [] as string[], behind: [] as string[] };
   const notes: any[] = [];
   const asked = (req: any) => String(req.context.proposal);
@@ -39,7 +39,7 @@ function two(first: (request: string) => Said, behind: (request: string) => stri
   } });
   const io = (adapter: LlmAdapter) => ({ adapter, annotate: async (x: object) => void notes.push(x), now: () => 0, prices: { "decide/ours": { input: 0, output: 0 }, "mock/prompted": { input: 0, output: 0 } } as any });
   const check = o.check ?? (async () => ({ ok: true }));
-  const t = createArrangement(createTranslator(io(a1), check, () => undefined, "translator", 1), createTranslator(io(a2), check, () => undefined), { arrangement: o.arrangement ?? "then" });
+  const t = createArrangement(createTranslator(io(a1), check, () => undefined, "translator", 1), createTranslator(io(a2), check, () => undefined), { arrangement: o.arrangement ?? "then", ...(o.probation ? { probation: o.probation } : {}) });
   let n = 0;
   const ask = (proposal: string, who = "mayor-system"): Promise<Arranged> => t.translate({ draftId: `draft.${who}.${++n}`, participant: who, as: "mayor", proposal, knowledge: knows() } as TranslateRequest);
   return { t, ask, calls, notes };
@@ -223,4 +223,28 @@ test("a draft the first made on fewer forms than the asker knows of, or on a for
   expect(s.route).toMatchObject({ used: "behind", why: "form_unseen", agree: false, first: { withheld: "form_unseen" }, behind: { result: "draft" } });
   // Nothing a seat reads says any of it.
   expect(shown(r)).not.toMatch(/subset|unseen|forms shown/i);
+});
+
+test("a form in its trial goes behind; a confirmed draft behind counts for the trial, by whether ours agreed", async () => {
+  const told: [string, boolean][] = [];
+  const probation = { probationOutcome: (form: string, agree: boolean) => void told.push([form, agree]) };
+  const x = two((r) => ({ program: "none(unclear)", withheld: r.includes("other") ? "type_unreleased" : "probation", wrote: PAY, trial: ["council_proposal"] }), (r) => (r.includes("differ") ? LETTER : PAY), { probation });
+  const r = await x.ask("Pay acc-9 500 from acc-city.");
+  expect(r.ok).toBe(true);
+  expect(r.route).toMatchObject({ used: "behind", why: "probation", agree: true, first: { withheld: "probation", wrote: PAY, trial: ["council_proposal"] } });
+  // (Declined: nothing counts. Confirmed: the trial is told, once.)
+  if (r.ok) x.t.signed(r.draft.id, "accept");
+  expect(told).toEqual([["council_proposal", true]]);
+  const d = await x.ask("Pay acc-9 500 from acc-city, but differ.", "other-seat");
+  expect(d.route).toMatchObject({ why: "probation", agree: false });
+  if (d.ok) x.t.signed(d.draft.id, "reject");
+  expect(told).toEqual([["council_proposal", true]]);
+  const e = await x.ask("Pay acc-9 500 from acc-city, differ again.", "third-seat");
+  if (e.ok) x.t.signed(e.draft.id, "accept");
+  expect(told).toEqual([["council_proposal", true], ["council_proposal", false]]);
+  // A kind not released goes behind too, and is no trial.
+  const u = await x.ask("Pay acc-9 500 from acc-city, other.", "fourth-seat");
+  expect(u.route).toMatchObject({ why: "type_unreleased" });
+  if (u.ok) x.t.signed(u.draft.id, "accept");
+  expect(told.length).toBe(2);
 });

@@ -303,7 +303,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   const currencies = o.money ? everyCurrency().flatMap((c) => Array.from({ length: o.money![c.code] ?? 1 }, () => c)) : undefined;
   const drawn = currencies ? { currencies } : {};
   if (o.pairs !== undefined && !(o.pairs >= 0 && o.pairs <= 1)) throw new Error(`pairs: a share from 0 to 1, got ${o.pairs}`);
-  for (const l of o.refusalLabels ?? []) if (!(calls.LABELS as readonly string[]).includes(l)) throw new Error(`refusal labels: no label ${l} (they are: ${calls.LABELS.join(", ")})`);
+  for (const l of o.refusalLabels ?? []) if (!(calls.TRANSLATOR_LABELS as readonly string[]).includes(l)) throw new Error(`refusal labels: no label ${l} (they are: ${calls.TRANSLATOR_LABELS.join(", ")})`);
   if (o.indirect !== undefined && !(o.indirect >= 0 && o.indirect <= 1)) throw new Error(`indirect: a share from 0 to 1, got ${o.indirect}`);
   const wanted = (g: Gold) => inOnly(g, o.only);
   const balanced = (o.floor ?? 300) > 0 ? await balancedGold(o.sources, { ...o, ...drawn }) : undefined;

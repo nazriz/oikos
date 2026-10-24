@@ -48,6 +48,8 @@ export type Why =
   | "no_program" // the first's answer is no program of the call language (or the request is longer than it reads)
   | "forms_subset" // the first was shown fewer forms than the asker knows of: its draft is recorded, never offered
   | "form_unseen" // the first's draft fills a form outside its training: recorded, never offered
+  | "type_unreleased" // the first reads forms by name, and its draft has a function or a kind of field it is not released for: recorded, never offered
+  | "probation" // the first's draft fills a form it was not taught and that is still in its trial: recorded, never offered
   | "form_not_shown" // the request names a form the first was not shown (more forms than its reader takes: translator/model/subset.ts)
   | "refused" // the first refused, sure of it, with a label that does not stand
   | "not_resolved" // acts could not be made of the first's call (the resolver asked, or the call was put together wrongly)
@@ -76,6 +78,8 @@ export interface RouteSide {
    * their records' ids, and of how many. Absent where it was shown them all. */
   forms_shown?: string[];
   forms_of?: number;
+  /** Forms of the first's draft still in their trial, where that is why it went behind. */
+  trial?: string[];
   /** Attempts beyond its first (the prompt-driven translator is asked again with what went wrong). */
   retries?: number;
   error?: string;
@@ -115,7 +119,7 @@ export function muchTheSame(a: string, b: string): boolean {
 function sideOf(id: TranslatorId, r: Translated | undefined, error?: string): RouteSide {
   if (!r) return { model: id.model, result: "failed", ...(error ? { error: error.slice(0, 500) } : {}) };
   const a = r.answered;
-  const more = { ...(a ? { sure_ppm: a.sure_ppm, ...(a.ms !== undefined ? { ms: a.ms } : {}), ...(a.withheld ? { withheld: a.withheld } : {}), ...(a.wrote !== undefined ? { wrote: a.wrote } : {}), ...(a.forms_shown ? { forms_shown: a.forms_shown, forms_of: a.forms_of } : {}) } : {}), ...(r.retries?.length ? { retries: r.retries.length } : {}) };
+  const more = { ...(a ? { sure_ppm: a.sure_ppm, ...(a.ms !== undefined ? { ms: a.ms } : {}), ...(a.withheld ? { withheld: a.withheld } : {}), ...(a.wrote !== undefined ? { wrote: a.wrote } : {}), ...(a.forms_shown ? { forms_shown: a.forms_shown, forms_of: a.forms_of } : {}), ...(a.trial?.length ? { trial: a.trial } : {}) } : {}), ...(r.retries?.length ? { retries: r.retries.length } : {}) };
   if (r.ok) return { model: id.model, result: "draft", call: r.draft.call, draft_hash: r.hash, ...more };
   const label = LABEL.exec(r.call ?? "")?.[1];
   const result = r.asked_back ? "asked_back" : label ? "refusal" : r.call && !r.invalid?.length && r.notices[0] !== NOT_CHECKED ? "question" : "failed";
@@ -128,7 +132,7 @@ function noDraft(r: Extract<Translated, { ok: false }>, stands: readonly string[
   if (withheld === "cut_off") return "unsure";
   if (withheld === "form_check") return "form_check";
   if (withheld === "form_not_shown") return "form_not_shown";
-  if (withheld === "forms_subset" || withheld === "form_unseen") return withheld;
+  if (withheld === "forms_subset" || withheld === "form_unseen" || withheld === "type_unreleased" || withheld === "probation") return withheld;
   if (withheld) return "no_program";
   const label = LABEL.exec(r.call ?? "")?.[1];
   // (An asking back that is not a refusal's own: a value of the call that could not be read. The call's fault.)
@@ -143,17 +147,17 @@ function noDraft(r: Extract<Translated, { ok: false }>, stands: readonly string[
  * without sampling is the same answer). `id` is the first's under `then` and the one behind's under `beside`: whose
  * drafts the world gets when nothing sends a request elsewhere. A draft carries the id of whoever drew it up.
  */
-export function createArrangement(first: One, behind: One, o: { arrangement: Arrangement; stands?: readonly string[] }) {
+export function createArrangement(first: One, behind: One, o: { arrangement: Arrangement; stands?: readonly string[]; /** Told each seat-confirmed request on a form in its trial, and whether the first's draft agreed (adapter.ts `probationOutcome`). */ probation?: { probationOutcome(form: string, agree: boolean): void } }) {
   const stands = o.stands ?? STANDS;
   /** By seat (a participant in a capacity): its last request that was answered and has not ended in a confirmed
    * draft, where that should send its next behind. `declined`: it declined the draft; else it was refused or asked. */
   const open = new Map<string, { proposal: string; declined: boolean }>();
   /** Drafts offered and not yet answered: whose, for what, and whether the request had gone behind for an open matter. */
-  const offered = new Map<string, { who: string; proposal: string; by: "first" | "behind"; continued: boolean }>();
+  const offered = new Map<string, { who: string; proposal: string; by: "first" | "behind"; continued: boolean; trial?: { forms: string[]; agree: boolean } }>();
   const seat = (participant: string, as?: string) => `${participant}|${as ?? ""}`;
   const agreement = (req: TranslateRequest, first: RouteSide, b: RouteSide): { agree: boolean; agree_text?: boolean } => {
     // (A draft of the first's that was recorded and not offered is still compared, as under `beside`: what it wrote.)
-    const a: RouteSide = (first.withheld === "forms_subset" || first.withheld === "form_unseen") && first.wrote ? { ...first, result: "draft", call: first.wrote } : first;
+    const a: RouteSide = (first.withheld === "forms_subset" || first.withheld === "form_unseen" || first.withheld === "type_unreleased" || first.withheld === "probation") && first.wrote ? { ...first, result: "draft", call: first.wrote } : first;
     if (a.result === "draft" && b.result === "draft") {
       const forms = req.knowledge.forms.map((f) => ({ form: String(f.data?.form), to: Knowledge.formOf(f), id: f.id, fields: (f.data?.fields ?? {}) as { [name: string]: { type: string } } }));
       const ctx = { currency: req.knowledge.currency, forms };
@@ -211,7 +215,10 @@ export function createArrangement(first: One, behind: One, o: { arrangement: Arr
         } else if (again || b.asked_back || theirs.result === "refusal") open.set(who, { proposal: req.proposal, declined: false });
       }
       const { answered: _, ...rest } = b;
-      return { ...rest, route: { arrangement: o.arrangement, used: "behind", why, first: mine, behind: theirs, ...(mine.result !== "failed" || mine.call ? agreement(req, mine, theirs) : {}) } };
+      const agreed: { agree?: boolean; agree_text?: boolean } = mine.result !== "failed" || mine.call ? agreement(req, mine, theirs) : {};
+      // (A form in its trial: what the seat answers to the draft behind decides whether ours agreed on a confirmed request.)
+      if (o.arrangement === "then" && b.ok && why === "probation" && mine.trial?.length) offered.get(b.draft.id)!.trial = { forms: mine.trial, agree: !!agreed.agree };
+      return { ...rest, route: { arrangement: o.arrangement, used: "behind", why, first: mine, behind: theirs, ...agreed } };
     },
     /** A seat's answer to a draft: confirmed, its matter is through; declined, its next request goes behind where the
      * draft was the first's (or the matter was behind already). */
@@ -219,7 +226,10 @@ export function createArrangement(first: One, behind: One, o: { arrangement: Arr
       const d = offered.get(draftId);
       if (!d) return;
       offered.delete(draftId);
-      if (decision === "accept") open.delete(d.who);
+      if (decision === "accept") {
+        open.delete(d.who);
+        for (const f of d.trial?.forms ?? []) o.probation?.probationOutcome(f, d.trial!.agree);
+      }
       else if (d.by === "first" || d.continued) open.set(d.who, { proposal: d.proposal, declined: true });
     },
   };

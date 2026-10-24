@@ -285,6 +285,9 @@ struct Base {
     types: BTreeMap<String, Value>,
     currency: Option<oikos_resolver::calls::Currency>,
     dated: Option<oikos_rules::calendar::Dated>,
+    /// Whether the world's people and bodies have names of their own (its config's `names`): how the resolver answers a
+    /// name it knows more than one by (docs/design/names-and-dates.md section 4).
+    named: bool,
     templates: BTreeMap<String, Value>,
     world: Arc<WorldInfo>,
     seed: u64,
@@ -328,7 +331,8 @@ impl Base {
         let dated = oikos_rules::calendar::Dated::from_config(config.get("calendar"));
         let templates =
             config["templates"].as_array().into_iter().flatten().filter_map(|t| Some((t["id"].as_str()?.to_string(), t.clone()))).collect();
-        Ok(Base { types, currency, dated, templates, world, seed, tick, run_end, lean, thinking })
+        let named = config.get("names").and_then(Value::as_bool) == Some(true);
+        Ok(Base { types, currency, dated, named, templates, world, seed, tick, run_end, lean, thinking })
     }
     /// The same, with its actors told the run captures their decisions (`EngineOptions::capture_citizens`).
     fn capturing(mut self, on: bool) -> Base {
@@ -347,6 +351,7 @@ pub struct Engine<W: Write> {
     types: BTreeMap<String, Value>,
     currency: Option<oikos_resolver::calls::Currency>,
     dated: Option<oikos_rules::calendar::Dated>,
+    named: bool,
     parts: BTreeMap<String, Part>,
     positions: BTreeMap<String, Pos>,
     templates: BTreeMap<String, Value>,
@@ -555,6 +560,7 @@ impl<W: Write> Engine<W> {
             types: base.types,
             currency: base.currency,
             dated: base.dated,
+            named: base.named,
             parts: BTreeMap::new(),
             positions: BTreeMap::new(),
             templates: base.templates,
@@ -669,7 +675,8 @@ impl<W: Write> Engine<W> {
                 let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
                 let cur = self.currency.clone();
                 let dated = self.dated.clone();
-                self.knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(cur).with_dated(dated)).absorb_seen(
+                let named = self.named;
+                self.knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(cur).with_dated(dated).with_names(named)).absorb_seen(
                     &crate::kernel::seen(obs),
                     &o.shown,
                     &mut self.registers,
@@ -1507,7 +1514,7 @@ impl<W: Write> Engine<W> {
             Action::Call { program, reasoning } => {
                 let text = oikos_resolver::calls::program_text(&program);
                 let kkey = if seat { pid.clone() } else { key.to_string() };
-                let empty = oikos_resolver::Knowledge::new(self.currency.clone()).with_dated(self.dated.clone());
+                let empty = oikos_resolver::Knowledge::new(self.currency.clone()).with_dated(self.dated.clone()).with_names(self.named);
                 let k = self.knowledge.get(&kkey).unwrap_or(&empty);
                 let types = &self.types;
                 let type_of = |t: &str| types.get(t).cloned();
@@ -1518,10 +1525,14 @@ impl<W: Write> Engine<W> {
                             self.begin(key, &pid, as_.as_deref(), blocks, vec![], prov, reasoning.filter(|_| seat || !self.lean))?;
                         Ok((true, acted, None))
                     }
-                    oikos_resolver::Resolution::Questions { questions, invalid } => {
+                    oikos_resolver::Resolution::Questions { questions, invalid, ambiguous } => {
                         let mut data = json!({ "call_unresolved": text, "questions": questions });
                         if !invalid.is_empty() {
                             data["invalid"] = json!(invalid);
+                        }
+                        // (Only in a world whose people have names: the old towns' notes are as they were.)
+                        if !ambiguous.is_empty() {
+                            data["ambiguous"] = json!(ambiguous);
                         }
                         self.note(&pid, data)?;
                         // (A code actor that asks the same unresolvable thing again in the same moment has nothing

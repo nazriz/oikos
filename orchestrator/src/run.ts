@@ -599,7 +599,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     return {
       key: `${p.id}|${cap}`, participant: p.id, capacity: cap, entity, module, controller: module.create(ctx), ctx,
       cadence: ceilTo(module.cadence(ctx), tick), firstWake: wakeAt ?? ceilTo(module.firstWake?.(ctx) ?? 0, tick), wokeFor: "start", since: 0,
-      knowledge: new Knowledge(currency), view: new View(), notices: [],
+      knowledge: new Knowledge(currency, cfg.names === true), view: new View(), notices: [],
     };
   };
 
@@ -615,7 +615,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const mine = held(p.id);
     // (Its reports, trays, office's file and staff, and the rest of its configuration: seat-config.ts, shared with the
     // experiment harness's model stewards.)
-    const knowledge = new Knowledge(currency);
+    const knowledge = new Knowledge(currency, cfg.names === true);
     const { config, office, entity, standingIds, roster, tally, dayBook } = seatConfig({ cfg, part: p, personal: personalChannels(p), mine, positions, mods, whoIs: namedFor(knowledge, whoIs), ctxFor, twin, draftText, sorted: sortedKeys });
     const controller = createLlmParticipant(config, io);
     const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };
@@ -742,7 +742,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // A translator that answers first, if the run has one: the two are one translator to every seat (arrangement.ts).
   // (The first is asked once a request: it decides without sampling, so asked again it says the same.)
   const arranged = o.translatorFirst
-    ? createArrangement(createTranslator({ ...io, adapter: watched(o.translatorFirst) }, kernelCheck, typeOf, undefined, 1, engineResolver), one, { arrangement: o.translatorArrangement ?? "then" })
+    ? createArrangement(createTranslator({ ...io, adapter: watched(o.translatorFirst) }, kernelCheck, typeOf, undefined, 1, engineResolver), one, { arrangement: o.translatorArrangement ?? "then", ...("probationOutcome" in o.translatorFirst ? { probation: o.translatorFirst as unknown as { probationOutcome(form: string, agree: boolean): void } } : {}) })
     : undefined;
   const translator: { id: typeof one.id; translate(req: Parameters<typeof one.translate>[0]): Promise<Awaited<ReturnType<typeof one.translate>> & { route?: Route }> } = arranged ?? one;
 
@@ -1110,7 +1110,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       let res: ReturnType<typeof resolve> | undefined = resolverMode === "engine" ? undefined : resolve(program, u.knowledge, typeOf, as);
       if (resolverMode !== "ts") {
         const e = await k.request({ op: "resolve", participant: u.participant, ...(u.capacity ? { only: u.capacity } : {}), ...(as ? { as } : {}), program: calls.programText(program) });
-        const byEngine = (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}) }) as ReturnType<typeof resolve>;
+        const byEngine = (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}), ...(e.ambiguous ? { ambiguous: e.ambiguous } : {}) }) as ReturnType<typeof resolve>;
         if (res === undefined) res = byEngine;
         else {
           resolverChecked++;
@@ -1125,7 +1125,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       platformMs += performance.now() - p1;
       if (!res) throw new Error("no resolver ran");
       if (!res.ok) {
-        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}) } } });
+        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}), ...(res.ambiguous ? { ambiguous: res.ambiguous } : {}) } } });
         for (const q of res.questions) u.notices.push({ t, text: q });
         return true;
       }
@@ -1312,7 +1312,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const notes: object[] = [];
     const tr = await translating.run(notes, async () => {
       try {
-        return await translator.translate({ draftId, participant, as, proposal, knowledge: units.get(key)?.knowledge ?? new Knowledge(currency), called: (id) => whoIs(id)?.name, ...(capacity ? { only: capacity } : {}) });
+        return await translator.translate({ draftId, participant, as, proposal, knowledge: units.get(key)?.knowledge ?? new Knowledge(currency, cfg.names === true), called: (id) => whoIs(id)?.name, ...(capacity ? { only: capacity } : {}) });
       } catch (e) {
         if (!(e instanceof ModelCallFailed)) throw e;
         return { ok: false as const, notices: ["The translator did not answer."], raw: { model_call_failed: e.message } } as Awaited<ReturnType<typeof translator.translate>>;

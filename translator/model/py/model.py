@@ -129,7 +129,7 @@ class Translator(nn.Module):
             self.read_norm = nn.LayerNorm(d)
             layer = nn.TransformerEncoderLayer(d, cfg.heads, cfg.feed, cfg.dropout, batch_first=True, norm_first=True)
             self.reader = nn.TransformerEncoder(layer, cfg.reader_layers, enable_nested_tensor=False)
-        if cfg.decoding == "slots":
+        if cfg.decoding in ("slots", "cards"):
             # Which slot a decision is for: told to the writer with each step (and, for a form's field, where its
             # name stands, through `span`), since the model no longer names the argument itself.
             self.slot = nn.Embedding(len(cfg.slots), d)

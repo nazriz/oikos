@@ -545,6 +545,8 @@ Additions only; nothing renamed or removed. A log or a world made before them is
 - **Log, `action_started`: `free`** (additive, optional): when the actor itself is free again, where that is before `done`. An act's `done` is now when its actor and every performer it names have done their part (a `work` is placed on the timeline of each performer, for the labour it takes them); the actor's own part is its table time. `free` is absent when the two are the same, which is every act with no `work` naming others, so an old log reads as before.
 - **Behaviour change, not a schema change (breaking for replay):** `work` now takes its performers' time on their timelines (before, it was counted against a separate daily budget and never touched them), an act starts when its actor and every performer are free, and a performer's working day (`catalogue.working_day`) is counted where the work is placed, and a work on a person or a space is on whoever was there when it was ordered. The refusal `no_time_left` is the same code and the same words ("<who> has <n> s of work left today; this needs <m>"), now read at the act's start from the person's own timeline. The kernel state no longer carries `labour_used`, and a timeline carries the day's placed work, so **every state hash moves**. **Migration:** a log made before this change replays only on the kernel build of its version: the commit before F1 is tagged `pre-foundations` (D6); old runs and their twins are replayed and re-run there.
 
+- **The `ambiguous` label and a world's `names` (2026-10-25, under the owner's blanket approval of contract changes, 2026-10-11, and his ruling of 2026-10-23: "Build person-by-name lookup with an 'ambiguous' answer, within what the seat has been shown. It's on wherever names are on."; docs/decisions.md, "A name the seat knows more than one by is asked back").** `calls.schema.json`: `ambiguous` joins the labels of `none` (the resolver's answer; a translator that writes it is refused as unclear). `world-config.schema.json`: an optional top-level boolean `names` (the generator sets it with a spec's `names`); the kernel reads none of it, the resolver does (calls.md). The resolver's answer to a call (`resolve`, and the `note` a call that did not resolve leaves in the log) gains `ambiguous`, a list of `{ label, name, for, candidates: [{ id, known_by }] }`, only where there is one; a world without `names` answers and logs as before, word for word. Both resolvers are held to `contracts/test/names.json`. Additive; the version stays 0.8.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).
@@ -666,6 +668,19 @@ No JSON Schema changed.
 - **Module manifest: `answers`** (optional, 2026-10-19, the cut-over's second step; blanket contract approval): how an office answers a letter (`office`, `acts`, `report`, `forms`), as the engine's manifests carry it. The manifests in `participants/manifests` are now written from the engine's (`bun participants/scripts/manifests.ts`), and the engine's kinds say it; the schema had no place for it.
 - **Module manifest: `capacity`** (optional, 2026-10-19): what sizes an office's staff where its kind states it (the registries' asks and seconds, the rule that sizes the staff, the figure's source), as the engine's manifests carry it; open inside.
 
+## Translator v3: forms read by name, released by kind, a trial per new form (2026-10-25; blanket contract approval of 2026-10-11; docs/decisions.md, "Translator v3")
+
+Additive only; no schema file changed. A log made before is a valid log.
+
+- **A translation's route** (`translation_route`; `translator/src/arrangement.ts`): `why` and `first.withheld` may be
+  `type_unreleased` (the first reads forms by name and its draft has a function or a kind of field it is not released
+  for) or `probation` (its draft fills a form it was not taught that is still in its trial); `first.trial` names the
+  forms in their trial. In both, the first's draft is on the route as `first.wrote` and not offered, and `agree`
+  compares it with the draft behind, as for `form_unseen`.
+- **A trained model's folder** may carry `config.json` `decoding: "cards"` (read twice: translator/model/encode.ts),
+  `types-released.json` (`types_released`, `functions_released`, and the counts they were decided on:
+  translator/model/release.ts) and `probation.jsonl` (a line a confirmed request on a form in its trial: `form`,
+  `agree`, `run`, `draft`; translator/model/probation.ts). A model of another decoding reads its folder as before.
 ## Change for the six pilots' faults (2026-10-25; docs/decisions.md, "A place committed to is a place"; under the owner's blanket approval of contract changes, 2026-10-11)
 
 - **Breaking, kernel (a new refusal):** `propose_agreement` is refused `not_a_place` when a commitment's `occupancy.in` or

@@ -243,3 +243,13 @@ STATUS in `runs/translator-v3-<date>/` and an entry in docs/decisions.md; nothin
 - CPU 95th percentile over 1.5 s: release nothing; profile first.
 - Plan usage 170 or GPU 12: stop where it stands and report.
 - After four runs, whatever the scores, the round ends. No tuning to held out, ever.
+
+## Progress (2026-10-25)
+
+Built and landed on branch `translator-v3`: read twice (section 1, without the field-type masks), the data of section 2
+by code (no Haiku table: one synonym table; the generated part templated, not read blind), release by kind and the
+trial per new form (section 4, as the owner ruled), the `ambiguous` answer and person-by-name lookup (branch
+`tr3-names`; whose names count as shown is open), offline scoring of the test pilots (`translator/eval/rr.ts`). Batch 1
+ran (two seeds; the control stopped at epoch 3). Section 9 fired: no run meets the bar to go first and RR's wrong drafts
+are above 2%, so nothing is released and `pod-small-r3-long-s1` stays first. Numbers and the question for the owner:
+docs/decisions.md, 2026-10-25 "Translator v3".

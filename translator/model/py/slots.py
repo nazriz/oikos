@@ -30,6 +30,41 @@ _FIELD = re.compile(r"([^\s,()]+) \(([^)]*)\)")
 _REQUIRED = re.compile(r"(^|, )required$")
 
 
+NAMED_BEFORE = "Named before: "
+
+
+def named_before(text: str) -> list[str]:
+    """The names earlier lines gave their results, from a fill input's last line (encode.ts `fillInput`)."""
+    last = text.rsplit("\n", 1)[-1] if "\n" in text else ""
+    return [x for x in last[len(NAMED_BEFORE):].split(", ") if x] if last.startswith(NAMED_BEFORE) else []
+
+
+def choose_line(line: str) -> str:
+    """What the choose pass is shown of a form: its head, then its fields' names (encode.ts `chooseLine`)."""
+    f = line.find(": fields ")
+    if f < 0:
+        return line
+    names: list[str] = []
+    for m in _FIELD.finditer(line[f + 9:]):
+        if m.group(1) not in names:
+            names.append(m.group(1))
+    return f"{line[:f]}: has {', '.join(names)}"
+
+
+def line_index(lines: list[str], form: str | None, to: str | None) -> int:
+    """Which of the forms' lines a call fills (encode.ts `lineOf`): -1 if none."""
+    if form is None:
+        return -1
+    mine = [k for k, l in enumerate(lines) if l.startswith(f"- {form},") or f"id {form}:" in l]
+    if to is not None:
+        for k in mine:
+            f = lines[k].find(": fields ")
+            head = lines[k] if f < 0 else lines[k][:f]
+            if f", to={to}," in head or head.endswith(f", to={to}"):
+                return k
+    return mine[0] if mine else -1
+
+
 def as_word(s: str) -> str:
     """A span's words as one word (encode.ts asWord)."""
     return re.sub(r"[\s-]+", "_", re.sub(r"^the\s+", "", s.strip().lower()))
@@ -88,15 +123,32 @@ class Forms:
 class Machine:
     """The decisions of one answer, one after another. `state` is what is to be decided now: (slot name, where a
     field's name stands in characters or None, what is allowed: a key for `allows`), or None when the answer is whole.
-    `take(step, text)` gives it the decision (a choice's name, or [kind, first, last] with the characters it copies)."""
+    `take(step, text)` gives it the decision (a choice's name, or [kind, first, last] with the characters it copies).
 
-    def __init__(self, grammar: dict, forms: Forms):
-        self.grammar, self.forms = grammar, forms
-        self.bound: list[str] = []
-        self._run = self._program()
-        self.state = next(self._run)
+    `mode` (encode.ts, "Read twice"): `full`, slot by slot over the whole input; `choose`, a form's fields are not
+    decided, and each form met is kept in `chosen` as (form, office, the names bound before its line, how many
+    decisions had been taken when its office was); `fill`, the decisions are the fields of the one form shown, with the
+    names in `bound` (the input's `Named before:` line) allowed as values."""
+
+    def __init__(self, grammar: dict, forms: Forms, mode: str = "full", bound: list[str] | None = None):
+        self.grammar, self.forms, self.mode = grammar, forms, mode
+        self.bound: list[str] = list(bound or [])
+        self.chosen: list[tuple] = []
+        self.taken = 0
+        self._run = self._fill() if mode == "fill" else self._program()
+        try:
+            self.state = next(self._run)
+        except StopIteration:
+            self.state = None
+
+    def _fill(self):
+        line = self.forms.lines[0] if self.forms.lines else None
+        for name, _wanted, a, z in (line["fields"] if line else []):
+            if name not in FORM_ARGS:
+                yield from self._slot("field", (a, z), False)
 
     def take(self, step, text: str | None = None):
+        self.taken += 1
         try:
             self.state = self._run.send((step, text))
         except StopIteration:
@@ -124,6 +176,9 @@ class Machine:
         if fn == "form":
             form = yield from self._slot("arg:form", None, True)
             to = yield from self._slot("arg:to", None, False)
+            if self.mode == "choose":
+                self.chosen.append((form, to, list(self.bound), self.taken))
+                return
             line = self.forms.line_of(form, to)
             for name, _wanted, a, z in (line["fields"] if line else []):
                 if name not in FORM_ARGS:
@@ -226,10 +281,10 @@ class Follow:
     class Inexact(Exception):
         pass
 
-    def __init__(self, grammar: dict, slots: list[str], masks: Masks, text: str, t, exact: bool = False):
+    def __init__(self, grammar: dict, slots: list[str], masks: Masks, text: str, t, exact: bool = False, mode: str = "full"):
         self.slots = {s: i for i, s in enumerate(slots)}
         self.masks, self.text, self.t, self.exact = masks, text, t, exact
-        self.machine = Machine(grammar, Forms(text))
+        self.machine = Machine(grammar, Forms(text), mode, named_before(text) if mode == "fill" else None)
 
     @property
     def now(self):
@@ -265,7 +320,8 @@ if __name__ == "__main__":
     import sys
     asked = json.loads(sys.stdin.read())
     for case in asked["cases"]:
-        m = Machine(asked["grammar"], Forms(case["input"]))
+        mode = case.get("mode", "full")
+        m = Machine(asked["grammar"], Forms(case["input"]), mode, named_before(case["input"]) if mode == "fill" else None)
         slots, off, fits = [], [], True
         try:
             for i, s in enumerate(case["steps"]):
@@ -280,4 +336,4 @@ if __name__ == "__main__":
             fits = fits and m.state is None
         except (KeyError, ValueError, IndexError, TypeError):
             fits = False
-        print(json.dumps({"fits": fits, "slots": slots, "off": off}))
+        print(json.dumps({"fits": fits, "slots": slots, "off": off, **({"chosen": [list(c) for c in m.chosen]} if m.mode == "choose" else {})}))

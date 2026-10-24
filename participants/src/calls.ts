@@ -10,7 +10,11 @@ import CALLS_SCHEMA from "../../contracts/calls.schema.json";
 
 export const FUNCTIONS = ["money", "goods", "work", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system", "take"] as const;
 export type Fn = (typeof FUNCTIONS)[number];
-export const LABELS = ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form", "not_an_act", "no_such_act", "look_first"] as const;
+/** The refusals a translator writes (contracts/calls.md): what a model is taught, and what training data is made of. */
+export const TRANSLATOR_LABELS = ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form", "not_an_act", "no_such_act", "look_first"] as const;
+/** Every label of the call language: the translator's, and `ambiguous`, the resolver's answer to a name the seat knows
+ * more than one by (docs/design/names-and-dates.md section 4). A translator never writes it: it does not know who exists. */
+export const LABELS = [...TRANSLATOR_LABELS, "ambiguous"] as const;
 export type Label = (typeof LABELS)[number];
 
 export type Value = { id: string } | { var: string } | { text: string } | { json: unknown } | { call: Call };

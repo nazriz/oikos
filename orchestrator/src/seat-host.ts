@@ -114,7 +114,7 @@ export class ModelSeat {
     } as ParticipantContext);
     this.whoIs = whoIsOf(cfg);
     const twin = false;
-    this.knowledge = new Knowledge(this.currency);
+    this.knowledge = new Knowledge(this.currency, cfg.names === true);
     const made = seatConfig({ cfg, part: framed, personal: framed.channels ?? [], mine, positions, mods: modules, whoIs: namedFor(this.knowledge, this.whoIs), ctxFor, twin, draftText, sorted: (v) => v });
     this.entity = made.entity;
     this.office = made.office;
@@ -155,7 +155,7 @@ export class ModelSeat {
     };
     const tio = (adapter: LlmAdapter): LlmIO => ({ ...io, adapter });
     const one = createTranslator(tio(o.translator.behind), check, typeOf, undefined, undefined, resolver);
-    this.arranged = o.translator.first ? createArrangement(createTranslator(tio(o.translator.first), check, typeOf, undefined, 1, resolver), one, { arrangement: o.translator.arrangement ?? "then" }) : undefined;
+    this.arranged = o.translator.first ? createArrangement(createTranslator(tio(o.translator.first), check, typeOf, undefined, 1, resolver), one, { arrangement: o.translator.arrangement ?? "then", ...("probationOutcome" in o.translator.first ? { probation: o.translator.first as unknown as { probationOutcome(form: string, agree: boolean): void } } : {}) }) : undefined;
     this.translator = this.arranged ?? one;
     const known = idsFrom(cfg);
     this.records = new SeatRecords([{ id: o.seat, known: known(o.seat), direct: [o.seat, ...mine.map((x) => x.id)] }], known);

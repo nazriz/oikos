@@ -100,7 +100,8 @@ export function grammarOf(dir: string): Grammar | undefined {
 export function decodingOf(dir: string): Decoding {
   try {
     const file = join(dir, "config.json");
-    return existsSync(file) && JSON.parse(readFileSync(file, "utf8")).decoding === "slots" ? "slots" : "steps";
+    const d = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).decoding : undefined;
+    return d === "slots" || d === "cards" ? d : "steps";
   } catch {
     return "steps";
   }
@@ -183,7 +184,61 @@ export const CUT_OFF = 0.1;
 /** Why this adapter offers no draft where the model's own answer was not a refusal it is sure of: its sureness is under
  * the cut-off; the form it filled in is not one of the forms shown as shown; or its steps make no program of the call
  * language; or the request with its forms is longer than the model reads. */
-export type Withheld = "cut_off" | "form_check" | "no_program" | "too_long" | "form_not_shown" | "forms_subset" | "form_unseen";
+export type Withheld = "cut_off" | "form_check" | "no_program" | "too_long" | "form_not_shown" | "forms_subset" | "form_unseen" | "type_unreleased" | "probation";
+
+/** A field's kind of value as a form's line shows it: `choice` for one of a few options, else the type it names. */
+export function fieldTypes(line: string): string[] {
+  const f = line.indexOf(": fields ");
+  if (f < 0) return [];
+  return [...line.slice(f + 9).matchAll(/([^\s,()]+) \(([^)]*)\)/g)].map((m) => (m[2]!.startsWith("one of ") ? "choice" : m[2]!.replace(/, required$/, "").trim()));
+}
+
+/** What a model that reads forms by name (decoding `cards`) is released for, from types-released.json beside it
+ * (translator/model/release.ts): the kinds of field it passes the mark on, on forms it was never taught, and the call
+ * language's functions it passes on, on requests kept out of its training. None where the file is missing or malformed:
+ * nothing of a `cards` model's is then offered (every draft goes behind, `type_unreleased`). */
+export function typesReleasedOf(dir: string): { types: string[]; functions: string[] } | undefined {
+  try {
+    const x = JSON.parse(readFileSync(join(dir, "types-released.json"), "utf8"));
+    const ok = (y: unknown) => Array.isArray(y) && y.every((z) => typeof z === "string");
+    return ok(x.types_released) && ok(x.functions_released) ? { types: x.types_released, functions: x.functions_released } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A form's trial (the owner's ruling, 2026-10-23): a form a `cards` model was not taught is drafted by the translator
+ * behind until five requests on it that the seat confirmed agree in meaning with what ours wrote, none disagreeing since;
+ * then ours is offered. The ledger is probation.jsonl beside the model, a line an outcome ({"form", "agree": true |
+ * false, "run", "draft"}), added to after a run (translator/model/probation.ts) and read once when the adapter starts.
+ * Within a run, outcomes are counted as they come (`DecideAdapter.probationOutcome`), so a form can pass its trial
+ * during the run; every route says where a request stood. */
+export const TRIAL = 5;
+
+/** Whether a `cards` model's draft is offered, by kind (the owner's ruling, 2026-10-23): not if a function it uses is not
+ * released, or a form it fills has a field of a kind not released (`type_unreleased`); not if a form it fills was not
+ * taught and is not past its trial (`probation`, with those forms by name in `trial`). */
+export function byKind(program: string, forms: string[], released: { types: string[]; functions: string[] } | undefined, passed: (form: string) => boolean): { withheld?: "type_unreleased" | "probation"; trial: string[] } {
+  const filled = [...program.matchAll(/\bform=([\w.-]+)/g)].map((m) => m[1]!);
+  const fns = [...program.matchAll(/(?:^|[\s(=,;\[])([a-z_]+)\(/g)].map((m) => m[1]!);
+  const lineFor = (f: string) => forms.find((l) => l.startsWith(`- ${f},`) || partsOf(l).id === f);
+  const names = filled.map((f) => (lineFor(f) ? partsOf(lineFor(f)!).name || f : f));
+  const trial = names.filter((f) => !passed(f));
+  const unreleased = !released || fns.some((fn) => !released.functions.includes(fn)) || filled.some((f) => !lineFor(f) || fieldTypes(lineFor(f)!).some((t) => !released.types.includes(t)));
+  return { ...(unreleased ? { withheld: "type_unreleased" as const } : trial.length ? { withheld: "probation" as const } : {}), trial };
+}
+export function probationOf(dir: string): Map<string, number> {
+  const run = new Map<string, number>();
+  try {
+    for (const l of readFileSync(join(dir, "probation.jsonl"), "utf8").split("\n")) {
+      if (!l.trim()) continue;
+      const x = JSON.parse(l);
+      if (typeof x.form !== "string") continue;
+      run.set(x.form, x.agree === true ? (run.get(x.form) ?? 0) + 1 : 0);
+    }
+  } catch {}
+  return run;
+}
 
 /** The list of forms a model was taught, from forms-trained.json beside its config.json; none if missing or malformed. */
 function sidecarList(dir: string): string[] | undefined {
@@ -248,13 +303,29 @@ export class DecideAdapter implements LlmAdapter {
   readonly decoding: Decoding;
   /** The slots the model was taught (`grammarOf`). */
   private readonly grammar?: Grammar;
+  /** A `cards` model's: what it is released for (`typesReleasedOf`), and each untaught form's run of agreements in its trial. */
+  private readonly released?: { types: string[]; functions: string[] };
+  private trial = new Map<string, number>();
+  /** A seat-confirmed request on a form in its trial: whether what ours wrote for it agreed with the draft confirmed
+   * (arrangement.ts, `signed`). Five in a row and the form is ours from then on; a disagreement starts it again. */
+  probationOutcome(form: string, agree: boolean): void {
+    this.trial.set(form, agree ? (this.trial.get(form) ?? 0) + 1 : 0);
+  }
+  /** Whether a form is past its trial (or was taught, and has none). */
+  private passed(form: string, trained?: string[]): boolean {
+    return !!trained?.includes(form) || (this.trial.get(form) ?? 0) >= TRIAL;
+  }
   /** `first`: this model answers first with another translator behind it (translator/src/arrangement.ts), so whoever
    * it is unsure for is never told so by it: the request goes behind. Then nobody is "given its best draft the next
    * time", and the cut-off holds for every request. */
-  constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean; quiet?: boolean; first?: boolean } = {}) {
+  constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean; quiet?: boolean; first?: boolean; /** A `cards` model measured before anything is released for it (release.ts): its drafts as they are, with no release by kind and no trial. */ unreleased?: boolean } = {}) {
     const vocabulary = vocabularyOf(this.dir());
     this.decoding = decodingOf(this.dir());
-    this.grammar = this.decoding === "slots" ? grammarOf(this.dir()) : undefined;
+    this.grammar = this.decoding !== "steps" ? grammarOf(this.dir()) : undefined;
+    if (this.decoding === "cards") {
+      this.released = typesReleasedOf(this.dir());
+      this.trial = probationOf(this.dir());
+    }
     this.cannot = vocabulary ? cannotSay(vocabulary) : [];
     if (this.cannot.length && !o.quiet) console.error(`decide/${model} was trained before these were in the call language and cannot answer with them: ${this.cannot.map(([, what]) => what).join("; ")}. A request for one gets what the model was taught then. Retrain to add them.`);
   }
@@ -323,7 +394,7 @@ export class DecideAdapter implements LlmAdapter {
   }
 
   /** The program for a request and the forms known, and how sure the model is. */
-  async translate(request: string, all: string[], o: { draft?: boolean; facts?: Omit<FormFacts, "line">[]; who?: string } = {}): Promise<{ program: string; sure: number; ms: number; unsure?: object; asked?: boolean; withheld?: Withheld; wrote?: string; shown?: { forms: string[]; of: number } }> {
+  async translate(request: string, all: string[], o: { draft?: boolean; facts?: Omit<FormFacts, "line">[]; who?: string } = {}): Promise<{ program: string; sure: number; ms: number; unsure?: object; asked?: boolean; withheld?: Withheld; wrote?: string; shown?: { forms: string[]; of: number }; trial?: string[] }> {
     // More forms than the reader takes (subset.ts): the request goes with as many of them as fit, the asker's own
     // office's first, then those whose words the request shares. The request itself is never cut or changed; one
     // that is too long with no form at all is asked back as before.
@@ -341,7 +412,7 @@ export class DecideAdapter implements LlmAdapter {
       for (let at = input.indexOf("\n"); at >= 0; at = input.indexOf("\n", at + 1)) breaks.push(ps.findIndex((p) => p.at[0] > at));
       // Where each piece stands goes too: a model whose reader has tokens of its own reads the input by them, and
       // answers in pieces as every model does.
-      a = await this.ask({ pieces: ps.map((p) => p.text), breaks, at: ps.map((p) => p.at) });
+      a = await this.ask({ pieces: ps.map((p) => p.text), breaks, at: ps.map((p) => p.at), head: request.length });
       // (Too long for the reader, with forms still shown: one fewer, the last by the rule. An answer of more
       // decisions than the model has places for is also "too long", and showing fewer forms does not help it.)
       if (!(a.too_long && n > 0 && reader.most !== undefined && a.read > reader.most)) break;
@@ -386,7 +457,19 @@ export class DecideAdapter implements LlmAdapter {
     // it passes its own per-form mark, whatever the model as a whole scores), that list is the one: a form taught and not
     // yet released is recorded as one never taught is (`form_unseen`), and the translator behind drafts for the world.
     if (shown && o.who) this.subsetFor.add(o.who);
-    if (!withheld && !/^none\(\w+\)$/.test(program)) {
+    // A model that reads forms by name (`cards`) is released by kind, not form by form (the owner's ruling,
+    // 2026-10-23): a draft is offered if each of its functions is released, every field of each form it fills is of a
+    // released kind, and each form it fills was taught or is past its trial. Otherwise it is recorded and the
+    // translator behind drafts. (Fewer forms shown than the asker knows of still goes behind, as for any model.)
+    let trial: string[] | undefined;
+    if (this.decoding === "cards" && !(this.o.unreleased ?? !!process.env.OIKOS_DECIDE_UNRELEASED) && !withheld && !/^none\(\w+\)$/.test(program)) {
+      const k = byKind(program, forms, this.released, (f) => this.passed(f, reader.trained));
+      trial = k.trial;
+      if (shown) withheld = "forms_subset";
+      else if (k.withheld) withheld = k.withheld;
+      if (withheld) program = "none(unclear)";
+    }
+    if (this.decoding !== "cards" && !withheld && !/^none\(\w+\)$/.test(program)) {
       const filled = [...program.matchAll(/\bform=([\w.-]+)/g)].map((m) => m[1]!);
       // (The forms the folder says are released, where it says; else those it was taught; else, for an asker whose forms
       // were once a subset, any.)
@@ -397,7 +480,7 @@ export class DecideAdapter implements LlmAdapter {
       if (withheld) program = "none(unclear)";
     }
     this.answers.push({ sure: a.sure, ms: a.ms, program, steps: a.steps.length, ...(a.parts ? { parts: a.parts } : {}), ...(unsure ? { unsure } : {}), ...(shown ? { shown } : {}) });
-    return { program, sure: a.sure, ms: a.ms, ...(unsure ? { unsure } : {}), ...(asked ? { asked } : {}), ...(withheld ? { withheld, ...(wrote !== program ? { wrote } : {}) } : {}), ...(shown ? { shown } : {}) };
+    return { program, sure: a.sure, ms: a.ms, ...(unsure ? { unsure } : {}), ...(asked ? { asked } : {}), ...(withheld ? { withheld, ...(wrote !== program ? { wrote } : {}) } : {}), ...(shown ? { shown } : {}), ...(withheld === "probation" && trial?.length ? { trial } : {}) };
   }
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
@@ -411,12 +494,12 @@ export class DecideAdapter implements LlmAdapter {
     // (What whoever asks says of each form, beside its line: whether it is the asker's own office's, and what it is
     // for. Facts behind the prompt, in the order of its forms; without them every form is anyone's.)
     const said = Array.isArray(req.context?.forms) && req.context.forms.length === forms.length ? (req.context.forms as Omit<FormFacts, "line">[]) : undefined;
-    const { program, unsure, asked, sure, ms, withheld, wrote, shown: sub } = await this.translate(request, forms, { draft: !this.o.first && !!who && this.askedBack.has(who), ...(said ? { facts: said } : {}), ...(who ? { who } : {}) });
+    const { program, unsure, asked, sure, ms, withheld, wrote, shown: sub, trial } = await this.translate(request, forms, { draft: !this.o.first && !!who && this.askedBack.has(who), ...(said ? { facts: said } : {}), ...(who ? { who } : {}) });
     if (who) asked ? this.askedBack.add(who) : this.askedBack.delete(who);
     // (With another translator behind it, its answer says how sure it was, how long it took and why it offers no
     // draft where it offers none: the arrangement routes on that, and the transcript keeps it. Whole numbers, as
     // everything in a log is: sureness in parts per million, time in milliseconds.)
-    const more = this.o.first ? { sure_ppm: Math.round(sure * 1e6), ms: Math.round(ms), ...(withheld ? { withheld } : {}), ...(wrote !== undefined ? { wrote } : {}), ...(sub ? { forms_shown: sub.forms, forms_of: sub.of } : {}) } : {};
+    const more = this.o.first ? { sure_ppm: Math.round(sure * 1e6), ms: Math.round(ms), ...(withheld ? { withheld } : {}), ...(wrote !== undefined ? { wrote } : {}), ...(sub ? { forms_shown: sub.forms, forms_of: sub.of } : {}), ...(trial ? { trial } : {}) } : {};
     return { content: [{ type: "tool_use", id: "decide", name: req.tools?.[0]?.name ?? "call", input: { program, ...(unsure ? { unsure } : {}), ...more } }], usage: { input_tokens: 0, output_tokens: 0 }, estimated: true };
   }
 

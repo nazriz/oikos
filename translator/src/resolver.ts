@@ -25,7 +25,11 @@ export interface StructureTypeInfo {
 }
 
 /** A resolution: the participant's acts, or questions for the participant (and, when the call itself broke the contract, what was wrong, for the log). */
-export type Resolution = { ok: true; blocks: Block[] } | { ok: false; questions: string[]; invalid?: string[] };
+export type Resolution = { ok: true; blocks: Block[] } | { ok: false; questions: string[]; invalid?: string[]; ambiguous?: Ambiguity[] };
+
+/** The resolver's answer to a name the seat knows more than one by, in a world whose people have names
+ * (docs/design/names-and-dates.md section 4): every candidate, and what tells each apart on the seat's own file. */
+export interface Ambiguity { label: "ambiguous"; name: string; for: string; candidates: { id: string; known_by: string[] }[] }
 
 /** Fixed texts for the translator's refusal labels (§11.1). */
 export const LABEL_TEXT: Record<calls.Label, string> = {
@@ -38,9 +42,20 @@ export const LABEL_TEXT: Record<calls.Label, string> = {
   no_such_act: "Nothing here does that as such. If it is for someone else to see to, direct them in writing, on their form for it if they have one.",
   // (Said of the request alone: nothing is looked up to say it, so it tells the caller nothing it didn't know.)
   look_first: "That needs something found out first. Look it up (in your own papers, or by asking whoever keeps it), then say what is to be done, naming each paper by its id.",
+  // (The resolver's own answer, never a translator's: the translator does not know who exists. Given alone, with no
+  // candidates, it says only this.)
+  ambiguous: "More than one of those you know of goes by that name. Name the one you mean by their id.",
 };
 
 class Ask extends Error {}
+/** A name that could be more than one of those the seat knows of: the question, and the answer as data. */
+class Ambiguous extends Ask {
+  constructor(question: string, readonly answer: Ambiguity) {
+    super(question);
+  }
+}
+/** Written as an id is written (lowercase letters, digits and `_.:/-`), not as a name. */
+const writtenAsId = (x: string): boolean => /^[a-z0-9_.:\/-]+$/.test(x);
 /** An id as the contract writes one (common.schema.json: a chosen id, a minted one, a cell, a space), or a name bound
  * in the same act. Anything else written where an id goes can never be recorded: it is asked about, with what it is. */
 const WRITTEN_ID = /^([a-z][a-z0-9_-]{0,63}|(ent|acc|str|rec|act|msg|par|pos|cnd)\.[0-9]{1,15}|cell\.[0-9]{1,6}\.[0-9]{1,6}|([a-z][a-z0-9_-]{0,63}|str\.[0-9]{1,15})\/[a-z][a-z0-9_-]{0,63}\.[0-9]{1,6})$/;
@@ -86,6 +101,8 @@ export const durationWords = forms.durationWords;
 
 /** Resolve a program. `typeOf` gives a structure type from the world's catalogue, for building on a lot. */
 export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined, as?: string, o: { /** The program was written by a translator from a request in words: a practice's and an offer's amounts and lengths of time are as the request wrote them (a code participant's are the smallest unit and whole seconds already). */ written?: boolean } = {}): Resolution {
+  // (`ambiguous` is the resolver's answer: a translator that writes it has said something it cannot know.)
+  if ("none" in program && program.none === "ambiguous") return { ok: false, questions: [LABEL_TEXT.unclear], invalid: ["`ambiguous` answers a name known by more than one; it is never written for a request"] };
   if ("none" in program) return { ok: false, questions: [LABEL_TEXT[program.none]] };
   if (calls.programText(program).length > 65536) return { ok: false, questions: [LABEL_TEXT.too_much] };
   const invalid = calls.contractErrors(program);
@@ -96,16 +113,18 @@ export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: str
   r.asWritten = !!o.written;
   const blocks: Block[] = [];
   const questions: string[] = [];
+  const ambiguous: Ambiguity[] = [];
   for (const line of program.lines) {
     try {
       blocks.push(...r.line(line.call, line.bind));
     } catch (e) {
-      if (e instanceof Ask) questions.push(e.message);
+      if (e instanceof Ambiguous) questions.push(e.message), ambiguous.push(e.answer);
+      else if (e instanceof Ask) questions.push(e.message);
       else if (e instanceof calls.UnitError) questions.push(`${e.message}. Please say it another way.`);
       else throw e;
     }
   }
-  if (questions.length) return { ok: false, questions };
+  if (questions.length) return { ok: false, questions, ...(ambiguous.length ? { ambiguous } : {}) };
   if (blocks.length > 32) return { ok: false, questions: [LABEL_TEXT.too_much] };
   return { ok: true, blocks };
 }
@@ -155,13 +174,26 @@ class Resolver {
       return v.id;
     }
     if ("var" in v) return `$${v.var}`;
-    if (named !== undefined) {
-      const found = this.k.byName(named);
-      if (found.length === 1) return found[0];
-      if (found.length > 1) throw new Ask(`More than one ${what} is called "${named}": ${found.join(", ")}. Which one?`);
-      throw new Ask(`You don't know of anyone or anything called "${named}" (for ${what}).`);
-    }
+    if (named !== undefined) return this.named(named, what);
     throw new Ask(`${what} should name something, not ${"json" in v ? "data" : "a call"}.`);
+  }
+  /** Who or what a name the seat wrote is, among those it knows of (`Knowledge.byName`): the one it knows by that
+   * name. Else a question: in a world whose people have names (docs/design/names-and-dates.md section 4), a name it
+   * knows more than one by is answered `ambiguous`, with every candidate and what tells each apart on its own file,
+   * and no guess is made; one it knows nobody by is not on file (never looked up anywhere else). In the old towns,
+   * the questions they always had. (The other resolver's `named`, word for word.) */
+  private named(n: string, what: string): string {
+    const found = this.k.byName(n);
+    if (found.length === 1) return found[0]!;
+    if (found.length === 0 && this.k.named) throw new Ask(this.asPost !== undefined ? `No ${n} is on file with this office.` : `No ${n} is on your file.`);
+    if (found.length === 0) throw new Ask(`You don't know of anyone or anything called "${n}" (for ${what}).`);
+    if (!this.k.named) throw new Ask(`More than one ${what} is called "${n}": ${found.join(", ")}. Which one?`);
+    const candidates = found.map((id) => ({ id, known_by: this.k.knownBy(id) }));
+    // (A post by its id: its name would be its organisation's.)
+    const who = (id: string) => (this.k.positionWords.has(id) ? id : this.k.name(id));
+    const said = candidates.map((c) => (c.known_by.length ? `${who(c.id)}, ${c.known_by.join(", ")}` : `${who(c.id)}, with nothing on your file to tell them apart but the id`));
+    const last = said.pop()!;
+    throw new Ambiguous(`Which "${n}" do you mean (for ${what})? You know of ${found.length} by that name: ${said.join("; ")}; or ${last}. Name the one you mean by their id.`, { label: "ambiguous", name: n, for: what, candidates });
   }
   /** What the act cites: one record as any id is written, or a list of records, passed on in the order given. In a
    * list, a name bound on a line of the program is that line's record, and anything not written as an id is a name
@@ -179,16 +211,11 @@ class Resolver {
       const ref = this.bound.has(x) ? x : undefined;
       let id: string;
       if (ref !== undefined) id = `$${ref}`;
-      else if (/^[a-z0-9_.:\/-]+$/.test(x)) {
+      else if (writtenAsId(x)) {
         if (!ID_SHAPE.test(x)) throw new Ask(notAnId(x, "basis"));
         id = x;
       }
-      else {
-        const found = this.k.byName(x);
-        if (found.length === 0) throw new Ask(`You don't know of anyone or anything called "${x}" (for basis).`);
-        if (found.length > 1) throw new Ask(`More than one basis is called "${x}": ${found.join(", ")}. Which one?`);
-        id = found[0]!;
-      }
+      else id = this.named(x, "basis");
       if (!out.includes(id)) out.push(id);
     }
     if (out.length === 0) throw new Ask("basis should name at least one record.");
@@ -243,6 +270,8 @@ class Resolver {
     if (v === undefined) return undefined;
     if ("json" in v) {
       if (!Array.isArray(v.json) || !v.json.every((x) => typeof x === "string")) throw new Ask(`${key} should be a list of names or ids.`);
+      // (In a world whose people have names, one written as a name in the list is one of those the seat knows.)
+      if (this.k.named) return (v.json as string[]).map((x) => (x.startsWith("$") || writtenAsId(x) ? x : this.named(x, key)));
       return v.json as string[];
     }
     return [this.id(c, key)!];
