@@ -8075,3 +8075,21 @@ fails every time, not now and then: the property draws new cases each run, and f
   depend on the thread count (the kernel's tests and the port gate check one thread against fourteen).
 - **Revisit if:** a lone heavy run is much slower for it (then elastic slots, PL-4, give it more tokens), or a test that
   needs several threads sets them itself.
+
+## 2026-10-25 · Foundations 2: conservation, space, capacity, figures' basis, and bounds as detectors; a plan, awaiting the owner (docs only; no code, no model called)
+
+- **Asked:** the owner agreed (2026-10-25) that realism gaps must become impossible at the kernel and platform layer,
+  not fixed one at a time, through five foundations; design them, and an AI economy that falls out of them.
+- **Plan:** `docs/design/foundations-2.md`. Five laws numbered on from the first foundations' seven: 8, nothing physical
+  from nothing (connections as standing flows; variables are conditions, never stocks); 9, everything is somewhere and
+  moves along a network (standing journeys, carriage, link capacity); 10, every doer's capacity stated (no implicit
+  second; template seconds, hours and hardware); 11, every figure has a basis (a figure table the kernel checks at
+  load; reach every run; reliance by screening); 12, reality bounds detect and never steer. Each with a backstop test
+  and an inventory that only shrinks, as F0 to F10 had. About 71 agent-days in six phases, plus sourcing.
+- **Why this shape:** the two laws already built this way (no god's view; all work takes time) closed their classes of
+  gap for good; the audit found the remaining gaps are quantities that escape the existing conservation of goods
+  (per-occupant variables, draws with no output, instant moves, a one-second default), not missing mechanisms.
+- **Eleven questions for the owner** are its section 9 (new hard rules; the edge's supply; equal shares under short
+  supply; baselines moving; held-out bounds; TARA's timing; WM-14's two; in-world suppliers; AI research; many towns;
+  persons licensing systems).
+- **Revisit if** the owner changes the order (TARA first), or phase 3's cost passes its stop rule.
