@@ -4,7 +4,7 @@
 // supplies.
 
 import type { Book } from "./common";
-import { MONTH_WORDS, returnRuleInWords, returnRulesOf, returnsOf, type ReturnRule } from "./returns";
+import { returnRulesOf, returnsOf, type ReturnRule } from "./returns";
 
 const DAY = 86_400;
 const YEAR = 365 * DAY;
@@ -146,30 +146,6 @@ export function withheld(law: IncomeTaxLaw | undefined, gross: number, period: n
   return { total, parts: taking.filter((c) => c.amount > 0) };
 }
 
-/**
- * The rule `withheld` reckons by, in the words a tax law gives it, so that whoever works a pay's withholding out by
- * hand from the law comes to the figure every payroll comes to. It is said step by step, with each rounding, because
- * the step people take from habit is another one: a year as a whole number of pays (26 pays of 14 days), where the
- * world's year is 365 days and a pay is its days' share of it. The two differ by a little on every pay under any
- * schedule with more than one rate (wave 2a, 2026-10-09: an opening wage instruction and a finance seat's own sum
- * stood thirty hundredths apart, and the seat withdrew eight workers' wages for it).
- * `period_days`: the pay period the words give as their example; `work_days`: the working days of a week, where pay by
- * the day is reckoned (see `dayPayPeriod`).
- */
-export function withholdingInWords(o: { period_days: number; work_days?: number }): string {
-  const d = o.period_days;
-  const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
-  const perDay = o.work_days === undefined ? undefined : dayPayPeriod(o.work_days) / DAY;
-  return [
-    "Employers withhold each from every pay. What is withheld from a pay is reckoned in three steps, and in no other way.",
-    `One: the pay is taken as a year's pay, by multiplying it by 365 and dividing by the number of days the pay is for, rounded down to the smallest unit of money. (A year is 365 days: a pay for ${days(d)} is ${d}/365 of a year's pay, and a year is not taken as a whole number of pays.)`,
-    "Two: each charge is reckoned on that year's pay as set out above, each band's part rounded down.",
-    "Three: the year's charges are added together, and that sum, multiplied by the number of days the pay is for and divided by 365, rounded down, is what is withheld from the pay.",
-    "Of what is withheld, each charge's part is its own year's amount multiplied and divided the same way, rounded down, and what that leaves over goes with the first charge that takes anything.",
-    ...(perDay === undefined ? [] : [`Pay for a day's work is taken as pay for ${Number(perDay.toFixed(4))} days: a week over its ${o.work_days} working days.`]),
-  ].join(" ");
-}
-
 /** The span a day's pay is reckoned over, for what the law takes from it: a day's pay is pay for a working day, so a
  * year's is the working days of a year of it (the week over its working days), not every day of the year. */
 export const dayPayPeriod = (workDaysAWeek: number) => Math.round((7 * 86_400) / Math.min(7, Math.max(1, workDaysAWeek)));
@@ -179,34 +155,3 @@ export function withholding(law: IncomeTaxLaw | undefined, gross: number, period
   return withheld(law, gross, period).total;
 }
 
-/** A law's charges in words, for the law's own text and for an office's report: each with what it is charged on, its
- * rates, its reliefs and where it is paid. `written` words a sum of money as the world writes it; `payee`, whom a charge
- * is paid to. */
-export function chargesInWords(charges: Charge[], written: (amount: number) => string, payee: (c: Charge) => string = (c) => c.account): string {
-  const pct = (bps: number) => `${bps / 100}%`;
-  return charges.map((c) => {
-    const b = c.base ?? {};
-    const on = b.on !== undefined ? `on the ${charges.find((x) => x.id === b.on)?.name ?? b.on} due` : "on a year's pay";
-    const less = (b.less ?? []).map((d) => ("charges" in d ? `less what is paid as ${d.charges.map((id) => charges.find((x) => x.id === id)?.name ?? id).join(", ")}`
-      : "share_bps" in d ? `less ${pct(d.share_bps)} of it${d.least !== undefined ? `, at least ${written(d.least)}` : ""}${d.most !== undefined ? `, at most ${written(d.most)}` : ""}`
-      : `less ${written(d.amount)}${d.tapers ? ` (reduced by ${pct(d.tapers.bps)} of pay above ${written(d.tapers.above)})` : ""}`));
-    const bands = [...c.schedule].sort((x, y) => x.from - y.from);
-    const rates = bands.length === 1 && bands[0]!.from === 0 && bands[0]!.rising_to_bps === undefined ? pct(bands[0]!.rate_bps)
-      // (The first band is said by where it ends, "nothing up to" or "so much up to": no law says "above nought".)
-      : bands.map((s, i) => {
-          const rate = `${pct(s.rate_bps)}${s.rising_to_bps !== undefined ? ` rising to ${pct(s.rising_to_bps)}` : ""}`;
-          if (s.from > 0) return `${rate} above ${written(s.from)}`;
-          const next = bands[i + 1];
-          return next ? `${s.rate_bps === 0 && s.rising_to_bps === undefined ? "nothing" : rate} up to ${written(next.from)}` : rate;
-        }).join(", ");
-    const reliefs = (c.reliefs ?? []).map((r) => ("none_due_up_to" in r ? `none due where that is ${written(r.none_due_up_to)} or less` : `less ${written(r.amount)} of the charge${r.tapers ? ` (reduced by ${pct(r.tapers.bps)} of pay above ${written(r.tapers.above)})` : ""}`));
-    return `${c.name ?? c.id}: ${[on, ...(b.from ? [`from ${written(b.from)}`] : []), ...(b.up_to !== undefined ? [`up to ${written(b.up_to)}`] : []), ...less].join(", ")}: ${rates}${reliefs.length ? `; ${reliefs.join("; ")}` : ""}; paid to ${payee(c)}${c.itemised ? ", reported worker by worker" : ""}`;
-  }).join(". ");
-}
-
-/** What the law says of the returns: which charges are reported together, how often, and the day each is due (returns.ts). */
-export function returnsInWords(law: IncomeTaxLaw): string {
-  const rules = returnsOf(law);
-  const name = (id: string) => law.charges.find((c) => c.id === id)?.name ?? id;
-  return `Employers report what they withheld, and pay it over with the report, in ${rules.length === 1 ? "this return" : "these returns"}: ${rules.map((r) => returnRuleInWords(r.id === "return-rest" ? { ...r, name: "Return of tax withheld from wages" } : r, (r.charges ?? []).map(name).join(", "))).join("; ")}. ${MONTH_WORDS}`;
-}

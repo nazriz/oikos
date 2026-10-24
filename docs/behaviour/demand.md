@@ -53,16 +53,30 @@ are divided among the kinds of the profile's `spending.demand`, and each sells i
   `goods` that has a `seller` keeps the single `goods` town (docs/risks.md, ME-19).
 - **How many shops of each kind.** The town's shops are divided by largest remainder: by the kinds' shares of
   businesses where every kind has one, otherwise by their shares of spending. `goods` always keeps one shop.
+- **Who works in a shop of each kind, and what they earn.** A kind's `seller.occupation` is the job its shop advertises
+  (`firm.retailer`'s `role`), and `seller.wage_vs_shop_bps` its pay as a share of the profile's shop wage
+  (`wages_per_pay_period.shop`, the retail trade's), from the place's earnings survey by industry and occupation. Each kind's
+  serving is a task of its own, `serve-<kind>` (`serve` for goods), in the world's work table.
 - **What a unit is.** Every kind's unit is what the same staff time serves (the profile's `industry.retail_labour_share_bps`
-  for goods), so a kind with a larger labour share has a smaller unit and a lower price: price = the cost of that time over
-  the kind's `labour_bps`. A service's unit is a smaller piece of work. The outside world sells each kind wholesale at
-  the price times `wholesale_bps`; `goods` keeps the figures it has without a mix.
+  for goods), so a kind with a larger labour share has a smaller unit and a lower price: price = the cost of that time
+  (at the kind's own wage) over the kind's `labour_bps`. A service's unit is a smaller piece of work. `goods` keeps the
+  figures it has without a mix.
+- **Who sells to the shops.** Each kind has wholesalers of its own in the outside world (`wholesale-<kind>`, a trader at the
+  world's price for that kind, the price `wholesale_bps` of the kind's price); `goods` and the factories' inputs are the world
+  market's. A shop sees its own kind's wholesaler and the factories' adverts.
+- **Who makes what the shops sell.** Where the profile names its main manufacturing industries (`industry.manufacturing`:
+  the product's kind, its share of the town's factories, its labour and input shares of its output and the input it uses), some
+  factories make that kind (task `make-<kind>`, from the input) and sell it to the shops of the kind; the others make `goods`.
+  The world buys each product's surplus, as it buys goods'.
+- **Complaints by kind.** `frictions.complaints_by_kind_bps` divides the yearly rate at which what is bought is found
+  faulty (`per_adult_bps_per_year.goods`) among the kinds; the opening caseload's complaints are against shops of the kinds
+  in those shares. The matter is still `goods` for every kind (the consumer desk hears only that).
 - **Sizing.** A shop expects its kind's share of what the town spends (the reckoning that sizes a shop of goods), at
   the kind's price, shared among the shops of the kind; it is staffed, stocked and given working capital from that, as a
   shop of goods is.
 - **Using a kind up.** The world's work table has a task `consume-<kind>` for each kind, and a resource of the kind.
-- **What stays one kind.** The factories make `goods`, which stands for household goods and other goods; people trading
-  on their own account sell `goods`. A shop founded in the run sells the kind of the premises it buys (ME-13, ME-19).
+- **What stays one kind.** The factories that make no named product make `goods`, which stands for household goods and other
+  goods; people trading on their own account sell `goods`. A shop founded in the run sells the kind of the premises it buys (ME-13, ME-19).
 - **Who knows what.** A household sees the prices posted at shops near it and looks up others, as before; a kind none of
   its known shops sells gets no spending that trip, and the shares are renormalised over those it can buy.
 

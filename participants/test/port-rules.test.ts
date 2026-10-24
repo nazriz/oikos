@@ -5,7 +5,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chargesOn, taxLawOf, withheld } from "../src/shared/tax";
-import { declarationFor, paymentsInWords, stopsWorkAt } from "../src/shared/payments";
+import { declarationFor, stopsWorkAt } from "../src/shared/payments";
 
 const read = (f: string) => JSON.parse(readFileSync(join(import.meta.dir, "../../contracts/test", f), "utf8"));
 
@@ -22,9 +22,8 @@ test("withholding.json: what the TS withheld and each charge took on a year's pa
   }
 });
 
-test("support.json: declarations, words and the age people stop work at", () => {
+test("support.json: declarations and the age people stop work at", () => {
   const f = read("support.json");
   for (const d of f.declarations) expect(declarationFor(d.rule, d.facts) ?? null).toEqual(d.declares);
-  for (const w of f.words) expect(paymentsInWords(w.rules, (n: number) => String(n))).toBe(w.words);
   for (const s of f.stops_work) for (const [draw, age] of s.draws) expect(stopsWorkAt(s.curve, draw) ?? null).toBe(age);
 });
