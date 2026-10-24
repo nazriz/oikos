@@ -7611,3 +7611,17 @@ that was not before: a person only lets go.
   performers have in hand and counted on each day it is done on, `kernel.rs` `begin`); the oracle now places it the same
   way, and keeps the rule that no one work is longer than a day (a second case shrunk to it while fixing the first).
   Both cases are in the regressions file; 9,000 further cases pass. Nothing in the kernel changed.
+- **10,000 people, a month, bound off and on** (all code, au-vic, `living.initiative_bps=10000`, log to `/dev/null`; the
+  same binary): peak footprint 10.30 against 10.16 GB, 80 s against 73 s, 901,494 against 900,083 steps. The bound bites
+  here: a citizen's book 121 against 91 records, the gathering notices they hold 51 against 20, the gatherings they decide
+  on each week (`decided_for`) 38 against 15, their mind's saved bytes 13.9 against 11.1 KB. But all citizens' memory
+  together is about 190 MB of a 10 GB process: **it is not what fills memory at this size.**
+- **50,000 people: not measurable as the town is now.** Both runs passed the 40 GB guard 104 s in, bound or not (44 GB
+  peak footprint): before or at the first moment, where perf-2's 50,000 town peaked at 17 GB. The generated config has
+  doubled since (1.39 GB against 660 MB: the shop mix and the kinds of shop, generator 0.64.0), and the start holds it
+  as `serde_json` values. So the 50,000 month is stopped by the start, not by what people remember, and perf-2's
+  likely cause of the daily growth (each citizen keeping every paper and gathering) was not borne out at 10,000.
+  **100,000 is not feasible on this machine** until the config is read participant by participant (performance.md's
+  ranked list, item 1); then the daily growth at 50,000 can be measured with a heap profile, as SC-1 asks.
+- **Revisit if** a heap profile at 20,000 to 50,000 shows citizens' books or minds among the largest holders (then
+  tighten `most`); or a measure of culture or recourse moves at 10,000 between bound on and off.

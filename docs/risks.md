@@ -1362,18 +1362,19 @@ The mechanism:
 
 ## Performance and scale
 
-### SC-1 · Untested past a 10,000-person year; 50,000 grows by the square
-- **Gap:** A ten-year run was never made. A 10,000-person year runs (2026-10-23, Rust world: 29 minutes, 7.8 GB, 9 GB of
-  log), but at 50,000 people memory grows about 2.8 GB a simulated day and the log 1.9 GB (some 30 to 40 times 10,000's for
-  five times the people), so a month does not fit this machine (stopped at day 16 at 45 GB); 100,000 is generated (1.56 GB
-  of config) and never run. Cause not yet confirmed by a heap profile: most likely each citizen keeping and weighing every
-  published record and gathering (docs/design/performance.md, "50,000 and 100,000 people").
-- **Where:** `docs/design/gradual-disempowerment.md` §2.6, §7; `docs/design/foundation-for-scale.md`.
+### SC-1 · Untested past a 10,000-person year; 50,000 no longer starts
+- **Gap:** A ten-year run was never made. A 10,000-person year runs (2026-10-23, Rust world: 29 minutes, 7.8 GB). At
+  50,000 people the start alone now passes 40 GB (2026-10-24: 44 GB in 104 s, bound or not), since the generated config
+  doubled (1.39 GB of JSON, held whole as `serde_json` values); before that, memory grew 2.8 GB a simulated day. 100,000
+  is not feasible. Citizens' memory of public goings-on is now bounded (`citizen/memory.rs`), but at 10,000 people it is
+  about 190 MB of a 10 GB process, so it is not the main cause; the daily growth's cause is still unprofiled.
+- **Where:** `docs/design/performance.md`; `docs/design/foundation-for-scale.md`; docs/decisions.md 2026-10-24
+  ("A review never answered ... a bounded memory").
 - **Effect:** Any study planned "at scale" rests on estimates.
-- **L / I:** high / medium · **Status:** to fix (probes R1 to R4)
+- **L / I:** high / medium · **Status:** to fix: read the config participant by participant (performance.md item 1),
+  then a heap profile at 20,000 to 50,000 for the daily growth.
 - **Notice by:** A run past 10,000 people slowing or running out of memory.
-- **Fix when:** Before a study at that scale: a heap profile at 20,000 to 50,000, then bound what a citizen keeps (behaviour),
-  and read the config participant by participant (performance.md's ranked list, 1 and 2); run the probes R1 to R4.
+- **Fix when:** Before a study at that scale.
 
 ### SC-2 · Resume replays from the start
 - **Gap:** No mid-run checkpoint; resume replays the whole log; resume against a real model is untested.
