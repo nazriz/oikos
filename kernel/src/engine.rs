@@ -359,6 +359,10 @@ pub struct Engine<W: Write> {
     run_end: i64,
     round: Option<Round>,
     rounds_at: (i64, u32),
+    /// The calls each code actor made in this moment that did not resolve (unit key, program text), by moment: the
+    /// same unresolved call again in the same moment ends that actor's wake (its mind decides the same from the same
+    /// view, so going on would ask it forever: lv-10, 2026-10-25). Transient: a snapshot is taken between moments.
+    unresolved_at: (i64, BTreeSet<(String, String)>),
     /// Wakes of the engine's own actors by why they woke (not state: no result depends on it, and a resumed run counts afresh).
     wakes_by: std::collections::BTreeMap<String, u64>,
     /// Failures of its own actors recovered in place (`participant_error` notes), for the run's summary.
@@ -563,6 +567,7 @@ impl<W: Write> Engine<W> {
             run_end: base.run_end,
             round: None,
             rounds_at: (-1, 0),
+            unresolved_at: (-1, BTreeSet::new()),
             wakes_by: Default::default(),
             failures: 0,
             questions: vec![],
@@ -1519,6 +1524,17 @@ impl<W: Write> Engine<W> {
                             data["invalid"] = json!(invalid);
                         }
                         self.note(&pid, data)?;
+                        // (A code actor that asks the same unresolvable thing again in the same moment has nothing
+                        // new to go on: its wake ends, as if it had decided nothing now. A seat is answered by its host.)
+                        if !seat {
+                            let now = self.run.kernel().t();
+                            if self.unresolved_at.0 != now {
+                                self.unresolved_at = (now, BTreeSet::new());
+                            }
+                            if !self.unresolved_at.1.insert((key.to_string(), text)) {
+                                return Ok((false, false, None));
+                            }
+                        }
                         Ok((true, false, None))
                     }
                 }

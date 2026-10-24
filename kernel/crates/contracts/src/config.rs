@@ -52,6 +52,11 @@ pub struct Config {
     /// Dials of a living world (docs/design/ai-citizens.md 10j). Opaque to the kernel; absent, every dial is off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dials: Option<BTreeMap<String, Value>>,
+    /// The world's calendar (contracts/world-config.schema.json `calendar`; docs/design/names-and-dates.md section 5).
+    /// Opaque to the kernel, which keeps time in seconds; the engine's actors and the seat-side tools read it. Absent:
+    /// dates are "year N, day D". (Missing here until 2026-10-24, so a town with `calendar: true` could not start.)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar: Option<Value>,
     /// Enforced by the orchestrator; the kernel only records it.
     pub orchestration: Value,
 }

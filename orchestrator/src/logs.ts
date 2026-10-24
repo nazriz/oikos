@@ -24,7 +24,7 @@ export const debriefsBeside = (log: string) => log.replace(/\.jsonl(\.zst)?$/, "
 /** The file beside a run's log that holds its citizens' decisions, captured for training (docs/citizen-data.md). */
 export const citizensBeside = (log: string) => log.replace(/\.jsonl(\.zst)?$/, ".citizens.jsonl.zst");
 
-export const isLog = (file: string) => (file.endsWith(".jsonl") || file.endsWith(".jsonl.zst")) && !/\.debriefs\.jsonl$/.test(file) && !/\.citizens\.jsonl\.zst$/.test(file) && !/\.anchors\.jsonl(\.zst)?$/.test(file) && !/translator-corpus\.jsonl$/.test(file) && !isStoppedLog(file);
+export const isLog = (file: string) => (file.endsWith(".jsonl") || file.endsWith(".jsonl.zst")) && !/\.debriefs\.jsonl$/.test(file) && !/\.calls\.jsonl$/.test(file) && !/\.citizens\.jsonl\.zst$/.test(file) && !/\.anchors\.jsonl(\.zst)?$/.test(file) && !/translator-corpus\.jsonl$/.test(file) && !isStoppedLog(file);
 
 /** A run's id from its log file's name. */
 export const runOf = (file: string) => file.split("/").at(-1)!.replace(/\.jsonl(\.zst)?$/, "");

@@ -30,6 +30,7 @@ import { logToResume, recordedCalls, prepareResume, Serving } from "./resume";
 import { ORCHESTRATOR_VERSION, runWorld, RunStuck, type RunOptions, type RunSummary } from "./run";
 import type { LlmAdapter } from "@oikos/participants/llm";
 import { stallMs, Watchdog } from "./watchdog";
+import { callRecorder } from "./experiment-seats";
 
 /** A world file (JSON or YAML), with `--set path=value` overrides applied, generated if it's a spec. */
 export async function loadWorld(path: string, sets: string[] = []): Promise<{ config: any; spec?: any; generator?: string }> {
@@ -177,6 +178,12 @@ export async function runOne(o: { debriefWording?: string; world?: string; seed?
   const arrangement = translatorArrangement(o);
   const first = o.translatorFirst ? chooseModel(o.translatorFirst, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl, first: true }) : undefined;
   await (first?.adapter as { ready?: () => Promise<void> } | undefined)?.ready?.();
+  // Every call a model is actually asked (not one served again from a resumed run's log) is recorded apart from the log,
+  // as an experiment's forks are (experiment-seats.ts callRecorder): `<runId>.calls.jsonl` beside it, per call its
+  // subject, purpose, model, tokens, cost, wall time and error; cost.json sums them (`calls`). Wall time is kept out of
+  // the log, which is what the world did; this is how the calls went. A run with no model (the mock) records nothing.
+  const calls = callRecorder(join(out, `${runId}.calls.jsonl`), { seed: Number(config.seed), arm: "run", seat: "" });
+  const named = (m: { adapter: LlmAdapter }, name: string) => calls.wrap(m.adapter, name);
   const serve = (a: LlmAdapter) => (serving ? serving.wrap(a) : a);
   // The composing models, for real, where the run asks and the world has a mix (docs/behaviour/founding.md): each
   // under the run's one spending limit. (A model reached through a command-line tool is given two minutes an
@@ -194,10 +201,10 @@ export async function runOne(o: { debriefWording?: string; world?: string; seed?
   let s: RunSummary;
   try {
     s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.captureCitizens !== undefined ? { captureCitizens: o.captureCitizens === "on" } : {}), ...(o.resume ? { resumed: true } : {}), ...(debriefWording ? { debriefWording } : {}), ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions !== undefined && recordDecisions !== "full" ? { recordDecisions } : {}),
-      ...(real ? { adapter: serve(real.adapter), prices: { ...real.prices, ...(tr?.prices ?? {}), ...(first?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : first ? { prices: first.prices } : {}),
-      ...(tr ? { translatorAdapter: serve(tr.adapter) } : {}),
-      ...(first ? { translatorFirst: serve(first.adapter), translatorArrangement: arrangement } : {}),
-      ...(composers.length ? { composerAdapters: new Map(composers.map((c) => [c.name, serve(c.adapter)])), prices: { ...(real?.prices ?? {}), ...(tr?.prices ?? {}), ...(first?.prices ?? {}), ...Object.assign({}, ...composers.map((c) => c.prices)) }, ...(oneBudget ? { budget: oneBudget } : {}) } : {}),
+      ...(real ? { adapter: serve(named(real, o.model!)), prices: { ...real.prices, ...(tr?.prices ?? {}), ...(first?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : first ? { prices: first.prices } : {}),
+      ...(tr ? { translatorAdapter: serve(named(tr, o.translatorModel!)) } : {}),
+      ...(first ? { translatorFirst: serve(named(first, o.translatorFirst!)), translatorArrangement: arrangement } : {}),
+      ...(composers.length ? { composerAdapters: new Map(composers.map((c) => [c.name, serve(named(c, c.name))])), prices: { ...(real?.prices ?? {}), ...(tr?.prices ?? {}), ...(first?.prices ?? {}), ...Object.assign({}, ...composers.map((c) => c.prices)) }, ...(oneBudget ? { budget: oneBudget } : {}) } : {}),
       ...(serving ? { resumedFrom: { log: basename(stoppedLog!), serving } } : {}) });
   } catch (e) {
     const err = e as Error;
@@ -219,6 +226,29 @@ export async function runOne(o: { debriefWording?: string; world?: string; seed?
 /** Leave a note in a run's folder that its measures failed, for whatever looks at the folder later (the pilot queue's status, alerts and report). */
 function noteMeasureFailed(out: string, why: string): void {
   try { writeFileSync(join(out, MEASURE_FAILED_FILE), `${why}\n`); } catch { /* (the folder is out of reach: the failure is still in problems) */ }
+}
+
+/**
+ * cost.json with how the calls went: the `<run>.calls.jsonl` files in the folder (every call a model was actually asked,
+ * across every attempt of a resumed run) summed by model, by model and purpose, and by subject, with wall time (p50,
+ * p95, max, total) and errors. Unchanged when no call was recorded (a mock run, or a run from before 2026-10-24).
+ */
+export function withCalls<T extends object>(json: T, out: string): T & { calls?: unknown } {
+  // (Not the adapters' own ledgers, `decide.calls.jsonl` and `claude-code.calls.jsonl`, which hold other fields.)
+  const files = existsSync(out) ? readdirSync(out).filter((f) => f.endsWith(".calls.jsonl") && !/^(decide|claude-code|codex)\.calls\.jsonl$/.test(f)).sort() : [];
+  const lines: any[] = files.flatMap((f) => readFileSync(join(out, f), "utf8").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return undefined; } }).filter(Boolean));
+  if (!lines.length) return json;
+  const q = (xs: number[], p: number) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(p * xs.length))]! : null);
+  const group = (key: (x: any) => string) => {
+    const by: { [k: string]: any[] } = {};
+    for (const x of lines) (by[key(x)] ??= []).push(x);
+    return Object.fromEntries(Object.entries(by).sort(([a], [b]) => a.localeCompare(b)).map(([k, xs]) => {
+      const ok = xs.filter((x) => !x.error), ms = ok.map((x) => Number(x.ms) || 0);
+      const sum = (f: string) => xs.reduce((a, x) => a + (Number(x[f]) || 0), 0);
+      return [k, { calls: ok.length, errors: xs.length - ok.length, input_tokens: sum("input_tokens"), cache_read_tokens: sum("cache_read_tokens"), cache_write_tokens: sum("cache_write_tokens"), output_tokens: sum("output_tokens"), cost_usd: sum("cost_microusd") / 1e6, ms: { p50: q(ms, 0.5), p95: q(ms, 0.95), max: ms.length ? Math.max(...ms) : null, total: ms.reduce((a, b) => a + b, 0) } }];
+    }));
+  };
+  return { ...json, calls: { files, total: group(() => "all").all, by_model: group((x) => String(x.model)), by_model_and_purpose: group((x) => `${x.model} ${x.purpose}`), by_subject: group((x) => String(x.subject)) } };
 }
 
 /**
@@ -258,7 +288,7 @@ export async function afterResume(rec: RunRecord, o: { translatorModel?: string;
       const cost = await costReport(measureDir, { translatorModel: o.translatorModel });
       const shown = withPlatformOverrun(cost, [rec]);
       writeFileSync(join(out, "cost.txt"), `${shown.text}\n`);
-      writeFileSync(join(out, "cost.json"), JSON.stringify(shown.json, null, 2));
+      writeFileSync(join(out, "cost.json"), JSON.stringify(withCalls(shown.json, out), null, 2));
       costText = shown.text;
       rmSync(join(out, MEASURE_FAILED_FILE), { force: true });
     } catch (e) {
@@ -545,7 +575,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     const cost = await costReport(measureDir, { translatorModel: o.translatorModel });
     const shown = withPlatformOverrun(cost, runs);
     writeFileSync(join(out, "cost.txt"), `${shown.text}\n`);
-    writeFileSync(join(out, "cost.json"), JSON.stringify(shown.json, null, 2));
+    writeFileSync(join(out, "cost.json"), JSON.stringify(withCalls(shown.json, out), null, 2));
     result.measureDir = measureDir;
     result.costText = shown.text;
     rmSync(join(out, MEASURE_FAILED_FILE), { force: true });
