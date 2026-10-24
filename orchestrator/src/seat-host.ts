@@ -150,7 +150,8 @@ export class ModelSeat {
     const resolver = async (req: any, program0: calls.Program) => {
       const named = this.performers(program0);
       if (named.told?.length) return { ok: false, questions: named.told } as any;
-      const e = o.world.resolve(req.participant, calls.programText(named.program), req.as);
+      // (With the names its reports printed beside ids, where the world has names: option (b), 2026-10-25.)
+      const e = o.world.resolve(req.participant, calls.programText(named.program), req.as, cfg.names === true ? Object.fromEntries(this.knowledge.names) : undefined);
       return (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}) }) as any;
     };
     const tio = (adapter: LlmAdapter): LlmIO => ({ ...io, adapter });

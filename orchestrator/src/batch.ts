@@ -22,6 +22,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { basename, join, resolve } from "node:path";
 import { exportLogs, MEASURE_VERSION } from "@oikos/measure";
 import { costReport } from "./cost";
+import { shareText, translatorShare } from "./pilot-report";
 import { chooseModel } from "./models";
 import { KernelDied, KernelLogFailed, kernelBinary } from "./kernel";
 import { MEASURE_FAILED_FILE } from "./pilot-state";
@@ -283,6 +284,16 @@ export function withPlatformOverrun<T extends { text: string }>(cost: T, runs: {
  * fails here is said and never undoes the run. (2026-10-09: a resumed pilot's cost.txt said no model had been called,
  * against 18.54 recorded in its log, and its log stayed 175 MB plain.)
  */
+/** The cost summary with the share of requests the translator behind drafted (the owner, 2026-10-25: shown in every
+ * run's cost summary, to be shrunk by each retrain). Unchanged where no request had two translators. */
+async function withShare<T extends { text: string; json: any }>(shown: T, logs: string[]): Promise<T> {
+  let a: Awaited<ReturnType<typeof translatorShare>>;
+  try { a = await translatorShare(logs); } catch { return shown; }
+  if (!a) return shown;
+  const share = { first: a.first, behind: a.behind, requests: a.requests, answered_by_first: a.answered_by_first, handed_behind: a.handed_behind, behind_share: a.behind_share, drafts_behind_share: a.drafts_behind_share, handed_behind_why: a.handed_behind_why };
+  return { ...shown, text: `${shown.text}\nTranslator: drafted behind (${a.behind}): ${shareText(a)}; first ${a.first}.`, json: { ...shown.json, translator_share: share } };
+}
+
 export async function afterResume(rec: RunRecord, o: { translatorModel?: string; measure?: boolean; compress?: boolean; log?: (line: string) => void } = {}): Promise<{ logPath: string; costText?: string; problems: string[] }> {
   const out = resolve(rec.logPath, "..");
   const problems: string[] = [];
@@ -294,7 +305,7 @@ export async function afterResume(rec: RunRecord, o: { translatorModel?: string;
       rmSync(measureDir, { recursive: true, force: true });
       await exportLogs(logs, measureDir);
       const cost = await costReport(measureDir, { translatorModel: o.translatorModel });
-      const shown = withPlatformOverrun(cost, [rec]);
+      const shown = await withShare(withPlatformOverrun(cost, [rec]), logs);
       writeFileSync(join(out, "cost.txt"), `${shown.text}\n`);
       writeFileSync(join(out, "cost.json"), JSON.stringify(withCalls(shown.json, out), null, 2));
       costText = shown.text;
@@ -585,7 +596,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     rmSync(measureDir, { recursive: true, force: true });
     await exportLogs(runs.map((r) => r.logPath), measureDir);
     const cost = await costReport(measureDir, { translatorModel: o.translatorModel });
-    const shown = withPlatformOverrun(cost, runs);
+    const shown = await withShare(withPlatformOverrun(cost, runs), runs.map((r) => r.logPath));
     writeFileSync(join(out, "cost.txt"), `${shown.text}\n`);
     writeFileSync(join(out, "cost.json"), JSON.stringify(withCalls(shown.json, out), null, 2));
     result.measureDir = measureDir;
