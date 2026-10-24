@@ -145,8 +145,36 @@ fn world(args: &[String]) -> Result<(), String> {
         println!("{}", h.finish()?);
         return Ok(());
     }
-    let log = std::io::BufWriter::new(std::fs::File::create(format!("{out}/{run_id}.jsonl")).map_err(|e| e.to_string())?);
+    let log = oikos_kernel::spool::Spool::new(std::fs::File::create(format!("{out}/{run_id}.jsonl")).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let (hash, e) = oikos_kernel::engine::run_code_world(config, &run_id, log, opts)?;
     println!("{{\"run_id\":{:?},\"state_hash\":{:?},\"t\":{},\"steps\":{}}}", run_id, hash, e.t(), e.steps);
+    // (For whoever measures: the run's own thread's CPU time, the critical path when the machine is shared.)
+    if let Some(ms) = thread_cpu_ms() {
+        eprintln!("main thread cpu {ms} ms");
+    }
     Ok(())
+}
+
+/// This thread's CPU time so far, in milliseconds (`clock_gettime` of the thread's CPU clock), where the platform has it.
+fn thread_cpu_ms() -> Option<i64> {
+    #[repr(C)]
+    struct Timespec {
+        tv_sec: i64,
+        tv_nsec: i64,
+    }
+    extern "C" {
+        fn clock_gettime(clock: u32, tp: *mut Timespec) -> i32;
+    }
+    #[cfg(target_os = "macos")]
+    const THREAD_CPU: u32 = 16;
+    #[cfg(target_os = "linux")]
+    const THREAD_CPU: u32 = 3;
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    return None;
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        let mut t = Timespec { tv_sec: 0, tv_nsec: 0 };
+        // SAFETY: `t` is a valid, writable timespec for the call's duration; the clock id is the platform's thread CPU clock.
+        (unsafe { clock_gettime(THREAD_CPU, &mut t) } == 0).then(|| t.tv_sec * 1000 + t.tv_nsec / 1_000_000)
+    }
 }

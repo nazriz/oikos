@@ -42,6 +42,8 @@ export interface RustOptions {
   label?: string;
   parent?: string;
   mock_seats?: boolean;
+  /** Acts not carried out (a researcher's intervention: kernel/src/engine.rs `Withhold`; docs/experiments.md). */
+  withhold?: { what: string; participant?: string; nth?: number; matter?: string; to?: string }[];
 }
 
 const need = () => {

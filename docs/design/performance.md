@@ -1,11 +1,126 @@
-# Performance: where a run's time and memory go, what was fixed, and the ambitious ideas ranked
+# Performance: where a run's time and memory go, what was fixed, and the ideas ranked
+
+Two passes. The first (below, "Before the port") measured the TypeScript world on 2026-10-17. The second, here, measures the
+Rust world after the cut-over (branch `perf-2`, 2026-10-23), fixes what it found, and ranks what is left.
+
+## The Rust world (branch `perf-2`, 2026-10-23)
+
+au-vic-2026 from `worlds/town-1000.yaml` (1,000 people; `citizens=10000` and `50000` for the larger towns),
+`living.initiative_bps=10000`, seed 1, all code, full log, `log.observations: seats` (run-one's default). Run with
+`oikos-kernel world <config> --until S` (the engine alone, its configs written by run-one or by the generator; a run-one
+of the same config ends at the same state hash, its log one line longer). The machine had a load of 12 to 28 on its 14
+cores throughout, so wall times move by a third between identical runs: beside them are instructions retired (`/usr/bin/time -l`)
+and, for the new builds, the run's own thread's CPU time (`main thread cpu`, printed by `oikos-kernel world`), which is the
+critical path. "Identical" means the same final state hash and the same log after its header line, each entry's hash and
+prev stripped (the header records the kernel's build id), for both `log.observations` settings (`seats`, and `all` at
+1,000 people). Raw notes and profiles: `.claude/perf2-runs/` on the run server (not in git).
+
+### Where the time went (the cut-over's build, 10,000 people, a month, main thread, macOS `sample`)
+
+| part | share | what it was |
+|---|---|---|
+| keeping a step's results (`Engine::keep`) | 46% | |
+| of which: decisions annotated | 18% | each checked against the Annotation schema (`jsonschema`, 7%), its integers walked again, copied whole by `json!` (8%) and dropped |
+| of which: entity records written | 15% | `World::record_target` searched the config's every participant and position for each write (9%: quadratic) |
+| looking (`start_round`'s observes) | 17% | building, and for a code actor under `seats`, encoding its observation's JSON only to read what it adds to its knowledge (5.5%) |
+| the log's writes (8 KB buffer, system calls) | 6% | |
+| threads started per round, and waiting on them | 2% + 7% | |
+| actors deciding on the main thread (rounds under 16) | 8% at 10,000, 32% at 1,000 | the behaviour code |
+
+At 1,000 people few actors wake per moment: a third of the run's own thread is actors deciding one at a time, a sixth is
+building observations, a seventh is advancing the world (physics), and the rest is carrying acts out and logging them. At
+10,000 one actor was the long pole of every parallel round: the support office (12% of the main thread waiting on it),
+searching its whole file of withholding reports and evidence for each claim's employer, and parsing the laws again.
+
+### What was fixed (each result-identical)
+
+| change | where | measured |
+|---|---|---|
+| the config's participants and record-keeping posts looked up by an index (`Statics::participant_at`, `record_keeping_at`) | world | 10,000 x 30 d: -9% instructions with the next two |
+| annotations: a subject and its data plainly of the contract (`plain_annotation`: kind, subject length, data `Opaque`) are passed without the schema (which decides everything else, with its messages; debug builds assert the schema agrees), their integers not walked twice, and not copied by `json!` | contracts, run, engine | |
+| a code actor's observation under `log.observations: seats` is not written as JSON: only what its records and cells add to its knowledge is made (`Kernel::shown`; debug builds compare with the encoder's) | kernel, run, engine | 1,000 x 30 d: -13% instructions |
+| the log is written on its own thread, a megabyte at a time (`spool.rs`; `flush` waits) | host, CLI | |
+| a thread pool kept for the process (rayon), in place of threads started per round | `pool.rs` | 10,000: main thread -10% with the one before |
+| the support office reads its file's employers on from where it left off (`Waits::employer_for`, checked against the full search in debug builds), and parses laws in place | actors (boundary) | 10,000: main thread -19% |
+| a decision's and outcome's annotation is written (canonical bytes, contract check) on the thread the actor decided on, and its value let go there when no seat is in the round | engine | 10,000: annotating 18% to 5% of the main thread; 50,000's first moment 28 to 17 GB |
+| the engine's participants share their controllers with the kernel's config, and an actor's params are a view of them (`oikos_actors::Params`), not a copy | engine, actors | 10,000 start 5.0 to 3.2 GB; a copy of the params is 2.4 GB at 10,000 people (a 10 KB JSON map is about 240 KB as `serde_json` values) |
+| `sync_units` finds a participant's units by key range, not by going through every unit | engine | 50,000 start: 192 to 69 s of main thread |
+| `oikos-kernel world` prints its main thread's CPU time; `OIKOS_SHARE_AT` sets how many actors a round shares out at least (for measuring) | CLI, engine | |
+
+Before (the cut-over's build, `34ee888c`) against after (this branch), the same LTO release build settings, one after the other:
+
+| run | before | after | |
+|---|---|---|---|
+| 1,000 people, 30 days | 20.1 s wall, 102.4 G instructions, 0.81 GB | 16.6 s, 91.3 G, 0.68 GB; main thread 13.3 s | -17% wall, -11% instructions |
+| 1,000 people, a year | 341 s wall (load 14), 1,238 G, 1.38 GB | 372 s wall (load 23 to 28), 1,054 G, 1.29 GB; main thread 220 s | -15% instructions; wall not comparable |
+| 10,000 people, 30 days | 214 s wall, 1,119 G, 6.83 GB | 135 s, 885 G, 5.30 GB; main thread 87 s | -37% wall, -21% instructions, -22% memory |
+| 50,000 people, the first minute (start and the first moment) | 243 s wall, 1,638 G, 25.9 GB | 110 s, 744 G, 17 GB footprint | -55% wall |
+
+Same state hashes before and after: 1,000 x 30 d `96eae33e5baa4155`, x 365 d `d406b85860a95327`; 10,000 x 30 d
+`2c3d4dc1ba6e9f24`; 50,000 to t=60 `64f58cbf6833de21`; and the same log bodies (digests `3cd10f04d10b056b`,
+`b207220820e7a92e`, `2bd598817b183fec`, `789ae32c789f998b`; `log.observations: all` at 1,000: `2368748c1cd1f1fb`).
+
+### A 10,000-person year
+
+One run, this branch's LTO build, at a machine load of 20 to 28: **28.7 minutes** wall (1,724 s; its own thread 937 s, all
+threads 1,513 s user), **7.8 GB peak resident** (8.2 GB footprint), **9.06 GB of log** (14.1 million lines; 1.0 GB as zstd -3),
+5,233 G instructions, 4.36 million steps; final state `dae9f7fe7fc66eeb`. On an idle machine the wall time would be nearer
+its own thread's 16 minutes plus the waits on the slowest actor of each round.
+
+### 50,000 and 100,000 people
+
+Configs made by the generator (`citizens=50000`: 50,024 participants, 660 MB of JSON; `citizens=100000`: 100,022, 1.56 GB).
+
+**50,000 people.** The start and the first moment (everyone's first look: 1.25 million log lines, 2.7 GB of log in the
+first simulated minute) take 110 s (69 s of the run's own thread; 192 s before the start was made linear) and peak at 17 GB.
+Then the town runs at about a simulated day per wall minute (load 25), writing 1.9 GB of log a day. Its memory grows by about
+2.8 GB a simulated day: 22 GB at day 3, 36 at day 9, 38 at day 14, 45 at day 16, where the run's memory guard (40 GB, so as not to
+starve the machine's other work) stopped it: 16.4 days in 16.5 minutes, 10,346 G instructions, 31 GB of log. **A month at
+50,000 does not fit on this machine as the town is now**: at that rate it would pass 60 GB by day 30, and the log would be
+about 60 GB (7 GB compressed).
+
+**100,000 people: not run.** Loading the config alone holds it as `serde_json` values (about 14 GB) before it is checked and
+read; units and the first moment would take the start past 35 GB, and the daily growth below would take it past the machine
+within days. Not feasible without the first two items below.
+
+**Why it does not scale linearly.** At 10,000 people memory grows about 70 MB a simulated day after the first month (5.3 GB
+at day 30, 8.2 GB at day 365) and the log 25 to 68 MB a day; at 50,000, 2.8 GB and 1.9 GB a day: some 30 to 40 times for
+five times the people, so about the square. CPU shows the same: the citizen's mind (`CitizenMind::gatherings`) is 12% of all
+CPU at 50,000 and `decide_rec` 8%; hashing and copying the decision annotations is 19% of the run's own thread at 50,000 against
+2% at 10,000. The likely cause (to confirm, SC-1: a heap profile, with a build on the system allocator and `malloc_history`): each
+citizen keeps every published record it reads (gathering notices, the town's boards) and weighs, and writes into each decision,
+every gathering on offer: both grow as people times the town's records. That is the mind's and the books' design (what a
+person keeps and forgets), not the engine's; bounding it (people forget old notices; a decision lists the options it weighed,
+not all of them) is behaviour, for its owners, and it is what stands between this machine and a 50,000 to 100,000-person month.
+
+### What is left, ranked (measured shares of the run's own thread, this branch)
+
+| # | idea | measured now | gain (est.) | effort | identical? |
+|---|---|---|---|---|---|
+| 1 | **Bound what a citizen keeps and weighs** (old notices forgotten, a decision's options the ones it weighed): behaviour, the mind's owners | quadratic memory and log at 50,000 (above); `gatherings` 12% of CPU | makes 50,000 for a month fit; 100,000 then likely (to confirm: SC-1) | a design talk first | **No**: behaviour |
+| 2 | **Read the config participant by participant** (validate and read each, keep its canonical bytes, never the whole as values) | the config's values ~6 GB at 50,000, ~14 GB at 100,000, before anything runs | -6 GB at 50,000's start; -14 GB at 100,000's | 2 to 3 agent-days (config load, the engine's start, the host's) | Yes (same hash, same checks, if the schema's participant part is checked alone exactly as within the whole) |
+| 3 | **The log's hash chain on its own thread** (the writer hashes and frames; the run hands over bodies) | hashing + framing the log: 2% of the main thread at 10,000, 19% at 50,000 | 2% / 15% | 1 to 2 agent-days: the anchors writer must be `Send`, and `head()`, `log_ref()` and snapshots must wait for it | Yes |
+| 4 | **Ids as integers inside the kernel** | `memcmp` 10% self at 10,000, 15% at 1,000 (string ids compared in every map) | 10 to 15% | 8 to 12 agent-days, every crate | Yes |
+| 5 | **The long pole of a parallel round**: the main thread waits 25% at 10,000 (decide threads 14%, observations made ready 11%) on a loaded machine | | 5 to 10%: build the next window of observations while the current is delivered; start the slowest actors first | 2 to 3 agent-days | Yes |
+| 6 | **Share small rounds too** (`OIKOS_SHARE_AT=4`) | at 1,000 a third of the main thread is actors deciding one at a time | main thread -10 to -15% at 1,000, but +22 to +40% instructions (the pool's spinning) and no wall time on this loaded machine | none: a setting | Yes |
+| 7 | **The world's advance** (physics: acts taking effect, leaving spaces, money moved, nature's day) | 14% of the main thread at 1,000 | 5% | 2 to 4 agent-days of profiling the world crate | Yes |
+| 8 | **Perception's build** (sites cells made per look; scopes as rectangles) | 10% of the main thread at 1,000 | 4 to 6% | 2 to 4 agent-days | Yes |
+| 9 | **A view's channel lists kept, not rebuilt** (a bank's accounts collected into a new list whenever one changes) | `View::apply` 5% at 10,000 | 3 to 5% | 2 agent-days; the actors' `Picture` changes | Yes |
+| 10 | **Profile-guided optimisation** (`llvm-tools` not installed here) | | 8 to 15% typical | 1 agent-day plus a training run | Yes |
+
+Done in this pass and so off the list: the observation builder's JSON for code actors (idea 3 of the earlier list, in the form
+that mattered: not writing it), a kept thread pool, sharing per-person settings (the controllers and params), the log's writes
+off the run's thread, annotations' checks and copies. Ideas 6 and 7 of the earlier list (do not wake people with nothing to
+do; a cheaper observation record) are decisions for the owner, as before.
+
+## Before the port: the TypeScript world (2026-10-17, branch `perf`)
 
 Written 2026-10-17 (branch `perf`). Measurements are of au-vic-2026 and gb-eng-2026 towns generated from
 `worlds/town-1000.yaml`'s shape (1,000 people: grid 40x30; 10,000: grid 128x95, ten times the buildings), with
 `living.initiative_bps=10000`, `living.friction_bps=10000`, `living.founding=true`, `opening_caseload=true`, seed 1, all-code
 (no model calls), full log. Raw numbers: `runs/perf-2026-10-17/STATUS`.
 
-## How it was measured (and why wall time is not used)
+### How it was measured (and why wall time is not used)
 
 The machine had a one-minute load of 15 to 43 throughout (cores: 14), so wall time and even user+sys vary by 30% between
 identical runs (the same 30-day, 1,000-person run: 28.9, 34.6, 40.1, 42.9, 45.1 s of CPU). The measure that does not move
@@ -13,7 +128,7 @@ is **the instructions the run's process retires** (`/usr/bin/time -l` around `ru
 counted). CPU seconds are given beside it for orientation only. "Identical" means: same final state hash, and a byte
 compare of the year's log with the hash chain stripped (the header records the build id, which changes every hash after it).
 
-## Where the time goes
+### Where the time goes
 
 **One year, 1,000 people** (wall 544 s under load; 504 CPU s; the kernel runs inside the host's process, as a native module):
 
@@ -44,7 +159,7 @@ bytes in the record would take about 1.5% off the whole run.
 **Observations are never repeats.** 1,465,221 observations in the year's log; 24 are identical to that participant's
 previous one (time is in every observation). So "do not rebuild an unchanged observation" cannot be made byte-identical.
 
-## What was fixed (each result-identical)
+### What was fixed (each result-identical)
 
 | commit | change | measured |
 |---|---|---|
@@ -70,7 +185,7 @@ final build's year at 1,000 people ends at `06469cf3549a412e...`, as the origina
 after the header match the original's body for body (`cmplogs`: hash and prev stripped). The kernel's 47 test binaries pass
 (debug builds check `whereabouts` against the full scan on every call).
 
-## Memory and log size
+### Memory and log size
 
 | | 1,000 people | 10,000 people |
 |---|---|---|
@@ -84,7 +199,7 @@ Compressed (`.zst`, the default after a run) a log is about a seventh of that. T
 (they share a process); the likely growth is the kernel's `Delivered` caches (records and buildings encoded once, never
 evicted) and the host's per-person books. That is a hypothesis, not a measurement.
 
-## Is a 3-year, 10,000-person run feasible on this machine (14 cores, 64 GB, 223 GB free)?
+### Is a 3-year, 10,000-person run feasible on this machine (14 cores, 64 GB, 223 GB free)?
 
 Yes, with a lean or compressed log, and one core.
 
@@ -98,7 +213,7 @@ Yes, with a lean or compressed log, and one core.
   40 GB stop. `--log lean` (no observation hashes, no written reasoning) or compress as it goes (idea 8). Compressed
   after the run, about a seventh: 17 GB. Not run for three years; this is 30 days measured and multiplied.
 
-## The ambitious ideas, ranked
+### The ambitious ideas, ranked
 
 Estimates are of the whole run's CPU time, from the measurements above; "identical" says whether the log can stay
 byte for byte.

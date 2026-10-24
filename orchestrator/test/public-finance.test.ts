@@ -11,7 +11,7 @@ import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
-const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+const base = { ...(Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any), shop_mix: false /* the single-goods town: this test holds a mechanism of it (docs/risks.md ME-21) */ };
 
 test("income tax: marginal rates on a year's income, a levy from its threshold, withheld per pay", () => {
   const law = taxLawOf("l", { brackets: [{ from: 0, rate_bps: 0 }, { from: 1_000_000, rate_bps: 2000 }, { from: 5_000_000, rate_bps: 4000 }], levy_bps: 100, levy_from: 2_000_000, collector: "o", account: "a" })!;

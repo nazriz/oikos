@@ -231,7 +231,7 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR> [--out file.html] [--twin DIR | --no-twin] | experiment run <spec.json|yaml|ts> --out DIR [--parallel P] [--no-slots] | experiment report <DIR> | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | view <log.jsonl[.zst]> <seq> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
+const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR> [--out file.html] [--twin DIR | --no-twin] | experiment run <spec.json|yaml|ts> --out DIR [--parallel P] [--no-slots] | experiment report <DIR> [--rebuild] | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | view <log.jsonl[.zst]> <seq> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -328,8 +328,9 @@ try {
     if (r.results.some((x) => x.error)) process.exitCode = 1;
   } else if (cmd === "experiment" && positional()[0] === "report" && positional()[1]) {
     const { readFileSync } = await import("node:fs");
-    const { reportText } = await import("./experiment");
-    console.log(reportText(JSON.parse(readFileSync(`${positional()[1]}/report.json`, "utf8"))));
+    const { rebuildReport, reportText } = await import("./experiment");
+    // (--rebuild: the report made again from the results and the registration kept with them; nothing is written.)
+    console.log(reportText(has("rebuild") ? rebuildReport(positional()[1]!) : JSON.parse(readFileSync(`${positional()[1]}/report.json`, "utf8"))));
   } else if (cmd === "explore" && (positional()[0] || process.argv.includes("--all"))) {
     // The pilot explorer (renderer/, docs/explorer.md): a run's town, people, institutions and seats' acts, served on
     // 127.0.0.1 from an index built beside the runs. The run is only read; nothing is fed back.

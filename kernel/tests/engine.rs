@@ -176,7 +176,7 @@ fn weather_steps_per_second() {
         performer: Default::default(),
         entity: "outside".into(),
         position: Some("weather-bureau".into()),
-        params: json!({ "events": events }).as_object().unwrap().clone(),
+        params: json!({ "events": events }).as_object().unwrap().clone().into(),
         world: std::sync::Arc::new(oikos_actors::WorldInfo { tick: 60, run_end: 365 * DAY, ..Default::default() }),
     };
     let mut actor = kind.create(&ctx).unwrap();

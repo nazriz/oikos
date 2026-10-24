@@ -1,0 +1,80 @@
+{
+  "name": "support-stewards",
+  "world": {
+    "file": "worlds/town-1000.yaml",
+    "sets": [
+      "years=1",
+      "opening_caseload=true"
+    ]
+  },
+  "post": "outside-support",
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "forkDay": 30,
+  "untilDay": 210,
+  "arms": [
+    {
+      "name": "code",
+      "steward": {
+        "kind": "code"
+      }
+    },
+    {
+      "name": "diligent",
+      "steward": {
+        "kind": "model",
+        "model": "mock/diligent"
+      }
+    },
+    {
+      "name": "rubber-stamp",
+      "steward": {
+        "kind": "model",
+        "model": "mock/rubber-stamp"
+      }
+    }
+  ],
+  "reference": "code",
+  "measures": [
+    "acts",
+    "records:decision_review",
+    "records:review_request",
+    "stewardship"
+  ],
+  "prices": {
+    "mock/diligent": {
+      "input": 3000000,
+      "output": 15000000
+    },
+    "mock/rubber-stamp": {
+      "input": 3000000,
+      "output": 15000000
+    }
+  },
+  "preregistration": "support-stewards.prereg.yaml",
+  "threads": 1,
+  "institutions": {
+    "public": [
+      "government",
+      "tribunal",
+      "police",
+      "school",
+      "health_service",
+      "electoral_commission",
+      "registry",
+      "audit_office"
+    ],
+    "firms": [
+      "shop",
+      "factory",
+      "landlord",
+      "builder",
+      "firm",
+      "utility",
+      "bank"
+    ]
+  }
+}

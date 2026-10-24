@@ -69,18 +69,21 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-17 at the bug hunt, a firm's owner's post: every firm with a principal shareholder of the town has an `-owners` post held abroad, so the config hashes and the states move; the towns' draws and life do not change for it before a holder leaves. 640002cd..., 0cc086d6... and 9be6db49... until then.)
 // (Re-taken once on 2026-10-18 at the merge of gd-adoption (strikes by cost, adoption by the numbers, the auditor) with the bug hunt's fixes: the generated town gained a vendor of systems, an auditor and the union's day's pay, so the config hashes and the states moved; 93e473eb..., e861d6a0... and ef1fa3d2... for the configs until then.)
 // (Re-taken on 2026-10-18 at port step 3, the config hashes only, a pin per world: the generator moved at integration (0.62.0, lane N's names and dates with the auditor's 0.61.0) and on the Rust world calls the shared rules natively (worlds/generator/rules.ts), whose town is its own; 114d1ca2..., c05933ad... and c7e0c672... until then. The TS states did not move. The Rust states are pinned beside them, from the same commit.)
-// (Re-taken once on 2026-10-24 at the guardianship of debt-risks (PB-22), the config hashes only: the town's `life` gained `majority` (the profile's youngest adult age) and `guardians` (child protection), the kernel's rule for who may take a minor out of the world; with those two fields removed the hashes are the old ones, ba713978..., b1dc6701... and 6597ecc3... The states did not move.)
+// (Re-taken once on 2026-10-24 at the guardianship of debt-risks (PB-22), the config hashes only: the town's `life` gained `majority` (the profile's youngest adult age) and `guardians` (child protection), the kernel's rule for who may take a minor out of the world; with those two fields removed the hashes are the ones debt-generic took, fcaf6597..., 3dd7883c... and 5bc6764a... (checked at the merge with main: stripped of the two fields the generated configs hash to exactly those) The states did not move.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "d67a62da6f5c18a9", "gb-eng-2026": "f4965e94177c275e", "ke-nakuru-2026": "a6e69c68a6d7fc61" }
+  ? { "au-vic-2026": "fa811113f550f30b", "gb-eng-2026": "b6ca8aff45f64863", "ke-nakuru-2026": "44f3f04f91a7ccb7" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
 // invoice's price, a household's death away from home is seen by those of it there, nobody sets off for a gathering from their work;
 // 2d57339d..., 44f157a8... and 072c2a5e... until then. The TS states did not move.)
+// (Re-taken on 2026-10-23 at debt-generic, config hashes and Rust states both: the mix of shops is the default, each kind of shop has its own premises
+// type and room, and a shop is staffed to its kind's sales (generator 0.63.0); ba713978..., b1dc6701... and 6597ecc3... for the configs, and
+// 8b9a1e90..., eac6c4b4... and 443b8875... for the states, until then. The towns' people did not change.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "8b9a1e902ee0fa843a6c4d67b73fd40b20d464caedac4c5445cb4a0782543a10",
-  "gb-eng-2026": "eac6c4b443f22bc7bf48b2c9645745ccb19975f82e98b8ee71c51782f6dddea0",
-  "ke-nakuru-2026": "443b8875f14438093e39eea5814d2a8f8b1e0519bbcb73619c642b181b595b56",
+  "au-vic-2026": "33ec652668809707919c60510d7473c31e87a3e5857e9b7777a86f55c12765d6",
+  "gb-eng-2026": "54f581f6cb3abb7fa25717930e3a97aa5acd849db064c328e8aa4f7b056e9759",
+  "ke-nakuru-2026": "076eebff269253039acec8552394a6d67f4d922924bb458d037f79ac85bfcfa2",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

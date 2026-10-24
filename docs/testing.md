@@ -39,6 +39,11 @@ invariant is about (no deaths, no payments under instructions...): an invariant 
 
 More seeds: `OIKOS_INVARIANT_SEEDS=6`; bigger towns: `OIKOS_INVARIANT_CITIZENS=200`.
 
+That file is in the slow tier (CI, on every push to main; docs/dev-machine.md, "Tiers"). The merge gate runs
+`orchestrator/test/invariants-gate.test.ts`: the same checker on 90 days of a 60-person town of each main profile, one
+seed, every observation recorded, so a broken invariant stops a merge within a minute; what takes a year (deaths,
+appointments) it leaves to the year.
+
 **What the invariants cannot see.** Whether an amount is the right amount (a wage doubled by the employer, a tax
 rounded the wrong way, a rent listed low): the log has the payment and the instruction, both wrong alike. Whether a
 law value was read from the right field, a notice period is a day short, or a draw is keyed on the right thing: those

@@ -19,6 +19,11 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { availableParallelism } from "node:os";
 import { join, resolve } from "node:path";
 import { DetachedActor, RustWorld, twinSpecs, type SeatWake } from "./rust-world";
+import { Ledger, STEWARDSHIP_MEASURES, STEWARDSHIP_NAMES, type Institutions, type StewardOfPost, type StewardshipResult } from "@oikos/measure/stewardship";
+import { bonferroni, differenceInDifferences, interval, pairedDifferences, type Interval } from "@oikos/measure/compare";
+import { comparisonKey, parsePrereg, preregHash, preregProblems, specMismatch, type Comparison, type Preregistration } from "@oikos/measure/prereg";
+import { copyFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 export const DAY = 86_400;
 
@@ -32,7 +37,12 @@ export type Steward =
   /** A model seat in the post: `model` is `provider/name` (`mock/...` for the mock policies below). */
   | { kind: "model"; model: string; effort?: string; params?: { [k: string]: unknown } };
 
-export interface Arm { name: string; steward: Steward }
+/** An act withheld in an arm (the engine's `withhold`, kernel/src/engine.rs; risk MT-19): of the acts from the fork on
+ * that publish a paper of the kind `what` (or are a block of that name), by `participant` (absent: anyone), of `matter`
+ * (its data's) and addressed `to` whom where given, the `nth`
+ * (from 1) is not carried out; its actor believes it sent it. The arm is then "the same arm without that act". */
+export interface Withhold { what: string; participant?: string; nth?: number; matter?: string; to?: string }
+export interface Arm { name: string; steward: Steward; withhold?: Withhold[] }
 
 /** How a seed's town is made: a world file (a generator spec or a config, as `oikos run` takes it), a generator spec, or a config; then `prepare`. */
 export interface WorldSource {
@@ -49,7 +59,12 @@ export interface MeasureMaker {
   name: string;
   make(ctx: MeasureContext): { see(entry: any): void; result(): number | null };
 }
-export interface MeasureContext { forkT: number; seat: string; post: string }
+export interface MeasureContext {
+  forkT: number; seat: string; post: string;
+  /** The arm's steward, and the fork's stewardship ledger's result (measure/src/stewardship.ts), read once at the end. */
+  steward?: Steward;
+  stewardship?: () => StewardshipResult;
+}
 
 export interface ExperimentSpec {
   name: string;
@@ -72,9 +87,26 @@ export interface ExperimentSpec {
   standIn?: string;
   /** The engine's own threads per run (default 1: the harness spreads forks over cores instead). */
   threads?: number;
+  /** The experiment's pre-registration (measure/src/prereg.ts; docs/experiments.md, "Pre-registration"): a file, relative
+   * to the spec file's folder (or the working folder). With one, the spec must agree with it and the report presents as
+   * primary only what it registered; without one, every comparison is exploratory. */
+  preregistration?: string;
+  /** The level of the report's intervals when nothing is registered (default 0.95). */
+  level?: number;
+  /** Which kinds of entity are public bodies and which firms, for the stewardship ledger's dependence measures (the
+   * platform names no kind of institution; without this, those measures are absent). */
+  institutions?: Institutions;
 }
 
 export const DEFAULT_MEASURES = ["acts", "records", "refused", "first_act_day", "log_entries"];
+
+/** The spec's measures, with `stewardship` standing for every measure of measure/src/stewardship.ts. */
+export function measureList(spec: ExperimentSpec): (string | MeasureMaker)[] {
+  return (spec.measures ?? DEFAULT_MEASURES).flatMap((m) => (m === "stewardship" ? STEWARDSHIP_MEASURES.map((x) => x.name) : [m]));
+}
+const wantsStewardship = (spec: ExperimentSpec) => measureList(spec).some((m) => typeof m === "string" && STEWARDSHIP_NAMES.has(m));
+/** How the stewardship ledger counts an arm's steward. */
+const stewardOf = (seat: string, s: Steward): StewardOfPost => ({ seat, kind: s.kind === "model" ? "model" : s.kind });
 
 // ---- the town of a seed
 
@@ -131,11 +163,13 @@ const tokens = (x: unknown) => Math.ceil(JSON.stringify(x).length / 4);
 const holding = (until: number): object => ({ type: "wait", until });
 
 /** The mock models: policies over the post's own code brain. `mock/diligent` acts as the code does, with the usage of a
- * model; `mock/delay:N` acts N days after the code would; `mock/skip:N` drops every Nth act (an unreliable steward). */
+ * model; `mock/delay:N` acts N days after the code would; `mock/skip:N` drops every Nth act (an unreliable steward);
+ * `mock/rubber-stamp` confirms every decision it is asked to look at again (below). */
 export function mockModel(name: string, brain: DetachedActor): SeatController {
   const [policy, arg] = name.split(":");
   const n = arg === undefined ? 0 : Number(arg);
-  if (!["diligent", "delay", "skip"].includes(policy!) || (policy !== "diligent" && !(n > 0))) throw new Error(`no mock model "mock/${name}" (mock/diligent, mock/delay:<days>, mock/skip:<n>)`);
+  if (policy === "rubber-stamp") return rubberStamp(brain);
+  if (!["diligent", "delay", "skip"].includes(policy!) || (policy !== "diligent" && !(n > 0))) throw new Error(`no mock model "mock/${name}" (mock/diligent, mock/delay:<days>, mock/skip:<n>, mock/rubber-stamp)`);
   const held: { due: number; action: object }[] = [];
   let acts = 0;
   return {
@@ -151,6 +185,53 @@ export function mockModel(name: string, brain: DetachedActor): SeatController {
         else if (held.length) action = holding(Math.min(...held.map((h) => h.due)));
       }
       return { action, usage };
+    },
+  };
+}
+
+/** Every record an observation shows, from every channel that shows records. */
+const recordsShown = (o: any): any[] => Object.values(o?.channels ?? {}).flatMap((c: any) => (Array.isArray(c?.records) ? c.records : []));
+const q = (x: string) => JSON.stringify(x);
+
+/**
+ * `mock/rubber-stamp`: a steward that confirms every decision it is asked to look at again. A request to the office to
+ * look at one of its decisions (`review_request`, addressed to the office) is taken out of what the code brain is
+ * shown, so the brain neither knows of it nor puts anything right; the steward answers it itself, at once: a record
+ * that the decision was looked at and stands (`decision_review`, outcome `upheld`) and the answer to the one who asked
+ * (`remedy_answer`, no), the same two papers the office's code writes for a decision it upholds
+ * (kernel/crates/actors/src/finance/decisions.rs, `Reconsiderations`). Everything else the office does is the code's.
+ * Answering through the brain's output instead (turning its "changed" into "upheld") would leave the brain paying what
+ * it had decided to put right: its state, not its papers, starts a payment.
+ */
+export function rubberStamp(brain: DetachedActor): SeatController {
+  const answered = new Set<string>();
+  let held: string[] = [];
+  return {
+    decide(w) {
+      const me = String(w.observation?.entity ?? "");
+      const shown = recordsShown(w.observation);
+      const isRequest = (r: any) => r?.kind === "review_request" && Array.isArray(r.addressed_to) && r.addressed_to.includes(me) && r.speaks_for !== me;
+      const fresh = shown.filter((r) => isRequest(r) && !answered.has(r.id));
+      // (What the brain sees: the same observation without the requests.)
+      const o = { ...w.observation, channels: Object.fromEntries(Object.entries(w.observation?.channels ?? {}).map(([k, c]: [string, any]) => [k, Array.isArray(c?.records) ? { ...c, records: c.records.filter((r: any) => !isRequest(r)) } : c])) };
+      const r = brain.step(o, w.woke_for, w.since);
+      for (const req of fresh) {
+        answered.add(req.id);
+        const who = String(req.speaks_for ?? ""), about = String(req.data?.about ?? "");
+        const decision = shown.find((x) => x.id === about);
+        const review = { decision: about, kind: decision?.kind ?? String(req.data?.matter ?? "decision"), request: req.id, outcome: "upheld", found: "looked at again: it stands", asked_by: who, ...(decision?.at !== undefined ? { decided_on: decision.at } : {}) };
+        const answer = { request: req.id, matter: String(req.data?.matter ?? ""), granted: false, review: "upheld", decision: about, reason: "looked at again: it stands" };
+        const basis = about || req.id;
+        held.push(`statement(basis=${basis}, data=${JSON.stringify(review)}, kind=decision_review, text=${q(`Review of ${about}, asked by ${who}: looked at again; it stands.`)}, to=[${q(who)}], visible=[${q(who)}, ${q(me)}])`);
+        held.push(`statement(basis=${req.id}, data=${JSON.stringify(answer)}, kind=remedy_answer, text=${q(`Answer to your request ${req.id}: no: looked at again; it stands.`)}, to=[${q(who)}], visible=[${q(who)}, ${q(me)}])`);
+      }
+      let action: any = r.action;
+      if (held.length && (isWait(action) || action?.type === "call")) {
+        const stamps = held.join("\n");
+        held = [];
+        action = isWait(action) ? { type: "call", call: stamps, reasoning: "Requests to look at our decisions again: each looked at; each stands." } : { ...action, call: `${action.call}\n${stamps}` };
+      }
+      return { action, usage: { input_tokens: tokens(w.observation), output_tokens: isWait(action) ? 20 : 150 } };
     },
   };
 }
@@ -192,6 +273,8 @@ const BUILTIN: { [name: string]: (arg: string | undefined, c: MeasureContext) =>
   first_record: (a, c) => { let t: number | null = null; return { see: (e) => { if (t === null && RECORDED(e) && e.body.record?.kind === a) t = e.t; }, result: () => (t === null ? null : Math.floor((t - c.forkT) / DAY)) }; },
   /** Money that moved between accounts, in cents, summed. */
   transfers_cents: () => { let n = 0; return { see: (e) => { if (e.kind === "event" && e.body?.event === "transfer") n += Number(e.body.amount) || 0; }, result: () => n }; },
+  /** Acts withheld in this fork (an arm's `withhold`): 0 where the act it names never came. */
+  withheld: () => { let n = 0; return { see: (e) => { if (e.kind === "annotation" && e.body?.annotation === "note" && e.body.data?.withheld) n++; }, result: () => n }; },
   /** Entries the log gained from the fork on. */
   log_entries: () => { let n = 0; return { see: () => { n++; }, result: () => n }; },
 };
@@ -201,7 +284,12 @@ export function makeMeasure(m: string | MeasureMaker, ctx: MeasureContext): { na
   const i = m.indexOf(":");
   const base = i < 0 ? m : m.slice(0, i), arg = i < 0 ? undefined : m.slice(i + 1);
   const f = BUILTIN[base];
-  if (!f) throw new Error(`no measure "${m}" (built in: ${Object.keys(BUILTIN).join(", ")}; or give a MeasureMaker)`);
+  if (!f && STEWARDSHIP_NAMES.has(m)) {
+    if (!ctx.stewardship) throw new Error(`measure "${m}" is the stewardship ledger's, and this fork has none`);
+    const read = ctx.stewardship;
+    return { name: m, see: () => {}, result: () => read().measures[m] ?? null };
+  }
+  if (!f) throw new Error(`no measure "${m}" (built in: ${Object.keys(BUILTIN).join(", ")}, the stewardship measures (measure/src/stewardship.ts), or "stewardship" for them all; or give a MeasureMaker)`);
   if ((base === "first_record") && !arg) throw new Error(`measure "first_record" needs a kind: first_record:<kind>`);
   return { name: m, ...f(arg, ctx) };
 }
@@ -213,6 +301,8 @@ export interface ArmResult {
   seed: number; arm: string; steward: Steward;
   stateHash: string; t: number; steps: number; wakes: number;
   measures: { [name: string]: number | null };
+  /** The stewardship ledger's detail (by office, month, supplier and institution), where the spec asked for its measures. */
+  stewardship?: Omit<StewardshipResult, "measures">;
   /** The seats' usage, from the log's own usage annotations, by seat. */
   costs: { [seat: string]: Cost };
   log?: string;
@@ -220,8 +310,8 @@ export interface ArmResult {
   error?: string;
 }
 
-interface SeedFiles { dir: string; base: string; snapshot: string; brains: string; config: string }
-const files = (dir: string): SeedFiles => ({ dir, base: join(dir, "base.oklog"), snapshot: join(dir, "snapshot.bin"), brains: join(dir, "brains.json"), config: join(dir, "config.json") });
+interface SeedFiles { dir: string; base: string; snapshot: string; brains: string; config: string; ledger: string }
+const files = (dir: string): SeedFiles => ({ dir, base: join(dir, "base.oklog"), snapshot: join(dir, "snapshot.bin"), brains: join(dir, "brains.json"), config: join(dir, "config.json"), ledger: join(dir, "ledger.json") });
 const seedDir = (out: string, seed: number) => join(out, `seed-${seed}`);
 
 /** Runs the town of a seed to the fork point and keeps what a fork needs: the snapshot, the twins' brains, the config. */
@@ -230,11 +320,15 @@ export async function runBase(spec: ExperimentSpec, seed: number, out: string): 
   mkdirSync(f.dir, { recursive: true });
   const config = await buildConfig(spec, seed);
   const forkT = spec.forkDay * DAY;
-  const w = RustWorld.start(config, { run_id: `${spec.name}-seed${seed}`, log: f.base, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stand_in: standIn(spec), label: "base" });
+  const ledger = wantsStewardship(spec) ? new Ledger({ config, from: forkT, steward: stewardOf(postHolder(config, spec.post), { kind: "code" }), ...(spec.institutions ? { institutions: spec.institutions } : {}) }) : undefined;
+  const w = RustWorld.start(config, { run_id: `${spec.name}-seed${seed}`, log: f.base, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stand_in: standIn(spec), label: "base", ...(ledger ? { stream: { cap: 4_000_000 } } : {}) });
+  // (The base's past, read into the ledger so that each fork's starts from it: systems delivered, who worked where.)
+  const pull = () => { if (ledger) for (;;) { const { entries } = w.events(); if (!entries.length) return; for (const e of entries) ledger.see(e); } };
   // (Until the fork every seat is its code twin: the same town whatever the arms later say.)
   const brains = twinSpecs(config);
   const live = new Map([...brains].map(([id, s]) => [id, new DetachedActor(s)]));
   for (;;) {
+    pull();
     const d = w.nextBy(forkT);
     if (d.due !== "seats") {
       if (d.due === "end") throw new Error(`seed ${seed}: the run ended at ${d.t} before the fork day ${spec.forkDay}`);
@@ -243,11 +337,15 @@ export async function runBase(spec: ExperimentSpec, seed: number, out: string): 
     for (const s of d.seats) w.submit(s.key, live.get(s.participant)?.step(s.observation, s.woke_for, s.since).action ?? { type: "wait" });
   }
   w.flush();
+  pull();
+  if (ledger) writeFileSync(f.ledger, JSON.stringify(ledger.save()));
   writeFileSync(f.snapshot, w.snapshot());
   writeFileSync(f.brains, JSON.stringify(Object.fromEntries([...live].map(([id, b]) => [id, b.save()]))));
   writeFileSync(f.config, JSON.stringify(config));
   return { seed, t: w.t(), stateHash: w.stateHash() };
 }
+
+const postHolder = (config: any, post: string): string => (config.positions.find((x: any) => x.id === post)).holder as string;
 
 const standIn = (spec: ExperimentSpec) => spec.standIn ?? process.env.OIKOS_STAND_IN ?? "idle";
 
@@ -257,20 +355,24 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   const f = files(seedDir(out, seed));
   const config = JSON.parse(readFileSync(f.config, "utf8"));
   const saved: { [participant: string]: object } = JSON.parse(readFileSync(f.brains, "utf8"));
-  const seat = (config.positions.find((x: any) => x.id === spec.post)).holder as string;
+  const seat = postHolder(config, spec.post);
   const brainOf = (id: string) => { const s = twinSpecs(config).get(id); return s && saved[id] ? new DetachedActor({ ...s, saved: saved[id]! }) : undefined; };
   const brains = new Map([...twinSpecs(config).keys()].map((id) => [id, brainOf(id)!]));
   const logPath = join(f.dir, `${safe(arm.name)}.oklog`);
-  const w = RustWorld.resume(readFileSync(f.snapshot), { log: logPath, parent: "base.oklog", label: arm.name, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stream: { cap: 4_000_000 } });
+  const w = RustWorld.resume(readFileSync(f.snapshot), { log: logPath, parent: "base.oklog", label: arm.name, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stream: { cap: 4_000_000 }, ...(arm.withhold?.length ? { withhold: arm.withhold } : {}) });
   const forkT = w.t();
-  const ctx: MeasureContext = { forkT, seat, post: spec.post };
-  const measures = (spec.measures ?? DEFAULT_MEASURES).map((m) => makeMeasure(m, ctx));
+  // (The stewardship ledger: the base's, taken up with this arm's steward, counting from the fork.)
+  const ledger = wantsStewardship(spec) ? (existsSync(f.ledger) ? Ledger.restore(JSON.parse(readFileSync(f.ledger, "utf8")), { from: forkT, steward: stewardOf(seat, arm.steward), ...(spec.institutions ? { institutions: spec.institutions } : {}) }) : new Ledger({ config, from: forkT, steward: stewardOf(seat, arm.steward), ...(spec.institutions ? { institutions: spec.institutions } : {}) })) : undefined;
+  let ledgerResult: StewardshipResult | undefined;
+  const ctx: MeasureContext = { forkT, seat, post: spec.post, steward: arm.steward, ...(ledger ? { stewardship: () => (ledgerResult ??= ledger.result()) } : {}) };
+  const measures = measureList(spec).map((m) => makeMeasure(m, ctx));
   const costs: { [seat: string]: Cost } = {};
   const pull = () => {
     for (;;) {
       const { entries } = w.events();
       if (!entries.length) return;
       for (const e of entries) {
+        ledger?.see(e);
         for (const m of measures) m.see(e);
         if (e.kind === "annotation" && e.body?.annotation === "usage") {
           const c = (costs[e.body.subject] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cost_microusd: 0 });
@@ -311,6 +413,7 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     seed, arm: arm.name, steward: arm.steward, stateHash: end.state_hash, t: end.t, steps: end.steps, wakes,
     measures: Object.fromEntries(measures.map((m) => [m.name, m.result()])), costs, log: logPath, seconds: Math.round((performance.now() - t0)) / 1000,
   };
+  if (ledgerResult) { const { measures: _m, ...detail } = ledgerResult; result.stewardship = detail; }
   writeFileSync(join(f.dir, `${safe(arm.name)}.json`), JSON.stringify(result, null, 1));
   return result;
 }
@@ -326,7 +429,27 @@ export interface Report {
   /** Each arm's measure minus the reference arm's, seed by seed (the same town and seed): mean and spread of the differences. */
   versus: { arm: string; measures: { [name: string]: Stat } }[];
   failures: { seed: number; arm: string; error: string }[];
+  /** Every comparison with its interval: the registered ones (primary, secondary), then every other arm against the
+   * reference on every measure (exploratory). */
+  comparisons?: ComparisonResult[];
+  /** The registration the report was read against (absent: none; every comparison is exploratory). */
+  preregistration?: { file: string; sha256: string; registered: string; committed?: string; question: string; level: number; correction: string; primary: number };
+  /** Plain words, first: what was compared, what the registered comparisons show, how many exploratory ones moved. */
+  summary?: string[];
 }
+
+export interface ComparisonResult {
+  key: string; measure: string; status: "primary" | "secondary" | "exploratory";
+  /** Arm minus vs; or (A - B) - (C - D). */
+  arm?: string; vs?: string; did?: [string, string, string, string];
+  expect?: "higher" | "lower" | "none";
+  interval: Interval;
+  /** The comparison in words. */
+  reading: string;
+}
+
+/** A registration, as the harness holds it with a run: the parsed file, its hash, where it was, and when git first had it. */
+export interface HeldPrereg { prereg: Preregistration; file: string; sha256: string; committed?: string }
 
 const stat = (values: { seed: number; value: number | null }[]): Stat => {
   const xs = values.map((v) => v.value).filter((v): v is number => v !== null);
@@ -335,7 +458,7 @@ const stat = (values: { seed: number; value: number | null }[]): Stat => {
   return { n: xs.length, mean, sd, min: xs.length ? Math.min(...xs) : null, max: xs.length ? Math.max(...xs) : null, values };
 };
 
-export function buildReport(spec: ExperimentSpec, results: ArmResult[]): Report {
+export function buildReport(spec: ExperimentSpec, results: ArmResult[], held?: HeldPrereg): Report {
   const reference = spec.reference ?? spec.arms[0]!.name;
   const ok = results.filter((r) => !r.error);
   const names = [...new Set(ok.flatMap((r) => Object.keys(r.measures)))];
@@ -360,7 +483,78 @@ export function buildReport(spec: ExperimentSpec, results: ArmResult[]): Report 
       return b && x !== null && x !== undefined && y !== null && y !== undefined ? [{ seed: r.seed, value: x - y }] : [];
     }))])),
   }));
-  return { name: spec.name, reference, seeds: spec.seeds, forkDay: spec.forkDay, untilDay: spec.untilDay, post: spec.post, arms, versus, failures: results.filter((r) => r.error).map((r) => ({ seed: r.seed, arm: r.arm, error: r.error! })) };
+  const failures = results.filter((r) => r.error).map((r) => ({ seed: r.seed, arm: r.arm, error: r.error! }));
+  const report: Report = { name: spec.name, reference, seeds: spec.seeds, forkDay: spec.forkDay, untilDay: spec.untilDay, post: spec.post, arms, versus, failures };
+  const bySeed = (arm: string, m: string) => of(arm).map((r) => ({ seed: r.seed, value: r.measures[m] ?? null }));
+  const comparisons: ComparisonResult[] = [];
+  const level = held?.prereg.level ?? spec.level ?? 0.95;
+  const registered = new Set<string>();
+  if (held) {
+    const p = held.prereg;
+    const k = p.primary.length;
+    const each = (p.correction ?? "bonferroni") === "bonferroni" ? bonferroni(level, k) : level;
+    for (const [status, list, lv] of [["primary", p.primary, each], ["secondary", p.secondary ?? [], level]] as const) {
+      for (const c of list) {
+        const key = comparisonKey(c, p.reference);
+        registered.add(key);
+        comparisons.push(compared(c, status, lv, p.reference, bySeed, names.includes(c.measure)));
+      }
+    }
+    report.preregistration = { file: held.file, sha256: held.sha256, registered: p.registered, ...(held.committed ? { committed: held.committed } : {}), question: p.question, level, correction: p.correction ?? "bonferroni", primary: k };
+  }
+  for (const m of names) for (const a of spec.arms) {
+    if (a.name === reference) continue;
+    const c: Comparison = { measure: m, arm: a.name, vs: reference };
+    if (registered.has(comparisonKey(c, reference))) continue;
+    comparisons.push(compared(c, "exploratory", level, reference, bySeed, true));
+  }
+  report.comparisons = comparisons;
+  report.summary = summaryOf(report);
+  return report;
+}
+
+const num = (x: number | null) => (x === null ? "-" : Math.abs(x) >= 100 || Number.isInteger(x) ? String(Math.round(x * 100) / 100) : x.toFixed(Math.abs(x) < 1 ? 3 : 2));
+
+function compared(c: Comparison, status: ComparisonResult["status"], level: number, reference: string, bySeed: (arm: string, m: string) => { seed: number; value: number | null }[], measured: boolean): ComparisonResult {
+  const vs = c.vs ?? reference;
+  const values = !measured ? [] : c.did ? differenceInDifferences(bySeed(c.did[0], c.measure), bySeed(c.did[1], c.measure), bySeed(c.did[2], c.measure), bySeed(c.did[3], c.measure)) : pairedDifferences(bySeed(c.arm!, c.measure), bySeed(vs, c.measure));
+  const iv = interval(values, level);
+  const what = c.did ? `(${c.did[0]} - ${c.did[1]}) - (${c.did[2]} - ${c.did[3]})` : `${c.arm} - ${vs}`;
+  let reading: string;
+  if (!measured) reading = `${c.measure}, ${what}: not measured in this run (the spec did not ask for it).`;
+  else if (iv.n === 0) reading = `${c.measure}, ${what}: no seed had a value in both arms.`;
+  else {
+    const pct = `${Math.round(iv.level * 1000) / 10}%`;
+    const span = iv.lo === null ? `one seed: no interval` : `${pct} interval ${num(iv.lo)} to ${num(iv.hi)}`;
+    const side = iv.lo === null ? "" : iv.lo > 0 || iv.hi! < 0 ? " The interval excludes zero." : " The interval includes zero.";
+    const exp = c.expect && c.expect !== "none" && iv.lo !== null ? ` Registered expectation ${c.expect}: ${(c.expect === "higher" ? iv.lo > 0 : iv.hi! < 0) ? "the interval agrees" : (c.expect === "higher" ? iv.hi! < 0 : iv.lo > 0) ? "the interval is on the other side" : "the interval does not settle it"}.` : "";
+    reading = `${c.measure}, ${what}: ${num(iv.mean)} (${span}; ${iv.above} of ${iv.n} seeds above zero, ${iv.below} below).${side}${exp}`;
+  }
+  return { key: comparisonKey(c, reference), measure: c.measure, status, ...(c.did ? { did: c.did } : { arm: c.arm, vs }), ...(c.expect ? { expect: c.expect } : {}), interval: iv, reading };
+}
+
+/** The plain words at the top of a report. */
+function summaryOf(r: Report): string[] {
+  const out: string[] = [];
+  const cs = r.comparisons ?? [];
+  out.push(`${r.arms.length} arms in the post ${r.post} (${r.arms.map((a) => a.name).join(", ")}), the same town per seed, ${r.seeds.length} seed${r.seeds.length === 1 ? "" : "s"}, forked at day ${r.forkDay} and run to day ${r.untilDay}. Each comparison is one arm's measure minus another's, seed by seed; the platform does not say which is better.`);
+  const p = r.preregistration;
+  if (p) {
+    const each = p.correction === "bonferroni" && p.primary > 1 ? ` (Bonferroni: each at ${Math.round(bonferroni(p.level, p.primary) * 1000) / 10}%)` : "";
+    out.push(`Pre-registered on ${p.registered}${p.committed ? `, first committed ${p.committed}` : ", not in git when it ran"}: "${p.question}". ${p.primary} primary comparison${p.primary === 1 ? "" : "s"}, read together at ${Math.round(p.level * 1000) / 10}%${each}:`);
+    for (const c of cs.filter((x) => x.status === "primary")) out.push(`  - ${c.reading}`);
+    const sec = cs.filter((x) => x.status === "secondary");
+    if (sec.length) { out.push(`Secondary (registered, read after the primary, each at ${Math.round(p.level * 1000) / 10}% alone):`); for (const c of sec) out.push(`  - ${c.reading}`); }
+  } else out.push("Nothing was pre-registered: every comparison here is exploratory.");
+  const all = cs.filter((x) => x.status === "exploratory");
+  const ex = all.filter((x) => x.interval.lo !== null);
+  const moved = ex.filter((x) => x.interval.lo! > 0 || x.interval.hi! < 0);
+  const without = all.length - ex.length;
+  out.push(`Exploratory: ${all.length} other comparison${all.length === 1 ? "" : "s"} against ${r.reference}${without ? ` (${without} with no interval: one seed, or nothing counted)` : ""}, of which ${moved.length} ha${moved.length === 1 ? "s" : "ve"} an interval that excludes zero. They are leads for a registered experiment, not findings${moved.length ? ":" : "."}`);
+  for (const c of moved.slice(0, 8)) out.push(`  - ${c.reading}`);
+  if (moved.length > 8) out.push(`  - and ${moved.length - 8} more (report.json, "comparisons").`);
+  if (r.failures.length) out.push(`${r.failures.length} fork${r.failures.length === 1 ? "" : "s"} failed: their seeds are missing from the comparisons that need them.`);
+  return out;
 }
 
 const fmt = (x: number | null, digits = 2) => (x === null ? "-" : Number.isInteger(x) ? String(x) : x.toFixed(digits));
@@ -368,14 +562,18 @@ const cell = (s: Stat, d = 2) => (s.n === 0 ? "-" : s.n === 1 ? fmt(s.mean, d) :
 
 /** The report as text: a table per measure, an arm a row; `mean ±sd [min..max]` over the seeds. */
 export function reportText(r: Report): string {
-  const lines = [`Experiment ${r.name}: post ${r.post}; forked at day ${r.forkDay}, run to day ${r.untilDay}; ${r.seeds.length} seed${r.seeds.length === 1 ? "" : "s"} (${r.seeds.join(", ")}); reference arm ${r.reference}.`,
+  const lines = [...(r.summary ?? []), "",`Experiment ${r.name}: post ${r.post}; forked at day ${r.forkDay}, run to day ${r.untilDay}; ${r.seeds.length} seed${r.seeds.length === 1 ? "" : "s"} (${r.seeds.join(", ")}); reference arm ${r.reference}.`,
     "Each cell is the mean over the seeds, with the sample sd and [min..max]; '-' none. Nothing here says which arm is better."];
   const measures = Object.keys(r.arms[0]?.measures ?? {});
   const w = Math.max(10, ...r.arms.map((a) => a.name.length));
   for (const m of measures) {
     lines.push("", m);
     for (const a of r.arms) lines.push(`  ${a.name.padEnd(w)}  ${cell(a.measures[m]!)}`);
-    for (const v of r.versus) lines.push(`  ${("  " + v.arm + " - " + r.reference).padEnd(w + 2)}  ${cell(v.measures[m]!)}`);
+    for (const v of r.versus) {
+      const c = (r.comparisons ?? []).find((x) => x.measure === m && x.arm === v.arm && x.vs === r.reference);
+      const iv = c && c.interval.lo !== null ? `; ${Math.round(c.interval.level * 1000) / 10}% ${fmt(c.interval.lo)}..${fmt(c.interval.hi)}${c.status === "exploratory" ? "" : ` (${c.status})`}` : "";
+      lines.push(`  ${("  " + v.arm + " - " + r.reference).padEnd(w + 2)}  ${cell(v.measures[m]!)}${iv}`);
+    }
   }
   lines.push("", "seats' cost (the steward's model calls)");
   for (const a of r.arms) lines.push(`  ${a.name.padEnd(w)}  calls ${cell(a.cost.calls)}; tokens in ${cell(a.cost.input_tokens)}, out ${cell(a.cost.output_tokens)}; USD ${cell(a.cost.cost_usd, 4)}`);
@@ -420,6 +618,7 @@ export function validate(spec: ExperimentSpec, factories: SeatFactories = {}): v
   for (const a of spec.arms) {
     if (names.has(a.name)) bad(`two arms are called ${a.name}`);
     names.add(a.name);
+    for (const x of a.withhold ?? []) if (!x?.what || (x.nth !== undefined && !(Number.isInteger(x.nth) && x.nth >= 1))) bad(`arm ${a.name}: a withhold names what (a kind of paper or a block) and an nth from 1`);
     if (a.steward.kind === "model") {
       const provider = a.steward.model.split("/")[0]!;
       if (provider !== "mock" && !factories[provider]) bad(`arm ${a.name}: model ${a.steward.model} has no seat controller here; real models need a SeatFactory (docs/experiments.md, "Real models")`);
@@ -429,12 +628,59 @@ export function validate(spec: ExperimentSpec, factories: SeatFactories = {}): v
 }
 
 /** Runs the experiment: a base per seed, then every arm of every seed from its base, and the report. */
+/** The spec's registration, read and checked against the spec before anything runs (absent: none). Throws on any
+ * disagreement: an experiment runs as registered or not at all. */
+export function loadPrereg(spec: ExperimentSpec, specFile?: string): HeldPrereg | undefined {
+  if (!spec.preregistration) return undefined;
+  const near = specFile ? resolve(dirname(resolve(specFile)), spec.preregistration) : resolve(spec.preregistration);
+  const file = existsSync(near) ? near : resolve(spec.preregistration);
+  if (!existsSync(file)) throw new Error(`experiment ${spec.name}: its preregistration ${spec.preregistration} is not there`);
+  const text = readFileSync(file, "utf8");
+  const prereg = parsePrereg(text, file);
+  const asked = new Set(measureList(spec).filter((m): m is string => typeof m === "string"));
+  const problems = [...preregProblems(prereg, (m) => asked.has(m)), ...specMismatch(prereg, spec)];
+  if (problems.length) throw new Error(`experiment ${spec.name}: its preregistration ${file} does not hold:\n  ${problems.join("\n  ")}`);
+  return { prereg, file, sha256: preregHash(text), ...committedAt(file) };
+}
+
+/** When git first had the file, if what is on disk is what git has (else nothing: it was changed since). */
+function committedAt(file: string): { committed?: string } {
+  const git = (args: string[]) => Bun.spawnSync(["git", "-C", dirname(file), ...args], { stdout: "pipe", stderr: "ignore" });
+  const unchanged = git(["diff", "--quiet", "HEAD", "--", file]).exitCode === 0 && git(["ls-files", "--error-unmatch", file]).exitCode === 0;
+  if (!unchanged) return {};
+  const first = git(["log", "--diff-filter=A", "--format=%cI", "--", file]).stdout.toString().trim().split("\n").pop();
+  return first ? { committed: first } : {};
+}
+
+/** The registered comparisons that need citizens who take recourse (the responsiveness and recourse families), where
+ * the town's citizens take none: a town without `living` has `dials.initiative_bps` and `dials.friction_bps` at 0, so
+ * nothing goes wrong for anyone and nobody asks, appeals, complains or petitions (docs/behaviour/frictions.md; the
+ * worked example of 2026-10-23 measured exactly that). Empty: nothing to say. */
+export function recourseProblems(config: any, held?: HeldPrereg): string[] {
+  const dial = (k: string) => Number(config?.dials?.[k] ?? 0) > 0;
+  if (dial("initiative_bps") && dial("friction_bps")) return [];
+  const needs = new Set(STEWARDSHIP_MEASURES.filter((m) => m.family === "responsiveness" || m.family === "recourse").map((m) => m.name));
+  const registered = held ? [...(held.prereg.primary ?? []), ...(held.prereg.secondary ?? [])].map((c) => c.measure) : [];
+  const named = [...new Set(registered.filter((m) => needs.has(m)))];
+  if (!named.length) return [];
+  return [`it registers ${named.join(", ")}, but its town's citizens take no recourse (dials.initiative_bps ${config?.dials?.initiative_bps ?? 0}, dials.friction_bps ${config?.dials?.friction_bps ?? 0}: a town without \`living\`; set living.initiative_bps and living.friction_bps)`];
+}
+
 export async function runExperiment(spec: ExperimentSpec, o: RunOptions): Promise<{ report: Report; results: ArmResult[]; text: string; out: string }> {
   const say = o.log ?? (() => {});
   validate(spec, o.factories);
+  const held = loadPrereg(spec, o.specFile);
+  // (A comparison that cannot move is not run: the first seed's town says whether its citizens take recourse at all.)
+  const lever = held ? recourseProblems(await buildConfig(spec, spec.seeds[0]!), held) : [];
+  if (lever.length) throw new Error(`experiment ${spec.name}: ${lever.join("; ")}`);
   const out = resolve(o.out);
   if (existsSync(join(out, "results.json"))) throw new Error(`${out} already holds an experiment's results: a run is training data and is never overwritten; name another folder`);
   mkdirSync(out, { recursive: true });
+  if (held) {
+    // (The registration as it was when the run began, kept beside the results with its hash and its commit time.)
+    copyFileSync(held.file, join(out, `preregistration${held.file.endsWith(".json") ? ".json" : ".yaml"}`));
+    writeFileSync(join(out, "preregistration.held.json"), JSON.stringify({ file: held.file, sha256: held.sha256, ...(held.committed ? { committed: held.committed } : {}) }, null, 1));
+  }
   writeFileSync(join(out, "spec.json"), JSON.stringify(spec, (_k, v) => (typeof v === "function" ? "[function]" : v), 1));
   const jobsN = spec.seeds.length * spec.arms.length;
   const workers = o.parallel === 0 ? 0 : Math.max(1, Math.min(o.parallel ?? Math.max(1, availableParallelism() - 2), jobsN));
@@ -451,7 +697,7 @@ export async function runExperiment(spec: ExperimentSpec, o: RunOptions): Promis
     results = (await dealt(arms, workers, spec, o, say)) as ArmResult[];
   }
   results.sort((a, b) => a.seed - b.seed || spec.arms.findIndex((x) => x.name === a.arm) - spec.arms.findIndex((x) => x.name === b.arm));
-  const report = buildReport(spec, results);
+  const report = buildReport(spec, results, held);
   const text = reportText(report);
   writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 1));
   writeFileSync(join(out, "report.json"), JSON.stringify(report, null, 1));
@@ -505,6 +751,23 @@ export async function workHand(hand: { specFile: string; spec?: Partial<Experime
   const arms = hand.jobs.flatMap((j) => (j.type === "arm" ? [j] : []));
   out.push(...(await Promise.all(arms.map((j) => runArm(spec, j.seed, spec.arms.find((a) => a.name === j.arm)!, hand.out, factories ?? {}).catch((e) => failed(j.seed, spec.arms.find((a) => a.name === j.arm)!, e))))));
   return out;
+}
+
+/** A finished experiment's report built again from what it left (its spec, results and the registration it ran under),
+ * for a report whose code has changed since: nothing is written. */
+export function rebuildReport(out: string): Report {
+  const dir = resolve(out);
+  const spec = JSON.parse(readFileSync(join(dir, "spec.json"), "utf8")) as ExperimentSpec;
+  const results = JSON.parse(readFileSync(join(dir, "results.json"), "utf8")) as ArmResult[];
+  const copy = ["preregistration.json", "preregistration.yaml"].map((f) => join(dir, f)).find(existsSync);
+  let held: HeldPrereg | undefined;
+  if (copy) {
+    const meta = JSON.parse(readFileSync(join(dir, "preregistration.held.json"), "utf8"));
+    const text = readFileSync(copy, "utf8");
+    if (preregHash(text) !== meta.sha256) throw new Error(`${copy} is not the registration the run was made under (its hash differs)`);
+    held = { prereg: parsePrereg(text, copy), file: meta.file, sha256: meta.sha256, ...(meta.committed ? { committed: meta.committed } : {}) };
+  }
+  return buildReport(spec, results, held);
 }
 
 /** The seeds' folders an experiment left (for tools that read its logs). */
