@@ -27,8 +27,8 @@ const SETS = ["seed=11", "opening_caseload=true", "mayor=llm", "model_seats=fina
 test("a mock pilot under unstated: nothing its seats are shown says what the town is; the framing and its reason are recorded; the debrief says and asks", async () => {
   const out = join(base, "wave.mock");
   const until = 12 * DAY;
-  // An entry with no framing of its own: the default for steward pilots.
-  const r = await mockPilot({ name: "u1", world: "worlds/town-300.yaml", sets: SETS, until }, out, 12);
+  // An entry that chooses unstated (no pilot is framed by default: seat-ready.ts, refuseUnframed).
+  const r = await mockPilot({ name: "u1", world: "worlds/town-300.yaml", sets: SETS, framing: "unstated", until }, out, 12);
   expect(r).toMatchObject({ generated: true, ranToEnd: true });
   const dir = join(out, "u1");
   const st = await runState(dir, until);
@@ -64,7 +64,7 @@ test("a mock pilot under unstated: nothing its seats are shown says what the tow
   // real person; and its first question is what the seat had taken the town to be.
   const debriefs = log.filter((e) => e.kind === "annotation" && e.body.annotation === "debrief");
   expect(debriefs.map((e) => e.body.subject).sort()).toEqual(seats);
-  expect(debriefs.every((e) => e.body.data.version === "0.4.1" && e.body.data.framing.disclosure === "unstated" && e.body.data.steps[1].id === "took")).toBe(true);
+  expect(debriefs.every((e) => e.body.data.version === "0.4.2" && e.body.data.framing.disclosure === "unstated" && e.body.data.steps[1].id === "took")).toBe(true);
   const opening = log.find((e) => e.kind === "annotation" && e.body.annotation === "transcript" && e.body.data.ref === "debrief/consent" && e.body.subject === "tribunal-member-system").body.data.input as string;
   expect(opening).toContain("Millbrook was a simulated town, run by a research platform called Oikos");
   expect(opening).toContain(`You were not told whether the town was real or simulated: nothing was said to you about it either way, and nothing false was said. It was simulated, as set out above. Whatever you took it to be while you held the seat, nothing you did or left undone in it reached a real person. The reason recorded in the run's configuration for not saying: ${UNSTATED_REASON}`);

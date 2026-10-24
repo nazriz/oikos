@@ -25,6 +25,8 @@ import { comparisonKey, parsePrereg, preregHash, preregProblems, specMismatch, t
 import { copyFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { SpendingLimitReached, type FramingSpec } from "@oikos/participants/llm";
+import { refuseUnready, seatReadiness } from "./seat-ready";
+import { modules as builtinModules } from "@oikos/participants";
 import { budgetProblems, closeAdapters, forkLimits, mockModels, modelArms, modelProblems, modelSeatFactories, type CallStats, type SeatsSpec } from "./experiment-seats";
 import type { ForkEnd } from "./seat-host";
 
@@ -799,6 +801,15 @@ export async function runExperiment(spec: ExperimentSpec, o: RunOptions): Promis
   // (A comparison that cannot move is not run: the first seed's town says whether its citizens take recourse at all.)
   const lever = held ? recourseProblems(await buildConfig(spec, spec.seeds[0]!), held) : [];
   if (lever.length) throw new Error(`experiment ${spec.name}: ${lever.join("; ")}`);
+  // A model steward is seated only where its office can do its work (seat-ready.ts): refused before any fork is run.
+  // And framed as the spec chooses, arm by arm or for every seat: a real model's seat is never framed by default.
+  const unframed = modelArms(spec).filter((a) => a.steward.kind === "model" && a.steward.framing === undefined && spec.seats?.framing === undefined).map((a) => a.name);
+  if (unframed.length) throw new Error(`experiment ${spec.name}: no framing is chosen for the model seat of ${unframed.length === 1 ? "the arm" : "the arms"} ${unframed.join(", ")}: give the arm a framing ("unstated" or "simulation", or { disclosure, reason }), or seats.framing for every arm`);
+  if (!mockModels(spec) && modelArms(spec).length) {
+    const config = await buildConfig(spec, spec.seeds[0]!);
+    const holder = (config.positions ?? []).find((x: any) => x.id === spec.post)?.holder;
+    refuseUnready(seatReadiness(config, builtinModules, holder ? [holder] : []));
+  }
   const out = resolve(o.out);
   if (existsSync(join(out, "results.json"))) throw new Error(`${out} already holds an experiment's results: a run is training data and is never overwritten; name another folder`);
   const specText = JSON.stringify(spec, (_k, v) => (typeof v === "function" ? "[function]" : v), 1);
