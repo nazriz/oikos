@@ -8037,3 +8037,12 @@ records twice, so the view built from changes lists the lots and the river law t
 It fails the same with this branch's kernel changes taken out, so it is on main. Not chased here (parity: record).
 - **Revisit:** before the next kernel merge, run the case (`ops` beginning `Smart { kind: 70 }, Smart { kind: 187 }`)
   and find which block delivers a standing channel whole twice.
+
+## 2026-10-25 · A slot's engine runs as many threads as the slot's weight
+
+- **What we saw:** load 44 on 14 cores with 12 slots held: the engine took every core (`default_threads`) whatever slot
+  it ran in, so a test file in a slot of 1, or a 10,000-person run in a slot of 3, each ran fourteen threads.
+- **Change:** `insideSlot` sets `OIKOS_ENGINE_THREADS` to the slot's weight unless the caller set it. Results do not
+  depend on the thread count (the kernel's tests and the port gate check one thread against fourteen).
+- **Revisit if:** a lone heavy run is much slower for it (then elastic slots, PL-4, give it more tokens), or a test that
+  needs several threads sets them itself.
