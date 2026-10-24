@@ -322,6 +322,10 @@ pub struct Money {
     /// When the other kinds are next used up.
     #[serde(default)]
     pub next_use_others: i64,
+    /// What we have ordered lately: (when, kind, units), the last two months' (what someone weighing a business of
+    /// their own knows of what a customer like them buys: docs/behaviour/entry.md, "Entry by expected profit").
+    #[serde(default)]
+    pub bought: Vec<(i64, String, i64)>,
 }
 
 /// What we keep of one kind we buy besides `goods`: where we buy it, how fully it served us, and money carried over.
@@ -369,6 +373,7 @@ impl Money {
             chose: BTreeMap::new(),
             others: BTreeMap::new(),
             next_use_others: 0,
+            bought: vec![],
         }
     }
 }
@@ -403,6 +408,7 @@ impl Default for Money {
             chose: BTreeMap::new(),
             others: BTreeMap::new(),
             next_use_others: 0,
+            bought: vec![],
         }
     }
 }
@@ -1040,6 +1046,8 @@ impl Person {
         let world = &w.cx.ctx.world;
         let words = format!("Order: {q} {goods} at {} each ({}), delivered to {} at {place}. Paid with this order.", money_words(s.price, world), money_words(total, world), self.me);
         let o = Order { kind: goods.to_string(), quantity: q, unit_price: s.price, deliver_to: Some(self.me.clone()), at: place, account: acc.account.clone(), pay_in_days: None, retry_of, for_days: Some(for_days) };
+        self.money.bought.retain(|b| w.t - b.0 < 2 * crate::common::MONTH);
+        self.money.bought.push((w.t, goods.to_string(), q));
         let order = say("order", &words, Say { to: Some(vec![s.shop.clone()]), visible: Some(Visible::Only(vec![self.me.clone(), s.shop.clone()])), data: Some(crate::papers::data(&o)), ..Default::default() });
         let p = pay(&s.account, total, Pay { from: Some(acc.account), for_: Some(format!("Order: {q} {goods}.")), ..Default::default() }, w.cx);
         w.push(step_of_lines(why, vec![bound("order", order), oikos_sight::calls::Line { bind: None, call: p }]));

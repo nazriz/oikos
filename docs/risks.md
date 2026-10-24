@@ -26,8 +26,8 @@ have been mended under other words. Correct it here when you find that.
 3. **The baseline is a set of unsourced rules.** The code mayor, a code council that votes on one line, and a code
    tribunal member harsher than au-vic's own law are what a seat is compared with; a difference measures distance
    from those rules, not from a real office. (MT-12, PB-14, PB-3)
-4. **Outcomes built in that move whatever the steward does.** Rents ratchet 5% at each review; strikes are always won in full; business births run at a set rate and employing
-   start-ups cannot happen; exports are fixed at the start; compliance is a coin flip. (ME-14, PB-9, ME-1,
+4. **Outcomes built in that move whatever the steward does.** Rents ratchet 5% at each review; strikes are always won in full; a business of one never
+   takes on a hand (births follow expected profit since 2026-10-24); exports are fixed at the start; compliance is a coin flip. (ME-14, PB-9, ME-1,
    ME-15, PB-16; the paper that printed only bad news, once here, is fixed)
 5. **How long work takes is guessed.** Every act time is a placeholder in minutes and a system takes one second;
    staff counts and grants are state averages applied to a small town. Delays, backlogs and any comparison of people
@@ -229,20 +229,22 @@ The mechanism:
 - **Where:** `docs/behaviour/entry.md` ("Starting a business of one", "Employing start-ups wait on leased premises").
 - **Effect:** Job creation cannot emerge from entry. Any experiment where a steward's policy should create or destroy
   jobs is biased towards stasis or displacement; the number of births is fixed by the profile whatever the steward does.
-- **L / I:** high / high · **Status:** to fix
-- **Port note:** Rust port, lane C1 (2026-10-17): entry now follows expected profit (`rules::entry`) and a start-up employs when demand outruns one person and the margin pays a wage; citizens (lane A1) call it in place of `found_own_ppm`. Premises are still the founder's home until commercial leasing exists.
-- **Notice by:** `economy/businesses`: no employing firm is born in a run.
+- **L / I:** high / medium · **Status:** to fix (the births: fixed, decisions 2026-10-24, "Market realism"; what is left: a business of one taking on a hand, which needs premises to let: commercial leasing, the owner's choice)
+- **Port note:** Rust port, lane C1 (2026-10-17) wrote `rules::entry`; nothing called it until 2026-10-24.
+- **Now (2026-10-24, citizen 0.59.0, generator 0.65.0):** no rate of births anywhere. A person weighs each venture monthly by its expected profit from what they know (prices read, their own purchases, the homes in view, the sellers they know, the going wage) against what they have, the choice the mind's (docs/behaviour/entry.md, "Entry by expected profit"). A shop in bought premises is weighed the same way and employs from its first day. Births in a year of the 1,000-person town: au-vic 26 to 37% (16.4% the ABS rate; 13 to 16% before), gb-eng and ke-nakuru in the decisions entry. Still: a business of one never takes on a hand (a home is the household's, a pitch holds one); founders count only the sellers they know; nobody borrows to start.
+- **Notice by:** `economy/businesses`: births far from the profile's rate; no business of one with staff.
 - **Fix when:** before any employment-effect or gradual-disempowerment experiment.
 
 ### ME-2 · Hiring is too easy and churn is wrong
 - **Gap:** Employers "hire anyone, whatever their trade", choosing at their next wake; job changes run about 13% a
   year against 7.2% sourced; unemployment sits low (1 to 2% where the target was 4.6%); business deaths 2.9% against
   13.9%. A 21-day posting window was tried and reverted.
-- **Where:** firm staffing in `participants/src/behaviour/firms.ts`; `docs/calibration.md`; decisions "Hiring that takes time: tried, and reverted".
+- **Where:** firm staffing in `kernel/crates/actors/src/firms/staffing.rs` (the routine), the job search in `citizen/work.rs`; `docs/calibration.md`; decisions "Hiring that takes time: tried, and reverted" and "Market realism".
 - **Effect:** Labour-market, wage, support-claim and re-employment results are biased towards quick matching;
   displacement looks cheaper than it is.
-- **L / I:** high / high · **Status:** to fix (the mechanism: matching by trade, postings that close)
-- **Port note:** Rust port, lane C1 (2026-10-17): staff follow the trade expected (`rules::labour`); matching by trade and closing postings are not yet built.
+- **L / I:** high / high · **Status:** to fix (part built 2026-10-24, decisions "Market realism": matching by trade, postings for several hands that close when filled, interviews in the manager's time; still wrong: job changes)
+- **Port note:** Rust port, lane C1 (2026-10-17): staff follow the trade expected (`rules::labour`).
+- **Now (2026-10-24):** a posting is for every hand a firm is short of and stays up until they are offered the post; an application to a posting re-published at a new wage stands for the new one (the reason the 21-day window failed); the manager interviews each one taken on (`publish/interview`, 45 minutes, a placeholder) and offers the post to those who have worked in its trade before others, then by who applied first; nothing is drawn. Job mobility did not move (au-vic 24 to 27% a year against 7.2%): changes of employer come from employed people's search for better pay (`search_due`, `job_move`), which this did not touch, and the next thing to look at. `boundary/environment_staff.rs` keeps its own copy of the old hiring (the environment office), and `participants/src/readers/staffing.ts` the TypeScript one (MT-18).
 - **Notice by:** hires, time to fill, job-change and business-death rates against `calibration.md`.
 - **Fix when:** before a labour-market steward study.
 
@@ -393,7 +395,8 @@ The mechanism:
   household, age or each other; households do not pool money ("nobody supports anybody").
 - **Where:** `worlds/generator/generate.ts` (labour force and savings draws); `docs/behaviour/households.md`.
 - **Effect:** Inequality compressed and hardship falls on random households; redistribution and support-targeting experiments are wrong in both who and how much.
-- **L / I:** high / high · **Status:** to fix
+- **L / I:** high / high · **Status:** to fix (part built 2026-10-24, decisions "Market realism": savings lean on pay; work shared within households where it would add workless households)
+- **Now (2026-10-24, generator 0.65.0):** a Gaussian copula (`worlds/generator/joint.ts`). Savings are drawn at a rank that leans on pay's rank by `income_wealth_rank_bps` (0.31, the middle of the Luxembourg Wealth Study's 0.27 to 0.36 once age and education are accounted for; borrowed for au-vic and gb-eng, to confirm against each place's own wealth survey; none for ke-nakuru); a 1,000-person au-vic town's rank correlation of pay and savings went from 0 to about 0.19 (ties at no pay dilute it). Households share a factor in who works, fitted to `household_work` (ONS 13.9% workless, ABS 18.5% jobless families), but in both towns each person's own chances already give more workless households than the survey (au-vic 27% of families, gb-eng 20%), so nothing is shared there: the gap is in the margins (participation, a placeholder, and who lives together), and a polarisation index (Gregg, Scutella and Wadsworth 2010) would fit the dependence apart from them. Still: one wage per kind of work, and nobody pools money within a household.
 - **Fix when:** Before any study of inequality, poverty or who is hit by a shock; sourced joint distributions (income, job, savings).
 - **Notice by:** income Gini and jobless-household share against the census.
 
@@ -1469,6 +1472,7 @@ are, and its register entry. "Read in code" means the line was opened, not only 
   national entry rate times the town's businesses over the people who could start one (`generate.ts`, `found_own_ppm`;
   `citizen.ts` checks only home, savings and the draw). Nothing looks at demand, competitors or the founder's wage, and
   the ABS rate counts registrations that never trade. *Mechanisms, not outcomes; market forces.* Sure: high. ME-1.
+  (Gone 2026-10-24: entry by expected profit, decisions "Market realism".)
 - **A-2 · Every strike is won in full after three stoppages** (`firms.ts`, `concede_after` 3, read in code). Hicks's
   concession curve does not say every dispute ends at the claim; real ones end in lockouts, arbitration, a lower
   settlement or closure. *Mechanisms, not outcomes.* Sure: high. PB-9. **Fixed in the Rust port, union side (2026-10-17); employer side with lane C1.**

@@ -260,8 +260,6 @@ impl P {
             }
         }
         let ventures: Vec<Json> = of(&v, "ventures");
-        let found_bps = i(&v, "found_bps").unwrap_or(0);
-        let found_own_ppm = i(&v, "found_own_ppm").unwrap_or(0);
         P {
             me: ctx.entity.clone(),
             participant: ctx.participant.clone(),
@@ -316,8 +314,7 @@ impl P {
             attach_mean_trade: v.get("attach_mean").and_then(|x| i(x, "trade_bps")),
             started: v.get("started").filter(|x| !x.is_null()).cloned(),
             ventures_any: !ventures.is_empty(),
-            can_found_business: !ventures.is_empty()
-                && (found_bps > 0 || found_own_ppm > 0 || ventures.iter().any(|x| x.get("own").and_then(Json::as_bool) == Some(true))),
+            can_found_business: !ventures.is_empty(),
             origin: s(&v, "origin"),
             initiative: v.get("initiative").and_then(Json::as_bool),
             mind: person::mind_params(v.get("mind").unwrap_or(&Json::Null)),

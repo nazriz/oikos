@@ -16,15 +16,14 @@ const base = { ...(Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "
 async function run(name: string, days: number, change: (params: any) => void, seed?: number) {
   const config = generate(seed === undefined ? base : { ...base, seed });
   const citizens = config.participants.filter((p: any) => p.controller?.impl === "citizen.default");
-  // (The town's own chance is small: nobody else starts one in the test.)
-  for (const p of citizens) p.controller = { ...p.controller, params: { ...p.controller.params, found_own_ppm: 0 } };
+  // (Anyone may start one where it pays (docs/behaviour/entry.md, "Entry by expected profit"): the one this test
+  // follows is someone out of work, with a home and the savings for it.)
   const age = (id: string) => -config.world.entities.find((e: any) => e.id === id).born_at / (365 * DAY);
   const housed = new Set(config.world.occupancy.map((o: any) => o.occupant));
   const employed = new Set(config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment").map((r: any) => r.terms.parties[1]));
   const one = citizens.find((p: any) => p.controller.params.in_labour_force !== false && age(p.person) >= 25 && age(p.person) < 50 && housed.has(p.person) && !employed.has(p.person))!;
   expect(one).toBeDefined();
   config.world.accounts.find((a: any) => a.id === `acc-${one.person}`).balance = "20000000";
-  one.controller.params.found_own_ppm = 1_000_000;
   change(one.controller.params);
   const out = join(root, "runs", `test-${name}`);
   rmSync(out, { recursive: true, force: true });
@@ -34,20 +33,23 @@ async function run(name: string, days: number, change: (params: any) => void, se
   return { config, person: one.person as string, ev, recs: ev.filter((e) => e.event === "recorded").map((e) => e.record) };
 }
 
-test("the generated town offers the venture, at a chance derived from its profile's business birth rate", () => {
+test("the generated town offers the venture with the trade price of what it sells, and no rate of founding", () => {
   const config = generate(base);
   const p = config.participants.find((x: any) => x.controller?.impl === "citizen.default").controller.params;
   const own = p.ventures.find((v: any) => v.own);
   expect(own.kind).toBe("own_account");
   expect(own.capital).toBeGreaterThan(0);
-  expect(p.found_own_ppm).toBeGreaterThan(0);
-  expect(p.found_own_ppm).toBeLessThan(100_000);
+  expect(own.unit_cost).toBeGreaterThan(0);
+  expect(own.unit_cost).toBeLessThan(own.role_module.params.price);
+  expect(p.found_own_ppm).toBeUndefined();
+  expect(p.found_bps).toBeUndefined();
   expect(config.catalogue.tasks.some((t: any) => t.id === "sell")).toBe(true);
 });
 
 test("someone out of work with savings and a home starts a business of one, puts in its capital, sells from home and is paid what it clears", async () => {
   const { person, ev, recs } = await run("own-venture", 150, () => {});
-  const made = ev.find((e) => e.event === "entity_created" && e.kind === "own_account");
+  const ours = new Set(ev.filter((e) => e.event === "position_created" && e.role_module?.params?.operator === person).map((e) => e.entity));
+  const made = ev.find((e) => e.event === "entity_created" && e.kind === "own_account" && ours.has(e.entity));
   expect(made).toBeDefined();
   const firm = made.entity as string;
   const post = ev.find((e) => e.event === "position_created" && e.entity === firm);
@@ -68,7 +70,7 @@ test("someone out of work with savings and a home starts a business of one, puts
 test("a business of one that does not pay its owner a living is given up: it closes, and its owner looks for work again", async () => {
   // (Judged after two months, against a living nobody's trade from home could clear: for the test.)
   const { person, ev, recs } = await run("own-venture-given-up", 300, (p) => Object.assign(p, { give_up_months: 2, give_up_below_bps: 1_000_000 }), 2);
-  const firm = ev.find((e) => e.event === "entity_created" && e.kind === "own_account")!.entity as string;
+  const firm = ev.find((e) => e.event === "position_created" && e.role_module?.params?.operator === person)!.entity as string;
   const closure = recs.find((r) => r.kind === "closure" && r.speaks_for === firm);
   expect(closure).toBeDefined();
   expect(closure.data.given_up).toBe(true);
@@ -76,11 +78,10 @@ test("a business of one that does not pay its owner a living is given up: it clo
 }, 600_000);
 
 test("a founding's draw of the shape \"business\" reaches the business of one: someone who has meant to start a business does, when they have a home and the money", async () => {
-  // (Step 3's founding, with only that shape to found and the chance made sure, as its own tests do. The town's own
-  // monthly chance of a business of one is turned off, so that every one started here follows a draw.)
+  // (Step 3's founding, with only that shape to found and the chance made sure, as its own tests do. Others may start
+  // one where it pays; what is held is that everyone who meant one and could, did.)
   const { loadWorld } = await import("../src/batch");
   const { config } = await loadWorld(join(root, "worlds/town.yaml"), ["shop_mix=false", "living.initiative_bps=10000", 'living.founding.shapes=["business"]', "living.founding.scale_bps=600000"]);
-  for (const p of config.participants) if (p.controller?.impl === "citizen.default") p.controller = { ...p.controller, params: { ...p.controller.params, found_own_ppm: 0 } };
   // (And everyone in the labour force is given the money for one: in the town as drawn, whoever comes to mean a
   // business may have a tenth of it, and then nothing comes of the draw, which is the rule and not what is tested.)
   const venture = config.participants.find((p: any) => p.controller?.impl === "citizen.default").controller.params.ventures.find((v: any) => v.own);
@@ -111,10 +112,9 @@ test("a founding's draw of the shape \"business\" reaches the business of one: s
   expect(meant.length).toBeGreaterThan(0);
   const started = log.filter((e) => e.kind === "event" && e.body.event === "recorded" && e.body.record?.record === "entity_declaration" && e.body.record.kind === "own_account").map((e) => ({ t: e.t, who: e.body.record.author as string }));
   expect(started.length).toBeGreaterThan(0);
-  // Every one started follows its founder's own draw, within the half year it holds; and it was no draw of the month's chance.
-  // (Those who came to town during the run have the town's own chance, which the test did not turn off: left out.)
-  for (const b of started.filter((x) => /^c\d+-self$/.test(x.who))) expect(meant.some((m) => m.who === b.who && m.t <= b.t && b.t - m.t <= 181 * DAY)).toBe(true);
-  expect(started.some((b) => meant.some((m) => m.who === b.who))).toBe(true);
+  // Someone who meant one started it, within the half year the draw holds. (Others start one where it pays: entry by
+  // expected profit, which this test does not turn off.)
+  expect(started.some((b) => meant.some((m) => m.who === b.who && m.t <= b.t && b.t - m.t <= 181 * DAY))).toBe(true);
   const sure = log.filter((e) => e.kind === "annotation" && e.body.data?.domain === "venture" && e.body.data?.choice === "found_own");
   for (const d of sure.filter((x) => /^c\d+-self$/.test(x.body.subject))) expect(d.body.data.options.find((o: any) => o.key === "found_own").score).toBe(10_000);
 }, 900_000);

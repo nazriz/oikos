@@ -35,9 +35,10 @@ pub struct Params {
     pub child_template_outside_lf: String,
     pub participation_bps: i64,
     pub ventures: Vec<Venture>,
-    pub found_bps: i64,
-    pub found_own_ppm: i64,
     pub found_own_buffer_months: i64,
+    /// The trade they worked in as the year began (the industry of their job then), which an application of theirs
+    /// names until they have worked elsewhere (docs/design/market-realism.md, ME-2).
+    pub trade: Option<String>,
     pub give_up_months: i64,
     pub give_up_below_bps: i64,
     pub possession: Option<Possession>,
@@ -134,9 +135,8 @@ impl Default for Params {
             child_template_outside_lf: String::new(),
             participation_bps: 10_000,
             ventures: vec![],
-            found_bps: 0,
-            found_own_ppm: 0,
             found_own_buffer_months: 1,
+            trade: None,
             give_up_months: 6,
             give_up_below_bps: 5_000,
             possession: None,
@@ -283,6 +283,10 @@ pub struct Venture {
     pub own: bool,
     #[serde(default)]
     pub expect_per_month: Option<i64>,
+    /// The trade price its goods are bought in at, as the world publishes it (for a founder who holds no trade price
+    /// list: docs/behaviour/entry.md, "Entry by expected profit").
+    #[serde(default)]
+    pub unit_cost: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

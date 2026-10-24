@@ -9,7 +9,8 @@
     "home",
     "job",
     "practice",
-    "shop"
+    "shop",
+    "venture"
   ],
   "doc": "docs/behaviour/citizen.md",
   "name": "citizen.default",
@@ -274,14 +275,6 @@
       },
       "source": "placeholder"
     },
-    "found_bps": {
-      "default": 0,
-      "schema": {
-        "type": "integer"
-      },
-      "source": "placeholder",
-      "unit": "bps"
-    },
     "found_own_buffer_months": {
       "default": 1,
       "schema": {
@@ -289,13 +282,6 @@
       },
       "source": "placeholder",
       "unit": "months"
-    },
-    "found_own_ppm": {
-      "default": 0,
-      "schema": {
-        "type": "integer"
-      },
-      "source": "placeholder"
     },
     "founding": {
       "default": null,
@@ -749,6 +735,16 @@
       "source": "roughly normal with this mean and spread (Granovetter 1978)",
       "unit": "bps"
     },
+    "trade": {
+      "default": null,
+      "schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "source": "the generator: the industry of the job a person opens with"
+    },
     "tribunal": {
       "default": null,
       "schema": {},
@@ -837,5 +833,5 @@
   },
   "perceives": [],
   "state": "none",
-  "version": "0.58.0"
+  "version": "0.59.0"
 }

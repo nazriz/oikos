@@ -14,6 +14,7 @@ const ROUTINE_KINDS: &[&str] = &[
     "hours_reply",
     "job_application",
     "job_posting",
+    "interview",
     "rental_listing",
     "property_for_sale",
     "consultation",

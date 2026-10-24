@@ -7,7 +7,7 @@
 1. **Premises come up for sale.** A closed firm offers its premises (the lot's title, and the building on it) with a public `property_for_sale` statement, at a share of what building them new costs (`premises_sale_bps`, 50%, a placeholder). If they're unsold after `reprice_days` (30), the asking price comes down by `reprice_bps` (10%), and again after as long, until someone buys (placeholders; the way an unsold property's price comes down).
 2. **Someone founds a business to buy them.** Once a month, a working-age citizen in the labour force looks at the premises for sale of a kind the world has a *venture* for. The generated town has one venture: a shop. They found a business if all of these hold:
    - they have the savings for the price, plus the venture's capital (derived from the town's own figures: a month's stock at the wholesale price and three months' wages for a shop's opening staff, until customers find it: about $91,000 in the generated town), plus a buffer of three months' housing and essentials;
-   - they pass the month's chance, `found_bps` (2%, a placeholder to calibrate against business entry rates).
+   - the shop they would open there is expected to beat what they have (below, "Entry by expected profit"): the mind weighs it, with no chance of founding set anywhere.
 3. **The business is founded.** Founding is the `entity` call: a new organisation, whose first position (Manager) the founder holds. That position has the channels and role module the venture's template gives it. The business's rules run in the position, as a manager follows the shop's routines.
 4. **It sets itself up.** The new shop:
    - opens an account at the bank;
@@ -20,15 +20,30 @@
    If someone else buys the premises first, the new shop returns the capital and closes.
 5. **It trades.** It then trades like any shop (docs/behaviour/retailer.md): it starts by hiring its minimum staff, stocks up and publishes its price.
 
-## Entry follows expected profit (lane C1, Rust port, 2026-10-17; risks A-1, ME-1)
+## Entry by expected profit (citizen 0.59.0, generator 0.65.0, 2026-10-24; risk ME-1; docs/design/market-realism.md)
 
-**The fault.** A person started a business with a monthly chance (`found_own_ppm`) derived from the profile's national entry rate on the town's businesses, whatever the market held: the same number of births with every shop empty or full, and a business of one never took on a hand.
+**The fault.** A person started a business of one with a monthly chance (`found_own_ppm`) derived from the profile's national entry rate on the town's businesses, and a shop in bought premises with a flat 2% a month (`found_bps`), whatever the market held: the same births with every shop empty or full. The rule written in the port (`rules::entry`, lane C1, 2026-10-17) had never been called: the section here said it had.
 
-**The rule now** (`rules::entry`, pure and integer; a citizen calls it with what they have seen). The founder judges the business as a person does: the price and what the goods cost to bring in (price lists they have read), the households they could serve and what their own household buys of it, the sellers they know are there, what one person's time can serve, the going wage for a hand, the rent of premises, and what they earn otherwise. Sales are shared equally between the sellers there are and the entrant (Cournot-style free entry: Mankiw and Whinston 1986); alone they serve what one person's time allows; **a hand is taken on for each further `units_per_worker` while the items they would serve earn more than their pay**, so a start-up employs when, and only when, demand outruns one person and the margin pays a wage. The chance to start is nothing unless the profit beats what the founder earns otherwise, and rises with the excess return (Orr 1974; Siegfried and Evans 1994) from nothing to a cap (four times the profile's rate). The profile's business birth rate still calibrates the scale, as the chance at the reference excess return (`reference_bps`, 50%, a placeholder). Nothing in it reads the world whole: every figure is something the person has seen.
+**The rule now.** There is no rate of births. Once a month (as they weigh looking for better work), someone in the labour force with the means for a venture the town offers weighs starting it against what they have. What they expect it to leave them is `rules::entry::expected`, filled from what they know and nothing else:
 
-**Employing start-ups** are possible once the founder's business reaches a lot where hired hands pay; premises are still the founder's home or a pitch until commercial leasing exists, and a lease of premises would be the `fixed` cost.
+| What the founder counts | Where it comes from |
+|---|---|
+| the price of its kind | the middle of the price lists they have read; the venture's figure where they have read none |
+| what it costs to bring in | a trade price list they hold (a wholesaler's, sold in lots), else the trade price the world publishes for it (`unit_cost` on the venture) |
+| what a customer buys of it a month | their own orders over the last two months; none yet, the essentials' units |
+| customers | the homes around them, as they see them by being there (the dwellings in their street's view): a business worked from home sells to its neighbourhood first. A first version counted the town's adults (the census) against the few sellers a person knows, and every town hit its cap of 50 founded firms within the year: the two counts must be of the same reach |
+| sellers there already | the sellers of it they know: no more, which is how founders misjudge (Camerer and Lovallo 1999, excess entry) |
+| what one person serves | a working day's hours, the days a week, at the venture's time an item |
+| the going wage | the best posting they have seen, else the venture's wage |
+| premises | nothing: a home, or premises bought outright |
 
-**Revisit if** the entry that results is wildly out of the profile's range once measured (a response too weak or too strong is a calibration of `reference_bps`, not a fault), or when commercial leasing arrives.
+Sales are shared equally among the sellers they know and themselves (Cournot-style free entry: Mankiw and Whinston 1986); alone they serve what one person's time allows; a hand is counted for each further lot of custom whose margin pays their wage, where the venture has room for staff. **The choice is the mind's** (`venture`, a decision like any other): the business at that figure against life as it is (their pay, or nothing). Nothing is started that is not expected to beat what they have; what working for oneself means beyond the money (`wk_enterprise`: more to the open and the achieving, and to someone who wants work of their own) is the option's meaning in the mind's appraisal, the same sways the chance had. A shop in premises for sale is weighed the same way: its sales among the sellers of its kind they know, served by as many hands as pay, up to its room, every one of them paid (its founder manages it beside their job). What a business of one is expected to pay its owner, until it has a record, is the figure it was started on. The profile's `business.entry_bps_per_year` is a target to compare with (docs/calibration.md), never a setting.
+
+Unchanged: the means (the capital and a month's housing and essentials; for premises, their price, the capital and three months'); someone in a job gives notice first; a founding's draw of "a business" starts one as soon as there are the means; a business of one that pays no living is given up.
+
+**Employing start-ups.** A shop founded in bought premises employs from its first day, and now only where its custom pays its staff. A business of one does not take on a hand: a home is the household's and a pitch holds one, and real small firms that grow lease premises. Commercial leasing (who owns premises to let, at what rent, with a source) is a new institution and the owner's choice to make (ME-1).
+
+**Revisit if** a town's births are far from the profile's rate (the likely causes are what founders know, the means, or the prices; never a rate to add), or when commercial leasing arrives.
 
 ## Starting a business of one (2026-10-11; citizen 0.48.0, firm.retailer 0.12.0)
 
@@ -39,8 +54,8 @@
 | | |
 |---|---|
 | **Who** | Someone in the labour force, of working age, with a home to trade from and savings for the capital beside a month of housing and essentials (`found_own_buffer_months`, a placeholder). In a job or out of one: both are in the literature (Maloney 2004: workers with savings leaving jobs to work for themselves; Fields 1975: those out of work who cannot wait). |
-| **How often** | Each month, the chance `found_own_ppm` (parts per million), shifted by who they are as for any venture (the open and the achieving more; in a living town, those wanting work more). **Derived, not chosen:** the births the profile's business birth rate (`business.entry_bps_per_year`, with its source) gives on the businesses the town has (shops, factories, landlords, the builder, the paper, businesses of one), spread over the people who could start one at the start. Victoria: 16.4% a year (ABS); 61 businesses; about ten births a year. |
-| **Meant, by a founding's draw** | Where the town has founding on (docs/behaviour/founding.md), someone whose draw of what to found is "a business" starts one within 180 days as soon as they have the home and the money, the month's chance set aside. In the 200-person test town the one person who drew it had $2,974 against a capital of $24,200, and nothing came of it: that is the rule. |
+| **How often** | Weighed once a month, by expected profit against what they have (above, "Entry by expected profit", since 2026-10-24); until then a monthly chance derived from the profile's birth rate, which is now a target only. |
+| **Meant, by a founding's draw** | Where the town has founding on (docs/behaviour/founding.md), someone whose draw of what to found is "a business" starts one within 180 days as soon as they have the home and the money, whatever it is expected to pay. In the 200-person test town the one person who drew it had $2,974 against a capital of $24,200, and nothing came of it: that is the rule. |
 | **In a job** | Gives notice ("starting a business of my own") and starts when it has run. |
 | **Founding** | The `entity` call, as for a shop: the business opens an account, calls its capital, records its founder as its only shareholder, and trades once the capital is in. No premises are bought. |
 | **Then** | As any business of one (below): it buys when stock runs low, sells from home, and pays its owner what it holds beyond its stock money every pay period. Its owner is not out of work. |

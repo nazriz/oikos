@@ -164,8 +164,8 @@ export interface Profile {
      * day, for the days worked, with no notice and no standing wage; `day_wage`: a day's pay for it, by kind (needed
      * for each kind that has a share). */
     /** Businesses born in a year, as a share of the businesses there are (the place's business demography, with its
-     * source): what the chance of someone starting a business of their own is derived from, with the town's own
-     * counts (docs/behaviour/entry.md, "Starting a business of one"). Left out: nobody starts one. */
+     * source): a target to compare a town's births with, never a setting (docs/behaviour/entry.md, "Entry by expected
+     * profit"; risk ME-1). */
     business?: { entry_bps_per_year: number;
       /** The days a supplier ordinarily gives a business to pay for goods it has delivered (docs/behaviour/trade.md, "Trade credit"): a
        * factory gives them to the shops that buy from it, and the outside world to the factories that buy inputs. Left out: cash with order. */
@@ -210,6 +210,16 @@ export interface Profile {
         seller?: { wholesale_bps?: number; labour_bps?: number; business_share_bps?: number; occupation?: string; wage_vs_shop_bps?: number } }[] } };
     /** An adult's savings (cash and deposits), by age: percentiles 10, 25, 50, 75, 90 (cents). */
     savings_by_age?: { from: number; pct: [number, number, number, number, number] }[];
+    /** How savings lean on pay (risk ME-17; docs/design/market-realism.md): the rank correlation of income and wealth
+     * once age is accounted for (basis points), from a wealth survey. A person's savings are drawn from their age's
+     * distribution at a rank that leans on their pay's rank by it. Left out: drawn on their own, as before. */
+    income_wealth_rank_bps?: number;
+    /** How work is shared within households (risk ME-17): the labour force survey's share of households in which nobody
+     * is in work (`workless_bps`), of the households it counts (`of`: "working_age", households with a member of working
+     * age; "families", households of two or more people, of any age, as some surveys count). The town's
+     * households share a common factor in who works, fitted to it; each person's own chances stay the profile's. Left
+     * out: each person drawn on their own, as before. */
+    household_work?: { workless_bps: number; of: "working_age" | "families" };
     /** The age people here stop work, where the profile gives one age for everyone; with `labour_force_share_by_age`,
      * the age the profile's other figures by age turn on (the retired's savings, the end of the payments for those out
      * of work, a retirement fund's access) and the top of the working ages the measures use. */

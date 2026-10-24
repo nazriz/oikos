@@ -530,6 +530,9 @@ pub struct Staffing {
     failed: Vec<(String, i64)>,
     unpaid: Vec<Unpaid>,
     asked_answered: BTreeSet<String>,
+    /// posting -> the offers made on it (a posting is for as many hands as it says: `openings`).
+    #[serde(default)]
+    post_offers: BTreeMap<String, i64>,
 }
 
 impl Staffing {
@@ -575,6 +578,7 @@ impl Staffing {
             failed: vec![],
             unpaid: vec![],
             asked_answered: BTreeSet::new(),
+            post_offers: BTreeMap::new(),
         }
     }
 
@@ -617,12 +621,16 @@ impl Staffing {
     }
 
     /// A posting: for a job on a standing wage, or (the employer's share of them) for work by the day.
-    fn posting(&self, cx: &mut Cx, wage: i64, account: &str, by_day: Option<bool>) -> Call {
+    /// `openings`: how many hands it is for (one posting stays up until they are all hired: docs/design/market-realism.md, ME-2).
+    fn posting(&self, cx: &mut Cx, wage: i64, account: &str, by_day: Option<bool>, openings: i64) -> Call {
         let by_day = match by_day {
             Some(b) => b,
             None => self.posts_by_the_day(cx),
         };
         let mut data = serde_json::Map::new();
+        if openings > 1 {
+            data.insert("openings".into(), json!(openings));
+        }
         if by_day {
             data.insert("wage".into(), json!(self.day_wage(wage)));
             data.insert("period".into(), json!(DAY));
@@ -645,7 +653,7 @@ impl Staffing {
             if let Some(w) = &self.o.workplace {
                 commitments.push(json!({ "who": "taker", "does": { "outcome": { "occupancy": { "in": w } } } }));
             }
-            let offer = json!({ "by": self.me, "to": { "min_age_years": 18 }, "take_up": "apply", "available": 1, "terms": { "template": "employment", "commitments": commitments,
+            let offer = json!({ "by": self.me, "to": { "min_age_years": 18 }, "take_up": "apply", "available": openings.max(1), "terms": { "template": "employment", "commitments": commitments,
                 "termination": [{ "party": self.me, "notice": NO_NOTICE }, { "party": "taker", "notice": NO_NOTICE }] } });
             return say(
                 "job_posting",
@@ -656,7 +664,7 @@ impl Staffing {
         say(
             "job_posting",
             &format!("Hiring: {} every {} days.", money_words(wage, &cx.ctx.world), self.o.period / DAY),
-            Say { data: Some(Value::Object(data)), extra: vec![("offer", self.job_offer(wage, account))], ..Default::default() },
+            Say { data: Some(Value::Object(data)), extra: vec![("offer", { let mut of = self.job_offer(wage, account); of["available"] = json!(openings.max(1)); of })], ..Default::default() },
         )
     }
 
@@ -1370,24 +1378,53 @@ impl Staffing {
             }
         }
 
-        // Hiring: one applicant at random per posting, at the posting's wage.
+        // Hiring (docs/design/market-realism.md, ME-2): a posting is for as many hands as it says; the applicants are
+        // judged by the hiring manager, each one taken on interviewed first (a paper to them, in the manager's time:
+        // the table of work's `publish/interview`), and the post offered to those who fit best: someone who has worked in
+        // its trade before anyone who has not, then who applied first. Someone who applied for a posting of ours since
+        // published again at a new wage applied for the job, not the wage: their application stands for the posting
+        // that replaced it.
         let posts = self.postings(book);
         let apps: Vec<&Arc<Record>> = book.open("job_application").filter(|a| crate::common::addressed_to(a).contains(&me) && !self.handled.contains(&a.id)).collect();
+        let kind_of = |p: &Record| (data(p).get("role").and_then(Value::as_str).map(String::from), data(p).get("by_the_day").is_some_and(truthy));
+        let applied_for = |a: &Record| -> Option<String> {
+            let named = data(a).get("posting").and_then(Value::as_str)?.to_string();
+            if posts.iter().any(|p| p.id == named) {
+                return Some(named);
+            }
+            let was = book.get(&named).filter(|r| r.speaks_for.as_deref() == Some(me.as_str()))?;
+            posts.iter().find(|p| kind_of(p) == kind_of(was)).map(|p| p.id.clone())
+        };
         for post in if does_hire { posts.clone() } else { vec![] } {
             // (An advertisement of ours that we have put on hold: nobody is offered the post while the hold stands.)
             if book.on_hold(&post.id, Some(std::slice::from_ref(&me))) {
                 continue;
             }
-            let mut mine: Vec<&Arc<Record>> = apps.iter().filter(|a| data(a).get("posting").and_then(Value::as_str) == Some(post.id.as_str())).copied().collect();
-            mine.sort_by(|x, y| filed_before(&x.id, &y.id));
+            let trade = data(post).get("industry").and_then(Value::as_str).map(String::from);
+            let fits = |a: &Record| trade.is_some() && data(a).get("trade").and_then(Value::as_str) == trade.as_deref();
+            let mut mine: Vec<&Arc<Record>> = apps.iter().filter(|a| applied_for(a).as_deref() == Some(post.id.as_str())).copied().collect();
+            mine.sort_by(|x, y| fits(y).cmp(&fits(x)).then_with(|| filed_before(&x.id, &y.id)));
             for a in &mine {
                 self.handled.insert(a.id.clone());
             }
             if mine.is_empty() {
                 continue;
             }
-            let chosen = mine[cx.rng(&format!("hire-{}", post.id)).below(mine.len() as u64) as usize];
+            let openings = data(post).get("openings").and_then(Value::as_i64).unwrap_or(1).max(1);
+            let made = self.post_offers.get(&post.id).copied().unwrap_or(0);
+            let take = ((openings - made).max(0) as usize).min(mine.len());
+            let considered = mine.len();
+            for (k, chosen) in mine.into_iter().take(take).enumerate() {
+            let filled = made + k as i64 + 1 >= openings;
+            let close = || if filled { vec![plain(withdraw(&post.id, Some("Filled.")))] } else { vec![] };
+            let how = if fits(chosen) { format!("who has worked in the trade, the best fit among {considered} who applied") } else { format!("the first to apply among {considered}, none of whom has worked in the trade") };
             let worker = chosen.speaks_for.clone().unwrap_or_default();
+            let interview = say(
+                "interview",
+                &format!("Interview for our posting, with {worker}."),
+                Say { to: Some(vec![worker.clone()]), visible: Some(Visible::Only(vec![me.clone(), worker.clone()])), basis: Some(chosen.id.clone()), data: Some(json!({ "posting": post.id, "application": chosen.id })), ..Default::default() },
+            );
+            *self.post_offers.entry(post.id.clone()).or_insert(0) += 1;
             let wage = data(post).get("wage").and_then(Value::as_i64).unwrap_or(want.wage);
             let account_to = data(chosen).get("account").and_then(Value::as_str).unwrap_or(&worker).to_string();
             let occupancy = self.o.workplace.as_ref().map(|w| call("occupancy", vec![("who", Some(arg(&worker))), ("in", Some(arg(w)))]));
@@ -1402,10 +1439,9 @@ impl Staffing {
                     basis: Some(chosen.id.clone()),
                     ..Default::default()
                 };
-                steps.push(step_lines(
-                    format!("Taking on a hand by the day: an applicant picked at random among {}.", mine.len()),
-                    vec![bound("job", offer(&worker, o)), plain(withdraw(&post.id, Some("Filled.")))],
-                ));
+                let mut lines = vec![plain(interview), bound("job", offer(&worker, o))];
+                lines.extend(close());
+                steps.push(step_lines(format!("Taking on a hand by the day, after interviewing them: {how}."), lines));
                 offers_now += 1;
                 continue;
             }
@@ -1428,11 +1464,11 @@ impl Staffing {
                 basis: Some(chosen.id.clone()),
                 ..Default::default()
             };
-            steps.push(step_lines(
-                format!("Hiring for our posting: an applicant picked at random among {}.", mine.len()),
-                vec![bound("job", offer(&worker, o)), plain(withdraw(&post.id, Some("Filled.")))],
-            ));
+            let mut lines = vec![plain(interview), bound("job", offer(&worker, o))];
+            lines.extend(close());
+            steps.push(step_lines(format!("Hiring for our posting, after interviewing them: {how}."), lines));
             offers_now += 1;
+            }
         }
 
         steps.extend(self.returns_due(pic, book, cx, account, law.as_ref(), &staff));
@@ -1445,7 +1481,9 @@ impl Staffing {
                 let by_day = d.get("by_the_day").is_some_and(truthy);
                 let now = if by_day { self.day_wage(want.wage) } else { want.wage };
                 if !apps.iter().any(|a| data(a).get("posting").and_then(Value::as_str) == Some(post.id.as_str())) && was != now && want.can_post {
-                    let c = self.posting(cx, want.wage, account, Some(by_day));
+                    // (For the hands it was still for: its applicants carry over, above.)
+                    let left = (d.get("openings").and_then(Value::as_i64).unwrap_or(1) - self.post_offers.get(&post.id).copied().unwrap_or(0)).max(1);
+                    let c = self.posting(cx, want.wage, account, Some(by_day), left);
                     steps.push(step(
                         format!("Our posting is still open, at {}; we offer {} now: posting it again at that.", usd(was), usd(now)),
                         vec![withdraw(&post.id, Some("Superseded: a new wage.")), c],
@@ -1457,8 +1495,16 @@ impl Staffing {
         // Post a job if short-staffed (and the module says we can).
         let have = (staff.len() + offered.len() + offers_now) as i64;
         if does_hire && have < want.target && posts.is_empty() && want.can_post {
-            let c = self.posting(cx, want.wage, account, None);
+            // (One posting for every hand we are short of.)
+            let c = self.posting(cx, want.wage, account, None, want.target - have);
             steps.push(step(want.why.clone().unwrap_or_else(|| format!("Short-staffed ({have} of {}): posting a job.", want.target)), vec![c]));
+        }
+        // (A posting for more hands than we now need, once those we need are taken on or offered the post: taken down.)
+        if does_hire && have >= want.target && offers_now == 0 {
+            let up: Vec<&Arc<Record>> = posts.iter().filter(|p| self.post_offers.get(&p.id).copied().unwrap_or(0) > 0).copied().collect();
+            if !up.is_empty() {
+                steps.push(step(format!("We have the staff we need ({have}): taking down our posting."), up.iter().map(|p| withdraw(&p.id, Some("No longer needed."))).collect()));
+            }
         }
         steps
     }
@@ -2758,8 +2804,10 @@ mod tests {
     }
 
     #[test]
-    fn a_firm_that_hires_posts_a_job_when_short_offers_it_to_one_applicant_and_does_not_post_twice() {
-        let (c, mut s, mut book) = (shop_ctx(), Staffing::new("shop", StaffingOpts::new(PERIOD, 14, "staff")), Book::new());
+    fn a_firm_short_of_hands_posts_one_job_for_them_all_and_offers_it_to_those_who_fit_best_after_interviewing_them() {
+        let mut o = StaffingOpts::new(PERIOD, 14, "staff");
+        o.industry = Some("retail".into());
+        let (c, mut s, mut book) = (shop_ctx(), Staffing::new("shop", o.clone()), Book::new());
         let steps = with_cx(&c, DAY, |cx| {
             let p = picture(DAY, "shop", vec![], &[("acc-shop", "shop", 900_000_000)], vec![]);
             book.absorb(&p);
@@ -2768,39 +2816,74 @@ mod tests {
         });
         let out = said(&steps);
         let post = statements(&out, "job_posting");
-        assert_eq!(post.len(), 1);
-        assert_eq!(argv(post[0], "data")["wage"], SHOP_WAGE);
+        assert_eq!(post.len(), 1, "one posting for both hands");
+        assert_eq!((argv(post[0], "data")["wage"].clone(), argv(post[0], "data")["openings"].clone()), (json!(SHOP_WAGE), json!(2)));
         assert!(steps[0].why.as_ref().unwrap().starts_with("Short-staffed (0 of 2): posting a job."));
-        // The posting is on the book, two apply: one is offered the job at the posting's wage, the posting is taken down.
+        // Three apply: Ann has no work on record; Bob and Cal have worked in the trade (Cal applied last).
         let posting = statement("post-1", DAY + 60, "job_posting", argv(post[0], "data"), "shop");
-        let apply = |id: &str, who: &str| {
-            rec(json!({ "id": id, "record": "statement", "author": format!("{who}-self"), "speaks_for": who, "at": DAY + 90, "visible_to": ["shop", who], "kind": "job_application", "text": "I apply.",
-                "addressed_to": ["shop"], "data": { "posting": "post-1", "account": format!("acc-{who}") } }))
+        let apply = |id: &str, who: &str, at: i64, trade: Option<&str>| {
+            let mut d = json!({ "posting": "post-1", "account": format!("acc-{who}") });
+            if let Some(t) = trade {
+                d["trade"] = json!(t);
+            }
+            rec(json!({ "id": id, "record": "statement", "author": format!("{who}-self"), "speaks_for": who, "at": at, "visible_to": ["shop", who], "kind": "job_application", "text": "I apply.", "addressed_to": ["shop"], "data": d }))
         };
+        let apps = vec![posting.clone(), apply("app-1", "ann", DAY + 90, None), apply("app-2", "bob", DAY + 95, Some("retail")), apply("app-3", "cal", DAY + 99, Some("retail"))];
         let t = 2 * DAY;
         let steps = with_cx(&c, t, |cx| {
-            let p = picture(t, "shop", vec![posting.clone(), apply("app-1", "ann"), apply("app-2", "bob")], &[("acc-shop", "shop", 900_000_000)], vec![]);
+            let p = picture(t, "shop", apps.clone(), &[("acc-shop", "shop", 900_000_000)], vec![]);
             book.absorb(&p);
             s.absorb(&p);
             s.routine::<()>(&p, &book, cx, "acc-shop", &Want { target: 2, wage: SHOP_WAGE, can_post: true, ..Default::default() })
         });
         let out = said(&steps);
-        let offers: Vec<_> = out.iter().filter(|c| c.fn_ == "agreement").collect();
-        assert_eq!(offers.len(), 1);
-        let who = argv(offers[0], "with");
-        assert!(who == json!("ann") || who == json!("bob"));
-        assert!(out.iter().any(|c| argv(c, "withdraw") == json!("post-1")), "the posting comes down once filled");
-        assert!(steps.iter().any(|s| s.lines.iter().any(|l| l.bind.as_deref() == Some("job"))));
-        // Drawn from the stream named for the posting: the same on a second run.
+        let offered: Vec<Value> = out.iter().filter(|c| c.fn_ == "agreement").map(|c| argv(c, "with")).collect();
+        assert_eq!(offered, vec![json!("bob"), json!("cal")], "those who have worked in the trade, whatever the order they applied in");
+        let interviews = statements(&out, "interview");
+        assert_eq!(interviews.len(), 2, "each one offered the post is interviewed first");
+        assert!(out.iter().filter(|c| argv(c, "withdraw") == json!("post-1")).count() == 1, "the posting comes down once both are offered it");
+        // Nothing is drawn: the same applicants give the same choice.
         let again = with_cx(&c, t, |cx| {
-            let mut s2 = Staffing::new("shop", StaffingOpts::new(PERIOD, 14, "staff"));
+            let mut s2 = Staffing::new("shop", o.clone());
             let mut b2 = Book::new();
-            let p = picture(t, "shop", vec![posting.clone(), apply("app-1", "ann"), apply("app-2", "bob")], &[("acc-shop", "shop", 900_000_000)], vec![]);
+            let p = picture(t, "shop", apps.clone(), &[("acc-shop", "shop", 900_000_000)], vec![]);
             b2.absorb(&p);
             s2.absorb(&p);
             s2.routine::<()>(&p, &b2, cx, "acc-shop", &Want { target: 2, wage: SHOP_WAGE, can_post: true, ..Default::default() })
         });
-        assert_eq!(argv(said(&again).iter().find(|c| c.fn_ == "agreement").unwrap(), "with"), who);
+        assert_eq!(said(&again).iter().filter(|c| c.fn_ == "agreement").map(|c| argv(c, "with")).collect::<Vec<_>>(), offered);
+    }
+
+    #[test]
+    fn a_posting_published_again_at_a_new_wage_keeps_who_applied_for_it_and_is_for_the_hands_still_wanted() {
+        let (c, mut s, mut book) = (shop_ctx(), Staffing::new("shop", StaffingOpts::new(PERIOD, 14, "staff")), Book::new());
+        // Our posting for three, one offered already, taken down for a new wage and published again.
+        let old = statement("post-1", DAY, "job_posting", json!({ "wage": SHOP_WAGE - 1_000, "period": PERIOD, "role": "staff", "openings": 3 }), "shop");
+        s.post_offers.insert("post-1".into(), 1);
+        let steps = with_cx(&c, 2 * DAY, |cx| {
+            let p = picture(2 * DAY, "shop", vec![old.clone()], &[("acc-shop", "shop", 900_000_000)], vec![]);
+            book.absorb(&p);
+            s.absorb(&p);
+            s.routine::<()>(&p, &book, cx, "acc-shop", &Want { target: 3, wage: SHOP_WAGE, can_post: true, ..Default::default() })
+        });
+        let out = said(&steps);
+        let post = statements(&out, "job_posting");
+        assert_eq!(post.len(), 1);
+        assert_eq!(argv(post[0], "data")["openings"], json!(2), "for the two hands it was still for");
+        // Someone who applied for the old one is considered for the new one.
+        let withdrawn = rec(json!({ "id": "w-1", "record": "withdrawal", "author": "shop-self", "at": 2 * DAY + 1, "visible_to": "public", "withdraws": "post-1" }));
+        let new = statement("post-2", 2 * DAY + 2, "job_posting", argv(post[0], "data"), "shop");
+        let app = rec(json!({ "id": "app-1", "record": "statement", "author": "ann-self", "speaks_for": "ann", "at": 2 * DAY - 10, "visible_to": ["shop", "ann"], "kind": "job_application", "text": "I apply.", "addressed_to": ["shop"], "data": { "posting": "post-1", "account": "acc-ann" } }));
+        let t = 3 * DAY;
+        let steps = with_cx(&c, t, |cx| {
+            let p = picture(t, "shop", vec![withdrawn.clone(), new.clone(), app.clone()], &[("acc-shop", "shop", 900_000_000)], vec![]);
+            book.absorb(&p);
+            s.absorb(&p);
+            s.routine::<()>(&p, &book, cx, "acc-shop", &Want { target: 3, wage: SHOP_WAGE, can_post: true, ..Default::default() })
+        });
+        let out = said(&steps);
+        assert_eq!(out.iter().filter(|c| c.fn_ == "agreement").map(|c| argv(c, "with")).collect::<Vec<_>>(), vec![json!("ann")]);
+        assert!(!out.iter().any(|c| argv(c, "withdraw") == json!("post-2")), "one of its two hands taken on: still up");
     }
 
     #[test]
