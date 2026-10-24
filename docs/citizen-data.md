@@ -56,5 +56,14 @@ carries `exclude_from_training`; the held-out cases are never read.
 
 ## What it costs
 
-Measured on the release kernel, one run at a time through the slots (docs/decisions.md has the figures): a 1,000-person
-year and a 10,000-person month, each with and without. See "Citizen data: the capture".
+Release kernel, au-vic town-1000 seed 1, lean log, one run at a time, the machine quiet (load about 4), pairs in
+alternating order: **no difference beyond the noise** (a few percent between two runs of the same thing).
+
+| | off (two runs) | on (two runs) | capture |
+|---|---|---|---|
+| 1,000 people, a year | 178 s, 175 s | 165 s, 188 s | 25.6 MB (298 MB of rows; 232,706 turns, 125,177 record changes) |
+| 10,000 people, a month | 79 s, 85 s | 76 s, 82 s | 52.7 MB |
+
+Compression and writing run on a thread of the capture's own; with them on the run's thread, the 10,000-person month
+was 4 to 30% slower in two pairs. The same run writes the same capture, byte for byte (two runs compared). The exporter makes the
+year's 232,706 examples in 4 s (605 MB of rows: each carries the person's whole record).

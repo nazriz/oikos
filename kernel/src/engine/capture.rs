@@ -25,11 +25,22 @@ pub const KIND: &str = "citizen.default";
 const FRAME: usize = 4 << 20;
 const LEVEL: i32 = 3;
 
+/// (Frames are compressed and written on a thread of the capture's own, in the order they are handed over: the run's
+/// thread only gathers rows. One writer, so the bytes are the same however the threads fall out.)
 pub struct Capture {
-    file: File,
     buf: Vec<u8>,
+    to: Option<std::sync::mpsc::SyncSender<Vec<u8>>>,
+    writer: Option<std::thread::JoinHandle<Result<(), String>>>,
     /// Rows written (for the summary; not state).
     pub rows: u64,
+}
+
+fn write_frames(mut file: File, from: std::sync::mpsc::Receiver<Vec<u8>>) -> Result<(), String> {
+    for buf in from {
+        let packed = zstd::bulk::compress(&buf, LEVEL).map_err(|e| format!("the citizen data: {e}"))?;
+        file.write_all(&packed).map_err(|e| format!("the citizen data: {e}"))?;
+    }
+    file.flush().map_err(|e| format!("the citizen data: {e}"))
 }
 
 impl Capture {
@@ -40,7 +51,9 @@ impl Capture {
             std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
         }
         let file = File::create(path).map_err(|e| format!("{path}: {e}"))?;
-        let mut c = Capture { file, buf: Vec::with_capacity(FRAME + (1 << 16)), rows: 0 };
+        let (to, from) = std::sync::mpsc::sync_channel::<Vec<u8>>(2);
+        let writer = std::thread::Builder::new().name("citizen-data".into()).spawn(move || write_frames(file, from)).map_err(|e| e.to_string())?;
+        let mut c = Capture { buf: Vec::with_capacity(FRAME + (1 << 16)), to: Some(to), writer: Some(writer), rows: 0 };
         let mut head = Map::new();
         head.insert("row".into(), "segment".into());
         head.insert("schema".into(), FORMAT.into());
@@ -70,16 +83,25 @@ impl Capture {
         if self.buf.is_empty() {
             return Ok(());
         }
-        let packed = zstd::bulk::compress(&self.buf, LEVEL).map_err(|e| format!("the citizen data: {e}"))?;
-        self.file.write_all(&packed).map_err(|e| format!("the citizen data: {e}"))?;
-        self.buf.clear();
-        Ok(())
+        let buf = std::mem::replace(&mut self.buf, Vec::with_capacity(FRAME + (1 << 16)));
+        match &self.to {
+            Some(to) if to.send(buf).is_ok() => Ok(()),
+            // (The writer stopped: its error is what finish says.)
+            _ => self.finish(),
+        }
     }
 
-    /// Everything held written out (at the run's end).
+    /// Everything held written out (at the run's end); the writer's error, if it had one.
     pub fn finish(&mut self) -> Result<(), String> {
-        self.frame()?;
-        self.file.flush().map_err(|e| format!("the citizen data: {e}"))
+        if self.to.is_some() && !self.buf.is_empty() {
+            let buf = std::mem::take(&mut self.buf);
+            let _ = self.to.as_ref().expect("checked").send(buf);
+        }
+        self.to = None;
+        match self.writer.take() {
+            Some(w) => w.join().map_err(|_| "the citizen data's writer panicked".to_string())?,
+            None => Ok(()),
+        }
     }
 }
 
