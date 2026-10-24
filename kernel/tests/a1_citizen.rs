@@ -97,6 +97,13 @@ fn with_take_up_at_nothing_nobody_claims_support() {
             p["controller"]["params"]["take_up_bps"] = json!(0);
         }
     }
+    // (And the people who come to town in the run: they are made from the templates, which carry the same take-up. The three claims at day 37 on 2026-10-24
+    // were newcomers', their templates unset.)
+    for t in c["templates"].as_array_mut().unwrap() {
+        if t["controller"]["impl"] == "citizen.default" {
+            t["controller"]["params"]["take_up_bps"] = json!(0);
+        }
+    }
     let (_, e) = run_code_world(c, "a1-takeup", Vec::new(), opts(4, 60 * DAY)).unwrap();
     let log = lines(&e.into_log());
     assert!(statements(&log, "benefit_claim").is_empty());
