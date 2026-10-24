@@ -363,5 +363,8 @@ if (!custom && !list) try {
 } catch { /* a record is a convenience: never a failure */ }
 if (!custom && ((!filters.length && !fast && !changed) || timeNew)) writeFileSync(timesPath, JSON.stringify(Object.fromEntries(Object.entries(times).sort()), null, 1) + "\n");
 for (const b of bad) console.log(b);
+// (A gate file that ran long belongs in the slow tier: a new file comes in untimed, and nothing else would say so.)
+const long = Object.entries(record).filter(([f, r]) => !isSlowTier(f) && r.secs > 90).map(([f, r]) => `${f} (${r.secs}s)`);
+if (long.length && !custom) console.log(`\nNOTE gate-tier files over 90 s: ${long.join(", ")}. Name them in scripts/test-tiers.json (the slow tier), with why.`);
 console.log(`\n${pass} pass, ${fail} fail across ${files.length} files, ${maxJobs} at a time, in ${((performance.now() - t0) / 1000).toFixed(0)}s${fast ? " (fast tier)" : changed ? " (fast tier and what changed)" : ""}, ${rerun} passed on rerun`);
 process.exit(failed ? 1 : 0);

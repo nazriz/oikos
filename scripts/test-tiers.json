@@ -38,6 +38,7 @@
   "orchestrator/test/prices.test.ts": "several towns run for months (72 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/production.test.ts": "towns run a year or more; several seeds or towns (141 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/reading-dial.test.ts": "several towns run for months (273 s on 2026-10-24, the whole suite at once)",
+  "orchestrator/test/recourse-town.test.ts": "several towns run for months, living and not (114 s in the merge gate of 2026-10-24, where it came in untimed)",
   "orchestrator/test/reliability.test.ts": "several seeds or towns (52 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/retail.test.ts": "towns run a year or more; the 1,000-person town (32 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/river.test.ts": "several towns run for months (56 s on 2026-10-24, the whole suite at once)",
