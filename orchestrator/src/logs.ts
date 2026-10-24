@@ -21,7 +21,7 @@ export const isStoppedLog = (file: string) => STOPPED.test(file);
  * run for ever, as the log is, and never published as it stands, since it holds what seats asked to be kept back. */
 export const debriefsBeside = (log: string) => log.replace(/\.jsonl(\.zst)?$/, ".debriefs.jsonl");
 
-export const isLog = (file: string) => (file.endsWith(".jsonl") || file.endsWith(".jsonl.zst")) && !/\.debriefs\.jsonl$/.test(file) && !/\.anchors\.jsonl(\.zst)?$/.test(file) && !/translator-corpus\.jsonl$/.test(file) && !isStoppedLog(file);
+export const isLog = (file: string) => (file.endsWith(".jsonl") || file.endsWith(".jsonl.zst")) && !/\.debriefs\.jsonl$/.test(file) && !/\.calls\.jsonl$/.test(file) && !/\.anchors\.jsonl(\.zst)?$/.test(file) && !/translator-corpus\.jsonl$/.test(file) && !isStoppedLog(file);
 
 /** A run's id from its log file's name. */
 export const runOf = (file: string) => file.split("/").at(-1)!.replace(/\.jsonl(\.zst)?$/, "");
