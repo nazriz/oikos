@@ -54,8 +54,7 @@ async function tenant(asking: boolean) {
   throw new Error("nobody");
 }
 
-// DIVERGENCE (cut-over, held as test.failing): through the engine's citizen a heavier weight on trust (wants.choice.trust) asks the landlord less, not more (of 59 seeds none asks at 100000, 20 at 0); the TS citizen asked for those who trust more (docs/behaviour/citizen.md, Wants and initiative). docs/risks.md, PC-15.
-test.failing("a tenant who takes initiative and trusts the landlord asks them to hold a rent rise; granted, the rent stays, the want is met and asking is learned to work", async () => {
+test("a tenant who takes initiative and trusts the landlord asks them to hold a rent rise; granted, the rent stays, the want is met and asking is learned to work", async () => {
   const { p, kept, said } = await tenant(true);
   // A letter to the landlord, resting on the notice, saying in typed terms what the tenant would have: the old rent.
   expect(asks(said).map((c) => ({ to: c.args.to, basis: c.args.basis, data: c.args.data, text: c.args.text }))).toEqual([{ to: ["landlord-1"], basis: "inc-1", text: `Request: please hold the rent for ${HOME} at $1,000.00 a month.`,
@@ -78,8 +77,7 @@ test.failing("a tenant who takes initiative and trusts the landlord asks them to
   expect(orders(await p.wake(61 * DAY, { transactions: wages(61 * DAY) }))).toEqual([]);
 });
 
-// DIVERGENCE (cut-over, held as test.failing): through the engine's citizen a heavier weight on trust (wants.choice.trust) asks the landlord less, not more (of 59 seeds none asks at 100000, 20 at 0); the TS citizen asked for those who trust more (docs/behaviour/citizen.md, Wants and initiative). docs/risks.md, PC-15.
-test.failing("refused, the rise is dealt with as it stands (paid, where it can be borne); unanswered, the same after a fortnight", async () => {
+test("refused, the rise is dealt with as it stands (paid, where it can be borne); unanswered, the same after a fortnight", async () => {
   const refused = await tenant(true);
   const said = await refused.p.wake(47 * DAY, { records: [answer("ans-1", 46 * DAY, "inc-1", false)], transactions: wages(47 * DAY) });
   expect(orders(said).map((c) => c.args.amount)).toEqual(["$1050.00"]);
@@ -92,8 +90,7 @@ test.failing("refused, the rise is dealt with as it stands (paid, where it can b
   expect(orders(await silent.p.wake(54 * DAY, { transactions: wages(54 * DAY) })).map((c) => c.args.amount)).toEqual(["$1050.00"]);
 });
 
-// DIVERGENCE (cut-over, held as test.failing): through the engine's citizen a heavier weight on trust (wants.choice.trust) asks the landlord less, not more (of 59 seeds none asks at 100000, 20 at 0); the TS citizen asked for those who trust more (docs/behaviour/citizen.md, Wants and initiative). docs/risks.md, PC-15.
-test.failing("someone who does not trust the landlord does not ask them; someone who takes no initiative holds no wants and does as tenants did before", async () => {
+test("someone who does not trust the landlord does not ask them; someone who takes no initiative holds no wants and does as tenants did before", async () => {
   const wary = await tenant(false);
   const said = wary.said;
   expect(asks(said)).toEqual([]);

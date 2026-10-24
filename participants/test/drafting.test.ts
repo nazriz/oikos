@@ -153,8 +153,10 @@ test("an amendment that fails changes nothing; one that names no figure isn't pu
   expect(second.split("\n").length).toBe(1);
 });
 
-// DIVERGENCE (held as test.failing; docs/risks.md, PB-21): the engine lists a law's figures in the clerk's report alphabetically (alone, dogs, share), not in the schedule's order (dogs, alone, share): kernel/crates/actors/src/offices/council.rs `amendable` iterates a BTreeMap.
-test.failing("a law in free words passes as words, and the clerk says so and where figures are changed, in the town's terms", () => {
+// (The figures in the clerk's report are listed by name, alone, dogs, share, not in the order the schedule was written in: the engine
+// keeps a schedule as a keyed record, whose keys the kernel holds sorted so that a world's state hash does not depend on how a file
+// was typed. Changed from the TypeScript order, with its reason, 2026-10-23: docs/decisions.md, "The held cases, settled".)
+test("a law in free words passes as words, and the clerk says so and where figures are changed, in the town's terms", () => {
   const clerk = councilClerk.create(ctx("clerk", {}, "council-clerk"));
   const old = dogLaw("law-dogs", { dogs: 2, alone: 4 * 3600, share: 2500 });
   const general = stmt("form-council-proposal", 0, "form", { data: { form: "council_proposal", submit_as: "proposal", submit_to: ["city"], fields: {} } });
@@ -172,7 +174,7 @@ test.failing("a law in free words passes as words, and the clerk says so and whe
   // Its report to anyone who writes: the same, with each such law's figures as they stand.
   const letter = { ...obs(16 * DAY, []), inbox: [{ id: "m1", from: "mayor-system", text: "What can I change?" }] } as unknown as Observation;
   const report = run(clerk, letter);
-  expect(report).toContain("A law proposed on that form stands as its words: no rule is set down with it for acts to be checked against. Laws made from figures are amended on their own forms: the law on keeping dogs (law-dogs) on amend_dogs (dogs: dogs to a home, now 2 dogs; alone: time a dog may be left, now 4 hours; share: share of the fee, now 25%).");
+  expect(report).toContain("A law proposed on that form stands as its words: no rule is set down with it for acts to be checked against. Laws made from figures are amended on their own forms: the law on keeping dogs (law-dogs) on amend_dogs (alone: time a dog may be left, now 4 hours; dogs: dogs to a home, now 2 dogs; share: share of the fee, now 25%).");
   // The code mayor's own way (a proposal carrying what to enact, rule and all) still enacts it as given, with no such note.
   const p2 = proposal("p2", 20 * DAY, { text: "Proposal", data: { enact: { kind: "law", text: "Dogs stay on leads.", adico: { attribute: "anyone", deontic: "must_not", aim: "walk a dog off a lead" }, formal: { language: "cel", condition: "block.kind == 'walk'" } }, tags: [] } });
   run(clerk, obs(20 * DAY, [p2]));
@@ -325,21 +327,5 @@ test("the clerk amends a law of optional figures: a requirement added, one taken
   expect(lines(made.closed, "law")[0]).toContain("They rest at least 5 days between ringings. (Made by the council on ballot b1.)");
 });
 
-// BLOCKED: this was part of the case above and called `breaches`, which the deleted TypeScript library exported. The engine's
-// `breaches` is covered for an act and a law that cannot be read (kernel/crates/actors/src/common/tests.rs, a_prohibition_binds_an_act_it_is_true_of_and_says_when_it_cannot_be_read),
-// but no Rust test judges an act by the amended law and by the law as it stood when the act was made. Kept, skipped, until one does.
-const breaches = (_book: Book, _act: object, _actor: string, _now: number): { id: string }[] => { throw new Error("blocked: breaches is not in TypeScript now"); };
-// PORT NEEDED (cut-over, held as test.skip): the TypeScript helper this case called is gone and no engine test judges the same; docs/risks.md, MT-18.
-test.skip("an act is judged by the amended law from when it was made, and by the law as it stood when the act was made", () => {
-  const old = dogLaw("law-dogs", { dogs: 2, alone: 4 * 3600, share: 2500 });
-  const amended = dogLaw("law-dogs-2", { dogs: 3, alone: 4 * 3600, share: 3000 }, { at: 15 * DAY, author: "clerk", data: { ...draftLaw("schedule-dogs", DOGS, { dogs: 3, alone: 4 * 3600, share: 3000 }).data, replaces: "law-dogs" } });
-  const book = new Book();
-  book.absorb(obs(0, [old]));
-  const three = { block: "publish", kind: "dog_registration", data: { dogs: 3, alone: 3600, share: 3000 } };
-  expect(breaches(book, three, "c1", 10 * DAY).map((l) => l.id)).toEqual(["law-dogs"]);
-  book.absorb(obs(15 * DAY, [amended]));
-  expect(breaches(book, three, "c1", 20 * DAY)).toEqual([]);
-  expect(breaches(book, { ...three, data: { dogs: 4, alone: 3600, share: 3000 } }, "c1", 20 * DAY).map((l) => l.id)).toEqual(["law-dogs-2"]);
-  // An act is judged by the law as it stood when the act was made.
-  expect(breaches(book, three, "c1", 10 * DAY).map((l) => l.id)).toEqual(["law-dogs"]);
-});
+// ("An act is judged by the amended law from when it was made, and by the law as it stood when the act was made" is held by the engine's own test:
+// kernel/crates/actors/src/common/tests.rs, an_act_is_judged_by_the_amended_law_from_when_it_was_made_and_by_the_law_as_it_stood_when_the_act_was_made.)

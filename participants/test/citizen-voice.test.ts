@@ -28,9 +28,12 @@ const signatures = (said: Said[]) => said.filter((c) => c.fn === "vote");
 const open = (id: string, at: number, by: string, x: object = {}) => statement(id, at, "petition", { author: `${by}-self`, speaks_for: by, text: "Petition.", data: { demand: { kind: "law", text: "x", tags: ["tenant_protection"] } }, ...x });
 const count = (id: string, of: string, at: number, by: string, n: number) => statement(id, at, "petition_count", { author: `${by}-self`, speaks_for: by, basis: of, text: `${n} people have signed.`, data: { petition: of, signatures: n } });
 
-// DIVERGENCE (cut-over, held as test.failing): the engine's citizen differs from the TS one on this case (see docs/risks.md, PC-15).
-test.failing("a tenant whose rent is 40% or more of income is aggrieved, and with no tenants' petition open starts one: a law, tagged tenant protection, with its breakdown", async () => {
-  const said = await first(tenant(STRAINED), STRAINED);
+// (What the petition asks for is the world's, from its profile's `petition_demand` (docs/profiles.md; risks PC-8): the TypeScript citizen wrote one
+// place's figures into every town's petition. Here the world is given the figures this case was written with, and the next case holds the wording
+// of a world that gives none. Changed from the TypeScript case, with its reason, 2026-10-23: docs/decisions.md, "The held cases, settled".)
+const DEMAND = { petition_demand: { notice_days: 90, rise_cap_bps: 500 } };
+test("a tenant whose rent is 40% or more of income is aggrieved, and with no tenants' petition open starts one: a law, tagged tenant protection, with its breakdown", async () => {
+  const said = await first(tenant(STRAINED, DEMAND), STRAINED);
   const made = petitions(said);
   expect(made.length).toBe(1);
   expect(made[0]!.why).toBe("Aggrieved (rent is 43% of household income) and no tenants' petition is open: starting one.");
@@ -39,13 +42,25 @@ test.failing("a tenant whose rent is 40% or more of income is aggrieved, and wit
     text: "A landlord must give at least 90 days' notice to end a tenancy, and may not raise the rent by more than 5% in any 12 months.",
     adico: { attribute: "landlords", deontic: "must_not", aim: "end a tenancy on less than 90 days' notice, or raise rent by more than 5% a year" } } });
   // Where the world's law on ending a tenancy is made from figures, the demand also names it and the notice asked, as a figure.
-  const named = petitions(await first(tenant(STRAINED, { tenancy_schedule: "schedule-tenancy" }), STRAINED));
+  const named = petitions(await first(tenant(STRAINED, { ...DEMAND, tenancy_schedule: "schedule-tenancy" }), STRAINED));
   expect(named[0]!.args.data.demand.amend).toEqual({ schedule: "schedule-tenancy", figures: { notice: 90 * DAY } });
   // Just under 40% (39.6% of $2,571.42): not aggrieved, and nothing started.
-  expect(petitions(await first(tenant(EASY), EASY))).toEqual([]);
-  expect(petitions(await first(tenant(101_900), 101_900))).toEqual([]);
-  expect(petitions(await first(tenant(102_900), 102_900)).length).toBe(1);
+  expect(petitions(await first(tenant(EASY, DEMAND), EASY))).toEqual([]);
+  expect(petitions(await first(tenant(101_900, DEMAND), 101_900))).toEqual([]);
+  expect(petitions(await first(tenant(102_900, DEMAND), 102_900)).length).toBe(1);
   expect(INCOME).toBe(257_142);
+});
+
+test("a world that gives no figures for what tenants petition for gets a petition in general words, naming no figure and amending no schedule", async () => {
+  const made = petitions(await first(tenant(STRAINED, { tenancy_schedule: "schedule-tenancy" }), STRAINED));
+  expect(made.length).toBe(1);
+  expect(made[0]!.args.text).toBe("Petition: landlords must give tenants longer notice, and limit how far they raise the rent.");
+  expect(made[0]!.args.data.demand.amend).toBeUndefined();
+  expect(made[0]!.args.data.demand.tags).toEqual(["tenant_protection"]);
+  expect(JSON.stringify(made[0]!.args)).not.toMatch(/\d/);
+  // One figure given: only that one is asked for.
+  const notice = petitions(await first(tenant(STRAINED, { petition_demand: { notice_days: 60 } }), STRAINED));
+  expect(notice[0]!.args.text).toBe("Petition: landlords must give 60 days' notice.");
 });
 
 test("a tenant given notice to go is aggrieved while angry with the landlord, and starts a petition though the rent is easy", async () => {
@@ -77,8 +92,7 @@ test("an aggrieved tenant starts a petition with the chance petition_start_bps e
   expect(signatures(other)).toEqual([]);
 });
 
-// DIVERGENCE (cut-over, held as test.failing): the engine's citizen differs from the TS one on this case (see docs/risks.md, PC-15).
-test.failing("only those who sign petitions at all (petition_willing_bps, drawn once) start or sign one, however aggrieved", async () => {
+test("only those who sign petitions at all (petition_willing_bps, drawn once) start or sign one, however aggrieved", async () => {
   const unwilling = tenant(STRAINED, { petition_willing_bps: 0 });
   expect(petitions(await first(unwilling, STRAINED))).toEqual([]);
   const board = [open("pet-9", 0, "c9")];
@@ -103,8 +117,7 @@ test("a tenant who isn't aggrieved signs once the share of the town in the organ
   expect(signatures(await p.wake(29 * DAY, { petitions: board, records: [count("n4", "pet-9", 28 * DAY, "c9", 90)], transactions: wages(29 * DAY) }))).toEqual([]);
 });
 
-// DIVERGENCE (cut-over, held as test.failing): the engine's citizen differs from the TS one on this case (see docs/risks.md, PC-15).
-test.failing("thresholds are roughly normal around threshold_mean_bps with spread threshold_sd_bps, a person's own", async () => {
+test("thresholds are roughly normal around threshold_mean_bps with spread threshold_sd_bps, a person's own", async () => {
   // 300 tenants, none aggrieved, shown a petition the whole town has signed: each signs, and says its threshold.
   const board = [open("pet-9", 0, "c9")];
   const thresholds: number[] = [];

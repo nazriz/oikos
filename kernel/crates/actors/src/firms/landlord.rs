@@ -900,7 +900,7 @@ impl Plan for Office {
         self.letting(cx, &e, &mut steps, &mut let_now, &mut offered_now);
         self.renewals(cx, &e, &mut steps);
         self.listings(cx, &e, &mut steps, &let_now, &offered_now);
-        self.deaths(&e, &sites, &mut steps);
+        self.deaths(cx, &e, &sites, &mut steps);
         self.arrears(cx, &e, &mut steps);
         self.rent_reviews(cx, &e, &mut steps, &offered_now);
         self.monthly(cx, &e, &mut steps);
@@ -1220,7 +1220,7 @@ impl Office {
     /// has, and only where nobody else lives: the home empty, and nobody in or out of it for a day (those who share a
     /// home report a death themselves, and say who the family is, which we can't; docs/behaviour/deaths.md). Once
     /// registered: give notice on their lease, as it allows (the household may apply for a home again).
-    fn deaths(&mut self, e: &Env, sites: &[&SiteCell], steps: &mut Vec<Step<Then>>) {
+    fn deaths(&mut self, cx: &mut Cx, e: &Env, sites: &[&SiteCell], steps: &mut Vec<Step<Then>>) {
         let me = self.me.clone();
         // Registered, as far as we have been told: the entry sent to us, or a certified copy of one made on someone
         // else's report.
@@ -1250,6 +1250,58 @@ impl Office {
             }
             self.notice_given.insert(a.id.clone(), e.t);
             steps.push(step(format!("Our tenant {who} has died (registered): giving notice on their lease."), vec![notice(&a.id, "The tenant has died.")]));
+            // The tenancy passes to the household member the lease names (else the partner the entry names), if they are
+            // alive as far as we know: a new lease on the same terms from when the old one ends, as a partner or household
+            // member who lived there stays where the law lets them. Read from papers only, never from who was seen where.
+            let lt = lease_terms(a, who);
+            let entry = self.book.all("death_registration").chain(self.book.all("death_certificate")).find(|r| data(r).s("deceased") == Some(who.as_str())).cloned();
+            let named: Vec<String> = match &a.body {
+                RecordBody::Agreement { terms } => terms.text.as_deref().and_then(|t| t.rsplit_once("household: ")).and_then(|(_, h)| h.strip_suffix('.')).map(|h| h.split(|c: char| c == ',' || c == ' ').filter(|x| !x.is_empty() && *x != who.as_str() && !registered.contains(*x)).map(String::from).collect()).unwrap_or_default(),
+                _ => vec![],
+            };
+            let partner: Vec<String> = entry.as_ref().and_then(|r| data(r).s("partner").map(String::from)).filter(|p| !registered.contains(p)).into_iter().collect();
+            let mut heirs: Vec<String> = named.into_iter().chain(partner).collect();
+            heirs.sort();
+            let Some(heir) = heirs.into_iter().next() else { continue };
+            let Some(space) = lt.space.clone().filter(|sp| self.owned.iter().any(|o| &o.space == sp)) else { continue };
+            if !self.p.renew || self.renewed.contains(&a.id) {
+                continue;
+            }
+            let ends = e.t + self.p.landlord_notice_days * DAY;
+            self.renewed.insert(a.id.clone());
+            self.renews_at.insert(a.id.clone(), ends);
+            let rent = self.rent_at(a, ends);
+            let months = self.term_months(cx, &format!("succeed-{who}"));
+            let o = Offer {
+                template: "lease".into(),
+                term: Some(ends - e.t + months * MONTH),
+                periodic: self.p.after_term.as_deref() == Some("periodic"),
+                our_notice: Some(self.p.landlord_notice_days * DAY),
+                their_notice: Some(self.p.tenant_notice_days * DAY),
+                we: Some(occupancy(&heir, &space)),
+                they: Some(rent_payment(&e.account, rent, cx)),
+                text: Some(format!("{heir} rents home {space} from {me} for {} a month, succeeding {who} (lease {}) for {months} months from day {}.", e.usd(rent), a.id, ends.div_euclid(DAY))),
+                basis: Some(a.id.clone()),
+                ..Default::default()
+            };
+            steps.push(step_lines(
+                format!("{who} has died and {heir}, of their household, may be living in {space}: offering {heir} the tenancy, a new lease at {} a month for {months} months from when the old one ends.", e.usd(rent)),
+                vec![bound("lease", offer(&heir, o))],
+            ));
+        }
+        // Nothing is asked of the dead: an application of ours for possession against a registered tenant's lease is withdrawn.
+        let pending: Vec<(String, String)> = self
+            .book
+            .open("tribunal_application")
+            .filter(|r| r.speaks_for.as_deref() == Some(me.as_str()) && data(r).s("kind") == Some("possession") && !self.handled.contains(&format!("withdrawn-{}", r.id)))
+            .filter_map(|r| {
+                let a = tenants.values().find(|a| data(r).s("about") == Some(a.id.as_str()))?;
+                registered.contains(tenant_of(a, &me)).then(|| (r.id.clone(), tenant_of(a, &me).to_string()))
+            })
+            .collect();
+        for (app, who) in pending {
+            self.handled.insert(format!("withdrawn-{app}"));
+            steps.push(step(format!("{who} has died: withdrawing our application for possession ({app}); nothing is asked of the dead."), vec![withdraw(&app, Some("Withdrawn: the tenant has died."))]));
         }
     }
 }
