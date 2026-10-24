@@ -106,6 +106,9 @@ pub struct Withhold {
     /// Only a paper addressed to this participant or entity.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
+    /// Only a paper whose data has this field (a decision made on a review: `on_review`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub has: Option<String>,
 }
 
 fn first() -> u32 {
@@ -120,8 +123,9 @@ impl Withhold {
                 && b["kind"].as_str() == Some(self.what.as_str())
                 && self.matter.as_deref().is_none_or(|m| b["data"]["matter"].as_str() == Some(m))
                 && self.to.as_deref().is_none_or(|to| b["addressed_to"].as_array().is_some_and(|a| a.iter().any(|x| x.as_str() == Some(to))))
+                && self.has.as_deref().is_none_or(|h| b["data"].get(h).is_some_and(|v| !v.is_null()))
         };
-        let block = |b: &Value| b["block"].as_str() == Some(self.what.as_str()) && self.matter.is_none() && self.to.is_none();
+        let block = |b: &Value| b["block"].as_str() == Some(self.what.as_str()) && self.matter.is_none() && self.to.is_none() && self.has.is_none();
         self.participant.as_deref().is_none_or(|p| p == pid) && blocks.iter().any(|b| paper(b) || block(b))
     }
 }
