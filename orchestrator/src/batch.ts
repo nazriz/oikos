@@ -133,7 +133,7 @@ export function translatorArrangement(o: { translatorFirst?: string; translatorA
 /** Run one seed in this process and write its summary next to its log. Or resume a run that stopped (`resume`: its
  * log): run again from its own config, with every model response served from that log (resume.ts, D59). `town`: the
  * town's seed (the spec's `seed` set to it, after any `sets`), named in the run's id; absent, the spec's own. */
-export async function runOne(o: { debriefWording?: string; world?: string; seed?: number; town?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; translatorFirst?: string; translatorArrangement?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; recordDecisions?: string; logDetail?: string; consult?: boolean; consultAvoid?: string; composer?: boolean }): Promise<RunRecord> {
+export async function runOne(o: { debriefWording?: string; world?: string; seed?: number; town?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; translatorFirst?: string; translatorArrangement?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; recordDecisions?: string; logDetail?: string; consult?: boolean; consultAvoid?: string; composer?: boolean; captureCitizens?: string }): Promise<RunRecord> {
   let config: any, runId: string, out: string, serving: Serving | undefined, stoppedLog: string | undefined;
   let consult = !!o.consult;
   let composerReal = !!o.composer;
@@ -142,6 +142,7 @@ export async function runOne(o: { debriefWording?: string; world?: string; seed?
   let debriefWording = o.debriefWording as "a" | "b" | undefined;
   let recordObservations = o.recordObservations;
   let recordDecisions = o.recordDecisions;
+  if (o.captureCitizens !== undefined && o.captureCitizens !== "on" && o.captureCitizens !== "off") throw new Error(`--capture-citizens is on or off, not "${o.captureCitizens}"`);
   if (recordDecisions !== undefined && !/^[a-z_]+(,[a-z_]+)*$/.test(recordDecisions)) throw new Error(`--record-decisions is full, none or a list of areas (want,found), not "${recordDecisions}"`);
   // What an audit found unstable (its report's avoid list), left out of the sparse mind.
   let consultAvoid: string[] | undefined = o.consultAvoid ? (JSON.parse(await Bun.file(o.consultAvoid).text()).avoid as string[]) : undefined;
@@ -192,7 +193,7 @@ export async function runOne(o: { debriefWording?: string; world?: string; seed?
   const watchdog = new Watchdog({ stallMs: stallMs(), diagnosisPath, runId });
   let s: RunSummary;
   try {
-    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.resume ? { resumed: true } : {}), ...(debriefWording ? { debriefWording } : {}), ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions !== undefined && recordDecisions !== "full" ? { recordDecisions } : {}),
+    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.captureCitizens !== undefined ? { captureCitizens: o.captureCitizens === "on" } : {}), ...(o.resume ? { resumed: true } : {}), ...(debriefWording ? { debriefWording } : {}), ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions !== undefined && recordDecisions !== "full" ? { recordDecisions } : {}),
       ...(real ? { adapter: serve(real.adapter), prices: { ...real.prices, ...(tr?.prices ?? {}), ...(first?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : first ? { prices: first.prices } : {}),
       ...(tr ? { translatorAdapter: serve(tr.adapter) } : {}),
       ...(first ? { translatorFirst: serve(first.adapter), translatorArrangement: arrangement } : {}),
@@ -322,6 +323,8 @@ export interface BatchOptions {
   recordDecisions?: string;
   /** How much the log keeps: "full" (the default) or "lean" (docs/reliability.md). */
   logDetail?: string;
+  /** Capture the citizens' decisions for training (docs/citizen-data.md): "on" or "off"; default on with a real model. */
+  captureCitizens?: string;
   /** The sparse mind on (docs/design/ai-citizens.md 4), leaving out what an audit report found unstable. */
   consult?: boolean;
   /** Call the world's composing models for real (docs/behaviour/founding.md): without it the mock plays the composer. */
@@ -457,7 +460,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
         limitUsd = held / 1e6;
       }
       const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), ...(town !== undefined ? ["--town", String(town)] : []), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
-        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.composer ? ["--composer"] : []), ...(o.debriefWording ? ["--debrief-wording", o.debriefWording] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...firstFlags(o), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
+        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.captureCitizens ? ["--capture-citizens", o.captureCitizens] : []), ...(o.consult ? ["--consult"] : []), ...(o.composer ? ["--composer"] : []), ...(o.debriefWording ? ["--debrief-wording", o.debriefWording] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...firstFlags(o), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
         ...(o.modules ? ["--modules", resolve(o.modules)] : []), ...(o.overwrite ? ["--overwrite"] : [])];
       const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: slotted ? insideSlot(1, { ...process.env }) : { ...process.env } }); // (the environment as it is now)
       children.add(p);

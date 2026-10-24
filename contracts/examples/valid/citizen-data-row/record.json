@@ -1,0 +1,1 @@
+{ "row": "record", "t": 604800, "p": "c12-self", "set": { "agency": { "now": 5200, "own": 5000 } }, "because": [{ "t": 600000, "what": "hired" }] }

@@ -1,0 +1,14 @@
+{
+  "schema": "citizen-example/1",
+  "run": "town-1",
+  "t": 864000,
+  "participant": "c12-self",
+  "n": 7,
+  "domain": "want",
+  "choice": "ask",
+  "decision": { "domain": "want", "strategy": "deliberate", "choice": "ask", "options": [{ "key": "ask", "score": 1200 }, { "key": "wait", "score": -800 }] },
+  "draws": [{ "key": ["participant", "c12-self", "self", "", "want-notice-paper#1", "1"], "drawn": ["9e3779b97f4a7c15"] }],
+  "record": { "agency": { "now": 5200, "own": 5000 } },
+  "record_at": 604800,
+  "outcomes": [{ "t": 950400, "domain": "want", "option": "ask", "kind": "worked", "way": "mine", "of": 7 }]
+}

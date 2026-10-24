@@ -23,8 +23,8 @@
 // call goes to the mock adapter.
 
 import { AsyncLocalStorage } from "node:async_hooks";
-import { appendFileSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { debriefsBeside } from "./logs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { citizensBeside, debriefsBeside } from "./logs";
 import { join } from "node:path";
 import { actedOn, besideOf, drawTies, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
 import { readForEnd } from "./run-end";
@@ -88,6 +88,10 @@ export interface RunOptions {
   /** Code citizens' decisions as their minds made them (docs/design/ai-citizens.md 7; training data for citizen models):
    * "full" (the default: every one, in a log that is not lean) or "none". */
   recordDecisions?: string; // "full", "none", or a list of areas ("want,found,found_shape"): those decisions only, kept in a lean log too, with no outcomes
+  /** Capture every code citizen's decision for training a citizen model (docs/citizen-data.md): `<run>.citizens.jsonl.zst`
+   * beside the log, with each decision's draws and the person's record as it stood. Nothing in the world or the log
+   * changes with it. Default: on for a run with a real model (a pilot), and for a resumed run that captured; off otherwise. */
+  captureCitizens?: boolean;
   /** The sparse mind (docs/design/ai-citizens.md 4): code citizens may ask the run's model (the mock, or --model) how
    * much their options would matter, with answers remembered by kind. Off by default. */
   consult?: boolean;
@@ -352,6 +356,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   mkdirSync(o.outDir, { recursive: true });
   const logPath = join(o.outDir, `${o.runId}.jsonl`);
   const anchorsPath = join(o.outDir, `${o.runId}.anchors.jsonl`);
+  const capturePath = citizensBeside(logPath);
+  const capture = o.captureCitizens ?? (!!o.adapter || (!!o.resumed && existsSync(capturePath)));
   let t = 0;
   let commands = 0, refused = 0, wakes = 0, kernelMs = 0, moduleMs = 0, platformMs = 0;
   const wakesBy: { [why: string]: number } = {};
@@ -392,7 +398,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const standIn = o.standIn ?? process.env.OIKOS_STAND_IN;
   // (On the Rust world the actors read the sparse mind's dial from the world, as they read the others: said there.)
   await k.request({ op: "start", config: o.consult ? { ...cfg, dials: { ...(cfg.dials ?? {}), consult: true } } : cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath,
-    ...({ engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(o.recordDecisions === "none" ? { record_decisions: false } : o.recordDecisions !== undefined && o.recordDecisions !== "full" ? { decision_areas: o.recordDecisions.split(",").map((x) => x.trim()).filter((x) => x) } : {}), ...(recordObs === "all" || recordObs === "code" ? { record_observations: true } : Array.isArray(recordObs) ? { record_observations: recordObs } : {}) } }) });
+    ...({ engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(capture ? { capture_citizens: capturePath } : {}), ...(o.recordDecisions === "none" ? { record_decisions: false } : o.recordDecisions !== undefined && o.recordDecisions !== "full" ? { decision_areas: o.recordDecisions.split(",").map((x) => x.trim()).filter((x) => x) } : {}), ...(recordObs === "all" || recordObs === "code" ? { record_observations: true } : Array.isArray(recordObs) ? { record_observations: recordObs } : {}) } }) });
   if (o.perturb) await k.request({ op: "perturb", extra_wakes_bps: o.perturb.extraWakesBps, seed: o.perturb.seed });
 
   // Every model call (participants, translator, debriefs) is recorded as it happens.

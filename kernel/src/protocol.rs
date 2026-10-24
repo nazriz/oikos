@@ -418,6 +418,8 @@ fn start_engine(session: &mut Session, req: &Value, config: Option<Value>) -> Re
         opts.mock_seats = b;
     }
     opts.withhold = crate::engine::withholds(&o["withhold"])?;
+    // (Where to capture the citizens' decisions, for training: docs/citizen-data.md. Changes nothing in the run.)
+    opts.capture_citizens = o["capture_citizens"].as_str().filter(|p| !p.is_empty()).map(String::from);
     let mut e = crate::engine::Engine::start(config.ok_or("missing config")?, str_field("run_id")?, BufWriter::new(log), anchors, opts)?;
     // (Records by reference are not kept here: the engine's own actors are handed records the host never sees, so the
     // host is handed every record whole. Only its seats' observations cross, and they are few.)

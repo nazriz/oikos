@@ -1,0 +1,8 @@
+{
+  "row": "turn",
+  "t": 864000,
+  "p": "c12-self",
+  "n": 7,
+  "decision": { "domain": "money", "strategy": "compare", "options": [] },
+  "draws": [{ "key": ["participant", "c12-self", "self", "10", "money", "1"], "u": 11400714819323198485 }]
+}
