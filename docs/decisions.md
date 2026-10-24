@@ -7753,3 +7753,37 @@ our translator first with Sonnet behind, about $100 to 150 on his API credit).
   translator. `fund-trustee` exists only once a fund is founded.
 - **Revisit if** the dry check is to be trusted on the Rust world (teach it `<office>-staff`), or a pilot wants one of the
   formless offices (write its stationery first).
+
+## 2026-10-25 · The six pilots ran (lv-08 to lv-13); an engine loop fixed on the way (branch `pilots-six`)
+
+Six pilots of 3,000 people, 120 days each, on the Rust world, seven seats each, in six profiles (gb-eng, in-tn, us-oh,
+de-ni, mx-jal, jp-akita), different offices in each; names and dates on in lv-09, lv-10, lv-13; lv-08, lv-10, lv-12 are
+the translator's test split (translator-v3 section 3), the others train. Seats Sonnet 5.5 (four) and Haiku 5.5 (two) on
+the owner's API credit; ours first, Sonnet 5.5 behind. All six reached day 120; every seat was debriefed; no seat left.
+**$31.86 recorded** (limits $160, cap $200). The review, cost table and audit are in
+`runs/pilots-six-2026-10-24/review.md`.
+
+- **Fixed: a code actor's unresolvable call looped until the run was stuck.** lv-10 stopped on day 9.4: the police seat
+  hired through our translator, which wrote the employment's work site as the job posting's id (`work(at=rec.2856)`);
+  the citizen who signed asked for `occupancy(in=rec.2856)`, it could not resolve, and the engine let its wake go on
+  (`apply`, `Questions` returned "goes on"), so its mind asked the same a thousand times in one moment. Now a code
+  actor that makes the same unresolved call again in the same moment ends its wake (`unresolved_at`, transient). Only a
+  run that would have stuck can move. lv-10 resumed on it from its log with no divergence and finished.
+- **Changed during the wave: bank-lending taken out of lv-13** (replaced by the inspector) after lv-08 and lv-09 showed
+  the lending seat's own looks evicted by prompt trimming ("What this look showed is no longer set out here"); it
+  decided no loan in either town, and lv-09's Haiku seat reported distress about the backlog it could not act on. Pressure
+  from a platform fault is beyond what any question needs (VISION 15). Queue b was stopped between pilots (its process
+  only) and restarted on the same commit.
+- **Translator, blind audit of every draft** (a Sonnet 5.5 reader shown the seat's words and the program only): ours 332
+  drafts, 35 wrong (10.5%; 24 declined by the seat, 11 carried out), 19 unclear; the fallback 319, 7 wrong (2.2%). lv-10
+  holds 22 of ours' 35 (12 union membership offers with the dues on the union's side; editor headlines that are a law's
+  id; police drafts); without it 13 of 268 (4.9%), near the 8 in 180 of R180. Ours answered 334 of 700 requests at
+  about 0.25 s; the fallback about 2 to 3.7 s.
+- **Debriefs:** Sonnet seats reported a little distress in 4 of 28, Haiku seats some or a little in 9 of 14, all about
+  the work (backlogs with no lever, unpaid workers behind a seat's own holds, a duplicate tax payment); none about being
+  pressed. Haiku seats cost about a fifth of Sonnet's.
+- **Not fixed, for the next round:** prompt trimming evicts a seat's own fresh look (lending office); the kernel accepts
+  an employment whose work site is not a space; the dry check's book-keeper names; our translator on union, editor and
+  police forms (new forms with real cases now, in a test pilot).
+- **Revisit if** a code actor is found to need a second identical unresolved call in one moment (none should: its view
+  is the same), or the fault behind it (a work site that is not a space) is refused at the kernel's check.
