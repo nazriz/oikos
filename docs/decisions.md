@@ -7604,3 +7604,10 @@ that was not before: a person only lets go.
   de-ni 1.40 to 1.48). The bound does not bite at 1,000 people: a town that size has fewer than 20 of each kind. The
   culture and recourse measures were not read separately (the logs were deleted for disk before); with the same steps
   run for run they are not expected to move, and the next measure at this size should read them.
+- **Found on the way to main: the physics oracle charged work to the wrong day.** The merge's `cargo test` drew a new
+  case of `physical_feasibility` (proptest, 3d09092b): a builder's system set a person to work while that person still
+  had work in hand; the kernel placed it when they were next free, on a day with room, and did it; the oracle had
+  charged the whole share to today and expected a refusal. The kernel follows law 1 (work is placed after what the
+  performers have in hand and counted on each day it is done on, `kernel.rs` `begin`); the oracle now places it the same
+  way, and keeps the rule that no one work is longer than a day (a second case shrunk to it while fixing the first).
+  Both cases are in the regressions file; 9,000 further cases pass. Nothing in the kernel changed.
