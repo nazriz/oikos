@@ -7811,3 +7811,58 @@ the owner's API credit; ours first, Sonnet 5.5 behind. All six reached day 120; 
   is SF-8's work.
 - **Revisit if** a seat needs balances after a look within a sitting (they come with its next report), or a lender
   seat's `prompt_trimmed` notes show `looks` above 0 again.
+
+## 2026-10-25 · A place committed to is a place (branch `pilot-faults`, fault 2 of the six pilots)
+
+- **What happened.** In lv-10 the police seat hired through our translator, which wrote the work site as the job
+  posting's id (`work(at=rec.2856)`). The kernel took the agreement (a commitment's `does` is opaque to it), both sides
+  signed, and the worker could never come to work: her mind asked for occupancy in `rec.2856` a thousand times in one
+  moment (the engine's loop, fixed in the wave), and the seat's debrief said "the staff never came in". Six such
+  agreements were signed.
+- **Fix: physics, at the act.** `propose_agreement` is refused with a new code, `not_a_place`, when a commitment's
+  `occupancy.in` or `work.at` names neither a building nor a space in one (`exec.rs`, `places_committed`). A body can
+  only be somewhere; this is the same kind of check as a published paper's `place` being a cell, not a law. The
+  meaning of the commitment is still not judged. The seat is told, in the world's words: "what was named as the place
+  to be or to work is not a place: name a building, or a space in one" (`words.ts`, `rules/words.rs`). The contract
+  says so on both fields; `log.schema.json` gains the code; `contracts/README.md` records it (blanket approval).
+  Test: `kernel/tests/physics.rs`, `a_place_committed_to_is_a_place` (a posting's id, a space the building has not, a
+  building that does not exist, a cell: refused; a space and a building: taken).
+- **Not checked:** agreements in a world's config (generated, already places); an offer's terms as published (a
+  posting naming a non-place is refused when someone's agreement is made from it); `goods.at` (not seen to go wrong).
+- **Revisit if** a real arrangement commits someone to a place that is not built yet (a job at a shop under
+  construction is fine: the building exists from the start of its building), or `goods.at` is seen to name a non-place.
+
+## 2026-10-25 · Mistakes the Haiku seats could not undo, looked into (branch `pilot-faults`, faults 3 and 4 of the six pilots)
+
+What a real official could do in each case, and whether the platform gives the seat that route.
+
+- **"$250,000 of energy purchases sent to a seller the town did not recognise" (lv-12, energy retail): no mistake, and a
+  platform fault behind the worry.** The seller is the grid's supplier, the outside world, as every energy retailer's
+  is; all six of the seat's orders were delivered (delivery notes on days 14, 54, 74, 91, 112). What the seat read as
+  "unknown" was the resolver: on day 15 it ordered "from The outside world", the very words its own file used ("order
+  to The outside world"), and was told "You don't know of anyone or anything called "The outside world"". The seat's
+  reports name organisations through `whoIs` (the config's names), and the resolver knew only names from directories
+  and declarations. **Fixed:** a name a seat's reports show it is learnt as they show it (`namedFor`,
+  `orchestrator/src/seat-config.ts`, in both hosts): only an organisation's or person's name, only when shown. Test:
+  `orchestrator/test/seat-names.test.ts`. No route to undo was needed.
+- **"A tax payment made twice that could not be undone" (lv-12, clinic): the real route exists and is missing; not
+  built.** The clinic's payroll clerk files and pays each month's return of withheld income tax by law; the seat paid
+  month 3 by hand as well (day 91), and the clerk paid it on its day (day 105). A real employer claims the payment not
+  owed back, or sets it against the next return (Mexico: Código Fiscal de la Federación, arts. 22 and 23, to confirm).
+  Here nobody keeps a taxpayer's account with the collector, so there is no one to claim from and nothing to set it
+  against (public-finance.md: "no yearly assessment, so no refunds or offsets"). Adding only the law would be a route
+  with no institution doing the work, so it is recorded as **PB-23**, with what it needs: the collector's office that
+  keeps each payer's account, at a stated time per claim and a place's refund time, a claim form, and the payer's
+  clerk reading its own books.
+- **Stopping a payment.** A standing payment can be held by whoever may instruct on its account, from a day after
+  the hold (the end of the business day before: UK PSR 2017 reg. 83; docs/behaviour/bank-payment-system.md). A
+  payment made once and settled cannot be stopped, here or in a real bank: realistic, recorded.
+- **Fault 4, "workers left unpaid behind the foreman's own holds" (lv-12): a real consequence, not a mechanism
+  fault.** The foreman held the four wage orders of workers its builder kept off the payroll returns (an informal
+  arrangement, as the profile's informal work has it). The bank took the holds and answered each: "Not paid while it
+  stands ... from the payment due on day 30 ... what it was for is still owed, and is yours to settle". One payment
+  went out after a hold (c0255's, day 23.06, the hold given day 22.42): inside the day's notice a hold takes, by the
+  sourced rule, and the bank's answer said so. The workers went unpaid, one resigned and claimed: what a worker does
+  (citizen.md). The routes the seat had were real ones: pay the wages by a payment of its own, lift the holds, or write
+  to the builder, whose code owner does not read letters' words (PC-1). Nothing changed.
+- **Revisit if** a seat is told a name is unknown that its reports showed it (the fix missed a path), or PB-23 is built.
