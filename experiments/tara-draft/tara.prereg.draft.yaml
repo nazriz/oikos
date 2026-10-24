@@ -1,5 +1,5 @@
 # DRAFT for the owner's review: not registered, not to be run as it stands. When it is agreed, copy it to
-# tara-steward.prereg.yaml with the date it is registered, point the spec's `preregistration` at that file, and commit
+# tara.prereg.yaml with the date it is registered, point the spec's `preregistration` at that file, and commit
 # both before the run (the commit time is the record that the registration came first: docs/experiments.md).
 # The README beside it says why each choice was made, the power estimate, the cost and the time.
 preregistration: 1

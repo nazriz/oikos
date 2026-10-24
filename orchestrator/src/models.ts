@@ -1,7 +1,9 @@
 // Real models, by name: "anthropic/<model>", "openai/<model>", or a local
 // open-weight model behind an OpenAI-compatible server ("ollama/<model>", or
 // "local/<model>" with --base-url). Keys come from the environment
-// (ANTHROPIC_API_KEY, OPENAI_API_KEY) and are never logged. Prices come from
+// (OIKOS_ANTHROPIC_KEY, OPENAI_API_KEY) and are never logged. The Anthropic key is
+// OIKOS_ANTHROPIC_KEY and never ANTHROPIC_API_KEY: with that one set, Claude Code
+// itself would bill the key instead of the owner's plan (docs/real-models.md). Prices come from
 // prices.json; a local model costs nothing to call (its compute is yours).
 
 import { readFileSync } from "node:fs";
@@ -45,7 +47,7 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
     return v;
   };
   const adapter =
-    provider === "anthropic" ? new AnthropicAdapter(model, { apiKey: need("ANTHROPIC_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
+    provider === "anthropic" ? new AnthropicAdapter(model, { apiKey: need("OIKOS_ANTHROPIC_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
     : provider === "openai" ? new OpenAICompatibleAdapter("openai", model, { apiKey: need("OPENAI_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
     : provider === "codex" ? new CodexCliAdapter(model, undefined, o.timeoutMs ? { timeoutMs: o.timeoutMs } : {}) // ("model@effort": the effort is part of the model's name, so the log records it)
     : provider === "claude-code" ? new ClaudeCodeAdapter(model, undefined, o.timeoutMs ? { timeoutMs: o.timeoutMs } : {}) // ("model@effort", as for codex)

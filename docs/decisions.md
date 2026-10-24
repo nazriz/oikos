@@ -7400,3 +7400,49 @@ usage page, differ from the projection by more than a third.
 **Blockers before the real run**: MT-21 is still open (a review request never answered shuts the appeal route; a
 model steward may well leave requests unanswered, and the risk's own "fix when" names this run), and the
 registration must be agreed and committed.
+
+## 2026-10-24 · TARA-ready, second part: model seats on the API credit, every call recorded, an experiment taken up again, and the office chosen by mock stewards (branch `tara-ready`; no model called)
+
+**The API on the plan's credit.** The owner's plan includes monthly API credit, and he wants seats in pilots and the
+TARA run on it (with prompt caching, and without competing with agents for the plan's weekly allowance). So
+`anthropic/` is now a provider the experiment seats by default, beside `claude-code/` and `codex/`; `openai/` still
+needs `seats.allow_paid_api`. The key is `OIKOS_ANTHROPIC_KEY`, read by `chooseModel` (orchestrator/src/models.ts) and
+never `ANTHROPIC_API_KEY` (with that one set, Claude Code itself would bill the key), never logged. When the API says
+the credit is spent, `AnthropicAdapter` throws `CreditExhausted` (a `SpendingLimitReached`): the fork stops cleanly,
+is not waited out (a credit does not come back in hours), and nothing is ever bought. *Revisit if* the provider's
+words for a spent credit change (`creditSpent` in participants/src/llm/anthropic.ts).
+
+**Every call recorded, apart from the log.** `callRecorder` (experiment-seats.ts) wraps each adapter a model fork's
+seat uses (inside the wait for a shut window, so a refused attempt is a line too) and writes `<arm>.calls.jsonl`: the
+attempt, purpose, model, tokens with the cache, cost, wall time, error. The fork's result carries the summary (`calls`:
+p50/p95, errors by kind, by purpose and model) and the run writes `cost.json` (by fork and arm, with the limits). Why
+outside the log: wall time differs on every run, and the log is what the world did; the owner asked for cost and
+performance per seat and per call. Wall time includes any wait for a free call slot (`calls_at_once`). *Revisit if*
+latency must be told apart from queueing: then record inside the gate.
+
+**Taken up again** (`--resume`; MT-22's last gap for a real run). A folder with an unfinished run is refused without
+it; with it, the spec must be byte for byte the one it began with; bases whose files are whole are kept; forks with a
+result are kept unless failed or stopped for want of the model (`CreditExhausted`, `UsageLimitReached`,
+`ModelUnreachable`), which run again from the snapshot; the interrupted log and result are kept under
+`<arm>.interrupted-<k>.*`; and what earlier attempts spent (from the calls file) comes off the fork's limit, so the
+experiment's total still holds. A fork is not taken up from where it stopped: the light host has no mid-fork snapshot
+of a seat, and a model fork run again is a new sample either way. Alternatives: a mid-fork snapshot (the seat's
+conversation and drafts as well as the world's): rejected for now, larger and only saves a fork's spending once.
+*Revisit if* interrupted forks cost a noticeable share of the credit.
+
+**The draft moved** to `experiments/tara-draft/` (`tara.json`, `tara.prereg.draft.yaml`, README for the owner):
+Claude arms on `anthropic/`, Sonnet behind our translator, limits $12.50 a Sonnet fork, $20 Haiku, $3 sol, $750 in all.
+Estimate from 37 pilots' recorded calls at API token prices with the cache: Sonnet $0.03 a call in this office, Haiku
+$0.014; about $320 in all ($170 to 560), against about $900 through Claude Code (which reports 1.4 to 4 times the token
+price). No model was called.
+
+**The office, by mock stewards** (`experiments/tara-draft/office-check/`; `runs/exp-tara-office-check-{support,tribunal}-2026-10-24`,
+town-1000 living, seeds 1 to 3, day 30 to 210, six arms: code, nobody, diligent, rubber-stamp, slow `delay:5`,
+careless `skip:2`). In the support office 43 of 290 exploratory comparisons excluded zero, in the tribunal 1: the
+tribunal acts about 20 times in 180 days and an empty tribunal moves claims refused by -1.0 and support paid by 3%,
+against -9.7 and 80% for an empty support office; the rubber stamp put right 2.7 fewer decisions (3 of 3 seeds) in the
+support office and nothing in the tribunal (no review requests reach it). So the draft keeps the support office.
+"Harsh" was asked for and is not built as a mock: a steward that refuses what the code grants needs the office's state
+changed, not its papers (the rubber stamp's note); `careless` and `slow` stand in. *Revisit if* a real model's
+forks in the support office show it doing something no mock steward does that the tribunal would see first (appeals
+decided, possession orders).

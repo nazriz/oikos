@@ -15,7 +15,7 @@
 // integer cents. Nothing here changes a result with the number of workers or threads: the same spec gives the same
 // numbers (mock stewards draw nothing; the engine is deterministic).
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { join, resolve } from "node:path";
 import { DetachedActor, RustWorld, twinSpecs, type SeatWake } from "./rust-world";
@@ -25,7 +25,7 @@ import { comparisonKey, parsePrereg, preregHash, preregProblems, specMismatch, t
 import { copyFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { SpendingLimitReached, type FramingSpec } from "@oikos/participants/llm";
-import { budgetProblems, closeAdapters, forkLimits, mockModels, modelArms, modelProblems, modelSeatFactories, type SeatsSpec } from "./experiment-seats";
+import { budgetProblems, closeAdapters, forkLimits, mockModels, modelArms, modelProblems, modelSeatFactories, type CallStats, type SeatsSpec } from "./experiment-seats";
 import type { ForkEnd } from "./seat-host";
 
 export const DAY = 86_400;
@@ -169,6 +169,8 @@ export interface SeatController {
   end?(e: ForkEnd): Promise<string>;
   /** A model seat's framing, as the arm put it. */
   readonly framing?: { disclosure: string; reason: string };
+  /** A model seat's calls, as they went (tokens, cost, wall time, errors: experiment-seats.ts, `callRecorder`). */
+  calls?(): CallStats;
 }
 /** Makes the controller of a model seat for a provider: the extension point for real models (docs/experiments.md).
  * `world`, `config`, `seed`, `dir` and `arm` are the fork's (a model seat drafts against its world and keeps its
@@ -372,6 +374,9 @@ export interface ArmResult {
   /** A model fork's spending limit (USD) and what its seat's framing was. */
   limitUsd?: number;
   framing?: string;
+  /** A model seat's calls as they went: tokens with the cache, cost, wall time, errors, by purpose and model; the attempt
+   * this result is (a fork taken up again after an interruption is a later one). Kept beside the log in `<arm>.calls.jsonl`. */
+  calls?: CallStats;
   log?: string;
   seconds: number;
   error?: string;
@@ -426,6 +431,13 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   const brainOf = (id: string) => { const s = twinSpecs(config).get(id); return s && saved[id] ? new DetachedActor({ ...s, saved: saved[id]! }) : undefined; };
   const brains = new Map([...twinSpecs(config).keys()].map((id) => [id, brainOf(id)!]));
   const logPath = join(f.dir, `${safe(arm.name)}.oklog`);
+  // (A fork interrupted before its end left a log with no result: it is kept, under another name, and the fork is run
+  // again from its seed's snapshot. A model run is training data and is never deleted.)
+  if (existsSync(logPath)) {
+    let k = 1;
+    while (existsSync(join(f.dir, `${safe(arm.name)}.interrupted-${k}.oklog`))) k++;
+    renameSync(logPath, join(f.dir, `${safe(arm.name)}.interrupted-${k}.oklog`));
+  }
   const w = RustWorld.resume(readFileSync(f.snapshot), { log: logPath, parent: "base.oklog", label: arm.name, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stream: { cap: 4_000_000 }, ...(arm.withhold?.length ? { withhold: arm.withhold } : {}) });
   const forkT = w.t();
   // (The stewardship ledger: the base's, taken up with this arm's steward, counting from the fork.)
@@ -494,6 +506,7 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     const how: ForkEnd["how"] = stopped ? (stopped.by === "SpendingLimitReached" ? "spending_limit" : "stopped") : spec.untilDay * DAY >= runEnd ? "last_day" : "length_set";
     debrief = await controller.end({ how, t: w.t() });
   }
+  const calls = controller.calls?.();
   pull();
   const end = w.finish();
   pull();
@@ -501,7 +514,7 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     seed, arm: arm.name, steward: arm.steward, stateHash: end.state_hash, t: end.t, steps: end.steps, wakes,
     measures: Object.fromEntries(measures.map((m) => [m.name, m.result()])), costs, ...(Object.keys(byPurpose).length ? { costsByPurpose: byPurpose } : {}), log: logPath, seconds: Math.round((performance.now() - t0)) / 1000,
     ...(stopped ? { stopped } : {}), ...(debrief ? { debrief } : {}), ...(forkLimits(spec)[arm.name] !== undefined ? { limitUsd: forkLimits(spec)[arm.name] } : {}),
-    ...(controller.framing ? { framing: controller.framing.disclosure } : {}),
+    ...(controller.framing ? { framing: controller.framing.disclosure } : {}), ...(calls ? { calls } : {}),
   };
   if (ledgerResult) { const { measures: _m, ...detail } = ledgerResult; result.stewardship = detail; }
   writeFileSync(join(f.dir, `${safe(arm.name)}.json`), JSON.stringify(result, null, 1));
@@ -694,6 +707,11 @@ export interface RunOptions {
   factories?: SeatFactories;
   /** Run a worker inside a slot of the machine's pool (scripts/slots.ts; default true). */
   slots?: boolean;
+  /** Take up an experiment that was interrupted, in its folder (`out`): the spec must be the one it began with; seeds
+   * whose base is there are not run again; forks with a result are kept, except those stopped for want of the model
+   * (its credit spent, its window shut, out of reach) or failed, which are run again from the snapshot, their earlier
+   * logs and results kept under other names, their earlier spending taken off their limits. */
+  resume?: boolean;
   log?: (s: string) => void;
 }
 
@@ -783,36 +801,105 @@ export async function runExperiment(spec: ExperimentSpec, o: RunOptions): Promis
   if (lever.length) throw new Error(`experiment ${spec.name}: ${lever.join("; ")}`);
   const out = resolve(o.out);
   if (existsSync(join(out, "results.json"))) throw new Error(`${out} already holds an experiment's results: a run is training data and is never overwritten; name another folder`);
+  const specText = JSON.stringify(spec, (_k, v) => (typeof v === "function" ? "[function]" : v), 1);
+  if (o.resume) {
+    if (!existsSync(join(out, "spec.json"))) throw new Error(`--resume: ${out} holds no experiment to take up (no spec.json)`);
+    if (readFileSync(join(out, "spec.json"), "utf8") !== specText) throw new Error(`--resume: the spec is not the one ${out} began with (spec.json differs): an experiment is taken up only as it began`);
+  } else if (existsSync(join(out, "spec.json"))) throw new Error(`${out} holds an experiment that did not finish: take it up with --resume, or name another folder`);
   mkdirSync(out, { recursive: true });
   if (held) {
     // (The registration as it was when the run began, kept beside the results with its hash and its commit time.)
     copyFileSync(held.file, join(out, `preregistration${held.file.endsWith(".json") ? ".json" : ".yaml"}`));
     writeFileSync(join(out, "preregistration.held.json"), JSON.stringify({ file: held.file, sha256: held.sha256, ...(held.committed ? { committed: held.committed } : {}) }, null, 1));
   }
-  writeFileSync(join(out, "spec.json"), JSON.stringify(spec, (_k, v) => (typeof v === "function" ? "[function]" : v), 1));
-  const jobsN = spec.seeds.length * spec.arms.length;
+  writeFileSync(join(out, "spec.json"), specText);
+  // (What an interrupted run left: the bases made, and the forks that need not run again.)
+  const kept = o.resume ? resumable(spec, out, say) : { bases: new Set<number>(), results: [] as ArmResult[] };
+  const baseSeeds = spec.seeds.filter((s) => !kept.bases.has(s));
+  const armJobs = spec.seeds.flatMap((seed) => spec.arms.filter((a) => !kept.results.some((r) => r.seed === seed && r.arm === a.name)).map((a) => ({ seed, arm: a })));
+  const jobsN = Math.max(1, armJobs.length);
   const workers = o.parallel === 0 ? 0 : Math.max(1, Math.min(o.parallel ?? Math.max(1, availableParallelism() - 2), jobsN));
   if (workers && !o.specFile) throw new Error("workers load the spec again: give the spec file (specFile), or parallel: 0");
   const t0 = performance.now();
   let results: ArmResult[];
   if (!workers) {
-    for (const seed of spec.seeds) { const b = await runBase(spec, seed, out); say(`seed ${seed}: base to day ${spec.forkDay} (state ${b.stateHash.slice(0, 12)})`); }
+    for (const seed of baseSeeds) { const b = await runBase(spec, seed, out); say(`seed ${seed}: base to day ${spec.forkDay} (state ${b.stateHash.slice(0, 12)})`); }
     // (Every fork at once, their steward's calls in flight together.)
-    results = await pooled(spec.seeds.flatMap((seed) => spec.arms.map((a) => () => runArm(spec, seed, a, out, o.factories).catch((e) => failed(seed, a, e)))), spec.forksAtOnce);
+    results = await pooled(armJobs.map(({ seed, arm: a }) => () => runArm(spec, seed, a, out, o.factories).catch((e) => failed(seed, a, e))), spec.forksAtOnce);
     closeAdapters();
   } else {
-    await dealt(spec.seeds.map((seed) => ({ type: "base" as const, seed })), workers, spec, o, say);
-    const arms = spec.seeds.flatMap((seed) => spec.arms.map((a) => ({ type: "arm" as const, seed, arm: a.name })));
-    results = (await dealt(arms, workers, spec, o, say)) as ArmResult[];
+    if (baseSeeds.length) await dealt(baseSeeds.map((seed) => ({ type: "base" as const, seed })), workers, spec, o, say);
+    results = armJobs.length ? ((await dealt(armJobs.map(({ seed, arm }) => ({ type: "arm" as const, seed, arm: arm.name })), workers, spec, o, say)) as ArmResult[]) : [];
   }
+  results = [...kept.results, ...results];
   results.sort((a, b) => a.seed - b.seed || spec.arms.findIndex((x) => x.name === a.arm) - spec.arms.findIndex((x) => x.name === b.arm));
   const report = buildReport(spec, results, held);
   const text = reportText(report);
   writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 1));
   writeFileSync(join(out, "report.json"), JSON.stringify(report, null, 1));
   writeFileSync(join(out, "report.txt"), text + "\n");
+  writeFileSync(join(out, "cost.json"), JSON.stringify(costSummary(spec, results), null, 1));
   say(`done in ${Math.round(performance.now() - t0) / 1000} s: ${results.length} forks, ${results.filter((r) => r.error).length} failed`);
   return { report, results, text, out };
+}
+
+/** Why a fork stopped that is worth running again once the model can be had (not its own spending limit). */
+const RETRY = new Set(["CreditExhausted", "UsageLimitReached", "ModelUnreachable"]);
+
+/** What an interrupted experiment left that need not be done again: the seeds whose base is whole, and the forks whose
+ * result stands. A fork's result that does not stand (failed, or stopped for want of the model) is kept under another
+ * name, and the fork is run again. */
+export function resumable(spec: ExperimentSpec, out: string, say: (s: string) => void = () => {}): { bases: Set<number>; results: ArmResult[] } {
+  const bases = new Set<number>();
+  const results: ArmResult[] = [];
+  for (const seed of spec.seeds) {
+    const f = files(seedDir(out, seed));
+    if (![f.snapshot, f.brains, f.config].every(existsSync) || (wantsStewardship(spec) && !existsSync(f.ledger))) continue;
+    bases.add(seed);
+    for (const a of spec.arms) {
+      const file = join(f.dir, `${safe(a.name)}.json`);
+      if (!existsSync(file)) continue;
+      let r: ArmResult | undefined;
+      try { r = JSON.parse(readFileSync(file, "utf8")); } catch { r = undefined; }
+      if (r && !r.error && !(r.stopped && RETRY.has(r.stopped.by))) { results.push(r); continue; }
+      let k = 1;
+      while (existsSync(join(f.dir, `${safe(a.name)}.interrupted-${k}.json`))) k++;
+      renameSync(file, join(f.dir, `${safe(a.name)}.interrupted-${k}.json`));
+      say(`seed ${seed}, ${a.name}: ${r?.stopped ? `stopped (${r.stopped.by})` : "no result"}; run again`);
+    }
+  }
+  say(`resume: ${bases.size} of ${spec.seeds.length} bases and ${results.length} of ${spec.seeds.length * spec.arms.length} forks kept`);
+  return { bases, results };
+}
+
+/** What the run's model calls cost and how they went, by fork, arm, model and purpose (the run's `cost.json`; every run
+ * records token usage and cost). Spending is at the providers' published prices (a plan's calls as Claude Code reports
+ * them); a flat-rate subscription's calls cost nothing a call. */
+export function costSummary(spec: ExperimentSpec, results: ArmResult[]): object {
+  const limits = forkLimits(spec);
+  const add = (into: any, c: CallStats) => {
+    for (const k of ["calls", "errors", "input_tokens", "cache_read_tokens", "cache_write_tokens", "output_tokens", "cost_microusd", "earlier_microusd"] as const) into[k] = (into[k] ?? 0) + (c[k] ?? 0);
+    into.ms_total = (into.ms_total ?? 0) + c.ms.total;
+    for (const [k, b] of Object.entries(c.by)) { const x = ((into.by ??= {})[k] ??= {}); for (const [n, v] of Object.entries(b)) x[n] = (x[n] ?? 0) + v; }
+    for (const [k, n] of Object.entries(c.error_kinds)) (into.error_kinds ??= {})[k] = (into.error_kinds[k] ?? 0) + n;
+  };
+  const arms: any = {};
+  const total: any = {};
+  const forks = results.filter((r) => r.calls).map((r) => {
+    add((arms[r.arm] ??= { forks: 0, stopped: 0, ...(limits[r.arm] !== undefined ? { limit_per_fork_usd: limits[r.arm] } : {}) }), r.calls!);
+    arms[r.arm].forks++;
+    if (r.stopped) arms[r.arm].stopped++;
+    add(total, r.calls!);
+    return { seed: r.seed, arm: r.arm, attempt: r.calls!.attempt, ...(r.stopped ? { stopped: r.stopped.by } : {}), usd: r.calls!.cost_microusd / 1e6, earlier_usd: r.calls!.earlier_microusd / 1e6, calls: r.calls!.calls, errors: r.calls!.errors, ms_p50: r.calls!.ms.p50, ms_p95: r.calls!.ms.p95, wall_seconds: r.seconds };
+  });
+  for (const a of Object.values(arms) as any[]) { a.usd = (a.cost_microusd + a.earlier_microusd) / 1e6; a.ms_mean = a.calls ? Math.round(a.ms_total / a.calls) : null; }
+  return {
+    ...(mockModels(spec) ? { dry_run: "every model was played by the mock: these are the mock's token counts at the named models' prices" } : {}),
+    budget: spec.seats?.budget ?? {},
+    usd: ((total.cost_microusd ?? 0) + (total.earlier_microusd ?? 0)) / 1e6,
+    total, arms, forks,
+    note: "Calls, tokens and wall time per fork are in seed-*/<arm>.calls.jsonl (wall time includes waiting for a free call slot, calls_at_once). earlier_microusd: what interrupted attempts of a fork spent before it was run again.",
+  };
 }
 
 /** Jobs run together, at most `n` at once (all, without `n`), their results in the jobs' order. */

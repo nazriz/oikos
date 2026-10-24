@@ -10,7 +10,7 @@ oikos run worlds/town.yaml --seeds 1 --set mayor=llm --model anthropic/claude-so
 
 - `--model provider/model` runs every language-model participant, and the translator, on that model. Without it, it's the mock.
 - **Providers:**
-  - `anthropic/…`, with `ANTHROPIC_API_KEY` in the environment;
+  - `anthropic/…`, with `OIKOS_ANTHROPIC_KEY` in the environment (the owner's prepaid API credit; never `ANTHROPIC_API_KEY`, which would switch Claude Code itself to billing the key). When the credit is spent the provider says so, and the run stops cleanly (`CreditExhausted`); nothing is ever bought;
   - `openai/…`, with `OPENAI_API_KEY`;
   - `ollama/…`, a local open-weight model behind Ollama (`http://localhost:11434/v1` by default);
   - `local/… --base-url URL`, any other OpenAI-compatible server (vLLM, LM Studio);

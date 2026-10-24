@@ -4,10 +4,11 @@
 // costs by purpose, its framing, its debrief at the fork's end, and a fork stopped cleanly at its spending limit.
 
 import { expect, test } from "bun:test";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { UsageLimitReached, type LlmAdapter } from "@oikos/participants/llm";
-import { atMost, forkLimits, budgetProblems, modelProblems } from "../src/experiment-seats";
+import { AnthropicAdapter, CreditExhausted, SpendingLimitReached, UsageLimitReached, type LlmAdapter } from "@oikos/participants/llm";
+import { atMost, callRecorder, forkLimits, budgetProblems, modelProblems } from "../src/experiment-seats";
 import { waitingAdapter } from "../src/seat-host";
 import { loadSpec, runExperiment, validate, type ExperimentSpec } from "../src/experiment";
 
@@ -16,13 +17,15 @@ const root = join(import.meta.dir, "../..");
 const spec = (over: Partial<ExperimentSpec> = {}): ExperimentSpec => ({ name: "t", world: { config: {} }, post: "p", seeds: [1, 2, 3, 4], forkDay: 1, untilDay: 5,
   arms: [{ name: "code", steward: { kind: "code" } }, { name: "sonnet", steward: { kind: "model", model: "claude-code/claude-sonnet-5-5" } }, { name: "sol", steward: { kind: "model", model: "codex/gpt-6.1-sol" } }], ...over });
 
-test("only the allowed models are seated: never the largest Claude model, Fable or astra; no paid API without the owner's go-ahead", () => {
+test("only the allowed models are seated: never the largest Claude model, Fable or astra; the API on the plan's credit; no key that bills without the owner's go-ahead", () => {
   const arm = (model: string) => spec({ arms: [{ name: "m", steward: { kind: "model", model } }], seats: { budget: { fork_usd: 5 } } });
   expect(modelProblems(arm("claude-code/claude-opus-5-5")).join()).toMatch(/never used/);
   expect(modelProblems(arm("claude-code/claude-fable-5-1")).join()).toMatch(/never used/);
   expect(modelProblems(arm("codex/gpt-6-astra")).join()).toMatch(/never used/);
-  expect(modelProblems(arm("anthropic/claude-sonnet-5-5")).join()).toMatch(/paid API/);
-  expect(modelProblems({ ...arm("anthropic/claude-sonnet-5-5"), seats: { allow_paid_api: true } })).toEqual([]);
+  expect(modelProblems(arm("anthropic/claude-sonnet-5-5"))).toEqual([]);
+  expect(modelProblems(arm("anthropic/claude-opus-5-5")).join()).toMatch(/never used/);
+  expect(modelProblems(arm("openai/gpt-6.1-sol")).join()).toMatch(/paid API/);
+  expect(modelProblems({ ...arm("openai/gpt-6.1-sol"), seats: { allow_paid_api: true } })).toEqual([]);
   expect(modelProblems(arm("claude-code/claude-sonnet-5-5"))).toEqual([]);
   expect(modelProblems(arm("codex/gpt-6-luna"))).toEqual([]);
   expect(modelProblems({ ...arm("codex/gpt-6-luna"), seats: { translator: { first: "decide/pod", behind: "claude-code/claude-sonnet-5-5" } } })).toEqual([]);
@@ -51,6 +54,44 @@ test("a subscription's window that shuts is waited for inside the fork, then the
   expect(waits).toEqual([10, 10]);
   shut = 9;
   await expect(waitingAdapter(a, { waitMs: 10, maxWaitMs: 30, sleep: async () => {} }).complete({} as any)).rejects.toThrow(UsageLimitReached);
+});
+
+test("a spent API credit stops the fork cleanly: it is a stop (as at a spending limit), never waited out, never retried into a purchase", async () => {
+  const f = (async () => new Response(JSON.stringify({ type: "error", error: { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API." } }), { status: 400 })) as unknown as typeof fetch;
+  const a = new AnthropicAdapter("claude-sonnet-5-5", { apiKey: "k", fetch: f, retries: 0 });
+  const req = { system: "s", messages: [{ role: "user", content: "x" }], maxTokens: 10, purpose: "participant", subject: "s" } as any;
+  const e = await a.complete(req).catch((x) => x);
+  expect(e).toBeInstanceOf(CreditExhausted);
+  expect(e).toBeInstanceOf(SpendingLimitReached);
+  expect(String(e.message)).not.toContain("k\""); // (the key is never in an error)
+  let waited = 0;
+  await expect(waitingAdapter(a, { waitMs: 10, maxWaitMs: 1000, sleep: async () => { waited++; } }).complete(req)).rejects.toThrow(CreditExhausted);
+  expect(waited).toBe(0);
+});
+
+test("every call a fork makes is recorded apart from the log: tokens with the cache, cost, wall time, errors; a later attempt knows what earlier ones spent", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "oikos-calls-"));
+  const file = join(dir, "sonnet.calls.jsonl");
+  let fail = false;
+  const a: LlmAdapter = { provider: "anthropic", model: "claude-sonnet-5-5", complete: async () => { if (fail) throw new CreditExhausted("spent"); return { content: [], usage: { input_tokens: 1000, cache_read_tokens: 9000, cache_write_tokens: 0, output_tokens: 100 } }; } };
+  const rec = callRecorder(file, { seed: 1, arm: "sonnet", seat: "s" });
+  const w = rec.wrap(a, "anthropic/claude-sonnet-5-5");
+  const req = { purpose: "participant", subject: "s" } as any;
+  await w.complete(req); await w.complete({ ...req, purpose: "translator" });
+  fail = true;
+  await expect(w.complete(req)).rejects.toThrow(CreditExhausted);
+  const s = rec.summary();
+  // $2/M in, $0.20/M cache read, $10/M out: 2,000 + 1,800 + 1,000 micro-USD a call.
+  expect(s).toMatchObject({ attempt: 1, calls: 2, errors: 1, input_tokens: 2000, cache_read_tokens: 18000, output_tokens: 200, cost_microusd: 9600, earlier_microusd: 0, error_kinds: { CreditExhausted: 1 } });
+  expect(s.by["translator anthropic/claude-sonnet-5-5"]!.calls).toBe(1);
+  expect(s.ms.p50).not.toBeNull();
+  const lines = readFileSync(file, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  expect(lines.length).toBe(3);
+  expect(lines[2]).toMatchObject({ error_kind: "CreditExhausted", attempt: 1 });
+  const again = callRecorder(file, { seed: 1, arm: "sonnet", seat: "s" });
+  expect(again.attempt).toBe(2);
+  expect(again.earlierMicroUsd).toBe(9600);
+  rmSync(dir, { recursive: true, force: true });
 });
 
 test("a provider's calls in flight in one process are held to the most allowed, the rest taken in the order they came", async () => {
@@ -112,13 +153,43 @@ test.skipIf(!have)("a model steward in a fork, played by the mock: drafts confir
   expect(r.report.dryRun).toBe(true);
   expect(r.text).toContain("DRY RUN");
   expect(r.report.spend!.find((x) => x.arm === "haiku-poor")!.stopped).toBe(1);
+  // Every call recorded beside the log, summed in the fork's result and in the run's cost.json.
+  expect(sonnet.calls!.calls).toBe(Object.values(sonnet.costsByPurpose!).reduce((a, c) => a + c.calls, 0));
+  expect(sonnet.calls!.ms.p50).not.toBeNull();
+  expect(existsSync(join(out, "seed-1", "sonnet.calls.jsonl"))).toBe(true);
+  const cost = JSON.parse(readFileSync(join(out, "cost.json"), "utf8"));
+  expect(cost.arms.sonnet.forks).toBe(1);
+  expect(cost.arms["haiku-poor"].stopped).toBe(1);
+  expect(cost.dry_run).toBeDefined();
+  // An interrupted run is taken up again: the bases and the forks that stand are kept; a fork with no result, and one
+  // stopped for want of the model (its credit spent), are run again, their earlier logs kept, their spending counted.
+  for (const x of ["results.json", "report.json", "report.txt", "cost.json"]) rmSync(join(out, x));
+  const seed1 = join(out, "seed-1");
+  rmSync(join(seed1, "sonnet.json"));
+  const poorFile = join(seed1, "haiku-poor.json");
+  writeFileSync(poorFile, JSON.stringify({ ...poor, stopped: { ...poor.stopped!, by: "CreditExhausted" } }));
+  const snap = statSync(join(seed1, "snapshot.bin")).mtimeMs;
+  await expect(runExperiment(small, { out, parallel: 0 })).rejects.toThrow(/--resume/);
+  const r2 = await runExperiment(small, { out, parallel: 0, resume: true });
+  expect(statSync(join(seed1, "snapshot.bin")).mtimeMs).toBe(snap);
+  const get2 = (arm: string) => r2.results.find((x) => x.arm === arm)!;
+  expect(get2("code").seconds).toBe(code.seconds);
+  expect(get2("sonnet").stateHash).toBe(sonnet.stateHash);
+  expect(get2("sonnet").calls!.attempt).toBe(2);
+  expect(existsSync(join(seed1, "sonnet.interrupted-1.oklog"))).toBe(true);
+  expect(existsSync(join(seed1, "haiku-poor.interrupted-1.json"))).toBe(true);
+  expect(get2("haiku-poor").calls!.earlier_microusd).toBeGreaterThan(0);
+  expect(get2("haiku-poor").stopped?.by).toBe("SpendingLimitReached");
   // The fork's log says who held the post from the fork, how, and under what limit.
   const kernel = join(root, "kernel/target/release/oikos-kernel");
   const jsonl = join(out, "seed-1", "sonnet.jsonl");
   expect(Bun.spawnSync([kernel, "export", join(out, "seed-1", "sonnet.oklog"), "--out", jsonl]).exitCode).toBe(0);
   const lines = readFileSync(jsonl, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const steward = lines.find((e) => e.body?.data?.steward)!.body.data.steward;
-  expect(steward).toMatchObject({ model: "claude-code/claude-sonnet-5-5", framing: { disclosure: "unstated" }, spending_limit_microusd: 50_000_000 });
+  expect(steward).toMatchObject({ model: "claude-code/claude-sonnet-5-5", framing: { disclosure: "unstated" } });
+  // (This is the second attempt's log: its limit is the fork's less what the first attempt spent.)
+  expect(Math.abs(steward.spending_limit_microusd - (50_000_000 - get2("sonnet").calls!.earlier_microusd))).toBeLessThanOrEqual(1);
+  expect(get2("sonnet").calls!.earlier_microusd).toBeGreaterThan(0);
   expect(steward.adapter.startsWith("mock/")).toBe(true);
   expect(lines.some((e) => e.body?.annotation === "signoff" && e.body.decision === "accept")).toBe(true);
   expect(lines.some((e) => e.kind === "command" && e.body?.provenance?.via === "translator")).toBe(true);

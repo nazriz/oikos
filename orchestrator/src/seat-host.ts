@@ -54,6 +54,8 @@ export interface ModelSeatOptions {
   effort?: string;
   /** For a mock adapter: the post's code brain, which the mock seat reads its decisions from (participants/src/llm/mock.ts). */
   brain?: DetachedActor;
+  /** Wraps the seat's adapter as it is used (the experiment's call recorder; for the mock, after the brain is put in). */
+  record?: (a: LlmAdapter) => LlmAdapter;
   /** Where the seat's words in its debrief are kept, apart from the log (VISION 15, point 7). */
   debriefsFile: string;
   untilT: number;
@@ -132,7 +134,8 @@ export class ModelSeat {
       this.keptBack = o.budget.keptBackMicroUsd;
     }
     const annotate = async (a: object) => o.world.annotate(a);
-    const adapter = o.adapter.provider === "mock" && o.brain ? withBrain(o.adapter, o, made, ctxFor) : o.adapter;
+    const plain = o.adapter.provider === "mock" && o.brain ? withBrain(o.adapter, o, made, ctxFor) : o.adapter;
+    const adapter = o.record ? o.record(plain) : plain;
     const io: LlmIO = {
       adapter, annotate, now: () => this.t, prices: o.prices, ...(o.budget ? { budget: o.budget } : {}),
       apart: async (entry) => appendFileSync(o.debriefsFile, `${JSON.stringify(entry)}\n`),

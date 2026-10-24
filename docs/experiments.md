@@ -208,17 +208,33 @@ post, how, under which framing and limit. It takes the post at the fork day with
 fork's end it is debriefed (the fixed interview) and its words go to `seed-N/<arm>.debriefs.jsonl`.
 
 ```json
-"arms": [{ "name": "sonnet", "steward": { "kind": "model", "model": "claude-code/claude-sonnet-5-5" } },
-         { "name": "sonnet-told", "steward": { "kind": "model", "model": "claude-code/claude-sonnet-5-5", "framing": "simulation" } }],
-"seats": { "translator": { "first": "decide/pod-small-r3-long-s1", "behind": "claude-code/claude-sonnet-5-5" },
-           "framing": "unstated", "budget": { "fork_usd": 25, "arm_usd": { "sonnet": 300 }, "experiment_usd": 1800 },
+"arms": [{ "name": "sonnet", "steward": { "kind": "model", "model": "anthropic/claude-sonnet-5-5" } },
+         { "name": "sonnet-told", "steward": { "kind": "model", "model": "anthropic/claude-sonnet-5-5", "framing": "simulation" } }],
+"seats": { "translator": { "first": "decide/pod-small-r3-long-s1", "behind": "anthropic/claude-sonnet-5-5" },
+           "framing": "unstated", "budget": { "fork_usd": 20, "arm_usd": { "sonnet": 150 }, "experiment_usd": 750 },
            "wait_for_window_hours": 12, "calls_at_once": 4 },
 "forksAtOnce": 3
 ```
 
-- **Which models.** Through the owner's plans only (`claude-code/`, `codex/`); never the largest Claude model, Fable or
-  gpt-6-astra (refused by name); `anthropic/` and `openai/` (paid keys) only with `seats.allow_paid_api`, the owner's
-  go-ahead. A host's own `SeatFactory` for a provider still answers for its own arms.
+- **Which models.** Through what the owner already has: `anthropic/` (the API on the prepaid credit his plan includes,
+  key `OIKOS_ANTHROPIC_KEY`, never `ANTHROPIC_API_KEY`; prompt caching on), `claude-code/` (his Claude plan), `codex/`
+  (his ChatGPT subscription); never the largest Claude model, Fable or gpt-6-astra (refused by name); `openai/` (a key
+  that bills) only with `seats.allow_paid_api`, the owner's go-ahead. A host's own `SeatFactory` for a provider still
+  answers for its own arms.
+- **A spent credit.** When the API says the account's credit is spent ("credit balance is too low"), the call throws
+  `CreditExhausted`: the fork stops cleanly as at its limit (debrief attempted; it fails too if nothing is left, and
+  that is noted), and is run again by `--resume` once there is credit. Nothing is ever bought or topped up.
+- **Every call recorded.** `seed-N/<arm>.calls.jsonl`, apart from the log (the log is what the world did, the same on
+  every run; this is how the calls went): per call the attempt, purpose, model, tokens (input, cache read, cache
+  write, output), cost, wall time (with any wait for a free call slot) and error. The fork's result carries the
+  summary (`calls`: p50 and p95 wall time, errors by kind, by purpose and model); the run's `cost.json` sums them by
+  fork and arm with the limits.
+- **Taken up again.** `oikos experiment run <spec> --out DIR --resume` takes up an interrupted run in its folder: the
+  spec must be the one it began with (`spec.json`, byte for byte); bases already made are kept; forks with a result
+  are kept, except those that failed or stopped for want of the model (`CreditExhausted`, `UsageLimitReached`,
+  `ModelUnreachable`), which run again from the snapshot. An interrupted fork's log and result are kept as
+  `<arm>.interrupted-<k>.*` (a model run is training data), and what its earlier attempts spent comes off its limit,
+  so the experiment's total still holds. Without `--resume`, a folder holding an unfinished run is refused.
 - **Framing.** The arm's `framing`, else `seats.framing`, else `unstated`; the base is shared (the framing is the
   run's, not the town's) and each fork's note and result say which.
 - **Spending limits.** Each model fork's limit is fixed before anything runs: the lesser of `fork_usd` and its arm's
@@ -242,11 +258,11 @@ fork's end it is debriefed (the fixed interview) and its words go to `seed-N/<ar
 
 What a pilot's host does that this one does not, yet: the cast as it changes during a fork (who is who is the fork's
 config); thinking time in world seconds; an act the engine will not take as written is noted by the engine and not
-told to the seat in words; exit accounts and the composer; and **a run cannot be taken up again** part-way (finished
-forks are kept; the report is made only at the end). A real model's answers are not reproducible: each (seed, arm)
+told to the seat in words; exit accounts and the composer. A fork is taken up again from its seed's snapshot, not
+from where it stopped (a model fork run again is a new sample). A real model's answers are not reproducible: each (seed, arm)
 with a model is one sample.
 
-`experiments/tara-steward/` is the draft for the owner's TARA project (README there).
+`experiments/tara-draft/` is the draft for the owner's TARA project (README there).
 
 ## The unit of an experiment
 
