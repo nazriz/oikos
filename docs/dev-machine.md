@@ -141,7 +141,7 @@ bun scripts/merge.ts <branch>... [--message "..."] [--no-push] [--full] [--fix-m
 It takes the merge lock, then in its own clean worktree (`.claude/worktrees/merge-bot`, made if missing; never
 `merge-main`): fetch; reset to `origin/main`; `git merge --no-ff` each branch in order; the worktree warm-up
 (`scripts/worktree-warm.ts --no-build`, installs); the typecheck alongside **the gate** (`bun scripts/test.ts --gate`, output
-in `merge-bot/merge-test.log`); restores `scripts/test-times.json`; pushes to `origin main` only if all passed. `--full` runs
+in `merge-bot/merge-test.log`, and each test run of a batch in `merge-test-<n>.log`, the set tested on its first line); restores `scripts/test-times.json`; pushes to `origin main` only if all passed. `--full` runs
 the whole suite on the release kernel instead. Everything it starts has slot priority (`OIKOS_SLOT_PRIORITY=high`): it
 stands ahead of every waiting job and is not capped.
 
