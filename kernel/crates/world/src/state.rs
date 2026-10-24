@@ -1093,6 +1093,15 @@ impl State {
                     Arc::make_mut(p).new_transactions.insert(key, ledger.clone());
                 }
             }
+            // And so does every channel of it, whole: what the holder looked through before, in an earlier tenure (a person
+            // appointed again to a post they lost), is not what the unit made for this one has been shown. Its first look is the
+            // office's file as it stands, as it is for someone who never held it.
+            if let Some(p) = self.participants.get_mut(&h) {
+                let prefix = format!("{position}/");
+                if p.looks.keys().any(|k| k.starts_with(&prefix)) {
+                    Arc::make_mut(p).looks.retain(|k, _| !k.starts_with(&prefix));
+                }
+            }
         }
     }
 }

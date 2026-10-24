@@ -77,17 +77,21 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
 // invoice's price, a household's death away from home is seen by those of it there, nobody sets off for a gathering from their work;
 // 2d57339d..., 44f157a8... and 072c2a5e... until then. The TS states did not move.)
+// (Re-taken once more on 2026-10-23, the held cases settled: a person is drawn who they are from the run's seed, not from seed 0, so the same town on seed 1 has
+// other people than it had; a refusal lowers the sense of agency and moves the tie; 8b9a1e90..., eac6c4b4... and 443b8875... until then.)
 // (Re-taken on 2026-10-23 at debt-generic, config hashes and Rust states both: the mix of shops is the default, each kind of shop has its own premises
 // type and room, and a shop is staffed to its kind's sales (generator 0.63.0); ba713978..., b1dc6701... and 6597ecc3... for the configs, and
 // 8b9a1e90..., eac6c4b4... and 443b8875... for the states, until then. The towns' people did not change.)
+// (Re-taken on 2026-10-24 at the merge of debt-behaviour with main's debt-generic, the states only (the config hashes are main's, unchanged): the two changes together, the run's seed drawing who a person is (on top of the mix of shops); 33ec6526..., 54f581f6... and 076eebff... until then.)
 // (Re-taken on 2026-10-24 at debt-generic-2, config hashes and Rust states both: each kind of shop's staff are paid and called what its kind's are, each
 // kind has a serving task and a wholesaler of its own, some factories make food and clothing from inputs of their own, complaints are by kind, the
 // first factory still makes goods (generator 0.64.0), and a closed shop's sale survives its manager leaving (ME-21); fcaf6597..., 3dd7883c... and 5bc6764a...
 // for the configs, and 33ec6526..., 54f581f6... and 076eebff... for the states, until then. The towns' people did not change.)
+// (Re-taken again on 2026-10-24 at the merge of debt-behaviour with main's debt-generic-2, the states only; the config hashes are main's, unchanged; 85e81e58..., b79165e8... and e0865435... until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "14b4e69773b7ab4f85cb25b3c2f7f9456e8689e34f1ebbbd4149613aab4f9f92",
-  "gb-eng-2026": "6b5d89ac218c315d0bfe2e09c01342ab8d59552a70065dd99a7fcafc962dca5c",
-  "ke-nakuru-2026": "0e51c51d575a479a7f3bbacbaf1cd37b4ab325d0d6a148285d0a74549d8debc0",
+  "au-vic-2026": "2ce3e90db65d2ee47a83f05e057eed00b2f060ff254cebf9322b603b782d945e",
+  "gb-eng-2026": "5dcf1eab0511e2e2d9440b153324b879cfdd70ec6934343398451febe4dc36aa",
+  "ke-nakuru-2026": "55a4e978431f394890fc5d95800abd07bd8defad2a0fbfb6ad84ad36ee7c7e5c",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

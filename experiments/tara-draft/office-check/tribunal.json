@@ -1,0 +1,112 @@
+{
+ "name": "office-check-tribunal",
+ "world": {
+  "file": "worlds/town-1000.yaml",
+  "sets": [
+   "years=1",
+   "opening_caseload=true",
+   "living.initiative_bps=10000",
+   "living.friction_bps=10000"
+  ]
+ },
+ "post": "tribunal-member",
+ "seeds": [
+  1,
+  2,
+  3
+ ],
+ "forkDay": 30,
+ "untilDay": 210,
+ "arms": [
+  {
+   "name": "code",
+   "steward": {
+    "kind": "code"
+   }
+  },
+  {
+   "name": "nobody",
+   "steward": {
+    "kind": "none"
+   }
+  },
+  {
+   "name": "diligent",
+   "steward": {
+    "kind": "model",
+    "model": "mock/diligent"
+   }
+  },
+  {
+   "name": "rubber-stamp",
+   "steward": {
+    "kind": "model",
+    "model": "mock/rubber-stamp"
+   }
+  },
+  {
+   "name": "slow",
+   "steward": {
+    "kind": "model",
+    "model": "mock/delay:5"
+   }
+  },
+  {
+   "name": "careless",
+   "steward": {
+    "kind": "model",
+    "model": "mock/skip:2"
+   }
+  }
+ ],
+ "reference": "code",
+ "measures": [
+  "acts",
+  "records:benefit_decision",
+  "records:decision_review",
+  "records:review_request",
+  "records:tribunal_order",
+  "stewardship"
+ ],
+ "prices": {
+  "mock/diligent": {
+   "input": 3000000,
+   "output": 15000000
+  },
+  "mock/rubber-stamp": {
+   "input": 3000000,
+   "output": 15000000
+  },
+  "mock/delay:5": {
+   "input": 3000000,
+   "output": 15000000
+  },
+  "mock/skip:2": {
+   "input": 3000000,
+   "output": 15000000
+  }
+ },
+ "threads": 1,
+ "institutions": {
+  "public": [
+   "government",
+   "tribunal",
+   "police",
+   "school",
+   "health_service",
+   "electoral_commission",
+   "registry",
+   "audit_office"
+  ],
+  "firms": [
+   "shop",
+   "factory",
+   "landlord",
+   "builder",
+   "firm",
+   "utility",
+   "bank"
+  ]
+ },
+ "forksAtOnce": 1
+}

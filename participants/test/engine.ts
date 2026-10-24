@@ -27,6 +27,9 @@ function whole(obs: any): any {
   return { status: "active", drafts: [], positions: [], ...obs, inbox, outcomes: (obs.outcomes ?? []).map((o: any) => ({ ...o, status: o.status === "ok" ? "applied" : o.status })), channels, readings };
 }
 
+/** The purposes of the draws a step made, in order (`chance:` first for a draw about one thing), on the act it returned. */
+export const DRAWS = Symbol("draws");
+
 export interface EngineOptions {
   /** The world's config the kind reads (positions, participants...), or a function that gives it when the actor is made: none by default (a clock and a currency). */
   config?: object | (() => object);
@@ -39,6 +42,7 @@ export function engine(kind: string, o: EngineOptions = {}): { name: string; cre
     create: (ctx: any): Controller => {
       const actor = new DetachedActor({ kind, participant: ctx.participant, capacity: ctx.position ?? "self", entity: ctx.entity, system: ctx.kind === "system" || /-system$/.test(ctx.participant), params: ctx.params ?? {}, seed: o.seed ?? ctx.seed ?? 1, config: (typeof o.config === "function" ? o.config() : o.config) ?? bare(ctx) });
       let since = 0;
+      const asked = new Set<string>();
       /** Which part of an observation the engine could not read, for a test's author. */
       const diagnose = (obs: any, e: Error): Error => {
         const readable = (x: any) => { try { actor.step({ ...x, outcomes: x.outcomes ?? [] }, "cadence", since); return true; } catch { return false; } };
@@ -61,14 +65,22 @@ export function engine(kind: string, o: EngineOptions = {}): { name: string; cre
           let obs = given[RAW] ? { ...given[RAW], entity: given.entity } : whole({ participant: ctx.participant, entity: ctx.entity, ...given });
           // (A post's channels are the kernel's `<position>/<channel>`: the view of that capacity takes its own prefix off.)
           if (ctx.position) obs = { ...obs, channels: Object.fromEntries(Object.entries<any>(obs.channels).map(([k, c]) => [k.includes("/") ? k : `${ctx.position}/${k}`, c])) };
+          // (A reader the test hands in is the reading desk: asked, as the host asks it for the engine, about each paper addressed to this
+          // person that is new to them, and its filing, or none, goes back as the answer, in the step that sees the paper.)
+          let answers: object[] | undefined;
+          if (typeof ctx.read === "function") {
+            const papers = Object.values<any>(obs.channels ?? {}).flatMap((c) => (c?.kind === "records" ? c.records : [])).filter((x: any) => (x.addressed_to ?? []).includes(ctx.entity) || (x.addressed_to ?? []).includes(ctx.participant));
+            answers = papers.filter((x: any) => !asked.has(x.id)).map((x: any) => { asked.add(x.id); return { kind: "reading", about: x.id, body: ctx.read(x.id, "addressee") ?? null }; });
+          }
           let r: any;
-          try { r = actor.step(obs, obs.woke_for ?? "cadence", since); } catch (e) { throw diagnose(obs, e as Error); }
+          try { r = actor.step(obs, obs.woke_for ?? "cadence", since, answers); } catch (e) { throw diagnose(obs, e as Error); }
           since = obs.t;
           // (What the actor reports beside its act, as the host reads it from the action: its record, outcomes and decisions.)
           const a = r.action;
           if (r.record && Object.keys(r.record).length) a[RECORD] = r.record;
           if (r.outcomes?.length) a[OUTCOMES] = r.outcomes;
           if (r.decisions?.length) a[DECISIONS] = r.decisions;
+          a[DRAWS] = r.draws ?? [];
           return a;
         },
         sent: (a: string) => actor.sent(a),

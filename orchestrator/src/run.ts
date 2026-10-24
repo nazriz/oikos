@@ -28,6 +28,7 @@ import { debriefsBeside } from "./logs";
 import { join } from "node:path";
 import { actedOn, besideOf, drawTies, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
 import { readForEnd } from "./run-end";
+import { seatConfig } from "./seat-config";
 import { ReadingDesk, type DeskCounts } from "./reading";
 import { culture as cultureNs, reading as readingNs } from "@oikos/participants";
 import { DayBook, calls, canonical, diaryText, forms, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, inCalendar, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
@@ -290,10 +291,10 @@ const DAY = 86_400;
 /** What a debrief's prompt is taken to come to, for what a run keeps back for it: the seat's standing instructions,
  * the opening message with the summary and the notebook at their most, and the questions and answers before. */
 // (The standing instructions are shown once, in the first call: spread over the calls they are little of each.)
-const DEBRIEF_PROMPT_CHARS = 2_000 + 4_000 + SUMMARY_MAX + 8_000 + 6_000;
+export const DEBRIEF_PROMPT_CHARS = 2_000 + 4_000 + SUMMARY_MAX + 8_000 + 6_000;
 const ACCOUNT_PROMPT_CHARS = 8_000;
 /** What debriefs and exit accounts have cost, measured, as data (orchestrator/debrief-costs.json). */
-const endCosts = (): EndCosts => JSON.parse(readFileSync(join(import.meta.dir, "../debrief-costs.json"), "utf8"));
+export const endCosts = (): EndCosts => JSON.parse(readFileSync(join(import.meta.dir, "../debrief-costs.json"), "utf8"));
 
 export async function runWorld(o: RunOptions): Promise<RunSummary> {
   if (process.env.OIKOS_RUN_TRACE) return traced(o);
@@ -606,57 +607,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const twin = !o.adapter && !!pp.mock?.twin && !!pp.mock?.brain;
     const cadence = (pp.cadence_days ?? 7) * DAY;
     const mine = held(p.id);
-    // Channel paths as the kernel names them: its own, and each held position's as <position>/<channel>.
-    const chans: { path: string; ch: any }[] = [
-      ...personalChannels(p).map((ch: any) => ({ path: ch.id, ch })),
-      ...mine.flatMap((x) => x.channels.map((ch: any) => ({ path: `${x.id}/${ch.id}`, ch }))),
-    ];
-    const titles = new Map<string, string>(chans.filter((x) => x.ch.title).map((x) => [x.path, x.ch.title]));
-    const standingIds: string[] = (pp.standing ?? []).flatMap((s: string) => chans.filter((x) => x.path === s || x.path.endsWith(`/${s}`)).map((x) => x.path));
-    const onRequest = chans.filter((x) => x.ch.on_request).map((x) => x.path);
-    const office = mine.length === 1 ? mine[0] : undefined;
-    // (A person who holds one office, as a seat's person does, acts for its organisation: that is the entity its papers and trays are of.)
-    const entity = office?.entity ?? p.person ?? p.owner!;
-    const entityName = (cfg.world?.entities ?? []).find((e: any) => e.id === entity)?.name;
-    // What kind of report each is: with it, the seat can look into its papers, its buildings and ground, and who's who.
-    const kinds = new Map<string, string>(chans.map((x) => [x.path, x.ch.kind]));
-    // And which way each reaches it (docs/design/knowing.md): a register asked of its keeper is asked about one named
-    // thing (by which fields), a board searched, who's who looked up, a place gone to.
-    const boards = new Set<string>((cfg.knowing?.published ?? []).filter((x: any) => x.board).map((x: any) => x.what));
-    const ways = new Map<string, { way: string; by?: string[]; board?: boolean }>(chans.filter((x) => x.ch.way).map((x) => [x.path, { way: x.ch.way, ...(x.ch.by ? { by: x.ch.by } : {}),
-      ...(x.ch.way === "published" && !x.ch.from && (x.ch.match?.statement_kinds ?? []).some((k: string) => boards.has(k)) ? { board: true } : {}) }]));
-    // An office that employs staff of its own (its module says so: `staffed`): whoever holds it knows its posts, who is
-    // in each and which are vacant, from the office's own papers (readers/roster.ts). Kept from what the seat is shown.
-    const staffedBy = office ? mods[office.role_module?.code ?? ""]?.staffed?.(office.role_module?.params ?? {}) : undefined;
-    const roster = office && staffedBy ? new Roster(ctxFor(p.id, office.id, entity, {}), entity, office.id, staffedBy, (mods[office.role_module?.code ?? ""]?.routines ?? []).map((r) => r.task)) : undefined;
-    // A seat that keeps its body's ballots, or votes on them (the world says which: `ballot_count`), has the count of
-    // each ballot not yet declared, or its own vote on file, set out from the votes it has been shown (readers/tally.ts).
-    const tally = office && (pp.ballot_count === "keeper" || pp.ballot_count === "member") ? new Tally(entity, pp.ballot_count === "member" ? office.id : undefined) : undefined;
-    // And its diary (readers/diary.ts): how long its own work takes it and what its staff have in a week, the town's practice as the town states it.
-    const times: { [row: string]: number } = cfg.orchestration?.act_time?.person ?? {};
-    const diary = (at: number) => office && Object.keys(times).length ? diaryText({ title: office.title ?? office.id, times, issues: mods[office.role_module?.code ?? ""]?.issues ?? [], ...(cfg.catalogue?.working_day ? { workday: cfg.catalogue.working_day } : {}), ...(roster ? { staff: roster.now(at) } : {}) }) : undefined;
-    const setOut = (at: number) => [roster ? roster.text(at, office!.title ?? office!.id, (id: string) => whoIs(id)?.name) : "", tally ? tally.text(at, office!.title ?? office!.id) : "", diary(at) ?? ""].filter(Boolean).join("\n\n");
-    // Its in-trays (what a paper filed with its office comes into): its own papers of some kinds only, or a folder of
-    // some kinds; and the folders that hold every paper of its organisation's. And whose papers are its office's own
-    // doing: its own, and its staff's where they are a post of their own.
-    const folderKinds = new Map<string, string[]>(Object.entries((pp.folders ?? {}) as { [id: string]: string[] }).flatMap(([id, kinds]) => chans.filter((x) => x.path === id || x.path.endsWith(`/${id}`)).map((x) => [x.path, kinds] as [string, string[]])));
-    const own = chans.filter((x) => x.ch.kind === "records" && x.ch.way === "mine" && !x.ch.on_request && !standingIds.includes(x.path));
-    const narrow = (m: any) => !!(m?.statement_kinds?.length || m?.records?.length || m?.has?.length);
-    const trays = { kinds: new Map<string, string[] | true>(own.flatMap((x): [string, string[] | true][] => (folderKinds.has(x.path) ? [[x.path, folderKinds.get(x.path)!]] : narrow(x.ch.match) ? [[x.path, true]] : []))),
-      all: new Set(own.filter((x) => !folderKinds.has(x.path) && !narrow(x.ch.match)).map((x) => x.path)),
-      // (Its organisation's only office, its own staff's post apart: what is addressed to the organisation is its post.)
-      ...(office && [...positions.values()].filter((x: any) => x.entity === office.entity && !mine.some((m) => x.id === `${m.id}-staff`)).length === 1 ? { sole: true } : {}) };
-    const ownAuthors = mine.flatMap((x) => { const staff = positions.get(`${x.id}-staff`)?.holder; return staff ? [staff] : []; });
-    // The office's own file (readers/daybook.ts): its own papers and payments, and what stands open on its books (its
-    // module's `books`, read from what the seat is shown as its clerk reads it), set out at every sitting.
-    const officeModule = office ? mods[office.role_module?.code ?? ""] : undefined;
-    const dayBook = new DayBook({ entity, authors: [p.id, ...ownAuthors], name: (id: string) => whoIs(id)?.name,
-      ...(office && officeModule?.books ? { books: officeModule.books(ctxFor(p.id, office.id, entity, sortedKeys(office.role_module?.params ?? {}) as any)) } : {}) });
-    const config = { dayBook: { text: (at: number) => dayBook.text(at, office?.title ?? entityName ?? "The office") }, ...(pp.mock?.debrief ? { mockDebrief: pp.mock.debrief } : {}), trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(roster || tally || (office && Object.keys(times).length) ? { staff: { text: setOut } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
-      ...(pp.sessions && !twin ? { sessions: pp.sessions } : {}), ...(twin ? { exactBack: true } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
-      // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.
-      ...(pp.folders ? { folders: new Map<string, string[]>(Object.entries(pp.folders as { [id: string]: string[] }).flatMap(([id, kinds]) => chans.filter((x) => x.path === id || x.path.endsWith(`/${id}`)).map((x) => [x.path, kinds] as [string, string[]]))) } : {}),
-      ...(pp.prompt_max ? { promptMax: pp.prompt_max } : {}) };
+    // (Its reports, trays, office's file and staff, and the rest of its configuration: seat-config.ts, shared with the
+    // experiment harness's model stewards.)
+    const { config, office, entity, standingIds, roster, tally, dayBook } = seatConfig({ cfg, part: p, personal: personalChannels(p), mine, positions, mods, whoIs, ctxFor, twin, draftText, sorted: sortedKeys });
     const controller = createLlmParticipant(config, io);
     const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };
     const ctx = ctxFor(p.id, office?.id ?? "self", entity, {});

@@ -96,6 +96,13 @@ export class UsageLimitReached extends SpendingLimitReached {
   override name = "UsageLimitReached";
 }
 
+/** The provider says the account's prepaid credit is spent ("credit balance is too low"): no call can be made until more
+ * credit arrives, and none is ever bought here (the owner's rule: drain the included credit, never charge a card). The
+ * run stops as at a spending limit, cleanly and saying why; it is not waited out (a credit does not come back in hours). */
+export class CreditExhausted extends SpendingLimitReached {
+  override name = "CreditExhausted";
+}
+
 /** The model can't be reached (call after call failing: a network down, a machine asleep): the run stops as it does at
  * a spending limit, to be resumed once it can (pilot 8: three failures retired every model seat for the rest of the year). */
 export class ModelUnreachable extends SpendingLimitReached {

@@ -3520,9 +3520,10 @@
     "declined": {
      "type": "choice",
      "options": [
-      "unpaid"
+      "unpaid",
+      "overdue"
      ],
-     "description": "Where nothing was delivered because it was not paid for."
+     "description": "Where nothing was delivered because the order was not paid for, or the buyer had not paid what it owed on earlier ones."
     }
    },
    "writes": {

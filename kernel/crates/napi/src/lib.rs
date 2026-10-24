@@ -118,6 +118,18 @@ impl World {
         self.host.annotate(parse(&annotation, "annotation")?).map_err(err)
     }
 
+    /// What a seat's call would come to from what it has been shown: `{blocks}` or `{questions, invalid?}` (nothing changes).
+    #[napi]
+    pub fn resolve(&self, participant: String, program: String, as_: Option<String>) -> napi::Result<String> {
+        Ok(self.host.resolve(&participant, &program, as_.as_deref()).map_err(err)?.to_string())
+    }
+
+    /// Whether these blocks would be carried out for the participant now: `{ok, refusal?}` (nothing changes).
+    #[napi]
+    pub fn check(&self, participant: String, as_: Option<String>, blocks: String) -> napi::Result<String> {
+        Ok(self.host.check(&participant, as_.as_deref(), &parse(&blocks, "blocks")?).map_err(err)?.to_string())
+    }
+
     /// Code actors' questions to models since last asked: `[{key, kind, about, body}]`.
     #[napi]
     pub fn questions(&mut self) -> String {
