@@ -7866,3 +7866,58 @@ What a real official could do in each case, and whether the platform gives the s
   (citizen.md). The routes the seat had were real ones: pay the wages by a payment of its own, lift the holds, or write
   to the builder, whose code owner does not read letters' words (PC-1). Nothing changed.
 - **Revisit if** a seat is told a name is unknown that its reports showed it (the fix missed a path), or PB-23 is built.
+
+## 2026-10-25 · A system's work takes time too: the support office (WM-14), a design, not built (branch `pilot-faults`, fault 5)
+
+Asked: per "all work takes time", a supplied system's work also takes time and has a capacity; design how its
+throughput and time are read from the table of work, charged and queued; build it if contained.
+
+- **What is already there.** The kernel charges a system as it charges a person: each act's seconds are read from the
+  table of work (`orchestration.act_time.system`, by block and by `publish/<kind>`), placed on the system's lanes
+  (`lanes`, how many at once) after what it has in hand (`kernel/crates/time`, `place`), and the act takes effect when
+  done. Throughput is lanes over seconds, and a backlog follows when work comes faster. Nothing new is needed in the
+  mechanism to read, charge or queue a system's time.
+- **What is wrong is what the system stands for, and its figures.** The support office is held by `agency-system`, whose
+  every row is one second (`WORK_TIME.system`), with one lane and no working day; its decision is the whole of a
+  caseworker's job done by a computer. So a claim is decided in about two hours (WM-14), and a model seated there sits
+  on that system and works at its speed, against the hard rule that a seat is a person's body.
+- **The design (each part a law or a figure, nothing a dial).**
+  1. *Waits the law sets* stay law, as data: the support law's `needs` (papers asked of the claimant or employer,
+     `within_days`) already make a decision wait; add, where a place's law has one, the period a first payment waits
+     for (Universal Credit: a month's assessment period and payment within seven days of its end; to confirm), per
+     profile, sourced or marked.
+  2. *The casework is an officer's*, not the computer's: rows `publish/benefit_decision`, `publish/<evidence request>`,
+     `publish/<review decision>` in the **person** table, an officer's minutes per case, sourced per place (unit costs
+     or time studies of the agency; placeholders marked).
+  3. *Who does it.* The outside world's people are not modelled, so the agency's casework is a supplied capacity: a
+     template `agency-casework` whose rows are those officers' minutes, whose `lanes` are the town's share of the
+     agency's officers (officers per claim in the place's published staffing, times the town's claims at generation;
+     a national average on a small town, as PS-10 already says of the town's offices), and which keeps a **working
+     day**. Two kernel changes, both in the contract: a template's `does` rows carry their own seconds for any block
+     (today only `work` has `seconds`; other rows fall back to the world's one system table, so every system's
+     decision is one second), and a template's `hours` places its lanes' work inside office hours, as a person's
+     timeline is. The case system (`agency-system`) keeps its one-second rows for what a computer does (payments,
+     notices), and the decision is made `by` the casework desk. The backlog is then the claims' arrivals against
+     officer hours, and the wait is that queue plus the law's waits.
+  4. *A seat there is a person.* When a model holds `outside-support`, its post is held by a person (an officer of the
+     agency: a body that is not a resident, with no home or household), at the person table's speed, who may direct
+     the case system (`by`) as any office-holder directs a system its organisation owns.
+- **Why not built now.** It is four changes across the kernel's time crate and contract (`hours` on a template), the
+  generator (the template, its lanes from a sourced ratio, the rows), nine profiles' figures with sources, and seats
+  on a non-resident person; every generated town's state hash moves, and the backstop
+  (`all-work-takes-time.test.ts`) should learn to fail on a one-second row for a decision. About four agent-days.
+- **For Naz:** (1) may a seat's body be a person of the outside world who is not a resident (an agency officer), or
+  should the outside's office be seated only as a system with a stated speed? (2) the agency's officers per claim, a
+  national figure applied to a small town: acceptable as a marked placeholder where a place publishes none?
+- **Revisit if** a support-office experiment is planned (WM-14's "fix when"), or the answer to (1) changes how seats
+  in other outside offices are held.
+
+## 2026-10-25 · Found on the way: the perception property fails now and then (not fixed)
+
+`kernel/tests/perception.rs`, `a_view_built_from_changes_equals_the_full_picture`, failed once in the gate on
+`pilot-faults` and passed three times after: proptest's cases are random, and one case (kept outside the repository, in
+the branch's scratch, not committed to `perception.proptest-regressions`) delivers a finance seat's `finance/laws`
+records twice, so the view built from changes lists the lots and the river law twice against the full picture's once.
+It fails the same with this branch's kernel changes taken out, so it is on main. Not chased here (parity: record).
+- **Revisit:** before the next kernel merge, run the case (`ops` beginning `Smart { kind: 70 }, Smart { kind: 187 }`)
+  and find which block delivers a standing channel whole twice.

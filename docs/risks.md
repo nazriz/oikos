@@ -247,6 +247,11 @@ The mechanism:
   the boundary's office a supplied system with a stated speed)
 - **Notice by:** claim-to-decision days against the place's published processing times.
 - **Fix when:** before a support-office experiment is read in days or hours, or a seat in it is compared with a seat elsewhere.
+- **Design (2026-10-25, not built; decisions "A system's work takes time too"):** the kernel already reads, charges and
+  queues a system's time (rows of `act_time.system`, lanes); what is wrong is the figures and what the system stands
+  for. Law-set waits as support-law data; casework as officers' minutes per case on an `agency-casework` template
+  with lanes from a sourced officers-per-claim ratio and a working day (two kernel changes: per-template seconds for
+  any block, `hours` on a template); a seat there held as a person (an agency officer). Two questions wait on Naz.
 
 ---
 
