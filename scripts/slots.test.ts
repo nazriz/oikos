@@ -9,10 +9,11 @@ import { join } from "node:path";
 
 const slots = join(import.meta.dir, "slots.ts");
 const pool = () => mkdtempSync(join(tmpdir(), "oikos-slots-"));
-/** The environment of a process outside any slot, with this pool. */
+/** The environment of a process outside any slot, with this pool: none of the caller's slot settings leak in (a test run
+ * by the merge has OIKOS_SLOT_PRIORITY=high, and every job here was then a merge's: 2026-10-24), and no cap unless asked. */
 const env = (dir: string, size: number | "off", more: Record<string, string> = {}) => {
-  const e: Record<string, string | undefined> = { ...process.env, OIKOS_SLOTS_DIR: dir, OIKOS_SLOTS: String(size), ...more };
-  if (!("OIKOS_SLOT_HELD" in more)) delete e.OIKOS_SLOT_HELD;
+  const e: Record<string, string | undefined> = { ...process.env, OIKOS_SLOTS_DIR: dir, OIKOS_SLOTS: String(size), OIKOS_SLOT_CAP: "none", ...more };
+  for (const k of ["OIKOS_SLOT_HELD", "OIKOS_SLOT_PRIORITY", "OIKOS_SLOT_OWNER"]) if (!(k in more)) delete e[k];
   return e;
 };
 async function sh(cmd: string[], e: Record<string, string | undefined>) {
@@ -123,5 +124,88 @@ test("the wrapper passes on its command's exit code", async () => {
   const dir = pool();
   try {
     expect((await sh(["bun", slots, "--", "sh", "-c", "exit 7"], env(dir, 2))).code).toBe(7);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}, 120_000);
+
+test("a job with priority high goes ahead of earlier waiters without it", async () => {
+  const dir = pool(), order = join(dir, "order");
+  try {
+    const mark = (name: string) => ["sh", "-c", `echo ${name} >> ${order}; sleep 0.2`];
+    const holder = sh(["bun", slots, "--", "sleep", "1.5"], env(dir, 1));
+    await Bun.sleep(600);
+    const normal = sh(["bun", slots, "--", ...mark("normal")], env(dir, 1));
+    await Bun.sleep(600);
+    const high = sh(["bun", slots, "--priority", "high", "--", ...mark("high")], env(dir, 1));
+    const done = await Promise.all([holder, normal, high]);
+    expect(done.map((d) => d.code)).toEqual([0, 0, 0]);
+    expect(readFileSync(order, "utf8").trim().split("\n")).toEqual(["high", "normal"]);
+    const bad = await sh(["bun", slots, "--priority", "urgent", "--", "true"], env(dir, 1));
+    expect(bad.code).toBe(2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}, 60_000);
+
+test("queueOrder: priority first, then the oldest", async () => {
+  const { queueOrder } = await import("./slots");
+  const w = (file: string, since: number, priority?: number) => ({ file, since, pid: 1, ...(priority ? { priority } : {}) });
+  expect([w("a", 1), w("b", 2, 1), w("c", 0)].sort(queueOrder).map((x) => x.file)).toEqual(["b", "c", "a"]);
+});
+
+test("the cap: one checkout holds at most its cap, even alone; another checkout is not held back by it", async () => {
+  const dir = pool(), a = join(dir, "a"), b = join(dir, "b");
+  try {
+    // Pool of 4, cap 1: checkout a's three jobs run one at a time though three tokens are free; b's runs beside them.
+    const as = Array.from({ length: 3 }, () => sh(["bun", slots, "--", ...job(a)], env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "a" })));
+    await Bun.sleep(150);
+    const bs = sh(["bun", slots, "--", ...job(b)], env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "b" }));
+    const done = await Promise.all([...as, bs]);
+    expect(done.map((d) => d.code)).toEqual([0, 0, 0, 0]);
+    expect(peak(a)).toBe(1);
+    expect(peak(b)).toBe(1);
+    // A weight above the cap is cut to the cap (and a build is told so: CARGO_BUILD_JOBS).
+    const w = await sh(["bun", slots, "--weight", "3", "--", "sh", "-c", "echo jobs=$CARGO_BUILD_JOBS held=$OIKOS_SLOT_HELD"], env(dir, 4, { OIKOS_SLOT_CAP: "2", OIKOS_SLOT_OWNER: "a" }));
+    expect(w.out).toContain("jobs=2");
+    // The merge's jobs (priority high) are not capped.
+    writeFileSync(a, "");
+    await Promise.all(Array.from({ length: 3 }, () => sh(["bun", slots, "--priority", "high", "--", ...job(a)], env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "a" }))));
+    expect(peak(a)).toBeGreaterThanOrEqual(2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}, 120_000);
+
+test("eligible: within the cap, the merge's, and a borrower only while no other checkout waits", async () => {
+  const { eligible } = await import("./slots");
+  const h = (owner: string, n: number) => Array.from({ length: n }, (_, i) => ({ pid: 100 + i, since: 1, owner, cwd: "/" }));
+  const w = (owner: string, more: object = {}) => ({ pid: 1, since: 2, weight: 1, owner, cwd: "/", ...more });
+  expect(eligible(w("a"), h("a", 2), [], 3)).toBe(true);
+  expect(eligible(w("a"), h("a", 3), [], 3)).toBe(false); // strict, even alone
+  expect(eligible(w("a", { priority: 1 }), h("a", 9), [w("b")], 3)).toBe(true);
+  expect(eligible(w("a", { borrow: true }), h("a", 9), [w("a")], 3)).toBe(true); // borrowing: nobody else waits
+  expect(eligible(w("a", { borrow: true }), h("a", 9), [w("a"), w("b")], 3)).toBe(false); // b waits: no more for a
+  expect(eligible(w("b"), h("a", 9), [w("a"), w("b")], 3)).toBe(true); // b is under its cap: it goes first
+  expect(eligible(w("a", { cap: null }), h("a", 9), [w("b")], 3)).toBe(true);
+  // A waiter's own part-taken tokens (same pid and time) do not count against it.
+  expect(eligible({ ...w("a"), weight: 3 }, [{ pid: 1, since: 2, owner: "a", cwd: "/" }, { pid: 1, since: 2, owner: "a", cwd: "/" }], [], 3)).toBe(true);
+});
+
+test("a borrower goes past its cap while it is alone, and stops taking as soon as another checkout waits", async () => {
+  const dir = pool();
+  try {
+    // Checkout a borrows: with the pool to itself (4, cap 1) it holds 3 at once.
+    const lib = (owner: string, n: number, ms: number) => ["bun", "-e", `import { take } from ${JSON.stringify(slots)};
+      const got = await Promise.all(Array.from({ length: ${n} }, () => take(1, "${owner}", { borrow: true, pollMs: 20 })));
+      console.log("took", got.filter((s) => s && s.weight).length); await Bun.sleep(${ms}); for (const s of got) s?.release();`];
+    const alone = await sh(lib("a", 3, 10), env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "a" }));
+    expect(alone.out).toContain("took 3");
+    // b waits (its one job, not borrowing) while a holds the whole pool; a's next take queues behind b's, though a borrows.
+    // (a writes 300 ms after its tokens come, so that b's job, given its token first, has written by then even under load;
+    // had a gone ahead of b, it would have written while b still waited, a second before.)
+    const holder = Bun.spawn(lib("a", 4, 1500), { stdout: "pipe", stderr: "pipe", env: env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "a" }) });
+    for (let i = 0; i < 400 && readdirSync(dir).filter((f) => f.startsWith("slot-")).length < 4; i++) await Bun.sleep(20);
+    const order = join(dir, "order");
+    const bJob = sh(["bun", slots, "--", "sh", "-c", `echo b >> ${order}`], env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "b" }));
+    for (let i = 0; i < 400 && !readdirSync(dir).some((f) => f.startsWith("wait-")); i++) await Bun.sleep(20);
+    const aMore = sh(["bun", "-e", `import { take } from ${JSON.stringify(slots)}; import { appendFileSync } from "node:fs"; const s = await take(1, "a again", { borrow: true, pollMs: 20 }); await Bun.sleep(300); appendFileSync(${JSON.stringify(order)}, "a\\n"); s?.release();`], env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "a" }));
+    const [, , more] = await Promise.all([holder.exited, bJob, aMore]);
+    expect(more.code).toBe(0);
+    expect(readFileSync(order, "utf8").trim().split("\n")).toEqual(["b", "a"]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 120_000);

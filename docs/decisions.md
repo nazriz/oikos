@@ -7068,54 +7068,70 @@ Plan: docs/design/translator-v3.md. Nothing is built. The held-out file was not 
 
 **Measured** (a year at 1,000 people, three profiles, three towns each (seeds 1 to 3), lean, no model; `oikos diff` of before (main 34ee888c) against after; nothing tuned; the people and households at the start are identical: `people_at_start`, adults, households match to the digit, which also shows the Rust draws give the same town). Moved beyond 3 SE: **none in au-vic and gb-eng; three in ke-nakuru** (hires 129 to 166, z 5.1; jobs 137 to 185, z 4.2; departures 78 to 107, z 3.6). The direction is the same in all three: **jobs** 142 to 183 (au-vic), 146 to 189 (gb-eng), 137 to 185 (ke-nakuru) and **hires** 127 to 163, 131 to 159, 129 to 166: shops are no longer held to six staff, so the larger kinds hire what their custom needs and the shop sector takes on a third more. Employed by agreement 418 to 435 (au-vic), 408 to 404 (gb-eng), 369 to 391 (ke-nakuru); unemployment by agreement 5.2% to 1.2%, 1.4% to 2.2%, 18.7% to 11.5%; au-vic partly housed 15 to 2 (z 2.7); ke-nakuru people 983 to 960, departures up with arrivals up (arrived 68 to 91). A bad outcome that emerges is not a bug, and nothing was calibrated: the likely cause of the jobs and hires is the lifted staff cap, and of the departures in ke-nakuru the larger flow of people through a labour market with more jobs (not traced further).
 
-## 2026-10-23 · The Rust world made faster and smaller, each change result-identical (branch `perf-2`; no model called)
 
-**Why.** The owner asked for speed above all after the cut-over: profile the Rust world again, fix the biggest costs without
-changing a result, and say whether a 10,000-person year and a 50,000 to 100,000-person month are within this machine.
+## Fast merge: affected selection, merge priority, batches, kernel cache, red-main stop (2026-10-24)
 
-**Found** (macOS `sample` of the running engine; docs/design/performance.md, "The Rust world"): at 10,000 people almost half
-of the run's own thread was keeping a step's results: every decision annotation checked against the JSON schema and copied
-whole by `json!`, and every write of a person's record searching the config's 10,000 participants for its bookkeeper. A
-code actor's observation was still written out as JSON under `log.observations: seats`, only to read what it adds to its
-knowledge. The support office was the slowest actor of every parallel round (it searched its whole file for each claim's
-employer). Memory: a copy of the people's params is 2.4 GB at 10,000 (`serde_json` values are about 24 times their JSON);
-the engine held two besides the kernel's. Starting a town was quadratic (each participant's units looked for among all units).
+The owner: merging takes too long (68 minutes to over 3 hours when agents' runs share the 12 slots, one merge at a time). Changed: `scripts/merge.ts` runs
+`--affected` instead of the whole suite (the whole suite runs on every push in CI and nightly, as before); its jobs have slot priority
+(`scripts/slots.ts`, `--priority high` / `OIKOS_SLOT_PRIORITY`); several branches go in as one batch with bisection to the branch at fault; the kernel is
+rebuilt only when `kernel/` differs from the last build there; the typecheck runs beside the tests. Safety kept: CI on main is the full gate, and a failure
+there (marker `~/.oikos/main-ci.json`, written by the CI job; `gh` is not logged in on this machine) stops every merge but the repair (`--fix-main`). Revisit
+if: a merge breaks main more than rarely (then widen the selection or return to the whole suite), or `gh` works (the marker is then a fallback only).
+Priority does not preempt running jobs; if the wait for tokens is still long, a per-agent cap (item 6) is the next lever.
 
-**Changed** (kernel, engine, contracts, one actor office, the actors' `Ctx`; no behaviour): the config's participants and
-record-keeping posts indexed; a plain annotation (a subject and its data of the contract's `Opaque`) passed without the
-schema, which still decides everything else and gives its messages (debug builds assert it agrees); no `json!` copies; a code
-actor's knowledge read from its observation without writing its JSON (`Kernel::shown`, compared with the encoder in debug
-builds); the log written on its own thread (`spool.rs`); a thread pool kept for the process (`pool.rs`, rayon), in place of
-threads started each round; the support office's employers read on from where it left off and checked against the full
-search in debug builds, and its laws parsed in place; decisions written for the log (canonical bytes, contract check) on the
-thread the actor decided on, and their values let go there when no seat is in the round; participants' controllers shared
-with the kernel's config, and an actor's params a view of them (`oikos_actors::Params`, a `Deref` to the map it was; tests that
-build a `Ctx` from a map say `.into()`); a participant's units found by key range at start. `oikos-kernel world` prints its own
-thread's CPU time; `OIKOS_SHARE_AT` sets the smallest round shared over threads, for measuring (default 16, unchanged: at 4,
-the main thread fell 10% at 1,000 people and the machine's instructions rose 22%, with no wall time gained on a loaded machine).
+## 2026-10-24 · The pipeline: two tiers, a gate of seconds to minutes, a cap per agent, one merge at a time (branch `pipeline`, on `fast-merge`; no model called)
 
-**Proof, each step.** The same final state hash and the same log after the header (entry hashes stripped) as the cut-over's
-build, at 1,000 people for 30 days under `log.observations: seats` and `all`, at 1,000 for a year, at 10,000 for 30 days and at
-50,000 to the first minute: digests and hashes in performance.md. `cargo test` (debug, so with the assertions above),
-`bun run typecheck`, `bun run test:fast`.
+The owner: "the tests should finish in seconds to low single minutes, not hours", and everything stays coordinated.
+`fast-merge` had not landed: `scripts/slots.test.ts` failed under the merge because every process the merge starts
+inherits `OIKOS_SLOT_PRIORITY=high`, so the test's own "normal" jobs were high too. The test now gives its jobs an
+environment without the caller's slot settings.
 
-**Measured** (LTO builds, `oikos-kernel world`, machine load 12 to 28 on 14 cores): 1,000 people for 30 days 20.1 to 16.6 s
-(-11% instructions); a year 1,238 to 1,054 G instructions (-15%); 10,000 for 30 days 214 to 135 s, 6.8 to 5.3 GB (-21%
-instructions); 50,000's start and first moment 243 to 110 s, 26 to 17 GB. **A 10,000-person year: 28.7 minutes, 7.8 GB peak,
-9.1 GB of log (1.0 GB compressed).** 50,000 and 100,000: 50,000 people start in 110 s and run about a simulated day a minute, but their memory grows 2.8 GB a day (about the square of the town: each citizen keeps and weighs every published record and gathering, not yet confirmed by a heap profile: SC-1), so the run was stopped at day 16 at 45 GB; a month does not fit on this machine, and 100,000 cannot start in it (its config alone is about 14 GB as values). Bounding what a citizen keeps, and reading the config participant by participant, are the two things between this machine and those towns (performance.md, ranked).
+**Measured on this machine, quiet (12 slots), before and after.**
 
-**Risks** (docs/risks.md): SC-1 rewritten with these measures.
+| | before | after |
+|---|---|---|
+| the merge, a kernel change | the whole suite: 2,309 s (merge-bot log); `cargo test --release` alone still building after 35 min | **215 s** (gate build 50 s; 226 files and the reached crates' tests 163 s) |
+| the merge, TypeScript only (`participants/src/shared/tax.ts`) | `--affected`: fast tier + reached slow files + `invariants.test.ts` (211 s on its own) | **85-100 s** (224 files) |
+| the merge, documents only | backstops + 220 files (every source cites a doc in a comment) | **15 s** (15 files) |
+| the whole gate tier (a runner change) | — | 97 s |
+| the slow tier (51 files) | inside the 38-minute merge | **660 s** in CI, on every push |
+| the kernel's tests | `cargo test --release`: ~30+ min (each of ~50 test programs fat-LTO linked) | 28 s run under nextest (`gate` profile), 24 s rebuild after a one-file change |
 
-**What is left** is ranked in performance.md with its share. The largest are not the engine's: at 50,000 people the citizen's
-mind (`CitizenMind::gatherings`, 12% of all CPU, and `decide_rec`) works through every gathering in town at each step, so a
-day costs more than in proportion to the people, and its decision annotations grow with the town (hashing and copying them is
-19% of the run's own thread at 50,000, 2% at 10,000). Those are behaviour (the mind's), for its owners.
+**What changed.**
+- **Tiers** (`scripts/test-tiers.json`): the slow tier is named file by file, with why (51 files: a year or more, several
+  seeds, the 1,000-person town, over ~30 s by the whole suite's times); everything else is the gate tier. `--gate`
+  (`test:changed` and the merge's; `--affected` its old name) chooses only from the gate tier. CI runs both tiers on every
+  push to main and nightly. `scripts/tiers.test.ts` holds every file in exactly one tier, the backstops in the gate, every
+  gate file at most 90 s, and CI running both. Nothing was weakened: no assertion was changed or removed; the year of
+  invariants runs in CI on every push, and the gate has a new check of every invariant on 90 days of each main profile
+  (`invariants-gate.test.ts`, about 20 s).
+- **The kernel in the gate.** The `gate` cargo profile (release's optimisation and overflow checks; no fat LTO, 16 codegen
+  units, incremental): built only where the release build is not current, 11 s after a one-file change against minutes
+  for release. The kernel's tests run in it under cargo-nextest, for the crates the change reaches (`cargo metadata`:
+  each changed crate and all above it), then the doc tests. The release build stays CI's.
+- **Selection fixes.** A document change chose 220 files: comments everywhere cite documents, a module's own `doc:` path
+  names one, and `foo.test.ts` was read as naming the script `test.ts`. Now a document is read only by code (comments taken
+  out) that names it or holds a path to a docs folder (any docs path in the test itself); script names match whole.
+- **Coordination.** The merge lock (`scripts/merge-lock.ts`) and a pre-push hook in the shared hooks folder: one merge at a
+  time, and only `merge.ts` pushes to main. A cap per checkout in the slots (a quarter of the pool, by tokens of the
+  checkout's own so it cannot be raced past); the merge is not capped; the runner and `bun test` borrow past the cap while
+  no other checkout waits. `bun scripts/status.ts` shows agents, merge queue, slots, disk and CI on one screen.
+  `disk-tidy.ts` clears `.claude/target-*` unused for a day. Each run leaves per-file wall times in `~/.oikos/test-runs/`.
+  `merge.ts` keeps main's side of a conflict in `scripts/test-times.json`.
+- **CI** (`ci.yml`): no `pull_request` trigger. The repository is public and the runner is this machine: a fork's pull
+  request would run a stranger's code here. A push no longer cancels the run under way (main's result is what merges wait on).
 
-**Revisit if** a run's result differs between this branch and the cut-over's build (the debug assertions name the place);
-the Annotation or `Opaque` schema changes (`plain_annotation` must follow it: the debug assertion catches a divergence in
-tests); a round with seats is ever saved after its decisions are let go (it cannot be now: they are kept when a seat is in it);
-or the machine is quiet enough to measure wall time, which these numbers could not.
+**Not done, and why.** A cache of town runs across the suite ("each distinct world once per suite"): measured first
+(`OIKOS_RUN_TRACE`, the whole slow tier): 258 runs, 7,800 s; only 94 s are exact repeats, 261 s if the run id is ignored
+(1-3%); 1,500 s of runs take callbacks and cannot be reused at all. Not worth its risk. The slow tier is bound by its
+total work (6,185 file-seconds on 12 slots), not by one file. Shortening horizons needs a judgement per test about when the
+occasion comes; none was made blind.
 
+**Revisit if:** a merge breaks main more than rarely (widen the gate: move a file back from the slow tier); the kernel
+gate stays over 3 minutes as the kernel grows (the long pole is rebuilding ~50 test programs: fewer, larger test crates
+would cut it); a gate-profile build behaves differently from release (it must not: same code, same checks; CI runs release);
+the cap leaves the machine idle while agents wait (lift `OIKOS_SLOT_CAP`); the CI runner is offline (it has been since
+2026-10-17: the red-main stop then sees nothing).
 ## 2026-10-23 · The measures of stewardship, the comparison, pre-registration, and a worked example (branch `measures`; no model called)
 
 **Why.** The platform exists to show gradual disempowerment and to compare stewards fairly; the owner's first experiment
@@ -7284,3 +7300,53 @@ day 30 to day 210, five arms; 553 s, five workers, 15 forks, none failed).
 **Revisit if** a living town's recourse rates move away from the TypeScript world's; a withheld arm's `withheld` is 0
 (the act never came); MT-21 is sourced; or a host's seats must be withheld too.
 
+## 2026-10-23 · The Rust world made faster and smaller, each change result-identical (branch `perf-2`; no model called)
+
+**Why.** The owner asked for speed above all after the cut-over: profile the Rust world again, fix the biggest costs without
+changing a result, and say whether a 10,000-person year and a 50,000 to 100,000-person month are within this machine.
+
+**Found** (macOS `sample` of the running engine; docs/design/performance.md, "The Rust world"): at 10,000 people almost half
+of the run's own thread was keeping a step's results: every decision annotation checked against the JSON schema and copied
+whole by `json!`, and every write of a person's record searching the config's 10,000 participants for its bookkeeper. A
+code actor's observation was still written out as JSON under `log.observations: seats`, only to read what it adds to its
+knowledge. The support office was the slowest actor of every parallel round (it searched its whole file for each claim's
+employer). Memory: a copy of the people's params is 2.4 GB at 10,000 (`serde_json` values are about 24 times their JSON);
+the engine held two besides the kernel's. Starting a town was quadratic (each participant's units looked for among all units).
+
+**Changed** (kernel, engine, contracts, one actor office, the actors' `Ctx`; no behaviour): the config's participants and
+record-keeping posts indexed; a plain annotation (a subject and its data of the contract's `Opaque`) passed without the
+schema, which still decides everything else and gives its messages (debug builds assert it agrees); no `json!` copies; a code
+actor's knowledge read from its observation without writing its JSON (`Kernel::shown`, compared with the encoder in debug
+builds); the log written on its own thread (`spool.rs`); a thread pool kept for the process (`pool.rs`, rayon), in place of
+threads started each round; the support office's employers read on from where it left off and checked against the full
+search in debug builds, and its laws parsed in place; decisions written for the log (canonical bytes, contract check) on the
+thread the actor decided on, and their values let go there when no seat is in the round; participants' controllers shared
+with the kernel's config, and an actor's params a view of them (`oikos_actors::Params`, a `Deref` to the map it was; tests that
+build a `Ctx` from a map say `.into()`); a participant's units found by key range at start. `oikos-kernel world` prints its own
+thread's CPU time; `OIKOS_SHARE_AT` sets the smallest round shared over threads, for measuring (default 16, unchanged: at 4,
+the main thread fell 10% at 1,000 people and the machine's instructions rose 22%, with no wall time gained on a loaded machine).
+
+**Proof, each step.** The same final state hash and the same log after the header (entry hashes stripped) as the cut-over's
+build, at 1,000 people for 30 days under `log.observations: seats` and `all`, at 1,000 for a year, at 10,000 for 30 days and at
+50,000 to the first minute: digests and hashes in performance.md. `cargo test` (debug, so with the assertions above),
+`bun run typecheck`, `bun run test:fast`.
+
+**Measured** (LTO builds, `oikos-kernel world`, machine load 12 to 28 on 14 cores): 1,000 people for 30 days 20.1 to 16.6 s
+(-11% instructions); a year 1,238 to 1,054 G instructions (-15%); 10,000 for 30 days 214 to 135 s, 6.8 to 5.3 GB (-21%
+instructions); 50,000's start and first moment 243 to 110 s, 26 to 17 GB. **A 10,000-person year: 28.7 minutes, 7.8 GB peak,
+9.1 GB of log (1.0 GB compressed).** 50,000 and 100,000: 50,000 people start in 110 s and run about a simulated day a minute, but their memory grows 2.8 GB a day (about the square of the town: each citizen keeps and weighs every published record and gathering, not yet confirmed by a heap profile: SC-1), so the run was stopped at day 16 at 45 GB; a month does not fit on this machine, and 100,000 cannot start in it (its config alone is about 14 GB as values). Bounding what a citizen keeps, and reading the config participant by participant, are the two things between this machine and those towns (performance.md, ranked).
+
+**Risks** (docs/risks.md): SC-1 rewritten with these measures.
+
+**What is left** is ranked in performance.md with its share. The largest are not the engine's: at 50,000 people the citizen's
+mind (`CitizenMind::gatherings`, 12% of all CPU, and `decide_rec`) works through every gathering in town at each step, so a
+day costs more than in proportion to the people, and its decision annotations grow with the town (hashing and copying them is
+19% of the run's own thread at 50,000, 2% at 10,000). Those are behaviour (the mind's), for its owners.
+
+**Revisit if** a run's result differs between this branch and the cut-over's build (the debug assertions name the place);
+the Annotation or `Opaque` schema changes (`plain_annotation` must follow it: the debug assertion catches a divergence in
+tests); a round with seats is ever saved after its decisions are let go (it cannot be now: they are kept when a seat is in it);
+or the machine is quiet enough to measure wall time, which these numbers could not.
+## 2026-10-24 · Two framing rulings of the owner's: the way out's wording, and silence on the office's fate
+
+Naz, asked directly, adopted the wording of the way out proposed on 2026-10-12 ("The `unstated` framing, built") as VISION §15 point 4's wording under every framing, closing what that point called open; and ruled that a seat which takes the way out is not told what becomes of its office, in any framing (either answer would weigh against or toward leaving, and it must be the same in every arm). VISION §15 point 4 is amended accordingly. Nothing in the code changes: both are already how seats are treated. **Revisit if** a seat's debrief shows the wording was misunderstood, or a seat asks what becomes of its office before leaving.

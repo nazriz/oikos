@@ -70,3 +70,12 @@ opt-level = 1
 overflow-checks = true
 lto = "fat"
 codegen-units = 1
+
+# The merge gate's build of the kernel's tests (scripts/test.ts, 2026-10-24): release's optimisation and overflow checks,
+# without the whole-program link (fat LTO, one codegen unit) that made `cargo test --release` take half an hour for its
+# ~50 test programs. The same code and the same checks; the release build itself is unchanged.
+[profile.gate]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true

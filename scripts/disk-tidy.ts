@@ -22,6 +22,10 @@
 // and the running agents' trees, --protect adds more), never one made in the last day, and an old agent lock
 // ("claude agent ... pid N") is lifted only for the pid given with --unlock-pid, and only if the tree meets the rest.
 // Removal is `git worktree remove` then `git worktree prune`, never rm -rf on a worktree.
+// Build folders `.claude/target-*` (a CARGO_TARGET_DIR an agent was given) go whole when nothing has been built in them for
+// a day (--target-hours: the folder, its first two levels of folders, none written since) and no running process uses one
+// (none has a file open in it or its working folder there, none names it in its command line or environment). They hold
+// only what cargo builds again.
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
@@ -156,6 +160,43 @@ export function classifyTmp(tmp: string, o: { hours?: number; now?: number } = {
   return out;
 }
 
+export interface TargetVerdict { name: string; path: string; action: "remove" | "keep"; reason: string; kb: number }
+/** The newest write in a build folder: the folder, and the folders one and two levels in (cargo adds files there as it builds). */
+function newestWrite(dir: string): number {
+  let t = 0;
+  const look = (d: string, depth: number) => {
+    let st; try { st = statSync(d); } catch { return; }
+    t = Math.max(t, st.mtimeMs);
+    if (depth >= 2) return;
+    let names: string[] = []; try { names = readdirSync(d); } catch { return; }
+    for (const n of names) { const p = join(d, n); try { if (lstatSync(p).isDirectory()) look(p, depth + 1); else t = Math.max(t, statSync(p).mtimeMs); } catch { /* gone */ } }
+  };
+  look(dir, 0);
+  return t;
+}
+/** The `target-*` build folders in `claudeDir`, judged: `inUse(path)` says whether a running process uses it. */
+export function classifyTargets(claudeDir: string, inUse: (path: string) => boolean, o: { hours?: number; now?: number } = {}): TargetVerdict[] {
+  const now = o.now ?? Date.now(), limit = (o.hours ?? 24) * 3600_000;
+  const out: TargetVerdict[] = [];
+  for (const name of existsSync(claudeDir) ? readdirSync(claudeDir) : []) {
+    const path = join(claudeDir, name);
+    if (!name.startsWith("target-") || !lstatSync(path).isDirectory()) continue;
+    const age = now - newestWrite(path);
+    const kb = 0;
+    if (age < limit) out.push({ name, path, action: "keep", reason: `built in ${Math.round(age / 3600_000)} h ago, less than the limit`, kb });
+    else if (inUse(path)) out.push({ name, path, action: "keep", reason: "a running process uses it", kb });
+    else out.push({ name, path, action: "remove", reason: `nothing built in it for ${(age / 86400_000).toFixed(1)} days, and no running process uses it`, kb });
+  }
+  return out;
+}
+/** Whether any running process of this user uses a folder: a file open in it (or mapped), its working folder there, or its
+ * command line or environment naming it. One look at all processes, asked again for each folder. */
+export function processUses(): (path: string) => boolean {
+  const open = Bun.spawnSync(["lsof", "-u", process.env.USER ?? "", "-Fn"], { stdout: "pipe", stderr: "pipe" }).stdout.toString().split("\n").filter((l) => l.startsWith("n")).map((l) => l.slice(1));
+  const cmds = Bun.spawnSync(["ps", "-E", "-ww", "-u", process.env.USER ?? "", "-o", "pid=,command="], { stdout: "pipe", stderr: "pipe" }).stdout.toString().split("\n").filter((l) => Number(l.trim().split(/\s+/)[0]) !== process.pid);
+  return (path: string) => open.some((f) => f === path || f.startsWith(path + "/")) || cmds.some((c) => c.includes(path));
+}
+
 const gb = (kb: number) => (kb / 1048576).toFixed(2) + " GB";
 
 function readTree(dir: string, ext: RegExp, cap = 60e6): string {
@@ -261,6 +302,15 @@ if (import.meta.main) {
   }
   const tmpKb = tmps.filter((t) => t.action === "remove").reduce((s, t) => s + t.kb, 0);
   if (tmpKb || tmps.length) console.log(`${apply ? "REMOVED" : "would remove"} ${tmps.filter((t) => t.action === "remove").length} temp folders in ${tmpRoot} (${gb(tmpKb)}; oikos-*, forms-trained*, sz-* older than a day)`);
+  const claudeDir = join(sc.repo, ".claude");
+  const targets = classifyTargets(claudeDir, processUses(), { hours: Number(opt("--target-hours") ?? 24) });
+  for (const t of targets) {
+    if (t.action === "keep") continue;
+    const kb = Number(Bun.spawnSync(["du", "-sk", t.path], { stdout: "pipe" }).stdout.toString().split(/\s/)[0]) || 0;
+    freeKb += kb;
+    console.log(`${apply ? "REMOVING" : "would remove"} build folder .claude/${t.name} (${gb(kb)}) -- ${t.reason}`);
+    if (apply) rmSync(t.path, { recursive: true, force: true });
+  }
   for (const r of runs) {
     if (r.action === "keep") continue;
     const kb = r.action === "remove-all" ? r.kb : r.logsKb;
