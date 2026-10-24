@@ -24,14 +24,14 @@ def check(data: str, encoder: str, max_tokens: int = 1024) -> dict:
     tokenizer = AutoTokenizer.from_pretrained(encoder)
     d = Path(data)
     export = json.loads((d / "export.json").read_text())
-    if export.get("decoding") != "slots":
+    if export.get("decoding") not in ("slots", "cards"):
         sys.exit("not slot-by-slot data")
     grammar, names = export["grammar"], slot_names(export["grammar"])
     choices = json.loads((d / "vocabulary.json").read_text()) + [f"<{p}>" for p in POINTERS]
     index = {c: i for i, c in enumerate(choices)}
     masks = Masks(choices)
     report: dict = {"encoder": encoder, "slots": len(names), "choices": len(choices)}
-    for side in ("train", "validation", "validation-real"):
+    for side in ("train", "validation", "validation-real", "validation-uf"):
         if not (d / f"{side}.jsonl").exists():
             continue
         n = {"examples": 0, "misfit": 0, "inexact": 0, "long": 0, "off_rule": 0, "most_decisions": 0}
@@ -48,7 +48,7 @@ def check(data: str, encoder: str, max_tokens: int = 1024) -> dict:
             if spans(t, r["at"], r["steps"]) is None:
                 n["inexact"] += 1
                 continue
-            follow = Follow(grammar, names, masks, text, t, exact=True)
+            follow = Follow(grammar, names, masks, text, t, exact=True, mode=r.get("mode", "full"))
             off, bad = False, ""
             try:
                 for s in r["steps"]:

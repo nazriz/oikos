@@ -741,7 +741,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // A translator that answers first, if the run has one: the two are one translator to every seat (arrangement.ts).
   // (The first is asked once a request: it decides without sampling, so asked again it says the same.)
   const arranged = o.translatorFirst
-    ? createArrangement(createTranslator({ ...io, adapter: watched(o.translatorFirst) }, kernelCheck, typeOf, undefined, 1, engineResolver), one, { arrangement: o.translatorArrangement ?? "then" })
+    ? createArrangement(createTranslator({ ...io, adapter: watched(o.translatorFirst) }, kernelCheck, typeOf, undefined, 1, engineResolver), one, { arrangement: o.translatorArrangement ?? "then", ...("probationOutcome" in o.translatorFirst ? { probation: o.translatorFirst as unknown as { probationOutcome(form: string, agree: boolean): void } } : {}) })
     : undefined;
   const translator: { id: typeof one.id; translate(req: Parameters<typeof one.translate>[0]): Promise<Awaited<ReturnType<typeof one.translate>> & { route?: Route }> } = arranged ?? one;
 

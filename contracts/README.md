@@ -665,3 +665,17 @@ No JSON Schema changed.
   recorded one also says the entity and capacity it was shown for). docs/reliability.md, "Observations in the log".
 - **Module manifest: `answers`** (optional, 2026-10-19, the cut-over's second step; blanket contract approval): how an office answers a letter (`office`, `acts`, `report`, `forms`), as the engine's manifests carry it. The manifests in `participants/manifests` are now written from the engine's (`bun participants/scripts/manifests.ts`), and the engine's kinds say it; the schema had no place for it.
 - **Module manifest: `capacity`** (optional, 2026-10-19): what sizes an office's staff where its kind states it (the registries' asks and seconds, the rule that sizes the staff, the figure's source), as the engine's manifests carry it; open inside.
+
+## Translator v3: forms read by name, released by kind, a trial per new form (2026-10-25; blanket contract approval of 2026-10-11; docs/decisions.md, "Translator v3")
+
+Additive only; no schema file changed. A log made before is a valid log.
+
+- **A translation's route** (`translation_route`; `translator/src/arrangement.ts`): `why` and `first.withheld` may be
+  `type_unreleased` (the first reads forms by name and its draft has a function or a kind of field it is not released
+  for) or `probation` (its draft fills a form it was not taught that is still in its trial); `first.trial` names the
+  forms in their trial. In both, the first's draft is on the route as `first.wrote` and not offered, and `agree`
+  compares it with the draft behind, as for `form_unseen`.
+- **A trained model's folder** may carry `config.json` `decoding: "cards"` (read twice: translator/model/encode.ts),
+  `types-released.json` (`types_released`, `functions_released`, and the counts they were decided on:
+  translator/model/release.ts) and `probation.jsonl` (a line a confirmed request on a form in its trial: `form`,
+  `agree`, `run`, `draft`; translator/model/probation.ts). A model of another decoding reads its folder as before.

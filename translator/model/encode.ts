@@ -16,7 +16,7 @@ export type Pointer = ["id" | "text" | "word" | "field", number, number];
  * writes, closes each call (`)`) and ends the program (`eos`) by decisions of its own. `slots`: code lists what there
  * is to decide and the model decides each once (below, "Slot by slot"). A model answers in the decoding it was trained
  * in; its folder says which (config.json `decoding`; absent: `steps`). */
-export type Decoding = "steps" | "slots";
+export type Decoding = "steps" | "slots" | "cards";
 /** A choice from the closed set (`vocabulary`), or a span. */
 export type Step = string | Pointer;
 
@@ -50,7 +50,11 @@ const fixedArgs = (fn: string): Set<string> | undefined => (fn === "form" ? FORM
 export function encode(e: { request: string; forms: string[]; program: string; spans?: Span[] }, order: Order = ORDER, decoding: Decoding = "steps"): Encoded {
   const input = inputOf(e.request, e.forms);
   const p = calls.parseProgram(e.program);
-  const slots = decoding === "slots";
+  // (`cards` is slot by slot over the same input, with one difference: a form's field whose value the request implies
+  // and that is one of the field's options as the form's line lists them is pointed at there, never chosen from the
+  // closed set, so that a form no example had can still be filled in. `splitCards` then reads it as two passes.)
+  const cards = decoding === "cards";
+  const slots = decoding === "slots" || cards;
   if ("none" in p) return { input, steps: slots ? [`none:${p.none}`] : [`none:${p.none}`, "eos"] };
   const steps: Step[] = [];
   const several = p.lines.length > 1;
@@ -108,7 +112,7 @@ export function encode(e: { request: string; forms: string[]; program: string; s
         for (const k of Object.keys(c.args)) if (!mine.some((s) => s.name === k)) throw new NotEncodable(c.fn === "form" ? `the field ${k} is not one of the form as shown` : `${c.fn} has no slot ${k}`);
         for (const s of mine) {
           if (!(s.name in c.args)) steps.push(LEFT_OUT);
-          else value(prefix + s.name, c.args[s.name]!, c.fn === "form" && FORM_ARGS.has(s.name) ? (v) => shownAt(input, e.request.length, c, s.name as "form" | "to", v) : undefined);
+          else value(prefix + s.name, c.args[s.name]!, c.fn === "form" && FORM_ARGS.has(s.name) ? (v) => shownAt(input, e.request.length, c, s.name as "form" | "to", v) : cards && c.fn === "form" ? (v) => optionAt(input, lineOf(shownForms, said(c.args.form), said(c.args.to)), s.name, v) : undefined);
         }
         return;
       }
@@ -321,7 +325,215 @@ export function decodeSlots(input: string, steps: Step[], o: { lacks?: { form: s
 }
 
 /** The program a model's decisions come to, in the decoding it was trained in. */
-export const programFrom = (input: string, steps: Step[], decoding: Decoding = "steps", grammar?: Grammar): string => (decoding === "slots" ? decodeSlots(input, steps, { grammar }) : decode(input, steps));
+export const programFrom = (input: string, steps: Step[], decoding: Decoding = "steps", grammar?: Grammar): string => (decoding === "slots" || decoding === "cards" ? decodeSlots(input, steps, { grammar }) : decode(input, steps));
+
+// ---------------------------------------------------------------- Read twice (`cards`, translator v3, 2026-10-25)
+//
+// The same decisions as slot by slot, made in two passes of one model over two shorter inputs
+// (docs/design/translator-v3.md, section 1):
+//   1. choose: the request, then each form the person knows of as its head and its fields' names only
+//      (`- name, to=office, id record: has a, b, c`). Every decision of slot by slot except a form's fields: which
+//      form is pointed at among the heads, and the office it goes to; the fields wait.
+//   2. fill, once for each form the choose pass wrote, in the order it wrote them: the request, then that form's line
+//      in full (types, options, which are required), then, where earlier lines named their results, `Named before: a,
+//      b`. The decisions are that form's fields, in its line's order, as slot by slot has them.
+// The two passes' decisions put together (`joinCards`) are slot by slot's over the whole input (request and full lines),
+// so the program is read from them exactly as before (`decodeSlots`), and so is every check of a draft against its
+// form. A form is never a choice of the closed set: it is pointed at, so a form no example had can be chosen, and
+// filled from what its line says. The model's decoder (py/slots.py, `Machine` with a mode; py/predict.py) is the same
+// rule in Python.
+
+/** What the choose pass is shown of a form: its head, then its fields' names. */
+export function chooseLine(line: string): string {
+  const f = line.indexOf(": fields ");
+  if (f < 0) return line;
+  const names = [...line.slice(f + 9).matchAll(/([^\s,()]+) \(([^)]*)\)/g)].map((m) => m[1]!);
+  return `${line.slice(0, f)}: has ${[...new Set(names)].join(", ")}`;
+}
+export const NAMED_BEFORE = "Named before: ";
+/** The choose pass's input. */
+export const chooseInput = (request: string, forms: string[]): string => inputOf(request, forms.map(chooseLine));
+/** The fill pass's input for one form: the request, the form's line in full, the names earlier lines gave their results. */
+export const fillInput = (request: string, line: string, bound: string[]): string => [request, line, ...(bound.length ? [NAMED_BEFORE + bound.join(", ")] : [])].join("\n");
+
+/** Where an option of a form's field stands in its line as shown (`b (one of x | y, required)`): of `value`, exactly. */
+function optionAt(input: string, line: FormLine | undefined, field: string, value: string): [number, number] | undefined {
+  const f = line?.fields.find((x) => x.name === field);
+  if (!f || input.slice(f.at[1], f.at[1] + 2) !== " (") return undefined;
+  const open = f.at[1] + 2, close = input.indexOf(")", open);
+  const inner = input.slice(open, close);
+  if (!inner.startsWith("one of ")) return undefined;
+  let at = open + 7;
+  for (const opt of inner.slice(7).replace(/, required$/, "").split(" | ")) {
+    if (opt === value) return [at, at + opt.length];
+    at += opt.length + 3;
+  }
+  return undefined;
+}
+
+/** Each decision of a run of slot decisions, tagged with the form call whose fields it is part of (-1: none), and each
+ * form call met, in order: its form and office, the names bound by the lines before its own, and the index just after
+ * its `to` decision (where its fields begin). `mode`: `full` (slot by slot over the whole input), `choose` (a form's
+ * fields are not decided), `fill` (the decisions are the fields of the one form shown, with what earlier lines named). */
+export function walkSlots(input: string, steps: Step[], mode: "full" | "choose" | "fill", grammar?: Grammar): { tags: number[]; forms: { form?: string; to?: string; bound: string[]; after: number }[] } {
+  let at = 0;
+  const tags: number[] = [];
+  const forms: { form?: string; to?: string; bound: string[]; after: number }[] = [];
+  let owner = -1;
+  const next = (): Step => {
+    if (at >= steps.length) throw new NotEncodable("the decisions end early");
+    tags.push(owner);
+    return steps[at++]!;
+  };
+  const shown = formsIn(input);
+  const bound: string[] = [];
+  const text = (s: Step): string | undefined => (typeof s === "string" ? (s.startsWith("const:") ? (s[6] === "\"" ? JSON.parse(s.slice(6)) : s.slice(6)) : undefined) : s[0] === "word" ? asWord(input.slice(s[1], s[2])) : input.slice(s[1], s[2]));
+  const data = (s: Step): void => {
+    if (s === "[") { for (let x = next(); x !== "]"; x = next()) data(x); }
+    else if (s === "{") { for (let k = next(); k !== "}"; k = next()) data(next()); }
+  };
+  const value = (s: Step): string | undefined => {
+    if (typeof s === "string") {
+      if (s.startsWith("fn:")) call(s.slice(3));
+      else if (s === "[" || s === "{") data(s);
+      else if (s.startsWith("const:")) return text(s);
+      return undefined;
+    }
+    return text(s);
+  };
+  const fields = (line: FormLine | undefined) => {
+    for (const f of line?.fields ?? []) if (!FORM_ARGS.has(f.name)) { const s = next(); if (s !== LEFT_OUT) value(s); }
+  };
+  const call = (fn: string) => {
+    if (fn === "form") {
+      const fs = next();
+      const form = fs === LEFT_OUT ? undefined : value(fs);
+      const ts = next();
+      const to = ts === LEFT_OUT ? undefined : value(ts);
+      const k = forms.push({ form, to, bound: [...bound], after: at }) - 1;
+      if (mode === "fill" || owner >= 0) throw new NotEncodable("a form within a form's field");
+      if (mode === "full") {
+        owner = k;
+        fields(lineOf(shown, form, to));
+        owner = -1;
+      }
+      return;
+    }
+    for (const _ of slotsOf(fn, shown, undefined, undefined, grammar)) { const s = next(); if (s !== LEFT_OUT) value(s); }
+  };
+  if (mode === "fill") {
+    // (Which names earlier lines gave their results: the fill input's last line, where there is one.)
+    fields(shown[0]);
+    if (at < steps.length) throw new NotEncodable("decisions after the form's last field");
+    return { tags, forms };
+  }
+  const first = next();
+  if (typeof first === "string" && first.startsWith("none:")) return { tags, forms };
+  if (first !== PROGRAM) throw new NotEncodable("the kind of answer was expected");
+  const lines = next();
+  const n = typeof lines === "string" && lines.startsWith("lines:") ? Number(lines.slice(6)) : NaN;
+  if (!Number.isInteger(n) || n < 1) throw new NotEncodable("the number of lines is no number");
+  for (let i = 0; i < n; i++) {
+    let name: string | undefined;
+    if (i < n - 1) { const b = next(); if (typeof b === "string" && b.startsWith("bind:")) name = b.slice(5); }
+    const f = next();
+    if (typeof f !== "string" || !f.startsWith("fn:")) throw new NotEncodable("a function was expected");
+    call(f.slice(3));
+    if (name) bound.push(name);
+  }
+  if (at < steps.length) throw new NotEncodable("decisions after the last line");
+  return { tags, forms };
+}
+
+/** Where each line of an input begins, in characters (the request's first). */
+const lineStarts = (input: string): number[] => {
+  const out = [0];
+  for (let at = input.indexOf("\n"); at >= 0; at = input.indexOf("\n", at + 1)) out.push(at + 1);
+  return out;
+};
+
+/** Moves a pointer from one input to another: a place in the request stays where it is (both begin with it); a place in
+ * line `from` (of the forms) moves to line `to` of the other, at the same distance from its start, if it stays within
+ * `room` characters of that line. Else undefined. */
+function moved(p: Pointer, request: number, a: number[], b: number[], line: (start: number) => number | undefined, room: (i: number) => number): Pointer | undefined {
+  if (p[2] <= request) return p;
+  const i = a.findIndex((s, k) => k > 0 && p[1] >= s && (k + 1 >= a.length || p[2] < a[k + 1]!));
+  if (i < 1) return undefined;
+  const j = line(i);
+  if (j === undefined || p[2] - a[i]! > room(i)) return undefined;
+  return [p[0], p[1] - a[i]! + b[j]!, p[2] - a[i]! + b[j]!];
+}
+
+export interface Fill extends Encoded { /** which form line of the whole input it fills (0: the first form) */ form: number; bound: string[] }
+/** Slot by slot's decisions over the whole input, as the choose pass's and each fill pass's (`cards`). Throws
+ * NotEncodable where a decision cannot be made in its pass (a form's field pointing into another form's line, a choice
+ * pointing into a form's fields, a form inside a form's field). */
+export function splitCards(request: string, forms: string[], steps: Step[], grammar?: Grammar): { choose: Encoded; fills: Fill[] } {
+  const whole = inputOf(request, forms);
+  const { tags, forms: met } = walkSlots(whole, steps, "full", grammar);
+  const shown = formsIn(whole);
+  const wa = lineStarts(whole);
+  const choose = chooseInput(request, forms);
+  const ca = lineStarts(choose);
+  const heads = forms.map((l) => (l.indexOf(": fields ") < 0 ? l.length : l.indexOf(": fields ")));
+  const chooseSteps: Step[] = [];
+  steps.forEach((s, i) => {
+    if (tags[i]! >= 0) return;
+    if (typeof s === "string") return void chooseSteps.push(s);
+    const m = moved(s, request.length, wa, ca, (k) => k, (k) => heads[k - 1]!);
+    if (!m) throw new NotEncodable("a choice points into a form's fields");
+    chooseSteps.push(m);
+  });
+  const fills: Fill[] = met.map((f, k) => {
+    const mine = lineOf(shown, f.form, f.to);
+    const index = mine ? shown.indexOf(mine) : -1;
+    if (index < 0) throw new NotEncodable(`the form ${f.form} is not one shown`);
+    const input = fillInput(request, forms[index]!, f.bound);
+    const fa = lineStarts(input);
+    const own: Step[] = [];
+    steps.forEach((s, i) => {
+      if (tags[i] !== k) return;
+      if (typeof s === "string") return void own.push(s);
+      const m = moved(s, request.length, wa, fa, (line) => (line === index + 1 ? 1 : undefined), () => forms[index]!.length);
+      if (!m) throw new NotEncodable("a field points into another form's line");
+      own.push(m);
+    });
+    return { input, steps: own, form: index, bound: f.bound };
+  });
+  return { choose: { input: choose, steps: chooseSteps }, fills };
+}
+
+/** The two passes' decisions as slot by slot's over the whole input: each fill pass's after its form's `to` decision,
+ * every pointer moved back to where it stands in the whole input. */
+export function joinCards(request: string, forms: string[], choose: Step[], fills: Step[][], grammar?: Grammar): Step[] {
+  const whole = inputOf(request, forms);
+  const wa = lineStarts(whole);
+  const ci = chooseInput(request, forms);
+  const ca = lineStarts(ci);
+  const heads = forms.map((l) => (l.indexOf(": fields ") < 0 ? l.length : l.indexOf(": fields ")));
+  const met = walkSlots(ci, choose, "choose", grammar).forms;
+  if (met.length !== fills.length) throw new NotEncodable("a fill for each form chosen was expected");
+  const shown = formsIn(whole);
+  const back = (s: Step, from: number[], line: (k: number) => number | undefined, room: (k: number) => number): Step => {
+    if (typeof s === "string") return s;
+    const m = moved(s, request.length, from, wa, line, room);
+    if (!m) throw new NotEncodable("a place in no line");
+    return m;
+  };
+  const out: Step[] = [];
+  let k = 0;
+  choose.forEach((s, i) => {
+    out.push(back(s, ca, (x) => x, (x) => heads[x - 1]!));
+    while (k < met.length && met[k]!.after === i + 1) {
+      const mine = lineOf(shown, met[k]!.form, met[k]!.to);
+      const index = mine ? shown.indexOf(mine) : -1;
+      const fa = lineStarts(fillInput(request, index < 0 ? "" : forms[index]!, met[k]!.bound));
+      for (const f of fills[k]!) out.push(back(f, fa, (line) => (line === 1 && index >= 0 ? index + 1 : undefined), () => (index < 0 ? 0 : forms[index]!.length)));
+      k++;
+    }
+  });
+  return out;
+}
 
 /** The lines of the forms shown, each with where it begins in the input. */
 function formLines(input: string, from: number): [number, string][] {

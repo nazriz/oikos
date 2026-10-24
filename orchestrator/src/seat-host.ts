@@ -155,7 +155,7 @@ export class ModelSeat {
     };
     const tio = (adapter: LlmAdapter): LlmIO => ({ ...io, adapter });
     const one = createTranslator(tio(o.translator.behind), check, typeOf, undefined, undefined, resolver);
-    this.arranged = o.translator.first ? createArrangement(createTranslator(tio(o.translator.first), check, typeOf, undefined, 1, resolver), one, { arrangement: o.translator.arrangement ?? "then" }) : undefined;
+    this.arranged = o.translator.first ? createArrangement(createTranslator(tio(o.translator.first), check, typeOf, undefined, 1, resolver), one, { arrangement: o.translator.arrangement ?? "then", ...("probationOutcome" in o.translator.first ? { probation: o.translator.first as unknown as { probationOutcome(form: string, agree: boolean): void } } : {}) }) : undefined;
     this.translator = this.arranged ?? one;
     const known = idsFrom(cfg);
     this.records = new SeatRecords([{ id: o.seat, known: known(o.seat), direct: [o.seat, ...mine.map((x) => x.id)] }], known);
