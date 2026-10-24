@@ -28,7 +28,7 @@ import { cpus, homedir, loadavg } from "node:os";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { realpathSync } from "node:fs";
-import { defaultPriority, insideSlot, poolSize, take } from "./slots";
+import { buildJobs, defaultPriority, insideSlot, poolSize, take } from "./slots";
 
 const repo = join(import.meta.dir, "..");
 const args = process.argv.slice(2);
@@ -281,7 +281,9 @@ async function kernelCargoTests(crates?: string[]) {
   if (crates) console.log(`kernel tests (cargo test): ${crates.join(", ")}`);
   // (cargo-nextest where it is installed: every test its own process, the test programs side by side, where `cargo test`
   // runs them one after another: 28 s against 87 s for the whole workspace. It runs no doc tests: cargo does, after.)
-  const jobs = String(Math.max(1, slot?.weight || 4));
+  // (Half as many rustc jobs as tokens: one rustc spreads its codegen over several cores, ~4-5 seen under load on
+  // 2026-10-24, so jobs = tokens left the machine at load 30 on 14 cores. `buildJobs` in slots.ts.)
+  const jobs = String(buildJobs(slot?.weight || 4));
   const nextest = Bun.spawnSync(["cargo", "nextest", "--version"], { cwd: repo, stdout: "pipe", stderr: "pipe" }).exitCode === 0;
   const m = ["--manifest-path", "kernel/Cargo.toml", ...which];
   const cmd = nextest
