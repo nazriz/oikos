@@ -430,7 +430,7 @@ The mechanism:
 - **L / I:** medium / medium · **Status:** to confirm (figures to source per place); built, **on by default since 2026-10-23** (owner's rule: one-of-a-kind stand-ins go). **Since 2026-10-24 (branch `debt-generic-2`):** a shop's wage and job are its kind's (`seller.occupation`, `seller.wage_vs_shop_bps`: a share of the profile's shop wage, placeholders from the pattern of earnings surveys by industry and occupation, all to confirm), each kind serves by a task of its own (`serve-<kind>`), each kind has a wholesaler of its own in the outside world (`wholesale-<kind>`), some factories make food and clothing from inputs of their own (`industry.manufacturing`: shares of factories, labour and input shares, placeholders, to confirm), and what is bought is found faulty and complained of in the kinds' shares (`frictions.complaints_by_kind_bps`, a placeholder with the matter still `goods`). **Still one:** services stocked like goods (a hairdresser's "units" are bought wholesale and held in stock; no appointments, no time of day; the retailer's restocking, clearance and price rules all read stock, so a service made to order by the staff's time needs the retailer to change); the complaint matter (the consumer desk hears `goods` only; a service matter is the recourse lane's); the outside world as the one buyer of the factories' surplus; automation systems that do the task `make` (a food factory makes by `make-food`); business counts by industry are in no profile, so shops are divided by spending shares (not sourced); the shop wage of goods and food is the profile's one retail wage; only these three profiles have the tables.
 - **Notice by:** a shop of one kind with unserved orders all run, or at a loss; shares of businesses by industry against the
   place's counts.
-- **Fix when:** the other six profiles are given the table; business counts by industry are sourced for the three; a wage by kind of shop, the manufacturing shares and the complaint shares are sourced; the retailer can sell a service made to order.
+- **Fix when:** the other six profiles are given the table; business counts by industry are sourced for the three; a wage by kind of shop, the manufacturing shares and the complaint shares are sourced; the retailer can sell a service made to order. Open as of 2026-10-24: services by appointment (own follow-up branch), and the year measure of the branch `debt-generic-2` predates ME-21 and is to be re-taken.
 
 ### ME-21 · In the mix town a closed shop's sale does not complete, and tests that hold town mechanisms still run in the single-goods town
 - **Gap:** (Traced and fixed 2026-10-24, branch `debt-generic-2-me21`: the sale did not complete because the closed shop's manager left town
@@ -569,7 +569,14 @@ The mechanism:
 
 ### PB-10 · Elections are thin
 - **Gap:** The mayor is elected directly (Victoria's councillors mostly choose one); no campaigns; a platform is a
-  candidate's top two values; voting weights placeholders. A mayor who runs the town well is re-elected in every seed.
+  candidate's top two values; voting weights placeholders. A mayor who runs the town well was re-elected in the seeds first
+  tried; with the mix of shops on, the generated town's well-run mayor lost the count (2026-10-24).
+- **Gap (candidacy):** Whether a person stands is a rate (`stand_bps`), not a decision with a cost, a party, a sponsor or a
+  reason. In the test town it gives a field of 19 candidates for about 118 formal votes, each on 6 to 9% of first
+  preferences, so the count is decided by how the votes split; real local elections have a handful of candidates, often
+  one or two, from a few organised sources. The incumbent's ranking in the voters' lists follows how the town is run
+  (`elections.test.ts` holds that, on three seeds); who wins the count in a field this wide does not. A real mechanism for
+  candidacy is needed (who stands, why, with what backing and at what cost in time); not built here.
 - **Where:** `docs/behaviour/elections.md`, `news.md`.
 - **Effect:** Accountability results carry little information; re-election is near certain.
 - **L / I:** medium / medium · **Status:** accepted

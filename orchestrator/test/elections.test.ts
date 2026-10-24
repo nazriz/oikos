@@ -16,7 +16,7 @@ const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 const POLL = 200;
 
-async function town(name: string, negligent: boolean, days: number, standBps?: number, extra: object = {}, standsAgain = true) {
+async function town(name: string, negligent: boolean, days: number, standBps?: number, extra: object = {}, standsAgain = true, seed = 2) {
   // (The negligent mayor's town has no budget on file at the start: the one its council adopts is that mayor's, with no staff line.)
   const config = generate({ ...spec, years: 1, first_election_days: POLL, ...(negligent ? { opening_budget: false } : {}), ...extra });
   if (!standsAgain) for (const x of officesBy(config, "city.mayor_code")) x.params.stands_again = false;
@@ -27,7 +27,7 @@ async function town(name: string, negligent: boolean, days: number, standBps?: n
   rmSync(out, { recursive: true, force: true });
   // (On the Rust world the run's seed is 2 from 2026-10-19, the cut-over's fixes: in the run from seed 1 the incumbent of the well-run town
   // lost the count; run alone, seeds 2, 3 and 4 keep the incumbent and pass the rest. The same seed for every town here, as before.)
-  const s = await runWorld({ config: onRust ? { ...config, seed: 2 } : config, runId: name, outDir: out, until: days * DAY });
+  const s = await runWorld({ config: onRust ? { ...config, seed } : config, runId: name, outDir: out, until: days * DAY });
   expect(s.participantErrors).toBe(0);
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const ev = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
@@ -59,9 +59,10 @@ test("an election in a town run well, and in a town whose mayor funds no works c
   // (POLL or the day after, 2026-10-17, the bug hunt, a firm's owner's post: with the owners' posts in the town the count is made at a quarter to midnight of polling day and recorded a quarter of an hour into the next; without them at the first wake of the day. Not diagnosed: the officer holds no owner's post, so it is not the officer's own time; the test would otherwise be a day out.)
   expect([POLL, POLL + 1]).toContain(Math.floor(kept.result.at / DAY));
   expect(kept.incumbent).toBeTruthy();
-  // The incumbent is kept, and reappointed.
-  expect(kept.result.data.winner).toBe(kept.incumbent);
-  expect(kept.appointed.map((e) => e.holder)).toEqual([kept.incumbent]);
+  // Whoever wins is appointed. (That it is the incumbent is not asserted: with 19 standing for about 118 votes, each on 6 to 9%
+  // of first preferences, who wins the count is the town's draw. What the mechanism guarantees is held below, on several seeds:
+  // the incumbent stands higher in the voters' rankings in a town run well than in the same town, neglected. Risk PB-10.)
+  expect(kept.appointed.map((e) => e.holder)).toEqual([kept.result.data.winner]);
   // Turnout near the profile's 83% (voting is compulsory; some don't).
   expect(kept.result.data.turnout_bps).toBeGreaterThan(7000);
   expect(kept.result.data.turnout_bps).toBeLessThan(9500);
@@ -115,6 +116,15 @@ test("an election in a town run well, and in a town whose mayor funds no works c
   expect(mean(angry!)).toBeLessThan(mean(content!));
   expect(neglect.places.length).toBeGreaterThan(0);
   expect(mean(neglect.places)).toBeGreaterThan(mean(kept.places));
+  // The link between how the town is run and the votes, on each of three seeds (the same seed for both towns of a pair): the
+  // incumbent stands higher in the voters' rankings, and the electors think more of the government, where the town is run well.
+  for (const seed of [1, 3]) {
+    const [k, n] = [await town(`kept-${seed}`, false, POLL + 5, 1000, {}, true, seed), await town(`neglected-${seed}`, true, POLL + 5, 1000, {}, true, seed)];
+    expect(k.places.length).toBeGreaterThan(0);
+    expect(n.places.length).toBeGreaterThan(0);
+    expect(mean(n.places)).toBeGreaterThan(mean(k.places));
+    expect(mean([...n.approval.values()])).toBeLessThan(mean([...k.approval.values()]));
+  }
   // (Not compared: how many complain. A kept town's one-person crew can leave, and six weeks pass before the next starts.)
 
   // A mayor who doesn't stand again: a resident is elected, appointed, and carries on from the office's record (nothing
