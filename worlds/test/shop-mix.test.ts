@@ -27,13 +27,24 @@ test("with shop_mix a town's shops are divided among the profile's kinds by thei
     for (const [i, k] of table.entries()) expect(got[k.kind] ?? 0).toBe(want[i]!);
     // Each shop's opening stock is its kind, in the town's shop; the world market sells each kind wholesale, below the shop's price.
     const stock = c.world.holdings as { kind: string; holder: string }[];
-    const sells = officeParams(c, "world.trade").sells as Record<string, number>;
+    // Each kind of shop buys from a wholesaler of its own (an entity of the outside world, `wholesale-<kind>`), the world market for goods.
+    const sells = Object.assign({}, ...officesBy(c, "world.trade").map((o) => o.params.sells)) as Record<string, number>;
+    const sellers = new Map(officesBy(c, "world.trade").flatMap((o) => Object.keys(o.params.sells).map((k) => [k, o.entity] as const)));
     for (const o of shopsOf(c)) {
       expect(stock.find((h) => h.holder === o.entity)!.kind).toBe(o.params.kind);
       expect(sells[o.params.kind]).toBeGreaterThan(0);
       expect(sells[o.params.kind]).toBeLessThan(o.params.price);
       expect(o.params.demand).toBeGreaterThan(0);
+      expect(o.params.suppliers).toEqual([sellers.get(o.params.kind)]);
+      expect(sellers.get(o.params.kind)).toBe(o.params.kind === "goods" ? "outside" : `wholesale-${o.params.kind}`);
     }
+    // Each kind's staff are what the place calls them, paid what its earnings survey says, and serve by a task of their own.
+    for (const o of shopsOf(c)) {
+      const k = table.find((x) => x.kind === o.params.kind)!;
+      expect(o.params.serve_task ?? "serve").toBe(o.params.kind === "goods" ? "serve" : `serve-${o.params.kind}`);
+      if (k.seller?.occupation && o.params.kind !== "goods") expect(o.params.role).toBe(k.seller.occupation);
+    }
+    expect(new Set(shopsOf(c).map((o) => o.params.wage)).size).toBeGreaterThan(1);
     // The work table has a task to use up each kind, and the resources name it.
     const json = JSON.stringify(c);
     for (const k of Object.keys(got)) {
@@ -67,7 +78,8 @@ test("a town with shop_mix: false has one kind of shop, selling goods, and the c
   expect(Object.keys(officeParams(off, "world.trade").sells).sort()).toEqual(["energy", "goods", "inputs", "materials"].filter((k) => k in officeParams(off, "world.trade").sells));
   // Turning it on changes the shops and nothing of the households' count.
   const on = generate(spec);
-  expect(on.participants.length).toBe(off.participants.length);
+  const people = (c: any) => c.participants.filter((p: any) => p.kind === "person").length;
+  expect(people(on)).toBe(people(off));
 });
 
 test("a profile without the table keeps the single goods town, flag or no flag", () => {
@@ -117,6 +129,39 @@ test("each kind of shop has premises of its own type with room for its staff, an
   }
   expect(new Set(ventures.filter((v) => v.kind.startsWith("shop")).map((v) => v.role_module.params.price)).size).toBeGreaterThan(1);
 });
+
+test("each kind of seller is its own: wages and jobs by occupation, a wholesaler of its own, factories by product with their inputs, and complaints in the kinds' shares", () => {
+  for (const profile of ["au-vic-2026", "gb-eng-2026", "ke-nakuru-2026"]) {
+    const P = loadProfile(profile);
+    const c = generate({ ...spec, profile, factories: 6, living: {} }) as any;
+    // Wages by occupation: a shop of a kind is paid the kind's share of the shop wage, in the workplace and the shop's rule.
+    const wage = new Map(shopsOf(c).map((o) => [o.params.kind, o.params.wage as number]));
+    for (const k of P.values.spending.demand!.kinds.filter((x) => wage.has(x.kind)))
+      expect(wage.get(k.kind)).toBe(Math.round((P.values.wages_per_pay_period.shop * (k.seller?.wage_vs_shop_bps ?? 10_000)) / 10_000));
+    // A trader of the outside world for each kind besides goods; none of them sells another's kind, nor the world market the kind.
+    const traders = officesBy(c, "world.trade");
+    for (const t of traders.filter((x) => x.entity !== "outside")) expect(Object.keys(t.params.sells)).toEqual([t.entity.replace("wholesale-", "")]);
+    expect(Object.keys(traders.find((x) => x.entity === "outside")!.params.sells).filter((k) => wage.has(k) && k !== "goods")).toEqual([]);
+    // Factories by product: each makes the product of its works from its own input, which the world sells, and the world buys the product.
+    const producers = officesBy(c, "firm.producer");
+    const made = new Set(producers.map((o) => o.params.output ?? "goods"));
+    expect(made.has("goods")).toBe(true);
+    const world = traders.find((x) => x.entity === "outside")!.params;
+    for (const o of producers) {
+      const kind = o.params.output ?? "goods";
+      expect(Object.keys(o.params.per_unit).length).toBe(1);
+      const input = Object.keys(o.params.per_unit)[0]!;
+      expect(world.sells[input]).toBeGreaterThan(0);
+      expect(world.buys[kind]).toBeDefined();
+      expect(JSON.stringify(c).includes(`"id":"${o.params.task ?? "make"}"`)).toBe(true);
+    }
+    // Complaints by kind: the town's rate is the profile's, shared among the kinds.
+    const citizen = citizenParams(c);
+    const f = citizen.frictions;
+    const total = f.faulty_bps_per_year + Object.values(f.faulty_by_kind as Record<string, number>).reduce((a, b) => a + b, 0);
+    expect(Math.abs(total - P.values.frictions!.per_adult_bps_per_year.goods)).toBeLessThanOrEqual(Object.keys(f.faulty_by_kind).length);
+  }
+}, 60_000);
 
 function citizenParams(c: any) {
   return c.participants.find((p: any) => p.controller?.impl === "citizen.default").controller.params;

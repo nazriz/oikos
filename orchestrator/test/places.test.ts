@@ -50,7 +50,9 @@ test("a factory starts with the money to pay its staff and buy its inputs until 
       // (One that starts with no staff has one worker's working capital: it can take a first one on.)
       const n = f.staff.get(x.entity) ?? 1;
       const monthly = Math.floor((n * x.working_day * x.work_days * 30) / 7 / x.labour_per_unit);
-      const inputs = monthly * x.per_unit.inputs * f.trade.sells.inputs;
+      // (A factory making a named product buys that product's input: each factory's own, at the price the world sells it for.)
+      const [input, perUnit] = Object.entries(x.per_unit)[0] as [string, number];
+      const inputs = monthly * perUnit * f.trade.sells[input];
       const wages = (n * x.wage * MONTH) / x.period;
       // Its own rules: it orders up to half a month's inputs as soon as it has used any, and lets staff go when it
       // can't cover the next pay period. Both must be within what it starts with, with a month's wages to spare.

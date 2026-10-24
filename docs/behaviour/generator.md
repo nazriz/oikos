@@ -52,6 +52,8 @@ task `consume-<kind>` and the resources a kind each, and the citizens' `demand` 
 kind's opening price. Factories still make `goods` (household goods and other goods); people trading on their own account sell `goods`.
 
 **Premises and the shops founded in the run (0.63.0).** A shop's staff are as many as its kind's expected sales need (not
+
+**Each kind of seller (0.64.0).** With the mix of shops, a shop's wage and job are its kind's (`seller.occupation`, `seller.wage_vs_shop_bps`), it serves by the task `serve-<kind>`, and buys from a wholesaler of its kind in the outside world (`wholesale-<kind>`); factories make the profile's main manufacturing products (`industry.manufacturing`) from inputs of their own, the first factories making `goods`; what is bought is found faulty in the kinds' shares (`frictions.complaints_by_kind_bps`, `faulty_by_kind`). The laws' words (tax on pay, support payments, decisions, the budget) are written by the engine's rules (`words.*`, worlds/generator/rules.ts). See docs/behaviour/demand.md and decisions 2026-10-24.
 capped at six), and its premises have room for `SHOP_ROOM_FACTOR` (2, a placeholder: no profile gives floor areas) times that.
 Each kind's shops are housed in a structure type of their own, `shop-<kind>` (`shop` for goods), its one workplace with that
 room. A founder buys premises of some type and opens a shop of that type's kind: the town has a venture for each type, with the

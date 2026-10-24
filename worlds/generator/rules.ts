@@ -49,7 +49,6 @@ export const draftLaw: typeof ts.draftLaw = (id, schedule, values) => {
 };
 
 // Tax on pay, the payments, and the household draws (MT-18, 2026-10-23): the Rust rules whenever the module is built.
-// The words functions (chargesInWords, paymentsInWords, ...) take a writer of sums and still run in TypeScript (docs/risks.md, MT-18).
 const memo = new Map<string, number>();
 export const withholding: typeof ts.withholding = (law, gross, period) => {
   const n = rust();
@@ -101,3 +100,18 @@ export function drawTown(spec: ts.HouseholdSpec, seed: bigint, citizens: number,
   for (let count = 0; count < citizens; ) { const d = ts.drawHousehold(H, (k) => hr(k)); count += d.members.length; out.push(d); }
   return { adult_age_bands: bands, households: out };
 }
+
+// The words of the laws (MT-18, 2026-10-24): written once, in Rust (`words.*`), with the town's currency and the names of
+// whom each account is paid to served as data, not as a closure; no TypeScript copy is left. They need the engine's module.
+const words = (name: string, args: object): string => {
+  const n = native(); // (the engine's whatever OIKOS_TS_RULES says: there is no other copy)
+  if (!n) throw new Error(`the law's words are written by the engine (rule ${name}): build the kernel (bun run kernel), or set OIKOS_ENGINE_MODULE`);
+  return call<string>(n, name, args);
+};
+type Currency = Parameters<typeof ts.formatMoney>[1];
+export const chargesInWords = (charges: ts.Charge[], currency: Currency, payees: Record<string, string> = {}): string => words("words.charges", { charges, currency, payees });
+export const withholdingInWords = (o: { period_days: number; work_days?: number }): string => words("words.withholding", { period_days: o.period_days, work_days: o.work_days ?? null });
+export const returnsInWords = (law: ts.IncomeTaxLaw): string => words("words.returns", { law });
+export const paymentsInWords = (payments: ts.PaymentRule[], currency: Currency, payees: Record<string, string> = {}): string => words("words.payments", { payments, currency, payees });
+export const decisionsInWords = (rules: ts.DecisionLaw[], currency: Currency): string => words("words.decisions", { rules, currency });
+export const linesInWords = (lines: Record<string, number>, currency: Currency): string => words("words.lines", { lines: Object.entries(lines), currency });

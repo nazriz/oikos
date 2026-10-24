@@ -70,7 +70,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken once on 2026-10-18 at the merge of gd-adoption (strikes by cost, adoption by the numbers, the auditor) with the bug hunt's fixes: the generated town gained a vendor of systems, an auditor and the union's day's pay, so the config hashes and the states moved; 93e473eb..., e861d6a0... and ef1fa3d2... for the configs until then.)
 // (Re-taken on 2026-10-18 at port step 3, the config hashes only, a pin per world: the generator moved at integration (0.62.0, lane N's names and dates with the auditor's 0.61.0) and on the Rust world calls the shared rules natively (worlds/generator/rules.ts), whose town is its own; 114d1ca2..., c05933ad... and c7e0c672... until then. The TS states did not move. The Rust states are pinned beside them, from the same commit.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "fcaf65973b209529", "gb-eng-2026": "3dd7883cf3dfb586", "ke-nakuru-2026": "5bc6764afedc2542" }
+  ? { "au-vic-2026": "00262404053e98a5", "gb-eng-2026": "7774a82b0d0b9ab6", "ke-nakuru-2026": "5b41f0959cbe77da" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -82,10 +82,15 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // type and room, and a shop is staffed to its kind's sales (generator 0.63.0); ba713978..., b1dc6701... and 6597ecc3... for the configs, and
 // 8b9a1e90..., eac6c4b4... and 443b8875... for the states, until then. The towns' people did not change.)
 // (Re-taken on 2026-10-24 at the merge of debt-behaviour with main's debt-generic, the states only (the config hashes are main's, unchanged): the two changes together, the run's seed drawing who a person is (on top of the mix of shops); 33ec6526..., 54f581f6... and 076eebff... until then.)
+// (Re-taken on 2026-10-24 at debt-generic-2, config hashes and Rust states both: each kind of shop's staff are paid and called what its kind's are, each
+// kind has a serving task and a wholesaler of its own, some factories make food and clothing from inputs of their own, complaints are by kind, the
+// first factory still makes goods (generator 0.64.0), and a closed shop's sale survives its manager leaving (ME-21); fcaf6597..., 3dd7883c... and 5bc6764a...
+// for the configs, and 33ec6526..., 54f581f6... and 076eebff... for the states, until then. The towns' people did not change.)
+// (Re-taken again on 2026-10-24 at the merge of debt-behaviour with main's debt-generic-2, the states only; the config hashes are main's, unchanged; 85e81e58..., b79165e8... and e0865435... until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "85e81e58129253a540b3610cbd1b090ff752c1986cc8567e3546f21c44b5e767",
-  "gb-eng-2026": "b79165e878a25401edfc7feaa9f57bf71f1d6597e2cc7a0355c8d67b65a91bf4",
-  "ke-nakuru-2026": "e08654359c6a4cfe5125cac4de339716f807af15eda2faf823f8145f00048d8f",
+  "au-vic-2026": "2ce3e90db65d2ee47a83f05e057eed00b2f060ff254cebf9322b603b782d945e",
+  "gb-eng-2026": "5dcf1eab0511e2e2d9440b153324b879cfdd70ec6934343398451febe4dc36aa",
+  "ke-nakuru-2026": "55a4e978431f394890fc5d95800abd07bd8defad2a0fbfb6ad84ad36ee7c7e5c",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

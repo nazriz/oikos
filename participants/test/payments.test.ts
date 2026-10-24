@@ -4,7 +4,7 @@ import { expect, test } from "bun:test";
 import { parseAmount } from "../src/calls";
 import { currencyNow, inCurrency } from "../src/money";
 
-import { paymentsInWords, stopsWorkAt, type PaymentRule } from "../src/shared/payments";
+import { stopsWorkAt, type PaymentRule } from "../src/shared/payments";
 import { context, DAY, MONTH, person, statement, wake } from "./stepping";
 import { engine } from "./engine";
 const citizen = engine("citizen.default");

@@ -10,7 +10,7 @@ A factory whose workers' hours turn inputs into goods, which it sells wholesale 
 
 **Making.**
 - **Each working day** (5 of every 7), its own employees at the works do the task `make`: as many units as their hours allow (each up to a working day) and its inputs allow.
-- **The process** is the factory's own knowledge: `per_unit` inputs and `labour_per_unit` seconds. In the generated town, an item of goods takes 10 kg of inputs and 1.5 hours of work.
+- **The process** is the factory's own knowledge: `per_unit` inputs and `labour_per_unit` seconds. In the generated town, an item of goods takes 10 kg of inputs and 1.5 hours of work. Where the profile names its main manufacturing industries (`industry.manufacturing`, docs/behaviour/demand.md), some factories make another product (`output`, with its own task `make-<product>`) from an input of its own, which the outside world sells at a price that keeps the product's input share (the unit of inputs is as many as whole numbers carry).
 - **When it stops.** When its stock is above the top of Lengnick's band (φ̄ × last month's demand), it makes nothing that day: more stock is no use. The workers are still paid; that's the employer's risk.
 
 **Inputs.**
