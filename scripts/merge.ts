@@ -154,7 +154,7 @@ async function main() {
   /** The merge worktree at origin/main with these branches merged in order; false (with the reason said) if one does not merge. */
   const assemble = (set: string[]): boolean => {
     if (!g("reset", "--hard", "origin/main").ok) stop("reset failed");
-    g("clean", "-fd", "-e", "node_modules", "-e", "kernel/target");
+    g("clean", "-fd", "-e", "node_modules", "-e", "kernel/target", "-e", "merge-test*.log"); // (the last run's log stays, to be read)
     for (const b of set) {
       const ref = refs[branches.indexOf(b)]!;
       const msg = `${branches.length === 1 && message ? message : `Merge ${b}`}\n\n${TRAILER}`;
@@ -177,6 +177,7 @@ async function main() {
   };
 
   let summary = "";
+  let runNo = 1, tested: string[] = [];
   /** Builds and tests the worktree as it stands: true if it passes. */
   const check = async (): Promise<boolean> => {
     // Installs (cloned when missing), then the kernel only if kernel/ changed since the last build here.
@@ -203,6 +204,8 @@ async function main() {
     const tc = stream(wt, ["bun", "run", "typecheck"]);
     const t1 = Date.now();
     const suite = await stream(wt, ["bun", "scripts/test.ts", ...(full ? ["--no-build"] : ["--gate"])], log);
+    // (Each test run's log is kept beside the last, by the set tested: a batch's bisection reads them after.)
+    writeFileSync(join(wt, `merge-test-${runNo++}.log`), `${tested.join(" + ")}\n${suite.text}`);
     console.log(`  ${full ? "whole suite" : "gate"}: ${Math.round((Date.now() - t1) / 1000)}s`);
     const tcr = await tc;
     if (tcr.code !== 0) { console.error(tcr.text.split("\n").slice(-30).join("\n")); console.error("typecheck failed"); return false; }
@@ -222,6 +225,7 @@ async function main() {
 
   const passes = async (set: string[]) => {
     console.log(`testing ${set.length ? set.join(" + ") : "(nothing)"} ...`);
+    tested = set;
     const ok = assemble(set) && await check();
     console.log(`  ${ok ? "pass" : "FAIL"} at ${secs()}`);
     return ok;
