@@ -50,6 +50,9 @@ pub const DAY: i64 = 86_400;
 /// its table of slips. Nothing about the world: that it knows only by perceiving (P14).
 #[derive(Debug, Clone, Default)]
 pub struct WorldInfo {
+    /// The run's seed (the config's): the one that every stream a unit draws from is made from. A person is drawn
+    /// who they are from it too, so that runs of one town on different seeds are not the same people.
+    pub seed: u64,
     pub tick: i64,
     pub run_end: i64,
     /// How the world's money is written (its config's first currency).
@@ -257,8 +260,11 @@ pub struct Cx<'a> {
     pub(crate) record: Option<Value>,
     pub(crate) questions: Vec<Question>,
     pub(crate) worded: Vec<Worded>,
+    /// The purposes of the draws made in the step, in order, where the caller asked to see them (a detached actor
+    /// stepped by a test; `Cx::keep_draws`). `None` in a run: nothing is kept.
+    drawn: Option<Vec<String>>,
     /// (Capturing: the streams opened since the last decision, and the decisions' draws: docs/citizen-data.md.)
-    drawn: Vec<Drawn>,
+    streams: Vec<Drawn>,
     captured: Vec<Captured>,
 }
 
@@ -294,6 +300,9 @@ pub struct Kept {
     /// Drafts of its words it decided on, or whose acts it sends with this action (the engine writes their signoffs and notes).
     #[serde(default)]
     pub worded: Vec<Worded>,
+    /// The purposes of the draws it made, in order (`Cx::keep_draws`; empty unless asked for): `chance:` marks a draw about one thing.
+    #[serde(default)]
+    pub drawn: Vec<String>,
     /// Its decisions' draws, where the run captures (docs/citizen-data.md); empty otherwise, and then not saved, so a
     /// snapshot is the same with the capture off.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -313,27 +322,38 @@ impl<'a> Cx<'a> {
             record: None,
             questions: vec![],
             worded: vec![],
-            drawn: vec![],
+            drawn: None,
+            streams: vec![],
             captured: vec![],
         }
+    }
+    /// Keep the purpose of each draw made from here (for a test that holds draws to their names).
+    pub fn keep_draws(&mut self) {
+        self.drawn.get_or_insert_with(Vec::new);
     }
     /// A deterministic stream for this participant, this matter or day, and this purpose (docs/reliability.md, "Draws
     /// and the moment"): the same however many threads run and in whatever order actors step.
     pub fn rng(&mut self, purpose: &str) -> Rng {
+        if let Some(d) = self.drawn.as_mut() {
+            d.push(purpose.to_string());
+        }
         let key = self.draws.key(self.t, purpose);
         let parts: Vec<&str> = key.iter().map(String::as_str).collect();
         let r = self.randomness.stream(&parts);
         if self.ctx.world.capture {
-            self.drawn.push(Drawn { start: r.clone(), key, values: None });
+            self.streams.push(Drawn { start: r.clone(), key, values: None });
         }
         r
     }
     /// A stream for a purpose alone: the same for whoever draws it (a fact about a thing, not about who meets it).
     pub fn chance(&mut self, purpose: &str) -> Rng {
+        if let Some(d) = self.drawn.as_mut() {
+            d.push(format!("chance:{purpose}"));
+        }
         let purpose = self.draws.chance_purpose(purpose);
         let r = self.randomness.stream(&["chance", &purpose]);
         if self.ctx.world.capture {
-            self.drawn.push(Drawn { start: r.clone(), key: vec!["chance".into(), purpose], values: None });
+            self.streams.push(Drawn { start: r.clone(), key: vec!["chance".into(), purpose], values: None });
         }
         r
     }
@@ -344,7 +364,7 @@ impl<'a> Cx<'a> {
     /// The stream opened last has come to `now`: the values it took are kept for the capture (stepped from its start
     /// until it reaches `now`, at most 4,096; past that only its first value is kept). Nothing when not capturing.
     pub fn drew(&mut self, now: &Rng) {
-        let Some(d) = self.drawn.last_mut() else { return };
+        let Some(d) = self.streams.last_mut() else { return };
         let mut r = d.start.clone();
         let mut values = vec![];
         while &r != now && values.len() < 4_096 {
@@ -362,7 +382,7 @@ impl<'a> Cx<'a> {
         }
         let hex = |v: u64| Value::String(format!("{v:016x}"));
         let draws = self
-            .drawn
+            .streams
             .drain(..)
             .map(|d| {
                 let mut o = Map::new();
@@ -394,7 +414,7 @@ impl<'a> Cx<'a> {
     }
     /// What the step left beside its action (the engine's).
     pub fn into_kept(self) -> Kept {
-        Kept { decisions: self.decisions, outcomes: self.outcomes, record: self.record, questions: self.questions, worded: self.worded, captured: self.captured }
+        Kept { decisions: self.decisions, outcomes: self.outcomes, record: self.record, questions: self.questions, worded: self.worded, drawn: self.drawn.unwrap_or_default(), captured: self.captured }
     }
 }
 

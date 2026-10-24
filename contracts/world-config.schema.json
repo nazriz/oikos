@@ -2899,6 +2899,19 @@
           "description": "Seconds in a year of age.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
         },
+        "majority": {
+          "description": "The age in years from which a person decides for themselves. Below it, a person may be taken out of the world by another: a parent or grandparent on record, a position in `guardians`, or, with no parent on record, any person. From it, only by themselves. Absent: nobody takes another out.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "guardians": {
+          "description": "Positions that may take a minor out of the world on their own authority (a child protection office).",
+          "type": "array",
+          "items": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+          "uniqueItems": true,
+          "maxItems": 100
+        },
         "other_causes": {
           "description": "Yearly chance of death from causes not otherwise modelled, by age (steps: each applies from its age until the next).",
           "type": "object",

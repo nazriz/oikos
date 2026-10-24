@@ -306,6 +306,7 @@ impl Base {
         let thinking = (config["orchestration"]["thinking_time"].as_str() == Some("costs_world_time"))
             .then(|| config["orchestration"]["thinking"]["code_seconds"].as_i64().unwrap_or(0));
         let world = Arc::new(WorldInfo {
+            seed,
             tick,
             run_end,
             currency: currency.clone(),

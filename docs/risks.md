@@ -632,7 +632,7 @@ The mechanism:
   at `compliance_bps` (50% for landlords in the example town). The laws of time say an error has a cause, never a per-case dial; compliance escaped that rule.
 - **Where:** `institutions.ts`, `firms.ts`, `union.ts`, `common.ts`.
 - **Effect:** Deterrence cannot change behaviour; enforcement experiments see a fixed rate whatever is enforced.
-- **L / I:** high / high (enforcement) · **Status:** the union's part fixed in the Rust port (2026-10-17: `compliance_bps` is gone; it weighs the gain of acting against the chance it is pursued, learnt from what it has seen, times the penalty, and keeps to the law where it has no measure: docs/behaviour/unions.md); planning, the inspector, landlords and directions remain (lanes E and C1), to fix (non-compliance from detection, gain and history)
+- **L / I:** high / high (enforcement) · **Status:** the union's part fixed in the Rust port (2026-10-17: `compliance_bps` is gone; it weighs the gain of acting against the chance it is pursued, learnt from what it has seen, times the penalty, and keeps to the law where it has no measure: docs/behaviour/unions.md); planning (already, lane E: a ceiling of looks, authority and holds), directions and the finance officer's payments procedure (2026-10-23: no draw; a standing direction from a post the rule names is followed unless held, the procedure is kept where it can be read) are mended; **landlords** (six draws in `firms/landlord.rs`: rent law, tax, refusal, fine, order, tribunal) and **system adoption** (`market/automation.rs`, `offices/systems.rs`) remain, to fix (non-compliance from the gain at stake against the chance it is pursued times the penalty, as the union's; needs per-profile penalty and pursuit figures to source, and the scenario knob `landlord_compliance_bps` replaced)
 - **Notice by:** Compliance rates identical across offices and cases; none depends on detection or history.
 - **Fix when:** Before enforcement or deterrence is studied; replace each coin with a cause (detection, gain, history).
 
@@ -677,17 +677,32 @@ The mechanism:
 ---
 
 ### PB-21 · Three engine offices differ from their TypeScript twins on held cases
-- **Gap:** Held as `test.failing` (assertion unchanged): the engine's landlord offers the tenancy to no one still there after a
-  registered death (it gives the notice only); the engine's mayor, run alone, acknowledges no letter (not traced whether
-  the engine's mayor has a report of its own now or the detached harness drops the letter); the council clerk's report lists a
-  law's figures in alphabetical order (a map's), not the schedule's.
-- **Where:** `kernel/crates/actors/src/offices/council.rs` (`amendable`), `common/letters.rs` (`Answering`), `firms/landlord.rs`;
-  `participants/test/landlord.test.ts`, `letters.test.ts`, `drafting.test.ts`.
-- **Effect:** A household that outlives a tenant may lose its home where the TypeScript landlord offered it on; the order of
-  figures in the clerk's report is not the law's.
-- **L / I:** medium / low · **Status:** to fix (found at the cut-over's test port, 2026-10-19)
-- **Notice by:** the cases flip from `test.failing` to a failure the day one is mended.
-- **Fix when:** Before a seat holds the landlord's or the clerk's office in a study of bereavement or amendment.
+- **Gap:** Three cases of the cut-over's test port, held as `test.failing`, are settled (2026-10-23, decisions "The held cases, settled"). Two were faults and are
+  mended: the engine's landlord did not offer the tenancy to the one still there after a registered death (it gave the notice only, and left a possession
+  application pending against the dead); the engine's mayor, run alone, acknowledged no letter (its create did not wrap it in `Answering`, as the manifest says).
+  One was a difference of no weight and the case changed: the council clerk's report lists a law's figures by name, not in the order the schedule was typed in
+  (a schedule is a keyed record and the kernel keeps keys sorted so a state hash does not depend on how a file was typed).
+- **Where:** `kernel/crates/actors/src/firms/landlord.rs` (`deaths`), `offices/council.rs` (`MayorCode::create`, `amendable`); `participants/test/landlord.test.ts`, `letters.test.ts`, `drafting.test.ts`.
+- **Effect:** None open. A report to a seat that asks the clerk what it may change lists the figures alphabetically.
+- **L / I:** low / low · **Status:** fixed (decisions 2026-10-23, The held cases, settled)
+- **Notice by:** the three cases are ordinary tests now.
+- **Fix when:** nothing; revisit the order of figures only if a study reads the clerk's report as the schedule's own order.
+
+### PB-22 · Anyone could take anyone out of the town
+- **Gap:** The kernel's `leave` took a `person` and the resolver passed any named person through, so any seat (a mayor, an
+  officer, a model in a lender's chair) could take any person out of the world. Fixed in the kernel 2026-10-23: a person
+  leaves by their own act; a minor (below `life.majority`) may also be taken by a parent or grandparent on record or a
+  position in `life.guardians` (child protection); an adult by nobody else; a world with no majority lets nobody take
+  another. **Left:** a newcomer's children arrive with no parentage on record, so a minor with no parent on record can
+  still be taken by any person (as before, to keep households leaving together); the fix is a `parents` field on
+  `arrive`, which needs the census to create parents before children (it creates children first, and changing the order
+  moves every id).
+- **Where:** `kernel/crates/world/src/exec.rs` (`may_take_out`); `Life.majority`, `Life.guardians`; `docs/behaviour/life.md`.
+- **Effect:** An experiment on who holds power over people would otherwise measure a seat's ability to do what no office
+  may do; the remainder exposes only children of newcomers.
+- **L / I:** low (after the fix) / high · **Status:** to fix (the newcomers' children; the rest fixed, decisions 2026-10-23, "Debt: the risk register, guardianship and compliance")
+- **Notice by:** a `leave` of a person other than the actor in the log; a refusal `not_theirs` on `leave`.
+- **Fix when:** the census creates parents before children, or before a seat is given a wide remit over households.
 
 ## People and culture
 
@@ -830,22 +845,18 @@ The mechanism:
 
 ---
 
-### PC-15 · The engine's citizen differs from the TypeScript citizen it replaced on seven held cases
-- **Gap:** Seven cases of participants/test, run against the engine's `citizen.default` (they were written for the TypeScript one
-  and are held as `test.failing`, assertion unchanged), differ: a heavier weight on trust in `wants.choice` asks the landlord for a
-  held rent less, not more (of 59 seeds, none asks at 100,000; 20 do at 0); the petition a tenant starts is worded generally, not
-  with the place's figures; `petition_willing_bps` draws nobody willing in 300 tries where the TypeScript citizen drew about 44%;
-  the thresholds' mean is 31 where 23 to 27 was drawn; `reads_news_bps` leaves every reader's approval moved (200 of 200) where 60
-  to 100 moved. Some may be deliberate (a general wording per docs/profiles.md) and some draws of the engine's own.
-- **Where:** `kernel/crates/actors/src/mind/`, `citizen/` (wants, voice, civic); `participants/test/citizen-wants.test.ts`,
-  `citizen-voice.test.ts`, `citizen-civic.test.ts`.
-- **Effect:** A town's people may be less willing to petition or ask, and less swayed by the news, than the profiles' calibration
-  of them meant; seed-level draws differ (twins hold on the engine).
-- **L / I:** medium / medium · **Status:** to fix (found at the cut-over's test port, 2026-10-19; not traced to a cause)
-- **Notice by:** the seven cases flip from `test.failing` to a failure the day one is mended (bun reports it).
-- **Fix when:** Before petitions, asks or news reading are read as findings of a study; trace each to the engine's draw or word.
-
-## Seats and framing
+### PC-15 · The engine's citizen differed from the TypeScript citizen it replaced on seven held cases
+- **Gap:** Settled (2026-10-23, decisions "The held cases, settled"). The cause of five of the seven was not the citizen's rules: **a person was drawn who they are
+  from seed 0 whatever the run's seed** (`Person::new`), so two runs of one town on different seeds had the same temperaments, trust leans, willingness to
+  petition and thresholds, and a test looping over seeds met one person fifty times. Mended: the seed is the world's (`WorldInfo.seed`). The petition's
+  wording was the sixth: a general wording where the world gives no figures is the engine's deliberate rule (PC-8), so the case now gives the world's `petition_demand`,
+  and a new case holds the general wording. A refusal of a request, an application or a grievance asked of its keeper did not lower the sense of agency or move the
+  tie (the three sites passed `tried` as "it worked"); mended.
+- **Where:** `kernel/crates/actors/src/citizen/person.rs`, `citizen/recourse.rs` (`treat_landing`), `mind/citizen.rs` (`treated`); `participants/test/citizen-wants.test.ts`, `citizen-voice.test.ts`, `citizen-civic.test.ts`.
+- **Effect:** None open. Every Rust-world state hash that has people in it moved once, with the seed (pins re-taken with this reason).
+- **L / I:** low / low · **Status:** fixed (decisions 2026-10-23, The held cases, settled)
+- **Notice by:** the cases are ordinary tests now; two runs of a town on different seeds differ in who the people are (`orchestrator/test` seed cases).
+- **Fix when:** nothing.
 
 ### SF-1 · A seat that cannot get an act through looks passive
 - **Gap:** Platform gaps, not choices, have stopped seats: a name where an id goes ends three ways; finance not shown
@@ -1189,15 +1200,14 @@ The mechanism:
 - **Fix when:** a study needs a seat's effect smaller than this spread (then more twin seeds, or a sourced rule at a
   knife-edge).
 
-### MT-18 · Rules still written twice, and cases not yet ported, after the cut-over
+### MT-18 · Rules still written twice after the cut-over
 - **Gap:** The Rust world is the only world, but TypeScript still holds copies of rules that live in Rust, kept because the
   generator, the host or the seat-side readers use them: tax and withholding (`shared/tax.ts`), payments, returns, the
   household, mind and inner draws, the papers' constants, the decision law's words, the staffing reader (`readers/staffing.ts`,
   about 1,000 lines beside `firms/staffing.rs`), the book (`shared/common.ts` `Book`) and the clerk's paper (`readers/books.ts`,
-  kept for books.test and day-list.test beside `offices/books.rs`'s five tests), and the open-books readers. Also held:
-  four cases of participants/test/reading-citizen.test.ts (`test.failing`: they hand the citizen a reading and count its draws
-  through hooks the detached engine actor does not carry) and two blocked as `test.skip` (drafting's amended-law judgement,
-  registry's title transfer: the TypeScript helper they called is gone and no engine test judges the same).
+  kept for books.test and day-list.test beside `offices/books.rs`'s five tests), and the open-books readers. (The cases once held with
+  this entry are settled, 2026-10-23: the four `reading-citizen` cases run on the engine, whose detached actor now takes a reading desk and
+  reports the draws it made; the two blocked `test.skip` cases are Rust tests, `common/tests.rs` and `offices/land.rs`.)
 - **Where:** `participants/src/shared/`, `readers/`, `kinds/`; `participants/test/`.
 - **Effect:** A rule changed in Rust and not in TypeScript changes the engine and not the generated town's words or a seat's
   books; the generated towns are held byte-identical to the cut-over's by decisions 2026-10-19 ("The cut-over, finished").

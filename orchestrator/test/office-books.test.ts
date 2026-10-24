@@ -83,7 +83,9 @@ test("a landlord's seat is shown who is behind with the rent before its code twi
   for (const l of lines) {
     expect(l).not.toContain('"says"');
     expect(l).toContain("the list: in this paper");
-    expect(l.length).toBeLessThan(1_500);
+    // (A line says what changed in each of the books' sections, at most four items of each and then "and N more": three sections changed on one day make about 1,600 characters
+    // in the Kenyan town at seed 1 (2026-10-24, the run's seed now draws who the people are), against well over 5,000 for the 33 open items it stands for.)
+    expect(l.length).toBeLessThan(2_500);
   }
   expect(lines.some((l) => l.includes("; new: ") || l.includes("no longer open: "))).toBe(true);
   // (That what people write to a landlord reaches its seat as post is held on papers made by hand: a small town's

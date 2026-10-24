@@ -215,8 +215,13 @@ impl Book {
                     self.standing.entry(kind.clone()).or_default().push(i);
                 }
                 if kind == "lot" {
-                    if let Some(cells) = data.as_ref().and_then(|d| d.get("cells")).and_then(Value::as_array) {
-                        let cells: BTreeSet<&str> = cells.iter().filter_map(Value::as_str).collect();
+                    // (The cells of a lot are a list; one written as a single name, a plot of one cell, is over that cell, as `cells_of` reads it.)
+                    let cells: Option<BTreeSet<&str>> = match data.as_ref().and_then(|d| d.get("cells")) {
+                        Some(Value::Array(cells)) => Some(cells.iter().filter_map(Value::as_str).collect()),
+                        Some(Value::String(cell)) => Some(BTreeSet::from([cell.as_str()])),
+                        _ => None,
+                    };
+                    if let Some(cells) = cells {
                         for c in cells {
                             self.lots_over.entry(c.to_string()).or_default().push(i);
                         }

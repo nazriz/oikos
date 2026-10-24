@@ -417,7 +417,7 @@ export const TRADE: Issued[] = [
   ORDER,
   { form: "delivery_note", title: "A delivery note for an order served",
     fields: { order: f("record", "The order.", req), buyer: f("entity", "Who ordered.", req), kind: f("text", "What was ordered.", req), ordered: f("count", "How many were ordered.", req), delivered: f("count", "How many were delivered.", req), refund: f("amount", "What was refunded for those not delivered.", req),
-      declined: f("choice", "Where nothing was delivered because it was not paid for.", { options: ["unpaid"] }) },
+      declined: f("choice", "Where nothing was delivered because the order was not paid for, or the buyer had not paid what it owed on earlier ones.", { options: ["unpaid", "overdue"] }) },
     writes: { kind: "delivery_note", text: "Delivered: {delivered} of {ordered} {kind} (order {order}).", basis: "=order", to: ["=buyer"], visible: ["=buyer", "=self"], data: { order: "=order", kind: "=kind", ordered: "=ordered", delivered: "=delivered", refund: "#refund", declined: "=declined" } } },
   { form: "wage_offer", title: "An answer to a union's wage claim",
     fields: { union: f("entity", "The union that made the claim.", req), claim: f("record", "The claim answered.", req), rise_bps: f("count", "The rise offered, in hundredths of a percent.", req), why: f("text", "Why that much.") },

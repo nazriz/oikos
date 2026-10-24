@@ -6,7 +6,6 @@
 
 import { expect, test } from "bun:test";
 import type { Observation } from "../src/contracts";
-import { Book } from "../src/shared/common";
 import { Randomness } from "../src/rng";
 import { engine } from "./engine";
 const landRegistry = engine("land.registry");
@@ -84,17 +83,5 @@ test("a death's entry is sent to those concerned, never published: whoever repor
   expect(entry({}, { deceased: "c0001" })).toContain('to=["c0002"]');
 });
 
-// BLOCKED: this case read the deleted TypeScript library's `ownerOf` directly; the engine's is `owner_of` (kernel/crates/actors/src/offices/land.rs),
-// which no Rust test yet holds to a stranger's transfer, the registry's transmission and the new holder's sale. Kept, skipped, until one does.
-const ownerOf = (_book: Book, _lot: string): string | undefined => { throw new Error("blocked: ownerOf is not in TypeScript now"); };
-// PORT NEEDED (cut-over, held as test.skip): the TypeScript helper this case called is gone and no engine test judges the same; docs/risks.md, MT-18.
-test.skip("a title's transfer counts only from its holder, or from whoever issued it", () => {
-  const book = new Book();
-  const by = (who: string, to: string, id: string) => ({ id, at: 300, author: "x", record: "claim_transfer", speaks_for: who, claim: "title-lot-1", to, visible_to: "public" });
-  book.absorb(obs([lot, title, by("c0009", "c0009", "rec.6")]));
-  expect(ownerOf(book, "lot-1")).toBe("c0001"); // (a stranger's transfer: nothing)
-  book.absorb(obs([by("land-registry", "c0002", "rec.7")]));
-  expect(ownerOf(book, "lot-1")).toBe("c0002"); // (the registry's transmission)
-  book.absorb(obs([by("c0002", "c0003", "rec.8")]));
-  expect(ownerOf(book, "lot-1")).toBe("c0003"); // (the new holder's sale)
-});
+// ("A title's transfer counts only from its holder, or from whoever issued it" is held by the engine's own test:
+// kernel/crates/actors/src/offices/land.rs, a_titles_transfer_counts_only_from_its_holder_or_from_whoever_issued_it.)

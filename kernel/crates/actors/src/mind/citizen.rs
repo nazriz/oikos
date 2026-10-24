@@ -1554,6 +1554,9 @@ impl Mind for CitizenMind {
 
     fn treated(&mut self, cx: &mut Cx, tr: Treated) {
         let t = cx.t;
+        // (Trust and agency have drifted back toward the person's own for the time since they were last looked at before this lands, as
+        // citizen.ts's wake settled them first: a landing is not worn down for the days before it came.)
+        self.s.inner.settle(t);
         let kind = if tr.kind.is_empty() { self.kind_of(&tr.who) } else { tr.kind.clone() };
         let rd = tr.paper.as_deref().and_then(|p| self.read_of(p));
         let rp = self.p.rdial.as_ref().map(|d| d.params.clone());
@@ -1622,6 +1625,9 @@ impl Mind for CitizenMind {
                 }
                 None => self.s.last_read = Some((r.paper.clone(), read)),
             }
+        }
+        if let Some((delta, why)) = tr.tie {
+            self.s.ties.add(&tr.who, delta, t, Some(why));
         }
         self.read_follows = false;
     }

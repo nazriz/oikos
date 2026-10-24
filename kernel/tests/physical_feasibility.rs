@@ -277,7 +277,14 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             if to.as_ref().is_some_and(|e| !s.is_boundary(e)) {
                 return Some(Err(RefusalCode::NotABoundary));
             }
-            living(st, &who)
+            if let Err(e) = living(st, &who) {
+                return Some(Err(e));
+            }
+            // Only oneself, unless a minor in someone's care (the world's `life.majority`; none here: nobody else).
+            if who != me && s.life().and_then(|l| l.majority).is_none() {
+                return Some(Err(RefusalCode::NotTheirs));
+            }
+            Ok(())
         }
         Block::Appoint { position: target, participant: to } => {
             if position.is_none() || st.entities.get(&me).is_some_and(|e| e.body.is_some()) {

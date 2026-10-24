@@ -10,7 +10,7 @@ import { inCurrency } from "../src/money";
 import { OUTCOMES, RECORD } from "../src/module";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { DAY, person, statement } from "./stepping";
-import { engine } from "./engine";
+import { DRAWS, engine } from "./engine";
 const citizen = engine("citizen.default");
 
 inCurrency(PROFILE.values.currency);
@@ -23,9 +23,6 @@ function watched(o: { dial: boolean; reads?: { [paper: string]: Reading | "none"
   const kept = { record: {} as { [s: string]: any }, outcomes: [] as any[], draws: [] as string[] };
   const module = { create: (ctx: any) => {
     if (o.dial) ctx.world = { ...ctx.world, dials: { reading: { reader: "mock" } } };
-    const rng = ctx.rng, chance = ctx.chance;
-    ctx.rng = (k: string) => { kept.draws.push(k); return rng(k); };
-    ctx.chance = (k: string) => { kept.draws.push(`chance:${k}`); return chance(k); };
     if (o.reads) ctx.read = (paper: string, standing: string): PaperRead | undefined => {
       const r = o.reads![paper];
       return r && r !== "none" ? { paper, standing: standing as any, shift: shiftOf(r, PLAIN), source: "model" } : r === "none" ? { paper, standing: standing as any, shift: NO_SHIFT, source: "table" } : undefined;
@@ -35,6 +32,7 @@ function watched(o: { dial: boolean; reads?: { [paper: string]: Reading | "none"
       const a: any = await m.step(ob, c);
       if (a[RECORD]) Object.assign(kept.record, a[RECORD].set);
       kept.outcomes.push(...(a[OUTCOMES] ?? []));
+      kept.draws.push(...(a[DRAWS] ?? []));
       return a;
     } };
   } };
@@ -52,8 +50,7 @@ async function refused(o: Parameters<typeof watched>[0]) {
   return x;
 }
 
-// PORT NEEDED (cut-over, held as test.failing): this case hands the citizen a reading through ctx.read and counts its draws through ctx.rng, which the detached engine actor does not carry; the arithmetic is held by kernel/crates/actors/src/mind/reading.rs (docs/risks.md, MT-18).
-test.failing("a refusal put kindly costs less trust and less sense of agency than the plain refusal, and one put curtly costs more; the same decision, the same person", async () => {
+test("a refusal put kindly costs less trust and less sense of agency than the plain refusal, and one put curtly costs more; the same decision, the same person", async () => {
   const off = await refused({ dial: false });
   const plain = await refused({ dial: true, reads: { "va-1": PLAIN } });
   const humane = await refused({ dial: true, reads: { "va-1": HUMANE } });
@@ -83,8 +80,7 @@ test.failing("a refusal put kindly costs less trust and less sense of agency tha
   expect(plain.kept.outcomes.some((o) => o.read)).toBe(false);
 });
 
-// PORT NEEDED (cut-over, held as test.failing): this case hands the citizen a reading through ctx.read and counts its draws through ctx.rng, which the detached engine actor does not carry; the arithmetic is held by kernel/crates/actors/src/mind/reading.rs (docs/risks.md, MT-18).
-test.failing("a grant put warmly counts for a little more, put grudgingly a little less; never the other way", async () => {
+test("a grant put warmly counts for a little more, put grudgingly a little less; never the other way", async () => {
   const run = async (r: Reading | undefined) => {
     const x = watched({ dial: true, ...(r ? { reads: { "va-1": r } } : {}) });
     await x.p.wake(DAY, {});
@@ -98,8 +94,7 @@ test.failing("a grant put warmly counts for a little more, put grudgingly a litt
   expect(trust(grudging)).toBeGreaterThan(trust(await refused({ dial: false })));
 });
 
-// PORT NEEDED (cut-over, held as test.failing): this case hands the citizen a reading through ctx.read and counts its draws through ctx.rng, which the detached engine actor does not carry; the arithmetic is held by kernel/crates/actors/src/mind/reading.rs (docs/risks.md, MT-18).
-test.failing("the dial off, a reader's answer to nothing, or a desk absent: the person is as they always were, and no draw is added, moved or renamed", async () => {
+test("the dial off, a reader's answer to nothing, or a desk absent: the person is as they always were, and no draw is added, moved or renamed", async () => {
   const base = await refused({ dial: false });
   const desk = await refused({ dial: true, reads: { "other-paper": HUMANE } }); // (a desk that read some other paper)
   const noDesk = await refused({ dial: true });
@@ -114,10 +109,5 @@ test.failing("the dial off, a reader's answer to nothing, or a desk absent: the 
   expect(trust(curt)).not.toBe(trust(base));
 });
 
-// PORT NEEDED (cut-over, held as test.failing): this case hands the citizen a reading through ctx.read and counts its draws through ctx.rng, which the detached engine actor does not carry; the arithmetic is held by kernel/crates/actors/src/mind/reading.rs (docs/risks.md, MT-18).
-test.failing("the odds of appealing follow the recourse a refusal gave: the score of asking again is up for a paper that named a way on, and the same draw is made", async () => {
-  // (Direct: a step of recourse is 500 on the score of the ways that answer the paper; see reading.test.ts for the sizes.)
-  const { recourseScore, READING_DEFAULTS } = await import("../src/shared/reading");
-  expect(recourseScore(shiftOf(HUMANE, PLAIN), READING_DEFAULTS)).toBe(1_000);
-  expect(recourseScore(shiftOf(CURT, PLAIN), READING_DEFAULTS)).toBe(0);
-});
+// ("The odds of appealing follow the recourse a refusal gave" is arithmetic, held by the engine's own test: kernel/crates/actors/src/mind/reading.rs,
+// a_step_of_recourse_is_five_hundred_on_the_score_of_asking_again; "the same draw is made" is the third case above.)
