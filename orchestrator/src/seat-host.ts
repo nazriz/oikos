@@ -120,7 +120,7 @@ export class ModelSeat {
     this.roster = made.roster;
     this.tally = made.tally;
     this.dayBook = made.dayBook;
-    this.knowledge = new Knowledge(this.currency);
+    this.knowledge = new Knowledge(this.currency, cfg.names === true);
     this.view = new View(new Set(made.standingIds));
     this.ctx = ctxFor(o.seat, made.office?.id ?? "self", made.entity, {});
     const config = { ...made.config, ...(o.effort ? { effort: o.effort } : {}) };

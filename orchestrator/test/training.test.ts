@@ -167,7 +167,7 @@ test("a balanced gold set: a floor under every function, made up with generated 
   const made = [...new Set([...refusalBriefs(gold, 1).map((b) => b.label), "too_much", "unknown_form"])];
   for (const label of ["needs_calculation", "not_yours", "unclear", "not_an_act", "too_much", "unknown_form"]) expect(made).toContain(label);
   for (const label of made) expect([label, manifest.by_shape[`none(${label})`] >= 8]).toEqual([label, true]);
-  expect(manifest.short_of_floor).toEqual(Object.fromEntries(calls.LABELS.filter((l) => !made.includes(l)).map((l) => [l, 0])));
+  expect(manifest.short_of_floor).toEqual(Object.fromEntries(calls.TRANSLATOR_LABELS.filter((l) => !made.includes(l)).map((l) => [l, 0])));
   // What the generator drew and dropped as no plausible thing to ask for is counted, by reason.
   expect(typeof manifest.gold.implausible).toBe("object");
   // Form examples carry their forms; the split is written, and no validation form is shown in training.

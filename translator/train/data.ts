@@ -2802,7 +2802,7 @@ export interface PlanOptions {
   perGold?: number;
   /** Written refusals asked for, per label that has a brief (`refusalBriefs`); none if absent. */
   refusalsPerLabel?: number;
-  /** At least so many refusals of every label of the call language (`calls.LABELS`, whatever they are): briefs for
+  /** At least so many refusals of every label a translator writes (`calls.TRANSLATOR_LABELS`, whatever they are; never `ambiguous`, the resolver's): briefs for
    * the written ones, two more rounds of them for a label that came out short, and the built ones as far as the
    * examples allow. What still came out short is in the manifest. */
   refusalFloor?: number;
@@ -3110,7 +3110,7 @@ async function fromPlan(plan: PlanItem[], o: {
   const kept = positives.filter(clean);
   // The floor under each label the built refusals can make: what the written ones left short of it.
   // (Where only some labels were asked for, only those are built and held to the floor.)
-  const labels_ = calls.LABELS.filter((l) => !o.refusalLabels || o.refusalLabels.includes(l));
+  const labels_ = calls.TRANSLATOR_LABELS.filter((l) => !o.refusalLabels || o.refusalLabels.includes(l));
   const floors = o.refusalFloor ? Object.fromEntries(labels_.map((l) => [l, Math.max(0, o.refusalFloor! - (have[l] ?? 0))])) : {};
   const examples = [...kept, ...written.filter(clean), ...builtRefusals(kept, o.seed ?? 1, 0.05, floors).filter((e) => (labels_ as string[]).includes(e.program.slice(5, -1))).filter(clean)];
   const count = (key: (e: Example) => string | undefined) => {

@@ -7787,3 +7787,48 @@ the owner's API credit; ours first, Sonnet 5.5 behind. All six reached day 120; 
   police forms (new forms with real cases now, in a test pilot).
 - **Revisit if** a code actor is found to need a second identical unresolved call in one moment (none should: its view
   is the same), or the fault behind it (a work site that is not a space) is refused at the kernel's check.
+
+## 2026-10-25 · A name the seat knows more than one by is asked back: the `ambiguous` label (branch `tr3-names`)
+
+The owner's ruling (2026-10-23): "Build person-by-name lookup with an 'ambiguous' answer, within what the seat has been
+shown. It's on wherever names are on." Stage 3 of docs/design/names-and-dates.md section 8, the resolver's part.
+
+- **What.** `ambiguous` is a ninth label of the call language (`LABELS` in kernel/crates/resolver/src/calls.rs and
+  participants/src/calls.ts; contracts/calls.md, calls.schema.json), and the resolver's answer, never a translator's.
+  In a world whose config says `names: true` (a new optional boolean in world-config.schema.json; the generator sets
+  it with a spec's `names`; the engine reads it into each seat's knowledge, `Knowledge::with_names`), a name written
+  where an id goes (an id slot, a basis entry, a name in a list of ids such as a message's `to`) that matches more than
+  one of those the seat has been shown is answered with one question and, beside it, `{ label, name, for, candidates:
+  [{ id, known_by }] }`: each candidate with up to three things that tell it apart on the seat's own file (the post it
+  is; the papers the seat was shown that speak for them, are addressed to them or that they are party to, newest
+  first; the accounts it knows they hold or asked to be paid into; the posts it knows are theirs). Kept per seat only
+  with names on (`Knowledge.named_in`, the latest three papers per entity; a lot names nobody, so a register of lots is
+  still shared whole). The answer is in the engine's `resolve` reply and the log's `note` for a call that did not
+  resolve, only where there is one. A name that matches nobody it knows is "No <name> is on file with this office." (or
+  "... on your file." acting as itself), never looked up anywhere else. A translator's `none(ambiguous)` is refused as
+  unclear with the reason in `invalid`. Both resolvers are held to `contracts/test/names.json`.
+- **Matching is unchanged** (`Knowledge::by_name` / `byName`): as written, case aside; then without "the" or a closing
+  word for a post; then without marks and with spaces closed up only where that finds exactly one. Names are matched in
+  the order the place writes them (the generator writes each name in its place's order, so an exact match is that
+  order); a name written in the other order is not found rather than reordered, which would be a guess.
+- **The model is not taught it.** `TRANSLATOR_LABELS` (the eight) is what training data, refusal floors and
+  `refusalLabels` read (translator/train/data.ts, orchestrator/src/training.ts); the trained model's vocabulary
+  (translator/model, config.json) is untouched, and an older model loads and answers as before.
+- **Names off moves nothing.** Every answer, note and saved knowledge of a world without `names` is as it was, word for
+  word: the flag is absent from its config, `named` and `named_in` are not saved when off, and the old questions are
+  kept (tests: the names-off cases of names.json, `a_world_without_names_knows_and_saves_what_it_always_did`,
+  worlds/test/names.test.ts, orchestrator/test/names-resolve.test.ts). The generator's version is not bumped, since it is
+  in every config's description and would move every pinned town.
+- **Not done, and why (a question for the owner).** "Within what the seat has been shown" leaves open whose names count
+  as shown. Built: the names the seat's knowledge already held (directory look-ups, which answer a look-up by name, and
+  entity declarations it was shown); the ruling's other sources (its books, its file, papers addressed to it) reach the
+  resolver only as ids, because a record carries a person's id, not their name. The seat's host prints the world's name
+  beside some of those ids (a letter's signature, the day book's payees and addressees; `whoIs`), but most reports print
+  the id alone. Adding the world's name of every entity named in a paper the seat was shown would let the resolver turn
+  "Mary Wanjiru" into an id the seat may never have seen beside that name, a small god's view; adding only those the host
+  prints would tie the engine to the host's renderers. Left for the owner to choose between: (a) every entity a paper the
+  seat was shown names, as the stage-2 design meant reports to print a name beside every id; (b) only those printed by
+  name; (c) as now, the directory and declarations only.
+- **Revisit if** the owner chooses (a) or (b) above; seats are seen writing the other name order and being refused
+  where the place's order is plain; or three particulars prove too few to tell people apart in the pilots' towns (an
+  address or a tenancy's home would be next: the knowledge does not hold addresses yet).

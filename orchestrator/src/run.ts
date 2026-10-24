@@ -599,7 +599,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     return {
       key: `${p.id}|${cap}`, participant: p.id, capacity: cap, entity, module, controller: module.create(ctx), ctx,
       cadence: ceilTo(module.cadence(ctx), tick), firstWake: wakeAt ?? ceilTo(module.firstWake?.(ctx) ?? 0, tick), wokeFor: "start", since: 0,
-      knowledge: new Knowledge(currency), view: new View(), notices: [],
+      knowledge: new Knowledge(currency, cfg.names === true), view: new View(), notices: [],
     };
   };
 
@@ -661,7 +661,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}), ...(dayBook ? { dayBook } : {}) },
       ...(codeTwin && office ? { sort: `${codeTwin}|${office.id}` } : {}), ...(brain ? { hears: true, ...(codeTwin ? { body: codeTwin } : {}), ...(office ? { post: office.id } : {}) } : {}),
       cadence: ceilTo(brain?.cadence ?? cadence, tick), firstWake: wakeAt ?? (brain ? ceilTo(brainFirstWake.get(p.id) ?? mods[pp.mock.brain]!.firstWake?.(brain.ctx) ?? 0, tick) : 0), wokeFor: "start", since: 0,
-      knowledge: new Knowledge(currency), view: new View(new Set(standingIds)), notices: [],
+      knowledge: new Knowledge(currency, cfg.names === true), view: new View(new Set(standingIds)), notices: [],
     };
   };
 
@@ -1109,7 +1109,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       let res: ReturnType<typeof resolve> | undefined = resolverMode === "engine" ? undefined : resolve(program, u.knowledge, typeOf, as);
       if (resolverMode !== "ts") {
         const e = await k.request({ op: "resolve", participant: u.participant, ...(u.capacity ? { only: u.capacity } : {}), ...(as ? { as } : {}), program: calls.programText(program) });
-        const byEngine = (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}) }) as ReturnType<typeof resolve>;
+        const byEngine = (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}), ...(e.ambiguous ? { ambiguous: e.ambiguous } : {}) }) as ReturnType<typeof resolve>;
         if (res === undefined) res = byEngine;
         else {
           resolverChecked++;
@@ -1124,7 +1124,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       platformMs += performance.now() - p1;
       if (!res) throw new Error("no resolver ran");
       if (!res.ok) {
-        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}) } } });
+        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}), ...(res.ambiguous ? { ambiguous: res.ambiguous } : {}) } } });
         for (const q of res.questions) u.notices.push({ t, text: q });
         return true;
       }
@@ -1311,7 +1311,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const notes: object[] = [];
     const tr = await translating.run(notes, async () => {
       try {
-        return await translator.translate({ draftId, participant, as, proposal, knowledge: units.get(key)?.knowledge ?? new Knowledge(currency), called: (id) => whoIs(id)?.name, ...(capacity ? { only: capacity } : {}) });
+        return await translator.translate({ draftId, participant, as, proposal, knowledge: units.get(key)?.knowledge ?? new Knowledge(currency, cfg.names === true), called: (id) => whoIs(id)?.name, ...(capacity ? { only: capacity } : {}) });
       } catch (e) {
         if (!(e instanceof ModelCallFailed)) throw e;
         return { ok: false as const, notices: ["The translator did not answer."], raw: { model_call_failed: e.message } } as Awaited<ReturnType<typeof translator.translate>>;

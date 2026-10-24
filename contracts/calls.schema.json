@@ -36,7 +36,8 @@
             "unknown_form",
             "not_an_act",
             "no_such_act",
-            "look_first"
+            "look_first",
+            "ambiguous"
           ]
         }
       }

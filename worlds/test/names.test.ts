@@ -46,6 +46,8 @@ test("a named, dated town: people, bodies and homes have names, the config has a
     expect(people.every((e: any) => e.name !== e.id && e.name.trim() === e.name && e.name.length >= 3), id).toBe(true);
     for (const e of config.world.entities.filter((x: any) => ["landlord", "shop", "factory"].includes(x.kind))) expect(e.name, `${id} ${e.id}`).not.toMatch(/^(Property Co\.|Shop|Factory) \d+$/);
     expect(config.world.entities.find((e: any) => e.id === "city").name, id).toContain(P.values.names!.town);
+    // (It says so: the resolver answers a name the seat knows more than one by `ambiguous`.)
+    expect(config.names, id).toBe(true);
     const cal = config.calendar;
     expect(cal.start, id).toBe(P.values.calendar!.start_date);
     expect(cal.months.length).toBe(12);
@@ -60,6 +62,8 @@ test("a named, dated town: people, bodies and homes have names, the config has a
 test("a town not asked for names and dates is as it was: ids and no calendar", () => {
   const config = generate(small("ke-nakuru-2026")) as any;
   expect(config.calendar).toBeUndefined();
+  // (Nor does it say it has names: the resolver answers a name as it always did; contracts/calls.md, `ambiguous`.)
+  expect("names" in config).toBe(false);
   expect(config.world.entities.filter((e: any) => e.kind === "person").every((e: any) => e.name === e.id)).toBe(true);
   expect(config.world.entities.find((e: any) => e.id === "landlord-1").name).toBe("Property Co. 1");
 });
