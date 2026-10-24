@@ -20,14 +20,13 @@ fn town() -> Value {
     static TOWN: OnceLock<Value> = OnceLock::new();
     TOWN.get_or_init(|| {
         let out = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("observations-town.json");
-        if !out.exists() {
-            let r = std::process::Command::new("bun")
-                .current_dir(root())
-                .args(["orchestrator/test/lib/write-town.ts", "worlds/town.yaml", out.to_str().unwrap(), "1"])
-                .output()
-                .expect("bun, to generate the town");
-            assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
-        }
+        // (Always run: it writes the file again only when the generator's inputs are not those the file was made from; orchestrator/test/lib/town-key.ts.)
+        let r = std::process::Command::new("bun")
+            .current_dir(root())
+            .args(["orchestrator/test/lib/write-town.ts", "worlds/town.yaml", out.to_str().unwrap(), "1"])
+            .output()
+            .expect("bun, to generate the town");
+        assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
         serde_json::from_slice(&std::fs::read(&out).unwrap()).unwrap()
     })
     .clone()

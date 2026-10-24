@@ -53,6 +53,9 @@ export interface ReviewRoute {
   grounds: string;
   /** An appeal lies only after a review has been asked for and answered. */
   required?: boolean;
+  /** Where the law says so: a review asked for and not answered within so many days of the asking is taken as refused (a deemed
+   * refusal), and the appeal's days run from then. None: silence is only silence. */
+  deemed_refused_days?: number;
 }
 export interface AppealRoute {
   /** The matter a venue that can set the decision aside says it hears. */

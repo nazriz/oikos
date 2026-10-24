@@ -574,6 +574,13 @@ pub trait Outlook {
 
 /// A citizen's mind. Implemented by lane A2 (`crate::mind`); called only by the citizen's life (lane A1).
 pub trait Mind: Outlook + Send {
+    /// The records it holds to for its own reasons, whatever their age (a gathering it goes to): never let go of
+    /// what is kept of public goings-on (citizen/memory.rs).
+    fn holds_to(&self) -> Vec<String> {
+        vec![]
+    }
+    /// The book has let go of some records: what it kept about them goes with them.
+    fn forgot(&mut self, _book: &Book) {}
     /// The start of a wake: the clock, and the book as life has absorbed it (the mind reads practices, offers of
     /// membership, hearings and assertions from it: what the person has seen). Answers to the mind's questions of the
     /// last wake are in `cx.answers`.

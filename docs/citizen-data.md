@@ -3,7 +3,7 @@
 Step 1 of the citizen model (docs/design/citizen-model.md section 1): before a model of our own can be trained to decide
 for people, every run must keep what each decision was made from, the draw it was made with, and what it chose. This is
 that capture. The contract is `contracts/citizen-data.schema.json`; the reasoning is in docs/decisions.md (2026-10-24,
-"Citizen data: the capture"); what it does not yet hold is in docs/risks.md (MT-23).
+"Citizen data: the capture"); what it does not yet hold is in docs/risks.md (MT-24).
 
 ## Turning it on
 

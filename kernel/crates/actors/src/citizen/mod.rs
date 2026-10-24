@@ -7,6 +7,7 @@ pub mod health;
 pub mod household;
 pub mod housing;
 pub mod lifecycle;
+pub mod memory;
 pub mod mind;
 pub mod money;
 pub mod params;

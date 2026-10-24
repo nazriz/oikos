@@ -283,6 +283,27 @@ A citizen doesn't receive the housing or job market. It looks when it needs to, 
 - **Always:** its own records (among them its own titles), money and holdings, the laws, the town's gatherings and teachings, and prices.
 - **The land register** (0.36.0): never shown, searched when a paper of its own calls for it: the plan of a lot it holds, and a title passed to it with the dealings in it ([ownership.md](ownership.md), "What an owner knows").
 
+## What a person remembers of public goings-on (0.59.0, 2026-10-24; risk SC-1)
+
+What is published as it comes (the paper, notices of gatherings, what groups teach, petitions' counts, what joining a
+group asks, an election's papers) reaches every reader, and until 0.59.0 each person kept and weighed all of it for good:
+a town's memory grew as people times papers, 2.8 GB a simulated day at 50,000 people. Now a person keeps a bounded slice
+(`citizen/memory.rs`, the world's `public_memory`; the generator's `PUBLIC_MEMORY`):
+
+- **What they saw lately:** everything put out in the last `days` (30).
+- **What touched them, whatever its age:** their own papers; what was addressed to them; what answers a paper of theirs
+  (a petition's count, a response); what speaks for someone they have dealings with (an employer, a landlord, a group
+  they joined, the union: a party to an agreement of theirs in force); and what their mind holds to (a gathering they
+  go to or are at, a teaching they believe).
+- **Of the rest still standing, the most recent `most` (20) of each kind.** A withdrawn paper older than the month goes.
+
+The rest is let go once a week (`every_days`, 7), as if never seen: the book no longer answers it (`Book::forget`), and
+what the mind kept about it goes with it (read marks, the decision to go to a gathering, what was learned of it). Nothing
+else is let go: the law, the forms, the budget, agreements, claims, letters and anything not public. A paper comes only
+once, so nothing let go returns as news. The sizes are placeholders, a bound and not a fit: people attend to and
+remember a bounded, recent, relevant slice of public news (limited attention, Simon; forgetting, Ebbinghaus: to
+confirm, references.md). A spec's `public_memory: false` keeps everything, as before.
+
 ## Which shops a household knows, and how it finds a home for sale (citizen 0.39.0, retailer 0.7.0, generator 0.29.0)
 
 Nobody has a god's view (docs/no-god-view.md). Until 0.39.0 every person was shown every shop's price list and every

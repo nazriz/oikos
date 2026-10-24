@@ -110,6 +110,9 @@ pub struct Withhold {
     /// Only a paper addressed to this participant or entity.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
+    /// Only a paper whose data has this field (a decision made on a review: `on_review`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub has: Option<String>,
 }
 
 fn first() -> u32 {
@@ -124,8 +127,9 @@ impl Withhold {
                 && b["kind"].as_str() == Some(self.what.as_str())
                 && self.matter.as_deref().is_none_or(|m| b["data"]["matter"].as_str() == Some(m))
                 && self.to.as_deref().is_none_or(|to| b["addressed_to"].as_array().is_some_and(|a| a.iter().any(|x| x.as_str() == Some(to))))
+                && self.has.as_deref().is_none_or(|h| b["data"].get(h).is_some_and(|v| !v.is_null()))
         };
-        let block = |b: &Value| b["block"].as_str() == Some(self.what.as_str()) && self.matter.is_none() && self.to.is_none();
+        let block = |b: &Value| b["block"].as_str() == Some(self.what.as_str()) && self.matter.is_none() && self.to.is_none() && self.has.is_none();
         self.participant.as_deref().is_none_or(|p| p == pid) && blocks.iter().any(|b| paper(b) || block(b))
     }
 }
@@ -1694,6 +1698,47 @@ impl<W: Write> Engine<W> {
 
 /// Runs a world with no seats to its end (or `until`), and returns its final state hash. For the gate, the port's
 /// own tests and `oikos-kernel world`.
+impl<W: Write> Engine<W> {
+    /// What its code actors keep, summed by what (`Actor::kept`), for whoever measures memory.
+    pub fn kept(&self) -> BTreeMap<String, u64> {
+        let mut out = BTreeMap::new();
+        for u in self.units.values() {
+            if let Some(k) = u.actor.as_ref().and_then(|a| a.kept()) {
+                for (what, n) in k {
+                    *out.entry(what).or_default() += n;
+                }
+            }
+        }
+        // (And what the engine keeps beside them: each participant's knowledge for the resolver, and the world's records.)
+        let mut add = |what: &str, n: usize| *out.entry(format!("engine.{what}")).or_default() += n as u64;
+        for k in self.knowledge.values() {
+            add("knowledge", 1);
+            add("knowledge.withdrawn", k.withdrawn.len());
+            add("knowledge.addressed", k.addressed.len());
+            add("knowledge.cells", k.cells.len());
+            add("knowledge.structures", k.structures.len());
+            add("knowledge.names", k.names.len());
+            add("knowledge.participant_person", k.participant_person.len());
+            add("knowledge.positions", k.positions.len());
+            add("knowledge.forms", k.forms.len());
+            add("knowledge.accounts", k.accounts.len());
+            add("knowledge.holdings", k.holdings.len());
+            add("knowledge.stated", k.stated.len());
+        }
+        let st = self.run.kernel().state();
+        add("state.records", st.records.len());
+        add("state.entities", st.entities.len());
+        add("state.entity_records", st.entity_records.len());
+        add("state.cells", st.cells.len());
+        for u in self.units.values() {
+            add("units", 1);
+            add("units.answers", u.answers.len());
+            add("units.diverged", u.diverged.len());
+        }
+        out
+    }
+}
+
 pub fn run_code_world<W: Write>(config: Value, run_id: &str, out: W, opts: EngineOptions) -> Result<(String, Engine<W>), String> {
     let mut e = Engine::start(config, run_id, out, None, opts)?;
     loop {

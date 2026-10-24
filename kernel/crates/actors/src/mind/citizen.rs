@@ -1376,6 +1376,29 @@ fn facts_in(f: &Facts) -> person::Facts {
 // ------------------------------------------------------------------ the seam
 
 impl Mind for CitizenMind {
+    fn holds_to(&self) -> Vec<String> {
+        // (The gatherings we go to, the one we are at, and the teachings we hold to: remembered whatever their age.)
+        let mut v: Vec<String> = self.s.went_last.iter().chain(self.s.going.keys()).cloned().collect();
+        v.extend(self.s.attending.as_ref().map(|a| a.practice.clone()));
+        v.extend(self.s.beliefs.iter().filter(|(_, b)| **b > 0).map(|(id, _)| id.clone()));
+        v
+    }
+    fn forgot(&mut self, book: &Book) {
+        // What we kept about papers let go goes with them (they come only once: none can be read again as new).
+        let has = |id: &String| book.has(id);
+        self.s.read_news.retain(has);
+        self.s.read_items.retain(has);
+        self.s.counted_ballots.retain(has);
+        self.s.stood_for.retain(has);
+        self.s.counts_published.retain(|id, _| book.has(id));
+        self.s.decided_for.retain(|id, _| book.has(id));
+        self.s.going.retain(|id, _| book.has(id));
+        self.s.company_at.retain(|id, _| book.has(id));
+        self.s.went_last.retain(has);
+        self.s.stayed_last.retain(has);
+        self.s.mind.forget_options("practice", |o| o == "stay" || book.has(o));
+        self.refresh_teachings(book);
+    }
     fn woke(&mut self, cx: &mut Cx, pic: &Picture, book: &Book, life: &Life) {
         let t = cx.t;
         // Where the hours since we last woke went, by where we are (citizen.ts `wake`, `whereAt`).

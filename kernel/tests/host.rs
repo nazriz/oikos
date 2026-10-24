@@ -273,11 +273,13 @@ fn a_fork_can_withhold_one_named_act_and_is_otherwise_its_parent_to_the_hash() {
     // Deterministic: the same withholding twice is the same world.
     assert_eq!(run(&mut h, json!([{ "what": "weather_warning", "participant": "inspector-system", "nth": 1 }])).0, hash);
     // The second, not the first.
+    // (Only a paper whose data has a field: the warnings' data has its kind, so `has: "kind"` is the first warning again.)
+    assert_eq!(run(&mut h, json!([{ "what": "weather_warning", "has": "kind", "nth": 1 }])).0, hash);
     let (second, at, _) = run(&mut h, json!([{ "what": "weather_warning", "nth": 2 }]));
     assert_eq!(at, warned[..1].to_vec());
     assert_ne!(second, hash);
     // Nothing named that comes (a third warning; another's; a kind never made): the parent's world to the hash, no note.
-    for w in [json!([{ "what": "weather_warning", "nth": 3 }]), json!([{ "what": "weather_warning", "participant": "alice-self" }]), json!([{ "what": "no_such_paper" }]), json!([{ "what": "weather_warning", "matter": "no_such_matter" }]), json!([{ "what": "weather_warning", "to": "nobody" }]), json!([])] {
+    for w in [json!([{ "what": "weather_warning", "nth": 3 }]), json!([{ "what": "weather_warning", "participant": "alice-self" }]), json!([{ "what": "no_such_paper" }]), json!([{ "what": "weather_warning", "matter": "no_such_matter" }]), json!([{ "what": "weather_warning", "to": "nobody" }]), json!([{ "what": "weather_warning", "has": "no_such_field" }]), json!([])] {
         let (h2, at, notes) = run(&mut h, w.clone());
         assert_eq!((h2, at, notes.len()), (end["state_hash"].clone(), warned.clone(), 0), "{w}");
     }

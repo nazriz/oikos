@@ -7601,7 +7601,7 @@ the noise. The year's capture is 25.6 MB (298 MB of rows, 232,706 turns: about 6
 the design's estimate); the month's at 10,000 people 52.7 MB. Two runs wrote the same capture, byte for byte. Under the
 day's load (load averages 15 to 90) single pairs differed by up to 40% either way, so those figures were discarded.
 
-**Not done** (risk MT-23): the typed situation for every domain, the papers a person held and wrote, the `dealings`
+**Not done** (risk MT-24): the typed situation for every domain, the papers a person held and wrote, the `dealings`
 join, firms' decisions, a size stop. *Revisit if* a pilot's capture passes 2 GB (the design's bound), if a profile's
 town shows the capture costing more than 5% of a run's time (then default it off for code runs, as now, and look at
 the turn rows' size), or when step 2's input builder needs a field the turns do not carry.
@@ -7628,3 +7628,104 @@ the turn rows' size), or when step 2's input builder needs a field the turns do 
 - **pipeline (CI only, 0.9 s):** passes here and in the gate on other heads; not reproduced, no cause found. Revisit if it fails again on CI.
 
 **And the kernel's own test (found on CI after the above, same day):** `a1_citizen with_take_up_at_nothing_nobody_claims_support` failed on a fresh checkout, passed on the merge machine. It sets `take_up_bps` 0 on the town's people but not on the templates the run's newcomers are made from; three newcomers (on day 37) claimed unemployment. The test now sets the templates too. It was hidden from the merge gate because `kernel/target/tmp/a1-town.json` (the generated town the test reads) is cached by existence and the merge worktree's copy was from 2026-10-23: **delete it when the generator changes** (a staleness that cost two false failures and one false pass today). **Revisit if** the test's town should be keyed by the generator's version.
+## 2026-10-24 · Act times from sources (WM-1): ten rows in two profiles, the rest marked (profiles, generator's notes, docs; no kernel; no model called)
+
+**What was asked.** Replace the placeholder minutes of the table of work with sourced figures, so that office throughput, backlogs and days-to-decision mean something in absolute time before any automation or adoption experiment.
+
+**What the decision row is.** The town has no act for reading, interviewing or verifying a file: a decision is the case's whole handling, charged when it is written. So a whole-case handling time for a new case (officer minutes per initial application, judicial minutes per filing, caseworker hours per resolved complaint) is the right figure for a decision row, less the acts the town models apart (a request for papers, which has its own row). The source check of 2026-10-16 set such figures aside as "not acts"; that was the wrong test.
+
+**What went in, by profile** (each with its quote and arithmetic in the profile's `work_time.sources`; citations in docs/research/references.md, "How long an act takes"):
+- **us-oh (6 rows):** `publish/benefit_claim` 1,140 s, `publish/benefit_decision` 4,500 s (application 19 + interview 30 + verification 24 + the notice 2 minutes), `publish/evidence_request` 120 s, `publish/evidence` 1,440 s: USDA FNS's burden estimates for SNAP (OMB 0584-0064, Federal Register 15 May 2015); `publish/confirmation_answer` 1,800 s: SSA-L4201, the letter to an employer for wage information (Federal Register 30 Dec 2020); `publish/tribunal_order` 900 s: Oregon's case weight for an eviction filing (NCSC, 2016), standing for Ohio's until an Ohio study is found.
+- **gb-eng (4 rows):** `publish/venue_decision` 41,956 s, from the Financial Ombudsman Service's 225,000 resolved cases and 1,507 investigator FTE (2024/25) over a 1,740-hour year (an assumption: 37.5 hours over 52 weeks less statutory leave); `publish/rent_increase` 600 s and `publish/notice_to_vacate` 900 s, the Renters' Rights Bill impact assessment's 10 minutes for a section 13 form and 15 for a letter to a tenant (November 2024); `open_account` 2,400 s, the banks' own estimates as Which? reported them (2019).
+- **Nothing general went into the generator.** Every figure found belongs to a place (one country's paperwork law, one ombudsman, one state's courts). The generator's 52 person rows stay placeholders; each note now says "(to confirm; WM-1)" and what would source it.
+
+**Found and not used, and why.** Mortgage underwriters' applications a month (MBA and STRATMOR, 33 in 2016, about five hours a file): the town's loans are small personal loans, a different file. The IRS's Form 941 burden (62 hours a year): a year's employment-tax reporting as a whole, not one return. HM Land Registry: nine in ten official-copy requests are answered by machine at once; its caseworkers' "11.4 applications" has no unit. Oregon's small-claims weight (3 minutes): the town's tribunal writes one kind of order for every list, and possession is most of them. New Mexico's court staff weight for landlord-tenant (25 minutes): the town's registrar has no row of its own to take it. VCAT members (194 across all lists) and residential tenancy cases (45,308 in 2022/23): members serve every list, so no time per case. Snippets not opened: a PIP mandatory reconsideration's cost (GBP 82; a cost, not a time), "five to ten minutes" for an undefended possession listing, VCAT's "15 to 60 minute" hearings. Searched and not found: DWP, Services Australia or Jobcenter minutes per claim or per review; England's judge time per possession claim; any form time for N5/N119/N11R; any Australian or German figure at all.
+
+**Before and after** (town-1000, living frictions and initiative on, opening caseloads, seed 1, a year; scratch measures of claim to answer by the record's `basis`, not kept). au-vic changes nothing (the same final state, 4abf2535), so the notes' new words move no town. In gb-eng and us-oh the final state moves, and with one seed a year diverges (us-oh made 93 claims against 68), so differences are read only against that: no backlog or days-to-decision moved beyond it. Claim to decision: gb-eng median 0.08 days both, us-oh 0.05 and 0.1 (published: Housing Benefit new claims a mean of 20 days, Great Britain, late 2024; Universal Credit's five-week first payment, about 90% on time; Ohio SNAP 92.5% within its 30-day standard, FY2023). A desk's answer: 14.5 to 15 days in both, the law's fortnight, though gb-eng's desk officers now spend 105 hours a year on nine decisions where they spent 2. A tribunal order: us-oh 28.7 days median both (its hearing wait); gb-eng's tribunal decided 1 and 3 of its applications in the year, at 252 days, with 8 and 7 open (the published England claim to order is 7.6 weeks: a gap of the tribunal's, not of its work rows, recorded and not chased here). Loans, permits, reviews: unchanged, within hours. Nothing was tuned to these figures.
+
+**What the note shows.** The rows found barely bind in today's towns, for three reasons: the deciding offices' waits are the law's days, not their hours; the support office is the outside world's system at a second an act (new register entry WM-14), so a benefit decision's person row reaches no code town and a seat in that post works at a system's speed; and the hours that pile up are trade paperwork (orders, shopping requests, deliveries: about 175,000 person-hours a year in gb-eng's town, and a 14-day median delivery wait there), whose rows and tasks are still placeholders. The rows will bind where a person or a seat holds a deciding office, and in an automation offer, whose system time is the person's row times its speed.
+
+**Revisit if** an Australian or German source for any decision row is found (au-vic is the TARA town and has none); WM-14 is fixed, when the benefit rows begin to bind and need checking against the places' waits; a sourced row moves a result by more than the spread between seeds; or a desk's own kind of decision (the council's desk, the consumer desk, the ombudsman) is wanted, since one `venue_decision` row now charges all three an ombudsman's case in gb-eng.
+## 2026-10-24 · disk-tidy clears each worktree's own test runs
+
+- **What we saw:** 40 GB free. Nine finished worktrees held 14 to 21 GB each in `runs/test-*`, the folders tests write
+  into the checkout they run in; disk-tidy only looked at the main `runs/`. Removing them by hand (none had a model call)
+  gave 183 GB free.
+- **Change:** disk-tidy judges every worktree's `runs/test-*` by the same rule as the main runs (code-only, older than
+  `--days`; a model run or any doubt is never touched).
+- **Revisit if:** tests move their scratch to a temp folder (then this is moot), or a worktree's `runs/test-*` ever holds
+  model calls.
+
+
+## 2026-10-24 · A review never answered: the deemed refusal as law (MT-21); a bounded memory of public goings-on (SC-1) (branch `fix-memory-appeal`, citizen 0.59.0, generator 0.65.0; no model called)
+
+**MT-21, the deemed refusal.** Where the law requires a review before an appeal, a review asked for and never answered
+left the claimant nowhere: the appeal's days ran from an answer that never came. Much administrative law treats no
+decision in the statutory time as a refusal that can be challenged. Now a review route may say so, as law data:
+`review.deemed_refused_days` (contracts/README.md, F8's `data.decisions`). When that many days have passed since the
+asking with no answer, the claimant's appeal route opens (`citizen/recourse.rs`, `Ways::for_want`), the appeal's days
+run from then, the application gives `review_asked_on`, and a venue that can order counts from the deemed refusal and
+turns an appeal away before it (`offices/hearing.rs`). The law's words say it (`rules::decisions::decisions_in_words`).
+- **Per place, as sourced:** de-ni 91 days (SGG s 88(2), the action for failure to act, recalled, to confirm; the real
+  action has no month's limit after the three months, ours is the stricter reading). au-vic, gb-eng and us-oh's pension
+  have no such rule that I recall (to confirm), so the route stays shut there, as it would; mx-jal's review is optional
+  and the appeal runs from the decision anyway (docs/behaviour/decisions.md, "Deemed refusal").
+- **Tests:** the words and the date (`rules`); a claimant whose review is never answered may appeal from day 91 after
+  asking, not before, out of time 30 days on, and never where the law has no deemed refusal (`citizen/recourse.rs`); a
+  venue hears such an appeal once the law takes the review as refused and turns it away before (`offices/desk.rs`); a
+  living de-ni and gb-eng town, 330 days, with the support office's answers withheld (`orchestrator/test/deemed-refusal-town.test.ts`,
+  slow tier: 150 to 265 s).
+- **What the living test found first.** Withholding the office's review papers alone left nobody unanswered: a review
+  that finds a refusal wrong decides the claim again in an act of its own, and every claimant was granted that way. The
+  engine's `withhold` now takes `has` (only a paper whose data has a field: `on_review`), and the test withholds both.
+  Then: in de-ni four claimants asked, none was answered, the courts and the ombudsman were among the ways open to one
+  of them 91 days on and to none before; nobody took them in that run (the mind weighs a venue against waiting, as any
+  way, and two had given the want up by then: three tries, a month and a half apart). So the test holds that the route
+  opens, not that it is taken. In gb-eng it never opens.
+- **Revisit if** a place's deemed refusal is sourced (au-vic's for TARA: what an Australian claimant does instead, the
+  Ombudsman or asking again, is MT-21's remainder), or claimants give up wants whose way the law opens on a known date.
+
+**SC-1, a bounded memory of public goings-on.** Each citizen kept and weighed every published paper and gathering for
+good. Now a person keeps (`citizen/memory.rs`, `Book::forget`, the citizen's `public_memory`, the generator's
+`PUBLIC_MEMORY`; `public_memory: false` in a spec gives the old behaviour): whatever touched them (their own papers,
+what was addressed to them, what answers a paper of theirs, what speaks for someone they deal with, what their mind
+holds to: a gathering they go to, a teaching they believe), and of the rest the 20 most recent of each kind of goings-on
+(a month's for what no longer stands; papers put out at once told apart by a fixed spread of person and paper, no draw).
+Gone through weekly; what the mind kept about a paper let go (read marks, a gathering's decision, what was learned of
+it) goes with it. The kinds are those that come as they come: the paper, an election's papers, petitions' counts, what
+joining a group asks, gatherings and teachings; the law, forms, budgets, agreements, claims and letters are never let go.
+The sizes are placeholders (limited attention, Simon 1971; forgetting, Ebbinghaus 1885: to confirm). Nothing is shown
+that was not before: a person only lets go.
+- **What the counts showed first** (`OIKOS_KEPT=1 oikos-kernel world`, a sum of what each code actor and the engine
+  keep): at 20,000 people by day 10 each citizen held every gathering's notice (101) and decided on each one a week
+  (`decided_for` and `stayed_last` 67 each); their books were small (175 records), the published kinds a few each.
+- **A year at 1,000 people, three profiles (au-vic, gb-eng, de-ni), two towns each, bound off and on** (lean; the same
+  binary): the same steps in every pair, peak memory within 0.02 GB (au-vic 2.86 to 3.09 GB, gb-eng 2.87 to 2.98,
+  de-ni 1.40 to 1.48). The bound does not bite at 1,000 people: a town that size has fewer than 20 of each kind. The
+  culture and recourse measures were not read separately (the logs were deleted for disk before); with the same steps
+  run for run they are not expected to move, and the next measure at this size should read them.
+- **Found on the way to main: the physics oracle charged work to the wrong day.** The merge's `cargo test` drew a new
+  case of `physical_feasibility` (proptest, 3d09092b): a builder's system set a person to work while that person still
+  had work in hand; the kernel placed it when they were next free, on a day with room, and did it; the oracle had
+  charged the whole share to today and expected a refusal. The kernel follows law 1 (work is placed after what the
+  performers have in hand and counted on each day it is done on, `kernel.rs` `begin`); the oracle now places it the same
+  way, and keeps the rule that no one work is longer than a day (a second case shrunk to it while fixing the first).
+  Both cases are in the regressions file; 9,000 further cases pass. Nothing in the kernel changed.
+- **10,000 people, a month, bound off and on** (all code, au-vic, `living.initiative_bps=10000`, log to `/dev/null`; the
+  same binary): peak footprint 10.30 against 10.16 GB, 80 s against 73 s, 901,494 against 900,083 steps. The bound bites
+  here: a citizen's book 121 against 91 records, the gathering notices they hold 51 against 20, the gatherings they decide
+  on each week (`decided_for`) 38 against 15, their mind's saved bytes 13.9 against 11.1 KB. But all citizens' memory
+  together is about 190 MB of a 10 GB process: **it is not what fills memory at this size.**
+- **50,000 people: not measurable as the town is now.** Both runs passed the 40 GB guard 104 s in, bound or not (44 GB
+  peak footprint): before or at the first moment, where perf-2's 50,000 town peaked at 17 GB. The generated config has
+  doubled since (1.39 GB against 660 MB: the shop mix and the kinds of shop, generator 0.64.0), and the start holds it
+  as `serde_json` values. So the 50,000 month is stopped by the start, not by what people remember, and perf-2's
+  likely cause of the daily growth (each citizen keeping every paper and gathering) was not borne out at 10,000.
+  **100,000 is not feasible on this machine** until the config is read participant by participant (performance.md's
+  ranked list, item 1); then the daily growth at 50,000 can be measured with a heap profile, as SC-1 asks.
+- **Revisit if** a heap profile at 20,000 to 50,000 shows citizens' books or minds among the largest holders (then
+  tighten `most`); or a measure of culture or recourse moves at 10,000 between bound on and off.
+
+## 2026-10-24 · The generated town the Rust tests read is keyed by the generator's inputs; MT-23 registered (branch `key-town-cache`)
+
+`orchestrator/test/lib/write-town.ts` writes `<out>.key`, a sha256 of the generator (`worlds/generator`), the profiles, `participants/src` (the rules it calls), `contracts/` (schemas), the engine's native module, the spec and the arguments (`town-key.ts`); a file whose key is not the current one is written again. The Rust tests (`a1_citizen`, `observations`) call it every time instead of only when the file is missing, and `worktree-warm` drops the `*-town.json` copies it clones. Why: today a cached town from before `life.majority` failed three tests in a worktree that a fresh checkout passed, and the merge machine's old copy let a failing test pass. Cost: one bun start (about 0.3 s) per test program. Proved in `orchestrator/test/town-key.test.ts`. **Revisit if** the generator reads an input not listed (add it to `INPUTS`). MT-23 registers the seat-diary day-21 span (untraced).
