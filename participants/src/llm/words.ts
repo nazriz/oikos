@@ -20,6 +20,7 @@ const REFUSAL: Record<string, string> = {
   unknown_structure: "there's no such building",
   structure_incomplete: "the building isn't finished",
   unknown_space: "there's no such place in that building",
+  not_a_place: "what was named as the place to be or to work is not a place: name a building, or a space in one",
   capacity_exceeded: "there isn't room",
   not_present: "they aren't there",
   already_present: "they're already here",

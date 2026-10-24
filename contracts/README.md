@@ -665,3 +665,11 @@ No JSON Schema changed.
   recorded one also says the entity and capacity it was shown for). docs/reliability.md, "Observations in the log".
 - **Module manifest: `answers`** (optional, 2026-10-19, the cut-over's second step; blanket contract approval): how an office answers a letter (`office`, `acts`, `report`, `forms`), as the engine's manifests carry it. The manifests in `participants/manifests` are now written from the engine's (`bun participants/scripts/manifests.ts`), and the engine's kinds say it; the schema had no place for it.
 - **Module manifest: `capacity`** (optional, 2026-10-19): what sizes an office's staff where its kind states it (the registries' asks and seconds, the rule that sizes the staff, the figure's source), as the engine's manifests carry it; open inside.
+
+## Change for the six pilots' faults (2026-10-25; docs/decisions.md, "A place committed to is a place"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- **Breaking, kernel (a new refusal):** `propose_agreement` is refused `not_a_place` when a commitment's `occupancy.in` or
+  `work.at` names neither a building nor a space in one (pilot lv-10: an employment whose work site was a job posting's
+  id). `contracts/log.schema.json` gains the code; `blocks.schema.json` says so on both fields. The meaning of a
+  commitment is still not judged: only that its place is a place. An agreement in a world's config, and an offer's
+  terms as published, are not checked.

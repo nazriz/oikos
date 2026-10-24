@@ -40,6 +40,17 @@ export interface SeatConfig {
   dayBook: DayBook;
 }
 
+/** Who someone is, as a seat's reports name them, with each organisation's or person's name it is told learnt as it is
+ * told: a name it has been shown is a name it can use in a request (pilot lv-12, 2026-10-24: told of orders "to The
+ * outside world" in its own file, a seat that ordered from "The outside world" was told it knew of no one by that name). */
+export function namedFor(knowledge: { names: Map<string, string> }, whoIs: SeatConfigInput["whoIs"]): SeatConfigInput["whoIs"] {
+  return (id) => {
+    const w = whoIs(id);
+    if (w?.name && !w.of && !knowledge.names.has(w.id)) knowledge.names.set(w.id, w.name);
+    return w;
+  };
+}
+
 export function seatConfig(x: SeatConfigInput): SeatConfig {
   const { cfg, part: p, mine, positions, mods, whoIs, ctxFor, twin } = x;
   const pp = p.controller?.params ?? {};
