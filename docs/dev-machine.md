@@ -101,6 +101,10 @@ Not touched: caches in the home folder (huggingface models) and `/private/tmp/cl
   seeds, the 1,000-person town, anything over about 30 s. `bun scripts/test.ts --tier slow`. CI runs it on every push
   to main and nightly. The year of invariants on several seeds is here (`invariants.test.ts`); the gate has its own
   check of every invariant on 90 days of each main profile (`invariants-gate.test.ts`).
+- Every run of `scripts/test.ts` leaves a record in `~/.oikos/test-runs/` (`OIKOS_TEST_RUNS`; the last 200): when, the
+  checkout and commit, the mode (gate, tier, all, filtered), and each file's wall seconds, pass or fail and test count.
+  `OIKOS_RUN_TRACE=<file>` adds a line per town run (test file, a hash of its options, seconds): it showed the slow tier
+  repeats only 1 to 3% of its run time, so no cache of runs was built (docs/decisions.md).
 - `scripts/tiers.test.ts` (a backstop) holds that every test file is in exactly one tier, that the slow tier's files
   exist and say why, that every gate file took at most 90 s (by `test-times.json`), and that CI runs both tiers.
 - **The kernel in the gate.** Where the release build is current, the gate uses it. Where it is not (a kernel change, or a

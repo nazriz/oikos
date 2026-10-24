@@ -7078,3 +7078,57 @@ rebuilt only when `kernel/` differs from the last build there; the typecheck run
 there (marker `~/.oikos/main-ci.json`, written by the CI job; `gh` is not logged in on this machine) stops every merge but the repair (`--fix-main`). Revisit
 if: a merge breaks main more than rarely (then widen the selection or return to the whole suite), or `gh` works (the marker is then a fallback only).
 Priority does not preempt running jobs; if the wait for tokens is still long, a per-agent cap (item 6) is the next lever.
+
+## 2026-10-24 · The pipeline: two tiers, a gate of seconds to minutes, a cap per agent, one merge at a time (branch `pipeline`, on `fast-merge`; no model called)
+
+The owner: "the tests should finish in seconds to low single minutes, not hours", and everything stays coordinated.
+`fast-merge` had not landed: `scripts/slots.test.ts` failed under the merge because every process the merge starts
+inherits `OIKOS_SLOT_PRIORITY=high`, so the test's own "normal" jobs were high too. The test now gives its jobs an
+environment without the caller's slot settings.
+
+**Measured on this machine, quiet (12 slots), before and after.**
+
+| | before | after |
+|---|---|---|
+| the merge, a kernel change | the whole suite: 2,309 s (merge-bot log); `cargo test --release` alone still building after 35 min | **215 s** (gate build 50 s; 226 files and the reached crates' tests 163 s) |
+| the merge, TypeScript only (`participants/src/shared/tax.ts`) | `--affected`: fast tier + reached slow files + `invariants.test.ts` (211 s on its own) | **85-100 s** (224 files) |
+| the merge, documents only | backstops + 220 files (every source cites a doc in a comment) | **15 s** (15 files) |
+| the whole gate tier (a runner change) | — | 97 s |
+| the slow tier (51 files) | inside the 38-minute merge | **660 s** in CI, on every push |
+| the kernel's tests | `cargo test --release`: ~30+ min (each of ~50 test programs fat-LTO linked) | 28 s run under nextest (`gate` profile), 24 s rebuild after a one-file change |
+
+**What changed.**
+- **Tiers** (`scripts/test-tiers.json`): the slow tier is named file by file, with why (51 files: a year or more, several
+  seeds, the 1,000-person town, over ~30 s by the whole suite's times); everything else is the gate tier. `--gate`
+  (`test:changed` and the merge's; `--affected` its old name) chooses only from the gate tier. CI runs both tiers on every
+  push to main and nightly. `scripts/tiers.test.ts` holds every file in exactly one tier, the backstops in the gate, every
+  gate file at most 90 s, and CI running both. Nothing was weakened: no assertion was changed or removed; the year of
+  invariants runs in CI on every push, and the gate has a new check of every invariant on 90 days of each main profile
+  (`invariants-gate.test.ts`, about 20 s).
+- **The kernel in the gate.** The `gate` cargo profile (release's optimisation and overflow checks; no fat LTO, 16 codegen
+  units, incremental): built only where the release build is not current, 11 s after a one-file change against minutes
+  for release. The kernel's tests run in it under cargo-nextest, for the crates the change reaches (`cargo metadata`:
+  each changed crate and all above it), then the doc tests. The release build stays CI's.
+- **Selection fixes.** A document change chose 220 files: comments everywhere cite documents, a module's own `doc:` path
+  names one, and `foo.test.ts` was read as naming the script `test.ts`. Now a document is read only by code (comments taken
+  out) that names it or holds a path to a docs folder (any docs path in the test itself); script names match whole.
+- **Coordination.** The merge lock (`scripts/merge-lock.ts`) and a pre-push hook in the shared hooks folder: one merge at a
+  time, and only `merge.ts` pushes to main. A cap per checkout in the slots (a quarter of the pool, by tokens of the
+  checkout's own so it cannot be raced past); the merge is not capped; the runner and `bun test` borrow past the cap while
+  no other checkout waits. `bun scripts/status.ts` shows agents, merge queue, slots, disk and CI on one screen.
+  `disk-tidy.ts` clears `.claude/target-*` unused for a day. Each run leaves per-file wall times in `~/.oikos/test-runs/`.
+  `merge.ts` keeps main's side of a conflict in `scripts/test-times.json`.
+- **CI** (`ci.yml`): no `pull_request` trigger. The repository is public and the runner is this machine: a fork's pull
+  request would run a stranger's code here. A push no longer cancels the run under way (main's result is what merges wait on).
+
+**Not done, and why.** A cache of town runs across the suite ("each distinct world once per suite"): measured first
+(`OIKOS_RUN_TRACE`, the whole slow tier): 258 runs, 7,800 s; only 94 s are exact repeats, 261 s if the run id is ignored
+(1-3%); 1,500 s of runs take callbacks and cannot be reused at all. Not worth its risk. The slow tier is bound by its
+total work (6,185 file-seconds on 12 slots), not by one file. Shortening horizons needs a judgement per test about when the
+occasion comes; none was made blind.
+
+**Revisit if:** a merge breaks main more than rarely (widen the gate: move a file back from the slow tier); the kernel
+gate stays over 3 minutes as the kernel grows (the long pole is rebuilding ~50 test programs: fewer, larger test crates
+would cut it); a gate-profile build behaves differently from release (it must not: same code, same checks; CI runs release);
+the cap leaves the machine idle while agents wait (lift `OIKOS_SLOT_CAP`); the CI runner is offline (it has been since
+2026-10-17: the red-main stop then sees nothing).

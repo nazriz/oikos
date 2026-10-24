@@ -196,12 +196,14 @@ test("a borrower goes past its cap while it is alone, and stops taking as soon a
     const alone = await sh(lib("a", 3, 10), env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "a" }));
     expect(alone.out).toContain("took 3");
     // b waits (its one job, not borrowing) while a holds the whole pool; a's next take queues behind b's, though a borrows.
+    // (a writes 300 ms after its tokens come, so that b's job, given its token first, has written by then even under load;
+    // had a gone ahead of b, it would have written while b still waited, a second before.)
     const holder = Bun.spawn(lib("a", 4, 1500), { stdout: "pipe", stderr: "pipe", env: env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "a" }) });
     for (let i = 0; i < 400 && readdirSync(dir).filter((f) => f.startsWith("slot-")).length < 4; i++) await Bun.sleep(20);
     const order = join(dir, "order");
     const bJob = sh(["bun", slots, "--", "sh", "-c", `echo b >> ${order}`], env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "b" }));
     for (let i = 0; i < 400 && !readdirSync(dir).some((f) => f.startsWith("wait-")); i++) await Bun.sleep(20);
-    const aMore = sh(["bun", "-e", `import { take } from ${JSON.stringify(slots)}; import { appendFileSync } from "node:fs"; const s = await take(1, "a again", { borrow: true, pollMs: 20 }); appendFileSync(${JSON.stringify(order)}, "a\\n"); s?.release();`], env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "a" }));
+    const aMore = sh(["bun", "-e", `import { take } from ${JSON.stringify(slots)}; import { appendFileSync } from "node:fs"; const s = await take(1, "a again", { borrow: true, pollMs: 20 }); await Bun.sleep(300); appendFileSync(${JSON.stringify(order)}, "a\\n"); s?.release();`], env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "a" }));
     const [, , more] = await Promise.all([holder.exited, bJob, aMore]);
     expect(more.code).toBe(0);
     expect(readFileSync(order, "utf8").trim().split("\n")).toEqual(["b", "a"]);

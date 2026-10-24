@@ -24,11 +24,11 @@
 // `--root DIR` runs the *.test.ts under DIR instead of the repo (used by scripts/test-runner.test.ts; no preconditions).
 
 import { Glob } from "bun";
-import { cpus, loadavg } from "node:os";
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { cpus, homedir, loadavg } from "node:os";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { realpathSync } from "node:fs";
-import { insideSlot, take } from "./slots";
+import { defaultPriority, insideSlot, poolSize, take } from "./slots";
 
 const repo = join(import.meta.dir, "..");
 const args = process.argv.slice(2);
@@ -117,8 +117,10 @@ function gateBuild() {
   const target = process.env.CARGO_TARGET_DIR ?? join(repo, "kernel/target");
   console.log("--gate: the release kernel is not current here: building the gate profile (seconds when little changed)...");
   const t = performance.now();
-  const cmd = "cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace -q && cargo build --release --manifest-path kernel/Cargo.toml --target wasm32-unknown-unknown -p oikos-law -q";
-  if (!run(["bun", join(import.meta.dir, "slots.ts"), "--weight", "4", "--what", "kernel build (gate profile)", "--", "sh", "-c", cmd], repo)) stop("the gate build of the kernel failed: run `cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace` and read its errors");
+  // (The merge's build takes the whole pool: nothing of the gate can start before it. The kernel's test programs are built
+  // after, beside the test files: 2026-10-24, building them here first made a kernel change's gate 220 s, beside 170 s.)
+  const cmd = `cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace -q && cargo build --release --manifest-path kernel/Cargo.toml --target wasm32-unknown-unknown -p oikos-law -q`;
+  if (!run(["bun", join(import.meta.dir, "slots.ts"), "--weight", String(defaultPriority() ? poolSize() : 4), "--what", "kernel build (gate profile)", "--", "sh", "-c", cmd], repo)) stop("the gate build of the kernel failed: run `cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace` and read its errors");
   const lib = ["liboikos_napi.dylib", "liboikos_napi.so"].map((f) => join(target, "gate", f)).find((f) => existsSync(f));
   process.env.OIKOS_KERNEL = join(target, "gate", "oikos-kernel");
   if (lib) process.env.OIKOS_ENGINE_MODULE = lib;
@@ -167,10 +169,11 @@ function reasons(tests: string[], deep = false): { why: Map<string, string>; cha
   const from = git("merge-base", base, "HEAD");
   const changedFiles = [...new Set([...git("diff", "--name-only", from).split("\n"), ...git("ls-files", "--others", "--exclude-standard").split("\n")].filter(Boolean))].sort();
   const set = new Set(changedFiles);
+  const allDocs = changedFiles.length > 0 && changedFiles.every(isDoc);
   // (Data a test reads by name, not by import: a world, a profile, a schema. Named by its file name in the test or what it imports.)
   const data = changedFiles.filter((f) => (deep && isDoc(f)) || /\.(ya?ml|json|cel|sql|txt|py)$/.test(f) && !/(^|\/)(package|tsconfig|test-times)\.json$/.test(f) && !f.startsWith("kernel/"));
-  const seen = new Map<string, { imports: string[]; text: string }>();
-  const load = (f: string) => { let e = seen.get(f); if (!e) { let text = ""; try { text = readFileSync(join(root, f), "utf8"); } catch {} e = { imports: /\.(ts|tsx|js|mjs)$/.test(f) ? importsOf(f, text) : [], text }; seen.set(f, e); } return e; };
+  const seen = new Map<string, { imports: string[]; text: string; readonly code: string }>();
+  const load = (f: string) => { let e = seen.get(f); if (!e) { let text = ""; try { text = readFileSync(join(root, f), "utf8"); } catch {} e = { imports: /\.(ts|tsx|js|mjs)$/.test(f) ? importsOf(f, text) : [], text, get code() { return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1"); } }; seen.set(f, e); } return e; };
   const why = new Map<string, string>();
   const reached = new Set<string>();
   for (const t of tests) {
@@ -183,10 +186,20 @@ function reasons(tests: string[], deep = false): { why: Map<string, string>; cha
       if (f !== t && set.has(f)) { reached.add(f); if (!why.has(t)) why.set(t, `imports ${f}${d > 1 ? ` (${d} imports down)` : ""}`); }
       // (--affected also takes a test that names the changed file's folder, or any document for a changed document: a
       // test that scans a folder or reads "docs/" never names the file.)
-      const named = data.find((c) => { const txt = load(f!).text; return txt.includes(c.split("/").pop()!) || (deep && (txt.includes(dirname(c) + "/") || (isDoc(c) && txt.includes("docs/")))); });
+      // (A document is read by code, not named in a comment: for one, the file's code with its comments taken out must name
+      // it, or hold a path into the docs in a string: in the test itself any ("docs/x.md"), in what it imports a folder only
+      // ("docs/behaviour/", "../../docs", join(root, "docs")); a module's note of its own document, or a message that cites
+      // one, "(docs/profiles.md)", does not read this one. Every source file cites a document in its comments, so a test that only
+      // imports one does not read documents: 2026-10-24, a change to one document chose 220 files.)
+      const named = data.find((c) => {
+        if (deep && isDoc(c)) { const code = load(f!).code; return code.includes(c.split("/").pop()!) || (f === t ? /["'`](?:[^"'`\n]*\/)?docs(?:\/|["'`])/ : /["'`](?:[^"'`\n]*\/)?docs(?:\/[\w\/-]*)?["'`]/).test(code); }
+        const txt = load(f!).text; return txt.includes(c.split("/").pop()!) || (deep && txt.includes(dirname(c) + "/"));
+      });
       if (named) { reached.add(named); if (!why.has(t)) why.set(t, `names ${named}${f === t ? "" : ` (in ${f})`}`); }
-      // (--affected: a test that starts a script by its name -- the command line, a pilot's queue -- reaches what the script imports.)
-      const spawned = deep ? [...new Set(load(f).text.match(/[\w-]+\.(?:ts|sh)\b/g) ?? [])].flatMap((b) => byName().get(b) ?? []) : [];
+      // (--affected: a test that starts a script by its name -- the command line, a pilot's queue -- reaches what the script imports.
+      // A whole name only: "foo.test.ts" names no script "test.ts".)
+      // (Not for documents only: a script started by name reads a document only if a test that imports it would.)
+      const spawned = deep && !allDocs ? [...new Set(load(f).text.match(/(?<![\w.-])[\w-]+\.(?:ts|sh)\b/g) ?? [])].flatMap((b) => byName().get(b) ?? []) : [];
       for (const i of [...load(f).imports, ...spawned]) if (!depth.has(i)) { depth.set(i, d + 1); queue.push(i); }
     }
   }
@@ -207,13 +220,18 @@ if (sel) {
   if (pick.unreached.length) console.log(`  no test imports or names: ${pick.unreached.slice(0, 12).join(", ")}${pick.unreached.length > 12 ? `, and ${pick.unreached.length - 12} more` : ""}`);
   if (slow.length && extra.length > slow.length / 2) console.log(`  (${extra.length} of the ${slow.length} slow files: this change reaches most of the suite. To run less, name the tests that cover it: bun scripts/test.ts <filter>...)`);
 }
+// The kernel's own tests: under --gate, when the kernel or the contracts it compiles in changed, and then only the crates
+// the change reaches (undefined: all of them; null: none).
+const contractsChanged = !!pick?.changedFiles.some((f) => /^contracts\/(?!.*\.md$)/.test(f));
+const kernelWhich: string[] | undefined | null = !filters.length && !custom && !timeNew && !list && tierFlag !== "slow" && (!pick || pick.kernel || contractsChanged) ? (pick && !contractsChanged ? kernelCrates(pick.changedFiles) : undefined) : null;
 if (!custom && !list) preconditions(affected);
 const files = all
   .filter((f) => !sel || (affected && BACKSTOPS.includes(f)) || (!docsOnly && (times[f] ?? Infinity) < FAST_SECONDS) || sel.why.has(f))
   .filter((f) => !fast || (times[f] ?? Infinity) < FAST_SECONDS)
   .filter((f) => !timeNew || times[f] === undefined)
   .sort((a, b) => (times[b] ?? 1e9) - (times[a] ?? 1e9) || (a < b ? -1 : 1));
-if (list) { console.log(files.join("\n")); process.exit(0); }
+// (Written at once: console.log to a pipe can be cut short by the exit that follows, and a list read by a test was, under load.)
+if (list) { writeSync(1, files.join("\n") + "\n"); process.exit(0); }
 if (untimed.length && !custom && !timeNew && !changed) {
   console.log(`NOTE ${untimed.length} test file${untimed.length > 1 ? "s" : ""} never timed, counted as slow${fast ? " and left out of the fast tier" : ""}: ${untimed.join(", ")}`);
   console.log(`     run \`bun scripts/test.ts --time-new\` to time ${untimed.length > 1 ? "them" : "it"} and record that in scripts/test-times.json`);
@@ -233,9 +251,7 @@ const t0 = performance.now();
 let failed = 0;
 // (Started now and awaited after the files: it used to run first and alone, and a suite waited for it, at four times
 // the slots it needs, before its first file started. Four tokens compile as fast as seven within a few seconds.)
-// (Under --gate: when the kernel or the contracts it compiles in changed, and then only the crates the change reaches.)
-const contractsChanged = !!pick?.changedFiles.some((f) => /^contracts\/(?!.*\.md$)/.test(f));
-const kernelTests = !filters.length && !custom && !timeNew && tierFlag !== "slow" && (!pick || pick.kernel || contractsChanged) ? kernelCargoTests(pick && !contractsChanged ? kernelCrates(pick.changedFiles) : undefined) : Promise.resolve();
+const kernelTests = kernelWhich !== null ? kernelCargoTests(kernelWhich) : Promise.resolve();
 /**
  * The kernel's crates a change reaches: each changed crate and every crate that depends on it, however far up (from
  * `cargo metadata`). A change outside any member crate (the workspace's manifest or lock, the contracts compiled in)
@@ -281,6 +297,8 @@ async function kernelCargoTests(crates?: string[]) {
 }
 
 let pass = 0, fail = 0, rerun = 0, next = 0, running = 0;
+/** This run, file by file (wall seconds, passed, tests): kept in ~/.oikos/test-runs (OIKOS_TEST_RUNS), the last 200 runs. */
+const record: Record<string, { secs: number; ok: boolean; tests: number }> = {};
 const bad: string[] = [];
 const lateTimeouts: string[] = [];
 
@@ -316,6 +334,7 @@ async function worker() {
     const r = await runFile(f).finally(() => slot.release());
     running--;
     times[f] = Math.round(r.secs * 10) / 10;
+    record[f] = { secs: times[f]!, ok: r.code === 0, tests: r.npass + r.nfail };
     if (r.onlyTimeouts) { lateTimeouts.push(f); console.log(`LATE ${f} ${r.secs.toFixed(0)}s (timed out; to be rerun alone)`); continue; }
     pass += r.npass; fail += r.nfail;
     console.log(`${r.code === 0 ? "ok  " : "FAIL"} ${f} ${r.secs.toFixed(0)}s`);
@@ -333,6 +352,14 @@ for (const f of lateTimeouts) {
   else { failed++; console.log(`FAIL ${f} ${r.secs.toFixed(0)}s (failed again on rerun)`); bad.push(tail(f, r.text)); }
 }
 
+if (!custom && !list) try {
+  const dir = process.env.OIKOS_TEST_RUNS ?? join(homedir(), ".oikos", "test-runs");
+  mkdirSync(dir, { recursive: true });
+  const head = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: repo, stdout: "pipe" }).stdout.toString().trim();
+  const mode = affected ? "gate" : tierFlag !== "all" ? `tier ${tierFlag}` : fast ? "fast" : filters.length ? "filtered" : "all";
+  writeFileSync(join(dir, `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}.json`), JSON.stringify({ at: new Date().toISOString(), root: repo, head, mode, wallSecs: Math.round((performance.now() - t0) / 100) / 10, failed, files: record }, null, 1) + "\n");
+  for (const old of readdirSync(dir).filter((f) => f.endsWith(".json")).sort().slice(0, -200)) rmSync(join(dir, old), { force: true });
+} catch { /* a record is a convenience: never a failure */ }
 if (!custom && ((!filters.length && !fast && !changed) || timeNew)) writeFileSync(timesPath, JSON.stringify(Object.fromEntries(Object.entries(times).sort()), null, 1) + "\n");
 for (const b of bad) console.log(b);
 console.log(`\n${pass} pass, ${fail} fail across ${files.length} files, ${maxJobs} at a time, in ${((performance.now() - t0) / 1000).toFixed(0)}s${fast ? " (fast tier)" : changed ? " (fast tier and what changed)" : ""}, ${rerun} passed on rerun`);
