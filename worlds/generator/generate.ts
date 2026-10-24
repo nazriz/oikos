@@ -645,6 +645,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const staffFor = (units: number, hoursPerWorkerMonth: number) => Math.max(1, Math.ceil((units * SERVE_EXACT * 10_000) / (hoursPerWorkerMonth * SHOP_UTILISATION_BPS) - 1e-9));
   // A mix of shops (docs/behaviour/demand.md): the kinds the town's shops sell, each kind's unit being what SERVE seconds of staff
   // time serves (so its price follows from its labour share), and which kind each shop sells. `goods` stands for what the factories make.
+  // What running a business of one costs a month beside its stock (registration, a licence and the like), the profile's,
+  // paid to the outside world (docs/behaviour/entry.md, "What a business costs"; risk ME-1). None: nothing.
+  const HOME_FIXED: { fixed_per_month?: number; fixed_to?: string } = V.business?.home_fixed_per_month ? { fixed_per_month: V.business.home_fixed_per_month, fixed_to: "acc-outside" } : {};
   const MIX: ShopKind[] | undefined = spec.shop_mix !== false && hasShopTable(V) ? shopMix(V, shops.length, { price: RETAIL_PRICE, wholesale: WORLD.goods_import }, (SERVE * hourly(wages.shop)) / HOUR) : undefined;
   const KIND_OF = new Map<string, ShopKind | undefined>();
   if (MIX) { let i = 0; for (const k of MIX) for (let j = 0; j < k.shops; j++) KIND_OF.set(shops[i++]!, k); }
@@ -2796,7 +2799,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // (It is shown no ground: a home or a market is not one business's premises. Its owner knows where they are.)
   for (const b of ownBusinesses) positions.push({ id: `${b.firm}-owner`, entity: b.firm, title: "Owner", holder: `${b.person}-self`,
     channels: [{ id: "books", kind: "accounts" }, mine(), market("outside"), shopBoards[0], { id: "stock", kind: "holdings" }],
-    role_module: { code: "firm.retailer", params: { premises: b.premises, workplace: b.space, operator: b.person, max_staff: 0, min_staff: 0, industry: "retail", wage: wages.shop, period: PAY, working_day: WORKING_DAY,
+    role_module: { code: "firm.retailer", params: { premises: b.premises, workplace: b.space, operator: b.person, ...HOME_FIXED, max_staff: 0, min_staff: 0, industry: "retail", wage: wages.shop, period: PAY, working_day: WORKING_DAY,
       serve_task: "sell", serve_labour: SHOP.serve, suppliers: ["outside"], trade_board: "trade", price: RETAIL_PRICE, demand: OWN.sales, shopfront: true, premises_cell: b.cell, ...(RD && b.space.startsWith(`${MARKET}/`) ? { open_from: RD.work_start_hour * HOUR, open_until: RD.work_end_hour * HOUR } : {}), stock_days: b.days, draw_days: V.pay_period_days, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } } });
   const ownWorkOf = new Map(ownBusinesses.map((b) => [b.person, { firm: b.firm, account: `acc-${b.firm}`, ...(b.space.startsWith(`${MARKET}/`) ? { at: b.space } : { home: b.space }), expect_per_month: OWN.monthly }]));
   // Citizens see petitions and their published counts, not each other's signatures.
@@ -2867,9 +2870,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // profile's business birth rate is a target to compare with, not a setting. `unit_cost` is the trade price the
   // world publishes for what it sells in.
   const ownCapital = 2 * Math.ceil((Math.max(Math.ceil((OWN_NEW.sales * 7) / 30), WHOLESALE_LEAST) * WORLD.goods_import * 11) / 10);
-  const ownVenture = { kind: "own_account", name: "Trading from home", own: true, expect_per_month: OWN_NEW.monthly, capital: ownCapital, unit_cost: WORLD.goods_import,
+  const ownVenture = { kind: "own_account", name: "Trading from home", own: true, expect_per_month: OWN_NEW.monthly, capital: ownCapital, unit_cost: WORLD.goods_import, ...(HOME_FIXED.fixed_per_month ? { fixed_per_month: HOME_FIXED.fixed_per_month } : {}),
     channels: [{ id: "books", kind: "accounts" }, mine(), market("outside"), shopBoards[0], { id: "stock", kind: "holdings" }],
-    role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{home}", operator: "{founder}", founder: "{founder}", capital: "{capital}", bank: "bank", max_staff: 0, min_staff: 0, industry: "retail",
+    role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{home}", operator: "{founder}", founder: "{founder}", capital: "{capital}", bank: "bank", ...HOME_FIXED, max_staff: 0, min_staff: 0, industry: "retail",
       wage: wages.shop, period: PAY, working_day: WORKING_DAY, serve_task: "sell", serve_labour: SHOP.serve, suppliers: ["outside"], trade_board: "trade", price: RETAIL_PRICE, demand: OWN_NEW.sales, shopfront: true,
       premises_cell: "{cell}", stock_days: 7, draw_days: V.pay_period_days, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } } };
   const citizenController = code("citizen.default", { outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,

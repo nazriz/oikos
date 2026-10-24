@@ -303,14 +303,6 @@
       },
       "source": "placeholder"
     },
-    "give_up_below_bps": {
-      "default": 5000,
-      "schema": {
-        "type": "integer"
-      },
-      "source": "placeholder",
-      "unit": "bps"
-    },
     "give_up_months": {
       "default": 6,
       "schema": {

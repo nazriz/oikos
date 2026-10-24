@@ -40,7 +40,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const MANIFEST: &str = include_str!("../../../../../participants/manifests/firm.retailer.json");
 /// The TS module's version (firm.retailer 0.18.0), which this one does what and more (prices from supply and demand).
-pub const VERSION: &str = "0.18.0";
+pub const VERSION: &str = "0.19.0";
 
 /// FNV-1a of who and what, for a draw that is a fact about the shop (see the module's doc).
 pub(crate) fn fact(who: &str, what: &str) -> u64 {
@@ -111,6 +111,10 @@ pub struct Params {
     pub operator: Option<String>,
     pub stock_days: i64,
     pub draw_days: i64,
+    /// What running a business of one costs a month beside its stock (registration, a licence and the like: the
+    /// profile's `business.home_fixed_per_month`), paid to `fixed_to` at each draw.
+    pub fixed_per_month: i64,
+    pub fixed_to: String,
     pub premises_cell: String,
     pub open_from: i64,
     pub open_until: i64,
@@ -167,6 +171,8 @@ impl Params {
             operator: ctx.param("operator", None)?,
             stock_days: ctx.param("stock_days", 30)?,
             draw_days: ctx.param("draw_days", 0)?,
+            fixed_per_month: ctx.param("fixed_per_month", 0)?,
+            fixed_to: ctx.param("fixed_to", String::new())?,
             premises_cell: ctx.param("premises_cell", String::new())?,
             open_from: ctx.param("open_from", 0)?,
             open_until: ctx.param("open_until", 0)?,
@@ -1339,8 +1345,19 @@ impl<B: Body> Shop<B> {
                 let least = offers.first().map_or(0, |o| o.min);
                 let unit = self.unit_cost.max(offers.first().map_or(0, |o| o.unit));
                 let keep = (top.max(least) * unit * 11 + 9).div_euclid(10) + self.payables.owing();
-                if acct.balance > keep {
-                    let (s, _) = distribute::<Then>(&self.book, &me, &Self::payer(&acct), acct.balance - keep, &format!("We hold {} and keep {} for stock: the rest is our owner's", money(acct.balance), money(keep)), &money);
+                // (What running it costs beside its stock, the profile's: registration or licence, and the like, paid
+                // for the period, before anything is the owner's: docs/behaviour/entry.md, "What a business costs".)
+                let running = (self.p.fixed_per_month * self.p.draw_days * DAY).div_euclid(MONTH).min(acct.balance.max(0));
+                let mut held = acct.balance;
+                if running > 0 && !self.p.fixed_to.is_empty() {
+                    held -= running;
+                    steps.push(because(
+                        format!("What running the business costs for {} days: {}.", self.p.draw_days, money(running)),
+                        vec![pay(&self.p.fixed_to, running, Pay { from: Some(acct.account.clone()), for_: Some("Running costs: registration, licence and the like.".into()), ..Default::default() }, cx)],
+                    ));
+                }
+                if held > keep {
+                    let (s, _) = distribute::<Then>(&self.book, &me, &Self::payer(&acct), held - keep, &format!("We hold {} and keep {} for stock: the rest is our owner's", money(held), money(keep)), &money);
                     steps.extend(s);
                 }
             }

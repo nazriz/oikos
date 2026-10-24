@@ -888,6 +888,8 @@ impl Person {
             looks.extend(self.job_market_looks());
             looks.extend(self.sale_looks(t));
             looks.extend(self.shop_looks(pic, cx));
+            let ventures = self.venture_looks(t, acc.balance, &looks);
+            looks.extend(ventures);
             looks.push(crate::common::ask::board("petitions", 10, vec![], None));
             if let (Some(j), Some(board)) = (&self.s.job, &self.p.work_board) {
                 looks.push(crate::common::ask::about(

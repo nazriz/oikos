@@ -30,6 +30,7 @@
         "data": {
           "industry": "@industry",
           "period": "=period",
+          "openings": "=posts",
           "role": "@role",
           "space": "@workplace",
           "wage": "#wage",
@@ -701,6 +702,21 @@
       "source": "placeholder",
       "unit": "days"
     },
+    "fixed_per_month": {
+      "default": 0,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "the profile: business.home_fixed_per_month",
+      "unit": "cents"
+    },
+    "fixed_to": {
+      "default": "",
+      "schema": {
+        "type": "string"
+      },
+      "source": "the generator: the outside world account fees are paid to"
+    },
     "founder": {
       "default": null,
       "schema": {},
@@ -1185,5 +1201,5 @@
   },
   "perceives": [],
   "state": "none",
-  "version": "0.18.0"
+  "version": "0.19.0"
 }

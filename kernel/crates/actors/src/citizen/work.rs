@@ -355,7 +355,7 @@ impl Person {
             .max();
         let wage = if hires { posted.or_else(|| g("wage").map(|w| div_round(w * MONTH, period))).unwrap_or(0) } else { 0 };
         let opportunity = self.s.job.as_ref().map_or(0, |j| div_round(j.wage * MONTH, j.period.max(DAY)));
-        Some(oikos_rules::entry::Prospect { price, unit_cost, units_per_household, households_reached: if v.own { homes.len() as i64 } else { self.p.population }, sellers_known: known.len() as i64, units_per_worker, wage, fixed: 0, opportunity })
+        Some(oikos_rules::entry::Prospect { price, unit_cost, units_per_household, households_reached: if v.own { homes.len() as i64 } else { self.p.population }, sellers_known: known.len() as i64, units_per_worker, wage, fixed: v.fixed_per_month.unwrap_or(0).max(0), opportunity })
     }
 
     /// Whether to start it (docs/behaviour/entry.md, "Entry by expected profit"): the mind's decision between the
@@ -398,6 +398,22 @@ impl Person {
     /// A building someone told us of: the jobs on offer there now.
     pub fn job_lead_look(&self, lead: &str) -> LookRequest {
         crate::common::ask::board("jobs", self.p.search_limit, vec![Condition { field: "data.workplace".into(), op: CmpOp::Eq, value: lead.into() }], None)
+    }
+
+    /// Before weighing a business of our own (docs/behaviour/entry.md, "Who else sells it"): a look through what
+    /// sellers advertise, the newest first, so that we know of those who have started since we last looked, as anyone
+    /// thinking of starting one would. Only when it is due and we have the means for it, and not when the same board is
+    /// being looked at for our shopping.
+    pub fn venture_looks(&self, t: i64, balance: i64, already: &[LookRequest]) -> Vec<LookRequest> {
+        if self.p.adverts.is_empty() || already.iter().any(|l| l.channel == self.p.adverts) {
+            return vec![];
+        }
+        let Some(v) = self.p.ventures.iter().find(|v| v.own) else { return vec![] };
+        let due = self.work.founded.is_none() && self.s.own_work.is_none() && self.work.venturing.is_none() && !self.s.retired && self.p.in_labour_force && t >= self.work.next_own_venture;
+        if !due || balance < v.capital + self.p.found_own_buffer_months * self.p.essentials {
+            return vec![];
+        }
+        vec![crate::common::ask::board(&self.p.adverts, self.p.search_limit, vec![Condition { field: "data.at".into(), op: CmpOp::Gt, value: json!("") }], Some(("at", true)))]
     }
 
     /// The jobs board, best-paid first, when we are looking (out of work, or this month's look for better).
@@ -887,8 +903,12 @@ impl Person {
         self.absorbed.pending_firm = Some(v.capital);
     }
 
-    /// Giving a business of one up: one that has not paid its owner a living for months is closed by them, and they
-    /// look for work again. Not in its first months, while customers are still finding it.
+    /// Giving a business of one up (docs/behaviour/entry.md, "Giving it up"): each month after its first, its owner
+    /// weighs it as they weighed starting it, against what they could do instead: what it has paid them a month over the
+    /// months they judge by (`give_up_months`, the most they look back; fewer while it is younger), against the best-paid
+    /// job they know of, or nothing. The choice is the mind's, between keeping it and giving it up; no age at which it may
+    /// first be given up, and no share of essentials below which it must be. (An owner learns what the business is worth
+    /// from what it pays them: Jovanovic 1982.)
     fn give_up_own(&mut self, w: &mut Week) {
         let t = w.t;
         let Some(own) = self.s.own_work.clone() else { return };
@@ -897,17 +917,42 @@ impl Person {
         }
         self.work.next_own_review = t + MONTH;
         let months = (t - self.work.own_since).div_euclid(MONTH);
-        let since = t - self.p.give_up_months * MONTH;
-        let drawn: i64 = self.absorbed.drawn_log.iter().filter(|d| d.0 >= since).map(|d| d.1).sum();
+        let window = months.min(self.p.give_up_months.max(1));
+        let since = t - self.p.give_up_months.max(1) * MONTH;
         self.absorbed.drawn_log.retain(|d| d.0 >= since);
-        if months < self.p.give_up_months || drawn * 10_000 >= self.p.give_up_below_bps * self.p.essentials * self.p.give_up_months {
+        if window < 1 {
+            return; // (not a month's trade yet: nothing to judge it by)
+        }
+        let from = t - window * MONTH;
+        let drawn: i64 = self.absorbed.drawn_log.iter().filter(|d| d.0 >= from).map(|d| d.1).sum();
+        let pays = div_round(drawn, window);
+        let period = 14 * DAY;
+        let instead = self
+            .s
+            .found_jobs
+            .iter()
+            .filter_map(|id| self.book.get(id))
+            .filter_map(|r| {
+                let d = data(r);
+                Some(div_round(d.i("wage")? * MONTH, d.i("period").unwrap_or(period).max(DAY)))
+            })
+            .max()
+            .unwrap_or(0);
+        let options = vec![
+            Choice { key: "keep".into(), facts: Some(Facts { money_per_month: pays, work_hours_per_month: Some(160), ..Default::default() }), others: None, meaning: Some(self.wk_enterprise(w)) },
+            Choice { key: "give_up".into(), facts: Some(Facts { money_per_month: instead, work_hours_per_month: (instead > 0).then_some(160), ..Default::default() }), others: None, meaning: None },
+        ];
+        let life = self.life(w.pic, t, w.acc.as_ref().map(|a| a.balance));
+        let d = self.mind.decide(w.cx, &life, Decide { domain: "venture".into(), options, current: Some("keep".into()), purpose: Some("venture".into()), ..Default::default() });
+        if d.key.as_deref() != Some("give_up") {
             return;
         }
-        self.tell(w, mine("own_work", &own.firm, "given_up", facts([("months", json!(months)), ("drawn", json!(drawn)), ("essentials", json!(self.p.essentials))])));
-        let d = crate::papers::data(&TradingFrom { closed: Some(true), ..Default::default() });
+        self.tell(w, mine("own_work", &own.firm, "given_up", facts([("months", json!(months)), ("drawn", json!(drawn)), ("instead", json!(instead))])));
+        let dd = crate::papers::data(&TradingFrom { closed: Some(true), ..Default::default() });
+        let alt = if instead > 0 { format!("a job paying {} a month", Self::wk_usd(w, instead)) } else { "looking for work".to_string() };
         w.push(because(
-            format!("Our business has paid us {} in {} months, under {}% of what essentials cost: closing it, and looking for work.", Self::wk_usd(w, drawn), self.p.give_up_months, self.p.give_up_below_bps / 100),
-            vec![say("trading_from", "Closing: the business is given up.", Say { to: Some(vec![own.firm.clone()]), visible: only(&self.me, &own.firm), data: Some(d), ..Default::default() })],
+            format!("Our business has paid us {} a month over {} months: not worth keeping against {alt}. Closing it, and looking for work.", Self::wk_usd(w, pays), window),
+            vec![say("trading_from", "Closing: the business is given up.", Say { to: Some(vec![own.firm.clone()]), visible: only(&self.me, &own.firm), data: Some(dd), ..Default::default() })],
         ));
         self.s.own_work = None;
         self.work.trading_from = None;
@@ -1394,22 +1439,30 @@ mod tests {
     }
 
     #[test]
-    fn a_business_of_one_that_pays_no_living_for_its_months_is_closed_and_not_in_its_first_months() {
+    fn a_business_of_one_is_weighed_monthly_against_the_best_job_known_given_up_when_it_pays_nothing_and_kept_when_it_pays() {
         let c = ctx_with(json!({ "own_work": { "firm": "stall-1", "account": "acc.stall", "home": "b1/dwelling.1", "expect_per_month": 100_000 } }));
+        let post = |id: &str| rec(json!({ "id": id, "record": "statement", "author": "p.x", "speaks_for": "works", "at": 0, "visible_to": "public", "kind": "job_posting", "text": "Hiring", "data": { "wage": 150_000, "period": 14 * DAY } }));
         let mut ann = Person::new(&c).unwrap();
         assert_eq!((ann.work.own_since, ann.work.trading_from.as_deref()), (0, Some("b1/dwelling.1")));
-        ann.absorbed.drawn_log = vec![(10 * DAY, 5_000)];
+        ann.book.take_all(&[post("rec.1")]);
+        ann.s.found_jobs = vec!["rec.1".into()];
+        // Not a month's trade yet: nothing to judge it by.
         ann.work.next_own_review = 0;
-        assert!(run(&mut ann, &c, &pic(3 * MONTH, None, false), 0, |a, w| a.ventures(w)).is_empty(), "not in its first months");
+        assert!(run(&mut ann, &c, &pic(20 * DAY, None, false), 0, |a, w| a.ventures(w)).is_empty());
+        // Two months that paid nothing, against a job at $3,214 a month: given up, at the second month, not the sixth.
         ann.work.next_own_review = 0;
-        let out = run(&mut ann, &c, &pic(6 * MONTH + DAY, None, false), 0, |a, w| a.ventures(w));
+        let out = run(&mut ann, &c, &pic(2 * MONTH + DAY, None, false), 0, |a, w| a.ventures(w));
         assert!(out.len() == 1 && out[0].contains("trading_from") && out[0].contains("\"closed\":true"), "{out:?}");
         assert!(ann.s.own_work.is_none() && ann.work.own_since == -1);
-        // One that pays a living goes on.
+        // One that pays more than the job known: kept, month after month.
         let mut bob = Person::new(&c).unwrap();
-        bob.absorbed.drawn_log = (0..6).map(|m| (m * MONTH + DAY, 40_000)).collect();
-        bob.work.next_own_review = 0;
-        assert!(run(&mut bob, &c, &pic(6 * MONTH + DAY, None, false), 0, |a, w| a.ventures(w)).is_empty());
+        bob.book.take_all(&[post("rec.1")]);
+        bob.s.found_jobs = vec!["rec.1".into()];
+        bob.absorbed.drawn_log = (0..6).map(|m| (m * MONTH + DAY, 900_000)).collect();
+        for m in 1..=6 {
+            bob.work.next_own_review = 0;
+            assert!(run(&mut bob, &c, &pic(m * MONTH + 2 * DAY, None, false), 0, |a, w| a.ventures(w)).is_empty(), "month {m}");
+        }
         assert!(bob.s.own_work.is_some());
     }
 

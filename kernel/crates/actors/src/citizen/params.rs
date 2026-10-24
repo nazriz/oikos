@@ -40,7 +40,6 @@ pub struct Params {
     /// names until they have worked elsewhere (docs/design/market-realism.md, ME-2).
     pub trade: Option<String>,
     pub give_up_months: i64,
-    pub give_up_below_bps: i64,
     pub possession: Option<Possession>,
     pub shop_every_days: i64,
     pub beta: i64,
@@ -140,7 +139,6 @@ impl Default for Params {
             found_own_buffer_months: 1,
             trade: None,
             give_up_months: 6,
-            give_up_below_bps: 5_000,
             possession: None,
             shop_every_days: 14,
             beta: 5,
@@ -290,6 +288,9 @@ pub struct Venture {
     /// list: docs/behaviour/entry.md, "Entry by expected profit").
     #[serde(default)]
     pub unit_cost: Option<i64>,
+    /// What running it costs a month beside its stock (registration, a licence and the like), as the place charges it.
+    #[serde(default)]
+    pub fixed_per_month: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

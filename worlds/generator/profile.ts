@@ -167,6 +167,9 @@ export interface Profile {
      * source): a target to compare a town's births with, never a setting (docs/behaviour/entry.md, "Entry by expected
      * profit"; risk ME-1). */
     business?: { entry_bps_per_year: number;
+      /** What running a business of one costs a month beside its stock: registration, a licence and the like (cents, with
+       * its source). A founder counts it, and the business pays it (docs/behaviour/entry.md, "What a business costs"). */
+      home_fixed_per_month?: number;
       /** The days a supplier ordinarily gives a business to pay for goods it has delivered (docs/behaviour/trade.md, "Trade credit"): a
        * factory gives them to the shops that buy from it, and the outside world to the factories that buy inputs. Left out: cash with order. */
       trade_credit_days?: number };

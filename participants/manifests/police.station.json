@@ -34,6 +34,7 @@
         "data": {
           "industry": "@industry",
           "period": "=period",
+          "openings": "=posts",
           "role": "@role",
           "space": "@workplace",
           "wage": "#wage",
