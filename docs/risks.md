@@ -92,17 +92,32 @@ The mechanism:
 ## World mechanics
 
 ### WM-1 · Act times are placeholders throughout
-- **Gap:** Every row of the table of work (`WORK_TIME`: a benefit decision 20 minutes, a tribunal order 45, a loan
-  decision 30, a letter, a vote) is a placeholder. The source check of 2026-10-16 opened nothing that replaces any:
-  the nearest sources are whole-case handling times, several hours a case. No profile overrides a row.
-- **Where:** `worlds/generator/generate.ts` (`WORK_TIME`); `values.work_time` (unused in all nine profiles).
-- **Effect:** All office throughput, backlogs and days-to-decision. Decision rows are probably too short (a benefit
-  decision perhaps eight times too short), so offices clear queues too fast and the cost of a person doing the work
-  is understated. The ratio of a person's seconds to a system's is the whole gain of automation, so it sets any
-  gradual-disempowerment result. Seat and twin share the table, so their difference is safer than absolute figures.
-- **L / I:** high / high · **Status:** to source
+- **Gap:** The generator's table of work (`WORK_TIME`: 52 rows for a person) is all placeholders, each now marked
+  "(to confirm; WM-1)" with what would source it. Since 2026-10-24 two profiles replace ten rows from opened sources
+  (docs/decisions.md, "Act times from sources"): us-oh six (a claim 19 minutes, a benefit decision 75 as the case's
+  whole handling, a request for papers 2, the claimant's papers 24, an employer's confirmation 30, all US burden
+  estimates; a tribunal order 15, another state's court case weight), gb-eng four (a desk's decision 11.7 hours from
+  an ombudsman's cases per investigator, a rent-increase notice 10 minutes and a notice to vacate 15 from an impact
+  assessment, opening an account 40 from journalism). The other seven profiles, and every other row, are
+  placeholders: nothing was found for au-vic or de-ni, nor for loans (only mortgages, about five hours a file),
+  reviews (costs per case, no times), withholding returns, invoices, audit or registry work. Whole-case handling
+  times are the right figure for a decision row (the town has no act for reading or checking a file); the 2026-10-16
+  check set them aside as the wrong quantity. One row serves every desk that writes `venue_decision`, so gb-eng's
+  council complaints desk is charged an ombudsman's case.
+- **Where:** `worlds/generator/generate.ts` (`WORK_TIME`); `values.work_time` in `worlds/profiles/us-oh-2026.json` and
+  `gb-eng-2026.json`.
+- **Effect:** Smaller in today's towns than this entry first said. Before and after on a year of the 1,000-person town
+  (seed 1; au-vic unchanged, the same final state): no backlog or days-to-decision moved beyond the run's own
+  divergence. A desk's answer and a tribunal's order wait the law's days (a fortnight; the time to a hearing), not
+  their makers' hours, and the support office is the outside world's system (WM-14), so a benefit decision's person
+  row reaches no code town. The hours that do pile up are trade paperwork (orders, shopping requests, deliveries:
+  about 175,000 person-hours a year in gb-eng's town, all placeholder rows and work tasks). Where the rows will bite:
+  a person or a seat holding a deciding office, and an automation offer, whose system time is the person's row times
+  its speed, so the ratio is still the whole gain of automation.
+- **L / I:** high / high · **Status:** partly sourced (10 rows in 2 of 9 profiles, 2026-10-24); the rest to source
 - **Notice by:** days-to-decision against a place's real waits; a result that changes when the table is scaled 2 to 4 times.
-- **Fix when:** before any result is read in absolute time or cost, and before any automation or adoption experiment.
+- **Fix when:** before any result is read in absolute time or cost, and before any automation or adoption
+  experiment; for au-vic (the TARA town) first, since nothing sources it yet.
 
 ### WM-2 · Mechanisms that do not bind (crime, pollution, water, clinic)
 - **Gap:** Several mechanisms run on placeholders sized so that they hardly act: theft is a rare chance (200 bps a
@@ -217,6 +232,21 @@ The mechanism:
 - **L / I:** medium / medium · **Status:** to fix and to source
 - **Notice by:** Illness by age in a heat wave against a place's heat-health record (older people should be worse hit).
 - **Fix when:** When a heat scenario is run; a sourced age gradient replaces the flat figure.
+
+### WM-14 · Claims for support are decided in a second, by the outside world's system
+- **Gap:** The support office (`outside-support`) is held by the outside world's own system, at a second an act, with
+  no staff, licence or hours. A claim in a year of the 1,000-person town is decided in about two hours (median 0.05
+  to 0.1 days in gb-eng, au-vic and us-oh), where the places publish a mean of 20 days for a new Housing Benefit claim
+  (Great Britain, late 2024), a five-week first Universal Credit payment, and Ohio's SNAP at 92.5% within its 30-day
+  standard (FY2023). A seat given the post sits on that system, not on a person, so it works at a system's speed too.
+- **Where:** `worlds/generator/generate.ts` (`office("outside-support", ...)`, the boundary's `agency-system`);
+  `docs/behaviour/staffing.md` ("the outside world's own").
+- **Effect:** Benefit days-to-decision, and every benefit row of the table of work (WM-1), in code towns and in a seat
+  in that office (the TARA support-office arm). A seat's speed there is not a person's, unlike every other seat.
+- **L / I:** high / high · **Status:** to fix (staff the office with people at the place's casework rates, or make
+  the boundary's office a supplied system with a stated speed)
+- **Notice by:** claim-to-decision days against the place's published processing times.
+- **Fix when:** before a support-office experiment is read in days or hours, or a seat in it is compared with a seat elsewhere.
 
 ---
 
