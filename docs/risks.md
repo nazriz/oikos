@@ -1202,6 +1202,52 @@ The mechanism:
 - **Notice by:** a profile edit whose generated words differ from what the engine does; the shared-rules tests failing.
 - **Fix when:** Before the next rule in this list changes.
 
+### MT-19 · No arm withholds a citizen's act, so responsiveness is measured only directly
+- **Gap:** The GD plan's counterfactual form of responsiveness (M2: the same town and seed with one act of a citizen
+  withheld) needs an arm that removes that act. Citizens are the engine's own actors and the light host decides only
+  seats; seating a citizen as its twin to withhold its act is not exact there (two seated citizens over 20 days lost 19
+  of their own records and 5 acts), and seating every citizen stops the engine (a wake loop).
+- **Where:** `kernel/src/engine.rs` (`Withhold`), `orchestrator/src/experiment.ts` (an arm's `withhold`); `docs/experiments.md` "The comparison"; decisions 2026-10-23 "The measures of stewardship" and 2026-10-24 "Citizens' recourse in the experiments".
+- **Effect:** Whether a lever still bites was read only from what the log names (reviews changed, appeals found for the
+  applicant, petitions taken up), not as the effect of the act on the outcome.
+- **L / I:** high / medium · **Status:** fixed (decisions 2026-10-24, "Citizens' recourse in the experiments"): the
+  engine withholds the nth act that publishes a named kind of paper (or is a named block), by a participant, of a matter,
+  to an addressee, as an option of the run or fork, recorded in the log (`note` `withheld`); an arm names it, and a
+  registration's `did` reads it. What stays open: the actor believes it sent the act (a letter lost before the post), so
+  this is "the act never arrived", not "the citizen chose otherwise"; an act a host's seat makes through its own commands
+  (`host_seats`) is not withheld.
+- **Notice by:** a claim that a lever "no longer bites" made from direct counts alone; a `withheld` measure of 0 in an arm
+  that names a withholding (the act never came).
+- **Fix when:** Before a TARA result about responsiveness is reported.
+
+### MT-20 · An experiment registered on recourse in a town where nobody takes any
+- **Gap:** A town without `living` has `dials.initiative_bps` and `dials.friction_bps` at 0 (docs/behaviour/frictions.md):
+  nothing goes wrong for anyone, no want is born, and nobody asks for a review, appeals, complains, petitions or applies
+  to a tribunal. The first worked example (2026-10-23) registered recourse comparisons in such a town and read them as
+  unsettled; it was taken for a fault of the port.
+- **Where:** `orchestrator/src/experiment.ts` (`recourseProblems`); `experiments/`; decisions 2026-10-24.
+- **Effect:** A registered comparison that cannot move, run and read as "no difference".
+- **L / I:** medium / high · **Status:** mitigated: the harness refuses to run a registration that names a measure of
+  the responsiveness or recourse families in a town whose citizens take no recourse. An unregistered spec is not refused
+  (its report shows the zeros).
+- **Notice by:** `reviews_asked` and `appeals_made` at 0 in every arm.
+- **Fix when:** Done; revisit if a third dial comes to govern whether people act.
+
+### MT-21 · A request for a review that is never answered leads nowhere
+- **Gap:** Where the law requires a review before an appeal (`review.required`: au-vic's support decisions), the appeal
+  clock runs from the review's answer. A request never answered is deemed `ignored` after `answer_days`, but has no
+  `answered_at`, so the claimant may not appeal, does not ask again (`asked` is set) and nothing else follows. Found by
+  the withheld arms of 2026-10-24 (three claimants, none went further in 160 days), and it is what an office that
+  sits on its requests would do to its claimants.
+- **Where:** `kernel/crates/actors/src/citizen/recourse.rs` (`disrepair`'s "ignored", `Ways::for_want`'s `may_apply`).
+- **Effect:** A steward that does not answer requests for review shuts the appeal route for good: the sim makes
+  silence a stronger lever than the place's law and its other bodies would.
+- **L / I:** medium / high · **Status:** open. What a real claimant does about an unanswered review is the place's (ask
+  again, complain to an ombudsman, a deemed refusal where the law has one): to be sourced, then law data, not a rule
+  in code.
+- **Notice by:** `withheld` arms whose claimant never acts again; a model steward that leaves requests unanswered.
+- **Fix when:** Before a TARA arm in which the steward may leave requests unanswered.
+
 ---
 
 ## Profiles and sources

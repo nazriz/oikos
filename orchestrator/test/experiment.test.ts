@@ -7,7 +7,9 @@ import { engineModule, kernelBinary } from "../src/kernel";
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { buildReport, DAY, loadSpec, makeMeasure, mockModel, reportText, runExperiment, seatify, validate, type ArmResult, type ExperimentSpec } from "../src/experiment";
+import { buildReport, DAY, loadPrereg, loadSpec, makeMeasure, measureList, mockModel, recourseProblems, reportText, runExperiment, seatify, validate, type ArmResult, type ExperimentSpec } from "../src/experiment";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import type { DetachedActor, SeatWake } from "../src/rust-world";
 
 const root = join(import.meta.dir, "../..");
@@ -89,6 +91,97 @@ test("the report sets each arm's measure with its spread over the seeds, and its
   expect(text).toContain("Nothing here says which arm is better");
 });
 
+test("the rubber stamp answers every request to look at a decision again with 'it stands', and the code never sees one", () => {
+  const seen: any[] = [];
+  let next: any = { type: "wait" };
+  const fake = { step: (o: any) => { seen.push(o); return { action: next }; } } as unknown as DetachedActor;
+  const stamp = mockModel("rubber-stamp", fake);
+  const decision = { id: "rec.3", kind: "benefit_decision", at: 100, speaks_for: "outside", addressed_to: ["p2"], data: { granted: false } };
+  const request = { id: "rec.6", kind: "review_request", speaks_for: "p2", addressed_to: ["outside"], data: { about: "rec.3", matter: "claim_refused" } };
+  const obs = { entity: "outside", channels: { "office/claims": { kind: "records", records: [decision, request] }, "office/ledger": { kind: "accounts", accounts: [] } } };
+  const w: SeatWake = { key: "k", participant: "sys", t: 200, woke_for: "news", since: 0, observation: obs };
+  const first = stamp.decide(w) as any;
+  // The brain was shown the decision and not the request.
+  expect(seen[0].channels["office/claims"].records.map((r: any) => r.id)).toEqual(["rec.3"]);
+  expect(seen[0].channels["office/ledger"]).toEqual(obs.channels["office/ledger"]);
+  expect(first.action.type).toBe("call");
+  const calls = first.action.call.split("\n");
+  expect(calls).toHaveLength(2);
+  expect(calls[0]).toContain("kind=decision_review");
+  expect(calls[0]).toContain('"outcome":"upheld"');
+  expect(calls[0]).toContain('"decided_on":100');
+  expect(calls[0]).toContain("basis=rec.3");
+  expect(calls[1]).toContain("kind=remedy_answer");
+  expect(calls[1]).toContain('"granted":false');
+  expect(calls[1]).toContain('to=["p2"]');
+  expect(first.usage.output_tokens).toBe(150);
+  // The same request again is not answered twice; the brain's own act goes out, and a new request rides with it.
+  next = { type: "call", call: "money(amount=\"$1\", from=a, to=b)" };
+  expect((stamp.decide(w) as any).action).toEqual(next);
+  const again = stamp.decide({ ...w, observation: { ...obs, channels: { c: { kind: "records", records: [{ ...request, id: "rec.7" }] } } } }) as any;
+  expect(again.action.call.split("\n")).toHaveLength(3);
+  expect(again.action.call.startsWith("money(")).toBe(true);
+});
+
+test("'stewardship' in a spec's measures stands for every stewardship measure, read from the fork's ledger", () => {
+  const names = measureList(base({ measures: ["acts", "stewardship"] }));
+  expect(names[0]).toBe("acts");
+  expect(names).toContain("human_in_decision_share");
+  expect(names).toContain("review_changed_share");
+  const m = makeMeasure("human_in_decision_share", { forkT: 0, seat: "s", post: "p", stewardship: () => ({ measures: { human_in_decision_share: 0.25 } }) as any });
+  expect(m.result()).toBe(0.25);
+  expect(() => makeMeasure("human_in_decision_share", { forkT: 0, seat: "s", post: "p" })).toThrow(/no(ne)?/);
+});
+
+test("a registered report presents as primary only what was registered; everything else is exploratory", () => {
+  const spec = base({ name: "e", post: "p", arms: [{ name: "code", steward: { kind: "code" } }, { name: "a", steward: { kind: "none" } }, { name: "b", steward: { kind: "none" } }], reference: "code", forkDay: 1, untilDay: 5 });
+  const r = (seed: number, arm: string, m1: number, m2: number): ArmResult => ({ seed, arm, steward: { kind: "code" }, stateHash: "", t: 1, steps: 1, wakes: 1, measures: { m1, m2 }, costs: {}, seconds: 0 });
+  const results = [1, 2, 3].flatMap((s) => [r(s, "code", 10, 5), r(s, "a", 4 + s * 0.1, 7 + s * 0.1), r(s, "b", 10, 5)]);
+  const held = { file: "x.yaml", sha256: "h", committed: "2026-10-23T10:00:00+01:00", prereg: { preregistration: 1 as const, experiment: "e", registered: "2026-10-23", question: "Does a lower m1?", post: "p", arms: ["code", "a", "b"], reference: "code", seeds: [1, 2, 3], forkDay: 1, untilDay: 5, primary: [{ measure: "m1", arm: "a", vs: "code", expect: "lower" as const }, { measure: "m1", arm: "b", vs: "code" }] } };
+  const report = buildReport(spec, results, held);
+  const c = report.comparisons!;
+  expect(c.filter((x) => x.status === "primary").map((x) => x.key)).toEqual(["m1: a - code", "m1: b - code"]);
+  // two primary comparisons at 95% together: each at 97.5%
+  expect(c[0]!.interval.level).toBeCloseTo(0.975, 10);
+  expect(c[0]!.interval.hi!).toBeLessThan(0);
+  expect(c[0]!.reading).toContain("Registered expectation lower: the interval agrees");
+  expect(c.filter((x) => x.status === "exploratory").map((x) => x.key).sort()).toEqual(["m2: a - code", "m2: b - code"]);
+  expect(c.find((x) => x.key === "m2: a - code")!.interval.level).toBe(0.95);
+  const text = reportText(report);
+  expect(text.split("\n")[0]).toContain("3 arms in the post p");
+  expect(text).toContain('Pre-registered on 2026-10-23, first committed 2026-10-23T10:00:00+01:00: "Does a lower m1?"');
+  expect(text).toContain("Exploratory: 2 other comparisons against code, of which 1 has an interval that excludes zero");
+  expect(text).not.toMatch(/\b(better|worse) (than|off)\b/i);
+  // Without a registration, everything is exploratory.
+  expect(buildReport(spec, results).summary).toContain("Nothing was pre-registered: every comparison here is exploratory.");
+});
+
+test("an experiment whose spec differs from its registration does not run", () => {
+  const dir = mkdtempSync(join(tmpdir(), "prereg-"));
+  const file = join(dir, "e.prereg.yaml");
+  writeFileSync(file, "preregistration: 1\nexperiment: e\nregistered: '2026-10-23'\nquestion: q\npost: p\narms: [a, b]\nreference: a\nseeds: [1, 2, 3]\nforkDay: 1\nuntilDay: 5\nprimary:\n  - { measure: acts, arm: b }\n");
+  const spec = base({ name: "e", preregistration: "e.prereg.yaml" });
+  expect(loadPrereg(spec, join(dir, "spec.json"))!.prereg.primary[0]!.measure).toBe("acts");
+  expect(() => loadPrereg({ ...spec, untilDay: 9 }, join(dir, "spec.json"))).toThrow(/days: registered 1 to 5, spec 1 to 9/);
+  expect(() => loadPrereg({ ...spec, measures: ["refused"] }, join(dir, "spec.json"))).toThrow(/no measure "acts"/);
+  expect(() => loadPrereg({ ...spec, preregistration: "nowhere.yaml" }, join(dir, "spec.json"))).toThrow(/not there/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("an arm's withholding is checked, and a registered comparison that needs citizens' recourse is refused in a town where they take none", () => {
+  expect(() => validate(base({ arms: [{ name: "a", steward: { kind: "code" }, withhold: [{ what: "" }] }] }))).toThrow(/withhold names what/);
+  expect(() => validate(base({ arms: [{ name: "a", steward: { kind: "code" }, withhold: [{ what: "review_request", nth: 0 }] }] }))).toThrow(/nth from 1/);
+  validate(base({ arms: [{ name: "a", steward: { kind: "code" }, withhold: [{ what: "review_request", matter: "claim_refused", to: "outside" }] }] }));
+  const held = (measure: string) => ({ file: "x.yaml", sha256: "h", prereg: { preregistration: 1 as const, experiment: "t", registered: "2026-10-24", question: "q", post: "p", arms: ["a", "b"], reference: "a", seeds: [1, 2, 3], forkDay: 1, untilDay: 5, primary: [{ measure, arm: "b" }] } });
+  const plain = { dials: { initiative_bps: 0, friction_bps: 0 } }, living = { dials: { initiative_bps: 10_000, friction_bps: 10_000 } };
+  // (The worked example of 2026-10-23: a town without `living`, so nothing went wrong for anyone and nobody asked.)
+  expect(recourseProblems(plain, held("appeals_made")).join()).toMatch(/registers appeals_made, but its town's citizens take no recourse/);
+  expect(recourseProblems({}, held("review_changed_share")).join()).toMatch(/living\.friction_bps/);
+  expect(recourseProblems(plain, held("decided_by_seat_share"))).toEqual([]);
+  expect(recourseProblems(living, held("appeals_made"))).toEqual([]);
+  expect(recourseProblems(plain)).toEqual([]);
+});
+
 // ---- a whole experiment on the engine
 
 // (The kernel the host would use: OIKOS_KERNEL and OIKOS_ENGINE_MODULE are honoured, as the merge gate sets them for its build.)
@@ -141,6 +234,29 @@ test.skipIf(!have)("a whole experiment: the weather bureau's steward, four arms,
   expect(lines.some((l) => l.includes('"annotation":"usage"'))).toBe(true);
   const v = Bun.spawnSync([kernel, "verify", jsonl]);
   expect(v.exitCode).toBe(0);
+  rmSync(out, { recursive: true, force: true });
+}, 600_000);
+
+test.skipIf(!have)("an arm that withholds one named act is its parent's fork without it: the act never comes, the log says so, and one never made changes nothing", async () => {
+  const { spec, factories } = await loadSpec(specFile);
+  const one: ExperimentSpec = { ...spec, name: "withhold", seeds: [1], untilDay: 40, measures: ["records:weather_warning", "withheld"], arms: [
+    { name: "code", steward: { kind: "code" } },
+    { name: "code-without-the-first", steward: { kind: "code" }, withhold: [{ what: "weather_warning" }] },
+    { name: "code-without-a-ninth", steward: { kind: "code" }, withhold: [{ what: "weather_warning", nth: 9 }] },
+    { name: "diligent-without-the-first", steward: { kind: "model", model: "mock/diligent" }, withhold: [{ what: "weather_warning", nth: 1 }] },
+  ] };
+  delete (one as any).preregistration;
+  const out = join(root, "runs", "test-experiment-withhold");
+  rmSync(out, { recursive: true, force: true });
+  const r = await runExperiment(one, { out, parallel: 0, factories });
+  expect(r.results.filter((x) => x.error)).toEqual([]);
+  const get = (arm: string) => r.results.find((x) => x.arm === arm)!;
+  expect(get("code").measures).toEqual({ "records:weather_warning": 2, withheld: 0 });
+  expect(get("code-without-the-first").measures).toEqual({ "records:weather_warning": 1, withheld: 1 });
+  expect(get("code-without-the-first").stateHash).not.toBe(get("code").stateHash);
+  expect(get("code-without-a-ninth")).toMatchObject({ stateHash: get("code").stateHash, measures: { withheld: 0 } });
+  // (The bureau is the seat's in a model arm: the withholding is of the act, whoever decided it.)
+  expect(get("diligent-without-the-first").measures).toEqual({ "records:weather_warning": 1, withheld: 1 });
   rmSync(out, { recursive: true, force: true });
 }, 600_000);
 

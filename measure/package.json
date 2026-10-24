@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./stewardship": "./src/stewardship.ts",
+    "./compare": "./src/compare.ts",
+    "./prereg": "./src/prereg.ts",
+    "./consequential": "./src/consequential.ts"
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.5-r.5"

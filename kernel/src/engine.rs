@@ -80,6 +80,64 @@ pub struct EngineOptions {
     pub record_observations: bool,
     /// Or only these participants' (run.ts `recordObservations` as a list).
     pub record_observations_of: BTreeSet<String>,
+    /// Acts withheld: a researcher's intervention (risk MT-19), never a law of the world.
+    pub withhold: Vec<Withhold>,
+}
+
+/// One act withheld (docs/experiments.md, "Counterfactual forks"; risk MT-19): of the acts carried out from the start of
+/// this run (or of this fork, or resume) whose blocks publish a paper of the kind `what` (a `publish` block's `kind`) or
+/// are a block of that name (`vote`, `transfer`...), by `participant` (absent: by anyone), of the `matter` and `to`
+/// whom it is addressed where those are given (a paper's `data.matter`, its `addressed_to`), the `nth` (from 1) is not
+/// carried out. Nothing of it reaches the world: no time is charged, no paper is written, no money moves. Its actor is
+/// told nothing (its wake ends as after any act): as a letter lost before it was posted, it believes it sent it, so the
+/// fork differs from its parent only from that act on. The log says so (a `note` whose data is `withheld`), so the arm's
+/// measures can show the intervention took place. Deterministic: the acts are counted in the order the engine carries
+/// them out, which is the run's own.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Withhold {
+    pub what: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participant: Option<String>,
+    #[serde(default = "first")]
+    pub nth: u32,
+    /// Only a paper whose data's `matter` is this (a request about a refused claim, not about arrears).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matter: Option<String>,
+    /// Only a paper addressed to this participant or entity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
+}
+
+fn first() -> u32 {
+    1
+}
+
+impl Withhold {
+    /// Whether an act of `pid` made of these blocks is one this counts.
+    fn counts(&self, pid: &str, blocks: &[Value]) -> bool {
+        let paper = |b: &Value| {
+            b["block"] == "publish"
+                && b["kind"].as_str() == Some(self.what.as_str())
+                && self.matter.as_deref().is_none_or(|m| b["data"]["matter"].as_str() == Some(m))
+                && self.to.as_deref().is_none_or(|to| b["addressed_to"].as_array().is_some_and(|a| a.iter().any(|x| x.as_str() == Some(to))))
+        };
+        let block = |b: &Value| b["block"].as_str() == Some(self.what.as_str()) && self.matter.is_none() && self.to.is_none();
+        self.participant.as_deref().is_none_or(|p| p == pid) && blocks.iter().any(|b| paper(b) || block(b))
+    }
+}
+
+/// The options' `withhold` (a list of `{what, participant?, nth?}`), as a host gives it.
+pub fn withholds(v: &Value) -> Result<Vec<Withhold>, String> {
+    match v {
+        Value::Null => Ok(vec![]),
+        v => {
+            let w: Vec<Withhold> = serde_json::from_value(v.clone()).map_err(|e| format!("withhold: {e}"))?;
+            if w.iter().any(|x| x.nth == 0 || x.what.is_empty()) {
+                return Err("withhold: each names what (a kind of paper or a block) and an nth from 1".into());
+            }
+            Ok(w)
+        }
+    }
 }
 
 impl Default for EngineOptions {
@@ -96,6 +154,7 @@ impl Default for EngineOptions {
             host_seats: false,
             record_observations: false,
             record_observations_of: BTreeSet::new(),
+            withhold: vec![],
         }
     }
 }
@@ -308,6 +367,8 @@ pub struct Engine<W: Write> {
     host_going_on: BTreeSet<String>,
     /// For whoever measures: how many steps the actors took (never logged).
     pub steps: u64,
+    /// How many acts each of `opts.withhold` has counted so far.
+    withheld: Vec<u32>,
 }
 
 fn ceil_to(t: i64, tick: i64) -> i64 {
@@ -443,6 +504,7 @@ impl<W: Write> Engine<W> {
             for_host_any: false,
             host_going_on: BTreeSet::new(),
             steps: 0,
+            withheld: vec![],
         }
     }
 
@@ -1307,6 +1369,9 @@ impl<W: Write> Engine<W> {
         provenance: Value,
         reasoning: Option<String>,
     ) -> Result<bool, String> {
+        if self.withholds(pid, &blocks)? {
+            return Ok(true);
+        }
         let mut cmd = json!({ "command": "act", "participant": pid, "blocks": blocks, "provenance": provenance });
         if let Some(a) = as_ {
             cmd["as"] = json!(a);
@@ -1338,6 +1403,27 @@ impl<W: Write> Engine<W> {
             }
         }
         Ok(false)
+    }
+
+    /// Whether this act is one a `withhold` takes out (counted by each; noted in the log when it is).
+    fn withholds(&mut self, pid: &str, blocks: &[Value]) -> Result<bool, String> {
+        if self.opts.withhold.is_empty() {
+            return Ok(false);
+        }
+        self.withheld.resize(self.opts.withhold.len(), 0);
+        let mut out = None;
+        for (i, w) in self.opts.withhold.iter().enumerate() {
+            if w.counts(pid, blocks) {
+                self.withheld[i] += 1;
+                if self.withheld[i] == w.nth && out.is_none() {
+                    out = Some(w.clone());
+                }
+            }
+        }
+        let Some(w) = out else { return Ok(false) };
+        let what: String = serde_json::to_string(blocks).unwrap_or_default().chars().take(4000).collect();
+        self.note(pid, json!({ "withheld": { "what": w.what, "nth": w.nth, "participant": pid, "t": self.t(), "blocks": what } }))?;
+        Ok(true)
     }
 
     /// A unit whose decisions keep failing stops acting (D59).
