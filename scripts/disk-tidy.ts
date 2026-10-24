@@ -320,6 +320,19 @@ if (import.meta.main) {
     if (r.action === "remove-all") rmSync(join(runsDir, r.name), { recursive: true, force: true });
     else for (const l of r.logs) rmSync(join(runsDir, r.name, l), { force: true });
   }
+  // Each worktree's own `runs/test-*`: the folders tests write into the checkout they run in (14 to 21 GB in each of nine
+  // finished worktrees, 2026-10-24). Judged by the same rule as the main runs (a model run, or any doubt, is never touched).
+  for (const t of sc.trees) {
+    const wr = join(t.path, "runs");
+    if (resolve(wr) === runsDir || !existsSync(wr)) continue;
+    for (const n of readdirSync(wr).filter((e) => e.startsWith("test-"))) {
+      const r = classifyRun(wr, n, { days, docsText });
+      if (r.action !== "remove-all") continue;
+      freeKb += r.kb;
+      console.log(`${apply ? "REMOVING" : "would remove"} ${t.name}/runs/${n} (${gb(r.kb)}) -- ${r.reason}`);
+      if (apply) rmSync(join(wr, n), { recursive: true, force: true });
+    }
+  }
   for (const w of trees) {
     if (w.action === "keep") continue;
     freeKb += w.tree.kb;

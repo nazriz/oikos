@@ -7603,3 +7603,12 @@ decided, possession orders).
 **What the note shows.** The rows found barely bind in today's towns, for three reasons: the deciding offices' waits are the law's days, not their hours; the support office is the outside world's system at a second an act (new register entry WM-14), so a benefit decision's person row reaches no code town and a seat in that post works at a system's speed; and the hours that pile up are trade paperwork (orders, shopping requests, deliveries: about 175,000 person-hours a year in gb-eng's town, and a 14-day median delivery wait there), whose rows and tasks are still placeholders. The rows will bind where a person or a seat holds a deciding office, and in an automation offer, whose system time is the person's row times its speed.
 
 **Revisit if** an Australian or German source for any decision row is found (au-vic is the TARA town and has none); WM-14 is fixed, when the benefit rows begin to bind and need checking against the places' waits; a sourced row moves a result by more than the spread between seeds; or a desk's own kind of decision (the council's desk, the consumer desk, the ombudsman) is wanted, since one `venue_decision` row now charges all three an ombudsman's case in gb-eng.
+## 2026-10-24 · disk-tidy clears each worktree's own test runs
+
+- **What we saw:** 40 GB free. Nine finished worktrees held 14 to 21 GB each in `runs/test-*`, the folders tests write
+  into the checkout they run in; disk-tidy only looked at the main `runs/`. Removing them by hand (none had a model call)
+  gave 183 GB free.
+- **Change:** disk-tidy judges every worktree's `runs/test-*` by the same rule as the main runs (code-only, older than
+  `--days`; a model run or any doubt is never touched).
+- **Revisit if:** tests move their scratch to a temp folder (then this is moot), or a worktree's `runs/test-*` ever holds
+  model calls.
