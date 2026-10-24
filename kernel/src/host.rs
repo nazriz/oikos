@@ -259,9 +259,10 @@ impl Host {
     /// What a seat's call would come to, from what the seat has been shown (the resolver over its knowledge, as the
     /// engine resolves a `call` it submits): `{blocks}` or `{questions, invalid?}`. Changes nothing; not logged. A seat's
     /// host drafts a request with it, for the seat to confirm before anything is done (the translator's preview).
-    pub fn resolve(&self, participant: &str, program: &str, as_: Option<&str>) -> Result<Value, String> {
+    pub fn resolve(&self, participant: &str, program: &str, as_: Option<&str>, names: &Value) -> Result<Value, String> {
+        let shown = oikos_resolver::Knowledge::shown_of(names);
         let program = oikos_resolver::calls::parse_program(program).map_err(|x| format!("the call doesn't parse: {}", x.0))?;
-        Ok(match self.e.host_resolve(participant, &program, as_) {
+        Ok(match self.e.host_resolve(participant, &program, as_, &shown) {
             oikos_resolver::Resolution::Blocks(blocks) => json!({ "blocks": blocks }),
             oikos_resolver::Resolution::Questions { questions, invalid, ambiguous } => {
                 let mut v = json!({ "questions": questions });

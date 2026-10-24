@@ -88,8 +88,10 @@ line: what, the doc, the dial (a dial off gives the earlier town).
   `docs/translator-pipeline.md`. Queue entry key `translator_first`; `--translator-arrangement beside` measures
   without touching the world.
   **Translator v3 (2026-10-25):** models that read forms by name (`decoding: "cards"`), released by kind of field with a
-  trial per new form, are built and trained (`runs/translator-v3-2026-10-25/models/`); none is released, and today's
-  first stays first (decisions 2026-10-25 "Translator v3"). `ambiguous` and person-by-name lookup are in both resolvers.
+  trial per new form, are built and trained (`runs/translator-v3-2026-10-25/models/`). **The first translator is now
+  `decide/pod-small-v3-s2`, released by kind** (Naz, 2026-10-25), Sonnet behind; every report and cost summary shows the
+  share Sonnet drafts. Retraining waits on foundations-2 (decisions 2026-10-25, the proposal there). `ambiguous` and
+  person-by-name lookup are in both resolvers; names are those a seat's reports print beside ids (option (b)).
 - **The `unstated` framing.** What a seat is told, the way out, and the debrief's "what did you take the town to be".
   `docs/real-models.md` "What a seat is told". Set in a queue entry's `sets` (`framing=...`); `oikos run` by hand stays
   under honest disclosure.

@@ -8075,3 +8075,44 @@ fails every time, not now and then: the property draws new cases each run, and f
   depend on the thread count (the kernel's tests and the port gate check one thread against fourteen).
 - **Revisit if:** a lone heavy run is much slower for it (then elastic slots, PL-4, give it more tokens), or a test that
   needs several threads sets them itself.
+
+## 2026-10-25 · Translator v3-s2 first, names rule (b), the share Sonnet drafts in every report (branch `translator-v3-first`)
+
+Naz's decisions on the entry above (through the coordinator, 2026-10-25):
+
+- **The first translator is `decide/pod-small-v3-s2`, released by kind of field**, with Sonnet 5.5 (prompt 0.9.5)
+  behind it for everything not released or where ours fails. The model is linked into `runs/translator-model/`
+  (`pod-small-v3-s2` -> `runs/translator-v3-2026-10-25/models/pod-small-v3-s2`, with its `types-released.json`,
+  `forms-trained.json` and an empty trial ledger); the old models' files stay where they were. There is no default in
+  code: a queue entry names `translator_first`; the TARA draft spec (experiments/tara-draft/tara.json) now names
+  v3-s2. What it means, measured on the test pilots: our wrong drafts 52 -> 6, seen confirmed-wrong 8 -> 1, and about
+  four requests in five go to Sonnet (more Sonnet spending, about 2 to 3 USD a pilot at the six pilots' rates).
+- **Names, option (b): only the names a seat's own reports print beside an id.** The host learns them as it writes
+  them (seat-config.ts `namedFor`, from main) and now sends them with every resolve where the world has names (the
+  host protocol's `resolve` and the napi `resolve` take an optional `names` {id: name}); the engine's resolver adds
+  them to what the seat knows for that resolution (`Knowledge::with_shown_names`: only with names on, never over a name
+  the seat already knows the id by, two shown with one name still `ambiguous`). Names off: nothing is sent, nothing
+  moves. Test: `names_its_reports_printed_beside_ids_are_known_where_names_are_on`.
+- **The share Sonnet drafts is in every run's report and cost summary:** `pilot-report` (`translator_arrangement.
+  behind_share`, `drafts_behind_share`, and a line "drafted behind: N of M requests (x%), y% of the drafts offered"),
+  and cost.json `translator_share` with a line in cost.txt (batch.ts `withShare`, from each request's route in the
+  log). Test: orchestrator/test/translator-share.test.ts. Each retrain is to shrink it.
+- **Revisit if** a pilot under v3-s2 shows wrong drafts of ours well above the 8% of the replay, or a seat is told a
+  name it was shown is unknown.
+
+**Translator retraining is on hold until foundations-2 lands** (the forms will change; Naz, 2026-10-25). No retrain was
+started and nothing was spent on RunPod. **A proposal for then, to take the most back from Sonnet:**
+1. *Where Sonnet's share comes from:* on the test pilots 284 of the 303 requests behind are `type_unreleased`, almost all
+   because a function is not released (`form` passes; `message` 3%, `money` 4%, `statement` 13%, `agreement` 8 to 13%
+   wrong on held-back requests, against the 1% mark). Releasing `message` and `money` alone would bring back roughly a
+   third of what goes behind; `agreement` is lv-10's membership offers.
+2. *Data:* (a) every Sonnet draft a seat confirmed in the allowed pilots (lv-09, lv-11, lv-13, and every new pilot not
+   marked test-only), labelled by a blind reader as round 3 did: these are exactly the requests ours gives away, in the
+   seats' own words; (b) the written examples for agreements, payments with a budget line and statements re-read blind
+   and rewritten by hand where a template wrote them (the membership direction was in 90 templated examples and one seed
+   still failed it); (c) the joined data regenerated on foundations-2's forms by code (renamed and names twins as in
+   joined-v3). Never lv-07a/b, lv-08, lv-10, lv-12, the R180 seat-days or the held-out cases.
+3. *Runs:* three seeds, not two (the seeds differed more than anything else did), chosen on validation, the norename
+   control finished on a host of normal speed, then release by kind as now.
+4. *Cost:* GPU about 2 to 3 USD (three or four runs of about three hours at about 0.22 USD an hour); plan usage about 25
+   to 40 USD for the blind reading (about 500 seat-confirmed drafts) and rewriting (about 1,000 examples); no seat calls.

@@ -120,8 +120,9 @@ impl World {
 
     /// What a seat's call would come to from what it has been shown: `{blocks}` or `{questions, invalid?}` (nothing changes).
     #[napi]
-    pub fn resolve(&self, participant: String, program: String, as_: Option<String>) -> napi::Result<String> {
-        Ok(self.host.resolve(&participant, &program, as_.as_deref()).map_err(err)?.to_string())
+    pub fn resolve(&self, participant: String, program: String, as_: Option<String>, names: Option<String>) -> napi::Result<String> {
+        let names: serde_json::Value = names.as_deref().and_then(|n| serde_json::from_str(n).ok()).unwrap_or_default();
+        Ok(self.host.resolve(&participant, &program, as_.as_deref(), &names).map_err(err)?.to_string())
     }
 
     /// Whether these blocks would be carried out for the participant now: `{ok, refusal?}` (nothing changes).

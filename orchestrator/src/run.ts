@@ -730,12 +730,16 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     }
     return { program: { lines: program.lines.map((l) => (l.call.args.done_by !== undefined ? { ...l, call: { ...l.call, args: Object.fromEntries(Object.entries(l.call.args).filter(([name]) => name !== "done_by")) } } : l)) }, ...(by.length ? { by: [...new Set(by)] } : {}), ...(told.length ? { told } : {}) };
   };
+  // The names a seat's reports printed beside ids (seat-config.ts `namedFor` learns them as they are written), sent with
+  // each resolve so the engine's resolver knows a person or body by a name the seat was shown: the owner's ruling of
+  // 2026-10-25, option (b). Only where the world has names.
+  const shownNames = (kn: Knowledge | undefined): { names?: { [id: string]: string } } => (cfg.names === true && kn?.names.size ? { names: Object.fromEntries(kn.names) } : {});
   const engineResolver: Parameters<typeof createTranslator>[5] = RESOLVER_MODE === "ts" ? undefined : async (req, program0) => {
     const named = performersOf(req.participant, program0);
     if (named.told?.length) return { ok: false, questions: named.told } as Resolution;
     const program = named.program;
     // (A language-model seat perceives all its capacities: its knowledge is the engine's under its participant.)
-    const e = await k.request({ op: "resolve", participant: req.participant, ...(req.only ? { only: req.only } : {}), ...(req.as ? { as: req.as } : {}), program: calls.programText(program) });
+    const e = await k.request({ op: "resolve", participant: req.participant, ...(req.only ? { only: req.only } : {}), ...(req.as ? { as: req.as } : {}), ...shownNames(req.knowledge), program: calls.programText(program) });
     return (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}) }) as Resolution;
   };
   const one = createTranslator(o.translatorAdapter ? { ...io, adapter: watched(o.translatorAdapter) } : io, kernelCheck, typeOf, undefined, undefined, engineResolver);
@@ -1109,7 +1113,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const resolverMode = RESOLVER_MODE;
       let res: ReturnType<typeof resolve> | undefined = resolverMode === "engine" ? undefined : resolve(program, u.knowledge, typeOf, as);
       if (resolverMode !== "ts") {
-        const e = await k.request({ op: "resolve", participant: u.participant, ...(u.capacity ? { only: u.capacity } : {}), ...(as ? { as } : {}), program: calls.programText(program) });
+        const e = await k.request({ op: "resolve", participant: u.participant, ...(u.capacity ? { only: u.capacity } : {}), ...(as ? { as } : {}), ...(u.llm ? shownNames(u.knowledge) : {}), program: calls.programText(program) });
         const byEngine = (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}), ...(e.ambiguous ? { ambiguous: e.ambiguous } : {}) }) as ReturnType<typeof resolve>;
         if (res === undefined) res = byEngine;
         else {

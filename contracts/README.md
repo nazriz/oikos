@@ -688,3 +688,7 @@ Additive only; no schema file changed. A log made before is a valid log.
   id). `contracts/log.schema.json` gains the code; `blocks.schema.json` says so on both fields. The meaning of a
   commitment is still not judged: only that its place is a place. An agreement in a world's config, and an offer's
   terms as published, are not checked.
+
+- **Host protocol and napi `resolve`** (2026-10-25, names rule (b); blanket approval): an optional `names` ({id: name}),
+  the names the seat's reports printed beside ids; the engine's resolver knows the seat's people and bodies by them
+  where the world has names. Absent, nothing changes.

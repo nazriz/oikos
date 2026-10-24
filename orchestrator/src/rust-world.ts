@@ -81,8 +81,8 @@ export class RustWorld {
     this.w.annotate(JSON.stringify(annotation));
   }
   /** What a seat's call would come to from what it has been shown (the engine's resolver; nothing changes, nothing logged). */
-  resolve(participant: string, program: string, as?: string): { blocks?: any[]; questions?: string[]; invalid?: string[] } {
-    return JSON.parse(this.w.resolve(participant, program, as ?? null));
+  resolve(participant: string, program: string, as?: string, names?: { [id: string]: string }): { blocks?: any[]; questions?: string[]; invalid?: string[] } {
+    return JSON.parse(this.w.resolve(participant, program, as ?? null, names && Object.keys(names).length ? JSON.stringify(names) : null));
   }
   /** Whether these blocks would be carried out for the participant now (the kernel's dry run; nothing changes). */
   check(participant: string, as: string | undefined, blocks: object[]): { ok: boolean; refusal?: any } {

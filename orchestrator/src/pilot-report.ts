@@ -346,11 +346,37 @@ export function arrangementOf(config: any, routes: Map<string, any>, reqs: Map<s
   return {
     arrangement: config?.arrangement ?? all[0]?.[1]?.arrangement ?? null, first, behind, ...(config?.stands ? { stands: config.stands } : {}),
     requests: all.length, answered_by_first: byFirst, first_refusals_that_stood: stood, handed_behind: all.length - byFirst, handed_behind_why: why,
+    // The share the translator behind drafted (the owner, 2026-10-25: each retrain is to shrink it, and it is shown in
+    // every run's report and cost summary): of the requests, and of the drafts the seats were offered.
+    ...behindShare(all.length, byFirst, answers.first.drafts, answers.behind.drafts),
     both_answered: both, agreed, agreed_by_what_the_first_answered: agreedBy,
     seats_answers: answers,
     first_calls: { ...(first && byModel[first] ? byModel[first] : {}), ms: ms, mean_ms: timed ? Math.round(ms / timed) : null },
     behind_calls: behind && byModel[behind] ? byModel[behind] : {},
   };
+}
+
+/** The share of a run's requests that went behind, and of the drafts offered that the one behind drew up. */
+export function behindShare(requests: number, byFirst: number, firstDrafts: number, behindDrafts: number): { behind_share: number | null; drafts_behind_share: number | null } {
+  const r = (x: number, of: number) => (of ? Math.round((1000 * x) / of) / 1000 : null);
+  return { behind_share: r(requests - byFirst, requests), drafts_behind_share: r(behindDrafts, firstDrafts + behindDrafts) };
+}
+export const shareText = (a: { requests: number; handed_behind: number; behind_share: number | null; drafts_behind_share: number | null }): string =>
+  `${a.handed_behind} of ${a.requests} requests (${a.behind_share === null ? "-" : `${(100 * a.behind_share).toFixed(1)}%`}), ${a.drafts_behind_share === null ? "-" : `${(100 * a.drafts_behind_share).toFixed(1)}%`} of the drafts offered`;
+
+/** The two translators' shares over a run's logs, from each request's route (for the cost summary: batch.ts). Undefined
+ * where no request had two translators. */
+export async function translatorShare(logs: string[]): Promise<ReturnType<typeof arrangementOf> | undefined> {
+  const routes = new Map<string, any>();
+  const reqs = new Map<string, { signoff?: "accept" | "reject" }>();
+  for (const log of logs) for await (const line of logLines(log)) {
+    if (!line.includes("translation_route")) continue;
+    try {
+      const d = JSON.parse(line)?.body?.data;
+      if (d?.translation_route) routes.set(String(d.translation_route.draft), d.translation_route);
+    } catch {}
+  }
+  return routes.size ? arrangementOf(undefined, routes, reqs, {}) : undefined;
 }
 
 /** A pilot folder's report(s): one for each run in it (a pilot has one), written as <DIR>/pilot-report.json. */
@@ -408,6 +434,7 @@ export function renderReport(r: any): string {
   L.push(`-- translator: ${t.requests} requests, ${t.model_calls} calls (${t.its_own_retries} own retries), ${t.cost_microusd} microusd`);
   L.push(`   endings: ${kv(t.endings)}; refused by label: ${kv(t.refused_by_label)}`);
   const a = r.translator_arrangement;
+  if (a) L.push(`   drafted behind (${a.behind}): ${shareText(a)}`);
   if (a) L.push(`   two translators (${a.arrangement}): ${a.requests} requests; the first (${a.first}) answered ${a.answered_by_first} (drafts ${a.seats_answers.first.drafts}: confirmed ${a.seats_answers.first.confirmed}, declined ${a.seats_answers.first.declined}; refusals that stood ${a.first_refusals_that_stood}; ${a.first_calls.mean_ms ?? "?"} ms a request); behind (${a.behind}) ${a.handed_behind}: ${kv(a.handed_behind_why)} (drafts ${a.seats_answers.behind.drafts}: confirmed ${a.seats_answers.behind.confirmed}, declined ${a.seats_answers.behind.declined}; ${a.behind_calls.cost_microusd ?? 0} microusd); both answered ${a.both_answered}, agreed ${a.agreed}`);
   for (const a of t.asked_back) L.push(`   asked back ${a.draft}: ${a.sentence}`);
   L.push(`   drafts offered ${t.drafts_offered}: confirmed ${t.drafts_confirmed}, declined ${t.drafts_declined}, unanswered ${t.drafts_unanswered}`);

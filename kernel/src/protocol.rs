@@ -313,7 +313,10 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
             let key = req["only"].as_str().map_or_else(|| participant.to_string(), |o| format!("{participant}|{o}"));
             let program = oikos_resolver::calls::parse_program(str_field("program")?).map_err(|e| format!("the call doesn't parse: {}", e.0))?;
             let empty = oikos_resolver::Knowledge::new(currency.clone()).with_dated(dated.clone()).with_names(*named);
-            let k = knowledge.get(&key).unwrap_or(&empty);
+            let base = knowledge.get(&key).unwrap_or(&empty);
+            // (The names the seat's reports printed beside ids, where the host sends them: option (b), 2026-10-25.)
+            let added = base.with_shown_names(&oikos_resolver::Knowledge::shown_of(&req["names"]));
+            let k = added.as_ref().unwrap_or(base);
             let type_of = |t: &str| types.get(t).cloned();
             Ok(match oikos_resolver::resolve(&program, k, &type_of, req["as"].as_str()) {
                 oikos_resolver::Resolution::Blocks(blocks) => json!({ "ok": true, "blocks": blocks }),
@@ -487,7 +490,7 @@ fn engine_reply(session: &mut Session, req: &Value) -> Result<Reply, String> {
             let participant = str_field("participant")?;
             let key = req["only"].as_str().map_or_else(|| participant.to_string(), |o| format!("{participant}|{o}"));
             let program = oikos_resolver::calls::parse_program(str_field("program")?).map_err(|x| format!("the call doesn't parse: {}", x.0))?;
-            Ok(Reply::Value(match e.host_resolve(&key, &program, req["as"].as_str()) {
+            Ok(Reply::Value(match e.host_resolve(&key, &program, req["as"].as_str(), &oikos_resolver::Knowledge::shown_of(&req["names"])) {
                 oikos_resolver::Resolution::Blocks(blocks) => json!({ "ok": true, "blocks": blocks }),
                 oikos_resolver::Resolution::Questions { questions, invalid, ambiguous } => {
                     let mut v = json!({ "ok": true, "questions": questions });
