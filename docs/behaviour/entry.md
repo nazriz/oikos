@@ -31,7 +31,7 @@
 | the price of its kind | the middle of the price lists they have read; the venture's figure where they have read none |
 | what it costs to bring in | a trade price list they hold (a wholesaler's, sold in lots), else the trade price the world publishes for it (`unit_cost` on the venture) |
 | what a customer buys of it a month | their own orders over the last two months; none yet, the essentials' units |
-| customers | the homes around them, as they see them by being there (the dwellings in their street's view): a business worked from home sells to its neighbourhood first. A first version counted the town's adults (the census) against the few sellers a person knows, and every town hit its cap of 50 founded firms within the year: the two counts must be of the same reach |
+| customers | for a business worked from home, the homes around them, as they see them by being there (the dwellings in their street's view): it sells to its neighbourhood first; for a shop in premises on the street, the town's adults, as the census publishes them, against the sellers of its kind they know. A first version counted the town's adults (the census) against the few sellers a person knows, and every town hit its cap of 50 founded firms within the year: the two counts must be of the same reach |
 | sellers there already | the sellers of it they know: no more, which is how founders misjudge (Camerer and Lovallo 1999, excess entry) |
 | what one person serves | a working day's hours, the days a week, at the venture's time an item |
 | the going wage | the best posting they have seen, else the venture's wage |

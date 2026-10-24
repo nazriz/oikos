@@ -16,8 +16,8 @@ pays) had been written in the port and never called.
 starting each venture the town offers against what they have. What they expect the business to leave them is
 `rules::entry::expected`, filled only from what they know: the price of its kind on the price lists they have read (the
 middle one), what it costs to bring in (a trade price list they hold, else the trade price the world publishes), what a
-customer like them buys of it a month (their own orders), the homes in view around them (their neighbourhood, seen by
-being there), the sellers they know, what one
+customer like them buys of it a month (their own orders), the homes in view around them for a business from home (their
+neighbourhood, seen by being there) and the town's adults (the census) for a shop in premises, the sellers they know, what one
 person's working day serves, and the going wage (the best posting they have seen). The choice is the mind's, between
 the business at that figure and life as it is (their pay, or nothing), as any choice of work is: nothing is started that is
 not expected to beat what they have, and the mind's own leanings (the open and the achieving more) weigh in as what it
