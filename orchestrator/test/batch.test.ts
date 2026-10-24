@@ -113,8 +113,8 @@ test("a batch's spending limit caps the whole batch: each run gets what's left o
   const server = Bun.serve({ port: 0, fetch: async (req) => Response.json({ content: [{ type: "tool_use", id: "x", name: "done_for_now", input: { days: 3 } }], usage: { input_tokens: Math.ceil((await req.text()).length / 4), output_tokens: 10 } }) });
   const out = join(root, "runs", "test-batch-budget");
   rmSync(out, { recursive: true, force: true });
-  const env = process.env.ANTHROPIC_API_KEY;
-  process.env.ANTHROPIC_API_KEY = "test-key";
+  const env = process.env.OIKOS_ANTHROPIC_KEY;
+  process.env.OIKOS_ANTHROPIC_KEY = "test-key";
   try {
     // Three at once: the first two hold $0.02 each, leaving the third $0.005 of the batch's $0.045.
     const r = await runBatch({ world, seeds: 3, parallel: 3, out, until: 60 * DAY, sets: ["citizens=40", "mayor=llm"], model: "anthropic/claude-haiku-4-5", baseUrl: `http://localhost:${server.port}`,
@@ -138,7 +138,7 @@ test("a batch's spending limit caps the whole batch: each run gets what's left o
     }
   } finally {
     server.stop(true);
-    if (env === undefined) delete process.env.ANTHROPIC_API_KEY;
-    else process.env.ANTHROPIC_API_KEY = env;
+    if (env === undefined) delete process.env.OIKOS_ANTHROPIC_KEY;
+    else process.env.OIKOS_ANTHROPIC_KEY = env;
   }
 }, 300_000);

@@ -100,8 +100,8 @@ test("a run that stops is reported as stopped, with why and the command that res
   // A stand-in for a paid provider (no network), and a spending limit the run reaches (as in batch.test.ts).
   const server = Bun.serve({ port: 0, fetch: async (req) => Response.json({ content: [{ type: "tool_use", id: "x", name: "done_for_now", input: { days: 3 } }], usage: { input_tokens: Math.ceil((await req.text()).length / 4), output_tokens: 10 } }) });
   const out = dir("stopped");
-  const env = process.env.ANTHROPIC_API_KEY;
-  process.env.ANTHROPIC_API_KEY = "test-key";
+  const env = process.env.OIKOS_ANTHROPIC_KEY;
+  process.env.OIKOS_ANTHROPIC_KEY = "test-key";
   const said: string[] = [];
   try {
     const o = { world, seeds: 1, out, until: 60 * DAY, sets: ["citizens=40", "mayor=llm"], model: "anthropic/claude-haiku-4-5", baseUrl: `http://localhost:${server.port}`, budgetUsd: 0.005, compress: true, log: (m: string) => said.push(m) };
@@ -132,8 +132,8 @@ test("a run that stops is reported as stopped, with why and the command that res
     expect(done.runs[0]!.end).toEqual({ reason: "aborted", detail: `stopped at ${3 * DAY}` });
     expect(done.runs[0]!.logPath.endsWith(".jsonl.zst")).toBe(true);
   } finally {
-    if (env === undefined) delete process.env.ANTHROPIC_API_KEY;
-    else process.env.ANTHROPIC_API_KEY = env;
+    if (env === undefined) delete process.env.OIKOS_ANTHROPIC_KEY;
+    else process.env.OIKOS_ANTHROPIC_KEY = env;
     server.stop(true);
   }
 }, 300_000);

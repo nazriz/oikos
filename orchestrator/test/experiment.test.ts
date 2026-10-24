@@ -61,9 +61,9 @@ test("a spec is checked before anything runs; a real model needs a seat factory"
   expect(() => validate(base({ forkDay: 5 }))).toThrow(/before untilDay/);
   expect(() => validate(base({ reference: "z" }))).toThrow(/not an arm/);
   expect(() => validate(base({ arms: [{ name: "a", steward: { kind: "code" } }, { name: "a", steward: { kind: "none" } }] }))).toThrow(/two arms/);
-  const real = base({ arms: [{ name: "m", steward: { kind: "model", model: "anthropic/claude-sonnet-5" } }] });
+  const real = base({ arms: [{ name: "m", steward: { kind: "model", model: "openai/gpt-6.1-sol" } }] });
   expect(() => validate(real)).toThrow(/SeatFactory/);
-  expect(() => validate(real, { anthropic: () => ({ decide: () => ({ action: { type: "wait" } }) }) })).not.toThrow();
+  expect(() => validate(real, { openai: () => ({ decide: () => ({ action: { type: "wait" } }) }) })).not.toThrow();
   expect(() => validate(base({ arms: [{ name: "m", steward: { kind: "model", model: "mock/diligent" } }] }))).not.toThrow();
 });
 

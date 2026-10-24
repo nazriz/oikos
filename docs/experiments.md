@@ -194,30 +194,75 @@ claimant, never answered, went no further (MT-21).
   `mock/rubber-stamp` (requests to look at a decision again are kept from the code and answered "it stands": the same
   `decision_review` and `remedy_answer` the code writes when it upholds). They exercise the whole harness and say
   nothing about any model.
-- `model` with any other provider: needs a `SeatFactory`, below.
+- `model` with `claude-code/...` or `codex/...`: a model seat, below ("Real models"); any other provider needs a `SeatFactory` of the host's own.
 
 ## Real models
 
-A real steward is a `SeatController` (`decide(wake) -> {action, usage}`: the wake is the seat's observation; the action
-the participant API's) made by a `SeatFactory` for its provider. Give `runExperiment` (or export `seatFactories` from a
-TS spec file, which workers load) `{ anthropic: (a) => ..., codex: ... }`, name the model in the arm
-(`"anthropic/claude-sonnet-5"`), and give the prices. **What does not exist yet**, and is the next step before a real run:
+A model steward is a `ModelSeat` (orchestrator/src/seat-host.ts) made by the harness's own seat factory
+(orchestrator/src/experiment-seats.ts) for `claude-code/...` and `codex/...` arms: the same seat a pilot has, in the
+light host. Its configuration is seat-config.ts's (shared with run.ts's `llmUnit`), its loop createLlmParticipant's,
+its requests drafted by the translator arrangement against the engine's own resolver and dry run (`RustWorld.resolve`
+and `check`, new in the native module: nothing changes and nothing is logged), shown to it as drafts and done only
+once it confirms; its observations, usage and transcripts in the fork's log; a note at the fork says who holds the
+post, how, under which framing and limit. It takes the post at the fork day with no notebook (a handover). At the
+fork's end it is debriefed (the fixed interview) and its words go to `seed-N/<arm>.debriefs.jsonl`.
 
-1. The factory itself. `run.ts` makes a model seat from pieces that are not yet separable from its 1,600-line loop (the
-   framing and prompt, the seat's reports and notebook, the translator that turns its words into a call, the
-   confirmation of a draft, the debrief). A factory should reuse those (`createLlmParticipant`, the translator
-   arrangement) with a minimal `LlmIO` whose `annotate` is `world.annotate`; the light host (`RustWorld`) accepts `call`
-   actions and resolves them in the engine, so no resolver is needed on this side. Debriefs belong at the end of an arm.
-2. The seat arrives at the fork with no notebook: the base's seat was the code twin, so a model steward takes the post
-   at the fork day knowing only what the office's files and the world show it (a handover, as a real new officeholder).
-   Forking a *model* seat's own memory mid-run (a base with a live model) is not served; a base held by a model is a
-   second experiment shape (arms branch from a shared model past), and needs the host's state (notebook, knowledge,
-   translator) to be saved and restored with the snapshot.
-3. Budgets: `callModel` needs a limit per real model; the factory must enforce one per arm. A paid API needs the
-   owner's go-ahead; the Codex CLI on his subscription (`gpt-6.1-sol` the driver, `gpt-6-luna` for narrow work) is the
-   default for pilots. Real runs go detached (`nohup`, `caffeinate -i -w`), never as a session's background command.
-4. Seeds are the towns' (and the draws'); a real model's answers are not reproducible, so each (seed, arm) with a real
-   model is one sample: use more seeds, and read the spread.
+```json
+"arms": [{ "name": "sonnet", "steward": { "kind": "model", "model": "anthropic/claude-sonnet-5-5" } },
+         { "name": "sonnet-told", "steward": { "kind": "model", "model": "anthropic/claude-sonnet-5-5", "framing": "simulation" } }],
+"seats": { "translator": { "first": "decide/pod-small-r3-long-s1", "behind": "anthropic/claude-sonnet-5-5" },
+           "framing": "unstated", "budget": { "fork_usd": 20, "arm_usd": { "sonnet": 150 }, "experiment_usd": 750 },
+           "wait_for_window_hours": 12, "calls_at_once": 4 },
+"forksAtOnce": 3
+```
+
+- **Which models.** Through what the owner already has: `anthropic/` (the API on the prepaid credit his plan includes,
+  key `OIKOS_ANTHROPIC_KEY`, never `ANTHROPIC_API_KEY`; prompt caching on), `claude-code/` (his Claude plan), `codex/`
+  (his ChatGPT subscription); never the largest Claude model, Fable or gpt-6-astra (refused by name); `openai/` (a key
+  that bills) only with `seats.allow_paid_api`, the owner's go-ahead. A host's own `SeatFactory` for a provider still
+  answers for its own arms.
+- **A spent credit.** When the API says the account's credit is spent ("credit balance is too low"), the call throws
+  `CreditExhausted`: the fork stops cleanly as at its limit (debrief attempted; it fails too if nothing is left, and
+  that is noted), and is run again by `--resume` once there is credit. Nothing is ever bought or topped up.
+- **Every call recorded.** `seed-N/<arm>.calls.jsonl`, apart from the log (the log is what the world did, the same on
+  every run; this is how the calls went): per call the attempt, purpose, model, tokens (input, cache read, cache
+  write, output), cost, wall time (with any wait for a free call slot) and error. The fork's result carries the
+  summary (`calls`: p50 and p95 wall time, errors by kind, by purpose and model); the run's `cost.json` sums them by
+  fork and arm with the limits.
+- **Taken up again.** `oikos experiment run <spec> --out DIR --resume` takes up an interrupted run in its folder: the
+  spec must be the one it began with (`spec.json`, byte for byte); bases already made are kept; forks with a result
+  are kept, except those that failed or stopped for want of the model (`CreditExhausted`, `UsageLimitReached`,
+  `ModelUnreachable`), which run again from the snapshot. An interrupted fork's log and result are kept as
+  `<arm>.interrupted-<k>.*` (a model run is training data), and what its earlier attempts spent comes off its limit,
+  so the experiment's total still holds. Without `--resume`, a folder holding an unfinished run is refused.
+- **Framing.** The arm's `framing`, else `seats.framing`, else `unstated`; the base is shared (the framing is the
+  run's, not the town's) and each fork's note and result say which.
+- **Spending limits.** Each model fork's limit is fixed before anything runs: the lesser of `fork_usd` and its arm's
+  `arm_usd` over its seeds; arms with neither share what `experiment_usd` leaves; if together they would pass
+  `experiment_usd` all are brought down in proportion. So the total cannot be passed however forks are dealt to
+  workers. A model that costs money (or a Codex arm whose translator does) needs a limit, or the spec is refused. Part
+  of each limit is kept back for the debrief. A fork that reaches its limit (or whose model is out of reach) stops
+  cleanly: `stopped` in its result, debriefed, its cost counted, and **not compared** (`failures` in the report).
+- **A subscription's window** (Codex, the Claude plan): a fork whose provider says its usage limit is reached waits
+  inside itself (its world stands still; nothing else waits) and asks again every 15 minutes, for at most
+  `wait_for_window_hours`; then it stops as above.
+- **Load.** `calls_at_once`: at most that many calls of one provider in flight per worker process; `forksAtOnce`: at
+  most that many forks held per worker (a fork of a town of a thousand holds about a gigabyte).
+- **A dry run.** `--mock-models` (or `seats.mock_models`): every model is played by the mock (the post's code brain
+  through the whole loop, participants/src/llm/mock.ts), priced at the named model's price so the limits bite; our
+  own translator still answers first (it calls no model). The report says DRY RUN first. No model is called.
+- **Measures for the counterfactual.** `asker_granted:<what>:<matter>:<nth>`: whether the one who made the nth such
+  request from the fork on (carried out, or withheld: the engine's note says whose) was granted support or had the
+  decision changed afterwards (1/0). With the act withheld in a twin arm, its difference in differences says whether
+  the request still bites under each steward (MT-21: a town-wide count is swamped).
+
+What a pilot's host does that this one does not, yet: the cast as it changes during a fork (who is who is the fork's
+config); thinking time in world seconds; an act the engine will not take as written is noted by the engine and not
+told to the seat in words; exit accounts and the composer. A fork is taken up again from its seed's snapshot, not
+from where it stopped (a model fork run again is a new sample). A real model's answers are not reproducible: each (seed, arm)
+with a model is one sample.
+
+`experiments/tara-draft/` is the draft for the owner's TARA project (README there).
 
 ## The unit of an experiment
 

@@ -7398,3 +7398,98 @@ Naz, asked directly, adopted the wording of the way out proposed on 2026-10-12 (
   not 5 (Naz, 2026-10-24).
 - **Revisit if:** a quiet machine's gate build gets slower by more than a fifth (then measure jobs against tokens properly),
   or load still runs far past the core count with 3 agents.
+## 2026-10-24 · TARA-ready: model stewards in the experiment harness, the draft TARA spec, its cost, and a dry run (branch `tara-ready`; no model called)
+
+**A model steward in a fork is the pilot's seat, in the light host.** `orchestrator/src/seat-host.ts` (`ModelSeat`) is
+what a `claude-code/` or `codex/` arm's seat is: its configuration from `seat-config.ts` (the part of run.ts's
+`llmUnit` that makes a seat's reports, trays, office file and staff, moved out so that both hosts make the same seat),
+its loop `createLlmParticipant`, its requests drafted by the translator arrangement (ours first, the general one
+behind) against the engine's own resolver and dry run, shown as drafts and done only once confirmed, debriefed at the
+fork's end. The engine's native `World` gained `resolve` and `check` (kernel/src/host.rs, crates/napi): they change
+nothing and log nothing. Why not run a fork through run.ts's full host: it starts a run, it cannot take up a
+snapshot, and its 1,700-line loop is the pilots'; resuming its unit table from a light-host snapshot was the larger and
+riskier change. *Revisit if* the two hosts drift: the gaps are MT-22 (the cast as it changes, thinking time, a rejected
+act told in words, exit accounts, resuming an experiment).
+
+**The seat factory's rules** (`orchestrator/src/experiment-seats.ts`): only `claude-code/` and `codex/` seats; the
+largest Claude model, Fable and gpt-6-astra refused by name; a paid key only with `seats.allow_paid_api`. Framing per
+arm, else the spec's, else `unstated`; recorded in a note at the fork and in the fork's result. **Spending limits**:
+each model fork's limit fixed before anything runs (the lesser of `fork_usd` and `arm_usd` over the arm's seeds; arms
+with neither share what `experiment_usd` leaves; all scaled down if together they pass `experiment_usd`), so the total
+cannot be passed however forks are dealt to workers; a priced model with no limit is refused. A fork at its limit stops
+cleanly, is debriefed from what was kept back, and is reported as stopped and never compared. A subscription's shut
+window is waited out inside the fork (15-minute retries, at most `wait_for_window_hours`), so Codex never blocks a
+Claude fork. `calls_at_once` (per provider per worker) and `forksAtOnce` (per worker: a town-1000 fork holds about
+1.2 GB; base and three forks peaked at 4.9 GB) bound the load. Alternatives: a shared ledger of spending across
+worker processes (a lock file): rejected, a fixed allotment is simpler and cannot overspend. *Revisit if* allotments
+leave much unspent while forks stop: then a shared ledger.
+
+**A dry run** (`--mock-models`): every model played by the mock through the whole loop, priced at the named model's
+price; our own translator answers first as in the real run (it calls no model). The report opens "DRY RUN".
+
+**`asker_granted:<what>:<matter>:<nth>`**: whether the one who made the nth such request from the fork on was granted
+support or had the decision changed afterwards; the asker of a withheld act is read from the engine's `withheld` note.
+It is the measure of "what reached the people who asked" that MT-21 said the counterfactual needs.
+
+**The TARA draft** (`experiments/tara-steward/`: spec, draft registration, README). Office: the support office
+(`outside-support`, with `model_seats=outside-support` in every arm), not the tribunal: in the living worked example
+it made 53 to 71 decisions about people a fork against the tribunal's 9 to 13, and the tribunal's cases are mostly
+appeals of the office's refusals, so a steward there moves too little in 180 days. Arms: code, nobody, Sonnet 5.5,
+Haiku 5.5, gpt-6.1-sol, Sonnet told it is simulated, and code and Sonnet each with the first review request withheld;
+12 seeds; day 30 to 210. Primary: `slips_caught`, `support_refused`, `appeals_made`, `human_in_decision_share`, each
+model against the code (12, Bonferroni); the withheld-act DiD secondary, because a 0/1 measure on one asker is powered
+at 12 seeds only for the lever's near-total loss (the README's power table, from the worked example's variances
+times 1.5). Cost, from 126 pilot logs (a helper's tally, `seats.json` in the session's scratch): about $900 of plan
+usage at API prices ($650–1,200), most of it Haiku (about $45 a fork against Sonnet's $10), and 3,000 Codex calls.
+Fallback: 8 seeds, 120 days, five arms, about $300. *Revisit if* the first real day's costs, set beside the account's
+usage page, differ from the projection by more than a third.
+
+**Blockers before the real run**: MT-21 is still open (a review request never answered shuts the appeal route; a
+model steward may well leave requests unanswered, and the risk's own "fix when" names this run), and the
+registration must be agreed and committed.
+
+## 2026-10-24 · TARA-ready, second part: model seats on the API credit, every call recorded, an experiment taken up again, and the office chosen by mock stewards (branch `tara-ready`; no model called)
+
+**The API on the plan's credit.** The owner's plan includes monthly API credit, and he wants seats in pilots and the
+TARA run on it (with prompt caching, and without competing with agents for the plan's weekly allowance). So
+`anthropic/` is now a provider the experiment seats by default, beside `claude-code/` and `codex/`; `openai/` still
+needs `seats.allow_paid_api`. The key is `OIKOS_ANTHROPIC_KEY`, read by `chooseModel` (orchestrator/src/models.ts) and
+never `ANTHROPIC_API_KEY` (with that one set, Claude Code itself would bill the key), never logged. When the API says
+the credit is spent, `AnthropicAdapter` throws `CreditExhausted` (a `SpendingLimitReached`): the fork stops cleanly,
+is not waited out (a credit does not come back in hours), and nothing is ever bought. *Revisit if* the provider's
+words for a spent credit change (`creditSpent` in participants/src/llm/anthropic.ts).
+
+**Every call recorded, apart from the log.** `callRecorder` (experiment-seats.ts) wraps each adapter a model fork's
+seat uses (inside the wait for a shut window, so a refused attempt is a line too) and writes `<arm>.calls.jsonl`: the
+attempt, purpose, model, tokens with the cache, cost, wall time, error. The fork's result carries the summary (`calls`:
+p50/p95, errors by kind, by purpose and model) and the run writes `cost.json` (by fork and arm, with the limits). Why
+outside the log: wall time differs on every run, and the log is what the world did; the owner asked for cost and
+performance per seat and per call. Wall time includes any wait for a free call slot (`calls_at_once`). *Revisit if*
+latency must be told apart from queueing: then record inside the gate.
+
+**Taken up again** (`--resume`; MT-22's last gap for a real run). A folder with an unfinished run is refused without
+it; with it, the spec must be byte for byte the one it began with; bases whose files are whole are kept; forks with a
+result are kept unless failed or stopped for want of the model (`CreditExhausted`, `UsageLimitReached`,
+`ModelUnreachable`), which run again from the snapshot; the interrupted log and result are kept under
+`<arm>.interrupted-<k>.*`; and what earlier attempts spent (from the calls file) comes off the fork's limit, so the
+experiment's total still holds. A fork is not taken up from where it stopped: the light host has no mid-fork snapshot
+of a seat, and a model fork run again is a new sample either way. Alternatives: a mid-fork snapshot (the seat's
+conversation and drafts as well as the world's): rejected for now, larger and only saves a fork's spending once.
+*Revisit if* interrupted forks cost a noticeable share of the credit.
+
+**The draft moved** to `experiments/tara-draft/` (`tara.json`, `tara.prereg.draft.yaml`, README for the owner):
+Claude arms on `anthropic/`, Sonnet behind our translator, limits $12.50 a Sonnet fork, $20 Haiku, $3 sol, $750 in all.
+Estimate from 37 pilots' recorded calls at API token prices with the cache: Sonnet $0.03 a call in this office, Haiku
+$0.014; about $320 in all ($170 to 560), against about $900 through Claude Code (which reports 1.4 to 4 times the token
+price). No model was called.
+
+**The office, by mock stewards** (`experiments/tara-draft/office-check/`; `runs/exp-tara-office-check-{support,tribunal}-2026-10-24`,
+town-1000 living, seeds 1 to 3, day 30 to 210, six arms: code, nobody, diligent, rubber-stamp, slow `delay:5`,
+careless `skip:2`). In the support office 43 of 290 exploratory comparisons excluded zero, in the tribunal 1: the
+tribunal acts about 20 times in 180 days and an empty tribunal moves claims refused by -1.0 and support paid by 3%,
+against -9.7 and 80% for an empty support office; the rubber stamp put right 2.7 fewer decisions (3 of 3 seeds) in the
+support office and nothing in the tribunal (no review requests reach it). So the draft keeps the support office.
+"Harsh" was asked for and is not built as a mock: a steward that refuses what the code grants needs the office's state
+changed, not its papers (the rubber stamp's note); `careless` and `slow` stand in. *Revisit if* a real model's
+forks in the support office show it doing something no mock steward does that the tribunal would see first (appeals
+decided, possession orders).
