@@ -127,6 +127,33 @@ impl WindingUp {
         WindingUp { me: me.into(), p, state: State::Trading, since: 0, paid: BTreeSet::new(), active_at: -1, listed_at: -1, asking: 0, sold: false, credit: BTreeMap::new() }
     }
 
+    /// A new holder of the post (the last left town, say) takes the firm over as it stands, and finds in its books what
+    /// the firm has said: that it is closing, or has closed, and where its premises are in the sale. A firm that has
+    /// announced its closing does not trade again because the person who closed it has gone (ME-21): the state is read
+    /// back from the firm's own public papers, which outlast whoever wrote them.
+    pub fn recover(&mut self, book: &Book) {
+        if self.state != State::Trading {
+            return;
+        }
+        let mine = |r: &&Arc<Record>| r.speaks_for.as_deref() == Some(self.me.as_str()) && !book.withdrawn(&r.id);
+        let newest = |kind: &str| book.open(kind).filter(mine).max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&b.id, &a.id))).cloned();
+        if let Some(c) = newest("closure") {
+            self.state = State::Closed;
+            self.since = c.at;
+            if let Some(l) = newest("property_for_sale") {
+                self.listed_at = l.at;
+                self.asking = crate::common::data(&l).get("price").and_then(Value::as_i64).unwrap_or(0);
+            }
+            self.sold = book.open("property_sold").any(|r| r.speaks_for.as_deref() == Some(self.me.as_str()));
+            return;
+        }
+        let closing = newest("closing").or_else(|| newest("insolvency"));
+        if let Some(c) = closing {
+            self.state = State::WindingUp;
+            self.since = crate::common::data(&c).get("since").and_then(Value::as_i64).unwrap_or(c.at);
+        }
+    }
+
     /// Debts recorded against us that we have not paid, in the order they are paid: wages, the tax withheld, then the
     /// rest, each oldest first.
     pub fn debts<'a>(&self, book: &'a Book) -> Vec<&'a Arc<Record>> {
@@ -427,5 +454,40 @@ impl WindingUp {
             break;
         }
         steps
+    }
+}
+
+#[cfg(test)]
+mod recover_tests {
+    use super::*;
+    use crate::firms::testkit::{statement, taken};
+
+    fn params() -> WindingParams {
+        WindingParams { short_days: 10, wind_up_days: 10, idle_days: 30, reprice_days: 30, reprice_bps: 1_000 }
+    }
+
+    /// ME-21: a new holder of a closed shop's post finds the shop closed, and its premises in the sale at the price asked.
+    #[test]
+    fn a_new_holder_finds_the_firm_closed_and_for_sale() {
+        let book = taken(vec![
+            statement("rec.1", 100, "closure", json!({ "firm": "shop-1" }), "shop-1"),
+            statement("rec.2", 200, "property_for_sale", json!({ "price": 33_000, "structure": "shop-1-premises" }), "shop-1"),
+            statement("rec.3", 300, "closure", json!({ "firm": "other" }), "other"),
+        ]);
+        let mut w = WindingUp::new("shop-1", params());
+        w.recover(&book);
+        assert_eq!(w.state, State::Closed);
+        assert_eq!((w.listed_at, w.asking, w.sold), (200, 33_000, false));
+        let mut other = WindingUp::new("shop-2", params());
+        other.recover(&book);
+        assert_eq!(other.state, State::Trading);
+    }
+
+    #[test]
+    fn a_new_holder_finds_the_firm_winding_up() {
+        let book = taken(vec![statement("rec.1", 100, "closing", json!({ "firm": "shop-1", "since": 90 }), "shop-1")]);
+        let mut w = WindingUp::new("shop-1", params());
+        w.recover(&book);
+        assert_eq!((w.state, w.since), (State::WindingUp, 90));
     }
 }

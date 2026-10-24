@@ -13,6 +13,11 @@ export interface ShopKind {
   wholesale: number;
   /** How many of the town's shops sell it. */
   shops: number;
+  /** What its shop's staff are (the job advertised), and their pay as a share of the shop wage, basis points (the profile's earnings by occupation). */
+  occupation?: string;
+  wage_bps: number;
+  /** The task a unit of it is served by: staff time, named for the kind (a kind's serving is its own work, with its own time and pay). */
+  serve_task: string;
 }
 
 /**
@@ -32,6 +37,9 @@ export function apportion(weights: number[], n: number): number[] {
   }
   return out;
 }
+
+/** The task serving a unit of a kind (`goods` keeps `serve`). */
+export const serveTaskOf = (kind: string) => (kind === "goods" ? "serve" : `serve-${kind}`);
 
 /** Whether the profile gives a table of kinds for shops to sell (`goods` and at least one other with a `seller`). */
 export function hasShopTable(V: Profile["values"]): boolean {
@@ -59,12 +67,14 @@ export function shopMix(V: Profile["values"], shops: number, goods: { price: num
   const out: ShopKind[] = [];
   sold.forEach((k, i) => {
     if (!counts[i]) return;
-    if (k.kind === "goods") { out.push({ kind: k.kind, share_bps: k.share_bps, income_elasticity_bps: k.income_elasticity_bps, price: goods.price, wholesale: goods.wholesale, shops: counts[i]! }); return; }
+    if (k.kind === "goods") { out.push({ kind: k.kind, share_bps: k.share_bps, income_elasticity_bps: k.income_elasticity_bps, price: goods.price, wholesale: goods.wholesale, shops: counts[i]!, occupation: k.seller?.occupation, wage_bps: k.seller?.wage_vs_shop_bps ?? 10_000, serve_task: serveTaskOf(k.kind) }); return; }
     const { wholesale_bps, labour_bps } = k.seller!;
     if (wholesale_bps === undefined || labour_bps === undefined || !(labour_bps > 0) || wholesale_bps + labour_bps >= 10_000)
       throw new Error(`the profile's kind ${k.kind} needs a seller with wholesale_bps and labour_bps whose sum leaves a margin (under 10,000)`);
-    const price = Math.max(2, Math.round((unit_serve_cost * 10_000) / labour_bps));
-    out.push({ kind: k.kind, share_bps: k.share_bps, income_elasticity_bps: k.income_elasticity_bps, price, wholesale: Math.max(1, Math.round((price * wholesale_bps) / 10_000)), shops: counts[i]! });
+    // (The unit is what the same staff time serves; what that time costs is this kind's staff's pay, so a dearer occupation prices its unit higher.)
+    const wage_bps = k.seller!.wage_vs_shop_bps ?? 10_000;
+    const price = Math.max(2, Math.round((unit_serve_cost * wage_bps) / labour_bps));
+    out.push({ kind: k.kind, share_bps: k.share_bps, income_elasticity_bps: k.income_elasticity_bps, price, wholesale: Math.max(1, Math.round((price * wholesale_bps) / 10_000)), shops: counts[i]!, occupation: k.seller!.occupation, wage_bps, serve_task: serveTaskOf(k.kind) });
   });
   return out;
 }

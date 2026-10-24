@@ -16,16 +16,16 @@ export { drawPerson, drawValues, NEEDS, VALUES, type PopulationValues } from "./
 export { raisedValues, UPBRINGING  } from "./shared/inner";
 
 export { draftLaw, figureGiven, figureWords, heldIn, type LawFigure, type LawFigures, type LawSchedule } from "./shared/common";
-export { annualTax, chargesInWords, chargesOn, dayPayPeriod, returnsInWords, taxLawOf, withheld, withholding, withholdingInWords, type Band, type Charge, type IncomeTaxLaw } from "./shared/tax";
+export { annualTax, chargesOn, dayPayPeriod, taxLawOf, withheld, withholding, type Band, type Charge, type IncomeTaxLaw } from "./shared/tax";
 export { dueFrom, nextReturn, returnRuleInWords, returnRulesOf, returnsOf, MONTH_WORDS, type ReturnDue, type ReturnRule } from "./shared/returns";
-export { declarationFor, forAge, forHousehold, forOutOfWork, paymentsInWords, stopsWorkAt, type Declared, type PaymentRule } from "./shared/payments";
+export { declarationFor, forAge, forHousehold, forOutOfWork, stopsWorkAt, type Declared, type PaymentRule } from "./shared/payments";
 export { adultAgeBands, drawHousehold, drawSavings, bedroomsNeeded, OCCUPANCY, type DrawnHousehold, type Extension, type HouseholdSpec, type OccupancyStandard } from "./shared/household";
 export { yearsOfSchooling, type SchoolingSpec } from "./shared/school";
-export { linesInWords, tabledLines, votedWords, yearInDays } from "./shared/government";
+export { tabledLines, votedWords, yearInDays } from "./shared/government";
 export { Roster, type RosterNow } from "./readers/roster";
 export { Tally, type BallotCount } from "./readers/tally";
 export { DayBook, LISTED_DAYS } from "./readers/daybook";
-export { decisionsInWords, KIND as DECISION_KIND, type DecisionLaw, type Need as DecisionNeed } from "./shared/decisions";
+export { KIND as DECISION_KIND, type DecisionLaw, type Need as DecisionNeed } from "./shared/decisions";
 export { particularsOf } from "./shared/frictions";
 export { diaryText } from "./readers/diary";
 export { planLaw, planLawWords, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, possessionOrderFor } from "./shared/papers";

@@ -206,8 +206,8 @@ export interface Profile {
     spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number; shops_known: number; shop_search_bps_per_month: number;
       /** The household demand system (docs/behaviour/demand.md): each kind's average share of spending and its income elasticity from the place's household expenditure survey, and Frisch's money flexibility. */
       demand?: { frisch_bps: number; kinds: { kind: string; share_bps: number; income_elasticity_bps: number;
-        /** What a shop that sells this kind is like (docs/behaviour/demand.md, "A town's mix of shops"): a kind with no `seller` is not sold by shops (energy is billed by the utilities). `wholesale_bps`: what the shop pays for a unit as a share of its retail price (left out for `goods`: the profile's `industry.retail_purchases_share_bps`); `labour_bps`: the staff's pay for serving a unit as a share of its price, which fixes the size of the unit (left out for `goods`: `industry.retail_labour_share_bps`); `business_share_bps`: the kind's share of the place's retail and service businesses, where counts by industry are sourced (left out: the shops are divided by spending). */
-        seller?: { wholesale_bps?: number; labour_bps?: number; business_share_bps?: number } }[] } };
+        /** What a shop that sells this kind is like (docs/behaviour/demand.md, "A town's mix of shops"): a kind with no `seller` is not sold by shops (energy is billed by the utilities). `wholesale_bps`: what the shop pays for a unit as a share of its retail price (left out for `goods`: the profile's `industry.retail_purchases_share_bps`); `labour_bps`: the staff's pay for serving a unit as a share of its price, which fixes the size of the unit (left out for `goods`: `industry.retail_labour_share_bps`); `business_share_bps`: the kind's share of the place's retail and service businesses, where counts by industry are sourced (left out: the shops are divided by spending); `occupation`: what the shop's staff are, in the place's terms (the job a shop of this kind advertises); `wage_vs_shop_bps`: their pay as a share of `wages_per_pay_period.shop` (from the place's earnings survey by occupation; left out: the shop wage, 10,000). */
+        seller?: { wholesale_bps?: number; labour_bps?: number; business_share_bps?: number; occupation?: string; wage_vs_shop_bps?: number } }[] } };
     /** An adult's savings (cash and deposits), by age: percentiles 10, 25, 50, 75, 90 (cents). */
     savings_by_age?: { from: number; pct: [number, number, number, number, number] }[];
     /** The age people here stop work, where the profile gives one age for everyone; with `labour_force_share_by_age`,
@@ -268,7 +268,7 @@ export interface Profile {
      * and its share of wrong refusals; and how the bodies that hear grievances work. Each with its source or marked
      * a placeholder. */
     frictions?: { per_adult_bps_per_year: { landlord: number; wages: number; bill: number; benefits: number; goods: number }; put_right_on_asking_bps: { [matter: string]: number };
-      pay_short_by_bps: number; bill_over_bps: number; goods_faulty_share_bps: number; repair_hours: number; support: { wrong_refusal_bps: number };
+      pay_short_by_bps: number; bill_over_bps: number; goods_faulty_share_bps: number; complaints_by_kind_bps?: { [kind: string]: number }; repair_hours: number; support: { wrong_refusal_bps: number };
       venues: { answer_days: number; tribunal_days: number; tribunal_fee_hours_of_pay: number; uphold_without_proof_bps: number } };
     /** The auditor (docs/behaviour/auditor.md; foundations B9): an office that examines other bodies' accounts and decisions as the place's law says, on a sample, and
      * publishes a report. `office`: what it is called here (a neutral name). `answer_within_days`: how long a body has to answer a request for one named item (the
@@ -360,7 +360,9 @@ export interface Profile {
      * adults who are members, how often it pays pensions, the least it pays of a balance a year by age, its costs as a
      * share of what it takes in. */
     retirement_fund?: { share_bps_of_local: number; member_bps: number; pension_every_days: number; drawdown_bps_by_age: { from: number; bps: number }[]; cost_bps_of_income: number };
-    industry: { factory_labour_share_bps: number; factory_input_share_bps: number; retail_purchases_share_bps: number; retail_labour_share_bps: number };
+    industry: { factory_labour_share_bps: number; factory_input_share_bps: number; retail_purchases_share_bps: number; retail_labour_share_bps: number;
+      /** The main manufacturing industries other than the general one above (which makes `goods`): the kind of thing households buy that each supplies, its share of the town's factories, its labour and input shares of its output and the input it uses. */
+      manufacturing?: { product: string; share_bps: number; labour_share_bps: number; input_share_bps: number; input: string }[] };
     /** Prices at the world market. `goods_world` is the price of an item of goods, the town's own unit and no real
      * thing's price: left out, the generator derives it (an item is a fixed amount of factory work); stated, it fixes
      * the unit, and the generator checks it's a size the world's whole numbers can carry (docs/profiles.md). */

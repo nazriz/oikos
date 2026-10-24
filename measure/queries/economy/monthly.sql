@@ -1,7 +1,7 @@
--- The goods economy, per run and month (30 days): what was made, served to customers (by shops' staff and by people selling on their own account) and used up; exports, goods sent back and imports; what households wanted, got and went without (and what was still being served when the log ends); the town's jobs by kind of workplace, and its adults, at the month's end; the average price households paid; money in and out across the edge (both in the world's currency, in whole units: the log counts in its smallest unit).
+-- The goods economy, per run and month (30 days): what was made (of every product), served to customers (of every kind) (by shops' staff and by people selling on their own account) and used up; exports, goods sent back and imports (of goods alone: a kind with its own wholesaler is bought from it, and is not counted here); what households wanted, got and went without (and what was still being served when the log ends); the town's jobs by kind of workplace, and its adults, at the month's end; the average price households paid; money in and out across the edge (both in the world's currency, in whole units: the log counts in its smallest unit).
 with m as (select r.run_id, r.world, r.seed, r.minor_units, g.m from runs r, range(0, (r.end_t // 2592000) + 1) g(m)),
 w as (select run_id, t // 2592000 as m,
-    sum(units) filter (where task = 'make') as made, sum(units) filter (where task in ('serve', 'sell')) as served, sum(units) filter (where task = 'consume') as used_up
+    sum(units) filter (where task = 'make' or task like 'make-%') as made, sum(units) filter (where task in ('serve', 'sell') or task like 'serve-%') as served, sum(units) filter (where task = 'consume' or task like 'consume-%') as used_up
   from work group by all),
 gd as (select run_id, t // 2592000 as m,
     sum(quantity) filter (where kind = 'goods' and "to" = 'outside') as exported,

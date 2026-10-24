@@ -1,6 +1,6 @@
 // A tax law as a list of charges (docs/behaviour/public-finance.md): the arithmetic, on laws of no place.
 import { expect, test } from "bun:test";
-import { annualTax, chargesInWords, chargesOn, dayPayPeriod, taxLawOf, withheld, withholding, withholdingInWords, type Charge } from "../src";
+import { annualTax, chargesOn, dayPayPeriod, taxLawOf, withheld, withholding, type Charge } from "../src";
 
 const DAY = 86_400;
 const to = { collector: "o", account: "a" };
@@ -79,7 +79,6 @@ test("reliefs: a sum off the charge, and a rebate that leaves low incomes untaxe
   expect(of(l, 2_000_000)).toEqual({ tax: 0, cess: 0, other: 0 }); // 10% of 2,000,000 is the relief exactly
   expect(of(l, 3_000_000)).toEqual({ tax: 250_000, cess: 10_000, other: 0 });
   expect(of(l, 3_000_001).other).toBe(50_000 + 200_000); // past the rebate's line, the whole charge
-  expect(chargesInWords(l.charges, (n) => String(n))).toContain("cess: on the Income tax due: 4%; paid to a");
 });
 
 test("a band whose rate rises in a straight line: the charge is the area under the line", () => {
@@ -135,17 +134,5 @@ test("what is withheld from a pay is what the law's three steps give, worked by 
   // Pay by the day: a day's pay is pay for a week over its working days.
   expect(dayPayPeriod(5) / DAY).toBe(1.4);
   expect(withheld(l, 23_600, dayPayPeriod(5)).total).toBe(Math.floor((annualTax(l, Math.floor((23_600 * 365 * DAY) / dayPayPeriod(5))) * dayPayPeriod(5)) / (365 * DAY)));
-  // The words say those steps, each rounding, the example's own period, and nothing of any place.
-  const words = withholdingInWords({ period_days: days, work_days: 5 });
-  for (const said of [
-    "What is withheld from a pay is reckoned in three steps, and in no other way.",
-    "One: the pay is taken as a year's pay, by multiplying it by 365 and dividing by the number of days the pay is for, rounded down to the smallest unit of money.",
-    "a pay for 14 days is 14/365 of a year's pay, and a year is not taken as a whole number of pays.",
-    "Two: each charge is reckoned on that year's pay as set out above, each band's part rounded down.",
-    "Three: the year's charges are added together, and that sum, multiplied by the number of days the pay is for and divided by 365, rounded down, is what is withheld from the pay.",
-    "each charge's part is its own year's amount multiplied and divided the same way, rounded down, and what that leaves over goes with the first charge that takes anything.",
-    "Pay for a day's work is taken as pay for 1.4 days: a week over its 5 working days.",
-  ]) expect(words).toContain(said);
-  expect(withholdingInWords({ period_days: 30 })).toContain("a pay for 30 days is 30/365 of a year's pay");
-  expect(withholdingInWords({ period_days: 30 })).not.toContain("a day's work");
+  // (The words that say those steps are the engine's, and are tested with it: kernel/crates/rules/src/withholding.rs.)
 });

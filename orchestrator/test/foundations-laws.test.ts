@@ -81,7 +81,9 @@ test("law 3 (F5): the posts of the town's own bodies are held by people of the t
     const byId = new Map<string, any>(c.participants.map((p: any) => [p.id, p]));
     const persons = new Set(c.world.entities.filter((e: any) => e.kind === "person").map((e: any) => e.id));
     const systems = c.positions.filter((p: any) => byId.get(p.holder)?.kind === "system").map((p: any) => `${p.entity}/${p.id}`);
-    expect(systems.filter((x: string) => !x.startsWith("outside/") && !x.startsWith("vendors/") && !/^bank\/bank-payments$|^fund\//.test(x)), `${profile}: posts held by a system`).toEqual([]);
+    // (The outside world's own: every boundary entity, the world market and each kind's wholesalers among them.)
+    const boundary = new Set<string>(c.world.boundaries);
+    expect(systems.filter((x: string) => !boundary.has(x.split("/")[0]!) && !/^bank\/bank-payments$|^fund\//.test(x)), `${profile}: posts held by a system`).toEqual([]);
     for (const p of c.positions.filter((x: any) => byId.get(x.holder)?.kind === "person")) expect(persons.has(byId.get(p.holder).person), `${profile}: ${p.id} is held by a resident`).toBe(true);
     // every post has a holder, and no person holds a seat's post along with another (none is a seat here)
     expect(c.positions.filter((p: any) => !p.holder).map((p: any) => p.id), `${profile}: posts nobody holds`).toEqual([]);

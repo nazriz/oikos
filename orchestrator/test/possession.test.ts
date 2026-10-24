@@ -117,7 +117,9 @@ test("a tenant who cannot pay and goes on the notice gives the home up: they are
   expect(went.at).toBeLessThan(ntv.data.by + 8 * DAY); // (at their first look after the date: within the week)
   // (The home, not wherever else they were that hour: with homes dealt by income, 2026-10-12, the tenant this test
   // finds is one who goes to a group's gatherings, and the first place they left after the notice was the hall.)
-  const space = ev.find((e) => e.event === "vacated" && e.occupant === tenant && e.t >= went.at && String(e.space).includes("/dwelling."))?.space;
+  // (2026-10-24, the shop mix on: this tenant gave the notice from the hall, ten minutes after leaving the home, so the home they gave
+  // up is the dwelling they were last in at the notice, not one they vacate after it. The check below is unchanged.)
+  const space = ev.filter((e) => e.event === "occupied" && e.occupant === tenant && e.t <= went.at && String(e.space).includes("/dwelling.")).at(-1)?.space;
   expect(space).toBeDefined();
   // They are not back in the home they gave up: not that day, not later. (Until 2026-10-12 the daily round took a
   // person with no home back to the dwelling they had last been in.)

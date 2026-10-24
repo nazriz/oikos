@@ -161,9 +161,9 @@ test("the cap: one checkout holds at most its cap, even alone; another checkout 
     expect(done.map((d) => d.code)).toEqual([0, 0, 0, 0]);
     expect(peak(a)).toBe(1);
     expect(peak(b)).toBe(1);
-    // A weight above the cap is cut to the cap (and a build is told so: CARGO_BUILD_JOBS).
+    // A weight above the cap is cut to the cap (and a build is told half of it, at least one: CARGO_BUILD_JOBS, buildJobs).
     const w = await sh(["bun", slots, "--weight", "3", "--", "sh", "-c", "echo jobs=$CARGO_BUILD_JOBS held=$OIKOS_SLOT_HELD"], env(dir, 4, { OIKOS_SLOT_CAP: "2", OIKOS_SLOT_OWNER: "a" }));
-    expect(w.out).toContain("jobs=2");
+    expect(w.out).toContain("jobs=1");
     // The merge's jobs (priority high) are not capped.
     writeFileSync(a, "");
     await Promise.all(Array.from({ length: 3 }, () => sh(["bun", slots, "--priority", "high", "--", ...job(a)], env(dir, 4, { OIKOS_SLOT_CAP: "1", OIKOS_SLOT_OWNER: "a" }))));
@@ -209,3 +209,13 @@ test("a borrower goes past its cap while it is alone, and stops taking as soon a
     expect(readFileSync(order, "utf8").trim().split("\n")).toEqual(["b", "a"]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 120_000);
+
+test("headOf: a capped waiter lets the next go, and an older slots.ts's waiter (no cap recorded) is passed over", async () => {
+  const { headOf } = await import("./slots");
+  const held = Array.from({ length: 3 }, (_, i) => ({ pid: 100 + i, since: 1, owner: "a", cwd: "/" }));
+  const capped = { pid: 1, since: 1, weight: 1, owner: "a", cwd: "/", cap: 3, file: "wait-1-0" };
+  const old = { pid: 2, since: 2, weight: 1, owner: "b", cwd: "/", file: "wait-2-0" }; // an older version wrote no cap
+  const next = { pid: 3, since: 3, weight: 1, owner: "c", cwd: "/", cap: 3, file: "wait-3-0" };
+  expect(headOf([capped, old, next], held, 3)?.file).toBe("wait-3-0");
+  expect(headOf([capped, old], held, 3)).toBeUndefined(); // the old waiter takes its own turn, by its own rule
+});

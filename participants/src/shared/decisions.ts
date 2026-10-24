@@ -79,15 +79,3 @@ export interface DecisionLaw {
   refused_by?: "office-holder" | "staff";
 }
 
-/** What a rule says, in words a law's text can carry (neutral: the places' figures are the profile's). */
-export function decisionsInWords(rules: DecisionLaw[], written: (amount: number) => string): string {
-  return rules.map((r) => {
-    const parts: string[] = [];
-    for (const n of r.needs ?? []) parts.push(`before it is decided, ${n.from === "claimant" ? "the claimant is asked for" : "the claimant's last employer is asked to confirm"} ${n.what}, to send it within ${n.within_days} days; ${n.else === "refuse" ? "if it does not come in time, the claim is refused" : "if it does not come in time, the claim is decided on what is on hand"}`);
-    if (r.review) parts.push(`the office that made the decision will look at it again if asked within ${r.review.within_days} days of it (${r.review.grounds})${r.review.required ? ", and an appeal lies only after that" : ""}${r.review.deemed_refused_days != null ? `; a review not answered within ${r.review.deemed_refused_days} days of being asked for is taken as refused` : ""}`);
-    if (r.appeal) parts.push(`it may be appealed to a body that hears ${r.appeal.matter.replace(/_/g, " ")} and can set it aside, within ${r.appeal.within_days} days of ${r.review?.required ? (r.review.deemed_refused_days != null ? "the answer to the review, or of the day it is taken as refused" : "the answer to the review") : "the decision"} (${r.appeal.grounds}); ${r.appeal.fee ? `applying costs ${written(r.appeal.fee)}` : "applying costs nothing"}`);
-    if (r.refused_by === "office-holder") parts.push("where the office has staff under a head, only the head refuses a claim");
-    if (r.refused_by === "staff") parts.push("the office's staff may refuse a claim");
-    return `${r.name}${r.payments ? ` (${r.payments.join(", ")})`: ""}: ${parts.join("; ")}.`;
-  }).join(" ");
-}
