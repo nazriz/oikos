@@ -16,7 +16,8 @@
     "test": "bun test",
     "test:all": "bun scripts/test.ts",
     "test:fast": "bun scripts/test.ts --fast",
-    "test:changed": "bun scripts/test.ts --changed",
+    "test:changed": "bun scripts/test.ts --gate",
+    "test:slow": "bun scripts/test.ts --tier slow",
     "kernel": "bun scripts/slots.ts --weight 4 --what \"kernel build\" -- sh -c \"cargo build --release --manifest-path kernel/Cargo.toml --workspace && cargo build --release --manifest-path kernel/Cargo.toml --target wasm32-unknown-unknown -p oikos-law\"",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

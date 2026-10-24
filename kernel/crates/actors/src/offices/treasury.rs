@@ -2708,7 +2708,7 @@ mod tests {
             performer: Default::default(),
             entity: "city".into(),
             position: Some(position.into()),
-            params: params.as_object().cloned().unwrap_or_default(),
+            params: params.as_object().cloned().unwrap_or_default().into(),
             world: Default::default(),
         };
         let actor = kind.create(&ctx).expect("created");

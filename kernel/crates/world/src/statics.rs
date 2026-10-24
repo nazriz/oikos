@@ -28,6 +28,12 @@ pub struct Statics {
     pub randomness: Randomness,
     /// Nature's ground (its cells, neighbours and flow layer), when the world has nature.
     pub nature: Option<oikos_nature::Ground>,
+    /// Each configured participant's place in `config.participants`, by id (the first of an id): looked up, not
+    /// searched for, at every write of a record.
+    pub participant_at: BTreeMap<String, usize>,
+    /// For each organisation, the first configured position of it that keeps its record (`keeps_record`), by its
+    /// place in `config.positions`.
+    pub record_keeping_at: BTreeMap<String, usize>,
 }
 
 impl Statics {

@@ -56,6 +56,8 @@ bun install
 # Packages outside the workspace have their own dependencies (a test there fails without them).
 (cd docs/research/cel-check && bun install)
 bun run kernel
+# Only scripts/merge.ts pushes to main: the pre-push hook, in the repository's hooks folder (every worktree shares it).
+bun scripts/merge-lock.ts install-hook
 bun run test:fast
 
 echo

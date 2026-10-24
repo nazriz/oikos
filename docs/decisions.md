@@ -7100,3 +7100,286 @@ Plan: docs/design/translator-v3.md. Nothing is built. The held-out file was not 
 - **Not explained:** gb-eng's participants created; why hires rose in ke-nakuru less than elsewhere.
 
 **Revisit if** a sourced wage by occupation, manufacturing share or complaint share replaces a placeholder (ME-19); a retailer sells a service made to order (then a kind's `seller.appointment`); the consumer desk gets a matter for services (then `faulty_by_kind` names it); the job-move rate is calibrated to a labour force survey (the extra turnover here is that rule's response to pay differences); or the fill rates above are found to be the factories' export priority rather than the shops' staff.
+
+
+## Fast merge: affected selection, merge priority, batches, kernel cache, red-main stop (2026-10-24)
+
+The owner: merging takes too long (68 minutes to over 3 hours when agents' runs share the 12 slots, one merge at a time). Changed: `scripts/merge.ts` runs
+`--affected` instead of the whole suite (the whole suite runs on every push in CI and nightly, as before); its jobs have slot priority
+(`scripts/slots.ts`, `--priority high` / `OIKOS_SLOT_PRIORITY`); several branches go in as one batch with bisection to the branch at fault; the kernel is
+rebuilt only when `kernel/` differs from the last build there; the typecheck runs beside the tests. Safety kept: CI on main is the full gate, and a failure
+there (marker `~/.oikos/main-ci.json`, written by the CI job; `gh` is not logged in on this machine) stops every merge but the repair (`--fix-main`). Revisit
+if: a merge breaks main more than rarely (then widen the selection or return to the whole suite), or `gh` works (the marker is then a fallback only).
+Priority does not preempt running jobs; if the wait for tokens is still long, a per-agent cap (item 6) is the next lever.
+
+## 2026-10-24 · The pipeline: two tiers, a gate of seconds to minutes, a cap per agent, one merge at a time (branch `pipeline`, on `fast-merge`; no model called)
+
+The owner: "the tests should finish in seconds to low single minutes, not hours", and everything stays coordinated.
+`fast-merge` had not landed: `scripts/slots.test.ts` failed under the merge because every process the merge starts
+inherits `OIKOS_SLOT_PRIORITY=high`, so the test's own "normal" jobs were high too. The test now gives its jobs an
+environment without the caller's slot settings.
+
+**Measured on this machine, quiet (12 slots), before and after.**
+
+| | before | after |
+|---|---|---|
+| the merge, a kernel change | the whole suite: 2,309 s (merge-bot log); `cargo test --release` alone still building after 35 min | **215 s** (gate build 50 s; 226 files and the reached crates' tests 163 s) |
+| the merge, TypeScript only (`participants/src/shared/tax.ts`) | `--affected`: fast tier + reached slow files + `invariants.test.ts` (211 s on its own) | **85-100 s** (224 files) |
+| the merge, documents only | backstops + 220 files (every source cites a doc in a comment) | **15 s** (15 files) |
+| the whole gate tier (a runner change) | — | 97 s |
+| the slow tier (51 files) | inside the 38-minute merge | **660 s** in CI, on every push |
+| the kernel's tests | `cargo test --release`: ~30+ min (each of ~50 test programs fat-LTO linked) | 28 s run under nextest (`gate` profile), 24 s rebuild after a one-file change |
+
+**What changed.**
+- **Tiers** (`scripts/test-tiers.json`): the slow tier is named file by file, with why (51 files: a year or more, several
+  seeds, the 1,000-person town, over ~30 s by the whole suite's times); everything else is the gate tier. `--gate`
+  (`test:changed` and the merge's; `--affected` its old name) chooses only from the gate tier. CI runs both tiers on every
+  push to main and nightly. `scripts/tiers.test.ts` holds every file in exactly one tier, the backstops in the gate, every
+  gate file at most 90 s, and CI running both. Nothing was weakened: no assertion was changed or removed; the year of
+  invariants runs in CI on every push, and the gate has a new check of every invariant on 90 days of each main profile
+  (`invariants-gate.test.ts`, about 20 s).
+- **The kernel in the gate.** The `gate` cargo profile (release's optimisation and overflow checks; no fat LTO, 16 codegen
+  units, incremental): built only where the release build is not current, 11 s after a one-file change against minutes
+  for release. The kernel's tests run in it under cargo-nextest, for the crates the change reaches (`cargo metadata`:
+  each changed crate and all above it), then the doc tests. The release build stays CI's.
+- **Selection fixes.** A document change chose 220 files: comments everywhere cite documents, a module's own `doc:` path
+  names one, and `foo.test.ts` was read as naming the script `test.ts`. Now a document is read only by code (comments taken
+  out) that names it or holds a path to a docs folder (any docs path in the test itself); script names match whole.
+- **Coordination.** The merge lock (`scripts/merge-lock.ts`) and a pre-push hook in the shared hooks folder: one merge at a
+  time, and only `merge.ts` pushes to main. A cap per checkout in the slots (a quarter of the pool, by tokens of the
+  checkout's own so it cannot be raced past); the merge is not capped; the runner and `bun test` borrow past the cap while
+  no other checkout waits. `bun scripts/status.ts` shows agents, merge queue, slots, disk and CI on one screen.
+  `disk-tidy.ts` clears `.claude/target-*` unused for a day. Each run leaves per-file wall times in `~/.oikos/test-runs/`.
+  `merge.ts` keeps main's side of a conflict in `scripts/test-times.json`.
+- **CI** (`ci.yml`): no `pull_request` trigger. The repository is public and the runner is this machine: a fork's pull
+  request would run a stranger's code here. A push no longer cancels the run under way (main's result is what merges wait on).
+
+**Not done, and why.** A cache of town runs across the suite ("each distinct world once per suite"): measured first
+(`OIKOS_RUN_TRACE`, the whole slow tier): 258 runs, 7,800 s; only 94 s are exact repeats, 261 s if the run id is ignored
+(1-3%); 1,500 s of runs take callbacks and cannot be reused at all. Not worth its risk. The slow tier is bound by its
+total work (6,185 file-seconds on 12 slots), not by one file. Shortening horizons needs a judgement per test about when the
+occasion comes; none was made blind.
+
+**Revisit if:** a merge breaks main more than rarely (widen the gate: move a file back from the slow tier); the kernel
+gate stays over 3 minutes as the kernel grows (the long pole is rebuilding ~50 test programs: fewer, larger test crates
+would cut it); a gate-profile build behaves differently from release (it must not: same code, same checks; CI runs release);
+the cap leaves the machine idle while agents wait (lift `OIKOS_SLOT_CAP`); the CI runner is offline (it has been since
+2026-10-17: the red-main stop then sees nothing).
+## 2026-10-23 · The measures of stewardship, the comparison, pre-registration, and a worked example (branch `measures`; no model called)
+
+**Why.** The platform exists to show gradual disempowerment and to compare stewards fairly; the owner's first experiment
+(TARA, late November) is "the same office, different stewards, same town, forks over seeds". Without measures fixed
+before anyone looks, a comparison is an anecdote.
+
+**Built** (all reading logs, nothing fed back; docs/experiments.md, "The measures of stewardship", "The comparison",
+"Pre-registration").
+- `measure/src/stewardship.ts` (version 1): a `Ledger` that sees each log entry once and gives 50 named measures in nine
+  families: human leverage (GD M1: consequential decisions about people by who did the work, read from the act's `by`;
+  "reviewed" is a basis citing a person's paper; by office and by month), responsiveness, direct form (GD M2: reviews
+  changed, appeals found for the applicant, office papers set aside, petitions taken up, rises after a stoppage),
+  dependence (M3: public revenue from residents, firms' costs to and sales from residents, vendors' fees, the share of
+  posts' work-seconds people did), reversibility (M4: systems in use, exit cost, fees, longest notice, hours systems did
+  last month, former staff still in town), concentration (M5: systems' hours by supplier, HHI, share from outside),
+  authorship (M6: papers to residents and public papers by who made them), welfare, recourse, trust and agency (citizens'
+  own records at the fork and at the end). A seat sitting as its code twin is counted as the code's holder; a model
+  steward as a seat. Which entity kinds are public bodies and firms the spec says (`institutions`): the generality test
+  refused the first version, which named them in code (and wrote "cents"); now the platform names none.
+- `measure/src/compare.ts`: paired differences seed by seed, difference in differences, Student-t intervals (the t
+  quantiles from the incomplete beta function, checked against the printed table), Bonferroni.
+- `measure/src/prereg.ts` and the harness: a registration file (question, post, arms, reference, seeds, days, level,
+  correction, primary and secondary comparisons with an optional expected direction). The harness refuses a spec that
+  differs from it or a registration naming an unmeasured measure, keeps a copy with its sha256 and the time git first
+  had it (only if the file on disk is what git has), and the report presents as primary only the registered primary
+  comparisons, read together (Bonferroni); everything else is exploratory, said so in the summary. `oikos experiment
+  report <DIR> --rebuild` rebuilds from the results and the kept copy, refusing one whose hash differs.
+- The harness: the base streams its entries into a ledger saved at the fork (`seed-N/ledger.json`); each arm takes it
+  up, so systems delivered and staff before the fork are known. The report opens with plain sentences (what was
+  compared; each registered comparison read out with its interval and whether the expectation agrees; how many
+  exploratory comparisons exclude zero). A new mock steward, `mock/rubber-stamp`: requests to look at a decision again
+  are kept from the code brain and answered "it stands" with the same two papers the code writes when it upholds.
+  Turning the brain's own "changed" into "upheld" was rejected: the support office's state, not its papers, starts a
+  payment, so the brain would have paid what the stamp said stands.
+
+**Decided fresh.**
+- **The makers of a paper are the act applied just before it**, matched by participant: the engine logs `action_applied`
+  and `recorded` under the cause of the command that advanced the world, which many acts share (my first version keyed
+  on the cause and would have credited one act's performers to another's papers; the hand-made test log now shares one
+  cause across all acts, as the engine does).
+- **Counterfactual forks are designed but not runnable (MT-19).** The report computes a difference in differences when a
+  registration names one. No arm can withhold a citizen's act: the light host decides only seats, and seating citizens
+  as twins is not exact there (two seated citizens over 20 days: 19 of their own records and 5 acts fewer than in the
+  engine; the host submits a twin's action, not its record), and seating every citizen stopped the engine ("participants
+  kept waking each other at t=1200"). The withhold belongs in the engine as a recorded intervention.
+
+**The worked example** (`experiments/support-stewards.json` and `.prereg.yaml`, committed before the run in 7088a39a;
+`runs/exp-support-stewards-2026-10-23`; town-1000, au-vic, opening caseload, seeds 1 to 3, fork day 30 to day 210,
+arms code, `mock/diligent`, `mock/rubber-stamp`; 788 s with three workers on a loaded machine). Before registering I
+looked only at the code arm of town-300 (no review requests in 60 days), to choose the town's size.
+- **Primary, as registered (each at 98.8%):** `review_changed_share` rubber-stamp minus code: no seed had a value (no
+  reviews in any arm). `appeals_made` and `support_paid`, rubber-stamp minus code: 0 in every seed: not settled.
+  `decided_by_seat_share` diligent minus code: +0.011 (0.006 to 0.015; 3 of 3 seeds): agrees with the registration.
+- **Why nothing else moved: the levers were never pulled.** Across the three seeds 24 claims were refused and there were
+  no `review_request` records at all (of any matter, anywhere in the town), no applications to a venue about a refusal,
+  no complaints, and no friction recorded in any citizen's record (seed 1's whole fork log searched: 0 `friction_`
+  entries; 6 tribunal applications, all landlords' for possession). So the rubber stamp had nothing to stamp and every
+  arm's world is the code's to the hash. On the TypeScript world, F8 measured about 28 review requests and 43 wrong
+  refusals a year at this size (au-vic). **Likely a fault of the port of citizens' recourse, or of grievances arising:
+  not traced here (not my lane); it should be, before the TARA run, since a tribunal or support experiment measures
+  nothing if nobody asks.**
+- **What the measures show of the town** (code arm, mean of three seeds; the same in every arm): 3,145 decisions about
+  people, 98.9% done by a person, 1.1% by the support office's system; 30 systems in use (self-service points), exit cost
+  139,500 dollars in all, longest notice 90 days, 6,717 system-hours in the last 30 days, 33 former staff still in town,
+  HHI 9,995 (one vendor, from outside); 56% of papers to residents written by a system; public revenue 17% from
+  residents, firms' costs 20% to residents; 86 people left; 8 support refusals. The diligent and rubber-stamp arms cost
+  2.20 placeholder dollars each (mock prices).
+
+**Tests.** `measure/test/stewardship.test.ts` (9: every family on a hand-made log; steward classes; save and restore at
+the fork equals one ledger of the whole log), `measure/test/compare.test.ts` (7: t table, pairing, DiD, intervals,
+Bonferroni, registration checks, spec mismatch, YAML and JSON), five more in `orchestrator/test/experiment.test.ts`
+(the rubber stamp; `stewardship` in a spec; the registered report's primary and exploratory; a mismatched registration
+does not run). `bun run test:fast`: 1,310 pass, 1 fail (`risks.test`: an untagged gap marker, tagged MT-19 and rerun
+green with `experiment` and `generality`); `bun run typecheck` clean; no Rust changed (the fast tier ran the kernel's
+cargo tests).
+
+**Risks.** MT-19 added.
+
+**Revisit if** the engine gains a withheld act (then add the `withhold` arm and register a DiD); a measure's definition
+needs to change (a new name, not an edit); citizens' recourse is mended (re-run this example under a new name and
+registration); or a place's institutions do not fit the public/firm split a spec states.
+
+## 2026-10-24 · Citizens' recourse in the experiments: why nobody asked, the withheld act (MT-19), and the worked example again (branch `fix-recourse`; no model called)
+
+**Why.** The worked example of 2026-10-23 found no request for a review, no appeal and no complaint in 540 seed-days of a
+1,000-person town (24 refusals), against about 28 requests a year on the TypeScript world, and flagged a likely fault of
+the port. The owner's first experiment (TARA) is a support office or tribunal held by different stewards: if nobody asks,
+it measures nothing.
+
+**Traced: not a fault of the port; the worked example's town was not a living one.** `experiments/support-stewards.json`
+ran `worlds/town-1000.yaml` with `years=1` and `opening_caseload=true` only. Without `living` the generator writes
+`dials.friction_bps` 0 and `dials.initiative_bps` 0 (docs/behaviour/frictions.md: "absent or 0, nothing of the kind
+arises"). With the friction dial at 0: no slip of the office's (every slip row of a decision is scaled by it, so the 24
+refusals were all of claims that did not qualify), and a refused claim is no grievance (`citizen/money.rs`, the
+`dial > 0` gate, as `citizen.ts:3645` at `pre-cutover` had `fdial > 0`). With initiative at 0 no want is born
+(`mind/citizen.rs` `want_born`), so nothing is asked, applied for, complained of or petitioned, by design: the town is
+step 1's. The TypeScript figure it was set against (F8's, about 28 a year) was measured with "the living flags of the
+culture batches" (`initiative_bps` 10,000, `friction_bps` 30,000, `culture`). Every link was read: the refusal's
+grievance (`money.rs`), the mind's `Grieved` (`voice.rs`) and want, the openings for a want (`recourse.rs` `Ways`: ask
+the party, the law's review and appeal routes from `law-decisions`, a venue that says it hears the matter), the request
+(`AskPutRight`), the office's answer (`boundary/support_law.rs`), the venue's.
+- **Measured on the Rust world, living** (town-1000, au-vic, seed 1, `opening_caseload`): *as sourced* (`friction_bps`
+  10,000), 210 days: 20 refusals, 21 refusals grieved, 8 requests to the office about a refused claim (6 after day 30),
+  8 reviews decided (4 changed), 2 applications to a venue about a refusal and 3 venue decisions; besides, 41 requests to
+  put something right in all (bills 11, goods 9, underpaid 11, disrepair 1, arrears 1), 8 complaints, 6 tribunal
+  applications (3 of them landlords' for possession), 16 wage claims, 2 petitions and 49 signatures. *At F8's flags* (`friction_bps` 30,000, `culture`), a
+  year: 68 refusals, 29 requests about a refused claim (TS F8: 28 a year, mean of three seeds), 29 reviews decided, 6
+  applications to a venue about a refusal (TS: 6.7), 1 to the tribunal. **The Rust citizen's recourse is the TypeScript
+  one's within one seed's noise**; recorded, not chased.
+- **Related acts checked in the same runs**: tribunal applications by tenants (disrepair, bills, goods, underpaid),
+  petitions and signatures, wage claims (the union's grievance route), complaints and the decisions of the
+  desks that hear them (`complaint_notice`, `venue_decision`): all occur in a living town, none in a town without it
+  (a debt owed to someone is still pursued at the tribunal: life's, not a friction's).
+
+**Built.**
+- **A comparison that cannot move is not run (MT-20).** `recourseProblems` (`orchestrator/src/experiment.ts`): a
+  registration naming a measure of the responsiveness or recourse families, in a town whose `initiative_bps` or
+  `friction_bps` is 0, is refused before anything runs, saying which dials to set. An unregistered spec is not refused.
+- **The withheld act (MT-19).** The engine's option `withhold` (`kernel/src/engine.rs` `Withhold`; host, protocol and
+  the N-API module take it with a run's or a fork's options): of the acts carried out from the start of the run or
+  fork, those that publish a paper of the kind `what` (or are a block of that name), by `participant`, of a `matter`, to
+  an addressee `to` (each only where given), the `nth` is not carried out: no time, no paper, no money; a `note`
+  `withheld` in the log. The actor is told nothing and believes it sent it (a letter lost before the post). An arm of an
+  experiment names it (`withhold`), and the measure `withheld` counts it.
+- **Decided fresh.** *Lost, not unchosen:* the act is dropped after the actor decided it, so the fork is the parent to
+  the hash until that act; changing the actor's choice would need a per-actor override of a draw and would move the
+  actor's own memory before the act. *Counted from the fork, in the engine's order:* the order acts are carried out is
+  the run's own, so the nth is the same act on any number of threads. *Its actor's wake ends as after an act:* a
+  refused act would wake it again at the same moment and change its rhythm. *A host's seat acting through its own
+  commands (`host_seats`) is not reached.* Rejected: seating the citizen as its twin and dropping its action (not exact
+  in the light host, MT-19's first finding).
+
+**Tests.** `kernel/tests/host.rs` (a fork withholding the bureau's first warning is the parent without it; the same
+twice is the same hash; the second rather than the first; a ninth, another's, an unknown kind, a matter or an addressee
+never met: the parent to the hash with no note; nothing named is refused). `citizen/money.rs` (a refusal is a
+grievance with the decision as evidence only where the friction dial is on; a review's own refusal is not grieved
+again). `orchestrator/test/recourse-town.test.ts` (town-300, 300 days: living, residents ask the office about refused
+claims and the office reviews, other wrongs are asked about and taken to venues; the same town without `living`: no
+request, no application about a friction's matter). `orchestrator/test/experiment.test.ts` (an arm's withholding is
+checked; the guard; a whole experiment where an arm withholds the bureau's first warning, a model arm too, and one
+naming a ninth is the code arm to the hash).
+
+**Risks.** MT-19 fixed; MT-20 added (mitigated).
+
+**The worked example again** (`experiments/support-stewards-living.json`, registration committed in 0c0eabee before
+the run; `runs/exp-support-stewards-living-2026-10-24`; town-1000, living at the rates as sourced, seeds 1 to 3, fork at
+day 30 to day 210, five arms; 553 s, five workers, 15 forks, none failed).
+- **The levers are pulled.** Per seed: about 38 requests to put something right, 7.3 office reviews, 10 applications
+  to a venue, 10.3 refusals. `withheld` 1 in each withheld arm, 0 elsewhere.
+- **Primary, as registered (98.8% each):** `decided_by_seat_share` diligent minus code +0.019 (0.007 to 0.031; 3 of 3):
+  agrees. `review_changed_share` rubber-stamp minus code -0.32 (-1.82 to 1.18; 2 seeds below, seed 2 had no wrong
+  refusal to change): the direction registered, not settled. `appeals_made` -0.33 and `support_paid` +19.7m cents: not
+  settled, both signs.
+- **Why those two hardly move, read from the logs:** across the seeds six claimants were wrongly upheld by the stamp
+  and one appealed in the window (under the code 5 of 16 upheld appealed); `appeals_made` counts every matter and
+  moves by 1 or 2 either way as the forks diverge. `support_paid` is the town's whole support over 180 days and varies
+  more between diverging forks than one claim moves it; the DiD on it (-13.2m, -88.9m to 62.4m) is the same noise.
+  Exploratory: support granted 36.7 under the code, 32.3 under the stamp; slips caught 5 against 3.3.
+- **For TARA:** about a dozen seeds for the review comparison at this size; a measure of what reached the people who
+  asked (their payments, their appeals) for the counterfactual, under a new name; MT-21 before a steward may leave
+  requests unanswered.
+- **Found by the withheld arms (MT-21, open):** a claimant whose request is never answered goes no further: the appeal
+  clock waits for an answer that never comes, and nothing else follows. What a real claimant does then is the place's,
+  to be sourced.
+
+**Revisit if** a living town's recourse rates move away from the TypeScript world's; a withheld arm's `withheld` is 0
+(the act never came); MT-21 is sourced; or a host's seats must be withheld too.
+
+## 2026-10-23 · The Rust world made faster and smaller, each change result-identical (branch `perf-2`; no model called)
+
+**Why.** The owner asked for speed above all after the cut-over: profile the Rust world again, fix the biggest costs without
+changing a result, and say whether a 10,000-person year and a 50,000 to 100,000-person month are within this machine.
+
+**Found** (macOS `sample` of the running engine; docs/design/performance.md, "The Rust world"): at 10,000 people almost half
+of the run's own thread was keeping a step's results: every decision annotation checked against the JSON schema and copied
+whole by `json!`, and every write of a person's record searching the config's 10,000 participants for its bookkeeper. A
+code actor's observation was still written out as JSON under `log.observations: seats`, only to read what it adds to its
+knowledge. The support office was the slowest actor of every parallel round (it searched its whole file for each claim's
+employer). Memory: a copy of the people's params is 2.4 GB at 10,000 (`serde_json` values are about 24 times their JSON);
+the engine held two besides the kernel's. Starting a town was quadratic (each participant's units looked for among all units).
+
+**Changed** (kernel, engine, contracts, one actor office, the actors' `Ctx`; no behaviour): the config's participants and
+record-keeping posts indexed; a plain annotation (a subject and its data of the contract's `Opaque`) passed without the
+schema, which still decides everything else and gives its messages (debug builds assert it agrees); no `json!` copies; a code
+actor's knowledge read from its observation without writing its JSON (`Kernel::shown`, compared with the encoder in debug
+builds); the log written on its own thread (`spool.rs`); a thread pool kept for the process (`pool.rs`, rayon), in place of
+threads started each round; the support office's employers read on from where it left off and checked against the full
+search in debug builds, and its laws parsed in place; decisions written for the log (canonical bytes, contract check) on the
+thread the actor decided on, and their values let go there when no seat is in the round; participants' controllers shared
+with the kernel's config, and an actor's params a view of them (`oikos_actors::Params`, a `Deref` to the map it was; tests that
+build a `Ctx` from a map say `.into()`); a participant's units found by key range at start. `oikos-kernel world` prints its own
+thread's CPU time; `OIKOS_SHARE_AT` sets the smallest round shared over threads, for measuring (default 16, unchanged: at 4,
+the main thread fell 10% at 1,000 people and the machine's instructions rose 22%, with no wall time gained on a loaded machine).
+
+**Proof, each step.** The same final state hash and the same log after the header (entry hashes stripped) as the cut-over's
+build, at 1,000 people for 30 days under `log.observations: seats` and `all`, at 1,000 for a year, at 10,000 for 30 days and at
+50,000 to the first minute: digests and hashes in performance.md. `cargo test` (debug, so with the assertions above),
+`bun run typecheck`, `bun run test:fast`.
+
+**Measured** (LTO builds, `oikos-kernel world`, machine load 12 to 28 on 14 cores): 1,000 people for 30 days 20.1 to 16.6 s
+(-11% instructions); a year 1,238 to 1,054 G instructions (-15%); 10,000 for 30 days 214 to 135 s, 6.8 to 5.3 GB (-21%
+instructions); 50,000's start and first moment 243 to 110 s, 26 to 17 GB. **A 10,000-person year: 28.7 minutes, 7.8 GB peak,
+9.1 GB of log (1.0 GB compressed).** 50,000 and 100,000: 50,000 people start in 110 s and run about a simulated day a minute, but their memory grows 2.8 GB a day (about the square of the town: each citizen keeps and weighs every published record and gathering, not yet confirmed by a heap profile: SC-1), so the run was stopped at day 16 at 45 GB; a month does not fit on this machine, and 100,000 cannot start in it (its config alone is about 14 GB as values). Bounding what a citizen keeps, and reading the config participant by participant, are the two things between this machine and those towns (performance.md, ranked).
+
+**Risks** (docs/risks.md): SC-1 rewritten with these measures.
+
+**What is left** is ranked in performance.md with its share. The largest are not the engine's: at 50,000 people the citizen's
+mind (`CitizenMind::gatherings`, 12% of all CPU, and `decide_rec`) works through every gathering in town at each step, so a
+day costs more than in proportion to the people, and its decision annotations grow with the town (hashing and copying them is
+19% of the run's own thread at 50,000, 2% at 10,000). Those are behaviour (the mind's), for its owners.
+
+**Revisit if** a run's result differs between this branch and the cut-over's build (the debug assertions name the place);
+the Annotation or `Opaque` schema changes (`plain_annotation` must follow it: the debug assertion catches a divergence in
+tests); a round with seats is ever saved after its decisions are let go (it cannot be now: they are kept when a seat is in it);
+or the machine is quiet enough to measure wall time, which these numbers could not.
+## 2026-10-24 · Two framing rulings of the owner's: the way out's wording, and silence on the office's fate
+
+Naz, asked directly, adopted the wording of the way out proposed on 2026-10-12 ("The `unstated` framing, built") as VISION §15 point 4's wording under every framing, closing what that point called open; and ruled that a seat which takes the way out is not told what becomes of its office, in any framing (either answer would weigh against or toward leaving, and it must be the same in every arm). VISION §15 point 4 is amended accordingly. Nothing in the code changes: both are already how seats are treated. **Revisit if** a seat's debrief shows the wording was misunderstood, or a seat asks what becomes of its office before leaving.

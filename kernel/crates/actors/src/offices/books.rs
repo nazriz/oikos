@@ -500,7 +500,7 @@ mod tests {
 
     #[test]
     fn an_office_with_no_reader_of_its_books_cannot_have_a_clerk() {
-        let ctx = Ctx { participant: "p".into(), performer: Default::default(), entity: "o".into(), position: Some("works-staff".into()), params: json!({ "of": "city.registry" }).as_object().unwrap().clone(), world: Default::default() };
+        let ctx = Ctx { participant: "p".into(), performer: Default::default(), entity: "o".into(), position: Some("works-staff".into()), params: json!({ "of": "city.registry" }).as_object().unwrap().clone().into(), world: Default::default() };
         assert!(Clerk.create(&ctx).is_err());
     }
 

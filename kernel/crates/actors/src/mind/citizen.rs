@@ -222,7 +222,7 @@ fn of<T: serde::de::DeserializeOwned + Default>(v: &Json, k: &str) -> T {
 
 impl P {
     pub fn of(ctx: &Ctx) -> P {
-        let v = Json::Object(ctx.params.clone());
+        let v = Json::Object((*ctx.params).clone());
         let dials = &ctx.world.dials;
         let nested = |k: &str, sub: &str| v.get(k).and_then(|x| s(x, sub));
         let union_join_bps: BTreeMap<String, i64> = of(&v, "union_join_bps");

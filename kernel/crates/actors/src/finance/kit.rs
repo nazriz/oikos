@@ -50,7 +50,7 @@ impl Rig {
             performer: Default::default(),
             entity: entity.into(),
             position: Some(format!("{entity}-office")),
-            params: params.as_object().cloned().unwrap_or_default(),
+            params: params.as_object().cloned().unwrap_or_default().into(),
             world,
         };
         let actor = kind.create(&ctx).expect("the kind is made");

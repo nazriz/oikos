@@ -50,3 +50,16 @@ test("temp folders: only the named prefixes, older than a day, whose run is gone
   expect(by).toEqual({ "oikos-old": "remove", "oikos-new": "keep", "forms-trained-1": "remove", "sz-1": "remove", [`oikos-test-${process.pid}-abc`]: "keep" });
   rmSync(tmp, { recursive: true, force: true });
 });
+
+test("build folders: a .claude/target-* goes when nothing was built in it for a day and no running process uses it", async () => {
+  const { classifyTargets } = await import("./disk-tidy");
+  const claude = mk();
+  put(claude, "target-old/release/deps/x.rlib", 10, 3);
+  put(claude, "target-new/release/deps/x.rlib", 10, 3); put(claude, "target-new/release/oikos-kernel", 10, 0); // built today
+  put(claude, "target-used/release/deps/x.rlib", 10, 3);
+  put(claude, "worktrees/x/file", 10, 3); put(claude, "other-old/x", 10, 3);
+  for (const d of ["target-old", "target-old/release", "target-old/release/deps", "target-used", "target-used/release", "target-used/release/deps", "target-new", "target-new/release/deps"]) { const t = (NOW - 3 * DAY) / 1000; utimesSync(join(claude, d), t, t); }
+  const by = Object.fromEntries(classifyTargets(claude, (p) => p.endsWith("target-used"), { now: NOW }).map((t) => [t.name, t.action]));
+  expect(by).toEqual({ "target-old": "remove", "target-new": "keep", "target-used": "keep" });
+  rmSync(claude, { recursive: true, force: true });
+});

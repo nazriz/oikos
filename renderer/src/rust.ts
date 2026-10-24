@@ -13,7 +13,7 @@ const REPO = resolve(import.meta.dir, "..", "..");
 /** The built binary: kernel/target/release, else debug (CARGO_TARGET_DIR is honoured). */
 export function rustBinary(): string | undefined {
   const dirs = [process.env.CARGO_TARGET_DIR, join(REPO, "kernel", "target")].filter(Boolean) as string[];
-  const found = dirs.flatMap((d) => ["release", "debug"].map((p) => join(d, p, "oikos-explore"))).filter((f) => existsSync(f));
+  const found = dirs.flatMap((d) => ["release", "gate", "debug"].map((p) => join(d, p, "oikos-explore"))).filter((f) => existsSync(f));
   return found.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
 }
 
