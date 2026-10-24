@@ -19,3 +19,18 @@ Deaths are acted on (D54). Those who share the dead person's home see it and rep
 
 
 **Found 2026-10-05: no risk until the first birthday in the world.** A body's yearly draws were made at its birthday for the year after, so from the start of a run, an arrival or a birth until then (half a year on average) it could not die, fall ill or be hurt; an infant, not for its whole first year. Now the first draws are made as it enters the world, for what's left of its year of age, at that share of a year's chance. Runs before this date have about half the first year's deaths and illnesses.
+
+## Taking a person out of the world (risk PB-22, 2026-10-23)
+
+Until this change the kernel let any seat take any person out of the world (`leave` with a `person`; the resolver passed
+the name through): a mayor, a police officer or a model in a lender's chair could deport anyone, and the platform recorded
+it as an ordinary act. A steward experiment about who may do what to whom would have measured a hole in the physics.
+
+The rule now (kernel `may_take_out`, from the world's `life.majority` and `life.guardians`): a person may take
+themselves out. A person below the age of majority may also be taken out by a parent or grandparent on record, by a
+position the world names a guardian (the child protection office, which takes a child with no adult at home into care),
+and, where no parent is on record (a newcomer's child: arrivals carry no parentage, PB-22), by any person, as before.
+An adult is taken out by nobody else. A world that sets no majority lets nobody take another. Whether a taking is
+lawful or wise is content; the kernel only says who has the physical standing to do it, as it does for a child in a
+parent's care. The generator sets `majority` from the profile's youngest adult age (`households.adult_ages[0]`) and
+names `child-protection` the guardian. Held by `kernel/tests/departures.rs`.

@@ -327,6 +327,9 @@ export function townLife(P: Profile, care?: { treated_bps: number; fatal_kept_bp
     illness: band ? { ...ill, severity: ill.severity.map((b) => (b === band ? { ...b, fatal_by_age: fatal.map((bps, age) => ({ from: age, bps })) } : b)) } : L.illness,
     injury: L.injury,
     birth: { ages: L.birth.ages, gestation: L.birth.gestation_days * DAY, reach: 0, female_bps: L.birth.female_bps },
+    // Who decides for themselves (docs/behaviour/life.md "Taking a person out of the world"): the profile's youngest adult; the child protection office may take a minor into care.
+    majority: P.values.households.adult_ages[0],
+    guardians: ["child-protection"],
   };
 }
 

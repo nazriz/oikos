@@ -135,6 +135,10 @@ pub struct Housing {
     next_buy_chance: i64,
     /// When we sold up to leave (leaving town reads it: TS's `soldAndGoing`).
     pub sold_and_going: Option<i64>,
+    /// The mortgage we asked the bank to be paid off with the sale's money, until we see the payment made (leaving town waits for it: what we
+    /// send on is what is left after it).
+    #[serde(default)]
+    pub paying_off: Option<String>,
     sold_lots: BTreeSet<String>,
     /// What the last look at the listings showed (ids), and when; whether a look is out.
     on_sale: Option<Vec<String>>,
@@ -2004,6 +2008,7 @@ impl Person {
                             calls.push(withdraw(&o, Some("Mortgage paid off.")));
                         }
                         w.push(because(format!("Paying our mortgage off ({}), and stopping its repayments.", Self::usd(w, amount)), calls));
+                        self.housing.paying_off = Some(loan.clone());
                         if s.leave_after {
                             self.housing.sold_and_going = Some(t);
                         }
