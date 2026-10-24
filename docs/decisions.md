@@ -8028,7 +8028,7 @@ throughput and time are read from the table of work, charged and queued; build i
 - **Revisit if** a support-office experiment is planned (WM-14's "fix when"), or the answer to (1) changes how seats
   in other outside offices are held.
 
-## 2026-10-25 · Found on the way: the perception property fails now and then (not fixed)
+## 2026-10-25 · Found on the way: the perception property fails now and then (fixed the same day, below)
 
 `kernel/tests/perception.rs`, `a_view_built_from_changes_equals_the_full_picture`, failed once in the gate on
 `pilot-faults` and passed three times after: proptest's cases are random, and one case (kept outside the repository, in
@@ -8037,3 +8037,33 @@ records twice, so the view built from changes lists the lots and the river law t
 It fails the same with this branch's kernel changes taken out, so it is on main. Not chased here (parity: record).
 - **Revisit:** before the next kernel merge, run the case (`ops` beginning `Smart { kind: 70 }, Smart { kind: 187 }`)
   and find which block delivers a standing channel whole twice.
+
+## 2026-10-25 · The perception property's fault, found and mended: a post handed back is shown whole, and says so (branch `view-flake`)
+
+The case above (now in `perception.proptest-regressions`, and as its own test, `a_post_handed_back_is_shown_whole_not_twice`)
+fails every time, not now and then: the property draws new cases each run, and few of them hand a post away and back.
+- **Cause.** Since 2026-10-24 (the twins entry: `set_holder` clears a new holder's marks for the post's channels) a
+  participant given back a post it held before is shown the post's file whole on its first look, as someone who never
+  held it is. Right for a code unit, which is made new for each tenure; but the delivery did not say it was whole, so it
+  read as "what's new since your last look", and whoever kept a view across the tenures (the property's view, and a seat,
+  whose one unit and view last the whole run) put the old file and the new one together. In the case the finance seat
+  hands its post to the mayor's, the mayor's hands it back, and every record of `finance/laws` is in the view twice.
+  Not an ordering fault or nondeterminism: one exact sequence, every time.
+- **Mended in the kernel.** The marks are kept, marked `anew` (`Look::anew`, world/state.rs), instead of dropped; the
+  next look through each such channel (perception/observe.rs) is a first look, as before, and is said to be whole
+  (`whole: true`, the flag a move already sets) for records and maps, and, for money and stores, which have no such
+  flag, also lists the accounts closed and the holdings gone to nothing, so that what was kept from before goes. The
+  contract's shape is unchanged; the two `whole` descriptions name the second reason (participant-api.schema.json).
+  A first tenure, and every look after the first, are as they were: state and log hashes move only in a run where a
+  post goes back to someone who looked through it before. The property is as strict as it was; a direct test
+  (`a_returning_holder_is_told_the_file_is_whole`) pins the flag.
+- **In real runs.** It can happen (the twins entry's own case: a deputy reappointing c0053 at day 90). No prompt listed a
+  record twice: both views a seat reads through (`sight/view.rs` and `participants/src/view.ts`) keep records by id, so
+  a standing channel's file was replaced record by record, and a channel that shows what's new showed the whole file as
+  new, which is what 2026-10-24 meant it to. What a returning seat could have been shown wrongly is the opposite of a
+  duplicate: anything that left the file while it was away (an account closed, a holding run out, the surroundings of a
+  near channel after a move) stayed in its view. Code units were never affected (a new unit each tenure). Logs hold
+  each observation as delivered: right for what was delivered, but a reader rebuilding a returning holder's view from an
+  older log by appending would double that look's records, as the property did.
+- **Revisit if** a host keeps views by appending rather than by id, or the contract gains a `whole` for accounts and
+  holdings (then use it here instead of listing what went).

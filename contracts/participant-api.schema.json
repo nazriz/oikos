@@ -897,7 +897,7 @@
               "const": true
             },
             "whole": {
-              "description": "The participant's entity has moved since its last look through this channel (which looks near it): these are everything the channel now covers, in place of what it covered before.",
+              "description": "These are everything the channel now covers, in place of what it covered before: the participant's entity has moved since its last look through this channel (which looks near it), or the channel is a post's that the participant held before, lost, and has been given again.",
               "const": true
             }
           }
@@ -919,7 +919,7 @@
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
             },
             "whole": {
-              "description": "The capacity's entity has moved since its last look through this channel (which looks near it): these cells are the whole of its new surroundings, in place of the old.",
+              "description": "These cells are the whole of what the channel now covers, in place of the old: the capacity's entity has moved since its last look through this channel (which looks near it), or the channel is a post's that the participant held before, lost, and has been given again.",
               "const": true
             },
             "visited": {
