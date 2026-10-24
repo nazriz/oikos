@@ -803,7 +803,7 @@ export async function runExperiment(spec: ExperimentSpec, o: RunOptions): Promis
   if (lever.length) throw new Error(`experiment ${spec.name}: ${lever.join("; ")}`);
   // A model steward is seated only where its office can do its work (seat-ready.ts): refused before any fork is run.
   // And framed as the spec chooses, arm by arm or for every seat: a real model's seat is never framed by default.
-  const unframed = modelArms(spec).filter((a) => a.steward.kind === "model" && a.steward.framing === undefined && spec.seats?.framing === undefined).map((a) => a.name);
+  const unframed = mockModels(spec) ? [] : modelArms(spec).filter((a) => a.steward.kind === "model" && a.steward.framing === undefined && spec.seats?.framing === undefined).map((a) => a.name);
   if (unframed.length) throw new Error(`experiment ${spec.name}: no framing is chosen for the model seat of ${unframed.length === 1 ? "the arm" : "the arms"} ${unframed.join(", ")}: give the arm a framing ("unstated" or "simulation", or { disclosure, reason }), or seats.framing for every arm`);
   if (!mockModels(spec) && modelArms(spec).length) {
     const config = await buildConfig(spec, spec.seeds[0]!);
