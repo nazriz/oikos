@@ -7370,3 +7370,16 @@ or the machine is quiet enough to measure wall time, which these numbers could n
 ## 2026-10-24 · Two framing rulings of the owner's: the way out's wording, and silence on the office's fate
 
 Naz, asked directly, adopted the wording of the way out proposed on 2026-10-12 ("The `unstated` framing, built") as VISION §15 point 4's wording under every framing, closing what that point called open; and ruled that a seat which takes the way out is not told what becomes of its office, in any framing (either answer would weigh against or toward leaving, and it must be the same in every arm). VISION §15 point 4 is amended accordingly. Nothing in the code changes: both are already how seats are treated. **Revisit if** a seat's debrief shows the wording was misunderstood, or a seat asks what becomes of its office before leaving.
+
+## 2026-10-24 · Slots: an older version's waiter cannot hold the queue, and a build runs half as many jobs as its tokens
+
+- **What we saw:** 41 jobs waiting with 3 tokens free, and the machine at load 30 on 14 cores. Two causes. (1) A worktree
+  on a slots.ts from before the cap queued by the strict oldest, while the new code passes over a waiter its cap holds
+  back: each version waited for the other's head. (2) A build holding N tokens ran N rustc jobs, and one rustc spreads its
+  codegen over 4 to 5 cores under load, so a build of 3 tokens used about 10 cores; five agents building at once made a
+  build of 81 s on a quiet machine take over 20 minutes.
+- **Change:** the head of the queue (`headOf`) passes over a waiter that recorded no cap (an older version's; it takes its
+  turn by its own rule once it is the oldest). A build's cargo jobs are half its tokens (`buildJobs`). Agents at once: 3,
+  not 5 (Naz, 2026-10-24).
+- **Revisit if:** a quiet machine's gate build gets slower by more than a fifth (then measure jobs against tokens properly),
+  or load still runs far past the core count with 3 agents.
