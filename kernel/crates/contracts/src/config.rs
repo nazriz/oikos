@@ -877,6 +877,14 @@ pub struct Life {
     pub harm: Option<Harm>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub birth: Option<BirthPhysics>,
+    /// The age (in years) from which a person decides for themselves. Below it a person may be taken out of the world by
+    /// another (their parent or grandparent, or a position in `guardians`); from it, only by themselves. Absent: nobody may take
+    /// another out (docs/behaviour/life.md "Taking a person out of the world").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub majority: Option<u32>,
+    /// Positions that may take a minor out of the world on their own authority (a child protection office).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardians: Vec<Id>,
 }
 
 /// Steps by age: each `{from, bps}` applies from that age (in years) until the next.

@@ -96,15 +96,16 @@ test("who may direct is the town's rule as it stands: amended, the new posts; wi
   expect(posted(wake(works({ directed_under: "" }), 6 * DAY, records(...base, d), { entity: "city" }))).toBe(1);
 });
 
-test("a direction is followed only on the office's own form, and only as often as the office follows directions", () => {
+test("a direction is followed only on the office's own form, and, once on it, always (PB-16: a share set as the office's compliance no longer decides it)", () => {
   // Filed on another office's form of the same shape: not ours.
   const other = direction("rec.50", 5 * DAY, "form-environment-staffing", "mayor", { recruit: "no" });
   const w = wake(works(), 6 * DAY, records(...base, form("environment_staffing", "environment"), other), { entity: "city" });
   expect(posted(w)).toBe(1);
   expect(letters(w)).toEqual([]);
-  // An office that never follows a direction (its holder's conduct, a parameter as the finance office's is).
+  // No office follows a direction by chance (PB-16, 2026-10-23): a world that still sets `direction_compliance_bps` to 0 is
+  // followed just the same; a direction is not followed only for want of authority or while on hold, both on file.
   const d = direction("rec.50", 5 * DAY, "form-works-staffing", "mayor", { recruit: "no" });
-  expect(posted(wake(works({ direction_compliance_bps: 0 }), 6 * DAY, records(...base, d), { entity: "city" }))).toBe(1);
+  expect(posted(wake(works({ direction_compliance_bps: 0 }), 6 * DAY, records(...base, d), { entity: "city" }))).toBe(0);
 });
 
 test("the works office's report says which directions it is following, and collects as often as directed", () => {
