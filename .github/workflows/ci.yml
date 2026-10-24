@@ -1,23 +1,26 @@
-# Automatic pass/fail on every push to main and every pull request, on the self-hosted runner on the run server
-# (Mac mini). Registering that runner is the owner's step: docs/ci-runner.md. Until it is registered, jobs queue.
+# Pass/fail on every push to main, and nightly, on the self-hosted runner on the run server (Mac mini): both tiers of
+# the suite (docs/dev-machine.md). The merge gate (scripts/merge.ts) runs only the gate tier, and only what the change
+# reaches; this runs everything, so every assertion runs on every push. Registering the runner: docs/ci-runner.md.
+# No pull_request trigger: the repository is public, and a self-hosted runner must not run code from a fork's PR.
 name: ci
 
 on:
   push:
     branches: [main]
-  pull_request:
   schedule:
     - cron: "0 3 * * *" # nightly, on main
+  workflow_dispatch:
 
-# A newer push to the same branch or PR replaces the one still running.
+# One run at a time. A push does not cancel the run under way (main's result is what the merge script waits on); a
+# newer push replaces one still waiting, since it holds everything the waiting one does.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event_name == 'schedule' && 'nightly' || github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'schedule' && 'nightly' || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   test:
     runs-on: [self-hosted, macOS, oikos-mini]
-    timeout-minutes: 120
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - name: Tools on the PATH
@@ -25,11 +28,13 @@ jobs:
       - run: bun install
       - run: bun run kernel
       - run: bun run typecheck
-      - name: Kernel tests
-        run: bun scripts/slots.ts --weight half --what "ci cargo test" -- cargo test --release --manifest-path kernel/Cargo.toml --workspace -q
-      - name: Whole suite
-        run: bun run test:all
+      # The gate tier (with the kernel's own tests), then the slow tier: year-long towns, multi-seed and scenario runs.
+      - name: Gate tier
+        run: bun scripts/test.ts --tier gate --no-build
+      - name: Slow tier
+        if: ${{ !cancelled() }}
+        run: bun scripts/test.ts --tier slow --no-build
       # What the merge script reads: while the latest result on main is a failure, it merges nothing but the fix.
       - name: Record the result for the merge script
-        if: always() && github.event_name != 'pull_request'
+        if: ${{ !cancelled() }}
         run: bun scripts/main-status.ts record "$GITHUB_SHA" "${{ job.status }}"

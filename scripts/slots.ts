@@ -17,14 +17,20 @@
 // A job given priority (--priority high, OIKOS_SLOT_PRIORITY=high, inherited by its children: the merge's) stands ahead of
 // every job without it in the queue, and a job without it never takes tokens past a waiting job with it. Nothing running
 // is stopped: it starts when the next tokens are free.
+// A cap per agent (2026-10-24): an agent is a checkout (the git worktree a job runs in; OIKOS_SLOT_OWNER names another),
+// and no agent holds more than a quarter of the pool (OIKOS_SLOT_CAP=N, or none). A job asks at most the cap (a build
+// asking half the cores gets the cap, and compiles that many at a time). Two kinds of job may go past it: the merge's
+// (priority high: one batch at a time, by the merge lock), and a job that borrows (the test runner's tokens, held for one
+// test file each: seconds), and that only while no other agent is waiting; once one is, the borrower takes nothing more
+// until it is back under its cap, and its borrowed tokens come back as its files end.
 // Waiting changes when a job starts and nothing else: nothing here is read by a run.
 
 import { existsSync, linkSync, mkdirSync, readdirSync, readFileSync, rmdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { availableParallelism, homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 export interface Slot { weight: number; release(): void }
-interface Holder { pid: number; since: number; what: string; cwd: string; priority?: number }
+interface Holder { pid: number; since: number; what: string; cwd: string; priority?: number; owner?: string; borrow?: boolean; cap?: number | null }
 interface Waiter extends Holder { weight: number; file: string }
 
 export const slotsDir = () => process.env.OIKOS_SLOTS_DIR ?? join(homedir(), ".oikos", "slots");
@@ -39,6 +45,32 @@ export const defaultPriority = () => ((process.env.OIKOS_SLOT_PRIORITY ?? "").to
 /** The queue's order: higher priority first, then the oldest. */
 export const queueOrder = (a: { priority?: number; since: number; pid: number; file: string }, b: { priority?: number; since: number; pid: number; file: string }) =>
   (b.priority ?? 0) - (a.priority ?? 0) || a.since - b.since || a.pid - b.pid || (a.file < b.file ? -1 : 1);
+/** The checkout a directory belongs to (the nearest folder above it with a `.git`): the agent, for the cap. */
+export function ownerOf(cwd: string): string {
+  for (let d = cwd; d && d !== "/"; d = dirname(d)) if (existsSync(join(d, ".git"))) return d;
+  return cwd;
+}
+const myOwner = () => process.env.OIKOS_SLOT_OWNER || ownerOf(process.cwd());
+/** The most tokens one agent holds: a quarter of the pool (OIKOS_SLOT_CAP=N sets it, "none" lifts it). */
+export function capSize(size = poolSize()): number {
+  const c = (process.env.OIKOS_SLOT_CAP ?? "").toLowerCase();
+  if (c === "none" || c === "off") return Infinity;
+  const n = Number(c);
+  return c && Number.isInteger(n) && n > 0 ? n : Math.max(1, Math.floor(size / 4));
+}
+/**
+ * Whether a waiter may take its tokens now, by the cap: the merge's always; anyone whose agent would stay within the cap;
+ * a borrower past it only while no other agent waits. (Its own part-taken tokens are not counted against it.)
+ */
+export function eligible(w: { pid: number; since: number; weight: number; owner?: string; cwd: string; priority?: number; borrow?: boolean; cap?: number | null }, holders: { pid: number; since: number; owner?: string; cwd: string }[], waiters: { owner?: string; cwd: string }[], defaultCap: number): boolean {
+  if ((w.priority ?? 0) > 0) return true;
+  // (The waiter's own cap, as it recorded it, so that every process judges the queue alike; null: none.)
+  const cap = w.cap === null ? Infinity : w.cap ?? defaultCap;
+  const owner = w.owner ?? ownerOf(w.cwd);
+  const held = holders.filter((h) => (h.owner ?? ownerOf(h.cwd)) === owner && !(h.pid === w.pid && h.since === w.since)).length;
+  if (held + w.weight <= cap) return true;
+  return !!w.borrow && !waiters.some((x) => (x.owner ?? ownerOf(x.cwd)) !== owner);
+}
 /** The weight of the slot this process was started inside (0: none). */
 export const heldByParent = () => Number(process.env.OIKOS_SLOT_HELD) || 0;
 /** The environment for a child started inside a slot of this weight. */
@@ -100,6 +132,9 @@ export function state(dir = slotsDir()): { size: number; holders: (Holder & { sl
       const h = read(join(dir, f));
       if (h && alive(h.pid)) holders.push({ ...h, slot: f });
       else reclaim(dir, f);
+    } else if (f.startsWith("own-")) {
+      const h = read(join(dir, f));
+      if (!h || !alive(h.pid)) reclaim(dir, f);
     } else if (f.startsWith("wait-")) {
       const w = read(join(dir, f)) as Waiter | undefined;
       if (w && alive(w.pid)) waiters.push({ ...w, file: f });
@@ -114,7 +149,7 @@ export function state(dir = slotsDir()): { size: number; holders: (Holder & { sl
  * Takes `weight` tokens, waiting for them if need be. Inside a slot already (a holder's child), or with slots off,
  * it returns at once holding nothing. `cancel` is asked while waiting: true gives up (the result is then undefined).
  */
-export async function take(weight = 1, what = process.argv.slice(1, 3).join(" "), o: { priority?: number; cancel?: () => boolean; say?: (line: string) => void; pollMs?: number } = {}): Promise<Slot | undefined> {
+export async function take(weight = 1, what = process.argv.slice(1, 3).join(" "), o: { priority?: number; borrow?: boolean; cancel?: () => boolean; say?: (line: string) => void; pollMs?: number } = {}): Promise<Slot | undefined> {
   const nothing: Slot = { weight: 0, release() {} };
   if (slotsOff() || heldByParent()) return nothing;
   const dir = slotsDir();
@@ -123,22 +158,40 @@ export async function take(weight = 1, what = process.argv.slice(1, 3).join(" ")
   hookExit();
   const size = poolSize();
   if (!Number.isFinite(weight)) throw new Error(`slots: ${weight} is not a weight (a number of tokens)`);
-  const want = Math.max(1, Math.min(size, Math.round(weight)));
   const priority = o.priority ?? defaultPriority();
-  const body = { pid: process.pid, since: Date.now(), what, cwd: process.cwd(), ...(priority ? { priority } : {}) };
+  const cap = capSize(size);
+  const want = Math.max(1, Math.min(size, priority ? Infinity : cap, Math.round(weight)));
+  const body = { pid: process.pid, since: Date.now(), what, cwd: process.cwd(), owner: myOwner(), ...(priority ? { priority } : {}), ...(o.borrow ? { borrow: true } : {}), cap: Number.isFinite(cap) ? cap : null };
+  const me = { ...body, weight: want };
   const got: string[] = [];
   const release = () => { for (const f of got.splice(0)) { remove(f); mine.delete(f); } };
-  const grab = () => {
-    for (let i = 0; i < size && got.length < want; i++) {
+  // The cap is held by tokens of the checkout's own (`own-<checkout>-<i>`, i below the cap), taken before the pool's, so
+  // that two jobs of one checkout starting at once cannot both find it under its cap. A borrower past the cap takes the
+  // pool's alone, and only while no other checkout waits.
+  const tag = Bun.hash(body.owner).toString(36);
+  const capped = !priority && Number.isFinite(cap);
+  const grab = (s: { waiters: Waiter[] }) => {
+    if (capped) {
+      let mineNow = got.filter((f) => f.includes(`/own-${tag}-`)).length;
+      for (let i = 0; i < cap && mineNow < want; i++) {
+        const path = join(dir, `own-${tag}-${i}`);
+        if (got.includes(path)) continue;
+        if (claim(dir, `own-${tag}-${i}`, body)) { got.push(path); mine.add(path); mineNow++; }
+      }
+      if (mineNow < want && !(o.borrow && !s.waiters.some((w) => (w.owner ?? ownerOf(w.cwd)) !== body.owner))) { release(); return false; }
+    }
+    let n = got.filter((f) => f.includes("/slot-")).length;
+    for (let i = 0; i < size && n < want; i++) {
       const path = join(dir, `slot-${i}`);
       if (got.includes(path)) continue;
-      if (claim(dir, `slot-${i}`, body)) { got.push(path); mine.add(path); }
+      if (claim(dir, `slot-${i}`, body)) { got.push(path); mine.add(path); n++; }
     }
-    return got.length >= want;
+    return n >= want;
   };
   // Nobody waiting: straight to the tokens. Otherwise, and if they aren't all free, into the queue.
   // (Tokens are held while waiting only by the head of the queue: a part taken here is given back first.)
-  if (!state(dir).waiters.some((w) => (w.priority ?? 0) >= priority) && grab()) return { weight: want, release };
+  const s0 = state(dir);
+  if (!s0.waiters.some((w) => (w.priority ?? 0) >= priority) && eligible(me, s0.holders, s0.waiters, cap) && grab(s0)) return { weight: want, release };
   release();
   const waitName = `wait-${process.pid}-${serial++}`;
   const waitFile = join(dir, waitName);
@@ -153,15 +206,19 @@ export async function take(weight = 1, what = process.argv.slice(1, 3).join(" ")
     const s = state(dir); // (also reclaims the tokens of the dead)
     // (The queue's directory emptied under us, by a cleanup: back into it, rather than wait for ever outside it.)
     if (!s.waiters.some((w) => w.file === waitName)) { mkdirSync(dir, { recursive: true }); claim(dir, waitName, { ...body, weight: want }); await Bun.sleep(o.pollMs ?? 250); continue; }
-    // Only the head of the queue takes tokens (it may hold some while it waits for the rest: nobody else is taking).
-    if (s.waiters[0]?.file === waitName && grab()) { leave(); return { weight: want, release }; }
-    // (A merge arrived ahead of us: the tokens we held while we were the head go back, so the head can fill its weight.)
-    if (s.waiters[0]?.file !== waitName && got.length) release();
+    // Only the head of the queue takes tokens (it may hold some while it waits for the rest: nobody else is taking). The
+    // head is the first waiter the cap lets take; a waiter held back by its agent's cap lets the next one go.
+    const head = s.waiters.find((w) => eligible(w, s.holders, s.waiters, cap));
+    if (head?.file === waitName && grab(s)) { leave(); return { weight: want, release }; }
+    // (Another is the head now, a merge or an agent under its cap: the tokens we held while we were the head go back.)
+    if (head?.file !== waitName && got.length) release();
     const waited = Date.now() - t0;
     if (waited >= 2000 && (!said || Date.now() - said >= 60_000)) {
       said = Date.now();
       const ahead = Math.max(0, s.waiters.findIndex((w) => w.file === waitName));
-      say(`slots: waiting ${Math.round(waited / 1000)} s so far for ${want} of ${size} (${s.holders.length} held, ${ahead} ahead in the queue): ${what}   [bun scripts/slots.ts status]`);
+      const mine = s.holders.filter((h) => (h.owner ?? ownerOf(h.cwd)) === body.owner).length;
+      const capped = !priority && mine + want > cap ? `; this checkout holds ${mine}, its cap is ${cap}` : "";
+      say(`slots: waiting ${Math.round(waited / 1000)} s so far for ${want} of ${size} (${s.holders.length} held, ${ahead} ahead in the queue${capped}): ${what}   [bun scripts/slots.ts status]`);
     }
     await Bun.sleep(o.pollMs ?? 250);
   }
@@ -173,7 +230,7 @@ if (import.meta.main) {
   if (args[0] === "status") {
     if (slotsOff()) console.log("slots are off (OIKOS_SLOTS=off)");
     const s = state();
-    console.log(`${s.holders.length} of ${s.size} slots held, ${s.waiters.length} waiting (${slotsDir()})`);
+    console.log(`${s.holders.length} of ${s.size} slots held, ${s.waiters.length} waiting (${slotsDir()}); cap per checkout ${capSize(s.size)}`);
     const by = new Map<string, (typeof s.holders)>();
     for (const h of s.holders) by.set(`${h.pid} ${h.since}`, [...(by.get(`${h.pid} ${h.since}`) ?? []), h]);
     for (const hs of by.values()) console.log(`  held ${String(hs.length).padStart(2)}  pid ${hs[0]!.pid}  for ${ago(hs[0]!.since)}  ${hs[0]!.what}  (${hs[0]!.cwd})`);

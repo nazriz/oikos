@@ -13,12 +13,14 @@
 // Heavy work goes through the machine's slots (scripts/slots.ts): one token for each test file running, half the cores
 // for the kernel's tests, so several suites on one machine share the cores. Under that, how many files run at once
 // still follows the load average (work that takes no slot counts too).
-// `--affected [--base REF]` is for the merge: everything the change could affect, and no more. A change to the kernel,
-// the contracts, the manifests or the runner itself (see FULL_ON) chooses the whole suite; a change of documents only
+// `--gate [--base REF]` (bun run test:changed; `--affected` is its old name) is the merge gate, and every agent's: the
+// gate tier only (scripts/test-tiers.json names the slow tier; CI runs both tiers on every push and nightly). A change
+// to the kernel, the contracts, the manifests or the runner itself (see FULL_ON) chooses the whole gate tier, and the
+// kernel's own tests of the crates the change reaches (cargo-nextest, the `gate` profile); a change of documents only
 // chooses the tests that read documents, plus the backstops; any other change chooses the fast tier, the tests that
 // are changed, import a changed file or name a changed data file or its folder, and the backstops (BACKSTOPS: the
-// invariant tests, always). The whole suite stays for a schedule (`bun run test:all`). `--list` prints the choice and
-// stops. The kernel's own tests (cargo) run alongside the test files, not before them.
+// invariant tests, always). Where the release kernel is not current, the gate builds the `gate` profile in seconds and
+// points the tests at it. `--tier gate|slow` runs one tier whole. `--list` prints the choice and stops.
 // `--root DIR` runs the *.test.ts under DIR instead of the repo (used by scripts/test-runner.test.ts; no preconditions).
 
 import { Glob } from "bun";
@@ -38,7 +40,10 @@ const jobsFlag = flag("jobs");
 const fast = bool("fast");
 const timeNew = bool("time-new");
 const noBuild = bool("no-build");
-const affected = bool("affected");
+// (`--gate` is the merge's and every agent's: `bun run test:changed`. `--affected` is its old name.)
+const affected = [bool("gate"), bool("affected")].some(Boolean);
+const tierFlag = flag("tier") ?? "all";
+if (!["gate", "slow", "all"].includes(tierFlag)) { console.log(`--tier is gate, slow or all, not ${tierFlag}`); process.exit(2); }
 const list = bool("list");
 const changed = bool("changed") || affected;
 const base = flag("base") ?? "origin/main";
@@ -46,7 +51,7 @@ const filters = args;
 /** A change to any of these could reach any test: the whole suite. */
 const FULL_ON = [/^kernel\//, /^contracts\/(?!.*\.md$)/, /^(package\.json|bun\.lock|bunfig\.toml|tsconfig.*\.json)$/, /^scripts\/(test|slots|slots-preload)\.ts$/, /^\.github\//];
 /** Always run under --affected: the invariants and backstops. */
-const BACKSTOPS = ["orchestrator/test/generality.test.ts", "orchestrator/test/no-god-view.test.ts", "contracts/test/contracts.test.ts", "orchestrator/test/invariants.test.ts"]; // (the last from the test audit; used once on main)
+const BACKSTOPS = ["orchestrator/test/generality.test.ts", "orchestrator/test/no-god-view.test.ts", "contracts/test/contracts.test.ts", "orchestrator/test/invariants-gate.test.ts", "orchestrator/test/all-work-takes-time.test.ts", "orchestrator/test/risks.test.ts", "orchestrator/test/unstated-run.test.ts", "scripts/tiers.test.ts"]; // (the year of invariants.test.ts is the slow tier's: CI)
 const isDoc = (f: string) => /\.md$/.test(f) || (f.startsWith("docs/") && /\.(txt|png|svg|jpg)$/.test(f));
 
 const cores = cpus().length;
@@ -61,6 +66,12 @@ function allowed(running: number): number {
 // How long each file took last time (kept beside this script): the slowest go first, so the run ends when they do.
 const timesPath = join(repo, "scripts", "test-times.json");
 const times: Record<string, number> = !custom && existsSync(timesPath) ? JSON.parse(readFileSync(timesPath, "utf8")) : {};
+// The tiers (scripts/test-tiers.json, under --root its own): the slow tier is named file by file, with why; every other
+// test file is the gate's. The gate never runs the slow tier: CI runs both on every push to main, and nightly
+// (scripts/tiers.test.ts holds that every file is in exactly one, and that CI runs them all).
+const tiersPath = join(root, "scripts", "test-tiers.json");
+const tiers: { slow: Record<string, string> } = existsSync(tiersPath) ? JSON.parse(readFileSync(tiersPath, "utf8")) : { slow: {} };
+const isSlowTier = (f: string) => Object.hasOwn(tiers.slow, f);
 /** A file is fast if it took under this long last time (never timed: slow, until it has been). */
 const FAST_SECONDS = 10;
 
@@ -76,7 +87,7 @@ function newest(dir: string, found = { t: 0, f: "" }): { t: number; f: string } 
   return found;
 }
 function run(cmd: string[], cwd: string) { return Bun.spawnSync(cmd, { cwd, stdout: "inherit", stderr: "inherit" }).exitCode === 0; }
-function preconditions() {
+function preconditions(gate = false) {
   if (!existsSync(join(repo, "node_modules")) && !run(["bun", "install"], repo)) stop("`bun install` failed in the repo root");
   const cel = join(repo, "docs/research/cel-check");
   if (existsSync(cel) && !existsSync(join(cel, "node_modules/@bufbuild/cel")) && !run(["bun", "install"], cel)) stop("`bun install --cwd docs/research/cel-check` failed");
@@ -90,16 +101,36 @@ function preconditions() {
   const built = () => Math.max(...[kernel, wasm, stamp].map((p) => statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? 0));
   const stale = () => [kernel, wasm].some((p) => !existsSync(p)) || built() < src.t;
   if (!stale()) return;
+  if (gate) return gateBuild();
   if (noBuild) stop(`the kernel binary or the law wasm module is missing or older than ${src.f.replace(repo + "/", "")}: run \`bun run kernel\``);
   console.log("building the kernel and the law module (bun run kernel)...");
   if (!run(["bun", "run", "kernel"], repo) || [kernel, wasm].some((p) => !existsSync(p))) stop("`bun run kernel` did not produce a kernel binary and law wasm module: run it and read its errors");
   if (!process.env.OIKOS_KERNEL && !process.env.OIKOS_LAW_MODULE) writeFileSync(stamp, "");
 }
-if (!custom) preconditions();
+/**
+ * The gate's kernel, when the release build is not current (a kernel change, or a checkout last built at another
+ * commit): the `gate` profile (kernel/Cargo.toml: release's optimisation and overflow checks, no whole-program link),
+ * built in seconds where the release build takes minutes, and the law's wasm module as always. The tests are pointed at
+ * it (OIKOS_KERNEL, OIKOS_ENGINE_MODULE, OIKOS_LAW_MODULE, inherited by every file). The release build is CI's.
+ */
+function gateBuild() {
+  const target = process.env.CARGO_TARGET_DIR ?? join(repo, "kernel/target");
+  console.log("--gate: the release kernel is not current here: building the gate profile (seconds when little changed)...");
+  const t = performance.now();
+  const cmd = "cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace -q && cargo build --release --manifest-path kernel/Cargo.toml --target wasm32-unknown-unknown -p oikos-law -q";
+  if (!run(["bun", join(import.meta.dir, "slots.ts"), "--weight", "4", "--what", "kernel build (gate profile)", "--", "sh", "-c", cmd], repo)) stop("the gate build of the kernel failed: run `cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace` and read its errors");
+  const lib = ["liboikos_napi.dylib", "liboikos_napi.so"].map((f) => join(target, "gate", f)).find((f) => existsSync(f));
+  process.env.OIKOS_KERNEL = join(target, "gate", "oikos-kernel");
+  if (lib) process.env.OIKOS_ENGINE_MODULE = lib;
+  process.env.OIKOS_LAW_MODULE = join(target, "wasm32-unknown-unknown/release/oikos_law.wasm");
+  console.log(`--gate: kernel built (gate profile) in ${((performance.now() - t) / 1000).toFixed(0)}s: ${process.env.OIKOS_KERNEL}`);
+}
 
 const all = [...new Glob("**/*.test.ts").scanSync({ cwd: root })]
-  .filter((f) => !f.includes("node_modules") && !f.startsWith("runs/") && !f.startsWith("kernel/target"))
-  .filter((f) => !filters.length || filters.some((x) => f.includes(x)));
+  .filter((f) => !f.includes("node_modules") && !f.startsWith("runs/") && !f.startsWith("kernel/target") && !f.startsWith(".claude/"))
+  .filter((f) => !filters.length || filters.some((x) => f.includes(x)))
+  // (The gate is the gate tier's; --tier picks one.)
+  .filter((f) => (affected || tierFlag === "gate" ? !isSlowTier(f) : tierFlag === "slow" ? isSlowTier(f) : true));
 const untimed = all.filter((f) => times[f] === undefined);
 
 // ---- `--changed`: what the branch touched, and the tests that reach it.
@@ -165,17 +196,18 @@ const pick = changed ? reasons(all, affected) : undefined;
 const fullWhy = affected && pick ? pick.changedFiles.find((f) => FULL_ON.some((r) => r.test(f))) : undefined;
 const docsOnly = affected && !!pick && !fullWhy && pick.changedFiles.length > 0 && pick.changedFiles.every(isDoc);
 const sel = fullWhy || !pick ? undefined : pick;
-if (affected) console.log(fullWhy ? `--affected: ${fullWhy} changed, which could reach any test: the whole suite.` : docsOnly ? "--affected: documents only: the tests that read documents, and the backstops." : "");
+if (affected) console.log(fullWhy ? `--gate: ${fullWhy} changed, which could reach any test: the whole gate tier (${all.length} files; the slow tier runs in CI).` : docsOnly ? "--gate: documents only: the tests that read documents, and the backstops." : "");
 if (sel) {
   const isFast = (f: string) => (times[f] ?? Infinity) < FAST_SECONDS;
   const extra = all.filter((f) => pick.why.has(f) && !isFast(f));
   const slow = all.filter((f) => !isFast(f));
   console.log(`--changed: ${pick.changedFiles.length} file${pick.changedFiles.length === 1 ? "" : "s"} changed since ${base}; the fast tier (${all.length - slow.length} files) and ${extra.length} more:`);
   for (const f of extra) console.log(`  + ${f} (about ${Math.round(times[f] ?? 0)}s): ${pick.why.get(f)}`);
-  if (pick.kernel) console.log("  + the kernel's own tests (cargo): kernel sources changed. The tests that simulate towns all run the kernel and are NOT chosen for that: they are the merge's full suite.");
+  if (pick.kernel && !affected) console.log("  + the kernel's own tests (cargo): kernel sources changed. The tests that simulate towns all run the kernel and are NOT chosen for that: `--gate` chooses them.");
   if (pick.unreached.length) console.log(`  no test imports or names: ${pick.unreached.slice(0, 12).join(", ")}${pick.unreached.length > 12 ? `, and ${pick.unreached.length - 12} more` : ""}`);
   if (slow.length && extra.length > slow.length / 2) console.log(`  (${extra.length} of the ${slow.length} slow files: this change reaches most of the suite. To run less, name the tests that cover it: bun scripts/test.ts <filter>...)`);
 }
+if (!custom && !list) preconditions(affected);
 const files = all
   .filter((f) => !sel || (affected && BACKSTOPS.includes(f)) || (!docsOnly && (times[f] ?? Infinity) < FAST_SECONDS) || sel.why.has(f))
   .filter((f) => !fast || (times[f] ?? Infinity) < FAST_SECONDS)
@@ -201,17 +233,51 @@ const t0 = performance.now();
 let failed = 0;
 // (Started now and awaited after the files: it used to run first and alone, and a suite waited for it, at four times
 // the slots it needs, before its first file started. Four tokens compile as fast as seven within a few seconds.)
-const kernelTests = !filters.length && !custom && !timeNew && (!sel || sel.kernel) ? kernelCargoTests() : Promise.resolve();
-async function kernelCargoTests() {
-  const slot = await take(4, "the kernel's tests (cargo test)");
-  const k = Bun.spawn(["cargo", "test", "--release", "--manifest-path", "kernel/Cargo.toml", "--workspace", "-q"], { cwd: repo, stdout: "pipe", stderr: "pipe", env: { ...insideSlot(4), ...(slot?.weight ? { CARGO_BUILD_JOBS: String(slot.weight) } : {}) } });
+// (Under --gate: when the kernel or the contracts it compiles in changed, and then only the crates the change reaches.)
+const contractsChanged = !!pick?.changedFiles.some((f) => /^contracts\/(?!.*\.md$)/.test(f));
+const kernelTests = !filters.length && !custom && !timeNew && tierFlag !== "slow" && (!pick || pick.kernel || contractsChanged) ? kernelCargoTests(pick && !contractsChanged ? kernelCrates(pick.changedFiles) : undefined) : Promise.resolve();
+/**
+ * The kernel's crates a change reaches: each changed crate and every crate that depends on it, however far up (from
+ * `cargo metadata`). A change outside any member crate (the workspace's manifest or lock, the contracts compiled in)
+ * reaches them all: undefined. Sound because a crate's tests can only see what it is built from.
+ */
+function kernelCrates(changedFiles: string[]): string[] | undefined {
+  const m = Bun.spawnSync(["cargo", "metadata", "--format-version", "1", "--no-deps", "--offline", "--manifest-path", "kernel/Cargo.toml"], { cwd: repo, stdout: "pipe", stderr: "pipe" });
+  if (m.exitCode !== 0) return undefined;
+  const pkgs = (JSON.parse(m.stdout.toString()).packages as { name: string; manifest_path: string; dependencies: { name: string; path?: string }[] }[])
+    .map((p) => ({ name: p.name, dir: dirname(p.manifest_path).slice(realpathSync(repo).length + 1), deps: p.dependencies.filter((d) => d.path).map((d) => d.name) }));
+  const hit = new Set<string>();
+  for (const f of changedFiles.filter((f) => f.startsWith("kernel/"))) {
+    // (The crate whose folder holds the file, the deepest; the root crate's own folders are src/, tests/, benches/, build.rs.)
+    const owner = pkgs.filter((p) => f.startsWith(p.dir + "/") && (p.dir !== "kernel" || /^kernel\/(src|tests|benches|examples)\/|^kernel\/build\.rs$/.test(f))).sort((a, b) => b.dir.length - a.dir.length)[0];
+    if (!owner) return undefined;
+    hit.add(owner.name);
+  }
+  for (let grew = true; grew;) { grew = false; for (const p of pkgs) if (!hit.has(p.name) && p.deps.some((d) => hit.has(d))) { hit.add(p.name); grew = true; } }
+  return [...hit].sort();
+}
+async function kernelCargoTests(crates?: string[]) {
+  // (The `gate` profile: release's optimisation and overflow checks, without its whole-program link: the same tests, built in
+  // a fraction of the time. 2026-10-24: `cargo test --release` built each of ~50 test programs with a fat LTO link.)
+  const slot = await take(4, `the kernel's tests (cargo test${crates ? ` -p ${crates.join(" -p ")}` : ""})`, { borrow: true });
+  const which = crates ? crates.flatMap((c) => ["-p", c]) : ["--workspace"];
+  if (crates) console.log(`kernel tests (cargo test): ${crates.join(", ")}`);
+  // (cargo-nextest where it is installed: every test its own process, the test programs side by side, where `cargo test`
+  // runs them one after another: 28 s against 87 s for the whole workspace. It runs no doc tests: cargo does, after.)
+  const jobs = String(Math.max(1, slot?.weight || 4));
+  const nextest = Bun.spawnSync(["cargo", "nextest", "--version"], { cwd: repo, stdout: "pipe", stderr: "pipe" }).exitCode === 0;
+  const m = ["--manifest-path", "kernel/Cargo.toml", ...which];
+  const cmd = nextest
+    ? `cargo nextest run --cargo-profile gate ${m.join(" ")} --test-threads ${jobs} --no-fail-fast --status-level fail --final-status-level fail --hide-progress-bar && cargo test --profile gate ${m.join(" ")} --doc -q`
+    : `cargo test --profile gate ${m.join(" ")} -q`;
+  const k = Bun.spawn(["sh", "-c", cmd], { cwd: repo, stdout: "pipe", stderr: "pipe", env: { ...insideSlot(4), CARGO_BUILD_JOBS: jobs } });
   children.add(k);
   const out = (await Promise.all([new Response(k.stdout).text(), new Response(k.stderr).text()])).join("");
   const ok = (await k.exited) === 0;
   children.delete(k);
   slot?.release();
   console.log(`${ok ? "ok  " : "FAIL"} kernel (cargo test) ${((performance.now() - t0) / 1000).toFixed(0)}s`);
-  if (!ok) { failed++; console.log(out.split("\n").filter((l) => /FAILED|panicked|error/.test(l)).slice(0, 40).join("\n")); }
+  if (!ok) { failed++; console.log(out.split("\n").filter((l) => /FAILED|FAIL \[|panicked|error/.test(l)).slice(0, 40).join("\n")); }
 }
 
 let pass = 0, fail = 0, rerun = 0, next = 0, running = 0;
@@ -242,7 +308,8 @@ async function worker() {
     while (next < files.length && running >= allowed(running)) await Bun.sleep(1000);
     if (next >= files.length) return;
     // A token of the machine's for each file running (waited for, with the files of every other suite and build).
-    const slot = await take(1, `test suite (${files.length} files) in ${root}`, { cancel: () => next >= files.length });
+    // (It borrows: a file holds its token for seconds, so the suite may go past its checkout's cap while no other checkout waits.)
+    const slot = await take(1, `test suite (${files.length} files) in ${root}`, { borrow: true, cancel: () => next >= files.length });
     const f = files[next++];
     if (!slot || !f) { slot?.release(); return; }
     running++;
@@ -259,7 +326,7 @@ await Promise.all([kernelTests, ...Array.from({ length: Math.max(1, Math.min(max
 
 // Files that only timed out run again, one at a time, with the machine to themselves as far as this run goes.
 for (const f of lateTimeouts) {
-  const slot = await take(1, `test suite (a rerun) in ${root}`);
+  const slot = await take(1, `test suite (a rerun) in ${root}`, { borrow: true });
   const r = await runFile(f).finally(() => slot?.release());
   pass += r.npass; fail += r.nfail;
   if (r.code === 0) { rerun++; times[f] = Math.round(r.secs * 10) / 10; console.log(`PASSED ON RERUN (timed out under load) ${f} ${r.secs.toFixed(0)}s`); }

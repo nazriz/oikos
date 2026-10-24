@@ -15,8 +15,11 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { blocker, fromRuns, readStatus } from "./main-status";
+import { acquire, installHook } from "./merge-lock";
 
 export const KEEP_BOTH_FILES = ["docs/decisions.md", "docs/research/references.md"];
+/** Conflicts resolved by keeping main's side: the suite's timings, a cache any run writes again. */
+export const KEEP_OURS_FILES = ["scripts/test-times.json"];
 export const KNOWN_FLAKES = ["scripts/slots.test.ts", "orchestrator/test/pilot-wave.test.ts"];
 export const TRAILER = "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>";
 
@@ -124,6 +127,10 @@ async function main() {
     if (!run(base, ["git", "worktree", "add", "--detach", wt, "HEAD"]).ok) stop("could not create the merge worktree");
   }
   const g = (...a: string[]) => run(wt, ["git", ...a]);
+  // One merge at a time, machine-wide (scripts/merge-lock.ts): a second waits in line. And only a merge pushes to main:
+  // the pre-push hook (scripts/hooks/pre-push) is put in the repository's hooks folder, shared by every worktree.
+  if (installHook(common)) console.log(`installed the pre-push hook in ${join(common, "hooks")}`);
+  await acquire(branches);
   if (!g("fetch", "origin", "main").ok) stop("fetch failed");
 
   // A red main stops every merge but the one that repairs it.
@@ -154,9 +161,13 @@ async function main() {
       const m = run(wt, ["git", "merge", "--no-ff", "-m", msg, ref], true);
       if (m.ok) continue;
       const conflicted = g("diff", "--name-only", "--diff-filter=U").out.trim().split("\n").filter(Boolean);
-      const others = conflicted.filter((f) => !KEEP_BOTH_FILES.includes(f));
+      const others = conflicted.filter((f) => !KEEP_BOTH_FILES.includes(f) && !KEEP_OURS_FILES.includes(f));
       if (!conflicted.length || others.length) { g("merge", "--abort"); console.error(`${b}: ${conflicted.length ? `conflicts in files this script does not resolve: ${others.join(", ")}` : `merge failed:\n${m.out}`}`); return false; }
-      for (const f of conflicted) { writeFileSync(join(wt, f), keepBoth(readFileSync(join(wt, f), "utf8"))); g("add", f); }
+      for (const f of conflicted) {
+        if (KEEP_OURS_FILES.includes(f)) g("checkout", "--ours", "--", f);
+        else writeFileSync(join(wt, f), keepBoth(readFileSync(join(wt, f), "utf8")));
+        g("add", f);
+      }
       const left = run(wt, ["git", "grep", "-nE", "^(<{7}( |$)|={7}$|>{7}( |$))", "--", "."], true);
       if (left.ok && left.out.trim()) { g("merge", "--abort"); console.error(`${b}: conflict markers remain:\n${left.out.slice(0, 600)}`); return false; }
       if (!g("commit", "--no-edit", "-m", msg).ok) { g("merge", "--abort"); console.error(`${b}: commit of the resolved merge failed`); return false; }
@@ -172,21 +183,27 @@ async function main() {
     const w = await stream(wt, ["bun", join(main, "scripts", "worktree-warm.ts"), wt, "--no-build"]);
     if (w.code !== 0) { console.error(w.text.split("\n").slice(-20).join("\n")); return false; }
     for (const cwd of [wt, join(wt, "docs/research/cel-check")]) if (existsSync(cwd)) await stream(cwd, ["bun", "install"]);
-    const tree = g("rev-parse", "HEAD:kernel").out.trim();
-    const stampFile = join(wt, "kernel/target/.merge-kernel-tree");
-    const there = existsSync(join(wt, "kernel/target/release/oikos-kernel")) && existsSync(join(wt, "kernel/target/wasm32-unknown-unknown/release/oikos_law.wasm"));
-    let stamp: string | undefined;
-    try { stamp = readFileSync(stampFile, "utf8").trim(); } catch { /* none */ }
-    if (kernelStale(stamp, tree, there)) {
-      const k = await stream(wt, ["bun", "run", "kernel"]);
-      if (k.code !== 0) { console.error(k.text.split("\n").slice(-30).join("\n")); console.error("kernel build failed"); return false; }
-      console.log("kernel built");
-    } else console.log("kernel build reused (kernel/ unchanged since the last build here)");
-    writeFileSync(stampFile, tree);
-    writeFileSync(join(wt, "kernel/target/.oikos-built"), ""); // (the runner's own check: built since the sources)
+    // The release kernel only for --full (and when kernel/ changed since the last build here). The gate builds what it
+    // needs itself: the release build when it is current, else the fast `gate` profile (scripts/test.ts, gateBuild).
+    if (full) {
+      const tree = g("rev-parse", "HEAD:kernel").out.trim();
+      const stampFile = join(wt, "kernel/target/.merge-kernel-tree");
+      const there = existsSync(join(wt, "kernel/target/release/oikos-kernel")) && existsSync(join(wt, "kernel/target/wasm32-unknown-unknown/release/oikos_law.wasm"));
+      let stamp: string | undefined;
+      try { stamp = readFileSync(stampFile, "utf8").trim(); } catch { /* none */ }
+      if (kernelStale(stamp, tree, there)) {
+        const k = await stream(wt, ["bun", "run", "kernel"]);
+        if (k.code !== 0) { console.error(k.text.split("\n").slice(-30).join("\n")); console.error("kernel build failed"); return false; }
+        console.log("kernel built");
+      } else console.log("kernel build reused (kernel/ unchanged since the last build here)");
+      writeFileSync(stampFile, tree);
+      writeFileSync(join(wt, "kernel/target/.oikos-built"), ""); // (the runner's own check: built since the sources)
+    }
     // Typecheck alongside the tests; the selection (the kernel's cargo tests are in it when kernel/ changed).
     const tc = stream(wt, ["bun", "run", "typecheck"]);
-    const suite = await stream(wt, ["bun", "scripts/test.ts", ...(full ? [] : ["--affected", "--no-build"]), ...(full ? ["--no-build"] : [])], log);
+    const t1 = Date.now();
+    const suite = await stream(wt, ["bun", "scripts/test.ts", ...(full ? ["--no-build"] : ["--gate"])], log);
+    console.log(`  ${full ? "whole suite" : "gate"}: ${Math.round((Date.now() - t1) / 1000)}s`);
     const tcr = await tc;
     if (tcr.code !== 0) { console.error(tcr.text.split("\n").slice(-30).join("\n")); console.error("typecheck failed"); return false; }
     const lines = suite.text.trim().split("\n");
@@ -195,7 +212,7 @@ async function main() {
       const f = readFailures(suite.text);
       const flake = flakeCandidate(f);
       if (!flake) { console.error(`tests failed (${[...f.files, ...f.other].join(", ") || "see log"}); log: ${log}\n${summary}`); return false; }
-      const again = await stream(wt, ["bun", "scripts/test.ts", "--no-build", flake]);
+      const again = await stream(wt, ["bun", "scripts/test.ts", "--gate", flake]);
       if (again.code !== 0) { console.error(`${flake} failed, and failed again alone; log: ${log}`); return false; }
       summary += ` (accepted after rerun alone: ${flake})`;
     }
@@ -217,7 +234,8 @@ async function main() {
   if (runs > 1 || rejected.length) { if (!assemble(accepted)) stop("could not reassemble the accepted set"); }
   const sha = g("rev-parse", "HEAD").out.trim();
   if (noPush) { console.log(`NOT PUSHED (--no-push). ${summary}\nmerge ${sha.slice(0, 8)} (${accepted.join(", ")}) in ${wt}, ${secs()}`); process.exit(rejected.length ? 1 : 0); }
-  if (!g("push", "origin", "HEAD:main").ok) stop("push failed (origin main moved? run again)");
+  const push = Bun.spawnSync(["git", "push", "origin", "HEAD:main"], { cwd: wt, stdout: "pipe", stderr: "pipe", env: { ...process.env, OIKOS_MERGE_LOCK: String(process.pid) } });
+  if (push.exitCode !== 0) { console.error(push.stderr.toString().trim()); stop("push failed (origin main moved? run again)"); }
   console.log(`PUSHED ${sha} (${accepted.join(", ")}; ${runs} test run${runs === 1 ? "" : "s"}). ${summary}\n${secs()}`);
   process.exit(rejected.length ? 1 : 0);
 }
