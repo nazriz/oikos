@@ -56,8 +56,11 @@ test("capturing citizens' decisions changes nothing, and gives every turn with i
     expect(x.n).toBe((last.get(x.p) ?? 0) + 1);
     last.set(x.p, x.n);
   }
-  expect(turns.every((x) => x.draws.length > 0)).toBe(true);
-  const exact = turns.filter((x) => x.draws.at(-1).drawn);
+  const bare = turns.filter((x) => !x.draws.length);
+  // (A decision may draw nothing: a petition weighed by copying others, with no draw to start one. Nearly all draw.)
+  expect(bare.length).toBeLessThan(turns.length / 20);
+  expect(bare.every((x) => x.decision.strategy !== "deliberate" || x.decision.domain !== "want")).toBe(true);
+  const exact = turns.filter((x) => x.draws.at(-1)?.drawn);
   expect(exact.length).toBeGreaterThan(100);
   expect(new Set(exact.map((x) => x.decision.domain)).size).toBeGreaterThan(2);
   // The record folded from the capture is the record the kernel took, change by change.

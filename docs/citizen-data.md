@@ -33,7 +33,8 @@ Rows (`row`), in the order the engine carries each round out, so the same run wr
   with its key (participant, capacity, day or matter, purpose, nth) and either every value the decision took from it
   (`drawn`, where the mind says which stream it chose with: the general decision and the choice of a way for a want)
   or the stream's first value (`u`: a single `below(n)`). Values are 16 hex digits (a u64; its share of 2^64 is the
-  uniform). From the run's seed and the key the stream can be made again; the values make that unnecessary.
+  uniform). A decision that drew nothing (a petition weighed by copying others) has none. From the run's seed and
+  the key the stream can be made again; the values make that unnecessary.
 - **The record that stood.** A person's record at a turn is the fold of their `record` rows above it in the stream
   (each section replaces the one before). It is what the kernel keeps, which is what a model will read; a person's
   first week's turns come before their first record write and fold to nothing (`before_record` in the exporter's
