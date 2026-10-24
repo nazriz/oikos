@@ -8067,3 +8067,11 @@ fails every time, not now and then: the property draws new cases each run, and f
   older log by appending would double that look's records, as the property did.
 - **Revisit if** a host keeps views by appending rather than by id, or the contract gains a `whole` for accounts and
   holdings (then use it here instead of listing what went).
+## 2026-10-25 · A slot's engine runs as many threads as the slot's weight
+
+- **What we saw:** load 44 on 14 cores with 12 slots held: the engine took every core (`default_threads`) whatever slot
+  it ran in, so a test file in a slot of 1, or a 10,000-person run in a slot of 3, each ran fourteen threads.
+- **Change:** `insideSlot` sets `OIKOS_ENGINE_THREADS` to the slot's weight unless the caller set it. Results do not
+  depend on the thread count (the kernel's tests and the port gate check one thread against fourteen).
+- **Revisit if:** a lone heavy run is much slower for it (then elastic slots, PL-4, give it more tokens), or a test that
+  needs several threads sets them itself.
