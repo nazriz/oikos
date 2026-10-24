@@ -76,7 +76,7 @@ test("a seat has its crew do the paperwork by naming them: on their time and not
   expect(applied.length).toBeGreaterThan(20);
   for (const e of applied) expect((e.body.by as string[]).every((p) => crew.has(p))).toBe(true);
   // (The delegated paperwork takes the crew's time, on a working day: 106 to 121 minutes on eighteen of the nineteen working days of days 1 to 28 at seed 1. Day 21 alone took 310 on
-  // 2026-10-24, after the run's seed began to draw who the people are, with the crew's acts run one after another where they run side by side on the other days (not traced further).
+  // 2026-10-24, after the run's seed began to draw who the people are, with the crew's acts run one after another where they run side by side on the other days (not traced further: MT-23).
   // A day is one draw; the claim is about the crew's days, so the middle day is held to the bound, as against more than nine hours when the seat writes them all itself.)
   const spans = Array.from({ length: 58 }, (_, i) => spanOf(theirs, i + 1)).filter((x) => x.acts > 0).map((x) => x.span).sort((a, b) => a - b);
   expect(spans.length).toBeGreaterThan(20);

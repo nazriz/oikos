@@ -7,7 +7,7 @@
 // clone only saves work, it is never trusted. Cargo keys a workspace crate's build by the crate's own path, so the
 // kernel's own crates are always compiled from the worktree's sources (checked by hand, docs/dev-machine.md); what is
 // reused is the compiled dependencies. --no-build stops after the clone (for trying that part alone).
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 const sh = (cmd: string[], cwd: string) => { const p = Bun.spawnSync(cmd, { cwd, stdout: "pipe", stderr: "pipe" }); return { ok: p.exitCode === 0, out: p.stdout.toString().trim(), err: p.stderr.toString().trim() }; };
@@ -58,6 +58,7 @@ export function warm(worktree: string, o: { from?: string; build?: boolean; say?
   if (from) {
     say(`warming ${dir} from ${from.path}${Number.isNaN(from.apart) ? "" : ` (${from.apart} commit${from.apart === 1 ? "" : "s"} apart)`}`);
     clone(from.path, dir, say);
+    dropCachedTowns(dir);
   } else say(`no other checkout has an install and a built kernel: ${dir} is built from nothing`);
   if (o.build === false) return;
   for (const [cmd, cwd] of [[["bun", "install"], dir], [["bun", "install"], join(dir, "docs/research/cel-check")], [["bun", "run", "kernel"], dir]] as const) {
@@ -67,6 +68,16 @@ export function warm(worktree: string, o: { from?: string; build?: boolean; say?
     if (b.exitCode !== 0) throw new Error(`${cmd.join(" ")} failed in ${cwd}`);
     say(`  ${cmd.join(" ")}${cwd === dir ? "" : " (cel-check)"}: ${((performance.now() - t) / 1000).toFixed(1)} s`);
   }
+}
+
+/** A generated town cached in the copied build (kernel/target/tmp/*-town.json) was made by the other checkout's generator: not taken (the tests
+ * write it again, keyed by the generator's inputs: orchestrator/test/lib/town-key.ts, so a stale one could not be read anyway). */
+export function dropCachedTowns(dir: string): number {
+  const tmp = join(dir, "kernel/target/tmp");
+  if (!existsSync(tmp)) return 0;
+  const gone = readdirSync(tmp).filter((f) => /-town\.json(\.key)?$/.test(f));
+  for (const f of gone) rmSync(join(tmp, f), { force: true });
+  return gone.length;
 }
 
 if (import.meta.main) {

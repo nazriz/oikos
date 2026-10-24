@@ -7682,3 +7682,7 @@ that was not before: a person only lets go.
   ranked list, item 1); then the daily growth at 50,000 can be measured with a heap profile, as SC-1 asks.
 - **Revisit if** a heap profile at 20,000 to 50,000 shows citizens' books or minds among the largest holders (then
   tighten `most`); or a measure of culture or recourse moves at 10,000 between bound on and off.
+
+## 2026-10-24 · The generated town the Rust tests read is keyed by the generator's inputs; MT-23 registered (branch `key-town-cache`)
+
+`orchestrator/test/lib/write-town.ts` writes `<out>.key`, a sha256 of the generator (`worlds/generator`), the profiles, `participants/src` (the rules it calls), `contracts/` (schemas), the engine's native module, the spec and the arguments (`town-key.ts`); a file whose key is not the current one is written again. The Rust tests (`a1_citizen`, `observations`) call it every time instead of only when the file is missing, and `worktree-warm` drops the `*-town.json` copies it clones. Why: today a cached town from before `life.majority` failed three tests in a worktree that a fresh checkout passed, and the merge machine's old copy let a failing test pass. Cost: one bun start (about 0.3 s) per test program. Proved in `orchestrator/test/town-key.test.ts`. **Revisit if** the generator reads an input not listed (add it to `INPUTS`). MT-23 registers the seat-diary day-21 span (untraced).
