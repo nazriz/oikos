@@ -7347,3 +7347,6 @@ day costs more than in proportion to the people, and its decision annotations gr
 the Annotation or `Opaque` schema changes (`plain_annotation` must follow it: the debug assertion catches a divergence in
 tests); a round with seats is ever saved after its decisions are let go (it cannot be now: they are kept when a seat is in it);
 or the machine is quiet enough to measure wall time, which these numbers could not.
+## 2026-10-24 · Two framing rulings of the owner's: the way out's wording, and silence on the office's fate
+
+Naz, asked directly, adopted the wording of the way out proposed on 2026-10-12 ("The `unstated` framing, built") as VISION §15 point 4's wording under every framing, closing what that point called open; and ruled that a seat which takes the way out is not told what becomes of its office, in any framing (either answer would weigh against or toward leaving, and it must be the same in every arm). VISION §15 point 4 is amended accordingly. Nothing in the code changes: both are already how seats are treated. **Revisit if** a seat's debrief shows the wording was misunderstood, or a seat asks what becomes of its office before leaving.
