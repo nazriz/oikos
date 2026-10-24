@@ -783,8 +783,15 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
     const back = ch.kind === "sites" && ch.visited && (ch.fresh?.length ?? 0) > 0;
     if (o.looked?.size && !asked && !back && (ch.kind === "sites" || ch.kind === "directory")) continue;
     if (ch.kind === "accounts") {
+      // (Nor, having looked at something else, every account it keeps for others again: a bank's ledger is every
+      // customer's account, and set out with each look it buried what the look found (pilots lv-08 and lv-09,
+      // 2026-10-24: 127,000 characters with every look, and the look's own result was what the prompt's ceiling left
+      // out). Its own accounts, and money in and out, are still told; a short list of accounts is set out as ever.)
+      const others = o.looked?.size && !asked && ch.accounts.length > max ? ch.accounts.filter((a) => a.holder !== obs.entity).length : 0;
+      const shownAccounts = others ? ch.accounts.filter((a) => a.holder === obs.entity) : ch.accounts;
       out.push("", `## ${title(id)}`);
-      for (const a of ch.accounts) out.push(`- ${a.account}${a.holder === obs.entity ? "" : ` (${a.holder}'s)`}, kept by ${a.custodian === obs.entity ? "you" : a.custodian}: ${money(a.balance)}`);
+      if (others) out.push(`(The ${num(others)} ${others === 1 ? "account" : "accounts"} you keep for others, as at your last report: set out again with your next.)`);
+      for (const a of shownAccounts) out.push(`- ${a.account}${a.holder === obs.entity ? "" : ` (${a.holder}'s)`}, kept by ${a.custodian === obs.entity ? "you" : a.custodian}: ${money(a.balance)}`);
       out.push(...describeTransactions(ch.transactions, new Set(ch.accounts.map((a) => a.account))).map((l) => `  ${l}`));
     } else if (ch.kind === "holdings") {
       out.push("", `## ${title(id)}`);

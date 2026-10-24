@@ -681,3 +681,10 @@ Additive only; no schema file changed. A log made before is a valid log.
   `types-released.json` (`types_released`, `functions_released`, and the counts they were decided on:
   translator/model/release.ts) and `probation.jsonl` (a line a confirmed request on a form in its trial: `form`,
   `agree`, `run`, `draft`; translator/model/probation.ts). A model of another decoding reads its folder as before.
+## Change for the six pilots' faults (2026-10-25; docs/decisions.md, "A place committed to is a place"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- **Breaking, kernel (a new refusal):** `propose_agreement` is refused `not_a_place` when a commitment's `occupancy.in` or
+  `work.at` names neither a building nor a space in one (pilot lv-10: an employment whose work site was a job posting's
+  id). `contracts/log.schema.json` gains the code; `blocks.schema.json` says so on both fields. The meaning of a
+  commitment is still not judged: only that its place is a place. An agreement in a world's config, and an offer's
+  terms as published, are not checked.

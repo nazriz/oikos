@@ -7904,3 +7904,136 @@ was never opened: it was read only by the leak check and the scorer, by code, an
   examples are read blind and rewritten by hand rather than by template (the membership direction was taught by 90 of
   them and one seed still failed it); `form`, `money` or `message` pass their mark on held-back requests, so that most
   requests could be ours; or the owner decides the bar for the first model is wrong drafts rather than right ones.
+## 2026-10-25 · A look's result reaches the next prompt (branch `pilot-faults`, fault 1 of the six pilots)
+
+- **What happened.** In lv-08 and lv-09 every look the lending seat made was replaced, at its very next prompt, by
+  "What this look showed is no longer set out here" (163 trimmed prompts in lv-09, 86 in lv-08, each removing one look
+  of about 128,000 characters). It decided no loan in either town and declined all 16 of its drafts in lv-08; lv-09's
+  seat reported distress at a backlog it could not read.
+- **Cause.** The seat's view keeps an accounts channel as its whole current picture (`participants/src/view.ts`), and the
+  bank's ledger is every customer's account: about 3,000, 127,000 characters. `renderObservation` set the whole ledger
+  out in every report, including each look's result, so a look for one paper came back at 130,000 characters, nearly
+  all of it the ledger. `fitPrompt` leaves a long part not looked up out first (SF-2, 2026-10-17), but only in text: a
+  look's result is a tool result, so its next step left out looks, oldest first, and the newest look was the only one.
+- **Fix, at both ends.** (1) `render.ts`: having looked at something else, an accounts list longer than a report's
+  list (40) is not set out again whole (as sites and the directory already were not): its own accounts and money in
+  and out still are, and a line says how many it keeps for others and that they come with its next report. On the
+  logged lv-08 look this is 4,210 characters where it was 130,773. A short list (a mayor's books) is as it was.
+  (2) `fitPrompt`'s first step reads tool results too: a long part a result carries that is not what was looked up
+  goes before the result does. Test: `seat-papers.test.ts`, "a seat's look results reach its next prompt" (a 3,000
+  account ledger; the look's result whole at the next two calls; fails on the old code).
+- **Not changed:** the opening of a sitting still sets the ledger out and the ceiling still leaves it out there (a
+  long part, with a line saying so); a lender sees one customer's balance only through its papers. Paging the ledger
+  is SF-8's work.
+- **Revisit if** a seat needs balances after a look within a sitting (they come with its next report), or a lender
+  seat's `prompt_trimmed` notes show `looks` above 0 again.
+
+## 2026-10-25 · A place committed to is a place (branch `pilot-faults`, fault 2 of the six pilots)
+
+- **What happened.** In lv-10 the police seat hired through our translator, which wrote the work site as the job
+  posting's id (`work(at=rec.2856)`). The kernel took the agreement (a commitment's `does` is opaque to it), both sides
+  signed, and the worker could never come to work: her mind asked for occupancy in `rec.2856` a thousand times in one
+  moment (the engine's loop, fixed in the wave), and the seat's debrief said "the staff never came in". Six such
+  agreements were signed.
+- **Fix: physics, at the act.** `propose_agreement` is refused with a new code, `not_a_place`, when a commitment's
+  `occupancy.in` or `work.at` names neither a building nor a space in one (`exec.rs`, `places_committed`). A body can
+  only be somewhere; this is the same kind of check as a published paper's `place` being a cell, not a law. The
+  meaning of the commitment is still not judged. The seat is told, in the world's words: "what was named as the place
+  to be or to work is not a place: name a building, or a space in one" (`words.ts`, `rules/words.rs`). The contract
+  says so on both fields; `log.schema.json` gains the code; `contracts/README.md` records it (blanket approval).
+  Test: `kernel/tests/physics.rs`, `a_place_committed_to_is_a_place` (a posting's id, a space the building has not, a
+  building that does not exist, a cell: refused; a space and a building: taken).
+- **Not checked:** agreements in a world's config (generated, already places); an offer's terms as published (a
+  posting naming a non-place is refused when someone's agreement is made from it); `goods.at` (not seen to go wrong).
+- **Revisit if** a real arrangement commits someone to a place that is not built yet (a job at a shop under
+  construction is fine: the building exists from the start of its building), or `goods.at` is seen to name a non-place.
+
+## 2026-10-25 · Mistakes the Haiku seats could not undo, looked into (branch `pilot-faults`, faults 3 and 4 of the six pilots)
+
+What a real official could do in each case, and whether the platform gives the seat that route.
+
+- **"$250,000 of energy purchases sent to a seller the town did not recognise" (lv-12, energy retail): no mistake, and a
+  platform fault behind the worry.** The seller is the grid's supplier, the outside world, as every energy retailer's
+  is; all six of the seat's orders were delivered (delivery notes on days 14, 54, 74, 91, 112). What the seat read as
+  "unknown" was the resolver: on day 15 it ordered "from The outside world", the very words its own file used ("order
+  to The outside world"), and was told "You don't know of anyone or anything called "The outside world"". The seat's
+  reports name organisations through `whoIs` (the config's names), and the resolver knew only names from directories
+  and declarations. **Fixed:** a name a seat's reports show it is learnt as they show it (`namedFor`,
+  `orchestrator/src/seat-config.ts`, in both hosts): only an organisation's or person's name, only when shown. Test:
+  `orchestrator/test/seat-names.test.ts`. No route to undo was needed.
+- **"A tax payment made twice that could not be undone" (lv-12, clinic): the real route exists and is missing; not
+  built.** The clinic's payroll clerk files and pays each month's return of withheld income tax by law; the seat paid
+  month 3 by hand as well (day 91), and the clerk paid it on its day (day 105). A real employer claims the payment not
+  owed back, or sets it against the next return (Mexico: Código Fiscal de la Federación, arts. 22 and 23, to confirm).
+  Here nobody keeps a taxpayer's account with the collector, so there is no one to claim from and nothing to set it
+  against (public-finance.md: "no yearly assessment, so no refunds or offsets"). Adding only the law would be a route
+  with no institution doing the work, so it is recorded as **PB-23**, with what it needs: the collector's office that
+  keeps each payer's account, at a stated time per claim and a place's refund time, a claim form, and the payer's
+  clerk reading its own books.
+- **Stopping a payment.** A standing payment can be held by whoever may instruct on its account, from a day after
+  the hold (the end of the business day before: UK PSR 2017 reg. 83; docs/behaviour/bank-payment-system.md). A
+  payment made once and settled cannot be stopped, here or in a real bank: realistic, recorded.
+- **Fault 4, "workers left unpaid behind the foreman's own holds" (lv-12): a real consequence, not a mechanism
+  fault.** The foreman held the four wage orders of workers its builder kept off the payroll returns (an informal
+  arrangement, as the profile's informal work has it). The bank took the holds and answered each: "Not paid while it
+  stands ... from the payment due on day 30 ... what it was for is still owed, and is yours to settle". One payment
+  went out after a hold (c0255's, day 23.06, the hold given day 22.42): inside the day's notice a hold takes, by the
+  sourced rule, and the bank's answer said so. The workers went unpaid, one resigned and claimed: what a worker does
+  (citizen.md). The routes the seat had were real ones: pay the wages by a payment of its own, lift the holds, or write
+  to the builder, whose code owner does not read letters' words (PC-1). Nothing changed.
+- **Revisit if** a seat is told a name is unknown that its reports showed it (the fix missed a path), or PB-23 is built.
+
+## 2026-10-25 · A system's work takes time too: the support office (WM-14), a design, not built (branch `pilot-faults`, fault 5)
+
+Asked: per "all work takes time", a supplied system's work also takes time and has a capacity; design how its
+throughput and time are read from the table of work, charged and queued; build it if contained.
+
+- **What is already there.** The kernel charges a system as it charges a person: each act's seconds are read from the
+  table of work (`orchestration.act_time.system`, by block and by `publish/<kind>`), placed on the system's lanes
+  (`lanes`, how many at once) after what it has in hand (`kernel/crates/time`, `place`), and the act takes effect when
+  done. Throughput is lanes over seconds, and a backlog follows when work comes faster. Nothing new is needed in the
+  mechanism to read, charge or queue a system's time.
+- **What is wrong is what the system stands for, and its figures.** The support office is held by `agency-system`, whose
+  every row is one second (`WORK_TIME.system`), with one lane and no working day; its decision is the whole of a
+  caseworker's job done by a computer. So a claim is decided in about two hours (WM-14), and a model seated there sits
+  on that system and works at its speed, against the hard rule that a seat is a person's body.
+- **The design (each part a law or a figure, nothing a dial).**
+  1. *Waits the law sets* stay law, as data: the support law's `needs` (papers asked of the claimant or employer,
+     `within_days`) already make a decision wait; add, where a place's law has one, the period a first payment waits
+     for (Universal Credit: a month's assessment period and payment within seven days of its end; to confirm), per
+     profile, sourced or marked.
+  2. *The casework is an officer's*, not the computer's: rows `publish/benefit_decision`, `publish/<evidence request>`,
+     `publish/<review decision>` in the **person** table, an officer's minutes per case, sourced per place (unit costs
+     or time studies of the agency; placeholders marked).
+  3. *Who does it.* The outside world's people are not modelled, so the agency's casework is a supplied capacity: a
+     template `agency-casework` whose rows are those officers' minutes, whose `lanes` are the town's share of the
+     agency's officers (officers per claim in the place's published staffing, times the town's claims at generation;
+     a national average on a small town, as PS-10 already says of the town's offices), and which keeps a **working
+     day**. Two kernel changes, both in the contract: a template's `does` rows carry their own seconds for any block
+     (today only `work` has `seconds`; other rows fall back to the world's one system table, so every system's
+     decision is one second), and a template's `hours` places its lanes' work inside office hours, as a person's
+     timeline is. The case system (`agency-system`) keeps its one-second rows for what a computer does (payments,
+     notices), and the decision is made `by` the casework desk. The backlog is then the claims' arrivals against
+     officer hours, and the wait is that queue plus the law's waits.
+  4. *A seat there is a person.* When a model holds `outside-support`, its post is held by a person (an officer of the
+     agency: a body that is not a resident, with no home or household), at the person table's speed, who may direct
+     the case system (`by`) as any office-holder directs a system its organisation owns.
+- **Why not built now.** It is four changes across the kernel's time crate and contract (`hours` on a template), the
+  generator (the template, its lanes from a sourced ratio, the rows), nine profiles' figures with sources, and seats
+  on a non-resident person; every generated town's state hash moves, and the backstop
+  (`all-work-takes-time.test.ts`) should learn to fail on a one-second row for a decision. About four agent-days.
+- **For Naz:** (1) may a seat's body be a person of the outside world who is not a resident (an agency officer), or
+  should the outside's office be seated only as a system with a stated speed? (2) the agency's officers per claim, a
+  national figure applied to a small town: acceptable as a marked placeholder where a place publishes none?
+- **Revisit if** a support-office experiment is planned (WM-14's "fix when"), or the answer to (1) changes how seats
+  in other outside offices are held.
+
+## 2026-10-25 · Found on the way: the perception property fails now and then (not fixed)
+
+`kernel/tests/perception.rs`, `a_view_built_from_changes_equals_the_full_picture`, failed once in the gate on
+`pilot-faults` and passed three times after: proptest's cases are random, and one case (kept outside the repository, in
+the branch's scratch, not committed to `perception.proptest-regressions`) delivers a finance seat's `finance/laws`
+records twice, so the view built from changes lists the lots and the river law twice against the full picture's once.
+It fails the same with this branch's kernel changes taken out, so it is on main. Not chased here (parity: record).
+- **Revisit:** before the next kernel merge, run the case (`ops` beginning `Smart { kind: 70 }, Smart { kind: 187 }`)
+  and find which block delivers a standing channel whole twice.

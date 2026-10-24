@@ -28,7 +28,7 @@ import { citizensBeside, debriefsBeside } from "./logs";
 import { join } from "node:path";
 import { actedOn, besideOf, drawTies, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
 import { readForEnd } from "./run-end";
-import { seatConfig } from "./seat-config";
+import { namedFor, seatConfig } from "./seat-config";
 import { ReadingDesk, type DeskCounts } from "./reading";
 import { culture as cultureNs, reading as readingNs } from "@oikos/participants";
 import { DayBook, calls, canonical, diaryText, forms, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, inCalendar, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
@@ -615,7 +615,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const mine = held(p.id);
     // (Its reports, trays, office's file and staff, and the rest of its configuration: seat-config.ts, shared with the
     // experiment harness's model stewards.)
-    const { config, office, entity, standingIds, roster, tally, dayBook } = seatConfig({ cfg, part: p, personal: personalChannels(p), mine, positions, mods, whoIs, ctxFor, twin, draftText, sorted: sortedKeys });
+    const knowledge = new Knowledge(currency, cfg.names === true);
+    const { config, office, entity, standingIds, roster, tally, dayBook } = seatConfig({ cfg, part: p, personal: personalChannels(p), mine, positions, mods, whoIs: namedFor(knowledge, whoIs), ctxFor, twin, draftText, sorted: sortedKeys });
     const controller = createLlmParticipant(config, io);
     const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };
     const ctx = ctxFor(p.id, office?.id ?? "self", entity, {});
@@ -661,7 +662,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}), ...(dayBook ? { dayBook } : {}) },
       ...(codeTwin && office ? { sort: `${codeTwin}|${office.id}` } : {}), ...(brain ? { hears: true, ...(codeTwin ? { body: codeTwin } : {}), ...(office ? { post: office.id } : {}) } : {}),
       cadence: ceilTo(brain?.cadence ?? cadence, tick), firstWake: wakeAt ?? (brain ? ceilTo(brainFirstWake.get(p.id) ?? mods[pp.mock.brain]!.firstWake?.(brain.ctx) ?? 0, tick) : 0), wokeFor: "start", since: 0,
-      knowledge: new Knowledge(currency, cfg.names === true), view: new View(new Set(standingIds)), notices: [],
+      knowledge, view: new View(new Set(standingIds)), notices: [],
     };
   };
 

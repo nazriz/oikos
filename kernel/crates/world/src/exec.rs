@@ -1619,6 +1619,31 @@ impl<'a> Exec<'a> {
         Ok(t)
     }
 
+    /// A place a party commits to be or to work at is a place in the world: a building, or a space of one (physics: a
+    /// body can only be somewhere). The commitment's meaning is still nobody's to judge here, only that its place is
+    /// one (pilot lv-10, 2026-10-24: an employment whose work site was a job posting's id was signed, and the worker
+    /// could never come to it).
+    fn places_committed(&self, t: &AgreementTerms) -> R<()> {
+        for c in &t.commitments {
+            let Some(o) = c.does.get("outcome") else { continue };
+            let named = [("occupancy", "in"), ("work", "at")]
+                .into_iter()
+                .filter_map(|(k, f)| o.get(k).and_then(|x| x.get(f)).and_then(|v| v.as_str()).map(|v| (k, f, v)));
+            for (k, f, v) in named {
+                let id = self.r(v)?;
+                let building = self.st.structures.contains_key(&id);
+                let space = split_space(&id).is_some_and(|(sid, local)| self.st.structures.get(sid).is_some_and(|x| self.s.space(&x.structure_type, local).is_some()));
+                if !building && !space {
+                    return Err(refuse(
+                        RefusalCode::NotAPlace,
+                        format!("{id}, where {} commits to {} ({k}.{f}), is not a place: name a building or a space in one", c.who, if k == "work" { "work" } else { "be" }),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Who a message reaches, and in which of their capacities.
     fn recipients(&self, to: &[Id]) -> R<BTreeSet<(Id, Id)>> {
         let mut out = BTreeSet::new();
@@ -2182,6 +2207,7 @@ impl<'a> Exec<'a> {
 
             Block::ProposeAgreement { terms, basis, speaks_for, visible_to, bind } => {
                 let terms = self.resolve_terms(terms)?;
+                self.places_committed(&terms)?;
                 let id = self.new_record(RecordBody::Agreement { terms }, self.ro(speaks_for)?, visible_to.clone(), self.cited(basis)?)?;
                 self.bind(bind, &id)
             }

@@ -32,6 +32,8 @@ pub enum RefusalCode {
     UnknownStructure,
     StructureIncomplete,
     UnknownSpace,
+    /// Where a party commits to be or to work is not a building or a space in one (an id of something else).
+    NotAPlace,
     CapacityExceeded,
     NotPresent,
     AlreadyPresent,

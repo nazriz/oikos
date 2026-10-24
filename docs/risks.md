@@ -247,6 +247,11 @@ The mechanism:
   the boundary's office a supplied system with a stated speed)
 - **Notice by:** claim-to-decision days against the place's published processing times.
 - **Fix when:** before a support-office experiment is read in days or hours, or a seat in it is compared with a seat elsewhere.
+- **Design (2026-10-25, not built; decisions "A system's work takes time too"):** the kernel already reads, charges and
+  queues a system's time (rows of `act_time.system`, lanes); what is wrong is the figures and what the system stands
+  for. Law-set waits as support-law data; casework as officers' minutes per case on an `agency-casework` template
+  with lanes from a sourced officers-per-claim ratio and a working day (two kernel changes: per-template seconds for
+  any block, `hours` on a template); a seat there held as a person (an agency officer). Two questions wait on Naz.
 
 ---
 
@@ -734,6 +739,25 @@ The mechanism:
 - **Notice by:** a `leave` of a person other than the actor in the log; a refusal `not_theirs` on `leave`.
 - **Fix when:** the census creates parents before children, or before a seat is given a wide remit over households.
 
+### PB-23 · Tax paid twice cannot be claimed back or set against the next return
+- **Gap:** Nobody keeps a taxpayer's account with the outside world's tax collector: returns are filed and paid, and
+  nothing reconciles what was paid against what was owed. A payment made twice (lv-12: the clinic's manager paid a
+  month's withheld income tax by hand, $17,573.92, on top of its payroll clerk's return for the same month) is simply
+  gone. Real places have the route: a claim for the refund of a payment not owed, or setting it against the next
+  return (Mexico: Código Fiscal de la Federación, arts. 22 and 23, refund and offset; United Kingdom: an employer's
+  PAYE overpayment is set against the next period or repaid; both to confirm). `public-finance.md` says it already:
+  "no yearly assessment, so no refunds or offsets".
+- **Where:** the boundary's tax collection (`kernel/crates/actors/src/firms/staffing.rs`, `returns_due`;
+  `offices/treasury.rs`); `docs/behaviour/public-finance.md`.
+- **Effect:** A seat's (or a code office's) duplicate payment is a permanent loss; a seat that sees it can do nothing,
+  and is distressed by it (lv-12's debrief). Small in money; matters for welfare and for any study of error recovery.
+- **L / I:** medium / low · **Status:** to fix. It is not a law alone: it needs the institution that does the work, the
+  collector's office keeping each taxpayer's account (who does it, at what time per claim, how long a refund takes,
+  by place, sourced), a form for the claim, and the payer's clerk reading its own books for what was paid over twice.
+- **Notice by:** two payments to the collector for one return's period from one payer.
+- **Fix when:** before a study reads errors and their correction, or a finance-side seat is seated again in a town
+  whose clerk files returns.
+
 ## People and culture
 
 ### PC-1 · Nobody reads what a seat writes
@@ -897,6 +921,8 @@ The mechanism:
 - **L / I:** high / high · **Status:** to fix (as each is found)
 - **Notice by:** zero requests from a seat with live business; "not understood" counts.
 - **Fix when:** the first pilot of any new office type.
+- **Six pilots (2026-10-25):** an employment whose work site was not a place was signed and no worker came (lv-10's
+  police); now refused at the act, `not_a_place`, and the seat is told why (decisions "A place committed to is a place").
 
 ### SF-2 · A lender's seat floods its own prompt
 - **Gap:** The bank's ledger (40 to 80 thousand characters) stays in the prompt and the seat's own look-ups are cut
@@ -907,6 +933,7 @@ The mechanism:
 - **Notice by:** A lender seat's prompt over the ceiling; its own look-ups cut.
 - **Fix when:** Before any lender is seated; the ledger on request, not in the prompt.
 - **Evidence:** `fitPrompt` (participants/src/llm/participant.ts) leaves out a standing part longer than `BULK_PART` (20,000 characters) before any of the seat's own look-ups, longest first, with a line saying so; test in `participants/test/seat-papers.test.ts`. A lender seat is still not run against the real ledger: check the first one.
+- **Came back (pilots lv-08, lv-09, 2026-10-24), fixed again 2026-10-25** (decisions "A look's result reaches the next prompt"): the 2026-10-17 fix reached only text, and the whole ledger (127,000 characters) was set out again inside every look's result, so the look's result was what went. Now the accounts it keeps for others are not set out with a look's result (its own, and money in and out, still are), and a long part inside a result goes before the result does; test "a seat's look results reach its next prompt". Check the next lender seat's `prompt_trimmed` notes: `looks` should be 0.
 
 ### SF-3 · Initiative depends on wording
 - **Gap:** Seats read "not bound to act" and the absence of a trigger as absence of duty; nothing prompts a seat to

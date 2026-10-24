@@ -237,6 +237,38 @@ test("a whole prompt has a ceiling: the oldest of what was looked up is left out
   expect(one.messages[0]!.content).toContain("(Cut short here: there was more than can be read at once. Look again for what you need.)");
 });
 
+test("a seat's look results reach its next prompt, whatever else its reports carry (a bank's whole ledger)", async () => {
+  // Pilots lv-08 and lv-09 (2026-10-24): the lending office keeps every customer's account, and the whole ledger
+  // (127,000 characters) was set out again with each look; the prompt's ceiling then left out the look's result, every
+  // time, as soon as it was asked for. The look's result is what it is shown next; the ledger is not set out again with it.
+  const ledger = { kind: "accounts", accounts: Array.from({ length: 3_000 }, (_, i) => ({ account: `acc-c${String(i).padStart(4, "0")}`, holder: `c${String(i).padStart(4, "0")}`, custodian: "city", currency: "AUD", balance: String(100_000 + i) })), transactions: [] };
+  const app = { id: "rec.111", record: "statement", kind: "loan_application", author: "c0001", at: 0, visible_to: ["city", "c0001"], text: "Application for a loan of $2,500.00 over 12 months, for living costs." };
+  const { p, calls, notes } = harness([[use("a", "look", { report: "finance/files", paper: "rec.111" })], [use("b", "look", { report: "finance/files", paper: "rec.111" })]],
+    { kinds: new Map([["finance/files", "records"], ["finance/treasury", "accounts"]]), promptMax: 60_000 });
+  const withLedger = (o: Observation) => ({ ...o, channels: { ...o.channels, "finance/treasury": ledger } }) as unknown as Observation;
+  await p.step(withLedger(base(9 * HOUR)), ctx);
+  await p.step(withLedger(found(9 * HOUR, "finance/files", [app])), ctx);
+  await p.step(withLedger(found(9 * HOUR, "finance/files", [app])), ctx);
+  expect(calls.length).toBe(3);
+  for (const call of calls.slice(1)) {
+    const r = resultsOf(call);
+    const id = Object.keys(r)[0]!;
+    expect(r[id]).not.toBe(LOOK_LEFT_OUT);
+    expect(r[id]).toContain("Application for a loan of $2,500.00 over 12 months");
+    expect(r[id]).not.toContain("acc-c0042");
+    expect(sizeOf(call)).toBeLessThanOrEqual(60_000);
+  }
+  // The look before last is still there whole at the third call: nothing it looked up had to go.
+  expect((calls[2]!.messages[2]!.content as any[])[0].content).toContain("Application for a loan");
+  // (The opening, with the whole ledger, was over the ceiling: the ledger went, as a long part not looked up.)
+  expect(notes.filter((n) => n.prompt_trimmed).every((n) => n.prompt_trimmed.looks === 0)).toBe(true);
+  // A look's result that does carry a long part it did not ask for: that part goes before the look's own result does.
+  const result = `It is year 1, day 1.\n\n## Files: the paper rec.111\n- [rec.111] the application\n\n## Treasury\n${"- acc-x: $1.00\n".repeat(3_000)}`;
+  const fit = fitPrompt("system", [{ role: "user", content: "Your notebook: (empty)" }, { role: "assistant", content: [use("a", "look", { report: "finance/files", paper: "rec.111" })] }, { role: "user", content: [{ type: "tool_result", tool_use_id: "a", content: result }] }], 20_000, new Set(["a"]));
+  expect(fit.left).toMatchObject({ looks: 0, parts: 1 });
+  expect((fit.messages[2]!.content as any[])[0].content).toContain("- [rec.111] the application");
+});
+
 test("a report set to come at every sitting obeys the same ceilings", async () => {
   const many = Array.from({ length: 6 }, (_, k) => use(`l${k}`, "look", { report: "finance/files", paper: `p${k}`, each_sitting: true }));
   const { p, calls } = harness([many, [use("d", "done_for_now", { days: 1 })], [use("d2", "done_for_now", { days: 1 })]], { promptMax: 30_000, sessions: { start: 9 * HOUR, end: 17 * HOUR, days: 7 } });
