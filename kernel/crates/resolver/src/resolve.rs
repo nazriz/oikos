@@ -25,22 +25,28 @@ pub fn label_text(label: &str) -> &'static str {
         "not_an_act" => "That's something to look up or read, not something to do. Look at your reports and papers, or write to whoever keeps it.",
         "no_such_act" => "Nothing here does that as such. If it is for someone else to see to, direct them in writing, on their form for it if they have one.",
         // (Said of the request alone: nothing is looked up to say it, so it tells the caller nothing it didn't know.)
+        // (The resolver's own answer, never a translator's: the translator does not know who exists. Given alone, with no
+        // candidates, it says only this.)
+        "ambiguous" => "More than one of those you know of goes by that name. Name the one you mean by their id.",
         "look_first" => "That needs something found out first. Look it up (in your own papers, or by asking whoever keeps it), then say what is to be done, naming each paper by its id.",
         _ => "It isn't clear what should happen. Could you say it more plainly?",
     }
 }
 
 /// A resolution: the seat's acts (blocks, as the kernel reads them), or questions for the seat (and, when the call
-/// itself broke the contract, what was wrong, for the log).
+/// itself broke the contract, what was wrong, for the log; and where a name it wrote could be more than one of those it
+/// knows of, in a world whose people have names, each such answer `ambiguous` with its candidates).
 #[derive(Debug, Clone, PartialEq)]
 pub enum Resolution {
     Blocks(Vec<Json>),
-    Questions { questions: Vec<String>, invalid: Vec<String> },
+    Questions { questions: Vec<String>, invalid: Vec<String>, ambiguous: Vec<Json> },
 }
 
 enum Stop {
     Ask(String),
     Unit(String),
+    /// A name that could be more than one of those the seat knows of: the question, and the answer as data.
+    Ambiguous(String, Json),
 }
 
 type R<T> = Result<T, Stop>;
@@ -84,8 +90,12 @@ fn some<T: Into<Json>>(x: T) -> Option<Json> {
 
 /// Resolve a program. `type_of` gives a structure type from the world's catalogue (footprint, terrains, spaces).
 pub fn resolve(program: &Program, k: &Knowledge, type_of: &dyn Fn(&str) -> Option<Json>, as_: Option<&str>) -> Resolution {
-    let q = |s: &str| Resolution::Questions { questions: vec![s.to_string()], invalid: vec![] };
+    let q = |s: &str| Resolution::Questions { questions: vec![s.to_string()], invalid: vec![], ambiguous: vec![] };
     let lines = match program {
+        // (`ambiguous` is the resolver's answer: a translator that writes it has said something it cannot know.)
+        Program::None(label) if label == "ambiguous" => {
+            return Resolution::Questions { questions: vec![label_text("unclear").into()], invalid: vec!["`ambiguous` answers a name known by more than one; it is never written for a request".into()], ambiguous: vec![] };
+        }
         Program::None(label) => return q(label_text(label)),
         Program::Lines(l) => l,
     };
@@ -94,21 +104,26 @@ pub fn resolve(program: &Program, k: &Knowledge, type_of: &dyn Fn(&str) -> Optio
     }
     let invalid = calls::contract_errors(program);
     if !invalid.is_empty() {
-        return Resolution::Questions { questions: vec![label_text("unclear").into()], invalid };
+        return Resolution::Questions { questions: vec![label_text("unclear").into()], invalid, ambiguous: vec![] };
     }
     let bound: BTreeSet<String> = lines.iter().filter_map(|l| l.bind.clone()).collect();
-    let mut r = Resolver { k, me: k.acting_for(as_), refs: bound.clone(), bound, n: 0, type_of };
+    let mut r = Resolver { k, me: k.acting_for(as_), office: as_.is_some(), refs: bound.clone(), bound, n: 0, type_of };
     let mut blocks = vec![];
     let mut questions = vec![];
+    let mut ambiguous = vec![];
     for line in lines {
         match r.line(&line.call, line.bind.as_deref()) {
             Ok(b) => blocks.extend(b),
             Err(Stop::Ask(s)) => questions.push(s),
             Err(Stop::Unit(s)) => questions.push(format!("{s}. Please say it another way.")),
+            Err(Stop::Ambiguous(s, a)) => {
+                questions.push(s);
+                ambiguous.push(a);
+            }
         }
     }
     if !questions.is_empty() {
-        return Resolution::Questions { questions, invalid: vec![] };
+        return Resolution::Questions { questions, invalid: vec![], ambiguous };
     }
     if blocks.len() > 32 {
         return q(label_text("too_much"));
@@ -119,6 +134,8 @@ pub fn resolve(program: &Program, k: &Knowledge, type_of: &dyn Fn(&str) -> Optio
 struct Resolver<'a> {
     k: &'a Knowledge,
     me: String,
+    /// Acting in a post (an office), not as itself.
+    office: bool,
     refs: BTreeSet<String>,
     /// The names the program's own lines bind (`refs` also holds the ones made up here).
     bound: BTreeSet<String>,
@@ -160,14 +177,7 @@ impl Resolver<'_> {
                 Ok(Some(i.clone()))
             }
             (Value::Var(x), _) => Ok(Some(format!("${x}"))),
-            (_, Some(n)) => {
-                let found = self.k.by_name(n);
-                match found.len() {
-                    1 => Ok(Some(found[0].clone())),
-                    0 => ask(format!("You don't know of anyone or anything called \"{n}\" (for {what}).")),
-                    _ => ask(format!("More than one {what} is called \"{n}\": {}. Which one?", found.join(", "))),
-                }
-            }
+            (_, Some(n)) => self.named(n, what).map(Some),
             (Value::Json(_), _) => ask(format!("{what} should name something, not data.")),
             _ => ask(format!("{what} should name something, not a call.")),
         }
@@ -183,6 +193,34 @@ impl Resolver<'_> {
             Some(_) => ask(format!("{key} should name a record by its id.")),
         }
     }
+    /// Who or what a name the seat wrote is, among those it knows of (`Knowledge::by_name`): the one it knows by that
+    /// name. Else a question: in a world whose people have names (docs/design/names-and-dates.md section 4), a name it
+    /// knows more than one by is answered `ambiguous`, with every candidate and what tells each apart on its own file,
+    /// and no guess is made; one it knows nobody by is not on file (never looked up anywhere else). In the old towns,
+    /// the questions they always had. (The other resolver's `named`, word for word.)
+    fn named(&self, n: &str, what: &str) -> R<String> {
+        let found = self.k.by_name(n);
+        match found.len() {
+            1 => Ok(found[0].clone()),
+            0 if self.k.named => ask(if self.office { format!("No {n} is on file with this office.") } else { format!("No {n} is on your file.") }),
+            0 => ask(format!("You don't know of anyone or anything called \"{n}\" (for {what}).")),
+            _ if self.k.named => {
+                let mut candidates = vec![];
+                let mut said = vec![];
+                for id in &found {
+                    let by = self.k.known_by(id);
+                    // (A post by its id: its name would be its organisation's.)
+                    let who = if self.k.position_words.contains_key(id) { id.clone() } else { self.k.name(id) };
+                    said.push(if by.is_empty() { format!("{who}, with nothing on your file to tell them apart but the id") } else { format!("{who}, {}", by.join(", ")) });
+                    candidates.push(json!({ "id": id, "known_by": by }));
+                }
+                let last = said.pop().unwrap_or_default();
+                let question = format!("Which \"{n}\" do you mean (for {what})? You know of {} by that name: {}; or {last}. Name the one you mean by their id.", found.len(), said.join("; "));
+                Err(Stop::Ambiguous(question, json!({ "label": "ambiguous", "name": n, "for": what, "candidates": candidates })))
+            }
+            _ => ask(format!("More than one {what} is called \"{n}\": {}. Which one?", found.join(", "))),
+        }
+    }
     fn id(&self, c: &Call, key: &str) -> R<Option<String>> {
         self.id_as(c, key, key)
     }
@@ -194,21 +232,15 @@ impl Resolver<'_> {
         let Some(items) = j.as_array().filter(|a| a.iter().all(Json::is_string)) else { return ask("basis should be a record, or a list of records.") };
         let mut out: Vec<String> = vec![];
         for x in items.iter().filter_map(Json::as_str) {
-            let written_as_id = !x.is_empty() && x.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || "_.:/-".contains(ch));
             let id = if self.bound.contains(x) {
                 format!("${x}")
-            } else if written_as_id {
+            } else if written_as_id(x) {
                 if !id_shape(x) {
                     return ask(not_an_id(x, "basis"));
                 }
                 x.to_string()
             } else {
-                let found = self.k.by_name(x);
-                match found.len() {
-                    1 => found[0].clone(),
-                    0 => return ask(format!("You don't know of anyone or anything called \"{x}\" (for basis).")),
-                    _ => return ask(format!("More than one basis is called \"{x}\": {}. Which one?", found.join(", "))),
-                }
+                self.named(x, "basis")?
             };
             if !out.contains(&id) {
                 out.push(id);
@@ -266,6 +298,8 @@ impl Resolver<'_> {
         match c.get(key) {
             None => Ok(None),
             Some(Value::Json(j)) => match j.as_array() {
+                // (In a world whose people have names, one written as a name in the list is one of those the seat knows.)
+                Some(a) if a.iter().all(Json::is_string) && self.k.named => a.iter().filter_map(Json::as_str).map(|x| if x.starts_with('$') || written_as_id(x) { Ok(x.to_string()) } else { self.named(x, key) }).collect::<R<Vec<String>>>().map(Some),
                 Some(a) if a.iter().all(Json::is_string) => Ok(Some(a.iter().map(|x| x.as_str().unwrap().to_string()).collect())),
                 _ => ask(format!("{key} should be a list of names or ids.")),
             },
@@ -1325,7 +1359,7 @@ impl Resolver<'_> {
             let own = if own_words && Self::has(c, "text") { Self::str_(c, "text")? } else { None };
             let money = |a: &str| {
                 self.currency().map(|cur| calls::format_money(a, cur)).map_err(|s| match s {
-                    Stop::Ask(m) | Stop::Unit(m) => m,
+                    Stop::Ask(m) | Stop::Unit(m) | Stop::Ambiguous(m, _) => m,
                 })
             };
             let paper = forms::write_paper(spec, &data, &me, self.k.t, &money, self.k.dated.as_ref(), own.as_deref()).map_err(Stop::Ask)?;
@@ -1374,6 +1408,11 @@ impl Resolver<'_> {
             ("ref", bind.map(Json::from)),
         ])])
     }
+}
+
+/// Written as an id is written (lowercase letters, digits and `_.:/-`), not as a name.
+fn written_as_id(x: &str) -> bool {
+    !x.is_empty() && x.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || "_.:/-".contains(ch))
 }
 
 fn digits(s: &str, most: usize) -> bool {
@@ -1687,6 +1726,63 @@ mod tests {
                 Resolution::Questions { questions, .. } => assert_eq!(json!(questions), c["asks"], "{name}"),
             }
         }
+    }
+
+    /// A person or body named by name, in a world whose people have names and in one without: the table this resolver
+    /// and the repository's TypeScript one are both held to (contracts/test/names.json; translator/test/names.test.ts
+    /// reads the same file). Where names are on, a name the seat knows more than one by is `ambiguous`, never a guess.
+    #[test]
+    fn names_as_the_shared_table_says() {
+        let table: Json = serde_json::from_str(include_str!("../../../../contracts/test/names.json")).unwrap();
+        let cases = table["cases"].as_array().unwrap();
+        assert!(cases.len() >= 13);
+        let dump = std::env::var("OIKOS_DUMP_NAMES").is_ok();
+        for c in cases {
+            let name = c["name"].as_str().unwrap();
+            let named = c["names"].as_bool() != Some(false);
+            let mut k = Knowledge::new(Currency::from_config(&table["currency"])).with_names(named);
+            k.absorb(&table["observation"]);
+            let program = parse_program(c["program"].as_str().unwrap()).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+            let got = match resolve(&program, &k, &|_| None, c["as"].as_str()) {
+                Resolution::Blocks(b) => json!({ "blocks": b }),
+                Resolution::Questions { questions, ambiguous, .. } if ambiguous.is_empty() => json!({ "asks": questions }),
+                Resolution::Questions { questions, ambiguous, .. } => json!({ "asks": questions, "ambiguous": ambiguous }),
+            };
+            if dump {
+                println!("{name}\t{got}");
+                continue;
+            }
+            let mut want = serde_json::Map::new();
+            for key in ["blocks", "asks", "ambiguous"] {
+                if let Some(v) = c.get(key) {
+                    want.insert(key.into(), v.clone());
+                }
+            }
+            assert_eq!(got, Json::Object(want), "{name}");
+        }
+    }
+
+    /// A world without names takes in what it is shown as it always did: nothing kept of who is named where, and its
+    /// knowledge saved as before (no new member), so a snapshot and a pinned hash do not move.
+    #[test]
+    fn a_world_without_names_knows_and_saves_what_it_always_did() {
+        let table: Json = serde_json::from_str(include_str!("../../../../contracts/test/names.json")).unwrap();
+        let mut off = Knowledge::new(Currency::from_config(&table["currency"]));
+        off.absorb(&table["observation"]);
+        assert!(off.named_in.is_empty() && !off.named);
+        let saved = serde_json::to_value(&off).unwrap();
+        assert!(saved.get("named").is_none() && saved.get("named_in").is_none(), "{saved}");
+        let mut on = Knowledge::new(Currency::from_config(&table["currency"])).with_names(true);
+        on.absorb(&table["observation"]);
+        assert_eq!(on.named_in["c0002"].len(), 2);
+        // (Everything else it knows is the same.)
+        let (mut a, b) = (serde_json::to_value(&on).unwrap(), saved);
+        a.as_object_mut().unwrap().remove("named");
+        a.as_object_mut().unwrap().remove("named_in");
+        assert_eq!(a, b);
+        // And read back, it is what it was.
+        let back: Knowledge = serde_json::from_value(serde_json::to_value(&on).unwrap()).unwrap();
+        assert!(back.named && back.named_in == on.named_in);
     }
 
     use super::{duration_words, nearest_days};

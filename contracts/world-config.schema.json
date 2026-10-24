@@ -806,6 +806,10 @@
         "fiscal_year_starts": { "description": "The month and day the fiscal year of public bodies begins.", "type": "object", "properties": { "month": { "type": "integer", "minimum": 1, "maximum": 12 }, "day": { "type": "integer", "minimum": 1, "maximum": 31 } }, "required": ["month", "day"], "additionalProperties": false }
       }
     },
+    "names": {
+      "description": "Whether the world's people and bodies have names of their own, drawn from a place (docs/design/names-and-dates.md; the generator sets it with a spec's `names`). The kernel reads none of it; the resolver does: a name a seat writes that matches more than one of those it has been shown is answered `ambiguous`, with the candidates and what tells them apart on its own file, and one that matches nobody it knows is \"not on file\" (contracts/calls.md). Absent or false: the old towns' answers, word for word.",
+      "type": "boolean"
+    },
     "dials": {
       "description": "Dials of a living world (docs/design/ai-citizens.md 10j). Opaque to the kernel; absent, every dial is off and the world is as before.",
       "type": "object",

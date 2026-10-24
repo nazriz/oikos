@@ -75,7 +75,39 @@ pub struct Knowledge {
     /// The world's calendar and the words its dates are written in (its config's `calendar`): how the resolver reads and
     /// writes a date. Absent: the old "year N, day D".
     pub dated: Option<oikos_rules::calendar::Dated>,
+    /// Whether the world's people and bodies have names of their own (its config's `names`; docs/design/names-and-dates.md
+    /// section 4): then a name the seat writes that it knows more than one by is answered `ambiguous`, with what tells
+    /// them apart on its own file, and one it doesn't know is "not on file". Off: the old towns' answers, word for word.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub named: bool,
+    /// With names on: entity -> the papers the seat has been shown that name it (the latest few, newest last): what
+    /// tells two people of one name apart on its own file. Nothing is kept here with names off.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub named_in: BTreeMap<String, Vec<Mention>>,
 }
+
+/// A paper that names someone, as the seat was shown it: its id, what it is (its kind, or an agreement's template), and
+/// how it names them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Mention {
+    pub record: String,
+    pub what: String,
+    pub how: MentionHow,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MentionHow {
+    /// It speaks for them (they wrote it, or it was written in their name).
+    From,
+    /// It is addressed to them.
+    To,
+    /// They are a party to it (an agreement).
+    Party,
+}
+
+/// How many papers naming one entity are kept.
+const MENTIONS_KEPT: usize = 3;
 
 /// A name for matching without its marks and spacing: lower case, the Latin letters that carry a mark as the plain
 /// letter (the same as taking the name apart with NFD and dropping the combining marks, for the letters people write),
@@ -133,6 +165,8 @@ pub struct RecordFacts {
     addressed: Option<(Arc<str>, Arc<[String]>)>,
     /// A procedure that states routines: each task, as it states it.
     routines: Vec<(String, RoutineFact)>,
+    /// Whom the record names, and how (taken in only where the world's people have names: `Knowledge::named`).
+    mentions: Vec<(String, Mention)>,
 }
 
 impl RecordFacts {
@@ -145,6 +179,23 @@ impl RecordFacts {
         if kind == "entity_declaration" {
             if let (Some(e), Some(n)) = (s(&r["entity"]), s(&r["name"])) {
                 facts.declares = Some((e.into(), n.into()));
+            }
+        }
+        let rid = s(&r["id"]).unwrap_or_default();
+        if kind == "agreement" {
+            let what = s(&r["terms"]["template"]).filter(|t| !t.is_empty()).unwrap_or("agreement");
+            for p in r["terms"]["parties"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+                facts.mentions.push((p.to_string(), Mention { record: rid.to_string(), what: what.to_string(), how: MentionHow::Party }));
+            }
+        }
+        // (A lot is a plan in a register, not a paper about anyone: a register of lots taken in whole names nobody.)
+        if kind == "statement" && s(&r["kind"]) != Some("lot") {
+            let what = s(&r["kind"]).unwrap_or("statement");
+            if let Some(who) = s(&r["speaks_for"]) {
+                facts.mentions.push((who.to_string(), Mention { record: rid.to_string(), what: what.to_string(), how: MentionHow::From }));
+            }
+            for to in r["addressed_to"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+                facts.mentions.push((to.to_string(), Mention { record: rid.to_string(), what: what.to_string(), how: MentionHow::To }));
             }
         }
         if kind == "statement" {
@@ -369,6 +420,12 @@ impl Knowledge {
         Knowledge { currency, ..Default::default() }
     }
 
+    /// In a world whose people and bodies have names of their own (its config's `names`), or not.
+    pub fn with_names(mut self, named: bool) -> Self {
+        self.named = named;
+        self
+    }
+
     /// With the world's calendar and the words its dates are written in.
     pub fn with_dated(mut self, dated: Option<oikos_rules::calendar::Dated>) -> Self {
         self.dated = dated;
@@ -496,6 +553,51 @@ impl Knowledge {
         for (task, fact) in &facts.routines {
             self.routines.insert(task.clone(), fact.clone());
         }
+        if self.named {
+            for (who, m) in &facts.mentions {
+                let kept = self.named_in.entry(who.clone()).or_default();
+                kept.retain(|x| !(x.record == m.record && x.how == m.how));
+                kept.push(m.clone());
+                if kept.len() > MENTIONS_KEPT {
+                    kept.remove(0);
+                }
+            }
+        }
+    }
+
+    /// What tells someone or something apart on the seat's own file, in words (at most three things, the papers that
+    /// name them first, newest first): the papers it has been shown that name them, the accounts it knows they hold or
+    /// asked to be paid into, the posts it knows are theirs. Nothing the seat was not shown. Empty: nothing but the id.
+    pub fn known_by(&self, id: &str) -> Vec<String> {
+        let mut out: Vec<String> = vec![];
+        if let Some((title, role)) = self.position_words.get(id) {
+            let called = if !title.is_empty() { title.clone() } else { role.replace('_', " ") };
+            let of = self.positions.get(id).map(|e| self.name(e)).unwrap_or_default();
+            out.push(if of.is_empty() { format!("the post of {called}") } else { format!("the post of {called} at {of}") });
+        }
+        for m in self.named_in.get(id).into_iter().flatten().rev() {
+            let what = m.what.replace('_', " ");
+            let a = if what.starts_with(['a', 'e', 'i', 'o', 'u']) { "an" } else { "a" };
+            out.push(match m.how {
+                MentionHow::From => format!("who wrote {} ({a} {what})", m.record),
+                MentionHow::To => format!("to whom {} ({a} {what}) is addressed", m.record),
+                MentionHow::Party => format!("party to {} ({a} {what})", m.record),
+            });
+        }
+        for a in self.accounts.iter().filter(|(_, a)| a.holder == id).map(|(k, _)| k) {
+            out.push(format!("who holds account {a}"));
+        }
+        for a in self.stated.get(id).into_iter().flatten() {
+            if !self.accounts.get(a).is_some_and(|x| x.holder == id) {
+                out.push(format!("who asked to be paid into {a}"));
+            }
+        }
+        let posts: Vec<&String> = self.positions.iter().filter(|(_, e)| *e == id).map(|(p, _)| p).collect();
+        if !posts.is_empty() {
+            out.push(format!("whose {} {}", if posts.len() == 1 { "post is" } else { "posts are" }, posts.iter().take(3).map(|p| p.as_str()).collect::<Vec<_>>().join(", ")));
+        }
+        out.truncate(3);
+        out
     }
 
     /// A routine as the seat's own procedure states it; none where no procedure it has seen names the task, or that

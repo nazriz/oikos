@@ -1,0 +1,58 @@
+{
+  "about": "A person or body named by name (docs/design/names-and-dates.md section 4; contracts/calls.md, `ambiguous`): what both resolvers (translator/src/resolver.ts and kernel/crates/resolver) must make of each program, from what this seat has been shown, in a world whose people have names (`names` true, the default here) and in one without (`names` false: the old answers, word for word). Each case has `blocks` (the acts) or `asks` (the questions back, whole) and, where the resolver answers `ambiguous`, `ambiguous` (the answer as data).",
+  "currency": { "code": "KES", "minor_units": 2, "symbol": "KSh" },
+  "observation": {
+    "participant": "registrar-seat", "t": 2592000, "status": "active", "entity": "c0009", "outcomes": [], "inbox": [], "drafts": [],
+    "positions": [{ "position": "registrar", "entity": "tribunal", "title": "Registrar", "role": "registrar" }],
+    "channels": {
+      "money": { "kind": "accounts", "transactions": [], "accounts": [{ "account": "acc-tribunal", "holder": "tribunal", "custodian": "bank", "balance": "500000" }] },
+      "who": { "kind": "directory",
+        "entities": [
+          { "entity": "tribunal", "kind": "tribunal", "name": "Nakuru Rent Tribunal" },
+          { "entity": "c0001", "kind": "person", "name": "José Muñoz García" },
+          { "entity": "c0002", "kind": "person", "name": "Mary Wanjiru" },
+          { "entity": "c0003", "kind": "person", "name": "Mary Wanjiru" },
+          { "entity": "c0004", "kind": "person", "name": "Hanna Müller" },
+          { "entity": "c0005", "kind": "person", "name": "Peter Otieno" },
+          { "entity": "c0006", "kind": "person", "name": "Peter Otieno" }
+        ],
+        "positions": [
+          { "position": "clerk-a", "entity": "tribunal", "title": "Clerk", "role": "clerk" },
+          { "position": "clerk-b", "entity": "tribunal", "title": "Clerk", "role": "clerk" }
+        ] },
+      "mine": { "kind": "records", "records": [
+        { "id": "lease-0042", "record": "agreement", "author": "genesis", "at": 0, "terms": { "template": "lease", "parties": ["landlord-1", "c0002"], "text": "Lease of Flat 2, 14 Kenyatta Avenue.", "commitments": [] } },
+        { "id": "rec.71", "record": "statement", "author": "registrar-seat", "in_position": "registrar", "speaks_for": "tribunal", "at": 86400, "kind": "notice", "addressed_to": ["c0003"], "text": "Notice of hearing.", "data": {} },
+        { "id": "rec.80", "record": "statement", "author": "c0002", "speaks_for": "c0002", "at": 172800, "kind": "application", "addressed_to": ["tribunal"], "text": "An application.", "data": {} }
+      ] }
+    }
+  },
+  "cases": [
+    { "name": "a name the seat knows one person by is that person", "as": "registrar", "program": "message(to=\"José Muñoz García\", text=\"Your hearing is on Monday.\")",
+      "blocks": [{"block": "message", "text": "Your hearing is on Monday.", "to": ["c0001"]}] },
+    { "name": "written without its marks, a name that finds one person is that person", "as": "registrar", "program": "message(to=\"Jose Munoz Garcia\", text=\"Your hearing is on Monday.\")",
+      "blocks": [{"block": "message", "text": "Your hearing is on Monday.", "to": ["c0001"]}] },
+    { "name": "a name the seat knows two people by is asked back, with what tells them apart on its own file", "as": "registrar", "program": "message(to=\"Mary Wanjiru\", text=\"Your hearing is on Monday.\")",
+      "asks": ["Which \"Mary Wanjiru\" do you mean (for to)? You know of 2 by that name: Mary Wanjiru (c0002), who wrote rec.80 (an application), party to lease-0042 (a lease); or Mary Wanjiru (c0003), to whom rec.71 (a notice) is addressed. Name the one you mean by their id."], "ambiguous": [{"candidates": [{"id": "c0002", "known_by": ["who wrote rec.80 (an application)", "party to lease-0042 (a lease)"]}, {"id": "c0003", "known_by": ["to whom rec.71 (a notice) is addressed"]}], "for": "to", "label": "ambiguous", "name": "Mary Wanjiru"}] },
+    { "name": "the same, the name in a list", "as": "registrar", "program": "message(to=[\"Mary Wanjiru\"], text=\"Your hearing is on Monday.\")",
+      "asks": ["Which \"Mary Wanjiru\" do you mean (for to)? You know of 2 by that name: Mary Wanjiru (c0002), who wrote rec.80 (an application), party to lease-0042 (a lease); or Mary Wanjiru (c0003), to whom rec.71 (a notice) is addressed. Name the one you mean by their id."], "ambiguous": [{"candidates": [{"id": "c0002", "known_by": ["who wrote rec.80 (an application)", "party to lease-0042 (a lease)"]}, {"id": "c0003", "known_by": ["to whom rec.71 (a notice) is addressed"]}], "for": "to", "label": "ambiguous", "name": "Mary Wanjiru"}] },
+    { "name": "two of one name that nothing on the file tells apart: said so", "as": "registrar", "program": "message(to=\"Peter Otieno\", text=\"Your hearing is on Monday.\")",
+      "asks": ["Which \"Peter Otieno\" do you mean (for to)? You know of 2 by that name: Peter Otieno (c0005), with nothing on your file to tell them apart but the id; or Peter Otieno (c0006), with nothing on your file to tell them apart but the id. Name the one you mean by their id."], "ambiguous": [{"candidates": [{"id": "c0005", "known_by": []}, {"id": "c0006", "known_by": []}], "for": "to", "label": "ambiguous", "name": "Peter Otieno"}] },
+    { "name": "two posts of one title are asked back the same way", "as": "registrar", "program": "message(to=\"the clerk\", text=\"Please list the case.\")",
+      "asks": ["Which \"the clerk\" do you mean (for to)? You know of 2 by that name: clerk-a, the post of Clerk at Nakuru Rent Tribunal (tribunal); or clerk-b, the post of Clerk at Nakuru Rent Tribunal (tribunal). Name the one you mean by their id."], "ambiguous": [{"candidates": [{"id": "clerk-a", "known_by": ["the post of Clerk at Nakuru Rent Tribunal (tribunal)"]}, {"id": "clerk-b", "known_by": ["the post of Clerk at Nakuru Rent Tribunal (tribunal)"]}], "for": "to", "label": "ambiguous", "name": "the clerk"}] },
+    { "name": "a name nobody the seat knows goes by is not on file with the office (never looked up anywhere else)", "as": "registrar", "program": "message(to=\"Hanna Mueller\", text=\"Your hearing is on Monday.\")",
+      "asks": ["No Hanna Mueller is on file with this office."] },
+    { "name": "as itself, not on its file", "program": "message(to=\"Grace Akinyi\", text=\"Hello.\")",
+      "asks": ["No Grace Akinyi is on your file."] },
+    { "name": "a list with one name it knows and one it does not", "as": "registrar", "program": "message(to=[\"c0004\", \"Grace Akinyi\"], text=\"Hello.\")",
+      "asks": ["No Grace Akinyi is on file with this office."] },
+    { "name": "a translator that writes none(ambiguous) has said what it cannot know: unclear", "as": "registrar", "program": "none(ambiguous)",
+      "asks": ["It isn't clear what should happen. Could you say it more plainly?"] },
+    { "name": "names off: two of one name are asked back as they always were", "names": false, "as": "registrar", "program": "message(to=\"Mary Wanjiru\", text=\"Your hearing is on Monday.\")",
+      "asks": ["More than one to is called \"Mary Wanjiru\": c0002, c0003. Which one?"] },
+    { "name": "names off: a name nobody goes by, as it always was", "names": false, "as": "registrar", "program": "message(to=\"Hanna Mueller\", text=\"Your hearing is on Monday.\")",
+      "asks": ["You don't know of anyone or anything called \"Hanna Mueller\" (for to)."] },
+    { "name": "names off: a list is passed on as written", "names": false, "as": "registrar", "program": "message(to=[\"Mary Wanjiru\"], text=\"Hello.\")",
+      "blocks": [{"block": "message", "text": "Hello.", "to": ["Mary Wanjiru"]}] }
+  ]
+}

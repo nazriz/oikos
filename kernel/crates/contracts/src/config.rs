@@ -57,6 +57,10 @@ pub struct Config {
     /// dates are "year N, day D". (Missing here until 2026-10-24, so a town with `calendar: true` could not start.)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub calendar: Option<Value>,
+    /// Whether the world's people and bodies have names of their own (contracts/world-config.schema.json `names`;
+    /// docs/design/names-and-dates.md section 4). Opaque to the kernel; the resolver reads it. Absent: the old towns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub names: Option<bool>,
     /// Enforced by the orchestrator; the kernel only records it.
     pub orchestration: Value,
 }
