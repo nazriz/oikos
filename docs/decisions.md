@@ -7729,3 +7729,27 @@ that was not before: a person only lets go.
 ## 2026-10-24 · The generated town the Rust tests read is keyed by the generator's inputs; MT-23 registered (branch `key-town-cache`)
 
 `orchestrator/test/lib/write-town.ts` writes `<out>.key`, a sha256 of the generator (`worlds/generator`), the profiles, `participants/src` (the rules it calls), `contracts/` (schemas), the engine's native module, the spec and the arguments (`town-key.ts`); a file whose key is not the current one is written again. The Rust tests (`a1_citizen`, `observations`) call it every time instead of only when the file is missing, and `worktree-warm` drops the `*-town.json` copies it clones. Why: today a cached town from before `life.majority` failed three tests in a worktree that a fresh checkout passed, and the merge machine's old copy let a failing test pass. Cost: one bun start (about 0.3 s) per test program. Proved in `orchestrator/test/town-key.test.ts`. **Revisit if** the generator reads an input not listed (add it to `INPUTS`). MT-23 registers the seat-diary day-21 span (untraced).
+
+## 2026-10-24 · The six pilots: two faults fixed before they ran (branch `pilots-six`)
+
+Found preparing the six pilots the owner approved (2026-10-23/24: 120 days, seven seats each, names and dates on in three,
+our translator first with Sonnet behind, about $100 to 150 on his API credit).
+
+- **A town with `names: true, calendar: true` could not start on the Rust world.** The generator writes the schema's
+  `calendar` section (contracts/world-config.schema.json), the engine reads it, but the kernel's mirror of the config
+  (`kernel/crates/contracts/src/config.rs`, `deny_unknown_fields`) had no such field, so the start was refused
+  ("unknown field `calendar`"). Names and dates had only ever run on the TypeScript world. Added as an opaque optional
+  field (absent, nothing serialises: no other town's config or hash moves). Proved: `orchestrator/test/run-calls.test.ts`
+  runs a 40-person names-and-calendar town two days.
+- **A pilot's calls had no record of wall time or errors.** Only the experiment harness kept one (`<arm>.calls.jsonl`).
+  `runOne` now wraps every adapter it builds (seat, translator behind, ours first, composers) in the same
+  `callRecorder`: `<run>.calls.jsonl` beside the log, a line a call actually made (not one served again on a resume),
+  and `cost.json` gains `calls` (by model, model and purpose, subject; p50, p95, max ms; errors). The calls file is not a
+  log (`isLog`). Why: the owner asked for every call's cost and performance, and "ours against Sonnet" needs latency too.
+- **Not faults, recorded:** the dry check's "clerk filed books: not shown" for every office but the support office is the
+  check reading the TypeScript world's naming; on the Rust world the books are filed by `<office>-staff` (bank-lending 112,
+  finance 36, mayor 6 in a 30-day mock). Offices with no published form (child-protection, city-appointments,
+  water-operations, land-registrar, rates, migration) were left out of the pilots: a seat there cannot act through the
+  translator. `fund-trustee` exists only once a fund is founded.
+- **Revisit if** the dry check is to be trusted on the Rust world (teach it `<office>-staff`), or a pilot wants one of the
+  formless offices (write its stationery first).
