@@ -105,3 +105,34 @@ pub fn own_land(book: &Book, owner: &str) -> Vec<OwnLot> {
     }
     lots.into_values().filter(|x| owner_of(book, &x.lot).as_deref() == Some(owner)).collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use oikos_sight::Record;
+    use std::sync::Arc;
+
+    fn rec(v: Value) -> Arc<Record> {
+        Arc::new(serde_json::from_value(v).expect("a record"))
+    }
+    fn title() -> Arc<Record> {
+        rec(serde_json::json!({ "id": "title-lot-1", "at": 0, "author": "genesis", "record": "claim", "speaks_for": "land-registry", "position": "right", "holder": "c0001", "visible_to": "public", "about": { "kind": "ownership", "object": "lot-1" } }))
+    }
+    fn transfer(by: &str, to: &str, id: &str) -> Arc<Record> {
+        rec(serde_json::json!({ "id": id, "at": 300, "author": "x", "record": "claim_transfer", "speaks_for": by, "claim": "title-lot-1", "to": to, "visible_to": "public" }))
+    }
+
+    /// Ported from participants/test/registry.test.ts ("a title's transfer counts only from its holder, or from whoever issued it"),
+    /// whose TypeScript helper (`ownerOf`) is gone.
+    #[test]
+    fn a_titles_transfer_counts_only_from_its_holder_or_from_whoever_issued_it() {
+        let mut book = Book::new();
+        book.take_all(&[title(), transfer("c0009", "c0009", "rec.6")]);
+        assert_eq!(owner_of(&book, "lot-1").as_deref(), Some("c0001"), "a stranger's transfer: nothing");
+        book.take_all(&[transfer("land-registry", "c0002", "rec.7")]);
+        assert_eq!(owner_of(&book, "lot-1").as_deref(), Some("c0002"), "the registry's transmission");
+        book.take_all(&[transfer("c0002", "c0003", "rec.8")]);
+        assert_eq!(owner_of(&book, "lot-1").as_deref(), Some("c0003"), "the new holder's sale");
+        assert_eq!(owner_of(&book, "lot-2"), None, "a lot with no title has no owner");
+    }
+}

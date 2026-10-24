@@ -314,6 +314,14 @@ impl Person {
         let k = kind_.unwrap_or_else(|| self.recourse_kind_of(who, &w.cx.ctx.params));
         self.treated(w, Treated { who: who.into(), kind: k, good, weight_bps: weight.then_some(20_000), tried, paper: paper.map(String::from), ..Default::default() });
     }
+    /// A decision that reached us after we asked or applied (citizen.ts `landing` with `tried` and `trust`): trust in whoever
+    /// decided moves by `weight_bps` (granted 2, refused 1, in TS's weights), and so does the sense of agency: something
+    /// we tried that worked, or that failed, whichever it was. (`treat`'s `tried` cannot say "tried and failed".)
+    #[allow(clippy::too_many_arguments)]
+    fn treat_landing(&mut self, w: &mut Week, who: &str, good: bool, weight_bps: i64, paper: Option<&str>, kind_: Option<String>, tie: Option<(i64, &'static str)>) {
+        let k = kind_.unwrap_or_else(|| self.recourse_kind_of(who, &w.cx.ctx.params));
+        self.treated(w, Treated { who: who.into(), kind: k, good, weight_bps: Some(weight_bps), tried: true, paper: paper.map(String::from), tie, ..Default::default() });
+    }
     fn way_outcome(&mut self, w: &mut Week, option: &str, kind_: &str, from: &str, payoff: i64, f: Value) {
         self.tell(w, Outcome { domain: "way".into(), option: option.into(), kind: kind_.into(), way: Way::Mine, from: Some(from.into()), facts: facts(f), payoff: Some(payoff), ..Default::default() });
     }
@@ -443,7 +451,7 @@ impl Person {
             let ok = d.flag("granted");
             self.way_outcome(w, "ask", if ok { "granted" } else { "refused" }, &by, if ok { 10_000 } else { 1_000 }, json!({ "about": about }));
             // (TS's `landing` and the tie: the mind moves trust and the tie from how we were treated.)
-            self.treat(w, &by, ok, ok, ok, Some(&r.id), None);
+            self.treat_landing(w, &by, ok, if ok { 20_000 } else { 10_000 }, Some(&r.id), None, Some(if ok { (1_500, "granted") } else { (-500, "refused") }));
             let rise = d.i("wage").filter(|wg| ok && self.s.job.as_ref().is_some_and(|j| j.employer == by && j.agreement == about && *wg > j.wage));
             if let (Some(wage), Some(j)) = (rise, self.s.job.clone()) {
                 self.tell(w, Outcome { domain: "job".into(), option: j.employer.clone(), kind: "rise".into(), way: Way::Mine, facts: facts(json!({ "wage": wage, "was": j.wage, "asked": true })), ..Default::default() });
@@ -528,7 +536,7 @@ impl Person {
                     (g.matter.clone(), g.amount, g.about.clone(), g.seeks.clone())
                 };
                 self.way_outcome(w, "ask", if ok { "granted" } else { "refused" }, &by, if ok { 10_000 } else { 1_000 }, json!({ "about": matter }));
-                self.treat(w, &by, ok, ok, ok, Some(&r.id), None);
+                self.treat_landing(w, &by, ok, if ok { 20_000 } else { 10_000 }, Some(&r.id), None, Some(if ok { (1_000, "granted") } else { (-1_000, "refused") }));
                 if ok && amount.is_some() {
                     if matter == "underpaid" {
                         if let Some(j) = self.s.job.as_mut().filter(|j| Some(&j.agreement) == about.as_ref()) {
@@ -560,7 +568,7 @@ impl Person {
                 self.way_outcome(w, "desk", &f, &by, payoff, json!({ "about": matter, "days": (t - since_applied).div_euclid(DAY), "binding": binding }));
                 if f != "referred" {
                     let kb = self.civil(&by, &w.cx.ctx.params);
-                    self.treat(w, &by, won, true, won, Some(&r.id), Some(kb));
+                    self.treat_landing(w, &by, won, 20_000, Some(&r.id), Some(kb), None);
                 }
                 if f == "settled" {
                     self.ended(w, &key, "settled", true);

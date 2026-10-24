@@ -12,11 +12,11 @@ const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
 test("a model that costs money needs a price, a spending limit and a key; a local one needs none", () => {
-  expect(() => chooseModel("anthropic/claude-sonnet-5", { env: { ANTHROPIC_API_KEY: "k" } })).toThrow("spending limit is required");
-  expect(() => chooseModel("anthropic/claude-sonnet-5", { budgetUsd: 5, env: {} })).toThrow("ANTHROPIC_API_KEY");
-  expect(() => chooseModel("anthropic/no-such-model", { budgetUsd: 5, env: { ANTHROPIC_API_KEY: "k" } })).toThrow("no published price");
+  expect(() => chooseModel("anthropic/claude-sonnet-5", { env: { OIKOS_ANTHROPIC_KEY: "k" } })).toThrow("spending limit is required");
+  expect(() => chooseModel("anthropic/claude-sonnet-5", { budgetUsd: 5, env: {} })).toThrow("OIKOS_ANTHROPIC_KEY");
+  expect(() => chooseModel("anthropic/no-such-model", { budgetUsd: 5, env: { OIKOS_ANTHROPIC_KEY: "k" } })).toThrow("no published price");
   expect(() => chooseModel("openai/gpt-5", { budgetUsd: 5, env: { OPENAI_API_KEY: "k" } })).toThrow("no published price"); // until its price is added, with a source
-  const ok = chooseModel("anthropic/claude-sonnet-5", { budgetUsd: 5, env: { ANTHROPIC_API_KEY: "k" } });
+  const ok = chooseModel("anthropic/claude-sonnet-5", { budgetUsd: 5, env: { OIKOS_ANTHROPIC_KEY: "k" } });
   expect(ok.adapter.provider).toBe("anthropic");
   expect(ok.budget).toEqual({ limitMicroUsd: 5_000_000, spentMicroUsd: 0 });
   const local = chooseModel("ollama/qwen3:8b", { env: {} });

@@ -9,7 +9,7 @@
 //     the T - 1 after it, and runs each --seeds times (1 if not given): `--towns 3` is three towns run once each,
 //     `--towns 3 --seeds 2` six runs. Their runs are named <world>.town<S>.seed<N>. For a generated world only.
 //     --model runs every language-model participant and the translator on a real model: anthropic/…, openai/…
-//     (keys from ANTHROPIC_API_KEY / OPENAI_API_KEY), or a local open-weight model: ollama/… or local/… --base-url.
+//     (keys from OIKOS_ANTHROPIC_KEY / OPENAI_API_KEY), or a local open-weight model: ollama/… or local/… --base-url.
 //     A model that costs money needs --budget: the run stops, and says why, rather than spend more. --batch-budget caps
 //     the whole batch: each run gets the per-run limit or what's left, whichever is less.
 //     --translator-first decide/NAME puts our own trained translator first, with the translator (the run's model, or
@@ -231,7 +231,7 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR> [--out file.html] [--twin DIR | --no-twin] | experiment run <spec.json|yaml|ts> --out DIR [--parallel P] [--no-slots] | experiment report <DIR> [--rebuild] | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | view <log.jsonl[.zst]> <seq> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
+const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR> [--out file.html] [--twin DIR | --no-twin] | experiment run <spec.json|yaml|ts> --out DIR [--parallel P] [--no-slots] [--mock-models] [--resume] | experiment report <DIR> [--rebuild] | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | view <log.jsonl[.zst]> <seq> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -322,8 +322,10 @@ try {
     // post, over several seeds, across cores; each fork's measures and seats' costs; a comparison report.
     const { loadSpec, runExperiment } = await import("./experiment");
     const file = positional()[1]!;
+    // (--mock-models: a dry run, every model steward played by the mock; no model is called: experiment-seats.ts.)
+    if (has("mock-models")) process.env.OIKOS_EXPERIMENT_MOCK_MODELS = "1";
     const { spec, factories } = await loadSpec(file);
-    const r = await runExperiment(spec, { out: flag("out") ?? `runs/experiment-${spec.name}`, parallel: flag("parallel") !== undefined ? Number(flag("parallel")) : undefined, specFile: file, factories, slots: !has("no-slots"), log: (s) => console.error(s) });
+    const r = await runExperiment(spec, { out: flag("out") ?? `runs/experiment-${spec.name}`, parallel: flag("parallel") !== undefined ? Number(flag("parallel")) : undefined, specFile: file, factories, slots: !has("no-slots"), resume: has("resume"), log: (s) => console.error(s) });
     console.log(`\n${r.text}\n\nresults, the report and every fork's log: ${r.out}`);
     if (r.results.some((x) => x.error)) process.exitCode = 1;
   } else if (cmd === "experiment" && positional()[0] === "report" && positional()[1]) {

@@ -4,6 +4,7 @@
 // (orchestrator/src/cli.ts); tests inject `fetch`.
 
 import type { ContentBlock, LlmAdapter, LlmRequest, LlmResponse } from "./adapter";
+import { CreditExhausted } from "./call";
 
 export interface HttpOptions {
   apiKey: string;
@@ -20,6 +21,9 @@ export interface HttpOptions {
   /** Prompt caching (Anthropic only; default on): see `withCacheBreakpoints`. */
   cache?: boolean;
 }
+
+/** Whether a provider's error says the account's prepaid credit is spent. */
+export const creditSpent = (message: string): boolean => /credit balance is too low|insufficient[_ ]credit|billing.*(required|limit)/i.test(message);
 
 const EPHEMERAL = { type: "ephemeral" } as const;
 
@@ -84,8 +88,15 @@ export class AnthropicAdapter implements LlmAdapter {
       ...(req.tools?.length ? { tools: req.tools } : {}),
       ...(this.o.temperatureMilli !== undefined ? { temperature: this.o.temperatureMilli / 1000 } : {}),
     };
-    const r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl ?? "https://api.anthropic.com"}/v1/messages`,
-      { "x-api-key": this.o.apiKey, "anthropic-version": "2023-06-01" }, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
+    let r: any;
+    try {
+      r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl ?? "https://api.anthropic.com"}/v1/messages`,
+        { "x-api-key": this.o.apiKey, "anthropic-version": "2023-06-01" }, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
+    } catch (e) {
+      // (The account's prepaid credit spent: the run stops cleanly; no credit is ever bought.)
+      if (creditSpent((e as Error).message)) throw new CreditExhausted(`the API account's credit is spent (${(e as Error).message.slice(0, 300)}): no further call is made, and nothing is bought`);
+      throw e;
+    }
     const content: ContentBlock[] = (r.content ?? []).flatMap((b: any): ContentBlock[] =>
       b.type === "text" ? [{ type: "text", text: b.text }] : b.type === "tool_use" ? [{ type: "tool_use", id: b.id, name: b.name, input: b.input }] : []);
     return {

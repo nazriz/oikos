@@ -328,7 +328,8 @@ impl Person {
     pub fn new(ctx: &Ctx) -> Result<Person, String> {
         let p = Params::of(&ctx.params)?;
         let mut d = crate::Draws::new(&ctx.participant, ctx.position.as_deref().unwrap_or("self"));
-        let mut cx = Cx::new(0, ctx, &mut d, 0, vec![]);
+        // (Who a person is is drawn from the run's seed, as every other draw of theirs is: runs of one town on two seeds are not the same people.)
+        let mut cx = Cx::new(0, ctx, &mut d, ctx.world.seed, vec![]);
         let stop_age = p.stop_age(cx.rng("stops-work").below(10_000) as i64);
         let life = Life { adult: true, in_labour_force: p.in_labour_force, essentials: p.essentials, ..Default::default() };
         let m = mind::make(&mut cx, &Born { life: &life, own_values: ctx.params.get("own_values").filter(|v| !v.is_null()), parents: vec![] })?;

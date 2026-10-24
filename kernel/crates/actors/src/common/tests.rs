@@ -269,6 +269,56 @@ fn a_prohibition_binds_an_act_it_is_true_of_and_says_when_it_cannot_be_read() {
     assert!(b.take_unread().is_none(), "said once");
 }
 
+/// A law no world has, with a count and a duration, made from its schedule (ported from participants/test/drafting.test.ts).
+fn dog_law(id: &str, at: i64, dogs: i64, alone: i64, share: i64, replaces: Option<&str>) -> Arc<Record> {
+    let schedule: oikos_rules::law::LawSchedule = serde_json::from_value(json!({
+        "title": "the law on keeping dogs", "form": "amend_dogs",
+        "figures": {
+            "dogs": { "type": "count", "unit": "dogs", "label": "dogs to a home" },
+            "alone": { "type": "duration", "unit": "hours", "label": "time a dog may be left" },
+            "share": { "type": "count", "unit": "percent", "held_in": "basis points", "per_unit": 100, "label": "share of the fee" }
+        },
+        "text": "No one may keep more than {dogs} dogs at a home, or leave one alone for more than {alone}. The pound keeps {share}% of the fee.",
+        "adico": { "attribute": "anyone", "deontic": "must_not", "aim": "keep dogs", "condition": "more than {dogs} at a home, or alone for more than {alone}" },
+        "formal": "block.block == 'publish' && block.kind == 'dog_registration' && (block.data.dogs > {dogs:dogs} || block.data.alone > {alone:seconds} || block.data.share != {share:basis_points})"
+    }))
+    .expect("a schedule");
+    let values = [("dogs".to_string(), dogs), ("alone".to_string(), alone), ("share".to_string(), share)].into_iter().collect();
+    let d = oikos_rules::law::draft_law("schedule-dogs", &schedule, &values).expect("a law");
+    let mut data = d.data();
+    if let Some(r) = replaces {
+        data["replaces"] = json!(r);
+    }
+    rec(json!({ "id": id, "record": "statement", "author": "clerk", "speaks_for": "city", "at": at, "visible_to": "public", "kind": "law", "text": d.text, "adico": d.adico, "formal": d.formal_part(), "data": data }))
+}
+
+/// Ported from participants/test/drafting.test.ts ("an act is judged by the amended law from when it was made, and by the law as it
+/// stood when the act was made"), whose TypeScript helper (`breaches`) is gone.
+#[test]
+fn an_act_is_judged_by_the_amended_law_from_when_it_was_made_and_by_the_law_as_it_stood_when_the_act_was_made() {
+    const DAY: i64 = 86_400;
+    let mut b = Book::new();
+    b.take_all(&[dog_law("rec.1", 0, 2, 4 * 3600, 2500, None)]);
+    let act = |dogs: i64| json!({ "block": "publish", "kind": "dog_registration", "data": { "dogs": dogs, "alone": 3600, "share": 3000 } });
+    let ids = |b: &mut Book, dogs: i64, at: i64| breaches(b, &act(dogs), "c1", at).iter().map(|r| r.id.clone()).collect::<Vec<_>>();
+    assert_eq!(ids(&mut b, 3, 10 * DAY), ["rec.1"], "three dogs, and a share other than the law's, breach the law in force");
+    b.take_all(&[dog_law("rec.2", 15 * DAY, 3, 4 * 3600, 3000, Some("rec.1"))]);
+    assert!(ids(&mut b, 3, 20 * DAY).is_empty(), "the amended law allows three, at its share");
+    assert_eq!(ids(&mut b, 4, 20 * DAY), ["rec.2"], "four breach the amended law, and only it");
+    assert_eq!(ids(&mut b, 3, 10 * DAY), ["rec.1"], "an act is judged by the law as it stood when the act was made");
+}
+
+/// A lot whose cells are written as one name (a plot of one cell) is over that cell, as a list of one is.
+#[test]
+fn a_lot_whose_cells_are_one_name_is_over_that_cell() {
+    let mut b = Book::new();
+    b.take_all(&[st("rec.1", 0, "lot", "registry", json!({ "cells": "c7" })), st("rec.2", 0, "lot", "registry", json!({ "cells": ["c7", "c8"] }))]);
+    assert_eq!(lot_of(&b, "c7"), Some("rec.1"), "the first seen");
+    assert_eq!(lot_of(&b, "c8"), Some("rec.2"));
+    assert_eq!(lot_of(&b, "c"), None, "a name is not matched in part");
+    assert_eq!(cells_of(&b, "rec.1"), ["c7"]);
+}
+
 #[test]
 fn asking_builds_one_named_thing_at_a_time() {
     let q = ask::about("titles", "about.object", "lot-1", ask::About { most: 5, newest: true, ..Default::default() });

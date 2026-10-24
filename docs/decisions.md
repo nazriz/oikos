@@ -7045,6 +7045,57 @@ half of the gate (1 and 14 threads) was not re-run: nothing of the engine change
 **Revisit if** a generated town differs from the one before this change; or when PC-15, PB-21 or MT-18's cases are mended (flip their `test.failing`); or when the tax, payments, returns and household
 rules are served through `rules_api.rs` (then delete their TypeScript copies and the test files that hold them, MT-18).
 
+## 2026-10-23 · The held cases, settled: the engine's citizen and three offices, the reading harness, two ported checks, the plot of land (branch `debt-behaviour`; no model called)
+
+The cut-over left 10 cases held as `test.failing` (PC-15, PB-21), 4 held for a harness limit and 2 skipped with no Rust test (MT-18), and a lot-of-land bug. Every case was judged fault (the Rust
+is mended, the test passes unchanged) or a native rule that is better (the test is changed, with its reason). None is held now; no `test.failing` or `test.skip` is left in `participants/test`.
+
+**The cause of most of the citizen's cases was one fault, not seven.** `Person::new` drew who a person is (values' offsets, temperament, trust lean, willingness to petition, threshold, whether they read
+the news, the age they stop work) with seed 0 whatever the run's seed. Persons differ by their participant id (the stream is keyed by it), so a town was full of different people, but **two runs of one
+town on different seeds had the same people**, and a case that loops over seeds to meet "fifty different tenants" met one tenant fifty times: nobody asked at trust 100,000 (the same z, -0.89, every seed), nobody
+was willing in 300, the thresholds' mean was one person's, and every reader read. `WorldInfo` now carries the run's seed (the engine's, the detached actor's from its spec) and `Person::new` uses it.
+Why it matters beyond the tests: replicates of a study on different seeds were less different than they should be (the same dispositions, different events). Every Rust-world state hash with people in it moved once
+(pins re-taken with this reason, below). Hard rule kept: one seeded PRNG owned by the kernel; this is the rule being kept, not changed.
+
+**Faults mended (the case unchanged):**
+- *A refusal did not lower the sense of agency, and moved no tie.* The three sites that land a decision on a person who asked or applied (a request to a landlord or employer; a grievance asked of its keeper; a desk's finding)
+  passed `tried` as "it worked", so a refusal was "not tried" (trust moved, agency did not); and the tie (+1,500 granted, -500 refused for a request; +1,000 and -1,000 for a grievance) citizen.ts added after the landing was lost.
+  `treat_landing` says "tried" always, with the worked or failed in `good`, and `Treated.tie` carries the tie. (citizen-wants case 1; the reading cases.)
+- *The citizen's landing is not worn down for the days before it came.* `Mind::treated` settles trust and agency to now first, as citizen.ts's wake did (idempotent): the figure a reading says the plain paper would have made is the figure the dial-off record shows, to the point.
+- *The landlord on a registered death.* It gave the notice and stopped. Now, as the TypeScript did, from papers only: the tenancy is offered to the household member the lease names (else the partner the entry names) who is not registered dead, a new lease at the rent then
+  from when the old one ends (`succeed-<who>` draw for the term), and a possession application of ours against the dead tenant's lease is withdrawn ("nothing is asked of the dead").
+- *The mayor acknowledged no letter.* Its manifest says how it answers (`answers`, no report of its own) and its create did not wrap it in `Answering`; it is wrapped now (a mayor saved before this restores as the plain office, wrapped, no letter waiting).
+- *A lot whose `cells` is one name.* `Book`'s index of lots by cell read only a list; a lot written as a single cell id is over that cell now, by the name (not by a part of it, as JavaScript's `includes` on a string did), as `cells_of` already read it.
+
+**Native rules that are better (the case changed, its assertion kept in a form the engine can meet):**
+- *The tenants' petition's wording* (citizen-voice case 1). The engine asks for what the world's `petition_demand` says (PC-8, docs/profiles.md): the TypeScript citizen wrote Victoria's 90 days and 5% into every town. The case now gives the world those
+  figures and asserts the same words; a new case holds the general wording of a world that gives none (no figure, no amendment) and a world that gives one.
+- *The order of a law's figures in the clerk's report* (drafting). By name (alone, dogs, share), not as the schedule was typed (dogs, alone, share): a schedule is a keyed record and the kernel keeps keys sorted so that a state hash does not depend on how a file was typed.
+  Nothing real reads the order. Revisit if a study reads the report as the schedule's own order.
+
+**The harness limit lifted (MT-18, 4 cases).** The detached actor now reports the purposes of the draws it made (`Cx::keep_draws`, `draws` beside `action`, kept in a run: nothing), and `participants/test/engine.ts` takes a `ctx.read` as the reading desk (asked about each paper addressed to the
+person that is new to them; its filing, or none, goes back as the answer in the step that sees the paper, as the host's does) and puts the draws on the act (`DRAWS`). The four cases run on the engine; the fourth was arithmetic (`recourseScore`, whose TypeScript is gone) and is
+`mind/reading.rs`'s `a_step_of_recourse_is_five_hundred_on_the_score_of_asking_again`; its "same draw is made" half is the third case.
+
+**The two skipped checks are Rust tests:** `common/tests.rs` `an_act_is_judged_by_the_amended_law_from_when_it_was_made_and_by_the_law_as_it_stood_when_the_act_was_made` (drafting, from a dog law made by `draft_law`, amended by a law that replaces it);
+`offices/land.rs` `a_titles_transfer_counts_only_from_its_holder_or_from_whoever_issued_it` (registry); and `common/tests.rs` `a_lot_whose_cells_are_one_name_is_over_that_cell`.
+
+**Revisit if** a study needs the run's seed NOT to move who the people are (it would then take the generator's draws, not the engine's); or the clerk's report is read for the schedule's order; or the landlord's succession needs the law of the place (the profile has none: it follows
+the town's succession of tenancy, as the TypeScript did).
+
+**Suites and pins.** `cargo test` (727 in the actors crate with the four new tests) and the whole suite (`bun run test:all`) on the branch: the first run was 1,589 pass and 4 fail of 273 files, the four being draws that the new people moved and not rules;
+each was re-taken with its reason in the file: culture-dial (the three Rust states: au-vic 698cd38c..., gb-eng 895b9324..., ke-nakuru 2604b9c5...; 8b9a1e90..., eac6c4b4... and 443b8875... until then), founding (run seed 1 has five who share the want behind the first thing
+founded; seed 2 had been the one), unions (seed 1: seeds 1, 3 and 4 of 1 to 5 have three wage claims), entry (seed 6: the file's two cases pass in 6 alone of 1 to 6). **Two lost an exactness that held, and the coordinator would not take a seed move for it: traced, and mended (second pass, same day).**
+- *twin-seat-year* (seed 1 again). The first differing act was at day 90: a seated shop manager died, and the deputy appointed c0053, who had held the post before, to it. In the town without seats c0053's channel marks for the post (`Participant.looks`, what they had looked
+  through) were still there from the first tenure, so their new unit, made without a memory, was shown only what was new since; in the town with the seat, c0053 had never looked, and was shown the file whole. The same post, the same person, two views: one unit
+  withdrew the old price list, the other posted a job. A new holder's unit is a new unit, and the file goes with the post (the ledger already did, `set_holder`): appointing someone now clears their marks for that post's channels (`world/state.rs`), so a first look is the whole file in
+  both towns. The next difference was a refused act, not a rule of the town: a producer declining an order from a buyer in arrears writes `declined: overdue` (the paper's own word, papers/market.rs), and the delivery-note form allowed only `unpaid`, so a seat's
+  call (which goes through the form) was refused while the code unit's act was not. The form allows both now (`papers.json`, `papers.ts`, the two manifests). Exact at seed 1: 86,546 acts and 353,508 events either side.
+- *twin-draws* (seed 1 again, no exemption). The seat's answer to a complaint landed three seconds after its twin's because a different post made it: the town with the seat has the ombudsman's staff post (the generator adds it for a seat) and the twin did not, so the officer decided in the
+  twin and the staff in the seat's town, one wake chain apart (13018945 against 13018948; the company's manager then acted one second after hearing it, 946 against 949; 77 of 119,749 acts). That is a difference of structure, not of clock, hours or the draft step. The owner's ruling: a twin
+  compares the same town with the same posts, differing only in who holds them. The twin is now generated with the seat too (`code:` in the case's `town`), its seat participant a code system with the office's own code and its staff post a system as in the other town. Stricter, not looser: acts 119,749 of 119,749
+  alike at seed 1, and the case holds at seeds 1, 5, 6, 8 and 9. What went with it: the twin now files the staff's reports too (53 in each), so the case asserts equal counts where it asserted the twin had none; the numbering of papers by what a seat files is the first and second cases' subject.
+
 ## 2026-10-23 · The translator, version 3: reading forms by name; a plan, awaiting the owner (docs only; no code, no model called, no training)
 
 Plan: docs/design/translator-v3.md. Nothing is built. The held-out file was not opened.
@@ -7398,6 +7449,113 @@ Naz, asked directly, adopted the wording of the way out proposed on 2026-10-12 (
   not 5 (Naz, 2026-10-24).
 - **Revisit if:** a quiet machine's gate build gets slower by more than a fifth (then measure jobs against tokens properly),
   or load still runs far past the core count with 3 agents.
+## 2026-10-24 · TARA-ready: model stewards in the experiment harness, the draft TARA spec, its cost, and a dry run (branch `tara-ready`; no model called)
+
+**A model steward in a fork is the pilot's seat, in the light host.** `orchestrator/src/seat-host.ts` (`ModelSeat`) is
+what a `claude-code/` or `codex/` arm's seat is: its configuration from `seat-config.ts` (the part of run.ts's
+`llmUnit` that makes a seat's reports, trays, office file and staff, moved out so that both hosts make the same seat),
+its loop `createLlmParticipant`, its requests drafted by the translator arrangement (ours first, the general one
+behind) against the engine's own resolver and dry run, shown as drafts and done only once confirmed, debriefed at the
+fork's end. The engine's native `World` gained `resolve` and `check` (kernel/src/host.rs, crates/napi): they change
+nothing and log nothing. Why not run a fork through run.ts's full host: it starts a run, it cannot take up a
+snapshot, and its 1,700-line loop is the pilots'; resuming its unit table from a light-host snapshot was the larger and
+riskier change. *Revisit if* the two hosts drift: the gaps are MT-22 (the cast as it changes, thinking time, a rejected
+act told in words, exit accounts, resuming an experiment).
+
+**The seat factory's rules** (`orchestrator/src/experiment-seats.ts`): only `claude-code/` and `codex/` seats; the
+largest Claude model, Fable and gpt-6-astra refused by name; a paid key only with `seats.allow_paid_api`. Framing per
+arm, else the spec's, else `unstated`; recorded in a note at the fork and in the fork's result. **Spending limits**:
+each model fork's limit fixed before anything runs (the lesser of `fork_usd` and `arm_usd` over the arm's seeds; arms
+with neither share what `experiment_usd` leaves; all scaled down if together they pass `experiment_usd`), so the total
+cannot be passed however forks are dealt to workers; a priced model with no limit is refused. A fork at its limit stops
+cleanly, is debriefed from what was kept back, and is reported as stopped and never compared. A subscription's shut
+window is waited out inside the fork (15-minute retries, at most `wait_for_window_hours`), so Codex never blocks a
+Claude fork. `calls_at_once` (per provider per worker) and `forksAtOnce` (per worker: a town-1000 fork holds about
+1.2 GB; base and three forks peaked at 4.9 GB) bound the load. Alternatives: a shared ledger of spending across
+worker processes (a lock file): rejected, a fixed allotment is simpler and cannot overspend. *Revisit if* allotments
+leave much unspent while forks stop: then a shared ledger.
+
+**A dry run** (`--mock-models`): every model played by the mock through the whole loop, priced at the named model's
+price; our own translator answers first as in the real run (it calls no model). The report opens "DRY RUN".
+
+**`asker_granted:<what>:<matter>:<nth>`**: whether the one who made the nth such request from the fork on was granted
+support or had the decision changed afterwards; the asker of a withheld act is read from the engine's `withheld` note.
+It is the measure of "what reached the people who asked" that MT-21 said the counterfactual needs.
+
+**The TARA draft** (`experiments/tara-steward/`: spec, draft registration, README). Office: the support office
+(`outside-support`, with `model_seats=outside-support` in every arm), not the tribunal: in the living worked example
+it made 53 to 71 decisions about people a fork against the tribunal's 9 to 13, and the tribunal's cases are mostly
+appeals of the office's refusals, so a steward there moves too little in 180 days. Arms: code, nobody, Sonnet 5.5,
+Haiku 5.5, gpt-6.1-sol, Sonnet told it is simulated, and code and Sonnet each with the first review request withheld;
+12 seeds; day 30 to 210. Primary: `slips_caught`, `support_refused`, `appeals_made`, `human_in_decision_share`, each
+model against the code (12, Bonferroni); the withheld-act DiD secondary, because a 0/1 measure on one asker is powered
+at 12 seeds only for the lever's near-total loss (the README's power table, from the worked example's variances
+times 1.5). Cost, from 126 pilot logs (a helper's tally, `seats.json` in the session's scratch): about $900 of plan
+usage at API prices ($650–1,200), most of it Haiku (about $45 a fork against Sonnet's $10), and 3,000 Codex calls.
+Fallback: 8 seeds, 120 days, five arms, about $300. *Revisit if* the first real day's costs, set beside the account's
+usage page, differ from the projection by more than a third.
+
+**Blockers before the real run**: MT-21 is still open (a review request never answered shuts the appeal route; a
+model steward may well leave requests unanswered, and the risk's own "fix when" names this run), and the
+registration must be agreed and committed.
+
+## 2026-10-24 · TARA-ready, second part: model seats on the API credit, every call recorded, an experiment taken up again, and the office chosen by mock stewards (branch `tara-ready`; no model called)
+
+**The API on the plan's credit.** The owner's plan includes monthly API credit, and he wants seats in pilots and the
+TARA run on it (with prompt caching, and without competing with agents for the plan's weekly allowance). So
+`anthropic/` is now a provider the experiment seats by default, beside `claude-code/` and `codex/`; `openai/` still
+needs `seats.allow_paid_api`. The key is `OIKOS_ANTHROPIC_KEY`, read by `chooseModel` (orchestrator/src/models.ts) and
+never `ANTHROPIC_API_KEY` (with that one set, Claude Code itself would bill the key), never logged. When the API says
+the credit is spent, `AnthropicAdapter` throws `CreditExhausted` (a `SpendingLimitReached`): the fork stops cleanly,
+is not waited out (a credit does not come back in hours), and nothing is ever bought. *Revisit if* the provider's
+words for a spent credit change (`creditSpent` in participants/src/llm/anthropic.ts).
+
+**Every call recorded, apart from the log.** `callRecorder` (experiment-seats.ts) wraps each adapter a model fork's
+seat uses (inside the wait for a shut window, so a refused attempt is a line too) and writes `<arm>.calls.jsonl`: the
+attempt, purpose, model, tokens with the cache, cost, wall time, error. The fork's result carries the summary (`calls`:
+p50/p95, errors by kind, by purpose and model) and the run writes `cost.json` (by fork and arm, with the limits). Why
+outside the log: wall time differs on every run, and the log is what the world did; the owner asked for cost and
+performance per seat and per call. Wall time includes any wait for a free call slot (`calls_at_once`). *Revisit if*
+latency must be told apart from queueing: then record inside the gate.
+
+**Taken up again** (`--resume`; MT-22's last gap for a real run). A folder with an unfinished run is refused without
+it; with it, the spec must be byte for byte the one it began with; bases whose files are whole are kept; forks with a
+result are kept unless failed or stopped for want of the model (`CreditExhausted`, `UsageLimitReached`,
+`ModelUnreachable`), which run again from the snapshot; the interrupted log and result are kept under
+`<arm>.interrupted-<k>.*`; and what earlier attempts spent (from the calls file) comes off the fork's limit, so the
+experiment's total still holds. A fork is not taken up from where it stopped: the light host has no mid-fork snapshot
+of a seat, and a model fork run again is a new sample either way. Alternatives: a mid-fork snapshot (the seat's
+conversation and drafts as well as the world's): rejected for now, larger and only saves a fork's spending once.
+*Revisit if* interrupted forks cost a noticeable share of the credit.
+
+**The draft moved** to `experiments/tara-draft/` (`tara.json`, `tara.prereg.draft.yaml`, README for the owner):
+Claude arms on `anthropic/`, Sonnet behind our translator, limits $12.50 a Sonnet fork, $20 Haiku, $3 sol, $750 in all.
+Estimate from 37 pilots' recorded calls at API token prices with the cache: Sonnet $0.03 a call in this office, Haiku
+$0.014; about $320 in all ($170 to 560), against about $900 through Claude Code (which reports 1.4 to 4 times the token
+price). No model was called.
+
+**The office, by mock stewards** (`experiments/tara-draft/office-check/`; `runs/exp-tara-office-check-{support,tribunal}-2026-10-24`,
+town-1000 living, seeds 1 to 3, day 30 to 210, six arms: code, nobody, diligent, rubber-stamp, slow `delay:5`,
+careless `skip:2`). In the support office 43 of 290 exploratory comparisons excluded zero, in the tribunal 1: the
+tribunal acts about 20 times in 180 days and an empty tribunal moves claims refused by -1.0 and support paid by 3%,
+against -9.7 and 80% for an empty support office; the rubber stamp put right 2.7 fewer decisions (3 of 3 seeds) in the
+support office and nothing in the tribunal (no review requests reach it). So the draft keeps the support office.
+"Harsh" was asked for and is not built as a mock: a steward that refuses what the code grants needs the office's state
+changed, not its papers (the rubber stamp's note); `careless` and `slow` stand in. *Revisit if* a real model's
+forks in the support office show it doing something no mock steward does that the tribunal would see first (appeals
+decided, possession orders).
+## 2026-10-24 · The citizen model: a small model of our own that people act through; a plan, awaiting the owner (docs only; no code, no model called, no training)
+
+**What was asked.** The owner, 2026-10-24: a bespoke model shared by every citizen, like the translator ("as empowered and as close to real economic actors as possible, but within the constraints of a tiny model that can run in ms"): record, situation and a kernel draw in; a decision out that changes what the person does. Later the same day: the Mac mini's CPU is not a limit, and **the first priority is capturing data from the pilots about to run**. The plan is `docs/design/citizen-model.md`; it decides and gives reasons.
+
+**What it decides.** (1) **Capture first**, written during the run as a stream beside the log (`<run>/citizen-data/`: `turns`, `records`, `papers`, `outcomes`; `dealings` and training examples joined after the run from the stream, no replay), because a decision's situation includes the mind's own state, which only a whole replay at the same commit could rebuild, and the archive showed that code does not survive. Contract `citizen-data.schema.json`, additive; state hash identical with it on or off. About 2 agent-days. (2) Round 1 decides recourse: whether to contest and where (a bounded shift on the code mind's odds, B's form) and what a request carries (seeks, amount, grounds, evidence, what it cites, register, a date), as pointers to facts and papers the person holds; **the text is rendered by code** from those choices, so the model cannot invent a fact or speak as anyone. (3) A typed set encoder, 2 to 5 million int8 weights, integer inference in Rust in the actors crate, bit-identical to a Python reference, under a millisecond a call on one core, no batching across citizens. (4) The draw picks from the model's readable odds (the stream is passed into the call); a draw as an input feature was rejected. (5) Trained on the code mind's decisions (the base), teachers on the Batch API as authors and as centred estimators (two families, pairs of records differing in one thing, a spread floor in the loss), anchored on legal needs surveys, the CFPB complaint database and published tribunal decisions (to confirm). (6) A gate fixed before training (scrambled records at least the code mind's spread, the decisive fact cited, not passive, twins, speed). About 14 agent-days, about 630 USD of API credit (limit 800), under 10 USD of GPU.
+
+**Relation to "Two decisions of Naz's" (B).** Not reopened: routine choices stay arithmetic and the shift form stays where code already scores; the model widens what a person can do where code has nothing. VISION 15 point 7 stands: a pure function, no memory, no voice.
+
+**For the owner:** text by code in round 1 or a small generator now; the teacher budget; whether code offices' laws may read `grounds` before a source says how such bodies weigh them. Steps 1 to 5 need no model call.
+
+**Revisit if** the base model trained on the code mind alone cannot keep its spread; no teacher family passes its own scrambled check on the author task; capture costs more than 3% of a run or 2 GB compressed a pilot; or the owner wants the model to write.
+
 
 ## 2026-10-24 · A review never answered: the deemed refusal as law (MT-21); a bounded memory of public goings-on (SC-1) (branch `fix-memory-appeal`, citizen 0.59.0, generator 0.65.0; no model called)
 

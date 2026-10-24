@@ -67,6 +67,16 @@ async function town(name: string, more: object, scribe?: string, days = Number(p
       // (And its staff post, which the seat's town has and the twin's has not: a system's too.)
       if (config.positions.some((p: any) => p.id === `${system.slice(5)}-staff`)) systemAt(config, `${system.slice(5)}-staff`);
     }
+    else if (system?.startsWith("code:")) {
+      // The twin of that town: the same posts (the town is generated with the same seat, so the office has the same staff post), the seat's participant the same system,
+      // and who holds the post the only difference: the office's own code holds it, and its staff.
+      const post = system.slice(5);
+      const seat = config.participants.find((p: any) => p.id === `${post}-system`);
+      const mock = seat.controller.params.mock;
+      seatAsSystem(config, post);
+      seat.controller = { type: "code", impl: mock.brain, params: mock.params ?? {} };
+      if (config.positions.some((p: any) => p.id === `${post}-staff`)) systemAt(config, `${post}-staff`);
+    }
     else if (system) systemAt(config, system);
     let modules: { [k: string]: BehaviourModule } | undefined;
     if (scribe) {
@@ -254,11 +264,16 @@ test("a year with one office in a mock seat that sits at other hours and files p
   // time spent on a seat is a true difference between a town and its twin, and what it moves is seen in the other tests of this file.)
   // The ombudsman's office deals with nobody in this town: its seat sits in office hours, reads its staff's reports and
   // files its own. Every draw but the seat's own, every decision, every act, every answer and every price must be the same.
-  const [twin, seat, mayor] = await Promise.all([town("moments-code", {}, undefined, 365, "ombudsman-officer"), town("moments-seat", { model_seats: "ombudsman-officer" }, undefined, 365, "seat:ombudsman-officer"), town("moments-mayor", { mayor: "llm" }, undefined, 365)]);
+  // (2026-10-23, the held cases settled. The two towns are the same town with the same posts: the twin is generated with the seat too, so that the ombudsman's office has the same
+  // staff post in both, and differs from the other only in who holds the posts, the office's own code or a seat. Until then the twin had no staff post, and the decision on a complaint
+  // was made by the officer in the twin and by the staff in the town with the seat, three seconds later: the people vary with the run seed, a complaint reached the ombudsman at seed 1, and 77 acts
+  // of 119,749 differed by that reaction. A comparison of a town and its twin compares the same posts.)
+  const [twin, seat, mayor] = await Promise.all([town("moments-code", { model_seats: "ombudsman-officer" }, undefined, 365, "code:ombudsman-officer"), town("moments-seat", { model_seats: "ombudsman-officer" }, undefined, 365, "seat:ombudsman-officer"), town("moments-mayor", { mayor: "llm" }, undefined, 365)]);
   const office = (pid: string) => pid.startsWith("ombudsman-officer");
   const papers = seat.records.filter((r) => r.kind === "staff_report").length;
   expect(papers).toBeGreaterThan(8);
-  expect(twin.records.some((r) => r.kind === "staff_report")).toBe(false);
+  // (The staff post is in both towns, and so are its reports: what the seat adds is its hours, not papers. The numbering of papers by what a seat files is the first and second cases' subject.)
+  expect(twin.records.filter((r) => r.kind === "staff_report").length).toBe(papers);
   const draws = alike(twin.draws, seat.draws, (pid) => !office(pid));
   const decided = matched(twin.decisions, seat.decisions, (pid) => !office(pid));
   // (An act addressed to the ombudsman is dealt with by the seat: a complaint it was sent and when its answer came is the seat's.)

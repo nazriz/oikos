@@ -255,6 +255,31 @@ impl Host {
         self.e.annotate_from_host(annotation)
     }
 
+    /// What a seat's call would come to, from what the seat has been shown (the resolver over its knowledge, as the
+    /// engine resolves a `call` it submits): `{blocks}` or `{questions, invalid?}`. Changes nothing; not logged. A seat's
+    /// host drafts a request with it, for the seat to confirm before anything is done (the translator's preview).
+    pub fn resolve(&self, participant: &str, program: &str, as_: Option<&str>) -> Result<Value, String> {
+        let program = oikos_resolver::calls::parse_program(program).map_err(|x| format!("the call doesn't parse: {}", x.0))?;
+        Ok(match self.e.host_resolve(participant, &program, as_) {
+            oikos_resolver::Resolution::Blocks(blocks) => json!({ "blocks": blocks }),
+            oikos_resolver::Resolution::Questions { questions, invalid } => {
+                let mut v = json!({ "questions": questions });
+                if !invalid.is_empty() {
+                    v["invalid"] = json!(invalid);
+                }
+                v
+            }
+        })
+    }
+
+    /// Whether these blocks would be carried out for the participant now (the kernel's dry run): `{ok, refusal?}`.
+    /// Changes nothing; not logged.
+    pub fn check(&self, participant: &str, as_: Option<&str>, blocks: &Value) -> Result<Value, String> {
+        let blocks: Vec<oikos_world::blocks::Block> = serde_json::from_value(blocks.clone()).map_err(|x| format!("bad blocks: {x}"))?;
+        let check = self.e.run().kernel().check(participant, as_, &blocks).map_err(|x| x.to_string())?;
+        serde_json::to_value(check).map_err(|x| x.to_string())
+    }
+
     pub fn questions(&mut self) -> Value {
         Value::Array(self.e.questions().into_iter().map(|(key, q)| json!({ "key": key, "kind": q.kind, "about": q.about, "body": q.body })).collect())
     }
@@ -348,15 +373,17 @@ impl Detached {
         let kind = oikos_actors::registry::find(&s("kind").ok_or("a detached actor names its kind")?).ok_or("no such actor kind")?;
         let capacity = s("capacity").unwrap_or_else(|| "self".into());
         let participant = s("participant").ok_or("a detached actor names its participant")?;
+        let seed = spec["seed"].as_u64().or(spec["config"]["seed"].as_u64()).unwrap_or(0);
+        let mut info = crate::engine::world_info(&spec["config"])?;
+        info.seed = seed;
         let ctx = Ctx {
             participant: participant.clone(),
             performer: if spec["system"].as_bool() == Some(true) { oikos_rules::slip::Performer::System } else { oikos_rules::slip::Performer::Person },
             entity: s("entity").unwrap_or_default(),
             position: (capacity != "self").then(|| capacity.clone()),
             params: spec["params"].as_object().cloned().unwrap_or_default().into(),
-            world: std::sync::Arc::new(crate::engine::world_info(&spec["config"])?),
+            world: std::sync::Arc::new(info),
         };
-        let seed = spec["seed"].as_u64().or(spec["config"]["seed"].as_u64()).unwrap_or(0);
         // (`saved`: one as `save` left it, taken up again: its memory, its view and its draws, so that a fork's twin goes
         // on as its parent's would.)
         let saved = &spec["saved"];
@@ -383,10 +410,11 @@ impl Detached {
         let answers: Vec<Answer> = if answers.is_null() { vec![] } else { serde_json::from_value(answers.clone()).map_err(|e| e.to_string())? };
         let pic = self.view.apply(obs, self.capacity.as_deref(), &self.ctx.entity.clone(), woke_for, since);
         let mut cx = Cx::new(pic.t, &self.ctx, &mut self.draws, self.seed, answers);
+        cx.keep_draws();
         let action = self.actor.step(&pic, &mut cx);
         let kept = cx.into_kept();
         let q: Vec<&Question> = kept.questions.iter().collect();
-        Ok(json!({ "action": action.to_json(), "decisions": kept.decisions, "outcomes": kept.outcomes, "record": kept.record, "questions": q }))
+        Ok(json!({ "action": action.to_json(), "decisions": kept.decisions, "outcomes": kept.outcomes, "record": kept.record, "questions": q, "draws": kept.drawn }))
     }
 
     /// The act it returned reached the world as this action.
