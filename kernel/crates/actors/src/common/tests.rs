@@ -238,6 +238,25 @@ fn directions_are_followed_only_from_the_posts_the_rule_names() {
     assert!(d.letters::<()>(&b, |_, _| String::new()).is_empty(), "each answered once");
 }
 
+/// PB-16: a direction from a post the rule names is followed whatever share a world once set as its "compliance": the
+/// only causes of not following one are lack of authority and a hold, both on file; no draw.
+#[test]
+fn a_standing_direction_is_followed_with_no_draw_whatever_compliance_is_set() {
+    let mut b = Book::new();
+    b.take_all(&[
+        st("rec.1", 0, "procedure", "city", json!({ "directions": { "by": ["mayor"] } })),
+        st("rec.2", 0, "form", "city", json!({ "office": "works", "form": "staffing" }) ),
+        rec(json!({ "id": "rec.3", "record": "statement", "author": "p.mayor", "in_position": "mayor", "speaks_for": "city", "at": 5, "visible_to": ["city"], "basis": "rec.2", "kind": "direction", "text": "Do it", "addressed_to": ["city"], "data": {} })),
+    ]);
+    let c = ctx(Some("works-staff"));
+    let d = Directions::new(&c, "rec.1", Some(0), "the works office");
+    for day in 0..40 {
+        let mut draws = Draws::default();
+        let mut cx = Cx::new(10 + day, &c, &mut draws, 1, vec![]);
+        assert_eq!(d.standing(&b, "staffing", &mut cx).map(|r| r.id.as_str()), Some("rec.3"), "day {day}");
+    }
+}
+
 #[test]
 fn pace_learns_how_long_a_crew_takes() {
     let mut p = Pace::new(600);
@@ -369,4 +388,36 @@ fn a_notice_sent_at_any_moment_of_a_day_runs_its_days_before_the_change_begins()
     }
     // (And what takes a quarter of an hour and waits half an hour more is within the lag.)
     assert!(starts_on(DAY - 60, lead) - (DAY - 60 + 900 + 1_800) >= lead);
+}
+
+#[test]
+fn a_book_lets_go_of_what_it_is_told_and_stands_as_a_book_restored_from_what_it_kept() {
+    let mut b = Book::new();
+    b.take_all(&[
+        st("rec.1", 1, "law", "city", json!({})),
+        st("rec.2", 2, "news", "paper", json!({})),
+        st("rec.3", 3, "news", "paper", json!({})),
+        withdrawal("rec.4", 4, "rec.3"),
+        st("rec.5", 5, "news", "paper", json!({})),
+        withdrawal("rec.6", 6, "rec.5"),
+        st("rec.7", 7, "law", "city", json!({ "replaces": "rec.1" })),
+    ]);
+    // Told to keep only the laws: the news goes, with the withdrawal of what went; the withdrawal of a kept paper
+    // (rec.5 is asked to go, rec.6 to go: both go) and what replaced a kept law stay.
+    let remap = b.forget(|r| r.id == "rec.1" || r.id == "rec.3" || r.id == "rec.7");
+    assert_eq!(remap, vec![Some(0), None, Some(1), Some(2), None, None, Some(3)], "rec.4 withdraws rec.3, which is kept: kept too");
+    assert_eq!(b.len(), 4);
+    assert!(!b.has("rec.2") && !b.has("rec.5") && b.get("rec.2").is_none());
+    assert!(b.withdrawn("rec.3") && !b.withdrawn("rec.5"));
+    assert_eq!(b.current("rec.1").map(|r| r.id.as_str()), Some("rec.7"));
+    assert_eq!(b.all("news").map(|r| r.id.as_str()).collect::<Vec<_>>(), ["rec.3"]);
+    // Saved and restored, the same book.
+    let back = Book::restore(b.save()).unwrap();
+    assert_eq!(back.save(), b.save());
+    for id in ["rec.1", "rec.3", "rec.5", "rec.7"] {
+        assert_eq!((back.withdrawn(id), back.has(id)), (b.withdrawn(id), b.has(id)), "{id}");
+    }
+    assert_eq!(back.open("law").map(|r| r.id.as_str()).collect::<Vec<_>>(), b.open("law").map(|r| r.id.as_str()).collect::<Vec<_>>());
+    // A record let go of and shown again is new.
+    assert_eq!(b.take_all(&[st("rec.2", 2, "news", "paper", json!({}))]).len(), 1);
 }

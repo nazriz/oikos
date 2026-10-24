@@ -52,6 +52,15 @@ pub struct Config {
     /// Dials of a living world (docs/design/ai-citizens.md 10j). Opaque to the kernel; absent, every dial is off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dials: Option<BTreeMap<String, Value>>,
+    /// The world's calendar (contracts/world-config.schema.json `calendar`; docs/design/names-and-dates.md section 5).
+    /// Opaque to the kernel, which keeps time in seconds; the engine's actors and the seat-side tools read it. Absent:
+    /// dates are "year N, day D". (Missing here until 2026-10-24, so a town with `calendar: true` could not start.)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar: Option<Value>,
+    /// Whether the world's people and bodies have names of their own (contracts/world-config.schema.json `names`;
+    /// docs/design/names-and-dates.md section 4). Opaque to the kernel; the resolver reads it. Absent: the old towns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub names: Option<bool>,
     /// Enforced by the orchestrator; the kernel only records it.
     pub orchestration: Value,
 }
@@ -877,6 +886,14 @@ pub struct Life {
     pub harm: Option<Harm>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub birth: Option<BirthPhysics>,
+    /// The age (in years) from which a person decides for themselves. Below it a person may be taken out of the world by
+    /// another (their parent or grandparent, or a position in `guardians`); from it, only by themselves. Absent: nobody may take
+    /// another out (docs/behaviour/life.md "Taking a person out of the world").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub majority: Option<u32>,
+    /// Positions that may take a minor out of the world on their own authority (a child protection office).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardians: Vec<Id>,
 }
 
 /// Steps by age: each `{from, bps}` applies from that age (in years) until the next.

@@ -18,14 +18,13 @@ fn town() -> Value {
     static TOWN: OnceLock<Value> = OnceLock::new();
     TOWN.get_or_init(|| {
         let out = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("a1-town.json");
-        if !out.exists() {
-            let r = std::process::Command::new("bun")
-                .current_dir(root())
-                .args(["orchestrator/test/lib/write-town.ts", "worlds/town.yaml", out.to_str().unwrap(), "1"])
-                .output()
-                .expect("bun, to generate the town");
-            assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
-        }
+        // (Always run: it writes the file again only when the generator's inputs are not those the file was made from; orchestrator/test/lib/town-key.ts.)
+        let r = std::process::Command::new("bun")
+            .current_dir(root())
+            .args(["orchestrator/test/lib/write-town.ts", "worlds/town.yaml", out.to_str().unwrap(), "1"])
+            .output()
+            .expect("bun, to generate the town");
+        assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
         serde_json::from_slice(&std::fs::read(&out).unwrap()).unwrap()
     })
     .clone()
@@ -95,6 +94,13 @@ fn with_take_up_at_nothing_nobody_claims_support() {
     for p in c["participants"].as_array_mut().unwrap() {
         if p["controller"]["impl"] == "citizen.default" {
             p["controller"]["params"]["take_up_bps"] = json!(0);
+        }
+    }
+    // (And the people who come to town in the run: they are made from the templates, which carry the same take-up. The three claims at day 37 on 2026-10-24
+    // were newcomers', their templates unset.)
+    for t in c["templates"].as_array_mut().unwrap() {
+        if t["controller"]["impl"] == "citizen.default" {
+            t["controller"]["params"]["take_up_bps"] = json!(0);
         }
     }
     let (_, e) = run_code_world(c, "a1-takeup", Vec::new(), opts(4, 60 * DAY)).unwrap();

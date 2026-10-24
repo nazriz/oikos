@@ -44,7 +44,7 @@ export type Steward =
  * that publish a paper of the kind `what` (or are a block of that name), by `participant` (absent: anyone), of `matter`
  * (its data's) and addressed `to` whom where given, the `nth`
  * (from 1) is not carried out; its actor believes it sent it. The arm is then "the same arm without that act". */
-export interface Withhold { what: string; participant?: string; nth?: number; matter?: string; to?: string }
+export interface Withhold { what: string; participant?: string; nth?: number; matter?: string; to?: string; /** Only a paper whose data has this field (`on_review`: a decision made on a review). */ has?: string }
 export interface Arm { name: string; steward: Steward; withhold?: Withhold[] }
 
 /** How a seed's town is made: a world file (a generator spec or a config, as `oikos run` takes it), a generator spec, or a config; then `prepare`. */

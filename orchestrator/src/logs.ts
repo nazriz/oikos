@@ -21,7 +21,10 @@ export const isStoppedLog = (file: string) => STOPPED.test(file);
  * run for ever, as the log is, and never published as it stands, since it holds what seats asked to be kept back. */
 export const debriefsBeside = (log: string) => log.replace(/\.jsonl(\.zst)?$/, ".debriefs.jsonl");
 
-export const isLog = (file: string) => (file.endsWith(".jsonl") || file.endsWith(".jsonl.zst")) && !/\.debriefs\.jsonl$/.test(file) && !/\.anchors\.jsonl(\.zst)?$/.test(file) && !/translator-corpus\.jsonl$/.test(file) && !isStoppedLog(file);
+/** The file beside a run's log that holds its citizens' decisions, captured for training (docs/citizen-data.md). */
+export const citizensBeside = (log: string) => log.replace(/\.jsonl(\.zst)?$/, ".citizens.jsonl.zst");
+
+export const isLog = (file: string) => (file.endsWith(".jsonl") || file.endsWith(".jsonl.zst")) && !/\.debriefs\.jsonl$/.test(file) && !/\.calls\.jsonl$/.test(file) && !/\.citizens\.jsonl\.zst$/.test(file) && !/\.anchors\.jsonl(\.zst)?$/.test(file) && !/translator-corpus\.jsonl$/.test(file) && !isStoppedLog(file);
 
 /** A run's id from its log file's name. */
 export const runOf = (file: string) => file.split("/").at(-1)!.replace(/\.jsonl(\.zst)?$/, "");
@@ -96,7 +99,7 @@ export async function clearForFreshRun(dir: string, runId: string, overwrite = f
   }
   // (Overwriting, or nothing there: what describes a log that's gone, or never was, goes with it.)
   for (const f of [...logs, recipe]) rmSync(f, { force: true });
-  if (existsSync(dir)) for (const f of readdirSync(dir)) if (new RegExp(`^${runId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\.stopped-\\d+)?\\.(anchors\\.jsonl|summary\\.json|failure\\.json)$`).test(f)) rmSync(join(dir, f), { force: true });
+  if (existsSync(dir)) for (const f of readdirSync(dir)) if (new RegExp(`^${runId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\.stopped-\\d+)?\\.(anchors\\.jsonl|summary\\.json|failure\\.json|citizens\\.jsonl\\.zst)$`).test(f)) rmSync(join(dir, f), { force: true });
 }
 
 const sha256OfStream = async (stream: AsyncIterable<Buffer | string>): Promise<{ hash: string; bytes: number }> => {

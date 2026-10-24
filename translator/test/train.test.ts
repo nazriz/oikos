@@ -1182,7 +1182,7 @@ test("too much, as people make it: two or three related acts piled into one mess
   const made = new Set(floored.examples.filter((e) => e.kind === "refusal").map((e) => e.program.slice(5, -1)));
   for (const label of ["too_much", "unknown_form", "needs_calculation", "not_yours", "unclear", "not_an_act"]) expect(made.has(label)).toBe(true);
   for (const label of made) expect([label, floored.manifest.by_shape[`none(${label})`]! >= 6]).toEqual([label, true]);
-  expect(floored.manifest.short_of_floor).toEqual(Object.fromEntries(calls.LABELS.filter((l) => !made.has(l)).map((l) => [l, 0])));
+  expect(floored.manifest.short_of_floor).toEqual(Object.fromEntries(calls.TRANSLATOR_LABELS.filter((l) => !made.has(l)).map((l) => [l, 0])));
   // Four of the too_much are the written kind; the built ones make up the floor and no more than that and their share.
   expect(floored.examples.filter((e) => e.source === "written: piled").length).toBe(4);
   expect(floored.examples.filter((e) => e.program === "none(too_much)").length).toBeGreaterThanOrEqual(6);

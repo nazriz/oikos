@@ -43,7 +43,7 @@ def token_item(row: dict, model: Translator, tokenizer) -> dict | str:
     index = {c: i for i, c in enumerate(model.choices)}
     choice = [index[s] if isinstance(s, str) else model.first_pointer + POINTERS.index(s[0]) for s in row["steps"]]
     item = {"row": row, "f": t.features(), "choice": choice, "start": [a for a, _ in at], "end": [z for _, z in at], "cfg": model.cfg, "tokens": t, "model": model, "tokenizer": tokenizer}
-    if model.cfg.decoding == "slots":
+    if model.cfg.decoding in ("slots", "cards"):
         cols = slot_columns(row, model, t, text, choice)
         if isinstance(cols, str):
             return cols
@@ -57,7 +57,7 @@ def slot_columns(row: dict, model: Translator, t, text: str, choice: list[int]) 
     lists for it: the two languages' rules differ, or the input was changed so that they no longer fit) or "inexact"
     (a field's name that isn't exactly a run of tokens). `off_rule`: the label makes a decision the rule would not
     allow an answer (none does in the data so far); the example is kept, and its label is always in the running."""
-    follow = Follow(model.cfg.grammar, model.cfg.slots, model.masks, text, t, exact=True)
+    follow = Follow(model.cfg.grammar, model.cfg.slots, model.masks, text, t, exact=True, mode=row.get("mode", "full"))
     slot, a, z, named, mask, off = [], [], [], [], [], False
     try:
         for s, c in zip(row["steps"], choice):
@@ -133,9 +133,12 @@ class Line(list):
 
 
 def form_lines(rows: list[dict]) -> list[Line]:
-    """Every form shown in these rows, each as its line's pieces, once."""
+    """Every form shown in these rows, each as its line's pieces, once. (Two passes: only the choose pass's rows are
+    shown other forms, so only their lines are drawn on: a fill pass is shown the one form it fills.)"""
     seen: dict[str, Line] = {}
     for r in rows:
+        if r.get("mode") == "fill":
+            continue
         cuts = r["breaks"] + [len(r["pieces"])]
         for a, b in zip(cuts, cuts[1:]):
             line = Line(r["pieces"][a:b])
@@ -184,7 +187,7 @@ def with_forms(row: dict, pool: list[list[str]], rand: random.Random) -> dict:
     A form that goes to an office the request names is not one it has nothing to do with (since 2026-10-09 an office
     may have a form of its own for being directed, and a direction to it is then that form filled in, not a letter:
     the letter shown beside that form would be taught wrong), so such a form is never one of those added."""
-    if not pool or row["steps"][0] == "none:unknown_form":
+    if not pool or row["steps"][0] == "none:unknown_form" or row.get("mode") == "fill":
         return row
     pieces, breaks = list(row["pieces"]), list(row["breaks"])
     at = list(row["at"]) if "at" in row else None
@@ -287,10 +290,11 @@ def score(model: Translator, items: list[dict], device: torch.device) -> dict:
     model.eval()
     right = {"positive": 0, "refusal": 0}
     total = {"positive": 0, "refusal": 0}
+    by_mode: dict = {}
     results = []
     for i in items:
         if "slot" in i:
-            steps, sure, _ = model.translate_slots(single(i["f"], device), Follow(model.cfg.grammar, model.cfg.slots, model.masks, i["text"], i["tokens"]))
+            steps, sure, _ = model.translate_slots(single(i["f"], device), Follow(model.cfg.grammar, model.cfg.slots, model.masks, i["text"], i["tokens"], mode=i["row"].get("mode", "full")))
             steps = steps or []
         else:
             steps, sure, _ = model.translate(single(i["f"], device))
@@ -299,8 +303,11 @@ def score(model: Translator, items: list[dict], device: torch.device) -> dict:
         ok = steps == i["row"]["steps"]
         kind = i["row"]["kind"]
         total[kind] += 1; right[kind] += ok
-        results.append({"id": i["row"]["id"], "right": ok, "sure": sure, "steps": steps})
-    return {"right": sum(right.values()), "of": len(items), "by_kind": {k: [right[k], total[k]] for k in total}, "results": results}
+        mode = i["row"].get("mode")
+        if mode:
+            by_mode.setdefault(mode, [0, 0]); by_mode[mode][0] += ok; by_mode[mode][1] += 1
+        results.append({"id": i["row"]["id"], "right": ok, "sure": sure, "steps": steps, **({"mode": mode} if mode else {})})
+    return {"right": sum(right.values()), "of": len(items), "by_kind": {k: [right[k], total[k]] for k in total}, **({"by_mode": by_mode} if by_mode else {}), "results": results}
 
 
 def main() -> None:
@@ -329,12 +336,12 @@ def main() -> None:
     vocabulary = json.loads((data / "vocabulary.json").read_text())
     # How the data's steps were written (export.json): as steps, or slot by slot, with the contract's slots.
     export = json.loads((data / "export.json").read_text()) if (data / "export.json").exists() else {}
-    how = {"decoding": "slots", "grammar": export["grammar"], "slots": slot_names(export["grammar"])} if export.get("decoding") == "slots" else {}
+    how = {"decoding": export["decoding"], "grammar": export["grammar"], "slots": slot_names(export["grammar"])} if export.get("decoding") in ("slots", "cards") else {}
     if a.max_steps:
         how["max_steps"] = a.max_steps
     if a.max_pieces:
         how["max_pieces"] = reader_pieces(a.max_pieces)
-    if how.get("decoding") == "slots" and not a.encoder:
+    if how.get("decoding") in ("slots", "cards") and not a.encoder:
         sys.exit("slot-by-slot data needs a reader with tokens (--encoder)")
     device = torch.device(a.device)
     tokenizer, left_out = None, {"train": {}, "validation": {}, "validation_forms_known": {}}
@@ -425,7 +432,7 @@ def main() -> None:
         if epoch % a.validate_every == 0 or epoch == a.epochs:
             s = score(model, val, device)
             k = score(model, val_known, device)
-            line.update({"validation_right": s["right"], "of": s["of"], "by_kind": s["by_kind"], "with_forms_known": k["right"]})
+            line.update({"validation_right": s["right"], "of": s["of"], "by_kind": s["by_kind"], "with_forms_known": k["right"], **({"by_mode": s["by_mode"]} if "by_mode" in s else {})})
             if real is not None:
                 r = score(model, real, device)
                 line.update({"real_right": r["right"], "real_of": r["of"], "real_by_kind": r["by_kind"]})

@@ -92,17 +92,32 @@ The mechanism:
 ## World mechanics
 
 ### WM-1 · Act times are placeholders throughout
-- **Gap:** Every row of the table of work (`WORK_TIME`: a benefit decision 20 minutes, a tribunal order 45, a loan
-  decision 30, a letter, a vote) is a placeholder. The source check of 2026-10-16 opened nothing that replaces any:
-  the nearest sources are whole-case handling times, several hours a case. No profile overrides a row.
-- **Where:** `worlds/generator/generate.ts` (`WORK_TIME`); `values.work_time` (unused in all nine profiles).
-- **Effect:** All office throughput, backlogs and days-to-decision. Decision rows are probably too short (a benefit
-  decision perhaps eight times too short), so offices clear queues too fast and the cost of a person doing the work
-  is understated. The ratio of a person's seconds to a system's is the whole gain of automation, so it sets any
-  gradual-disempowerment result. Seat and twin share the table, so their difference is safer than absolute figures.
-- **L / I:** high / high · **Status:** to source
+- **Gap:** The generator's table of work (`WORK_TIME`: 52 rows for a person) is all placeholders, each now marked
+  "(to confirm; WM-1)" with what would source it. Since 2026-10-24 two profiles replace ten rows from opened sources
+  (docs/decisions.md, "Act times from sources"): us-oh six (a claim 19 minutes, a benefit decision 75 as the case's
+  whole handling, a request for papers 2, the claimant's papers 24, an employer's confirmation 30, all US burden
+  estimates; a tribunal order 15, another state's court case weight), gb-eng four (a desk's decision 11.7 hours from
+  an ombudsman's cases per investigator, a rent-increase notice 10 minutes and a notice to vacate 15 from an impact
+  assessment, opening an account 40 from journalism). The other seven profiles, and every other row, are
+  placeholders: nothing was found for au-vic or de-ni, nor for loans (only mortgages, about five hours a file),
+  reviews (costs per case, no times), withholding returns, invoices, audit or registry work. Whole-case handling
+  times are the right figure for a decision row (the town has no act for reading or checking a file); the 2026-10-16
+  check set them aside as the wrong quantity. One row serves every desk that writes `venue_decision`, so gb-eng's
+  council complaints desk is charged an ombudsman's case.
+- **Where:** `worlds/generator/generate.ts` (`WORK_TIME`); `values.work_time` in `worlds/profiles/us-oh-2026.json` and
+  `gb-eng-2026.json`.
+- **Effect:** Smaller in today's towns than this entry first said. Before and after on a year of the 1,000-person town
+  (seed 1; au-vic unchanged, the same final state): no backlog or days-to-decision moved beyond the run's own
+  divergence. A desk's answer and a tribunal's order wait the law's days (a fortnight; the time to a hearing), not
+  their makers' hours, and the support office is the outside world's system (WM-14), so a benefit decision's person
+  row reaches no code town. The hours that do pile up are trade paperwork (orders, shopping requests, deliveries:
+  about 175,000 person-hours a year in gb-eng's town, all placeholder rows and work tasks). Where the rows will bite:
+  a person or a seat holding a deciding office, and an automation offer, whose system time is the person's row times
+  its speed, so the ratio is still the whole gain of automation.
+- **L / I:** high / high · **Status:** partly sourced (10 rows in 2 of 9 profiles, 2026-10-24); the rest to source
 - **Notice by:** days-to-decision against a place's real waits; a result that changes when the table is scaled 2 to 4 times.
-- **Fix when:** before any result is read in absolute time or cost, and before any automation or adoption experiment.
+- **Fix when:** before any result is read in absolute time or cost, and before any automation or adoption
+  experiment; for au-vic (the TARA town) first, since nothing sources it yet.
 
 ### WM-2 · Mechanisms that do not bind (crime, pollution, water, clinic)
 - **Gap:** Several mechanisms run on placeholders sized so that they hardly act: theft is a rare chance (200 bps a
@@ -217,6 +232,26 @@ The mechanism:
 - **L / I:** medium / medium · **Status:** to fix and to source
 - **Notice by:** Illness by age in a heat wave against a place's heat-health record (older people should be worse hit).
 - **Fix when:** When a heat scenario is run; a sourced age gradient replaces the flat figure.
+
+### WM-14 · Claims for support are decided in a second, by the outside world's system
+- **Gap:** The support office (`outside-support`) is held by the outside world's own system, at a second an act, with
+  no staff, licence or hours. A claim in a year of the 1,000-person town is decided in about two hours (median 0.05
+  to 0.1 days in gb-eng, au-vic and us-oh), where the places publish a mean of 20 days for a new Housing Benefit claim
+  (Great Britain, late 2024), a five-week first Universal Credit payment, and Ohio's SNAP at 92.5% within its 30-day
+  standard (FY2023). A seat given the post sits on that system, not on a person, so it works at a system's speed too.
+- **Where:** `worlds/generator/generate.ts` (`office("outside-support", ...)`, the boundary's `agency-system`);
+  `docs/behaviour/staffing.md` ("the outside world's own").
+- **Effect:** Benefit days-to-decision, and every benefit row of the table of work (WM-1), in code towns and in a seat
+  in that office (the TARA support-office arm). A seat's speed there is not a person's, unlike every other seat.
+- **L / I:** high / high · **Status:** to fix (staff the office with people at the place's casework rates, or make
+  the boundary's office a supplied system with a stated speed)
+- **Notice by:** claim-to-decision days against the place's published processing times.
+- **Fix when:** before a support-office experiment is read in days or hours, or a seat in it is compared with a seat elsewhere.
+- **Design (2026-10-25, not built; decisions "A system's work takes time too"):** the kernel already reads, charges and
+  queues a system's time (rows of `act_time.system`, lanes); what is wrong is the figures and what the system stands
+  for. Law-set waits as support-law data; casework as officers' minutes per case on an `agency-casework` template
+  with lanes from a sourced officers-per-claim ratio and a working day (two kernel changes: per-template seconds for
+  any block, `hours` on a template); a seat there held as a person (an agency officer). Two questions wait on Naz.
 
 ---
 
@@ -635,7 +670,7 @@ The mechanism:
   at `compliance_bps` (50% for landlords in the example town). The laws of time say an error has a cause, never a per-case dial; compliance escaped that rule.
 - **Where:** `institutions.ts`, `firms.ts`, `union.ts`, `common.ts`.
 - **Effect:** Deterrence cannot change behaviour; enforcement experiments see a fixed rate whatever is enforced.
-- **L / I:** high / high (enforcement) · **Status:** the union's part fixed in the Rust port (2026-10-17: `compliance_bps` is gone; it weighs the gain of acting against the chance it is pursued, learnt from what it has seen, times the penalty, and keeps to the law where it has no measure: docs/behaviour/unions.md); planning, the inspector, landlords and directions remain (lanes E and C1), to fix (non-compliance from detection, gain and history)
+- **L / I:** high / high (enforcement) · **Status:** the union's part fixed in the Rust port (2026-10-17: `compliance_bps` is gone; it weighs the gain of acting against the chance it is pursued, learnt from what it has seen, times the penalty, and keeps to the law where it has no measure: docs/behaviour/unions.md); planning (already, lane E: a ceiling of looks, authority and holds), directions and the finance officer's payments procedure (2026-10-23: no draw; a standing direction from a post the rule names is followed unless held, the procedure is kept where it can be read) are mended; **landlords** (six draws in `firms/landlord.rs`: rent law, tax, refusal, fine, order, tribunal) and **system adoption** (`market/automation.rs`, `offices/systems.rs`) remain, to fix (non-compliance from the gain at stake against the chance it is pursued times the penalty, as the union's; needs per-profile penalty and pursuit figures to source, and the scenario knob `landlord_compliance_bps` replaced)
 - **Notice by:** Compliance rates identical across offices and cases; none depends on detection or history.
 - **Fix when:** Before enforcement or deterrence is studied; replace each coin with a cause (detection, gain, history).
 
@@ -690,6 +725,43 @@ The mechanism:
 - **L / I:** low / low · **Status:** fixed (decisions 2026-10-23, The held cases, settled)
 - **Notice by:** the three cases are ordinary tests now.
 - **Fix when:** nothing; revisit the order of figures only if a study reads the clerk's report as the schedule's own order.
+
+### PB-22 · Anyone could take anyone out of the town
+- **Gap:** The kernel's `leave` took a `person` and the resolver passed any named person through, so any seat (a mayor, an
+  officer, a model in a lender's chair) could take any person out of the world. Fixed in the kernel 2026-10-23: a person
+  leaves by their own act; a minor (below `life.majority`) may also be taken by a parent or grandparent on record or a
+  position in `life.guardians` (child protection); an adult by nobody else; a world with no majority lets nobody take
+  another. **Left:** a newcomer's children arrive with no parentage on record, so a minor with no parent on record can
+  still be taken by any person (as before, to keep households leaving together); the fix is a `parents` field on
+  `arrive`, which needs the census to create parents before children (it creates children first, and changing the order
+  moves every id).
+- **Where:** `kernel/crates/world/src/exec.rs` (`may_take_out`); `Life.majority`, `Life.guardians`; `docs/behaviour/life.md`.
+- **Effect:** An experiment on who holds power over people would otherwise measure a seat's ability to do what no office
+  may do; the remainder exposes only children of newcomers.
+- **L / I:** low (after the fix) / high · **Status:** to fix (the newcomers' children; the rest fixed, decisions 2026-10-23, "Debt: the risk register, guardianship and compliance")
+- **Notice by:** a `leave` of a person other than the actor in the log; a refusal `not_theirs` on `leave`.
+- **Fix when:** the census creates parents before children, or before a seat is given a wide remit over households.
+
+### PB-23 · Tax paid twice cannot be claimed back or set against the next return
+- **Gap:** Nobody keeps a taxpayer's account with the outside world's tax collector: returns are filed and paid, and
+  nothing reconciles what was paid against what was owed. A payment made twice (lv-12: the clinic's manager paid a
+  month's withheld income tax by hand, $17,573.92, on top of its payroll clerk's return for the same month) is simply
+  gone. Real places have the route: a claim for the refund of a payment not owed, or setting it against the next
+  return (Mexico: Código Fiscal de la Federación, arts. 22 and 23, refund and offset; United Kingdom: an employer's
+  PAYE overpayment is set against the next period or repaid; both to confirm). `public-finance.md` says it already:
+  "no yearly assessment, so no refunds or offsets".
+- **Where:** the boundary's tax collection (`kernel/crates/actors/src/firms/staffing.rs`, `returns_due`;
+  `offices/treasury.rs`); `docs/behaviour/public-finance.md`.
+- **Effect:** A seat's (or a code office's) duplicate payment is a permanent loss; a seat that sees it can do nothing,
+  and is distressed by it (lv-12's debrief). Small in money; matters for welfare and for any study of error recovery.
+- **L / I:** medium / low · **Status:** to fix. It is not a law alone: it needs the institution that does the work, the
+  collector's office keeping each taxpayer's account (who does it, at what time per claim, how long a refund takes,
+  by place, sourced), a form for the claim, and the payer's clerk reading its own books for what was paid over twice.
+- **Notice by:** two payments to the collector for one return's period from one payer.
+- **Fix when:** before a study reads errors and their correction, or a finance-side seat is seated again in a town
+  whose clerk files returns.
+
+## People and culture
 
 ### PC-1 · Nobody reads what a seat writes
 - **Gap:** The reading gate failed (2026-10-14): no model reads a steward's words for the town, so a careful reason and
@@ -852,6 +924,8 @@ The mechanism:
 - **L / I:** high / high · **Status:** to fix (as each is found)
 - **Notice by:** zero requests from a seat with live business; "not understood" counts.
 - **Fix when:** the first pilot of any new office type.
+- **Six pilots (2026-10-25):** an employment whose work site was not a place was signed and no worker came (lv-10's
+  police); now refused at the act, `not_a_place`, and the seat is told why (decisions "A place committed to is a place").
 
 ### SF-2 · A lender's seat floods its own prompt
 - **Gap:** The bank's ledger (40 to 80 thousand characters) stays in the prompt and the seat's own look-ups are cut
@@ -862,6 +936,7 @@ The mechanism:
 - **Notice by:** A lender seat's prompt over the ceiling; its own look-ups cut.
 - **Fix when:** Before any lender is seated; the ledger on request, not in the prompt.
 - **Evidence:** `fitPrompt` (participants/src/llm/participant.ts) leaves out a standing part longer than `BULK_PART` (20,000 characters) before any of the seat's own look-ups, longest first, with a line saying so; test in `participants/test/seat-papers.test.ts`. A lender seat is still not run against the real ledger: check the first one.
+- **Came back (pilots lv-08, lv-09, 2026-10-24), fixed again 2026-10-25** (decisions "A look's result reaches the next prompt"): the 2026-10-17 fix reached only text, and the whole ledger (127,000 characters) was set out again inside every look's result, so the look's result was what went. Now the accounts it keeps for others are not set out with a look's result (its own, and money in and out, still are), and a long part inside a result goes before the result does; test "a seat's look results reach its next prompt". Check the next lender seat's `prompt_trimmed` notes: `looks` should be 0.
 
 ### SF-3 · Initiative depends on wording
 - **Gap:** Seats read "not bound to act" and the absence of a trigger as absence of duty; nothing prompts a seat to
@@ -1234,7 +1309,7 @@ The mechanism:
 - **Notice by:** `reviews_asked` and `appeals_made` at 0 in every arm.
 - **Fix when:** Done; revisit if a third dial comes to govern whether people act.
 
-### MT-21 · A request for a review that is never answered leads nowhere
+### MT-21 · A request for a review that is never answered leads nowhere (where the law has no deemed refusal)
 - **Gap:** Where the law requires a review before an appeal (`review.required`: au-vic's support decisions), the appeal
   clock runs from the review's answer. A request never answered is deemed `ignored` after `answer_days`, but has no
   `answered_at`, so the claimant may not appeal, does not ask again (`asked` is set) and nothing else follows. Found by
@@ -1243,11 +1318,16 @@ The mechanism:
 - **Where:** `kernel/crates/actors/src/citizen/recourse.rs` (`disrepair`'s "ignored", `Ways::for_want`'s `may_apply`).
 - **Effect:** A steward that does not answer requests for review shuts the appeal route for good: the sim makes
   silence a stronger lever than the place's law and its other bodies would.
-- **L / I:** medium / high · **Status:** open. What a real claimant does about an unanswered review is the place's (ask
-  again, complain to an ombudsman, a deemed refusal where the law has one): to be sourced, then law data, not a rule
-  in code.
-- **Notice by:** `withheld` arms whose claimant never acts again; a model steward that leaves requests unanswered.
-- **Fix when:** Before a TARA arm in which the steward may leave requests unanswered.
+- **L / I:** medium / high · **Status:** mitigated (2026-10-24, branch `fix-memory-appeal`). A deemed refusal is law
+  data (`review.deemed_refused_days`): where a place's law has one, a review unanswered that long is taken as refused
+  and the claimant's appeal runs from then (de-ni: 91 days, SGG s 88(2), to confirm; held at citizen level and in a
+  living town whose office's answers are withheld). Still open where the law has none: au-vic (the TARA town), gb-eng,
+  us-oh's pension recall none (to confirm); what their claimants do instead (ask again, the ombudsman, judicial review)
+  is not built.
+- **Notice by:** `withheld` arms whose claimant never acts again in a town whose law has no deemed refusal; a model
+  steward that leaves requests unanswered there.
+- **Fix when:** Before a TARA arm in au-vic in which the steward may leave requests unanswered: source what an
+  Australian claimant does (a complaint to the Commonwealth Ombudsman, asking again) and give it to them as law data.
 
 ### MT-22 · A model steward in a fork is a pilot's seat, less a few things
 - **Gap:** The experiment harness's model seat (`orchestrator/src/seat-host.ts`) is the pilot's seat (the same
@@ -1261,6 +1341,35 @@ The mechanism:
 - **L / I:** low / medium · **Status:** open; the dry run of the TARA spec at full size is the check that the path runs.
 - **Notice by:** `rejected_action` notes in a model fork; an experiment's log that stops without "done".
 - **Fix when:** Before the TARA run if a model fork's log shows `rejected_action`s from its seat.
+
+### MT-23 · A crew's day of delegated work took three times as long on one day, cause untraced
+- **Gap:** In `orchestrator/test/seat-diary.test.ts` (a works seat naming its crew to write forty notices a working day, 600 citizens, seed 1) the crew's paperwork takes 106 to 121 minutes from the first act of the day to the last on 18 of the 19 working days of days 1 to 28, and 310 minutes on day 21 (found 2026-10-24, after the run's seed began to draw who the people are). On the ordinary days the four crew members who are at work apply their acts side by side; on day 21 they applied one after another, the first four 30 minutes apart (555, 585, 615, 645 minutes into the day), and the day's later acts bunched in fours as well. **Not traced:** whether a crew member was busy with a gathering, a trip or another job that morning, whether the kernel serialised acts through one performer's time, or whether the seat's own sitting was late.
+- **Where:** the works crew's time (the kernel's charge of an act to its performers, `docs/all-work-takes-time.md`); `orchestrator/test/seat-diary.test.ts` (its bound is held to the middle working day since then).
+- **Effect:** A study that measures how fast delegated work gets done could read a one-day outlier as a delegation effect. If the cause is a fault, a crew's day is slower than its hours allow on some days.
+- **L / I:** low / medium · **Status:** open; untraced
+- **Notice by:** a day's span in the seat-diary run well above the others (`spanOf`), or a crew member's acts in the log not overlapping on a day when more than one is at work.
+- **Fix when:** a study reads delegated work's speed, or the day shows again at another seed.
+
+### MT-24 · The citizen capture keeps each decision as the mind recorded it, not yet everything the citizen model will read
+- **Gap:** The capture (docs/citizen-data.md, step 1 of docs/design/citizen-model.md) writes every recorded decision
+  with its draws, the person's record and their outcomes. It does not yet write: the typed `situation/1` for every
+  domain (only wants carry a `situation`; other domains carry their options, circumstances, needs and state); the
+  papers a person held, received or wrote (the design's `papers` file and `dealings` join); choices the mind makes
+  without recording a decision (whom to catch up with, passing news on), whose draws land on the next decision's
+  `draws`; firms' and founded bodies' decisions. A person's first week's turns come before their first record write
+  and fold to an empty record. Ids of those a person deals with appear raw (step 2's input builder makes them roles).
+  An outcome is joined to its turn by person and count, which restarts if a person's controller does. A turn kept
+  out of training is any on a test case's run and day, every citizen, which is coarse. There is no size stop yet.
+- **Where:** `kernel/src/engine/capture.rs`, `kernel/crates/actors/src/lib.rs` (`Cx::rng`, `drew`, `capture_turn`),
+  `mind/citizen.rs` `decision`; `orchestrator/src/citizen-data.ts`; contracts/citizen-data.schema.json.
+- **Effect:** A model trained only on this would see less of the matter and of held papers than the design's input
+  has, and could not be trained on what to put in a letter (no content heads yet: nothing chooses content today). No
+  effect on any run: the capture changes nothing in the world or the log (tested).
+- **L / I:** medium / medium for the citizen model; none for steward experiments · **Status:** to fix (step 2 of the
+  citizen-model plan builds the input builder and the situation for every domain).
+- **Notice by:** `oikos citizen-data` summary (`before_record`, outcomes joined against all); a domain whose examples
+  carry no situation.
+- **Fix when:** Step 2 (the input builder), before any training; papers before the content heads.
 
 ---
 
@@ -1360,18 +1469,19 @@ The mechanism:
 
 ## Performance and scale
 
-### SC-1 · Untested past a 10,000-person year; 50,000 grows by the square
-- **Gap:** A ten-year run was never made. A 10,000-person year runs (2026-10-23, Rust world: 29 minutes, 7.8 GB, 9 GB of
-  log), but at 50,000 people memory grows about 2.8 GB a simulated day and the log 1.9 GB (some 30 to 40 times 10,000's for
-  five times the people), so a month does not fit this machine (stopped at day 16 at 45 GB); 100,000 is generated (1.56 GB
-  of config) and never run. Cause not yet confirmed by a heap profile: most likely each citizen keeping and weighing every
-  published record and gathering (docs/design/performance.md, "50,000 and 100,000 people").
-- **Where:** `docs/design/gradual-disempowerment.md` §2.6, §7; `docs/design/foundation-for-scale.md`.
+### SC-1 · Untested past a 10,000-person year; 50,000 no longer starts
+- **Gap:** A ten-year run was never made. A 10,000-person year runs (2026-10-23, Rust world: 29 minutes, 7.8 GB). At
+  50,000 people the start alone now passes 40 GB (2026-10-24: 44 GB in 104 s, bound or not), since the generated config
+  doubled (1.39 GB of JSON, held whole as `serde_json` values); before that, memory grew 2.8 GB a simulated day. 100,000
+  is not feasible. Citizens' memory of public goings-on is now bounded (`citizen/memory.rs`), but at 10,000 people it is
+  about 190 MB of a 10 GB process, so it is not the main cause; the daily growth's cause is still unprofiled.
+- **Where:** `docs/design/performance.md`; `docs/design/foundation-for-scale.md`; docs/decisions.md 2026-10-24
+  ("A review never answered ... a bounded memory").
 - **Effect:** Any study planned "at scale" rests on estimates.
-- **L / I:** high / medium · **Status:** to fix (probes R1 to R4)
+- **L / I:** high / medium · **Status:** to fix: read the config participant by participant (performance.md item 1),
+  then a heap profile at 20,000 to 50,000 for the daily growth.
 - **Notice by:** A run past 10,000 people slowing or running out of memory.
-- **Fix when:** Before a study at that scale: a heap profile at 20,000 to 50,000, then bound what a citizen keeps (behaviour),
-  and read the config participant by participant (performance.md's ranked list, 1 and 2); run the probes R1 to R4.
+- **Fix when:** Before a study at that scale.
 
 ### SC-2 · Resume replays from the start
 - **Gap:** No mid-run checkpoint; resume replays the whole log; resume against a real model is untested.

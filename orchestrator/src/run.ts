@@ -23,12 +23,12 @@
 // call goes to the mock adapter.
 
 import { AsyncLocalStorage } from "node:async_hooks";
-import { appendFileSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { debriefsBeside } from "./logs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { citizensBeside, debriefsBeside } from "./logs";
 import { join } from "node:path";
 import { actedOn, besideOf, drawTies, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
 import { readForEnd } from "./run-end";
-import { seatConfig } from "./seat-config";
+import { namedFor, seatConfig } from "./seat-config";
 import { ReadingDesk, type DeskCounts } from "./reading";
 import { culture as cultureNs, reading as readingNs } from "@oikos/participants";
 import { DayBook, calls, canonical, diaryText, forms, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, inCalendar, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
@@ -88,6 +88,10 @@ export interface RunOptions {
   /** Code citizens' decisions as their minds made them (docs/design/ai-citizens.md 7; training data for citizen models):
    * "full" (the default: every one, in a log that is not lean) or "none". */
   recordDecisions?: string; // "full", "none", or a list of areas ("want,found,found_shape"): those decisions only, kept in a lean log too, with no outcomes
+  /** Capture every code citizen's decision for training a citizen model (docs/citizen-data.md): `<run>.citizens.jsonl.zst`
+   * beside the log, with each decision's draws and the person's record as it stood. Nothing in the world or the log
+   * changes with it. Default: on for a run with a real model (a pilot), and for a resumed run that captured; off otherwise. */
+  captureCitizens?: boolean;
   /** The sparse mind (docs/design/ai-citizens.md 4): code citizens may ask the run's model (the mock, or --model) how
    * much their options would matter, with answers remembered by kind. Off by default. */
   consult?: boolean;
@@ -352,6 +356,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   mkdirSync(o.outDir, { recursive: true });
   const logPath = join(o.outDir, `${o.runId}.jsonl`);
   const anchorsPath = join(o.outDir, `${o.runId}.anchors.jsonl`);
+  const capturePath = citizensBeside(logPath);
+  const capture = o.captureCitizens ?? (!!o.adapter || (!!o.resumed && existsSync(capturePath)));
   let t = 0;
   let commands = 0, refused = 0, wakes = 0, kernelMs = 0, moduleMs = 0, platformMs = 0;
   const wakesBy: { [why: string]: number } = {};
@@ -392,7 +398,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const standIn = o.standIn ?? process.env.OIKOS_STAND_IN;
   // (On the Rust world the actors read the sparse mind's dial from the world, as they read the others: said there.)
   await k.request({ op: "start", config: o.consult ? { ...cfg, dials: { ...(cfg.dials ?? {}), consult: true } } : cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath,
-    ...({ engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(o.recordDecisions === "none" ? { record_decisions: false } : o.recordDecisions !== undefined && o.recordDecisions !== "full" ? { decision_areas: o.recordDecisions.split(",").map((x) => x.trim()).filter((x) => x) } : {}), ...(recordObs === "all" || recordObs === "code" ? { record_observations: true } : Array.isArray(recordObs) ? { record_observations: recordObs } : {}) } }) });
+    ...({ engine: { ...(standIn ? { stand_in: standIn } : {}), ...(o.audit ? { audit: true } : {}), mock_seats: !o.adapter, ...(capture ? { capture_citizens: capturePath } : {}), ...(o.recordDecisions === "none" ? { record_decisions: false } : o.recordDecisions !== undefined && o.recordDecisions !== "full" ? { decision_areas: o.recordDecisions.split(",").map((x) => x.trim()).filter((x) => x) } : {}), ...(recordObs === "all" || recordObs === "code" ? { record_observations: true } : Array.isArray(recordObs) ? { record_observations: recordObs } : {}) } }) });
   if (o.perturb) await k.request({ op: "perturb", extra_wakes_bps: o.perturb.extraWakesBps, seed: o.perturb.seed });
 
   // Every model call (participants, translator, debriefs) is recorded as it happens.
@@ -593,7 +599,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     return {
       key: `${p.id}|${cap}`, participant: p.id, capacity: cap, entity, module, controller: module.create(ctx), ctx,
       cadence: ceilTo(module.cadence(ctx), tick), firstWake: wakeAt ?? ceilTo(module.firstWake?.(ctx) ?? 0, tick), wokeFor: "start", since: 0,
-      knowledge: new Knowledge(currency), view: new View(), notices: [],
+      knowledge: new Knowledge(currency, cfg.names === true), view: new View(), notices: [],
     };
   };
 
@@ -609,7 +615,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const mine = held(p.id);
     // (Its reports, trays, office's file and staff, and the rest of its configuration: seat-config.ts, shared with the
     // experiment harness's model stewards.)
-    const { config, office, entity, standingIds, roster, tally, dayBook } = seatConfig({ cfg, part: p, personal: personalChannels(p), mine, positions, mods, whoIs, ctxFor, twin, draftText, sorted: sortedKeys });
+    const knowledge = new Knowledge(currency, cfg.names === true);
+    const { config, office, entity, standingIds, roster, tally, dayBook } = seatConfig({ cfg, part: p, personal: personalChannels(p), mine, positions, mods, whoIs: namedFor(knowledge, whoIs), ctxFor, twin, draftText, sorted: sortedKeys });
     const controller = createLlmParticipant(config, io);
     const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };
     const ctx = ctxFor(p.id, office?.id ?? "self", entity, {});
@@ -655,7 +662,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}), ...(dayBook ? { dayBook } : {}) },
       ...(codeTwin && office ? { sort: `${codeTwin}|${office.id}` } : {}), ...(brain ? { hears: true, ...(codeTwin ? { body: codeTwin } : {}), ...(office ? { post: office.id } : {}) } : {}),
       cadence: ceilTo(brain?.cadence ?? cadence, tick), firstWake: wakeAt ?? (brain ? ceilTo(brainFirstWake.get(p.id) ?? mods[pp.mock.brain]!.firstWake?.(brain.ctx) ?? 0, tick) : 0), wokeFor: "start", since: 0,
-      knowledge: new Knowledge(currency), view: new View(new Set(standingIds)), notices: [],
+      knowledge, view: new View(new Set(standingIds)), notices: [],
     };
   };
 
@@ -735,7 +742,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // A translator that answers first, if the run has one: the two are one translator to every seat (arrangement.ts).
   // (The first is asked once a request: it decides without sampling, so asked again it says the same.)
   const arranged = o.translatorFirst
-    ? createArrangement(createTranslator({ ...io, adapter: watched(o.translatorFirst) }, kernelCheck, typeOf, undefined, 1, engineResolver), one, { arrangement: o.translatorArrangement ?? "then" })
+    ? createArrangement(createTranslator({ ...io, adapter: watched(o.translatorFirst) }, kernelCheck, typeOf, undefined, 1, engineResolver), one, { arrangement: o.translatorArrangement ?? "then", ...("probationOutcome" in o.translatorFirst ? { probation: o.translatorFirst as unknown as { probationOutcome(form: string, agree: boolean): void } } : {}) })
     : undefined;
   const translator: { id: typeof one.id; translate(req: Parameters<typeof one.translate>[0]): Promise<Awaited<ReturnType<typeof one.translate>> & { route?: Route }> } = arranged ?? one;
 
@@ -1103,7 +1110,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       let res: ReturnType<typeof resolve> | undefined = resolverMode === "engine" ? undefined : resolve(program, u.knowledge, typeOf, as);
       if (resolverMode !== "ts") {
         const e = await k.request({ op: "resolve", participant: u.participant, ...(u.capacity ? { only: u.capacity } : {}), ...(as ? { as } : {}), program: calls.programText(program) });
-        const byEngine = (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}) }) as ReturnType<typeof resolve>;
+        const byEngine = (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}), ...(e.ambiguous ? { ambiguous: e.ambiguous } : {}) }) as ReturnType<typeof resolve>;
         if (res === undefined) res = byEngine;
         else {
           resolverChecked++;
@@ -1118,7 +1125,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       platformMs += performance.now() - p1;
       if (!res) throw new Error("no resolver ran");
       if (!res.ok) {
-        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}) } } });
+        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}), ...(res.ambiguous ? { ambiguous: res.ambiguous } : {}) } } });
         for (const q of res.questions) u.notices.push({ t, text: q });
         return true;
       }
@@ -1305,7 +1312,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const notes: object[] = [];
     const tr = await translating.run(notes, async () => {
       try {
-        return await translator.translate({ draftId, participant, as, proposal, knowledge: units.get(key)?.knowledge ?? new Knowledge(currency), called: (id) => whoIs(id)?.name, ...(capacity ? { only: capacity } : {}) });
+        return await translator.translate({ draftId, participant, as, proposal, knowledge: units.get(key)?.knowledge ?? new Knowledge(currency, cfg.names === true), called: (id) => whoIs(id)?.name, ...(capacity ? { only: capacity } : {}) });
       } catch (e) {
         if (!(e instanceof ModelCallFailed)) throw e;
         return { ok: false as const, notices: ["The translator did not answer."], raw: { model_call_failed: e.message } } as Awaited<ReturnType<typeof translator.translate>>;

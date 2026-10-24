@@ -67,6 +67,9 @@ pub struct WorldInfo {
     /// How the place writes a date (the same `calendar` section's `format`, `long_format`, `months`, `weekdays`): absent, an
     /// ISO date. Read through `common::when_words`, the one place a date is written in words.
     pub date_style: Option<oikos_rules::calendar::DateStyle>,
+    /// The run captures its citizens' decisions for training (docs/citizen-data.md): each decision's draws are kept
+    /// beside it (`Cx::rng` notes every stream it opens). Read by nothing that decides: a run is the same with it on.
+    pub capture: bool,
 }
 
 /// Where an actor runs: which participant, acting for which entity, in which position (absent: as itself), and its
@@ -260,6 +263,28 @@ pub struct Cx<'a> {
     /// The purposes of the draws made in the step, in order, where the caller asked to see them (a detached actor
     /// stepped by a test; `Cx::keep_draws`). `None` in a run: nothing is kept.
     drawn: Option<Vec<String>>,
+    /// (Capturing: the streams opened since the last decision, and the decisions' draws: docs/citizen-data.md.)
+    streams: Vec<Drawn>,
+    captured: Vec<Captured>,
+}
+
+/// A stream an actor opened while its run captures (`WorldInfo::capture`): its key, where it started, and, where the
+/// actor said so (`Cx::drew`), every value it took.
+struct Drawn {
+    key: Vec<String>,
+    start: Rng,
+    values: Option<Vec<u64>>,
+}
+
+/// A decision's draws, for the capture (docs/citizen-data.md): `at` is the decision's place in `Kept::decisions`, `n`
+/// the person's count of it; `draws` the streams opened since the decision before it, in order, each `{key, drawn}`
+/// (every value the decision took, where the mind said which stream it chose with) or `{key, u}` (the stream's first
+/// value). Values are written as 16 hex digits: a u64 does not fit a JSON reader's number.
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Captured {
+    pub at: usize,
+    pub n: u64,
+    pub draws: Vec<Value>,
 }
 
 /// What a step left beside its action.
@@ -278,6 +303,10 @@ pub struct Kept {
     /// The purposes of the draws it made, in order (`Cx::keep_draws`; empty unless asked for): `chance:` marks a draw about one thing.
     #[serde(default)]
     pub drawn: Vec<String>,
+    /// Its decisions' draws, where the run captures (docs/citizen-data.md); empty otherwise, and then not saved, so a
+    /// snapshot is the same with the capture off.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub captured: Vec<Captured>,
 }
 
 impl<'a> Cx<'a> {
@@ -294,6 +323,8 @@ impl<'a> Cx<'a> {
             questions: vec![],
             worded: vec![],
             drawn: None,
+            streams: vec![],
+            captured: vec![],
         }
     }
     /// Keep the purpose of each draw made from here (for a test that holds draws to their names).
@@ -308,7 +339,11 @@ impl<'a> Cx<'a> {
         }
         let key = self.draws.key(self.t, purpose);
         let parts: Vec<&str> = key.iter().map(String::as_str).collect();
-        self.randomness.stream(&parts)
+        let r = self.randomness.stream(&parts);
+        if self.ctx.world.capture {
+            self.streams.push(Drawn { start: r.clone(), key, values: None });
+        }
+        r
     }
     /// A stream for a purpose alone: the same for whoever draws it (a fact about a thing, not about who meets it).
     pub fn chance(&mut self, purpose: &str) -> Rng {
@@ -316,7 +351,50 @@ impl<'a> Cx<'a> {
             d.push(format!("chance:{purpose}"));
         }
         let purpose = self.draws.chance_purpose(purpose);
-        self.randomness.stream(&["chance", &purpose])
+        let r = self.randomness.stream(&["chance", &purpose]);
+        if self.ctx.world.capture {
+            self.streams.push(Drawn { start: r.clone(), key: vec!["chance".into(), purpose], values: None });
+        }
+        r
+    }
+    /// Whether the run captures its citizens' decisions (docs/citizen-data.md).
+    pub fn capturing(&self) -> bool {
+        self.ctx.world.capture
+    }
+    /// The stream opened last has come to `now`: the values it took are kept for the capture (stepped from its start
+    /// until it reaches `now`, at most 4,096; past that only its first value is kept). Nothing when not capturing.
+    pub fn drew(&mut self, now: &Rng) {
+        let Some(d) = self.streams.last_mut() else { return };
+        let mut r = d.start.clone();
+        let mut values = vec![];
+        while &r != now && values.len() < 4_096 {
+            values.push(r.next_u64());
+        }
+        if &r == now {
+            d.values = Some(values);
+        }
+    }
+    /// The decision just recorded (`decided`: this person's `n`th), with the streams opened since the one before it:
+    /// for the capture. Nothing when not capturing.
+    pub fn capture_turn(&mut self, n: u64) {
+        if !self.ctx.world.capture || self.decisions.is_empty() {
+            return;
+        }
+        let hex = |v: u64| Value::String(format!("{v:016x}"));
+        let draws = self
+            .streams
+            .drain(..)
+            .map(|d| {
+                let mut o = Map::new();
+                o.insert("key".into(), Value::Array(d.key.into_iter().map(Value::String).collect()));
+                match d.values {
+                    Some(v) => o.insert("drawn".into(), Value::Array(v.into_iter().map(hex).collect())),
+                    None => o.insert("u".into(), hex(d.start.clone().next_u64())),
+                };
+                Value::Object(o)
+            })
+            .collect();
+        self.captured.push(Captured { at: self.decisions.len() - 1, n, draws });
     }
     pub fn decided(&mut self, decision: Value) {
         self.decisions.push(decision);
@@ -336,7 +414,7 @@ impl<'a> Cx<'a> {
     }
     /// What the step left beside its action (the engine's).
     pub fn into_kept(self) -> Kept {
-        Kept { decisions: self.decisions, outcomes: self.outcomes, record: self.record, questions: self.questions, worded: self.worded, drawn: self.drawn.unwrap_or_default() }
+        Kept { decisions: self.decisions, outcomes: self.outcomes, record: self.record, questions: self.questions, worded: self.worded, drawn: self.drawn.unwrap_or_default(), captured: self.captured }
     }
 }
 
@@ -367,6 +445,29 @@ pub trait Actor: Send {
     /// Its whole memory, as JSON (snapshot and fork: docs/port-guide.md, "Snapshots"). `Kind::restore` of this must
     /// give an actor that steps exactly as this one would from here. Required: every actor's memory is saved.
     fn save(&self) -> Result<Value, String>;
+    /// How much it keeps, counted by what (for whoever measures memory: `oikos-kernel world` with `OIKOS_KEPT` set
+    /// sums these over a run's actors at its end). None: not counted.
+    fn kept(&self) -> Option<std::collections::BTreeMap<String, u64>> {
+        None
+    }
+}
+
+/// Entries of each collection in a saved memory, by path (`s.read_news`), two levels down: for `Actor::kept`.
+pub fn kept_sizes(prefix: &str, v: &Value, out: &mut std::collections::BTreeMap<String, u64>) {
+    let Value::Object(m) = v else { return };
+    for (k, x) in m {
+        let path = if prefix.is_empty() { k.clone() } else { format!("{prefix}.{k}") };
+        match x {
+            Value::Array(a) => *out.entry(path).or_default() += a.len() as u64,
+            Value::Object(o) => {
+                *out.entry(path.clone()).or_default() += o.len() as u64;
+                if prefix.split('.').count() < 3 {
+                    kept_sizes(&path, x, out);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 /// A kind of actor (what a world names in `controller.impl` or a position's `role_module.code`).

@@ -21,7 +21,7 @@ import { createArrangement, createTranslator, draftText, Knowledge, NOT_CHECKED,
 import { drawTies, largest, leftAlone, besideOf, renderSummary, SeatRecords, idsFrom } from "./debrief-summary";
 import { DEBRIEF_PROMPT_CHARS, endCosts, MAX_FAILURES_IN_A_ROW } from "./run";
 import { joinRaw, RAW, type DetachedActor, type RustWorld, type SeatWake } from "./rust-world";
-import { seatConfig, type SeatPos } from "./seat-config";
+import { namedFor, seatConfig, type SeatPos } from "./seat-config";
 
 const DAY = 86_400;
 /** The most turns a seat takes in one wake before it is left to wait (a loop of drafts and declines, say). */
@@ -114,13 +114,13 @@ export class ModelSeat {
     } as ParticipantContext);
     this.whoIs = whoIsOf(cfg);
     const twin = false;
-    const made = seatConfig({ cfg, part: framed, personal: framed.channels ?? [], mine, positions, mods: modules, whoIs: this.whoIs, ctxFor, twin, draftText, sorted: (v) => v });
+    this.knowledge = new Knowledge(this.currency, cfg.names === true);
+    const made = seatConfig({ cfg, part: framed, personal: framed.channels ?? [], mine, positions, mods: modules, whoIs: namedFor(this.knowledge, this.whoIs), ctxFor, twin, draftText, sorted: (v) => v });
     this.entity = made.entity;
     this.office = made.office;
     this.roster = made.roster;
     this.tally = made.tally;
     this.dayBook = made.dayBook;
-    this.knowledge = new Knowledge(this.currency);
     this.view = new View(new Set(made.standingIds));
     this.ctx = ctxFor(o.seat, made.office?.id ?? "self", made.entity, {});
     const config = { ...made.config, ...(o.effort ? { effort: o.effort } : {}) };
@@ -155,7 +155,7 @@ export class ModelSeat {
     };
     const tio = (adapter: LlmAdapter): LlmIO => ({ ...io, adapter });
     const one = createTranslator(tio(o.translator.behind), check, typeOf, undefined, undefined, resolver);
-    this.arranged = o.translator.first ? createArrangement(createTranslator(tio(o.translator.first), check, typeOf, undefined, 1, resolver), one, { arrangement: o.translator.arrangement ?? "then" }) : undefined;
+    this.arranged = o.translator.first ? createArrangement(createTranslator(tio(o.translator.first), check, typeOf, undefined, 1, resolver), one, { arrangement: o.translator.arrangement ?? "then", ...("probationOutcome" in o.translator.first ? { probation: o.translator.first as unknown as { probationOutcome(form: string, agree: boolean): void } } : {}) }) : undefined;
     this.translator = this.arranged ?? one;
     const known = idsFrom(cfg);
     this.records = new SeatRecords([{ id: o.seat, known: known(o.seat), direct: [o.seat, ...mine.map((x) => x.id)] }], known);

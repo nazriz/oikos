@@ -482,7 +482,13 @@ impl Person {
     pub fn leaving_town(&mut self, w: &mut Week) -> bool {
         let t = w.t;
         // (Our home sold to leave: we go, as we meant to.)
-        if self.housing.sold_and_going.is_some_and(|s| t > s) {
+        if let Some(s) = self.housing.sold_and_going.filter(|s| t > *s) {
+            // (Not while earlier steps are still queued, or the mortgage's payoff is not yet seen made: what we send on is what is left after them,
+            // and the balance we see is the one from before they are made. Planned again when they are done.)
+            // (A payoff the bank never makes is not waited on for ever: a month, and we go.)
+            if !self.todo.is_empty() || (self.housing.paying_off.is_some() && t < s + MONTH) {
+                return true;
+            }
             self.housing.sold_and_going = None;
             self.departure(w, "Our home sold: leaving town, as we meant to.");
             return true;
@@ -1139,6 +1145,20 @@ mod tests {
         assert!(t[2].contains("kind=household") && t[2].contains("\"parents\":[\"ann\",\"bob\"]"), "{t:?}");
         assert_eq!(t.len(), 3, "not conceiving while expecting");
         assert!(ann.s.children_now.iter().any(|k| k.person == "kid"));
+    }
+
+    #[test]
+    fn a_seller_who_means_to_leave_goes_when_what_was_queued_before_it_is_done() {
+        let c = ctx("ann", json!({}));
+        let mut ann = Person::new(&c).unwrap();
+        ann.housing.sold_and_going = Some(10 * DAY);
+        ann.todo.push(Todo::from(crate::steps::because("Paying our mortgage off.", vec![crate::steps::call("money", vec![])])));
+        let p = pic("ann", 11 * DAY, adult("female", None), vec![], vec![]);
+        let (waits, steps) = week(&mut ann, &c, &p, |a, w| a.leaving_town(w));
+        assert!(waits && !ann.s.leaving && steps.is_empty() && ann.housing.sold_and_going == Some(10 * DAY), "the payoff comes first");
+        ann.todo.clear();
+        let (gone, steps) = week(&mut ann, &c, &p, |a, w| a.leaving_town(w));
+        assert!(gone && ann.s.leaving && ann.housing.sold_and_going.is_none() && texts(&steps).iter().any(|s| s.contains("presence")));
     }
 
     #[test]

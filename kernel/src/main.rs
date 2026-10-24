@@ -148,6 +148,10 @@ fn world(args: &[String]) -> Result<(), String> {
     let log = oikos_kernel::spool::Spool::new(std::fs::File::create(format!("{out}/{run_id}.jsonl")).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let (hash, e) = oikos_kernel::engine::run_code_world(config, &run_id, log, opts)?;
     println!("{{\"run_id\":{:?},\"state_hash\":{:?},\"t\":{},\"steps\":{}}}", run_id, hash, e.t(), e.steps);
+    // (For whoever measures memory: what the code actors keep, summed by what.)
+    if std::env::var_os("OIKOS_KEPT").is_some() {
+        eprintln!("kept {}", serde_json::to_string(&e.kept()).unwrap_or_default());
+    }
     // (For whoever measures: the run's own thread's CPU time, the critical path when the machine is shared.)
     if let Some(ms) = thread_cpu_ms() {
         eprintln!("main thread cpu {ms} ms");

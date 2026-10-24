@@ -35,6 +35,8 @@ export interface RustOptions {
   until?: number;
   stand_in?: string;
   record_decisions?: boolean;
+  /** Capture the citizens' decisions to this file, for training (docs/citizen-data.md); changes nothing in the run. */
+  capture_citizens?: string;
   audit?: boolean;
   snapshot_every_days?: number;
   stream?: { cap?: number; kinds?: string[] };
@@ -43,7 +45,7 @@ export interface RustOptions {
   parent?: string;
   mock_seats?: boolean;
   /** Acts not carried out (a researcher's intervention: kernel/src/engine.rs `Withhold`; docs/experiments.md). */
-  withhold?: { what: string; participant?: string; nth?: number; matter?: string; to?: string }[];
+  withhold?: { what: string; participant?: string; nth?: number; matter?: string; to?: string; has?: string }[];
 }
 
 const need = () => {

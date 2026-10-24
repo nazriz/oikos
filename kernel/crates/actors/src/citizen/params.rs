@@ -49,6 +49,8 @@ pub struct Params {
     pub shops_known: i64,
     pub sale_board: String,
     pub frictions: Frictions,
+    /// What a person keeps of public goings-on (citizen/memory.rs; risk SC-1). None: everything, for good.
+    pub public_memory: Option<super::memory::PublicMemory>,
     pub started: Option<Started>,
     pub essentials_units: i64,
     pub goods: String,
@@ -147,6 +149,7 @@ impl Default for Params {
             shops_known: 7,
             sale_board: String::new(),
             frictions: Frictions::default(),
+            public_memory: None,
             started: None,
             essentials_units: 10,
             goods: "goods".into(),

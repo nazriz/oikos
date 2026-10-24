@@ -942,6 +942,30 @@ impl<'a> Exec<'a> {
     }
 
     /// The acting person (acting as itself), for acts only a body can do on its own behalf.
+    /// Who may take a person out of the world: they themselves; for a minor (below the world's `life.majority`) also a
+    /// parent or grandparent on record, a position the world names a guardian, and, for a minor with no parent on record
+    /// (a newcomer's child: arrivals carry no parentage yet, risk PB-22), any person. An adult is taken out by nobody
+    /// else: a seat's authority over a person is physics (a guardianship), never a law.
+    fn may_take_out(&self, who: &str) -> R<()> {
+        if who == self.entity {
+            return Ok(());
+        }
+        let no = |why: &str| Err(refuse(RefusalCode::NotTheirs, format!("{who} {why}")));
+        let Some(majority) = self.s.life().and_then(|l| l.majority) else { return no("is not the acting person's to take out of the world") };
+        let life = self.s.life().unwrap();
+        let b = self.st.body(who).unwrap();
+        if (self.now() - b.born_at) / life.year >= majority as i64 {
+            return no("decides for themselves: nobody else can take them out of the world");
+        }
+        let kin = b.parents.iter().any(|p| *p == self.entity || self.st.body(p).is_some_and(|pb| pb.parents.iter().any(|g| *g == self.entity)));
+        let guardian = self.position.is_some_and(|p| life.guardians.iter().any(|g| g == p));
+        if kin || guardian || (b.parents.is_empty() && self.position.is_none()) {
+            Ok(())
+        } else {
+            no("is a child in someone else's care")
+        }
+    }
+
     fn acting_person(&self) -> R<Id> {
         match self.position {
             None => Ok(self.entity.clone()),
@@ -1595,6 +1619,31 @@ impl<'a> Exec<'a> {
         Ok(t)
     }
 
+    /// A place a party commits to be or to work at is a place in the world: a building, or a space of one (physics: a
+    /// body can only be somewhere). The commitment's meaning is still nobody's to judge here, only that its place is
+    /// one (pilot lv-10, 2026-10-24: an employment whose work site was a job posting's id was signed, and the worker
+    /// could never come to it).
+    fn places_committed(&self, t: &AgreementTerms) -> R<()> {
+        for c in &t.commitments {
+            let Some(o) = c.does.get("outcome") else { continue };
+            let named = [("occupancy", "in"), ("work", "at")]
+                .into_iter()
+                .filter_map(|(k, f)| o.get(k).and_then(|x| x.get(f)).and_then(|v| v.as_str()).map(|v| (k, f, v)));
+            for (k, f, v) in named {
+                let id = self.r(v)?;
+                let building = self.st.structures.contains_key(&id);
+                let space = split_space(&id).is_some_and(|(sid, local)| self.st.structures.get(sid).is_some_and(|x| self.s.space(&x.structure_type, local).is_some()));
+                if !building && !space {
+                    return Err(refuse(
+                        RefusalCode::NotAPlace,
+                        format!("{id}, where {} commits to {} ({k}.{f}), is not a place: name a building or a space in one", c.who, if k == "work" { "work" } else { "be" }),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Who a message reaches, and in which of their capacities.
     fn recipients(&self, to: &[Id]) -> R<BTreeSet<(Id, Id)>> {
         let mut out = BTreeSet::new();
@@ -1957,6 +2006,7 @@ impl<'a> Exec<'a> {
                     None => self.s.boundary().to_string(),
                 };
                 self.living_present(&who)?;
+                self.may_take_out(&who)?;
                 let own = self.st.body(&who).and_then(|b| b.participant.clone());
                 let seats = seats_of(self.st, &who, own.as_deref());
                 let events = vacate_all(self.s, self.st, &who, VacateReason::Departed, Some(self.participant));
@@ -2157,6 +2207,7 @@ impl<'a> Exec<'a> {
 
             Block::ProposeAgreement { terms, basis, speaks_for, visible_to, bind } => {
                 let terms = self.resolve_terms(terms)?;
+                self.places_committed(&terms)?;
                 let id = self.new_record(RecordBody::Agreement { terms }, self.ro(speaks_for)?, visible_to.clone(), self.cited(basis)?)?;
                 self.bind(bind, &id)
             }

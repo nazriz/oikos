@@ -11,6 +11,7 @@
   "orchestrator/test/culture-dial.test.ts": "the 1,000-person town (82 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/deaths.test.ts": "towns run a year or more (54 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/debrief.test.ts": "towns run a year or more (72 s on 2026-10-24, the whole suite at once)",
+  "orchestrator/test/deemed-refusal-town.test.ts": "two 300-person towns run 330 days (265 s in a gate of 2026-10-24, the machine loaded)",
   "orchestrator/test/elections.test.ts": "several seeds or towns (86 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/entity-records.test.ts": "towns run a year or more (190 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/entry.test.ts": "towns run a year or more; several seeds or towns (71 s on 2026-10-24, the whole suite at once)",

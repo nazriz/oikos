@@ -81,6 +81,7 @@ fn options(v: &Value) -> Result<Options, String> {
     }
     engine.audit = v["audit"].as_bool() == Some(true);
     engine.withhold = crate::engine::withholds(&v["withhold"])?;
+    engine.capture_citizens = v["capture_citizens"].as_str().filter(|p| !p.is_empty()).map(String::from);
     if let Some(n) = v["share_at"].as_u64() {
         engine.share_at = n as usize;
     }
@@ -262,10 +263,13 @@ impl Host {
         let program = oikos_resolver::calls::parse_program(program).map_err(|x| format!("the call doesn't parse: {}", x.0))?;
         Ok(match self.e.host_resolve(participant, &program, as_) {
             oikos_resolver::Resolution::Blocks(blocks) => json!({ "blocks": blocks }),
-            oikos_resolver::Resolution::Questions { questions, invalid } => {
+            oikos_resolver::Resolution::Questions { questions, invalid, ambiguous } => {
                 let mut v = json!({ "questions": questions });
                 if !invalid.is_empty() {
                     v["invalid"] = json!(invalid);
+                }
+                if !ambiguous.is_empty() {
+                    v["ambiguous"] = json!(ambiguous);
                 }
                 v
             }

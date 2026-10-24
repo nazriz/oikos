@@ -30,6 +30,7 @@ import { logToResume, recordedCalls, prepareResume, Serving } from "./resume";
 import { ORCHESTRATOR_VERSION, runWorld, RunStuck, type RunOptions, type RunSummary } from "./run";
 import type { LlmAdapter } from "@oikos/participants/llm";
 import { stallMs, Watchdog } from "./watchdog";
+import { callRecorder } from "./experiment-seats";
 
 /** A world file (JSON or YAML), with `--set path=value` overrides applied, generated if it's a spec. */
 export async function loadWorld(path: string, sets: string[] = []): Promise<{ config: any; spec?: any; generator?: string }> {
@@ -133,7 +134,7 @@ export function translatorArrangement(o: { translatorFirst?: string; translatorA
 /** Run one seed in this process and write its summary next to its log. Or resume a run that stopped (`resume`: its
  * log): run again from its own config, with every model response served from that log (resume.ts, D59). `town`: the
  * town's seed (the spec's `seed` set to it, after any `sets`), named in the run's id; absent, the spec's own. */
-export async function runOne(o: { debriefWording?: string; world?: string; seed?: number; town?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; translatorFirst?: string; translatorArrangement?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; recordDecisions?: string; logDetail?: string; consult?: boolean; consultAvoid?: string; composer?: boolean }): Promise<RunRecord> {
+export async function runOne(o: { debriefWording?: string; world?: string; seed?: number; town?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; translatorFirst?: string; translatorArrangement?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; recordDecisions?: string; logDetail?: string; consult?: boolean; consultAvoid?: string; composer?: boolean; captureCitizens?: string }): Promise<RunRecord> {
   let config: any, runId: string, out: string, serving: Serving | undefined, stoppedLog: string | undefined;
   let consult = !!o.consult;
   let composerReal = !!o.composer;
@@ -142,6 +143,7 @@ export async function runOne(o: { debriefWording?: string; world?: string; seed?
   let debriefWording = o.debriefWording as "a" | "b" | undefined;
   let recordObservations = o.recordObservations;
   let recordDecisions = o.recordDecisions;
+  if (o.captureCitizens !== undefined && o.captureCitizens !== "on" && o.captureCitizens !== "off") throw new Error(`--capture-citizens is on or off, not "${o.captureCitizens}"`);
   if (recordDecisions !== undefined && !/^[a-z_]+(,[a-z_]+)*$/.test(recordDecisions)) throw new Error(`--record-decisions is full, none or a list of areas (want,found), not "${recordDecisions}"`);
   // What an audit found unstable (its report's avoid list), left out of the sparse mind.
   let consultAvoid: string[] | undefined = o.consultAvoid ? (JSON.parse(await Bun.file(o.consultAvoid).text()).avoid as string[]) : undefined;
@@ -176,6 +178,12 @@ export async function runOne(o: { debriefWording?: string; world?: string; seed?
   const arrangement = translatorArrangement(o);
   const first = o.translatorFirst ? chooseModel(o.translatorFirst, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl, first: true }) : undefined;
   await (first?.adapter as { ready?: () => Promise<void> } | undefined)?.ready?.();
+  // Every call a model is actually asked (not one served again from a resumed run's log) is recorded apart from the log,
+  // as an experiment's forks are (experiment-seats.ts callRecorder): `<runId>.calls.jsonl` beside it, per call its
+  // subject, purpose, model, tokens, cost, wall time and error; cost.json sums them (`calls`). Wall time is kept out of
+  // the log, which is what the world did; this is how the calls went. A run with no model (the mock) records nothing.
+  const calls = callRecorder(join(out, `${runId}.calls.jsonl`), { seed: Number(config.seed), arm: "run", seat: "" });
+  const named = (m: { adapter: LlmAdapter }, name: string) => calls.wrap(m.adapter, name);
   const serve = (a: LlmAdapter) => (serving ? serving.wrap(a) : a);
   // The composing models, for real, where the run asks and the world has a mix (docs/behaviour/founding.md): each
   // under the run's one spending limit. (A model reached through a command-line tool is given two minutes an
@@ -192,11 +200,11 @@ export async function runOne(o: { debriefWording?: string; world?: string; seed?
   const watchdog = new Watchdog({ stallMs: stallMs(), diagnosisPath, runId });
   let s: RunSummary;
   try {
-    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.resume ? { resumed: true } : {}), ...(debriefWording ? { debriefWording } : {}), ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions !== undefined && recordDecisions !== "full" ? { recordDecisions } : {}),
-      ...(real ? { adapter: serve(real.adapter), prices: { ...real.prices, ...(tr?.prices ?? {}), ...(first?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : first ? { prices: first.prices } : {}),
-      ...(tr ? { translatorAdapter: serve(tr.adapter) } : {}),
-      ...(first ? { translatorFirst: serve(first.adapter), translatorArrangement: arrangement } : {}),
-      ...(composers.length ? { composerAdapters: new Map(composers.map((c) => [c.name, serve(c.adapter)])), prices: { ...(real?.prices ?? {}), ...(tr?.prices ?? {}), ...(first?.prices ?? {}), ...Object.assign({}, ...composers.map((c) => c.prices)) }, ...(oneBudget ? { budget: oneBudget } : {}) } : {}),
+    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.captureCitizens !== undefined ? { captureCitizens: o.captureCitizens === "on" } : {}), ...(o.resume ? { resumed: true } : {}), ...(debriefWording ? { debriefWording } : {}), ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions !== undefined && recordDecisions !== "full" ? { recordDecisions } : {}),
+      ...(real ? { adapter: serve(named(real, o.model!)), prices: { ...real.prices, ...(tr?.prices ?? {}), ...(first?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : first ? { prices: first.prices } : {}),
+      ...(tr ? { translatorAdapter: serve(named(tr, o.translatorModel!)) } : {}),
+      ...(first ? { translatorFirst: serve(named(first, o.translatorFirst!)), translatorArrangement: arrangement } : {}),
+      ...(composers.length ? { composerAdapters: new Map(composers.map((c) => [c.name, serve(named(c, c.name))])), prices: { ...(real?.prices ?? {}), ...(tr?.prices ?? {}), ...(first?.prices ?? {}), ...Object.assign({}, ...composers.map((c) => c.prices)) }, ...(oneBudget ? { budget: oneBudget } : {}) } : {}),
       ...(serving ? { resumedFrom: { log: basename(stoppedLog!), serving } } : {}) });
   } catch (e) {
     const err = e as Error;
@@ -218,6 +226,29 @@ export async function runOne(o: { debriefWording?: string; world?: string; seed?
 /** Leave a note in a run's folder that its measures failed, for whatever looks at the folder later (the pilot queue's status, alerts and report). */
 function noteMeasureFailed(out: string, why: string): void {
   try { writeFileSync(join(out, MEASURE_FAILED_FILE), `${why}\n`); } catch { /* (the folder is out of reach: the failure is still in problems) */ }
+}
+
+/**
+ * cost.json with how the calls went: the `<run>.calls.jsonl` files in the folder (every call a model was actually asked,
+ * across every attempt of a resumed run) summed by model, by model and purpose, and by subject, with wall time (p50,
+ * p95, max, total) and errors. Unchanged when no call was recorded (a mock run, or a run from before 2026-10-24).
+ */
+export function withCalls<T extends object>(json: T, out: string): T & { calls?: unknown } {
+  // (Not the adapters' own ledgers, `decide.calls.jsonl` and `claude-code.calls.jsonl`, which hold other fields.)
+  const files = existsSync(out) ? readdirSync(out).filter((f) => f.endsWith(".calls.jsonl") && !/^(decide|claude-code|codex)\.calls\.jsonl$/.test(f)).sort() : [];
+  const lines: any[] = files.flatMap((f) => readFileSync(join(out, f), "utf8").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return undefined; } }).filter(Boolean));
+  if (!lines.length) return json;
+  const q = (xs: number[], p: number) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(p * xs.length))]! : null);
+  const group = (key: (x: any) => string) => {
+    const by: { [k: string]: any[] } = {};
+    for (const x of lines) (by[key(x)] ??= []).push(x);
+    return Object.fromEntries(Object.entries(by).sort(([a], [b]) => a.localeCompare(b)).map(([k, xs]) => {
+      const ok = xs.filter((x) => !x.error), ms = ok.map((x) => Number(x.ms) || 0);
+      const sum = (f: string) => xs.reduce((a, x) => a + (Number(x[f]) || 0), 0);
+      return [k, { calls: ok.length, errors: xs.length - ok.length, input_tokens: sum("input_tokens"), cache_read_tokens: sum("cache_read_tokens"), cache_write_tokens: sum("cache_write_tokens"), output_tokens: sum("output_tokens"), cost_usd: sum("cost_microusd") / 1e6, ms: { p50: q(ms, 0.5), p95: q(ms, 0.95), max: ms.length ? Math.max(...ms) : null, total: ms.reduce((a, b) => a + b, 0) } }];
+    }));
+  };
+  return { ...json, calls: { files, total: group(() => "all").all, by_model: group((x) => String(x.model)), by_model_and_purpose: group((x) => `${x.model} ${x.purpose}`), by_subject: group((x) => String(x.subject)) } };
 }
 
 /**
@@ -257,7 +288,7 @@ export async function afterResume(rec: RunRecord, o: { translatorModel?: string;
       const cost = await costReport(measureDir, { translatorModel: o.translatorModel });
       const shown = withPlatformOverrun(cost, [rec]);
       writeFileSync(join(out, "cost.txt"), `${shown.text}\n`);
-      writeFileSync(join(out, "cost.json"), JSON.stringify(shown.json, null, 2));
+      writeFileSync(join(out, "cost.json"), JSON.stringify(withCalls(shown.json, out), null, 2));
       costText = shown.text;
       rmSync(join(out, MEASURE_FAILED_FILE), { force: true });
     } catch (e) {
@@ -322,6 +353,8 @@ export interface BatchOptions {
   recordDecisions?: string;
   /** How much the log keeps: "full" (the default) or "lean" (docs/reliability.md). */
   logDetail?: string;
+  /** Capture the citizens' decisions for training (docs/citizen-data.md): "on" or "off"; default on with a real model. */
+  captureCitizens?: string;
   /** The sparse mind on (docs/design/ai-citizens.md 4), leaving out what an audit report found unstable. */
   consult?: boolean;
   /** Call the world's composing models for real (docs/behaviour/founding.md): without it the mock plays the composer. */
@@ -457,7 +490,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
         limitUsd = held / 1e6;
       }
       const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), ...(town !== undefined ? ["--town", String(town)] : []), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
-        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.composer ? ["--composer"] : []), ...(o.debriefWording ? ["--debrief-wording", o.debriefWording] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...firstFlags(o), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
+        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.captureCitizens ? ["--capture-citizens", o.captureCitizens] : []), ...(o.consult ? ["--consult"] : []), ...(o.composer ? ["--composer"] : []), ...(o.debriefWording ? ["--debrief-wording", o.debriefWording] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...firstFlags(o), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
         ...(o.modules ? ["--modules", resolve(o.modules)] : []), ...(o.overwrite ? ["--overwrite"] : [])];
       const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: slotted ? insideSlot(1, { ...process.env }) : { ...process.env } }); // (the environment as it is now)
       children.add(p);
@@ -542,7 +575,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     const cost = await costReport(measureDir, { translatorModel: o.translatorModel });
     const shown = withPlatformOverrun(cost, runs);
     writeFileSync(join(out, "cost.txt"), `${shown.text}\n`);
-    writeFileSync(join(out, "cost.json"), JSON.stringify(shown.json, null, 2));
+    writeFileSync(join(out, "cost.json"), JSON.stringify(withCalls(shown.json, out), null, 2));
     result.measureDir = measureDir;
     result.costText = shown.text;
     rmSync(join(out, MEASURE_FAILED_FILE), { force: true });

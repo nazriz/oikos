@@ -1,0 +1,21 @@
+{
+  "row": "turn",
+  "t": 864000,
+  "p": "c12-self",
+  "n": 7,
+  "decision": {
+    "t": 864000,
+    "n": 7,
+    "domain": "want",
+    "strategy": "deliberate",
+    "choice": "ask",
+    "options": [
+      { "key": "ask", "score": 1200 },
+      { "key": "wait", "score": -800 }
+    ],
+    "situation": { "v": 1, "want": { "about": "notice", "from": "event", "weight": 4000, "days": 3, "tried": 0, "grown": 0, "seeks": ["occupancy"] } }
+  },
+  "draws": [
+    { "key": ["participant", "c12-self", "self", "", "want-notice-paper#1", "1"], "drawn": ["9e3779b97f4a7c15", "0123456789abcdef"] }
+  ]
+}

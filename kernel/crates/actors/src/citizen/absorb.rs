@@ -323,6 +323,12 @@ impl Person {
                 }
             }
         }
+        // The payment that pays our mortgage off, seen made.
+        if let (Some(acc), Some(loan)) = (&w.acc, self.housing.paying_off.clone()) {
+            if pic.transactions().any(|tx| tx.from == acc.account && tx.settles.as_deref() == Some(loan.as_str())) {
+                self.housing.paying_off = None;
+            }
+        }
         self.at_work(&mut w, &fresh);
         self.home_seen(pic);
         self.firm_founded(&mut w);

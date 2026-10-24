@@ -806,6 +806,10 @@
         "fiscal_year_starts": { "description": "The month and day the fiscal year of public bodies begins.", "type": "object", "properties": { "month": { "type": "integer", "minimum": 1, "maximum": 12 }, "day": { "type": "integer", "minimum": 1, "maximum": 31 } }, "required": ["month", "day"], "additionalProperties": false }
       }
     },
+    "names": {
+      "description": "Whether the world's people and bodies have names of their own, drawn from a place (docs/design/names-and-dates.md; the generator sets it with a spec's `names`). The kernel reads none of it; the resolver does: a name a seat writes that matches more than one of those it has been shown is answered `ambiguous`, with the candidates and what tells them apart on its own file, and one that matches nobody it knows is \"not on file\" (contracts/calls.md). Absent or false: the old towns' answers, word for word.",
+      "type": "boolean"
+    },
     "dials": {
       "description": "Dials of a living world (docs/design/ai-citizens.md 10j). Opaque to the kernel; absent, every dial is off and the world is as before.",
       "type": "object",
@@ -2898,6 +2902,19 @@
         "year": {
           "description": "Seconds in a year of age.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
+        },
+        "majority": {
+          "description": "The age in years from which a person decides for themselves. Below it, a person may be taken out of the world by another: a parent or grandparent on record, a position in `guardians`, or, with no parent on record, any person. From it, only by themselves. Absent: nobody takes another out.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "guardians": {
+          "description": "Positions that may take a minor out of the world on their own authority (a child protection office).",
+          "type": "array",
+          "items": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+          "uniqueItems": true,
+          "maxItems": 100
         },
         "other_causes": {
           "description": "Yearly chance of death from causes not otherwise modelled, by age (steps: each applies from its age until the next).",

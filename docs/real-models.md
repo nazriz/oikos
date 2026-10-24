@@ -186,6 +186,19 @@ The letting office was shown 13 to 15 of its 25 forms: **its own 15 do not alway
 
 A form the model was taught is not for that reason one it answers for the world. The model's folder may carry `forms-released.json` beside `forms-trained.json` (`scripts/forms-released.ts`, read by `readerOf` and `DecideAdapter.translate`): the forms whose drafts are offered. A form taught and not on the list is recorded and not offered, as one never taught is (`form_unseen`, the draft on the route as `wrote`), and the translator behind drafts for the world. A folder without the file is read as before: the forms taught. **The mark** is per form: at least 8 real requests of it, 90% right, no wrong draft, and 90% of its generated tests. The owner's ruling of 2026-10-14: **a form is handed to our model as soon as it passes its own mark, even while the model as a whole is under 90%.** The list is written once beside a model (nothing there is overwritten, and a form the model was not taught is refused); a list that grows is the work of the step that scores a model and of the pilots after it. No model is called by any of it.
 
+**Translator v3: a model that reads forms by name (`decoding: "cards"`, 2026-10-25).** It answers in two passes of one
+reader (translator/model/encode.ts, "Read twice"; docs/design/translator-v3.md): it chooses among the forms' heads, then
+fills the chosen form from its own line. Such a model's folder carries no list of forms; it is **released by kind**
+(the owner's ruling of 2026-10-23): `types-released.json` (translator/model/release.ts) names the kinds of field it
+passes the mark on, measured on forms kept out of its training entirely, and the functions of the call language it
+passes on, on requests kept out of training (at least 30 cases, 90% right, at most 1% wrong drafts each). A draft
+with a function or a field of a kind not released goes behind (`type_unreleased`). **A form it was not taught has a
+trial:** the translator behind drafts for the world, ours is recorded, and once five requests on that form that the seat
+confirmed agree in meaning with ours (none disagreeing since), ours is offered (`probation`; the ledger
+`probation.jsonl` beside the model, read when the run starts, counted on within the run, and added to after it with
+`bun translator/model/probation.ts decide/<name> <translations.jsonl>... --write`). The test pilots' requests are scored
+offline with `bun translator/eval/rr.ts`.
+
 ## The composing model (2026-10-11)
 
 Where a town has `living.composer` (docs/behaviour/founding.md, "Words"), the words of what people found are written by a model asked as an author shown the founder's record, who may decline (VISION 15, point 7). It is not a seat and not the translator: it has its own purpose in the log (`compose`) and its own models.
@@ -510,7 +523,7 @@ Pilots for the translator's data are run unattended, in waves. Three pieces: a q
 - stopped at its spending limit: over as far as it got; left there, the next pilot is started;
 - asked to stop (a signal, as `scripts/mini stop` sends): not a failure. The queue stops with it; running the queue again resumes it;
 - anything else: tried once more after a minute, then left with why.
-A resumed run's folder is put in order as a batch's is (`afterResume`, `orchestrator/src/batch.ts`): its measures and its `cost.txt` and `cost.json` are made again from the run's current log, so they are the whole run's and not what it had cost at its first stop, and a run that got to its end has its log compressed (`oikos resume ... --no-measure --no-compress` leave either out).
+Every call a model is actually asked in a run (seats, translators, composers, debriefs; not one served again on a resume) is also recorded apart from the log, in `<run>.calls.jsonl` beside it (subject, purpose, model, tokens, cost, wall time, error; from 2026-10-24, as an experiment's forks are), and `cost.json` carries their sums by model, purpose and subject with wall-time quantiles (`calls`). A resumed run's folder is put in order as a batch's is (`afterResume`, `orchestrator/src/batch.ts`): its measures and its `cost.txt` and `cost.json` are made again from the run's current log, so they are the whole run's and not what it had cost at its first stop, and a run that got to its end has its log compressed (`oikos resume ... --no-measure --no-compress` leave either out).
 The status log (`<queue>.status.log`) writes times in local time with the offset from UTC. `"test": true` marks a pilot whose requests are kept out of training (a held-out test): the runner writes it into the pilot's `PILOT.txt` (a first line, and the entry as JSON) and the pilot report carries `"test": true`, so later steps (the training data, the in-situ cases) can leave that pilot's requests out. Nothing yet acts on the flag but the report.
 
 **The report** (`bun orchestrator/src/cli.ts pilot-report <DIR>... [--no-write]`). Reads a pilot folder's log alone, prints, and writes `<DIR>/pilot-report.json`:

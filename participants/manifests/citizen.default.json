@@ -520,6 +520,16 @@
       "schema": {},
       "source": "placeholder"
     },
+    "public_memory": {
+      "default": null,
+      "schema": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "source": "placeholder: what a person keeps of public goings-on (kinds, has, days, most, every_days); docs/behaviour/citizen.md"
+    },
     "register": {
       "default": null,
       "schema": {},
@@ -833,5 +843,5 @@
   },
   "perceives": [],
   "state": "none",
-  "version": "0.59.0"
+  "version": "0.60.0"
 }

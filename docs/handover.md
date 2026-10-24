@@ -87,6 +87,9 @@ line: what, the doc, the dial (a dial off gives the earlier town).
   with no real case. The next step for new forms is real cases from pilots. `docs/real-models.md` "Our own translator first";
   `docs/translator-pipeline.md`. Queue entry key `translator_first`; `--translator-arrangement beside` measures
   without touching the world.
+  **Translator v3 (2026-10-25):** models that read forms by name (`decoding: "cards"`), released by kind of field with a
+  trial per new form, are built and trained (`runs/translator-v3-2026-10-25/models/`); none is released, and today's
+  first stays first (decisions 2026-10-25 "Translator v3"). `ambiguous` and person-by-name lookup are in both resolvers.
 - **The `unstated` framing.** What a seat is told, the way out, and the debrief's "what did you take the town to be".
   `docs/real-models.md` "What a seat is told". Set in a queue entry's `sets` (`framing=...`); `oikos run` by hand stays
   under honest disclosure.

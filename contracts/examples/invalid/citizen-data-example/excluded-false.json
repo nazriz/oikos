@@ -1,0 +1,13 @@
+{
+  "schema": "citizen-example/1",
+  "run": "town-1",
+  "t": 864000,
+  "participant": "c12-self",
+  "n": 7,
+  "domain": "want",
+  "decision": { "domain": "want", "strategy": "deliberate", "options": [] },
+  "draws": [],
+  "record": {},
+  "outcomes": [],
+  "exclude_from_training": false
+}

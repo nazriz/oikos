@@ -279,7 +279,8 @@ impl<W: Write> Engine<W> {
                 .iter()
                 .map(|(k, d)| {
                     let d = match d {
-                        Decided::Code(Ok((a, kept)), _) => DecidedSaved::Code(Ok((action_saved(a), kept.clone()))),
+                        // (Without the capture's draws: a snapshot is the same with the capture on or off.)
+                        Decided::Code(Ok((a, kept)), _) => DecidedSaved::Code(Ok((action_saved(a), Kept { captured: vec![], ..kept.clone() }))),
                         Decided::Code(Err(e), _) => DecidedSaved::Code(Err(e.clone())),
                         Decided::Seat(a) => DecidedSaved::Seat(a.as_ref().map(action_saved)),
                     };
@@ -333,7 +334,7 @@ impl<W: Write> Engine<W> {
     pub fn resume(snap: &Snapshot, out: W, anchors: Option<Box<dyn Write>>, opts: EngineOptions) -> Result<Self, String> {
         let s = &snap.saved;
         let config: Value = serde_json::from_slice(&snap.config).map_err(|e| format!("the snapshot's config: {e}"))?;
-        let base = Base::of(&config)?;
+        let base = Base::of(&config)?.capturing(opts.capture_citizens.is_some());
         let world = base.world.clone();
         let currency = base.currency.clone();
         let run = Run::resume(snap.kernel.fork(), snap.config.clone(), &snap.head.run_id, snap.head.next_seq, &snap.head.prev, out, anchors);
@@ -408,6 +409,7 @@ impl<W: Write> Engine<W> {
             }
             e.round = Some(Round { awake: r.awake.clone(), decided, cursor: r.cursor, next: r.next.clone() });
         }
+        e.open_capture()?;
         Ok(e)
     }
 

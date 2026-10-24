@@ -621,7 +621,10 @@ impl Directions {
         if book.on_hold(&d.id, None) {
             return None;
         }
-        (cx.rng(&format!("direction-{}", d.id)).below(10_000) < self.compliance_bps.max(0) as u64).then_some(d)
+        // (PB-16: a direction from a post the rule names, not on hold, is followed. It is not followed for lack of authority or
+        // because it is held; no draw. `compliance_bps` is accepted and unused.)
+        let _ = (&cx, self.compliance_bps);
+        Some(d)
     }
 
     /// Letters about directions newly received, one to each writer, once: to one who may direct us, that we have it

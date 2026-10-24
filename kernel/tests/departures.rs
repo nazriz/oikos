@@ -103,3 +103,37 @@ fn a_post_that_holds_abroad_stays_with_its_holder_who_leaves() {
     assert_eq!(outcome(&mut run, &cmd("alice-self", None, json!([{"block": "leave"}]))), None);
     assert_eq!(run.kernel().state().positions["clerk"].holder.as_deref(), Some("alice-self"));
 }
+
+/// Risk register (guardianship): the kernel let anyone take anyone out of the world. Now an adult is taken out by
+/// themselves only; a minor by a parent on record or a position the world names a guardian; a world that sets no age of
+/// majority lets nobody take another.
+#[test]
+fn nobody_takes_another_out_of_the_world_but_a_guardian_of_a_minor() {
+    let build = |majority: Option<u32>, parent: bool| {
+        let mut c = world(&default_params());
+        // carol is a child of 12, with alice as her parent on record; bob is 25.
+        let ents = c["world"]["entities"].as_array_mut().unwrap();
+        let carol = ents.iter_mut().find(|e| e["id"] == "carol").unwrap();
+        carol["born_at"] = json!(-12 * YEAR);
+        if parent {
+            carol["parents"] = json!(["alice"]);
+        }
+        if let Some(m) = majority {
+            c["life"]["majority"] = json!(m);
+            c["life"]["guardians"] = json!(["clerk"]);
+        }
+        Run::start(c, "guardianship", Vec::new(), None).unwrap()
+    };
+    // No age of majority: refused, whoever asks.
+    let mut run = build(None, true);
+    assert_eq!(outcome(&mut run, &cmd("alice-self", None, json!([{"block": "leave", "person": "carol"}]))).as_deref(), Some("not_theirs"));
+    // With one: a stranger cannot take an adult or a child; the parent takes the child; nobody takes an adult.
+    let mut run = build(Some(18), true);
+    assert_eq!(outcome(&mut run, &cmd("alice-self", None, json!([{"block": "leave", "person": "bob"}]))).as_deref(), Some("not_theirs"));
+    assert_eq!(outcome(&mut run, &cmd("bob-self", None, json!([{"block": "leave", "person": "carol"}]))).as_deref(), Some("not_theirs"));
+    assert_eq!(outcome(&mut run, &cmd("alice-self", None, json!([{"block": "leave", "person": "carol"}]))), None);
+    // A minor with no parent on record (a newcomer's child) can be taken by any person; an adult still by nobody.
+    let mut run = build(Some(18), false);
+    assert_eq!(outcome(&mut run, &cmd("alice-self", None, json!([{"block": "leave", "person": "bob"}]))).as_deref(), Some("not_theirs"));
+    assert_eq!(outcome(&mut run, &cmd("bob-self", None, json!([{"block": "leave", "person": "carol"}]))), None);
+}

@@ -530,7 +530,10 @@ impl Hearings {
                                 let decided = d.get("evidence").and_then(|e| e.i("at")).or_else(|| d.i("decided_on"));
                                 let reviewed = d.i("reviewed_on");
                                 let review_required = law.review.as_ref().is_some_and(|r| r.required);
-                                let from = if review_required { reviewed } else { decided };
+                                // Where the law takes a review left unanswered as refused after so many days, the
+                                // days run from then (a deemed refusal, MT-21); before then there is still no answer.
+                                let deemed = law.review.as_ref().zip(d.i("review_asked_on")).and_then(|(r, asked)| r.deemed_refused_at(asked)).filter(|at| a.at >= *at);
+                                let from = if review_required { reviewed.or(deemed) } else { decided };
                                 let within = appeal.within_days;
                                 if review_required && from.is_none() {
                                     self.say2(&mut steps, t, &c, "rejected", "the law asks that the decision be looked at again by the office that made it before it is appealed, and there is no answer to that on the papers.", json!({}), format!("An appeal ({}) without the review the law asks first: saying so.", matter.replace('_', " ")), true);
@@ -539,7 +542,7 @@ impl Hearings {
                                 if let Some(from) = from {
                                     let late = (a.at - from).div_euclid(DAY);
                                     if late > within {
-                                        self.say2(&mut steps, t, &c, "rejected", &format!("an appeal is to be made within {within} days of {}, and this was made {late} days after.", if review_required { "the answer to the review" } else { "the decision" }), json!({ "out_of_time": true }), format!("An appeal ({}) outside the {within} days the law allows: saying so.", matter.replace('_', " ")), true);
+                                        self.say2(&mut steps, t, &c, "rejected", &format!("an appeal is to be made within {within} days of {}, and this was made {late} days after.", if reviewed.is_none() && deemed.is_some() { "the day the review was taken as refused" } else if review_required { "the answer to the review" } else { "the decision" }), json!({ "out_of_time": true }), format!("An appeal ({}) outside the {within} days the law allows: saying so.", matter.replace('_', " ")), true);
                                         continue;
                                     }
                                 }

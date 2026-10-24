@@ -339,6 +339,30 @@ fn opting_out_silences_a_participant_unless_the_world_names_a_stand_in() {
 }
 
 #[test]
+fn a_place_committed_to_is_a_place() {
+    // Pilot lv-10 (2026-10-24): an employment whose work site was a job posting's id was signed, and the worker could
+    // never come to work. Where a party commits to be or to work must be a building or a space in one; the act is refused
+    // otherwise, with a reason the actor sees.
+    let mut run = town();
+    let r = act(&mut run, "developer", json!([{"block": "publish", "kind": "job_posting", "text": "Hiring.", "speaks_for": "devco", "ref": "post"}]));
+    let posting = created(&r, "post");
+    let job = |at: &str, k: &str| json!([{"block": "propose_agreement", "speaks_for": "devco", "terms": {"template": "employment", "parties": ["devco", "alice"],
+        "commitments": [{"who": "devco", "every": 14 * DAY, "does": {"outcome": {"money": {"amount": "100000", "to": "acc-alice"}}}},
+                        {"who": "alice", "does": {"outcome": if k == "work" { json!({"work": {"task": "serve", "at": at}}) } else { json!({"occupancy": {"in": at}}) }}}]}}]);
+    for k in ["work", "occupancy"] {
+        for bad in [posting.as_str(), "s-shop/stable.1", "nowhere/workplace.1", "cell.0.0"] {
+            let r = act(&mut run, "developer", job(bad, k));
+            assert_eq!(refusal(&r), Some(RefusalCode::NotAPlace), "{k} at {bad}");
+            let EventBody::ActionRefused { detail: Some(detail), .. } = &r.events[0].body else { unreachable!() };
+            assert!(detail.contains(&format!("{bad}, where alice commits to")) && detail.contains("is not a place"), "{detail}");
+        }
+        for good in ["s-shop/workplace.1", "s-shop"] {
+            assert_eq!(refusal(&act(&mut run, "developer", job(good, k))), None, "{k} at {good}");
+        }
+    }
+}
+
+#[test]
 fn an_offer_its_owner_has_taken_back_cannot_be_signed() {
     let offer = |run: &mut Run<Vec<u8>>| {
         let r = act(run, "developer", json!([{"block": "propose_agreement", "speaks_for": "devco", "ref": "job", "terms": {"template": "construction", "parties": ["devco", "buildco"], "commitments": [{"who": "buildco", "does": {"outcome": {"structure": {"type": "apartments", "on": "p12"}}}}]}},

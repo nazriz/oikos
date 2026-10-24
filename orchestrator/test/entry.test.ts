@@ -38,7 +38,9 @@ test("a failed shop's premises are bought by someone who founds a new shop there
   // (Why a hop and not a fault, 2026-10-16, measured on the foundations-review branch, seeds 1 to 6: the new shop serves by day 300 in seeds 1, 3, 4 and 6; in seed 5 it is sold on day 156 and hires on day 255; in seed 2, the original seed, its one hire leaves town four days after being hired (day 91) and the reposted post draws no applicant in 200 days, so the shop never serves. Who applies and who leaves is a draw; the founder, the sale and the first hire are the same in every seed. Seed 4 kept.)
   // (Run seed 6 from 2026-10-23, the held cases settled: a person is drawn who they are from the run's seed, so each seed's people differ from before, and in seed 4 the premises are not sold by day 300.
   // Of seeds 1 to 6 the file's two cases pass in 6 alone. Which seed has the new shop trade is a matter of draws, not of the rule.)
-  const s = await runWorld({ config: { ...config, seed: 6 }, runId: "entry", outDir: out, until: 300 * DAY });
+  // (Run to day 450, 2026-10-24: at seed 6 the premises are sold on day 283 and the new shop, founded there, had 17 days to hire and serve before day 300 ended the run.
+  // When in the run a sale falls is a matter of draws; the claim is that the new shop trades once it has the premises, so the run is long enough for a late sale to be followed.)
+  const s = await runWorld({ config: { ...config, seed: 6 }, runId: "entry", outDir: out, until: 450 * DAY });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   expect(log.filter((e) => e.kind === "annotation" && (e.body.data?.call_unresolved || e.body.data?.call_unreadable)).map((e) => e.body.data)).toEqual([]);
   const ev = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));

@@ -198,3 +198,55 @@ fn a_closed_account_leaves_the_view() {
     let want: Vec<String> = reference.channels.values().flat_map(|c| match c { ChannelData::Accounts { accounts, .. } => accounts.iter().map(|a| a.account.clone()).collect(), _ => vec![] }).collect();
     assert_eq!(view.accounts.keys().cloned().collect::<Vec<_>>(), want);
 }
+
+/// The case the property shrank to (2026-10-25): the finance post handed away and back to the one who held it, whose
+/// first look in the new tenure is the whole file again. Said only as "what's new", it was added to what the holder had
+/// from before, and every record of `finance/laws` was in the view twice. (Also in perception.proptest-regressions.)
+#[test]
+fn a_post_handed_back_is_shown_whole_not_twice() {
+    let s = |kind, a, b, flag| Op::Smart { kind, a, b, flag };
+    let ops = vec![
+        s(70, 0, 0, false),
+        s(187, 0, 0, false),
+        s(177, 7, 0, false),
+        Op::Act { actor: 0, blocks: vec![B::OpenAccount { holder: 1, to_new: true }] },
+        Op::Observe { actor: 93 },
+        s(83, 191, 170, false),
+        s(164, 103, 39, true),
+        Op::OptOut { actor: 228 },
+        s(21, 65, 241, true),
+        s(60, 119, 85, false),
+        s(47, 148, 214, true),
+        Op::Observe { actor: 34 },
+    ];
+    check_run(&default_params(), &ops).unwrap();
+}
+
+/// Directly: a holder given its post back is told the file is whole; someone given a post for the first time is not (there
+/// is nothing of it to replace), and neither is the next look after either.
+#[test]
+fn a_returning_holder_is_told_the_file_is_whole() {
+    let mut run = Run::start(world(&default_params()), "perception-anew", Vec::new(), None).unwrap();
+    let laws = |run: &mut Run<Vec<u8>>, who: &str| -> Option<(Option<bool>, Vec<String>)> {
+        let obs = run.command(&Command::Observe { participant: who.into(), only: None }).unwrap().observation.unwrap();
+        match obs.channels.get("finance/laws")? {
+            ChannelData::Records { records, whole, .. } => Some((*whole, records.iter().map(|r| r.id.clone()).collect())),
+            other => panic!("{other:?}"),
+        }
+    };
+    let appoint = |run: &mut Run<Vec<u8>>, by: &str, to: &str| {
+        let cmd = direct(by, Some("finance"), serde_json::from_value(serde_json::json!([{"block": "appoint", "position": "finance", "participant": to}])).unwrap()).unwrap();
+        let r = run.done(&cmd).unwrap();
+        assert!(r.events.iter().any(|e| matches!(e.body, oikos_kernel::events::EventBody::ActionApplied { .. })), "the appointment was applied: {:?}", r.events);
+    };
+    let (whole, first) = laws(&mut run, "finance-system").unwrap();
+    assert_eq!(whole, None, "a first look has nothing to replace");
+    assert!(first.contains(&"law-river".to_string()));
+    appoint(&mut run, "finance-system", "mayor-system");
+    assert_eq!(laws(&mut run, "mayor-system").unwrap().0, None, "a first tenure is not told whole");
+    appoint(&mut run, "mayor-system", "finance-system");
+    let (whole, again) = laws(&mut run, "finance-system").unwrap();
+    assert_eq!(whole, Some(true), "the post given back: its file whole, in place of what was kept");
+    assert_eq!(again, first);
+    assert_eq!(laws(&mut run, "finance-system").unwrap(), (None, vec![]), "and then only what's new");
+}

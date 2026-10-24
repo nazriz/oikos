@@ -30,6 +30,7 @@ use std::sync::{Arc, Mutex};
 
 pub const ENGINE_VERSION: &str = "0.2.0";
 
+pub mod capture;
 mod hosted;
 mod snapshot;
 pub use snapshot::{Snapshot, SNAPSHOT_FORMAT};
@@ -82,6 +83,9 @@ pub struct EngineOptions {
     pub record_observations_of: BTreeSet<String>,
     /// Acts withheld: a researcher's intervention (risk MT-19), never a law of the world.
     pub withhold: Vec<Withhold>,
+    /// Capture the citizens' decisions to this file (docs/citizen-data.md: `<run>.citizens.jsonl.zst`, beside the log),
+    /// for training. Nothing in the world or the log changes with it.
+    pub capture_citizens: Option<String>,
 }
 
 /// One act withheld (docs/experiments.md, "Counterfactual forks"; risk MT-19): of the acts carried out from the start of
@@ -106,6 +110,9 @@ pub struct Withhold {
     /// Only a paper addressed to this participant or entity.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
+    /// Only a paper whose data has this field (a decision made on a review: `on_review`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub has: Option<String>,
 }
 
 fn first() -> u32 {
@@ -120,8 +127,9 @@ impl Withhold {
                 && b["kind"].as_str() == Some(self.what.as_str())
                 && self.matter.as_deref().is_none_or(|m| b["data"]["matter"].as_str() == Some(m))
                 && self.to.as_deref().is_none_or(|to| b["addressed_to"].as_array().is_some_and(|a| a.iter().any(|x| x.as_str() == Some(to))))
+                && self.has.as_deref().is_none_or(|h| b["data"].get(h).is_some_and(|v| !v.is_null()))
         };
-        let block = |b: &Value| b["block"].as_str() == Some(self.what.as_str()) && self.matter.is_none() && self.to.is_none();
+        let block = |b: &Value| b["block"].as_str() == Some(self.what.as_str()) && self.matter.is_none() && self.to.is_none() && self.has.is_none();
         self.participant.as_deref().is_none_or(|p| p == pid) && blocks.iter().any(|b| paper(b) || block(b))
     }
 }
@@ -155,6 +163,7 @@ impl Default for EngineOptions {
             record_observations: false,
             record_observations_of: BTreeSet::new(),
             withhold: vec![],
+            capture_citizens: None,
         }
     }
 }
@@ -252,7 +261,8 @@ enum Decided {
     /// (With its decisions and outcomes made ready for the log where they were made: `prepare_kept`. Not kept in a
     /// snapshot: one restored logs them from `Kept`, the same bytes.)
     /// (Where every one was written, and the round has no seat, `Kept` no longer holds them: `true`.)
-    Code(Result<(Action, Kept), String>, Option<(Vec<Option<Vec<u8>>>, bool)>),
+    /// (And the capture's rows of it, where the run captures: `capture::rows`, made on the same thread.)
+    Code(Result<(Action, Kept), String>, Option<(Vec<Option<Vec<u8>>>, bool, Vec<u8>)>),
     Seat(Option<Action>),
 }
 
@@ -275,6 +285,9 @@ struct Base {
     types: BTreeMap<String, Value>,
     currency: Option<oikos_resolver::calls::Currency>,
     dated: Option<oikos_rules::calendar::Dated>,
+    /// Whether the world's people and bodies have names of their own (its config's `names`): how the resolver answers a
+    /// name it knows more than one by (docs/design/names-and-dates.md section 4).
+    named: bool,
     templates: BTreeMap<String, Value>,
     world: Arc<WorldInfo>,
     seed: u64,
@@ -313,11 +326,20 @@ impl Base {
             // (The config's calendar, where a world has one: lane N writes the section; docs/port-guide.md, step 1b.)
             calendar: config.get("calendar").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| format!("calendar: {e}"))?,
             date_style: config.get("calendar").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| format!("calendar: {e}"))?,
+            capture: false,
         });
         let dated = oikos_rules::calendar::Dated::from_config(config.get("calendar"));
         let templates =
             config["templates"].as_array().into_iter().flatten().filter_map(|t| Some((t["id"].as_str()?.to_string(), t.clone()))).collect();
-        Ok(Base { types, currency, dated, templates, world, seed, tick, run_end, lean, thinking })
+        let named = config.get("names").and_then(Value::as_bool) == Some(true);
+        Ok(Base { types, currency, dated, named, templates, world, seed, tick, run_end, lean, thinking })
+    }
+    /// The same, with its actors told the run captures their decisions (`EngineOptions::capture_citizens`).
+    fn capturing(mut self, on: bool) -> Base {
+        if on {
+            self.world = Arc::new(WorldInfo { capture: true, ..(*self.world).clone() });
+        }
+        self
     }
 }
 
@@ -329,6 +351,7 @@ pub struct Engine<W: Write> {
     types: BTreeMap<String, Value>,
     currency: Option<oikos_resolver::calls::Currency>,
     dated: Option<oikos_rules::calendar::Dated>,
+    named: bool,
     parts: BTreeMap<String, Part>,
     positions: BTreeMap<String, Pos>,
     templates: BTreeMap<String, Value>,
@@ -341,6 +364,10 @@ pub struct Engine<W: Write> {
     run_end: i64,
     round: Option<Round>,
     rounds_at: (i64, u32),
+    /// The calls each code actor made in this moment that did not resolve (unit key, program text), by moment: the
+    /// same unresolved call again in the same moment ends that actor's wake (its mind decides the same from the same
+    /// view, so going on would ask it forever: lv-10, 2026-10-25). Transient: a snapshot is taken between moments.
+    unresolved_at: (i64, BTreeSet<(String, String)>),
     /// Wakes of the engine's own actors by why they woke (not state: no result depends on it, and a resumed run counts afresh).
     wakes_by: std::collections::BTreeMap<String, u64>,
     /// Failures of its own actors recovered in place (`participant_error` notes), for the run's summary.
@@ -374,6 +401,8 @@ pub struct Engine<W: Write> {
     pub steps: u64,
     /// How many acts each of `opts.withhold` has counted so far.
     withheld: Vec<u32>,
+    /// The capture of citizens' decisions, where the run makes one (`opts.capture_citizens`).
+    capture: Option<capture::Capture>,
 }
 
 /// The canonical bytes of `subject_data(kind, subject, data)`, written from its parts, where the annotation plainly keeps
@@ -458,7 +487,7 @@ pub fn each_mut<T: Send, R: Send>(items: &mut [T], threads: usize, share_at: usi
 impl<W: Write> Engine<W> {
     /// A run of this world, its log written to `out`.
     pub fn start(config: Value, run_id: &str, out: W, anchors: Option<Box<dyn Write>>, opts: EngineOptions) -> Result<Self, String> {
-        let base = Base::of(&config)?;
+        let base = Base::of(&config)?.capturing(opts.capture_citizens.is_some());
         let mut parts = BTreeMap::new();
         for p in config["participants"].as_array().into_iter().flatten() {
             let id = p["id"].as_str().ok_or("a participant without an id")?.to_string();
@@ -503,6 +532,7 @@ impl<W: Write> Engine<W> {
         for pid in e.parts.keys().cloned().collect::<Vec<_>>() {
             e.sync_units(&pid, None)?;
         }
+        e.open_capture()?;
         let modules: Map<String, Value> = e.used.iter().map(|(k, v)| (k.clone(), json!({ "version": v }))).collect();
         if e.opts.host_seats {
             // (The host writes the run's `orchestrator` record, as it always has: the engine's part is a note beside it.)
@@ -530,6 +560,7 @@ impl<W: Write> Engine<W> {
             types: base.types,
             currency: base.currency,
             dated: base.dated,
+            named: base.named,
             parts: BTreeMap::new(),
             positions: BTreeMap::new(),
             templates: base.templates,
@@ -542,6 +573,7 @@ impl<W: Write> Engine<W> {
             run_end: base.run_end,
             round: None,
             rounds_at: (-1, 0),
+            unresolved_at: (-1, BTreeSet::new()),
             wakes_by: Default::default(),
             failures: 0,
             questions: vec![],
@@ -557,7 +589,22 @@ impl<W: Write> Engine<W> {
             host_going_on: BTreeSet::new(),
             steps: 0,
             withheld: vec![],
+            capture: None,
         }
+    }
+
+    /// The capture's stream opened, where the run makes one (at its start, or where it is taken up again).
+    pub(crate) fn open_capture(&mut self) -> Result<(), String> {
+        if let Some(path) = self.opts.capture_citizens.clone() {
+            let version = oikos_actors::registry::find(capture::KIND).map(|k| k.version()).unwrap_or_default();
+            self.capture = Some(capture::Capture::create(&path, self.run.run_id(), self.t(), version)?);
+        }
+        Ok(())
+    }
+
+    /// How many rows the capture has written (none: the run makes none).
+    pub fn captured_rows(&self) -> Option<u64> {
+        self.capture.as_ref().map(|c| c.rows)
     }
 
     pub fn t(&self) -> i64 {
@@ -628,7 +675,8 @@ impl<W: Write> Engine<W> {
                 let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
                 let cur = self.currency.clone();
                 let dated = self.dated.clone();
-                self.knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(cur).with_dated(dated)).absorb_seen(
+                let named = self.named;
+                self.knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(cur).with_dated(dated).with_names(named)).absorb_seen(
                     &crate::kernel::seen(obs),
                     &o.shown,
                     &mut self.registers,
@@ -1162,6 +1210,7 @@ impl<W: Write> Engine<W> {
         // Decide, all at once.
         let seed = self.seed;
         let (areas, record, lean) = (self.opts.decision_areas.as_ref(), self.opts.record_decisions, self.lean);
+        let capturing = self.capture.is_some();
         // (A round no seat waits in is carried out before anything can save it: its decisions, once written for the
         // log, need not be kept as values till then. One with seats may be saved while they think, values and all.)
         let strip = seats.is_empty();
@@ -1176,6 +1225,10 @@ impl<W: Write> Engine<W> {
             match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| actor.step(pic, &mut cx))) {
                 Ok(a) => {
                     let mut kept = cx.into_kept();
+                    let mut rows = vec![];
+                    if capturing && u.kind == capture::KIND {
+                        capture::rows(&kept, &u.participant, pic.t, &mut rows);
+                    }
                     let prepared = prepare_kept(&kept, &u.participant, areas, record, lean);
                     let stripped = strip && prepared.iter().all(Option::is_some);
                     if stripped {
@@ -1183,7 +1236,7 @@ impl<W: Write> Engine<W> {
                         kept.decisions = vec![];
                         kept.outcomes = vec![];
                     }
-                    Ok((a, kept, (prepared, stripped)))
+                    Ok((a, kept, (prepared, stripped, rows)))
                 }
                 Err(p) => Err(p
                     .downcast_ref::<String>()
@@ -1310,11 +1363,23 @@ impl<W: Write> Engine<W> {
     /// to its own record (the kernel holds it), its questions (queued for the host), and what it made of drafts of its
     /// words: each signoff, a `words` note for one not done, and those its action carries out (returned, for their
     /// note once the action is applied).
-    fn keep(&mut self, key: &str, kept: Kept, prepared: Option<(Vec<Option<Vec<u8>>>, bool)>) -> Result<Vec<oikos_actors::Worded>, String> {
+    fn keep(&mut self, key: &str, kept: Kept, prepared: Option<(Vec<Option<Vec<u8>>>, bool, Vec<u8>)>) -> Result<Vec<oikos_actors::Worded>, String> {
         let u = &self.units[key];
         let (pid, cap) = (u.participant.clone(), u.capacity.clone());
         // (Each annotation from the bytes made ready for it where it was decided, or from its value: the same entry.)
         let stripped = prepared.as_ref().is_some_and(|p| p.1);
+        // (The capture's rows, made where it decided; or here, for a round taken up from a snapshot.)
+        if self.capture.is_some() && u.kind == capture::KIND {
+            let rows = match &prepared {
+                Some(p) => std::borrow::Cow::Borrowed(&p.2),
+                None => {
+                    let mut rows = vec![];
+                    capture::rows(&kept, &pid, self.run.kernel().t(), &mut rows);
+                    std::borrow::Cow::Owned(rows)
+                }
+            };
+            self.capture.as_mut().expect("checked").push(&rows)?;
+        }
         let mut prepared = prepared.map(|p| p.0.into_iter());
         let mut ready = move || prepared.as_mut().and_then(Iterator::next).flatten();
         if stripped {
@@ -1449,7 +1514,7 @@ impl<W: Write> Engine<W> {
             Action::Call { program, reasoning } => {
                 let text = oikos_resolver::calls::program_text(&program);
                 let kkey = if seat { pid.clone() } else { key.to_string() };
-                let empty = oikos_resolver::Knowledge::new(self.currency.clone()).with_dated(self.dated.clone());
+                let empty = oikos_resolver::Knowledge::new(self.currency.clone()).with_dated(self.dated.clone()).with_names(self.named);
                 let k = self.knowledge.get(&kkey).unwrap_or(&empty);
                 let types = &self.types;
                 let type_of = |t: &str| types.get(t).cloned();
@@ -1460,12 +1525,27 @@ impl<W: Write> Engine<W> {
                             self.begin(key, &pid, as_.as_deref(), blocks, vec![], prov, reasoning.filter(|_| seat || !self.lean))?;
                         Ok((true, acted, None))
                     }
-                    oikos_resolver::Resolution::Questions { questions, invalid } => {
+                    oikos_resolver::Resolution::Questions { questions, invalid, ambiguous } => {
                         let mut data = json!({ "call_unresolved": text, "questions": questions });
                         if !invalid.is_empty() {
                             data["invalid"] = json!(invalid);
                         }
+                        // (Only in a world whose people have names: the old towns' notes are as they were.)
+                        if !ambiguous.is_empty() {
+                            data["ambiguous"] = json!(ambiguous);
+                        }
                         self.note(&pid, data)?;
+                        // (A code actor that asks the same unresolvable thing again in the same moment has nothing
+                        // new to go on: its wake ends, as if it had decided nothing now. A seat is answered by its host.)
+                        if !seat {
+                            let now = self.run.kernel().t();
+                            if self.unresolved_at.0 != now {
+                                self.unresolved_at = (now, BTreeSet::new());
+                            }
+                            if !self.unresolved_at.1.insert((key.to_string(), text)) {
+                                return Ok((false, false, None));
+                            }
+                        }
                         Ok((true, false, None))
                     }
                 }
@@ -1619,6 +1699,9 @@ impl<W: Write> Engine<W> {
 
     /// The run's end: logged, its final state hash.
     pub fn finish(&mut self) -> Result<String, String> {
+        if let Some(c) = self.capture.as_mut() {
+            c.finish()?;
+        }
         let completed = self.until == self.run_end;
         let detail = format!("stopped at {}", self.until);
         self.run
@@ -1642,6 +1725,47 @@ impl<W: Write> Engine<W> {
 
 /// Runs a world with no seats to its end (or `until`), and returns its final state hash. For the gate, the port's
 /// own tests and `oikos-kernel world`.
+impl<W: Write> Engine<W> {
+    /// What its code actors keep, summed by what (`Actor::kept`), for whoever measures memory.
+    pub fn kept(&self) -> BTreeMap<String, u64> {
+        let mut out = BTreeMap::new();
+        for u in self.units.values() {
+            if let Some(k) = u.actor.as_ref().and_then(|a| a.kept()) {
+                for (what, n) in k {
+                    *out.entry(what).or_default() += n;
+                }
+            }
+        }
+        // (And what the engine keeps beside them: each participant's knowledge for the resolver, and the world's records.)
+        let mut add = |what: &str, n: usize| *out.entry(format!("engine.{what}")).or_default() += n as u64;
+        for k in self.knowledge.values() {
+            add("knowledge", 1);
+            add("knowledge.withdrawn", k.withdrawn.len());
+            add("knowledge.addressed", k.addressed.len());
+            add("knowledge.cells", k.cells.len());
+            add("knowledge.structures", k.structures.len());
+            add("knowledge.names", k.names.len());
+            add("knowledge.participant_person", k.participant_person.len());
+            add("knowledge.positions", k.positions.len());
+            add("knowledge.forms", k.forms.len());
+            add("knowledge.accounts", k.accounts.len());
+            add("knowledge.holdings", k.holdings.len());
+            add("knowledge.stated", k.stated.len());
+        }
+        let st = self.run.kernel().state();
+        add("state.records", st.records.len());
+        add("state.entities", st.entities.len());
+        add("state.entity_records", st.entity_records.len());
+        add("state.cells", st.cells.len());
+        for u in self.units.values() {
+            add("units", 1);
+            add("units.answers", u.answers.len());
+            add("units.diverged", u.diverged.len());
+        }
+        out
+    }
+}
+
 pub fn run_code_world<W: Write>(config: Value, run_id: &str, out: W, opts: EngineOptions) -> Result<(String, Engine<W>), String> {
     let mut e = Engine::start(config, run_id, out, None, opts)?;
     loop {

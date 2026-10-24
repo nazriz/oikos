@@ -17,10 +17,20 @@ export interface StructureFact {
   spaces: SiteSpace[];
 }
 
+/** A paper that names someone, as the participant was shown it: its id, what it is (its kind, or an agreement's
+ * template), and how it names them (it speaks for them, is addressed to them, or they are a party to it). */
+export interface Mention { record: string; what: string; how: "from" | "to" | "party" }
+/** How many papers naming one entity are kept. */
+const MENTIONS_KEPT = 3;
+
 export class Knowledge {
   /** `currency`: how the world's money is written (its config's first currency): what the resolver reads and writes
-   * amounts in. The platform has none of its own. */
-  constructor(readonly currency: Currency) {}
+   * amounts in. The platform has none of its own. `named`: whether the world's people and bodies have names of their
+   * own (its config's `names`; docs/design/names-and-dates.md section 4): then a name the participant knows more than
+   * one by is answered `ambiguous`, and one it doesn't know is "not on file". Off: the old towns' answers. */
+  constructor(readonly currency: Currency, readonly named = false) {}
+  /** With names on: entity -> the papers the participant has been shown that name it (the latest few, newest last). */
+  readonly namedIn = new Map<string, Mention[]>();
   readonly withdrawn = new Set<string>();
   readonly accounts = new Map<string, AccountFact>(); // accounts the participant can see directly
   /** What the entity acted for holds, and where (phase B): `at|kind` -> quantity (a decimal-string integer). */
@@ -171,6 +181,7 @@ export class Knowledge {
       this.claims.push(r);
     }
     if (r.record === "entity_declaration") this.names.set(r.entity, r.name);
+    if (this.named) this.mentions(r);
     if (r.record === "statement") {
       if (r.addressed_to?.length) this.addressed.set(r.id, r.addressed_to);
       if (r.kind === "form") this.formsById.set(r.id, r);
@@ -186,6 +197,50 @@ export class Knowledge {
       const m = r.data?.outcome?.money;
       if (who && m && typeof m.to === "string" && m.from === undefined) this.stated.set(who, new Set([...(this.stated.get(who) ?? []), m.to]));
     }
+  }
+
+  /** Whom a record names, and how, kept against each (with names on). (A lot is a plan in a register, not a paper about
+   * anyone.) */
+  private mentions(r: Record): void {
+    const found: [string, Mention][] = [];
+    if (r.record === "agreement") for (const p of r.terms?.parties ?? []) found.push([p, { record: r.id, what: r.terms?.template || "agreement", how: "party" }]);
+    if (r.record === "statement" && r.kind !== "lot") {
+      const what = r.kind ?? "statement";
+      if (r.speaks_for) found.push([r.speaks_for, { record: r.id, what, how: "from" }]);
+      for (const to of r.addressed_to ?? []) found.push([to, { record: r.id, what, how: "to" }]);
+    }
+    for (const [who, m] of found) {
+      const kept = (this.namedIn.get(who) ?? []).filter((x) => !(x.record === m.record && x.how === m.how));
+      kept.push(m);
+      if (kept.length > MENTIONS_KEPT) kept.shift();
+      this.namedIn.set(who, kept);
+    }
+  }
+
+  /** What tells someone or something apart on the participant's own file, in words (at most three things): the post
+   * it is, the papers it has been shown that name them (newest first), the accounts it knows they hold or asked to be
+   * paid into, the posts it knows are theirs. Nothing it was not shown. Empty: nothing but the id. (The other
+   * resolver's `known_by`, word for word.) */
+  knownBy(id: string): string[] {
+    const out: string[] = [];
+    const w = this.positionWords.get(id);
+    if (w) {
+      const called = w.title || (w.role ?? "").replace(/_/g, " ");
+      const org = this.positions.get(id);
+      out.push(org ? `the post of ${called} at ${this.name(org)}` : `the post of ${called}`);
+    }
+    for (const m of [...(this.namedIn.get(id) ?? [])].reverse()) {
+      const what = m.what.replace(/_/g, " ");
+      const a = /^[aeiou]/.test(what) ? "an" : "a";
+      out.push(m.how === "from" ? `who wrote ${m.record} (${a} ${what})` : m.how === "to" ? `to whom ${m.record} (${a} ${what}) is addressed` : `party to ${m.record} (${a} ${what})`);
+    }
+    const byKey = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+    const held = [...this.accounts.values()].filter((a) => a.holder === id).map((a) => a.account).sort(byKey);
+    for (const a of held) out.push(`who holds account ${a}`);
+    for (const a of [...(this.stated.get(id) ?? [])].sort(byKey)) if (this.accounts.get(a)?.holder !== id) out.push(`who asked to be paid into ${a}`);
+    const posts = [...this.positions].filter(([, e]) => e === id).map(([p]) => p).sort(byKey);
+    if (posts.length) out.push(`whose ${posts.length === 1 ? "post is" : "posts are"} ${posts.slice(0, 3).join(", ")}`);
+    return out.slice(0, 3);
   }
 
   /** The entity an id refers to: a participant's person, a position's organisation, or the entity itself. */
