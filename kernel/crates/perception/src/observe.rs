@@ -906,6 +906,9 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                 continue; // perceived only when asked
             }
             let last = if mode == Mode::Full { None } else { p.looks.get(&path).copied() };
+            // A post given back to someone who held it before: a first look, said to be whole (`Look::anew`).
+            let anew = last.is_some_and(|l| l.anew);
+            let last = last.filter(|l| !l.anew);
             if let (Some(every), Some(l), None) = (ch.every, last, asked) {
                 if st.t < l.at + every {
                     continue; // not looking through this channel yet; changes accumulate
@@ -915,7 +918,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             // since the last look, the whole of its new surroundings replaces the old.
             let from = matches!(area, Some(Area::Near(_))).then(|| st.entities.get(&me).map_or(0, |e| e.moved));
             let moved = last.is_some_and(|l| l.from != from);
-            let whole = moved.then_some(true);
+            let whole = (moved || anew).then_some(true);
             let scope = area.map(|a| index.scope(s, st, a, &me));
             // Changes after this cursor are new; None: everything (a first look, a move, or the full picture).
             let after = if moved { None } else { last.map(|l| l.cursor) };
@@ -937,7 +940,9 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         plain.sort_by(|a, b| a.account.cmp(&b.account));
                         assert_eq!(accounts, plain, "the list of changed accounts and the accounts themselves disagree for {me}");
                     }
-                    if after.is_some() {
+                    // (Accounts and holdings have no "whole" to say: a first look anew also says what has gone since, so
+                    // that what the holder kept from before goes too.)
+                    if after.is_some() || anew {
                         for (id, x) in st.closed_accounts.iter() {
                             if (x.holder == me || x.custodian == me) && changed(x.changed) {
                                 accounts.push(AccountItem { account: id.clone(), holder: x.holder.clone(), custodian: x.custodian.clone(), currency: x.currency.clone(), balance: 0, closed: Some(true) });
@@ -960,7 +965,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         .holdings
                         .range(lo..hi)
                         // What's new includes a holding gone to nothing (so a view drops it); the full picture is only what's held.
-                        .filter(|(_, h)| changed(h.changed) && (after.is_some() || h.quantity != 0))
+                        .filter(|(_, h)| changed(h.changed) && (after.is_some() || anew || h.quantity != 0))
                         .map(|(_, h)| HoldingItem { kind: h.kind.clone(), at: h.at.clone(), quantity: h.quantity })
                         .collect();
                     ChannelData::Holdings { holdings }
@@ -1055,7 +1060,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             };
             if mode == Mode::Look {
                 let cursor = if matches!(ch.kind, ChannelKind::Records { .. }) { st.counters.record_seq } else { st.counters.change };
-                looks.push((path.clone(), Look { at: st.t, cursor, from }));
+                looks.push((path.clone(), Look { at: st.t, cursor, from, anew: false }));
             }
             channels.insert(path, data);
         }

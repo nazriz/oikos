@@ -219,3 +219,9 @@ test("headOf: a capped waiter lets the next go, and an older slots.ts's waiter (
   expect(headOf([capped, old, next], held, 3)?.file).toBe("wait-3-0");
   expect(headOf([capped, old], held, 3)).toBeUndefined(); // the old waiter takes its own turn, by its own rule
 });
+
+test("insideSlot: the engine runs as many threads as the slot's weight, unless the caller set them", async () => {
+  const { insideSlot } = await import("./slots");
+  expect(insideSlot(3, { OIKOS_SLOT_HELD: undefined }).OIKOS_ENGINE_THREADS).toBe("3");
+  expect(insideSlot(1, { OIKOS_SLOT_HELD: undefined, OIKOS_ENGINE_THREADS: "14" }).OIKOS_ENGINE_THREADS).toBe("14");
+});
