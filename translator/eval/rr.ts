@@ -36,7 +36,7 @@ const judged = new Map<string, string>();
 for (const f of judgedFiles) for (const x of jl(f)) judged.set(x.id, x.verdict);
 
 type Outcome = "draft" | "refusal_stands" | "behind";
-interface Row { id: string; pilot: string; outcome: Outcome; why?: string; program: string; wrote?: string; sure: number; ms: number; pilot_call: string | null; pilot_verdict: string | null; pilot_signoff: string | null; same?: boolean; verdict?: "right" | "wrong" | "unclear" | "to_judge"; confirmed_wrong?: boolean }
+interface Row { id: string; pilot: string; outcome: Outcome; why?: string; program: string; wrote?: string; sure: number; ms: number; pilot_call: string | null; pilot_verdict: string | null; pilot_signoff: string | null; same?: boolean; same_text?: boolean; verdict?: "right" | "wrong" | "unclear" | "to_judge"; confirmed_wrong?: boolean }
 const rows: Row[] = [];
 const cases = jl(file);
 const currencies = new Map<string, any>();
@@ -52,15 +52,18 @@ for (const c of cases) {
   if (outcome === "draft") {
     const ctx = { currency: currencies.get(c.pilot), forms: c.forms.map((l: string) => { const p = partsOf(l); const fields: { [k: string]: { type: string } } = {}; const f = l.indexOf(": fields "); if (f >= 0) for (const m of l.slice(f + 9).matchAll(/([^\s,()]+) \(([^)]*)\)/g)) fields[m[1]!] = { type: m[2]!.startsWith("one of ") ? "choice" : m[2]!.replace(/, required$/, "") }; return { form: p.name, to: /, to=([^,]+),/.exec(l)?.[1] ?? "", id: p.id, fields }; }) };
     if (c.call && !c.call.startsWith("none(")) {
-      try { r.same = sameMeaning(a.program, c.call, ctx) || sameButForFreeText(a.program, c.call, ctx); } catch { r.same = a.program === c.call; }
+      try { r.same_text = sameMeaning(a.program, c.call, ctx); r.same = r.same_text || sameButForFreeText(a.program, c.call, ctx); } catch { r.same = r.same_text = a.program === c.call; }
     }
     const j = judged.get(r.id);
-    if (r.same && (c.verdict === "right" || c.verdict === "wrong")) r.verdict = c.verdict;
+    // (The same as a draft read right, free text aside, is right; the same as one read wrong is wrong only where the
+    // free text is the same too: a pilot's draft can be wrong in its words alone, a headline that is a law's id.)
+    if (r.same && c.verdict === "right") r.verdict = "right";
+    else if (r.same_text && c.verdict === "wrong") r.verdict = "wrong";
     else if (j === "right" || j === "wrong" || j === "unclear") r.verdict = j;
     else if (r.same && c.verdict === "unclear") r.verdict = "unclear";
     else r.verdict = "to_judge";
     // (Confirmed wrong, as can be seen: wrong, and the same as a draft the seat confirmed in the pilot.)
-    if (r.verdict === "wrong") r.confirmed_wrong = !!r.same && c.signoff === "accept";
+    if (r.verdict === "wrong") r.confirmed_wrong = !!r.same_text && c.signoff === "accept";
   }
   rows.push(r);
 }

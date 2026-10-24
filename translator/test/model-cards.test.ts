@@ -13,6 +13,8 @@ import { calls } from "@oikos/participants";
 import { byKind, DecideAdapter, fieldTypes, probationOf, programOf, TRIAL, typesReleasedOf } from "../model/adapter";
 import { chooseInput, chooseLine, decodeSlots, encode, fillInput, grammar, joinCards, splitCards, walkSlots, type Span } from "../model/encode";
 import { cardRows } from "../model/export";
+import { outcomesOf } from "../model/probation";
+import { functionsOf, passes } from "../model/release";
 import { formLine, spansIn } from "../train/data";
 import { directions, papers, synthetic } from "../train/synthetic";
 
@@ -147,5 +149,16 @@ test("a model that reads by name is released by kind of field and by function, a
   expect(passed("news_item")).toBe(false);
   expect(passed("rental_listing", ["rental_listing"])).toBe(true);
   expect(programOf("x", [], [], "cards")).toBe("none(unclear)");
+});
+
+test("the mark a kind is released on, and the outcomes a run adds to a form's trial", () => {
+  expect(passes({ cases: 30, right: 27, wrong: 0, missed: 3, none: 0 })).toBe(true);
+  expect(passes({ cases: 29, right: 29, wrong: 0, missed: 0, none: 0 })).toBe(false); // too few
+  expect(passes({ cases: 100, right: 95, wrong: 2, missed: 3, none: 0 })).toBe(false); // over 1% wrong
+  expect(passes({ cases: 100, right: 89, wrong: 1, missed: 0, none: 10 })).toBe(false); // under 90% right
+  expect(functionsOf('v1 = entity(kind=union, name="U")\nmessage(to=v1, text="hi")')).toEqual(["entity", "message"]);
+  expect(functionsOf("none(unclear)")).toEqual([]);
+  const route = (why: string, agree: boolean, decision: string) => ({ run: "r", draft: `d.${why}.${decision}`, signoff: { decision }, route: { why, agree, first: { trial: ["news_item"] } } });
+  expect(outcomesOf([route("probation", true, "accept"), route("probation", false, "reject"), route("unsure", true, "accept")])).toEqual([{ form: "news_item", agree: true, run: "r", draft: "d.probation.accept" }]);
 });
 

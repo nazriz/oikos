@@ -72,7 +72,10 @@ if (import.meta.main) {
   await adapter.ready();
   const zero = (): Tally => ({ cases: 0, right: 0, wrong: 0, missed: 0, none: 0 });
   const types: { [t: string]: Tally } = {}, fns: { [f: string]: Tally } = {};
-  const choose = { cases: 0, right: 0 };
+  // (Which form: the choose pass's part, scored apart. A form's draft is released by this and by its fields' kinds, as
+  // the plan has it (section 4: "every field it has is of a released type and the choose pass passes on UF"); `form`
+  // on the other requests is reported and does not decide.)
+  const choose = zero();
   for (const e of uf.flatMap(jl)) {
     const a = await adapter.translate(e.request, e.forms);
     const drafted = !a.withheld && !/^none\(/.test(a.program);
@@ -80,9 +83,11 @@ if (import.meta.main) {
     const label = fieldsOf(e.program), draft = drafted ? fieldsOf(a.program) : [];
     const lineOf = (form: string, to: string) => { const mine = e.forms.filter((l: string) => partsOf(l).name === form || partsOf(l).id === form); return mine.find((l: string) => l.includes(`, to=${to},`)) ?? mine[0] ?? ""; };
     const typeOf = (form: string, to: string, field: string) => { const l = lineOf(form, to); const i = partsOf(l).fields.indexOf(field); return fieldTypes(l)[i] ?? "unknown"; };
-    // (Which form: the choose pass's part, scored apart.)
-    const want = label.map((x) => x.form)[0], got = draft.map((x) => x.form)[0] ?? (/form=([\w.-]+)/.exec(a.program)?.[1]);
-    choose.cases++; choose.right += Number(drafted && !!want && got === want);
+    const want = /form=([\w.-]+)/.exec(e.program)?.[1], got = drafted ? /form=([\w.-]+)/.exec(a.program)?.[1] : undefined;
+    choose.cases++;
+    if (!drafted) choose.none++;
+    else if (got === want) choose.right++;
+    else choose.wrong++;
     const seen = new Set<string>();
     for (const x of label) {
       const t = (types[typeOf(x.form, x.to, x.field)] ??= zero());
@@ -114,7 +119,7 @@ if (import.meta.main) {
     }
   }
   adapter.close();
-  const released = { types_released: Object.keys(types).filter((t) => passes(types[t]!)).sort(), functions_released: Object.keys(fns).filter((f) => passes(fns[f]!)).sort() };
+  const released = { types_released: Object.keys(types).filter((t) => passes(types[t]!)).sort(), functions_released: [...Object.keys(fns).filter((f) => f !== "form" && passes(fns[f]!)), ...(passes(choose) ? ["form"] : [])].sort() };
   const result = { model, mark: MARK, ...released, choose_on_unseen_forms: choose, types, functions: fns, measured_on: { uf, val } };
   console.log(JSON.stringify(result, null, 1));
   if (write) writeFileSync(join(process.env.OIKOS_TRANSLATOR_MODELS ?? resolve(import.meta.dir, "../../runs/translator-model"), model.slice(7), "types-released.json"), JSON.stringify(result, null, 1) + "\n");

@@ -462,7 +462,7 @@ export class DecideAdapter implements LlmAdapter {
     // released kind, and each form it fills was taught or is past its trial. Otherwise it is recorded and the
     // translator behind drafts. (Fewer forms shown than the asker knows of still goes behind, as for any model.)
     let trial: string[] | undefined;
-    if (this.decoding === "cards" && !this.o.unreleased && !withheld && !/^none\(\w+\)$/.test(program)) {
+    if (this.decoding === "cards" && !(this.o.unreleased ?? !!process.env.OIKOS_DECIDE_UNRELEASED) && !withheld && !/^none\(\w+\)$/.test(program)) {
       const k = byKind(program, forms, this.released, (f) => this.passed(f, reader.trained));
       trial = k.trial;
       if (shown) withheld = "forms_subset";
