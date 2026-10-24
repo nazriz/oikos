@@ -22,6 +22,7 @@ const SCHEMA_FILES = [
   "entity-record.schema.json",
   "dataset.schema.json",
   "module.schema.json",
+  "citizen-data.schema.json",
 ];
 
 // examples/<valid|invalid>/<dir>/*.json is checked against TARGETS[<dir>].
@@ -45,6 +46,8 @@ const TARGETS: Record<string, string> = {
   "entity-record": `${NS}:entity-record#/$defs/PersonRecord`,
   "entity-record-organisation": `${NS}:entity-record#/$defs/OrganisationRecord`,
   "dataset-want": `${NS}:dataset#/$defs/Want`,
+  "citizen-data-row": `${NS}:citizen-data#/$defs/Row`,
+  "citizen-data-example": `${NS}:citizen-data#/$defs/Example`,
 };
 
 const readJson = (path: string) => JSON.parse(readFileSync(path, "utf8"));

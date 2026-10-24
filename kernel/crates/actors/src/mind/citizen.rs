@@ -873,6 +873,7 @@ impl CitizenMind {
             self.s.chose.insert(format!("{domain}:{a}"), n);
         }
         cx.decided(Json::Object(d));
+        cx.capture_turn(n);
         n
     }
     /// Something we came to know of how a choice went (citizen.ts `outcome`): numbered by the decision it follows
@@ -1291,6 +1292,7 @@ impl CitizenMind {
         let mut rng = cx.rng(d.purpose.as_deref().unwrap_or(&d.domain));
         let ask = person::Ask { options, current: d.current.clone(), levels, circ: circ.clone(), satisfied_here: d.satisfied_here, doubt: Some(doubt) };
         let got = self.s.mind.decide(&d.domain, &mut rng, &ask);
+        cx.drew(&rng);
         let emotion = self.s.feelings.strongest(t);
         let held: Map<String, Json> = self.s.beliefs.iter().filter(|(_, &b)| b > 0).map(|(k, b)| (k.clone(), json!(b))).collect();
         let goal = self.s.pursuits.values().find(|x| x.method().is_some()).map(|x| json!({ "goal": x.goal, "method": x.method() }));

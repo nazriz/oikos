@@ -743,6 +743,7 @@ impl CitizenMind {
         let mut rng = cx.rng(&purpose);
         let open = self.s.mind.person.temperament.openness;
         let (key, weights) = self.s.mind.learned("way").choose(&mut rng, &options, open);
+        cx.drew(&rng);
         let total: i64 = weights.iter().sum::<i64>().max(1);
         let mut d = Map::new();
         d.insert("t".into(), json!(t));

@@ -1267,6 +1267,27 @@ The mechanism:
 - **Notice by:** `rejected_action` notes in a model fork; an experiment's log that stops without "done".
 - **Fix when:** Before the TARA run if a model fork's log shows `rejected_action`s from its seat.
 
+### MT-23 · The citizen capture keeps each decision as the mind recorded it, not yet everything the citizen model will read
+- **Gap:** The capture (docs/citizen-data.md, step 1 of docs/design/citizen-model.md) writes every recorded decision
+  with its draws, the person's record and their outcomes. It does not yet write: the typed `situation/1` for every
+  domain (only wants carry a `situation`; other domains carry their options, circumstances, needs and state); the
+  papers a person held, received or wrote (the design's `papers` file and `dealings` join); choices the mind makes
+  without recording a decision (whom to catch up with, passing news on), whose draws land on the next decision's
+  `draws`; firms' and founded bodies' decisions. A person's first week's turns come before their first record write
+  and fold to an empty record. Ids of those a person deals with appear raw (step 2's input builder makes them roles).
+  An outcome is joined to its turn by person and count, which restarts if a person's controller does. A turn kept
+  out of training is any on a test case's run and day, every citizen, which is coarse. There is no size stop yet.
+- **Where:** `kernel/src/engine/capture.rs`, `kernel/crates/actors/src/lib.rs` (`Cx::rng`, `drew`, `capture_turn`),
+  `mind/citizen.rs` `decision`; `orchestrator/src/citizen-data.ts`; contracts/citizen-data.schema.json.
+- **Effect:** A model trained only on this would see less of the matter and of held papers than the design's input
+  has, and could not be trained on what to put in a letter (no content heads yet: nothing chooses content today). No
+  effect on any run: the capture changes nothing in the world or the log (tested).
+- **L / I:** medium / medium for the citizen model; none for steward experiments · **Status:** to fix (step 2 of the
+  citizen-model plan builds the input builder and the situation for every domain).
+- **Notice by:** `oikos citizen-data` summary (`before_record`, outcomes joined against all); a domain whose examples
+  carry no situation.
+- **Fix when:** Step 2 (the input builder), before any training; papers before the content heads.
+
 ---
 
 ## Profiles and sources

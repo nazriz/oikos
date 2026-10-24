@@ -35,6 +35,8 @@ export interface RustOptions {
   until?: number;
   stand_in?: string;
   record_decisions?: boolean;
+  /** Capture the citizens' decisions to this file, for training (docs/citizen-data.md); changes nothing in the run. */
+  capture_citizens?: string;
   audit?: boolean;
   snapshot_every_days?: number;
   stream?: { cap?: number; kinds?: string[] };

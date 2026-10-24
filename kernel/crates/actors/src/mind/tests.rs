@@ -100,6 +100,38 @@ fn a_mind_is_the_citizen_mind_and_saves_to_the_bit() {
     assert_eq!(m.save().unwrap(), again.save().unwrap());
 }
 
+/// The capture (docs/citizen-data.md): a mind decides alike with it on, and keeps beside each decision the values of
+/// the stream it decided with, exactly as the stream gives them.
+#[test]
+fn a_decision_captured_is_the_same_decision_with_its_draws() {
+    let c = ctx(initiative(), Value::Null);
+    let mut on = c.clone();
+    on.world = Arc::new(WorldInfo { capture: true, ..(*c.world).clone() });
+    let ask = || Decide { domain: "job".into(), options: vec![Choice { key: "a".into(), facts: Some(Facts { money_per_month: 10, ..Default::default() }), ..Default::default() }, Choice { key: "b".into(), facts: Some(Facts { money_per_month: 20, ..Default::default() }), ..Default::default() }], ..Default::default() };
+    let (mut m, mut n) = (made(&c), made(&on));
+    let (x, plain) = at(&c, &mut Draws::new("p.ann", "self"), 2 * DAY, vec![], |cx| m.decide(cx, &life(2 * DAY), ask()));
+    let (y, kept) = at(&on, &mut Draws::new("p.ann", "self"), 2 * DAY, vec![], |cx| n.decide(cx, &life(2 * DAY), ask()));
+    assert_eq!(x, y);
+    assert_eq!(plain.decisions, kept.decisions, "the decision's record is the same");
+    assert_eq!(m.save().unwrap(), n.save().unwrap());
+    assert!(plain.captured.is_empty());
+    assert_eq!(kept.captured.len(), 1);
+    let cap = &kept.captured[0];
+    assert_eq!((cap.at, cap.n), (0, y.n.unwrap()));
+    let last = cap.draws.last().unwrap();
+    let key: Vec<String> = serde_json::from_value(last["key"].clone()).unwrap();
+    assert_eq!(key[4], "job");
+    // (The values are the stream's own: made again from the seed and the key.)
+    let seed = c.participant.bytes().fold(7u64, |a, b| a.wrapping_mul(31).wrapping_add(u64::from(b)));
+    let parts: Vec<&str> = key.iter().map(String::as_str).collect();
+    let mut r = oikos_core::rng::Randomness::new(seed).stream(&parts);
+    let drawn = last["drawn"].as_array().expect("the general decision says which stream it chose with");
+    assert!(!drawn.is_empty());
+    for v in drawn {
+        assert_eq!(v.as_str().unwrap(), format!("{:016x}", r.next_u64()));
+    }
+}
+
 #[test]
 fn unpaid_wages_cost_trust_bring_fear_and_a_want() {
     let c = ctx(initiative(), Value::Null);

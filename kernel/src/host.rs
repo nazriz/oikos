@@ -81,6 +81,7 @@ fn options(v: &Value) -> Result<Options, String> {
     }
     engine.audit = v["audit"].as_bool() == Some(true);
     engine.withhold = crate::engine::withholds(&v["withhold"])?;
+    engine.capture_citizens = v["capture_citizens"].as_str().filter(|p| !p.is_empty()).map(String::from);
     if let Some(n) = v["share_at"].as_u64() {
         engine.share_at = n as usize;
     }

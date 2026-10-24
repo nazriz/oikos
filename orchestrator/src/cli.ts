@@ -63,6 +63,10 @@
 //                 [--skip repeat,reversed,reworded,scrambled] [--budget DOLLARS] [--out DIR]
 //     The teachers' gate: scrambled records, one-thing edits, option order, rewording, the town's totals, agreement.
 //     The mock by default. Every call is kept, and served again from the same folder.
+//   oikos citizen-data <DIR|log|run.citizens.jsonl.zst> [--out FILE]
+//     A run's captured citizen decisions (`--capture-citizens on`, on by default with a real model: docs/citizen-data.md)
+//     as training rows, one a turn, the person's record folded as it stood and the turn's outcomes under it, in
+//     <run>.dataset/citizen_examples.jsonl. Reads the capture alone: no log, no replay.
 //   oikos dataset <DIR|log.jsonl> [--out DIR] [--actions]
 //     (and, for a run with the culture dial on, culture.json beside it: norm shares, verdicts, talk, standing, events remembered, tipping)
 //     Run datasets: each log's data as training examples, in <run>.dataset/ (docs/design/run-datasets.md): the manifest,
@@ -175,7 +179,7 @@
 //
 // A DIR is a batch folder (its measure/ is used) or a folder of logs (exported to DIR/measure first).
 
-import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { exportLogs, queries, query, runQuery, table } from "@oikos/measure";
 import { afterResume, loadWorld, resumeCommand, runBatch, runName, runOne, type StopSignal } from "./batch";
@@ -239,7 +243,7 @@ try {
       world: positional()[0]!, seeds: Number(flag("seeds", "1")), ...(flag("towns") !== undefined ? { towns: Number(flag("towns")) } : {}), out: flag("out") ?? scenarioOut(positional()[0]!), parallel: flag("parallel") ? Number(flag("parallel")) : undefined,
       until: flag("until") ? Number(flag("until")) : undefined, sets: sets(), translatorModel: flag("translator-model"), translatorFirst: flag("translator-first"), translatorArrangement: flag("translator-arrangement"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
+      recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), captureCitizens: flag("capture-citizens"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
       batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined, consult: has("consult"), composer: has("composer"), consultAvoid: flag("consult-avoid"), debriefWording: flag("debrief-wording"),
       overwrite: has("overwrite"), stop: stopOnSignal(),
     });
@@ -283,7 +287,7 @@ try {
   } else if (cmd === "run-one" && positional()[0]) {
     await runOne({ world: positional()[0]!, seed: Number(flag("seed")), ...(flag("town") !== undefined ? { town: Number(flag("town")) } : {}), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: sets(),
       model: flag("model"), translatorModel: flag("translator-model"), translatorFirst: flag("translator-first"), translatorArrangement: flag("translator-arrangement"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), consult: has("consult"), composer: has("composer"), consultAvoid: flag("consult-avoid"), debriefWording: flag("debrief-wording"), overwrite: has("overwrite"), stop: stopOnSignal() });
+      recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), captureCitizens: flag("capture-citizens"), consult: has("consult"), composer: has("composer"), consultAvoid: flag("consult-avoid"), debriefWording: flag("debrief-wording"), overwrite: has("overwrite"), stop: stopOnSignal() });
   } else if (cmd === "resume" && positional()[0]) {
     // A run that stopped (a stall, a crash, cut short): run again from its own config, serving its recorded model calls.
     const o = { until: flag("until") ? Number(flag("until")) : undefined, modules: flag("modules"),
@@ -591,6 +595,15 @@ try {
       process.exit(2);
     }
     console.error(`verified: ${r.n} change${r.n > 1 ? "s" : ""}, each link of the chain and each digest as the kernel logged it`);
+  } else if (cmd === "citizen-data" && positional()[0]) {
+    // A run's captured citizen decisions as training rows (docs/citizen-data.md): one example a turn, the record folded.
+    const { captureOf, exportCitizenData } = await import("./citizen-data");
+    const src = captureOf(positional()[0]!);
+    const out = flag("out") ?? join(src, "..", `${src.split("/").at(-1)!.replace(/\.citizens\.jsonl(\.zst)?$/, "")}.dataset`, "citizen_examples.jsonl");
+    mkdirSync(join(out, ".."), { recursive: true });
+    const s = await exportCitizenData(src, out);
+    console.log(`${s.run}: ${s.examples} examples (${s.excluded} excluded from training), ${s.records} record changes, ${s.outcomes_joined} of ${s.outcomes} outcomes joined to their turn; ${s.before_record} turns before the person's first record -> ${out}`);
+    console.log(`  by domain: ${Object.entries(s.by_domain).sort((a, b) => b[1] - a[1]).map(([d, n]) => `${d} ${n}`).join(", ")}`);
   } else if (cmd === "dataset" && positional()[0]) {
     // Run datasets: every run's data as training examples (docs/design/run-datasets.md).
     const { logsIn } = await import("./corpus");

@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:oikos:contracts:0.8:citizen-data",
+  "title": "Citizen data (citizen-data/1)",
+  "description": "Every decision a citizen made in a run, captured while it ran, for training a citizen model of our own (docs/citizen-data.md; docs/design/citizen-model.md section 1). A stream beside the run's log (`<run>.citizens.jsonl.zst`: JSON lines, zstd, in frames), never in it: a run is the same with it on. Rows (`row`): one `segment` first; then, step by step in the order the engine carries a round out, each person's `turn`s, `outcome` and `record`. A person's record at a turn is the fold of that person's `record` rows above it (each section set whole replaces the one before). Built only from what the person's own mind held and the kernel kept for them: nothing of the world's registers. `oikos citizen-data` turns a stream into training rows (Example).",
+  "$defs": {
+    "Row": {
+      "oneOf": [
+        { "$ref": "#/$defs/Segment" },
+        { "$ref": "#/$defs/Turn" },
+        { "$ref": "#/$defs/Outcome" },
+        { "$ref": "#/$defs/Record" }
+      ]
+    },
+    "Hex64": {
+      "description": "A value of the kernel's random stream (xoshiro256**, crates/core rng.rs), as 16 hex digits: a u64 does not fit a JSON reader's number. Its share of 2^64 is the uniform draw.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "Segment": {
+      "description": "The stream's first row (and the first of each part a run taken up again from a snapshot wrote: rows after it from `from_t` replace what an earlier part wrote from then on).",
+      "type": "object",
+      "required": ["row", "schema", "run", "from_t", "engine", "citizen"],
+      "additionalProperties": false,
+      "properties": {
+        "row": { "const": "segment" },
+        "schema": { "const": "citizen-data/1" },
+        "run": { "type": "string" },
+        "from_t": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime" },
+        "engine": { "description": "The engine's version.", "type": "string" },
+        "citizen": { "description": "The version of the citizen's rules (the `citizen.default` kind) that decided.", "type": "string" }
+      }
+    },
+    "Draw": {
+      "description": "A stream of the kernel's the person opened since their decision before this one (in that step), in order: its key (who, what for, the matter or the day, the nth time), and the values the decision took from it (`drawn`, where the mind says which stream it chose with: every value, in order) or the stream's first value (`u`: a single draw, as `below(n)` takes it). The last stream before a decision is, as a rule, the one it was decided with.",
+      "type": "object",
+      "required": ["key"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "type": "array", "items": { "type": "string" }, "maxItems": 8 },
+        "drawn": { "type": "array", "items": { "$ref": "#/$defs/Hex64" }, "maxItems": 4096 },
+        "u": { "$ref": "#/$defs/Hex64" }
+      }
+    },
+    "Turn": {
+      "description": "One decision of a person's: as their mind recorded it (`decision`: the data of the log's `decision` annotation, the same whether or not the log keeps it: domain, strategy, options with their facts and scores, choice, and the situation, circumstances and state it was decided in), its number `n` (the person's count: what an outcome's `of` names), and its draws.",
+      "type": "object",
+      "required": ["row", "t", "p", "n", "decision", "draws"],
+      "additionalProperties": false,
+      "properties": {
+        "row": { "const": "turn" },
+        "t": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime" },
+        "p": { "description": "The person's participant id.", "type": "string" },
+        "n": { "type": "integer", "minimum": 1 },
+        "decision": {
+          "type": "object",
+          "required": ["domain", "strategy", "options"],
+          "properties": {
+            "domain": { "type": "string" },
+            "strategy": { "type": "string" },
+            "choice": { "type": "string" },
+            "options": { "type": "array" }
+          }
+        },
+        "draws": { "type": "array", "items": { "$ref": "#/$defs/Draw" } }
+      }
+    },
+    "Outcome": {
+      "description": "What the person came to know, in one step, of how things went (the data of the log's `outcome` annotation): each names the decision it follows by `of`, where it is one of theirs.",
+      "type": "object",
+      "required": ["row", "t", "p", "outcomes"],
+      "additionalProperties": false,
+      "properties": {
+        "row": { "const": "outcome" },
+        "t": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime" },
+        "p": { "type": "string" },
+        "outcomes": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "Record": {
+      "description": "A change to the person's own record (contracts/entity-record.schema.json), as their step asked the kernel to keep it: the sections set, whole, and what happened since the last (`because`).",
+      "type": "object",
+      "required": ["row", "t", "p", "set"],
+      "additionalProperties": false,
+      "properties": {
+        "row": { "const": "record" },
+        "t": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime" },
+        "p": { "type": "string" },
+        "set": { "type": "object" },
+        "because": { "type": "array" }
+      }
+    },
+    "Example": {
+      "description": "A training row (`oikos citizen-data`, orchestrator/src/citizen-data.ts): one turn with the person's record folded as it stood (`record`: sections; `record_at`: when it was last changed, absent before the first), the draws, and every outcome that names the turn (`outcomes`). `exclude_from_training`: the turn is on a day of a run that a real test case of the translator came from (translator/eval/pilot-cases.ts), which stays out of all training.",
+      "type": "object",
+      "required": ["schema", "run", "t", "participant", "n", "domain", "decision", "draws", "record", "outcomes"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "citizen-example/1" },
+        "run": { "type": "string" },
+        "t": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime" },
+        "participant": { "type": "string" },
+        "n": { "type": "integer", "minimum": 1 },
+        "domain": { "type": "string" },
+        "choice": { "type": "string" },
+        "decision": { "type": "object" },
+        "draws": { "type": "array", "items": { "$ref": "#/$defs/Draw" } },
+        "record": { "type": "object" },
+        "record_at": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime" },
+        "outcomes": { "type": "array", "items": { "type": "object" } },
+        "exclude_from_training": { "const": true }
+      }
+    }
+  }
+}
