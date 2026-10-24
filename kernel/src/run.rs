@@ -272,6 +272,15 @@ impl<W: Write> Run<W> {
         }
     }
 
+    /// What the observation the last command returned adds to a seat's knowledge (`observed(obs).shown`), without its
+    /// JSON where that was not made for the log.
+    pub fn shown(&mut self, obs: &mut Observation) -> Result<std::collections::BTreeMap<String, oikos_resolver::knowledge::Shown>, canon::CanonError> {
+        match self.observed.take() {
+            Some(o) => Ok(o.shown),
+            None => self.kernel.shown(obs),
+        }
+    }
+
     fn checkpoint(&mut self) -> Result<(), RunError> {
         let hash = self.kernel.state_hash().map_err(|e| RunError::Config(e.to_string()))?;
         self.log.append(self.kernel.t(), Kind::Checkpoint, json!({ "state_hash": hash }))?;
@@ -282,10 +291,21 @@ impl<W: Write> Run<W> {
     /// validated against the Annotation contract.
     pub fn annotate(&mut self, annotation: Value) -> Result<u64, RunError> {
         self.not_ended()?;
-        canon::check_integers(&annotation).map_err(|e| ProtocolError(e.to_string()))?;
-        crate::contracts::check(&crate::contracts::contracts().annotation, &annotation)
-            .map_err(|e| ProtocolError(format!("annotation {e}")))?;
+        // (One plainly of the contract has only safe integers: the integers' own check, and its message, are for the rest.)
+        if !crate::contracts::plain_annotation(&annotation) {
+            canon::check_integers(&annotation).map_err(|e| ProtocolError(e.to_string()))?;
+            crate::contracts::check(&crate::contracts::contracts().annotation, &annotation).map_err(|e| ProtocolError(format!("annotation {e}")))?;
+        }
         Ok(self.log.append(self.kernel.t(), Kind::Annotation, annotation)?.seq)
+    }
+
+    /// An annotation already checked against the contract and written in canonical form (`annotate`'s, done where its
+    /// bytes were made: see `Engine`'s decisions): logged as `annotate` would log it.
+    pub fn annotate_canonical(&mut self, bytes: &[u8]) -> Result<u64, RunError> {
+        self.not_ended()?;
+        let seq = self.log.next_seq();
+        self.log.append_canonical(self.kernel.t(), Kind::Annotation, bytes)?;
+        Ok(seq)
     }
 
     pub fn finish(&mut self, reason: &str, detail: Option<&str>) -> Result<(u64, String), RunError> {

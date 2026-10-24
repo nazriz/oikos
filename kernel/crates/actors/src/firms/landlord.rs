@@ -2378,7 +2378,7 @@ mod tests {
     impl Town {
         fn new(params: Value) -> Town {
             let mut c = ctx("landlord-1-office-system", ME);
-            c.params = params.as_object().cloned().unwrap_or_default();
+            c.params = params.as_object().cloned().unwrap_or_default().into();
             let currency = Currency { code: "XTS".into(), minor_units: 2, ..Default::default() };
             c.world = Arc::new(WorldInfo { currency: Some(currency), ..Default::default() });
             let actor = LANDLORD.create(&c).unwrap();
@@ -3026,7 +3026,7 @@ mod tests {
     #[test]
     fn a_notice_made_again_when_sent_counts_from_when_it_is_sent() {
         let mut c = ctx("landlord-1-office-system", ME);
-        c.params = Map::new();
+        c.params = Map::new().into();
         let mut office = Office::new(&c, Params::read(&c).unwrap(), respondent(&c));
         let g = VacateGive { lease: "L1".into(), tenant: "ann".into(), space: "s1/home".into(), arrears: 300_000, law: "law-possession".into(), arrears_days: 14, notice_days: 14, bears: 2, by: starts_on(DAY - 3_700, 14 * DAY) };
         office.ending.insert("L1".into(), Ending { stage: EndStage::Noticed, by: g.by, notice: None, seen: BTreeSet::new(), plan: None });

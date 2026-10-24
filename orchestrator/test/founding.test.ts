@@ -33,6 +33,8 @@ const check = (ref: string, row: unknown) => {
 const rows = (path: string) => readFileSync(path, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
 const lean = (config: any) => ({ ...config, seed: 1, log: { ...config.log, detail: "lean" } });
 const TOWN = join(root, "worlds/town.yaml");
+/** The single-goods town: these tests hold founding's mechanisms in it (docs/risks.md ME-19). */
+const NOMIX = "shop_mix=false";
 // (Every occasion founds: the profile's fitted chance, scaled up to certainty. Even so the small town's first
 // founding is on day 177: an occasion needs someone from beyond the household known to share the want. So these runs
 // are long ones. A town that is compared runs at the scale of 10,000.)
@@ -102,13 +104,13 @@ const LIVING = "living.initiative_bps=10000";
 test("with founding off a living town has nothing of founding; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
   try {
-    const plain = (await loadWorld(TOWN, [LIVING])).config;
+    const plain = (await loadWorld(TOWN, [NOMIX, LIVING])).config;
     expect(plain.dials.founding).toBeUndefined();
     expect(plain.dials.composer).toBeUndefined();
     expect(JSON.stringify(plain)).not.toContain("group.founded");
     expect(JSON.stringify(plain)).not.toContain('"memberships"');
     const off = await runWorld({ config: lean(plain), runId: "off", outDir: out, until: 60 * DAY, recordObservations: "none" });
-    const on = (await loadWorld(TOWN, [LIVING, "living.founding=true", SURE])).config;
+    const on = (await loadWorld(TOWN, [NOMIX, LIVING, "living.founding=true", SURE])).config;
     expect(on.dials.founding).toEqual({ shapes: ["gathering", "fund", "cause", "business"], scale_bps: 600_000 });
     const none = await runWorld({ config: { ...lean(on), dials: { ...on.dials, founding: { shapes: [], scale_bps: 600_000 } } }, runId: "none", outDir: out, until: 60 * DAY, recordObservations: "none" });
     // (Its people are handed the founding figures and one more channel, which are part of the world's state: so the
@@ -124,7 +126,7 @@ test("with founding off a living town has nothing of founding; turned on with no
 test("founding in code: with the composer off no model is called; a founded thing says what it is for in plain words, keeps its founder's want in a record of its own, and is joined", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
   try {
-    const config = (await loadWorld(TOWN, [LIVING, "living.founding=true", SURE, ONE, WRONGS])).config;
+    const config = (await loadWorld(TOWN, [NOMIX, LIVING, "living.founding=true", SURE, ONE, WRONGS])).config;
     // The generator's part: the profile's sizes reach people, with the post a founder holds and the hall's hire.
     const citizen = config.templates.find((x: any) => x.controller?.params?.founding)?.controller.params.founding ?? config.participants.find((x: any) => x.controller?.params?.founding).controller.params.founding;
     expect(citizen.chance_bps).toBeGreaterThan(0);
@@ -221,7 +223,7 @@ function scriptedTranslator(seen: string[]): LlmAdapter {
 test("words: a composed piece is asked for and logged; its parts go through the translator and are done only as the founder's module says a draft may be; the rest arrives as a closed choice; the same seed, the same town; a resumed run is served the piece", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
   try {
-    const world = async () => ({ ...(await loadWorld(TOWN, [LIVING, "living.founding=true", SURE, ONE, WRONGS, "living.composer=true"])).config, seed: 1 });
+    const world = async () => ({ ...(await loadWorld(TOWN, [NOMIX, LIVING, "living.founding=true", SURE, ONE, WRONGS, "living.composer=true"])).config, seed: 1 });
     const config = await world();
     expect(config.dials.composer).toEqual({ pieces_per_month: 8, mix: [{ model: "claude-code/claude-sonnet-5-5", share_bps: 5_000 }, { model: "codex/gpt-6.1-sol", share_bps: 5_000 }], fallback: "claude-code/claude-sonnet-5-5", follow_up_bps: 2_500 });
     const asked: string[] = [];
@@ -285,7 +287,7 @@ test("words: a composed piece is asked for and logged; its parts go through the 
 test("the composer is never asked more often than its dial allows: at nothing a month no model is called, and every statement is the plain one", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
   try {
-    const config = { ...(await loadWorld(TOWN, [LIVING, "living.founding=true", SURE, ONE, WRONGS, "living.composer.pieces_per_month=0"])).config, seed: 1 };
+    const config = { ...(await loadWorld(TOWN, [NOMIX, LIVING, "living.founding=true", SURE, ONE, WRONGS, "living.composer.pieces_per_month=0"])).config, seed: 1 };
     expect(config.dials.composer.pieces_per_month).toBe(0);
     const s = await runWorld({ config: lean(config), runId: "capped", outDir: out, until: 205 * DAY, recordObservations: "none" });
     expect(s.composer).toMatchObject({ asked: 0, composed: 0 });

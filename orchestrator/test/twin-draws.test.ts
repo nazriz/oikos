@@ -20,7 +20,7 @@ import { officeAt, systemAt } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
-const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+const spec = { ...(Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any), shop_mix: false /* the single-goods town: this test holds a mechanism of it (docs/risks.md ME-19) */ };
 // (Frictions at several times the sourced rate, so that a small town has requests enough in a short run.)
 const living = { ...spec, citizens: 300, profile: "ke-nakuru-2026", living: { initiative_bps: 10_000, friction_bps: Number(process.env.TWIN_FRICTION ?? 100_000) } };
 // (2026-10-12, homes by income: until then most of this town's requests and decisions were about rent nobody in the

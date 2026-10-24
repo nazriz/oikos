@@ -12,7 +12,7 @@ import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
-const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+const spec = { ...(Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any), shop_mix: false /* the single-goods town: this test holds a mechanism of it (docs/risks.md ME-19) */ };
 
 test("a death is seen, reported, registered, and the world's people act on it", async () => {
   const out = join(root, "runs", "test-deaths");
