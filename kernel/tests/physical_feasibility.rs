@@ -222,8 +222,32 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             if total > 0 {
                 let day = s.config.catalogue.working_day.unwrap();
                 let share = (total + performers.len() as i64 - 1) / performers.len() as i64;
-                let today = oikos_kernel::exec::day_of(st.t);
-                if performers.iter().any(|p| st.timelines.get(p).map_or(0, |tl| tl.worked_on(today)) + share > day) {
+                // (The work is placed when the actor and every performer are free, after what each has in hand, and is
+                // counted on each day it is done on: law 1, kernel.rs `begin`. Until 2026-10-24 the oracle charged the
+                // whole share to today, and expected a refusal for work that began when its performer was next free, on a
+                // day with room: proptest's case 3d09092b.)
+                let free = |who: &str, lanes: usize| {
+                    let mut l = st.timelines.get(who).map(|x| x.lanes.clone()).unwrap_or_default();
+                    oikos_time::place(&mut l, lanes, st.t, 0).0
+                };
+                let (key, lanes) = match p.kind {
+                    oikos_kernel::config::ParticipantKind::Person => (p.person.clone().unwrap_or_else(|| participant.to_string()), 1),
+                    oikos_kernel::config::ParticipantKind::System => (participant.to_string(), p.def.lanes.unwrap_or(1) as usize),
+                };
+                let start = performers.iter().filter(|w| **w != key).map(|w| free(w, 1)).fold(free(&key, lanes), i64::max);
+                let portions = |mut at: i64, mut left: i64| {
+                    let mut out = vec![];
+                    while left > 0 {
+                        let d = oikos_kernel::exec::day_of(at);
+                        let take = left.min((d + 1) * 86_400 - at);
+                        out.push((d, take));
+                        at += take;
+                        left -= take;
+                    }
+                    out
+                };
+                // (And no one work is longer than a day: exec.rs refuses it whenever it would be done.)
+                if share > day || performers.iter().any(|w| portions(start, share).into_iter().any(|(d, take)| st.timelines.get(w).map_or(0, |tl| tl.worked_on(d)) + take > day)) {
                     return Some(Err(RefusalCode::NoTimeLeft));
                 }
             }

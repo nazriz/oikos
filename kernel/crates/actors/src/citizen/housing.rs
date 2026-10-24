@@ -97,8 +97,8 @@ pub struct Housing {
     plan_asked: Asked,
     title_asked: Asked,
     /// The book's place at the last full plan, and how far it runs in this one (see the module's head).
-    fresh_from: usize,
-    fresh_to: usize,
+    pub(super) fresh_from: usize,
+    pub(super) fresh_to: usize,
     /// Rent orders replaced or stopped by us: never again taken for the home's order.
     old_orders: BTreeSet<String>,
     /// Listings we've applied for.

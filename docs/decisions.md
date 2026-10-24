@@ -7612,3 +7612,73 @@ decided, possession orders).
   `--days`; a model run or any doubt is never touched).
 - **Revisit if:** tests move their scratch to a temp folder (then this is moot), or a worktree's `runs/test-*` ever holds
   model calls.
+
+
+## 2026-10-24 · A review never answered: the deemed refusal as law (MT-21); a bounded memory of public goings-on (SC-1) (branch `fix-memory-appeal`, citizen 0.59.0, generator 0.65.0; no model called)
+
+**MT-21, the deemed refusal.** Where the law requires a review before an appeal, a review asked for and never answered
+left the claimant nowhere: the appeal's days ran from an answer that never came. Much administrative law treats no
+decision in the statutory time as a refusal that can be challenged. Now a review route may say so, as law data:
+`review.deemed_refused_days` (contracts/README.md, F8's `data.decisions`). When that many days have passed since the
+asking with no answer, the claimant's appeal route opens (`citizen/recourse.rs`, `Ways::for_want`), the appeal's days
+run from then, the application gives `review_asked_on`, and a venue that can order counts from the deemed refusal and
+turns an appeal away before it (`offices/hearing.rs`). The law's words say it (`rules::decisions::decisions_in_words`).
+- **Per place, as sourced:** de-ni 91 days (SGG s 88(2), the action for failure to act, recalled, to confirm; the real
+  action has no month's limit after the three months, ours is the stricter reading). au-vic, gb-eng and us-oh's pension
+  have no such rule that I recall (to confirm), so the route stays shut there, as it would; mx-jal's review is optional
+  and the appeal runs from the decision anyway (docs/behaviour/decisions.md, "Deemed refusal").
+- **Tests:** the words and the date (`rules`); a claimant whose review is never answered may appeal from day 91 after
+  asking, not before, out of time 30 days on, and never where the law has no deemed refusal (`citizen/recourse.rs`); a
+  venue hears such an appeal once the law takes the review as refused and turns it away before (`offices/desk.rs`); a
+  living de-ni and gb-eng town, 330 days, with the support office's answers withheld (`orchestrator/test/deemed-refusal-town.test.ts`,
+  slow tier: 150 to 265 s).
+- **What the living test found first.** Withholding the office's review papers alone left nobody unanswered: a review
+  that finds a refusal wrong decides the claim again in an act of its own, and every claimant was granted that way. The
+  engine's `withhold` now takes `has` (only a paper whose data has a field: `on_review`), and the test withholds both.
+  Then: in de-ni four claimants asked, none was answered, the courts and the ombudsman were among the ways open to one
+  of them 91 days on and to none before; nobody took them in that run (the mind weighs a venue against waiting, as any
+  way, and two had given the want up by then: three tries, a month and a half apart). So the test holds that the route
+  opens, not that it is taken. In gb-eng it never opens.
+- **Revisit if** a place's deemed refusal is sourced (au-vic's for TARA: what an Australian claimant does instead, the
+  Ombudsman or asking again, is MT-21's remainder), or claimants give up wants whose way the law opens on a known date.
+
+**SC-1, a bounded memory of public goings-on.** Each citizen kept and weighed every published paper and gathering for
+good. Now a person keeps (`citizen/memory.rs`, `Book::forget`, the citizen's `public_memory`, the generator's
+`PUBLIC_MEMORY`; `public_memory: false` in a spec gives the old behaviour): whatever touched them (their own papers,
+what was addressed to them, what answers a paper of theirs, what speaks for someone they deal with, what their mind
+holds to: a gathering they go to, a teaching they believe), and of the rest the 20 most recent of each kind of goings-on
+(a month's for what no longer stands; papers put out at once told apart by a fixed spread of person and paper, no draw).
+Gone through weekly; what the mind kept about a paper let go (read marks, a gathering's decision, what was learned of
+it) goes with it. The kinds are those that come as they come: the paper, an election's papers, petitions' counts, what
+joining a group asks, gatherings and teachings; the law, forms, budgets, agreements, claims and letters are never let go.
+The sizes are placeholders (limited attention, Simon 1971; forgetting, Ebbinghaus 1885: to confirm). Nothing is shown
+that was not before: a person only lets go.
+- **What the counts showed first** (`OIKOS_KEPT=1 oikos-kernel world`, a sum of what each code actor and the engine
+  keep): at 20,000 people by day 10 each citizen held every gathering's notice (101) and decided on each one a week
+  (`decided_for` and `stayed_last` 67 each); their books were small (175 records), the published kinds a few each.
+- **A year at 1,000 people, three profiles (au-vic, gb-eng, de-ni), two towns each, bound off and on** (lean; the same
+  binary): the same steps in every pair, peak memory within 0.02 GB (au-vic 2.86 to 3.09 GB, gb-eng 2.87 to 2.98,
+  de-ni 1.40 to 1.48). The bound does not bite at 1,000 people: a town that size has fewer than 20 of each kind. The
+  culture and recourse measures were not read separately (the logs were deleted for disk before); with the same steps
+  run for run they are not expected to move, and the next measure at this size should read them.
+- **Found on the way to main: the physics oracle charged work to the wrong day.** The merge's `cargo test` drew a new
+  case of `physical_feasibility` (proptest, 3d09092b): a builder's system set a person to work while that person still
+  had work in hand; the kernel placed it when they were next free, on a day with room, and did it; the oracle had
+  charged the whole share to today and expected a refusal. The kernel follows law 1 (work is placed after what the
+  performers have in hand and counted on each day it is done on, `kernel.rs` `begin`); the oracle now places it the same
+  way, and keeps the rule that no one work is longer than a day (a second case shrunk to it while fixing the first).
+  Both cases are in the regressions file; 9,000 further cases pass. Nothing in the kernel changed.
+- **10,000 people, a month, bound off and on** (all code, au-vic, `living.initiative_bps=10000`, log to `/dev/null`; the
+  same binary): peak footprint 10.30 against 10.16 GB, 80 s against 73 s, 901,494 against 900,083 steps. The bound bites
+  here: a citizen's book 121 against 91 records, the gathering notices they hold 51 against 20, the gatherings they decide
+  on each week (`decided_for`) 38 against 15, their mind's saved bytes 13.9 against 11.1 KB. But all citizens' memory
+  together is about 190 MB of a 10 GB process: **it is not what fills memory at this size.**
+- **50,000 people: not measurable as the town is now.** Both runs passed the 40 GB guard 104 s in, bound or not (44 GB
+  peak footprint): before or at the first moment, where perf-2's 50,000 town peaked at 17 GB. The generated config has
+  doubled since (1.39 GB against 660 MB: the shop mix and the kinds of shop, generator 0.64.0), and the start holds it
+  as `serde_json` values. So the 50,000 month is stopped by the start, not by what people remember, and perf-2's
+  likely cause of the daily growth (each citizen keeping every paper and gathering) was not borne out at 10,000.
+  **100,000 is not feasible on this machine** until the config is read participant by participant (performance.md's
+  ranked list, item 1); then the daily growth at 50,000 can be measured with a heap profile, as SC-1 asks.
+- **Revisit if** a heap profile at 20,000 to 50,000 shows citizens' books or minds among the largest holders (then
+  tighten `most`); or a measure of culture or recourse moves at 10,000 between bound on and off.

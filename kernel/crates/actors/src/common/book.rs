@@ -301,6 +301,98 @@ impl Book {
         idx.map(Vec::as_slice).unwrap_or(&[]).iter().map(move |i| &self.seen[*i as usize])
     }
 
+    // ---- letting go (a person's bounded memory of public goings-on: citizen/memory.rs)
+
+    /// Lets go of every record `keep` says no to, as if it had never been seen: it is no longer among what the book
+    /// answers, and its place is given up. What it did when taken in stays done (a withdrawal it made still stands),
+    /// except that a withdrawal let go of is no longer known, nor the withdrawn record it named if that is let go too.
+    /// Returns, for each old place in the order seen, its new place (none: let go), for whoever keeps a place in the
+    /// book (`records().skip(n)`). Deterministic: the order of what is kept is the order seen.
+    pub fn forget(&mut self, keep: impl Fn(&Record) -> bool) -> Vec<Option<u32>> {
+        // Only a statement, or a withdrawal, is ever let go: what else a book holds (an agreement, a signature, a claim)
+        // is a party's own. And never a paper that made a kept one stand down (its withdrawal, what replaced it): a book
+        // saved and restored takes its records in again, and must stand where it stood.
+        let mut keeps: Vec<bool> = self.seen.iter().map(|r| !matches!(r.body, RecordBody::Statement { .. } | RecordBody::Withdrawal { .. }) || keep(r)).collect();
+        for (i, r) in self.seen.iter().enumerate() {
+            if keeps[i] {
+                continue;
+            }
+            let names = match &r.body {
+                RecordBody::Withdrawal { withdraws, .. } => Some(withdraws.as_str()),
+                RecordBody::Statement { data, .. } => data.as_ref().and_then(|d| d.get("replaces")).and_then(Value::as_str),
+                _ => None,
+            };
+            if names.and_then(|id| self.place.get(&key(id))).is_some_and(|&j| keeps[j as usize]) {
+                keeps[i] = true;
+            }
+        }
+        let mut remap: Vec<Option<u32>> = Vec::with_capacity(self.seen.len());
+        let mut kept: Vec<Arc<Record>> = Vec::with_capacity(self.seen.len());
+        let mut gone: Vec<Arc<Record>> = vec![];
+        for (i, r) in std::mem::take(&mut self.seen).into_iter().enumerate() {
+            if keeps[i] {
+                remap.push(Some(kept.len() as u32));
+                kept.push(r);
+            } else {
+                remap.push(None);
+                gone.push(r);
+            }
+        }
+        if gone.is_empty() {
+            self.seen = kept;
+            return remap;
+        }
+        let map = |v: &mut Vec<u32>| v.retain_mut(|i| match remap[*i as usize] {
+            Some(n) => {
+                *i = n;
+                true
+            }
+            None => false,
+        });
+        let maps = |m: &mut BTreeMap<String, Vec<u32>>| {
+            for v in m.values_mut() {
+                map(v);
+            }
+            m.retain(|_, v| !v.is_empty());
+        };
+        maps(&mut self.kinds);
+        maps(&mut self.standing);
+        maps(&mut self.claims_holder);
+        maps(&mut self.claims_counterparty);
+        maps(&mut self.claims_object);
+        maps(&mut self.lots_over);
+        for v in self.types.values_mut() {
+            map(v);
+        }
+        self.types.retain(|_, v| !v.is_empty());
+        map(&mut self.with_practice);
+        map(&mut self.with_assertion);
+        map(&mut self.with_hears);
+        for r in &gone {
+            self.place.remove(&key(&r.id));
+        }
+        for i in self.place.values_mut() {
+            *i = remap[*i as usize].unwrap_or_else(|| unreachable!("a place kept for a record let go"));
+        }
+        // (A withdrawal let go of, and what it withdrew if that is not kept either: no longer known.)
+        for r in &gone {
+            let named = match &r.body {
+                RecordBody::Withdrawal { withdraws, .. } => Some(withdraws.clone()),
+                RecordBody::Statement { data, .. } => data.as_ref().and_then(|d| d.get("replaces")).and_then(Value::as_str).map(str::to_string),
+                _ => None,
+            };
+            if let Some(id) = named.filter(|id| !self.place.contains_key(&key(id))) {
+                self.withdrawn.remove(&id);
+                self.withdrawn_at.remove(&id);
+                if self.replaced_by.get(&id) == Some(&r.id) {
+                    self.replaced_by.remove(&id);
+                }
+            }
+        }
+        self.seen = kept;
+        remap
+    }
+
     // ---- what it has seen
 
     /// The record of an id, as first seen.
@@ -320,6 +412,16 @@ impl Book {
     /// Every record, in the order seen.
     pub fn records(&self) -> impl DoubleEndedIterator<Item = &Arc<Record>> {
         self.seen.iter()
+    }
+    /// How many records of each statement kind (and of each other record type) it holds: for whoever measures memory.
+    pub fn counts(&self) -> BTreeMap<String, u64> {
+        let mut out: BTreeMap<String, u64> = self.kinds.iter().map(|(k, v)| (k.clone(), v.len() as u64)).collect();
+        for (t, v) in &self.types {
+            if *t != "statement" {
+                out.insert(format!("[{t}]"), v.len() as u64);
+            }
+        }
+        out
     }
     /// Where a record stands in the order seen (none: not seen).
     pub fn place_of(&self, id: &str) -> Option<usize> {

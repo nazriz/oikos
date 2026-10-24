@@ -61,6 +61,17 @@ pub struct ReviewRoute {
     /// An appeal lies only after a review has been asked for and answered.
     #[serde(default)]
     pub required: bool,
+    /// Where the law says so: a review asked for and not answered within so many days of the asking is taken as
+    /// refused (a deemed refusal), and the appeal's days run from then. None: silence is only silence.
+    #[serde(default, deserialize_with = "opt_whole", skip_serializing_if = "Option::is_none")]
+    pub deemed_refused_days: Option<i64>,
+}
+
+impl ReviewRoute {
+    /// When a review asked for at `asked` and not answered is taken as refused, if the law has a deemed refusal.
+    pub fn deemed_refused_at(&self, asked: i64) -> Option<i64> {
+        self.deemed_refused_days.map(|d| asked + d * DAY)
+    }
 }
 
 /// The venue that can set the decision aside.
@@ -205,9 +216,17 @@ pub fn decisions_in_words(rules: &[DecisionLaw], written: impl Fn(i64) -> String
                     v.grounds,
                     if v.required { ", and an appeal lies only after that" } else { "" }
                 ));
+                if let Some(d) = v.deemed_refused_days {
+                    let last = parts.pop().unwrap_or_default();
+                    parts.push(format!("{last}; a review not answered within {d} days of being asked for is taken as refused"));
+                }
             }
             if let Some(a) = &r.appeal {
-                let after = if r.review.as_ref().is_some_and(|v| v.required) { "the answer to the review" } else { "the decision" };
+                let after = match &r.review {
+                    Some(v) if v.required && v.deemed_refused_days.is_some() => "the answer to the review, or of the day it is taken as refused",
+                    Some(v) if v.required => "the answer to the review",
+                    _ => "the decision",
+                };
                 let fee = match a.fee {
                     Some(f) if f != 0 => format!("applying costs {}", written(f)),
                     _ => "applying costs nothing".to_string(),
@@ -314,6 +333,25 @@ the office that made the decision will look at it again if asked within 28 days 
 it may be appealed to a body that hears support appeal and can set it aside, within 30 days of the answer to the review (wrong law); applying costs $25.00; \
 the office's staff may refuse a claim."
         );
+    }
+
+    #[test]
+    fn a_deemed_refusal_is_said_in_the_words_and_dated_from_the_asking() {
+        let data = json!({ "decisions": [{ "kind": "k", "name": "Support",
+            "review": { "within_days": 30, "grounds": "any", "required": true, "deemed_refused_days": 91 },
+            "appeal": { "matter": "claim_refused", "within_days": 30, "grounds": "any error" } }] });
+        let rules = rules_of(&data);
+        let words = decisions_in_words(&rules, |n| format!("{n}"));
+        assert_eq!(
+            words,
+            "Support: the office that made the decision will look at it again if asked within 30 days of it (any), and an appeal lies only after that; \
+a review not answered within 91 days of being asked for is taken as refused; \
+it may be appealed to a body that hears claim refused and can set it aside, within 30 days of the answer to the review, or of the day it is taken as refused (any error); applying costs nothing."
+        );
+        let review = rules[0].review.as_ref().unwrap();
+        assert_eq!(review.deemed_refused_at(5 * DAY), Some(96 * DAY));
+        let none = rules_of(&json!({ "decisions": [{ "kind": "k", "name": "S", "review": { "within_days": 30, "grounds": "any", "required": true } }] }));
+        assert_eq!(none[0].review.as_ref().unwrap().deemed_refused_at(0), None, "no deemed refusal unless the law says so");
     }
 
     #[test]

@@ -1028,6 +1028,7 @@ impl Person {
                     evidence: g.evidence.clone(),
                     decided_on: decided_at,
                     reviewed_on: g.answered_at,
+                    review_asked_on: g.asked.filter(|_| g.answered_at.is_none() && g.matter == "claim_refused"),
                     brought_forward: None,
                 };
                 let mut calls = vec![say(
@@ -1246,11 +1247,14 @@ impl Openings for Ways<'_> {
             let review = law.as_ref().and_then(|l| l.get("review")).filter(|v| !v.is_null());
             let appeal = law.as_ref().and_then(|l| l.get("appeal")).filter(|v| !v.is_null());
             let may_ask_g = law.is_none() || (review.is_some() && decided_at.is_some_and(|d| days_left(d, review.and_then(|r| r.i("within_days")).unwrap_or(0), t) >= 0));
+            // A review asked for and never answered, where the law takes silence as a refusal after so many days (a
+            // deemed refusal): the appeal's days run from then, as from an answer (MT-21).
+            let deemed = review.and_then(|r| r.i("deemed_refused_days")).zip(g.asked).map(|(d, a)| a + d * DAY).filter(|at| g.answered_at.is_none() && t >= *at);
             let may_apply = law.is_none() || {
-                if review.is_some() && g.answer.is_none() {
+                if review.is_some() && g.answer.is_none() && deemed.is_none() {
                     false
                 } else if let Some(a) = appeal {
-                    let from = if review.is_some_and(|r| r.flag("required")) { g.answered_at } else { decided_at };
+                    let from = if review.is_some_and(|r| r.flag("required")) { g.answered_at.or(deemed) } else { decided_at };
                     from.is_some_and(|f| days_left(f, a.i("within_days").unwrap_or(0), t) >= 0)
                 } else {
                     false
@@ -1263,7 +1267,7 @@ impl Openings for Ways<'_> {
                 out.push(o);
             }
             // (A venue is for what asking did not settle: after a no, nothing, or a yes not done.)
-            let after_asking = g.answer.as_deref().is_some_and(|a| a != "granted") || (law.is_some() && review.is_none());
+            let after_asking = g.answer.as_deref().is_some_and(|a| a != "granted") || (law.is_some() && review.is_none()) || deemed.is_some();
             if after_asking && may_apply {
                 for h in book.hearings() {
                     let venue = h.speaks_for.clone().unwrap_or_else(|| h.author.clone());
@@ -1775,6 +1779,62 @@ mod tests {
         });
         assert_eq!(fns.len(), 1);
         assert!(p.recourse.grievances["underpaid:J1"].told);
+    }
+
+    /// A refused claim whose law requires a review before an appeal, with or without a deemed refusal; asked for at
+    /// day 10 and never answered (MT-21).
+    fn unanswered_review(deemed: Option<i64>) -> (Ctx, Person, Vec<Arc<Record>>) {
+        let c = ctx(json!({}), true);
+        let mut p = person(&c, 0);
+        let mut review = json!({ "within_days": 30, "grounds": "any", "required": true });
+        if let Some(d) = deemed {
+            review["deemed_refused_days"] = json!(d);
+        }
+        let law = rec(json!({ "id": "law-decisions", "record": "statement", "author": "genesis", "speaks_for": "outside", "at": 0, "visible_to": "public", "kind": "law", "text": "Decisions.",
+            "data": { "decisions": [{ "kind": "benefit_decision", "name": "Support", "payments": ["pension"], "review": review, "appeal": { "matter": "claim_refused", "within_days": 30, "grounds": "any error" } }] } }));
+        let dec = statement("dec-1", 5 * DAY, "benefit_decision", "support", json!({ "claim": "cl-1", "payment": "pension", "granted": false, "reason": "papers" }));
+        let world = vec![law, dec, hearing("h1", "tribunal", "claim_refused")];
+        at(&mut p, &c, &pic(5 * DAY, world.clone()), |p, w| {
+            let g = p.grieve(w, "claim_refused", "support", Some("dec-1"), None, None, 10_000, "security", Some("papers"));
+            g.seeks = Some("pension".into());
+        });
+        let wnt = want("claim_refused", "support", Some(("dec-1", "claim_refused")), &["money.to"]);
+        let pc = pic(10 * DAY, vec![]);
+        let ask = ways(&p, &pc, &wnt).into_iter().find(|o| o.kind == "ask").expect("a review may be asked for");
+        at(&mut p, &c, &pc, |p, w| p.carry_out(w, &ask.intent, None));
+        (c, p, world)
+    }
+
+    #[test]
+    fn a_review_never_answered_is_taken_as_refused_where_the_law_says_so_and_the_appeal_runs_from_then() {
+        let wnt = want("claim_refused", "support", Some(("dec-1", "claim_refused")), &["money.to"]);
+        let (c, mut p, _) = unanswered_review(Some(91));
+        assert_eq!(p.recourse.grievances.values().next().unwrap().asked, Some(10 * DAY));
+        // Unanswered past the claimant's patience: ignored, but the law's days have not run; no appeal yet.
+        at(&mut p, &c, &pic(30 * DAY, vec![]), |p, w| p.disrepair(w));
+        assert_eq!(p.recourse.grievances.values().next().unwrap().answer.as_deref(), Some("ignored"));
+        assert!(ways(&p, &pic(100 * DAY, vec![]), &wnt).iter().all(|o| !o.venue), "the review is not yet taken as refused");
+        // 91 days after asking: taken as refused; the tribunal is open, and the application says when the review was asked.
+        let pc = pic(101 * DAY, vec![]);
+        let venues: Vec<Opening> = ways(&p, &pc, &wnt).into_iter().filter(|o| o.venue).collect();
+        assert_eq!(venues.iter().map(|o| o.key.as_str()).collect::<Vec<_>>(), ["desk:tribunal"]);
+        let intent = venues[0].intent.clone();
+        let (out, _) = at(&mut p, &c, &pc, |p, w| p.carry_out(w, &intent, None));
+        assert_eq!((out[0].4["review_asked_on"].as_i64(), out[0].4.get("reviewed_on")), (Some(10 * DAY), None));
+        // The appeal's 30 days run from the deemed refusal (day 101): gone by day 132.
+        let (_, q, _) = unanswered_review(Some(91));
+        assert!(ways(&q, &pic(131 * DAY, vec![]), &wnt).iter().any(|o| o.venue));
+        assert!(ways(&q, &pic(132 * DAY, vec![]), &wnt).iter().all(|o| !o.venue), "out of time");
+    }
+
+    #[test]
+    fn without_a_deemed_refusal_in_the_law_an_unanswered_review_still_leads_nowhere() {
+        let wnt = want("claim_refused", "support", Some(("dec-1", "claim_refused")), &["money.to"]);
+        let (c, mut p, _) = unanswered_review(None);
+        at(&mut p, &c, &pic(30 * DAY, vec![]), |p, w| p.disrepair(w));
+        for d in [31, 101, 200] {
+            assert!(ways(&p, &pic(d * DAY, vec![]), &wnt).iter().all(|o| !o.venue), "day {d}: the law's route, as the place has it");
+        }
     }
 
     #[test]

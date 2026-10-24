@@ -509,7 +509,7 @@ impl Paper for ReviewRequest {
 /// Written by: citizen.ts (`PAPER.application`), firms.ts (a landlord's application for rent in arrears: `kind`
 /// `arrears`, `evidence` `{id, record}`). Read by: desk.ts (a body's cases), frictions.ts (the Respondent), daybook.ts.
 /// `kind` is the matter again where a body takes several; `evidence` is a reference or a whole record;
-/// `decided_on` and `reviewed_on` are times; `request` says in words what was asked of the other side.
+/// `decided_on`, `reviewed_on` and `review_asked_on` (a review asked for and not answered) are times; `request` says in words what was asked of the other side.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Application {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -537,6 +537,9 @@ pub struct Application {
     pub decided_on: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int")]
     pub reviewed_on: Option<i64>,
+    /// When a review was asked for that has had no answer (the law's deemed refusal counts from it).
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int")]
+    pub review_asked_on: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brought_forward: Option<bool>,
 }
