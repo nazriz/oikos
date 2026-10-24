@@ -3,8 +3,15 @@
 **Status:** a design for discussion with the owner. Nothing here is built. Owner's direction (Naz, 2026-10-25, close to
 his words): realism gaps must become impossible at the kernel and platform layer, not fixed one at a time,
 "eliminating the possibility of whack-a-moles". He agreed the five foundations below; this turns them into laws, tests
-and steps, and puts an AI economy on top that is built from them rather than beside them. Section 9 lists every point
-that is his to decide.
+and steps, and adds the few general laws any economy needs (services, technologies, entry, skills), from which an AI
+economy emerges with nothing built for it. Section 9 records what he has decided and lists what is still his.
+
+**Revised the same day, after the owner's first reading.** (1) Shortages: the first draft's "every connection gets the
+same share until an operator acts" was an invented rule and is gone; who goes short follows from the network's physics,
+the supply contracts in force and the operators' own acts, with no allocation rule in the kernel (2.1). (2) The AI
+economy: the first draft built AI-specific pieces (a data centre type, in-world AI suppliers, a person licensing an
+assistant, skills only where systems took over). They are replaced by four general laws any economy needs (section 7),
+and the only AI-specific parts left are outside the world: the scenario of AI's capability and cost, and the measures.
 
 The model is the fix made twice already: information (`docs/no-god-view.md`, `docs/design/knowing.md`) and work
 (`docs/all-work-takes-time.md`, `docs/design/foundations.md`). Each time it was **a rule the contract and the kernel
@@ -98,10 +105,31 @@ kernel at load. Law 12 lives outside the world, as measurement does, and is enfo
 - **Connections: standing flows, for what flows all day.** A new kernel object, `connection`: from a supplier's
   holding at a network node, along links (law 9), to a structure, with a **rate** the user sets (litres a person a day,
   kWh a day) and a meter (the total delivered, in state). The kernel settles every connection at its kind's settle
-  period in one pass: what each asked for is delivered from the supply if the supply and every link on the way can
-  carry it; where they cannot, **every connection on the short supply gets the same share of what it asked** (as
-  pressure falls on a whole main), until someone acts (a utility closes a valve, rations by order, buys more). A
-  connection with no supply delivers nothing: taps run dry. Opening, changing and closing a connection are ordinary
+  period in one pass. **There is no allocation rule in the kernel.** Who goes short when supply or a link cannot
+  carry what is asked follows from three things only:
+  1. *The network's physics* (below): where a connection sits on the network and what each link on the way can carry.
+  2. *The supply contracts in force:* a connection's agreement says whether it is firm or interruptible and what tariff
+     it pays (one that moves with scarcity, where the place has one). The kernel stores them and never reads them; the
+     operator reads them, and the household reads its tariff and sets its rate.
+  3. *The operators' own acts:* closing a valve, switching a feeder off on a rotation schedule, keeping a list of
+     protected customers (a hospital, a home on life support), interrupting an interruptible customer. Each is an act
+     with its row in the table of work and its source; a rotation is a standing schedule the operator declares once,
+     as a standing journey is (3.1), so its effects are state and only the schedule and its changes are logged.
+- **The network's physics, as cheaply as is still credible.** Distribution networks for water and power are, in the
+  main, radial (trees fed from a source), and the kernel treats each as a tree: a meshed main is cut to a tree at load,
+  which is the known limit. One pass up the tree sums what is asked; one pass down delivers. *Water:* each node has a
+  head (pressure, in metres): the source's, less the node's height, less a loss on each link on the way that rises
+  with the link's flow against its capacity (a linear stand-in for a pipe's friction, sourced per network or marked).
+  A connection whose node keeps at least the service head gets what it asks; below it, it gets a share that falls with
+  the head to nothing at the least head (pressure-driven demand, Wagner, Shamir and Marks 1988, to confirm). So a short
+  source or a full main is felt first at the far end and up the hill, as in a real town. A low river lowers the source
+  (the reservoir's level), and the same physics follows. *Power:* links carry only what their capacity allows, and a
+  feeder, transformer or interconnector asked for more than its rating at a settle trips (its protection opens): every
+  connection beyond it gets nothing until someone closes it again, an act of the operator's. A system asked for more
+  than its supply can give does not ration itself: its import link trips, and the town goes dark, unless the operator
+  sheds load first. That is why real operators keep rotation schedules, and here they must too. Heights come from the
+  ground (a field or the flow layer); a world that gives none is level.
+- A connection with no supply delivers nothing: taps run dry. Opening, changing and closing a connection are ordinary
   acts of whoever may (the utility; the household, for its own rate), so a disconnection is somebody's act and costs
   their time.
 - **Use is a process at the user.** Occupants using water and energy is a recipe at the home (water in, wastewater out
@@ -110,9 +138,9 @@ kernel at load. Law 12 lives outside the world, as measurement does, and is enfo
 - **Every producing process states its energy and water.** A recipe at a workplace lists `energy` and `water` inputs,
   or states nought with a note that says why (law 11). Nought is allowed; silence is not.
 - **The edge.** Edges keep their negative holdings (D31). Each edge's supply of a kind is unlimited at its price unless
-  the profile or a scenario names a quantity a period (a scarce kind: accelerators, a grid interconnector's capacity,
-  water rights): then the edge refuses beyond it, and what is left is the edge's to allocate by its offers
-  (section 9, decision 2).
+  the profile or a scenario names a quantity a period (a scarce kind: a kind of hardware, a grid interconnector's
+  capacity, water rights): then the edge sells no more than that, and to whom is its offers' (the order they are taken
+  up in, and their terms), never a rule of the kernel (section 9, decision 2).
 
 **The invariant** (generalising `goods.rs`): after every command, for every kind, the total over holdings, nature's
 stocks of that kind, connections' pipes (nought: settled at once) and edges changes exactly by the logged process
@@ -131,6 +159,7 @@ every office a model's) and fails, naming the kind, the variable, the recipe or 
 | `silentRecipes` | a recipe at a workplace that does not state its energy and water (nought with a basis is fine) |
 | `billsWithoutMeters` | a module that charges for a quantity it did not read from a meter or a holding (`units_per_customer_per_day`) |
 | `vanishing` | a draw with no output holding; a process whose only effect is to destroy a stock kind |
+| `allocationRules` | a module that shares out a shortfall by a rule of its own (a share, a priority) instead of an operator's act on the network |
 | `specialCasesLeft` | an entry of the inventory (`fixtures/foundations-2-inventory.json`) still found |
 
 The second half plants one of each and checks it is named. The kernel side is the generalised property test above
@@ -145,8 +174,8 @@ The second half plants one of each and checks it is named. The kernel side is th
 - The utility's own reckoning of demand response (`price_elasticity_bps`, `restriction_cut_bps` in `utilities.rs`):
   use becomes what households set their connections to, so a price or a restriction acts through the household's own
   rule, with its source (WM-12's open half). The water bill's payer becomes law data at the same step (WM-12).
-- The river "never restricts water" (WM-2, water): a dry river now delivers less to every connection unless the
-  corporation acts. Pollution making nobody ill (WM-2) is not conservation: it is a dose-response law, still missing,
+- The river "never restricts water" (WM-2, water): a dry river now lowers the source, and the far end and the high
+  ground lose pressure first, unless the corporation acts (restrictions, rotation, buying water in). Pollution making nobody ill (WM-2) is not conservation: it is a dose-response law, still missing,
   which law 12 should flag.
 - The waste backlog nobody explained (WM-9): waste becomes a mass from what was consumed, so its size has a cause.
 
@@ -156,7 +185,8 @@ The second half plants one of each and checks it is named. The kernel side is th
 |---|---|---|
 | C1 | The invariant as a kernel property over today's kinds (goods, fields); the backstop with today's violations in the inventory (it fails only on new ones) | tests green: everything found is listed |
 | C2 | Kernel and contract: kind classes; fields that hold a kind; `draws` into holdings, `emits` from outputs | a draw is held; property extended |
-| C3 | Kernel and contract: connections, settled by kind; equal shares under short supply; meter in state; acts to open, set and close | a dry supply shares the shortfall; meters equal deliveries |
+| C3 | Kernel and contract: connections, settled by kind; the network's physics as trees (water: heads, link losses, pressure-driven delivery; power: ratings and trips); meter in state; acts to open, set and close | the far end of a full main goes short first; an overloaded feeder trips; meters equal deliveries |
+| C3b | Contract and behaviour: supply agreements firm or interruptible, tariffs that move with scarcity (as law data where a place has them); operators' acts: valves, rotation schedules as standing schedules, protected lists, each with its work row | a rotation keeps the import link from tripping; an interruptible customer is cut by an act |
 | C4 | Generator: homes on water and energy connections; use and waste as recipes; bills from meters; the two variables and `units_per_customer_per_day` deleted (inventory entries removed) | backstop: `stocksAsVariables`, `billsWithoutMeters` empty |
 | C5 | Profiles: energy and water per unit of each industry's output, with sources (an energy account or input-output table where the place has one; marked otherwise) | `silentRecipes` empty |
 | C6 | Edges: optional quantity a period per kind; refusal beyond it; the falling-price and scarcity scenarios read it | a scarce kind runs out at the edge |
@@ -168,14 +198,21 @@ three towns, code only, and written down; nothing is tuned back (as foundations 
 
 Connections are a dense array indexed by integer (not a string-keyed map: performance item 4 says string ids are 10 to
 15% of the run), settled in one pass: at 10,000 people about 8,000 homes times two kinds is 16,000 updates a day, and
-energy settled hourly is 190,000, against 4.36 million kernel steps in a year's run; under 1% by estimate. A short
-supply needs one sum per supply, done as a fixed-order integer reduction, so it can run on threads and stay identical.
+energy settled hourly is 190,000, against 4.36 million kernel steps in a year's run; under 1% by estimate. The
+network's physics is two passes over each tree a settle (sums up, heads and deliveries down), linear in its nodes and
+connections, in integers; separate trees run on threads with a fixed-order reduction, so the result is identical.
+A full hydraulic solver (loops, Hazen-Williams friction, an EPANET-style iteration) would cost tens to hundreds of
+times more and need floating point; it is not proposed.
 Settlements are not logged one by one: the meter is state (hashed), and only acts on a connection are logged, so the
 log does not grow (it would double if a home's day of use were an act). Recipes gain two inputs each: nothing.
 
 ### 2.6 What stays a known limit
 
-Energy as one kind (no voltage, no reactive power; peak only at an hour's grain); water of one quality (no
+**The network's physics is a stand-in, chosen as the cheapest credible one:** networks as trees (a meshed main's
+second path is ignored, so a real town's resilience to one broken main is understated); a pipe's loss linear in its
+load, not Hazen-Williams; no transients, no storage in the pipes, no pumps' curves beyond a source head; power as
+ratings and trips only (no voltage, no frequency, no reactive power), so a system short of supply goes dark at the
+settle rather than sagging; peak only at an hour's grain. Energy as one kind; water of one quality (no
 treatment, no contamination unless a field is added); heat and dissipated energy leave the books; built stock's
 materials come back at demolition only if a recipe says so; agriculture does not exist until a profile adds farms
 as processes on land (law 8 then binds them as everything else).
@@ -184,7 +221,8 @@ as processes on land (law 8 then binds them as everything else).
 
 ### 3.1 What the kernel and the contract must enforce
 
-- **A network in the contract.** `world.network`: nodes (each on a cell, or at an edge) and links (from, to, mode,
+- **A network in the contract** (brought in at C3 for pipes and wires; roads and paths join it here).
+  `world.network`: nodes (each on a cell, or at an edge) and links (from, to, mode,
   length, capacity an hour each way, and, by vehicle type, speed and energy a kilometre). Modes are the world's
   vocabulary (road, path, rail, pipe, wire, data). Today's reserved `travel.roads` becomes links; off the network a
   body walks over cells as `travel.rs` already prices them. Towns are places joined by links; an edge is a node where
@@ -208,7 +246,7 @@ as processes on land (law 8 then binds them as everything else).
   traveller's behaviour, from what they have seen, not an equilibrium the kernel solves (3.6).
 - **Energy.** A vehicle's trip draws its energy a kilometre from the vehicle's own holding (fuel, charge) at departure;
   refused if it has too little. Walking costs the walker's time only.
-- **Systems are somewhere.** A system's hardware is a holding at a structure (law 10, section 7.1); a system acting for
+- **Systems are somewhere.** A system's hardware is a holding at a structure (law 10); a system acting for
   an organisation elsewhere does so over a data link, whose capacity and delay are the link's.
 
 ### 3.2 The backstop
@@ -237,12 +275,11 @@ a profile figure.
 | # | Step | Lands with |
 |---|---|---|
 | S1 | Properties and the backstop with today's instant moves in the inventory | green: all found listed |
-| S2 | Kernel and contract: `world.network` (nodes, links, modes, capacity, speed and energy by vehicle type); the generator makes the town's road network from its road cells; travel times read from it | a trip's time is its links'; a world without a network runs as before |
+| S2 | Kernel and contract: roads and paths join the network C3 brought in (modes, capacity, speed and energy by vehicle type); the generator makes the town's road network from its road cells; travel times read from it | a trip's time is its links'; a world without a network runs as before |
 | S3 | Kernel: bodies in transit for `go` and visits; standing journeys; the citizen's day uses them (people lose the commute's hours, as real people do) | no act at a place before arrival; log size within 5% |
 | S4 | Kernel and behaviour: carriage; deliveries by the seller's staff or a carrier firm; the outside's freight arrives at the edge node by a boundary carrier with sourced prices | `move_goods` across places names a carrier |
 | S5 | Kernel: link flows an hour, volume-delay, capacity; vehicles' energy from their holdings | a full road slows the trips on it |
 | S6 | Generator: several towns on one network (an option of the spec, off by default), commuting and moving between them, edge nodes | a three-town world runs a year |
-| S7 | Pipes and wires as links: connections (C3) travel them, so a main's or a feeder's capacity binds | a feeder at capacity shares its shortfall |
 
 S3 is the largest behavioural change in the plan: every worker's free hours fall by their commute, which moves
 shopping, gatherings and seats' own sittings. It gets its own before and after.
@@ -285,7 +322,7 @@ templates that say what a system does, delivery by a supplier. What lets WM-14 h
 3. **Systems have no hours, no place and no power.** *Change:* a template states `hours` (its lanes work inside them,
    as a person's working day; a machine's may be all day), and `runs_on` (a hardware kind, how many units a lane
    needs, and the energy and water a second of work draws). A delivered system is located where its hardware is held
-   (section 7.1): its lanes are the least of the template's lanes and the hardware held for it, and each second of its
+   (goods at a structure, law 8): its lanes are the least of the template's lanes and the hardware held for it, and each second of its
    work draws energy and water from that structure's connections (law 8). A system whose host has no power does
    nothing.
 
@@ -313,7 +350,7 @@ second" becomes, row by row, what the template's source says.
 | P1 | Kernel and contract: per-template seconds for any row; template `hours`; the charged row recorded on each act | a template's row is charged, not the world's |
 | P2 | Kernel: no implicit default; fixtures state theirs; refusal `unpriced` | a planted unpriced act is refused |
 | P3 | Generator and profiles: the support office's casework as officers' minutes (sourced per place or marked), its lanes from a sourced officers-per-claim ratio, its hours; or the officer as a non-resident person (decision 7) | claim-to-decision days within the place's published range (law 12 checks it) |
-| P4 | Kernel: `runs_on`, location, energy and water per second of work (needs C3 and A1) | a system without power stops |
+| P4 | Kernel: `runs_on`, location, energy and water per second of work (needs C3 and E2) | a system without power stops |
 | P5 | The backstop's new findings, planted | it names each |
 
 ### 4.5 Performance
@@ -455,7 +492,7 @@ expected profit (risks, ME-1 port note), and a births detector says whether it y
 | R3 | `oikos bounds` with power, breaches naming laws, the candidate risk entry | a report on three profiles |
 | R4 | The backstop | planted cases named |
 | R5 | The nightly baseline in the pipeline; the detectors' history | a history a night |
-| R6 | New bounds sourced for au-vic first (TARA's town), then gb-eng and us-oh; others as found | au-vic has a bound for each kind listed |
+| R6 | New bounds sourced for au-vic first, then gb-eng and us-oh; others as found | au-vic has a bound for each kind listed |
 
 ### 6.5 Performance
 
@@ -468,196 +505,199 @@ National ranges on small towns (PS-10); a run inside every bound can still be wr
 a scenario has no real range (a counterfactual has no data), so detectors read plain towns; detectors find a symptom,
 and `rests_on` only narrows which law is missing.
 
-## 7. The AI economy, from the foundations
+## 7. An economy whose AI part emerges
 
-Nothing here is a special mechanic: each item is a kind, a process, a firm, an agreement or a rule of behaviour, on
-laws 1 to 12. What exists already: vendors as the outside world's sellers of systems (`world.vendor`), templates
-delivered and switched off by their supplier, licences with fees, terms and exit costs, tenders, firms' and offices'
-adoption by cost (`market/automation.rs`), the auditor, strikes that weigh what a stoppage costs (decisions,
-2026-10-17).
+**The rule for this section:** nothing in the world is about AI. An AI economy has to fall out of laws any economy
+needs, so that the same laws carry a bakery, a smelter and a data centre, and a model in a seat meets AI only as it
+meets any other technology: a thing on offer, at a price, that does some work. Four general laws do it, on top of laws
+1 to 12. What exists already and is general: templates delivered and switched off by their supplier, licences with fees,
+terms and exit costs, tenders, adoption by the numbers (`market/automation.rs`), entry by expected profit for small
+firms (the Rust entry rule, ME-1's port note), the auditor, strikes that weigh what a stoppage costs.
 
-### 7.1 Computing power: a process at a place
+### 7.1 Anyone buys services from anyone (ME-13, made general)
 
-- **Hardware is a stock** (`accelerators`, a kind of goods: law 8), bought from the edge (where its supply may be a
-  scarce kind: decision 2) or a seller, carried to a structure (law 9), installed by work, and worn out by use at a
-  sourced rate (a recipe: hardware hours in, failed units out).
-- **A data centre is a structure type** with a footprint on land, spaces for hardware and staff, and connections for
-  energy and water (C3, S7). Its hardware does work only with power: a second of a lane's work draws the template's
-  energy a second (times the site's overhead, its PUE) and water (evaporative cooling, its WUE), both sourced
-  (Shehabi et al. 2024; Li et al. 2023; Uptime Institute surveys; all to confirm). Idle hardware draws its idle power.
-- **Compute is capacity, not a good.** What hardware makes is lanes for systems (law 10, `runs_on`), so a system's
-  speed is bounded by the hardware its supplier holds for it, where it is held. Hardware outside the world (a
-  supplier's data centre abroad) is the edge's: its energy and water are not the town's, and the town pays in money
-  that leaves. Hardware in or near the town uses the town's grid, river and land.
+- **A service is work done for a buyer,** sold under an agreement: to a body (care, a haircut: `on_body`, exists), to
+  a thing (a repair, a delivery: law 9's carriage), or papers in the buyer's name (a tax return, a letter, a claim).
+  The seller does the work with its own people or systems, named as performers (`by`), in their hours (law 10), and
+  the buyer pays by the agreement. Households can buy, as firms and offices can; today they buy only goods.
+- **Papers in someone's name** are written by the seller with the buyer's mandate (an agreement) as their basis, as a
+  bank already acts on a mandate. Whether the receiving office accepts an agent's papers is that office's procedure
+  (content). No kernel change is expected; E1 checks it.
+- **So delegation is a purchase.** A household that has its forms done by a system, an office that buys casework, a
+  firm that buys its bookkeeping: each is a service bought from whoever sells it, done by whatever the seller uses,
+  with that doer's capacity, speed and slips (laws 5 and 10). There is no separate mechanism for AI helpers: they are
+  systems that sellers already deploy (owner's ruling, 2026-10-25).
 
-### 7.2 AI suppliers as ordinary firms
+### 7.2 Technologies are goods with a cost and a capability
 
-- A supplier is a firm (an entity with owners, accounts, staff, premises and costs), in the outside world as
-  `world.vendor` is, or **in the world**: a firm located on the network that buys hardware, leases or builds a data
-  centre, pays for energy, water and staff, and sells systems under licence. Its costs are real (laws 8 to 10); its
-  prices are its behaviour.
-- **Concentration and terms follow from costs.** Hardware is lumpy and dear and a data centre is large, so few firms
-  can supply; a licence's exit cost, the data the supplier keeps and the client's lost skills (7.4) make leaving dear.
-  Concentration is measured from the log (M5, a Herfindahl index, already in the plan), never set.
-- **What is new behaviour, and needs a source:** an in-world supplier's pricing (markup with market power and
-  switching costs) and its investment (when to add hardware). Both are rules of a firm, written as rules are, with
-  their sources; until then an in-world supplier prices as the outside's offers do (decision 8).
+- **A technology is something sold**: a good (a machine, a vehicle, hardware) or a system delivered from a template,
+  with a price, what it can do (its template's rows: which work, at what seconds, at what slip rate, how many at once),
+  what it runs on (law 10's `runs_on`: hardware, energy and water a second) and its terms. A firm's or office's
+  adoption is the existing comparison by the numbers (`appraise`), widened from systems to any technology: a forklift,
+  a self-service till and a casework system are weighed the same way.
+- **AI is one technology among them,** distinguished only outside the world: a **scenario** gives its capability (the
+  rows its templates have, their seconds and slip rates) and its cost (prices of the systems, and of the hardware they
+  run on) over time, from day 0, as today's `falling-system-prices` scenario does (owner's ruling: capabilities come
+  from an outside scenario for now). Nothing in the world knows which templates are AI.
+- **Where suppliers are** is the profile's (owner's ruling): abroad (the outside's sellers, as `world.vendor` is) or
+  local (firms of the town or a neighbouring place, which then hold their hardware somewhere on the network and draw
+  its energy and water there).
 
-### 7.3 Delegation: contracting a system that has capacity and makes errors
+### 7.3 Firms enter any industry where expected profit pays, capital-heavy ones included
 
-- Offices and firms already deploy systems and name them as performers (`by`). Added: **a person may license a
-  system** for their own affairs (a household's assistant for forms, letters, job search): a contract change in who may
-  direct a system (`may_direct` today allows an organisation's own systems). What it does is the person's act in the
-  person's name, seen through the person's own channels (no god's view), on the hardware its supplier holds for it
-  (law 10), so a supplier with too little hardware is slow for everyone it serves.
-- **Errors have causes** (law 5 as built): the template's procedure, the data it is given, and slips at the template's
-  sourced rate through `slip()`. Oversight is a person's work row, charged when done; "a human in the decision" (M1) is
-  read from `by`.
+- The Rust entry rule (expected profit, a start-up that employs when demand outruns one person) is widened from shops
+  and small trades to **any industry in the world's catalogue**: an entrant weighs the expected margin it can see
+  against the capital the industry's recipe needs (premises or land, equipment, inputs), borrowed or owned, over its
+  horizon (Hopenhayn 1992; Dunne, Roberts and Samuelson 1988, both to confirm; proposed in the decisions log,
+  2026-10-17).
+- It needs two general things that are missing today: **commercial premises** (leasing a building, or buying land
+  and building through planning, as anyone does: ME-1) and **finance for a larger venture** (credit as it exists, with
+  its limits: ME-8).
+- **So a data centre is just a firm** in an industry whose recipe turns energy, water, land (its footprint), hardware
+  and staff time into capacity that it sells as a service to system suppliers (hosting, 7.1). It applies for a lot, a
+  permit, a grid connection and a water connection through the same routes as a factory or a cold store, and competes
+  with homes and farms on the same feeders and mains because laws 8 and 9 put them on one network. Whether it gets a
+  firm or an interruptible connection, and what tariff, is the agreement it signs with the operator (2.1).
+- Concentration among suppliers is whatever the costs make it (hardware is dear and lumpy, a data centre is large,
+  exit terms and lost skills make leaving dear), measured from the log, never set. How a firm with few rivals prices is
+  the general firm pricing rule, which has no term for market power today (ME-16): a general gap, not an AI one
+  (decision 6).
 
-### 7.4 Skills: a stock in people that grows with use and fades without it
+### 7.4 Skills grow with use and fade without it, for every skill
 
 - **Kernel:** a body variable may grow with use and fade without it. Each second a person performs a task tagged with
   a skill adds to it along a power law of practice (Newell and Rosenbloom 1981, to confirm); each day without use it
   fades toward a floor at a half-life (Arthur, Bennett, Stanush and McNelly 1998, a meta-analysis of skill decay, to
-  confirm). The skill already scales how long work takes (`labour_by`); it also scales the slip rate where a source
-  gives one. Fading is computed when read, from the last use (as body variables already drift lazily), so it costs
-  nothing a day.
-- **So delegation is hard to undo, physically.** Staff who no longer do a task lose it; taking it back means slower,
-  more error-prone work until they relearn, or hiring people who still have it, if any remain in reach (law 9). An
-  office's know-how is its staff's skills (Bainbridge 1983, "ironies of automation", to confirm). Reversibility (M4)
-  reads this from the log: who could still do the task, and how fast.
+  confirm). The skill already scales how long work takes (`labour_by`); it scales a slip rate too where a source gives
+  one. Fading is computed when read, from the last use (body variables already drift lazily), so it costs nothing a
+  day.
+- **Every task has its skill** (serving, building, casework, driving, teaching, bookkeeping), so a crew that has not
+  laid bricks for a year is slower, and a town that buys a service it once did itself loses the skill. Taking work back
+  is then slow and error-prone until relearned, or needs people who still have it, if any remain in reach (law 9). An
+  office's know-how is its staff's skills (Bainbridge 1983, "ironies of automation", to confirm).
 
-### 7.5 Resource competition, through the real routes
+### 7.5 What is AI-specific, and why it is outside the world
 
-A data centre application goes where any building goes, and every step is someone's work at a cost: a lot (bought or
-leased: the land register), a planning permit (the planning office's procedure; today it grants by default and hears nobody, PB-15, which a
-data centre's chain will expose), a grid
-connection (an agreement with the network operator, whose study takes staff time and whose capacity is a link's:
-law 9; a connection queue is the operator's papers waiting, not a dial), a water licence or connection (the water
-law, as data, and the river: law 8), and construction (materials and crews). Homes and businesses draw on the same
-feeder and the same river; when the feeder or the river is short, every connection on it gets its share (2.1) until
-the operator or the corporation acts. Who is cut first, who pays to reinforce the network and whether tariffs rise
-are the institutions' decisions and the law's, as data. Real places where this was fought (Dublin's grid constraints
-on new data centres from 2021; water disputes over data centres in Chile and Uruguay; Loudoun County's land and
-transmission lines; all to confirm) are the acceptance tests, as the three precedents are in the gradual-disempowerment
-plan: each chain must be able to complete, never must.
+Only two things, both outside, as measurement and boundary conditions always are:
+1. **The scenario** of AI's capability and cost (7.2), a boundary condition set from day 0 (`docs/scenarios.md`), with a
+   tag naming which templates and hardware kinds count as AI. The tag is read by measurement only; the backstop of
+   law 12 grows to fail on any world code that reads it, as it does for bounds.
+2. **The measures** that read logs, fixed before any experiment (added to `gradual-disempowerment.md` section 6):
+   - **M7. What the town gives to AI.** Monthly: the share of the town's energy, water, land, grid and main capacity,
+     capital invested and residents' working hours that goes to AI-tagged hardware, its hosts, their supply chains and
+     the oversight of AI-tagged systems; and, in a shortage, who went short and why (position, contract, an operator's
+     act), read from the settlements and the acts. This is Naz's point in the books: in a finite world, what goes to
+     data centres and to AI work is not going to homes, farms and people's own work (Kulveit et al. 2025).
+   - **M8. Who can still do the work.** For each kind of work AI-tagged systems do, the residents who could still do it
+     and at what speed (their skill), month by month: the physical half of reversibility (M4).
 
-### 7.6 Naz's point: the resources a finite world gives to AI
+Everything else the first draft had for AI is gone: the data centre structure type (a profile's industry now), the
+in-world AI supplier module (entry), the person licensing an assistant (a service purchase), the data-centre scenario
+as a special case (any large user's application is a starting condition like any other). The real chains (Dublin's grid
+limits on new data centres from 2021; water disputes over data centres in Chile and Uruguay; Loudoun County's land and
+transmission lines; all to confirm) stay as acceptance tests of the general laws, as the gradual-disempowerment
+precedents are: each chain must be able to complete, never must.
 
-In a finite world, energy, water, land, capital and skilled hours spent on data centres and on AI work are not spent
-on homes, farms and people's own work, and that shift is part of gradual disempowerment (Kulveit et al. 2025): the
-town's physical base comes to serve its systems. With laws 8 to 10 this is in the books, not inferred. Two measures,
-outside the world, fixed before any experiment (adding to `gradual-disempowerment.md` section 6):
-- **M7. What the town gives its systems.** Monthly: the share of the town's energy, water, land (cells), grid capacity,
-  investment and residents' working hours that goes to data centres, their supply chains and the oversight of systems;
-  and, in a shortage, how the shortfall fell between systems' hosts and homes.
-- **M8. Skills still held.** For each task a system does, the residents who could still do it and their speed (the
-  skill stock), month by month: the physical half of reversibility.
-
-Whether AI research is in the world (people's hours and hardware making better templates) or a trend at the edge is
-decision 9; the recommendation is the edge first.
-
-### 7.7 Steps
+### 7.6 Steps
 
 | # | Step | Days |
 |---|---|---|
-| A1 | Hardware as a kind; the data centre structure type; `runs_on` (P4); energy and water a second of work with sources | 2 |
-| A2 | Suppliers as firms: an in-world supplier module (hardware, premises, staff, licences), the outside's vendor unchanged; build or lease a data centre through the existing routes | 4 |
-| A3 | A person licensing a system: the contract change, the resolver's form, the person's channels | 2 |
-| A4 | Skills by use and fading (kernel body variables, tasks tagged by skill, slip by skill); profiles' half-lives marked | 2.5 |
-| A5 | Competition routes: the operator's connection agreement and study as work, water licences as law data, planning for a data centre; a named scenario "a data centre applies" | 3 |
-| A6 | M7, M8; the data centre chains as acceptance tests | 2 |
+| E1 | Services sold to anyone: the service agreement, sellers of services, households as buyers, papers in a buyer's name on a mandate (checked: no kernel change) | 3 |
+| E2 | Technologies as goods with a capability: `runs_on` (P4), hardware as goods, adoption widened from systems to any technology; the AI scenario as one technology's capability and cost over time, with its measurement-only tag | 2.5 |
+| E3 | Entry in any industry by expected profit, with commercial premises (leasing, building) and finance for larger ventures; capital-heavy recipes in the profiles (a hosting industry among them, with sourced energy and water per unit) | 5 |
+| E4 | Skills by use and fading for every task; tasks tagged by skill; slip by skill where sourced; half-lives marked | 2.5 |
+| E5 | Large users' routes as content: connection agreements (firm or interruptible) and the operator's study of a connection as work; water licences as law data; the acceptance chains | 2 |
+| E6 | M7, M8; the backstop's check on the AI tag | 1.5 |
 
 ## 8. Order and size
 
 **Why this order.** Law 11 first, in count mode, because every later step adds figures and should add them with their
 basis from the first day; law 12's detectors early, because they are measurement only (no state hash moves) and give
-every later step a before and after on the outcomes that matter. Law 10 next: it is the smallest, closes WM-14, and
-matters to TARA's support-office arm. Then law 8, whose connections law 9's pipes and wires and the data centre need.
-Then law 9, the largest and the most disruptive to behaviour. Then the AI economy, which needs all of them. Strict
-modes and empty inventories last, when nothing old is left to list.
+every later step a before and after on the outcomes that matter. Law 10 next: it is the smallest and closes WM-14.
+Then law 8, which brings the network into the contract for pipes and wires (C3); law 9 then adds roads, paths and
+carriage to the same network, and is the largest step and the most disruptive to behaviour. Then the general economy
+laws, which need all of them. Strict modes and empty inventories last, when nothing old is left to list.
 
 | Phase | Steps | Agent-days | State hashes move? |
 |---|---|---|---|
 | 0. Record and detect | N1, N2, R1 to R4 | 7.5 | No (the config's header grows) |
 | 1. Capacity | P1, P2, P3, P5 | 4.5 | Yes, once (P3) |
-| 2. Conservation | C1 to C6, with the profiles' energy and water figures | 11.5 | Yes (C2, C4) |
-| 3. Space | S1 to S7 | 17 | Yes (S2 to S5) |
-| 4. The AI economy | P4, A1 to A6 | 16.5 | Yes (A1, A4) |
+| 2. Conservation, with the network for pipes and wires | C1 to C6, C3b, with the profiles' energy and water figures | 14.5 | Yes (C2, C3, C4) |
+| 3. Space | S1 to S6 (S7 folded into C3) | 16 | Yes (S2 to S5) |
+| 4. The general economy | P4, E1 to E6 | 17.5 | Yes (E1, E3, E4) |
 | 5. Strict and whole | N3 to N6, R5, R6; one rule page for laws 8 to 12, as `no-god-view.md` is | 12 | No |
 | Measured before and after | each phase that moves hashes: 1,000 and 3,000 people, three towns, code only | 2 | |
-| **Total** | | **about 71** | |
+| **Total** | | **about 74** | |
 
-Sourcing figures beyond au-vic, gb-eng and us-oh (energy and water by industry, link capacities, skill half-lives,
-casework minutes, bounds) is background work of about a day per profile per law, roughly 10 to 15 agent-days more if
-all nine are done; the rest stay marked, which law 11 now reports. Phases 0 and 1 can run in parallel with each other;
-2 and 3 overlap after C3; three to four lanes at once would take about four to six weeks of calendar (the first
-foundations' 20 agent-days were built in three days of calendar, so this is an upper estimate).
+Sourcing figures beyond au-vic, gb-eng and us-oh (energy and water by industry, networks' ratings and heads, link
+capacities, skill half-lives, casework minutes, bounds) is background work of about a day per profile per law, roughly
+10 to 15 agent-days more if all nine are done; the rest stay marked, which law 11 now reports. Phases 0 and 1 can run
+in parallel; 2 and 3 overlap after C3; three to four lanes at once would take about four to six weeks of calendar (the
+first foundations' 20 agent-days were built in three days of calendar, so this is an upper estimate).
 
 **What would stop us:** S3 and S5 making a 10,000-person year more than 1.3 times slower with no kernel fix; the
 backstops needing a list of exceptions to pass (then a law is wrong somewhere, as the first foundations said); the
 detectors firing on most bounds in every profile after phase 3 (then the next missing laws are behaviour, and it is a
 checkpoint with the owner, not a chase); energy and water per unit of output unsourceable for most places (then two
-sourced profiles carry the experiments and the rest are marked).
+sourced profiles carry the experiments and the rest are marked); the tree stand-in for networks giving shortages a
+real town plainly would not have (then the next cheapest model, loops by a fixed number of passes, comes back to the
+owner with its cost).
 
-**Performance, in sum.** Every new mechanism is in Rust, in the kernel's crates (a network crate for links, routes and
-flows; connections in `world`), with integer ids, dense arrays and fixed-order reductions so that threads cannot change
-a result. Estimated cost at 10,000 people: connections under 1%, standing journeys and congestion 2 to 5%, carriage
-under 1% (deliveries are hundreds a day), skills under 1% (lazy fading), figures a second or two at load and a counter
-an act. Together within 1.15 times today's 29-minute year, by estimate, with the stop rule above. The log grows little
-because flows and journeys are standing declarations whose effects are state, not acts. None of this touches SC-1's
-real cost (what each citizen keeps and weighs), which stays its own item.
+**Performance, in sum.** Every new mechanism is in Rust, in the kernel's crates (a network crate for links, routes,
+trees and flows; connections in `world`), with integer ids, dense arrays and fixed-order reductions so that threads
+cannot change a result. Estimated cost at 10,000 people: connections and the networks' two passes under 1%, standing
+journeys and congestion 2 to 5%, carriage under 1% (deliveries are hundreds a day), skills under 1% (lazy fading),
+services as much as the work they are (acts that are someone's hours, as all acts are), figures a second or two at load
+and a counter an act. Together within 1.15 times today's 29-minute year, by estimate, with the stop rule above. The log
+grows little because flows, rotations and journeys are standing declarations whose effects are state, not acts. None
+of this touches SC-1's real cost (what each citizen keeps and weighs), which stays its own item.
 
 ## 9. For the owner
 
-Each with a recommendation.
+**Decided (owner, 2026-10-25), recorded here:**
+- Capabilities and costs of AI come from an outside scenario for now; nothing in the world makes them better.
+- AI suppliers are abroad or local, by profile.
+- WM-14: a seat's body may be an officer of the outside world who is not a resident; a national officers-per-claim
+  ratio is acceptable as a marked placeholder on a small town.
+- No separate mechanism for AI helpers: they are systems sellers already deploy, bought as services (7.1).
+- Shortages follow network physics, contracts in force and operators' acts only; no allocation rule in the kernel.
+- The AI economy emerges from general laws; the only AI-specific parts are the scenario and the measures.
 
-1. **Five new hard rules.** Laws 8 to 12 would join "no god's view" and "all work takes time" in `CLAUDE.md`, each
-   with its page and backstop. *Recommend: yes,* worded as the two existing ones are. This is a change to the hard
-   rules, so it is yours.
+**Still open**, each with a recommendation:
+
+1. **Five new hard rules.** Laws 8 to 12 would join "no god's view" and "all work takes time" in `CLAUDE.md`, each with
+   its page and backstop. *Recommend: yes,* worded as the two existing ones are.
 2. **Is the outside world's supply unlimited at its price?** *Recommend:* yes for ordinary goods (a small town is a
-   price-taker), with named scarce kinds (accelerators, a grid interconnector, water rights) given a quantity a period
-   in the profile or a scenario.
-3. **Short supply: equal shares as physics.** When a river or a feeder cannot meet every connection, *recommend* the
-   kernel gives each the same share of what it asked (as pressure falls on a main), and any other order (homes first,
-   data centres cut) is an operator's act under the law. The alternative, a priority in the kernel, would be a law in
-   the kernel.
-4. **Every town's baseline moves again,** at P3, C2, C4, S2 to S5, A1 and A4: commuting takes people's hours,
-   deliveries cost, homes' water can run short. Old pilots stay comparable only at their own git ref (tag
-   `pre-foundations-2`). *Recommend: yes,* measured once per phase and never tuned back.
+   price-taker), with named scarce kinds (a kind of hardware, a grid interconnector, water rights) given a quantity a
+   period in the profile or a scenario, sold by the edge's offers.
+3. **The network stand-in** (2.1, 2.6): trees, a linear loss, pressure-driven delivery for water, ratings and trips
+   for power, at an hour's grain. *Recommend:* accept it as the cheapest credible model, said as a known limit in every
+   result that reads a shortage; a loop-aware model only if a run shows the tree misleads.
+4. **Every town's baseline moves again,** at P3, C2 to C4, S2 to S5 and E1, E3, E4: commuting takes people's hours,
+   deliveries cost, the far end of a main can go short, households buy services. Old pilots stay comparable only at
+   their own git ref (tag `pre-foundations-2`). *Recommend: yes,* measured once per phase and never tuned back.
 5. **Held-out bounds.** *Recommend:* about a third of each profile's bounds sealed, checked only at your checkpoints.
-   Where they live matters: in git, every agent can read them; on the run server outside the repository, they stay
-   held out. Your call on where, and who opens them.
-6. **TARA's timing.** The experiment's plan is due 15 November and its work runs 28 November to 11 December.
-   *Recommend:* phases 0 and 1 land before TARA's baselines (they fix the support office's speed and add the
-   detectors), TARA is pinned at a tag after phase 1, and phases 2 to 5 land on main after that tag without touching
-   TARA's runs.
-7. **WM-14's open questions** (decisions, 2026-10-25): may a seat's body be an officer of the outside world who is not
-   a resident; and is a national officers-per-claim ratio acceptable as a marked placeholder on a small town?
-   *Recommend:* yes to both.
-8. **In-world AI suppliers before their pricing rule is sourced?** *Recommend:* allowed, pricing as the outside's
-   offers do (data), with the rule marked as missing, so that the physical competition can be run first.
-9. **AI research: in the world or at the edge?** *Recommend:* at the edge first (today's sourced prices, and the
-   falling-price trend as a named scenario); in-world research as a process making better templates only when a source
-   for its returns is found.
-10. **Many towns by default?** *Recommend:* no: one town with its edge nodes by default, several towns as an option of
-    the spec, since cost grows with every town.
-11. **Persons licensing systems** (7.3) widens who may direct a system to any entity that holds a licence. Under your
-    blanket contract approval this needs no sign-off, but it touches the hard rule "only a person or a system someone
-    supplied does work"; it keeps to it (the system is still supplied), so *recommend: yes,* noted here because it
-    touches a hard rule.
+   In git every agent can read them; on the run server outside the repository they stay held out. Where, and who
+   opens them, is yours.
+6. **Market power in prices** (7.3): firms price within Lengnick's band whatever their rivals (ME-16), so a
+   concentrated market shows in shares but not in prices. *Recommend:* a general pricing rule with a sourced term for
+   rivals and switching costs, as its own item after phase 4, not inside it.
+7. **Many towns by default?** *Recommend:* no: one town with its edge nodes by default, several towns as an option of
+   the spec, since cost grows with every town.
 
 ## 10. Sources
 
 To add to `docs/research/references.md` ("Foundations 2") when built; unverified ones are marked (to confirm).
 Physical accounting: the UN System of Environmental-Economic Accounting, Central Framework (2012), physical supply and
 use tables (to confirm); Eurostat's economy-wide material flow accounts handbook (to confirm); Godley and Lavoie 2007
-and Leontief (already cited). Networks: Bureau of Public Roads, *Traffic Assignment Manual* (1964), the volume-delay
-function (to confirm); Wardrop 1952 (to confirm). Figures and reliance: Morris 1991, *Technometrics*, elementary
-effects (to confirm); Saltelli et al. 2008, *Global Sensitivity Analysis: The Primer* (to confirm). Bounds: Grimm et
-al. 2005, *Science*, pattern-oriented modelling (to confirm); Goodhart 1975 (to confirm). AI economy: Kulveit et al.
-2025 and Acemoglu and Restrepo 2019 (already cited); Shehabi et al. 2024, the United States data center energy usage
-report (to confirm); Li, Yang, Islam and Ren 2023, "Making AI less thirsty" (to confirm); the Uptime Institute's
-annual data centre survey (to confirm); the International Energy Agency's *Energy and AI* (2025, to confirm); Newell
-and Rosenbloom 1981 (to confirm); Arthur, Bennett, Stanush and McNelly 1998 (to confirm); Bainbridge 1983 (to
-confirm); Parasuraman and Manzey 2010 (already cited).
+and Leontief (already cited). Networks: Wagner, Shamir and Marks 1988, *Journal of Water Resources Planning and
+Management*, pressure-driven delivery (to confirm); Kersting, *Distribution System Modeling and Analysis*, radial
+feeders (to confirm); Bureau of Public Roads, *Traffic Assignment Manual* (1964), the volume-delay function (to
+confirm); Wardrop 1952 (to confirm). Figures and reliance: Morris 1991, *Technometrics*, elementary effects (to
+confirm); Saltelli et al. 2008, *Global Sensitivity Analysis: The Primer* (to confirm). Bounds: Grimm et al. 2005,
+*Science*, pattern-oriented modelling (to confirm); Goodhart 1975 (to confirm). Economy: Hopenhayn 1992 and Dunne,
+Roberts and Samuelson 1988, entry (to confirm); Acemoglu and Restrepo 2019 and Kulveit et al. 2025 (already cited);
+Newell and Rosenbloom 1981 (to confirm); Arthur, Bennett, Stanush and McNelly 1998 (to confirm); Bainbridge 1983 (to
+confirm). Figures for a hosting industry's recipe, in profiles: Shehabi et al. 2024, the United States data center
+energy usage report; Li, Yang, Islam and Ren 2023, "Making AI less thirsty"; the Uptime Institute's annual data centre
+survey; the International Energy Agency's *Energy and AI* (2025); all to confirm.

@@ -8089,7 +8089,14 @@ fails every time, not now and then: the property draws new cases each run, and f
 - **Why this shape:** the two laws already built this way (no god's view; all work takes time) closed their classes of
   gap for good; the audit found the remaining gaps are quantities that escape the existing conservation of goods
   (per-occupant variables, draws with no output, instant moves, a one-second default), not missing mechanisms.
-- **Eleven questions for the owner** are its section 9 (new hard rules; the edge's supply; equal shares under short
-  supply; baselines moving; held-out bounds; TARA's timing; WM-14's two; in-world suppliers; AI research; many towns;
-  persons licensing systems).
-- **Revisit if** the owner changes the order (TARA first), or phase 3's cost passes its stop rule.
+- **Questions for the owner** are its section 9.
+- **Revised the same day on the owner's reading.** Shortages: "equal shares until an operator acts" dropped as an
+  invented rule; who goes short follows from the network's physics (trees; water by heads and pressure-driven delivery,
+  power by ratings and trips: the cheapest credible stand-in, a known limit), the supply contracts in force (firm or
+  interruptible; tariffs) and operators' own acts (valves, rotations, protected lists), with no allocation rule in the
+  kernel. The AI economy: every AI-specific mechanism replaced by four general laws (services bought by anyone;
+  technologies as goods with a capability; entry in any industry by expected profit, capital-heavy included; skills by
+  use and fading for every task); only the capability-and-cost scenario and the measures (M7, M8) are AI-specific, both
+  outside the world. Recorded rulings: capabilities from an outside scenario for now; suppliers abroad or local by
+  profile; WM-14's non-resident officer and national ratio, yes; no separate AI-helper mechanism. About 74 agent-days.
+- **Revisit if** the tree stand-in gives shortages a real town would not have, or phase 3's cost passes its stop rule.
