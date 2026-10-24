@@ -3,6 +3,7 @@
 // forks with the post's code, nobody and mock models as steward, the same numbers in this process and across workers,
 // and a fork's log that exports and verifies.
 
+import { engineModule, kernelBinary } from "../src/kernel";
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -183,8 +184,9 @@ test("an arm's withholding is checked, and a registered comparison that needs ci
 
 // ---- a whole experiment on the engine
 
-const kernel = join(root, "kernel/target/release/oikos-kernel");
-const have = existsSync(kernel) && !!Bun.spawnSync(["sh", "-c", `ls ${join(root, "kernel/target/release")}/liboikos_napi.* 2>/dev/null`]).stdout.toString().trim();
+// (The kernel the host would use: OIKOS_KERNEL and OIKOS_ENGINE_MODULE are honoured, as the merge gate sets them for its build.)
+const kernel = (() => { try { return kernelBinary(); } catch { return ""; } })();
+const have = !!kernel && existsSync(kernel) && !!engineModule();
 
 const specFile = join(root, "experiments/weather-stewards.ts");
 const smaller = (spec: ExperimentSpec): ExperimentSpec => ({ ...spec, seeds: [1, 2], untilDay: 40, arms: spec.arms.filter((a) => ["code", "nobody", "diligent", "three-days-late"].includes(a.name)) });

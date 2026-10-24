@@ -297,6 +297,10 @@ const ACCOUNT_PROMPT_CHARS = 8_000;
 export const endCosts = (): EndCosts => JSON.parse(readFileSync(join(import.meta.dir, "../debrief-costs.json"), "utf8"));
 
 export async function runWorld(o: RunOptions): Promise<RunSummary> {
+  if (process.env.OIKOS_RUN_TRACE) return traced(o);
+  return runWorldInner(o);
+}
+async function runWorldInner(o: RunOptions): Promise<RunSummary> {
   const k = o.kernel ?? new Kernel();
   try {
     return await runWith(o, k);
@@ -304,6 +308,22 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     // A run that fails takes its kernel with it (one it was given is the caller's to close).
     if (!o.kernel) k.kill();
     throw e;
+  }
+}
+
+// For measuring the suite (docs/dev-machine.md, "Tiers"): OIKOS_RUN_TRACE=<file> appends one line per run: the test file,
+// a hash of its options (with and without the run id), the options that are functions (a run with any cannot be reused),
+// and how long it took. Nothing else changes. (It showed, 2026-10-24, that the slow tier repeats 1 to 3% of its run time.)
+async function traced(o: RunOptions): Promise<RunSummary> {
+  const { createHash } = await import("node:crypto");
+  const { appendFileSync } = await import("node:fs");
+  const fns = Object.entries(o).filter(([, v]) => typeof v === "function" || (v && typeof v === "object" && Object.values(v).some((x) => typeof x === "function")) || v instanceof Kernel).map(([k]) => k);
+  const data = Object.fromEntries(Object.entries(o).filter(([k]) => !fns.includes(k) && k !== "outDir"));
+  const h = (x: unknown) => createHash("sha256").update(JSON.stringify(x)).digest("hex").slice(0, 12);
+  const t0 = performance.now();
+  const env = process.env.OIKOS_RUN_TRACE!;
+  try { return await runWorldInner(o); } finally {
+    appendFileSync(env, JSON.stringify({ file: process.env.OIKOS_TEST_FILE ?? process.argv.slice(1).join(" "), key: h(data), keyNoRun: h({ ...data, runId: 0 }), fns, until: o.until, ms: Math.round(performance.now() - t0) }) + "\n");
   }
 }
 

@@ -24,7 +24,7 @@ pub(crate) fn ctx(params: Value) -> Ctx {
         performer: Default::default(),
         entity: ME.into(),
         position: Some("police-oic".into()),
-        params: params.as_object().unwrap().clone(),
+        params: params.as_object().unwrap().clone().into(),
         world: Arc::new(WorldInfo { tick: 60, run_end: 400 * DAY, ..Default::default() }),
     }
 }

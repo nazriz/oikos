@@ -28,6 +28,9 @@ const call = <T>(n: Native, name: string, args: object): T => JSON.parse(n.rules
 /** Without the absent parts (Rust writes them as null; TS leaves them out). */
 const present = <T extends object>(x: T): T => Object.fromEntries(Object.entries(x).filter(([, v]) => v !== null && v !== undefined)) as T;
 
+/** Whether the Rust rules are in use (the module is built and nothing asks for the TypeScript ones). */
+export const rustRulesInUse = (): boolean => rust() !== undefined;
+
 export const planLaw: typeof ts.planLaw = (p) => {
   const n = rust();
   return n ? present(call(n, "forms.plan_law", p)) : ts.planLaw(p);
@@ -44,3 +47,57 @@ export const draftLaw: typeof ts.draftLaw = (id, schedule, values) => {
   const n = rust();
   return n ? present(call(n, "law.draft", { schedule_id: id, schedule, values })) : ts.draftLaw(id, schedule, values);
 };
+
+// Tax on pay, the payments, and the household draws (MT-18, 2026-10-23): the Rust rules whenever the module is built.
+// The words functions (chargesInWords, paymentsInWords, ...) take a writer of sums and still run in TypeScript (docs/risks.md, MT-18).
+const memo = new Map<string, number>();
+export const withholding: typeof ts.withholding = (law, gross, period) => {
+  const n = rust();
+  if (!n) return ts.withholding(law, gross, period);
+  if (!law || gross <= 0 || period <= 0) return 0;
+  const key = `${(law as { id?: string }).id}|${law.charges.length}|${gross}|${period}`;
+  let v = memo.get(key);
+  if (v === undefined) memo.set(key, (v = call<number>(n, "withholding.withholding", { law, gross, period })));
+  return v;
+};
+export const dayPayPeriod: typeof ts.dayPayPeriod = (days) => {
+  const n = rust();
+  return n ? call<number>(n, "withholding.day_pay_period", { work_days: days }) : ts.dayPayPeriod(days);
+};
+export const declarationFor: typeof ts.declarationFor = (rule, facts) => {
+  const n = rust();
+  return n ? (call<object | null>(n, "support.declaration_for", { rule, facts }) ?? undefined) as ReturnType<typeof ts.declarationFor> : ts.declarationFor(rule, facts);
+};
+export const forAge: typeof ts.forAge = (r) => {
+  const n = rust();
+  return n ? call<boolean>(n, "support.for_age", { rule: r }) : ts.forAge(r);
+};
+export const forOutOfWork: typeof ts.forOutOfWork = (r) => {
+  const n = rust();
+  return n ? call<boolean>(n, "support.for_out_of_work", { rule: r }) : ts.forOutOfWork(r);
+};
+export const stopsWorkAt: typeof ts.stopsWorkAt = (curve, draw) => {
+  const n = rust();
+  return n ? (call<number | null>(n, "support.stops_work_at", { curve, draw }) ?? undefined) : ts.stopsWorkAt(curve, draw);
+};
+export const bedroomsNeeded: typeof ts.bedroomsNeeded = (h, t, year, standard) => {
+  const n = rust();
+  return n ? call<number>(n, "household.bedrooms_needed", { household: h, t, year, standard: standard ?? null }) : ts.bedroomsNeeded(h, t, year, standard);
+};
+export const drawSavings: typeof ts.drawSavings = (pct, q) => {
+  const n = rust();
+  return n ? call<number>(n, "household.draw_savings", { pct, q }) : ts.drawSavings(pct, q);
+};
+/** The town's households (and the adults' age bands where the spec has none), drawn on the generator's keyed streams. */
+export function drawTown(spec: ts.HouseholdSpec, seed: bigint, citizens: number, below: (stream: string) => (n: number) => number): { adult_age_bands: ts.HouseholdSpec["adult_age_bands"]; households: ReturnType<typeof ts.drawHousehold>[] } {
+  const n = rust();
+  if (n) {
+    const r = call<{ adult_age_bands: ts.HouseholdSpec["adult_age_bands"] | null; households: ReturnType<typeof ts.drawHousehold>[] }>(n, "household.town", { spec, seed: Number(seed), citizens });
+    return { adult_age_bands: r.adult_age_bands ?? undefined, households: r.households.map((d) => ({ ...d, extended: d.extended ?? undefined })) };
+  }
+  let H = spec, bands: ts.HouseholdSpec["adult_age_bands"];
+  if (!H.adult_age_bands) { const ar = below("age-bands"); bands = ts.adultAgeBands(H, (k) => ar(k)); H = { ...H, adult_age_bands: bands }; }
+  const hr = below("households"), out: ReturnType<typeof ts.drawHousehold>[] = [];
+  for (let count = 0; count < citizens; ) { const d = ts.drawHousehold(H, (k) => hr(k)); count += d.members.length; out.push(d); }
+  return { adult_age_bands: bands, households: out };
+}

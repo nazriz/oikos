@@ -55,9 +55,10 @@ function officeParams(c: any, impl: string) {
   return officesBy(c, impl)[0]!.params;
 }
 
-test("a town without the flag is as before: one kind of shop, selling goods, and the citizens weigh only goods", () => {
-  const off = generate(spec);
-  expect(JSON.stringify(generate({ ...spec, shop_mix: false }))).toBe(JSON.stringify(off));
+test("a town with shop_mix: false has one kind of shop, selling goods, and the citizens weigh only goods; the mix is the default", () => {
+  const off = generate({ ...spec, shop_mix: false });
+  expect(JSON.stringify(generate(spec))).toBe(JSON.stringify(generate({ ...spec, shop_mix: true })));
+  expect(Object.keys(kindsOf(generate(spec))).length).toBeGreaterThanOrEqual(4);
   for (const o of shopsOf(off)) expect(o.params.kind).toBeUndefined();
   const citizen = off.participants.find((p: any) => p.controller?.impl === "citizen.default");
   // (A town of one kind carries no demand figures: the citizen weighs goods alone without them, as the TS world's manifest
@@ -65,7 +66,7 @@ test("a town without the flag is as before: one kind of shop, selling goods, and
   expect(citizen.controller.params.demand).toBeUndefined();
   expect(Object.keys(officeParams(off, "world.trade").sells).sort()).toEqual(["energy", "goods", "inputs", "materials"].filter((k) => k in officeParams(off, "world.trade").sells));
   // Turning it on changes the shops and nothing of the households' count.
-  const on = generate({ ...spec, shop_mix: true });
+  const on = generate(spec);
   expect(on.participants.length).toBe(off.participants.length);
 });
 
@@ -94,3 +95,40 @@ test("shops are apportioned by largest remainder, to the whole number of shops, 
   const c = generate({ ...spec, shops: 2, shop_mix: true });
   expect(kindsOf(c).goods).toBeGreaterThanOrEqual(1);
 });
+
+test("each kind of shop has premises of its own type with room for its staff, and a venture to found one (not six staff and one template for all)", () => {
+  const c = generate(spec) as any;
+  const types = new Map<string, any>(c.catalogue.structure_types.map((t: any) => [t.id, t]));
+  const roomOf = (id: string) => types.get(id).spaces.find((s: any) => s.kind === "workplace").capacity as number;
+  const ventures = citizenParams(c).ventures as { kind: string; role_module: { params: { kind?: string; max_staff: number; price: number } } }[];
+  const kinds = new Set<string>();
+  for (const o of shopsOf(c)) {
+    const premises = structureOf(c, o.params.premises);
+    expect(premises.type === "shop" ? o.params.kind === "goods" : premises.type === `shop-${o.params.kind}`).toBe(true);
+    expect(roomOf(premises.type)).toBeGreaterThanOrEqual(o.params.max_staff);
+    kinds.add(premises.type);
+  }
+  expect(kinds.size).toBeGreaterThanOrEqual(4);
+  // a venture for each type of premises a shop stands in, carrying that kind's price and room
+  expect(new Set(ventures.filter((v) => v.kind.startsWith("shop")).map((v) => v.kind))).toEqual(kinds);
+  for (const v of ventures.filter((x) => x.kind.startsWith("shop"))) {
+    expect(v.role_module.params.max_staff).toBe(roomOf(v.kind));
+    expect(v.role_module.params.price).toBeGreaterThan(0);
+  }
+  expect(new Set(ventures.filter((v) => v.kind.startsWith("shop")).map((v) => v.role_module.params.price)).size).toBeGreaterThan(1);
+});
+
+function citizenParams(c: any) {
+  return c.participants.find((p: any) => p.controller?.impl === "citizen.default").controller.params;
+}
+
+/** The structure with this id, wherever the config keeps its structures. */
+function structureOf(c: any, id: string): { id: string; type: string } {
+  const seen: any[] = [c];
+  while (seen.length) {
+    const x = seen.pop();
+    if (Array.isArray(x)) { for (const y of x) { if (y && y.id === id && typeof y.type === "string" && y.built_by !== undefined) return y; seen.push(y); } }
+    else if (x && typeof x === "object") seen.push(...Object.values(x));
+  }
+  throw new Error(`no structure ${id}`);
+}

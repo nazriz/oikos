@@ -74,8 +74,89 @@ pub struct Ctx {
     pub performer: Performer,
     pub entity: String,
     pub position: Option<String>,
-    pub params: Map<String, Value>,
+    pub params: Params,
     pub world: Arc<WorldInfo>,
+}
+
+/// An actor's parameters: read as the map they are (`ctx.params.get(..)`), held without a copy where they are a member
+/// of a value the engine keeps already (a participant's controller, shared with the world's config: a town's people
+/// each have large params, and a second copy of them was 2.4 GB at 10,000 people).
+/// (Always an object: `member_of` takes one that is not as no params.)
+#[derive(Clone)]
+pub struct Params {
+    of: Arc<Value>,
+    /// The member of `of` they are (absent: `of` itself).
+    member: Option<&'static str>,
+}
+
+impl Params {
+    /// The `member` of this value, shared (one that is not an object: no params).
+    pub fn member_of(of: Arc<Value>, member: &'static str) -> Params {
+        if of[member].is_object() {
+            Params { of, member: Some(member) }
+        } else {
+            Params::default()
+        }
+    }
+}
+
+impl Default for Params {
+    fn default() -> Params {
+        Params::from(Map::new())
+    }
+}
+
+impl From<Map<String, Value>> for Params {
+    fn from(m: Map<String, Value>) -> Params {
+        Params { of: Arc::new(Value::Object(m)), member: None }
+    }
+}
+
+impl std::ops::Deref for Params {
+    type Target = Map<String, Value>;
+    fn deref(&self) -> &Map<String, Value> {
+        let v = match self.member {
+            Some(k) => &self.of[k],
+            None => &*self.of,
+        };
+        match v {
+            Value::Object(m) => m,
+            _ => unreachable!("params are always an object (`member_of`, `from`)"),
+        }
+    }
+}
+
+/// (Changed in place, they become the actor's own: copied from what they were shared with, the first time.)
+impl std::ops::DerefMut for Params {
+    fn deref_mut(&mut self) -> &mut Map<String, Value> {
+        if self.member.is_some() {
+            *self = Params::from((**self).clone());
+        }
+        match Arc::make_mut(&mut self.of) {
+            Value::Object(m) => m,
+            _ => unreachable!("made an object just above"),
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a Params {
+    type Item = (&'a String, &'a Value);
+    type IntoIter = serde_json::map::Iter<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        (**self).iter()
+    }
+}
+
+impl std::fmt::Debug for Params {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (**self).fmt(f)
+    }
+}
+
+impl<'de> Deserialize<'de> for Params {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Params, D::Error> {
+        Map::deserialize(d).map(Params::from)
+    }
 }
 
 impl Ctx {

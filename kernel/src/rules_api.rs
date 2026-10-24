@@ -7,7 +7,7 @@
 //! adds its line here, and the generator's call switches to it (worlds/generator/rules.ts). Every rule is pure: the
 //! same arguments, the same answer.
 
-use oikos_rules::{forms, law};
+use oikos_rules::{forms, household, law, support, withholding};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
@@ -77,6 +77,79 @@ pub const RULES: &[(&str, Rule, &str)] = &[
             Ok(match accept_membership(&arg::<String>(a, "me")?, &bounds, &blocks) { Ok(done) => json!({ "ok": done }), Err(why) => json!({ "refused": why }) })
         },
         "{me, account, dues, notice, blocks}: a founder's draft of its offer of membership, accepted ({ok: blocks}) or refused ({refused: why})",
+    ),
+    (
+        "withholding.withholding",
+        |a| {
+            let law: Option<withholding::IncomeTaxLaw> = arg(a, "law")?;
+            to(withholding::withholding(law.as_ref(), arg(a, "gross")?, arg(a, "period")?))
+        },
+        "{law?: IncomeTaxLaw, gross, period}: what is withheld from one pay (tax.ts withholding); no law, nothing",
+    ),
+    ("withholding.day_pay_period", |a| to(withholding::day_pay_period(arg(a, "work_days")?)), "{work_days}: the span a day's pay is reckoned over (tax.ts dayPayPeriod)"),
+    (
+        "support.declaration_for",
+        |a| {
+            let r: support::PaymentRule = arg(a, "rule")?;
+            let f = a.get("facts").ok_or("argument facts")?;
+            let facts = support::Facts {
+                household_income: arg(f, "household_income")?,
+                household_members: arg(f, "household_members")?,
+                children_born_at: arg(f, "children_born_at")?,
+                other_pension: arg(f, "other_pension")?,
+            };
+            to(support::declaration_for(&r, &facts))
+        },
+        "{rule: PaymentRule, facts: {household_income, household_members, children_born_at, other_pension}}: what a claim must declare (payments.ts declarationFor); null for none",
+    ),
+    ("support.for_age", |a| to(support::for_age(&arg(a, "rule")?)), "{rule}: a pension (payments.ts forAge)"),
+    ("support.for_out_of_work", |a| to(support::for_out_of_work(&arg(a, "rule")?)), "{rule}: a payment for those out of work (payments.ts forOutOfWork)"),
+    (
+        "support.stops_work_at",
+        |a| {
+            let curve: Vec<(i64, i64)> = arg::<Vec<Value>>(a, "curve")?
+                .iter()
+                .map(|b| Ok((arg(b, "from")?, arg(b, "bps")?)))
+                .collect::<Result<_, String>>()?;
+            to(support::stops_work_at(&curve, arg(a, "draw")?))
+        },
+        "{curve: [{from, bps}], draw}: the age someone stops work (payments.ts stopsWorkAt); null for never",
+    ),
+    (
+        "household.bedrooms_needed",
+        |a| {
+            let std: Option<household::OccupancyStandard> = arg(a, "standard")?;
+            to(household::bedrooms_needed(&arg(a, "household")?, arg(a, "t")?, arg(a, "year")?, std.as_ref()))
+        },
+        "{household, t, year, standard?}: the bedrooms a household needs (household.ts bedroomsNeeded)",
+    ),
+    ("household.draw_savings", |a| to(household::draw_savings(arg(a, "pct")?, arg(a, "q")?)), "{pct: [5], q}: a saving drawn between the percentiles (household.ts drawSavings)"),
+    (
+        "household.town",
+        |a| {
+            use oikos_core::rng::Randomness;
+            let seed: u64 = arg(a, "seed")?;
+            let citizens: usize = arg(a, "citizens")?;
+            let mut spec: household::HouseholdSpec = arg(a, "spec")?;
+            let r = Randomness::new(seed);
+            let bands = if spec.adult_age_bands.is_none() {
+                let mut s = r.stream(&["generator", "age-bands"]);
+                let b = household::adult_age_bands(&spec, &mut |n| s.below(n as u64) as i64, household::ADULT_AGE_BANDS_DRAWS);
+                spec.adult_age_bands = b.clone();
+                b
+            } else {
+                None
+            };
+            let mut s = r.stream(&["generator", "households"]);
+            let (mut count, mut out) = (0usize, vec![]);
+            while count < citizens {
+                let d = household::draw_household(&spec, &mut |n| s.below(n as u64) as i64);
+                count += d.members.len();
+                out.push(d);
+            }
+            Ok(json!({ "adult_age_bands": bands, "households": out }))
+        },
+        "{spec, seed, citizens}: the town's households, drawn on the generator's keyed streams (age-bands, households) until the people are counted (household.ts adultAgeBands, drawHousehold)",
     ),
     ("actors.manifests", |_| Ok(manifests()), "every actor kind's manifest (contracts/module.schema.json), by name"),
 ];

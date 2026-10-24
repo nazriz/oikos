@@ -177,6 +177,20 @@ impl World {
                     .collect();
                 oikos_nature::Ground::new(&cells.into_iter().collect::<Vec<_>>(), &w.flows)
             }),
+            participant_at: {
+                let mut at = BTreeMap::new();
+                for (i, x) in c.participants.iter().enumerate() {
+                    at.entry(x.id.clone()).or_insert(i);
+                }
+                at
+            },
+            record_keeping_at: {
+                let mut at = BTreeMap::new();
+                for (i, x) in c.positions.iter().enumerate().filter(|(_, x)| x.keeps_record) {
+                    at.entry(x.entity.clone()).or_insert(i);
+                }
+                at
+            },
             config: loaded.config.clone(),
         };
         let person_of: BTreeMap<&str, &str> = c.participants.iter().filter(|p| !p.shares_body).filter_map(|p| p.person.as_deref().map(|e| (e, p.id.as_str()))).collect();
@@ -701,7 +715,8 @@ impl World {
         match named {
             None => {
                 let Some(entity) = p.person.as_ref() else { return perr(format!("{participant} is not a person: it has no record of its own")) };
-                let named = self.s.config.participants.iter().find(|x| x.id == participant).and_then(|x| x.record_keeper.as_deref());
+                let named = self.s.participant_at.get(participant).and_then(|i| self.s.config.participants[*i].record_keeper.as_deref());
+                debug_assert_eq!(named, self.s.config.participants.iter().find(|x| x.id == participant).and_then(|x| x.record_keeper.as_deref()));
                 let coded = (p.def.controller.get("type").and_then(Value::as_str) == Some("code")).then(|| p.def.controller.get("impl").and_then(Value::as_str)).flatten();
                 match named.or(coded) {
                     Some(k) => Ok((entity.clone(), k.to_string())),
@@ -718,7 +733,8 @@ impl World {
                 if self.state.entities[org].kind == crate::config::PERSON {
                     return perr(format!("{org} is a person: only its own participant's bookkeeping sets a person's record"));
                 }
-                let keeping = self.s.config.positions.iter().find(|x| x.entity == org && x.keeps_record);
+                let keeping = self.s.record_keeping_at.get(org).map(|i| &self.s.config.positions[*i]);
+                debug_assert_eq!(keeping.map(|x| &x.id), self.s.config.positions.iter().find(|x| x.entity == org && x.keeps_record).map(|x| &x.id));
                 let Some(keeping) = keeping else {
                     // An organisation founded in a run: the one post of it whose role module says it keeps the
                     // organisation's record (`role_module.keeps_record`, with its `code`), held now by this participant.

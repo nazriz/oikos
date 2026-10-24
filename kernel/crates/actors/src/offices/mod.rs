@@ -166,7 +166,7 @@ pub mod testing {
                 performer: Default::default(),
                 entity: entity.into(),
                 position: position.map(String::from),
-                params: params.as_object().cloned().unwrap_or_default(),
+                params: params.as_object().cloned().unwrap_or_default().into(),
                 world: Arc::new(WorldInfo { tick: 60, run_end: 400 * DAY, ..Default::default() }),
             };
             let actor = kind.create(&ctx).expect("the kind is made");

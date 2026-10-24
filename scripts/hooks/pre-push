@@ -1,0 +1,12 @@
+#!/bin/sh
+# Only scripts/merge.ts pushes to main (docs/dev-machine.md, "Merging"): a push to main is refused unless the pusher holds
+# the merge lock (scripts/merge-lock.ts), which merge.ts says by OIKOS_MERGE_LOCK=<its pid>. Other branches pass.
+# Installed into the repository's common hooks folder (every worktree shares it) by merge.ts and scripts/setup-mini.sh.
+lock="${OIKOS_MERGE_DIR:-$HOME/.oikos/merge}/lock"
+while read -r lref lsha rref rsha; do
+  [ "$rref" = "refs/heads/main" ] || continue
+  if [ -n "$OIKOS_MERGE_LOCK" ] && grep -q "\"pid\":$OIKOS_MERGE_LOCK[,}]" "$lock" 2>/dev/null; then continue; fi
+  echo "pre-push: refused. Only scripts/merge.ts pushes to main: bun scripts/merge.ts <branch>... (it holds the merge lock and runs the gate)." >&2
+  exit 1
+done
+exit 0

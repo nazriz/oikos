@@ -23,13 +23,14 @@ use oikos_actors::sight::{Action, View};
 use oikos_actors::{Actor, Answer, Ctx, Cx, Draws, Question};
 use serde_json::{json, Value};
 use std::fs::File;
-use std::io::{self, BufWriter, Write};
+use crate::spool::Spool;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 /// Where a run's log goes.
 pub enum Out {
-    Jsonl(BufWriter<File>),
-    Binary(BinLog<BufWriter<File>>),
+    Jsonl(Spool),
+    Binary(BinLog<Spool>),
     /// Kept in memory (tests; a fork nobody keeps).
     Memory(Vec<u8>),
     Nowhere,
@@ -118,7 +119,7 @@ fn open(o: &Options, run_id: &str, from: Option<(u64, &str, Option<String>)>) ->
             if let Some(d) = p.parent().filter(|d| !d.as_os_str().is_empty()) {
                 std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
             }
-            let f = BufWriter::with_capacity(1 << 20, File::create(p).map_err(|e| format!("{}: {e}", p.display()))?);
+            let f = Spool::new(File::create(p).map_err(|e| format!("{}: {e}", p.display()))?).map_err(|e| format!("{}: {e}", p.display()))?;
             if binary(p) {
                 let (seq, prev, parent) = from.map_or((0, crate::canon::ZERO_HASH, None), |(s, p, parent)| (s, p, parent));
                 let about = About { run_id: run_id.into(), parent, label: o.label.clone() };
@@ -377,7 +378,7 @@ impl Detached {
             performer: if spec["system"].as_bool() == Some(true) { oikos_rules::slip::Performer::System } else { oikos_rules::slip::Performer::Person },
             entity: s("entity").unwrap_or_default(),
             position: (capacity != "self").then(|| capacity.clone()),
-            params: spec["params"].as_object().cloned().unwrap_or_default(),
+            params: spec["params"].as_object().cloned().unwrap_or_default().into(),
             world: std::sync::Arc::new(crate::engine::world_info(&spec["config"])?),
         };
         let seed = spec["seed"].as_u64().or(spec["config"]["seed"].as_u64()).unwrap_or(0);

@@ -427,7 +427,8 @@ pub fn decision_law(book: &Book, kind: &str, payment: Option<&str>) -> Option<De
     for l in book.open("law") {
         let Some(list) = data(l).get("decisions").and_then(Value::as_array) else { continue };
         for d in list {
-            let Ok(d) = serde_json::from_value::<DecisionLaw>(d.clone()) else { continue };
+            // (Read in place: the same as reading a copy of it.)
+            let Ok(d) = DecisionLaw::deserialize(d) else { continue };
             if d.kind != kind {
                 continue;
             }
@@ -476,6 +477,21 @@ pub struct Waits {
     /// taken in more. Never saved (it is the book's, read again).
     #[serde(skip)]
     came: Option<Came>,
+    /// Whom the office's file names as each claimant's employer, read once and kept up as the file grows
+    /// (`employer_for`). Never saved (it is the book's, read again).
+    #[serde(skip)]
+    employers: Employers,
+}
+
+/// The office's file read for `employer_for`, as far as it has been read: each claimant's papers to the office naming a
+/// last employer, in the order seen; and the last employer that reported pay for each worker to the office (the first
+/// of the latest, as the file was read in order). Each was looked for through the whole file for every claim.
+#[derive(Debug, Clone, Default)]
+struct Employers {
+    evidence_read: usize,
+    named: BTreeMap<String, Vec<Arc<Record>>>,
+    reports_read: usize,
+    reported: BTreeMap<String, (i64, String)>,
 }
 
 /// The office's file read once for `Waits::came`: of the standing evidence addressed to it, who each piece speaks for, by
@@ -490,7 +506,57 @@ struct Came {
 
 impl Waits {
     pub fn new(me: &str) -> Self {
-        Waits { me: me.to_string(), asked: BTreeMap::new(), came: None }
+        Waits { me: me.to_string(), asked: BTreeMap::new(), came: None, employers: Employers::default() }
+    }
+
+    /// `employer_of(book, me, who)`, from the file as read so far (and read on from where it was left).
+    fn employer_for(&mut self, book: &Book, who: &str) -> Option<String> {
+        let me = self.me.as_str();
+        let e = &mut self.employers;
+        // (A file shorter than what was read is another file: read it from the start.)
+        if book.all("evidence").len() < e.evidence_read || book.all("withholding_report").len() < e.reports_read {
+            *e = Employers::default();
+        }
+        let evidence = book.all("evidence");
+        let n = evidence.len();
+        for r in evidence.skip(e.evidence_read) {
+            if let Some(w) = r.speaks_for.as_deref() {
+                if addressed_to(r).iter().any(|x| x == me) && data(r).s("last_employer").is_some() {
+                    e.named.entry(w.to_string()).or_default().push(r.clone());
+                }
+            }
+        }
+        e.evidence_read = n;
+        let reports = book.all("withholding_report");
+        let n = reports.len();
+        for r in reports.skip(e.reports_read) {
+            let Some(by) = r.speaks_for.as_deref() else { continue };
+            if !addressed_to(r).iter().any(|x| x == me) {
+                continue;
+            }
+            let Some(staff) = data(r).get("staff").and_then(Value::as_array) else { continue };
+            for w in staff.iter().filter_map(|l| l.s("worker")) {
+                match e.reported.get_mut(w) {
+                    Some(b) if r.at <= b.0 => {}
+                    Some(b) => *b = (r.at, by.to_string()),
+                    None => {
+                        e.reported.insert(w.to_string(), (r.at, by.to_string()));
+                    }
+                }
+            }
+        }
+        e.reports_read = n;
+        // (Standing papers only: those withdrawn since they were read are passed over, as `open` leaves them out.)
+        let named = e.named.get(who).into_iter().flatten().filter(|r| !book.withdrawn(&r.id)).fold(None::<&Arc<Record>>, |a, b| match a {
+            Some(a) if b.at <= a.at => Some(a),
+            _ => Some(b),
+        });
+        let found = match named {
+            Some(n) => data(n).s("last_employer").map(String::from),
+            None => e.reported.get(who).map(|b| b.1.clone()),
+        };
+        debug_assert_eq!(found, Self::employer_of(book, me, who), "the file's employers, read on, are not what reading it through says");
+        found
     }
 
     /// The employer to ask: whom the claimant's own papers name as their last employer, else the last that reported pay
@@ -583,7 +649,7 @@ impl Waits {
                 continue;
             }
             let Some(&(_, by)) = self.asked.get(&key) else {
-                let employer = if n.from == "employer" { Self::employer_of(book, &self.me, &who) } else { None };
+                let employer = if n.from == "employer" { self.employer_for(book, &who) } else { None };
                 if n.from == "employer" && employer.is_none() {
                     // (Nobody to ask yet: the claimant's papers may name their last employer, so while those are out we wait; once they are in, or none
                     // are asked for, and no one is named and no pay was ever reported for the claimant, what cannot be had is not waited for.)
