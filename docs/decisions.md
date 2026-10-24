@@ -7555,3 +7555,13 @@ decided, possession orders).
 **For the owner:** text by code in round 1 or a small generator now; the teacher budget; whether code offices' laws may read `grounds` before a source says how such bodies weigh them. Steps 1 to 5 need no model call.
 
 **Revisit if** the base model trained on the code mind alone cannot keep its spread; no teacher family passes its own scrambled check on the author task; capture costs more than 3% of a run or 2 GB compressed a pilot; or the owner wants the model to write.
+
+## 2026-10-24 · disk-tidy clears each worktree's own test runs
+
+- **What we saw:** 40 GB free. Nine finished worktrees held 14 to 21 GB each in `runs/test-*`, the folders tests write
+  into the checkout they run in; disk-tidy only looked at the main `runs/`. Removing them by hand (none had a model call)
+  gave 183 GB free.
+- **Change:** disk-tidy judges every worktree's `runs/test-*` by the same rule as the main runs (code-only, older than
+  `--days`; a model run or any doubt is never touched).
+- **Revisit if:** tests move their scratch to a temp folder (then this is moot), or a worktree's `runs/test-*` ever holds
+  model calls.
