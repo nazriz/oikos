@@ -6,6 +6,7 @@
   "license": "Apache-2.0",
   "description": "The pilot explorer: a run's town, people, institutions and seats' acts in an isometric WebGPU scene, read from the log through an index. It never writes to a run.",
   "dependencies": {
+    "hyparquet-writer": "0.17.0",
     "three": "^0.186.1"
   },
   "devDependencies": {

@@ -271,3 +271,80 @@ fn kept_lines_are_held_compressed_in_frames_and_come_back_whole() {
     }
     assert!(ix.line_text(10_000).is_none());
 }
+
+#[test]
+fn the_workbench_tables_count_what_a_brute_force_scan_counts_and_page_through_it() {
+    use oikos_explore::bench::{by_building, cohort, events, CohortQuery, CohortRule, EventQuery};
+    let ix = index();
+    ix.with(|s| {
+        let all = events(s, &EventQuery { limit: 1000, ..Default::default() });
+        assert_eq!(all["total"], ix.kept());
+        assert_eq!(all["rows"].as_array().unwrap().len(), ix.kept());
+        // a kind, and who: the same as counting the lines
+        let name = s.name_of(0).to_string();
+        let want = (0..ix.kept() as u32).filter(|&o| s.name_of(o) == name).count();
+        assert_eq!(events(s, &EventQuery { kinds: vec![name.clone()], limit: 10, ..Default::default() })["total"], want);
+        let by_c1 = (0..ix.kept() as u32).filter(|&o| matches!(s.who_of(o), Some("c1") | Some("c1-self"))).count();
+        assert_eq!(events(s, &EventQuery { who: Some("c1".into()), limit: 10, ..Default::default() })["total"], by_c1);
+        // pages: two halves are the whole, in order; newest first is the reverse
+        let a = events(s, &EventQuery { limit: 3, ..Default::default() });
+        let b = events(s, &EventQuery { offset: 3, limit: 1000, ..Default::default() });
+        let joined: Vec<Value> = a["rows"].as_array().unwrap().iter().chain(b["rows"].as_array().unwrap()).cloned().collect();
+        assert_eq!(&joined, all["rows"].as_array().unwrap());
+        let desc = events(s, &EventQuery { limit: 1, desc: true, ..Default::default() });
+        assert_eq!(desc["rows"][0]["ord"], ix.kept() - 1);
+        // days, outcomes and words narrow; the facets add up to the total
+        let day1 = events(s, &EventQuery { from_day: Some(1), to_day: Some(1), limit: 1000, ..Default::default() });
+        assert!(day1["rows"].as_array().unwrap().iter().all(|r| r["day"] == 1));
+        let applied = events(s, &EventQuery { outcome: Some("applied".into()), limit: 1000, ..Default::default() });
+        assert!(applied["rows"].as_array().unwrap().iter().all(|r| r["outcome"] == "applied"));
+        let facets: u64 = all["classes"].as_object().unwrap().values().map(|v| v.as_u64().unwrap()).sum();
+        assert_eq!(facets as usize, ix.kept());
+        let word = events(s, &EventQuery { text: Some("tribunal".into()), limit: 1000, ..Default::default() });
+        assert!(word["total"].as_u64().unwrap() > 0 && word["exact"] == true);
+        assert!(word["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|r| r["text"].as_str().unwrap().to_lowercase().contains("tribunal") || r["kind"].as_str().unwrap().contains("tribunal")));
+        // a group: everyone reached by a change that landed hard, against the rest
+        let hard_people: std::collections::BTreeSet<String> = (0..s.pulses.len())
+            .step_by(6)
+            .filter(|&k| s.pulses[k + 4] & 1 != 0 && s.pulses[k + 3] != 0)
+            .map(|k| s.persons[s.pulses[k + 1] as usize].clone())
+            .collect();
+        let g = cohort(
+            s,
+            &CohortQuery {
+                rule: CohortRule::Reached { cls: None, hard: true, word: None },
+                from_day: None,
+                to_day: None,
+                offset: 0,
+                limit: 100,
+            },
+        );
+        assert_eq!(g["members"], hard_people.len());
+        let got: std::collections::BTreeSet<String> =
+            g["page"].as_array().unwrap().iter().map(|m| m["person"].as_str().unwrap().to_string()).collect();
+        assert_eq!(got, hard_people);
+        assert_eq!(g["cohort"]["money_mean_minor"].as_array().unwrap().len(), g["days"].as_u64().unwrap() as usize + 1);
+        // per building and class, days 1..=2: every pulse that landed on a building those days, once
+        let by = by_building(s, 1, 2);
+        let landed =
+            (0..s.pulses.len()).step_by(6).filter(|&k| s.pulses[k + 2] >= 0 && (1..=2).contains(&(s.pulses[k] as i64 / DAY))).count();
+        assert_eq!(by.iter().flatten().sum::<u32>() as usize, landed);
+        // by money at a day: those with at most the sum then
+        // per building and class, days 1..=2: every pulse that landed on a building those days, once
+        let by = by_building(s, 1, 2);
+        let landed =
+            (0..s.pulses.len()).step_by(6).filter(|&k| s.pulses[k + 2] >= 0 && (1..=2).contains(&(s.pulses[k] as i64 / DAY))).count();
+        assert_eq!(by.iter().flatten().sum::<u32>() as usize, landed);
+        // by money at a day: those with at most the sum then (c1 held 9,800 at day 2, c2 5,200)
+        let at_most = |minor| {
+            cohort(s, &CohortQuery { rule: CohortRule::MoneyAtMost { minor, day: 2 }, from_day: None, to_day: None, offset: 0, limit: 10 })
+        };
+        assert_eq!(at_most(9900)["members"], 2);
+        assert_eq!(at_most(6000)["members"], 1);
+        assert_eq!(at_most(6000)["page"][0]["person"], "c2");
+    });
+}
