@@ -433,7 +433,7 @@ pub struct ParticipantDef {
     /// (Its channels, controller and framing are shared with the config they came from.)
     #[serde(default, skip_serializing_if = "crate::config::no_channels")]
     pub channels: Arc<Vec<Channel>>,
-    pub controller: Arc<Value>,
+    pub controller: crate::config::Controller,
     pub framing: Arc<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_opt_out: Option<Value>,

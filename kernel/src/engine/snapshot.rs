@@ -28,7 +28,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::io::Write;
-use std::sync::Arc;
 
 /// Bumped whenever what a snapshot holds changes shape (old snapshots are then refused, never misread).
 pub const SNAPSHOT_FORMAT: u32 = 1;
@@ -39,7 +38,8 @@ const LEVEL: i32 = 3;
 /// The whole run at one moment.
 pub struct Snapshot {
     pub head: Head,
-    config: Arc<[u8]>,
+    /// (As the run keeps it: compressed, in pieces. Whole only in the bytes of a snapshot that carries it.)
+    config: crate::config::Canonical,
     kernel: Kernel,
     saved: Saved,
 }
@@ -166,9 +166,9 @@ impl Snapshot {
         let head = serde_json::to_vec(&head).map_err(|e| e.to_string())?;
         let state = serde_json::to_vec(self.kernel.state()).map_err(|e| format!("the state: {e}"))?;
         let engine = serde_json::to_vec(&self.saved).map_err(|e| format!("the engine: {e}"))?;
-        let mut body = Vec::with_capacity(self.config.len() + state.len() + engine.len() + 24);
-        let config: &[u8] = if without_config { &[] } else { &self.config[..] };
-        for part in [config, &state, &engine] {
+        let config = if without_config { vec![] } else { self.config.to_vec() };
+        let mut body = Vec::with_capacity(config.len() + state.len() + engine.len() + 24);
+        for part in [&config, &state, &engine] {
             body.extend_from_slice(&(part.len() as u64).to_le_bytes());
             body.extend_from_slice(part);
         }
@@ -219,13 +219,14 @@ impl Snapshot {
             parts.push(body.get(at + 8..at + 8 + len).ok_or("a snapshot's body cut short")?);
             at += 8 + len;
         }
-        let config: Arc<[u8]> = match (head.config_elsewhere, given) {
-            (false, _) => Arc::from(parts[0]),
-            (true, Some(c)) => Arc::from(c),
+        let config: &[u8] = match (head.config_elsewhere, given) {
+            (false, _) => parts[0],
+            (true, Some(c)) => c,
             (true, None) => return Err("this snapshot was taken for a log and holds no config: read it with the log's (blog::snapshot_in)".into()),
         };
         head.config_elsewhere = false;
-        let loaded = crate::config::load(serde_json::from_slice(&config).map_err(|e| format!("the config: {e}"))?)?;
+        let (loaded, _) = crate::config::load_from(config).map_err(|e| format!("the config: {e}"))?;
+        let config = crate::config::Canonical::of(config);
         let state: crate::state::State = serde_json::from_slice(parts[1]).map_err(|e| format!("the state: {e}"))?;
         let kernel = Kernel::resume(&loaded, state)?;
         let hash = kernel.state_hash().map_err(|e| e.to_string())?;
@@ -256,7 +257,7 @@ impl<W: Write> Engine<W> {
                         system: c.performer == Performer::System,
                         entity: c.entity.clone(),
                         position: c.position.clone(),
-                        params: (*c.params).clone(),
+                        params: c.params.to_map(),
                     }),
                     actor: u.actor.as_ref().map(|a| a.save()).transpose().map_err(|e| format!("{}: {e}", u.key))?,
                     draws: u.draws.clone(),
@@ -305,7 +306,7 @@ impl<W: Write> Engine<W> {
                 seats_waiting,
                 config_elsewhere: false,
             },
-            config: self.run.config_bytes().clone(),
+            config: self.run.config_canonical().clone(),
             kernel: self.run.kernel().fork(),
             saved: Saved {
                 sched: self.sched.clone(),
@@ -333,7 +334,8 @@ impl<W: Write> Engine<W> {
     /// a fork, apart from the others from then on.
     pub fn resume(snap: &Snapshot, out: W, anchors: Option<Box<dyn Write>>, opts: EngineOptions) -> Result<Self, String> {
         let s = &snap.saved;
-        let config: Value = serde_json::from_slice(&snap.config).map_err(|e| format!("the snapshot's config: {e}"))?;
+        // (What the engine reads of the config as JSON: its members but the participants and most of the world.)
+        let config = Value::Object(crate::config::rest_of(snap.config.reader()).map_err(|e| format!("the snapshot's config: {e}"))?);
         let base = Base::of(&config)?.capturing(opts.capture_citizens.is_some());
         let world = base.world.clone();
         let currency = base.currency.clone();

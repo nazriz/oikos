@@ -56,7 +56,7 @@ if (!existsSync(copy)) {
 const changed = repo === here ? sh(["git", "ls-files", "-m", "-o", "--exclude-standard"], repo).out.split("\n").filter(Boolean) : [];
 for (const f of changed) if (existsSync(join(repo, f))) { mkdirSync(dirname(join(copy, f)), { recursive: true }); cpSync(join(repo, f), join(copy, f)); }
 // Every mutated file is put back from the repo before anything runs (a run stopped mid-mutation leaves its bug).
-for (const m of MUTATIONS) cpSync(join(repo, m.file), join(copy, m.file));
+for (const m of MUTATIONS) if (existsSync(join(repo, m.file))) cpSync(join(repo, m.file), join(copy, m.file)); // (a bug whose file is gone is not planted)
 
 const times: Record<string, number> = JSON.parse(readFileSync(join(repo, "scripts/test-times.json"), "utf8"));
 // Every test file the suite has, but those the suite's own timings call slow (10 s or more; they simulate towns):

@@ -777,10 +777,9 @@ impl Person {
     }
 
     /// Starting a business (citizen.ts 3698-3802; docs/behaviour/entry.md): the capital a new business calls for, put
-    /// in; a business of one from home, with the month's chance; one given up that pays no living; premises bought for a
-    /// venture, with the month's chance. (docs/risks.md A-1/ME-1: the births come at a set rate, the world's
-    /// `found_bps` and `found_own_ppm` shifted by who the person is; lane C1 replaces that with its own entry. The
-    /// draw is as TS has it.)
+    /// in; a business of one from home, and premises bought for a venture, each where it is expected to pay more than
+    /// we have (docs/behaviour/entry.md, "Entry by expected profit"); one weighed each month and given up when it is not
+    /// worth keeping ("Giving it up").
     pub fn ventures(&mut self, w: &mut Week) {
         let t = w.t;
         let me = self.me.clone();

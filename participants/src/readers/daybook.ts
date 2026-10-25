@@ -49,6 +49,14 @@ function fit(lines: string[], room: number): { shown: string[]; left: number } {
   }
   return { shown, left: lines.length - shown.length };
 }
+/** The fields in which a paper names the day it is to be answered or done by. */
+const DUE_FIELDS = ["answer_by", "due", "by"] as const;
+/** The day a paper of the office's own names as the one it is to be answered or done by, if it names one. */
+function dueOf(r: Paper): number | undefined {
+  const d = r.record === "statement" ? (r.data as any) : undefined;
+  for (const k of DUE_FIELDS) if (typeof d?.[k] === "number" && Number.isFinite(d[k]) && d[k] > r.at) return d[k];
+  return undefined;
+}
 const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}`;
 /** "3 rent reminders, 2 payments out": the most common kinds, then the number of the rest. */
 function counted(by: Map<string, number>, most = 5): string {
@@ -71,6 +79,8 @@ export class DayBook {
   private readonly own = new Map<string, Paper>();
   /** A record cited by a paper of someone else's (or by a reply that names it): who, when, what kind. */
   private readonly followed = new Map<string, { at: number; kind: string; by: string }>();
+  /** The latest time a paper of someone else's cited each record (a reply to a notice may cite what the notice rests on). */
+  private readonly citedLast = new Map<string, number>();
   private readonly accounts = new Set<string>();
   private readonly out: Flow[] = [];
   private readonly into: Flow[] = [];
@@ -97,7 +107,10 @@ export class DayBook {
         // (A paper of someone else's that names one of ours: it follows it.)
         const d = r.record === "statement" ? (r.data as any) : undefined;
         const refs = [...basesOf(r), ...(["request", "application", "order", "reply_to"] as const).map((k) => d?.[k]).filter((x): x is string => typeof x === "string"), ...(r.record === "withdrawal" ? [r.withdraws] : [])];
-        for (const id of refs) if (!this.followed.has(id) || this.followed.get(id)!.at > r.at) this.followed.set(id, { at: r.at, kind: r.record === "statement" ? r.kind : r.record, by: r.speaks_for ?? r.author });
+        for (const id of refs) {
+          if (!this.followed.has(id) || this.followed.get(id)!.at > r.at) this.followed.set(id, { at: r.at, kind: r.record === "statement" ? r.kind : r.record, by: r.speaks_for ?? r.author });
+          if ((this.citedLast.get(id) ?? -1) < r.at) this.citedLast.set(id, r.at);
+        }
       }
     }
     for (const tx of channels.transactions(obs)) {
@@ -124,7 +137,7 @@ export class DayBook {
   }
 
   /** What the office's own acts come to, newest first, each with what came of it. */
-  private entries(): Entry[] {
+  private entries(now: number): Entry[] {
     const taken = new Set<Flow>();
     const list: Entry[] = [];
     for (const r of [...this.own.values()].sort((a, b) => a.at - b.at)) {
@@ -144,8 +157,13 @@ export class DayBook {
         : r.record === "signature" ? `signed ${r.agreement}`
         : r.record === "withdrawal" ? `withdrew ${r.withdraws}`
         : r.record === "notice" ? `gave notice on ${r.agreement}` : r.record === "agreement" ? cut(String((r.terms as any)?.template ?? ""), 40) : "";
+      // (A paper that names a day by which it is to be answered or done, with nothing following it by then: overdue.)
+      const due = dueOf(r);
+      // (Nothing has followed it: no paper of anyone else's cites it, nor, since it was made, what it rests on.)
+      const answered = basesOf(r).some((b) => (this.citedLast.get(b) ?? -1) > r.at);
+      const late = !f && !answered && due !== undefined && now > due ? `; nothing has followed it, and its day (${dateWords(due)}) has passed: overdue` : "";
       list.push({ at: r.at, kind: what, id: r.id,
-        line: `${dateWords(r.at)}: ${what}${to.length ? ` to ${to.slice(0, 2).map((x) => this.name(x)).join(" and ")}${to.length > 2 ? ` and ${to.length - 2} more` : ""}` : ""}${body ? `: "${cut(body, 90)}"` : ""} (${r.id})${f ? `; followed ${dateWords(f.at)} by a ${words(f.kind)} (${this.name(f.by)})` : ""}` });
+        line: `${dateWords(r.at)}: ${what}${to.length ? ` to ${to.slice(0, 2).map((x) => this.name(x)).join(" and ")}${to.length > 2 ? ` and ${to.length - 2} more` : ""}` : ""}${body ? `: "${cut(body, late ? 50 : 90)}"` : ""} (${r.id})${f ? `; followed ${dateWords(f.at)} by a ${words(f.kind)} (${this.name(f.by)})` : late}` });
     }
     // (Payments out that no request of ours led to: a standing pay, an instruction given another way. The same sum for
     // the same stated reason, to one payee or many, is one line: how many, to whom, since when, the latest.)
@@ -174,7 +192,7 @@ export class DayBook {
 
   /** The text for a sitting at `t`; empty where the office has no acts, no payments and nothing open yet. */
   text(t: number, title: string): string {
-    const all = this.entries();
+    const all = this.entries(t);
     const recent = all.filter((e) => t - e.at <= LISTED_DAYS * DAY);
     const sent = fit(recent.map((e) => `- ${cut(e.line, LINE + 60)}`), SENT_CHARS);
     const older = [...all.slice(recent.length), ...recent.slice(sent.shown.length)];

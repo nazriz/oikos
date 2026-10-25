@@ -6,7 +6,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { MockAdapter, type LlmRequest } from "@oikos/participants/llm";
+import { MockAdapter, PROMPT_MAX, type LlmRequest } from "@oikos/participants/llm";
 import { generate } from "@oikos/worlds/generator/generate";
 import { logLines } from "../src/logs";
 import { runWorld } from "../src/run";
@@ -40,24 +40,19 @@ test("a seat that looks into its office's papers at every sitting is shown lists
   });
   const out = join(root, "runs", "test-seat-sight");
   rmSync(out, { recursive: true, force: true });
-  await runWorld({ config: generate({ ...spec, mayor: "llm", model_seats: "finance" }), runId: "town.seed1", outDir: out, until: 8 * DAY, adapter, recordObservations: "none" });
+  const s = await runWorld({ config: generate({ ...spec, mayor: "llm", model_seats: "finance" }), runId: "town.seed1", outDir: out, until: 8 * DAY, adapter, recordObservations: "none" });
   const finance = prompts.filter((p) => p.seat === "finance-system");
   expect(finance.length).toBeGreaterThan(8);
-  // No prompt of either seat is more than a few tens of thousands of characters.
-  const largest = Math.max(...prompts.map((p) => p.size)); 
-  expect(largest).toBeLessThan(76_000); // (76,000 since 2026-10-17, the auditor, where it was 75,000: the finance seat is shown the audit office's public requests and reports as two more published lists and has one more form, its answer to a request (`audit_answer`); the largest was 75,130 with them, and the form was cut to what a seat needs to fill it in. 75,000 since 2026-10-17, foundations F9, where it was 70,000: three more public forms the town publishes for what a person files with an office that decides (a claimant's papers, an employer's confirmation, a request to look at a decision again), 2.7 thousand characters of fields in the forms a seat is shown and 0.7 in the list of what is on file, and the office's diary (460 characters); the largest was 74,552 with them and 68,835 without. 70,000 since 2026-10-16, foundations F8, where it was 68,000: the town's law on decisions (what a decision waits for, its review and appeal, for each payment and for planning), a public law the mayor's file holds, 68,369; the mayor's, most of it what is on file for the office: its laws and forms; 62,000 since 2026-10-12, where it was 60,000: the form for answering a petition, 60,803; 64,000 later that day: that form's `answer` and the words added to the forms that say something, 62,367)
-  // (68,000 since foundations F5, where it was 64,000: the mayor's file now holds the town's administrative staff's employment agreements, signatures and standing payments, a hundred papers more; the largest prompt was 66,162.)
-  // (45,000 since 2026-10-11, where it was 40,000: the town's law book gained its laws on ending a job and on possession,
-  // and the payments procedure says which line a wage is on; the largest finance prompt was 40,505.)
-  // (50,000 since 2026-10-12, where it was 45,000: finance has a form of its own, the return of tax withheld, and so a
-  // folder of forms, which holds the town's public forms too: 49,371. The cost is recorded in docs/behaviour/office-papers.md.)
-  // (52,000 since 2026-10-12, where it was 50,000: the tax law says its returns and the day each falls due, and the books
-  // list them; 50,483 in the Kenyan town with four. Docs/decisions.md, "Returns on the law's days".)
-  // (56,000 since 2026-10-13, where it was 52,000: the office's own file is set out at every sitting, at most 4,500
-  // characters (docs/decisions.md, "What a seat carries between sittings"); the largest finance prompt was 52,193.)
-  // (63,000 since 2026-10-16, foundations F8, where it was 56,000: the finance office reads the payments procedure for who approves a payment over what sum, no longer a
-  // parameter, and is shown the town's procedures to do it (4,648 characters), and the town's law on decisions is in the laws it is shown (3,581); the largest finance prompt was 61,229.)
-  expect(Math.max(...finance.map((p) => p.size))).toBeLessThan(68_000); // (68,000 since 2026-10-24, market realism, where it was 66,000: who is in work is drawn with their household (ME-17), so another person holds the finance post, and what a seat is told of its own person (age, children, home) and its file differ; the largest was 67,329 against 65,289 on main the same day, the difference in what it is told of its person and the names on its file. 66,000 since 2026-10-17, foundations F9, where it was 63,000: the same three forms and the diary; the largest finance prompt was 64,654, and 61,615 without them.)
+  // No prompt of either seat comes near what a model cannot take: none over the ceiling a prompt is fitted to (PROMPT_MAX), and none
+  // had to be fitted to it (a `prompt_trimmed` note), so nothing a seat looked up was left out for want of room. (Until the test
+  // pruning, 2026-10-24, two figures just above the largest prompts of the day, 76,000 and 66,000, re-taken at fifteen changes that
+  // gave a seat a form or a law more: a change detector. The live check of 2026-10-09 that this test answers was a prompt of 602,000.)
+  const largest = Math.max(...prompts.map((p) => p.size));
+  expect(largest).toBeLessThanOrEqual(PROMPT_MAX);
+  const trimmed: string[] = [];
+  for await (const line of logLines(s.logPath)) if (line.includes("prompt_trimmed")) trimmed.push(line.slice(0, 300));
+  expect(trimmed).toEqual([]);
+  console.log(`seat sight: the largest prompt ${largest.toLocaleString("en")} characters, finance's ${Math.max(...finance.map((p) => p.size)).toLocaleString("en")}`);
   // The folder named for payroll holds the employment agreements, a line each; the files, everything, as a list.
   const second = finance[1]!.text;
   expect(second).toContain("## Finance officer: Payroll: what you looked up (");

@@ -247,7 +247,7 @@ process.exit(open ? 0 : 1);
   return script;
 }
 const QUEUE = join(import.meta.dir, "../../scripts/pilot-queue.ts");
-const entry = (name: string, model: string) => ({ name, world: "worlds/town-1000.yaml", model, translator: "claude-code/s", until: 30 * 86_400, budget: 1 });
+const entry = (name: string, model: string) => ({ name, world: "worlds/town-1000.yaml", model, translator: "claude-code/s", framing: "unstated", until: 30 * 86_400, budget: 1 });
 const queueEnv = (runs: string, cli: string) => ({ ...process.env, OIKOS_RUNS: runs, OIKOS_WAVE: "pk", OIKOS_NO_NOTIFY: "1", OIKOS_ALERT_CMD: "", OIKOS_POLL_SECONDS: "0.2", OIKOS_QUEUE_CLI: cli });
 
 test("a pilot at a usage limit is parked and the queue goes on to what needs another sign-in; it is come back to, and nothing is lost", async () => {
@@ -332,7 +332,7 @@ process.exit(again ? 0 : 1);
   const p = Bun.spawn(["bun", QUEUE, queue, "--wait", "0.02"], { env: queueEnv(runs, cli), stdout: "pipe", stderr: "pipe" });
   const [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited]);
   expect(code).toBe(0);
-  expect(out).toContain("ours-first: starting (framing unstated (the default for steward pilots); claude-code/s, translator claude-code/s, decide/pod-small-r2-s1 first (then))");
+  expect(out).toContain("ours-first: starting (framing unstated; claude-code/s, translator claude-code/s, decide/pod-small-r2-s1 first (then))");
   // The one behind at its usage limit: the pilot is parked for that sign-in, as any is, and taken up again.
   expect(out).toMatch(/ours-first: parked at a usage limit on day 1 \(claude-code: /);
   expect(out).toContain("ours-first: done (day 30)");
@@ -346,11 +346,11 @@ process.exit(again ? 0 : 1);
   expect(asked[1]).toStartWith("resume ");
 }, 60_000);
 
-test("a pilot's framing: the entry's own, else its world file's own, else unstated, the default for steward pilots; honest disclosure by name", () => {
+test("a pilot's framing: the entry's own, else its world file's own, and never a default (a run with a model is then refused); honest disclosure by name", () => {
   const generated = { generate: "town", name: "Millbrook" };
   expect(STEWARD_FRAMING).toBe("unstated");
-  expect(framingSets({}, generated)).toEqual({ sets: ["framing=unstated"], said: "framing unstated (the default for steward pilots)" });
-  expect(framingSets({})).toEqual({ sets: ["framing=unstated"], said: "framing unstated (the default for steward pilots)" });
+  expect(framingSets({}, generated)).toEqual({ sets: [], said: 'NO FRAMING CHOSEN: a run with a model is refused (write "framing": "unstated" or "simulation", or per seat)' });
+  expect(framingSets({}).sets).toEqual([]);
   expect(framingSets({ framing: "simulation" }, generated)).toEqual({ sets: ["framing=simulation"], said: "framing simulation" });
   expect(framingSets({ framing: { disclosure: "simulation", reason: "The arm under honest disclosure." } }, generated)).toEqual({ sets: ['framing={"disclosure":"simulation","reason":"The arm under honest disclosure."}'], said: "framing simulation" });
   // A world file that says its own is left to say it; a world that is not generated carries its participants' framing in itself.

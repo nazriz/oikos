@@ -75,11 +75,22 @@ pub struct World {
 
 #[napi]
 impl World {
-    /// `config`: the world's config; `options`: see kernel/src/host.rs (`run_id`, `log`, `threads`, `until`,
-    /// `stand_in`, `snapshot_every_days`, `stream`...).
+    /// `config`: the world's config (its JSON text; or empty, and `config_file` in the options names a file holding
+    /// it); `options`: see kernel/src/host.rs (`run_id`, `log`, `threads`, `until`, `stand_in`,
+    /// `snapshot_every_days`, `stream`...). Either way it is read participant by participant (`config::load_from`),
+    /// never held whole as JSON.
     #[napi(constructor)]
     pub fn new(config: String, options: String) -> napi::Result<Self> {
-        Ok(World { host: Host::start(parse(&config, "config")?, &parse(&options, "options")?).map_err(err)? })
+        let opts = parse(&options, "options")?;
+        let read = match opts["config_file"].as_str() {
+            Some(path) if config.is_empty() => {
+                oikos_kernel::config::load_from(std::fs::File::open(path).map_err(|e| err(format!("config_file {path}: {e}")))?)
+            }
+            _ => oikos_kernel::config::load_from(config.as_bytes()),
+        };
+        let (loaded, rest) = read.map_err(|e| err(format!("invalid config: {e}")))?;
+        drop(config);
+        Ok(World { host: Host::start_loaded(loaded, rest, &opts).map_err(err)? })
     }
 
     /// A run taken up again from a snapshot's bytes, with its own options (its log, `parent`, threads).
@@ -120,8 +131,9 @@ impl World {
 
     /// What a seat's call would come to from what it has been shown: `{blocks}` or `{questions, invalid?}` (nothing changes).
     #[napi]
-    pub fn resolve(&self, participant: String, program: String, as_: Option<String>) -> napi::Result<String> {
-        Ok(self.host.resolve(&participant, &program, as_.as_deref()).map_err(err)?.to_string())
+    pub fn resolve(&self, participant: String, program: String, as_: Option<String>, names: Option<String>) -> napi::Result<String> {
+        let names: serde_json::Value = names.as_deref().and_then(|n| serde_json::from_str(n).ok()).unwrap_or_default();
+        Ok(self.host.resolve(&participant, &program, as_.as_deref(), &names).map_err(err)?.to_string())
     }
 
     /// Whether these blocks would be carried out for the participant now: `{ok, refusal?}` (nothing changes).

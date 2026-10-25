@@ -299,6 +299,8 @@ async function kernelCargoTests(crates?: string[]) {
   if (!ok) { failed++; console.log(out.split("\n").filter((l) => /FAILED|FAIL \[|panicked|error/.test(l)).slice(0, 40).join("\n")); }
 }
 
+/** Files whose failures under load are timing, not behaviour (docs/dev-machine.md, "Flakes"): rerun once alone, and accepted only if they then pass. */
+const KNOWN_FLAKES = new Set(["scripts/slots.test.ts", "orchestrator/test/pilot-wave.test.ts"]);
 let pass = 0, fail = 0, rerun = 0, next = 0, running = 0;
 /** This run, file by file (wall seconds, passed, tests): kept in ~/.oikos/test-runs (OIKOS_TEST_RUNS), the last 200 runs. */
 const record: Record<string, { secs: number; ok: boolean; tests: number }> = {};
@@ -324,6 +326,11 @@ async function runFile(f: string): Promise<Result> {
 }
 const tail = (f: string, text: string) => `\n== ${f}\n${text.split("\n").filter((l) => !/^\s*$/.test(l)).slice(-60).join("\n")}`;
 
+// Seconds in which none of this run's files was running though some were still to run: the run waiting on the machine
+// (slots held by others, the load average), which the slow tier's wall budget does not count against the suite.
+let stalled = 0;
+const stallTimer = setInterval(() => { if (running === 0 && next < files.length) stalled++; }, 1000);
+stallTimer.unref?.();
 async function worker() {
   for (;;) {
     while (next < files.length && running >= allowed(running)) await Bun.sleep(1000);
@@ -339,6 +346,9 @@ async function worker() {
     times[f] = Math.round(r.secs * 10) / 10;
     record[f] = { secs: times[f]!, ok: r.code === 0, tests: r.npass + r.nfail };
     if (r.onlyTimeouts) { lateTimeouts.push(f); console.log(`LATE ${f} ${r.secs.toFixed(0)}s (timed out; to be rerun alone)`); continue; }
+    // (A known timing flake, the same two files merge.ts's flake rule names, gets the same one rerun alone in every run,
+    // CI's included: main went red on 2026-10-25 for slots.test.ts alone, which passed three times in a row by hand.)
+    if (r.code !== 0 && KNOWN_FLAKES.has(f)) { lateTimeouts.push(f); console.log(`LATE ${f} ${r.secs.toFixed(0)}s (a known timing flake; to be rerun alone)`); continue; }
     pass += r.npass; fail += r.nfail;
     console.log(`${r.code === 0 ? "ok  " : "FAIL"} ${f} ${r.secs.toFixed(0)}s`);
     if (r.code !== 0) { failed++; bad.push(tail(f, r.text)); }
@@ -369,4 +379,23 @@ for (const b of bad) console.log(b);
 const long = Object.entries(record).filter(([f, r]) => !isSlowTier(f) && r.secs > 90).map(([f, r]) => `${f} (${r.secs}s)`);
 if (long.length && !custom) console.log(`\nNOTE gate-tier files over 90 s: ${long.join(", ")}. Name them in scripts/test-tiers.json (the slow tier), with why.`);
 console.log(`\n${pass} pass, ${fail} fail across ${files.length} files, ${maxJobs} at a time, in ${((performance.now() - t0) / 1000).toFixed(0)}s${fast ? " (fast tier)" : changed ? " (fast tier and what changed)" : ""}, ${rerun} passed on rerun`);
-process.exit(failed ? 1 : 0);
+// The time budgets (scripts/test-budgets.json; raising one is a decision with its entry in docs/decisions.md): the gate fails when the
+// sum of its files' own times is over its file-seconds, or a file is over its file limit (each file's time, not the run's wall: a merge
+// never fails because the machine was busy while it ran); the slow tier warns over its wall time. (Not for named files or another root.)
+let over = false;
+if (!custom && !filters.length && !list) {
+  const budgets = JSON.parse(readFileSync(join(repo, "scripts", "test-budgets.json"), "utf8")) as { gate: { file_seconds_total: number; file_seconds: number }; slow: { wall_seconds: number } };
+  const say = "(docs/testing.md, \"Pruning: when a budget is hit\"; a budget is raised only with an entry in docs/decisions.md)";
+  if (affected || tierFlag === "gate") {
+    const long = Object.entries(record).filter(([, r]) => r.secs > budgets.gate.file_seconds).map(([f, r]) => `${f} ${r.secs}s`);
+    if (long.length) { over = true; console.log(`BUDGET: gate files over ${budgets.gate.file_seconds}s: ${long.join(", ")} ${say}`); }
+    const total = Object.values(record).reduce((n, r) => n + r.secs, 0);
+    console.log(`(budgets: the gate's files took ${total.toFixed(0)} file-seconds of its ${budgets.gate.file_seconds_total})`);
+    if (total > budgets.gate.file_seconds_total) { over = true; console.log(`BUDGET: the gate's files took ${total.toFixed(0)} file-seconds, over its ${budgets.gate.file_seconds_total} ${say}`); }
+  } else if (tierFlag === "slow") {
+    // (Less the seconds the run stood waiting on the machine with nothing of its own running.)
+    const wall = (performance.now() - t0) / 1000 - stalled;
+    if (wall > budgets.slow.wall_seconds) console.log(`BUDGET (a warning): the slow tier took ${wall.toFixed(0)}s, over its ${budgets.slow.wall_seconds}s ${say}`);
+  }
+}
+process.exit(failed || over ? 1 : 0);

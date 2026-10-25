@@ -53,11 +53,10 @@ test("what each office's code acts on was in that office's books, as its clerk k
   for (const p of config.participants) if (p.controller?.type === "llm") p.controller.params.mock = { ...p.controller.params.mock, back_days: 3 };
   const out = mkdtempSync(join(tmpdir(), "oikos-books-walk-"));
   let recs: any[] = [];
-  const withdrawals: any[] = []; // (a withdrawal is a record of its own, not a statement: `withdrawnAt` below looked among statements and could never find one, until the day a landlord withdrew a case the member had listed, 2026-10-12)
   try {
-    const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "books-walk", outDir: out, until: Number(process.env.WALK_DAYS ?? 400) * DAY, recordObservations: "none" });
+    const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "books-walk", outDir: out, until: Number(process.env.WALK_DAYS ?? 150) * DAY, recordObservations: "none" });
     expect(s.participantErrors).toBe(0);
-    for (const l of readFileSync(s.logPath, "utf8").split("\n")) if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement") recs.push(r); else if (r?.record === "withdrawal") withdrawals.push(r); }
+    for (const l of readFileSync(s.logPath, "utf8").split("\n")) if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement") recs.push(r); }
   } finally { rmSync(out, { recursive: true, force: true }); }
   const seatOf = new Map<string, string>(["mayor", ...seats].map((id) => [`${id}-system`, id]));
   const books = recs.filter((r) => r.kind === "office_books");
@@ -121,45 +120,9 @@ test("what each office's code acts on was in that office's books, as its clerk k
   expect(closures).toBeGreaterThan(20);
   expect(silently).toEqual([]);
 
-  // ---- The tribunal member's list is a standing list (the fourth living pilot's member missed the one case whose
-  // day had come: its books named only what had changed since the clerk's last paper). Every case listed and not
-  // decided is on every paper's list with its day; and from the morning of its day until it is decided, every paper
-  // names it in its own words, first.
-  const tribunal = papers.get("tribunal-member") ?? [];
-  // (Those listed in the run, and those on the tribunal's file as the year began with the tenant's time still running.)
-  const listed = [...(config.world.records as any[]).filter((r) => r.kind === "hearing_notice" && Number(r.data?.answer_by) > 0), ...recs].filter((r) => r.kind === "hearing_notice" && r.speaks_for === "tribunal" && typeof r.data?.application === "string");
-  const orderAt = (app: string) => Math.min(Infinity, ...recs.filter((r) => r.kind === "tribunal_order" && r.data?.application === app).map((r) => r.at));
-  const withdrawnAt = (app: string) => Math.min(Infinity, ...withdrawals.filter((r) => r.withdraws === app).map((r) => r.at));
-  // (A tenant who answers that they have left the home is the end of the case on the list: the member's books drop it, as its code does. Found 2026-10-12, "Returns on the law's days": a changed town had one such case.)
-  const leftAt = (app: string) => Math.min(Infinity, ...recs.filter((r) => r.kind === "tribunal_response" && r.data?.application === app && r.data?.left === true).map((r) => r.at));
-  let onList = 0, ripeNamed = 0, ripeCases = 0;
-  const missing: string[] = [];
-  for (const n of listed) {
-    const app = n.data.application as string, day = Number(n.data.answer_by ?? n.data.hearing_at), closed = Math.min(orderAt(app), withdrawnAt(app), leftAt(app));
-    const ids = [app, n.id];
-    let ripe = false;
-    for (const b of tribunal) {
-      if (b.at <= n.at || b.at >= closed) continue;
-      const items = (b.data.open as any[]).filter((x) => ids.includes(String(x.about)));
-      if (!items.length) { missing.push(`day ${Math.floor(b.at / DAY)}: ${app} is not on the list (notice ${n.id} at ${(n.at / DAY).toFixed(3)}, paper at ${(b.at / DAY).toFixed(3)})`); continue; }
-      onList++;
-      if (Number.isFinite(day) && Math.floor(day / DAY) <= Math.floor(b.at / DAY)) {
-        ripe = true;
-        if (ids.some((id) => names(String(b.text), id)) && /day has come|time to answer has run/.test(String(items[0].what))) ripeNamed++;
-        else missing.push(`day ${Math.floor(b.at / DAY)}: ${app}, whose day was ${Math.floor(day / DAY)}, is not named in the paper's words`);
-      }
-    }
-    if (ripe) ripeCases++;
-  }
-  console.log(`  the tribunal's list: ${listed.length} cases listed, ${tribunal.length} papers; a case on a paper's list ${onList} times; ${ripeCases} cases stood with their day come at some paper, named there ${ripeNamed} times; faults ${missing.length}${missing.length ? ` (${missing.slice(0, 5).join("; ")})` : ""}`);
-  // (400 days where it was 250, 2026-10-17, the bug hunt: with the findings fixed, no case in this town stood with its day come in 250 days (a person who leaves town no longer keeps a post and acts from outside, and the clerk of the books carries on from the file when its holder changes); one does in 400, and nothing leaves a list unsaid at either. Not narrowed to one finding.)
-  // (250 days again, 2026-10-16: the moves to 400 and then 520 at foundations F5 and F6 are undone: with the fixes of the foundations review (found-fixes), at 250 days the walk now has one case with its day come, named at its paper (at 400 days, three). Measured on the foundations-review branch after its fixes.)
-  // (520 days where it was 400 since foundations F6 (2026-10-16): the world differs again and in this town no case stood with its day come in 400 days; two do in 520.)
-  // (400 days where it was 250 since foundations F5 (2026-10-16): the tribunal's staff are people now, each with a body's one timeline, and in this town no case stood with its day come in 250 days; one does in 400.)
-  // (250 days where it was 150: with draws named for the day, 2026-10-12, no case in this town stood with its day come before day 150.)
-  // (More than 2 where it was more than 3: with homes dealt by income, 2026-10-12, this town opens with the cases its
-  // own households make, those where someone is out of work as the year begins, not a quarter of its tenancies.)
-  expect(listed.length).toBeGreaterThan(2);
-  expect(ripeCases).toBeGreaterThan(0);
-  expect(missing).toEqual([]);
+  // (Until the test pruning, 2026-10-24, the walk also held the tribunal member's list as a standing list: every case listed and not decided
+  // on every paper, and from its day named first in the paper's words. A case with its day come is a rare draw in this town, and the walk
+  // was lengthened from 150 days to 250, 400, 520, 250 and 400 to find one. The rule is held on papers made by hand in
+  // participants/test/day-list.test.ts, and in a run whose tribunal has cases falling ripe by construction in
+  // orchestrator/test/member-sittings.test.ts; the walk is back to the 150 days its other two checks were written for.)
 }, 1_800_000);

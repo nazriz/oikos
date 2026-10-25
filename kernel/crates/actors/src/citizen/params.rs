@@ -34,7 +34,9 @@ pub struct Params {
     pub child_template: String,
     pub child_template_outside_lf: String,
     pub participation_bps: i64,
-    pub ventures: Vec<Venture>,
+    /// (Shared: the same list in every person's params is read once and held once: `shared_ventures`.)
+    #[serde(deserialize_with = "shared_ventures")]
+    pub ventures: std::sync::Arc<Vec<Venture>>,
     pub found_own_buffer_months: i64,
     /// The trade they worked in as the year began (the industry of their job then), which an application of theirs
     /// names until they have worked elsewhere (docs/design/market-realism.md, ME-2).
@@ -135,7 +137,7 @@ impl Default for Params {
             child_template: "child".into(),
             child_template_outside_lf: String::new(),
             participation_bps: 10_000,
-            ventures: vec![],
+            ventures: Default::default(),
             found_own_buffer_months: 1,
             trade: None,
             give_up_months: 6,
@@ -210,7 +212,7 @@ impl Default for Params {
 
 impl Params {
     /// The parameters as the world gives them (a role's with the person's own on top, as the engine composes them).
-    pub fn of(params: &serde_json::Map<String, Value>) -> Result<Params, String> {
+    pub fn of(params: &crate::Params) -> Result<Params, String> {
         // (A null is "the module's default", as TS's `params` read it: dropped before reading.)
         let given: serde_json::Map<String, Value> = params.iter().filter(|(_, v)| !v.is_null()).map(|(k, v)| (k.clone(), v.clone())).collect();
         serde_json::from_value(Value::Object(given)).map_err(|e| format!("citizen.default's parameters: {e}"))
@@ -227,6 +229,15 @@ impl Params {
             },
         }
     }
+}
+
+/// A world's ventures, as every person's params give them: the same list (a town's are 17 KB of JSON each, and held
+/// as values each person's copy was 200 KB, 2 GB at 10,000 people), read once and shared by all who are given it. The
+/// list is looked up by its text (`controller::read_once`): the same text is the same list, which no one changes, so
+/// nothing anyone does differs (SC-1, docs/decisions.md 2026-10-25).
+fn shared_ventures<'de, D: serde::Deserializer<'de>>(d: D) -> Result<std::sync::Arc<Vec<Venture>>, D::Error> {
+    let v = Value::deserialize(d)?;
+    oikos_contracts::controller::read_once(&v.to_string(), || serde_json::from_value::<Vec<Venture>>(v)).map_err(serde::de::Error::custom)
 }
 
 /// payments.ts `stopsWorkAt`: the age at which someone at quantile `q` (of 10,000) leaves the labour force, read from
@@ -473,7 +484,7 @@ mod tests {
         let v = json!({ "bank": "bank", "essentials": 41000, "values": { "values": {} }, "retirement_age": 67, "own_values": null,
             "stop_work_curve": [{ "from": 25, "bps": 8700 }, { "from": 55, "bps": 7752 }, { "from": 65, "bps": 1613 }],
             "school": { "entity": "school", "building": "b", "ages": [5, 17] } });
-        let p = Params::of(v.as_object().unwrap()).unwrap();
+        let p = Params::of(&crate::Params::from(v.as_object().unwrap().clone())).unwrap();
         assert_eq!((p.essentials, p.bank.as_deref(), p.shop_every_days), (41_000, Some("bank"), 14));
         // (The curve: 7752/8700 = 8910 of 10,000 are still in at 55, 1613/8700 = 1854 at 65; a draw at or over the
         // share kept has stopped by then.)
@@ -482,6 +493,6 @@ mod tests {
         assert_eq!(p.stop_age(1_000), None, "below every band's share: never stops");
         let mut never = v.as_object().unwrap().clone();
         never.insert("stops_work_at".into(), json!("never"));
-        assert_eq!(Params::of(&never).unwrap().stop_age(9_500), None);
+        assert_eq!(Params::of(&crate::Params::from(never)).unwrap().stop_age(9_500), None);
     }
 }

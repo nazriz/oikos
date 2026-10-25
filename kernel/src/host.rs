@@ -149,10 +149,16 @@ fn wake_json(s: &crate::engine::SeatWake) -> Value {
 
 impl Host {
     pub fn start(config: Value, opts: &Value) -> Result<Host, String> {
+        let (loaded, rest) = crate::config::load_split(config).map_err(|e| crate::run::RunError::Config(e).to_string())?;
+        Self::start_loaded(loaded, rest, opts)
+    }
+
+    /// `start`, from a config read already (`config::load_from`: a large world's, participant by participant).
+    pub fn start_loaded(loaded: crate::config::LoadedConfig, rest: crate::config::Rest, opts: &Value) -> Result<Host, String> {
         let o = options(opts)?;
         let run_id = o.run_id.clone().unwrap_or_else(|| "run".into());
         let (out, anchors) = open(&o, &run_id, None)?;
-        let e = Engine::start(config, &run_id, Tee::new(out, o.stream.clone()), anchors, o.engine.clone())?;
+        let e = Engine::start_loaded(loaded, rest, &run_id, Tee::new(out, o.stream.clone()), anchors, o.engine.clone())?;
         let mut h = Host { e, log: o.log.clone(), snapshot_every: None, next_snapshot: None };
         h.every(o.snapshot_every);
         Ok(h)
@@ -259,9 +265,10 @@ impl Host {
     /// What a seat's call would come to, from what the seat has been shown (the resolver over its knowledge, as the
     /// engine resolves a `call` it submits): `{blocks}` or `{questions, invalid?}`. Changes nothing; not logged. A seat's
     /// host drafts a request with it, for the seat to confirm before anything is done (the translator's preview).
-    pub fn resolve(&self, participant: &str, program: &str, as_: Option<&str>) -> Result<Value, String> {
+    pub fn resolve(&self, participant: &str, program: &str, as_: Option<&str>, names: &Value) -> Result<Value, String> {
+        let shown = oikos_resolver::Knowledge::shown_of(names);
         let program = oikos_resolver::calls::parse_program(program).map_err(|x| format!("the call doesn't parse: {}", x.0))?;
-        Ok(match self.e.host_resolve(participant, &program, as_) {
+        Ok(match self.e.host_resolve(participant, &program, as_, &shown) {
             oikos_resolver::Resolution::Blocks(blocks) => json!({ "blocks": blocks }),
             oikos_resolver::Resolution::Questions { questions, invalid, ambiguous } => {
                 let mut v = json!({ "questions": questions });
