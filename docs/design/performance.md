@@ -59,6 +59,18 @@ held whole. Minds and memories are `mem-minds`'s (compact formats).
 |---|---|---|---|---|---|
 | main (`3b87959e`) | 693 MB | 5.25 GB | 34.2 GB | 590 KB | |
 | the state hash streamed, no cache (`mem-state-hash`) | 592 MB | 4.34 GB | | 480 KB | +0.4% at 10,000, +0.1 to 2.6% at 1,000 |
+| what's been seen held once (`mem-seen`) | 521 MB | 3.12 GB | 17.2 GB (956 s, against 1,004) | 410 KB | at or under main: -0.5 to 0% at 1,000, -10.6% at 10,000, -21% at 50,000 |
+
+*What's been seen.* A building as someone sees it (its spaces, who is in each where that can be told, its wear) was
+made at every look and kept by everyone who saw it, each their own copy: at 50,000 people, 408 KB a person. Now it is
+made once for everyone who sees it the same (per building, and whether the looker can be told who is there) and made
+again only when what it is made from has changed (the building, its occupancy, its spaces' departures and arrivals:
+compared by where they are in memory, since the state never changes them in place, and field for field); held while
+anyone holds it. Debug builds check each one kept against one made afresh. A view kept the cells it had seen as a map
+and copied them into the list it handed its actor besides; it keeps the one list. A first version held the buildings
+behind one lock per shard and made the 50,000 month 58% slower in wall time (the people of one building look at once,
+on many threads, and queued for its shard); read under a shared lock, the comparison outside it, it is faster than
+main.
 
 ## What held memory, and the config read participant by participant (branch `scale-next`, 2026-10-25)
 
