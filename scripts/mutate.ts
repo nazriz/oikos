@@ -9,8 +9,9 @@
 // --copy DIR   the scratch copy (made with `cp -c -R`, a copy-on-write clone, if it is not there; the files this checkout
 //              changes are copied in on every start). The repo itself is never touched.
 // --tests      which tests each mutation is run against: `fast` (the default) is the fast tier, the files the mutation
-//              names, the kernel's own tests for a kernel mutation, and the invariants; `own` the files it names and the
-//              invariants; `invariants` the invariants alone.
+//              names, the kernel's own tests for a kernel mutation, and the invariants (the year's and the gate's); `own`
+//              the files it names, the gate's invariants and, for a kernel mutation, the kernel's own tests; `invariants`
+//              the year's invariants alone.
 // --out FILE   results as JSON (default: DIR/mutation-results.json), written after each mutation, so a stopped run keeps
 //              what it found; a mutation already in it is not run again unless --again.
 //
@@ -41,6 +42,9 @@ const again = bool("again");
 const noBaseline = bool("no-baseline");
 const FILE_LIMIT_MS = Number(flag("file-limit-s") ?? 1500) * 1000;
 const INVARIANTS = "orchestrator/test/invariants.test.ts";
+// (The gate's 90 days of the same checker: what `own` runs, in a minute rather than the year's minutes.)
+const INVARIANTS_GATE = "orchestrator/test/invariants-gate.test.ts";
+const isInvariants = (f: string) => f.startsWith(INVARIANTS) || f.startsWith(INVARIANTS_GATE);
 
 const sh = (cmd: string[], cwd: string, env?: Record<string, string>) => {
   const p = Bun.spawnSync(cmd, { cwd, stdout: "pipe", stderr: "pipe", env: { ...process.env, ...env } });
@@ -75,7 +79,7 @@ async function runFile(file: string, tag: string): Promise<FileResult> {
   mkdirSync(dirname(junit), { recursive: true });
   rmSync(junit, { force: true });
   const t0 = Date.now();
-  const p = Bun.spawn(["bun", "test", "--reporter=junit", `--reporter-outfile=${junit}`, file], { cwd: copy, stdout: "pipe", stderr: "pipe", env: { ...process.env } });
+  const p = Bun.spawn(["bun", "test", "--reporter=junit", `--reporter-outfile=${junit}`, file], { cwd: copy, stdout: "pipe", stderr: "pipe", env: { ...process.env, ...engineEnv() } });
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; p.kill(9); }, FILE_LIMIT_MS);
   const [o, e] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
@@ -114,11 +118,19 @@ async function runFiles(files: string[], tag: string): Promise<FileResult[]> {
   return results;
 }
 
+// The kernel is built and tested in the gate profile (kernel/Cargo.toml: release's optimisation and overflow checks, no
+// whole-program link), as the merge gate does: a mutation's rebuild in a minute or two, not the release link's many.
+// Every test file in the copy is pointed at that build.
+const GATE = join(copy, "kernel/target/gate");
+const engineEnv = (): Record<string, string> => {
+  const lib = ["liboikos_napi.dylib", "liboikos_napi.so"].map((f) => join(GATE, f)).find((f) => existsSync(f));
+  return { OIKOS_KERNEL: join(GATE, "oikos-kernel"), ...(lib ? { OIKOS_ENGINE_MODULE: lib } : {}), OIKOS_LAW_MODULE: join(copy!, "kernel/target/wasm32-unknown-unknown/release/oikos_law.wasm") };
+};
 function kernelBuild(): { ok: boolean; out: string } {
-  return sh(["sh", "-c", "cargo build --release --manifest-path kernel/Cargo.toml --workspace && cargo build --release --manifest-path kernel/Cargo.toml --target wasm32-unknown-unknown -p oikos-law"], copy!);
+  return sh(["sh", "-c", "cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace && cargo build --release --manifest-path kernel/Cargo.toml --target wasm32-unknown-unknown -p oikos-law"], copy!);
 }
 function kernelTests(): { ok: boolean; failed: string[] } {
-  const r = sh(["cargo", "test", "--release", "--manifest-path", "kernel/Cargo.toml", "--workspace", "--no-fail-fast"], copy!);
+  const r = sh(["cargo", "test", "--profile", "gate", "--manifest-path", "kernel/Cargo.toml", "--workspace", "--no-fail-fast"], copy!);
   const failed = [...r.out.matchAll(/^test (\S+) \.\.\. FAILED$/gm)].map((m) => `kernel > ${m[1]}`);
   if (!r.ok && !failed.length) failed.push(`kernel (did not build or run: ${r.out.split("\n").filter((l) => /^error/.test(l)).slice(0, 3).join(" | ")})`);
   return { ok: r.ok, failed };
@@ -127,7 +139,7 @@ function kernelTests(): { ok: boolean; failed: string[] } {
 const filesFor = (m: Mutation) => {
   const own = [...(m.tests ?? [])].filter((f) => existsSync(join(copy!, f)));
   const fast = candidates.filter((f) => (baseMs[f] ?? 0) < FAST_MS);
-  const set = tier === "invariants" ? [INVARIANTS] : tier === "own" ? [...own, INVARIANTS] : [...fast, ...own, INVARIANTS];
+  const set = tier === "invariants" ? [INVARIANTS] : tier === "own" ? [...own, INVARIANTS_GATE] : [...fast, ...own, INVARIANTS];
   return [...new Set(set)].filter((f) => existsSync(join(copy!, f)));
 };
 
@@ -139,6 +151,12 @@ const chosen = MUTATIONS.filter((m) => !only || only.includes(m.id)).filter((m) 
 // Kernel mutations last: each needs a build, and the copy's kernel is rebuilt clean at the end.
 chosen.sort((a, b) => Number(a.file.startsWith("kernel/")) - Number(b.file.startsWith("kernel/")));
 console.log(`${chosen.length} mutation${chosen.length === 1 ? "" : "s"} to run, ${jobs} test file${jobs === 1 ? "" : "s"} at a time, tests: ${tier}`);
+
+// ---- The copy's kernel, unmutated, in the gate profile (what every test file here runs).
+{
+  const b = kernelBuild();
+  if (!b.ok) { console.error(`the unmutated kernel did not build in the copy:\n${b.out.slice(-3000)}`); process.exit(1); }
+}
 
 // ---- Baseline: every file any chosen mutation may run, unmutated (and timed).
 const allFiles = tier === "fast" ? [...new Set([...candidates, ...chosen.flatMap((m) => m.tests ?? []), INVARIANTS])] : [...new Set(chosen.flatMap(filesFor))];
@@ -154,6 +172,15 @@ if (!noBaseline) {
     results.baseline = { failed: [...baseFailed], files: (results as any).baselineFiles.length, at: new Date().toISOString() };
     save();
     console.log(`baseline: ${baseFailed.size} failing unmutated (${Math.round((Date.now() - t0) / 1000)} s)${baseFailed.size ? ": " + [...baseFailed].slice(0, 8).join("; ") : ""}`);
+  }
+  // (The kernel's own tests too, once, where a kernel mutation will run them: one failing unmutated catches nothing.)
+  if (tier !== "invariants" && chosen.some((m) => m.file.startsWith("kernel/")) && !(results as any).baselineKernel) {
+    const kt = kernelTests();
+    for (const f of kt.failed) baseFailed.add(f);
+    (results as any).baselineKernel = true;
+    results.baseline = { ...(results.baseline ?? { files: 0, at: new Date().toISOString() }), failed: [...baseFailed] };
+    save();
+    console.log(`baseline: the kernel's own tests, ${kt.failed.length} failing unmutated${kt.failed.length ? ": " + kt.failed.slice(0, 8).join("; ") : ""}`);
   }
 }
 
@@ -182,15 +209,15 @@ for (const m of chosen) {
     }
     const files = filesFor(m);
     const rs = note ? [] : await runFiles(files, m.id);
-    if (isKernel && !note && tier === "fast") kt = kernelTests();
+    if (isKernel && !note && tier !== "invariants") kt = kernelTests();
     const failed = [...rs.flatMap((r) => r.failed), ...(kt?.failed ?? [])].filter((f) => !baseFailed.has(f));
     const timedOut = rs.filter((r) => r.timedOut).map((r) => r.file);
     const by = [...failed, ...timedOut.map((f) => `${f} (timed out)`)];
-    const byInvariants = by.filter((f) => f.startsWith(INVARIANTS));
+    const byInvariants = by.filter(isInvariants);
     const r: MutationResult = { id: m.id, kind: m.kind, file: m.file, caught: by.length > 0, by, byInvariants, timedOut, files, applied: true, ...(kt ? { kernelTests: { ok: kt.ok, failed: kt.failed } } : {}), ...(note ? { note } : {}), ms: Date.now() - t0 };
     // Merging with an earlier result for the same bug: a run of the invariants alone keeps what the other tests found.
     const prev = results.mutations.find((x) => x.id === m.id);
-    if (prev && tier === "invariants") { r.by = [...prev.by.filter((f) => !f.startsWith(INVARIANTS)), ...byInvariants]; r.caught = r.by.length > 0; r.files = [...new Set([...prev.files, ...files])]; if (prev.kernelTests) r.kernelTests = prev.kernelTests; }
+    if (prev && tier === "invariants") { r.by = [...prev.by.filter((f) => !f.startsWith(INVARIANTS)), ...byInvariants.filter((f) => f.startsWith(INVARIANTS))]; r.caught = r.by.length > 0; r.files = [...new Set([...prev.files, ...files])]; if (prev.kernelTests) r.kernelTests = prev.kernelTests; }
     results.mutations = results.mutations.filter((x) => x.id !== m.id);
     results.mutations.push(r);
     save();
@@ -208,6 +235,6 @@ if (kernelDirty) {
 // ---- Summary.
 const done = results.mutations.filter((r) => r.applied);
 const caught = done.filter((r) => r.caught);
-const before = done.filter((r) => r.by.some((f) => !f.startsWith(INVARIANTS)));
+const before = done.filter((r) => r.by.some((f) => !isInvariants(f)));
 console.log(`\n${done.length} bugs planted; caught by the tests other than the invariants: ${before.length}; by anything: ${caught.length}; by the invariants: ${done.filter((r) => r.byInvariants.length).length}`);
 for (const r of done) console.log(`  ${r.caught ? "caught " : "MISSED "} ${r.id} (${r.kind}): ${r.by.slice(0, 4).join("; ")}${r.by.length > 4 ? ` and ${r.by.length - 4} more` : ""}`);
