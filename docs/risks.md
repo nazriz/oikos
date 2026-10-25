@@ -171,7 +171,7 @@ The mechanism:
   whose last staff member dies has nobody to appoint a successor (no owner's or member's office). A question to a keeper nobody staffs waits for ever.
 - **Where:** `docs/behaviour/staffing.md`; decisions 2026-10-16 "Foundations: the review's findings fixed" item 6 and 2026-10-17 "Four faults" (six letting offices and shops' deputies vacant at year end, gb-eng seed 1).
 - **Effect:** In long runs a firm or institution can silently stop. Resilience and service measures fall for a reason that is not anyone's decision.
-- **L / I:** medium (long runs) / medium · **Status:** to fix
+- **L / I:** medium (long runs) / medium · **Status:** to fix (the paper, grant-kept, filled by the council since 2026-10-25: its one officer died in a year of the test town and its wage ran on for months; the bank, the union, shops and letting offices still have nobody)
 - **Notice by:** posts vacant at the end of a run; held questions never taken up.
 - **Fix when:** any run past a year, or a body on its own account goes headless in a pilot.
 
