@@ -80,3 +80,14 @@ test("the run dataset says it too: the same acts, the same ends", async () => {
   const rows = readFileSync(join(out, "translations.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
   expect(byDraft(rows)).toEqual(RIGHT);
 });
+
+test("an act put back and begun again ends under the command that began it", async () => {
+  const { actEnds } = await import("../src/act-ends");
+  const e = actEnds();
+  e.started({ action: "act.9", cause: 100 });
+  // (Its performer's day ran out: the act is begun again, by the event that put it back.)
+  e.started({ action: "act.9", cause: 205 });
+  expect([...e.underWay]).toEqual([100]);
+  expect(e.ended({ action: "act.9", cause: 230 })).toBe(100);
+  expect(e.underWay.size).toBe(0);
+});

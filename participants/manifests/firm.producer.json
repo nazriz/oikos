@@ -29,6 +29,7 @@
       "writes": {
         "data": {
           "industry": "@industry",
+          "openings": "=posts",
           "period": "=period",
           "role": "@role",
           "space": "@workplace",

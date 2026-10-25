@@ -223,6 +223,9 @@ impl Answerer<BodyThen> for Pay<'_> {
 }
 
 impl Body for FirmBody {
+    fn set_workplace(&mut self, space: &str) {
+        self.staffing.set_workplace(space);
+    }
     fn absorb(&mut self, pic: &Picture, book: &Book, cx: &mut Cx) {
         self.ensure_org(cx);
         self.winding.recover(book);

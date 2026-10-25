@@ -80,6 +80,7 @@ export const PUBLISHED: { what: string; why: string; board?: true; most?: number
   { what: "has:assertion", why: "What is put forward to be believed (a teaching, a platform, a report) is addressed to the public." },
   // Boards: read on request, a few at a time.
   { what: "rental_listing", why: "Homes to let are advertised to whoever is looking for one.", board: true },
+  { what: "premises_listing", why: "Shop premises to let are advertised to whoever may take them (docs/behaviour/leasing.md).", board: true },
   { what: "job_posting", why: "Jobs are advertised to whoever is looking for work.", board: true },
   { what: "property_for_sale", why: "Property for sale is advertised to whoever may buy.", board: true },
   { what: "property_sold", why: "Sale results are published, property by property.", board: true },

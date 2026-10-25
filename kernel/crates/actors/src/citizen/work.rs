@@ -93,11 +93,6 @@ fn div_round(n: i64, d: i64) -> i64 {
     }
 }
 
-/// A rate shifted by a share of itself (citizen.ts `shifted`): `shift_bps` of 10,000 doubles it; kept in 0..10,000.
-fn shifted(bps: i64, shift_bps: i64) -> i64 {
-    div_round(bps * (10_000 + shift_bps), 10_000).clamp(0, 10_000)
-}
-
 /// A rate swayed by where a person stands against their town (wants.ts `swayed`): `z` in hundredths of a standard
 /// deviation (held within three), `per_milli` the share a standard deviation moves it, in thousandths.
 fn swayed(bps: i64, z: i64, per_milli: i64) -> i64 {
@@ -203,6 +198,15 @@ fn fill(x: &Value, with: &BTreeMap<&str, Value>, inline_structure: Option<&str>)
     }
 }
 
+/// The cheapest trade price of a kind on the price lists we hold that sell in lots (a wholesaler's), if any.
+fn trade_price(book: &crate::common::Book, kind: &str) -> Option<i64> {
+    crate::common::latest_by_speaker(book, "price_list", |r| data(r).i("min_order").unwrap_or(1) > 1)
+        .values()
+        .filter_map(|r| data(r).get("goods").and_then(|g| g.get(kind)).and_then(crate::papers::lenient::whole))
+        .filter(|p| *p > 0)
+        .min()
+}
+
 // ------------------------------------------------------------------ the part's own helpers
 
 impl Person {
@@ -291,6 +295,91 @@ impl Person {
         }
         self.absorbed.on_sale.iter().flatten().filter_map(|id| self.wk_record(pic, id)).collect()
     }
+    /// What we know of a venture's market, as a would-be founder (docs/behaviour/entry.md, "Entry by expected profit";
+    /// `oikos_rules::entry`): the price of its kind on the price lists we have read (the middle one), what it costs to
+    /// bring in (a trade price list we hold, else the trade price the venture names, which is published), how much a
+    /// customer like us buys of it a month (our own orders), the town's adults as the census publishes them, the sellers
+    /// of it we know, what one person's working time serves, the going wage (the best posting we have seen, else the
+    /// venture's), and nothing for premises (a home, or premises bought outright). `hires`: whether hands may be taken
+    /// on. None where we know no price for it.
+    pub fn venture_prospect(&self, pic: &Picture, v: &super::params::Venture, hires: bool) -> Option<oikos_rules::entry::Prospect> {
+        // (The custom in reach: for a business worked from home, the homes around us, as we see them by being there (it sells
+        // to its neighbourhood first, and its rivals are the sellers we, like our neighbours, know); for a shop in premises
+        // on the street, the town's adults, as the census publishes them, against the sellers of its kind we know.)
+        let mut homes: BTreeSet<String> = BTreeSet::new();
+        for c in pic.channels.values() {
+            if let Seen::Sites { cells, .. } = c {
+                for cell in cells.iter() {
+                    for sp in cell.structure.iter().flat_map(|s| s.spaces.iter()).filter(|sp| sp.kind == "dwelling") {
+                        for i in 0..sp.count.max(1) {
+                            homes.insert(format!("{}#{i}", sp.space));
+                        }
+                    }
+                }
+            }
+        }
+        let pm = v.role_module.get("params").cloned().unwrap_or(Value::Null);
+        let g = |k: &str| pm.get(k).and_then(crate::papers::lenient::whole);
+        let kind = pm.get("kind").and_then(Value::as_str).unwrap_or(&self.p.goods).to_string();
+        let mine: BTreeSet<String> = self.s.own_work.iter().map(|o| o.firm.clone()).collect();
+        let known: Vec<super::money::Shop> = super::money::shops(&self.book, &kind).into_iter().filter(|s| !mine.contains(&s.shop)).collect();
+        let mut prices: Vec<i64> = known.iter().map(|s| s.price).collect();
+        prices.sort_unstable();
+        let price = prices.get(prices.len() / 2).copied().or_else(|| g("price"))?;
+        let unit_cost = trade_price(&self.book, &kind).or(v.unit_cost).unwrap_or(0);
+        // (Per month, over the time we have kept count; none counted yet: what we need of it, the essentials' units.)
+        let units: i64 = self.money.bought.iter().filter(|b| b.1 == kind).map(|b| b.2).sum();
+        let first = self.money.bought.iter().map(|b| b.0).min();
+        let last = self.money.bought.iter().map(|b| b.0).max();
+        let units_per_household = match (first, last) {
+            (Some(f), Some(l)) if units > 0 => div_round(units * MONTH, (l - f + 14 * DAY).max(14 * DAY)),
+            _ => self.p.essentials_units,
+        };
+        let working_day = g("working_day").unwrap_or(8 * 3_600);
+        let work_days = g("work_days").unwrap_or(5);
+        let serve = g("serve_labour").unwrap_or(0);
+        if serve <= 0 {
+            return None;
+        }
+        let units_per_worker = working_day * work_days * 30 / 7 / serve;
+        let period = g("period").unwrap_or(14 * DAY).max(DAY);
+        let posted = self
+            .s
+            .found_jobs
+            .iter()
+            .filter_map(|id| self.book.get(id))
+            .filter_map(|r| {
+                let d = data(r);
+                Some(div_round(d.i("wage")? * MONTH, d.i("period").unwrap_or(period).max(DAY)))
+            })
+            .max();
+        let wage = if hires { posted.or_else(|| g("wage").map(|w| div_round(w * MONTH, period))).unwrap_or(0) } else { 0 };
+        let opportunity = self.s.job.as_ref().map_or(0, |j| div_round(j.wage * MONTH, j.period.max(DAY)));
+        Some(oikos_rules::entry::Prospect { price, unit_cost, units_per_household, households_reached: if v.own { homes.len() as i64 } else { self.p.population }, sellers_known: known.len() as i64, units_per_worker, wage, fixed: v.fixed_per_month.unwrap_or(0).max(0), opportunity })
+    }
+
+    /// Whether to start it (docs/behaviour/entry.md, "Entry by expected profit"): the mind's decision between the
+    /// business, at what we expect it to leave us a month, and life as it is (our pay, or nothing). Nothing is started
+    /// that we do not expect to beat what we have; whether we start one that does is the mind's, as any choice of work
+    /// is. `keeps_job`: the business is managed beside our work (premises with staff), not worked in.
+    fn weigh_venture(&mut self, w: &mut Week, profit: i64, keeps_job: bool) -> bool {
+        let now = self.s.job.as_ref().map_or(0, |j| div_round(j.wage * MONTH, j.period.max(DAY)));
+        let with = if keeps_job { now + profit } else { profit };
+        if with <= now {
+            return false;
+        }
+        let hours = self.s.job.as_ref().map(|_| 160);
+        let options = vec![
+            // (What working for oneself means beyond the money, as it did for the chance before: more to the open and the
+            // achieving, and to one who wants work of their own: `wk_enterprise`, the same sways.)
+            Choice { key: "found".into(), facts: Some(Facts { money_per_month: with, work_hours_per_month: Some(160), ..Default::default() }), others: None, meaning: Some(self.wk_enterprise(w)) },
+            Choice { key: "as_now".into(), facts: Some(Facts { money_per_month: now, work_hours_per_month: hours, ..Default::default() }), others: None, meaning: None },
+        ];
+        let life = self.life(w.pic, w.t, w.acc.as_ref().map(|a| a.balance));
+        let d = self.mind.decide(w.cx, &life, Decide { domain: "venture".into(), options, current: Some("as_now".into()), purpose: Some("venture".into()), ..Default::default() });
+        d.key.as_deref() == Some("found")
+    }
+
     /// Recorded as the mind's decision, yes or no, at the chance it came to (TS `decision`, deliberate): a conduct the
     /// mind does not lean, decided already.
     fn wk_record_choice(&mut self, w: &mut Week, domain: &str, yes: &str, no: &str, score: i64, does: bool) {
@@ -309,6 +398,22 @@ impl Person {
     /// A building someone told us of: the jobs on offer there now.
     pub fn job_lead_look(&self, lead: &str) -> LookRequest {
         crate::common::ask::board("jobs", self.p.search_limit, vec![Condition { field: "data.workplace".into(), op: CmpOp::Eq, value: lead.into() }], None)
+    }
+
+    /// Before weighing a business of our own (docs/behaviour/entry.md, "Who else sells it"): a look through what
+    /// sellers advertise, the newest first, so that we know of those who have started since we last looked, as anyone
+    /// thinking of starting one would. Only when it is due and we have the means for it, and not when the same board is
+    /// being looked at for our shopping.
+    pub fn venture_looks(&self, t: i64, balance: i64, already: &[LookRequest]) -> Vec<LookRequest> {
+        if self.p.adverts.is_empty() || already.iter().any(|l| l.channel == self.p.adverts) {
+            return vec![];
+        }
+        let Some(v) = self.p.ventures.iter().find(|v| v.own) else { return vec![] };
+        let due = self.work.founded.is_none() && self.s.own_work.is_none() && self.work.venturing.is_none() && !self.s.retired && self.p.in_labour_force && t >= self.work.next_own_venture;
+        if !due || balance < v.capital + self.p.found_own_buffer_months * self.p.essentials {
+            return vec![];
+        }
+        vec![crate::common::ask::board(&self.p.adverts, self.p.search_limit, vec![Condition { field: "data.at".into(), op: CmpOp::Gt, value: json!("") }], Some(("at", true)))]
     }
 
     /// The jobs board, best-paid first, when we are looking (out of work, or this month's look for better).
@@ -353,6 +458,20 @@ impl Person {
     /// from there (citizen.ts 1907-1917). Where our new home stands we know from having been there.
     pub fn trading_from(&mut self, w: &mut Week) {
         let Some(own) = self.s.own_work.clone() else { return };
+        // (Our business has taken premises on a lease, and says so: we work there now, and not from home:
+        // docs/behaviour/leasing.md.)
+        let moved = crate::common::latest_by_speaker(&self.book, "trading_at", |r| crate::common::addressed_to(r).contains(&self.me))
+            .get(&Some(own.firm.as_str()))
+            .map(|r| (data(r).s("space").map(String::from), data(r).i("rent"), data(r).i("until")));
+        if let Some((Some(space), rent, until)) = moved.filter(|m| m.0.is_some() && own.at.as_deref() != m.0.as_deref()) {
+            if let Some(o) = self.s.own_work.as_mut() {
+                o.at = Some(space);
+                o.home = None;
+                o.lease = rent.zip(until);
+            }
+            self.work.trading_from = None;
+            return;
+        }
         if own.at.is_some() {
             return;
         }
@@ -644,7 +763,13 @@ impl Person {
             _ => ", weighing each job's pay and hours",
         };
         let ours = job.as_ref().map_or(String::new(), |j| format!(", better than ours ({})", Self::wk_usd(w, j.wage)));
-        let paper = crate::papers::data(&JobApplication { posting: best.id.clone(), account: acc.account.clone() });
+        // (Our trade: where we work, or last worked, as we know its industry; else the one we had as the year began.)
+        let trade = [self.s.job.as_ref().map(|j| j.employer.clone()), self.s.last_employer.clone()]
+            .into_iter()
+            .flatten()
+            .find_map(|e| self.s.industry_of.get(&e).cloned())
+            .or_else(|| self.p.trade.clone());
+        let paper = crate::papers::data(&JobApplication { posting: best.id.clone(), account: acc.account.clone(), trade });
         w.push(because(
             format!("Applying for a job at {} a pay period{ours}{how}.", Self::wk_usd(w, data(&best).i("wage").unwrap_or(0))),
             vec![say("job_application", "Application for the advertised job.", Say { to: Some(vec![employer.clone()]), visible: only(&me, &employer), data: Some(paper), basis: Some(best.id.clone()), ..Default::default() })],
@@ -652,10 +777,9 @@ impl Person {
     }
 
     /// Starting a business (citizen.ts 3698-3802; docs/behaviour/entry.md): the capital a new business calls for, put
-    /// in; a business of one from home, with the month's chance; one given up that pays no living; premises bought for a
-    /// venture, with the month's chance. (docs/risks.md A-1/ME-1: the births come at a set rate, the world's
-    /// `found_bps` and `found_own_ppm` shifted by who the person is; lane C1 replaces that with its own entry. The
-    /// draw is as TS has it.)
+    /// in; a business of one from home, and premises bought for a venture, each where it is expected to pay more than
+    /// we have (docs/behaviour/entry.md, "Entry by expected profit"); one weighed each month and given up when it is not
+    /// worth keeping ("Giving it up").
     pub fn ventures(&mut self, w: &mut Week) {
         let t = w.t;
         let me = self.me.clone();
@@ -688,7 +812,7 @@ impl Person {
                 self.tell(w, mine("venture", "found", "capital_called", facts([("firm", json!(firm)), ("asked", json!(asked)), ("paid", json!(amount.max(0)))])));
                 // (A business of one: our work from now on, trading from our home; what it clears is our income.)
                 if let Some((home, expect)) = f.own.clone() {
-                    self.s.own_work = Some(super::params::OwnWork { firm: firm.clone(), account, at: None, home: Some(home.clone()), expect_per_month: expect });
+                    self.s.own_work = Some(super::params::OwnWork { firm: firm.clone(), account, at: None, home: Some(home.clone()), expect_per_month: expect, lease: None });
                     self.work.trading_from = Some(home);
                     self.work.own_since = t;
                     self.work.next_own_review = t + MONTH;
@@ -712,7 +836,7 @@ impl Person {
             Some(_) => self.s.job.is_none(),
             None => t >= self.work.next_own_venture,
         };
-        if self.work.founded.is_some() || self.s.own_work.is_some() || !(self.p.found_own_ppm > 0 || wanted) || self.s.retired || !self.p.in_labour_force || !due {
+        if self.work.founded.is_some() || self.s.own_work.is_some() || self.s.retired || !self.p.in_labour_force || !due {
             return;
         }
         self.work.next_own_venture = t + MONTH;
@@ -720,12 +844,18 @@ impl Person {
         let cell = dwelling.as_deref().and_then(|d| Self::wk_cell_of(w.pic, structure_of(d)));
         let housing = self.s.home.as_ref().map(|h| h.rent).or_else(|| self.s.share.as_ref().map(|s| s.0)).unwrap_or(0);
         let means = dwelling.is_some() && cell.is_some() && acc.balance >= v.capital + self.p.found_own_buffer_months * (housing + self.p.essentials);
-        let chance = if means { div_round(self.p.found_own_ppm * shifted(1_000, self.wk_enterprise(w)), 1_000) } else { 0 };
         let venturing = self.work.venturing.is_some();
-        let founds = means && (venturing || wanted || (w.cx.rng("found-own").below(1_000_000) as i64) < chance);
-        if means && !venturing {
-            let score = if wanted { 10_000 } else { div_round(chance, 100) };
-            self.wk_record_choice(w, "venture", "found_own", "not", score, founds);
+        // (Entry by expected profit, weighed against what we have: no rate of births. Meant by a founding's draw: started
+        // as soon as there are the means, as before.)
+        let founds = means
+            && (venturing || wanted || {
+                // (Hands only where the business can take them on: its room for staff.)
+                let hires = v.role_module.get("params").and_then(|p| p.get("max_staff")).and_then(crate::papers::lenient::whole).unwrap_or(0) > 0;
+                let e = self.venture_prospect(w.pic, &v, hires).map(|p| oikos_rules::entry::expected(&p));
+                e.is_some_and(|e| e.units > 0 && self.weigh_venture(w, e.profit, false))
+            });
+        if means && !venturing && wanted {
+            self.wk_record_choice(w, "venture", "found_own", "not", 10_000, founds);
         }
         if !means {
             self.work.venturing = None;
@@ -765,7 +895,10 @@ impl Person {
         ]
         .into_iter()
         .collect();
-        self.work.founded = Some(Founded { firm: None, capital: v.capital, paid: false, own: Some((dwelling.clone(), v.expect_per_month.unwrap_or(0))) });
+        // (What we expect it to pay us a month, by what we know of its market, until it has a record of its own; the
+        // venture's figure where we know no price.)
+        let expect = self.venture_prospect(w.pic, &v, false).map(|p| oikos_rules::entry::expected(&p).profit).filter(|x| *x > 0).or(v.expect_per_month).unwrap_or(0);
+        self.work.founded = Some(Founded { firm: None, capital: v.capital, paid: false, own: Some((dwelling.clone(), expect)) });
         let entity = call(
             "entity",
             vec![
@@ -783,8 +916,12 @@ impl Person {
         self.absorbed.pending_firm = Some(v.capital);
     }
 
-    /// Giving a business of one up: one that has not paid its owner a living for months is closed by them, and they
-    /// look for work again. Not in its first months, while customers are still finding it.
+    /// Giving a business of one up (docs/behaviour/entry.md, "Giving it up"): each month after its first, its owner
+    /// weighs it as they weighed starting it, against what they could do instead: what it has paid them a month over the
+    /// months they judge by (`give_up_months`, the most they look back; fewer while it is younger), against the best-paid
+    /// job they know of, or nothing. The choice is the mind's, between keeping it and giving it up; no age at which it may
+    /// first be given up, and no share of essentials below which it must be. (An owner learns what the business is worth
+    /// from what it pays them: Jovanovic 1982.)
     fn give_up_own(&mut self, w: &mut Week) {
         let t = w.t;
         let Some(own) = self.s.own_work.clone() else { return };
@@ -793,17 +930,44 @@ impl Person {
         }
         self.work.next_own_review = t + MONTH;
         let months = (t - self.work.own_since).div_euclid(MONTH);
-        let since = t - self.p.give_up_months * MONTH;
-        let drawn: i64 = self.absorbed.drawn_log.iter().filter(|d| d.0 >= since).map(|d| d.1).sum();
+        let window = months.min(self.p.give_up_months.max(1));
+        let since = t - self.p.give_up_months.max(1) * MONTH;
         self.absorbed.drawn_log.retain(|d| d.0 >= since);
-        if months < self.p.give_up_months || drawn * 10_000 >= self.p.give_up_below_bps * self.p.essentials * self.p.give_up_months {
+        if window < 1 {
+            return; // (not a month's trade yet: nothing to judge it by)
+        }
+        let from = t - window * MONTH;
+        let drawn: i64 = self.absorbed.drawn_log.iter().filter(|d| d.0 >= from).map(|d| d.1).sum();
+        let pays = div_round(drawn, window);
+        let period = 14 * DAY;
+        let job_pay = self
+            .s
+            .found_jobs
+            .iter()
+            .filter_map(|id| self.book.get(id))
+            .filter_map(|r| {
+                let d = data(r);
+                Some(div_round(d.i("wage")? * MONTH, d.i("period").unwrap_or(period).max(DAY)))
+            })
+            .max()
+            .unwrap_or(0);
+        // (Under a lease of premises, giving the business up does not end what it owes: the rent runs to the lease's end.)
+        let instead = job_pay - own.lease.filter(|(_, until)| *until > t).map_or(0, |(rent, _)| rent);
+        let options = vec![
+            Choice { key: "keep".into(), facts: Some(Facts { money_per_month: pays, work_hours_per_month: Some(160), ..Default::default() }), others: None, meaning: Some(self.wk_enterprise(w)) },
+            Choice { key: "give_up".into(), facts: Some(Facts { money_per_month: instead, work_hours_per_month: (job_pay > 0).then_some(160), ..Default::default() }), others: None, meaning: None },
+        ];
+        let life = self.life(w.pic, t, w.acc.as_ref().map(|a| a.balance));
+        let d = self.mind.decide(w.cx, &life, Decide { domain: "venture".into(), options, current: Some("keep".into()), purpose: Some("venture".into()), ..Default::default() });
+        if d.key.as_deref() != Some("give_up") {
             return;
         }
-        self.tell(w, mine("own_work", &own.firm, "given_up", facts([("months", json!(months)), ("drawn", json!(drawn)), ("essentials", json!(self.p.essentials))])));
-        let d = crate::papers::data(&TradingFrom { closed: Some(true), ..Default::default() });
+        self.tell(w, mine("own_work", &own.firm, "given_up", facts([("months", json!(months)), ("drawn", json!(drawn)), ("instead", json!(instead))])));
+        let dd = crate::papers::data(&TradingFrom { closed: Some(true), ..Default::default() });
+        let alt = if job_pay > 0 { format!("a job paying {} a month", Self::wk_usd(w, job_pay)) } else { "looking for work".to_string() };
         w.push(because(
-            format!("Our business has paid us {} in {} months, under {}% of what essentials cost: closing it, and looking for work.", Self::wk_usd(w, drawn), self.p.give_up_months, self.p.give_up_below_bps / 100),
-            vec![say("trading_from", "Closing: the business is given up.", Say { to: Some(vec![own.firm.clone()]), visible: only(&self.me, &own.firm), data: Some(d), ..Default::default() })],
+            format!("Our business has paid us {} a month over {} months: not worth keeping against {alt}. Closing it, and looking for work.", Self::wk_usd(w, pays), window),
+            vec![say("trading_from", "Closing: the business is given up.", Say { to: Some(vec![own.firm.clone()]), visible: only(&self.me, &own.firm), data: Some(dd), ..Default::default() })],
         ));
         self.s.own_work = None;
         self.work.trading_from = None;
@@ -816,13 +980,13 @@ impl Person {
     fn found_premises(&mut self, w: &mut Week, acc: &crate::common::OwnAccount) {
         let t = w.t;
         let me = self.me.clone();
-        if self.work.founded.is_some() || self.p.ventures.is_empty() || self.p.found_bps <= 0 || t < self.work.next_venture || self.s.retired || !self.p.in_labour_force {
+        if self.work.founded.is_some() || self.p.ventures.iter().all(|v| v.own) || t < self.work.next_venture || self.s.retired || !self.p.in_labour_force {
             return;
         }
         self.work.next_venture = t + MONTH;
         let housing = self.s.home.as_ref().map(|h| h.rent).or_else(|| self.s.share.as_ref().map(|s| s.0)).unwrap_or(0);
         let ventures = self.p.ventures.clone();
-        let venture_of = |r: &Record| data(r).s("type").and_then(|k| ventures.iter().find(|v| v.kind == k)).cloned();
+        let venture_of = |r: &Record| data(r).s("type").and_then(|k| ventures.iter().find(|v| !v.own && v.kind == k)).cloned();
         let mut listings: Vec<Arc<Record>> = self.wk_for_sale(w.pic).into_iter().filter(|l| venture_of(l).is_some()).collect();
         listings.sort_by(|a, b| data(a).i("price").unwrap_or(0).cmp(&data(b).i("price").unwrap_or(0)).then_with(|| filed_before(&a.id, &b.id)));
         let essentials = self.p.essentials;
@@ -830,13 +994,30 @@ impl Person {
         // (What a model would say it meant to someone like us, in a run with the sparse mind, is the mind's question:
         // not asked here.)
         let Some(l) = l else { return };
-        let chance = if t < self.s.venture_wanted { 10_000 } else { shifted(self.p.found_bps, self.wk_enterprise(w)) };
-        let founds = (w.cx.rng("found").below(10_000) as i64) < chance;
-        self.wk_record_choice(w, "venture", "found", "not", chance, founds);
+        let Some(v) = venture_of(&l) else { return };
+        // (Entry by expected profit: the shop's sales among the sellers of its kind we know, served by hands whose margin
+        // pays their wage, as many as its room holds; we keep our job and manage it. Meant by a founding's draw: bought,
+        // as before.)
+        let wanted = t < self.s.venture_wanted;
+        let founds = wanted || {
+            let room = v.role_module.get("params").and_then(|p| p.get("max_staff")).and_then(crate::papers::lenient::whole).unwrap_or(1).max(1);
+            match self.venture_prospect(w.pic, &v, true) {
+                Some(p) if p.wage > 0 => {
+                    // (Nobody serves for nothing: the hand who serves what an owner alone would is paid too.)
+                    let e = oikos_rules::entry::expected(&p);
+                    let hands = (e.hired + 1).min(room);
+                    let profit = e.units.min(hands * p.units_per_worker) * (p.price - p.unit_cost).max(0) - hands * p.wage;
+                    e.units > 0 && self.weigh_venture(w, profit, true)
+                }
+                _ => false,
+            }
+        };
+        if wanted {
+            self.wk_record_choice(w, "venture", "found", "not", 10_000, founds);
+        }
         if !founds {
             return;
         }
-        let Some(v) = venture_of(&l) else { return };
         let d = data(&l);
         let price = d.i("price").unwrap_or(0);
         let structure = d.s("structure").unwrap_or_default().to_string();
@@ -966,10 +1147,14 @@ mod tests {
             { "who": "ann", "does": { "outcome": { "work": { "task": "serve", "at": format!("{employer}/floor") } } } } ] } }))
     }
     fn pic(t: i64, born_at: Option<i64>, street: bool) -> Picture {
+        homes_around(t, born_at, if street { 1 } else { 0 })
+    }
+    /// A picture whose street shows ann's block, of so many homes (none: no street seen).
+    fn homes_around(t: i64, born_at: Option<i64>, homes: u32) -> Picture {
         let mut channels = BTreeMap::new();
-        if street {
+        if homes > 0 {
             let cell: oikos_sight::SiteCell = serde_json::from_value(json!({ "cell": "c.1", "x": 0, "y": 0, "structure": { "structure": "b1", "type": "house", "at": "c.1", "w": 1, "h": 1, "complete": true,
-                "spaces": [{ "space": "b1/dwelling.1", "kind": "dwelling", "capacity": 4, "count": 1, "occupants": ["ann"] }] } }))
+                "spaces": [{ "space": "b1/dwelling.1", "kind": "dwelling", "capacity": 4, "count": homes, "occupants": ["ann"] }] } }))
             .unwrap();
             channels.insert("street".to_string(), Seen::Sites { as_of: t, cells: Arc::new(vec![cell]), visit: None });
         }
@@ -1166,72 +1351,160 @@ mod tests {
     }
 
     fn own_venture() -> Value {
-        json!([{ "kind": "shop", "name": "A stall", "capital": 50_000, "own": true, "expect_per_month": 200_000,
-            "channels": [{ "id": "street", "at": "{cell}" }], "role_module": { "code": "retailer", "params": { "premises": "{structure}", "home": "{home}", "founder": "{founder}" } } }])
+        json!([{ "kind": "shop", "name": "A stall", "capital": 50_000, "own": true, "expect_per_month": 200_000, "unit_cost": 800,
+            "channels": [{ "id": "street", "at": "{cell}" }], "role_module": { "code": "retailer", "params": { "premises": "{structure}", "home": "{home}", "founder": "{founder}", "price": 1_200, "serve_labour": 600 } } }])
+    }
+    /// The shops someone knows sell goods, each at `price`.
+    fn known_shops(n: usize, price: i64) -> Vec<Arc<Record>> {
+        (0..n).map(|i| st(&format!("rec.pl{i}"), "price_list", &format!("shop{i}"), json!({ "goods": { "goods": price }, "account": format!("acc.shop{i}") }))).collect()
+    }
+    fn at_home(ann: &mut Person) {
+        ann.s.home = Some(Home { agreement: "rec.lease".into(), space: "b1/dwelling.1".into(), structure: "b1".into(), rent: 100_000, moved_in: true, ..Default::default() });
     }
 
     #[test]
-    fn someone_out_of_work_with_a_home_and_the_means_starts_a_business_of_one_puts_in_its_capital_and_trades_from_home() {
-        let c = ctx_with(json!({ "ventures": own_venture(), "found_own_ppm": 1_000_000 }));
+    fn someone_out_of_work_with_a_home_and_the_means_starts_a_business_of_one_where_it_pays_puts_in_its_capital_and_trades_from_home() {
+        let c = ctx_with(json!({ "ventures": own_venture() }));
         let mut ann = Person::new(&c).unwrap();
-        ann.s.home = Some(Home { agreement: "rec.lease".into(), space: "b1/dwelling.1".into(), structure: "b1".into(), rent: 100_000, moved_in: true, ..Default::default() });
+        at_home(&mut ann);
+        // Two sellers known at 1,200 against 800 to bring in, 200 homes in view buying 10 a month: about 666 a month, $2,664 to us.
+        ann.book.take_all(&known_shops(2, 1_200));
         ann.work.next_own_venture = 0;
         // Short of the capital and a month's housing and essentials: nothing.
-        assert!(run(&mut ann, &c, &pic(DAY, None, true), 100_000, |a, w| a.ventures(w)).is_empty());
-        ann.work.next_own_venture = 0;
-        let out = run(&mut ann, &c, &pic(2 * DAY, None, true), 500_000, |a, w| a.ventures(w));
+        assert!(run(&mut ann, &c, &homes_around(DAY, None, 200), 100_000, |a, w| a.ventures(w)).is_empty());
+        let p = ann.venture_prospect(&homes_around(DAY, None, 200), &ann.p.ventures[0].clone(), false).unwrap();
+        assert_eq!((p.price, p.unit_cost, p.sellers_known, p.households_reached, p.units_per_household), (1_200, 800, 2, 200, 10));
+        // With the means: weighed, month by month, against nothing coming in; started within the year.
+        let mut out = vec![];
+        for m in 1..=12 {
+            ann.work.next_own_venture = 0;
+            out = run(&mut ann, &c, &homes_around(m * MONTH, None, 200), 500_000, |a, w| a.ventures(w));
+            if !out.is_empty() {
+                break;
+            }
+        }
         assert!(out.len() == 1 && out[0].starts_with("firm = entity(") && out[0].contains("\"premises\":\"b1\"") && out[0].contains("\"at\":\"c.1\"") && out[0].contains("\"home\":\"b1/dwelling.1\""), "{out:?}");
         assert_eq!(ann.absorbed.pending_firm, Some(50_000));
+        // What it is expected to pay us is what its market gave, not the venture's figure.
+        assert_eq!(ann.work.founded.as_ref().and_then(|f| f.own.as_ref()).map(|o| o.1), Some(666 * 400));
         // The firm made, and its call for capital: paid, and it is our work from now on.
         ann.absorbed.pending_firm = None;
         ann.absorbed.founded_firm = Some("firm-1".into());
         ann.book.take_all(&[st("rec.30", "capital_call", "firm-1", json!({ "account": "acc.firm-1", "amount": 50_000 }))]);
-        let paid = run(&mut ann, &c, &pic(3 * DAY, None, true), 500_000, |a, w| a.ventures(w));
+        let paid = run(&mut ann, &c, &homes_around(13 * MONTH, None, 200), 500_000, |a, w| a.ventures(w));
         assert!(paid.len() == 1 && paid[0].contains("acc.firm-1") && paid[0].contains("$500.00"), "{paid:?}");
         let own = ann.s.own_work.clone().unwrap();
-        assert_eq!((own.firm.as_str(), own.home.as_deref(), own.expect_per_month), ("firm-1", Some("b1/dwelling.1"), 200_000));
+        assert_eq!((own.firm.as_str(), own.home.as_deref(), own.expect_per_month), ("firm-1", Some("b1/dwelling.1"), 666 * 400));
         assert_eq!(ann.work.trading_from.as_deref(), Some("b1/dwelling.1"));
         // Moved home to nowhere: the business is told it has nowhere to trade from.
         ann.s.home = None;
-        let told = run(&mut ann, &c, &pic(4 * DAY, None, true), 0, |a, w| a.trading_from(w));
+        let told = run(&mut ann, &c, &pic(13 * MONTH + DAY, None, true), 0, |a, w| a.trading_from(w));
         assert!(told.len() == 1 && told[0].contains("\"nowhere\":true"), "{told:?}");
     }
 
     #[test]
-    fn someone_in_a_job_who_means_to_work_for_themself_gives_notice_first() {
-        let c = ctx_with(json!({ "ventures": own_venture(), "found_own_ppm": 1_000_000 }));
+    fn nobody_starts_a_business_that_is_not_expected_to_beat_what_they_have_however_long_they_weigh_it() {
+        let c = ctx_with(json!({ "ventures": own_venture() }));
+        // No margin: goods sell for what they cost to bring in.
         let mut ann = Person::new(&c).unwrap();
-        ann.s.home = Some(Home { agreement: "rec.lease".into(), space: "b1/dwelling.1".into(), structure: "b1".into(), rent: 100_000, moved_in: true, ..Default::default() });
+        at_home(&mut ann);
+        ann.book.take_all(&known_shops(2, 800));
+        // A crowded market, against a job that pays more than a share of it would.
+        let mut bob = Person::new(&c).unwrap();
+        at_home(&mut bob);
+        bob.book.take_all(&known_shops(40, 1_200));
+        bob.s.job = Some(job("works", 0));
+        for m in 1..=36 {
+            for x in [&mut ann, &mut bob] {
+                x.work.next_own_venture = 0;
+                assert!(run(x, &c, &homes_around(m * MONTH, None, 200), 5_000_000, |a, w| a.ventures(w)).is_empty(), "month {m}");
+            }
+        }
+        assert!(ann.work.founded.is_none() && bob.work.venturing.is_none());
+        // The same crowded market draws someone with nothing coming in: a small share beats nothing.
+        let e = oikos_rules::entry::expected(&bob.venture_prospect(&homes_around(DAY, None, 200), &bob.p.ventures[0].clone(), false).unwrap());
+        assert!(e.profit > 0 && e.profit < 100_000 * MONTH / (14 * DAY), "{e:?}");
+    }
+
+    #[test]
+    fn someone_in_a_job_who_means_to_work_for_themself_gives_notice_first() {
+        let c = ctx_with(json!({ "ventures": own_venture() }));
+        let mut ann = Person::new(&c).unwrap();
+        at_home(&mut ann);
+        // One seller known: the business would serve about 1,000 a month, $4,000, against a job's $2,143.
+        ann.book.take_all(&known_shops(1, 1_200));
         ann.s.job = Some(job("shop", 0));
-        ann.work.next_own_venture = 0;
-        let out = run(&mut ann, &c, &pic(DAY, None, true), 500_000, |a, w| a.ventures(w));
+        let mut out = vec![];
+        let mut at = 0;
+        for m in 1..=12 {
+            ann.work.next_own_venture = 0;
+            out = run(&mut ann, &c, &homes_around(m * MONTH, None, 200), 500_000, |a, w| a.ventures(w));
+            if !out.is_empty() {
+                at = m * MONTH;
+                break;
+            }
+        }
         assert!(out.len() == 1 && out[0].contains("notice=rec.shop"), "{out:?}");
-        assert_eq!(ann.work.venturing, Some(DAY));
+        assert_eq!(ann.work.venturing, Some(at));
         // The job over: the business starts at once.
         ann.s.job = None;
-        let out = run(&mut ann, &c, &pic(20 * DAY, None, true), 500_000, |a, w| a.ventures(w));
+        let out = run(&mut ann, &c, &homes_around(at + 20 * DAY, None, 200), 500_000, |a, w| a.ventures(w));
         assert!(out.len() == 1 && out[0].contains("entity("), "{out:?}");
         assert!(ann.work.venturing.is_none());
     }
 
     #[test]
-    fn a_business_of_one_that_pays_no_living_for_its_months_is_closed_and_not_in_its_first_months() {
+    fn a_business_of_one_is_weighed_monthly_against_the_best_job_known_given_up_when_it_pays_nothing_and_kept_when_it_pays() {
         let c = ctx_with(json!({ "own_work": { "firm": "stall-1", "account": "acc.stall", "home": "b1/dwelling.1", "expect_per_month": 100_000 } }));
+        let post = |id: &str| rec(json!({ "id": id, "record": "statement", "author": "p.x", "speaks_for": "works", "at": 0, "visible_to": "public", "kind": "job_posting", "text": "Hiring", "data": { "wage": 150_000, "period": 14 * DAY } }));
         let mut ann = Person::new(&c).unwrap();
         assert_eq!((ann.work.own_since, ann.work.trading_from.as_deref()), (0, Some("b1/dwelling.1")));
-        ann.absorbed.drawn_log = vec![(10 * DAY, 5_000)];
+        ann.book.take_all(&[post("rec.1")]);
+        ann.s.found_jobs = vec!["rec.1".into()];
+        // Not a month's trade yet: nothing to judge it by.
         ann.work.next_own_review = 0;
-        assert!(run(&mut ann, &c, &pic(3 * MONTH, None, false), 0, |a, w| a.ventures(w)).is_empty(), "not in its first months");
+        assert!(run(&mut ann, &c, &pic(20 * DAY, None, false), 0, |a, w| a.ventures(w)).is_empty());
+        // Two months that paid nothing, against a job at $3,214 a month: given up, at the second month, not the sixth.
         ann.work.next_own_review = 0;
-        let out = run(&mut ann, &c, &pic(6 * MONTH + DAY, None, false), 0, |a, w| a.ventures(w));
+        let out = run(&mut ann, &c, &pic(2 * MONTH + DAY, None, false), 0, |a, w| a.ventures(w));
         assert!(out.len() == 1 && out[0].contains("trading_from") && out[0].contains("\"closed\":true"), "{out:?}");
         assert!(ann.s.own_work.is_none() && ann.work.own_since == -1);
-        // One that pays a living goes on.
+        // One that pays more than the job known: kept, month after month.
         let mut bob = Person::new(&c).unwrap();
-        bob.absorbed.drawn_log = (0..6).map(|m| (m * MONTH + DAY, 40_000)).collect();
-        bob.work.next_own_review = 0;
-        assert!(run(&mut bob, &c, &pic(6 * MONTH + DAY, None, false), 0, |a, w| a.ventures(w)).is_empty());
+        bob.book.take_all(&[post("rec.1")]);
+        bob.s.found_jobs = vec!["rec.1".into()];
+        bob.absorbed.drawn_log = (0..6).map(|m| (m * MONTH + DAY, 900_000)).collect();
+        for m in 1..=6 {
+            bob.work.next_own_review = 0;
+            assert!(run(&mut bob, &c, &pic(m * MONTH + 2 * DAY, None, false), 0, |a, w| a.ventures(w)).is_empty(), "month {m}");
+        }
         assert!(bob.s.own_work.is_some());
+    }
+
+    #[test]
+    fn an_owner_whose_business_leases_premises_works_there_and_weighs_giving_it_up_against_the_rent_still_owed() {
+        let c = ctx_with(json!({ "own_work": { "firm": "stall-1", "account": "acc.stall", "home": "b1/dwelling.1", "expect_per_month": 100_000 } }));
+        let post = rec(json!({ "id": "rec.1", "record": "statement", "author": "p.x", "speaks_for": "works", "at": 0, "visible_to": "public", "kind": "job_posting", "text": "Hiring", "data": { "wage": 150_000, "period": 14 * DAY } }));
+        let at = st("rec.2", "trading_at", "stall-1", json!({ "space": "unit-1/workplace.1", "structure": "unit-1", "cell": "c.9", "rent": 500_000, "until": 60 * MONTH }));
+        let mut ann = Person::new(&c).unwrap();
+        ann.book.take_all(&[post.clone(), at.clone()]);
+        ann.s.found_jobs = vec!["rec.1".into()];
+        // Told, we work there, not from home.
+        run(&mut ann, &c, &pic(DAY, None, false), 0, |a, w| a.trading_from(w));
+        let own = ann.s.own_work.clone().unwrap();
+        assert_eq!((own.at.as_deref(), own.home.as_deref(), own.lease), (Some("unit-1/workplace.1"), None, Some((500_000, 60 * MONTH))));
+        // Two months that paid nothing, against a job at $3,214 a month: with $5,000 of rent a month owed to the lease's
+        // end whatever we do, giving up leaves us worse: kept.
+        ann.work.next_own_review = 0;
+        assert!(run(&mut ann, &c, &pic(2 * MONTH + DAY, None, false), 0, |a, w| a.ventures(w)).is_empty());
+        assert!(ann.s.own_work.is_some());
+        // The same with no lease: given up (the earlier test).
+        let mut bob = Person::new(&c).unwrap();
+        bob.book.take_all(&[post]);
+        bob.s.found_jobs = vec!["rec.1".into()];
+        bob.work.next_own_review = 0;
+        let out = run(&mut bob, &c, &pic(2 * MONTH + DAY, None, false), 0, |a, w| a.ventures(w));
+        assert!(out.len() == 1 && out[0].contains("\"closed\":true"), "{out:?}");
     }
 
     #[test]
