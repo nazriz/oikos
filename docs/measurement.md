@@ -24,7 +24,7 @@ A batch folder holds:
 | `batch.json` | What ran: the world file, the overrides, the generated spec and generator version, seeds, versions, timings, and each run's final state hash. |
 | `measure/` | The measurement tables (below). |
 | `cost.txt`, `cost.json` | The cost report (below). |
-| `figures.txt`, `figures.json` | What the world's numbers rest on: how many are sourced, to confirm, derived, fitted, placeholders, conventions or unbased, and where the unbased are (`oikos figures <world>`; docs/design/foundations-2.md, law 11). Counting only: never in the log. |
+| `figures.txt`, `figures.json` | What the world's numbers rest on: how many are sourced, to confirm, derived, fitted, placeholders, conventions or unbased, and where the unbased are (`oikos figures <world>`; docs/design/foundations-2.md, law 11; PS-1). Counting only: never in the log. |
 
 ## Measurement tables
 
