@@ -530,6 +530,13 @@ pub struct Staffing {
     failed: Vec<(String, i64)>,
     unpaid: Vec<Unpaid>,
     asked_answered: BTreeSet<String>,
+    /// The tax collector's statements and decisions on our account we have acted on (docs/behaviour/public-finance.md,
+    /// "The taxpayer's account").
+    #[serde(default)]
+    tax_seen: BTreeSet<String>,
+    /// Credit the collector has agreed we may set against our next return, not yet used: (its decision, the collector, what is left).
+    #[serde(default)]
+    set_offs: Vec<(String, String, i64)>,
 }
 
 impl Staffing {
@@ -575,6 +582,8 @@ impl Staffing {
             failed: vec![],
             unpaid: vec![],
             asked_answered: BTreeSet::new(),
+            tax_seen: BTreeSet::new(),
+            set_offs: vec![],
         }
     }
 
@@ -1490,6 +1499,9 @@ impl Staffing {
             }
         }
 
+        if self.o.pay {
+            steps.extend(self.tax_account(book, cx, account));
+        }
         steps.extend(self.returns_due(pic, book, cx, account, law.as_ref(), &staff));
 
         // A posting unfilled at an old wage (ours has moved since): published again at the wage we offer now.
@@ -1601,14 +1613,32 @@ impl Staffing {
                 }
                 for collector in collectors {
                     let mut parts: Vec<(Charge, i64, i64)> = vec![];
+                    // (A credit the collector has agreed we may set against this return is used first: we pay that much less, and say so.)
+                    let mut credit: i64 = self.set_offs.iter().filter(|s| s.1 == collector).map(|s| s.2).sum();
+                    let mut set_off = 0;
                     for x in due.iter().filter(|x| x.charge.collector == collector) {
-                        let paid = x.amount.min(left);
+                        let off = x.amount.min(credit);
+                        credit -= off;
+                        set_off += off;
+                        let paid = (x.amount - off).min(left);
                         left -= paid;
                         if let Some(o) = self.owed.iter_mut().find(|o| o.charge.id == x.charge.id) {
-                            o.amount = x.amount - paid;
+                            o.amount = x.amount - off - paid;
                         }
                         parts.push((x.charge.clone(), x.amount, paid));
                     }
+                    let mut set_off_of: Vec<String> = vec![];
+                    let mut using = set_off;
+                    for s in self.set_offs.iter_mut().filter(|s| s.1 == collector) {
+                        let u = s.2.min(using);
+                        if u > 0 {
+                            s.2 -= u;
+                            using -= u;
+                            set_off_of.push(s.0.clone());
+                        }
+                    }
+                    self.set_offs.retain(|s| s.2 > 0);
+                    let off_words = if set_off > 0 { format!(" Set off from our credit with the collector: {}.", usd(set_off)) } else { String::new() };
                     let owed: i64 = parts.iter().map(|p| p.1).sum();
                     let paid: i64 = parts.iter().map(|p| p.2).sum();
                     let mut accounts: Vec<String> = vec![];
@@ -1629,17 +1659,21 @@ impl Staffing {
                         data["paid"] = json!(paid);
                         data["period_end"] = json!(t);
                         data["account"] = json!(account);
+                        if set_off > 0 {
+                            data["set_off"] = json!(set_off);
+                            data["set_off_of"] = json!(set_off_of);
+                        }
                         let mut calls = vec![say(
                             "withholding_report",
-                            &format!("Income tax withheld from wages, owed: {}; paid now: {}.", usd(owed), usd(paid)),
+                            &format!("Income tax withheld from wages, owed: {}; paid now: {}.{off_words}", usd(owed), usd(paid)),
                             Say { to, visible, basis, data: Some(data), ..Default::default() },
                         )];
                         if paid > 0 {
                             calls.push(pay(&accounts[0], paid, Pay { from: Some(account.to_string()), for_: Some("Income tax withheld from wages.".into()), ..Default::default() }, cx));
                         }
                         steps.push(step(
-                            if paid == owed {
-                                format!("{label}, due {}: paying over the {} of income tax we withheld from wages.", date(falls), usd(owed))
+                            if paid + set_off == owed {
+                                format!("{label}, due {}: paying over the {} of income tax we withheld from wages.{off_words}", date(falls), usd(owed))
                             } else {
                                 format!("{label}, due {}: we owe {} of income tax withheld from wages and have {}: paying that, and still owing the rest.", date(falls), usd(owed), usd(paid))
                             },
@@ -1659,10 +1693,14 @@ impl Staffing {
                     if itemised {
                         data["staff"] = json!(lines.iter().map(|(w, g)| json!({ "worker": w, "gross": g })).collect::<Vec<_>>());
                     }
+                    if set_off > 0 {
+                        data["set_off"] = json!(set_off);
+                        data["set_off_of"] = json!(set_off_of);
+                    }
                     let mut calls = vec![say(
                         "withholding_report",
                         &format!(
-                            "Withheld from wages, owed: {}; paid now: {}. {}.",
+                            "Withheld from wages, owed: {}; paid now: {}. {}.{off_words}",
                             usd(owed),
                             usd(paid),
                             parts.iter().map(|c| format!("{}: owed {}, paid {}", named(&c.0), usd(c.1), usd(c.2))).collect::<Vec<_>>().join("; ")
@@ -1678,7 +1716,7 @@ impl Staffing {
                         }
                     }
                     steps.push(step(
-                        if paid == owed {
+                        if paid + set_off == owed {
                             format!("{label}, due {}: paying over the {} we withheld from wages ({}).", date(falls), usd(owed), parts.iter().map(|c| format!("{} {}", named(&c.0), usd(c.1))).collect::<Vec<_>>().join(", "))
                         } else {
                             format!("{label}, due {}: we owe {} withheld from wages and have {}: paying that, and still owing the rest.", date(falls), usd(owed), usd(paid))
@@ -1688,6 +1726,87 @@ impl Staffing {
                 }
             }
             self.paid_since.remove(&rule.id);
+        }
+        steps
+    }
+
+    /// Our account with the tax collector (docs/behaviour/public-finance.md, "The taxpayer's account"), from our own papers:
+    /// a statement that shows us in credit is claimed, set against our next return where the law on tax paid and not owed
+    /// allows it and repaid into our account where it does not; a set-off the collector agrees is kept for the next return
+    /// (`returns_due`); a claim refused while the collector's own statement showed us in credit is asked to be looked at
+    /// again, where the law's decisions give a review and inside its days. Nothing here is done from anyone else's books.
+    fn tax_account<T>(&mut self, book: &Book, cx: &mut Cx, account: &str) -> Vec<Step<T>> {
+        use crate::boundary::collector::{refund_law, CLAIM, DECISION, STATEMENT};
+        use crate::boundary::support_law::{days_left, decision_law};
+        let t = cx.t;
+        let me = self.me.clone();
+        let world = cx.ctx.world.clone();
+        let usd = |n: i64| money_words(n, &world);
+        let mut steps = vec![];
+        let to_me = |r: &Arc<Record>| crate::common::addressed_to(r).contains(&me);
+        let mut statements: Vec<&Arc<Record>> = book.all(STATEMENT).filter(|r| to_me(r)).collect();
+        statements.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
+        // (What the latest statement says we are in credit by.)
+        let credit_stated = statements.last().map_or(0, |s| amount_of(data(s).get("credit")));
+        let mut decisions: Vec<&Arc<Record>> = book.all(DECISION).filter(|r| to_me(r) && !self.tax_seen.contains(&r.id)).collect();
+        decisions.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
+        for d in decisions {
+            self.tax_seen.insert(d.id.clone());
+            let dd = data(d);
+            let by = d.speaks_for.clone().unwrap_or_default();
+            let granted = dd.get("granted").and_then(Value::as_bool) == Some(true);
+            let sum = amount_of(dd.get("amount"));
+            if granted && dd.get("use").and_then(Value::as_str) == Some("set_off") && sum > 0 {
+                self.set_offs.push((d.id.clone(), by, sum));
+                continue;
+            }
+            if granted || credit_stated <= 0 {
+                continue;
+            }
+            let Some(review) = decision_law(book, DECISION, None).and_then(|l| l.review) else { continue };
+            if days_left(d.at, review.within_days, t) < 0 {
+                continue;
+            }
+            steps.push(because(
+                format!("Our claim was refused ({}), and the collector's own statement shows us in credit by {}: asking for the decision to be looked at again.", dd.get("reason").and_then(Value::as_str).unwrap_or("no reason given"), usd(credit_stated)),
+                vec![say(
+                    "review_request",
+                    "Request: please put this right (refund_refused).",
+                    Say {
+                        to: Some(vec![by.clone()]),
+                        visible: Some(Visible::Only(vec![me.clone(), by.clone()])),
+                        basis: Some(d.id.clone()),
+                        data: Some(json!({ "matter": "refund_refused", "against": by, "about": d.id, "particulars": format!("Your statement of our account shows us in credit by {}.", usd(credit_stated)), "seeks": "the credit repaid, or set against our next return" })),
+                        ..Default::default()
+                    },
+                )],
+            ));
+        }
+        let fresh: Vec<&Arc<Record>> = statements.iter().filter(|s| !self.tax_seen.contains(&s.id)).copied().collect();
+        for s in &fresh {
+            self.tax_seen.insert(s.id.clone());
+        }
+        if let Some(s) = fresh.last() {
+            let credit = amount_of(data(s).get("credit"));
+            let Some(by) = s.speaks_for.clone() else { return steps };
+            if credit > 0 {
+                let set_off = refund_law(book).is_some_and(|l| l.set_off && l.collector == by);
+                let use_ = if set_off { "set_off" } else { "refund" };
+                steps.push(because(
+                    format!("The collector's statement shows our account in credit by {}: claiming it, {}.", usd(credit), if set_off { "to be set against our next return" } else { "to be repaid" }),
+                    vec![say(
+                        CLAIM,
+                        &format!("Claim for tax paid and not owed: {use_} {}.", usd(credit)),
+                        Say {
+                            to: Some(vec![by.clone()]),
+                            visible: Some(Visible::Only(vec![me.clone(), by.clone()])),
+                            basis: Some(s.id.clone()),
+                            data: Some(json!({ "office": by, "use": use_, "amount": credit, "account": account, "particulars": format!("Your statement {} shows our account in credit by {}.", s.id, usd(credit)) })),
+                            ..Default::default()
+                        },
+                    )],
+                ));
+            }
         }
         steps
     }
@@ -2727,6 +2846,60 @@ mod tests {
         assert_eq!((argv(m[0], "to"), argv(m[0], "from")), (json!("acc-o"), json!("acc-shop")));
         assert!(argv(m[0], "amount").as_str().unwrap().ends_with("200.00"));
         assert!(statements(&said(&shop_wake(&mut s, &mut book, &c, 31 * DAY, vec![], vec![], vec![])), "withholding_report").is_empty(), "a period files once");
+    }
+
+    /// A paper of the tax collector's to the shop (docs/behaviour/public-finance.md, "The taxpayer's account").
+    fn from_collector(id: &str, at: i64, kind: &str, data: Value) -> Arc<Record> {
+        crate::firms::testkit::rec(json!({ "id": id, "record": "statement", "author": "p.outside", "speaks_for": "outside", "at": at, "visible_to": ["shop", "outside"], "kind": kind, "text": id, "data": data, "addressed_to": ["shop"] }))
+    }
+    fn refund_law(set_off: bool) -> Arc<Record> {
+        statement("law-tax-refunds", 0, "law", json!({ "refunds": { "collector": "outside", "set_off": set_off, "pay_within_days": 30 } }), "outside")
+    }
+
+    #[test]
+    fn a_credit_the_collector_states_is_claimed_and_a_set_off_it_agrees_is_paid_less_on_the_next_return_and_said() {
+        let (c, mut s, mut book) = (shop_ctx(), shop(), Book::new());
+        let mut records = on_the_books("w");
+        records.push(refund_law(true));
+        shop_wake(&mut s, &mut book, &c, DAY, records, vec![], vec![]);
+        shop_wake(&mut s, &mut book, &c, PERIOD, vec![], vec![], vec![paid("ord-1", PERIOD)]);
+        // The collector's statement: 5,000 in credit. Claimed once, to be set against the next return (the law allows it).
+        let out = said(&shop_wake(&mut s, &mut book, &c, 20 * DAY, vec![from_collector("st-1", 20 * DAY, "tax_statement", json!({ "taxpayer": "shop", "credit": 5_000 }))], vec![], vec![]));
+        let claim = statements(&out, "tax_credit_claim");
+        assert_eq!(claim.len(), 1);
+        let d = argv(claim[0], "data");
+        assert_eq!((d["use"].as_str(), d["amount"].as_i64(), d["account"].as_str()), (Some("set_off"), Some(5_000), Some("acc-shop")));
+        assert_eq!(argv(claim[0], "to"), json!(["outside"]));
+        assert!(statements(&said(&shop_wake(&mut s, &mut book, &c, 21 * DAY, vec![], vec![], vec![])), "tax_credit_claim").is_empty(), "claimed once");
+        // Agreed: the next return pays 15,000 of the 20,000 and says the 5,000 is set off.
+        shop_wake(&mut s, &mut book, &c, 22 * DAY, vec![from_collector("dec-1", 22 * DAY, "tax_credit_decision", json!({ "taxpayer": "shop", "use": "set_off", "granted": true, "amount": 5_000 }))], vec![], vec![]);
+        let out = said(&shop_wake(&mut s, &mut book, &c, 30 * DAY, vec![], vec![], vec![]));
+        let r = statements(&out, "withholding_report");
+        let d = argv(r[0], "data");
+        assert_eq!((d["withheld"].as_i64(), d["paid"].as_i64(), d["set_off"].as_i64(), d["set_off_of"].clone()), (Some(20_000), Some(15_000), Some(5_000), json!(["dec-1"])));
+        assert!(arg_text(r[0]).contains("Set off from our credit with the collector"));
+        let m: Vec<_> = out.iter().filter(|c| c.fn_ == "money").collect();
+        assert!(argv(m[0], "amount").as_str().unwrap().ends_with("150.00"));
+        // Used up, and nothing is carried as owed.
+        assert!(s.set_offs.is_empty());
+        assert_eq!(s.owed.iter().map(|o| o.amount).sum::<i64>(), 0);
+    }
+
+    #[test]
+    fn where_the_law_gives_no_set_off_a_credit_is_claimed_back_and_a_refusal_against_the_collectors_own_statement_is_asked_about() {
+        let (c, mut s, mut book) = (shop_ctx(), shop(), Book::new());
+        let mut records = on_the_books("w");
+        records.push(refund_law(false));
+        records.push(statement("law-decisions", 0, "law", json!({ "decisions": [{ "kind": "tax_credit_decision", "name": "x", "review": { "within_days": 30, "grounds": "any" } }] }), "outside"));
+        shop_wake(&mut s, &mut book, &c, DAY, records, vec![], vec![]);
+        let out = said(&shop_wake(&mut s, &mut book, &c, 20 * DAY, vec![from_collector("st-1", 20 * DAY, "tax_statement", json!({ "taxpayer": "shop", "credit": 5_000 }))], vec![], vec![]));
+        assert_eq!(argv(statements(&out, "tax_credit_claim")[0], "data")["use"], "refund");
+        let refused = from_collector("dec-1", 22 * DAY, "tax_credit_decision", json!({ "taxpayer": "shop", "use": "refund", "granted": false, "amount": 0, "reason": "the payment could not be matched to the account" }));
+        let out = said(&shop_wake(&mut s, &mut book, &c, 22 * DAY, vec![refused], vec![], vec![]));
+        let ask = statements(&out, "review_request");
+        assert_eq!(ask.len(), 1);
+        assert_eq!((argv(ask[0], "data")["about"].as_str(), argv(ask[0], "to")), (Some("dec-1"), json!(["outside"])));
+        assert!(statements(&said(&shop_wake(&mut s, &mut book, &c, 23 * DAY, vec![], vec![], vec![])), "review_request").is_empty(), "asked once");
     }
 
     #[test]

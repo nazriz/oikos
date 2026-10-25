@@ -227,6 +227,18 @@ export const statistics: BehaviourModule = {
   create: inEngine("world.statistics"),
 };
 
+/** world.tax_collector: the tax collector, keeping each taxpayer's account (docs/behaviour/public-finance.md, "The taxpayer's account"; risk PB-23). Engine-only from the start. */
+export const taxCollector: BehaviourModule = {
+  name: "world.tax_collector",
+  answers: {"office": "the tax collector", "acts": "What it acts on: a taxpayer's claim to have a credit on its account repaid or set against its next return, made on the claim form; a taxpayer's request for a statement of its own account; and a request to look at one of its decisions again. A letter changes nothing on an account."},
+  issues: P.TAX_COLLECTOR,
+  version: "0.1.0",
+  doc: "docs/behaviour/public-finance.md",
+  cadence: () => DAY,
+  firstWake: () => 0,
+  create: inEngine("world.tax_collector"),
+};
+
 /** world.valuer, as the deleted participants/src/behaviour/world.ts had it. */
 export const valuer: BehaviourModule = {
   name: "world.valuer",

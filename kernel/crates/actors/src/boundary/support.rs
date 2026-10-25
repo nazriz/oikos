@@ -343,7 +343,7 @@ struct Support {
 
 /// The office's casework, and who does it.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-struct Casework {
+pub(crate) struct Casework {
     by: String,
     kinds: Vec<String>,
 }
@@ -351,7 +351,7 @@ struct Casework {
 impl Casework {
     /// A step that is only casework papers goes to the desk: `done_by` on its first call (the platform gives it to the act
     /// as `by`). A step with anything else in it (a payment) stays the actor's own, whole.
-    fn assign<T>(&self, step: &mut Step<T>) {
+    pub(crate) fn assign<T>(&self, step: &mut Step<T>) {
         let casework = |l: &oikos_sight::calls::Line| {
             l.call.fn_ == "statement" && matches!(l.call.get("kind"), Some(oikos_sight::calls::Value::Id(k) | oikos_sight::calls::Value::Text(k)) if self.kinds.iter().any(|x| x == k))
         };

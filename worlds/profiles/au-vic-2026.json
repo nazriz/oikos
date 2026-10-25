@@ -761,6 +761,7 @@
       "rates_due_days": 30,
       "rates_penalty_interest_bps": 1000,
       "median_house_price": 57200000,
+      "refunds": {"pay_within_days": 30, "set_off": false, "wrong_refusal_bps": 500},
       "rates_exempt_kinds": ["health_service", "school", "utility", "police"]
     },
     "services": {
@@ -1000,7 +1001,8 @@
           "grounds": "any error of fact or law in the decision as reviewed",
           "fee_hours_of_pay": 0
         }
-      }
+      },
+      {"kind": "tax_credit_decision", "name": "A decision on a claim for tax paid and not owed", "review": {"within_days": 30, "grounds": "any: the collector looks at its decision again on the account"}}
     ],
     "frictions": {
       "per_adult_bps_per_year": {
@@ -1098,6 +1100,8 @@
     "calendar.fiscal_year_starts": "1 July: the Australian and Victorian government financial year, 1 July to 30 June (recalled; also the date used in the profile's own sources, e.g. 'Services Australia annual report 2023-24', to confirm against Victorian Department of Treasury and Finance).",
     "calendar.holidays": "Public Holidays Act 1993 (Vic): the Act's landing page was opened at https://www.legislation.vic.gov.au/in-force/acts/public-holidays-act-1993 (version 027 as listed there, effective 6 April 2020; the text of the sections was not readable, so which days the Act lists is taken from Business Victoria's public holidays pages as summarised by web search for 2026 to 2028, and from qppstudio.net and holidaydb.com, opened 2026-10-17). The list: New Year's Day, Australia Day, Labour Day (second Monday of March), Good Friday, the Saturday before Easter Sunday, Easter Sunday, Easter Monday, Anzac Day, King's Birthday (second Monday of June), the Friday before the AFL Grand Final, Melbourne Cup Day (first Tuesday of November), Christmas Day, Boxing Day. The dates for 2026 to 2028 were checked against the pages for those years: Labour Day 9 Mar 2026, 8 Mar 2027, 13 Mar 2028; King's Birthday 8 Jun 2026, 14 Jun 2027, 12 Jun 2028; Melbourne Cup 3 Nov 2026, 2 Nov 2027, 7 Nov 2028; Easter 5 Apr 2026, 28 Mar 2027, 16 Apr 2028. Grand Final Friday: 25 September 2026 (qppstudio); 24 September 2027 and 29 September 2028 are (to confirm), set by the AFL, taken as the Friday before the last Saturday of September. Substitute days: 28 Dec 2026; 27 and 28 Dec 2027; 3 Jan 2028 (New Year's Day on a Saturday), from the same pages; the Act's own substitute rules are recalled only (to confirm), so they are explicit dates here. Australia Day carries shift_if_rest as recalled (to confirm). Anzac Day is not shifted. Earlier notice: the brief named the Act as 1993, which it is (not 2010).",
     "decisions.permit_decision": "PLACEHOLDER: an office's own second look at a planning decision within 30 days of it; the place's appeal route for a permit (to a tribunal or an inspectorate) is not built, since no one in the town yet brings a permit to a body that hears it. No source was opened for the days.",
+    "decisions.tax_credit_decision": "(risk PB-23) PLACEHOLDER: the tax collector looks at its decision on a claim for tax paid and not owed again if asked within 30 days; no source was opened for this place's review or appeal of a refund decision. The appeal to a court or tribunal is left out: the collector does not yet carry out a venue's order (docs/behaviour/public-finance.md).",
+    "public_finance.refunds": "(risk PB-23) PLACEHOLDER: no source was opened for this place's law on tax paid and not owed. pay_within_days (30) is a stand-in for the time its law gives the collector to repay; set_off is false (a credit is claimed back, not set against the next return) for want of a source; wrong_refusal_bps (500: one claim that is due in twenty refused) has no source for any place. To be sourced from the place's tax code (refund of payments not owed, offset) and its tax authority's figures on refund claims refused and later allowed.",
     "decisions": "Review and appeal of a decision on a claim for support, and what the decision waits for (docs/behaviour/decisions.md; foundations F8). Recalled, not opened: each key below says what is recalled and what is a placeholder. The sim's one deciding office stands for the agency; its second look is by the same office (the sim has no second officer to give it to).",
     "decisions.benefit_decision.pension": "Review: an authorised review officer of Services Australia reviews the decision on request, within 13 weeks (91 days) of it (Social Security (Administration) Act 1999, ss 111 and 129: recalled, to confirm); appeal to the Administrative Review Tribunal within 13 weeks of the review decision, no fee for a social security matter (the same Act, s 142, and the Administrative Review Tribunal Act 2024: recalled, to confirm); an appeal lies only after the review. The 14 days to send the documents a claim needs: recalled from Services Australia's guidance to claimants (to confirm).",
     "decisions.benefit_decision.unemployment": "As the Age Pension (review and appeal: recalled, to confirm). The employer's confirmation that the job has ended is the employment separation certificate Services Australia asks a JobSeeker claimant to have their employer complete (recalled, to confirm); its 14 days is a PLACEHOLDER, and the claim is decided without it if it does not come.",

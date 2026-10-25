@@ -757,7 +757,7 @@ The mechanism:
 - **Notice by:** a `leave` of a person other than the actor in the log; a refusal `not_theirs` on `leave`.
 - **Fix when:** the census creates parents before children, or before a seat is given a wide remit over households.
 
-### PB-23 · Tax paid twice cannot be claimed back or set against the next return
+### PB-23 · Tax paid twice could not be claimed back or set against the next return (the collector's account, built 2026-10-25)
 - **Gap:** Nobody keeps a taxpayer's account with the outside world's tax collector: returns are filed and paid, and
   nothing reconciles what was paid against what was owed. A payment made twice (lv-12: the clinic's manager paid a
   month's withheld income tax by hand, $17,573.92, on top of its payroll clerk's return for the same month) is simply
@@ -769,12 +769,24 @@ The mechanism:
   `offices/treasury.rs`); `docs/behaviour/public-finance.md`.
 - **Effect:** A seat's (or a code office's) duplicate payment is a permanent loss; a seat that sees it can do nothing,
   and is distressed by it (lv-12's debrief). Small in money; matters for welfare and for any study of error recovery.
-- **L / I:** medium / low · **Status:** to fix. It is not a law alone: it needs the institution that does the work, the
-  collector's office keeping each taxpayer's account (who does it, at what time per claim, how long a refund takes,
-  by place, sourced), a form for the claim, and the payer's clerk reading its own books for what was paid over twice.
-- **Notice by:** two payments to the collector for one return's period from one payer.
-- **Fix when:** before a study reads errors and their correction, or a finance-side seat is seated again in a town
-  whose clerk files returns.
+- **L / I:** medium / low · **Status:** mitigated: the mechanism is built, the figures are not sourced (decisions 2026-10-25, "The taxpayer's account"; branch
+  `taxpayer-accounts`): the tax collector (`world.tax_collector`, post `outside-tax`) keeps each taxpayer's account from
+  its own papers and accounts, states a credit to its taxpayer, and decides claims (refund, or set-off where the law
+  allows) in its time, with a slip and a review as law data; payroll officers claim a stated credit and use a set-off on
+  the next return; the public forms let a seat do the same (docs/behaviour/public-finance.md, "The taxpayer's account").
+  **What is left, open:** (a) a payment is the collector's by its words (it names tax, a sum withheld or a charge): one
+  whose words say nothing of tax is allocated to nobody and stays lost; a real payment's structured reference is not
+  modelled; (b) the figures are mostly placeholders: Mexico's 40 days (CFF art. 22) and 30-day review (art. 121) were
+  read on a transcription, its no-set-off of withheld tax (art. 23) and England's set-off are to confirm, the other
+  seven profiles' are placeholders, and `wrong_refusal_bps` (500) has no source anywhere; (c) the collector's officers
+  are a desk of one officer's working day (law 10), unsized by any figure, at a placeholder twenty minutes a decision,
+  so the wait for a refund is that desk's queue, not a real office's backlog; (d) no appeal past the review, no request
+  for more papers, no interest on a late refund, no time limit for claiming; (e) the translator has not learnt the two
+  new forms' names (`tax_credit_claim`, `tax_account_request`).
+- **Notice by:** two payments to the collector for one return's period from one payer, and no `tax_statement` to that
+  payer after (a payment the words rule missed); a refund claim refused and never asked about.
+- **Fix when:** (a) before a study reads how seats recover from payment errors with free-worded payments; (b) before
+  one reads refund times or refusals.
 
 ## People and culture
 

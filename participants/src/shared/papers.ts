@@ -470,6 +470,46 @@ export const SUPPORT: Issued[] = [
       data: { claim: "=claim", payment: "=payment", granted: "?granted", reason: "=reason", amount: "#amount", every: "=every", until: "=until" } } },
 ];
 
+// ------------------------------------------------------------------ the taxpayer's account (world.tax_collector; risk PB-23)
+
+/**
+ * A taxpayer's papers to the tax collector, as forms published for anyone who pays tax over (an employer's payroll, or
+ * whoever holds the office that pays it): a claim to have a credit on its account repaid, or set against its next
+ * return where the law allows, and a request for a statement of its own account. Each is a paper of the one who files
+ * it, to the collector, and of no one else's. A code payroll officer writes the same statements from its own books
+ * (kernel/crates/actors/src/firms/staffing.rs).
+ */
+export const TAX_CREDIT_CLAIM: Issued = {
+  form: "tax_credit_claim", title: "A claim for tax paid and not owed: repaid, or set against the next return",
+  does: "Asks the tax collector to repay a credit on your account with it (tax paid twice, or paid and not owed), into the account you name, or, where the law on tax paid and not owed allows it, to agree that the credit be set against your next return. The collector decides it against your account as it keeps it; a credit set against a return is used by paying that much less on the return and saying so on it. It moves no money by itself.",
+  fields: {
+    office: f("entity", "The tax collector.", req), use: f("choice", "Repaid (refund), or set against the next return (set_off).", { ...req, options: ["refund", "set_off"] }),
+    amount: f("amount", "How much you claim (left out: the whole of the credit)."), account: f("account", "The account a refund is paid into."),
+    particulars: f("text", "What was paid and not owed, in words (the payment, its day, the period it was for)."),
+  },
+  writes: { kind: "tax_credit_claim", text: "Claim for tax paid and not owed: {use} {amount}.", to: ["=office"], visible: ["=self", "=office"],
+    data: { office: "=office", use: "=use", amount: "#amount", account: "=account", particulars: "=particulars" } },
+};
+export const TAX_ACCOUNT_REQUEST: Issued = {
+  form: "tax_account_request", title: "A request for a statement of your account with the tax collector",
+  does: "Asks the tax collector for a statement of your own account with it: what your returns say was owed, what it has received from you, what it has repaid, and whether you owe or are in credit. Only your own account is stated.",
+  fields: { office: f("entity", "The tax collector.", req), particulars: f("text", "Anything the collector should know.") },
+  writes: { kind: "tax_account_request", text: "Please send a statement of our account.", to: ["=office"], visible: ["=self", "=office"], data: { office: "=office", particulars: "=particulars" } },
+};
+/** What the tax collector issues (world.tax_collector), where a model holds the office. */
+export const TAX_COLLECTOR: Issued[] = [
+  { form: "tax_credit_decision", title: "Decision on a claim for tax paid and not owed", does: "Says what is decided on a taxpayer's claim, to the taxpayer: a refund granted (and how much), a credit that may be set against its next return, or a refusal and why. A refund granted on it is paid by a payment from the collector's account into the account the claim names; it moves no money by itself.",
+    fields: { claim: f("record", "The claim decided.", req), taxpayer: f("entity", "Who made the claim.", req), use: f("choice", "What was asked for.", { ...req, options: ["refund", "set_off"] }),
+      granted: f("choice", "Whether it is granted.", { ...req, options: YES_NO }), amount: f("amount", "Where granted: how much."), reason: f("text", "Why not, or why less than was asked.") },
+    writes: { kind: "tax_credit_decision", text: "Claim {claim}: granted {granted}.", basis: "=claim", to: ["=taxpayer"], visible: ["=taxpayer", "=self"],
+      data: { claim: "=claim", taxpayer: "=taxpayer", use: "=use", granted: "?granted", amount: "#amount", reason: "=reason" } } },
+  { form: "tax_statement", title: "Statement of a taxpayer's account", does: "Tells a taxpayer how its own account stands: what its returns say was owed, what was received from it, what was repaid, and what is owing or in credit. It changes nothing on the account.",
+    fields: { taxpayer: f("entity", "Whose account.", req), owed: f("amount", "Owed on its returns, in all.", req), paid: f("amount", "Received from it, in all.", req), refunded: f("amount", "Repaid to it, in all."),
+      credit: f("amount", "In credit by (nothing: 0)."), outstanding: f("amount", "Owing (nothing: 0).") },
+    writes: { kind: "tax_statement", text: "Statement of account: owed {owed}, paid {paid}; in credit {credit}.", to: ["=taxpayer"], visible: ["=taxpayer", "=self"],
+      data: { taxpayer: "=taxpayer", owed: "#owed", paid: "#paid", refunded: "#refunded", credit: "#credit", outstanding: "#outstanding" } } },
+];
+
 // ------------------------------------------------------------------ a tenant's answer, and a place's own order form
 
 /**

@@ -915,7 +915,8 @@
         "utility",
         "police"
       ],
-      "median_house_price": 200000000
+      "median_house_price": 200000000,
+      "refunds": {"pay_within_days": 30, "set_off": false, "wrong_refusal_bps": 500}
     },
     "services": {
       "waste_per_person_per_day_g": 400,
@@ -1385,7 +1386,8 @@
           "grounds": "any error in the decision, heard on appeal to the revenue officer above the deciding office",
           "fee_hours_of_pay": 0
         }
-      }
+      },
+      {"kind": "tax_credit_decision", "name": "A decision on a claim for tax paid and not owed", "review": {"within_days": 30, "grounds": "any: the collector looks at its decision again on the account"}}
     ],
     "frictions": {
       "per_adult_bps_per_year": {
@@ -1462,6 +1464,8 @@
     "calendar.fiscal_year_starts": "The Indian financial year runs 1 April to 31 March (General Clauses Act 1897 section 3(21) and the Union and State budgets).",
     "calendar.holidays": "Opened: The News Minute, 'Tamil Nadu govt issues 2026 public holiday list with 24 declared holidays' (via web search summary, 2025/26, thenewsminute.com), the Government of Tamil Nadu's list under the Negotiable Instruments Act 1881 and Tamil Nadu Government notification; 2026 dates are from it. Two of the 24 were not read, so they are not listed (to confirm); Christmas 25 December is added from the standing list (to confirm). Fixed days are rules; Good Friday is Easter minus 2. Dates of lunar festivals for 2027 and 2028 are computed from general knowledge of the lunar calendar (to confirm); the State fixes them in its yearly notification. No shift_if_rest: Indian holidays are not moved.",
     "decisions.permit_decision": "PLACEHOLDER: an office's own second look at a planning decision within 30 days of it; the place's appeal route for a permit (to a tribunal or an inspectorate) is not built, since no one in the town yet brings a permit to a body that hears it. No source was opened for the days.",
+    "decisions.tax_credit_decision": "(risk PB-23) PLACEHOLDER: the tax collector looks at its decision on a claim for tax paid and not owed again if asked within 30 days; no source was opened for this place's review or appeal of a refund decision. The appeal to a court or tribunal is left out: the collector does not yet carry out a venue's order (docs/behaviour/public-finance.md).",
+    "public_finance.refunds": "(risk PB-23) PLACEHOLDER: no source was opened for this place's law on tax paid and not owed. pay_within_days (30) is a stand-in for the time its law gives the collector to repay; set_off is false (a credit is claimed back, not set against the next return) for want of a source; wrong_refusal_bps (500: one claim that is due in twenty refused) has no source for any place. To be sourced from the place's tax code (refund of payments not owed, offset) and its tax authority's figures on refund claims refused and later allowed.",
     "decisions": "Review and appeal of a decision on a claim for support, and what the decision waits for (docs/behaviour/decisions.md; foundations F8). Not opened.",
     "decisions.benefit_decision.pension": "PLACEHOLDER: an appeal within 30 days, no fee, no review first (the state's old age pension scheme's own appeal rules were not found). 14 days for documents is a PLACEHOLDER.",
     "culture.conducts": "What people start out holding right, for the four conducts where a figure in this profile's own outlook speaks to it (the rest start from values alone: no figure was opened). approves_bps is the national share with 'a great deal' or 'quite a lot' of confidence, as `outlook.trust` has it (World Values Survey and European Values Study, joint wave 7, as Our World in Data publishes it; opened 2026-10-11, to confirm against the survey's tables; see sources.outlook for the country and the items). Mapping, ours: answer_tribunal and take_to_tribunal <- confidence in the courts (a person who trusts the courts approves of answering a case there and of taking a wrong to it); complain <- confidence in the civil service (writing to the town is approved where the town's officers are trusted to answer); join_union <- confidence in labour unions. Weak: confidence in an institution is not approval of an act toward it, and the share above a threshold is read as a mean, as outlook does; the figure sets where people start (their own lean and their picture of what others approve), nothing else, and the lean is measured from it, so the rates stay the calibrated ones. No figure for strike, take_in, stay_past_notice, take_from_employer or an organisation's conduct (the survey's items on joining strikes and on the justifiability of stealing property were not opened); no figure by origin group (no source found that gives one). National, not the place's. does_bps is never given: a conduct's own rate in the profile.",

@@ -8913,3 +8913,72 @@ copies part of it); the book's indexes (about 11 KB); their home's building as l
   each person's reading is their own again, as before: memory, not results); a book's records come far out of order
   (then most go to the map, as before); a profile at 50,000 shows what people keep (the book, the inline state) to
   matter beside the run's own holders.
+
+## 2026-10-25 · The taxpayer's account: the tax collector keeps it, a credit is claimed back or set off (branch `taxpayer-accounts`; PB-23; world.tax_collector 0.1.0, generator 0.69.0; no model called)
+
+Asked: lv-12's clinic paid a month's withheld tax twice (its manager by hand, its payroll officer with the return) and
+could not get it back; build the real institution, so that an overpayment shows as a credit the taxpayer can claim
+back or set against its next return, done in time by whoever does the collector's work, wrong at a rate, with review
+routes as law data, nobody shown more than is theirs.
+
+- **The law, as data** (`law-tax-refunds`, the outside world's, public; the profile's `public_finance.refunds`:
+  `pay_within_days`, `set_off`, `wrong_refusal_bps`, with its source): the collector keeps each taxpayer's account,
+  tells it of a credit, repays one claimed back within the law's days, and (where `set_off`) agrees that it be set
+  against the next return. The review is the profile's `decisions` rule for `tax_credit_decision` (published in
+  `law-decisions` with the others; `Reconsiderations` reads it as the support office's reviews are read).
+- **Who does it.** A new office of the outside world, `outside-tax` (`world.tax_collector`, Rust,
+  `kernel/crates/actors/src/boundary/collector.rs`), held by the outside world's case system as the support office is.
+  Its casework is its officers' (law 10, as main's foundations-2 phase 1 made the support office's, met at the merge of
+  main): the decision, a review and its answer are named `by` a desk of the outside world's (`outside-tax-casework`,
+  template `tax-casework`: the person table's minutes, a decision twenty as a placeholder, in an officer's working day,
+  one lane, a placeholder since no figure sizes a collector's officers for a town); the refund's payment is a step of its
+  own, the case system's. (Before the merge the decision was a twenty-minute row on the case system; that row is gone.)
+  The decision has a row in the table of slips (a claim that is due refused, "the
+  payment could not be matched to the account", at the profile's rate, in a town with frictions). A taxpayer's claim
+  is a payroll officer's quarter of an hour (placeholder).
+- **What it sees: only its own.** Its channels are its accounts (the `ledger`), the returns, claims, requests and
+  reviews addressed to it, and the laws; it declares no `keeps` because nothing it is shown is anyone else's register.
+  A taxpayer sees its own account in the statements sent to it (when a credit first stands, and when the figure
+  changes) and in one it asks for on the public request form; the payroll officer's file `tax-account` holds the
+  collector's papers to its organisation, nothing else.
+- **The account** (`ledger`): each return a liability (what it says is owed less what the return before it under the
+  same rule left owing, since a payroll short of money carries the rest into the next figure); each payment allocated to
+  what is outstanding, the rest held on account and allocated to the next return; a refund paid out of what is on
+  account; the credit is what is on account less any set-off agreed and not yet used. A payment is the collector's when
+  its words say tax (tax, withheld, or a charge's id or name), into one of its charges' accounts from elsewhere: the
+  outside world's general account also takes orders, licences, repairs and dividends, and only the words tell them apart
+  (a real payment's structured reference is not modelled: PB-23, what is left).
+- **The taxpayer's side** (`Staffing::tax_account`, every payroll that files returns): a statement in credit is claimed
+  (set off where the law allows, repaid where not); a set-off agreed is used on the next return (it pays that much
+  less and says `set_off`, `set_off_of`; its own books carry nothing owed for it); a refusal while the collector's own
+  statement shows a credit is asked about once, inside the review's days. The forms `tax_credit_claim` and
+  `tax_account_request` are public, so a seat in any office that pays tax over can do the same.
+- **Sources.** Mexico (`mx-jal-2026`): refund within 40 days of the claim, CFF art. 22, and recurso de revocación within
+  30 days, art. 121, both read on a transcription (mley.mx), to confirm against the DOF; no set-off of withheld tax, art.
+  23 as a search snippet gives it (offset only against one's own debts of the same tax), to confirm. England: an
+  employer's PAYE credit used against its next payments or repaid (HMRC guidance, search snippets, to confirm); no
+  statutory time to repay found (30 days a placeholder); a review within 30 days (recalled). The other seven profiles:
+  placeholders, marked (30 days, no set-off, a review in 30 days). `wrong_refusal_bps` 500 everywhere, a placeholder.
+  `docs/research/references.md` has both rows.
+- **Left out** (docs/behaviour/public-finance.md, "Leaves out"): the authority's request for more papers (Mexico's 20
+  days), interest on a late refund, the time limit for claiming, the appeal past the review (the collector does not yet
+  carry out a venue's order, so no appeal route is published for it), allocation by period, chasing what is owing.
+- **When nobody overpays, nothing happens.** The collector writes only when a credit stands, a claim or a request comes,
+  or a review is asked for; payroll code writes only on the collector's papers; a return with no set-off is word for word
+  what it was. Checked: au-vic-2026 (town.yaml, seed 1) run 60 days with the collector and with it taken out (its office, system, desk, file, law and forms) has the same records (31,648 before the merge of main, 31,543 after it), payments and moves, line for line; the Mexican town of the new test, 80 days, writes no paper of the account.
+- **Pins re-taken, with this entry as the reason** (on main after foundations-2 phase 1, at the merge of 2026-10-26): `culture-dial.test.ts`, the three config hashes (a new office, its system and its officers' desk, the law and two forms, the payroll officer's file, a row of the table of work, generator 0.69.0: dbb34546..., b5082f8c..., 47fed11d... to 4c714b3d..., a6a15d31..., dd840c8e...) and the three Rust states (the new participants: f49ce487..., ce90d241..., 1605af11... to e6916c32..., 47582857..., f94c4358...). au-vic over 60 days has the same 31,543 records, payments and moves with the collector as with it taken out. No other pin moved in the tests run.
+- **Tests.** `collector.rs` (7: the lv-12 case in the ledger, a short return carried, payments told by their words, a
+  month paid twice stated once, repaid once, a second claim finding nothing; set-off only where the law allows and used
+  by paying less; a refusal reviewed inside the days and put right, and out of time after; a statement on request);
+  `staffing.rs` (2: a stated credit claimed and a set-off paid less on the next return, said; where the law has no
+  set-off a refund claimed and a refusal against the collector's own statement asked about once);
+  `orchestrator/test/taxpayer-account.test.ts` (a Mexican town run 80 days: nobody pays twice and no paper of the account
+  is written; the clinic's manager pays $1,000.00 by hand and the collector states it to the clinic alone, the clinic's
+  payroll officer claims it back, the collector grants it and the refund reaches the clinic's account). Changed:
+  `foundations-laws.test.ts` (F7's list of a living town's slips names the new row).
+- **Not done:** docs/plan.md does not exist (asked to tick PB-23's gap line there); PB-23 is marked mitigated in the
+  register, not fixed, because its figures are placeholders and the payment's reference is words. The translator has
+  not learnt the two new forms.
+- **Revisit if** a payment a seat makes for tax in words that do not say so is lost (the words rule missed it); a
+  study reads refund times or refusals (source the figures first); a place's figure for tax officers per employer is found
+  (size the desk by it); or a place's law allocates payments by period and it matters.

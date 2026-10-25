@@ -928,6 +928,7 @@
    "rates_instalments": 10,
    "rates_due_days": 30,
    "median_house_price": 27100000,
+   "refunds": {"pay_within_days": 30, "set_off": true, "wrong_refusal_bps": 500},
    "rates_exempt_kinds": [
     "health_service",
     "school",
@@ -1437,7 +1438,8 @@
         "grounds": "any error of fact or law in the decision as reconsidered",
         "fee_hours_of_pay": 0
       }
-    }
+    },
+    {"kind": "tax_credit_decision", "name": "A decision on a claim for tax paid and not owed", "review": {"within_days": 30, "grounds": "any: HMRC looks at its decision again on a request for a review"}}
   ],
   "frictions": {
    "per_adult_bps_per_year": {
@@ -1525,6 +1527,8 @@
     "calendar.fiscal_year_starts": "6 April: the UK tax year (income tax) begins on 6 April; local authority financial years begin on 1 April. 6 April is used here as the tax year the public finance rests on (to confirm for local councils, whose own year is 1 April).",
     "calendar.holidays": "Opened: GOV.UK, UK bank holidays, https://www.gov.uk/bank-holidays, Open Government Licence v3.0, England and Wales list for 2026 to 2028. Legal basis: Banking and Financial Dealings Act 1971, Schedule 1: New Year's Day, Good Friday, Easter Monday, early May (first Monday in May), spring (last Monday in May), summer (last Monday in August), Christmas Day, Boxing Day; those falling on a weekend are substituted by the next weekday (Christmas Day and Boxing Day by the next two free weekdays), as the 2026 to 2028 lists confirm (28 Dec 2026, 27 and 28 Dec 2027, 3 Jan 2028). No one-off bank holidays are announced for 2026 to 2028 on that page. Easter Monday and Good Friday follow Easter via easter_offset.",
    "decisions.permit_decision": "PLACEHOLDER: an office's own second look at a planning decision within 30 days of it; the place's appeal route for a permit (to a tribunal or an inspectorate) is not built, since no one in the town yet brings a permit to a body that hears it. No source was opened for the days.",
+   "decisions.tax_credit_decision": "(risk PB-23) [RECALLED, to confirm] An HMRC decision may be reviewed by HMRC, or appealed to the First-tier Tribunal (Tax), within 30 days (Taxes Management Act 1970, Part 5). The appeal is left out: the collector does not yet carry out a venue's order.",
+   "public_finance.refunds": "(risk PB-23) [SEARCH SNIPPETS, to confirm] HMRC guidance (gov.uk, 'Pay employers' PAYE'; PAYE Manual PAYE47106, overpayments and repayments): an employer in credit on its PAYE account may reduce its next payments to use the credit, or ask HMRC to repay it; so set_off is true. pay_within_days (30) is a PLACEHOLDER: no statutory time for HMRC to repay was found. wrong_refusal_bps (500) is a PLACEHOLDER.",
    "decisions": "Review and appeal of a decision on a claim for support, and what the decision waits for (docs/behaviour/decisions.md; foundations F8). Recalled, not opened: each key says what is recalled and what is a placeholder.",
    "work_time": "How long a person's act takes, by what it makes, laid over the generator's placeholders (docs/profiles.md; WM-1, 2026-10-24): four rows from an ombudsman's published budget, a government impact assessment and consumer journalism, each with its own source under work_time.sources; every other row is the generator's placeholder.",
    "decisions.benefit_decision.pension": "A mandatory reconsideration is asked for within one month of the decision (Social Security and Child Support (Decisions and Appeals) Regulations 2013, reg 7: recalled from gov.uk guidance, to confirm; late requests up to 13 months for good reason are not built); an appeal to the First-tier Tribunal (Social Entitlement Chamber) within one month of the reconsideration notice, no fee, and only after it (recalled, to confirm). The 14 days for documents a claim needs is a PLACEHOLDER.",

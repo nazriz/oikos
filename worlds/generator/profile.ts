@@ -400,6 +400,13 @@ export interface Profile {
        * 30 days from the year's first day (the twelfth takes the last five). Left out: every charge monthly, on the first
        * day of the month after (a neutral stand-in). */
       returns?: ReturnRule[];
+      /** The law on tax paid and not owed (docs/behaviour/public-finance.md, "The taxpayer's account"; risk PB-23): the collector keeps
+       * each taxpayer's account and repays a credit claimed back within `pay_within_days` of the claim (said in the law; the time it
+       * takes is its officers'); `set_off`: whether a taxpayer may instead set the credit against its next return; `wrong_refusal_bps`:
+       * of the claims that are due, the share the collector refuses (a row of the table of slips, in a town with frictions). Its source
+       * in `sources["public_finance.refunds"]`, or marked a placeholder. Left out: no collector keeps accounts, and nothing paid twice
+       * can be claimed back. The review of a decision on a claim is the place's `decisions` rule for `tax_credit_decision`. */
+      refunds?: { pay_within_days: number; set_off: boolean; wrong_refusal_bps: number };
       grants_per_resident_per_year: number;
       rates_per_resident_per_year: number;
       rates_instalments: number;

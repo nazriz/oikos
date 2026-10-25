@@ -80,8 +80,13 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-26 at the merge of main (8570d699: the appointments main took meanwhile, the press among the posts the council
 // fills) into foundations-2 phase 1, config hashes and Rust states both, on the merged tree; neither side's change alone is the town any
 // more; 6a09320a..., d7cf0e19... and f87b1c3a... for the configs, and 46b53dc8..., 4fd33b34... and 3ab351d6... for the states, until then.)
+// (Re-taken on 2026-10-26 at taxpayer-accounts (PB-23), on main after foundations-2 phase 1, config hashes and Rust states both: the outside
+// world's tax collector keeps each taxpayer's account (a new office, its system and its officers' desk, the law on tax paid and not owed,
+// two public forms, a payroll officer's file of its account, a row of the table of work; generator 0.69.0). The towns' life did not move:
+// au-vic over 60 days has the same 31,543 records, payments and moves with the collector as with it taken out; the states move with the
+// participants. dbb34546..., b5082f8c... and 47fed11d... for the configs, and f49ce487..., ce90d241... and 1605af11... for the states, until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "dbb3454674886208", "gb-eng-2026": "b5082f8c08dd7a16", "ke-nakuru-2026": "47fed11d40196ea9" }
+  ? { "au-vic-2026": "4c714b3dfcc3b9c2", "gb-eng-2026": "a6a15d31eca574f1", "ke-nakuru-2026": "dd840c8e0b0fa93c" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -107,9 +112,9 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // (police.station 0.7.0); 772a98b9..., 5704b7de... and da91782e... for the configs, and 1befde62..., cd0ed6c2... and 824018a6... for
 // the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "f49ce48709372091058fe705f5f542eb0c4fa4e1b5b106f56fb72b7361b9fa5c",
-  "gb-eng-2026": "ce90d2418a043de3ab94879f44a1caee12522a824f55b840a3e7d6a8caf5a471",
-  "ke-nakuru-2026": "1605af11e5aee4bda27c0542ca5ad3343f339545501953d455f7d9c7ea54013a",
+  "au-vic-2026": "e6916c3268ba51e48cd60a28dc4ec243b25f08b67dafe4d270030d1a7c3385f6",
+  "gb-eng-2026": "47582857ac19d970661ec8cdf87d3b111e0cc1e98e562e0e66de88f446b279fd",
+  "ke-nakuru-2026": "f94c43584df629c860d51b414d6630e1235e878b2ce5d015037f75af4bed412b",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
