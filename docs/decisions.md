@@ -8703,3 +8703,21 @@ side (then draws.ts goes too).
 - **Revisit if:** a building's view comes to depend on the looker beyond whether they can be told who is there (then
   that goes in its key), or the state comes to change occupancy or departures in place (then comparing by where they
   are in memory would not do: debug builds' check would catch it).
+
+## 2026-10-26 · Records delivered without their bytes for code actors; a town's channel lists read once (branch `mem-delivered`; no model called)
+
+- **Change:** `Delivered` (kernel/src/kernel.rs) keeps what a record adds to a seat's knowledge from the first time it
+  is shown, and its canonical bytes only once an observation that is written shows it (a seat's, or one whose hash the
+  log keeps); a code actor's look makes none. The config's reader holds each distinct channel list once for all the
+  participants given it.
+- **Measured** (against main `3b87959e`, with the cuts before it beneath): 1,000 au-vic 693 to 512 MB, 10,000 5.25 to
+  2.98 GB, 50,000 34.2 to 17.0 GB resident (857 s wall against 1,004; its own thread 651 s of CPU against 689). The
+  same state hash and log digest on 203 people, three profiles' 1,000 and 10,000, and the same hash at 50,000. The
+  budget at 476 to 477 MB, 366 KB a person: the ceiling lowered from 410 to 390 KB.
+- **No performance loss, and how that was told:** single runs showed this cut 1 to 2% over in instructions, within
+  what one build moves between runs as the load varies. Main and this build in turn, three times on each profile's
+  1,000-person month at 4 threads, at a load of 2 to 6: this build was faster in all nine pairs (wall -1 to -5%, user
+  CPU -5 to -8%, instructions -0.2 to -0.4%) and 22 to 26% smaller.
+- **A version tried and dropped:** the bytes held only while an observation held them (weakly): no smaller, and they
+  were made again for each seat that was shown the same record.
+- **Revisit if:** runs come to have many model seats (their records' bytes are kept for the run, as they always were).
