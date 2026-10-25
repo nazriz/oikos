@@ -172,7 +172,9 @@ test("they sell to households by their own hours, draw what the business clears,
   expect(n(sum!.employed)).toBeGreaterThanOrEqual(n(sum!.employed_by_agreement) + n(work!.own_account));
   expect(n(sum!.employed_by_agreement)).toBe(n(work!.employees));
   expect(n(work!.informal_employment_pct)).toBeCloseTo((100 * n(work!.own_account)) / n(work!.employed), 0);
-  expect(n(sum!.unemployment_pct)).toBeLessThan(n(sum!.unemployment_by_agreement_pct) - 20);
+  // (The old series counts those working for themselves as out of work: the gap is about their share of the labour force,
+  // however many of them are still in being.)
+  expect(n(sum!.unemployment_by_agreement_pct) - n(sum!.unemployment_pct)).toBeGreaterThan((100 * n(work!.own_account)) / n(sum!.labour_force) - 3);
   // An owner who moved home took the business along: told, it sells from the new home after.
   const moved = recs.filter((r) => r.kind === "trading_from" && r.data?.structure);
   for (const r of moved) {
