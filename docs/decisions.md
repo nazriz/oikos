@@ -8806,3 +8806,14 @@ log against the same town built at 3d113a1f.
   every unit's decisions are held at once): no smaller (each decision is held as a value too, while seats are in the
   round) and slower (100,000 for a week 40.4 GB and 551 s; the run's own thread 9 to 15% slower at 10,000 and 50,000).
 - **Revisit if:** a building's facts come to depend on who is in it (then the view's own would be needed again).
+
+## 2026-10-26 · The memory budget's ceiling raised from 380 to 415 KB a person: the margin was too small (branch `mem-budget-fix`)
+
+- **What happened:** `mem-facts` lowered the ceiling to 380 KB, 4% over what its own branch measured (365 KB at 4
+  threads). On main, with other merges beside it since (foundations-2's main fix, the producer's changes), the same
+  test measures 490 to 495 MB, 380 to 385 KB a person, and failed in CI's slow tier at 55c9528d. My error: the ceiling
+  followed the cut, not main, and its margin was within what other work moves.
+- **Change:** the ceiling 415 KB: main's 385 and about 8%. From now on a ceiling is lowered to about 8% over what main,
+  with the cut merged, measures (two runs), never over what the cut's own branch measures.
+- **Revisit if:** main's measure moves past 400 KB without a cut that explains it (then that change is looked into: a
+  person costing more is what the test is for).
