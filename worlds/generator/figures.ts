@@ -104,8 +104,6 @@ export const FIGURE_BASIS: Basis[] = [
     prof("retirement_age", "retirement_age"),
     prof("stop_work_curve.**", "labour_force_share_by_age"),
     derived("ventures.**", "a venture's settings: the town's own shops' (their wage the profile's, the rest the generator's)"),
-    placeholder("found_bps", "the monthly chance of founding a shop: the generator's (ME-1)"),
-    derived("found_own_ppm", "from the profile's business.entry_bps_per_year and the town's own counts"),
     prof("founding.**", "founding"),
     derived("own_values", "a person's values, drawn from the profile's values"),
     prof("union_join_bps", "unions.membership_bps"),
@@ -119,6 +117,8 @@ export const FIGURE_BASIS: Basis[] = [
     derived("attach_mean", "the town's mean attachment, from the profile's outlook.residence and outlook.job_tenure"),
     placeholder("frictions.*.at", "the level of a variable at which a home is counted as in fault: the generator's"),
   ]),
+  // A landlord's shop units to let (commercial leasing): the profile's commercial terms.
+  ...of("firm.landlord", [prof("commercial", "commercial")]),
   // The rest of the starting state.
   derived("world.entities.*.born_at", "drawn from the profile's age structure"),
   derived("world.entities.*.variables.skill", "years of schooling, from the profile's education"),
