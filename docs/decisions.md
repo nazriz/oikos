@@ -8193,3 +8193,33 @@ started and nothing was spent on RunPod. **A proposal for then, to take the most
    control finished on a host of normal speed, then release by kind as now.
 4. *Cost:* GPU about 2 to 3 USD (three or four runs of about three hours at about 0.22 USD an hour); plan usage about 25
    to 40 USD for the blind reading (about 500 seat-confirmed drafts) and rewriting (about 1,000 examples); no seat calls.
+## 2026-10-25 · Foundations 2: conservation, space, capacity, figures' basis, and bounds as detectors; a plan, awaiting the owner (docs only; no code, no model called)
+
+- **Asked:** the owner agreed (2026-10-25) that realism gaps must become impossible at the kernel and platform layer,
+  not fixed one at a time, through five foundations; design them, and an AI economy that falls out of them.
+- **Plan:** `docs/design/foundations-2.md`. Five laws numbered on from the first foundations' seven: 8, nothing physical
+  from nothing (connections as standing flows; variables are conditions, never stocks); 9, everything is somewhere and
+  moves along a network (standing journeys, carriage, link capacity); 10, every doer's capacity stated (no implicit
+  second; template seconds, hours and hardware); 11, every figure has a basis (a figure table the kernel checks at
+  load; reach every run; reliance by screening); 12, reality bounds detect and never steer. Each with a backstop test
+  and an inventory that only shrinks, as F0 to F10 had. About 71 agent-days in six phases, plus sourcing.
+- **Why this shape:** the two laws already built this way (no god's view; all work takes time) closed their classes of
+  gap for good; the audit found the remaining gaps are quantities that escape the existing conservation of goods
+  (per-occupant variables, draws with no output, instant moves, a one-second default), not missing mechanisms.
+- **Questions for the owner** are its section 9.
+- **Revised the same day on the owner's reading.** Shortages: "equal shares until an operator acts" dropped as an
+  invented rule; who goes short follows from the network's physics (trees; water by heads and pressure-driven delivery,
+  power by ratings and trips: the cheapest credible stand-in, a known limit), the supply contracts in force (firm or
+  interruptible; tariffs) and operators' own acts (valves, rotations, protected lists), with no allocation rule in the
+  kernel. The AI economy: every AI-specific mechanism replaced by four general laws (services bought by anyone;
+  technologies as goods with a capability; entry in any industry by expected profit, capital-heavy included; skills by
+  use and fading for every task); only the capability-and-cost scenario and the measures (M7, M8) are AI-specific, both
+  outside the world. Recorded rulings: capabilities from an outside scenario for now; suppliers abroad or local by
+  profile; WM-14's non-resident officer and national ratio, yes; no separate AI-helper mechanism. About 74 agent-days.
+- **Approved (owner, 2026-10-25).** Laws 8 to 12 become hard rules, each line added to `CLAUDE.md` when its
+  enforcement and backstop land; the edge's supply unlimited at its price except named scarce kinds; the tree model
+  accepted as a known limit; baselines move, with `pre-foundations-2` tagged before the first result-changing step;
+  ME-16 its own item after phase 4; several towns opt-in. Law 12 cut down ("who cares? I don't care what the real
+  figure is"): no real-world ranges and no held-out set, only flags for clearly broken states (a stampede, a freeze, a
+  stock below nought or unbounded, a dead law), outside the world and never gating. About 70 agent-days.
+- **Revisit if** the tree stand-in gives shortages a real town would not have, or phase 3's cost passes its stop rule.
