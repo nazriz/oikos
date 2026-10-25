@@ -1,6 +1,7 @@
 {
  "//": "The slow tier (docs/dev-machine.md, \"Tiers\"): run by CI on every push to main and nightly, never by the merge gate. Every other test file is the gate tier. A file moves here when it simulates towns for long (more than ~30 s), with why; scripts/tiers.test.ts holds that every file is in exactly one tier.",
  "slow": {
+  "orchestrator/test/all-work-takes-time-runs.test.ts": "nine towns run for a month each, and a planted one: 31 s alone on 2026-10-25, two to three times that under the suite's load (law 10's backstop of acts refused unpriced; foundations-2 P5)",
   "orchestrator/test/auditor.test.ts": "the 1,000-person town (74 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/automation-run.test.ts": "several towns run for months (115 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/batch.test.ts": "several seeds or towns (29 s on 2026-10-24, the whole suite at once)",
@@ -72,6 +73,12 @@
   },
   "orchestrator/test/home-market.test.ts": {
    "why": "a town's sales, mortgages and leavers' money end to end; on 2026-10-25 it was where a broad change (who the run's seed draws) showed a real bug, a leaver's savings sent before the mortgage payoff"
+  },
+  "orchestrator/test/hazards.test.ts": {
+   "why": "a 200-day default-town run: where moved draws and headless offices show up (it was red after commercial leasing, 2026-10-25, with the canaries green)"
+  },
+  "orchestrator/test/figures.test.ts": {
+   "why": "law 11's count: a new figure with no basis row fails it, and broad changes add figures (red after commercial leasing, 2026-10-25)"
   }
  }
 }

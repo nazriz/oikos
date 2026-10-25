@@ -366,6 +366,14 @@
       },
       "source": "the account it pays from where a payment names none (the world must say)"
     },
+    "casework": {
+      "default": null,
+      "schema": {
+        "description": "who does the office's casework (law 10): `by`, a system of the office's own organisation named on every act that is only papers of `kinds` (its officers' desk, whose template gives an officer's minutes for each and the officers' hours); absent, whoever acts does it",
+        "type": "object"
+      },
+      "source": "the world gives it: the generator's support office and its officers' desk (docs/behaviour/boundary.md)"
+    },
     "part": {
       "default": "",
       "schema": {
@@ -416,5 +424,5 @@
     }
   ],
   "state": "none",
-  "version": "0.10.0"
+  "version": "0.11.0"
 }

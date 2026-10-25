@@ -138,6 +138,17 @@ It grants or refuses (`benefit_decision`: the sum, how often, and `until` where 
 
 **Behaviour that is deliberately not here** (it belongs to the citizen redesign, docs/design/ai-citizens.md): a payment changing how hard or how choosily someone looks for work. Longer or richer insurance lengthens spells out of work and leaving bunches when it runs out (Meyer 1990; Schmieder, von Wachter and Bender 2012; Chetty 2008; to confirm), but today's citizen applies for one posting a week and takes what it is offered: it has no wage below which it refuses for a payment to raise. Until then, a payment's size and length change people's income and when they give up and leave town, and nothing else. Nor is there a take-up share: everyone who fits claims.
 
+**Who decides a claim** (law 10, foundations-2 P3, 2026-10-25; WM-14). The agency's officers, not its computer: the
+generator gives the outside a desk, `outside-casework` (template `agency-casework`), whose rows are an officer's minutes
+for a decision, a request for papers or a confirmation, and a decision looked at again (the person table's rows: sourced
+for us-oh, placeholders elsewhere), whose hours are an officer's working day, and whose lanes are the town's share of the
+agency's officers (`public_service.support_officers_per_1000_claims` times the town's claims in payment at generation;
+a placeholder national ratio in every profile). The office names the desk (`casework: {by, kinds}`, `done_by` on each
+act that is only those papers); its case system pays and gives notice at a computer's seconds. A share of an officer
+under one is a share of a day. Where a model holds the office, its staff route the casework to the desk and its own
+decisions on what is put before it stay its own, at the case system's speed (a person who is not a resident is not built:
+WM-14).
+
 **Leaves out:** a payment that falls as income rises (a taper); couples' rates; rules by sex or by year of birth; an early or late pension at a reduction or an increase; a waiting time before the first payment; a pension reckoned from years of contributions or past earnings; housing costs paid on top; checking what is declared; a payment whose rule changes in a run (a payment granted keeps its sum). A world that needs a national government's decisions inside it replaces this module with a participant of its own, reading the same law and claims (phase F).
 
 ## `world.funding` (v0.1.0): money lent into the world from outside

@@ -1525,6 +1525,23 @@ impl<W: Write> Engine<W> {
                 Ok((true, acted, None))
             }
             Action::Call { program, reasoning } => {
+                // (A code unit that names a system of its organisation to do the work, `done_by=<id>` on a call: the act is done by it and
+                // on its time, as run.ts `performersOf` has it for the host's units; the kernel looks at whose it is. Until foundations-2 P3
+                // the engine's own units left `done_by` on the call, which the resolver refused: an office's system never did its papers.)
+                let mut program = program;
+                let mut done_by: Vec<String> = vec![];
+                if !seat {
+                    if let oikos_resolver::calls::Program::Lines(lines) = &mut program {
+                        for l in lines.iter_mut() {
+                            if let Some(oikos_resolver::calls::Value::Id(id)) = l.call.get("done_by") {
+                                if !done_by.contains(id) {
+                                    done_by.push(id.clone());
+                                }
+                            }
+                            l.call.args.retain(|(k, _)| k != "done_by");
+                        }
+                    }
+                }
                 let text = oikos_resolver::calls::program_text(&program);
                 let kkey = if seat { pid.clone() } else { key.to_string() };
                 let empty = oikos_resolver::Knowledge::new(self.currency.clone()).with_dated(self.dated.clone()).with_names(self.named);
@@ -1535,7 +1552,7 @@ impl<W: Write> Engine<W> {
                     oikos_resolver::Resolution::Blocks(blocks) => {
                         let prov = json!({ "via": "call", "call": text, "resolver": { "id": "resolver", "version": oikos_resolver::RESOLVER_VERSION } });
                         let acted =
-                            self.begin(key, &pid, as_.as_deref(), blocks, vec![], prov, reasoning.filter(|_| seat || !self.lean))?;
+                            self.begin(key, &pid, as_.as_deref(), blocks, done_by, prov, reasoning.filter(|_| seat || !self.lean))?;
                         Ok((true, acted, None))
                     }
                     oikos_resolver::Resolution::Questions { questions, invalid, ambiguous } => {

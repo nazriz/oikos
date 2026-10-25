@@ -8416,6 +8416,154 @@ JSON value and three copies of its canonical bytes.
   accepts it only if it then passes; the line says so.
 - **Revisit if:** a listed file fails twice in a row (then it is a fault, not a flake), or the list grows past these two.
 
+## 2026-10-25 · Foundations-2 phase 1: capacity for every doer, systems included (law 10: P1, P2, P3, P5; branch `f2-phase1`, stacked on `f2-phase0`; no model called)
+
+Asked: build phase 1 of docs/design/foundations-2.md section 4 (P4 not in scope), with the WM-14 design of the same day
+("A system's work takes time too") as P3's detail. Naz approved the design, a national officers' ratio as a marked
+placeholder on a small town, and a non-resident officer as the seat's body if that is contained.
+
+- **P1, kernel and contract.** A template's `does` rows carry `seconds` for any block (`Does.seconds`; `work`'s keep their
+  per-unit meaning, read where the work's labour is). A system's act reads its template's covering row (the one naming
+  the kind, then the block's), then the world's `act_time.system` row, then a stated default (`oikos_time::ActTimes::seconds`;
+  the rows are made into one map per template at load, `ActTimes::with_template`: one look-up an act, as before). A
+  template's `hours` (`{from, seconds}`, a daily window) are placed by a pure function, `oikos_time::place_within`, with its
+  unit tests: an act begins at the first moment of the window after it is ready and its lane free, and what does not fit
+  goes on in the next day's window (arithmetic, not a walk over days), so a backlog is a queue, never a refusal. It is used
+  wherever a system's lanes are placed: an act's actor and performers (`begin`, and work placed late in `act`), a question
+  answered by a keeper's system (`ask_performer`, `place_ask`), a visit (`sites::begin`). Every day is a working day (a
+  known limit). `world-config.schema.json` and the Rust config gain `hours` and the wider `seconds` (and refuse hours on a
+  person's template, or outside the day); `contracts/README.md` has the change.
+- **P2, no implicit second.** `DEFAULT_ACT_SECONDS` is gone. An act whose rows (the performer's template's, the world's
+  table for their kind) and the world's stated `default` are all absent is refused **`unpriced`** when due, with a reason
+  naming what nobody priced and for whom, and takes nobody's time (`action_started` with `starts = done`); `check` says the
+  same. Code, words (`rules/words.rs`, `participants/src/llm/words.ts`: "nobody here knows what doing that takes, so it
+  can't be done") and the log schema's enum. The hand-written worlds that leaned on the second now state
+  `act_time.default: 1` with a note in `act_time.sources.default` that it is a placeholder for a test world: the thirteen
+  `contracts/examples/{valid,refused}/world-config` worlds and the kernel tests' worlds (`tests/common`, `tests/position.rs`,
+  and the tests that replace the table: `foundations.rs`, `foundation_fixes.rs`, `time.rs`). No TS fixture needed it (they
+  load those examples or the generator). The generated town states no default (the backstop already said so).
+- **Found on the way, and changed with it (both move results):**
+  1. *Someone who only orders an act was held until it began.* With `by` naming others only, the actor's lane was placed
+     from the act's start, so a case system that asked a desk of officers to decide a claim (P3) could pay nobody until they
+     were free: payments would have queued behind weeks of casework. The order is now placed when the actor is free and the
+     actor goes on (`ORDER_SECONDS`, the second it has always been, now a named convention and not a fallback). The act
+     still starts no earlier than the actor was free. No generated town named `by` before P3 (none in a year of au-vic), so
+     this moved nothing else.
+  2. *The engine's own code units could not name a system to do the work.* `done_by=<id>` on a call was given to the act as
+     `by` only by the TypeScript host (run.ts `performersOf`); in the engine (`kernel/src/engine.rs`, `Action::Call`) it
+     stayed on the call and the resolver refused it ("statement takes no argument done_by"): every act an office's system
+     was to do (the planning and rates offices' adopted systems, `offices/systems.rs` `assign`) was silently not done, a
+     note in the log and nothing more. Fixed as the host does it: a code unit's `done_by` ids leave the call and are the
+     act's `by`; the kernel still checks whose the system is and what its template does. This is why au-vic's state moves
+     with more than the casework (its offices adopt systems).
+  3. *An office offer's seconds were rows of the world's one table for every system* (`publish/rates_notice`,
+     `publish/permit_decision` at 15% of a person's), so any system writing those kinds wrote them at the offer's speed. They
+     are now the offer's template's own rows, with their sources keyed `template.<id>.<row>` in `act_time.sources`.
+- **P3, the support office's casework.** A template `agency-casework` (supplied by the outside) with rows
+  `publish/benefit_decision`, `evidence_request`, `confirmation_request` and `decision_review`, each an officer's minutes:
+  the person table's rows (us-oh's are sourced, FNS burden estimates, 75 minutes a decision; every other profile, gb-eng
+  included, has the generator's placeholders, 20 minutes a decision: the brief said gb-eng's were sourced, they are not:
+  its sourced rows are other papers). Its `hours` are an officer's working day: from the profile's `round.work_start_hour`,
+  the ordinary week (`ordinary_hours_per_week` over `work_days`) spread over every day of the week (a system's hours are
+  every day's, so the average day is right and the week's rhythm is not), times the town's share of officers over its lanes.
+  The desk, `outside-casework` (a system of the outside's, holding no post), has as many lanes as the town's share of the
+  agency's officers rounds up to: `public_service.support_officers_per_1000_claims` times the town's claims in payment at
+  generation (a national figure on a small town). The ratio is in all nine profiles as a **PLACEHOLDER** (4 per 1,000: an
+  order of magnitude recalled for Great Britain, DWP staff over claims in payment; not opened, to confirm). At 1,000 people
+  the share is under one officer everywhere (0.60, 0.94 and 0.70 in au-vic, gb-eng and us-oh), so the desk is one lane working a
+  share of a day (au-vic 3.3 hours, gb-eng 6.4, us-oh 4.0; ke-nakuru 14 minutes, from 8 claims). The support office
+  (`world.transfers` 0.11.0) names the desk (`done_by`) on every step that is only casework papers (`casework: {by,
+  kinds}`); a step with a payment in it stays the case system's, whole. The case system (`agency-system`) keeps its
+  one-second rows for payments and notices. Where a model holds the office, its staff route the casework to the desk; the
+  office-holder's own decisions on what is put before it are its own (not routed).
+- **The seat as a non-resident officer: not built.** A person with a body who is not a resident reaches the census, the
+  life table, elections, the registers of persons and every module that counts persons or bodies; giving one a body that
+  none of them sees is a change of its own, not contained in this phase. So a model seated in `outside-support` still
+  sits on the case system and decides what is put before it at a system's speed. Recorded in WM-14 as left.
+- **Not built: the charged row on each act** (P1's third part in the design's table). The design's backstop read acts
+  charged by a stated default; the generated town states none and the brief's backstop is acts refused `unpriced`, so no
+  log field was added. It belongs with law 11's strict mode (N3) if a reader of the log needs which row priced an act.
+- **Every machine says its hours.** The generator's machine templates (`agency-system`, `payment-system`, `market-system`,
+  `vendor-system`, the offers) state the whole day (`{0, 86400}`, identical to no hours: tested), so the backstop can ask
+  every system for its hours.
+- **P5, the backstop.** `all-work-takes-time.test.ts` gains `decisionsAtTheSystemsSecond` (a system template's row for a
+  kind the published decision law names, or `decision_review`, with no seconds of its own), `systemsWithoutHours`, and in
+  `unpricedWork` a template's own row with no source; each planted and named. The month's run is in a new slow-tier file,
+  `all-work-takes-time-runs.test.ts` (`unpricedActs`: nine towns of 300 for a month take 31 s alone and two to three times that under the suite's load, near the gate's budget
+  for a file), with a planted world (a system's `transfer` row taken away) whose refusals are named. A limit: the static
+  audit sees only a row that names a decision kind; a machine's generic `publish` row still covers one at the world's
+  second if a module publishes a decision without naming the desk (WM-14, left 5).
+- **Measured, code only, a year of `worlds/town-1000.yaml`, seed 1** (before: the f2-phase0 tip 644b2308, exported and
+  built apart; after: this branch; logs kept in `runs/f2-phase1-measure/`, on the run server; `after-au-vic-2026` is a
+  first after-run stopped part-way when fault 2 above was found, kept, not used). Claims made in the year (not those
+  brought forward), days from claim to decision:
+
+  | Town | Claims (decided) | Days, p10 / median / p90 / max | Open claims, mean / max | Casework acts' wait for the desk, median / p90 / max (days) |
+  |---|---|---|---|---|
+  | au-vic before | 203 (203) | 0.03 / 0.07 / 7.00 / 14.07 | 0.72 / 17 | none (decided at once) |
+  | au-vic after | 193 (191; 2 open at the year's end) | 0.55 / 4.43 / 9.94 / 16.49 | 2.50 / 88 | 0.57 / 5.37 / 7.89 |
+  | gb-eng before | 129 (129) | 0.02 / 0.08 / 5.63 / 7.01 | 0.42 / 3 | none |
+  | gb-eng after | 124 (124) | 0.14 / 0.58 / 1.57 / 7.42 | 0.33 / 16 | 0.09 / 0.66 / 0.73 |
+  | us-oh before | 140 (140) | 0.03 / 0.19 / 5.73 / 9.16 | 0.50 / 11 | none |
+  | us-oh after | 130 (130) | 0.50 / 1.84 / 6.04 / 11.64 | 0.95 / 22 | 0.49 / 2.36 / 4.40 |
+
+  The median claim now waits for an officer: hours to days, where it was an hour or two. The tails (p90) are still
+  mostly the law's waits for papers (14 days, the claimant's own time), and gb-eng's p90 fell (5.6 to 1.6 days) with a
+  different mix of claims in a town whose people now live differently (fewer waits for papers in its year): not chased.
+  The desk is far from the places' published waits (weeks): it is a share of an officer at the person table's minutes,
+  and the minutes are placeholders but for us-oh's; the law's own waits (a first Universal Credit payment's month) are not
+  data yet. Nothing tuned. Also moved, not chased: au-vic's citizens' own refusals (`not_at_work` 1,582 to 2,393,
+  `no_time_left` 1,414 to 2,173), gb-eng's the other way (1,498 to 916, 1,254 to 1,002), us-oh's down (401 to 207, 816 to
+  703): the towns diverge once support arrives days later (and au-vic's offices' systems now do their papers, fault 2);
+  no act anywhere was refused `unpriced`. A year took 396, 497 and 276 s after against 346 (gb-eng) and 195 (us-oh)
+  before, on a shared machine with other jobs in the slots (not a like-for-like timing).
+
+- **Pins re-taken** (culture-dial.test.ts, the one deliberate alarm, docs/testing.md "Change detectors"): the three config
+  hashes and the three Rust states, with the reason beside them (the casework desk, machines' hours, offers' rows, the
+  order, the engine's `done_by`). The figures fixture lost one unbased place (`templates.*.does.*.seconds`, now based).
+- **Why this way.** The kernel already charged and queued a system's time (lanes, `place`); what was wrong was that a
+  system's figures were one table for every system and that it worked every second of the day. Per-template rows and hours
+  are the two smallest changes that let a desk of people and a computer differ, as the WM-14 design said; refusing an
+  unpriced act turns the platform's silent "a second" into a finding.
+- **Revisit if** a place publishes its agency's officers and caseload (then the ratio is sourced, and the lanes move); a
+  support-office experiment is planned with a seat (then the non-resident officer, as its own change); weekly rhythm
+  matters to a result (then hours by weekday, as a person's working days are); a module's decision is found published by a
+  machine at its second (then the static audit should follow the module's issues, not only the rows); the order's second
+  is to be priced (then a row for ordering, and `ORDER_SECONDS` goes).
+- **Merged with main (2026-10-25, origin/main at 3b87959e: market realism, commercial leasing).** The generator is 0.68.0
+  (this phase on main's 0.67.0), and culture-dial's pins were re-taken once more on the merged tree, with the reason beside
+  them. The measurements above are from before the merge (f2-phase0 tip against this branch), not re-run on main's towns.
+## 2026-10-25 · Main's slow tier after commercial leasing: the station's head is a sworn officer, the paper is the council's to fill, and five tests re-taken with their reasons (branch `fix-main-leasing`; no model called)
+
+- **What we saw:** CI's slow tier failed eight files after the commercial-leasing merge (3b87959e); the gate's canaries
+  passed. Market realism moved every default town's draws (who is hired, by interview; incomes and savings drawn
+  together; businesses born by weighing), and the slow files run long default-town scenarios the canaries do not.
+- **Faults fixed in the mechanism:**
+  - *The station's officer in charge did no station work* (seat-acts, hazards). The station staffs its "police officer"
+    role; its head, employed as "officer in charge", was not counted. With the new hiring the one officer of the default
+    town is injured on day 171, and the station carried out no warrant and looked into no report for a month while its
+    head sat at the station. A small station's head is a sworn officer (a sergeant or inspector) who takes the work when
+    the officers are away. `police.station` 0.7.0 counts its staff in `in_charge_role` (default "officer in charge") who
+    are at the station after its officers; `Staffing::in_role` lists those employed in a role other than the one it staffs.
+  - *The paper was a headless one-person body* (deaths; WM-7). Its one person died and nobody filled the post, so it went
+    on paying the dead. The paper is kept on the town's grant as the courts are, so every profile's
+    `public_service.appointed_by` now has `press: council`, sourced as the courts are; bodies run on their own account
+    (bank, union, landlords, shops) are still not covered (WM-7 stays open for them).
+  - *Commercial leasing's figures had no basis rows* (figures). `firm.landlord`'s commercial rent, deposit, term and
+    notice are now read from the profile (`prof` rows); two stale rows of the old founding rate are gone.
+- **Tests re-taken, each with the reason in place:**
+  - production: a factory that bought an automation system has its units `make`; a system is the firm's performer and
+    is not held to a person's working day.
+  - hazards: reports left undealt are counted only while someone who looks into reports is at the station.
+  - unions: one stop where there were two (the town as drawn since puts fewer members at factory-1; not traced further).
+  - police-station-seat: seed 1 where it was 7, measured on the code twin for 330 days over seeds 1 to 10 (in the test).
+  - deaths: a housemate who reports the death and then leaves town the same day counts as living there (a widow's two
+    grown children, in this draw).
+  - seat-diary: the refusal of a crew member not at work is taken from a seat that sits at 07:00 in a town of the usual
+    size, since the 600-person town's works crew now have no home and sleep at the hall.
+- **Also:** culture-dial's config hashes and Rust states re-taken (the profiles and the station moved); manifests regenerated. The whole slow tier passes on the branch (58 files).
+- **Revisit if:** a station is ever seated with a head who should not do officers' work (a civilian manager), or the
+  600-person town gets homes for its people (seat-diary could look in its main run again).
 ## 2026-10-25 · A memory budget for each person, held by a test (branch `mem-budget`; no model called)
 
 - **What was asked:** (Naz, 2026-10-25, "very important") a per-person memory budget, enforced, then cut towards about
@@ -8438,6 +8586,81 @@ JSON value and three copies of its canonical bytes.
   what's been seen did) shows only larger: the 50,000 numbers are measured with each cut and recorded here.
 - **Revisit if:** the test's spread from run to run nears the margin (then two runs, the lower), or a cut shows at
   10,000 and 50,000 and not at 1,000 (then a 5,000-person town for the test, in the slow tier still).
+## 2026-10-25 · Test strength: the host's dead paths cut, the mutation catalogue rebuilt against the engine, the gaps it found held (branch `test-strength`; no model called)
+
+**Why.** The test pruning of 2026-10-25 found the catalogue mostly stale (15 of 49 bugs still applied, the rest in the
+TypeScript actors deleted at the cut-over), two twin bugs in host code the Rust world no longer runs, and nothing
+catching `kernel-care-draw-by-number`.
+
+**Dead code removed** (found by reachability: units are made only in `syncUnits`, which since the cut-over makes a unit
+for a seat alone, and an import graph from every tool, CLI and script; no whole library file was unreached):
+- `orchestrator/src/run.ts` (1,724 lines to 1,578): `codeUnit` and every branch for a code unit (`!u.llm`; a unit's
+  `capacity`, never set for a seat: the slice, prefixed looks, `only`, the performers a code unit named), the TS
+  resolver's `ts` and `shadow` modes (`OIKOS_RESOLVER`, `resolverShadow`, `<run>.resolver-diffs.json`; the engine's
+  resolver is the one, docs/design/rebuild.md has the shadow check's record), and `recordChangeOf` with its call (a
+  seat's units only ever returned nothing: a record is the engine's bookkeeping, held by `kernel/tests/entity_record.rs`).
+  Its two tests in `entity-records.test.ts` went; the API test there now says no orchestrator source sends
+  `entity_record` and keeps the participant-API check.
+- `orchestrator/src/rust-world.ts`: `runRustWorld` and `twinBrains` (no caller; experiments drive `RustWorld` directly).
+- Unused exports: `forkLogs` (experiment.ts), `datasetDirFor` (dataset.ts), `onParams` (module.ts: the manifests are no
+  longer written by running TS modules), `smallestNow` (money.ts).
+- **Not dead, contrary to the pruning's note:** the host's draw keying (`drawFor`, `stablePurpose`) still names the
+  streams of what the host runs on a seat's side (a mock seat's signing, `mock.ts`; a seat's office books' readers, e.g.
+  `Directions.standing` through openbooks-townhall). It moved to `orchestrator/src/draws.ts` (the same rules as the
+  engine's `actors/src/draws.rs`) with a unit test, `orchestrator/test/draws.test.ts`, so its twin bugs can be caught.
+
+**The catalogue** (`scripts/mutations.ts`): 46 bugs, 35 in `kernel/crates` and 11 in live TypeScript, each `kind` the rule
+it breaks: money 6, integer cents 3, the dead 6, the absent 1, work's time 4, sight 10, twins 7, review and appeal 4,
+the decision law 2, the generator, the measures and the translator 1 each. 13 kept from the old catalogue (the 10
+kernel bugs, `amounttext-round`, `self-sees-position-channels`, `view-cache-stale`), the two host twin bugs re-planted in
+draws.ts, 31 new (drafted by subagents by area, checked to apply once and to compile). `scripts/mutate.ts` now builds and
+tests the kernel in the `gate` profile (a mutant's rebuild in minutes, not the release link's half hour), points every
+test file and the kernel's tests at that build, runs the kernel's tests once unmutated each run, runs them under `--tests
+own` too (with the gate's 90-day invariants), and empties the copy's `runs/test-*` after each bug.
+
+**Measured** (main at 3f3e16b5 plus this branch): `--tests own` first, then the fast tier for the survivors. One fault
+of the harness was found and fixed on the way: kernel tests that write their town with the TS generator loaded the copy's
+stale release engine module, which is refused when its sources differ, so under any kernel bug they all failed: their
+catches were not catches. Results, 46 bugs: **34 caught for certain** (all 11 TypeScript; 23 kernel, each by a test of its own module, the
+invariants or a twin test; 7 of them only with the tests below), **2 survive**, **10 unconfirmed**.
+- Survive: `kernel-zero-transfer` (equivalent: the contract's Amount refuses 0 before the engine's range check) and
+  `rs-bank-dead-holder-pays-out` (near-equivalent: the bank's check of who may instruct on an account refuses the same
+  payments, so no money moves from a dead holder's account; the bank only writes "cannot" where it would have said
+  nothing).
+- Unconfirmed: the only catchers shown for these in the first pass were the generator-backed town tests (`a1_citizen`,
+  `c2_shop_mix` and the like). The fixed rerun was stopped at its third bug, when free disk fell under the 60 GB floor
+  (the copy's gate build is about 38 GB): `kernel-absent-may-work`, `rs-retailer-hours-used-forgotten`,
+  `rs-utilities-slip-row-misnamed`, `kernel-performer-not-charged`, `kernel-named-sees-private`,
+  `kernel-answer-cap-ignored`, `rs-world-price-moment`, `rs-appeal-window-off-by-one`, `rs-grievance-ignored-in-seconds`,
+  `rs-method-order-inverted`. Run them again with the fixed harness when the disk allows: `--tests own --only <ids>`,
+  about 10 minutes each.
+- The invariants caught 4 (doubled credit, work charged no time, records shown to those not allowed, a capacity handed another's letters); the 90-day gate
+  invariants are what `own` runs.
+
+**Tests added or strengthened**, each for the rule and not a figure:
+- `kernel/tests/services.rs`, `care_draws_on_the_condition_not_its_number`: on 16 seeds, care keeps or calls off a death
+  alike in two towns that differ only by one more injury filed first (the condition's number moves, its onset does not);
+  both outcomes occur across the seeds. Catches `kernel-care-draw-by-number`.
+- `kernel/crates/actors/src/offices/treasury.rs`: the tax clerk's assessment is exactly the law's rate of the rent
+  reported (it was a substring match that a tenfold tax passed). Catches `rs-treasury-rent-tax-tenfold`.
+- `kernel/tests/physics.rs`: a transfer of 0 or less is refused and moves nothing. (`kernel-zero-transfer` stays
+  uncaught and is equivalent for every act a participant sends: the contract's Amount refuses 0 before the engine's own
+  range check; noted in the catalogue.)
+- `participants/test/view.test.ts` (new): a seat's view takes in every change it is shown, and one capacity's slice holds
+  that capacity's channels only. Catches `view-cache-stale`, `self-sees-position-channels`.
+- `participants/test/staff-report.test.ts`: an office-holder's list of standing orders is its own organisation's.
+  Catches `ts-roster-orders-of-any-body` (the seat-side Roster had no test).
+- `translator/test/own-office.test.ts`: an office's own stationery is a form of its holder's only.
+- `orchestrator/test/draws.test.ts` (new, with draws.ts).
+
+**Disk** (`scripts/disk-tidy.ts`, `judgeTarget`): a worktree whose branch and HEAD are in origin/main and that nothing is
+running in (no process working there or using a file in it) loses its `kernel/target` at once, whatever its age or its
+agent lock (the lock names the session that started the agent, which outlives it). Protected names, wave copies and the
+tree it runs in are left. Finished agents' builds filled the disk twice on 2026-10-25.
+
+**Revisit if** a kernel bug is "caught" only by town-wide tests again (look at what they failed on before counting it), a
+catalogue bug stops applying (a refactor moved its line: re-plant it), or the host stops running anything on a seat's
+side (then draws.ts goes too).
 
 ## 2026-10-26 · The state hash written as a stream, with no cache of encoded copies (branch `mem-state-hash`; no model called)
 
@@ -8456,6 +8679,11 @@ JSON value and three copies of its canonical bytes.
 - **Revisit if:** checkpoints become frequent (daily, say): then the records' bytes might be kept compressed between
   them, not whole.
 
+## 2026-10-26 · Two more canaries: hazards and figures
+
+- **Why:** commercial leasing landed with the three canaries green and turned 8 slow-tier files red; the agent that fixed
+  them found `hazards` (a 200-day default-town run, about 50 s) and `figures` (law 11's count) would have caught most.
+- **Revisit if:** a broad change's gate grows past about 5 extra minutes on a quiet machine, or a red main again slips past.
 ## 2026-10-26 · What's been seen held once for all who see it the same (branch `mem-seen`; no model called)
 
 - **What the profile showed:** at 50,000 people, what people have seen was 20.4 of 34.8 GB live (408 KB a person,

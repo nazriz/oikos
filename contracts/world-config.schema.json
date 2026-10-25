@@ -983,7 +983,7 @@
           "type": "string"
         },
         "act_time": {
-          "description": "How long each kind of act takes its actor, in world seconds (docs/design/rebuild.md 6.3), by actor kind; an act takes effect when done. Keyed by block name (transfer, message, publish...) or, narrower, by what the act makes: `publish/<kind of record>`, `create_entity/<kind>`, `work/<task>` (the kernel reads that row first and falls back to the block's; kinds are opaque labels to it; docs/design/foundations.md law 2); `default` for any kind a table doesn't name. Absent (or no figure for a kind, and no default): one second. Each figure sourced or a placeholder (sources).",
+          "description": "How long each kind of act takes its actor, in world seconds (docs/design/rebuild.md 6.3), by actor kind; an act takes effect when done. Keyed by block name (transfer, message, publish...) or, narrower, by what the act makes: `publish/<kind of record>`, `create_entity/<kind>`, `work/<task>` (the kernel reads that row first and falls back to the block's; kinds are opaque labels to it; docs/design/foundations.md law 2); `default` for any kind a table doesn't name. A system's act reads its template's own row first (`templates[].does[].seconds`, law 10). With no row and no stated default, nobody priced the act and it is refused (`unpriced`; foundations-2 P2: until then it took one second). A hand-written test world states its default, with a note in `sources.default` that it is a placeholder; the generated town states none. Each figure sourced or a placeholder (sources).",
           "type": "object",
           "additionalProperties": false,
           "properties": {
@@ -2878,9 +2878,10 @@
                 "minLength": 1
               },
               "seconds": {
-                "description": "For work: the seconds a unit when a system does it (in place of the task's labour); a crew of systems only takes the slowest's. Absent: the task's labour.",
+                "description": "For work: the seconds a unit when a system does it (in place of the task's labour); a crew of systems only takes the slowest's. Absent: the task's labour. For any other block (law 10, foundations-2 P1): the seconds one such act takes a system from this template, read before the world's `act_time.system` row (the row naming a kind before the block's own). Absent: the world's row.",
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1,
+                "maximum": 31536000
               }
             }
           }
@@ -2888,6 +2889,27 @@
         "supplier": {
           "description": "For a system (foundations F4): the organisation that supplies systems from this template. Only it delivers one (`deploy`, naming the client), and it may switch one off (`retire`) as the client may. Absent: nobody supplies it, so none is delivered. Never on a person's.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
+        "hours": {
+          "description": "For a system (law 10, foundations-2 P1): the daily window its lanes work in, from `from` seconds after midnight, for `seconds`. An act begins at the first moment of the window after it is ready and its lane is free, and what is not finished by the window's end goes on in the next day's: work coming faster than the hours take it is a queue, never a refusal. Every day is a working day (a known limit). Absent: any time of day. Never on a person's.",
+          "type": "object",
+          "required": [
+            "from",
+            "seconds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 86399
+            },
+            "seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            }
+          }
         }
       }
     },

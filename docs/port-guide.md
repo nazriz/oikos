@@ -364,7 +364,7 @@ indexer.ts`, `store.ts`, `trace.ts`, `world.ts` and `panels.ts` on branch `explo
 - **The live stream** (`kernel/src/stream.rs`): `Tee` hands every log line to a `Stream` the watcher pulls, capped, with
   a count of what a slow watcher missed. Nothing in the world reads it.
 - **The host** (`kernel/src/host.rs`; N-API `World`, `Detached`, `rules`, `manifests` in `kernel/crates/napi`): JSON in
-  and out. TS: `orchestrator/src/rust-world.ts` (`RustWorld`, `DetachedActor`, `rustRule`, `runRustWorld`);
+  and out. TS: `orchestrator/src/rust-world.ts` (`RustWorld`, `DetachedActor`, `rustRule`);
   `runWorld` under `OIKOS_WORLD=rust` runs `run.ts`'s own loop against the engine (`start` with `engine`; kernel/src/
   engine/hosted.rs): every seat feature as on the TS world, no code unit in TS; `OIKOS_STAND_IN=idle` until the
   cut-over. Seats of every fork can be out at once; the host records each

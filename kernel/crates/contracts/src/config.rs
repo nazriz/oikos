@@ -836,6 +836,19 @@ pub struct Template {
     /// the client), and it may switch one off (`retire`) as the client may. Absent: nobody supplies it, so none is delivered.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supplier: Option<Id>,
+    /// A system's: the daily window its lanes work in (law 10, foundations-2 P1): from `from` seconds after midnight, for
+    /// `seconds`. An act not finished by the window's end goes on in the next day's (a queue, not a refusal). Every day is
+    /// a working day. Absent: any time of day.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hours: Option<TemplateHours>,
+}
+
+/// A template's working hours (law 10).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TemplateHours {
+    pub from: i64,
+    pub seconds: i64,
 }
 
 /// One thing a system from a template can do (foundations F4).
@@ -851,6 +864,8 @@ pub struct Does {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
     /// For `work`: the seconds a unit when the system is the one doing it (in place of the task's labour). Absent: the task's.
+    /// For any other block (law 10, foundations-2 P1): the seconds one such act takes a system from this template, read
+    /// before the world's `act_time.system` row. Absent: the world's row.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seconds: Option<i64>,
 }
@@ -864,6 +879,14 @@ impl Does {
         match self.task.as_deref().or(self.kind.as_deref()) {
             None => true,
             Some(x) => makes.and_then(|m| m.split_once('/')).is_some_and(|(_, m)| m == x),
+        }
+    }
+
+    /// The key of this row in a table of work: `block`, or `block/kind` (`work/task`) where it names one.
+    pub fn key(&self) -> String {
+        match self.task.as_deref().or(self.kind.as_deref()) {
+            None => self.block.clone(),
+            Some(x) => format!("{}/{x}", self.block),
         }
     }
 }
@@ -2672,8 +2695,13 @@ pub fn validate(c: &Config) -> Result<(), String> {
         }
     };
     for t in &c.templates {
-        if t.kind == ParticipantKind::Person && (t.does.is_some() || t.supplier.is_some()) {
-            return Err(format!("template {}: a person's has no `does` or supplier (only a system is supplied)", t.id));
+        if t.kind == ParticipantKind::Person && (t.does.is_some() || t.supplier.is_some() || t.hours.is_some()) {
+            return Err(format!("template {}: a person's has no `does`, supplier or hours (only a system is supplied; a person's day is their own)", t.id));
+        }
+        if let Some(h) = t.hours {
+            if !(0..86_400).contains(&h.from) || !(1..=86_400).contains(&h.seconds) {
+                return Err(format!("template {}: `hours` opens within the day (0 to 86399 s after midnight) and lasts 1 to 86400 s", t.id));
+            }
         }
         if let Some(s) = &t.supplier {
             org_exists(s, &format!("template {}: its supplier", t.id))?;
@@ -2683,8 +2711,8 @@ pub fn validate(c: &Config) -> Result<(), String> {
             return Err(format!("template {}: a system's template says what it does (`does`)", t.id));
         }
         for r in t.does.iter().flatten() {
-            if r.seconds.is_some_and(|x| x < 1) || (r.seconds.is_some() && r.block != "work") {
-                return Err(format!("template {}: `seconds` is a work row's, and is positive", t.id));
+            if r.seconds.is_some_and(|x| !(1..=31_536_000).contains(&x)) {
+                return Err(format!("template {}: a row's `seconds` is positive and at most a year", t.id));
             }
         }
     }

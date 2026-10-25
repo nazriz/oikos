@@ -15,7 +15,7 @@
 // integer cents. Nothing here changes a result with the number of workers or threads: the same spec gives the same
 // numbers (mock stewards draw nothing; the engine is deterministic).
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { join, resolve } from "node:path";
 import { DetachedActor, RustWorld, twinSpecs, type SeatWake } from "./rust-world";
@@ -987,7 +987,3 @@ export function rebuildReport(out: string): Report {
   return buildReport(spec, results, held);
 }
 
-/** The seeds' folders an experiment left (for tools that read its logs). */
-export function forkLogs(out: string): string[] {
-  return readdirSync(resolve(out), { withFileTypes: true }).filter((d) => d.isDirectory() && d.name.startsWith("seed-")).flatMap((d) => readdirSync(join(out, d.name)).filter((f) => f.endsWith(".oklog")).map((f) => join(out, d.name, f)));
-}
