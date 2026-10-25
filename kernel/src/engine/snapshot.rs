@@ -238,6 +238,29 @@ impl Snapshot {
     }
 }
 
+/// A step's `Kept` as it was decided: where its decisions and outcomes were let go of once written for the log
+/// (`Engine::start_round`), read back from those bytes (each the canonical annotation; its data is the value).
+fn kept_whole(kept: &Kept, prepared: &Option<(Vec<Option<Vec<u8>>>, bool, Vec<u8>)>) -> Kept {
+    let mut k = kept.clone();
+    let Some((bytes, true, _)) = prepared else { return k };
+    for b in bytes.iter().flatten() {
+        let mut v: Value = serde_json::from_slice(b).expect("an annotation the engine wrote is JSON");
+        let data = v["data"].take();
+        match v["annotation"].as_str() {
+            Some("decision") => k.decisions.push(data),
+            Some("outcome") => {
+                if let Value::Object(mut m) = data {
+                    if let Some(Value::Array(o)) = m.remove("outcomes") {
+                        k.outcomes = o;
+                    }
+                }
+            }
+            other => unreachable!("a prepared annotation of kind {other:?}"),
+        }
+    }
+    k
+}
+
 impl<W: Write> Engine<W> {
     /// The whole run as it is now: between moments (after `next_by` stopped), or while a round waits on seats.
     pub fn snapshot(&self) -> Result<Snapshot, String> {
@@ -281,7 +304,7 @@ impl<W: Write> Engine<W> {
                 .map(|(k, d)| {
                     let d = match d {
                         // (Without the capture's draws: a snapshot is the same with the capture on or off.)
-                        Decided::Code(Ok((a, kept)), _) => DecidedSaved::Code(Ok((action_saved(a), Kept { captured: vec![], ..kept.clone() }))),
+                        Decided::Code(Ok((a, kept)), prepared) => DecidedSaved::Code(Ok((action_saved(a), Kept { captured: vec![], ..kept_whole(kept, prepared) }))),
                         Decided::Code(Err(e), _) => DecidedSaved::Code(Err(e.clone())),
                         Decided::Seat(a) => DecidedSaved::Seat(a.as_ref().map(action_saved)),
                     };

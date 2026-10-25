@@ -149,3 +149,82 @@ fn a_config_read_participant_by_participant_is_checked_as_the_whole_is() {
     let (l, _) = config::load_from(&twice[..]).unwrap();
     assert_eq!(l.hash, config::load(whole).unwrap().hash);
 }
+
+/// A town in which one person is a model's seat (who only waits) and everyone else is code: its decisions are written
+/// for the log as they are made, and not kept as values while the seat thinks (SC-1). A run saved while the seat
+/// thinks at the town's first moment, with every citizen's decisions of that round held, and taken up again from its bytes, is the run.
+#[test]
+fn a_round_saved_while_a_seat_thinks_logs_the_decisions_its_people_made() {
+    use oikos_actors::sight::Action;
+    use oikos_kernel::engine::{Due, Engine, Snapshot};
+    let mut town: Value = serde_json::from_slice(&town_text("au-vic-2026")).unwrap();
+    let seat = town["participants"].as_array_mut().unwrap().iter_mut().find(|p| p["controller"]["impl"] == "citizen.default").unwrap();
+    seat["controller"] = json!({ "type": "llm", "impl": "mock", "params": {} });
+    let seat_id = seat["id"].as_str().unwrap().to_string();
+    let opts = || EngineOptions { threads: 4, until: Some(20 * DAY), ..Default::default() };
+    let drive = |e: &mut Engine<Vec<u8>>| loop {
+        match e.next().unwrap() {
+            Due::End => break e.finish().unwrap(),
+            Due::Seats(seats) => {
+                for s in seats {
+                    e.submit(&s.key, Action::wait()).unwrap();
+                }
+            }
+        }
+    };
+    let mut straight = Engine::start(town.clone(), "seat", Vec::new(), None, opts()).unwrap();
+    let hash = drive(&mut straight);
+    let log = straight.into_log();
+    let mut e = Engine::start(town, "seat", Vec::new(), None, opts()).unwrap();
+    let mut wakes = 0;
+    let key = loop {
+        match e.next().unwrap() {
+            Due::End => panic!("the seat never woke"),
+            Due::Seats(seats) => {
+                assert!(seats.iter().all(|s| s.participant == seat_id));
+                wakes += 1;
+                // (Its first wake is the town's first moment: everyone decides in that round.)
+                if wakes == 1 {
+                    break seats[0].key.clone();
+                }
+                for s in seats {
+                    e.submit(&s.key, Action::wait()).unwrap();
+                }
+            }
+        }
+    };
+    let snap = Snapshot::from_bytes(&e.snapshot().unwrap().to_bytes().unwrap()).unwrap();
+    let before = e.into_log();
+    let mut f = Engine::resume(&snap, Vec::new(), None, opts()).unwrap();
+    f.submit(&key, Action::wait()).unwrap();
+    let h = drive(&mut f);
+    let mut whole = before;
+    whole.extend(f.into_log());
+    assert_eq!(h, hash);
+    assert!(whole.len() > 1_000_000 && whole == log, "the run taken up again is the run, its decisions all logged");
+    let pat: &[u8] = b"\"annotation\":\"decision\"";
+    let decisions = whole.split(|b| *b == b'\n').filter(|l| l.windows(pat.len()).any(|w| w == pat)).count();
+    assert!(decisions > 100, "{decisions} decisions logged");
+}
+
+/// A round of many units with no seat is decided a window at a time as it is carried out (SC-1: a town's first moment
+/// held every unit's decisions together). Each decides from what it was shown and its own state, so the run is the
+/// same with any window: here seven against all at once, on three profiles' towns for 60 days. (A unit let go of in a
+/// round before it decided decides first, as it would have with the others: `decided_early_n`. No town tried reaches
+/// it, a year at 200 people nor 120 days at 1,000, so it is held by its construction, not by this test.)
+#[test]
+fn a_round_decided_a_window_at_a_time_is_the_round_decided_at_once() {
+    for profile in PROFILES {
+        let text = town_text(profile);
+        let run = |window: usize| {
+            let opts = EngineOptions { threads: 4, until: Some(60 * DAY), decide_window: window, ..Default::default() };
+            let (h, e) = run_code_world(serde_json::from_slice(&text).unwrap(), "window", Vec::new(), opts).unwrap();
+            let n = e.decided_early_n;
+            (h, e.into_log(), n)
+        };
+        let (h1, a, _) = run(usize::MAX);
+        let (h2, b, _) = run(7);
+        assert_eq!(h1, h2, "{profile}: the same state");
+        assert!(a.len() > 1_000_000 && a == b, "{profile}: the same log, byte for byte");
+    }
+}
