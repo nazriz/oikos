@@ -107,8 +107,9 @@ Not touched: caches in the home folder (huggingface models) and `/private/tmp/cl
   repeats only 1 to 3% of its run time, so no cache of runs was built (docs/decisions.md).
 - `scripts/tiers.test.ts` (a backstop) holds that every test file is in exactly one tier, that the slow tier's files
   exist and say why, that every gate file took at most the gate's file limit (by `test-times.json`), and that CI runs both tiers.
-- **Budgets** (`scripts/test-budgets.json`, 2026-10-24): a gate run fails, after its tests, when it took longer than the
-  gate's wall time or any file took longer than the file limit (a `BUDGET:` line; merge.ts reads it as a failure, never a
+- **Budgets** (`scripts/test-budgets.json`, 2026-10-24): a gate run fails, after its tests, when the sum of its files' own
+  times is over the gate's file-seconds or any file took longer than the file limit (each file's time, never the run's wall:
+  a merge does not fail because the machine was busy) (a `BUDGET:` line; merge.ts reads it as a failure, never a
   flake); a slow-tier run over its wall time warns. Raising a budget is a decision with its entry in docs/decisions.md;
   what to do instead is in docs/testing.md, "Pruning: when a budget is hit".
 - **The kernel in the gate.** Where the release build is current, the gate uses it. Where it is not (a kernel change, or a
