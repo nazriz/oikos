@@ -226,6 +226,9 @@ fn a_round_decided_a_window_at_a_time_is_the_round_decided_at_once() {
         let (h2, b, _) = run(7);
         assert_eq!(h1, h2, "{profile}: the same state");
         assert!(a.len() > 1_000_000 && a == b, "{profile}: the same log, byte for byte");
+    }
+}
+
 /// Two worlds in one process, run side by side (a host's arms; tests at once): what each person has seen of a building
 /// is held once for everyone in their world who sees it the same (SC-1), never shared with the other world, whose
 /// building of the same name may stand on another config. The same town twice, the second with its buildings' wear
