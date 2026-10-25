@@ -8302,3 +8302,11 @@ JSON value and three copies of its canonical bytes.
   before, and memory rises with it); a heap profile at 50,000 shows the end-of-run spike (the final state's canonical
   bytes, likely) to matter; or the run's own holders (the hash's caches, what people have seen) are to be cut: those
   are changes to what is kept, not copies.
+
+## 2026-10-25 · A known timing flake is rerun once alone in every run, CI's too
+
+- **What we saw:** main went red at 72dbbed0 for `scripts/slots.test.ts` alone (it passed three times in a row by hand);
+  merge.ts already reran that file once alone, CI did not, so a timing flake blocked every merge.
+- **Change:** `scripts/test.ts` reruns a failed file from the known-flakes list (the two merge.ts names) once alone, and
+  accepts it only if it then passes; the line says so.
+- **Revisit if:** a listed file fails twice in a row (then it is a fault, not a flake), or the list grows past these two.

@@ -299,6 +299,8 @@ async function kernelCargoTests(crates?: string[]) {
   if (!ok) { failed++; console.log(out.split("\n").filter((l) => /FAILED|FAIL \[|panicked|error/.test(l)).slice(0, 40).join("\n")); }
 }
 
+/** Files whose failures under load are timing, not behaviour (docs/dev-machine.md, "Flakes"): rerun once alone, and accepted only if they then pass. */
+const KNOWN_FLAKES = new Set(["scripts/slots.test.ts", "orchestrator/test/pilot-wave.test.ts"]);
 let pass = 0, fail = 0, rerun = 0, next = 0, running = 0;
 /** This run, file by file (wall seconds, passed, tests): kept in ~/.oikos/test-runs (OIKOS_TEST_RUNS), the last 200 runs. */
 const record: Record<string, { secs: number; ok: boolean; tests: number }> = {};
@@ -339,6 +341,9 @@ async function worker() {
     times[f] = Math.round(r.secs * 10) / 10;
     record[f] = { secs: times[f]!, ok: r.code === 0, tests: r.npass + r.nfail };
     if (r.onlyTimeouts) { lateTimeouts.push(f); console.log(`LATE ${f} ${r.secs.toFixed(0)}s (timed out; to be rerun alone)`); continue; }
+    // (A known timing flake, the same two files merge.ts's flake rule names, gets the same one rerun alone in every run,
+    // CI's included: main went red on 2026-10-25 for slots.test.ts alone, which passed three times in a row by hand.)
+    if (r.code !== 0 && KNOWN_FLAKES.has(f)) { lateTimeouts.push(f); console.log(`LATE ${f} ${r.secs.toFixed(0)}s (a known timing flake; to be rerun alone)`); continue; }
     pass += r.npass; fail += r.nfail;
     console.log(`${r.code === 0 ? "ok  " : "FAIL"} ${f} ${r.secs.toFixed(0)}s`);
     if (r.code !== 0) { failed++; bad.push(tail(f, r.text)); }
