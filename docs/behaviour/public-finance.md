@@ -53,12 +53,74 @@ A charge may also say `itemised`: the employer's report of it names each worker 
 
 **Leaves out:**
 - a charge the employer bears on top of the wage (employers' contributions): firms' reckoning of what a worker costs would have to read it;
-- credits paid out as money (a refundable credit, a credit for children), and anything else settled once a year: there is no yearly assessment, so no refunds or offsets;
+- credits paid out as money (a refundable credit, a credit for children), and anything else settled once a year: there is no yearly assessment (tax paid and not owed on a return can be claimed back: "The taxpayer's account", below);
 - withholding on the year so far (each pay is reckoned as a year's);
 - tax on other income (support payments, dividends, rent);
 - a law that changes during a run (orders keep the withholding they started with);
 - the collector chasing an employer that doesn't pay over;
 - a tax on a small trader's turnover.
+
+## The taxpayer's account: tax paid and not owed (world.tax_collector 0.1.0, 2026-10-25; risk PB-23)
+
+**Why.** In lv-12 a clinic's manager (a seat) paid a month's withheld income tax by hand, and the clinic's payroll officer
+paid it again with the month's return. A real employer claims the payment back, or sets it against its next return
+(Mexico: Código Fiscal de la Federación arts. 22 and 23; the United Kingdom: an employer's PAYE credit is used against
+its next payments or repaid). Here nobody kept a taxpayer's account, so there was no one to claim from.
+
+**The law** (`law-tax-refunds`, the outside world's, public; from the profile's `public_finance.refunds`, with its
+source): the collector keeps each taxpayer's account; money paid and not owed stands to its credit, and the collector
+tells it so; a credit may be claimed back on the claim form, and a refund granted is paid within the law's days of the
+claim; where the place's law allows (`set_off`), the taxpayer may instead ask that the credit be set against its next
+return. A decision on a claim is reviewed as the place's `decisions` rule for `tax_credit_decision` says (`review`: the
+days, the grounds), published in `law-decisions` with the others.
+
+**Who does the work.** The tax collector (`outside-tax`, an office of the outside world, held by its case system as the
+support office is; its officers are not modelled, so its row in the table of work for a decision is an officer's
+twenty minutes, a placeholder: WM-14). It is shown nobody's register: it keeps each account from what is its own, the
+returns addressed to it and the payments into the accounts its charges are paid into (its `ledger`), and its own
+decisions. A taxpayer sees its own account only: in a statement the collector sends it when a credit first stands on it
+(and when the figure changes), and in one it asks for on the public request form.
+
+**The account** (`ledger`, in the order things happened). A return is its period's liability: what it says is owed,
+less what the return before it under the same rule left owing (an employer short of money carries the rest into the
+next return's figure). A payment is allocated to what is outstanding; what is left over is held on account, and is
+allocated to the next return as it comes. A refund granted is paid out of what is on account. What is on account, less
+any credit agreed to be set against a later return and not yet used, is the taxpayer's **credit**. A payment is the
+collector's when its reference says it is tax: into one of its accounts, from elsewhere, in words that name tax, a sum
+withheld, or a charge of the law. (A real payment carries a structured reference; a payment here carries its payer's
+words. One that names no tax is not allocated to anyone: PB-23, what is left.)
+
+**A claim** (`tax_credit_claim`, the public form: the office, `refund` or `set_off`, how much, the account to repay
+into) is decided against the account in the collector's time: granted up to the credit (a refund is paid at once into
+the account the claim names); a set-off asked for where the law gives none, or a claim with nothing in credit, is
+refused with the reason. A claim that is due may be refused wrongly ("the payment could not be matched to the account"),
+a slip at the profile's `wrong_refusal_bps` (the table of slips, `publish/tax_credit_decision`, in a town with
+frictions). A request to look at a decision again, inside the law's days, is decided again on the account as it then
+stands, without a slip; a refusal found wrong is put right with a new decision that names the one it replaces.
+
+**The taxpayer's side** (every employer's payroll: `Staffing`, `firms/staffing.rs`). A payroll officer that files
+returns reads the collector's papers to it (its file `tax-account`): a statement in credit is claimed, to be set off
+where the law allows and repaid where not; a set-off agreed is used on the next return to the collector, which pays
+that much less and says so (`data.set_off`, `set_off_of`: the decisions it uses); a refusal while the collector's own
+statement shows a credit is asked to be looked at again, where the law gives a review and inside its days. A seat in
+any office that pays tax over may do the same on the forms.
+
+**In the profiles** (PB-23). Mexico: refunds within 40 days of the claim (CFF art. 22, opened on a transcription); no set-off of
+withheld tax (art. 23 allows offset only against what is owed on one's own account: to confirm); review by recurso de
+revocación within 30 days (art. 121). England: a credit set against the next payments, or repaid (HMRC guidance, seen on
+search snippets: to confirm); no statutory time to repay (30 days a placeholder); review within 30 days (recalled).
+The other seven: placeholders, marked (30 days, no set-off, a review within 30 days). `wrong_refusal_bps` is 500 in
+all nine, a placeholder.
+
+**Leaves out:** the collector's request for more papers before it decides (Mexico gives it 20 days, and the taxpayer 20
+to answer); interest on a refund paid late; the time limit for claiming (five years in Mexico); the appeal to a court
+or tribunal (the collector does not yet carry out a venue's order); allocation by period (a payment meets the oldest
+liability); the collector chasing what is owing; statements on a schedule (a credit is said when it stands, the rest on
+request); a payment's structured reference.
+
+*Revisit if:* a seat's payment that says nothing of tax is lost again (allocation by words missed it), a place's law
+allocates payments by period and it matters, or the support office's casework is given officers (WM-14): the
+collector's should be too.
 
 ## Rates, on the valuer's valuations
 

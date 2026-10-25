@@ -931,6 +931,7 @@
       "rates_due_days": 30,
       "rates_penalty_interest_bps": 1000,
       "median_house_price": 500000000,
+      "refunds": {"pay_within_days": 30, "set_off": false, "wrong_refusal_bps": 500},
       "rates_exempt_kinds": [
         "health_service",
         "school",
@@ -1377,7 +1378,8 @@
           "grounds": "any administrative action the law lets be challenged without good reason or reasons given (fair administrative action)",
           "fee_hours_of_pay": 0
         }
-      }
+      },
+      {"kind": "tax_credit_decision", "name": "A decision on a claim for tax paid and not owed", "review": {"within_days": 30, "grounds": "any: the collector looks at its decision again on the account"}}
     ],
     "frictions": {
       "per_adult_bps_per_year": {
@@ -1430,6 +1432,8 @@
     "calendar.fiscal_year_starts": "Kenya's government fiscal year runs 1 July to 30 June (Public Finance Management Act 2012; recalled, to confirm).",
     "calendar.holidays": "Public Holidays Act, Cap 110, Laws of Kenya (kenyalaw.org; page returned 403, not read; content recalled and confirmed by a search result listing New Year, Good Friday, Easter Monday, Labour Day, Madaraka, Idd-ul-Fitr, Idd-ul-Azha, Utamaduni, Mashujaa, Jamhuri, Christmas, Boxing Day). Utamaduni Day on 10 October (restored the Moi Day slot, gazetted 2023, per Capital FM / The Star reports; a 2023 proposal to scrap it was reported; status to confirm). Section 2(3) keeps a holiday falling on Sunday on the next Monday (recalled, to confirm), so shift_if_rest is used; it also moves Saturday ones by this profile's rest-day rule, which the Act does not (small difference, recorded). Idd dates are explicit and moon-dependent (to confirm; announced by the Cabinet Secretary each year): Idd-ul-Fitr 2026-03-20, 2027-03-10, 2028-02-27; Idd-ul-Azha 2026-05-27, 2027-05-17, 2028-05-05, astronomical estimates.",
     "decisions.permit_decision": "PLACEHOLDER: an office's own second look at a planning decision within 30 days of it; the place's appeal route for a permit (to a tribunal or an inspectorate) is not built, since no one in the town yet brings a permit to a body that hears it. No source was opened for the days.",
+    "decisions.tax_credit_decision": "(risk PB-23) PLACEHOLDER: the tax collector looks at its decision on a claim for tax paid and not owed again if asked within 30 days; no source was opened for this place's review or appeal of a refund decision. The appeal to a court or tribunal is left out: the collector does not yet carry out a venue's order (docs/behaviour/public-finance.md).",
+    "public_finance.refunds": "(risk PB-23) PLACEHOLDER: no source was opened for this place's law on tax paid and not owed. pay_within_days (30) is a stand-in for the time its law gives the collector to repay; set_off is false (a credit is claimed back, not set against the next return) for want of a source; wrong_refusal_bps (500: one claim that is due in twenty refused) has no source for any place. To be sourced from the place's tax code (refund of payments not owed, offset) and its tax authority's figures on refund claims refused and later allowed.",
     "decisions": "Review and appeal of a decision on a claim for support, and what the decision waits for (docs/behaviour/decisions.md; foundations F8). Recalled, not opened.",
     "decisions.benefit_decision.pension": "PLACEHOLDER for the programme's own appeal route (none found). The 90 days to challenge an administrative action: the Fair Administrative Action Act 2015 (recalled, to confirm); no fee assumed; no review by the office is required first. 14 days for documents is a PLACEHOLDER.",
     "culture.conducts": "What people start out holding right, for the four conducts where a figure in this profile's own outlook speaks to it (the rest start from values alone: no figure was opened). approves_bps is the national share with 'a great deal' or 'quite a lot' of confidence, as `outlook.trust` has it (World Values Survey and European Values Study, joint wave 7, as Our World in Data publishes it; opened 2026-10-11, to confirm against the survey's tables; see sources.outlook for the country and the items). Mapping, ours: answer_tribunal and take_to_tribunal <- confidence in the courts (a person who trusts the courts approves of answering a case there and of taking a wrong to it); complain <- confidence in the civil service (writing to the town is approved where the town's officers are trusted to answer); join_union <- confidence in labour unions. Weak: confidence in an institution is not approval of an act toward it, and the share above a threshold is read as a mean, as outlook does; the figure sets where people start (their own lean and their picture of what others approve), nothing else, and the lean is measured from it, so the rates stay the calibrated ones. No figure for strike, take_in, stay_past_notice, take_from_employer or an organisation's conduct (the survey's items on joining strikes and on the justifiability of stealing property were not opened); no figure by origin group (no source found that gives one). National, not the place's. does_bps is never given: a conduct's own rate in the profile.",

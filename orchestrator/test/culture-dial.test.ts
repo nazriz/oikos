@@ -73,8 +73,13 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-25, config hashes and Rust states both, on main after work-times and fix-memory-appeal (both slow-tier blind at their merges): generator 0.65.0
 // writes every town's `public_memory` bound (SC-1) and the table of work's rows changed; a3d0ce4e..., a805fb6d... and 2b872ca6... for the configs, and
 // 2ce3e90d..., 5dcf1eab... and 55a4e978... for the states, until then. Not every move is the bound: with `public_memory` left out the configs still differ (the version and work rows).)
+// (Re-taken on 2026-10-25 at taxpayer-accounts (PB-23), config hashes and Rust states both: the outside world's tax collector keeps each
+// taxpayer's account (a new office and its system, the law on tax paid and not owed, two public forms, a payroll officer's file of
+// its account, two rows of the table of work; generator 0.68.0). The towns' life did not move: au-vic over 60 days has the same
+// 31,648 records, payments and moves with the collector as with it taken out; the states move with the participant. 772a98b9...,
+// 5704b7de... and da91782e... for the configs, and 1befde62..., cd0ed6c2... and 824018a6... for the states, until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "772a98b97b10802a", "gb-eng-2026": "5704b7de4ac8121c", "ke-nakuru-2026": "da91782ee412b18d" }
+  ? { "au-vic-2026": "ce6779fe1be21e9d", "gb-eng-2026": "4a325401f6e04494", "ke-nakuru-2026": "c19dbaa5f82d126f" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -96,9 +101,9 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // for every hand, a business of one's running costs, and empty shop units to let on the landlords' lots (generator 0.67.0);
 // 482f5218..., b002520e... and 86c7a397... for the configs, and cfeeb1be..., d24f6f24... and 261e509d... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "1befde6244b82041ebbf329b143a15a6f22ad110b7e41cc2d552b80010a1ee41",
-  "gb-eng-2026": "cd0ed6c2f5c4b2a39e835bbff4e51e0a3b24d494ce8ff52d542e76c32188b23d",
-  "ke-nakuru-2026": "824018a608756ea3cc5ae0d43771a885414fafad19b2187685dd015875cc83cb",
+  "au-vic-2026": "4c8bfee1d06589df667d0571151c41d4fb84e83761637ec60f8a9c4a750c283b",
+  "gb-eng-2026": "7f5910e59c852ac80f045ecdc38c73ea49853eaf283e224ae04b68c680e1e2ea",
+  "ke-nakuru-2026": "3dcc25ed66d4c8168cabcef990efc7ebbce59a52ae5a859dc417267b3a979c9d",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

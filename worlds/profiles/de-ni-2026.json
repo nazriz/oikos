@@ -1003,6 +1003,7 @@
       "rates_due_days": 30,
       "rates_penalty_interest_bps": 1200,
       "median_house_price": 33900000,
+      "refunds": {"pay_within_days": 30, "set_off": false, "wrong_refusal_bps": 500},
       "rates_exempt_kinds": [
         "health_service",
         "school",
@@ -1519,7 +1520,8 @@
           "grounds": "any error of fact or law in the decision on the objection, heard by the social court",
           "fee_hours_of_pay": 0
         }
-      }
+      },
+      {"kind": "tax_credit_decision", "name": "A decision on a claim for tax paid and not owed", "review": {"within_days": 30, "grounds": "any: the collector looks at its decision again on the account"}}
     ],
     "frictions": {
       "per_adult_bps_per_year": {
@@ -1595,6 +1597,8 @@
     "calendar.fiscal_year_starts": "1 January: the Haushaltsjahr of Gemeinden is the calendar year (NKomVG para 112 and the Haushaltsordnung; to confirm the paragraph).",
     "calendar.holidays": "Niedersaechsisches Feiertagsgesetz (NFeiertagsG) para 2: New Year, Good Friday, Easter Monday, 1 May, Ascension, Whit Monday, 3 October, 31 October (Reformation Day, added by the amendment of 22 June 2018, Nds. GVBl. no. 7 of 28 June 2018, p. 122, confirmed by search results of 2026-10-17 from weka.de and the Landtag documents), 25 and 26 December. The law's text itself was not opened. No holiday is moved when it falls on a weekend (no shift_if_rest). Corpus Christi and All Saints are not holidays in Niedersachsen.",
     "decisions.permit_decision": "PLACEHOLDER: an office's own second look at a planning decision within 30 days of it; the place's appeal route for a permit (to a tribunal or an inspectorate) is not built, since no one in the town yet brings a permit to a body that hears it. No source was opened for the days.",
+    "decisions.tax_credit_decision": "(risk PB-23) PLACEHOLDER: the tax collector looks at its decision on a claim for tax paid and not owed again if asked within 30 days; no source was opened for this place's review or appeal of a refund decision. The appeal to a court or tribunal is left out: the collector does not yet carry out a venue's order (docs/behaviour/public-finance.md).",
+    "public_finance.refunds": "(risk PB-23) PLACEHOLDER: no source was opened for this place's law on tax paid and not owed. pay_within_days (30) is a stand-in for the time its law gives the collector to repay; set_off is false (a credit is claimed back, not set against the next return) for want of a source; wrong_refusal_bps (500: one claim that is due in twenty refused) has no source for any place. To be sourced from the place's tax code (refund of payments not owed, offset) and its tax authority's figures on refund claims refused and later allowed.",
     "decisions": "Review and appeal of a decision on a claim for support, and what the decision waits for (docs/behaviour/decisions.md; foundations F8). Recalled, not opened.",
     "decisions.benefit_decision.pension": "An objection (Widerspruch) within one month of the notice (Sozialgerichtsgesetz s 84: recalled, to confirm), required before a claim to the social court (s 78), which is brought within one month of the decision on the objection (s 87: recalled, to confirm) and is free of court fees for recipients (s 183: recalled, to confirm). An objection not decided within three months may be taken to the social court as an action for failure to act (Untaetigkeitsklage, Sozialgerichtsgesetz s 88(2): recalled, to confirm); modelled as a deemed refusal after 91 days, from which the month to go to court runs (the real action has no such month: ours is the stricter reading). The claimant must supply what the authority asks for within a reasonable time it sets (SGB I s 60: recalled, to confirm); 14 days is a PLACEHOLDER.",
     "decisions.benefit_decision.unemployment-insurance": "As the pension. The employer must issue the employment certificate (Arbeitsbescheinigung) on the end of a job (SGB III s 312: recalled, to confirm); its 14 days is a PLACEHOLDER, and the claim is decided without it if it does not come.",

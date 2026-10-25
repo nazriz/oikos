@@ -28,10 +28,10 @@ export { DayBook, LISTED_DAYS } from "./readers/daybook";
 export { KIND as DECISION_KIND, type DecisionLaw, type Need as DecisionNeed } from "./shared/decisions";
 export { particularsOf } from "./shared/frictions";
 export { diaryText } from "./readers/diary";
-export { planLaw, planLawWords, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, possessionOrderFor } from "./shared/papers";
+export { planLaw, planLawWords, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, possessionOrderFor } from "./shared/papers";
 import type { BehaviourModule } from "./module";
 // (The kinds whose TypeScript actors were deleted at the cut-over: what is still read of each, the engine runs them.)
-import { bankPaymentSystem, bodyPayroll, disposal, electoralOffice, energy, exportDemand, founded, funding, grants, idle, migration, newspaper, producer, retailer, retirementFund, statistics, trade, transfers, valuer, water, weather } from "./engine-kinds";
+import { bankPaymentSystem, bodyPayroll, disposal, electoralOffice, energy, exportDemand, founded, funding, grants, idle, migration, newspaper, producer, retailer, retirementFund, statistics, taxCollector, trade, transfers, valuer, water, weather } from "./engine-kinds";
 import { lending } from "./kinds/credit";
 import { organiser } from "./kinds/union";
 import { citizen } from "./kinds/citizen";
@@ -90,6 +90,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [funding, "engine-kinds.ts"],
       [weather, "engine-kinds.ts"],
       [valuer, "engine-kinds.ts"],
+      [taxCollector, "engine-kinds.ts"],
       [statistics, "engine-kinds.ts"],
       [grants, "engine-kinds.ts"],
       [disposal, "engine-kinds.ts"],
