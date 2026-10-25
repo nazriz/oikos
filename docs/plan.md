@@ -38,13 +38,28 @@ Status words: `[x]` landed on main, `[~]` in progress, `[ ]` not started, `[?]` 
   grammar; Sonnet only as the safety net, its share reported in every run. Retrain plan: the 2026-10-25 "Translator v3"
   entry in docs/decisions.md.
 - [ ] **Citizen model,** trained from the captured citizen decisions (docs/design/citizen-model.md, docs/citizen-data.md).
+  Caveat: trained on code minds' decisions, it inherits their assumptions; it is faster, not an independent check of how
+  people delegate or respond to AI.
 
 ## Waiting on the owner
 
-- [?] **Delegation capabilities** (proposed, not approved): responsibilities granted, changed and withdrawn at levels set
-  independently per kind of matter (no ladder); a principal's instructions logged apart from the AI's acts; the AI's
-  requests for scope as logged acts; providers as organisations with their own records and contracts, records
-  transferable by contract; forks that apply an intervention; delegation decisions from the actor's own information only.
+- [?] **Delegation capabilities** (proposed, not approved). General, deciding no result:
+  - Responsibilities granted, changed and withdrawn at levels set independently per kind of matter (advice, draft for
+    sign-off, act with approval, act alone); no ladder, nothing climbs by itself.
+  - Learning from experience: a principal's delegation, approval and withdrawal decisions are updated from the results it
+    has observed (outcomes, complaints, costs, its own time), starting from the provider's claims, using only its own
+    information; a test fails on anything read from outside the actor's channels.
+  - A principal's instructions logged apart from the AI's acts; the AI's requests for more scope or resources as logged
+    acts with what they answer.
+  - Providers as organisations with their own records, contracts and authority (two may run the same model); records
+    transferable as the contract says.
+  - Replacement and taking work back: when a provider is replaced or the principal resumes the work, the work goes on
+    (open matters handed over, records as the contract allows, the cost and delay of the change where they fall).
+  - Forks that apply an intervention at a checkpoint (grant, change, withdraw, replace, take back).
+  - **Prerequisites:** foundations-2 phase 1 (real time and capacity, so time saved means something) and services
+    anyone can buy (phase 4's first step). The current translator, with its safety net, is enough. Conservation,
+    transport, the translator rebuild and the citizen model are the wider roadmap, not prerequisites; skill decay is
+    optional, an experimental factor. So this could start straight after phase 1, beside phase 2.
 - [?] **The research definition** of people becoming less able to shape their society, and the study's measures and
   arms (the owner's research choice).
 - [?] **A second batch of pilots** on the API credit (expires 11 November): whether, and its budget.
