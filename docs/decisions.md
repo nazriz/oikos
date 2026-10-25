@@ -8455,3 +8455,23 @@ JSON value and three copies of its canonical bytes.
   the delivered records) take far more off: all of them together are 10% under main at 10,000 and level at 1,000.
 - **Revisit if:** checkpoints become frequent (daily, say): then the records' bytes might be kept compressed between
   them, not whole.
+
+## 2026-10-26 · What's been seen held once for all who see it the same (branch `mem-seen`; no model called)
+
+- **What the profile showed:** at 50,000 people, what people have seen was 20.4 of 34.8 GB live (408 KB a person,
+  against 52 at 10,000): each person's own copy of each building as they last saw it, its spaces and who is in them,
+  where one building holds hundreds. It grew faster than the town.
+- **Change:** `sites::seen_structure`: a building as seen is made once for everyone who would see it the same, and
+  again only when what it is made from has changed; a view keeps its seen cells as one list, the one it hands out. No
+  one sees anything different (the same state hash and log digest on 203 people, three profiles' 1,000, 10,000 and
+  50,000, 30 days), and nothing is forgotten: this holds what was seen compactly, it does not bound it (a bound would
+  be a law, Naz's to decide).
+- **Measured** (14 threads, against main `3b87959e`, with the streamed state hash beneath it): 1,000 au-vic 693 to
+  521 MB; 10,000 5.25 to 3.12 GB; 50,000 34.2 to 17.2 GB resident, 1,004 to 956 s wall, 15.0 to 11.8 T instructions.
+  The budget (4 threads) at 496 MB, 386 KB a person: the ceiling lowered from 480 to 410 KB.
+- **Found on the way:** behind one lock per shard, the 50,000 month took 1,590 s against main's 1,004 (the run's own
+  thread waited on the lock: a building's people look at it at once, on many threads). Under a shared lock, compared
+  outside it, the wait is gone.
+- **Revisit if:** a building's view comes to depend on the looker beyond whether they can be told who is there (then
+  that goes in its key), or the state comes to change occupancy or departures in place (then comparing by where they
+  are in memory would not do: debug builds' check would catch it).
