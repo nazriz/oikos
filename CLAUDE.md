@@ -5,6 +5,7 @@ A wind tunnel for AI stewardship: a configurable, living, visual simulated world
 ## Read first
 - `VISION.md`: what this is, why, principles, architecture, research integrity, AI-participant welfare (§15, a working draft that evolves).
 - `V0.md`: the current build brief. Stages, ground rules, definition of done.
+- `docs/plan.md`: the plan, in order, ticked as work lands. Tick your item in the commit that lands it.
 - `docs/risks.md`: the risk register, the one place known gaps and doubtful assumptions live, with what each could do to results.
 
 ## How we work

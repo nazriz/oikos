@@ -8674,3 +8674,57 @@ kinds; the tree model for networks; baselines move). C1 is the invariant over to
 - **Revisit if** a shortage a town plainly would not have comes from the tree (then loops by a fixed number of passes, its
   cost to Naz first); the operator needs to see more than its instruments (then it is a register to declare); many trees
   make settlement a cost worth threads (then `rayon` over trees, applied in order).
+
+## 2026-10-25 · Main's slow tier after commercial leasing: the station's head is a sworn officer, the paper is the council's to fill, and five tests re-taken with their reasons (branch `fix-main-leasing`; no model called)
+
+- **What we saw:** CI's slow tier failed eight files after the commercial-leasing merge (3b87959e); the gate's canaries
+  passed. Market realism moved every default town's draws (who is hired, by interview; incomes and savings drawn
+  together; businesses born by weighing), and the slow files run long default-town scenarios the canaries do not.
+- **Faults fixed in the mechanism:**
+  - *The station's officer in charge did no station work* (seat-acts, hazards). The station staffs its "police officer"
+    role; its head, employed as "officer in charge", was not counted. With the new hiring the one officer of the default
+    town is injured on day 171, and the station carried out no warrant and looked into no report for a month while its
+    head sat at the station. A small station's head is a sworn officer (a sergeant or inspector) who takes the work when
+    the officers are away. `police.station` 0.7.0 counts its staff in `in_charge_role` (default "officer in charge") who
+    are at the station after its officers; `Staffing::in_role` lists those employed in a role other than the one it staffs.
+  - *The paper was a headless one-person body* (deaths; WM-7). Its one person died and nobody filled the post, so it went
+    on paying the dead. The paper is kept on the town's grant as the courts are, so every profile's
+    `public_service.appointed_by` now has `press: council`, sourced as the courts are; bodies run on their own account
+    (bank, union, landlords, shops) are still not covered (WM-7 stays open for them).
+  - *Commercial leasing's figures had no basis rows* (figures). `firm.landlord`'s commercial rent, deposit, term and
+    notice are now read from the profile (`prof` rows); two stale rows of the old founding rate are gone.
+- **Tests re-taken, each with the reason in place:**
+  - production: a factory that bought an automation system has its units `make`; a system is the firm's performer and
+    is not held to a person's working day.
+  - hazards: reports left undealt are counted only while someone who looks into reports is at the station.
+  - unions: one stop where there were two (the town as drawn since puts fewer members at factory-1; not traced further).
+  - police-station-seat: seed 1 where it was 7, measured on the code twin for 330 days over seeds 1 to 10 (in the test).
+  - deaths: a housemate who reports the death and then leaves town the same day counts as living there (a widow's two
+    grown children, in this draw).
+  - seat-diary: the refusal of a crew member not at work is taken from a seat that sits at 07:00 in a town of the usual
+    size, since the 600-person town's works crew now have no home and sleep at the hall.
+- **Also:** culture-dial's config hashes and Rust states re-taken (the profiles and the station moved); manifests regenerated. The whole slow tier passes on the branch (58 files).
+- **Revisit if:** a station is ever seated with a head who should not do officers' work (a civilian manager), or the
+  600-person town gets homes for its people (seat-diary could look in its main run again).
+## 2026-10-25 · A memory budget for each person, held by a test (branch `mem-budget`; no model called)
+
+- **What was asked:** (Naz, 2026-10-25, "very important") a per-person memory budget, enforced, then cut towards about
+  50 KB a person at the peak (50,000 people in some 2.5 GB, 100,000 in 5 GB), beside a fixed overhead.
+- **Change:** `scripts/memory-budget.json` (the town, days and threads it is measured on; the fixed overhead; the
+  ceiling held now; the target) and `orchestrator/test/memory-budget.test.ts` in the slow tier: `worlds/town-1000.yaml`
+  for 30 days on the release kernel at 4 threads, failing if its peak resident memory less the overhead, over its
+  people, passes the ceiling. The kernel's `world` command prints its peak (`getrusage`). `scripts/heapprof.ts
+  --components` puts a heap profile's live bytes with components, and per person.
+- **The numbers it starts from** (main `3b87959e`, docs/design/performance.md "Bytes per person"): at 4 threads, 203
+  people 221 to 230 MB, 1,000 people 651 to 668 MB (two runs each): about 110 MB fixed and 546 KB a person. At 14
+  threads, 30 days: 1,000 people 0.69 GB, 10,000 5.25 GB (514 KB a person), 50,000 34.2 GB (682 KB). By component at
+  50,000, what's been seen was 408 KB a person of 697 live: it grows faster than the town.
+- **Why a ceiling and a target, not the target alone:** a test that fails on main cannot land (main stays green). So
+  the ceiling starts at main's cost (590 KB: the worst run, 558, and about 6%), and each cut lowers it in the commit
+  that lands it, until it is the target. Lowering it goes with the cut that earns it; raising it is a decision here.
+- **Why resident, and why 1,000 people for a month:** resident peak is what a run can be stopped for, and the same
+  measure on any platform; 1,000 people for 30 days takes 15 s, and per person it is near 10,000's (583 against
+  514 KB a person at 14 threads), so a cut that matters shows at 1,000. A cost that grows faster than the town (as
+  what's been seen did) shows only larger: the 50,000 numbers are measured with each cut and recorded here.
+- **Revisit if:** the test's spread from run to run nears the margin (then two runs, the lower), or a cut shows at
+  10,000 and 50,000 and not at 1,000 (then a 5,000-person town for the test, in the slow tier still).

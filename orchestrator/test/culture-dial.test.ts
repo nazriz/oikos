@@ -77,14 +77,20 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // the agency's officers (`outside-casework`, an officer's minutes in an officer's hours: claims are decided in days, not hours), every machine's template
 // states its hours, an office offer's seconds are its template's rows, someone who only orders an act goes on at once, and the engine gives a code unit's `done_by` to the act as `by` (generator 0.68.0, on main's 0.67.0 at the merge of origin/main into f2-phase1);
 // 772a98b9..., 5704b7de... and da91782e... for the configs, and 1befde62..., cd0ed6c2... and 824018a6... for the states (main's, at market realism and commercial leasing), until then.)
+// (Re-taken on 2026-10-26 at the merge of main (8570d699: the appointments main took meanwhile, the press among the posts the council
+// fills) into foundations-2 phase 1, config hashes and Rust states both, on the merged tree; neither side's change alone is the town any
+// more; 6a09320a..., d7cf0e19... and f87b1c3a... for the configs, and 46b53dc8..., 4fd33b34... and 3ab351d6... for the states, until then.)
 // (Re-taken on 2026-10-26 at foundations-2 C2 (law 8), config hashes and Rust states both: kinds have a class, the river's water is a kind held in
 // litres (its figures a thousand times the profile's kilolitres, so its decay and spills round at a finer grain), and what the water works draws is
 // held at the works (generator 0.69.0); 3c86931d..., 6ee4f4ac... and 58f52331... for the configs, and 4f597e2a..., c2e206a4... and c944d672... for the
 // states, until then.)
 // (Re-taken on 2026-10-26 at foundations-2 C3, the config hashes only: the table of work gained the rows for acts on a connection and a link (and their sources);
 // no town has a network yet, and the states did not move; 910fbe98..., 90e0e68d... and 31bce73d... until then.)
+// (Re-taken on 2026-10-26 at the merge of main (phase 1 landed, 0824efb6) into foundations-2 phase 2, config hashes and Rust states both,
+// on the merged tree; main's dbb34546..., b5082f8c..., 47fed11d... and f49ce487..., ce90d241..., 1605af11..., and this branch's febd3aa0...,
+// 44ce5bcf..., 9ea834be... and fec98d61..., 0152badb..., 7787a6c6..., until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "febd3aa06d37a5a4", "gb-eng-2026": "44ce5bcfc484caed", "ke-nakuru-2026": "9ea834be9096ae42" }
+  ? { "au-vic-2026": "12dfe7e7a4a6e5fc", "gb-eng-2026": "b0f0a2aca7d5af9f", "ke-nakuru-2026": "bd137799df5e52e0" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -105,10 +111,14 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // births (ventures weighed by expected profit), who works and what they have saved drawn together, hiring by fit with postings
 // for every hand, a business of one's running costs, and empty shop units to let on the landlords' lots (generator 0.67.0);
 // 482f5218..., b002520e... and 86c7a397... for the configs, and cfeeb1be..., d24f6f24... and 261e509d... for the states, until then.)
+// (Re-taken on 2026-10-26 at main's slow tier after commercial leasing, config hashes and Rust states both: the paper is among the
+// posts the council fills (every profile's `appointed_by`; WM-7), and the station's head takes the station's work after its officers
+// (police.station 0.7.0); 772a98b9..., 5704b7de... and da91782e... for the configs, and 1befde62..., cd0ed6c2... and 824018a6... for
+// the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "fec98d6147bd33deaac73dce9ae497b34802f2de9fe2fe83af73c9e18504e802",
-  "gb-eng-2026": "0152badbca6804a78a0723c762526ddd2826fa6ab657387e2f93aaa7dee1504a",
-  "ke-nakuru-2026": "7787a6c62aeca4ea9fbc8a716489bdc89c582403e77b343036c280c8d0feb43a",
+  "au-vic-2026": "47d8441592fc8358bd882942393a9b414b92015418250af540e3c15b705b4a54",
+  "gb-eng-2026": "a02d0f45882ca706ace628ca17024d5ed760ffb069f9f3657988e1834d7508c0",
+  "ke-nakuru-2026": "4f88cd1f50159765244b76d6ee0076323f4325563069541281016d0300c7cf59",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

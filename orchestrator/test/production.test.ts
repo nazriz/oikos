@@ -55,6 +55,13 @@ test("goods are made from inputs by workers' hours, exported within each factory
     const [firm, worker] = a.terms.parties;
     employees.set(firm, (employees.get(firm) ?? new Set()).add(worker));
   }
+  // (Or by a system the firm owns: a factory may adopt an automated production cell, delivered to it by its vendor, as
+  // docs/behaviour/automation.md has it; since 2026-10-25 factory-1 of this town does, on day 242.)
+  const systems = new Set<string>();
+  for (const e of ev.filter((e) => e.event === "participant_created" && e.kind === "system" && e.owner)) {
+    employees.set(e.owner, (employees.get(e.owner) ?? new Set()).add(e.participant));
+    systems.add(e.participant);
+  }
   const made = ev.filter((e) => e.event === "worked" && e.task === "make");
   expect(made.length).toBeGreaterThan(50);
   // The time it took: the task's, scaled by the crew's mean schooling where skill speeds work (labour_by), exactly as the
@@ -68,7 +75,8 @@ test("goods are made from inputs by workers' hours, exported within each factory
   }
   const perDay = new Map<string, number>();
   const startOf = workStarts(ev);
-  for (const w of made) for (const p of w.performers) {
+  // (A person's working day bounds a person; a system works the day round, in the lanes its template gives it.)
+  for (const w of made) for (const p of w.performers.filter((p: string) => !systems.has(p))) {
     // (A work that runs past midnight counts on each day it is done on, as the kernel counts it: review of the foundations, finding 9.)
     for (let at = startOf.get(w)!, left = Math.ceil(w.labour / w.performers.length); left > 0;) {
       const day = Math.floor(at / DAY), take = Math.min(left, (day + 1) * DAY - at);

@@ -113,12 +113,17 @@ export const FIGURE_BASIS: Basis[] = [
     prof("fertility_per_10000", "fertility_per_10000"),
   ]),
   conv("dials", "a researcher's setting for the run (the spec's dials), not a figure of a place"),
+  // Shop premises a landlord lets (docs/behaviour/leasing.md): the profile's commercial terms.
+  ...of("firm.landlord", [
+    prof("commercial.rent", "commercial.rent_per_month"),
+    prof("commercial.deposit_months", "commercial.deposit_months"),
+    prof("commercial.term_months", "commercial.term_months"),
+    prof("commercial.notice_days", "commercial.notice_days"),
+  ]),
   ...of(CITIZEN, [
     derived("attach_mean", "the town's mean attachment, from the profile's outlook.residence and outlook.job_tenure"),
     placeholder("frictions.*.at", "the level of a variable at which a home is counted as in fault: the generator's"),
   ]),
-  // A landlord's shop units to let (commercial leasing): the profile's commercial terms.
-  ...of("firm.landlord", [prof("commercial", "commercial")]),
   // The rest of the starting state.
   derived("world.entities.*.born_at", "drawn from the profile's age structure"),
   derived("world.entities.*.variables.skill", "years of schooling, from the profile's education"),
