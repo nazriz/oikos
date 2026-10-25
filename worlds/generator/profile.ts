@@ -209,6 +209,10 @@ export interface Profile {
     spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number; shops_known: number; shop_search_bps_per_month: number;
       /** The household demand system (docs/behaviour/demand.md): each kind's average share of spending and its income elasticity from the place's household expenditure survey, and Frisch's money flexibility. */
       demand?: { frisch_bps: number; kinds: { kind: string; share_bps: number; income_elasticity_bps: number;
+        /** What a unit of it is, physically (law 8, docs/nothing-from-nothing.md): `stock` (a thing, which becomes waste when
+         * used; the default), `dissipates` (fuel: its energy leaves the world as heat) or `service` (a unit of a service sold
+         * over a counter, a haircut or a visit to a venue: no physical quantity, used as it is bought). */
+        class?: "stock" | "dissipates" | "service";
         /** What a shop that sells this kind is like (docs/behaviour/demand.md, "A town's mix of shops"): a kind with no `seller` is not sold by shops (energy is billed by the utilities). `wholesale_bps`: what the shop pays for a unit as a share of its retail price (left out for `goods`: the profile's `industry.retail_purchases_share_bps`); `labour_bps`: the staff's pay for serving a unit as a share of its price, which fixes the size of the unit (left out for `goods`: `industry.retail_labour_share_bps`); `business_share_bps`: the kind's share of the place's retail and service businesses, where counts by industry are sourced (left out: the shops are divided by spending); `occupation`: what the shop's staff are, in the place's terms (the job a shop of this kind advertises); `wage_vs_shop_bps`: their pay as a share of `wages_per_pay_period.shop` (from the place's earnings survey by occupation; left out: the shop wage, 10,000). */
         seller?: { wholesale_bps?: number; labour_bps?: number; business_share_bps?: number; occupation?: string; wage_vs_shop_bps?: number } }[] } };
     /** An adult's savings (cash and deposits), by age: percentiles 10, 25, 50, 75, 90 (cents). */

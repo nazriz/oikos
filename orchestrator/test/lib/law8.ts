@@ -11,7 +11,7 @@ export const INVENTORY = join(import.meta.dir, "../fixtures/foundations-2-invent
 export const SOURCES = ["kernel/crates/actors/src", "kernel/crates/rules/src", "kernel/crates/world/src", "participants/src/kinds", "participants/src/shared", "participants/src/readers"];
 
 export type Task = { id: string; in?: string; labour?: number; consumes?: Record<string, string>; produces?: Record<string, string>; changes?: Record<string, number>; draws?: { field: string; per_unit: number }; emits?: Record<string, number>; on_body?: unknown; surveys?: boolean; investigates?: boolean };
-type Resource = { id: string; unit: string; class?: "stock" | "dissipates" };
+type Resource = { id: string; unit: string; class?: "stock" | "dissipates" | "service" };
 
 /** Every module's parameters in a world: each post's role module, and each participant's controller. */
 function moduleParams(c: any): { who: string; module: string; params: Record<string, unknown> }[] {
@@ -106,7 +106,7 @@ export function vanishing(c: any): string[] {
     if (t.draws && !fields.get(t.draws.field)?.kind) out.push(`${t.id}: draws from ${t.draws.field}, which holds no kind: what is drawn goes nowhere`);
     const stock = Object.keys(t.consumes ?? {}).filter((k) => (resources.get(k)?.class ?? "stock") === "stock");
     const effect = Object.keys(t.produces ?? {}).length || Object.keys(t.changes ?? {}).length || Object.keys(t.emits ?? {}).some((k) => fields.get(k)?.kind) || t.on_body || t.surveys || t.investigates;
-    if (stock.length && !effect) out.push(`${t.id}: only destroys ${stock.join(", ")} (a stock kind: it must become something, or be a kind that dissipates)`);
+    if (stock.length && !effect) out.push(`${t.id}: only destroys ${stock.join(", ")} (a stock kind: it must become something, or be a kind that dissipates or a service)`);
   }
   return out;
 }

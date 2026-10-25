@@ -99,7 +99,7 @@ test("it fails, naming the recipe, on a quantity that vanishes: a draw into noth
   // (A kind that dissipates may be used up with nothing out: energy leaves the books as heat.)
   c.catalogue.resources.push({ id: "heat_fuel", unit: "kWh", class: "dissipates" });
   c.catalogue.tasks.push({ id: "warm", labour: 0, consumes: { heat_fuel: "1" } });
-  expect(vanishing(c).filter((x) => !before.includes(x))).toEqual(["pump: draws from aquifer, which holds no kind: what is drawn goes nowhere", "burn: only destroys materials (a stock kind: it must become something, or be a kind that dissipates)"]);
+  expect(vanishing(c).filter((x) => !before.includes(x))).toEqual(["pump: draws from aquifer, which holds no kind: what is drawn goes nowhere", "burn: only destroys materials (a stock kind: it must become something, or be a kind that dissipates or a service)"]);
 });
 
 test("it fails, naming the file, on a module that shares out a shortfall by a rule of its own", () => {

@@ -131,6 +131,25 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 32
+              },
+              "class": {
+                "description": "Law 8 (docs/nothing-from-nothing.md): `stock` (the default: conserved, as water, materials, goods, waste and hardware are), `dissipates` (energy, fuel: it may be a process's input with nothing out, as heat leaves the world's books; otherwise it is conserved), or `service` (a unit of a service sold over a counter, a haircut or a visit to a venue: no physical quantity, used as it is bought). All are held, moved and counted the same.",
+                "enum": ["stock", "dissipates", "service"]
+              },
+              "settle": {
+                "description": "How a connection carrying this kind is settled (foundations-2 C3): once a `day`, or each `hour`. Absent: the kind flows on no connection.",
+                "enum": ["day", "hour"]
+              },
+              "shape_bps": {
+                "description": "For a kind settled hourly: the share of a connection's daily rate delivered in each hour of the day (24 shares, in basis points, summing to 10,000: a load shape). Absent: an even 24th each hour.",
+                "type": "array",
+                "minItems": 24,
+                "maxItems": 24,
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                }
               }
             }
           }
@@ -440,6 +459,10 @@
             "properties": {
               "id": {
                 "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+              },
+              "kind": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId",
+                "description": "Law 8: the kind of resource the field holds, in the kind's unit (a river's water). A `draws` from it moves what is drawn into the actor's holding; an `emits` to it is the process's output, put on the cell; nature's day (sources, decay, flow off the ground, a bound reached) is nature's edge, counted (state `nature.edge`). Its baseline is nought and its minimum at least nought. Absent: a field that is no stock (a concentration, a habitat's quality)."
               },
               "min": {
                 "type": "integer",

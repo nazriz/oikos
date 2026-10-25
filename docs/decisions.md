@@ -8572,3 +8572,42 @@ kinds; the tree model for networks; baselines move). C1 is the invariant over to
 - **Revisit if** a finding turns out to be a false positive (then the audit is wrong, never the inventory widened); a kind
   is found that the audits cannot see (law 8's honest limit: a kind nobody thought of); the profiles' towns at 120 people
   miss a module a larger town has (then the backstop's town grows).
+
+## 2026-10-25 · Foundations-2 phase 2, C2: kinds have a class, a field may hold a kind, and a draw is held (branch `f2-phase2`; results move; no model called)
+
+- **Contract (world config).** `catalogue.resources[]` gains `class`: `stock` (the default: conserved), `dissipates`
+  (energy and fuel: may be a process's input with nothing out, as heat leaves the books) or `service` (a unit of a
+  service sold over a counter: no physical quantity). It gains also `settle` (`day` or `hour`) and `shape_bps` (24 hourly
+  shares of a day), for C3's connections. `catalogue.fields[]` gains `kind`: the field holds that kind, in its unit.
+  Refused at load: a field holding a kind the world does not declare, a field that holds a kind from anything but nought
+  (baseline 0, min at least 0), two fields holding one kind.
+- **Kernel.** A `draws` from a field that holds a kind moves what it takes into the actor's holding at the structure
+  (`exec.rs`, `work`); from a field that holds none it is as before (the backstop's `vanishing` names it). An `emits` to a
+  field that holds a kind is the process's output, put on the cell, and is refused (`overflow`) where it would pass the
+  field's most rather than be lost to the bound. Nature's day is nature's edge: for each field that holds a kind, what its
+  day changed (sources, decay, flow off the ground, a bound reached; diffusion and flow within the ground sum to nothing)
+  is counted in `nature.edge` (state, hashed; empty, and not serialised, for a world with no such field), so that the
+  kind's total over holdings, edges, the field and nature's edge changes only by what processes make and use
+  (`kernel/tests/conservation.rs`, a third property, a held draw, and the load refusals). A spin-up before the run is the
+  world's starting state and is not counted.
+- **The class `service` is an addition to the design** (2.1 had `stock` and `dissipates`). The shops' kinds the profiles
+  sell include a haircut and a visit to a venue (`personal_services`, `recreation`): units of a service, which no recipe
+  should have to turn into waste. Without a third class the backstop would have named their `consume-<kind>` as vanishing
+  stock for ever, or asked for an invented output. `transport` (a service station's sales: fuel) is `dissipates`. The class
+  of a kind is what a unit of it is, not a figure of the place, so it is the same in the three profiles that sell these
+  kinds (`spending.demand.kinds[].class`, au-vic, gb-eng and ke-nakuru); goods, food, clothing and a meal out stay stock,
+  and their use becomes waste at C4.
+- **Generator 0.69.0.** Energy is `dissipates`; the river's `water` field holds the kind `water`, in litres (the profile's
+  kilolitres times a thousand: inflow, a wetland's soaking, the bank's level and the flood depth; the field's most is a
+  thousand times higher too); `draw_water` draws a kilolitre a unit (1,000 litres), so the water corporation's draws, in
+  kilolitres, are unchanged, and **what it draws is now held at the works** (where until C4 nothing uses it: the backstop's
+  `orphanKinds` lists it, C4 ends it). The inventory: `draw_water` and `supply_energy` leave `vanishing` (supply_energy's
+  energy dissipates; that energy is still used up at the depot and not at the homes stays an entry, ended by C4); the
+  `consume` tasks of the service kinds and of fuel leave it too; the silent recipes now lack a kind the world has.
+- **Results move** (the river in litres decays and floods by the same rules at a finer grain; the works' holding of water is
+  new state). Measured: a year of the 1,000-person town before (f2-phase1 tip) and after this step, three profiles; the figures are in the C4 entry with the rest.
+- **Revisit if** a kind is found that is neither a thing, a fuel nor a service (then a class for it, with its reason);
+  a process is found that should put a kind on a cell beyond the field's bound (then a spill, as nature's own, rather than a
+  refusal).
+- **Pins re-taken:** culture-dial's three config hashes and three Rust states, with the reason beside them (generator 0.69.0).
+- **Found, not mine:** `figures.test.ts` (slow tier) fails on f2-phase1's tip already: four `commercial.*` parameters from commercial leasing (main) have no row in the figure table. Left to the merge of main (not a law-8 change).

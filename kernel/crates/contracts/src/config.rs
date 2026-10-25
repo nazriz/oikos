@@ -194,6 +194,10 @@ pub struct SuccessionCfg {
 #[serde(deny_unknown_fields)]
 pub struct FieldCfg {
     pub id: Id,
+    /// Law 8: the kind the field holds (a river's water, in the kind's unit). A draw moves it into a holding; nature's
+    /// day is nature's edge, counted. Absent: a field that is no stock (a concentration, a habitat's quality).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<Id>,
     pub min: i64,
     pub max: i64,
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -406,6 +410,40 @@ fn is_zero(x: &i64) -> bool {
 pub struct ResourceCfg {
     pub id: Id,
     pub unit: String,
+    /// Law 8 (docs/nothing-from-nothing.md): conserved (`stock`, the default), one that may be used up with nothing out
+    /// (`dissipates`: energy, whose heat leaves the world's books), or a unit of a service (`service`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub class: Option<KindClass>,
+    /// How a connection carrying this kind is settled (foundations-2 C3): daily or hourly. Absent: it flows on none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settle: Option<Settle>,
+    /// For a kind settled hourly: each hour's share of a connection's daily rate (24 shares summing to 10,000).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape_bps: Option<Vec<i64>>,
+}
+
+/// A kind's class (law 8): conserved; used up into heat; or a unit of a service sold over a counter (no physical
+/// quantity: used as it is bought). The kernel counts all three alike; the backstop reads the class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KindClass {
+    Stock,
+    Dissipates,
+    Service,
+}
+
+/// How often a connection's flow is settled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Settle {
+    Day,
+    Hour,
+}
+
+impl ResourceCfg {
+    pub fn dissipates(&self) -> bool {
+        self.class == Some(KindClass::Dissipates)
+    }
 }
 
 /// A holding at the start: a quantity of a kind, held by an entity at a structure (or, for an edge, at itself).
@@ -1927,6 +1965,22 @@ fn check_bodies(c: &Config) -> Result<(), String> {
     for x in &cat.counters {
         if !counters.insert(&x.id) || cat.fields.iter().any(|f| f.id == x.id) {
             return Err(format!("counter {}: its id must be unique among counters and fields", x.id));
+        }
+    }
+    // Fields that hold a kind (law 8): a kind the world declares, held from nought (nothing below it, nothing assumed
+    // at a baseline), one field a kind.
+    let mut held_by_field: BTreeSet<&str> = BTreeSet::new();
+    for f in &cat.fields {
+        if let Some(k) = &f.kind {
+            if !cat.resources.iter().any(|r| &r.id == k) {
+                return Err(format!("field {}: holds no kind the world declares ({k})", f.id));
+            }
+            if f.baseline != 0 || f.min < 0 {
+                return Err(format!("field {}: a field that holds {k} counts it from nought (baseline 0, min at least 0)", f.id));
+            }
+            if !held_by_field.insert(k) {
+                return Err(format!("field {}: {k} is held by another field already", f.id));
+            }
         }
     }
     for t in &cat.tasks {

@@ -8,7 +8,11 @@
 //!   the cells changes only by what work draws from it and emits to it; a day of nature is nature's own (its sources,
 //!   decay and flow), declared on the field.
 //!
-//! This generalises `goods.rs` (phase B) to fields (foundations-2 C1), over the kinds the world has today.
+//! - **A field that holds a kind** (C2: a river's water): the kind's total over holdings, edges, the field's cells and
+//!   nature's edge (what nature's days have added and taken, `nature.edge`) changes only by what processes make and
+//!   use; a draw moves what it takes into the drawer's holding, so nothing is drawn into nothing.
+//!
+//! This generalises `goods.rs` (phase B) to fields (foundations-2 C1) and to fields that hold a kind (C2).
 
 mod common;
 
@@ -35,12 +39,35 @@ fn world_with_fields() -> Value {
     c
 }
 
-/// Each field's total over the cells (sparse: cells at the baseline, nought here, are not kept).
+/// The same world, its field holding a kind (C2): the river's water is a stock, in litres.
+fn world_with_a_kind() -> Value {
+    let mut c = world_with_fields();
+    c["catalogue"]["resources"].as_array_mut().unwrap().push(json!({"id": "water", "unit": "L"}));
+    c["catalogue"]["fields"][0]["kind"] = json!("water");
+    c
+}
+
+/// Each field's total over the cells (sparse: cells at the baseline, nought here, are not kept): the fields that hold
+/// no kind (a field that holds one is counted with its kind, `kind_totals`).
 fn field_totals<W: std::io::Write>(run: &Run<W>) -> BTreeMap<String, i128> {
     let mut t = BTreeMap::new();
-    for f in &run.kernel().statics().config.catalogue.fields {
+    for f in run.kernel().statics().config.catalogue.fields.iter().filter(|f| f.kind.is_none()) {
         let n = run.kernel().state().nature.as_deref().and_then(|n| n.fields.get(&f.id)).map_or(0, |m| m.values().map(|v| *v as i128).sum());
         t.insert(f.id.clone(), n);
+    }
+    t
+}
+
+/// Each kind's total: over holdings (edges' included), and for a kind a field holds, over its cells and nature's edge.
+fn kind_totals<W: std::io::Write>(run: &Run<W>) -> BTreeMap<String, i128> {
+    let st = run.kernel().state();
+    let mut t = st.total_goods();
+    for f in &run.kernel().statics().config.catalogue.fields {
+        let Some(k) = &f.kind else { continue };
+        let n = st.nature.as_deref();
+        let cells: i128 = n.and_then(|n| n.fields.get(&f.id)).map_or(0, |m| m.values().map(|v| *v as i128).sum());
+        let edge = n.and_then(|n| n.edge.get(&f.id)).copied().unwrap_or(0);
+        *t.entry(k.clone()).or_insert(0) += cells + edge;
     }
     t
 }
@@ -81,7 +108,8 @@ fn work_cmd(task: &str, units: u8) -> Command {
 /// Runs the operations, checking the invariant after each; returns how many goods moves, draws and emits there were.
 fn check_run(config: Value, ops: &[COp]) -> Result<(usize, usize), TestCaseError> {
     let mut run = Run::start(config, "conservation", Vec::new(), None).unwrap();
-    let mut expected = run.kernel().state().total_goods();
+    let mut expected = kind_totals(&run);
+    let kind_of: BTreeMap<String, String> = run.kernel().statics().config.catalogue.fields.iter().filter_map(|f| f.kind.clone().map(|k| (f.id.clone(), k))).collect();
     let mut fields = field_totals(&run);
     let tasks = run.kernel().statics().config.catalogue.tasks.clone();
     let types = run.kernel().statics().types.clone();
@@ -121,12 +149,20 @@ fn check_run(config: Value, ops: &[COp]) -> Result<(usize, usize), TestCaseError
                             *expected.entry(k.clone()).or_insert(0) += per * *units as i128;
                         }
                         if let Some(d) = &t.draws {
-                            *field_change.entry(d.field.clone()).or_insert(0) -= d.per_unit as i128 * *units as i128;
+                            // (From a field that holds a kind, a draw moves it into a holding: the kind's total is unchanged.)
+                            if fields.contains_key(&d.field) {
+                                *field_change.entry(d.field.clone()).or_insert(0) -= d.per_unit as i128 * *units as i128;
+                            }
                             drawn += 1;
                         }
                         for (k, per) in &t.emits {
                             if fields.contains_key(k) {
                                 *field_change.entry(k.clone()).or_insert(0) += *per as i128 * *units as i128;
+                                drawn += 1;
+                            }
+                            // (Emitted to a field that holds a kind: the process's output, put on the cell.)
+                            if let Some(kind) = kind_of.get(k) {
+                                *expected.entry(kind.clone()).or_insert(0) += *per as i128 * *units as i128;
                                 drawn += 1;
                             }
                         }
@@ -141,11 +177,11 @@ fn check_run(config: Value, ops: &[COp]) -> Result<(usize, usize), TestCaseError
             }
         }
         let st = run.kernel().state();
-        let mut have = st.total_goods();
+        let mut have = kind_totals(&run);
         for k in expected.keys() {
             have.entry(k.clone()).or_insert(0);
         }
-        prop_assert_eq!(&have, &expected, "goods not accounted for after {:?}", cmd);
+        prop_assert_eq!(&have, &expected, "a kind not accounted for after {:?}", cmd);
         for h in st.holdings.values() {
             prop_assert!(h.quantity >= 0 || edges.contains(&h.holder), "{} holds {} of {} at {}", h.holder, h.quantity, h.kind, h.at);
         }
@@ -174,6 +210,43 @@ proptest! {
     fn fields_change_only_by_what_work_draws_and_emits_and_by_nature(ops in proptest::collection::vec(cop_strategy(), 1..120)) {
         check_run(world_with_fields(), &ops)?;
     }
+
+    #[test]
+    fn a_kind_a_field_holds_is_conserved_over_holdings_cells_and_natures_edge(ops in proptest::collection::vec(cop_strategy(), 1..120)) {
+        check_run(world_with_a_kind(), &ops)?;
+    }
+}
+
+/// A draw from a field that holds a kind is held by whoever drew it, where they drew it; a world that says nothing of
+/// kinds draws as it always did (into nothing: the backstop's `vanishing` names it).
+#[test]
+fn a_draw_from_a_field_that_holds_a_kind_is_held() {
+    let mut run = Run::start(world_with_a_kind(), "draw-held", Vec::new(), None).unwrap();
+    let before = run.kernel().state().holding("devco", "s-shop", "water");
+    let r = step(&mut run, &work_cmd("draw", 10)).expect("accepted");
+    let done = r.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { done, .. } => Some(*done), _ => None }).unwrap();
+    run.command(&Command::Advance { to: done }).unwrap();
+    assert_eq!(run.kernel().state().holding("devco", "s-shop", "water") - before, 30, "ten units of three litres, held at the shop");
+    let mut old = Run::start(world_with_fields(), "draw-gone", Vec::new(), None).unwrap();
+    let r = step(&mut old, &work_cmd("draw", 10)).expect("accepted");
+    let done = r.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { done, .. } => Some(*done), _ => None }).unwrap();
+    old.command(&Command::Advance { to: done }).unwrap();
+    assert!(old.kernel().state().holdings.values().all(|h| h.kind != "water"));
+}
+
+/// A world that holds a kind in a field refuses to load where it would count it from anything but nought, or names a
+/// kind it does not have.
+#[test]
+fn a_field_holds_only_a_kind_the_world_has_counted_from_nought() {
+    let refused = |edit: &dyn Fn(&mut Value)| {
+        let mut c = world_with_a_kind();
+        edit(&mut c);
+        Run::start(c, "field-kind", Vec::new(), None).err().map(|e| format!("{e:?}"))
+    };
+    assert!(refused(&|_| {}).is_none());
+    assert!(refused(&|c| c["catalogue"]["fields"][0]["kind"] = json!("milk")).unwrap().contains("holds no kind"));
+    assert!(refused(&|c| c["catalogue"]["fields"][0]["baseline"] = json!(5)).unwrap().contains("from nought"));
+    assert!(refused(&|c| c["catalogue"]["fields"][0]["min"] = json!(-5)).unwrap().contains("from nought"));
 }
 
 /// Not vacuous: goods do move (imports, deliveries) and edges go negative; work does draw from and emit to the field.

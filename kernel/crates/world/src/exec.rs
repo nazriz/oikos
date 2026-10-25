@@ -1226,10 +1226,16 @@ impl<'a> Exec<'a> {
                 self.st.touch_structure(&target);
             }
         }
-        // Drawn from the field; emitted to fields (at the corner cell) and counters.
+        // Drawn from the field; emitted to fields (at the corner cell) and counters. A field that holds a kind (law 8):
+        // what is drawn goes into the actor's holding there, and nothing is drawn into nothing.
         if let Some((field, cell, left)) = drawn {
+            let kind = self.s.config.catalogue.fields.iter().find(|f| f.id == field).and_then(|f| f.kind.clone());
             let n = Arc::make_mut(self.st.nature.as_mut().unwrap());
+            let had = n.fields.get(&field).and_then(|m| m.get(&cell)).copied().unwrap_or(0);
             n.fields.entry(field).or_default().insert(cell, left);
+            if let Some(k) = kind {
+                self.add_holding(&me, &at, &k, (had - left) as Money, c)?;
+            }
         }
         if let Some(x) = spec.as_ref().filter(|x| !x.emits.is_empty()) {
             let corner = self.st.structures[&at].at.clone();
@@ -1240,6 +1246,10 @@ impl<'a> Exec<'a> {
                 } else if let Some(f) = self.s.config.catalogue.fields.iter().find(|f| &f.id == k) {
                     if let Some(n) = self.st.nature.as_mut().map(Arc::make_mut) {
                         let cur = n.fields.get(k).and_then(|m| m.get(&corner)).copied().unwrap_or(f.baseline);
+                        // (A field that holds a kind is a stock: what is put on a cell beyond its bound is refused, not lost.)
+                        if f.kind.is_some() && cur.checked_add(by).is_none_or(|x| x > f.max) {
+                            return Err(refuse(RefusalCode::Overflow, format!("{k} at {corner} would pass its most ({})", f.max)));
+                        }
                         n.fields.entry(k.clone()).or_default().insert(corner.clone(), cur.saturating_add(by).clamp(f.min, f.max));
                     }
                 }
