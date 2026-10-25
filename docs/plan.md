@@ -8,14 +8,14 @@ Status words: `[x]` landed on main, `[~]` in progress, `[ ]` not started, `[?]` 
 
 ## Now
 
-- [~] **Memory per person.** A 10,000-person month peaked at about 500 KB a person; target about 50 KB, enforced by a
+- [~] **Memory per person.** A 10,000-person month peaked at about 500 KB a person; target about 50 KB (the representation rewrite's, after foundations-2 phase 2: 90 to 120 KB, Naz 2026-10-26; then tiered storage, docs/design/performance.md), enforced by a
   test like the time budgets, results byte-identical (docs/design/performance.md, risk SC-1).
   - [x] Measure bytes per person at peak by component, at 1,000, 10,000 and 50,000 people (`mem-budget`, 8c28f399).
   - [x] The budget and its backstop test (a 1,000-person month fails over budget) (`mem-budget`, 8c28f399; ceiling 590 KB, lowered with each cut).
   - [~] Compact minds and memories (a cloud agent, branch `mem-minds`).
   - [x] A state hash worked out as it goes, without the cache of encoded copies (`mem-state-hash`, a60f9ae3).
   - [x] What people have seen, held compactly (any bound on what they remember is a law: to the owner first) (`mem-seen`, 7f81ceb3: held once for all who see it the same; no bound). Records delivered (`mem-delivered`) and buildings' facts (`mem-facts`) the same way.
-  - [ ] No whole-world copies during a step.
+  - [x] No whole-world copies during a step (the state hash streamed, `mem-state-hash`; a round's decisions decided a window at a time and not kept as values, `mem-first`, 2e3f6277).
   - [x] 50,000 people for a month and 100,000 for a week, measured (with `mem-minds`: 14.7 GB and 604 s; 31.0 GB and 320 s; docs/design/performance.md).
 - [x] **Foundations-2, phase 1: capacity** (law 10). Every act has a time, every system its hours and lanes; casework
   done by officers' minutes (WM-14). Landed at 0824efb6; tag `pre-foundations-2` is main at 8570d699, before it.
