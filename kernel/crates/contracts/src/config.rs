@@ -1266,13 +1266,16 @@ struct Parts {
     bytes: zstd::stream::Encoder<'static, Vec<u8>>,
     len: u64,
     scratch: Vec<u8>,
+    /// The participants' channel lists read so far, by their canonical JSON: a town's people have one or two lists
+    /// among them, each held once for all who have it (as a list the participant shares with the state already).
+    channels: BTreeMap<Vec<u8>, Arc<Vec<Channel>>>,
     /// What went wrong, told the way the whole config's check tells it (the reader's own error carries no more).
     failed: Option<String>,
 }
 
 impl Parts {
     fn new() -> Parts {
-        Parts { list: vec![], bytes: zstd::stream::Encoder::new(vec![], CANON_LEVEL).expect("an encoder"), len: 0, scratch: vec![], failed: None }
+        Parts { list: vec![], bytes: zstd::stream::Encoder::new(vec![], CANON_LEVEL).expect("an encoder"), len: 0, scratch: vec![], channels: BTreeMap::new(), failed: None }
     }
 
     fn write(&mut self, b: &[u8]) {
@@ -1297,7 +1300,23 @@ impl Parts {
         canon::write_value(&v, &mut b);
         self.write(&b);
         self.scratch = b;
-        self.list.push(ParticipantCfg::deserialize(v).map_err(|e| format!("config does not match contract: {e}"))?);
+        let channels_key = v.get("channels").map(|c| {
+            let mut k = Vec::new();
+            canon::write_value(c, &mut k);
+            k
+        });
+        let mut p = ParticipantCfg::deserialize(v).map_err(|e| format!("config does not match contract: {e}"))?;
+        if let Some(k) = channels_key {
+            // (The same text read into the same list: the one held already, if there is one.)
+            match self.channels.get(&k) {
+                Some(same) if **same == *p.channels => p.channels = same.clone(),
+                Some(_) => {}
+                None => {
+                    self.channels.insert(k, p.channels.clone());
+                }
+            }
+        }
+        self.list.push(p);
         Ok(())
     }
 

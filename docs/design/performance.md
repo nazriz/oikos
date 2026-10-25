@@ -60,6 +60,16 @@ held whole. Minds and memories are `mem-minds`'s (compact formats).
 | main (`3b87959e`) | 693 MB | 5.25 GB | 34.2 GB | 590 KB | |
 | the state hash streamed, no cache (`mem-state-hash`) | 592 MB | 4.34 GB | | 480 KB | +0.4% at 10,000, +0.1 to 2.6% at 1,000 |
 | what's been seen held once (`mem-seen`) | 521 MB | 3.12 GB | 17.2 GB (956 s, against 1,004) | 410 KB | at or under main: -0.5 to 0% at 1,000, -10.6% at 10,000, -21% at 50,000 |
+| records delivered without bytes for code actors; channel lists shared (`mem-delivered`) | 512 MB | 2.98 GB | 17.0 GB (857 s) | 390 KB | paired with main at 4 threads, three times on each profile: wall -1 to -5%, user CPU -5 to -8% |
+
+*Records as delivered.* The kernel kept, for every record anyone was shown, its canonical bytes and what it adds to a
+seat's knowledge, for the whole run. A code actor's look needs only what it adds: its bytes are now made only for an
+observation that is written (a seat's, or one whose hash the log keeps), and kept as before. A town's people's
+channel lists (one or two among them) are read once at the start and shared.
+
+*How the cost was told.* Instructions retired move by 1 to 2% between runs of the same build as the machine's load
+varies (the thread pool's idle threads spin), so a cost of that size is told by running main and the cut in turn on
+the same towns, three times each, at a quiet hour: `pair.sh`, its numbers above.
 
 *What's been seen.* A building as someone sees it (its spaces, who is in each where that can be told, its wear) was
 made at every look and kept by everyone who saw it, each their own copy: at 50,000 people, 408 KB a person. Now it is
