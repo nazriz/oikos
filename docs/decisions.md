@@ -8848,3 +8848,68 @@ log against the same town built at 3d113a1f.
   least ten files have one, and only when it is over 1). The per-file limit is unchanged.
 - **Revisit if:** the recorded times drift (they are rewritten by whole runs), or a real slowdown of every file at once (a
   slower kernel) is hidden by it; then compare against a quiet-machine run.
+
+## 2026-10-25 · Citizens' minds and memories held compactly (SC-1; branch `mem-minds`; no result changes; no model called)
+
+**Measured first.** A sampling heap profile (`--features heapprof`, 8 KB rate; a dump at the run's end, `heapprof::dump("end")`,
+added to `oikos-kernel world`) of main's 1,000-person month (au-vic, `living.initiative_bps=10000`): what the citizen's
+code holds (stacks through `oikos_actors::citizen` or `::mind`) is **84.8 MB for 1,003 people, about 85 KB a person**, of
+a 663 MB peak footprint. The largest holders: what a person last wrote to their record, kept as `serde_json` values to
+compare the next write with (`State::written`, 16 KB a person); the mind's and the life's readings of their params, each
+person's own copy though nearly all alike (the mind's `P` with the `Inner`, `Wants`, culture and town-memory copies of its
+parts, about 10 KB; the life's `Params`, about 5 KB); the person and the mind themselves (7.7 KB each inline, the params'
+copies part of it); the book's indexes (about 11 KB); their home's building as last seen, copied out of the picture
+(2.8 KB); what others told them (2.1 KB); the unit's draws (3.9 KB).
+
+**What changed (each result-identical; the saved memories unchanged, so snapshots are too).**
+- *The params read once for all who have them alike but for a person's own members* (`citizen::params::PERSONS_OWN`:
+  `beliefs`, `own_values`, `started`, `stops_work_at`, `trade`, the members the generator gives each person their own).
+  The life's `Params::of` gives `Given` (the person's own, by name, and the rest, `Params`, through `Deref`); the mind's
+  `P` holds the person's own and its `Common` through `Deref`. Each rest is read from the params less those members, and
+  looked up by their text (and, for the mind, the world's dials and tick: all `Common::of` reads) with
+  `controller::read_once`: the same text, the same reading, held once. The mind's parts take theirs from it shared
+  (`Arc`): `Inner`'s params, population figures and outlook, `Wants`' params, `Culture`'s and `TownMemory`'s params
+  (from the culture dial's), the founding params (read once by their two members' text).
+- *What a person last wrote to their record kept as text* (`mind::packed::Packed`): read back where it is compared or
+  shown, it is the value it was made from (serde_json writes every number so that it reads back to the same bits, and a
+  map in key order); saved, the value. The mind's `started` figures, read once at the first plan, likewise.
+- *Their home's building shared with the picture* (`Absorbed::home_site` an `Arc`, as the picture holds it).
+- *Boxed where a map's node or the struct held room for nothing*: what others told us (a map node holds eleven of its
+  values, some 250 bytes each), the optional culture and town memory (1 KB a person where the culture dial is off), a
+  home being sold or bought.
+- *The book's places* (`common::book::Place`): minted ids (`rec.<n>`) in a sorted list, pushed at its end or put within
+  64 of it (16 bytes a record against a map node's 45 or so), the rest in a map; the statements of each kind and those
+  standing in one map. *The draws' keys* as `Box<str>` (exactly their text).
+
+**Measured after** (release builds, 8 engine threads, each run alone in a slot; the machine's load 20 to 30):
+- What the citizen's code holds at the 1,000-person month's end: **84.8 MB to 43.4 MB, about 85 KB to 43 KB a person**
+  (the profile of the same run). Of that 43 KB: the person and mind inline (8.5 KB), the book (about 10 KB), the record's
+  text, ties, what they learned, teachings, gatherings, word of mouth and the rest each under 1.5 KB.
+- Peak footprint, 1,000 people x 30 days: au-vic 663 to 609 MB, gb-eng 622 to 591, us-oh 534 to 506.
+- 10,000 people x 30 days (au-vic, a town made as SC-1's was: `town-1000.yaml`, `citizens=10000`): **5.10 to 4.68 GB** peak footprint (5.20 to 4.75 GB
+  resident), 1,180 to 1,161 G instructions, main thread 111 to 97 s of CPU.
+- Identical: the same final state hash and log digest (the log as written, less the header's build id and each entry's
+  own hash and prev) as main (`3b87959e`) on 30-day runs of the 1,000-person towns of au-vic (`b98638694d4b...`,
+  `ec2cc14727186a53`), gb-eng (`0b5859fe...`, `cf781cfa5b33f4cf`) and us-oh (`b5d61ceb...`, `2e29c52dfac0e567`), of the
+  200-person towns of the three, and of the 10,000-person au-vic month (`ce1314d1...`, `71cd6c7043f254ec`); and what
+  every actor keeps, as `OIKOS_KEPT` counts it from their saved memories, the same at the end. Tests:
+  `kernel/tests/mind_memory.rs`: held always, in three profiles' generated towns every person's shared readings are
+  what they would have read of all their params alone, one reading for each set of params alike but for their own; and
+  the proof against main, `#[ignore]`d and run by hand (`cargo test --test mind_memory -- --ignored`: the three
+  200-person living towns run a month to main's state hash and log digest), since a pin of a whole town is a change
+  detector (docs/testing.md) and culture-dial.test.ts is the one alarm kept. Beside them: the book finds every record
+  where it was taken in, in whatever order they come and after letting go (`common/tests.rs`); people given the same
+  params but their own hold one reading (`mind/tests.rs`); `packed`'s round trip, floats to the bit.
+- **Again on main as it moved** (2e3f6277, after scale-next's cuts and foundations 2 phase 1; merged with no
+  overlap in code): the same state hash and log digest on 30-day runs of the three profiles' 1,000-person towns
+  (au-vic `2220ea75...`/`f11b3714e6ae067e`, gb-eng `dca5e9de...`/`3ed720ffc2a55ad1`, us-oh `5e799346...`/
+  `9f1f372c7269a6c2`); peak footprint 512 to 466 MB, 494 to 445, 442 to 400 (about 45 KB a person). The ignored
+  proof's pins taken again from that main.
+- **Not reached:** the owner's 50 KB a person is for the whole run; minds and memories are now about 43 KB of the 10,000
+  town's 468 KB a person. The rest is the run's own (the hash's caches, knowledge, the engine, the log's buffer), the
+  other SC-1 work.
+- **Revisit if** a module comes to read one of `PERSONS_OWN` in the shared part (it would read nothing there: the
+  member must then be read per person), or a generator gives each person another member of their own (then add it, or
+  each person's reading is their own again, as before: memory, not results); a book's records come far out of order
+  (then most go to the map, as before); a profile at 50,000 shows what people keep (the book, the inline state) to
+  matter beside the run's own holders.

@@ -327,3 +327,42 @@ fn the_same_inputs_give_the_same_mind_whatever_else_ran() {
     let _ = std::mem::size_of::<CitizenMind>();
 }
 
+/// SC-1: what a mind and a life read of their params is read once for all given them alike but for a person's own
+/// members, and held once; each person's own are theirs.
+#[test]
+fn people_given_the_same_params_but_their_own_hold_one_reading_of_them() {
+    use super::citizen::P;
+    use crate::citizen::params::Params;
+    let given = |me: &str, own: Value| {
+        let mut p = json!({ "bank": "bank", "essentials": 41_000, "values": { "values": { "security": { "mean_bps": 6_000, "sd_bps": 900 } } },
+            "inner": { "trust": { "kept": 5 } }, "wants": { "kept": 4 }, "founding": { "chance_bps": 50 } });
+        p.as_object_mut().unwrap().extend(own.as_object().unwrap().clone());
+        let mut c = ctx(p, json!({ "founding": { "shapes": ["club"] }, "initiative_bps": 10_000 }));
+        c.entity = me.into();
+        c.participant = format!("p.{me}");
+        c
+    };
+    let ann = given("ann", json!({ "own_values": { "security": 7_000 }, "beliefs": { "t1": 3_000 }, "started": { "trade_days": 30 }, "trade": "retail", "stops_work_at": 70 }));
+    let bob = given("bob", json!({ "own_values": { "security": 2_000 }, "started": { "place_days": 9 } }));
+    let (pa, pb) = (P::of(&ann), P::of(&bob));
+    assert!(Arc::ptr_eq(&pa.c, &pb.c), "one reading of the mind's params for both");
+    assert!(Arc::ptr_eq(&pa.inner, &pb.inner) && Arc::ptr_eq(&pa.wants, &pb.wants));
+    assert_eq!((pa.me.as_str(), pb.me.as_str(), pa.participant.as_str()), ("ann", "bob", "p.ann"));
+    assert_eq!(pa.own_values.as_ref().unwrap()["security"], 7_000);
+    assert_eq!(pb.own_values.as_ref().unwrap()["security"], 2_000);
+    assert_eq!((pa.beliefs.get("t1"), pb.beliefs.get("t1")), (Some(&3_000), None));
+    assert_eq!((pa.started.as_ref().map(super::packed::Packed::value), pb.started.as_ref().map(super::packed::Packed::value)), (Some(json!({ "trade_days": 30 })), Some(json!({ "place_days": 9 }))));
+    assert_eq!((pa.essentials, pa.bank.as_deref(), pa.inner.trust.kept, pa.wants.kept), (41_000, Some("bank"), 5, 4));
+    let (la, lb) = (Params::of(&ann.params).unwrap(), Params::of(&bob.params).unwrap());
+    assert!(Arc::ptr_eq(&la.common, &lb.common), "one reading of the life's params for both");
+    assert_eq!((la.trade.as_deref(), lb.trade.as_deref()), (Some("retail"), None));
+    assert_eq!((la.started.as_ref().and_then(|s| s.trade_days), lb.started.as_ref().and_then(|s| s.place_days)), (Some(30), Some(9)));
+    assert_eq!((la.stop_age(0), la.essentials), (Some(70), 41_000));
+    // Anything else of theirs that differs, and the reading is theirs: never someone else's.
+    let mut cara = given("cara", json!({}));
+    cara.params.insert("essentials".into(), json!(52_000));
+    let (pc, lc) = (P::of(&cara), Params::of(&cara.params).unwrap());
+    assert!(!Arc::ptr_eq(&pc.c, &pa.c) && !Arc::ptr_eq(&lc.common, &la.common));
+    assert_eq!((pc.essentials, lc.essentials), (52_000, 52_000));
+}
+

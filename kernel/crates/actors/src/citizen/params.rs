@@ -26,8 +26,6 @@ pub struct Params {
     pub income_window_days: i64,
     pub buffer_months: i64,
     pub retirement_age: Option<i64>,
-    /// An age, or "never" (`StopsWork`).
-    pub stops_work_at: Option<Value>,
     pub stop_work_curve: Option<Vec<FromBps>>,
     pub own_work: Option<OwnWork>,
     pub in_labour_force: bool,
@@ -38,9 +36,6 @@ pub struct Params {
     #[serde(deserialize_with = "shared_ventures")]
     pub ventures: std::sync::Arc<Vec<Venture>>,
     pub found_own_buffer_months: i64,
-    /// The trade they worked in as the year began (the industry of their job then), which an application of theirs
-    /// names until they have worked elsewhere (docs/design/market-realism.md, ME-2).
-    pub trade: Option<String>,
     pub give_up_months: i64,
     pub possession: Option<Possession>,
     pub shop_every_days: i64,
@@ -52,7 +47,6 @@ pub struct Params {
     pub frictions: Frictions,
     /// What a person keeps of public goings-on (citizen/memory.rs; risk SC-1). None: everything, for good.
     pub public_memory: Option<super::memory::PublicMemory>,
-    pub started: Option<Started>,
     pub essentials_units: i64,
     pub goods: String,
     /// How a household divides its spending among the kinds on offer (the linear expenditure system: the profile's
@@ -130,7 +124,6 @@ impl Default for Params {
             income_window_days: 90,
             buffer_months: 3,
             retirement_age: None,
-            stops_work_at: None,
             stop_work_curve: None,
             own_work: None,
             in_labour_force: true,
@@ -139,7 +132,6 @@ impl Default for Params {
             participation_bps: 10_000,
             ventures: Default::default(),
             found_own_buffer_months: 1,
-            trade: None,
             give_up_months: 6,
             possession: None,
             shop_every_days: 14,
@@ -150,7 +142,6 @@ impl Default for Params {
             sale_board: String::new(),
             frictions: Frictions::default(),
             public_memory: None,
-            started: None,
             essentials_units: 10,
             goods: "goods".into(),
             demand: None,
@@ -210,13 +201,61 @@ impl Default for Params {
     }
 }
 
+/// The members of a citizen's params that are a person's own (the generator gives each their own: their values,
+/// beliefs, how long they have been where they are, when they stop work, their trade). Each person's are read for them
+/// (life's in `Own`, the mind's in its `P`); what life and mind read of the rest is read from the rest alone, once for
+/// all who have the rest alike (`Given`, the mind's `Common`). Neither reading of the rest reads any of these.
+pub const PERSONS_OWN: [&str; 5] = ["beliefs", "own_values", "started", "stops_work_at", "trade"];
+/// Life's own (`Own`).
+const LIFE_OWN: [&str; 3] = ["started", "stops_work_at", "trade"];
+
+/// What of a person's parameters is theirs alone.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Own {
+    /// An age, or "never" (`StopsWork`).
+    pub stops_work_at: Option<Value>,
+    /// The trade they worked in as the year began (the industry of their job then), which an application of theirs
+    /// names until they have worked elsewhere (docs/design/market-realism.md, ME-2).
+    pub trade: Option<String>,
+    pub started: Option<Started>,
+}
+
+/// A person's parameters: their own (`Own`, by name: `p.trade`), and the rest (`Params`, through `Deref`), read once
+/// for all whose params are alike but for their own and held once for them all (risk SC-1: a copy each was about 5 KB
+/// a person). The rest is read from the same members the same way, so it is what each would have read.
+#[derive(Debug, Clone)]
+pub struct Given {
+    pub stops_work_at: Option<Value>,
+    pub trade: Option<String>,
+    pub started: Option<Started>,
+    pub common: std::sync::Arc<Params>,
+}
+
+impl std::ops::Deref for Given {
+    type Target = Params;
+    fn deref(&self) -> &Params {
+        &self.common
+    }
+}
+
 impl Params {
     /// The parameters as the world gives them (a role's with the person's own on top, as the engine composes them).
-    pub fn of(params: &crate::Params) -> Result<Params, String> {
+    pub fn of(params: &crate::Params) -> Result<Given, String> {
         // (A null is "the module's default", as TS's `params` read it: dropped before reading.)
-        let given: serde_json::Map<String, Value> = params.iter().filter(|(_, v)| !v.is_null()).map(|(k, v)| (k.clone(), v.clone())).collect();
-        serde_json::from_value(Value::Object(given)).map_err(|e| format!("citizen.default's parameters: {e}"))
+        let given = |of: &dyn Fn(&str) -> bool| -> serde_json::Map<String, Value> {
+            params.iter().filter(|(k, v)| !v.is_null() && of(k.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect()
+        };
+        let err = |e: serde_json::Error| format!("citizen.default's parameters: {e}");
+        // (Keyed by the text of what it is read from: the same text, the same reading.)
+        let rest = || serde_json::from_value::<Params>(Value::Object(given(&|k| !PERSONS_OWN.contains(&k))));
+        let common = oikos_contracts::controller::read_once(&params.text_without(&PERSONS_OWN), rest).map_err(err)?;
+        let own: Own = serde_json::from_value(Value::Object(given(&|k| LIFE_OWN.contains(&k)))).map_err(err)?;
+        Ok(Given { stops_work_at: own.stops_work_at, trade: own.trade, started: own.started, common })
     }
+}
+
+impl Given {
     /// The age at which this person stops work (none: never), from their own (`stops_work_at`), the world's curve
     /// (drawn once, `q` of 10,000), or the world's one age.
     pub fn stop_age(&self, q: i64) -> Option<i64> {

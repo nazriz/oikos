@@ -233,7 +233,7 @@ pub enum Taken {
 /// What a person remembers of the town: at most `slots` events.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TownMemory {
-    pub p: CultureParams,
+    pub p: std::sync::Arc<CultureParams>,
     held: Vec<Slot>,
     cached: Option<HeardSection>,
     dirty: bool,
@@ -243,7 +243,8 @@ pub struct TownMemory {
 }
 
 impl TownMemory {
-    pub fn new(p: CultureParams) -> TownMemory {
+    pub fn new(p: impl Into<std::sync::Arc<CultureParams>>) -> TownMemory {
+        let p = p.into();
         TownMemory { p, held: vec![], cached: None, dirty: true, version: 0, seen: vec![] }
     }
 

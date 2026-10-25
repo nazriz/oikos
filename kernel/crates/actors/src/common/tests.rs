@@ -36,6 +36,42 @@ fn a_book_keeps_what_stands_in_the_order_seen() {
     assert_eq!(b.open("law").map(|r| r.id.as_str()).collect::<Vec<_>>(), ["rec.9"]);
 }
 
+/// SC-1: the book's places are kept in a sorted list for minted ids that come near the end, a map for the rest; in
+/// whatever order records come (in order, a little out of it, far back, not minted), each is found where it was taken
+/// in, and still after some are let go.
+#[test]
+fn a_book_finds_every_record_where_it_was_taken_in_whatever_order_they_come() {
+    // In order, then a few just behind, then some far back (behind more than 64), and some ids not minted.
+    let mut ids: Vec<String> = (100..300).map(|n| format!("rec.{n}")).collect();
+    ids.extend(["rec.298", "rec.97", "rec.5", "rec.299", "law-1", "rec.1", "rec.07", "x"].map(String::from));
+    ids.extend((300..400).rev().map(|n| format!("rec.{n}")));
+    let recs: Vec<Arc<Record>> = ids.iter().enumerate().map(|(i, id)| st(id, i as i64, if i % 3 == 0 { "news" } else { "law" }, "city", json!({}))).collect();
+    let mut b = Book::new();
+    b.take_all(&recs);
+    let mut first: Vec<&str> = vec![];
+    for id in &ids {
+        if !first.contains(&id.as_str()) && !(id == "rec.07" && first.contains(&"rec.7")) {
+            first.push(id);
+        }
+    }
+    assert_eq!(b.len(), first.len(), "each id taken in once");
+    for (place, id) in first.iter().enumerate() {
+        assert_eq!(b.place_of(id), Some(place), "{id}");
+        assert!(b.has(id) && b.get(id).unwrap().id == *id);
+    }
+    assert!(!b.has("rec.6") && !b.has("rec.400") && b.place_of("y").is_none());
+    // Let go of every other news item: the rest are found at their new places, the others not at all.
+    let gone = |r: &Record| matches!(&r.body, oikos_sight::RecordBody::Statement { kind, .. } if kind == "news") && r.at % 2 == 0;
+    b.forget(|r| !gone(r));
+    let kept: Vec<&&str> = first.iter().filter(|id| !gone(&recs.iter().find(|r| r.id == **id).unwrap())).collect();
+    assert_eq!(b.len(), kept.len());
+    for (place, id) in kept.iter().enumerate() {
+        assert_eq!(b.place_of(id), Some(place), "{id} after letting go");
+    }
+    assert!(first.iter().filter(|id| !kept.contains(id)).all(|id| !b.has(id)));
+    assert_eq!(b.all("law").count() + b.all("news").count(), kept.len());
+}
+
 #[test]
 fn an_amended_law_replaces_the_one_it_names_for_its_speaker_only() {
     let mut b = Book::new();

@@ -58,7 +58,7 @@ pub struct Absorbed {
     /// Cuts of hours asked of us (work's `hours_asked` drains it).
     pub hours_asked: Vec<HoursAsked>,
     /// Our home's building, as we last saw it (recourse, housing).
-    pub home_site: Option<SiteStructure>,
+    pub home_site: Option<std::sync::Arc<SiteStructure>>,
     pub bin_seen: BinSeen,
     /// What our own business has paid us, kept as long as we judge it by (work's ventures).
     pub drawn_log: Vec<(i64, i64)>,
@@ -453,7 +453,7 @@ impl Person {
             let Seen::Sites { cells, .. } = ch else { continue };
             for c in cells.iter() {
                 let Some(st) = c.structure.as_ref().filter(|s| s.structure == home.structure) else { continue };
-                self.absorbed.home_site = Some((**st).clone());
+                self.absorbed.home_site = Some(st.clone());
                 let view = st.variables.as_ref().and_then(|v| v.get(&self.p.complain_about)).cloned();
                 let now = view.as_ref().map_or(0, |v| crate::common::variable_today(v, t));
                 let bin = &mut self.absorbed.bin_seen;

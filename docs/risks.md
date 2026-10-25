@@ -1490,7 +1490,8 @@ The mechanism:
   its ceiling lowered with each cut). 50,000 people for a month: 14.7 to 17 GB. 100,000 for a week: 31 GB, its peak the
   first moment (a round's decisions held whole while seats are in it). Left: the engine's units and the records
   delivered, the world's records made, minds, the typed config.
-- **Where:** `docs/design/performance.md` ("Bytes per person"); docs/decisions.md 2026-10-25 and 2026-10-26;
+- **Where:** `docs/design/performance.md` ("Bytes per person"; "Citizens' minds and memories"); docs/decisions.md
+  2026-10-25 and 2026-10-26;
   `kernel/src/heapprof.rs`, `scripts/heapprof.ts --components`.
 - **Effect:** A study at 100,000 for a month may not fit; one at 50,000 has room.
 - **L / I:** medium / medium · **Status:** partly fixed: the first moment's decisions next, then the engine's units.
