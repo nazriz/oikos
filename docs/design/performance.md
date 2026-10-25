@@ -52,6 +52,14 @@ each building as they last saw it, so it grows as people times the people they s
 peak fell on the month's checkpoint, when the state hash wrote the whole state's canonical bytes out of a copy it
 held whole. Minds and memories are `mem-minds`'s (compact formats).
 
+**The cuts, each landed alone, each byte-identical (the same state hash and log digest on 203 people, three profiles'
+1,000 and 10,000, 30 days).** Peak resident at 14 threads; the budget's ceiling after it; instructions against main.
+
+| cut | 1,000 au-vic | 10,000 | 50,000 | ceiling | instructions |
+|---|---|---|---|---|---|
+| main (`3b87959e`) | 693 MB | 5.25 GB | 34.2 GB | 590 KB | |
+| the state hash streamed, no cache (`mem-state-hash`) | 592 MB | 4.34 GB | | 480 KB | +0.4% at 10,000, +0.1 to 2.6% at 1,000 |
+
 ## What held memory, and the config read participant by participant (branch `scale-next`, 2026-10-25)
 
 au-vic-2026 from `worlds/town-1000.yaml` with `citizens=10000` (and `50000`), `living.initiative_bps=10000`, seed 1,
