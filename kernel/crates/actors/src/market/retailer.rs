@@ -392,6 +392,10 @@ pub struct Shop<B: Body> {
     /// Order -> what its customer paid over our price for what it buys (refunded with its note).
     #[serde(default)]
     over_paid: BTreeMap<String, i64>,
+    /// Order -> how many its customer ordered, where our price had risen since and their money bought fewer: the note
+    /// says what was ordered, and the price we charged for what it bought.
+    #[serde(default)]
+    repriced: BTreeMap<String, i64>,
 }
 
 impl<B: Body> Shop<B> {
@@ -450,6 +454,7 @@ impl<B: Body> Shop<B> {
             sys_credit: 0,
             account_now: None,
             over_paid: BTreeMap::new(),
+            repriced: BTreeMap::new(),
             body,
             book: Book::new(),
             p,
@@ -906,6 +911,14 @@ fn cond(field: &str, op: &str, value: Value) -> oikos_sight::Condition {
 }
 
 impl<B: Body> Shop<B> {
+    /// An order's note has gone out: what it settled (items a system got wrong, money paid over our price, the number
+    /// ordered where our price had risen) is forgotten.
+    fn settle(&mut self, order: &str) {
+        self.faulty.remove(order);
+        self.over_paid.remove(order);
+        self.repriced.remove(order);
+    }
+
     /// Serving's outcome: the goods went, or the world refused (and the order waits, or is refunded).
     #[allow(clippy::too_many_arguments)]
     fn served(&mut self, o: &Order, q: i64, share: i64, crew: &[String], by_system: &[Sys], before: i64, finished: bool, since: i64, day: i64, t: i64, done: Done, cx: &mut Cx) -> Vec<Step<Then>> {
@@ -918,8 +931,19 @@ impl<B: Body> Shop<B> {
                 if qc > 0 {
                     self.pace.done(crew, t.div_euclid(DAY));
                 }
+                if finished {
+                    self.settle(&o.id);
+                }
                 return vec![];
             }
+        }
+        // (Not served: the items our systems were to serve in it were not, so none of them was got wrong.)
+        if let Some(f) = self.faulty.get_mut(&o.id) {
+            for n in before..before + qs {
+                f.remove(&n.to_string());
+            }
+        }
+        if let Done::Outcome(res) = done {
             // (A system the world refuses is switched off, or not ours: not counted on again.)
             if !by_system.is_empty() {
                 self.sys_credit += qs * 10_000;
@@ -986,7 +1010,9 @@ impl<B: Body> Shop<B> {
                 _ => String::new(),
             };
             let Some(acct) = self.account_now.clone() else { return vec![] };
-            return vec![self.fill_with(cx, o, 0, before, &[], &[], &format!("We couldn't deliver order {} ({why}): refunding what's left of it.", o.id), &acct)];
+            let note = self.fill_with(cx, o, 0, before, &[], &[], &format!("We couldn't deliver order {} ({why}): refunding what's left of it.", o.id), &acct);
+            self.settle(&o.id);
+            return vec![note];
         }
         if finished {
             self.queue.insert(0, Queued { o: o.clone(), served: before, since });
@@ -1033,17 +1059,29 @@ impl<B: Body> Shop<B> {
         }
         if total >= 0 {
             // (What a system of ours got wrong is refunded with what we could not serve.)
-            let faulty = self.faulty.remove(&o.id).map_or(0, |f| f.len() as i64);
-            let refund = (o.quantity - total + total.min(faulty)) * o.unit_price + self.over_paid.remove(&o.id).unwrap_or(0);
+            // (What the note settles is read here and forgotten only once the note has gone out (`settle`): a serving the
+            // world refuses, or that lapses at the close, waits its turn again, and its note must still carry the
+            // over-payment and the price. Until 2026-10-26 it was forgotten here, and the note of the serving that went
+            // out kept a customer's over-payment: docs/decisions.md, "Main red after foundations-2 phase 1".)
+            let faulty = self.faulty.get(&o.id).map_or(0, |f| f.len() as i64);
+            let refund = (o.quantity - total + total.min(faulty)) * o.unit_price + self.over_paid.get(&o.id).copied().unwrap_or(0);
             if refund > 0 {
                 let memo = if o.quantity > total { format!("Refund: {} {} we couldn't sell you.", o.quantity - total, o.kind) } else { format!("Refund: what you paid over our price of {}.", money(o.unit_price)) };
                 calls.push(pay(&o.account, refund, Pay { from: Some(account.to_string()), for_: Some(memo), ..Default::default() }, cx));
             }
-            let words = if total == o.quantity {
+            // (An order whose money bought fewer at our raised price: the note says what was ordered, and the price we
+            // charged for what it bought, as a till's receipt would.)
+            let ordered = self.repriced.get(&o.id).copied();
+            let words = if ordered.is_none() && total == o.quantity {
                 format!("Served: {total} {} to {} at {}.", o.kind, o.to, o.at)
             } else {
-                format!("Served {total} of the {} {} ordered{}.", o.quantity, o.kind, if refund > 0 { format!("; {} refunded", money(refund)) } else { String::new() })
+                let at = if ordered.is_some() { format!(" (at our price of {} each)", money(o.unit_price)) } else { String::new() };
+                format!("Served {total} of the {} {} ordered{at}{}.", ordered.unwrap_or(o.quantity), o.kind, if refund > 0 { format!("; {} refunded", money(refund)) } else { String::new() })
             };
+            let mut data = json!({ "order": o.id, "kind": o.kind, "ordered": ordered.unwrap_or(o.quantity), "delivered": total, "refund": refund });
+            if ordered.is_some() {
+                data["unit_price"] = json!(o.unit_price);
+            }
             calls.push(say(
                 "delivery_note",
                 &words,
@@ -1051,7 +1089,7 @@ impl<B: Body> Shop<B> {
                     to: Some(vec![o.buyer.clone()]),
                     visible: Some(Visible::Only(vec![o.buyer.clone(), self.me.clone()])),
                     basis: Some(o.id.clone()),
-                    data: Some(json!({ "order": o.id, "kind": o.kind, "ordered": o.quantity, "delivered": total, "refund": refund })),
+                    data: Some(data),
                     ..Default::default()
                 },
             ));
@@ -1372,10 +1410,12 @@ impl<B: Body> Shop<B> {
             self.published_price = -1;
             for x in std::mem::take(&mut self.queue) {
                 steps.push(self.fill_with(cx, &x.o, 0, x.served, &[], &[], "We are not trading: refunding what we had not served.", &acct.account));
+                self.settle(&x.o.id);
             }
             let due = self.orders.due(&self.book, t, |_| true);
             for o in &due.paid {
                 steps.push(self.fill_with(cx, o, 0, 0, &[], &[], "We are not trading: refunding the order.", &acct.account));
+                self.settle(&o.id);
             }
             if self.at.gone && !self.at.closed {
                 self.at.closed = true;
@@ -1550,12 +1590,14 @@ impl<B: Body> Shop<B> {
             if o.kind == self.p.kind && o.unit_price < self.price && o.total() >= self.price && self.price > 0 {
                 let q = o.total() / self.price;
                 self.over_paid.insert(o.id.clone(), o.total() - q * self.price);
+                self.repriced.insert(o.id.clone(), o.quantity);
                 o.quantity = q;
                 o.unit_price = self.price;
             }
             if o.kind != self.p.kind || o.unit_price < self.price {
                 let why = format!("An order {}: refunding it.", if o.kind != self.p.kind { format!("for {}, which we don't sell", o.kind) } else { "below our price".to_string() });
                 steps.push(self.fill_with(cx, &o, 0, 0, &[], &[], &why, &acct.account));
+                self.settle(&o.id);
                 continue;
             }
             self.sold += o.quantity;
