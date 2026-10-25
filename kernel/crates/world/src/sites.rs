@@ -246,7 +246,7 @@ pub fn begin(s: &Statics, st: &mut State, participant: &str, key: &str, path: &s
     let cells: Vec<Vec<Id>> = places.iter().filter_map(|pl| place_cells(st, pl)).collect();
     let seconds = visit_seconds(s, st, person.as_deref(), channels, &cells, look_seconds);
     let mut timeline = st.timelines.get(&timeline_key).cloned().unwrap_or_default();
-    let (starts, done) = oikos_time::place(&mut timeline.lanes, lanes, t, seconds);
+    let (starts, done) = oikos_time::place_within(&mut timeline.lanes, lanes, t, seconds, crate::kernel::lane_hours(s, st, &timeline_key));
     st.timelines.insert(timeline_key, timeline);
     let position = (key != crate::config::SELF).then(|| key.to_string());
     st.schedule(done, Sched::Visit { participant: participant.into(), position: position.clone(), channel: path.into(), places: places.to_vec(), cells: cells.into_iter().flatten().collect(), names });
