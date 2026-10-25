@@ -167,7 +167,11 @@ impl World {
             boundary_accounts,
             currency: currency.clone(),
             tick: c.clock.tick_seconds,
-            act_times: oikos_time::ActTimes::from_orchestration(&c.orchestration),
+            // (A system template's own rows and hours, made into one table at load: law 10, foundations-2 P1.)
+            act_times: c.templates.iter().filter(|t| t.kind == ParticipantKind::System).fold(oikos_time::ActTimes::from_orchestration(&c.orchestration), |a, t| {
+                let rows = t.does.iter().flatten().filter(|r| r.block != "work").filter_map(|r| r.seconds.map(|s| (r.key(), s))).collect();
+                a.with_template(&t.id, oikos_time::TemplateTimes { rows, hours: t.hours.and_then(|h| oikos_time::Hours::new(h.from, h.seconds)) })
+            }),
             performers_in: c.orchestration["performers_in"].as_str().map(String::from),
             randomness: Randomness::new(c.seed),
             nature: oikos_nature::configured(&c.catalogue).then(|| {
@@ -783,6 +787,12 @@ impl World {
         })
     }
 
+    /// The hours a timeline's lanes work in: a system's, its template's (law 10, foundations-2 P1); a person's, none (their
+    /// working day is counted where their work is placed, `over_the_day`).
+    fn lane_hours(&self, who: &str) -> Option<oikos_time::Hours> {
+        lane_hours(&self.s, &self.state, who)
+    }
+
     /// Who is where, for each work in an act that is on a person or a space (literal ids only): kept with the act, which
     /// takes effect hours later.
     fn seen_at_order(&self, blocks: &[Block]) -> BTreeMap<Id, Vec<Id>> {
@@ -811,6 +821,15 @@ impl World {
         }
         if blocks.is_empty() || blocks.len() > 32 {
             return perr("an action has 1..=32 blocks");
+        }
+        // (An act nobody priced for its actor is refused, as it would be when done: law 10, foundations-2 P2.)
+        let p = &self.state.participants[participant];
+        let (actor, template) = match p.kind {
+            ParticipantKind::Person => (oikos_time::Actor::Person, None),
+            ParticipantKind::System => (oikos_time::Actor::System, p.template.as_deref()),
+        };
+        if let Err(k) = self.s.act_times.program(actor, template, blocks.iter().map(|b| (b.name(), b.makes()))) {
+            return Ok(Check { ok: false, refusal: Some(refusal_info(&refuse(RefusalCode::Unpriced, format!("nobody priced {k} for {participant}")))) });
         }
         let mut scratch = self.state.clone();
         Ok(match exec_action(&self.s, &mut scratch, participant, position, blocks, &[]) {
@@ -847,7 +866,11 @@ impl World {
             })
             .max()
             .unwrap_or(0);
-        let seconds = self.s.act_times.program(actor, blocks.iter().map(|b| (b.name(), b.makes()))) + trip;
+        // (A system's own rows first, from its template; then the world's table for its kind; then a default the world
+        // states. Nobody's: the act is refused, `unpriced`.)
+        let template_of = |state: &State, w: &str| state.participants.get(w).filter(|x| x.kind == ParticipantKind::System).and_then(|x| x.template.clone());
+        let own_program = self.s.act_times.program(actor, template_of(&self.state, participant).as_deref(), blocks.iter().map(|b| (b.name(), b.makes())));
+        let seconds = own_program.clone().unwrap_or(0) + trip;
         let ready = t + thinking;
         // Who else does the act's work (F3): the action's `by`, a person other than the actor. The act's own time is theirs,
         // shared (the actor, if it is among them, takes a share; if not, only the second of ordering it).
@@ -864,16 +887,31 @@ impl World {
         // Each performer is charged their own time for the work: a person by the person's row, a system by its template's
         // (the world's table is by who does it), shared among those who do it.
         let kind_of = |state: &State, w: &str| if state.participants.get(w).is_some_and(|x| x.kind == ParticipantKind::System) { oikos_time::Actor::System } else { oikos_time::Actor::Person };
-        let seconds_of = |state: &State, w: &str| self.s.act_times.program(kind_of(state, w), blocks.iter().map(|b| (b.name(), b.makes()))) + trip;
+        let program_of = |state: &State, w: &str| self.s.act_times.program(kind_of(state, w), template_of(state, w).as_deref(), blocks.iter().map(|b| (b.name(), b.makes())));
         let actor_in = by.iter().any(|w| *w == key || w == participant);
+        // (An act nobody priced for whoever is to do it: nobody's time is taken, and it is refused when due, now.)
+        let unpriced = if others.is_empty() || actor_in { own_program.as_ref().err().map(|k| (participant.to_string(), k.clone())) } else { None }
+            .or_else(|| others.iter().find_map(|w| program_of(&self.state, w).err().map(|k| (w.clone(), k))))
+            .map(|(who, k)| {
+                let what = if kind_of(&self.state, &who) == oikos_time::Actor::System { "a system" } else { "a person" };
+                format!("nobody priced {k} for {who}: the world's table of work has no row for it for {what}{}, and states no default", if what == "a system" { " and its template none" } else { "" })
+            });
+        if let Some(why) = unpriced {
+            let pos = position.map(String::from);
+            let placed = crate::state::Placed { unpriced: Some(why), day: crate::exec::day_of(ready), ..Default::default() };
+            self.state.schedule(ready, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone(), blocks: blocks.to_vec(), by: by.to_vec(), placed });
+            return Output { events: vec![Timed::new(t, EventBody::ActionStarted { action, participant: participant.into(), position: pos, starts: ready, done: ready, free: None })] };
+        }
+        let seconds_of = |state: &State, w: &str| program_of(state, w).unwrap_or(0) + trip;
         let n = others.len() as i64 + i64::from(actor_in);
         let by_shares: Vec<(Id, i64)> = others.iter().map(|w| (w.clone(), (seconds_of(&self.state, w) + n - 1) / n)).collect();
+        let only_orders = !others.is_empty() && !actor_in;
         let actor_seconds = if others.is_empty() {
             seconds
         } else if actor_in {
             (seconds + n - 1) / n
         } else {
-            oikos_time::DEFAULT_ACT_SECONDS
+            oikos_time::ORDER_SECONDS
         };
         // One time account per person (docs/design/foundations.md law 1; F1): the hours of a `work` are the time of
         // those who do it, placed on their timelines like any act's time. The act starts when its actor and every one
@@ -897,15 +935,18 @@ impl World {
         for (w, share) in &by_shares {
             *shares.entry(w.clone()).or_insert(0) += share;
         }
-        let free_from = |tl: Option<&crate::state::Timeline>, lanes: usize| -> i64 {
+        // (A system's lanes work within its template's hours, law 10: it is free for this from the next moment of work.)
+        let free_from = |tl: Option<&crate::state::Timeline>, (lanes, hours): (usize, Option<oikos_time::Hours>)| -> i64 {
             let mut lanes_now = tl.map(|x| x.lanes.clone()).unwrap_or_default();
-            oikos_time::place(&mut lanes_now, lanes, ready, 0).0
+            oikos_time::place_within(&mut lanes_now, lanes, ready, 0, hours).0
         };
-        let mut start = free_from(self.state.timelines.get(&key), lanes);
+        let own_lanes = (lanes, self.lane_hours(&key));
+        let actor_free = free_from(self.state.timelines.get(&key), own_lanes);
+        let mut start = actor_free;
         // (A system that does another's work takes it on as many lanes as it has.)
-        let lanes_of = |state: &State, p: &str| state.participants.get(p).filter(|x| x.kind == ParticipantKind::System).map_or(1, |x| x.def.lanes.unwrap_or(1) as usize);
+        let lanes_of = |me: &Self, p: &str| (me.state.participants.get(p).filter(|x| x.kind == ParticipantKind::System).map_or(1, |x| x.def.lanes.unwrap_or(1) as usize), me.lane_hours(p));
         for p in shares.keys().filter(|p| **p != key) {
-            start = start.max(free_from(self.state.timelines.get(p), lanes_of(&self.state, p)));
+            start = start.max(free_from(self.state.timelines.get(p), lanes_of(self, p)));
         }
         // A performer's working day: what is already placed on it, and this act's share, within the day's hours.
         let mut start = start;
@@ -914,7 +955,7 @@ impl World {
         if over.is_some() {
             // (No room in their day: the act is refused, and its actor hears so now, not when the crew would have been free.)
             shares.clear();
-            start = free_from(self.state.timelines.get(&key), lanes);
+            start = actor_free;
             day_idx = crate::exec::day_of(start);
             over = over.take();
         }
@@ -935,12 +976,12 @@ impl World {
             v.extend(others.iter().map(|w| crate::state::WorkCheck { who: w.clone(), at: None, space: None }));
             v
         };
-        let placed = crate::state::Placed { over, day: day_idx, from: start, hours: shares.clone(), seen: self.seen_at_order(blocks), late };
+        let placed = crate::state::Placed { over, day: day_idx, from: start, hours: shares.clone(), seen: self.seen_at_order(blocks), late, unpriced: None };
         let mut done = start;
-        let place = |state: &mut State, who: &Id, lanes: usize, secs: i64, work: i64| {
+        let place = |state: &mut State, who: &Id, (lanes, hours): (usize, Option<oikos_time::Hours>), from: i64, secs: i64, work: i64| {
             let mut tl = state.timelines.get(who).cloned().unwrap_or_default();
-            let (_, d) = oikos_time::place(&mut tl.lanes, lanes, start, secs);
-            for (d, take) in day_portions(start, work) {
+            let (_, d) = oikos_time::place_within(&mut tl.lanes, lanes, from, secs, hours);
+            for (d, take) in day_portions(from, work) {
                 if take > 0 {
                     tl.add_worked(d, take);
                 }
@@ -949,11 +990,15 @@ impl World {
             d
         };
         let own = shares.get(&key).copied().unwrap_or(0);
-        let own_done = place(&mut self.state, &key, lanes, actor_seconds + own, own);
+        // (Someone who only orders it gives the order when they are free, and goes on: the act waits for those who do it,
+        // not for the one who asked. Until foundations-2 P1 the order was held on the actor's lane until the work began, so a
+        // case system that asked its officers to decide a claim could pay nobody until they had.)
+        let order_from = if only_orders && own == 0 { actor_free } else { start };
+        let own_done = place(&mut self.state, &key, own_lanes, order_from, actor_seconds + own, own);
         done = done.max(own_done);
         for (p, share) in shares.iter().filter(|(p, _)| **p != key) {
-            let l = lanes_of(&self.state, p);
-            done = done.max(place(&mut self.state, p, l, *share, *share));
+            let l = lanes_of(self, p);
+            done = done.max(place(&mut self.state, p, l, start, *share, *share));
         }
         let starts = start;
         let free = (own_done < done).then_some(own_done);
@@ -982,6 +1027,8 @@ impl World {
         let mut late_shares: BTreeMap<Id, i64> = BTreeMap::new();
         let result = if !can_act(&self.state.participants[participant]) {
             Err(crate::exec::inactive_refusal(&self.state, participant, position))
+        } else if let Some(d) = placed.unpriced.clone() {
+            Err(refuse(RefusalCode::Unpriced, d))
         } else if let Some(d) = placed.over.clone() {
             let i = blocks.iter().position(|b| matches!(b, Block::Work { .. }));
             Err(Refusal { block: i, ..refuse(RefusalCode::NoTimeLeft, d) })
@@ -1013,7 +1060,7 @@ impl World {
                 self.state = scratch;
                 for (who, secs) in &late_shares {
                     let mut tl = self.state.timelines.get(who).cloned().unwrap_or_default();
-                    oikos_time::place(&mut tl.lanes, 1, t, *secs);
+                    oikos_time::place_within(&mut tl.lanes, 1, t, *secs, self.lane_hours(who));
                     for (d, take) in day_portions(t, *secs) {
                         tl.add_worked(d, take);
                     }
@@ -1208,7 +1255,7 @@ impl World {
             let seconds = self.s.act_times.row(actor, &format!("answer/{id}")).or_else(|| self.s.act_times.row(actor, "answer"));
             let Some(seconds) = seconds.filter(|s| *s > 0) else { continue };
             let mut lanes_now = self.state.timelines.get(&tl_key).map(|x| x.lanes.clone()).unwrap_or_default();
-            let (start, done) = oikos_time::place(&mut lanes_now, lanes, t, seconds);
+            let (start, done) = oikos_time::place_within(&mut lanes_now, lanes, t, seconds, self.lane_hours(&tl_key));
             if actor == oikos_time::Actor::Person && self.over_the_day(&BTreeMap::from([(tl_key.clone(), seconds)]), start).is_some() {
                 continue; // (their working day is full: not on duty)
             }
@@ -1229,7 +1276,8 @@ impl World {
             ParticipantKind::System => (performer.clone(), p.def.lanes.unwrap_or(1) as usize, false),
         };
         let mut timeline = self.state.timelines.get(&tl_key).cloned().unwrap_or_default();
-        let (starts, done) = oikos_time::place(&mut timeline.lanes, lanes, t, seconds);
+        let hours = self.lane_hours(&tl_key);
+        let (starts, done) = oikos_time::place_within(&mut timeline.lanes, lanes, t, seconds, hours);
         if person {
             for (d, take) in day_portions(starts, seconds) {
                 timeline.add_worked(d, take);
@@ -1371,6 +1419,13 @@ pub fn is_body_news(b: &EventBody) -> bool {
 }
 
 /// How a stretch of `secs` seconds run on from `start` falls on days: (day, seconds of it on that day).
+/// The hours a timeline's lanes work in (the timeline's key: a system participant's id, or a person's): a system's
+/// template's, else none. One look-up by id and one by template: nothing scanned.
+pub(crate) fn lane_hours(s: &Statics, st: &State, who: &str) -> Option<oikos_time::Hours> {
+    let p = st.participants.get(who).filter(|x| x.kind == ParticipantKind::System)?;
+    s.act_times.hours(p.template.as_deref())
+}
+
 fn day_portions(start: i64, secs: i64) -> Vec<(i64, i64)> {
     let mut out = vec![];
     let (mut at, mut left) = (start, secs);

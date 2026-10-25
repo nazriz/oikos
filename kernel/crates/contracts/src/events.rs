@@ -92,6 +92,10 @@ pub enum RefusalCode {
     /// A signature on an agreement whose owner has withdrawn it before every party had signed: an offer that no longer
     /// stands cannot be accepted.
     OfferWithdrawn,
+    /// An act the world's table of work does not price, for whoever would do it (no row of the performer's template, of
+    /// the world's table for their kind, and no `default` the world states): nobody said what it takes, so it is not done
+    /// (law 10, foundations-2 P2; before, it took a second).
+    Unpriced,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

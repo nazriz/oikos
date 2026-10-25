@@ -243,7 +243,7 @@ The mechanism:
   `docs/behaviour/staffing.md` ("the outside world's own").
 - **Effect:** Benefit days-to-decision, and every benefit row of the table of work (WM-1), in code towns and in a seat
   in that office (the TARA support-office arm). A seat's speed there is not a person's, unlike every other seat.
-- **L / I:** high / high · **Status:** to fix (staff the office with people at the place's casework rates, or make
+- **L / I:** high / high · **Status:** mitigated for code towns, 2026-10-25 (below); was: to fix (staff the office with people at the place's casework rates, or make
   the boundary's office a supplied system with a stated speed)
 - **Notice by:** claim-to-decision days against the place's published processing times.
 - **Fix when:** before a support-office experiment is read in days or hours, or a seat in it is compared with a seat elsewhere.
@@ -252,6 +252,21 @@ The mechanism:
   for. Law-set waits as support-law data; casework as officers' minutes per case on an `agency-casework` template
   with lanes from a sourced officers-per-claim ratio and a working day (two kernel changes: per-template seconds for
   any block, `hours` on a template); a seat there held as a person (an agency officer). Two questions wait on Naz.
+- **Built (2026-10-25, foundations-2 phase 1, branch `f2-phase1`; decisions "Foundations-2 phase 1"):** the two kernel
+  changes (a template's own seconds for any row, read before the world's system row; `hours` on a template, a queue across
+  days) and no implicit second (`unpriced`). The support office's casework (decision, evidence and confirmation requests,
+  review) is done `by` the desk `outside-casework` (`agency-casework`: the person table's minutes, an officer's working
+  day, lanes the town's share of the agency's officers from a placeholder national ratio, 4 per 1,000 claims in payment,
+  in every profile); the case system keeps its seconds for payments and notices. Claim-to-decision days now come from
+  officers' hours (figures in the decisions entry). **Left:** (1) a model seated in `outside-support` still sits on the
+  case system (`agency-system`) and decides what is put before it at a system's speed: the approved alternative, a
+  non-resident officer as the seat's body, is not built, because a person with a body who is not a resident reaches the
+  census, life events, elections and every module that counts persons (not contained); (2) the officers' ratio is a
+  placeholder everywhere, and the minutes are sourced for us-oh only (gb-eng's and the others' are the generator's
+  placeholders); (3) the law's own waits (Universal Credit's assessment period) are not data yet; (4) a system's hours
+  are every day's (no weekends), so the officers' week is spread evenly over seven days; (5) a generic `publish` row on a
+  machine's template still covers a decision kind at the world's second if a module publishes one without naming the
+  desk: the backstop sees only rows that name a decision kind.
 
 ---
 

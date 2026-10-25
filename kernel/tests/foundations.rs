@@ -40,9 +40,12 @@ fn town() -> R {
     start(world(&default_params()))
 }
 
-/// The town with the world's table of act times set (`orchestration.act_time`).
+/// The town with the world's table of act times set (`orchestration.act_time`), over the test world's stated default
+/// (every act it does not name a second: foundations-2 P2).
 fn town_with_times(table: Value) -> R {
     let mut c = world(&default_params());
+    let mut table = table;
+    table["default"] = json!(1);
     c["orchestration"]["act_time"] = table;
     start(c)
 }
@@ -145,7 +148,7 @@ fn law1_a_person_never_does_two_things_at_once_and_each_takes_its_table_time() {
 #[test]
 fn law1_a_system_never_has_more_in_hand_than_it_has_lanes() {
     let mut c = world(&default_params());
-    c["orchestration"]["act_time"] = json!({"system": {"message": 10}});
+    c["orchestration"]["act_time"] = json!({"default": 1, "system": {"message": 10}});
     for p in c["participants"].as_array_mut().unwrap() {
         if p["id"] == "mayor-system" {
             p["lanes"] = json!(2);
@@ -542,7 +545,7 @@ fn law5_presence_is_looked_at_when_the_work_begins() {
 #[test]
 fn law5_an_act_naming_performers_takes_their_time_shared() {
     let mut c = world(&default_params());
-    c["orchestration"]["act_time"] = json!({"person": {"message": 600}, "system": {"message": 1_200}});
+    c["orchestration"]["act_time"] = json!({"default": 1, "person": {"message": 600}, "system": {"message": 1_200}});
     c["orchestration"]["performers_in"] = json!("workplace");
     let mut run = start(c);
     employ(&mut run, "devco", "developer-system", Some("developer"), "carol");

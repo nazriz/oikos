@@ -677,6 +677,10 @@ pub struct Placed {
     /// placed when the act takes effect.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub late: bool,
+    /// Nobody priced the act for whoever would do it (law 10, foundations-2 P2): it takes nobody's time and is refused
+    /// (`unpriced`) when due, with this reason.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unpriced: Option<String>,
 }
 
 /// A person who is to be at work when an act's work begins: alive, in the world, and, if `at` is given, in that

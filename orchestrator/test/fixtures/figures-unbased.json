@@ -297,7 +297,6 @@
     "positions.*.role_module.params.warrant_days",
     "positions.*.role_module.params.work_days",
     "seed",
-    "templates.*.does.*.seconds",
     "world.currencies.*.grouping.*",
     "world.currencies.*.minor_units",
     "world.currencies.*.number_words.crore",

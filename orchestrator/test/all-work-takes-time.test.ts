@@ -60,7 +60,13 @@ export function unpricedWork(c: any): string[] {
   const out: string[] = [];
   const person: { [k: string]: number } = table.person ?? {}, system: { [k: string]: number } = table.system ?? {};
   for (const b of BLOCKS) if (!((person[b] ?? 0) > 0)) out.push(`a person's ${b}: no row in the table of work`);
-  for (const t of (c.templates ?? []).filter((x: any) => x.kind === "system")) for (const r of t.does ?? []) if (!((system[r.block] ?? 0) > 0)) out.push(`${t.id}: its ${r.block} has no row for a system`);
+  for (const t of (c.templates ?? []).filter((x: any) => x.kind === "system")) for (const r of t.does ?? []) {
+    // (A row's own seconds are its price, law 10, and have their source beside the table's, `template.<id>.<row>`; `work`'s are a unit's, read with the task.)
+    const own = r.block !== "work" && r.seconds > 0;
+    if (!own && !((system[r.block] ?? 0) > 0)) out.push(`${t.id}: its ${r.block} has no row for a system`);
+    const key = `${r.block}${r.kind ? `/${r.kind}` : r.task ? `/${r.task}` : ""}`;
+    if (own && !(String(table.sources?.[`template.${t.id}.${key}`] ?? "").length >= 20)) out.push(`template ${t.id}.${key}: no source`);
+  }
   for (const [who, rows] of [["person", person], ["system", system]] as const) for (const [k, s] of Object.entries(rows)) {
     if (!(s > 0)) out.push(`${who}.${k}: ${s} seconds`);
     // (A row for what is made, `publish/<kind>`, has a source of its own; a row for a block may stand under its kind of actor's.)
@@ -69,6 +75,28 @@ export function unpricedWork(c: any): string[] {
   }
   if (table.default !== undefined) out.push("the table has a default: an act it does not name is not priced");
   return out;
+}
+
+/** The kinds of paper an office decides (law 10): each decision the published decision law names, and a decision looked at again. */
+export function decisionKinds(c: any): string[] {
+  const law = c.world.records.find((r: any) => r.record === "statement" && r.kind === "law" && Array.isArray(r.data?.decisions));
+  return [...new Set([...(law?.data.decisions ?? []).map((d: any) => String(d.kind)), "decision_review"])].sort();
+}
+
+/** Law 10: a system template that may write a decision says what one takes it (its row's own seconds, from the template's source), and not the world's
+ * one table for every system, which is a computer's second (WM-14: a claim decided in two hours). Names the template and the kind. */
+export function decisionsAtTheSystemsSecond(c: any): string[] {
+  const kinds = new Set(decisionKinds(c));
+  const out: string[] = [];
+  for (const t of (c.templates ?? []).filter((x: any) => x.kind === "system")) for (const r of t.does ?? []) {
+    if (r.block === "publish" && kinds.has(r.kind) && !(r.seconds > 0)) out.push(`${t.id}: publish/${r.kind}, a decision, has no seconds of its own`);
+  }
+  return out;
+}
+
+/** Law 10: every system says when its lanes work (`hours`: a machine's may be the whole day, a desk of people's is their working day). Names the template. */
+export function systemsWithoutHours(c: any): string[] {
+  return (c.templates ?? []).filter((t: any) => t.kind === "system" && !(t.hours?.seconds > 0)).map((t: any) => `${t.id}: a system with no hours`);
 }
 
 /** Law 2: every kind of paper a form writes takes a person time: the row for what it makes, else the block's (never none). Names the form. */
@@ -138,6 +166,8 @@ test("every profile's town, as code and with every office a model's, has no free
     expect(unpricedWork(c), `${profile} (${how}): work with no time`).toEqual([]);
     expect(unpricedPapers(c), `${profile} (${how}): papers with no time`).toEqual([]);
     expect(dialsHanded(c), `${profile} (${how}): throughput, delay or error set directly`).toEqual([]);
+    expect(decisionsAtTheSystemsSecond(c), `${profile} (${how}): decisions at a computer's second`).toEqual([]);
+    expect(systemsWithoutHours(c), `${profile} (${how}): systems with no hours`).toEqual([]);
   }
 }, 600_000);
 
@@ -204,6 +234,25 @@ test("it fails, naming the row, on work with no time: a block nobody priced, a r
   delete c.orchestration.act_time.person.publish;
   const form = c.world.records.find((r: any) => r.record === "statement" && r.data?.writes?.kind && !c.orchestration.act_time.person[`publish/${r.data.writes.kind}`])!;
   expect(unpricedPapers(c).some((x) => x.startsWith(`${form.id}: the paper it writes (${form.data.writes.kind}) takes no time`))).toBe(true);
+});
+
+test("it fails, naming the template, on a system's capacity left unsaid: a decision at the system's second, a system with no hours, a row of its own with no source (law 10)", () => {
+  const base = living("au-vic-2026");
+  expect(decisionKinds(base)).toContain("benefit_decision");
+  // The support office's casework desk, its decision's own seconds taken away: it would decide at the world's second for systems.
+  let c = structuredClone(base);
+  const desk = c.templates.find((t: any) => t.does?.some((r: any) => r.kind === "benefit_decision" && r.seconds > 0))!;
+  delete desk.does.find((r: any) => r.kind === "benefit_decision").seconds;
+  expect(decisionsAtTheSystemsSecond(c)).toEqual([`${desk.id}: publish/benefit_decision, a decision, has no seconds of its own`]);
+  // A system that does not say when it works.
+  c = structuredClone(base);
+  const machine = c.templates.find((t: any) => t.kind === "system" && t.id !== desk.id)!;
+  delete machine.hours;
+  expect(systemsWithoutHours(c)).toEqual([`${machine.id}: a system with no hours`]);
+  // A row of its own whose figure says nothing of where it is from.
+  c = structuredClone(base);
+  delete c.orchestration.act_time.sources[`template.${desk.id}.publish/benefit_decision`];
+  expect(unpricedWork(c)).toEqual([`template ${desk.id}.publish/benefit_decision: no source`]);
 });
 
 test("it fails, naming the post, on a special case of each kind the foundations deleted: a dial on a venue, a rate of error handed to a module, an error drawn outside slip()", () => {

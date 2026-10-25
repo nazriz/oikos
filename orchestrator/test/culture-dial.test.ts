@@ -73,8 +73,12 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-25, config hashes and Rust states both, on main after work-times and fix-memory-appeal (both slow-tier blind at their merges): generator 0.65.0
 // writes every town's `public_memory` bound (SC-1) and the table of work's rows changed; a3d0ce4e..., a805fb6d... and 2b872ca6... for the configs, and
 // 2ce3e90d..., 5dcf1eab... and 55a4e978... for the states, until then. Not every move is the bound: with `public_memory` left out the configs still differ (the version and work rows).)
+// (Re-taken on 2026-10-25 at foundations-2 phase 1 (law 10), config hashes and Rust states both: the support office's casework is done by a desk of
+// the agency's officers (`outside-casework`, an officer's minutes in an officer's hours: claims are decided in days, not hours), every machine's template
+// states its hours, an office offer's seconds are its template's rows, someone who only orders an act goes on at once, and the engine gives a code unit's `done_by` to the act as `by` (generator 0.66.0);
+// 482f5218..., b002520e... and 86c7a397... for the configs, and cfeeb1be..., d24f6f24... and 261e509d... for the states, until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "482f52185c6909d6", "gb-eng-2026": "b002520e79c638b2", "ke-nakuru-2026": "86c7a3972f44e3b0" }
+  ? { "au-vic-2026": "b5a2ad2ae43724a4", "gb-eng-2026": "727b3cda2b46b1b1", "ke-nakuru-2026": "f30f73cecd9191b2" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -92,9 +96,9 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // for the configs, and 33ec6526..., 54f581f6... and 076eebff... for the states, until then. The towns' people did not change.)
 // (Re-taken again on 2026-10-24 at the merge of debt-behaviour with main's debt-generic-2, the states only; the config hashes are main's, unchanged; 85e81e58..., b79165e8... and e0865435... until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "cfeeb1be119f0a027395d7a19f781349c51c04d91c779e9074499872beaf13a6",
-  "gb-eng-2026": "d24f6f241854b13e5f2b26a389f492b12e645bd8be077b67ad87432271e7f6b3",
-  "ke-nakuru-2026": "261e509d6ee0fef2c5870bb71bc5d4e247439b8643257381548615bf8e6661c9",
+  "au-vic-2026": "af8d1e427dc42aa870221ed1ebae68c1d8f818eee8b1fa8c6f4f84ec7048a4a2",
+  "gb-eng-2026": "0ee54d305c4a41f9361ecc054cb6826413da09bd06d7ba252ed72d3d14198a96",
+  "ke-nakuru-2026": "c5d03ed5c233395544e251ad5b789931fd4a30197f1078e7a54bb3aa72dd35ac",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

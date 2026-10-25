@@ -2037,7 +2037,8 @@
         "not_being_built",
         "not_coming_down",
         "coming_down",
-        "offer_withdrawn"
+        "offer_withdrawn",
+        "unpriced"
       ]
     },
     "AnnotationEntry": {
