@@ -421,8 +421,6 @@ if (!custom && !filters.length && !list) {
     const own = Object.entries(record).filter(([f]) => !slowChosenSet.has(f));
     const slowRan = Object.entries(record).filter(([f]) => slowChosenSet.has(f));
     if (slowRan.length) console.log(`(budgets: the slow tier's files the change reached took ${slowRan.reduce((n, [, r]) => n + r.secs, 0).toFixed(0)} file-seconds, not counted: ${slowRan.map(([f, r]) => `${f} ${r.secs}s`).join(", ")})`);
-    const long = own.filter(([, r]) => r.secs > budgets.gate.file_seconds).map(([f, r]) => `${f} ${r.secs}s`);
-    if (long.length) { over = true; console.log(`BUDGET: gate files over ${budgets.gate.file_seconds}s: ${long.join(", ")} ${say}`); }
     const raw = own.reduce((n, [, r]) => n + r.secs, 0);
     // (Load-adjusted: files share cores, so under load every file runs slower. The load is the median of this run's time over the
     // recorded time, across the files that have one; the total is divided by it when it is over 1. 2026-10-26: a gate went 32 s
@@ -430,6 +428,9 @@ if (!custom && !filters.length && !list) {
     const ratios = own.filter(([f]) => recorded[f]! > 1).map(([f, r]) => r.secs / recorded[f]!).sort((x, y) => x - y);
     const load = ratios.length >= 10 ? Math.max(1, ratios[Math.floor(ratios.length / 2)]!) : 1;
     const total = raw / load;
+    // (The per-file limit is read at the same load: a 91 s file at load 1.3 is a 70 s file.)
+    const long = own.filter(([, r]) => r.secs / load > budgets.gate.file_seconds).map(([f, r]) => `${f} ${r.secs}s`);
+    if (long.length) { over = true; console.log(`BUDGET: gate files over ${budgets.gate.file_seconds}s at the recorded load: ${long.join(", ")} ${say}`); }
     console.log(`(budgets: the gate's files took ${raw.toFixed(0)} file-seconds${load > 1 ? `, ${total.toFixed(0)} at the recorded load (this run ran ${load.toFixed(2)}x slower)` : ""} of its ${budgets.gate.file_seconds_total})`);
     if (total > budgets.gate.file_seconds_total) { over = true; console.log(`BUDGET: the gate's files took ${total.toFixed(0)} file-seconds (load-adjusted), over its ${budgets.gate.file_seconds_total} ${say}`); }
   } else if (tierFlag === "slow") {
