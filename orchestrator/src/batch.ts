@@ -14,7 +14,8 @@
 //
 // A batch folder holds each run's log, anchors and summary; batch.json (what
 // ran, with which versions, and how long it took); the measurement tables
-// (measure/, DuckDB over Parquet); and the cost report (cost.txt, cost.json).
+// (measure/, DuckDB over Parquet); the cost report (cost.txt, cost.json); and what the world's numbers rest on
+// (figures.txt, figures.json: docs/design/foundations-2.md, law 11).
 
 import { availableParallelism } from "node:os";
 import { insideSlot, take } from "../../scripts/slots";
@@ -468,6 +469,16 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
       const real = await realModelIn(join(out, f));
       if (real) throw new Error(`${join(out, f)} holds a real model's answers (${real}): nothing in its folder is overwritten, whatever was asked. Choose another --out.`);
     }
+  }
+  // What the world's numbers rest on (docs/design/foundations-2.md, law 11; counting only): written beside the runs,
+  // never into a log, and never a reason for a batch to fail.
+  try {
+    const { figuresFor, figuresText } = await import("./figures");
+    const r = figuresFor(config, spec);
+    writeFileSync(join(out, "figures.json"), JSON.stringify(r, null, 2));
+    writeFileSync(join(out, "figures.txt"), `${figuresText(r)}\n`);
+  } catch (e) {
+    log(`  ! counting what the world's figures rest on failed: ${(e as Error).message}`);
   }
   const parallel = Math.max(1, Math.min(seeds.length, o.parallel ?? Math.floor(availableParallelism() / 2)));
   const started = new Date();
