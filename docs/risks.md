@@ -1484,21 +1484,18 @@ The mechanism:
 
 ## Performance and scale
 
-### SC-1 · Untested past a 10,000-person year; 50,000 fits a month at the edge; 100,000 does not start its first moment
-- **Gap:** A ten-year run was never made. A 10,000-person year runs (2026-10-23: 29 minutes, 7.8 GB); its month now
-  peaks at 5.2 GB, was 10.2 (2026-10-25). 50,000 people now run a month (22 minutes, 28 to 33 GB through it, a 41 GB
-  spike at the end): at the edge of the 40 GB guard. 100,000 starts (bounded) but its first moment passes 40 GB. The
-  config is read participant by participant and kept compressed, and people's params are held once for all who have
-  them alike (a heap profile found those copies were 4.6 of 8.8 GB live at 10,000); what is left is the run's own
-  (the hash's caches of canonical bytes, what people have seen, the engine, minds), and what grows past the town's
-  size at 100,000's first moment is unprofiled.
-- **Where:** `docs/design/performance.md` ("What held memory"); docs/decisions.md 2026-10-25 ("SC-1: what held a
-  10,000-person month's memory"); `kernel/src/heapprof.rs`, `scripts/heapprof.ts`.
-- **Effect:** A study at 50,000 is possible but has no headroom; one at 100,000 rests on estimates.
-- **L / I:** medium / medium · **Status:** partly fixed: next, a heap profile of 50,000's first moment and end, then
-  the hash's caches kept compressed or the first moment's looks taken in windows.
-- **Notice by:** A 50,000 run stopped by the guard; any run past 50,000 people.
-- **Fix when:** Before a study past 50,000 people, or one at 50,000 that needs room beside it.
+### SC-1 · Memory per person: 50,000 for a month and 100,000 for a week run; the target is far
+- **Gap:** A ten-year run was never made. Each person costs 322 KB at the peak (1,000 people, 4 threads, with the
+  minds' cut; main was 546), against a target of 50 KB (Naz, 2026-10-25), held by a test (`scripts/memory-budget.json`,
+  its ceiling lowered with each cut). 50,000 people for a month: 14.7 to 17 GB. 100,000 for a week: 31 GB, its peak the
+  first moment (a round's decisions held whole while seats are in it). Left: the engine's units and the records
+  delivered, the world's records made, minds, the typed config.
+- **Where:** `docs/design/performance.md` ("Bytes per person"); docs/decisions.md 2026-10-25 and 2026-10-26;
+  `kernel/src/heapprof.rs`, `scripts/heapprof.ts --components`.
+- **Effect:** A study at 100,000 for a month may not fit; one at 50,000 has room.
+- **L / I:** medium / medium · **Status:** partly fixed: the first moment's decisions next, then the engine's units.
+- **Notice by:** The memory budget's test failing; a run past 50,000 near the 40 GB guard.
+- **Fix when:** Before a study at 100,000 for longer than a week.
 
 ### SC-2 · Resume replays from the start
 - **Gap:** No mid-run checkpoint; resume replays the whole log; resume against a real model is untested.
