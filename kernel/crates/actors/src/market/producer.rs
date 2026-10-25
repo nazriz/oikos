@@ -179,7 +179,7 @@ pub struct Factory<B: Body> {
     committed: Committed,
     room: ExportRoom,
     invoices_read: usize,
-    /// Makings ordered whose crew has not had the hours for them yet: (units, by).
+    /// Makings ordered whose outcome has not come back yet: (units, when planned).
     making: Vec<(i64, i64)>,
     on_order: BTreeMap<String, i64>,
     order_qty: BTreeMap<String, (String, i64)>,
@@ -392,13 +392,19 @@ impl<B: Body> Plan for Factory<B> {
                     Done::Outcome(o) => Some(o),
                     _ => None,
                 };
+                // (No longer in flight: made, and in our stock, or not made. Until 2026-10-26 a making was counted in flight
+                // for twice its hours from when it was planned, not sent; a manager with other acts before it sent it after
+                // that, woke while it was under way, and ordered the day's work again past the band's top: docs/decisions.md,
+                // "Main red after foundations-2 phase 1".)
+                if let Some(i) = self.making.iter().position(|m| m.0 == *units && m.1 == *started) {
+                    self.making.remove(i);
+                }
                 if outcome.is_some_and(|o| o.status == OutcomeStatus::Applied) {
                     if *qc > 0 {
                         self.pace.done(crew, t.div_euclid(DAY));
                     }
                     return vec![];
                 }
-                self.making.retain(|m| !(m.0 == *units && m.1 > *started));
                 for (id, n, secs) in by_system {
                     let used = self.sys_used.get(id).copied().unwrap_or(0);
                     self.sys_used.insert(id.clone(), (used - n * secs).max(0));
@@ -773,7 +779,7 @@ impl<B: Body> Factory<B> {
             let per_unit = if crew.is_empty() { 0 } else { self.pace.per_unit(&crew) };
             let by_hours = if crew.is_empty() { 0 } else { each * crew.len() as i64 / per_unit };
             let by_inputs = self.p.per_unit.iter().map(|(k, q)| held(pic, &self.p.works, k) / q.max(&1)).min().unwrap_or(0);
-            let in_flight: i64 = self.making.iter().filter(|x| x.1 > t).map(|x| x.0).sum();
+            let in_flight: i64 = self.making.iter().filter(|x| x.1 + DAY > t).map(|x| x.0).sum();
             // No further than the top of the band: a day's making can be a lot next to a month's demand.
             let room = ((self.p.lengnick.phi_high_bps * self.last_demand + 9999).div_euclid(10_000) - stock - in_flight).max(0);
             // Our systems make their share first (what they can do of the day's making, as far as their own day goes); our people the rest.
@@ -804,10 +810,9 @@ impl<B: Body> Factory<B> {
                         *self.used.entry(w.clone()).or_insert(0) += share;
                     }
                 }
-                // (Its crew may be busy first: twice the hours it needs, to be safe.)
-                let by = t + 2 * by_system.iter().map(|b| b.1 * b.2).fold(share, i64::max);
-                self.making.retain(|x| x.1 > t);
-                self.making.push((units, by));
+                // (In flight until its outcome comes back: made, or refused. A day is the most it is counted for, should none.)
+                self.making.retain(|x| x.1 + DAY > t);
+                self.making.push((units, t));
                 let why = format!(
                     "The day's work: {}{}{} making {units} {}{}{}.",
                     if qc > 0 { format!("{} of our workers", crew.len()) } else { String::new() },

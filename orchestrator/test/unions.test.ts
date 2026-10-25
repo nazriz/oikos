@@ -52,7 +52,9 @@ test("claims are answered by offers; those accepted become enterprise agreements
     expect(recs.some((r) => r.kind === "offer_accepted" && r.speaks_for === "union" && r.data.employer === ea.data.employer && r.at <= ea.at)).toBe(true);
     // (With the agreement, or as soon after as the employer's wakes allow: a busy wake carries its steps to the next.)
     const after = recs.filter((r) => r.kind === "request" && r.speaks_for === ea.data.employer && r.at >= ea.at && r.at <= ea.at + 2 * DAY && r.data?.every && r.data?.outcome?.money?.for?.startsWith("Wages"));
-    if (ea.data.rise_bps > 0) expect(after.length).toBeGreaterThan(0);
+    // (Where those two days are in the run: an agreement made in its last two days may have its orders after the end. Since
+    // 2026-10-26, "Main red after foundations-2 phase 1" in docs/decisions.md: shop-4's was made at day 149.98 of 150.)
+    if (ea.data.rise_bps > 0 && ea.at + 2 * DAY <= 150 * DAY) expect(after.length).toBeGreaterThan(0);
     for (const o of after) {
       const net = Number(o.data.outcome.money.amount);
       // Some gross wage, net of the law's withholding, gives this amount.

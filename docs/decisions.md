@@ -8703,3 +8703,57 @@ side (then draws.ts goes too).
 - **Revisit if:** a building's view comes to depend on the looker beyond whether they can be told who is there (then
   that goes in its key), or the state comes to change occupancy or departures in place (then comparing by where they
   are in memory would not do: debug builds' check would catch it).
+
+## 2026-10-26 · Main red after foundations-2 phase 1: two faults it exposed, two towns it moved (branch `fix-main-f2p1`; no model called)
+
+Four slow-tier files failed from the phase-1 merge (0824efb6) on, and passed at 3d113a1f. Each was traced in its town's
+log against the same town built at 3d113a1f.
+
+- **retail.test.ts: a fault, fixed in the shop.** A delivery note gave 8 ordered where 9 were, and refunded nothing of
+  what was paid. An order at a price the shop has since raised buys what its money buys at the new price (docs/behaviour
+  /retailer.md, "Selling"): the shop rewrote the order's quantity and price in its queue, and its note then gave the
+  number the money bought as the number ordered. Worse, what a note settles (the money paid over the price, the items a
+  system got wrong) was forgotten when the serving was sent, not when it went out; a serving refused (a crew short of
+  time) or lapsed at the close waits its turn again, and the note of the one that went out refunded none of the
+  over-payment: the shop kept it. Phase 1's done_by fix put the shops' systems to work and moved the shops' timing,
+  which is what reached this path. Now the note says what was ordered and, where the price had risen, the price
+  charged (`unit_price`, optional on the paper and its form), and the shop forgets what a note settles only once the
+  note has gone out (`settle`); a serving not done drops the slips of its systems' items. The test checks the refund
+  against the price charged. Unit tests: the raised-price note, and a serving refused then served the next day still
+  refunding the over-payment. Revisit if a household's reading of a note (money.rs: served = delivered over ordered)
+  should not count a price rise against the shop's service: it now does, as a customer told "eight of your nine" would.
+- **production.test.ts: a fault, fixed in the factory, and the town set up for what is tested.** The slack town had
+  nobody let go in seven months. Its only redundancy until phase 1 was factory-2's, the food works, which had *more*
+  orders than it could make and ran out of cash on day 80 (its second hire signed on day 79, 18 days after it was
+  chosen, and it paid cash for its inputs); since phase 1 that hire signs the same day, the works makes and sells more,
+  buys on terms and borrows when short. The works with too little demand, factory-1, opens with about six months of its
+  wage bill and loses a third of it a month, so it never runs short in seven months, before phase 1 or after. The test
+  now opens it with two months' wages (by construction, said beside it). That run then showed a fault: a factory
+  counted a day's making in flight for twice its hours from when it was *planned*; a manager with other acts before it
+  sent it later, and, no longer held while the crew works (phase 1's order fix), woke while it was under way, saw nothing
+  in flight, and ordered the day's work again, past the top of its band (665 against 663). A making is now in flight
+  until its outcome comes back (a day at most, should none). Unit test: a day's work under way is not ordered again
+  four hours on. Revisit if a making's outcome can be lost for good (then the day's fallback is what bounds it).
+- **own-venture.test.ts: the town's timing, the test's world set up.** After giving its business up, its owner looked at
+  the jobs board at nearly every wake for 105 days and never applied: no posting stood open at any of those looks. In
+  this town a posting is filled within hours by whoever is looking when it goes up (a posting for ten went up and was
+  filled between two of the owner's wakes). Nothing in the owner's search changed; the town's postings came at other
+  hours. The test now keeps the others who open the year out of work, with no work of their own, out of the labour
+  force, so the owner is not racing them: they apply on day 60. Revisit if a person out of work should look more often
+  than they wake (a search habit by the day), which would be a behaviour with a source.
+- **police-station-seat.test.ts: the households' draws; the floor that was a seed hop made "some".** Fewer than two
+  warrants both towns issued were carried out: the second household of seed 1's town (lease-c0269) paid its arrears in
+  the seat's town and its claim was withdrawn, while the twin's issued a warrant on day 232. "Two or more" had been kept
+  by hopping the seed (3, 7, 1). A second case brought forward by construction (the town's other tenancy in arrears at
+  the opening's hearing stage) went the same way: its tenant left on the order's day in one town and days later in the
+  other. Per docs/testing.md ("Seed pins": "some" where the count is the draws'), the test holds some, and among them
+  the case the town opens with at a hearing, which both towns issue a warrant for in the second month; the rest
+  (the same set, the same day within one, lapses equal, the staff's reports) is unchanged. Revisit if the station's
+  handling of a later warrant could differ from its first (then a case later in the year is to be made by construction,
+  with a tenant who stays).
+- **Two more the fixes moved, in the slow tier.** `unions.test.ts`: an enterprise agreement made at day 149.98 of a
+  150-day run has its new wage orders after the end; the two days the test allows are now held only where they fall
+  in the run. `automation-run.test.ts`: in the town with a law against taking a system *to serve*, factory-3 takes a
+  production cell on day 151, which the law does not forbid; the test held that no system at all was delivered, and
+  now holds that no serving system is (and that the town that ignores the law takes one). Revisit the second if the
+  law the test writes is meant to cover every use.
