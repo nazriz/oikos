@@ -52,6 +52,10 @@ pub struct Delivered {
     /// say), each with its canonical bytes and what's known of it. Used only for a building that's equal to one of
     /// them, field for field: the bytes are what encoding it again would give.
     structures: RwLock<BTreeMap<Id, Vec<Building>>>,
+    /// structure id -> what's known of it (its type, where it is, its spaces): one for everyone told of it, while it is
+    /// the same. It is made of what a building is, not of who is in it, so the many ways a building is shown (as its
+    /// occupants come and go) share it; each person's knowledge held its own (SC-1: 0.4 GB at 50,000 people).
+    facts: RwLock<BTreeMap<Id, Arc<StructureFact>>>,
 }
 
 /// For a host that asked for records by reference: record id -> the record it was last handed whole under that id
@@ -143,7 +147,7 @@ impl Delivered {
             return Ok((bytes.clone(), fact.clone()));
         }
         let bytes: Arc<[u8]> = canon::canonical(&**x)?.into();
-        let fact = Arc::new(StructureFact { type_: x.structure_type.clone(), at: x.at.clone(), spaces: x.spaces.iter().map(|sp| sp.space.clone()).collect() });
+        let fact = self.fact_of(x);
         let mut structures = held(self.structures.write());
         let ways = structures.entry(x.structure.clone()).or_default();
         ways.insert(0, (x.clone(), bytes.clone(), fact.clone()));
@@ -157,7 +161,18 @@ impl Delivered {
         if let Some(fact) = held(self.structures.read()).get(&x.structure).and_then(|ways| ways.iter().find(|(shown, _, _)| Arc::ptr_eq(shown, x)).map(|(_, _, f)| f.clone())) {
             return fact;
         }
-        Arc::new(StructureFact { type_: x.structure_type.clone(), at: x.at.clone(), spaces: x.spaces.iter().map(|sp| sp.space.clone()).collect() })
+        self.fact_of(x)
+    }
+
+    /// What's known of a building as shown: the one held for it, if it still says the same; else made, and held.
+    fn fact_of(&self, x: &SiteStructure) -> Arc<StructureFact> {
+        let same = |f: &StructureFact| f.type_ == x.structure_type && f.at == x.at && f.spaces.len() == x.spaces.len() && f.spaces.iter().zip(&x.spaces).all(|(a, b)| *a == b.space);
+        if let Some(f) = held(self.facts.read()).get(&x.structure).filter(|f| same(f)) {
+            return f.clone();
+        }
+        let f = Arc::new(StructureFact { type_: x.structure_type.clone(), at: x.at.clone(), spaces: x.spaces.iter().map(|sp| sp.space.clone()).collect() });
+        held(self.facts.write()).insert(x.structure.clone(), f.clone());
+        f
     }
 
     /// A cell as a sites channel shows it: its canonical bytes (exactly `canon::canonical` of it, written here member
