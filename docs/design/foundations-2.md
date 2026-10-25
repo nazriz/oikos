@@ -423,6 +423,19 @@ reading: the figure table shows a value that is a placeholder in all nine profil
 |---|---|---|
 | N1 | Contract: `figures` and `provenance`; the kernel checks at load in *count* mode (reports, refuses nothing) | the count of unbased figures in every town |
 | N2 | Generator: figures and patterns for profile values, manifests, work rows, recipes; the source notes converted to the structured form | the count falls to the code literals |
+
+**Built (phase 0, 2026-10-25; decisions, "Law 11, counting").** N1 and N2 as counting only, outside the config and the
+log, so that no run changes (three profiles' half-year logs byte-identical before and after): `orchestrator/src/figures.ts`
+reads every number of a config and finds its basis in the table of work's and slips' notes, the generator's table
+(`worlds/generator/figures.ts`, patterns over the config's paths naming a profile path or a class and why) and, for a
+parameter left at its module's default, the manifest's note; `oikos figures <world>` prints it and every batch writes
+`figures.txt` and `figures.json` beside its runs. A town of 200 (au-vic) has 54,483 numbers: 7% sourced, 6% to confirm,
+41% derived, 39% placeholder, 6% conventions, 0.9% unbased (464 in 156 places, listed in
+`orchestrator/test/fixtures/figures-unbased.json`, which only shrinks). Left for N3, when the table goes into the config
+and the kernel refuses: the kernel's own check, and the profiles' notes in structured form (a note's class is read from
+its words today, and a note that calls any of its figures a placeholder counts all of them as placeholders). The
+`derived` rows are the generator's statements of where a figure comes from; the class of what it is derived from is not
+yet carried through.
 | N3 | Kernel: refuse mode for generated worlds; fixtures' blanket pattern | a planted unbased figure is refused |
 | N4 | The figure registries; literals moved into them or into parameters; the lint with its inventory | inventory shrinking to nought, step by step |
 | N5 | Reach tallies in the kernel and the run summary; decisions' parameter lists in manifests | every run states its reach |

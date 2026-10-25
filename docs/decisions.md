@@ -8223,3 +8223,30 @@ started and nothing was spent on RunPod. **A proposal for then, to take the most
   figure is"): no real-world ranges and no held-out set, only flags for clearly broken states (a stampede, a freeze, a
   stock below nought or unbounded, a dead law), outside the world and never gating. About 70 agent-days.
 - **Revisit if** the tree stand-in gives shortages a real town would not have, or phase 3's cost passes its stop rule.
+
+## 2026-10-25 · Law 11, counting: what a world's numbers rest on (foundations 2, phase 0: N1, N2; branch `f2-phase0`; no result changes; no model called)
+
+- **What.** `orchestrator/src/figures.ts` finds every number in a world's config and says what it rests on: sourced,
+  to confirm, derived, fitted, placeholder, convention, or unbased. The basis is read from what the world already
+  carries (the table of work's and of slips' `sources`; a module's manifest, for a parameter at its default) and from a
+  new table of the generator's own (`worlds/generator/figures.ts`: patterns over the config's paths, each naming the
+  profile path the figure is made from or a class and why). `oikos figures <world> [--json]` prints it; every batch
+  writes `figures.txt` and `figures.json` beside its runs. `orchestrator/test/figures.test.ts` counts every profile's
+  town (and two living ones) and fails on an unbased place not listed in `fixtures/figures-unbased.json` (306 places
+  today), on a listed place no town has any more, and on a row of the generator's table that speaks for nothing.
+- **Found.** The 200-person au-vic town: 54,483 numbers, 3,955 sourced (7.3%), 3,105 to confirm, 22,387 derived,
+  21,481 placeholder (39.4%), 3,091 conventions, 464 unbased (0.9%). The other profiles are alike (placeholders 35 to
+  50% of their towns' numbers; br-mg has the most unbased, 1,299 of 15,420, in parameters only its town is given).
+- **Results unchanged, shown.** Nothing reads the report; it is never in a config or a log. A half-year of the 200-person
+  town for au-vic, gb-eng and us-oh, run at origin/main (ca78ce86) and at this branch: logs byte-identical (sha-256 of
+  the decompressed logs cc586aef..., bfa140d9..., d73fc4a7...; 449,000 to 636,000 lines), anchors identical, final
+  states e5b72b44..., a0c02eb7..., 77b3448b... both times.
+- **Why counting outside the config, not the design's figure table in it.** Putting the table in the config would
+  change every log's first line, and phase 0 was to change no result or log. The table moves into the config, and the
+  kernel refuses an unbased figure, at N3; law 11's hard-rule line goes into `CLAUDE.md` then, not now.
+- **Known faults of the count.** A note's class is read from its words (a note that calls any figure it covers a
+  placeholder makes them all placeholders: the count errs towards less sourced); a `derived` row is the generator's
+  statement of where a figure comes from, and the class of what it is derived from is not carried through; numbers in
+  behaviour code that never reach the config (the engine's own constants) are not counted (N4).
+- **Revisit if** the count's classes are disputed for a profile (then structured notes first, N3), or the test passes
+  90 s on the gate (then fewer living towns).
