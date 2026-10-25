@@ -86,8 +86,15 @@ export function headOf<W extends Parameters<typeof eligible>[0]>(waiters: W[], h
 /** Cargo jobs for a build holding `tokens`: half, since one rustc uses several cores (2026-10-24, load 30 on 14 cores). */
 export const buildJobs = (tokens: number) => Math.max(1, Math.ceil(tokens / 2));
 
-/** The environment for a child started inside a slot of this weight. */
-export const insideSlot = (weight: number, env: Record<string, string | undefined> = process.env) => ({ ...env, OIKOS_SLOT_HELD: String(Math.max(weight, heldByParent(), 1)) });
+/**
+ * The environment for a child started inside a slot of this weight. The engine runs as many threads as the slot's weight
+ * (OIKOS_ENGINE_THREADS, unless set): with every core by default, a town in a slot of 1 used fourteen, and the machine ran
+ * at load 44 on 14 cores (2026-10-25). Results do not depend on the thread count (the kernel's tests check one against many).
+ */
+export const insideSlot = (weight: number, env: Record<string, string | undefined> = process.env) => {
+  const w = Math.max(weight, heldByParent(), 1);
+  return { ...env, OIKOS_SLOT_HELD: String(w), OIKOS_ENGINE_THREADS: env.OIKOS_ENGINE_THREADS ?? String(w) };
+};
 
 /** Whether a process this one descends from holds a token (the mark in the environment can be lost on the way). */
 function ancestorHolds(dir: string): boolean {

@@ -426,6 +426,27 @@ impl Knowledge {
         self
     }
 
+    /// The same knowledge, with the names the seat's own reports printed beside ids (the owner's ruling of 2026-10-25,
+    /// option (b): a name is one the seat was shown when its host wrote it beside the id in something the seat read).
+    /// Only where names are on, and never over a name the seat already knows the id by. None where nothing is added.
+    pub fn with_shown_names(&self, shown: &[(String, String)]) -> Option<Knowledge> {
+        if !self.named || shown.iter().all(|(id, name)| id.is_empty() || name.is_empty() || self.names_at.contains_key(id)) {
+            return None;
+        }
+        let mut k = self.clone();
+        for (id, name) in shown {
+            if !id.is_empty() && !name.is_empty() && !k.names_at.contains_key(id) {
+                set_ordered(&mut k.names, &mut k.names_at, id, name);
+            }
+        }
+        Some(k)
+    }
+
+    /// The `names` of a host's resolve request ({id: name}), as pairs.
+    pub fn shown_of(v: &serde_json::Value) -> Vec<(String, String)> {
+        v.as_object().map(|o| o.iter().filter_map(|(k, n)| n.as_str().map(|n| (k.clone(), n.to_string()))).collect()).unwrap_or_default()
+    }
+
     /// With the world's calendar and the words its dates are written in.
     pub fn with_dated(mut self, dated: Option<oikos_rules::calendar::Dated>) -> Self {
         self.dated = dated;
@@ -760,6 +781,23 @@ impl Knowledge {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// Option (b) of the owner's ruling (2026-10-25): a name the seat's reports printed beside an id is one it can use;
+    /// only where names are on, never over a name it already knows the id by, and two shown with one name are a question.
+    #[test]
+    fn names_its_reports_printed_beside_ids_are_known_where_names_are_on() {
+        let mut k = Knowledge::default().with_names(true);
+        k.absorb(&json!({ "entity": "me", "t": 0, "positions": [], "channels": { "who": { "kind": "directory", "entities": [{ "entity": "c0001", "name": "Ana Ruiz" }], "positions": [] } } }));
+        let shown = Knowledge::shown_of(&json!({ "c0001": "Someone Else", "c0002": "Mary Wanjiru", "c0003": "Mary Wanjiru", "c0004": "Luis Peña" }));
+        assert!(k.by_name("Luis Peña").is_empty(), "not shown yet");
+        let with = k.with_shown_names(&shown).expect("something added");
+        assert_eq!(with.by_name("Luis Peña"), vec!["c0004"]);
+        assert_eq!(with.by_name("Mary Wanjiru"), vec!["c0002", "c0003"], "two shown with one name: asked which");
+        assert_eq!(with.by_name("Ana Ruiz"), vec!["c0001"], "a name it knew is kept");
+        assert!(with.by_name("Someone Else").is_empty());
+        assert!(k.with_shown_names(&Knowledge::shown_of(&json!({ "c0001": "Ana Ruiz" }))).is_none(), "nothing new");
+        assert!(Knowledge::default().with_shown_names(&shown).is_none(), "names off: nothing is added");
+    }
 
     /// A person's name among those the seat has been shown: as written, then without its marks if that finds one person
     /// (translator/test/resolver.test.ts has the same cases).

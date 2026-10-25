@@ -22,6 +22,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { basename, join, resolve } from "node:path";
 import { exportLogs, MEASURE_VERSION } from "@oikos/measure";
 import { costReport } from "./cost";
+import { shareText, translatorShare } from "./pilot-report";
 import { chooseModel } from "./models";
 import { KernelDied, KernelLogFailed, kernelBinary } from "./kernel";
 import { MEASURE_FAILED_FILE } from "./pilot-state";
@@ -31,6 +32,9 @@ import { ORCHESTRATOR_VERSION, runWorld, RunStuck, type RunOptions, type RunSumm
 import type { LlmAdapter } from "@oikos/participants/llm";
 import { stallMs, Watchdog } from "./watchdog";
 import { callRecorder } from "./experiment-seats";
+import { refuseUnframed, refuseUnready, seatReadiness } from "./seat-ready";
+import { framingNotChosen } from "@oikos/participants/llm";
+import { modules as builtinModules } from "@oikos/participants";
 
 /** A world file (JSON or YAML), with `--set path=value` overrides applied, generated if it's a spec. */
 export async function loadWorld(path: string, sets: string[] = []): Promise<{ config: any; spec?: any; generator?: string }> {
@@ -160,7 +164,12 @@ export async function runOne(o: { debriefWording?: string; world?: string; seed?
     consultAvoid = r.consultAvoid;
     serving = new Serving(recordedCalls(r.stoppedLog));
   } else {
-    config = { ...(await loadWorld(o.world!, townSets(o.sets, o.town))).config, seed: o.seed };
+    const loaded = await loadWorld(o.world!, townSets(o.sets, o.town));
+    config = { ...loaded.config, seed: o.seed };
+    // A seat is seated with a real model only where its office can do its work, and with a framing chosen for it
+    // (seat-ready.ts): refused here, before anything is written or spent. (A resumed run was checked when it began.)
+    if (o.model && !o.model.startsWith("mock")) refuseUnframed(framingNotChosen(loaded.config, loaded.spec));
+    if (o.model && !o.model.startsWith("mock")) refuseUnready(seatReadiness(config, { ...builtinModules, ...((await loadModules(o.modules)) ?? {}) }));
     // How much the log keeps (docs/reliability.md): lean for quick test runs, full (the default) when the data matters.
     if (o.logDetail) config.log = { ...config.log, detail: o.logDetail };
     runId = runIdFor(o.world!, o.seed!, o.town);
@@ -275,6 +284,16 @@ export function withPlatformOverrun<T extends { text: string }>(cost: T, runs: {
  * fails here is said and never undoes the run. (2026-10-09: a resumed pilot's cost.txt said no model had been called,
  * against 18.54 recorded in its log, and its log stayed 175 MB plain.)
  */
+/** The cost summary with the share of requests the translator behind drafted (the owner, 2026-10-25: shown in every
+ * run's cost summary, to be shrunk by each retrain). Unchanged where no request had two translators. */
+async function withShare<T extends { text: string; json: any }>(shown: T, logs: string[]): Promise<T> {
+  let a: Awaited<ReturnType<typeof translatorShare>>;
+  try { a = await translatorShare(logs); } catch { return shown; }
+  if (!a) return shown;
+  const share = { first: a.first, behind: a.behind, requests: a.requests, answered_by_first: a.answered_by_first, handed_behind: a.handed_behind, behind_share: a.behind_share, drafts_behind_share: a.drafts_behind_share, handed_behind_why: a.handed_behind_why };
+  return { ...shown, text: `${shown.text}\nTranslator: drafted behind (${a.behind}): ${shareText(a)}; first ${a.first}.`, json: { ...shown.json, translator_share: share } };
+}
+
 export async function afterResume(rec: RunRecord, o: { translatorModel?: string; measure?: boolean; compress?: boolean; log?: (line: string) => void } = {}): Promise<{ logPath: string; costText?: string; problems: string[] }> {
   const out = resolve(rec.logPath, "..");
   const problems: string[] = [];
@@ -286,7 +305,7 @@ export async function afterResume(rec: RunRecord, o: { translatorModel?: string;
       rmSync(measureDir, { recursive: true, force: true });
       await exportLogs(logs, measureDir);
       const cost = await costReport(measureDir, { translatorModel: o.translatorModel });
-      const shown = withPlatformOverrun(cost, [rec]);
+      const shown = await withShare(withPlatformOverrun(cost, [rec]), logs);
       writeFileSync(join(out, "cost.txt"), `${shown.text}\n`);
       writeFileSync(join(out, "cost.json"), JSON.stringify(withCalls(shown.json, out), null, 2));
       costText = shown.text;
@@ -417,6 +436,10 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const { config, spec, generator } = await loadWorld(o.world, sets);
   const perRunUsd = o.budgetUsd ?? o.batchBudgetUsd;
   if (o.model) chooseModel(o.model, { budgetUsd: perRunUsd, baseUrl: o.baseUrl }); // fail early: a price, a limit and a key
+  // (And whether every seat has a framing chosen and an office ready for a model to hold it: seat-ready.ts. Refused
+  // before any run starts.)
+  if (o.model && !o.model.startsWith("mock")) refuseUnframed(framingNotChosen(config, spec));
+  if (o.model && !o.model.startsWith("mock")) refuseUnready(seatReadiness(config, { ...builtinModules, ...((await loadModules(o.modules)) ?? {}) }));
   if (o.model && o.translatorModel) chooseModel(o.translatorModel, { budgetUsd: perRunUsd, baseUrl: o.baseUrl });
   translatorArrangement(o);
   if (o.translatorFirst) (chooseModel(o.translatorFirst, { budgetUsd: perRunUsd, baseUrl: o.baseUrl, first: true }).adapter as { check?: () => void }).check?.();
@@ -573,7 +596,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     rmSync(measureDir, { recursive: true, force: true });
     await exportLogs(runs.map((r) => r.logPath), measureDir);
     const cost = await costReport(measureDir, { translatorModel: o.translatorModel });
-    const shown = withPlatformOverrun(cost, runs);
+    const shown = await withShare(withPlatformOverrun(cost, runs), runs.map((r) => r.logPath));
     writeFileSync(join(out, "cost.txt"), `${shown.text}\n`);
     writeFileSync(join(out, "cost.json"), JSON.stringify(withCalls(shown.json, out), null, 2));
     result.measureDir = measureDir;

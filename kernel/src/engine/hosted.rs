@@ -110,9 +110,11 @@ impl<W: Write> Engine<W> {
     }
 
     /// What the seat's knowledge resolves a call to (the resolver, from what it has been shown: P8).
-    pub fn host_resolve(&self, key: &str, program: &oikos_resolver::calls::Program, as_: Option<&str>) -> oikos_resolver::Resolution {
+    pub fn host_resolve(&self, key: &str, program: &oikos_resolver::calls::Program, as_: Option<&str>, shown: &[(String, String)]) -> oikos_resolver::Resolution {
         let empty = oikos_resolver::Knowledge::new(self.currency.clone()).with_dated(self.dated.clone()).with_names(self.named);
-        let k = self.knowledge.get(key).unwrap_or(&empty);
+        let base = self.knowledge.get(key).unwrap_or(&empty);
+        let added = base.with_shown_names(shown);
+        let k = added.as_ref().unwrap_or(base);
         let types = &self.types;
         let type_of = |t: &str| types.get(t).cloned();
         oikos_resolver::resolve(program, k, &type_of, as_)

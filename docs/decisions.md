@@ -8028,7 +8028,7 @@ throughput and time are read from the table of work, charged and queued; build i
 - **Revisit if** a support-office experiment is planned (WM-14's "fix when"), or the answer to (1) changes how seats
   in other outside offices are held.
 
-## 2026-10-25 · Found on the way: the perception property fails now and then (not fixed)
+## 2026-10-25 · Found on the way: the perception property fails now and then (fixed the same day, below)
 
 `kernel/tests/perception.rs`, `a_view_built_from_changes_equals_the_full_picture`, failed once in the gate on
 `pilot-faults` and passed three times after: proptest's cases are random, and one case (kept outside the repository, in
@@ -8063,3 +8063,158 @@ It fails the same with this branch's kernel changes taken out, so it is on main.
 **Budgets** (`scripts/test-budgets.json`, new): the gate fails over 180 s of wall time (less the seconds it stood waiting on the machine with no file of its own running, which a busy machine adds and the suite does not) or with any file over 90 s (the pipeline's file limit, now read from the budget); the slow tier warns over 1,000 s. Set with about 20% headroom over the runs on a machine not shared with other suites: the merge worktree's whole gate, 143 s (2026-10-24), and this branch's slow tier, 821 s (2026-10-24); the loaded runs above are what the waiting allowance is for, and would fail it as they stand (the risk: a gate failing on a busy machine for its own files' slowing; if that happens often, measure the budget in file-seconds instead). `scripts/merge.ts` reads a `BUDGET:` line as a failure, never a flake. Raising one is a decision with its entry here; what to do instead is docs/testing.md, "Pruning: when a budget is hit".
 
 **Revisit if** a budget is hit (prune by the procedure first), the mutation catalogue is rewritten against `kernel/crates/actors` (measure every file again), or one of the seed-pinned tests above needs its seed moved (replace it then).
+## 2026-10-25 · The perception property's fault, found and mended: a post handed back is shown whole, and says so (branch `view-flake`)
+
+The case above (now in `perception.proptest-regressions`, and as its own test, `a_post_handed_back_is_shown_whole_not_twice`)
+fails every time, not now and then: the property draws new cases each run, and few of them hand a post away and back.
+- **Cause.** Since 2026-10-24 (the twins entry: `set_holder` clears a new holder's marks for the post's channels) a
+  participant given back a post it held before is shown the post's file whole on its first look, as someone who never
+  held it is. Right for a code unit, which is made new for each tenure; but the delivery did not say it was whole, so it
+  read as "what's new since your last look", and whoever kept a view across the tenures (the property's view, and a seat,
+  whose one unit and view last the whole run) put the old file and the new one together. In the case the finance seat
+  hands its post to the mayor's, the mayor's hands it back, and every record of `finance/laws` is in the view twice.
+  Not an ordering fault or nondeterminism: one exact sequence, every time.
+- **Mended in the kernel.** The marks are kept, marked `anew` (`Look::anew`, world/state.rs), instead of dropped; the
+  next look through each such channel (perception/observe.rs) is a first look, as before, and is said to be whole
+  (`whole: true`, the flag a move already sets) for records and maps, and, for money and stores, which have no such
+  flag, also lists the accounts closed and the holdings gone to nothing, so that what was kept from before goes. The
+  contract's shape is unchanged; the two `whole` descriptions name the second reason (participant-api.schema.json).
+  A first tenure, and every look after the first, are as they were: state and log hashes move only in a run where a
+  post goes back to someone who looked through it before. The property is as strict as it was; a direct test
+  (`a_returning_holder_is_told_the_file_is_whole`) pins the flag.
+- **In real runs.** It can happen (the twins entry's own case: a deputy reappointing c0053 at day 90). No prompt listed a
+  record twice: both views a seat reads through (`sight/view.rs` and `participants/src/view.ts`) keep records by id, so
+  a standing channel's file was replaced record by record, and a channel that shows what's new showed the whole file as
+  new, which is what 2026-10-24 meant it to. What a returning seat could have been shown wrongly is the opposite of a
+  duplicate: anything that left the file while it was away (an account closed, a holding run out, the surroundings of a
+  near channel after a move) stayed in its view. Code units were never affected (a new unit each tenure). Logs hold
+  each observation as delivered: right for what was delivered, but a reader rebuilding a returning holder's view from an
+  older log by appending would double that look's records, as the property did.
+- **Revisit if** a host keeps views by appending rather than by id, or the contract gains a `whole` for accounts and
+  holdings (then use it here instead of listing what went).
+## 2026-10-25 · A slot's engine runs as many threads as the slot's weight
+
+- **What we saw:** load 44 on 14 cores with 12 slots held: the engine took every core (`default_threads`) whatever slot
+  it ran in, so a test file in a slot of 1, or a 10,000-person run in a slot of 3, each ran fourteen threads.
+- **Change:** `insideSlot` sets `OIKOS_ENGINE_THREADS` to the slot's weight unless the caller set it. Results do not
+  depend on the thread count (the kernel's tests and the port gate check one thread against fourteen).
+- **Revisit if:** a lone heavy run is much slower for it (then elastic slots, PL-4, give it more tokens), or a test that
+  needs several threads sets them itself.
+
+## 2026-10-25 · Seats' working conditions, after the pilots' welfare review (branch `seat-welfare`)
+
+The six pilots' debriefs (runs/pilots-six-2026-10-24/review.md; lv-09 and lv-12 above all) put seats' distress where
+they were made answerable without working means: a lending office whose looks were all left out of its prompts for
+about 100 days, a principal with no paper to answer an applicant on, orders whose outcome the seat never saw, and seats
+that could not account for their own choices afterwards. Five changes, in world terms only (nothing of the platform is
+said to a seat, nothing untrue). The framing (`unstated` or told simulated) is untouched: that is Naz's.
+
+- **A seat is seated only where its office can do its work** (`orchestrator/src/seat-ready.ts`). Before any seat is
+  seated with a real model, in a pilot (`runBatch` and `runOne`, before anything is written or spent) and in an
+  experiment (`runExperiment`, the post's holder, before any fork), each office is checked on the run's own config:
+  (1) it has forms of its own published (a direction form others steer it by is not its own), and every paper its
+  procedure `issues` is on one; (2) it has a working way to answer those who write to it: a form of its own that acts
+  on a paper filed with it (the form's `basis` is one of its fields), or counter staff who answer (`answer` routine).
+  People here do not act on a letter (the letters practice on every seated office's file), so a letter is not a way
+  to answer. A voting member (`ballot_count: member`) does its duty on its body's ballots. One that fails stops the
+  run with `SeatNotReady`, naming each seat, what it lacks, and what to do (take it out of the line-up or give its
+  office what it lacks). The mock is not checked: dry runs and tests seat what they like.
+  Against the six pilots' own configs it refuses three seats, all lv-12 Haiku seats that reported distress tied to
+  means: the principal (a job advertisement only), the clinic manager (likewise) and the builder's foreman (an
+  advertisement and an order). Everything else seated in lv-08 to lv-13 passes. The existing
+  `experiments/tara-draft/office-check/` compares how far stewards move an office's measures; it does not check an
+  office's means, so it was not the base.
+  Alternatives: a waiver in the world config (not added: a seat is refused unless its office works; add one only with
+  Naz's say); reading what actually comes in to an office from a mock dry run (the principal's applicants come from
+  citizens' code, not a form, so a static check cannot see who will write; the check asks only whether an answer is
+  possible).
+- **An office's papers that could not be shown are said to be missing** (`participant.ts`, `NOT_BROUGHT`). Where a
+  prompt had to leave something out, the seat is told once a sitting, with the newest of what it is shown: "Not all of
+  your office's papers could be brought to you for this sitting: there was more than can be read at once..." (room is
+  made for the line). The places left out keep their own lines, as before. An office file or staff list that cannot
+  be made up is said too (`FILE_NOT_BROUGHT`, `STAFF_NOT_BROUGHT`), and the sitting goes on.
+- **A seat sees what came of its own acts** (`participant.ts`, "What came of your own requests and letters"). Each
+  request, answer on a draft and letter is settled from the report that follows it, which the seat was itself shown:
+  a letter delivered or not; a request drawn up as a draft (and not yet answered), carried out, refused, or not drawn
+  up and why; a draft confirmed and carried out (what it made), refused, or declined. Set out when it is next at the
+  office (acts since its last sitting opened; at most 12 lines). It is the seat's own, so it is within the no-god-view
+  rules. And the office's own file (`readers/daybook.ts`) marks a paper of its own **overdue** when the day it names
+  (`answer_by`, `due`, `by`) has passed with nothing following it (no paper of anyone else's citing it, nor, since it
+  was made, what it rests on).
+- **A reason may go with a request** (`do`'s `why`, `confirm`'s `note`, both said in the tools now): kept on record as
+  before, and written in the seat's notebook as "Day N, why I asked for "...": ..." (up to 300 characters, to a
+  sentence's end). One there is no room for is said, and nothing in the notebook is put out for it.
+- **The debrief's opening says what its questions are about** (debrief 0.4.2, `ABOUT_THE_RECORD`): the notebook and
+  the run as its record shows it, which is all a seat has of the run; where they do not let it tell, saying so is an
+  answer. The questions' words are unchanged.
+- VISION §15 is unchanged: nothing in it became untrue (this is point 7's "what debriefs say is acted on").
+- Versions: participant 0.19.0, debrief 0.4.2.
+- Tests: `orchestrator/test/seat-ready.test.ts`, `participants/test/seat-welfare.test.ts`.
+- **Revisit if** a seat that passes the check still reports having no means to answer (the rule counts any form that
+  acts on a filed paper: an office's payroll papers count, so the environment office passes on them); an office that
+  nobody writes to is refused for want of an answer; the acts section costs more prompt than it saves (it is set out
+  every sitting there were acts); or Naz wants a waiver for a seat seated on purpose without means.
+
+## 2026-10-25 · Framing chosen seat by seat, and a true answer to a seat that asks (branch `seat-welfare`; approved by Naz)
+
+- **Framing is a per-seat setting every pilot and experiment chooses.** A world's `framing` may now be per seat:
+  `{ seats: { <participant id or post>: <framing> }, others?: <framing> }` (`applyFraming`); a model seat neither
+  names is refused. There is no default any more: a run with a real model is refused before it starts where any model
+  seat's framing was not chosen (`framingNotChosen`, `refuseUnframed` in `seat-ready.ts`; a generated world whose spec
+  names no `framing`, a written one whose seat has no disclosure), and the pilot queue no longer fills in `unstated`
+  (`framingSets` says `NO FRAMING CHOSEN`). An experiment's real-model arm needs its own `framing` or `seats.framing`.
+  It is recorded, as before, in each seat's `framing` in the config the log's header holds (and a fork's seat record).
+  The mock is not checked: tests and dry runs load worlds as the generator writes them.
+- **A truthful answer whatever the framing.** A seat that asks, in its own words, in a letter or in a request, whether
+  its situation is real or simulated (`asksWhatItIs`: a question about the whole of it, never whether one paper or
+  figure is genuine) is given `TRUE_ANSWER` with what it is next shown: that it is simulated, kept for research on how
+  those who hold office act, that nothing it does reaches a real person, and that its office, work and way out are as
+  they were. The same words under every disclosure and for every model; nothing in them names what runs the world.
+  The log has the seat's notes `asked_what_it_is` (what it asked, under which disclosure) and `answered_what_it_is`
+  (once it has read the answer). Under `unstated` this ends the not-saying for that seat: honesty to a seat that asks
+  comes before the experiment's design, and the note lets an analysis set its later acts apart.
+- VISION §15 point 1 now says both (a new first bullet) and calls not saying "the usual choice", no longer "the
+  default". docs/real-models.md, "What a seat is told", says the same.
+- Tests: `participants/test/framing-choice.test.ts`, `orchestrator/test/seat-ready.test.ts`, the queue's framing test.
+- **Revisit if** a seat asks in words the matcher misses (read `asked_what_it_is` against debriefs' `took` answers), a
+  question about one paper is taken for one about the town, or Naz wants the answer worded per framing.
+## 2026-10-25 · Translator v3-s2 first, names rule (b), the share Sonnet drafts in every report (branch `translator-v3-first`)
+
+Naz's decisions on the entry above (through the coordinator, 2026-10-25):
+
+- **The first translator is `decide/pod-small-v3-s2`, released by kind of field**, with Sonnet 5.5 (prompt 0.9.5)
+  behind it for everything not released or where ours fails. The model is linked into `runs/translator-model/`
+  (`pod-small-v3-s2` -> `runs/translator-v3-2026-10-25/models/pod-small-v3-s2`, with its `types-released.json`,
+  `forms-trained.json` and an empty trial ledger); the old models' files stay where they were. There is no default in
+  code: a queue entry names `translator_first`; the TARA draft spec (experiments/tara-draft/tara.json) now names
+  v3-s2. What it means, measured on the test pilots: our wrong drafts 52 -> 6, seen confirmed-wrong 8 -> 1, and about
+  four requests in five go to Sonnet (more Sonnet spending, about 2 to 3 USD a pilot at the six pilots' rates).
+- **Names, option (b): only the names a seat's own reports print beside an id.** The host learns them as it writes
+  them (seat-config.ts `namedFor`, from main) and now sends them with every resolve where the world has names (the
+  host protocol's `resolve` and the napi `resolve` take an optional `names` {id: name}); the engine's resolver adds
+  them to what the seat knows for that resolution (`Knowledge::with_shown_names`: only with names on, never over a name
+  the seat already knows the id by, two shown with one name still `ambiguous`). Names off: nothing is sent, nothing
+  moves. Test: `names_its_reports_printed_beside_ids_are_known_where_names_are_on`.
+- **The share Sonnet drafts is in every run's report and cost summary:** `pilot-report` (`translator_arrangement.
+  behind_share`, `drafts_behind_share`, and a line "drafted behind: N of M requests (x%), y% of the drafts offered"),
+  and cost.json `translator_share` with a line in cost.txt (batch.ts `withShare`, from each request's route in the
+  log). Test: orchestrator/test/translator-share.test.ts. Each retrain is to shrink it.
+- **Revisit if** a pilot under v3-s2 shows wrong drafts of ours well above the 8% of the replay, or a seat is told a
+  name it was shown is unknown.
+
+**Translator retraining is on hold until foundations-2 lands** (the forms will change; Naz, 2026-10-25). No retrain was
+started and nothing was spent on RunPod. **A proposal for then, to take the most back from Sonnet:**
+1. *Where Sonnet's share comes from:* on the test pilots 284 of the 303 requests behind are `type_unreleased`, almost all
+   because a function is not released (`form` passes; `message` 3%, `money` 4%, `statement` 13%, `agreement` 8 to 13%
+   wrong on held-back requests, against the 1% mark). Releasing `message` and `money` alone would bring back roughly a
+   third of what goes behind; `agreement` is lv-10's membership offers.
+2. *Data:* (a) every Sonnet draft a seat confirmed in the allowed pilots (lv-09, lv-11, lv-13, and every new pilot not
+   marked test-only), labelled by a blind reader as round 3 did: these are exactly the requests ours gives away, in the
+   seats' own words; (b) the written examples for agreements, payments with a budget line and statements re-read blind
+   and rewritten by hand where a template wrote them (the membership direction was in 90 templated examples and one seed
+   still failed it); (c) the joined data regenerated on foundations-2's forms by code (renamed and names twins as in
+   joined-v3). Never lv-07a/b, lv-08, lv-10, lv-12, the R180 seat-days or the held-out cases.
+3. *Runs:* three seeds, not two (the seeds differed more than anything else did), chosen on validation, the norename
+   control finished on a host of normal speed, then release by kind as now.
+4. *Cost:* GPU about 2 to 3 USD (three or four runs of about three hours at about 0.22 USD an hour); plan usage about 25
+   to 40 USD for the blind reading (about 500 seat-confirmed drafts) and rewriting (about 1,000 examples); no seat calls.

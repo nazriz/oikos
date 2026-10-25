@@ -111,7 +111,7 @@
  ],
  "seats": {
   "translator": {
-   "first": "decide/pod-small-r3-long-s1",
+   "first": "decide/pod-small-v3-s2",
    "behind": "anthropic/claude-sonnet-5-5",
    "arrangement": "then"
   },

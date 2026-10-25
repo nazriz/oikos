@@ -529,6 +529,11 @@ pub struct Look {
     /// For a channel that looks near the capacity's entity: where it was then (the entity's `moved` stamp).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<u64>,
+    /// Looked through in an earlier tenure of the post, which the holder has since lost and been given again: the next
+    /// look is the office's file whole, said to be whole, so that what the holder kept of it from before is replaced, not
+    /// added to (`set_holder`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub anew: bool,
 }
 
 /// A holding of a resource: a quantity of a kind, held by an entity, at a place (a structure, or an edge itself).
@@ -1095,11 +1100,17 @@ impl State {
             }
             // And so does every channel of it, whole: what the holder looked through before, in an earlier tenure (a person
             // appointed again to a post they lost), is not what the unit made for this one has been shown. Its first look is the
-            // office's file as it stands, as it is for someone who never held it.
+            // office's file as it stands, as it is for someone who never held it; and, because a participant may have kept
+            // what it was shown before, it is said to be whole (its marks are kept, marked `anew`): delivered as only
+            // "what's new", the old file and the new one would be put together, each record twice.
             if let Some(p) = self.participants.get_mut(&h) {
                 let prefix = format!("{position}/");
-                if p.looks.keys().any(|k| k.starts_with(&prefix)) {
-                    Arc::make_mut(p).looks.retain(|k, _| !k.starts_with(&prefix));
+                if p.looks.iter().any(|(k, l)| k.starts_with(&prefix) && !l.anew) {
+                    for (k, l) in Arc::make_mut(p).looks.iter_mut() {
+                        if k.starts_with(&prefix) {
+                            l.anew = true;
+                        }
+                    }
                 }
             }
         }
