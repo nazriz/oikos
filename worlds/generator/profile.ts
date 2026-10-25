@@ -216,8 +216,17 @@ export interface Profile {
     /** Shop premises to let (docs/behaviour/leasing.md; risk ME-1): `vacant_bps`, the share of a place's shop units that
      * stand empty (the town opens with that share of empty units beside its shops, let by its landlords); a lease's
      * `rent_per_month` for a small unit, its `deposit_months` (a security deposit, held and given back at the end),
-     * `term_months` and the `notice_days` either side gives at its end. Each with its source; left out, no premises to let. */
-    commercial?: { vacant_bps: number; rent_per_month: number; deposit_months: number; term_months: number; notice_days: number };
+     * `term_months`, and what a landlord asks to accept a tenant's surrender (`surrender_months` of rent, its practice).
+     * `law`, the place's law on leases of shop premises (published as `law-premises-leases`; docs/behaviour/leasing.md,
+     * "Remedies"): rent owed `arrears_days` before a landlord may end a lease for it, after `forfeiture_notice_days` of
+     * notice (0: re-entry the next day); a tenant's own notice to end it early (`tenant_notice_days`; 0: none, only a
+     * surrender agreed); a rent review at most every `review_months`, on `review_notice_days` of notice, `upward_only` or
+     * not; and who hears a claim for rent owed (`disputes`: the town's tribunal). Each with its source; left out, no
+     * premises to let. */
+    commercial?: {
+      vacant_bps: number; rent_per_month: number; deposit_months: number; term_months: number; surrender_months: number;
+      law?: { arrears_days: number; forfeiture_notice_days: number; tenant_notice_days: number; review_months: number; review_notice_days: number; upward_only?: boolean; disputes?: "tribunal" };
+    };
     /** How savings lean on pay (risk ME-17; docs/design/market-realism.md): the rank correlation of income and wealth
      * once age is accounted for (basis points), from a wealth survey. A person's savings are drawn from their age's
      * distribution at a rank that leans on their pay's rank by it. Left out: drawn on their own, as before. */

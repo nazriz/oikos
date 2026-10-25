@@ -759,6 +759,15 @@
       },
       "source": "placeholder"
     },
+    "leave_after_months": {
+      "default": 3,
+      "schema": {
+        "description": "a business of one in premises it leases: months running that they pay it less than trading alone before it asks to leave (docs/behaviour/leasing.md, \"Leaving early\")",
+        "type": "integer"
+      },
+      "source": "placeholder (ME-1)",
+      "unit": "months"
+    },
     "lender": {
       "default": "",
       "schema": {
@@ -1201,5 +1210,5 @@
   },
   "perceives": [],
   "state": "none",
-  "version": "0.20.0"
+  "version": "0.21.0"
 }

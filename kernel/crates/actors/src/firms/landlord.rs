@@ -90,6 +90,40 @@ pub fn possession_law(book: &Book) -> Option<PossessionLaw> {
     })
 }
 
+/// The law on leases of shop premises, as its lawmaker published it (docs/behaviour/leasing.md, "Remedies"): how long
+/// rent must be owed before a landlord may end a lease for it, and the notice it gives then (0: it re-enters, the next
+/// day); a tenant's own notice to end one early (0: none, only a surrender the landlord agrees to); how often a rent
+/// may be reviewed and on what notice, and whether a review may lower it; who hears a claim for rent owed. A record
+/// the landlord, the business that leases and the tribunal read; no place's figures here, and a world with no such
+/// law has none of it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PremisesLaw {
+    pub id: String,
+    pub arrears_days: i64,
+    pub forfeiture_notice_days: i64,
+    pub tenant_notice_days: i64,
+    pub review_months: i64,
+    pub review_notice_days: i64,
+    pub upward_only: bool,
+    pub heard_by: Option<String>,
+}
+
+pub fn premises_law(book: &Book) -> Option<PremisesLaw> {
+    let l = latest_law(book, |r| data(r).s("lease") == Some("premises"))?;
+    let d = data(l);
+    let n = |k: &str| d.get(k).and_then(|v| scaled(v, 1)).filter(|x| *x >= 0).unwrap_or(0);
+    Some(PremisesLaw {
+        id: l.id.clone(),
+        arrears_days: n("arrears_days"),
+        forfeiture_notice_days: n("forfeiture_notice_days"),
+        tenant_notice_days: n("tenant_notice_days"),
+        review_months: n("review_months"),
+        review_notice_days: n("review_notice_days"),
+        upward_only: d.flag("upward_only"),
+        heard_by: d.s("heard_by").map(String::from),
+    })
+}
+
 /// Whom a lease names as living in the home with the tenant (its words say: "... to live there with their household:
 /// a, b."; none named: the tenant alone), the tenant first.
 pub fn household_named(lease_text: &str, tenant: &str) -> Vec<String> {
@@ -120,13 +154,42 @@ struct Possession {
     warrant_fee: Option<i64>,
 }
 
-/// Shop premises we let (docs/behaviour/leasing.md; risk ME-1): the profile's terms for a small unit.
+/// Shop premises we let (docs/behaviour/leasing.md; risk ME-1): the profile's terms for a small unit, what we ask to
+/// accept a tenant's surrender (months of rent: our practice), and where a claim for rent owed is brought.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Commercial {
     rent: i64,
     deposit_months: i64,
     term_months: i64,
+    #[serde(default)]
+    surrender_months: i64,
+    #[serde(default)]
+    tribunal: Option<String>,
+    /// (A world with no law on premises leases: the notice either side gives, as leases were let before the remedies.)
+    #[serde(default)]
     notice_days: i64,
+}
+
+/// Where a lease of our premises has got to in our rent book (docs/behaviour/leasing.md, "Remedies").
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PremisesCase {
+    /// Since when it has been a month's rent or more behind, at our looks in the rent book.
+    behind_since: Option<i64>,
+    /// When we last wrote to ask for what is owed.
+    demanded_at: Option<i64>,
+    /// When we ended it for rent owed (our notice under the lease).
+    forfeited_at: Option<i64>,
+    /// A surrender asked for: what we asked for it, and when we said so.
+    surrender: Option<(i64, i64)>,
+    /// When we ended it on the surrender agreed (paid).
+    surrendered_at: Option<i64>,
+    /// When it last had its rent reviewed (none: from its signing).
+    reviewed_at: Option<i64>,
+    /// Ended, and dealt with: its deposit given back less what was owed, or the rest claimed.
+    settled: bool,
+    /// The rent owed beyond the deposit, recorded as a debt of the tenant's, and the claim applied on.
+    claimed: Option<i64>,
+    applied: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -364,7 +427,7 @@ impl Kind for Landlord {
         "firm.landlord"
     }
     fn version(&self) -> &'static str {
-        "0.20.0"
+        "0.21.0"
     }
     fn doc(&self) -> &'static str {
         "docs/behaviour/firms.md"
@@ -562,6 +625,9 @@ struct Office {
     /// Premises leases whose deposit we have given back.
     #[serde(default)]
     deposits_returned: BTreeSet<String>,
+    /// Premises lease -> where it has got to in our rent book.
+    #[serde(default)]
+    premises_book: BTreeMap<String, PremisesCase>,
     /// tenant account -> each payment received, and when
     received: BTreeMap<String, Vec<(i64, i64)>>,
     /// a lease we've offered to renew -> when its term ends (the new one's rent runs from then)
@@ -625,6 +691,7 @@ impl Office {
             owned: vec![],
             premises: vec![],
             deposits_returned: BTreeSet::new(),
+            premises_book: BTreeMap::new(),
             received: BTreeMap::new(),
             renews_at: BTreeMap::new(),
             notice_given: BTreeMap::new(),
@@ -932,6 +999,7 @@ impl Plan for Office {
         let mut offered_now: Vec<String> = vec![];
         self.letting(cx, &e, &mut steps, &mut let_now, &mut offered_now);
         self.premises_letting(cx, &e, &premises_leases, &mut steps);
+        self.premises_remedies(cx, &e, &premises_leases, &mut steps);
         self.renewals(cx, &e, &mut steps);
         self.listings(cx, &e, &mut steps, &let_now, &offered_now);
         self.deaths(cx, &e, &sites, &mut steps);
@@ -1175,7 +1243,7 @@ impl Office {
                     money_words(deposit, &cx.ctx.world)
                 ),
                 Say {
-                    data: Some(json!({ "structure": o.structure, "space": o.space, "type": o.type_, "cell": o.cell, "rent": rent, "premises": true, "room": room, "deposit": deposit, "term_months": c.term_months, "notice_days": c.notice_days })),
+                    data: Some(json!({ "structure": o.structure, "space": o.space, "type": o.type_, "cell": o.cell, "rent": rent, "premises": true, "room": room, "deposit": deposit, "term_months": c.term_months })),
                     extra: vec![("offer", json!({ "by": me, "take_up": "apply", "available": 1, "terms": terms }))],
                     visible: Some(Visible::Public),
                     ..Default::default()
@@ -1205,16 +1273,34 @@ impl Office {
             let tenant = pick.speaks_for.clone().unwrap_or_default();
             let rent = whole(d.get("rent"));
             let deposit = whole(d.get("deposit"));
+            // The lease's own terms of ending, as the law on premises leases has them (docs/behaviour/leasing.md,
+            // "Remedies"): ours, the notice we give when we end it for rent owed or on a surrender agreed (re-entry the
+            // next day where the law asks no notice); the tenant's, only where the law gives it one. With no such law: the
+            // notice either side, as before.
+            let law = premises_law(&self.book);
+            let (ours, theirs, ending) = match &law {
+                Some(l) => (
+                    l.forfeiture_notice_days.max(1) * DAY,
+                    (l.tenant_notice_days > 0).then(|| l.tenant_notice_days * DAY),
+                    format!(
+                        " {me} may end it before its term only for rent owed for {} days or more, or on a surrender agreed, {}; {}.",
+                        l.arrears_days,
+                        if l.forfeiture_notice_days > 0 { format!("by {} days' notice", l.forfeiture_notice_days) } else { "re-entering the next day".into() },
+                        if l.tenant_notice_days > 0 { format!("{tenant} may end it by {} days' notice", l.tenant_notice_days) } else { format!("{tenant} may end it early only by a surrender {me} agrees to") }
+                    ),
+                ),
+                None => (c.notice_days * DAY, Some(c.notice_days * DAY), String::new()),
+            };
             let o = Offer {
                 template: "lease".into(),
                 term: Some(c.term_months * MONTH),
                 periodic: false,
-                our_notice: Some(c.notice_days * DAY),
-                their_notice: Some(c.notice_days * DAY),
+                our_notice: Some(ours),
+                their_notice: theirs,
                 we: Some(occupancy(&tenant, &space)),
                 they: Some(rent_payment(&e.account, rent, cx)),
                 text: Some(format!(
-                    "{tenant} leases shop premises {space} from {me} for {} a month, for {} months, and pays a security deposit of {} to {} as it signs, which {me} gives back within 30 days of the lease's end, less any rent then owed.",
+                    "{tenant} leases shop premises {space} from {me} for {} a month, for {} months, and pays a security deposit of {} to {} as it signs, which {me} gives back within 30 days of the lease's end, less any rent then owed.{ending}",
                     e.usd(rent),
                     c.term_months,
                     e.usd(deposit),
@@ -1248,27 +1334,273 @@ impl Office {
                 }
             }
         }
-        // A lease that has ended: its deposit given back, to the account the tenant applied from.
+    }
+
+    /// The account a premises tenant applied from, and pays from (its application is the lease's basis).
+    fn premises_account(&self, a: &Record) -> Option<String> {
+        let app = a.basis.as_ref().and_then(|b| self.book.get(b.first()))?;
+        data(app).s("account").map(String::from)
+    }
+
+    /// A premises lease's account in our rent book now (docs/behaviour/leasing.md, "Remedies"): what has fallen due under
+    /// it (the deposit as it is signed, the rent monthly in advance from then until it ends, at the rent of each month,
+    /// and a surrender's price once asked for) against all that has come in from the account it applied from since it
+    /// was offered. Above nought, behind; below, in credit (the deposit we hold among it).
+    fn premises_owed(&self, a: &Record, c: &Commercial, case: &PremisesCase, t: i64) -> (i64, i64) {
+        let me = self.me.as_str();
+        let Some(signed) = self.book.signed_at(&a.id) else { return (0, 0) };
+        let tenant = tenant_of(a, me);
+        let first = lease_terms(a, tenant).rent;
+        let until = self.book.ends_at(&a.id).unwrap_or(i64::MAX).min(t + 1);
+        let mut due = first * c.deposit_months;
+        let mut k = 0;
+        while signed + k * MONTH < until {
+            due += self.rent_at(a, signed + k * MONTH);
+            k += 1;
+        }
+        if let Some((price, _)) = case.surrender {
+            due += price;
+        }
+        let paid: i64 = self.premises_account(a).and_then(|acc| self.received.get(&acc)).map_or(0, |v| v.iter().filter(|(at, _)| *at >= a.at).map(|(_, amt)| amt).sum());
+        (due - paid, self.rent_at(a, t))
+    }
+
+    /// What we do about our premises leases at our look in the rent book (docs/behaviour/leasing.md, "Remedies"), as the
+    /// law on premises leases has it: a tenant a month's rent or more behind is written to for it; still behind once the
+    /// law's days have run, the lease is ended for it, by our notice under it (re-entry, or the law's notice); a tenant who
+    /// asks to surrender is told what we take for it, and on its being paid the lease is ended by our notice; the rent is
+    /// reviewed to the market as often as the law lets; a lease that has ended has the deposit set against what is owed,
+    /// the rest given back, and anything owed beyond it recorded as a debt and, where the law sends it there, brought
+    /// before the tribunal. Nothing here puts anyone out or takes anything: the tenant's business moves out as its lease
+    /// ends, and an order to pay is the tribunal's to make and its registrar's to enforce.
+    fn premises_remedies(&mut self, cx: &mut Cx, e: &Env, leases: &[Arc<Record>], steps: &mut Vec<Step<Then>>) {
+        let Some(c) = self.p.commercial.clone() else { return };
+        let law = premises_law(&self.book);
+        let me = self.me.clone();
+        let t = e.t;
+        // A surrender asked for: answered with what we take for it (our practice: so many months' rent), whenever we look.
+        let asks: Vec<Arc<Record>> = self
+            .book
+            .open("surrender_request")
+            .filter(|r| crate::common::addressed_to(r).contains(&me) && !self.handled.contains(&r.id))
+            .cloned()
+            .collect();
+        for r in asks {
+            self.handled.insert(r.id.clone());
+            let Some(a) = data(&r).s("lease").and_then(|l| leases.iter().find(|a| a.id == l)).cloned() else { continue };
+            let tenant = tenant_of(&a, &me).to_string();
+            if r.speaks_for.as_deref() != Some(tenant.as_str()) || !self.book.in_force(&a.id) {
+                continue;
+            }
+            let case = self.premises_book.entry(a.id.clone()).or_default();
+            if case.surrender.is_some() || case.forfeited_at.is_some() {
+                continue;
+            }
+            let rent = self.rent_at(&a, t);
+            let price = rent * c.surrender_months;
+            self.premises_book.entry(a.id.clone()).or_default().surrender = Some((price, t));
+            let space = lease_terms(&a, &tenant).space.unwrap_or_default();
+            steps.push(step(
+                format!("{tenant} asks to surrender its lease of {space}: we take {} for it ({} months' rent), with what is owed; paid, we end the lease.", e.usd(price), c.surrender_months),
+                vec![say(
+                    "surrender_terms",
+                    &format!(
+                        "Surrender of lease {}: we accept it on payment of {} ({} months' rent) to {}, with any rent owed; once paid, we end the lease by our notice under it, and give the deposit back less what is owed.",
+                        a.id,
+                        e.usd(price),
+                        c.surrender_months,
+                        e.account
+                    ),
+                    Say { to: Some(vec![tenant.clone()]), visible: visible(&[&me, &tenant]), basis: Some(r.id.clone()), data: Some(json!({ "lease": a.id, "price": price, "account": e.account })), ..Default::default() },
+                )],
+            ));
+        }
+        if !e.at_books {
+            return;
+        }
         for a in leases {
-            if self.deposits_returned.contains(&a.id) || !self.book.concluded(&a.id) || self.book.ends_at(&a.id).is_none_or(|end| t < end) {
-                continue;
-            }
             let tenant = tenant_of(a, &me).to_string();
-            if !self.book.signed_by(&a.id, &tenant) {
+            if !self.book.concluded(&a.id) || !self.book.signed_by(&a.id, &tenant) {
                 continue;
             }
-            self.deposits_returned.insert(a.id.clone());
-            let app = a.basis.as_ref().and_then(|b| self.book.get(b.first())).cloned();
-            let Some(to) = app.as_ref().and_then(|r| data(r).s("account").map(String::from)) else { continue };
-            let rent = lease_terms(a, &tenant).rent;
-            let deposit = rent * c.deposit_months;
-            if deposit > 0 {
-                steps.push(step(
-                    format!("The lease of {} has ended: giving the security deposit of {} back.", lease_terms(a, &tenant).space.unwrap_or_default(), e.usd(deposit)),
-                    vec![pay(&to, deposit, Pay { from: Some(e.account.clone()), basis: Some(a.id.clone()), for_: Some("Security deposit given back at the lease's end.".into()), ..Default::default() }, cx)],
-                ));
+            let mut case = self.premises_book.get(&a.id).cloned().unwrap_or_default();
+            if case.settled && (case.claimed.is_none() || case.applied) {
+                continue;
+            }
+            let (behind, rent) = self.premises_owed(a, &c, &case, t);
+            let space = lease_terms(a, &tenant).space.unwrap_or_default();
+            let ended = !self.book.in_force(&a.id);
+            if ended {
+                // ---- the lease is over: the deposit set against what is owed; the rest back, or what is still owed claimed ----
+                if !case.settled {
+                    case.settled = true;
+                    self.deposits_returned.insert(a.id.clone());
+                    // (The deposit we hold is the tenant's again, set against what it owes.)
+                    let behind = behind - lease_terms(a, &tenant).rent * c.deposit_months;
+                    if behind < 0 {
+                        if let Some(to) = self.premises_account(a) {
+                            steps.push(step(
+                                format!("The lease of {space} has ended: giving back the {} we hold of {tenant}'s, the security deposit less what was owed.", e.usd(-behind)),
+                                vec![pay(&to, -behind, Pay { from: Some(e.account.clone()), basis: Some(a.id.clone()), for_: Some("Security deposit given back at the lease's end, less what was owed.".into()), ..Default::default() }, cx)],
+                            ));
+                        }
+                    } else if behind > 0 {
+                        case.claimed = Some(behind);
+                        steps.push(step(
+                            format!("The lease of {space} has ended with {} owed beyond the deposit: recording it as {tenant}'s debt to us.", e.usd(behind)),
+                            vec![crate::common::record("right", &me, json!({ "kind": "debt", "amount": behind, "for": format!("Rent owed under lease {} beyond its security deposit.", a.id) }), Some(&tenant), Some(&a.id))],
+                        ));
+                    }
+                } else if let (Some(owed), false) = (case.claimed, case.applied) {
+                    // (The debt on the record: brought before the tribunal, where the law sends such a claim and the town has one.)
+                    let claim = self.book.of_type("claim").find(|r| matches!(&r.body, RecordBody::Claim { holder, counterparty, about, .. } if *holder == me && counterparty.as_deref() == Some(tenant.as_str()) && about.get("kind").and_then(Value::as_str) == Some("debt")) && crate::common::cites(r, &a.id)).cloned();
+                    match (claim, c.tribunal.clone().filter(|_| law.as_ref().is_some_and(|l| l.heard_by.is_some()))) {
+                        (Some(claim), Some(tribunal)) => {
+                            case.applied = true;
+                            steps.push(step(
+                                format!("{tenant} owes us {} under the lease of {space}, beyond its deposit: applying to {tribunal} for an order to pay, as the law has it.", e.usd(owed)),
+                                vec![say(
+                                    "tribunal_application",
+                                    &format!("Application: {tenant} owes us {} in rent under lease {}, beyond its security deposit (claim {}).", e.usd(owed), a.id, claim.id),
+                                    Say {
+                                        to: Some(vec![tribunal.clone()]),
+                                        visible: visible(&[&me, &tribunal, &tenant]),
+                                        basis: Some(claim.id.clone()),
+                                        data: Some(json!({ "kind": "debt", "against": tenant, "claim": claim.id, "amount": owed, "account": e.account, "about": a.id, "evidence": serde_json::to_value(&*claim).unwrap_or(Value::Null) })),
+                                        ..Default::default()
+                                    },
+                                )],
+                            ));
+                        }
+                        (_, None) => case.applied = true, // (nobody to bring it before: it stays on the record)
+                        (None, _) => {}
+                    }
+                }
+                self.premises_book.insert(a.id.clone(), case);
+                continue;
+            }
+            // ---- in force ----
+            // A surrender asked and paid for: ended by our notice under the lease.
+            if let (Some((price, at)), None) = (case.surrender, case.surrendered_at) {
+                if behind <= 0 && case.forfeited_at.is_none() {
+                    case.surrendered_at = Some(t);
+                    steps.push(step(
+                        format!("{tenant} has paid the {} we take for its surrender: ending its lease of {space} by our notice under it.", e.usd(price)),
+                        vec![notice(&a.id, "Notice: the lease is surrendered, as agreed with the tenant.")],
+                    ));
+                } else if t - at >= MONTH {
+                    // (Not paid in a month: what we said lapses.)
+                    case.surrender = None;
+                }
+            }
+            if case.surrendered_at.is_some() || case.forfeited_at.is_some() {
+                self.premises_book.insert(a.id.clone(), case);
+                continue;
+            }
+            // (With no law on premises leases, a lease runs to its end, as leases were let before the remedies.)
+            let Some(law) = law.as_ref() else {
+                self.premises_book.insert(a.id.clone(), case);
+                continue;
+            };
+            // Arrears: written to for them; still owed once the law's days have run, the lease ended for them.
+            if behind >= rent && rent > 0 {
+                let since = *case.behind_since.get_or_insert(t);
+                if t - since >= law.arrears_days * DAY {
+                    case.forfeited_at = Some(t);
+                    self.org().remember(t, "gave_notice", Some(&tenant), 3_000);
+                    let how = if law.forfeiture_notice_days > 0 { format!("{} days' notice", law.forfeiture_notice_days) } else { "re-entry the next day".into() };
+                    steps.push(step(
+                        format!("{tenant} has owed a month's rent or more ({}) for {} days or more: ending its lease of {space} for it, by {how}, as {} allows.", e.usd(behind), law.arrears_days, law.id),
+                        vec![
+                            say(
+                                "lease_forfeiture",
+                                &format!(
+                                    "Notice: lease {} of {space} is ended for rent owed of {}, as {} allows; {}. The deposit is set against what is owed, and anything owed beyond it is claimed.",
+                                    a.id,
+                                    e.usd(behind),
+                                    law.id,
+                                    if law.forfeiture_notice_days > 0 { format!("the premises are to be given up by {}", e.date(t + law.forfeiture_notice_days * DAY)) } else { "we re-enter the premises the next day".into() }
+                                ),
+                                Say { to: Some(vec![tenant.clone()]), visible: visible(&[&me, &tenant]), basis: Some(a.id.clone()), data: Some(json!({ "lease": a.id, "owed": behind, "law": law.id })), ..Default::default() },
+                            ),
+                            notice(&a.id, "Notice: the lease is ended for rent owed."),
+                        ],
+                    ));
+                    self.premises_book.insert(a.id.clone(), case);
+                    continue;
+                }
+                if case.demanded_at.is_none_or(|d| t - d >= MONTH) {
+                    case.demanded_at = Some(t);
+                    steps.push(step(
+                        format!("{tenant} is {} behind with the rent for {space}: writing to ask for it.", e.usd(behind)),
+                        vec![say(
+                            "review_request",
+                            &format!("Request: the rent for the premises {space} is {} in arrears under lease {}. Please pay it.", e.usd(behind), a.id),
+                            Say {
+                                to: Some(vec![tenant.clone()]),
+                                visible: visible(&[&me, &tenant]),
+                                basis: Some(a.id.clone()),
+                                data: Some(json!({ "matter": "arrears", "against": tenant, "about": a.id, "amount": behind, "account": e.account })),
+                                ..Default::default()
+                            },
+                        )],
+                    ));
+                }
+            } else {
+                case.behind_since = None;
+            }
+            // A rent review, as often as the law lets: to the market rent, by what we know of our own units (up only, where
+            // the law says so), from the first rent day once the law's notice has run.
+            if law.review_months > 0 {
+                let signed = self.book.signed_at(&a.id).unwrap_or(a.at);
+                let since = case.reviewed_at.unwrap_or(signed);
+                let from = {
+                    let lead = t + law.review_notice_days * DAY + DAY;
+                    signed + (lead - signed + MONTH - 1).div_euclid(MONTH) * MONTH
+                };
+                if t - since >= law.review_months * MONTH && self.book.ends_at(&a.id).is_none_or(|end| from < end) {
+                    case.reviewed_at = Some(t);
+                    let now = self.rent_at(a, t);
+                    let ev = self.premises_evidence(e, leases, &a.id);
+                    let full = Review { pass_up_bps: 10_000, pass_down_bps: 10_000, soft_vacancy_bps: 0 };
+                    let mut market = reviewed(now, &ev, &full);
+                    if law.upward_only {
+                        market = market.max(now);
+                    }
+                    if market != now {
+                        self.rent_changes.entry(a.id.clone()).or_default().push(RentChange { from, rent: market });
+                        let basis = format!("{} recent lets and {} asking rents of our units", ev.lets.len(), ev.asking.len());
+                        steps.push(step(
+                            format!("A rent review of {space} (every {} months at most, as {} allows): by {basis}, the market rent is {} a month against the {} it lets for: moving it from {}.", law.review_months, law.id, e.usd(market), e.usd(now), e.date(from)),
+                            vec![say(
+                                "rent_review",
+                                &format!("Notice of rent review for the premises {space} under lease {}: the rent is {} a month from {} (was {}).", a.id, e.usd(market), e.date(from), e.usd(now)),
+                                Say { to: Some(vec![tenant.clone()]), visible: visible(&[&me, &tenant]), basis: Some(a.id.clone()), data: Some(json!({ "lease": a.id, "rent": market, "from": from, "was": now, "law": law.id })), ..Default::default() },
+                            )],
+                        ));
+                    }
+                }
+            }
+            self.premises_book.insert(a.id.clone(), case);
+        }
+    }
+
+    /// What we know of the market for our units (docs/behaviour/leasing.md, "Rent reviews"): what our other units have
+    /// let for lately, what we ask for those listed, and how many stand empty. Nothing past our own books.
+    fn premises_evidence(&self, e: &Env, leases: &[Arc<Record>], lease: &str) -> Evidence {
+        let me = self.me.as_str();
+        let mut ev = Evidence { homes: self.premises.len() as i64, ..Default::default() };
+        let held: BTreeSet<String> = leases.iter().filter(|a| self.book.in_force(&a.id)).filter_map(|a| lease_terms(a, tenant_of(a, me)).space).collect();
+        ev.vacant = self.premises.iter().filter(|o| !held.contains(&o.space)).count() as i64;
+        for x in leases.iter().filter(|x| x.id != lease && self.book.in_force(&x.id)) {
+            if self.book.signed_at(&x.id).is_some_and(|s| s >= e.t - self.p.evidence_days * DAY) {
+                ev.lets.push(self.rent_at(x, e.t));
             }
         }
+        for l in self.book.open("premises_listing").filter(|l| l.speaks_for.as_deref() == Some(me)) {
+            ev.asking.push(whole(data(l).get("rent")));
+        }
+        ev
     }
 
     /// Renewals: a tenancy whose term ends within our notice period, with no notice given, is offered again to the
@@ -2678,11 +3010,153 @@ mod tests {
         let mut records = vec![lease];
         records.extend(signed("PL1", DAY, "ent.1"));
         town.readings = vec![("PL1".into(), "in_force", Some(DAY + 60 * MONTH))];
-        let made = town.wake(2 * DAY, "cadence", records, vec![]);
+        // (Everything due under it paid: the deposit, and the rent for its term.)
+        let paid: oikos_sight::Transaction = serde_json::from_value(json!({ "t": 2 * DAY, "from": "acc-ent.1", "to": "acc-landlord", "amount": (750_000 + 60 * 250_000).to_string(), "currency": "XTS", "by": "bank", "memo": "rent" })).unwrap();
+        let made = town.wake(2 * DAY, "cadence", records, vec![paid]);
         assert!(!made.iter().any(|m| m.arg("kind") == json!("premises_listing")), "let: not listed again");
         town.readings = vec![("PL1".into(), "ended", Some(DAY + 60 * MONTH))];
         let back: Vec<Made> = town.wake(DAY + 60 * MONTH + DAY, "cadence", vec![], vec![]).into_iter().filter(|m| m.call.fn_ == "payment" || m.arg("for").as_str().is_some_and(|f| f.contains("deposit"))).collect();
         assert!(back.iter().any(|m| m.arg("to") == json!("acc-ent.1") && m.arg("amount").as_str().is_some_and(|a| a.contains("7500") || a.contains("7,500") || a == "750000")), "{back:?}");
+    }
+
+    // ---- the remedies of a lease of shop premises (docs/behaviour/leasing.md, "Remedies")
+
+    /// The law on premises leases, published.
+    fn premises_law_record(d: Value) -> Arc<Record> {
+        let mut d = d;
+        d["lease"] = json!("premises");
+        statement("law-premises-leases", 0, "law", d, "outside")
+    }
+    /// A town with two units of ours, unit-1 let on PL1 to ent.1 from `DAY` (applied for from acc-ent.1), unit-2 empty.
+    fn premises_town(law: Value, commercial: Value) -> (Town, Vec<Arc<Record>>) {
+        let mut params = base_params();
+        let mut c = json!({ "rent": 250_000, "deposit_months": 1, "term_months": 60, "surrender_months": 3, "tribunal": "tribunal" });
+        for (k, v) in commercial.as_object().cloned().unwrap_or_default() {
+            c[k] = v;
+        }
+        params["commercial"] = c;
+        let mut town = Town::new(params);
+        town.cells = vec![unit("c1", "unit-1", 4), unit("c2", "unit-2", 4)];
+        let app = rec(json!({ "id": "app-1", "at": DAY - 100, "author": "ent.1-owner", "record": "statement", "speaks_for": "ent.1", "kind": "rental_application", "visible_to": [ME, "ent.1"], "addressed_to": [ME],
+            "text": "Application.", "data": { "listing": "pl-x", "account": "acc-ent.1", "premises": true } }));
+        let lease = with_basis(rec(json!({ "id": "PL1", "at": DAY, "author": "landlord-1-office-system", "record": "agreement", "visible_to": [ME, "ent.1"], "terms": { "template": "lease", "parties": [ME, "ent.1"], "term": 60 * MONTH, "commitments": [
+            { "who": ME, "does": { "outcome": { "occupancy": { "who": "ent.1", "in": "unit-1/workplace.1" } } } },
+            { "who": "ent.1", "does": { "outcome": { "money": { "from": "acc-ent.1", "to": "acc-landlord", "amount": "250000", "for": "rent" } } }, "every": MONTH } ] } })), "app-1");
+        let mut g = vec![lot("lot-1", &["c1", "c2"]), title("lot-1", ME), premises_law_record(law), app, lease];
+        g.extend(signed("PL1", DAY, "ent.1"));
+        town.readings = vec![("PL1".into(), "in_force", Some(DAY + 60 * MONTH))];
+        (town, g)
+    }
+    fn from_tenant(t: i64, amount: i64) -> oikos_sight::Transaction {
+        serde_json::from_value(json!({ "t": t, "from": "acc-ent.1", "to": "acc-landlord", "amount": amount.to_string(), "currency": "XTS", "by": "bank", "memo": "rent" })).unwrap()
+    }
+    fn noticed<'a>(m: &'a [Made], lease: &str) -> Vec<&'a Made> {
+        m.iter().filter(|x| x.call.fn_ == "agreement" && x.arg("notice") == json!(lease)).collect()
+    }
+
+    #[test]
+    fn a_premises_lease_is_offered_with_the_landlords_ending_for_rent_owed_and_the_tenants_notice_only_where_the_law_gives_one() {
+        for (tenant_days, theirs) in [(0, false), (180, true)] {
+            let (mut town, mut g) = premises_town(json!({ "arrears_days": 14, "forfeiture_notice_days": 0, "tenant_notice_days": tenant_days, "review_months": 0 }), json!({}));
+            g.truncate(3); // (only the lot, our title and the law: nothing let yet)
+            town.readings.clear();
+            let made = town.wake(0, "cadence", g, vec![]);
+            let listing = kind(&made, "premises_listing").into_iter().find(|m| m.arg("data")["space"] == json!("unit-1/workplace.1")).expect("listed").id.clone();
+            let app = rec(json!({ "id": "app-9", "at": DAY - 50, "author": "ent.9-owner", "record": "statement", "speaks_for": "ent.9", "kind": "rental_application", "visible_to": [ME, "ent.9"], "addressed_to": [ME],
+                "text": "Application.", "data": { "listing": listing, "account": "acc-ent.9", "premises": true } }));
+            let made = town.wake(DAY, "cadence", vec![app], vec![]);
+            let offer = fns(&made, "agreement").into_iter().find(|m| m.arg("with") == json!("ent.9")).expect("offered");
+            assert!(offer.arg("our_notice") != Value::Null, "ours: re-entry, the next day where the law asks no notice");
+            assert_eq!(offer.arg("their_notice") != Value::Null, theirs, "{tenant_days}");
+        }
+    }
+
+    #[test]
+    fn a_premises_tenant_behind_is_asked_for_the_rent_then_its_lease_ended_for_it_once_the_laws_days_have_run_and_what_the_deposit_does_not_cover_is_claimed_before_the_tribunal() {
+        let (mut town, g) = premises_town(json!({ "arrears_days": 14, "forfeiture_notice_days": 60, "review_months": 0, "heard_by": "tribunal" }), json!({}));
+        // The deposit and the first month paid as it signed; nothing since.
+        town.wake(DAY + 3600, "cadence", g, vec![from_tenant(DAY, 250_000), from_tenant(DAY, 250_000)]);
+        let t1 = DAY + MONTH + DAY;
+        let made = town.wake(t1, "cadence", vec![], vec![]);
+        let asked = kind(&made, "review_request");
+        assert!(asked.iter().any(|m| m.arg("data")["amount"] == json!(250_000) && m.arg("data")["about"] == json!("PL1")), "a month behind: asked for: {made:?}");
+        assert!(noticed(&made, "PL1").is_empty(), "not ended yet");
+        // A week on, still within the law's 14 days: nothing more.
+        let made = town.wake(t1 + 7 * DAY, "cadence", vec![], vec![]);
+        assert!(noticed(&made, "PL1").is_empty() && kind(&made, "review_request").is_empty(), "{made:?}");
+        // Two weeks on: ended for it, by the law's notice.
+        let made = town.wake(t1 + 14 * DAY, "cadence", vec![], vec![]);
+        assert_eq!(noticed(&made, "PL1").len(), 1, "{made:?}");
+        assert!(kind(&made, "lease_forfeiture").iter().any(|m| m.arg("data")["owed"] == json!(250_000)), "{made:?}");
+        // The notice runs out: four months' rent fell due under it (to its end), one paid; the deposit covers one.
+        let end = t1 + 14 * DAY + 60 * DAY;
+        town.readings = vec![("PL1".into(), "ended", Some(end))];
+        let made = town.wake(end + 3 * DAY, "cadence", vec![], vec![]);
+        let claim = fns(&made, "claim");
+        assert_eq!(claim.len(), 1, "{made:?}");
+        assert_eq!((claim[0].arg("about")["kind"].clone(), claim[0].arg("about")["amount"].clone(), claim[0].arg("against")), (json!("debt"), json!(500_000), json!("ent.1")));
+        assert!(!fns(&made, "money").iter().any(|m| m.arg("to") == json!("acc-ent.1")), "no deposit back: it went to the rent");
+        // The debt on the record: brought before the tribunal, once.
+        let debt = rec(json!({ "id": "cl-1", "at": end + 3 * DAY, "author": "landlord-1-office-system", "record": "claim", "position": "right", "holder": ME, "counterparty": "ent.1", "basis": "PL1",
+            "about": { "kind": "debt", "amount": 500_000, "for": "Rent owed." }, "visible_to": [ME, "ent.1"] }));
+        let made = town.wake(end + 10 * DAY, "cadence", vec![debt], vec![]);
+        let app = kind(&made, "tribunal_application");
+        assert_eq!(app.len(), 1, "{made:?}");
+        assert_eq!((app[0].arg("data")["kind"].clone(), app[0].arg("data")["claim"].clone(), app[0].arg("data")["amount"].clone(), app[0].arg("to")), (json!("debt"), json!("cl-1"), json!(500_000), json!(["tribunal"])));
+        let made = town.wake(end + 17 * DAY, "cadence", vec![], vec![]);
+        assert!(kind(&made, "tribunal_application").is_empty(), "once");
+    }
+
+    #[test]
+    fn a_premises_tenant_that_pays_what_it_is_asked_for_keeps_its_lease() {
+        let (mut town, g) = premises_town(json!({ "arrears_days": 14, "forfeiture_notice_days": 0, "review_months": 0 }), json!({}));
+        town.wake(DAY + 3600, "cadence", g, vec![from_tenant(DAY, 500_000)]);
+        let t1 = DAY + MONTH + DAY;
+        assert!(!kind(&town.wake(t1, "cadence", vec![], vec![]), "review_request").is_empty());
+        let made = town.wake(t1 + 14 * DAY, "cadence", vec![], vec![from_tenant(t1 + DAY, 250_000)]);
+        assert!(noticed(&made, "PL1").is_empty() && kind(&made, "lease_forfeiture").is_empty(), "paid up: kept: {made:?}");
+    }
+
+    #[test]
+    fn a_surrender_asked_for_is_priced_at_the_landlords_months_of_rent_and_once_paid_ended_by_its_notice_and_the_deposit_given_back_less_what_is_owed() {
+        let (mut town, g) = premises_town(json!({ "arrears_days": 14, "forfeiture_notice_days": 0, "review_months": 0 }), json!({}));
+        town.wake(DAY + 3600, "cadence", g, vec![from_tenant(DAY, 500_000)]);
+        let ask = rec(json!({ "id": "sr-1", "at": DAY + 5 * DAY, "author": "ent.1-owner", "record": "statement", "speaks_for": "ent.1", "kind": "surrender_request", "visible_to": [ME, "ent.1"], "addressed_to": [ME], "text": "Request.", "data": { "lease": "PL1" } }));
+        let made = town.wake(DAY + 6 * DAY, "cadence", vec![ask], vec![]);
+        let terms = kind(&made, "surrender_terms");
+        assert_eq!(terms.len(), 1, "{made:?}");
+        assert_eq!(terms[0].arg("data")["price"], json!(750_000));
+        assert!(noticed(&made, "PL1").is_empty(), "not until it is paid");
+        let made = town.wake(DAY + 13 * DAY, "cadence", vec![], vec![from_tenant(DAY + 8 * DAY, 750_000)]);
+        assert_eq!(noticed(&made, "PL1").len(), 1, "paid: ended by our notice: {made:?}");
+        // Ended the next day: the deposit back whole (nothing owed: its one month's rent was paid).
+        town.readings = vec![("PL1".into(), "ended", Some(DAY + 14 * DAY))];
+        let made = town.wake(DAY + 20 * DAY, "cadence", vec![], vec![]);
+        assert!(fns(&made, "money").iter().any(|m| m.arg("to") == json!("acc-ent.1") && m.arg("amount").as_str().is_some_and(|a| a.contains("2500.00"))), "{made:?}");
+    }
+
+    #[test]
+    fn a_premises_rent_is_reviewed_to_the_market_as_often_as_the_law_lets_from_a_rent_day_after_its_notice_and_up_only_where_the_law_says() {
+        for (asking, upward_only, expect) in [(300_000, false, Some(300_000)), (200_000, false, Some(200_000)), (200_000, true, None)] {
+            let (mut town, mut g) = premises_town(json!({ "arrears_days": 14, "forfeiture_notice_days": 0, "review_months": 12, "review_notice_days": 30, "upward_only": upward_only }), json!({}));
+            // What we ask for the empty unit: the market, as we know it.
+            g.push(rec(json!({ "id": "pl-2", "at": 12 * MONTH, "author": "landlord-1-office-system", "record": "statement", "speaks_for": ME, "kind": "premises_listing", "visible_to": "public", "text": "To let.",
+                "data": { "space": "unit-2/workplace.1", "structure": "unit-2", "rent": asking, "premises": true, "room": 4 } })));
+            let t = DAY + 12 * MONTH + 2 * DAY;
+            let made = town.wake(t, "cadence", g, vec![from_tenant(DAY, 250_000 * 14)]);
+            let review = kind(&made, "rent_review");
+            match expect {
+                Some(rent) => {
+                    assert_eq!(review.len(), 1, "{made:?}");
+                    let from = review[0].arg("data")["from"].as_i64().unwrap();
+                    assert_eq!(review[0].arg("data")["rent"], json!(rent));
+                    assert!(from >= t + 30 * DAY && (from - DAY) % MONTH == 0, "a rent day once the notice has run: {from}");
+                }
+                None => assert!(review.is_empty(), "up only: no fall: {made:?}"),
+            }
+            // Not again within the law's twelve months.
+            assert!(kind(&town.wake(t + 3 * MONTH, "cadence", vec![], vec![]), "rent_review").is_empty());
+        }
     }
 
     // ---- participants/test/landlord.test.ts
@@ -3279,7 +3753,7 @@ mod tests {
     #[test]
     fn the_manifest_names_its_issues_and_every_parameter_the_module_reads() {
         let m = LANDLORD.manifest();
-        assert_eq!((m["name"].as_str(), m["version"].as_str(), m["doc"].as_str()), (Some("firm.landlord"), Some("0.20.0"), Some("docs/behaviour/firms.md")));
+        assert_eq!((m["name"].as_str(), m["version"].as_str(), m["doc"].as_str()), (Some("firm.landlord"), Some("0.21.0"), Some("docs/behaviour/firms.md")));
         for k in ["pass_up_bps", "pass_down_bps", "soft_vacancy_bps", "evidence_days", "possession", "repair", "respond", "rent_review_months"] {
             assert!(m["params"][k].is_object(), "{k}");
         }

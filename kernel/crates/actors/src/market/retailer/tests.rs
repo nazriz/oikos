@@ -316,3 +316,159 @@ fn premises_pay_when_the_custom_outruns_one_person_and_the_margin_pays_the_hands
     // A thin margin does not pay the hands: worse than alone however much is wanted.
     assert!(premises_pay(300, 100, 100, 30_000, 50_000, 6).0 < 100 * 100);
 }
+
+// ---- a business of one in premises it leases (docs/behaviour/leasing.md) ----
+
+const LEASE: &str = "rec.PL1";
+/// The agreement reader's name, as the kernel signs its readings.
+const READER: &str = "terms-0.2.0";
+
+/// A business of one trading from its owner's home.
+fn sole(extra: Value) -> Harness {
+    let mut p = json!({ "operator": "ann", "premises": "home-1", "workplace": "home-1/dwelling.1", "premises_cell": "cell.1.1", "max_staff": 0, "min_staff": 0, "premises_board": "premises" });
+    for (k, v) in extra.as_object().cloned().unwrap_or_default() {
+        p[k] = v;
+    }
+    harness(p)
+}
+
+/// Its memory given a lease of unit-1 (as taking one leaves it), and where it traded before.
+fn with_lease(h: &mut Harness) {
+    fn find(v: &mut Value) -> Option<&mut serde_json::Map<String, Value>> {
+        if v.as_object().is_some_and(|m| m.contains_key("premises_applied")) {
+            return v.as_object_mut();
+        }
+        match v {
+            Value::Object(m) => m.values_mut().find_map(find),
+            Value::Array(a) => a.iter_mut().find_map(find),
+            _ => None,
+        }
+    }
+    let mut saved = h.actor.save().unwrap();
+    let shop = find(&mut saved).expect("the shop's memory");
+    shop.insert("lease".into(), json!({ "agreement": LEASE, "space": "unit-1/workplace.1", "structure": "unit-1", "cell": "cell.2.1", "room": 4, "rent": 250_000, "from": ["home-1", "home-1/dwelling.1", "cell.1.1"] }));
+    shop["at"]["premises"] = json!("unit-1");
+    shop["at"]["workplace"] = json!("unit-1/workplace.1");
+    h.actor = h.kind.restore(&h.ctx, saved).unwrap();
+}
+
+/// The lease, signed by both, with the landlord's clause and, where the law gives one, ours.
+fn the_lease(ours: Option<i64>) -> Vec<Value> {
+    let mut termination = vec![json!({ "party": "landlord-1", "notice": DAY })];
+    if let Some(n) = ours {
+        termination.push(json!({ "party": SHOP, "notice": n }));
+    }
+    vec![
+        json!({ "id": LEASE, "record": "agreement", "author": "landlord-1-office-system", "at": 0, "visible_to": [SHOP, "landlord-1"], "terms": { "template": "lease", "parties": ["landlord-1", SHOP], "term": 60 * MONTH, "termination": termination,
+            "commitments": [{ "who": "landlord-1", "does": { "outcome": { "occupancy": { "who": SHOP, "in": "unit-1/workplace.1" } } } },
+                            { "who": SHOP, "does": { "outcome": { "money": { "to": "acc-landlord-1", "amount": "250000", "for": "rent" } } }, "every": MONTH }] } }),
+        json!({ "id": "sig-l", "record": "signature", "author": "landlord-1-office-system", "at": 0, "visible_to": [SHOP, "landlord-1"], "agreement": LEASE, "as": "landlord-1" }),
+        json!({ "id": "sig-s", "record": "signature", "author": "ann-self", "at": 0, "visible_to": [SHOP, "landlord-1"], "agreement": LEASE, "as": SHOP }),
+        // (Our standing order for its rent.)
+        json!({ "id": "rec.order", "record": "statement", "author": "ann-self", "speaks_for": SHOP, "at": 0, "visible_to": [SHOP], "kind": "request", "text": "Pay the rent.", "basis": LEASE, "data": { "every": MONTH, "to": "acc-landlord-1", "amount": 250_000 } }),
+    ]
+}
+
+/// The unit as we see it there: who is in its workplace.
+fn unit(here: &[&str]) -> Value {
+    json!({ "unit": { "kind": "sites", "as_of": 0, "cells": [{ "cell": "cell.2.1", "x": 2, "y": 1, "structure": {
+        "structure": "unit-1", "type": "shop-unit", "at": "cell.2.1", "w": 1, "h": 1, "complete": true,
+        "spaces": [{ "space": "unit-1/workplace.1", "kind": "workplace", "capacity": 4, "count": here.len(), "occupants": here }] } }] } })
+}
+
+fn leased_world(here: &[&str], extra: Vec<Value>, stock: i64, balance: i64, txs: Value, ours: Option<i64>) -> Value {
+    let mut recs = the_lease(ours);
+    recs.extend(extra);
+    channels(vec![money(SHOP, balance, txs), records("mine", recs), holdings(&[("unit-1", "bread", stock)]), unit(here)])
+}
+
+#[test]
+fn in_premises_it_leases_a_business_serves_only_once_it_sees_its_owner_there() {
+    let mut h = sole(json!({}));
+    h.wake(DAY + 6 * H, channels(vec![money(SHOP, 1_000_000, json!([])), records("mine", vec![]), holdings(&[("home-1", "bread", 10)])]));
+    with_lease(&mut h);
+    h.readings = json!({ LEASE: { "of": "agreement", "status": "in_force", "ends_at": 60 * MONTH, "reader": READER } });
+    let txs = json!([tx("acc-bob", "acc-shop", 1500, DAY + 8 * H, "Order: 3 bread.")]);
+    // Its owner is not at the unit yet: nothing is served (no act the kernel would refuse for nobody there).
+    let t = all(&h.wake(DAY + 9 * H, leased_world(&[], vec![an_order("rec.50", DAY + 8 * H, "bob", 3, 500)], 10, 1_000_000, txs, None)));
+    assert!(!t.contains("work("), "nobody there to serve: {t}");
+    // Its owner has come: served, there.
+    let t = all(&h.wake(DAY + 10 * H, leased_world(&["ann"], vec![], 10, 1_000_000, json!([]), None)));
+    assert!(t.contains("work(") && t.contains("units=\"3\"") && t.contains("at=unit-1") && t.contains("ann"), "{t}");
+}
+
+#[test]
+fn a_rent_demand_is_paid_if_held_and_a_review_changes_the_rent_from_its_day_and_stops_the_old_order_after_its_last_payment() {
+    let mut h = sole(json!({}));
+    h.wake(DAY, channels(vec![money(SHOP, 1_000_000, json!([])), records("mine", vec![]), holdings(&[("home-1", "bread", 10)])]));
+    with_lease(&mut h);
+    h.readings = json!({ LEASE: { "of": "agreement", "status": "in_force", "ends_at": 60 * MONTH, "reader": READER } });
+    let demand = statement("rec.d", 2 * DAY, "landlord-1", "review_request", &[SHOP], json!({ "matter": "arrears", "about": LEASE, "amount": 250_000, "account": "acc-landlord-1" }));
+    let from = 3 * MONTH;
+    let review = statement("rec.r", 2 * DAY, "landlord-1", "rent_review", &[SHOP], json!({ "lease": LEASE, "rent": 300_000, "from": from, "was": 250_000 }));
+    let t = all(&h.wake(2 * DAY + H, leased_world(&["ann"], vec![demand, review], 10, 1_000_000, json!([]), None)));
+    assert!(t.contains("money(") && t.contains("$2500.00") && t.contains("to=acc-landlord-1") && t.contains("Rent owed"), "the demand paid: {t}");
+    assert!(t.contains("$3000.00") && t.contains("every="), "a new order at the new rent: {t}");
+    assert!(!t.contains("withdraw=rec.order"), "the old order runs until its last payment: {t}");
+    let t = all(&h.wake(from - DAY + H, leased_world(&["ann"], vec![], 10, 1_000_000, json!([]), None)));
+    assert!(t.contains("withdraw=rec.order"), "stopped before the new rent's day: {t}");
+    // A demand it cannot pay is left: the landlord has its remedies.
+    let mut poor = sole(json!({}));
+    poor.wake(DAY, channels(vec![money(SHOP, 100_000, json!([])), records("mine", vec![]), holdings(&[("home-1", "bread", 10)])]));
+    with_lease(&mut poor);
+    poor.readings = h.readings.clone();
+    let demand = statement("rec.d", 2 * DAY, "landlord-1", "review_request", &[SHOP], json!({ "matter": "arrears", "about": LEASE, "amount": 250_000, "account": "acc-landlord-1" }));
+    let t = all(&poor.wake(2 * DAY + H, leased_world(&["ann"], vec![demand], 10, 100_000, json!([]), None)));
+    assert!(!t.contains("Rent owed"), "{t}");
+}
+
+#[test]
+fn a_closing_business_asks_to_surrender_a_lease_that_gives_it_no_notice_and_pays_the_price_or_gives_its_own_notice_where_it_does() {
+    for ours in [None, Some(180 * DAY)] {
+        let mut h = sole(json!({}));
+        h.wake(DAY, channels(vec![money(SHOP, 2_000_000, json!([])), records("mine", vec![]), holdings(&[("home-1", "bread", 10)])]));
+        with_lease(&mut h);
+        h.readings = json!({ LEASE: { "of": "agreement", "status": "in_force", "ends_at": 60 * MONTH, "reader": READER } });
+        let closed = statement("rec.c", 2 * DAY, "ann", "trading_from", &[SHOP], json!({ "closed": true }));
+        let t = all(&h.wake(2 * DAY + H, leased_world(&["ann"], vec![closed], 10, 2_000_000, json!([]), ours)));
+        assert!(!t.contains("\"closure\"") && !t.contains("kind=closure"), "it does not close while the lease binds it: {t}");
+        match ours {
+            None => {
+                assert!(t.contains("surrender_request") && t.contains(LEASE), "{t}");
+                let terms = statement("rec.st", 3 * DAY, "landlord-1", "surrender_terms", &[SHOP], json!({ "lease": LEASE, "price": 750_000, "account": "acc-landlord-1" }));
+                let t = all(&h.wake(3 * DAY + H, leased_world(&["ann"], vec![terms], 10, 2_000_000, json!([]), ours)));
+                assert!(t.contains("money(") && t.contains("$7500.00") && t.contains("surrender"), "the price paid: {t}");
+            }
+            Some(_) => assert!(t.contains(&format!("notice={LEASE}")) && !t.contains("surrender_request"), "its own notice: {t}"),
+        }
+    }
+}
+
+#[test]
+fn when_its_lease_ends_a_business_stops_the_rent_takes_its_stock_back_and_tells_its_owner() {
+    let mut h = sole(json!({}));
+    h.wake(DAY, channels(vec![money(SHOP, 1_000_000, json!([])), records("mine", vec![]), holdings(&[("home-1", "bread", 10)])]));
+    with_lease(&mut h);
+    h.readings = json!({ LEASE: { "of": "agreement", "status": "ended", "ends_at": 2 * DAY, "ended_by": "notice", "reader": READER } });
+    let t = all(&h.wake(3 * DAY, leased_world(&["ann"], vec![], 7, 1_000_000, json!([]), None)));
+    assert!(t.contains("withdraw=rec.order"), "the rent stopped: {t}");
+    assert!(t.contains("goods(") && t.contains("at=home-1") && t.contains("from_at=unit-1") && t.contains("quantity=\"7\""), "its stock back home: {t}");
+    assert!(t.contains("trading_at") && t.contains("\"back\":true") || t.contains("back"), "its owner told: {t}");
+}
+
+#[test]
+fn premises_are_weighed_while_leased_as_taking_them_was_and_a_unit_that_adds_nothing_to_one_person_loses_its_rent() {
+    let h = sole(json!({}));
+    let mut s = Shop::new(&h.ctx, Params::read(&h.ctx).unwrap(), PlainBody::new(SHOP));
+    s.price = 500;
+    s.unit_cost = 300;
+    s.lease = Some(Lease { rent: 250_000, room: 4, ..Default::default() });
+    let alone = (s.p.hours_per_worker_month() / s.p.serve_labour.max(1)).max(1);
+    // Custom one person serves: the unit adds only its rent.
+    s.last_demand = alone / 2;
+    assert_eq!(s.lease_loss(), 250_000);
+    // Custom for four, at a margin that pays three hands and the rent: it pays.
+    s.last_demand = 4 * alone;
+    s.price = 5_000;
+    assert_eq!(s.lease_loss(), 0, "{:?}", s.premises_weighing(250_000, 4));
+}

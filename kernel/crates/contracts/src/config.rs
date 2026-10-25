@@ -1102,6 +1102,10 @@ pub enum Area {
     Near(Near),
     /// The cells an office occupies or runs: one organisation's only.
     Premises(Premises),
+    /// The cells of the buildings where an agreement in force gives the capacity's organisation occupancy of a space
+    /// (premises it leases: docs/behaviour/leasing.md). It is there as its premises are; the area moves as its
+    /// agreements do, and after a change the next look delivers the whole of it in place of the old.
+    Held(Held),
     /// (A whole view not yet replaced: the cells of a place, where it's detailed.)
     Place(PlaceArea),
 }
@@ -1110,6 +1114,20 @@ pub enum Area {
 #[serde(deny_unknown_fields)]
 pub struct Premises {
     pub premises: Vec<Id>,
+}
+
+/// What an organisation holds a right to be in: `occupancy`, an agreement in force naming it as the occupant of a
+/// space (the only kind there is).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HeldBy {
+    Occupancy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Held {
+    pub held: HeldBy,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1635,7 +1653,17 @@ pub fn check_channels(owner: &str, channels: &[Channel], seat: &Seat) -> Result<
                     }
                     Ok(())
                 }
-                _ => no("what is here is near where one is (`near`) or at one's premises (`premises`): a whole map or a list of other cells is not expressible".into()),
+                // (The ground of premises an organisation holds by agreement: a map of where it is, never notices.)
+                Some(Area::Held(_)) => {
+                    if seat.organisation.is_none() {
+                        return no("premises held by agreement are an organisation's (a person is where their body is: near)".into());
+                    }
+                    if !map {
+                        return no("premises held by agreement are a map of the ground there (`kind: sites`), not of notices".into());
+                    }
+                    Ok(())
+                }
+                _ => no("what is here is near where one is (`near`) or at one's premises (`premises`, or `held` by agreement): a whole map or a list of other cells is not expressible".into()),
             }
         };
         match &ch.kind {
