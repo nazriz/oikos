@@ -10,13 +10,13 @@ Status words: `[x]` landed on main, `[~]` in progress, `[ ]` not started, `[?]` 
 
 - [~] **Memory per person.** A 10,000-person month peaked at about 500 KB a person; target about 50 KB, enforced by a
   test like the time budgets, results byte-identical (docs/design/performance.md, risk SC-1).
-  - [ ] Measure bytes per person at peak by component, at 1,000, 10,000 and 50,000 people.
-  - [ ] The budget and its backstop test (a 1,000-person month fails over budget).
+  - [x] Measure bytes per person at peak by component, at 1,000, 10,000 and 50,000 people (`mem-budget`, 8c28f399).
+  - [x] The budget and its backstop test (a 1,000-person month fails over budget) (`mem-budget`, 8c28f399; ceiling 590 KB, lowered with each cut).
   - [~] Compact minds and memories (a cloud agent, branch `mem-minds`).
-  - [ ] A state hash worked out as it goes, without the cache of encoded copies.
-  - [ ] What people have seen, held compactly (any bound on what they remember is a law: to the owner first).
+  - [x] A state hash worked out as it goes, without the cache of encoded copies (`mem-state-hash`, a60f9ae3).
+  - [x] What people have seen, held compactly (any bound on what they remember is a law: to the owner first) (`mem-seen`, 7f81ceb3: held once for all who see it the same; no bound). Records delivered (`mem-delivered`) and buildings' facts (`mem-facts`) the same way.
   - [ ] No whole-world copies during a step.
-  - [ ] 50,000 people for a month and 100,000 for a week, measured.
+  - [x] 50,000 people for a month and 100,000 for a week, measured (with `mem-minds`: 14.7 GB and 604 s; 31.0 GB and 320 s; docs/design/performance.md).
 - [x] **Foundations-2, phase 1: capacity** (law 10). Every act has a time, every system its hours and lanes; casework
   done by officers' minutes (WM-14). Landed at 0824efb6; tag `pre-foundations-2` is main at 8570d699, before it.
 - [~] **Test strength.** Dead TypeScript removed; the planted-bug catalogue rebuilt against the code that runs; tests
