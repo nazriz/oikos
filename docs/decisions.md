@@ -8817,3 +8817,26 @@ log against the same town built at 3d113a1f.
   with the cut merged, measures (two runs), never over what the cut's own branch measures.
 - **Revisit if:** main's measure moves past 400 KB without a cut that explains it (then that change is looked into: a
   person costing more is what the test is for).
+## 2026-10-26 · A town's first moment decided a window at a time; decisions not kept as values once written (branch `mem-first`; no model called)
+
+- **What it was:** at 100,000 people the week's peak is the first moment: every unit decides at once, and each one's
+  decisions were held (as their canonical bytes for the log, and, in a round with seats, as values too) until the
+  whole round was carried out.
+- **Change** (kernel/src/engine.rs): a round no seat waits in, of more than 2,048 units, is decided a window of 2,048 at
+  a time as it is carried out, not all at once. Each unit decides from what it was shown (made for all before any
+  decides) and its own state, as it did; a unit let go of in the round before it decides (`sync_units`) decides first,
+  as it would have with the others. And a step's decisions, once written for the log, are not kept as values in any
+  round: a round with seats may be saved while they think, and its snapshot reads them back from those bytes
+  (`kept_whole`). The window is an engine option (`decide_window`).
+- **Tests** (`kernel/tests/config_stream.rs`): a window of seven against all at once on three profiles' towns for 60
+  days, the same log; a run saved at its first moment while a seat thinks and taken up again from its bytes is the
+  run, its citizens' decisions all logged (a mutant whose snapshot did not read them back was caught). The path where
+  a unit is let go of before it decides is reached by no town tried (a year at 200 people and at 1,000: zero), so it
+  is held by its construction, not by a test.
+- **Measured:** the same state hash and log digest on 203 people, three profiles' 1,000 and 10,000 for a month. The
+  100,000 week, this build and the one before it in turn, twice each, 14 threads: peak footprint 33.1 to 33.4 GB
+  against 43.3 GB both times, resident about the same (31.0 to 33.6 against 32.8 to 35.8 GB), instructions the same
+  (7,362 G against 7,360 G on average), wall 414 s against 433 s on average (load 6 to 13). Nothing changes at 1,000
+  (no round there has more than 2,048 units), so the budget's ceiling stays at 380 KB.
+- **Revisit if:** a unit's decision comes to read anything another's carrying out changes within a round (then
+  windows would change results; the window test would catch it in the towns it runs).
