@@ -3,6 +3,70 @@
 Two passes. The first (below, "Before the port") measured the TypeScript world on 2026-10-17. The second, here, measures the
 Rust world after the cut-over (branch `perf-2`, 2026-10-23), fixes what it found, and ranks what is left.
 
+## What held memory, and the config read participant by participant (branch `scale-next`, 2026-10-25)
+
+au-vic-2026 from `worlds/town-1000.yaml` with `citizens=10000` (and `50000`), `living.initiative_bps=10000`, seed 1,
+all code, `log.observations: seats`, `oikos-kernel world` with 14 engine threads (`OIKOS_ENGINE_THREADS=14`, set for
+every number here), the log piped to a digest and not kept. Each run alone in a slot; the machine's load was 20 to 40
+from others' work, so wall times are rough and instructions retired are the steadier measure. Notes, dumps and scripts:
+the session's scratch folder (not in git).
+
+**A heap profile of the 10,000-person month** (a sampling profiler in the binary, `--features heapprof`,
+`kernel/src/heapprof.rs`; `scripts/heapprof.ts` names the stacks). Main's build at its high-water mark: 8.8 GB live of a
+10.2 GB peak footprint.
+
+| what | live at the peak | why |
+|---|---|---|
+| the typed config's participants: each person's controller as JSON values | 2.5 GB | 23 KB of JSON a person, nearly all of it the same for everyone (the ventures on offer are 17.6 KB), each a quarter of a megabyte as `serde_json` values |
+| each citizen's own reading of its params (`citizen::params::Params`), the ventures list above all | 2.1 GB | read from those values once per person, into values again |
+| entity records' canonical bytes, kept for the state hash (`EntityRecord` serialised) | 0.54 GB | by design: the hash is not re-encoded each checkpoint |
+| the engine's own (units, knowledge, rounds) | 0.86 GB | |
+| what people have seen of buildings (`sites::site_structure`) and of work done (`exec_action_seen`) | 0.86 GB | their knowledge, kept as they learnt it |
+| the citizen's person and mind (`Person::step`, `plan`, `make`) | 0.75 GB | its memory; bounded since fix-memory-appeal |
+| the state's other canonical bytes (`State` serialised) | 0.28 GB | the hash's cache |
+| the log's buffer on its way out | 0.29 GB | |
+| the start (the whole config as JSON, its text, three copies of its canonical bytes) | not live at the peak | but most of the start's peak: 6.2 GB live within 30 s, and 44 GB at 50,000 people |
+
+**What was done (each result-identical).**
+
+| change | where | 10,000 x 30 d |
+|---|---|---|
+| the config read participant by participant (`config::load_from`): each checked against the schema's `Participant` (the whole config's schema checks the rest, its list of participants empty, and the list's own limit), its canonical bytes written on, compressed, and read into its type; never the whole as JSON, nor its text whole | contracts, CLI, native module (`config_file`), `RustWorld.start` (a file written participant by participant past 10,000 people: one string could not hold 100,000's) | the start's footprint 6.3 GB at 30 s to 3.4 GB |
+| the config's canonical bytes kept compressed, in three pieces (before the participants, the participants, after); the header written from them; a snapshot's taken from them (`config::Canonical`) | contracts, run, snapshot | 270 MB to a few MB; at 50,000, 1.39 GB held three times to tens of MB |
+| a citizen's ventures read once for everyone given the same list (`controller::read_once`) | actors (citizen params) | peak 10.2 to 7.6 GB with the two above |
+| a controller's long params members (128 bytes or more of JSON) held once for all who have them alike (`controller::Controller`); actors' `Params` read their own members and the shared ones as one map, in order | contracts, world state, engine, actors | peak 7.6 to 5.2 GB |
+
+Before (main, `eac4ab51`) and after, the same release build settings, 14 threads:
+
+| run | before | after |
+|---|---|---|
+| 10,000 people, 30 days | 184 s wall, 1,052 G instructions, **10.21 GB peak** footprint (10.59 GB resident) | 123 s wall, 1,068 G instructions, **5.19 GB** (5.22 GB resident) |
+| 1,000 people, 30 days, au-vic / gb-eng / us-oh | 0.99 / 0.96 / 0.65 GB | 0.84 / 0.83 / 0.61 GB |
+| 50,000 people, a month | stopped by the 40 GB guard at the start (44 GB in 104 s) | **completes**: 22.3 min wall, 28 to 33 GB through the month, 30.1 GB peak resident, 41.0 GB peak footprint (a spike at the end), 15,033 G instructions; state `ea006720ed53d36c` |
+
+Identical: the same final state hash and the same log after the header's `kernel`, entries' hash and prev stripped,
+on all of them: 10,000 x 30 d `d2c58d35f85e747f`, digest `1d4162c3b258f44f` (2,449,923 lines, before, after the
+first two changes, and after all four); 1,000 x 30 d au-vic `b1dd5f2faefe82cf` / `4c36bd108b515e5f`, gb-eng
+`a40249ca0ab5c312` / `60dd70a707fea7b6`, us-oh `d15119f05ad34eb4` / `e711b89323570a43`. The profiled build ended at
+the same hash. Tests: `kernel/tests/config_stream.rs` (three profiles' towns: the streamed read is the whole read, in
+canonical bytes, hash and typed config; a run from it is the same log byte for byte; it refuses what the whole read
+refuses, and says where), `orchestrator/test/config-file.test.ts` (the file is `JSON.stringify`'s text; a run from it
+is the same log), the controller's own tests.
+
+After all four, the same profile: 4.0 GB live at the peak, of which the config's controllers are 0.18 GB and the
+citizens' params 0.1 GB. What is left is the run's own: the hash's caches of canonical bytes (0.8 GB), what people
+have seen (0.9 GB), the engine (0.5 GB), the citizens' minds (0.7 GB). None of it is a copy; making it smaller is a
+change of what is kept (the hash's caches compressed, or knowledge kept as integers), for another pass.
+
+**The largest town now.** 50,000 people for a month fits (above); its 41 GB footprint at the end is a spike between
+the guard's looks, so it runs at the edge of the 40 GB guard and is the largest town to run as things stand.
+100,000: the config is generated in 141 s (5.4 GB, 3.12 GB of JSON, written in pieces) and the start is bounded (8.7 GB
+at two minutes), but the first moment (everyone's first look, 4.8 GB of log at t=0) passed the 40 GB guard 50 s
+later (44.6 GB footprint, 22 GB resident). A profile of 20,000's start and first moment (4.8 GB peak) has the state
+hash's caches of canonical bytes largest (entity records 1.1 GB, the rest of the state 0.5 GB, of 4.3 live); what
+grows faster than the town at 100,000's first moment is not yet profiled. That is the next item: a heap profile of
+50,000's first moment and its end, then the hash's caches kept compressed or the first moment's looks taken in windows.
+
 ## The Rust world (branch `perf-2`, 2026-10-23)
 
 au-vic-2026 from `worlds/town-1000.yaml` (1,000 people; `citizens=10000` and `50000` for the larger towns),
@@ -98,7 +162,7 @@ not all of them) is behaviour, for its owners, and it is what stands between thi
 | # | idea | measured now | gain (est.) | effort | identical? |
 |---|---|---|---|---|---|
 | 1 | **Bound what a citizen keeps and weighs** (old notices forgotten, a decision's options the ones it weighed): behaviour, the mind's owners | quadratic memory and log at 50,000 (above); `gatherings` 12% of CPU | makes 50,000 for a month fit; 100,000 then likely (to confirm: SC-1) | a design talk first | **No**: behaviour |
-| 2 | **Read the config participant by participant** (validate and read each, keep its canonical bytes, never the whole as values) | the config's values ~6 GB at 50,000, ~14 GB at 100,000, before anything runs | -6 GB at 50,000's start; -14 GB at 100,000's | 2 to 3 agent-days (config load, the engine's start, the host's) | Yes (same hash, same checks, if the schema's participant part is checked alone exactly as within the whole) |
+| 2 | ~~**Read the config participant by participant**~~ **Done** 2026-10-25 (branch `scale-next`, above), with people's params held once: 10,000's month 10.2 to 5.2 GB, 50,000's month now runs | | | | Yes (checked) |
 | 3 | **The log's hash chain on its own thread** (the writer hashes and frames; the run hands over bodies) | hashing + framing the log: 2% of the main thread at 10,000, 19% at 50,000 | 2% / 15% | 1 to 2 agent-days: the anchors writer must be `Send`, and `head()`, `log_ref()` and snapshots must wait for it | Yes |
 | 4 | **Ids as integers inside the kernel** | `memcmp` 10% self at 10,000, 15% at 1,000 (string ids compared in every map) | 10 to 15% | 8 to 12 agent-days, every crate | Yes |
 | 5 | **The long pole of a parallel round**: the main thread waits 25% at 10,000 (decide threads 14%, observations made ready 11%) on a loaded machine | | 5 to 10%: build the next window of observations while the current is delivered; start the slowest actors first | 2 to 3 agent-days | Yes |

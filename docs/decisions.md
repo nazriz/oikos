@@ -8075,3 +8075,56 @@ fails every time, not now and then: the property draws new cases each run, and f
   depend on the thread count (the kernel's tests and the port gate check one thread against fourteen).
 - **Revisit if:** a lone heavy run is much slower for it (then elastic slots, PL-4, give it more tokens), or a test that
   needs several threads sets them itself.
+
+## 2026-10-25 · SC-1: what held a 10,000-person month's memory, the config read participant by participant, and people's params held once (branch `scale-next`; no model called)
+
+**What held it.** A sampling heap profiler in the kernel binary (`--features heapprof`, `kernel/src/heapprof.rs`;
+`scripts/heapprof.ts` names the stacks) on main's 10,000-person month (au-vic, `living.initiative_bps=10000`, 14 engine
+threads): 8.8 GB live at the high-water mark of a 10.2 GB footprint. The two largest holders were copies of the same
+thing: each person's controller in the typed config, as JSON values (2.5 GB: 23 KB of JSON a person, nearly all the
+same for everyone, the town's ventures alone 17.6 KB), and each citizen's own reading of those params (2.1 GB, the
+ventures again). Citizens' memory and minds were about 0.75 GB (as fix-memory-appeal found, not the cause). The rest
+is the run's own: the state hash's caches of canonical bytes (0.8 GB), what people have seen of buildings and work
+(0.9 GB), the engine (0.9 GB). The start, not live at the peak, made most of 50,000's: the config's text, its whole
+JSON value and three copies of its canonical bytes.
+
+**What changed (each result-identical; contracts unchanged, the config's text, hash and the log the same).**
+- *The config read participant by participant* (`config::load_from`): each participant checked against the schema's
+  own `Participant` definition (the whole schema checks the rest, its participants empty, and the list's limit), its
+  canonical bytes written on, compressed, and read into its type; the rest read as JSON as before. Its canonical bytes
+  are kept compressed in three pieces (`config::Canonical`); the header is written from them, and a snapshot takes
+  them from there. `load` and `load_split` (from a value) take the same path. `oikos-kernel world` and the native
+  `World` read so (a `config_file` option, or the text); `RustWorld.start` writes a config of 10,000 participants or
+  more to a file member by member and participant by participant (one string could not hold 100,000's 2.8 GB).
+- *A controller's long params members held once* (`controller::Controller`, in the config and the world's state): a
+  member of 128 bytes or more of JSON is held once for everyone who has it alike; read whole (its serialisation, its
+  equality, `to_value`) it is the controller as given. The actors' `Params` read a person's own members and the shared
+  ones as one map, in key order; it no longer derefs to a `Map` (twelve call sites changed to `get`, `iter`,
+  `to_map`, or a `&Params` in place of a `&Map`). A first version kept one shared map per person's combination of long
+  members; a person's own long members (values, beliefs) made each combination different, so nothing was shared and
+  the peak did not move: found by the test (one map per person), now one held member per distinct member.
+- *The citizen's ventures read once* for all given the same list (`controller::read_once`, in the contracts crate:
+  the actors may hold no lock, and this is an immutable reading of the same text, which no one can change).
+
+**Measured** (release builds, 14 engine threads, each run alone in a slot, the machine's load 20 to 40):
+- 10,000 x 30 days: **10.21 to 5.19 GB** peak footprint (10.59 to 5.22 GB resident), 184 to 123 s wall,
+  1,052 to 1,068 G instructions (+1.5%: params read through the shared view, the controllers serialised for the hash);
+  the start 6.3 GB at 30 s to 2.4 GB at 42 s. After the first two changes alone: 7.58 GB.
+- 1,000 x 30 days, three profiles: au-vic 0.99 to 0.84 GB, gb-eng 0.96 to 0.83, us-oh 0.65 to 0.61.
+- 50,000 x 30 days: **completes** (main stopped at the start past the 40 GB guard, 44 GB in 104 s): 22.3 minutes wall,
+  about 28 to 33 GB through the month, 30.1 GB peak resident, 41.0 GB peak footprint (a spike at the end, between the
+  guard's 10-second looks), 15,033 G instructions, 4.06 million steps, state `ea006720ed53d36c`. Generating its config:
+  27 s, 2.05 GB, 1.39 GB of JSON.
+- 100,000: **not yet**. Its config is generated in 141 s (5.4 GB; 3.12 GB of JSON) and the start is bounded (8.7 GB at
+  two minutes), but the first moment (everyone's first look, still at t=0 with 4.8 GB of log out) passed the 40 GB
+  guard (44.6 GB footprint, 22 GB resident). At 20,000 the start and first moment peak at 4.8 GB, the hash's caches of
+  canonical bytes the largest holder (1.6 GB of 4.3 live); what grows faster than the town at 100,000 is unprofiled.
+- Identical: the same final state hash and log digest (header's `kernel`, entries' hash and prev stripped) before and
+  after, on 10,000 x 30 d (`d2c58d35f85e747f`, `1d4162c3b258f44f`) and on 1,000 x 30 d of au-vic, gb-eng and us-oh;
+  the profiled build too. Tests: `kernel/tests/config_stream.rs` (three profiles: the streamed read is the whole read,
+  a run from it the same log, the same refusals, one held list of ventures for all), `orchestrator/test/config-file.test.ts`,
+  the controller's own.
+- **Revisit if** a module's params come to be changed per person in place (`Params::make_mut` then copies them, as
+  before, and memory rises with it); a heap profile at 50,000 shows the end-of-run spike (the final state's canonical
+  bytes, likely) to matter; or the run's own holders (the hash's caches, what people have seen) are to be cut: those
+  are changes to what is kept, not copies.
