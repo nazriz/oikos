@@ -3,6 +3,55 @@
 Two passes. The first (below, "Before the port") measured the TypeScript world on 2026-10-17. The second, here, measures the
 Rust world after the cut-over (branch `perf-2`, 2026-10-23), fixes what it found, and ranks what is left.
 
+## Bytes per person: the budget, and what each person costs (2026-10-25, from branch `mem-budget` on)
+
+**The budget.** A town's memory is a fixed overhead and so much for each person; the goal (Naz, 2026-10-25) is about
+50 KB a person at the peak, so 50,000 people in some 2.5 GB and 100,000 in 5 GB beside the overhead.
+`scripts/memory-budget.json` holds the target, the fixed overhead (110 MB, measured), and the ceiling held now;
+`orchestrator/test/memory-budget.test.ts` (slow tier) runs `worlds/town-1000.yaml` for 30 days on the release kernel
+at 4 engine threads and fails if `(peak resident - overhead) / people` passes the ceiling. The kernel's `world` command
+says its peak (`getrusage`'s maximum resident set: the same measure on macOS and Linux). The ceiling starts at what
+main costs (590 KB, from 546 KB measured and a margin for run to run), and each cut that lands lowers it towards the
+target in the same commit; raising it is a decision with its entry in docs/decisions.md. The target is not met until
+the ceiling is 50 KB.
+
+**How it is measured.** Peak resident memory of `oikos-kernel world`, all code, the log piped away and not kept;
+`OIKOS_ENGINE_THREADS` given with every number. By component: the sampling heap profiler (`--features heapprof`) at
+its high-water mark, each live allocation put with a component by its call stack (`scripts/heapprof.ts <dump> <dwarf>
+--components PEOPLE`): the state hash's and the log's by any frame of theirs on the stack, the rest by the innermost
+of the kernel's own frames. Sampled live bytes at the peak, so a little under the resident peak (the allocator's own
+and the binary's are not in it).
+
+**Main at the start (`3b87959e`), 30 days, 14 threads.** Resident peak; per person after the 110 MB overhead.
+
+| town | peak resident | per person | wall |
+|---|---|---|---|
+| 203 people | 0.25 GB | | 3 s |
+| 1,000 (au-vic / gb-eng / us-oh) | 0.69 / 0.67 / 0.57 GB | 583 / 560 / 455 KB | 15 / 10 / 9 s |
+| 10,000 | 5.25 GB | 514 KB | 121 s |
+| 50,000 | 34.2 GB (40.8 GB footprint) | 682 KB | 1,004 s |
+
+By component at the peak (KB a person, live, sampled):
+
+| component | 1,000 | 10,000 | 50,000 |
+|---|---|---|---|
+| what's been seen (buildings seen, views, knowledge) | 59 | 52 | **408** |
+| the state hash's encoded copies (the whole state's canonical bytes, at a checkpoint) | (not at the peak) | 82 | (not at the peak) |
+| the engine (units, the records delivered and what they add) | 82 | 58 | 61 |
+| citizens' minds | 33 | 47 | 69 |
+| citizens (person, params) | 44 | 48 | 59 |
+| world state (records made, accounts, bodies) | 48 | 40 | 36 |
+| the config (typed, controllers) | 30 | 30 | 32 |
+| offices, firms and other actors | 18 | 9 | 9 |
+| other (the compiled schemas, the log's buffer, unattributed) | 112 | 25 | 16 |
+| all, live | 435 | 391 | 697 |
+
+What grows faster than the town is what's been seen: a building's view lists who is in each of its spaces to anyone
+known there, a workplace's hundreds of people are each shown all the others, and every person kept their own copy of
+each building as they last saw it, so it grows as people times the people they share a building with. At 10,000 the
+peak fell on the month's checkpoint, when the state hash wrote the whole state's canonical bytes out of a copy it
+held whole. Minds and memories are `mem-minds`'s (compact formats).
+
 ## What held memory, and the config read participant by participant (branch `scale-next`, 2026-10-25)
 
 au-vic-2026 from `worlds/town-1000.yaml` with `citizens=10000` (and `50000`), `living.initiative_bps=10000`, seed 1,

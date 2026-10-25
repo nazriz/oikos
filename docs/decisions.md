@@ -8415,3 +8415,26 @@ JSON value and three copies of its canonical bytes.
 - **Change:** `scripts/test.ts` reruns a failed file from the known-flakes list (the two merge.ts names) once alone, and
   accepts it only if it then passes; the line says so.
 - **Revisit if:** a listed file fails twice in a row (then it is a fault, not a flake), or the list grows past these two.
+
+## 2026-10-25 · A memory budget for each person, held by a test (branch `mem-budget`; no model called)
+
+- **What was asked:** (Naz, 2026-10-25, "very important") a per-person memory budget, enforced, then cut towards about
+  50 KB a person at the peak (50,000 people in some 2.5 GB, 100,000 in 5 GB), beside a fixed overhead.
+- **Change:** `scripts/memory-budget.json` (the town, days and threads it is measured on; the fixed overhead; the
+  ceiling held now; the target) and `orchestrator/test/memory-budget.test.ts` in the slow tier: `worlds/town-1000.yaml`
+  for 30 days on the release kernel at 4 threads, failing if its peak resident memory less the overhead, over its
+  people, passes the ceiling. The kernel's `world` command prints its peak (`getrusage`). `scripts/heapprof.ts
+  --components` puts a heap profile's live bytes with components, and per person.
+- **The numbers it starts from** (main `3b87959e`, docs/design/performance.md "Bytes per person"): at 4 threads, 203
+  people 221 to 230 MB, 1,000 people 651 to 668 MB (two runs each): about 110 MB fixed and 546 KB a person. At 14
+  threads, 30 days: 1,000 people 0.69 GB, 10,000 5.25 GB (514 KB a person), 50,000 34.2 GB (682 KB). By component at
+  50,000, what's been seen was 408 KB a person of 697 live: it grows faster than the town.
+- **Why a ceiling and a target, not the target alone:** a test that fails on main cannot land (main stays green). So
+  the ceiling starts at main's cost (590 KB: the worst run, 558, and about 6%), and each cut lowers it in the commit
+  that lands it, until it is the target. Lowering it goes with the cut that earns it; raising it is a decision here.
+- **Why resident, and why 1,000 people for a month:** resident peak is what a run can be stopped for, and the same
+  measure on any platform; 1,000 people for 30 days takes 15 s, and per person it is near 10,000's (583 against
+  514 KB a person at 14 threads), so a cut that matters shows at 1,000. A cost that grows faster than the town (as
+  what's been seen did) shows only larger: the 50,000 numbers are measured with each cut and recorded here.
+- **Revisit if:** the test's spread from run to run nears the margin (then two runs, the lower), or a cut shows at
+  10,000 and 50,000 and not at 1,000 (then a 5,000-person town for the test, in the slow tier still).
