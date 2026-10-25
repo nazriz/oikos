@@ -133,11 +133,88 @@ pub fn site_cell(s: &Statics, st: &State, id: &Id, c: &crate::state::Cell, me: &
             if let Some((_, structure)) = shown.iter().rev().find(|(shown, _)| shown == sid) {
                 return structure.clone();
             }
-            let structure = Arc::new(site_structure(s, st, sid, me, names));
+            let structure = seen_structure(s, st, sid, me, names);
             shown.push((sid.clone(), structure.clone()));
             structure
         }),
     }
+}
+
+/// What a building as seen is made from (`site_structure`): the building, who is in it, each space's departures and
+/// when someone last went in, and whether the looker can be told who (`known`). Compared cheaply: the building field
+/// for field (a few ids and numbers), the rest by where they are in memory (the state's own, never changed in place:
+/// a change makes a new one) or as the numbers they are.
+struct MadeFrom {
+    /// The world's config (its building types and their variables), held: two worlds in one process (tests side by
+    /// side, a host's arms) may have a building of the same name, empty in both, and must not share its view.
+    config: Arc<crate::config::Config>,
+    structure: crate::state::Structure,
+    occupancy: Option<Arc<BTreeMap<Id, std::collections::BTreeSet<Id>>>>,
+    departures: Vec<Option<Arc<Vec<crate::state::Departure>>>>,
+    entered: Vec<Option<i64>>,
+}
+
+impl MadeFrom {
+    fn of(s: &Statics, st: &State, sid: &Id, x: &crate::state::Structure, spaces: &BTreeMap<String, crate::config::SpaceSpec>) -> MadeFrom {
+        let space = |local: &String| format!("{sid}/{local}");
+        MadeFrom {
+            config: s.config.clone(),
+            structure: x.clone(),
+            occupancy: st.occupancy.get(sid).cloned(),
+            departures: spaces.keys().map(|l| st.departures.get(&space(l)).cloned()).collect(),
+            entered: spaces.keys().map(|l| st.entered.get(&space(l)).copied()).collect(),
+        }
+    }
+
+    fn same(&self, s: &Statics, st: &State, sid: &Id, x: &crate::state::Structure, spaces: &BTreeMap<String, crate::config::SpaceSpec>) -> bool {
+        fn ptr<T>(a: &Option<Arc<T>>, b: Option<&Arc<T>>) -> bool {
+            match (a, b) {
+                (None, None) => true,
+                (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+                _ => false,
+            }
+        }
+        Arc::ptr_eq(&self.config, &s.config)
+            && self.structure == *x
+            && ptr(&self.occupancy, st.occupancy.get(sid))
+            && self.departures.len() == spaces.len()
+            && spaces.keys().zip(&self.departures).zip(&self.entered).all(|((l, d), e)| {
+                let space = format!("{sid}/{l}");
+                ptr(d, st.departures.get(&space)) && *e == st.entered.get(&space).copied()
+            })
+    }
+}
+
+/// The buildings as last seen, by building and by whether the looker could be told who is in it: what each was made
+/// from, and the building as seen, while anyone holds it. In shards (looks are made on many threads at once).
+type Seen = BTreeMap<(Id, bool), Arc<(MadeFrom, std::sync::Weak<SiteStructure>)>>;
+const SHARDS: usize = 64;
+static SEEN: [std::sync::RwLock<Option<Seen>>; SHARDS] = [const { std::sync::RwLock::new(None) }; SHARDS];
+
+/// A building as someone there sees it, held once for everyone who sees it the same: made again only when what it is
+/// made from has changed (SC-1: every look made its own and each person kept theirs; at 50,000 people, where one
+/// building's occupants are many and each is shown them all, 20 GB). It is never changed once made, so sharing it
+/// changes nothing anyone sees.
+pub fn seen_structure(s: &Statics, st: &State, sid: &Id, me: &str, names: bool) -> Arc<SiteStructure> {
+    let x = &st.structures[sid];
+    let spaces = &s.spaces[&x.structure_type];
+    let occ = st.occupancy.get(sid);
+    let known = names || occ.is_some_and(|m| m.values().any(|b| b.contains(me)));
+    let shard = &SEEN[sid.bytes().fold(0usize, |h, b| h.wrapping_mul(31).wrapping_add(b as usize)) % SHARDS];
+    let key = (sid.clone(), known);
+    // (Looked up under a shared lock and compared outside it: the people of one building look at once, on many threads.)
+    let entry = shard.read().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|m| m.get(&key).cloned());
+    if let Some(entry) = entry {
+        let (made, held) = &*entry;
+        if let Some(h) = held.upgrade().filter(|_| made.same(s, st, sid, x, spaces)) {
+            debug_assert!(*h == site_structure(s, st, sid, me, names), "a building as seen, kept, is not as it would be made now: {sid}");
+            return h;
+        }
+    }
+    let h = Arc::new(site_structure(s, st, sid, me, names));
+    let made = MadeFrom::of(s, st, sid, x, spaces);
+    shard.write().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(BTreeMap::new).insert(key, Arc::new((made, Arc::downgrade(&h))));
+    h
 }
 
 /// The buildings one look has shown so far, each as it shows it (the same for every cell a building stands on).

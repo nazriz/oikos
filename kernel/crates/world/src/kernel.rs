@@ -123,20 +123,30 @@ pub struct Check {
 pub struct World {
     s: Statics,
     state: State,
-    /// Canonical bytes already made for the state hash (not part of the state): see `write_state`.
-    canon_cache: std::cell::RefCell<CanonCache>,
 }
 
-/// Records never change once made, and the order they were made in only grows, so their canonical bytes are kept
-/// between checkpoints: a checkpoint encodes only what's new, not the whole history. The same bytes, so the same hash.
-#[derive(Default)]
-struct CanonCache {
-    /// record id -> the record it was made from (to be sure it's the same one), and its canonical bytes
-    records: BTreeMap<Id, (Arc<crate::blocks::Record>, u64, Arc<[u8]>)>,
-    /// `record_order`'s elements so far, canonical and comma-separated; how many; the last one
-    order: Vec<u8>,
-    order_n: usize,
-    order_last: Option<Id>,
+/// A map's canonical bytes, written entry by entry (each value's encoded alone and let go): exactly `canon::canonical`
+/// of the whole map, for keys that serialise as themselves (ids: strings).
+fn write_map<K: AsRef<str> + Ord + Clone, V: serde::Serialize + Clone>(m: &crate::state::Map<K, V>, sink: &mut dyn FnMut(&[u8])) -> Result<(), canon::CanonError> {
+    // Canonical key order is by UTF-16 code units; for ASCII keys (every id so far) that's the map's own order.
+    let mut keys: Vec<&K> = m.keys().collect();
+    if !keys.iter().all(|k| k.as_ref().is_ascii()) {
+        keys.sort_by(|a, b| a.as_ref().encode_utf16().cmp(b.as_ref().encode_utf16()));
+    }
+    let mut buf = Vec::new();
+    sink(b"{");
+    for (i, k) in keys.into_iter().enumerate() {
+        buf.clear();
+        if i > 0 {
+            buf.push(b',');
+        }
+        canon::write_string(k.as_ref(), &mut buf);
+        buf.push(b':');
+        sink(&buf);
+        sink(&canon::canonical(&m[k])?);
+    }
+    sink(b"}");
+    Ok(())
 }
 
 fn refusal_info(r: &Refusal) -> RefusalInfo {
@@ -384,7 +394,7 @@ impl World {
         for (id, born) in people {
             schedule_birthday(&s, &mut st, &id, born);
         }
-        let k = World { s, state: st, canon_cache: Default::default() };
+        let k = World { s, state: st };
         k.state_hash().map_err(|e| format!("initial state is not canonical: {e}"))?;
         Ok(k)
     }
@@ -394,7 +404,7 @@ impl World {
     pub fn resume(loaded: &LoadedConfig, mut state: State) -> Result<World, String> {
         let s = World::new(loaded)?.s;
         state.rebuild_derived();
-        let k = World { s, state, canon_cache: Default::default() };
+        let k = World { s, state };
         k.state_hash().map_err(|e| format!("the resumed state is not canonical: {e}"))?;
         Ok(k)
     }
@@ -402,7 +412,7 @@ impl World {
     /// The same world, apart from this one from now on (a fork): the state is persistent, so this copies almost
     /// nothing until one of them changes.
     pub fn fork(&self) -> World {
-        World { s: self.s.clone(), state: self.state.clone(), canon_cache: Default::default() }
+        World { s: self.s.clone(), state: self.state.clone() }
     }
 
     pub fn state(&self) -> &State {
@@ -432,16 +442,52 @@ impl World {
         Ok(canon::to_hex(&h.finalize()))
     }
 
-    /// The state's canonical bytes (exactly `canon::canonical(&self.state)`), streamed: the records and their order
-    /// from the cache, encoding only those made since the last time; the rest (small by comparison) encoded afresh.
+    /// The state's canonical bytes (exactly `canon::canonical(&self.state)`), streamed: each large map entry by entry,
+    /// the records' order id by id, the rest (small by comparison) member by member. Nothing is held whole, and nothing
+    /// is kept between one time and the next (SC-1: the cache of records' bytes it kept grew with the run).
     fn write_state(&self, sink: &mut dyn FnMut(&[u8])) -> Result<(), canon::CanonError> {
         let mut rest = self.state.clone(); // (a persistent copy: cheap)
-        rest.records = crate::state::Map::new();
+        // Nothing is kept of what was written before: it is written afresh each time (the state is hashed at its
+        // checkpoints, a month apart in a town; each record's bytes are made, hashed and let go), and the large maps (a town's people, their bodies and records, cells, buildings...) are written entry by entry,
+        // as the records are: none of them is held whole as canonical bytes (at 50,000 people, the whole state's were
+        // gigabytes at every checkpoint: SC-1). Emptied here, they are written from the state below.
+        let s = &self.state;
+        let mut streamed: Vec<(&str, Box<dyn Fn(&mut dyn FnMut(&[u8])) -> Result<(), canon::CanonError> + '_>)> = vec![];
+        macro_rules! stream {
+            ($($f:ident),*) => {$(
+                rest.$f = Default::default();
+                if !s.$f.is_empty() {
+                    streamed.push((stringify!($f), Box::new(move |sink: &mut dyn FnMut(&[u8])| write_map(&s.$f, sink))));
+                }
+            )*};
+        }
+        stream!(entities, accounts, holdings, closed_accounts, cells, structures, occupancy, departures, entered, records, participants, positions, timelines);
         rest.record_order = imbl::Vector::new();
-        // (Its members' canonical bytes, in order, written straight from the state: no JSON value is made of it.)
-        let members = canon::canonical_members(&rest)?;
-        let mut cache = self.canon_cache.borrow_mut();
-        let cache = &mut *cache;
+        if !s.record_order.is_empty() {
+            streamed.push(("record_order", Box::new(move |sink: &mut dyn FnMut(&[u8])| {
+                let mut buf = Vec::new();
+                sink(b"[");
+                for (i, id) in s.record_order.iter().enumerate() {
+                    buf.clear();
+                    if i > 0 {
+                        buf.push(b',');
+                    }
+                    canon::write_string(id, &mut buf);
+                    sink(&buf);
+                }
+                sink(b"]");
+                Ok(())
+            })));
+        }
+        // (Its other members' canonical bytes, in order, written straight from the state: no JSON value is made of it.)
+        let mut members: Vec<(String, Option<Vec<u8>>)> = canon::canonical_members(&rest)?.into_iter().map(|(k, b)| (k, Some(b))).collect();
+        for (k, _) in &streamed {
+            // (A map left out when empty is not among the rest's members: it goes where its key does.)
+            if !members.iter().any(|(m, _)| m == k) {
+                members.push((k.to_string(), None));
+            }
+        }
+        members.sort_by(|a, b| a.0.encode_utf16().cmp(b.0.encode_utf16()));
         sink(b"{");
         for (i, (k, bytes)) in members.iter().enumerate() {
             let mut buf = Vec::new();
@@ -451,67 +497,19 @@ impl World {
             canon::write_string(k, &mut buf);
             buf.push(b':');
             sink(&buf);
-            match k.as_str() {
-                "records" => self.write_records(cache, sink)?,
-                "record_order" => self.write_order(cache, sink),
-                _ => sink(bytes),
+            match streamed.iter().find(|(f, _)| f == k) {
+                Some((_, write)) => write(sink)?,
+                None => sink(bytes.as_deref().expect("a member of the rest")),
             }
         }
         sink(b"}");
         Ok(())
     }
 
-    fn write_records(&self, cache: &mut CanonCache, sink: &mut dyn FnMut(&[u8])) -> Result<(), canon::CanonError> {
-        let records = &self.state.records;
-        // Canonical key order is by UTF-16 code units; for ASCII ids (every id so far) that's the map's own order.
-        let mut ids: Vec<&Id> = records.keys().collect();
-        if !ids.iter().all(|k| k.is_ascii()) {
-            ids.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
-        }
-        let mut buf = Vec::new();
-        sink(b"{");
-        for (i, id) in ids.into_iter().enumerate() {
-            let stored = &records[id];
-            buf.clear();
-            if i > 0 {
-                buf.push(b',');
-            }
-            canon::write_string(id, &mut buf);
-            buf.push(b':');
-            sink(&buf);
-            let fresh = match cache.records.get(id) {
-                Some((r, seq, _)) => !(Arc::ptr_eq(r, &stored.record) && *seq == stored.seq),
-                None => true,
-            };
-            if fresh {
-                let bytes: Arc<[u8]> = canon::canonical(stored)?.into();
-                cache.records.insert(id.clone(), (stored.record.clone(), stored.seq, bytes));
-            }
-            sink(&cache.records[id].2);
-        }
-        sink(b"}");
-        Ok(())
-    }
-
-    fn write_order(&self, cache: &mut CanonCache, sink: &mut dyn FnMut(&[u8])) {
-        let order = &self.state.record_order;
-        // Only ever appended to; if it isn't what was cached (it always should be), start again.
-        let same = cache.order_n <= order.len() && (cache.order_n == 0 || order.get(cache.order_n - 1) == cache.order_last.as_ref());
-        if !same {
-            cache.order.clear();
-            cache.order_n = 0;
-        }
-        for id in order.iter().skip(cache.order_n) {
-            if cache.order_n > 0 {
-                cache.order.push(b',');
-            }
-            canon::write_string(id, &mut cache.order);
-            cache.order_n += 1;
-        }
-        cache.order_last = order.last().cloned();
-        sink(b"[");
-        sink(&cache.order);
-        sink(b"]");
+    /// The canonical bytes of the state as `canon::canonical` makes them whole (for the test that `write_state`'s
+    /// stream is the same bytes).
+    pub fn canonical_state_whole(&self) -> Result<Vec<u8>, canon::CanonError> {
+        canon::canonical(&self.state)
     }
 
     fn check_only(&self, participant: &str, only: &Option<Id>) -> Result<(), ProtocolError> {

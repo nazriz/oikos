@@ -8728,3 +8728,189 @@ kinds; the tree model for networks; baselines move). C1 is the invariant over to
   what's been seen did) shows only larger: the 50,000 numbers are measured with each cut and recorded here.
 - **Revisit if:** the test's spread from run to run nears the margin (then two runs, the lower), or a cut shows at
   10,000 and 50,000 and not at 1,000 (then a 5,000-person town for the test, in the slow tier still).
+## 2026-10-25 · Test strength: the host's dead paths cut, the mutation catalogue rebuilt against the engine, the gaps it found held (branch `test-strength`; no model called)
+
+**Why.** The test pruning of 2026-10-25 found the catalogue mostly stale (15 of 49 bugs still applied, the rest in the
+TypeScript actors deleted at the cut-over), two twin bugs in host code the Rust world no longer runs, and nothing
+catching `kernel-care-draw-by-number`.
+
+**Dead code removed** (found by reachability: units are made only in `syncUnits`, which since the cut-over makes a unit
+for a seat alone, and an import graph from every tool, CLI and script; no whole library file was unreached):
+- `orchestrator/src/run.ts` (1,724 lines to 1,578): `codeUnit` and every branch for a code unit (`!u.llm`; a unit's
+  `capacity`, never set for a seat: the slice, prefixed looks, `only`, the performers a code unit named), the TS
+  resolver's `ts` and `shadow` modes (`OIKOS_RESOLVER`, `resolverShadow`, `<run>.resolver-diffs.json`; the engine's
+  resolver is the one, docs/design/rebuild.md has the shadow check's record), and `recordChangeOf` with its call (a
+  seat's units only ever returned nothing: a record is the engine's bookkeeping, held by `kernel/tests/entity_record.rs`).
+  Its two tests in `entity-records.test.ts` went; the API test there now says no orchestrator source sends
+  `entity_record` and keeps the participant-API check.
+- `orchestrator/src/rust-world.ts`: `runRustWorld` and `twinBrains` (no caller; experiments drive `RustWorld` directly).
+- Unused exports: `forkLogs` (experiment.ts), `datasetDirFor` (dataset.ts), `onParams` (module.ts: the manifests are no
+  longer written by running TS modules), `smallestNow` (money.ts).
+- **Not dead, contrary to the pruning's note:** the host's draw keying (`drawFor`, `stablePurpose`) still names the
+  streams of what the host runs on a seat's side (a mock seat's signing, `mock.ts`; a seat's office books' readers, e.g.
+  `Directions.standing` through openbooks-townhall). It moved to `orchestrator/src/draws.ts` (the same rules as the
+  engine's `actors/src/draws.rs`) with a unit test, `orchestrator/test/draws.test.ts`, so its twin bugs can be caught.
+
+**The catalogue** (`scripts/mutations.ts`): 46 bugs, 35 in `kernel/crates` and 11 in live TypeScript, each `kind` the rule
+it breaks: money 6, integer cents 3, the dead 6, the absent 1, work's time 4, sight 10, twins 7, review and appeal 4,
+the decision law 2, the generator, the measures and the translator 1 each. 13 kept from the old catalogue (the 10
+kernel bugs, `amounttext-round`, `self-sees-position-channels`, `view-cache-stale`), the two host twin bugs re-planted in
+draws.ts, 31 new (drafted by subagents by area, checked to apply once and to compile). `scripts/mutate.ts` now builds and
+tests the kernel in the `gate` profile (a mutant's rebuild in minutes, not the release link's half hour), points every
+test file and the kernel's tests at that build, runs the kernel's tests once unmutated each run, runs them under `--tests
+own` too (with the gate's 90-day invariants), and empties the copy's `runs/test-*` after each bug.
+
+**Measured** (main at 3f3e16b5 plus this branch): `--tests own` first, then the fast tier for the survivors. One fault
+of the harness was found and fixed on the way: kernel tests that write their town with the TS generator loaded the copy's
+stale release engine module, which is refused when its sources differ, so under any kernel bug they all failed: their
+catches were not catches. Results, 46 bugs: **34 caught for certain** (all 11 TypeScript; 23 kernel, each by a test of its own module, the
+invariants or a twin test; 7 of them only with the tests below), **2 survive**, **10 unconfirmed**.
+- Survive: `kernel-zero-transfer` (equivalent: the contract's Amount refuses 0 before the engine's range check) and
+  `rs-bank-dead-holder-pays-out` (near-equivalent: the bank's check of who may instruct on an account refuses the same
+  payments, so no money moves from a dead holder's account; the bank only writes "cannot" where it would have said
+  nothing).
+- Unconfirmed: the only catchers shown for these in the first pass were the generator-backed town tests (`a1_citizen`,
+  `c2_shop_mix` and the like). The fixed rerun was stopped at its third bug, when free disk fell under the 60 GB floor
+  (the copy's gate build is about 38 GB): `kernel-absent-may-work`, `rs-retailer-hours-used-forgotten`,
+  `rs-utilities-slip-row-misnamed`, `kernel-performer-not-charged`, `kernel-named-sees-private`,
+  `kernel-answer-cap-ignored`, `rs-world-price-moment`, `rs-appeal-window-off-by-one`, `rs-grievance-ignored-in-seconds`,
+  `rs-method-order-inverted`. Run them again with the fixed harness when the disk allows: `--tests own --only <ids>`,
+  about 10 minutes each.
+- The invariants caught 4 (doubled credit, work charged no time, records shown to those not allowed, a capacity handed another's letters); the 90-day gate
+  invariants are what `own` runs.
+
+**Tests added or strengthened**, each for the rule and not a figure:
+- `kernel/tests/services.rs`, `care_draws_on_the_condition_not_its_number`: on 16 seeds, care keeps or calls off a death
+  alike in two towns that differ only by one more injury filed first (the condition's number moves, its onset does not);
+  both outcomes occur across the seeds. Catches `kernel-care-draw-by-number`.
+- `kernel/crates/actors/src/offices/treasury.rs`: the tax clerk's assessment is exactly the law's rate of the rent
+  reported (it was a substring match that a tenfold tax passed). Catches `rs-treasury-rent-tax-tenfold`.
+- `kernel/tests/physics.rs`: a transfer of 0 or less is refused and moves nothing. (`kernel-zero-transfer` stays
+  uncaught and is equivalent for every act a participant sends: the contract's Amount refuses 0 before the engine's own
+  range check; noted in the catalogue.)
+- `participants/test/view.test.ts` (new): a seat's view takes in every change it is shown, and one capacity's slice holds
+  that capacity's channels only. Catches `view-cache-stale`, `self-sees-position-channels`.
+- `participants/test/staff-report.test.ts`: an office-holder's list of standing orders is its own organisation's.
+  Catches `ts-roster-orders-of-any-body` (the seat-side Roster had no test).
+- `translator/test/own-office.test.ts`: an office's own stationery is a form of its holder's only.
+- `orchestrator/test/draws.test.ts` (new, with draws.ts).
+
+**Disk** (`scripts/disk-tidy.ts`, `judgeTarget`): a worktree whose branch and HEAD are in origin/main and that nothing is
+running in (no process working there or using a file in it) loses its `kernel/target` at once, whatever its age or its
+agent lock (the lock names the session that started the agent, which outlives it). Protected names, wave copies and the
+tree it runs in are left. Finished agents' builds filled the disk twice on 2026-10-25.
+
+**Revisit if** a kernel bug is "caught" only by town-wide tests again (look at what they failed on before counting it), a
+catalogue bug stops applying (a refactor moved its line: re-plant it), or the host stops running anything on a seat's
+side (then draws.ts goes too).
+
+## 2026-10-26 · The state hash written as a stream, with no cache of encoded copies (branch `mem-state-hash`; no model called)
+
+- **Change:** `World::write_state` writes the state's canonical bytes for its hash member by member, and each large map
+  (entities, accounts, cells, structures, occupancy, records, participants, positions...) entry by entry, each entry
+  encoded alone and let go. Nothing is kept between one hash and the next: the cache of every record's encoded bytes,
+  which grew with the run, is gone. The bytes are exactly `canon::canonical` of the state (a test holds it on three
+  profiles' towns, `kernel/tests/config_stream.rs`), so every hash is the same.
+- **Measured** (30 days, 14 threads; main `3b87959e` against this): 1,000 people au-vic 693 to 592 MB, gb-eng 670 to
+  570, us-oh 565 to 514; 10,000 people 5.25 to 4.34 GB. The same state hash and log digest on all of them. At the
+  budget's own settings (4 threads) 1,000 people peak at 553 to 560 MB: 450 KB a person beside 110 MB, so the
+  budget's ceiling is lowered from 590 to 480 KB.
+- **Its cost:** instructions +0.4% at 10,000 people, +0.1 to 2.6% at 1,000: the records are encoded again at each
+  hash (the start's, each checkpoint's, the end's) where the cache had them. The cuts that follow it (what's been seen,
+  the delivered records) take far more off: all of them together are 10% under main at 10,000 and level at 1,000.
+- **Revisit if:** checkpoints become frequent (daily, say): then the records' bytes might be kept compressed between
+  them, not whole.
+
+## 2026-10-26 · Two more canaries: hazards and figures
+
+- **Why:** commercial leasing landed with the three canaries green and turned 8 slow-tier files red; the agent that fixed
+  them found `hazards` (a 200-day default-town run, about 50 s) and `figures` (law 11's count) would have caught most.
+- **Revisit if:** a broad change's gate grows past about 5 extra minutes on a quiet machine, or a red main again slips past.
+## 2026-10-26 · What's been seen held once for all who see it the same (branch `mem-seen`; no model called)
+
+- **What the profile showed:** at 50,000 people, what people have seen was 20.4 of 34.8 GB live (408 KB a person,
+  against 52 at 10,000): each person's own copy of each building as they last saw it, its spaces and who is in them,
+  where one building holds hundreds. It grew faster than the town.
+- **Change:** `sites::seen_structure`: a building as seen is made once for everyone who would see it the same, and
+  again only when what it is made from has changed; a view keeps its seen cells as one list, the one it hands out. No
+  one sees anything different (the same state hash and log digest on 203 people, three profiles' 1,000, 10,000 and
+  50,000, 30 days), and nothing is forgotten: this holds what was seen compactly, it does not bound it (a bound would
+  be a law, Naz's to decide).
+- **Measured** (14 threads, against main `3b87959e`, with the streamed state hash beneath it): 1,000 au-vic 693 to
+  521 MB; 10,000 5.25 to 3.12 GB; 50,000 34.2 to 17.2 GB resident, 1,004 to 956 s wall, 15.0 to 11.8 T instructions.
+  The budget (4 threads) at 496 MB, 386 KB a person: the ceiling lowered from 480 to 410 KB.
+- **Found on the way:** behind one lock per shard, the 50,000 month took 1,590 s against main's 1,004 (the run's own
+  thread waited on the lock: a building's people look at it at once, on many threads). Under a shared lock, compared
+  outside it, the wait is gone.
+- **Revisit if:** a building's view comes to depend on the looker beyond whether they can be told who is there (then
+  that goes in its key), or the state comes to change occupancy or departures in place (then comparing by where they
+  are in memory would not do: debug builds' check would catch it).
+
+## 2026-10-26 · Main red after foundations-2 phase 1: two faults it exposed, two towns it moved (branch `fix-main-f2p1`; no model called)
+
+Four slow-tier files failed from the phase-1 merge (0824efb6) on, and passed at 3d113a1f. Each was traced in its town's
+log against the same town built at 3d113a1f.
+
+- **retail.test.ts: a fault, fixed in the shop.** A delivery note gave 8 ordered where 9 were, and refunded nothing of
+  what was paid. An order at a price the shop has since raised buys what its money buys at the new price (docs/behaviour
+  /retailer.md, "Selling"): the shop rewrote the order's quantity and price in its queue, and its note then gave the
+  number the money bought as the number ordered. Worse, what a note settles (the money paid over the price, the items a
+  system got wrong) was forgotten when the serving was sent, not when it went out; a serving refused (a crew short of
+  time) or lapsed at the close waits its turn again, and the note of the one that went out refunded none of the
+  over-payment: the shop kept it. Phase 1's done_by fix put the shops' systems to work and moved the shops' timing,
+  which is what reached this path. Now the note says what was ordered and, where the price had risen, the price
+  charged (`unit_price`, optional on the paper and its form), and the shop forgets what a note settles only once the
+  note has gone out (`settle`); a serving not done drops the slips of its systems' items. The test checks the refund
+  against the price charged. Unit tests: the raised-price note, and a serving refused then served the next day still
+  refunding the over-payment. Revisit if a household's reading of a note (money.rs: served = delivered over ordered)
+  should not count a price rise against the shop's service: it now does, as a customer told "eight of your nine" would.
+- **production.test.ts: a fault, fixed in the factory, and the town set up for what is tested.** The slack town had
+  nobody let go in seven months. Its only redundancy until phase 1 was factory-2's, the food works, which had *more*
+  orders than it could make and ran out of cash on day 80 (its second hire signed on day 79, 18 days after it was
+  chosen, and it paid cash for its inputs); since phase 1 that hire signs the same day, the works makes and sells more,
+  buys on terms and borrows when short. The works with too little demand, factory-1, opens with about six months of its
+  wage bill and loses a third of it a month, so it never runs short in seven months, before phase 1 or after. The test
+  now opens it with two months' wages (by construction, said beside it). That run then showed a fault: a factory
+  counted a day's making in flight for twice its hours from when it was *planned*; a manager with other acts before it
+  sent it later, and, no longer held while the crew works (phase 1's order fix), woke while it was under way, saw nothing
+  in flight, and ordered the day's work again, past the top of its band (665 against 663). A making is now in flight
+  until its outcome comes back (a day at most, should none). Unit test: a day's work under way is not ordered again
+  four hours on. Revisit if a making's outcome can be lost for good (then the day's fallback is what bounds it).
+- **own-venture.test.ts: the town's timing, the test's world set up.** After giving its business up, its owner looked at
+  the jobs board at nearly every wake for 105 days and never applied: no posting stood open at any of those looks. In
+  this town a posting is filled within hours by whoever is looking when it goes up (a posting for ten went up and was
+  filled between two of the owner's wakes). Nothing in the owner's search changed; the town's postings came at other
+  hours. The test now keeps the others who open the year out of work, with no work of their own, out of the labour
+  force, so the owner is not racing them: they apply on day 60. Revisit if a person out of work should look more often
+  than they wake (a search habit by the day), which would be a behaviour with a source.
+- **police-station-seat.test.ts: the households' draws; the floor that was a seed hop made "some".** Fewer than two
+  warrants both towns issued were carried out: the second household of seed 1's town (lease-c0269) paid its arrears in
+  the seat's town and its claim was withdrawn, while the twin's issued a warrant on day 232. "Two or more" had been kept
+  by hopping the seed (3, 7, 1). A second case brought forward by construction (the town's other tenancy in arrears at
+  the opening's hearing stage) went the same way: its tenant left on the order's day in one town and days later in the
+  other. Per docs/testing.md ("Seed pins": "some" where the count is the draws'), the test holds some, and among them
+  the case the town opens with at a hearing, which both towns issue a warrant for in the second month; the rest
+  (the same set, the same day within one, lapses equal, the staff's reports) is unchanged. Revisit if the station's
+  handling of a later warrant could differ from its first (then a case later in the year is to be made by construction,
+  with a tenant who stays).
+- **Two more the fixes moved, in the slow tier.** `unions.test.ts`: an enterprise agreement made at day 149.98 of a
+  150-day run has its new wage orders after the end; the two days the test allows are now held only where they fall
+  in the run. `automation-run.test.ts`: in the town with a law against taking a system *to serve*, factory-3 takes a
+  production cell on day 151, which the law does not forbid; the test held that no system at all was delivered, and
+  now holds that no serving system is (and that the town that ignores the law takes one). Revisit the second if the
+  law the test writes is meant to cover every use.
+## 2026-10-26 · A fault in what's been seen, held once: two worlds in one process could share a building's view (branch `mem-seen-fix`; no model called)
+
+- **What was wrong:** `sites::seen_structure` (from `mem-seen`, 7f81ceb3) keeps one view of each building, keyed by the
+  building's id, and takes it again while what it was made from is the same: the building field for field, and its
+  occupancy and departures by where they are in memory. An empty building has neither, so in two worlds in one
+  process with a building of the same name, empty in both, the second took the first's view, made on the first's
+  config (its building types' spaces and variables). Found by a test that failed only beside the others; a run alone,
+  and forks of one run (which share their config), are not affected. Two worlds of different configs in one process
+  (tests side by side; a host running an experiment's arms, if their configs differ) could see the other's buildings.
+- **Fix:** what a view was made from includes the world's config, held and compared by where it is in memory.
+- **Test:** `kernel/tests/config_stream.rs` "two worlds side by side are each the world alone": one town, and the same
+  with its buildings' wear coming on twice as fast, stepped a day each in turn on one thread; each is its run alone.
+  Without the fix it fails (world 0's log differs); with it, it passes.
+- **Revisit if:** anything else in the engine is held across worlds in a process: it must be keyed by what it is made
+  of in full (as the controllers' members and the ventures are, by their text), or by its world.

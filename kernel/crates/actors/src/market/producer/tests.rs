@@ -94,6 +94,22 @@ fn its_staff_make_the_days_units_as_far_as_inputs_and_hours_allow() {
 }
 
 #[test]
+fn a_days_work_under_way_is_not_ordered_again_however_long_it_takes_to_come_back() {
+    // (Found 2026-10-26, "Main red after foundations-2 phase 1" in docs/decisions.md: a making was counted in flight for
+    // twice its hours from when it was planned; once a manager who orders work goes on at once (foundations-2 phase 1),
+    // one woken again while the work was not yet done, past that time, ordered the day's work a second time, and the
+    // works made past the top of its band.)
+    let mut h = harness(json!({}));
+    let o = vec![farm("rec.1", 100), offer("rec.2", 0, 450, 200, Some((F, 150)))];
+    // (147 in stock against the band's top of 150, the offer's share: three to make, as far as the band goes.)
+    let first = all(&h.wake_leaving(DAY + 9 * H, world(&["w1"], o, 147, 100, 10_000_000, json!([])), Some("task=make")));
+    assert!(first.contains("task=make") && first.contains("units=\"3\""), "{first}");
+    // Four hours on (the three units' hour and a half, twice over), the work not yet come back: the stock as it was.
+    let again = all(&h.wake(DAY + 13 * H, world(&["w1"], vec![], 147, 100, 10_000_000, json!([]))));
+    assert!(!again.contains("task=make"), "the day's work is under way: not ordered again: {again}");
+}
+
+#[test]
 fn a_paid_wholesale_order_is_delivered_from_stock_and_one_below_the_least_or_its_price_is_refunded() {
     let mut h = harness(json!({}));
     let o = vec![
