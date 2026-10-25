@@ -154,7 +154,11 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   // different one, 2026-10-08.)
   // (Or a body's deputy appointing one of its staff who had died too, in the days before anyone told it: the next look names another. Foundations F6.)
   // ("-owners" added 2026-10-17, the bug hunt: a firm owner's appointer who has died and does not yet know it is refused when it appoints itself, as a deputy is.)
-  const diedDoing = (e: any) => e.code === "participant_inactive" && (/-(deputy|payroll|owners)(-deputy)?$/.test(e.as ?? "") || (diedAt.has(String(e.participant).replace(/-self$/, "")) && e.t >= diedAt.get(String(e.participant).replace(/-self$/, ""))!));
+  // (A participant's person: `<person>-self` for the town's own, and for a newcomer, `par.<n>`, the person it was made for.
+  // Added 2026-10-26, when law 8 moved the run's course and a newcomer died in the middle of an act of its own.)
+  const personOf = new Map<string, string>(ev.filter((e) => e.event === "participant_created" && e.person).map((e) => [e.participant, e.person]));
+  const whose = (p: string) => personOf.get(p) ?? p.replace(/-self$/, "");
+  const diedDoing = (e: any) => e.code === "participant_inactive" && (/-(deputy|payroll|owners)(-deputy)?$/.test(e.as ?? "") || (diedAt.has(whose(String(e.participant))) && e.t >= diedAt.get(whose(String(e.participant)))!));
   const partnerGone = (e: any) => e.code === "too_far" && / isn't near /.test(e.detail ?? "");
   // (And, when the run's course changed again on 2026-10-08: someone on their way home, brought there meanwhile by
   // another of the household moving them in; their own arrival finds them already there.)
