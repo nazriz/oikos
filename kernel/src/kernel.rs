@@ -652,6 +652,11 @@ impl Kernel {
         self.world.canonical_state()
     }
 
+    /// The same bytes made whole by `canon::canonical` (for checking the stream `canonical_state` writes).
+    pub fn canonical_state_whole(&self) -> Result<Vec<u8>, canon::CanonError> {
+        self.world.canonical_state_whole()
+    }
+
     pub fn state_hash(&self) -> Result<String, canon::CanonError> {
         self.world.state_hash()
     }

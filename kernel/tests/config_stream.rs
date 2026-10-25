@@ -86,6 +86,10 @@ fn a_run_from_a_config_read_participant_by_participant_is_the_same_run() {
         let (loaded, rest) = config::load_from(&text[..]).unwrap();
         let (h2, e2) = run_code_world_loaded(loaded, rest, "stream", Vec::new(), opts()).unwrap();
         assert_eq!(h1, h2, "{profile}: the same state");
+        // The state's canonical bytes, written map entry by map entry for its hash, are the state's made whole.
+        let k = e1.run().kernel();
+        let (streamed, whole) = (k.canonical_state().unwrap(), k.canonical_state_whole().unwrap());
+        assert!(streamed.len() > 1_000_000 && streamed == whole, "{profile}: the state's bytes, streamed and whole");
         let (a, b) = (e1.into_log(), e2.into_log());
         assert!(a.len() > 1_000_000, "{profile}: a run of some length ({} bytes)", a.len());
         assert!(a == b, "{profile}: the same log, byte for byte");
