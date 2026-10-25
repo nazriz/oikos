@@ -107,6 +107,46 @@ impl<W: Write> LogWriter<W> {
     /// (Byte-identical to canonicalising the whole entry; see entry_hash and the tests.)
     pub fn append_canonical(&mut self, t: i64, kind: Kind, body: &[u8]) -> io::Result<String> {
         use sha2::{Digest, Sha256};
+        let tail = self.tail(t, kind);
+        // (Hashed: the entry without `hash`, and without the line's end.)
+        let mut h = Sha256::new();
+        h.update(canon::DOMAIN_LOG.as_bytes());
+        h.update(b"{\"body\":");
+        h.update(body);
+        h.update(&tail[..tail.len() - 1]);
+        self.out.write_all(b"{\"body\":")?;
+        self.out.write_all(body)?;
+        self.end_entry(h, &tail)
+    }
+
+    /// `append_canonical`, the body's canonical bytes written by `body` (once, to the log and its hash together): for a
+    /// body held in pieces (the header's, with a large world's config, `config::Canonical`), never put together.
+    pub fn append_canonical_with(&mut self, t: i64, kind: Kind, body: &mut dyn FnMut(&mut dyn Write) -> io::Result<()>) -> io::Result<String> {
+        use sha2::{Digest, Sha256};
+        struct Both<'a, W: Write>(&'a mut W, &'a mut Sha256);
+        impl<W: Write> Write for Both<'_, W> {
+            fn write(&mut self, b: &[u8]) -> io::Result<usize> {
+                self.0.write_all(b)?;
+                self.1.update(b);
+                Ok(b.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                self.0.flush()
+            }
+        }
+        let tail = self.tail(t, kind);
+        // (The same bytes as `append_canonical` writes and hashes, the body's taken as `body` writes them.)
+        let mut h = Sha256::new();
+        h.update(canon::DOMAIN_LOG.as_bytes());
+        h.update(b"{\"body\":");
+        self.out.write_all(b"{\"body\":")?;
+        body(&mut Both(&mut self.out, &mut h))?;
+        h.update(&tail[..tail.len() - 1]);
+        self.end_entry(h, &tail)
+    }
+
+    /// An entry's members after its body and hash, and the line's end.
+    fn tail(&self, t: i64, kind: Kind) -> Vec<u8> {
         let kind_name = serde_json::to_value(kind).expect("kinds serialize");
         let mut tail = Vec::with_capacity(160);
         tail.extend_from_slice(b",\"kind\":");
@@ -114,19 +154,17 @@ impl<W: Write> LogWriter<W> {
         tail.extend_from_slice(b",\"prev\":");
         canon::write_string(&self.prev, &mut tail);
         tail.extend_from_slice(format!(",\"seq\":{},\"t\":{t}}}\n", self.next_seq).as_bytes());
-        // (Hashed: the entry without `hash`, and without the line's end.)
-        let mut h = Sha256::new();
-        h.update(canon::DOMAIN_LOG.as_bytes());
-        h.update(b"{\"body\":");
-        h.update(body);
-        h.update(&tail[..tail.len() - 1]);
+        tail
+    }
+
+    /// The entry's hash (of all hashed so far), and the rest of its line written.
+    fn end_entry(&mut self, h: sha2::Sha256, tail: &[u8]) -> io::Result<String> {
+        use sha2::Digest;
         let hash = canon::to_hex(&h.finalize());
         let mut after = Vec::with_capacity(tail.len() + 80);
         after.extend_from_slice(b",\"hash\":");
         canon::write_string(&hash, &mut after);
-        after.extend_from_slice(&tail);
-        self.out.write_all(b"{\"body\":")?;
-        self.out.write_all(body)?;
+        after.extend_from_slice(tail);
         self.out.write_all(&after)?;
         self.next_seq += 1;
         self.prev = hash.clone();

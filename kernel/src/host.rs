@@ -149,10 +149,16 @@ fn wake_json(s: &crate::engine::SeatWake) -> Value {
 
 impl Host {
     pub fn start(config: Value, opts: &Value) -> Result<Host, String> {
+        let (loaded, rest) = crate::config::load_split(config).map_err(|e| crate::run::RunError::Config(e).to_string())?;
+        Self::start_loaded(loaded, rest, opts)
+    }
+
+    /// `start`, from a config read already (`config::load_from`: a large world's, participant by participant).
+    pub fn start_loaded(loaded: crate::config::LoadedConfig, rest: crate::config::Rest, opts: &Value) -> Result<Host, String> {
         let o = options(opts)?;
         let run_id = o.run_id.clone().unwrap_or_else(|| "run".into());
         let (out, anchors) = open(&o, &run_id, None)?;
-        let e = Engine::start(config, &run_id, Tee::new(out, o.stream.clone()), anchors, o.engine.clone())?;
+        let e = Engine::start_loaded(loaded, rest, &run_id, Tee::new(out, o.stream.clone()), anchors, o.engine.clone())?;
         let mut h = Host { e, log: o.log.clone(), snapshot_every: None, next_snapshot: None };
         h.every(o.snapshot_every);
         Ok(h)

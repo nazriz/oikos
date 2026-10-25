@@ -1466,19 +1466,21 @@ The mechanism:
 
 ## Performance and scale
 
-### SC-1 · Untested past a 10,000-person year; 50,000 no longer starts
-- **Gap:** A ten-year run was never made. A 10,000-person year runs (2026-10-23, Rust world: 29 minutes, 7.8 GB). At
-  50,000 people the start alone now passes 40 GB (2026-10-24: 44 GB in 104 s, bound or not), since the generated config
-  doubled (1.39 GB of JSON, held whole as `serde_json` values); before that, memory grew 2.8 GB a simulated day. 100,000
-  is not feasible. Citizens' memory of public goings-on is now bounded (`citizen/memory.rs`), but at 10,000 people it is
-  about 190 MB of a 10 GB process, so it is not the main cause; the daily growth's cause is still unprofiled.
-- **Where:** `docs/design/performance.md`; `docs/design/foundation-for-scale.md`; docs/decisions.md 2026-10-24
-  ("A review never answered ... a bounded memory").
-- **Effect:** Any study planned "at scale" rests on estimates.
-- **L / I:** high / medium · **Status:** to fix: read the config participant by participant (performance.md item 1),
-  then a heap profile at 20,000 to 50,000 for the daily growth.
-- **Notice by:** A run past 10,000 people slowing or running out of memory.
-- **Fix when:** Before a study at that scale.
+### SC-1 · Untested past a 10,000-person year; 50,000 fits a month at the edge; 100,000 does not start its first moment
+- **Gap:** A ten-year run was never made. A 10,000-person year runs (2026-10-23: 29 minutes, 7.8 GB); its month now
+  peaks at 5.2 GB, was 10.2 (2026-10-25). 50,000 people now run a month (22 minutes, 28 to 33 GB through it, a 41 GB
+  spike at the end): at the edge of the 40 GB guard. 100,000 starts (bounded) but its first moment passes 40 GB. The
+  config is read participant by participant and kept compressed, and people's params are held once for all who have
+  them alike (a heap profile found those copies were 4.6 of 8.8 GB live at 10,000); what is left is the run's own
+  (the hash's caches of canonical bytes, what people have seen, the engine, minds), and what grows past the town's
+  size at 100,000's first moment is unprofiled.
+- **Where:** `docs/design/performance.md` ("What held memory"); docs/decisions.md 2026-10-25 ("SC-1: what held a
+  10,000-person month's memory"); `kernel/src/heapprof.rs`, `scripts/heapprof.ts`.
+- **Effect:** A study at 50,000 is possible but has no headroom; one at 100,000 rests on estimates.
+- **L / I:** medium / medium · **Status:** partly fixed: next, a heap profile of 50,000's first moment and end, then
+  the hash's caches kept compressed or the first moment's looks taken in windows.
+- **Notice by:** A 50,000 run stopped by the guard; any run past 50,000 people.
+- **Fix when:** Before a study past 50,000 people, or one at 50,000 that needs room beside it.
 
 ### SC-2 · Resume replays from the start
 - **Gap:** No mid-run checkpoint; resume replays the whole log; resume against a real model is untested.

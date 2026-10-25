@@ -17,6 +17,9 @@ const SCHEMAS: [&str; 6] = [
 
 pub struct Contracts {
     pub config: jsonschema::Validator,
+    /// One of a config's participants (its `participants` items), for a config read participant by participant
+    /// (`config::load_from`): the config's own schema checks each with this same definition.
+    pub participant: jsonschema::Validator,
     pub command: jsonschema::Validator,
     pub annotation: jsonschema::Validator,
 }
@@ -35,6 +38,7 @@ pub fn contracts() -> &'static Contracts {
     static C: OnceLock<Contracts> = OnceLock::new();
     C.get_or_init(|| Contracts {
         config: validator("urn:oikos:contracts:0.8:world-config"),
+        participant: validator("urn:oikos:contracts:0.8:world-config#/$defs/Participant"),
         command: validator("urn:oikos:contracts:0.8:log#/$defs/Command"),
         annotation: validator("urn:oikos:contracts:0.8:log#/$defs/Annotation"),
     })
@@ -42,6 +46,12 @@ pub fn contracts() -> &'static Contracts {
 
 /// Ok, or the first few violations as one message.
 pub fn check(v: &jsonschema::Validator, instance: &Value) -> Result<(), String> {
+    check_at(v, instance, "")
+}
+
+/// `check`, of a value that stands at `at` within a larger one (a JSON pointer): its violations are told at their place
+/// in the whole.
+pub fn check_at(v: &jsonschema::Validator, instance: &Value, at_whole: &str) -> Result<(), String> {
     // (Nearly everything checked is valid, and saying only that is much the cheaper question: the violations are
     // looked for when there are some.)
     if v.is_valid(instance) {
@@ -51,7 +61,7 @@ pub fn check(v: &jsonschema::Validator, instance: &Value) -> Result<(), String> 
         .iter_errors(instance)
         .take(3)
         .map(|e| {
-            let at = e.instance_path.to_string();
+            let at = format!("{at_whole}{}", e.instance_path);
             format!("{}{}", if at.is_empty() { String::new() } else { format!("{at}: ") }, e)
         })
         .collect();

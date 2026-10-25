@@ -101,9 +101,17 @@ pub struct Run<W: Write> {
     /// Requests to observe whose shape has been checked against the contract (participant -> capacities asked for):
     /// the same one, asked again, keeps to it as it did. (A wake is one of these, and there are a few thousand kinds.)
     observes_checked: std::collections::BTreeMap<String, std::collections::BTreeSet<Option<String>>>,
-    /// The config as it was given, in canonical JSON (what the header carries): a snapshot carries it too.
-    config: std::sync::Arc<[u8]>,
+    /// The config as it was given, in canonical JSON (what the header carries): a snapshot carries it too. (Kept
+    /// compressed: `config::Canonical`.)
+    config: config::Canonical,
     run_id: String,
+}
+
+fn check_run_id(run_id: &str) -> Result<(), RunError> {
+    if run_id.is_empty() || run_id.len() > 128 || !run_id.bytes().all(|b| b.is_ascii_alphanumeric() || b"_.:-".contains(&b)) {
+        return Err(RunError::Config(format!("invalid run id {run_id:?}")));
+    }
+    Ok(())
 }
 
 impl<W: Write> Run<W> {
@@ -119,13 +127,25 @@ impl<W: Write> Run<W> {
         out: W,
         anchors: Option<Box<dyn Write>>,
     ) -> Result<Self, RunError> {
-        if run_id.is_empty() || run_id.len() > 128 || !run_id.bytes().all(|b| b.is_ascii_alphanumeric() || b"_.:-".contains(&b)) {
-            return Err(RunError::Config(format!("invalid run id {run_id:?}")));
-        }
+        check_run_id(run_id)?;
         let loaded = config::load(config).map_err(RunError::Config)?;
+        Self::start_loaded(loaded, run_id, identity, out, anchors)
+    }
+
+    /// Start from a config already checked and read (`config::load_from`: a large world's, read participant by
+    /// participant).
+    pub fn start_loaded(
+        loaded: config::LoadedConfig,
+        run_id: &str,
+        identity: KernelIdentity,
+        out: W,
+        anchors: Option<Box<dyn Write>>,
+    ) -> Result<Self, RunError> {
+        check_run_id(run_id)?;
         let kernel = Kernel::new(&loaded).map_err(RunError::Config)?;
-        // (The header is made without its config, whose canonical bytes are then written where it stands: a large
-        // world's config goes to the log from the bytes its hash was taken of, and is held as JSON nowhere.)
+        // (The header is made without its config, whose canonical bytes are then written where it stands, read out of
+        // the pieces they are kept in: a large world's config goes to the log from the bytes its hash was taken of,
+        // and is held as JSON nowhere, nor whole.)
         let header = Header {
             contracts: CONTRACTS_VERSION.into(),
             kernel: identity,
@@ -138,25 +158,36 @@ impl<W: Write> Run<W> {
         let body = serde_json::to_value(&header).expect("header serializes");
         let Value::Object(members) = &body else { unreachable!("a header is an object") };
         let (anchor_every, checkpoint_every) = (loaded.config.log.anchor_every_entries, loaded.config.log.checkpoint_every);
-        let mut bytes = Vec::with_capacity(loaded.canonical.len() + 512);
-        canon::write_object(members, &mut bytes, |key, x, out| if key == "config" { out.extend_from_slice(&loaded.canonical) } else { canon::write_value(x, out) });
+        let mut before = Vec::with_capacity(512);
+        let mut cut = 0;
+        canon::write_object(members, &mut before, |key, x, out| if key == "config" { cut = out.len() } else { canon::write_value(x, out) });
+        let after = before.split_off(cut);
         let mut log = LogWriter::new(out, anchors, anchor_every);
-        log.append_canonical(0, Kind::Header, &bytes)?;
-        let config = std::sync::Arc::from(loaded.canonical);
+        log.append_canonical_with(0, Kind::Header, &mut |w| {
+            w.write_all(&before)?;
+            loaded.canonical.write_to(w)?;
+            w.write_all(&after)
+        })?;
+        let config = loaded.canonical;
         Ok(Run { checkpoint_every, kernel, log, ended: false, observed: None, observes_checked: Default::default(), config, run_id: run_id.into() })
     }
 
     /// A run going on from where it was (a snapshot, or a fork): this kernel, its log carried on from entry `next_seq`
     /// whose previous entry's hash is `prev` (no header is written: the log before it is the run's, or its parent's).
-    pub fn resume(kernel: Kernel, config: std::sync::Arc<[u8]>, run_id: &str, next_seq: u64, prev: &str, out: W, anchors: Option<Box<dyn Write>>) -> Self {
+    pub fn resume(kernel: Kernel, config: config::Canonical, run_id: &str, next_seq: u64, prev: &str, out: W, anchors: Option<Box<dyn Write>>) -> Self {
         let (anchor_every, checkpoint_every) =
             (kernel.statics().config.log.anchor_every_entries, kernel.statics().config.log.checkpoint_every);
         let log = LogWriter::resume(out, anchors, anchor_every, next_seq, prev);
         Run { checkpoint_every, kernel, log, ended: false, observed: None, observes_checked: Default::default(), config, run_id: run_id.into() }
     }
 
-    /// The config as it was given, in canonical JSON.
-    pub fn config_bytes(&self) -> &std::sync::Arc<[u8]> {
+    /// The config as it was given, in canonical JSON (put together from how it is kept: `config_canonical`).
+    pub fn config_bytes(&self) -> std::sync::Arc<[u8]> {
+        self.config.to_vec().into()
+    }
+
+    /// The same, as it is kept (compressed, in pieces).
+    pub fn config_canonical(&self) -> &config::Canonical {
         &self.config
     }
 

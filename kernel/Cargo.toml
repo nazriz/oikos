@@ -60,6 +60,10 @@ proptest = "1"
 # The explorer's data layer attaches to a live run through the stream (tests/explore_live.rs); it reads, and the kernel never depends on it.
 oikos-explore = { path = "crates/explore" }
 
+[features]
+# A sampling heap profiler in the binary (src/heapprof.rs), for measuring memory only.
+heapprof = []
+
 [profile.test]
 opt-level = 1
 
@@ -74,6 +78,14 @@ codegen-units = 1
 # The merge gate's build of the kernel's tests (scripts/test.ts, 2026-10-24): release's optimisation and overflow checks,
 # without the whole-program link (fat LTO, one codegen unit) that made `cargo test --release` take half an hour for its
 # ~50 test programs. The same code and the same checks; the release build itself is unchanged.
+# For a heap profile (`--features heapprof`): release, with line tables for naming the stacks.
+[profile.heapprof]
+inherits = "release"
+debug = "line-tables-only"
+split-debuginfo = "packed"
+lto = "thin"
+codegen-units = 16
+
 [profile.gate]
 inherits = "release"
 lto = false

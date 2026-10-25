@@ -1,0 +1,147 @@
+//! A config read participant by participant (`config::load_from`) is the config read whole: the same checks, the same
+//! canonical bytes and hash, the same typed config; and a run started from it is the same run, its log byte for byte
+//! (SC-1: a large world's start was bounded by its config's JSON held whole). Three profiles' generated towns.
+
+use oikos_kernel::canon;
+use oikos_kernel::config::{self, Config};
+use oikos_kernel::engine::{run_code_world, run_code_world_loaded, EngineOptions};
+use serde::Deserialize;
+use serde_json::{json, Value};
+use std::path::PathBuf;
+
+const DAY: i64 = 86_400;
+
+fn root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
+}
+
+/// The town of `worlds/town.yaml` from a profile, as the generator writes it (its JSON text, cached for the build).
+fn town_text(profile: &str) -> Vec<u8> {
+    let out = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("stream-town-{profile}.json"));
+    let r = std::process::Command::new("bun")
+        .current_dir(root())
+        .args(["orchestrator/test/lib/write-town.ts", "worlds/town.yaml", out.to_str().unwrap(), "1", &format!("profile=\"{profile}\"")])
+        .output()
+        .expect("bun, to generate the town");
+    assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
+    std::fs::read(&out).unwrap()
+}
+
+const PROFILES: [&str; 3] = ["au-vic-2026", "gb-eng-2026", "us-oh-2026"];
+
+#[test]
+fn a_config_read_participant_by_participant_is_the_config_read_whole() {
+    for profile in PROFILES {
+        let text = town_text(profile);
+        let whole: Value = serde_json::from_slice(&text).unwrap();
+        // The old reading, written out here: the whole value's canonical bytes, their hash, the whole read into its type.
+        let canonical = canon::canonical_value(&whole).unwrap();
+        let hash = canon::hash_with_domain(canon::DOMAIN_CONFIG, &canonical);
+        let typed = Config::deserialize(whole.clone()).unwrap();
+        let (streamed, rest) = config::load_from(&text[..]).unwrap();
+        assert!(typed.participants.len() > 100, "{profile}: a town with its people");
+        assert_eq!(streamed.canonical.len(), canonical.len() as u64, "{profile}");
+        assert!(streamed.canonical.to_vec() == canonical, "{profile}: the same canonical bytes");
+        assert_eq!(streamed.hash, hash, "{profile}");
+        assert!(*streamed.config == typed, "{profile}: the same config");
+        // Read from a value, the same again.
+        let (from_value, rest2) = config::load_split(whole.clone()).unwrap();
+        assert!(from_value.canonical.to_vec() == canonical && from_value.hash == hash && *from_value.config == typed, "{profile}");
+        assert_eq!(rest, rest2);
+        // What the engine reads as JSON: every member but the participants as given, and the world's currencies.
+        for (k, v) in whole.as_object().unwrap() {
+            match k.as_str() {
+                "participants" => assert_eq!(rest[k], json!([])),
+                "world" => assert_eq!(rest[k], json!({ "currencies": v["currencies"] })),
+                _ => assert_eq!(&rest[k], v, "{profile}: {k}"),
+            }
+        }
+        // A snapshot's reading of the rest, without the participants or the world.
+        assert_eq!(config::rest_of(&canonical[..]).unwrap(), rest);
+        // The people's controllers keep their params' long members once for all (the town's ventures, demand...): a
+        // handful of maps for some hundreds of people, and each controller reads back as given.
+        let people: Vec<_> = streamed.config.participants.iter().filter(|p| p.controller.get("impl").and_then(Value::as_str) == Some("citizen.default")).collect();
+        // (Each distinct member, held once: the town's ventures, the same for everyone, are one.)
+        let held = |name: &str| -> std::collections::BTreeSet<usize> {
+            people.iter().flat_map(|p| p.controller.parts().1.iter().filter(|m| m.0 == name).map(|m| std::sync::Arc::as_ptr(m) as usize)).collect()
+        };
+        assert!(people.len() > 100 && people.iter().all(|p| p.controller.shares()), "{profile}");
+        assert_eq!(held("ventures").len(), 1, "{profile}: one list of ventures for {} people", people.len());
+        assert!(held("demand").len() <= 2, "{profile}");
+        for (p, given) in streamed.config.participants.iter().zip(whole["participants"].as_array().unwrap()) {
+            assert!(p.controller.to_value() == given["controller"], "{profile}: {}", p.id);
+        }
+        // Kept compressed: a few per cent of what it is.
+        let kept: usize = streamed.canonical.kept_bytes();
+        assert!(kept * 10 < canonical.len(), "{profile}: {kept} of {}", canonical.len());
+    }
+}
+
+#[test]
+fn a_run_from_a_config_read_participant_by_participant_is_the_same_run() {
+    for profile in PROFILES {
+        let text = town_text(profile);
+        let opts = || EngineOptions { threads: 4, until: Some(10 * DAY), ..Default::default() };
+        let (h1, e1) = run_code_world(serde_json::from_slice(&text).unwrap(), "stream", Vec::new(), opts()).unwrap();
+        let (loaded, rest) = config::load_from(&text[..]).unwrap();
+        let (h2, e2) = run_code_world_loaded(loaded, rest, "stream", Vec::new(), opts()).unwrap();
+        assert_eq!(h1, h2, "{profile}: the same state");
+        let (a, b) = (e1.into_log(), e2.into_log());
+        assert!(a.len() > 1_000_000, "{profile}: a run of some length ({} bytes)", a.len());
+        assert!(a == b, "{profile}: the same log, byte for byte");
+        // The header carries the config as given, in canonical JSON.
+        let header: Value = serde_json::from_slice(a.split(|b| *b == b'\n').next().unwrap()).unwrap();
+        assert!(canon::canonical_value(&header["body"]["config"]).unwrap() == canon::canonical_value(&serde_json::from_slice::<Value>(&text).unwrap()).unwrap());
+    }
+}
+
+#[test]
+fn a_config_read_participant_by_participant_is_checked_as_the_whole_is() {
+    let text = town_text("au-vic-2026");
+    let whole: Value = serde_json::from_slice(&text).unwrap();
+    let read = |v: &Value| config::load_from(serde_json::to_vec(v).unwrap().as_slice()).map(|_| ());
+    let both = |v: &Value| (read(v), config::load(v.clone()).map(|_| ()));
+    // A participant against the contract: refused, and told where.
+    let mut bad = whole.clone();
+    bad["participants"][3]["kind"] = json!("ghost");
+    let (a, b) = both(&bad);
+    assert!(a.as_ref().unwrap_err().contains("/participants/3/kind"), "{a:?}");
+    assert!(b.is_err());
+    // A number that is not a whole one, in a participant.
+    let mut bad = whole.clone();
+    bad["participants"][5]["controller"]["params"]["x"] = json!(1.5);
+    let (a, b) = both(&bad);
+    assert!(a.as_ref().unwrap_err().contains("/participants/5/controller/params/x"), "{a:?}");
+    assert!(b.is_err());
+    // The rest against the contract, with the participants fine.
+    let mut bad = whole.clone();
+    bad["seed"] = json!("one");
+    let (a, b) = both(&bad);
+    assert!(a.as_ref().unwrap_err().contains("/seed"), "{a:?}");
+    assert!(b.is_err());
+    // A semantic check across the participants (an id used twice).
+    let mut bad = whole.clone();
+    let first = bad["participants"][0].clone();
+    bad["participants"].as_array_mut().unwrap().push(first);
+    let (a, b) = both(&bad);
+    assert!(a.is_err() && b.is_err(), "{a:?} {b:?}");
+    // Participants that are not a list, or none.
+    let mut bad = whole.clone();
+    bad["participants"] = json!({});
+    let (a, b) = both(&bad);
+    assert!(a.is_err() && b.is_err());
+    let mut none = whole.clone();
+    none.as_object_mut().unwrap().remove("participants");
+    let (a, b) = both(&none);
+    assert!(a.is_err() && b.is_err());
+    // Text that is not one JSON value.
+    let mut trailing = text.clone();
+    trailing.extend_from_slice(b" {}");
+    assert!(config::load_from(&trailing[..]).is_err());
+    assert!(config::load_from(&text[..text.len() / 2]).is_err());
+    // A member given twice: the last is the config's, as when the text is read whole.
+    let mut twice = br#"{"participants":[],"#.to_vec();
+    twice.extend_from_slice(&text[1..]);
+    let (l, _) = config::load_from(&twice[..]).unwrap();
+    assert_eq!(l.hash, config::load(whole).unwrap().hash);
+}

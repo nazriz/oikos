@@ -84,25 +84,119 @@ pub struct Ctx {
     pub world: Arc<WorldInfo>,
 }
 
-/// An actor's parameters: read as the map they are (`ctx.params.get(..)`), held without a copy where they are a member
-/// of a value the engine keeps already (a participant's controller, shared with the world's config: a town's people
-/// each have large params, and a second copy of them was 2.4 GB at 10,000 people).
+/// An actor's parameters: read as the map they are (`ctx.params.get(..)`, `iter`, `params["x"]`), held without a copy
+/// where they are a member of a value the engine keeps already (a participant's controller, shared with the world's
+/// config: a town's people each have large params, and a second copy of them was 2.4 GB at 10,000 people), and with
+/// the long members many people's have alike held once for all (`oikos_contracts::controller`: SC-1). Read, they are
+/// the map as given, every member in its order.
 /// (Always an object: `member_of` takes one that is not as no params.)
 #[derive(Clone)]
 pub struct Params {
     of: Arc<Value>,
     /// The member of `of` they are (absent: `of` itself).
     member: Option<&'static str>,
+    /// Members kept apart, shared with others' (their keys are none of `of`'s).
+    shared: Arc<[Arc<oikos_contracts::controller::Member>]>,
 }
 
 impl Params {
     /// The `member` of this value, shared (one that is not an object: no params).
     pub fn member_of(of: Arc<Value>, member: &'static str) -> Params {
         if of[member].is_object() {
-            Params { of, member: Some(member) }
+            Params { of, member: Some(member), shared: Arc::from([]) }
         } else {
             Params::default()
         }
+    }
+
+    /// A controller's params, as it keeps them.
+    pub fn of_controller(c: &oikos_contracts::config::Controller) -> Params {
+        let (top, shared) = c.parts();
+        if top["params"].is_object() {
+            Params { of: top.clone(), member: Some("params"), shared: shared.clone() }
+        } else {
+            Params::default()
+        }
+    }
+
+    /// The members held in the map itself.
+    fn own(&self) -> &Map<String, Value> {
+        let v = match self.member {
+            Some(k) => &self.of[k],
+            None => &*self.of,
+        };
+        match v {
+            Value::Object(m) => m,
+            _ => unreachable!("params are always an object (`member_of`, `from`)"),
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&Value> {
+        self.own().get(key).or_else(|| self.shared.iter().find(|m| m.0 == key).map(|m| &m.1))
+    }
+
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.get(key).is_some()
+    }
+
+    /// Every member, in key order (as a map of them all would give them).
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
+        oikos_contracts::controller::merged(self.own(), &self.shared)
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = &String> {
+        self.iter().map(|(k, _)| k)
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = &Value> {
+        self.iter().map(|(_, v)| v)
+    }
+
+    pub fn len(&self) -> usize {
+        self.own().len() + self.shared.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// The params as a map of their own (a copy).
+    pub fn to_map(&self) -> Map<String, Value> {
+        self.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+    }
+
+    /// Changed in place, they become the actor's own: copied from what they were shared with, the first time.
+    pub fn make_mut(&mut self) -> &mut Map<String, Value> {
+        if self.member.is_some() || !self.shared.is_empty() {
+            *self = Params::from(self.to_map());
+        }
+        match Arc::make_mut(&mut self.of) {
+            Value::Object(m) => m,
+            _ => unreachable!("made an object just above"),
+        }
+    }
+
+    pub fn insert(&mut self, key: String, v: Value) -> Option<Value> {
+        self.make_mut().insert(key, v)
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<Value> {
+        self.make_mut().remove(key)
+    }
+}
+
+impl std::ops::Index<&str> for Params {
+    type Output = Value;
+    /// (As a JSON object reads: null where there is no such member.)
+    fn index(&self, key: &str) -> &Value {
+        static NULL: Value = Value::Null;
+        self.get(key).unwrap_or(&NULL)
+    }
+}
+
+impl PartialEq for Params {
+    fn eq(&self, o: &Params) -> bool {
+        self.len() == o.len() && self.iter().zip(o.iter()).all(|(a, b)| a == b)
     }
 }
 
@@ -114,48 +208,13 @@ impl Default for Params {
 
 impl From<Map<String, Value>> for Params {
     fn from(m: Map<String, Value>) -> Params {
-        Params { of: Arc::new(Value::Object(m)), member: None }
-    }
-}
-
-impl std::ops::Deref for Params {
-    type Target = Map<String, Value>;
-    fn deref(&self) -> &Map<String, Value> {
-        let v = match self.member {
-            Some(k) => &self.of[k],
-            None => &*self.of,
-        };
-        match v {
-            Value::Object(m) => m,
-            _ => unreachable!("params are always an object (`member_of`, `from`)"),
-        }
-    }
-}
-
-/// (Changed in place, they become the actor's own: copied from what they were shared with, the first time.)
-impl std::ops::DerefMut for Params {
-    fn deref_mut(&mut self) -> &mut Map<String, Value> {
-        if self.member.is_some() {
-            *self = Params::from((**self).clone());
-        }
-        match Arc::make_mut(&mut self.of) {
-            Value::Object(m) => m,
-            _ => unreachable!("made an object just above"),
-        }
-    }
-}
-
-impl<'a> IntoIterator for &'a Params {
-    type Item = (&'a String, &'a Value);
-    type IntoIter = serde_json::map::Iter<'a>;
-    fn into_iter(self) -> Self::IntoIter {
-        (**self).iter()
+        Params { of: Arc::new(Value::Object(m)), member: None, shared: Arc::from([]) }
     }
 }
 
 impl std::fmt::Debug for Params {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        (**self).fmt(f)
+        f.debug_map().entries(self.iter()).finish()
     }
 }
 
