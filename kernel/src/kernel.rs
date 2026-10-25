@@ -64,10 +64,13 @@ struct Handed {
     whole: BTreeSet<usize>,
 }
 
-/// A record as it's delivered.
+/// A record as it's delivered: what it adds (kept from the first time it is shown: a record is shown to many, and
+/// read again at each look), and its canonical bytes while anyone holds them (an observation being encoded: a seat's,
+/// or one whose hash the log keeps). A code actor's look makes no bytes. (They were kept for every record ever shown,
+/// for the whole run: SC-1.) The record is kept with them, so no other comes to be where it is in memory.
 struct Shared {
     record: Arc<Record>,
-    bytes: Arc<[u8]>,
+    bytes: std::sync::Weak<[u8]>,
     facts: Arc<RecordFacts>,
 }
 
@@ -86,29 +89,54 @@ impl Delivered {
     /// A record an observation shows: its canonical bytes, what it adds, and where it's kept here.
     fn record(&self, r: &Arc<Record>) -> Result<(Arc<[u8]>, Arc<RecordFacts>, usize), canon::CanonError> {
         let at = Arc::as_ptr(r) as usize;
-        if let Some(shared) = held(self.records.read()).get(&at) {
-            return Ok((shared.bytes.clone(), shared.facts.clone(), at));
-        }
+        let facts = match held(self.records.read()).get(&at) {
+            Some(shared) => {
+                if let Some(b) = shared.bytes.upgrade() {
+                    return Ok((b, shared.facts.clone(), at));
+                }
+                Some(shared.facts.clone())
+            }
+            None => None,
+        };
         let v = serde_json::to_value(&**r).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
         let bytes: Arc<[u8]> = canon::canonical_value(&v)?.into();
-        let facts = Arc::new(RecordFacts::of(&v));
+        let facts = facts.unwrap_or_else(|| Arc::new(RecordFacts::of(&v)));
         // (Encoded by another meanwhile: theirs is kept, and given.)
         let mut records = held(self.records.write());
-        let shared = records.entry(at).or_insert(Shared { record: r.clone(), bytes, facts });
-        Ok((shared.bytes.clone(), shared.facts.clone(), at))
+        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: std::sync::Weak::<[u8; 0]>::new(), facts: facts.clone() });
+        match shared.bytes.upgrade() {
+            Some(b) => Ok((b, shared.facts.clone(), at)),
+            None => {
+                shared.bytes = Arc::downgrade(&bytes);
+                Ok((bytes, shared.facts.clone(), at))
+            }
+        }
+    }
+
+    /// What a record adds to a seat's knowledge, without its bytes (a code actor's look: nothing of it is written).
+    fn record_facts(&self, r: &Arc<Record>) -> Result<Arc<RecordFacts>, canon::CanonError> {
+        let at = Arc::as_ptr(r) as usize;
+        if let Some(shared) = held(self.records.read()).get(&at) {
+            return Ok(shared.facts.clone());
+        }
+        let v = serde_json::to_value(&**r).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
+        let facts = Arc::new(RecordFacts::of(&v));
+        let mut records = held(self.records.write());
+        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: std::sync::Weak::<[u8; 0]>::new(), facts });
+        Ok(shared.facts.clone())
     }
 
     /// Writes a record for a host that keeps what it's handed: whole the first time, its id from then on.
     fn hand_over(&self, handed: &mut Handed, at: usize, bytes: &[u8], out: &mut Vec<u8>) {
-        let records = held(self.records.read());
-        let Some(shared) = records.get(&at) else { return out.extend_from_slice(bytes) };
+        let record = held(self.records.read()).get(&at).map(|shared| shared.record.clone());
+        let Some(record) = record else { return out.extend_from_slice(bytes) };
         if handed.whole.contains(&at) {
-            return canon::write_string(&shared.record.id, out);
+            return canon::write_string(&record.id, out);
         }
         handed.whole.insert(at);
         out.extend_from_slice(bytes);
         // (Another record handed over under this id before, if that could be: the host no longer holds it.)
-        if let Some(was) = handed.by_id.insert(shared.record.id.clone(), at).filter(|was| *was != at) {
+        if let Some(was) = handed.by_id.insert(record.id.clone(), at).filter(|was| *was != at) {
             handed.whole.remove(&was);
         }
     }
@@ -496,7 +524,7 @@ impl Kernel {
                 ChannelData::Records { records, .. } if !records.is_empty() => {
                     let facts = shown.entry(path.clone()).or_default();
                     for r in records {
-                        facts.records.push(delivered.record(r)?.1);
+                        facts.records.push(delivered.record_facts(r)?);
                     }
                 }
                 ChannelData::Sites { cells, .. } if !cells.is_empty() => {
