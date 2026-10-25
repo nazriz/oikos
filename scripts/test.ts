@@ -356,7 +356,7 @@ for (const f of lateTimeouts) {
   const slot = await take(1, `test suite (a rerun) in ${root}`, { borrow: true });
   const r = await runFile(f).finally(() => slot?.release());
   pass += r.npass; fail += r.nfail;
-  if (r.code === 0) { rerun++; times[f] = Math.round(r.secs * 10) / 10; console.log(`PASSED ON RERUN (alone) ${f} ${r.secs.toFixed(0)}s`); }
+  if (r.code === 0) { rerun++; times[f] = Math.round(r.secs * 10) / 10; console.log(`PASSED ON RERUN (timed out under load) ${f} ${r.secs.toFixed(0)}s`); }
   else { failed++; console.log(`FAIL ${f} ${r.secs.toFixed(0)}s (failed again on rerun)`); bad.push(tail(f, r.text)); }
 }
 
