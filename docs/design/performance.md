@@ -89,6 +89,7 @@ there: a round's decisions held once, as bytes, when seats are in it, or the fir
 varies (the thread pool's idle threads spin), so a cost of that size is told by running main and the cut in turn on
 the same towns, three times each, at a quiet hour: `pair.sh`, its numbers above.
 | what's known of a building, one per building (`mem-facts`) | 499 MB | 2.97 GB | 16.9 GB (595 s) | 380 KB | |
+| the first moment decided a window at a time (`mem-first`) | 508 MB | 2.99 GB | | 380 KB | the 100,000 week: footprint 33 GB against 43, the same instructions, wall 414 s against 433 (paired) |
 
 *What's been seen.* A building as someone sees it (its spaces, who is in each where that can be told, its wear) was
 made at every look and kept by everyone who saw it, each their own copy: at 50,000 people, 408 KB a person. Now it is
