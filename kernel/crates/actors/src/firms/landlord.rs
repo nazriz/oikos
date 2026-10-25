@@ -1344,7 +1344,7 @@ impl Office {
 
     /// A premises lease's account in our rent book now (docs/behaviour/leasing.md, "Remedies"): what has fallen due under
     /// it (the deposit as it is signed, the rent monthly in advance from then until it ends, at the rent of each month,
-    /// and a surrender's price once asked for) against all that has come in from the account it applied from since it
+    /// and a surrender's price once agreed (paid; one asked for and not paid is no rent owed) for) against all that has come in from the account it applied from since it
     /// was offered. Above nought, behind; below, in credit (the deposit we hold among it).
     fn premises_owed(&self, a: &Record, c: &Commercial, case: &PremisesCase, t: i64) -> (i64, i64) {
         let me = self.me.as_str();
@@ -1358,7 +1358,9 @@ impl Office {
             due += self.rent_at(a, signed + k * MONTH);
             k += 1;
         }
-        if let Some((price, _)) = case.surrender {
+        // (A surrender's price is owed once the surrender is agreed, by its being paid: asked for and not paid, it is no
+        // rent owed, and nothing is ended for it.)
+        if let (Some((price, _)), Some(_)) = (case.surrender, case.surrendered_at) {
             due += price;
         }
         let paid: i64 = self.premises_account(a).and_then(|acc| self.received.get(&acc)).map_or(0, |v| v.iter().filter(|(at, _)| *at >= a.at).map(|(_, amt)| amt).sum());
@@ -1482,7 +1484,8 @@ impl Office {
             // ---- in force ----
             // A surrender asked and paid for: ended by our notice under the lease.
             if let (Some((price, at)), None) = (case.surrender, case.surrendered_at) {
-                if behind <= 0 && case.forfeited_at.is_none() {
+                // (Paid: what has come in covers the rent due and the price besides.)
+                if behind + price <= 0 && case.forfeited_at.is_none() {
                     case.surrendered_at = Some(t);
                     steps.push(step(
                         format!("{tenant} has paid the {} we take for its surrender: ending its lease of {space} by our notice under it.", e.usd(price)),
@@ -3133,6 +3136,20 @@ mod tests {
         town.readings = vec![("PL1".into(), "ended", Some(DAY + 14 * DAY))];
         let made = town.wake(DAY + 20 * DAY, "cadence", vec![], vec![]);
         assert!(fns(&made, "money").iter().any(|m| m.arg("to") == json!("acc-ent.1") && m.arg("amount").as_str().is_some_and(|a| a.contains("2500.00"))), "{made:?}");
+    }
+
+    #[test]
+    fn a_surrender_asked_for_and_not_paid_is_no_rent_owed_and_nothing_is_ended_for_it() {
+        // (Found in a year of an au-vic town: a closing business asked to surrender, could not pay the price, and its lease
+        // was ended "for rent owed" of exactly the price, its rent paid.)
+        let (mut town, g) = premises_town(json!({ "arrears_days": 14, "forfeiture_notice_days": 0, "review_months": 0 }), json!({}));
+        town.wake(DAY + 3600, "cadence", g, vec![from_tenant(DAY, 500_000)]);
+        let ask = rec(json!({ "id": "sr-1", "at": DAY + 5 * DAY, "author": "ent.1-owner", "record": "statement", "speaks_for": "ent.1", "kind": "surrender_request", "visible_to": [ME, "ent.1"], "addressed_to": [ME], "text": "Request.", "data": { "lease": "PL1" } }));
+        assert_eq!(kind(&town.wake(DAY + 6 * DAY, "cadence", vec![ask], vec![]), "surrender_terms").len(), 1);
+        for week in 1..4 {
+            let made = town.wake(DAY + 6 * DAY + week * 7 * DAY, "cadence", vec![], vec![]);
+            assert!(noticed(&made, "PL1").is_empty() && kind(&made, "lease_forfeiture").is_empty() && kind(&made, "review_request").is_empty(), "week {week}: {made:?}");
+        }
     }
 
     #[test]
