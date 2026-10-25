@@ -324,6 +324,11 @@ async function runFile(f: string): Promise<Result> {
 }
 const tail = (f: string, text: string) => `\n== ${f}\n${text.split("\n").filter((l) => !/^\s*$/.test(l)).slice(-60).join("\n")}`;
 
+// Seconds in which none of this run's files was running though some were still to run: the run waiting on the machine
+// (slots held by others, the load average), which the gate's wall budget does not count against the suite.
+let stalled = 0;
+const stallTimer = setInterval(() => { if (running === 0 && next < files.length) stalled++; }, 1000);
+stallTimer.unref?.();
 async function worker() {
   for (;;) {
     while (next < files.length && running >= allowed(running)) await Bun.sleep(1000);
@@ -369,4 +374,19 @@ for (const b of bad) console.log(b);
 const long = Object.entries(record).filter(([f, r]) => !isSlowTier(f) && r.secs > 90).map(([f, r]) => `${f} (${r.secs}s)`);
 if (long.length && !custom) console.log(`\nNOTE gate-tier files over 90 s: ${long.join(", ")}. Name them in scripts/test-tiers.json (the slow tier), with why.`);
 console.log(`\n${pass} pass, ${fail} fail across ${files.length} files, ${maxJobs} at a time, in ${((performance.now() - t0) / 1000).toFixed(0)}s${fast ? " (fast tier)" : changed ? " (fast tier and what changed)" : ""}, ${rerun} passed on rerun`);
-process.exit(failed ? 1 : 0);
+// The time budgets (scripts/test-budgets.json; raising one is a decision with its entry in docs/decisions.md): the gate fails over its
+// wall time or with a file over its file limit; the slow tier warns over its wall time. (Not for a run of named files or another root.)
+let over = false;
+if (!custom && !filters.length && !list) {
+  const budgets = JSON.parse(readFileSync(join(repo, "scripts", "test-budgets.json"), "utf8")) as { gate: { wall_seconds: number; file_seconds: number }; slow: { wall_seconds: number } };
+  // (Less the seconds the run stood waiting on the machine with nothing of its own running: a busy machine is not the suite's growth.)
+  const wall = (performance.now() - t0) / 1000 - stalled;
+  if (stalled > 0) console.log(`(budgets: ${stalled}s waiting on the machine with no file running are not counted)`);
+  const say = "(docs/testing.md, \"Pruning: when a budget is hit\"; a budget is raised only with an entry in docs/decisions.md)";
+  if (affected || tierFlag === "gate") {
+    const long = Object.entries(record).filter(([, r]) => r.secs > budgets.gate.file_seconds).map(([f, r]) => `${f} ${r.secs}s`);
+    if (long.length) { over = true; console.log(`BUDGET: gate files over ${budgets.gate.file_seconds}s: ${long.join(", ")} ${say}`); }
+    if (wall > budgets.gate.wall_seconds) { over = true; console.log(`BUDGET: the gate took ${wall.toFixed(0)}s, over its ${budgets.gate.wall_seconds}s ${say}`); }
+  } else if (tierFlag === "slow" && wall > budgets.slow.wall_seconds) console.log(`BUDGET (a warning): the slow tier took ${wall.toFixed(0)}s, over its ${budgets.slow.wall_seconds}s ${say}`);
+}
+process.exit(failed || over ? 1 : 0);

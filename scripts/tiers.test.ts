@@ -14,8 +14,16 @@ const list = (...a: string[]) => {
 };
 const tiers = JSON.parse(readFileSync(join(import.meta.dir, "test-tiers.json"), "utf8")) as { slow: Record<string, string> };
 const times = JSON.parse(readFileSync(join(import.meta.dir, "test-times.json"), "utf8")) as Record<string, number>;
-/** The most a gate file may take (by test-times.json): the gate is to end in a minute or two on twelve slots. */
-const GATE_FILE_MAX = 90;
+/** The most a gate file may take (by test-times.json): the gate's file limit in scripts/test-budgets.json, which the runner also holds at the end of a gate. */
+const budgets = JSON.parse(readFileSync(join(import.meta.dir, "test-budgets.json"), "utf8")) as { gate: { wall_seconds: number; file_seconds: number }; slow: { wall_seconds: number } };
+const GATE_FILE_MAX = budgets.gate.file_seconds;
+
+test("the budgets are whole seconds, the gate's file limit within its wall time", () => {
+  for (const x of [budgets.gate.wall_seconds, budgets.gate.file_seconds, budgets.slow.wall_seconds]) expect(Number.isInteger(x) && x > 0).toBe(true);
+  expect(budgets.gate.file_seconds).toBeLessThan(budgets.gate.wall_seconds);
+  // (The runner holds them at the end of a run: a gate over either fails, a slow tier over its wall warns.)
+  expect(readFileSync(runner, "utf8")).toContain("test-budgets.json");
+});
 
 test("every test file is in exactly one tier", () => {
   const all = list("--tier", "all"), gate = list("--tier", "gate"), slow = list("--tier", "slow");

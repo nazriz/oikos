@@ -1,0 +1,5 @@
+{
+ "//": "The suite's time budgets (docs/testing.md, \"Pruning: when a budget is hit\"; docs/dev-machine.md, \"Tiers\"), read by scripts/test.ts and scripts/tiers.test.ts. The gate fails over its wall time (less the seconds it stood waiting on the machine with no file of its own running) or with any file over its file limit; the slow tier warns over its wall time. Set 2026-10-25 with about 20% headroom on the Mini (14 cores, 12 slots): the whole gate tier in the merge worktree 143 s (2026-10-24, uncapped), the slow tier on this branch 821 s (2026-10-24). Raising one is a decision with its entry in docs/decisions.md.",
+ "gate": { "wall_seconds": 180, "file_seconds": 90 },
+ "slow": { "wall_seconds": 1000 }
+}

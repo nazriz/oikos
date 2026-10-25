@@ -31,7 +31,6 @@ kernel/crates/
   explore   the explorer's data layer, interface only (section 9).
 kernel/src/engine.rs   the run loop with the actors inside: units from the cast, rounds, parallel decide, carry-out.
 kernel/tests/engine.rs, actors_boundary.rs, papers_typed.rs   the engine's tests, the boundary and paper backstops.
-orchestrator/test/port-weather.test.ts       the worked example against the TS module, to the state hash.
 participants/test/port-forms.test.ts         the forms catalogue equal to papers.ts until the cut-over.
 contracts/test/law-drafts.json               laws drafted from figures: the TS answers the Rust is held to.
 scripts/port-gate.ts                         the gate's measured half.
@@ -112,8 +111,8 @@ scripts/port-gate.ts                         the gate's measured half.
 6. Bump nothing in TS. TS behaviour is frozen.
 
 `world.weather` (boundary/weather.rs) took 120 lines: a `Plan` with no books, its `plan` the TS one's loop, its
-`until` the next warning. `orchestrator/test/port-weather.test.ts` runs the TS module in the TS loop and the Rust kind
-in the engine on the same generated town, every other actor idle in both, and gets the same warnings and **the same
+`until` the next warning. `orchestrator/test/port-weather.test.ts` (deleted with the TS loop at the test pruning, 2026-10-24) ran the TS module in the TS loop and the Rust kind
+in the engine on the same generated town, every other actor idle in both, and got the same warnings and **the same
 final state hash**, and the same hash on 1 and 14 threads. A module ported that faithfully, in a world where every other
 actor is idle or scripted, should match its TS twin to the hash; where it decides fresh (section 2), it will not, and
 the test asserts the behaviour instead.
@@ -131,7 +130,7 @@ the test asserts the behaviour instead.
   paper types say (section 5).
 - **TS scenario tests are the outside referee**, run against the all-Rust world once every module is in (the
   integration step). Before that, a lane may run a scenario test against a Rust world where everything else is idle or
-  scripted if the test's assertions only touch its modules (as port-weather.test.ts does).
+  scripted if the test's assertions only touch its modules (as port-weather.test.ts did).
 - **Determinism**: every lane's tests run their world on 1 thread and on 14 (`EngineOptions::threads`, `share_at: 1`)
   and assert the same hash.
 - **Heavy runs through the slots** (`bun scripts/slots.ts --weight N -- cargo test ...`). Each lane builds in its own
