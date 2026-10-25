@@ -303,3 +303,16 @@ fn its_manifest_is_the_ts_one_and_adds_only_what_the_port_adds() {
     assert_eq!(rust["name"], ts["name"]);
     assert!(rust["params"]["price_adjust_bps"].is_object());
 }
+
+#[test]
+fn premises_pay_when_the_custom_outruns_one_person_and_the_margin_pays_the_hands_and_the_rent() {
+    // 300 a month wanted, 100 a worker: three at work (the owner and two hands), at 1,000 a unit, 30,000 a hand.
+    assert_eq!(premises_pay(300, 100, 1_000, 30_000, 50_000, 6), (300 * 1_000 - 2 * 30_000 - 50_000, 3));
+    // The room holds two: 200 served.
+    assert_eq!(premises_pay(300, 100, 1_000, 30_000, 50_000, 2), (200 * 1_000 - 30_000 - 50_000, 2));
+    // What one person serves alone gains nothing from premises: the rent is all it adds.
+    let alone = 100 * 1_000;
+    assert!(premises_pay(100, 100, 1_000, 30_000, 50_000, 6).0 < alone);
+    // A thin margin does not pay the hands: worse than alone however much is wanted.
+    assert!(premises_pay(300, 100, 100, 30_000, 50_000, 6).0 < 100 * 100);
+}

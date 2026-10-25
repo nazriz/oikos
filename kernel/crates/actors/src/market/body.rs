@@ -179,6 +179,8 @@ pub trait Body: Serialize + DeserializeOwned + Send + Sized + 'static {
     fn wind_up_owed(&mut self, _book: &Book, _t: i64, _acct: &OwnAccount, _cx: &mut Cx) -> (Vec<Step<BodyThen>>, i64) {
         (vec![], 0)
     }
+    /// Where its staff work from now (premises it has taken on a lease: docs/behaviour/leasing.md).
+    fn set_workplace(&mut self, _space: &str) {}
     /// The act that ends a wake: the organisation's record (its character and memory), if it has one to write.
     fn keep(&mut self, _cx: &mut Cx) {}
     /// The firm never opened (the premises it meant to buy went to someone else) and is closed: it trades no more.

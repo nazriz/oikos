@@ -27,7 +27,7 @@ export const JOB_ADVERTISEMENT: Issued = {
   },
   writes: {
     kind: "job_posting", text: "Hiring: {wage} every {period}.",
-    data: { wage: "#wage", period: "=period", role: "@role", industry: "@industry", workplace: "@workplace_structure", space: "@workplace" },
+    data: { wage: "#wage", period: "=period", openings: "=posts", role: "@role", industry: "@industry", workplace: "@workplace_structure", space: "@workplace" },
     offer: { by: "=self", to: { min_age_years: 18 }, take_up: "apply", available: "=posts", terms: { template: "employment",
       commitments: [{ who: "=self", does: { outcome: { money: { from: "=account", amount: "=wage", for: "wages" } } }, every: "=period" }, "@occupancy"], termination: "@termination" } },
   },

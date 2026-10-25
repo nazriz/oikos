@@ -113,10 +113,11 @@ test("a profile that states none of it is dealt its homes by size, with nothing 
   const config = generateFrom({ ...spec }, P);
   expect(config.world.records.some((r: any) => r.data?.brought_forward)).toBe(false);
   expect(/As the year begins/.test(config.meta.description)).toBe(false);
-  // (The count the fault was recorded with: docs/design/ai-citizens.md, "Progress", the firm-side fixes.)
+  // (The count the fault was recorded with: docs/design/ai-citizens.md, "Progress", the firm-side fixes; 241 since
+  // 2026-10-24, when who works and what they have saved came to be drawn together (ME-17): a different town.)
   const o = opening(config);
-  expect(o.renting.length).toBe(239);
-  expect(o.renting.filter((r) => r.wages === 0).length).toBe(73);
+  expect(o.renting.length).toBe(241);
+  expect(o.renting.filter((r) => r.wages === 0).length).toBe(74);
 });
 
 test("payments in force are paid from the first period by the office's file, and their holders do not claim again", async () => {
@@ -134,7 +135,10 @@ test("payments in force are paid from the first period by the office's file, and
   // Each is paid on the day its grant names, and then every period.
   const paidTo = new Map<string, number[]>();
   for (const e of lines) if (e.kind === "event" && e.body?.event === "transfer" && /support\.$/.test(String(e.body.memo ?? ""))) paidTo.set(e.body.to, [...(paidTo.get(e.body.to) ?? []), e.t]);
-  for (const g of o.grants) {
+  // (A payment its holder asked to stop, having found work, is no longer in force: since 2026-10-24 an unemployed holder
+  // taken on on the first day, who in the earlier town was not, stops theirs. Hiring by fit, ME-2.)
+  const stopped = new Set(lines.filter((e) => e.kind === "event" && e.body?.event === "recorded" && e.body.record?.kind === "benefit_change" && e.body.record.data?.stop).map((e) => e.body.record.data.claim));
+  for (const g of o.grants.filter((g) => !stopped.has(g.data.claim ?? g.basis ?? "") && !stopped.has(g.id.replace(/^grant-/, "claim-")))) {
     const got = paidTo.get(`acc-${g.addressed_to[0]}`) ?? [];
     expect(got.length, g.id).toBeGreaterThanOrEqual(Math.floor((29 * DAY - g.data.next) / g.data.every) + 1); // (the office pays when it next looks: a day of slack at the end)
     expect(got[0]! - g.data.next, g.id).toBeLessThan(2 * DAY);

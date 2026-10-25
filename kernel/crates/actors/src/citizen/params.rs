@@ -37,11 +37,11 @@ pub struct Params {
     /// (Shared: the same list in every person's params is read once and held once: `shared_ventures`.)
     #[serde(deserialize_with = "shared_ventures")]
     pub ventures: std::sync::Arc<Vec<Venture>>,
-    pub found_bps: i64,
-    pub found_own_ppm: i64,
     pub found_own_buffer_months: i64,
+    /// The trade they worked in as the year began (the industry of their job then), which an application of theirs
+    /// names until they have worked elsewhere (docs/design/market-realism.md, ME-2).
+    pub trade: Option<String>,
     pub give_up_months: i64,
-    pub give_up_below_bps: i64,
     pub possession: Option<Possession>,
     pub shop_every_days: i64,
     pub beta: i64,
@@ -138,11 +138,9 @@ impl Default for Params {
             child_template_outside_lf: String::new(),
             participation_bps: 10_000,
             ventures: Default::default(),
-            found_bps: 0,
-            found_own_ppm: 0,
             found_own_buffer_months: 1,
+            trade: None,
             give_up_months: 6,
-            give_up_below_bps: 5_000,
             possession: None,
             shop_every_days: 14,
             beta: 5,
@@ -282,6 +280,9 @@ pub struct OwnWork {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub home: Option<String>,
     pub expect_per_month: i64,
+    /// Premises it leases, as it told us: the rent a month, and when the lease ends (we stay bound by it until then).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lease: Option<(i64, i64)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -297,6 +298,13 @@ pub struct Venture {
     pub own: bool,
     #[serde(default)]
     pub expect_per_month: Option<i64>,
+    /// The trade price its goods are bought in at, as the world publishes it (for a founder who holds no trade price
+    /// list: docs/behaviour/entry.md, "Entry by expected profit").
+    #[serde(default)]
+    pub unit_cost: Option<i64>,
+    /// What running it costs a month beside its stock (registration, a licence and the like), as the place charges it.
+    #[serde(default)]
+    pub fixed_per_month: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

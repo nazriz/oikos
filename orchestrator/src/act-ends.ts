@@ -20,6 +20,9 @@ export function actEnds(): ActEnds {
     underWay,
     started(b) {
       if (typeof b.action !== "string") return;
+      // (An act put back and begun again, its performer having run out of the day, is started a second time by the
+      // event that put it back: the command that began it is still the first start's.)
+      if (startedBy.has(b.action)) return;
       startedBy.set(b.action, b.cause);
       underWay.add(b.cause);
     },
