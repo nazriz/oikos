@@ -8533,3 +8533,42 @@ placeholder on a small town, and a non-resident officer as the seat's body if th
 - **Merged with main (2026-10-25, origin/main at 3b87959e: market realism, commercial leasing).** The generator is 0.68.0
   (this phase on main's 0.67.0), and culture-dial's pins were re-taken once more on the merged tree, with the reason beside
   them. The measurements above are from before the merge (f2-phase0 tip against this branch), not re-run on main's towns.
+
+## 2026-10-25 · Foundations-2 phase 2, C1: law 8's invariant and its backstop, with today's violations in an inventory (branch `f2-phase2`, stacked on `f2-phase1`; no result changes; no model called)
+
+Asked: build phase 2 of docs/design/foundations-2.md (law 8, conservation of everything physical), steps C1 to C6 and
+C3b, Naz having approved the design on 2026-10-25 (the outside's supply unlimited at its price except named scarce
+kinds; the tree model for networks; baselines move). C1 is the invariant over today's kinds and the backstop.
+
+- **The kernel's side: `kernel/tests/conservation.rs`, replacing `goods.rs`.** The goods property is kept whole (every
+  resource kind's total over holdings and edges changes only by work's inputs and outputs and construction's materials;
+  nobody but an edge below nought; goods moved only by their holder), and fields are added: in a world with a field on
+  every cell and a task that draws from it and one that emits to it, a step with no day of nature in it changes each
+  field's total by what work drew and emitted, exactly; a day of nature is nature's own (sources, decay, diffusion, flow),
+  and the totals are taken afresh after it. A third test holds that the runs are not vacuous (goods move, work draws and
+  emits). `foundations.rs` and `foundations-laws.test.ts` name the new file.
+- **The backstop: `orchestrator/test/nothing-from-nothing.test.ts`** (gate tier; its audits in `test/lib/law8.ts`). It
+  generates every profile's town (120 people, three factories, living) and reads the modules' sources, and names:
+  `stocksAsVariables` (a variable that grows by its occupants, has a kind's name, or is read as a meter), `orphanKinds`
+  (a kind consumed that no recipe, edge or nature makes; a kind made that nothing uses or takes in), `silentRecipes` (a
+  recipe at a workplace that does not state its energy and its water: nought is allowed, its basis then a row of the
+  figure table, law 11), `billsWithoutMeters` (a parameter that is an assumed use a head, customer, household or home),
+  `vanishing` (a draw from a field that holds no kind; a process whose only effect is to destroy a stock kind),
+  `allocationRules` (code that shares out a shortfall by a rule of its own: a pro rata, a ration, a share out, and the
+  utility's own reckoning of demand, `restriction_cut_bps` and `price_elasticity_bps`), and `specialCasesLeft` (a special
+  case a landed step deleted, standing again). Each is planted in the second half and seen named.
+- **The inventory, `orchestrator/test/fixtures/foundations-2-inventory.json`, only shrinks.** It lists today's findings
+  by audit and the special cases the plan deletes (literal strings, as `foundations-inventory.json` does), each with the
+  step that deletes it. A finding not in it fails (a new way round the law), and so does an entry no longer found (the
+  change that ended it removes it, with a line here); a step that has landed goes into `done`, and its entries stay as
+  guards. Today: the `waste` and `water_used` variables (growing per occupant; `waste` also a kind's name); fourteen
+  silent recipes at workplaces (the world has no `water` kind yet); the energy retailer's `units_per_customer_per_day` and
+  the water corporation's `litres_per_person_per_day` (assumed uses); vanishing: `draw_water` (into nothing),
+  `supply_energy` (energy at the depot), and `consume` and the five `consume-<kind>` tasks (goods and the shops' kinds
+  used up into nothing); the utility's own demand rules as allocation rules. No orphan kinds.
+- **Why this way.** It is the shape the two earlier laws took (`docs/all-work-takes-time.md`, `docs/no-god-view.md`): the
+  backstop reads what the generator makes and what the modules say, so that a world that breaks the law fails a test by
+  name, and the inventory makes the remaining work a list that can only get shorter.
+- **Revisit if** a finding turns out to be a false positive (then the audit is wrong, never the inventory widened); a kind
+  is found that the audits cannot see (law 8's honest limit: a kind nobody thought of); the profiles' towns at 120 people
+  miss a module a larger town has (then the backstop's town grows).

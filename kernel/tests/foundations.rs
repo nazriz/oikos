@@ -8,7 +8,7 @@
 //!
 //! Law 6 (who may do what is data) and law 7 (information with its keeper) are kept already and have their own tests:
 //! `statements_have_no_power.rs`, `knowing.rs` and `orchestrator/test/no-god-view.test.ts`. Law 1's money and goods are
-//! `money_conservation.rs` and `goods.rs`; what is added here is time.
+//! `money_conservation.rs` and `conservation.rs`; what is added here is time.
 
 mod common;
 
