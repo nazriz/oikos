@@ -1477,8 +1477,9 @@ The mechanism:
   them alike (a heap profile found those copies were 4.6 of 8.8 GB live at 10,000); what is left is the run's own
   (the hash's caches of canonical bytes, what people have seen, the engine, minds), and what grows past the town's
   size at 100,000's first moment is unprofiled.
-- **Where:** `docs/design/performance.md` ("What held memory"); docs/decisions.md 2026-10-25 ("SC-1: what held a
-  10,000-person month's memory"); `kernel/src/heapprof.rs`, `scripts/heapprof.ts`.
+- **Where:** `docs/design/performance.md` ("What held memory"; "Citizens' minds and memories": 85 to 43 KB a person,
+  the 10,000 month 5.10 to 4.68 GB); docs/decisions.md 2026-10-25 ("SC-1: what held a 10,000-person month's memory";
+  "Citizens' minds and memories held compactly"); `kernel/src/heapprof.rs`, `scripts/heapprof.ts`.
 - **Effect:** A study at 50,000 is possible but has no headroom; one at 100,000 rests on estimates.
 - **L / I:** medium / medium · **Status:** partly fixed: next, a heap profile of 50,000's first moment and end, then
   the hash's caches kept compressed or the first moment's looks taken in windows.

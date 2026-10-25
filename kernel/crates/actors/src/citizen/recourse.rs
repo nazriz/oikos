@@ -1625,10 +1625,10 @@ mod tests {
         let c = ctx(params.clone(), true);
         let mut p = person(&c, 0);
         tenant(&mut p);
-        p.absorbed.home_site = Some(site(10_000));
+        p.absorbed.home_site = Some(std::sync::Arc::new(site(10_000)));
         at(&mut p, &c, &pic(DAY, vec![]), |p, w| p.disrepair(w));
         assert!(p.recourse.grievances.is_empty());
-        p.absorbed.home_site = Some(site(60_000));
+        p.absorbed.home_site = Some(std::sync::Arc::new(site(60_000)));
         at(&mut p, &c, &pic(8 * DAY, vec![]), |p, w| p.disrepair(w));
         let g = &p.recourse.grievances["disrepair:landlord-1"];
         assert_eq!((g.structure.as_deref(), g.seeks.as_deref()), (Some("apts-1"), Some("repair")));
@@ -1638,14 +1638,14 @@ mod tests {
         let (out, _) = at(&mut p, &c, &pc, |p, w| p.carry_out(w, &o.intent, None));
         assert_eq!(out[0].4, json!({ "matter": "disrepair", "against": "landlord-1", "structure": "apts-1", "seeks": "repair" }));
         assert_eq!(out[0].1, "Request: please put this right (disrepair at apts-1).");
-        p.absorbed.home_site = Some(site(0));
+        p.absorbed.home_site = Some(std::sync::Arc::new(site(0)));
         at(&mut p, &c, &pic(20 * DAY, vec![]), |p, w| p.disrepair(w));
         assert!(p.recourse.grievances.is_empty());
         assert!(said(&p).iter().any(|x| x["kind"] == "ended" && x["facts"]["how"] == "repaired"));
         let off = ctx(params, false);
         let mut q = person(&off, 0);
         tenant(&mut q);
-        q.absorbed.home_site = Some(site(60_000));
+        q.absorbed.home_site = Some(std::sync::Arc::new(site(60_000)));
         at(&mut q, &off, &pic(8 * DAY, vec![]), |p, w| p.disrepair(w));
         assert!(q.recourse.grievances.is_empty());
     }
@@ -1706,7 +1706,7 @@ mod tests {
         let c = ctx(json!({ "complain_to": "town", "complain_bps": 10_000 }), true);
         let mut p = person(&c, 8_000);
         tenant(&mut p);
-        p.absorbed.home_site = Some(site(5_000));
+        p.absorbed.home_site = Some(std::sync::Arc::new(site(5_000)));
         p.absorbed.bin_seen.structure = "apts-1".into();
         p.absorbed.bin_seen.emptied_at = 0;
         let (none, _) = at(&mut p, &c, &pic(5 * DAY, vec![]), |p, w| p.complaints(w));
@@ -1724,7 +1724,7 @@ mod tests {
         let c0 = ctx(json!({ "complain_to": "town", "complain_bps": 0 }), true);
         let mut q = person(&c0, 8_000);
         tenant(&mut q);
-        q.absorbed.home_site = Some(site(5_000));
+        q.absorbed.home_site = Some(std::sync::Arc::new(site(5_000)));
         q.absorbed.bin_seen.structure = "apts-1".into();
         q.absorbed.bin_seen.emptied_at = 0;
         assert!(at(&mut q, &c0, &pic(8 * DAY, vec![]), |p, w| p.complaints(w)).0.is_empty());
