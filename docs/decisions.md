@@ -8892,6 +8892,11 @@ copies part of it); the book's indexes (about 11 KB); their home's building as l
   detector (docs/testing.md) and culture-dial.test.ts is the one alarm kept. Beside them: the book finds every record
   where it was taken in, in whatever order they come and after letting go (`common/tests.rs`); people given the same
   params but their own hold one reading (`mind/tests.rs`); `packed`'s round trip, floats to the bit.
+- **Again on main as it moved** (2e3f6277, after scale-next's cuts and foundations 2 phase 1; merged with no
+  overlap in code): the same state hash and log digest on 30-day runs of the three profiles' 1,000-person towns
+  (au-vic `2220ea75...`/`f11b3714e6ae067e`, gb-eng `dca5e9de...`/`3ed720ffc2a55ad1`, us-oh `5e799346...`/
+  `9f1f372c7269a6c2`); peak footprint 512 to 466 MB, 494 to 445, 442 to 400 (about 45 KB a person). The ignored
+  proof's pins taken again from that main.
 - **Not reached:** the owner's 50 KB a person is for the whole run; minds and memories are now about 43 KB of the 10,000
   town's 468 KB a person. The rest is the run's own (the hash's caches, knowledge, the engine, the log's buffer), the
   other SC-1 work.

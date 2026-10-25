@@ -7,7 +7,7 @@
 //!   read of all their params alone (so leaving their own members out of what is shared, and sharing it, changed nothing
 //!   anyone reads), and people given the same params but their own share one reading.
 //! - The proof of the change, run by hand (`cargo test --test mind_memory -- --ignored`): a living town of each of the
-//!   three profiles runs a month to the state hash and the log main did before the change (main at 3b87959e). These are
+//!   three profiles runs a month to the state hash and the log main did before the change (main at 2e3f6277). These are
 //!   pins, which catch any change to what a town does (docs/testing.md, "Change detectors"), so they are not run with
 //!   the others: culture-dial.test.ts is the one alarm kept. The 1,000- and 10,000-person towns were checked the same
 //!   way (the decisions entry).
@@ -90,11 +90,11 @@ fn everyones_shared_readings_of_their_params_are_what_they_would_have_read_alone
     }
 }
 
-/// (profile, final state hash, log digest), main at 3b87959e, before the change.
+/// (profile, final state hash, log digest), main at 2e3f6277, before the change.
 const MAIN: [(&str, &str, &str); 3] = [
-    ("au-vic-2026", "287f0bec6c74a32dcab1ff3ef986a903a4d788e5cff9c27ad75bba06ad1f3bef", "32d85a47870951a7"),
-    ("gb-eng-2026", "e7441b8cfef8cba2aee59ee900f56fa59a881a584598c9aa54be93c8ea013b4b", "b278b3c6dbdfe728"),
-    ("us-oh-2026", "594f08ace72fe4b759f478ae460b324dddd63502dedb11c53ffa2b47068900a4", "5c023d4efa466bc5"),
+    ("au-vic-2026", "d53a6dafedbcb5c9066f0d378e046a6b6fe05ca3ecf5408f8de42bb45fa3f7c4", "fc4ab34da461c63d"),
+    ("gb-eng-2026", "b287a219983d3006e14d399959a304a996a72c4e9750a3fcf3fab2efe34508ed", "72a8c1c2833ab669"),
+    ("us-oh-2026", "ca5fff918c582133b0550c4c4510fa672d536d888570c6a062ae878ba5379557", "5d37f0021e6a9485"),
 ];
 
 /// The log as written, less what follows from the build: the header's `"kernel":{...}`, and each entry's own `hash`
