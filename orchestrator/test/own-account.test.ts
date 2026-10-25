@@ -148,8 +148,13 @@ test("they sell to households by their own hours, draw what the business clears,
   expect(new Set(draws.map((e) => e.to)).size).toBeGreaterThan(firms.size * 0.6);
   // They take on nobody, apply for no job, and claim nothing for being out of work.
   expect(recs.filter((r) => r.kind === "job_posting" && firms.has(r.speaks_for))).toEqual([]);
-  expect(recs.filter((r) => r.kind === "job_application" && owners.has(r.speaks_for))).toEqual([]);
-  expect(recs.filter((r) => r.kind === "benefit_claim" && owners.has(r.speaks_for) && r.data?.payment === "unemployment")).toEqual([]);
+  // (While their business is in being: an owner who gives it up, weighing it each month against a job, looks for work
+  // after, docs/behaviour/entry.md, "Giving it up".)
+  const closedAt = new Map<string, number>();
+  // (When its owner gives it up: the owner's word to the business, which closes it at its next look.)
+  for (const r of recs) if (r.kind === "trading_from" && r.data?.closed && owners.has(r.speaks_for)) closedAt.set(r.speaks_for, Math.min(r.at, closedAt.get(r.speaks_for) ?? Infinity));
+  expect(recs.filter((r) => r.kind === "job_application" && owners.has(r.speaks_for) && r.at < (closedAt.get(r.speaks_for) ?? Infinity))).toEqual([]);
+  expect(recs.filter((r) => r.kind === "benefit_claim" && owners.has(r.speaks_for) && r.data?.payment === "unemployment" && r.at < (closedAt.get(r.speaks_for) ?? Infinity))).toEqual([]);
   // Nothing reaches the tax office from them: no report, nothing paid over.
   expect(recs.filter((r) => r.kind === "withholding_report" && firms.has(r.speaks_for))).toEqual([]);
   // Measured as a labour force survey counts (docs/measurement.md, "Employment"): they are employed, by the work they
@@ -159,8 +164,10 @@ test("they sell to households by their own hours, draw what the business clears,
   const [sum] = await runQuery(m, "economy/summary");
   const [work] = await runQuery(m, "economy/work");
   const n = (x: unknown) => Number(x);
-  expect(n(work!.own_account)).toBeGreaterThan(firms.size - 4);
-  expect(n(work!.own_account)).toBeLessThanOrEqual(firms.size);
+  // (Those still in being: an owner who weighed theirs and gave it up is not counted.)
+  const inBeing = firms.size - closedAt.size;
+  expect(n(work!.own_account)).toBeGreaterThan(inBeing - 4);
+  expect(n(work!.own_account)).toBeLessThanOrEqual(inBeing);
   expect(n(sum!.employed)).toBe(n(work!.employed));
   expect(n(sum!.employed)).toBeGreaterThanOrEqual(n(sum!.employed_by_agreement) + n(work!.own_account));
   expect(n(sum!.employed_by_agreement)).toBe(n(work!.employees));
