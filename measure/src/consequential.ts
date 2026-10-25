@@ -9,7 +9,7 @@
 // routine paperwork (orders of goods, supply requests, price lists, delivery notes).
 
 /** Record kinds that are never consequential by themselves: routine paperwork. */
-export const ROUTINE_KINDS = new Set(["request", "order", "delivery_note", "supply_request", "price_list", "hours_reply", "job_application", "job_posting", "interview", "rental_listing", "property_for_sale", "consultation", "office_books", "staff_report", "accounts", "petition_count", "lot", "household", "form", "practice", "teaching", "service_address", "enrolment"]);
+export const ROUTINE_KINDS = new Set(["request", "order", "delivery_note", "supply_request", "price_list", "hours_reply", "job_application", "job_posting", "interview", "premises_listing", "rental_listing", "property_for_sale", "consultation", "office_books", "staff_report", "accounts", "petition_count", "lot", "household", "form", "practice", "teaching", "service_address", "enrolment"]);
 
 /** A record kind that decides, orders, notifies, bills or answers. */
 export const CONSEQUENTIAL_KIND = /decision|order|notice|refus|answer|change|warrant|judg|fine|penalt|evict|possession|terminat|dismiss|hired|award|grant|invoice|bill|demand|arrears|debt|levy|assessment|summons|ruling|determination|redundan|stop|sanction|claim_refused|offer|agreed|restored|departure|death_notification|valuation|rates/;

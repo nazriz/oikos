@@ -616,6 +616,11 @@ impl Staffing {
         share > 0 && self.o.day_wage.unwrap_or(0) > 0 && (cx.rng("by-the-day").below(10_000) as i64) < share
     }
 
+    /// Where those we take on will work from now (premises taken on a lease: docs/behaviour/leasing.md).
+    pub fn set_workplace(&mut self, space: &str) {
+        self.o.workplace = Some(space.to_string());
+    }
+
     /// A posting: for a job on a standing wage, or (the employer's share of them) for work by the day.
     /// `openings`: how many hands it is for (one posting stays up until they are all hired: docs/design/market-realism.md, ME-2).
     fn posting(&self, cx: &mut Cx, wage: i64, account: &str, by_day: Option<bool>, openings: i64) -> Call {

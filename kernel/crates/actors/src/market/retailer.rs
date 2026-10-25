@@ -40,7 +40,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const MANIFEST: &str = include_str!("../../../../../participants/manifests/firm.retailer.json");
 /// The TS module's version (firm.retailer 0.18.0), which this one does what and more (prices from supply and demand).
-pub const VERSION: &str = "0.19.0";
+pub const VERSION: &str = "0.20.0";
 
 /// FNV-1a of who and what, for a draw that is a fact about the shop (see the module's doc).
 pub(crate) fn fact(who: &str, what: &str) -> u64 {
@@ -115,6 +115,8 @@ pub struct Params {
     /// profile's `business.home_fixed_per_month`), paid to `fixed_to` at each draw.
     pub fixed_per_month: i64,
     pub fixed_to: String,
+    /// Where shop premises to let are listed (a business of one that outgrows its owner takes a unit: docs/behaviour/leasing.md).
+    pub premises_board: String,
     pub premises_cell: String,
     pub open_from: i64,
     pub open_until: i64,
@@ -173,6 +175,7 @@ impl Params {
             draw_days: ctx.param("draw_days", 0)?,
             fixed_per_month: ctx.param("fixed_per_month", 0)?,
             fixed_to: ctx.param("fixed_to", String::new())?,
+            premises_board: ctx.param("premises_board", String::new())?,
             premises_cell: ctx.param("premises_cell", String::new())?,
             open_from: ctx.param("open_from", 0)?,
             open_until: ctx.param("open_until", 0)?,
@@ -259,6 +262,18 @@ impl From<BodyThen> for Then {
     }
 }
 
+/// Shop premises a business of one has taken on a lease (docs/behaviour/leasing.md): the lease, the unit, where it
+/// stands, and the room it has at work (its owner and those it takes on).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct Lease {
+    agreement: String,
+    space: String,
+    structure: String,
+    cell: String,
+    room: i64,
+    rent: i64,
+}
+
 /// A shop just founded, setting up.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct Setup {
@@ -322,6 +337,13 @@ pub struct Shop<B: Body> {
     suppliers: BTreeSet<String>,
     next_trade_look: i64,
     next_rival_look: i64,
+    /// The premises we lease, once taken; the listing we have applied for, and when; when we next look at what is to let.
+    #[serde(default)]
+    lease: Option<Lease>,
+    #[serde(default)]
+    premises_applied: Option<(String, i64)>,
+    #[serde(default)]
+    next_premises_look: i64,
     unit_cost: i64,
     /// Worker -> seconds worked today.
     used: BTreeMap<String, i64>,
@@ -389,6 +411,9 @@ impl<B: Body> Shop<B> {
             suppliers: p.suppliers.iter().cloned().collect(),
             next_trade_look: 0,
             next_rival_look: 0,
+            lease: None,
+            premises_applied: None,
+            next_premises_look: 0,
             unit_cost: 0,
             used: BTreeMap::new(),
             used_day: -1,
@@ -454,11 +479,15 @@ impl<B: Body> Shop<B> {
     }
 
     fn premises_of(&self, pic: &Picture) -> Option<(String, String, String)> {
-        sites(pic).find_map(|c| c.structure.as_ref().filter(|s| s.structure == self.p.premises).map(|s| (s.structure.clone(), s.structure_type.clone(), c.cell.clone())))
+        sites(pic).find_map(|c| c.structure.as_ref().filter(|s| s.structure == self.at.premises).map(|s| (s.structure.clone(), s.structure_type.clone(), c.cell.clone())))
     }
 
     /// Room in our workplace: its capacity less our staff, or the bodies in it now if more.
     fn room_at_work(&self, pic: &Picture, staff: i64) -> i64 {
+        // (Premises we lease: their room, less the owner and those we have.)
+        if let (Some(l), Some(_)) = (&self.lease, &self.p.operator) {
+            return (l.room - 1 - staff).max(0);
+        }
         let sp = sites(pic).find(|c| c.structure.as_ref().is_some_and(|s| s.structure == self.p.premises)).and_then(|c| c.structure.as_ref().and_then(|s| s.spaces.iter().find(|x| x.kind == "workplace").cloned()));
         match sp {
             Some(sp) => i64::from(sp.capacity) - i64::from(sp.count).max(staff),
@@ -471,7 +500,12 @@ impl<B: Body> Shop<B> {
         let tod = t.rem_euclid(DAY);
         if let Some(op) = &self.p.operator {
             let open = self.p.open_until == 0 || (self.p.work_day(t) && tod >= self.p.open_from && tod < self.p.open_until);
-            return if open { vec![op.clone()] } else { vec![] };
+            // (In premises we lease, those we have taken on work beside the owner, in their hours.)
+            let mut here = if open { vec![op.clone()] } else { vec![] };
+            if open && self.lease.is_some() {
+                here.extend(workers.iter().filter(|w| *w != op).cloned());
+            }
+            return here;
         }
         if self.p.open_until > 0 && !(self.p.work_day(t) && tod >= self.p.open_from && tod < self.p.open_until) {
             return vec![];
@@ -488,6 +522,111 @@ impl<B: Body> Shop<B> {
             }
         }
         here.into_iter().collect()
+    }
+
+    /// Whether premises to let would pay us better than trading alone (docs/behaviour/leasing.md): the custom we had and
+    /// turned away last month, served by as many hands as it needs within a unit's room, each paid the going wage, less
+    /// the unit's rent and our running costs, against what the owner alone serves. The best that beats it, and that we
+    /// have the deposit, a month's rent and a month's wages for, is applied for.
+    fn apply_for_premises(&mut self, t: i64, balance: i64, account: &str, money: &dyn Fn(i64) -> String) -> Option<Step<Then>> {
+        let wanted = self.last_demand + self.last_turned_away;
+        let hpwm = self.p.hours_per_worker_month();
+        let serve = self.p.serve_labour.max(1);
+        let per_worker = (hpwm * self.p.utilisation_bps / 10_000 / serve).max(1);
+        let alone = (hpwm / serve).max(1);
+        let margin = (self.price - self.unit_cost).max(0);
+        let wage_m = self.wage * MONTH / self.p.period.max(1);
+        let now = wanted.min(alone) * margin - self.p.fixed_per_month;
+        let mut best: Option<(i64, std::sync::Arc<oikos_sight::Record>, i64, i64)> = None;
+        for l in self.book.open("premises_listing") {
+            let d = data(l);
+            let (rent, room, deposit) = (d.i("rent").unwrap_or(0), d.i("room").unwrap_or(0), d.i("deposit").unwrap_or(0));
+            if room < 1 || rent <= 0 {
+                continue;
+            }
+            let (with, hands) = premises_pay(wanted, per_worker, margin, wage_m, rent + self.p.fixed_per_month, room);
+            if with > now && balance >= deposit + rent + (hands - 1) * wage_m && best.as_ref().is_none_or(|b| with > b.0) {
+                best = Some((with, l.clone(), hands, deposit));
+            }
+        }
+        let (with, l, hands, deposit) = best?;
+        let landlord = l.speaks_for.clone()?;
+        let me = self.me.clone();
+        self.premises_applied = Some((l.id.clone(), t));
+        let space = data(&l).s("space").unwrap_or_default().to_string();
+        Some(because(
+            format!(
+                "We turned {} customers' items away last month: premises {space} at {} a month, with {} hand(s) beside our owner, would leave us {} a month against {} alone. Applying to lease it (a deposit of {}).",
+                self.last_turned_away,
+                money(data(&l).i("rent").unwrap_or(0)),
+                hands - 1,
+                money(with),
+                money(now),
+                money(deposit)
+            ),
+            vec![say(
+                "rental_application",
+                &format!("Application to lease the premises {space}."),
+                Say { to: Some(vec![landlord.clone()]), visible: Some(Visible::Only(vec![me.clone(), landlord])), basis: Some(l.id.clone()), data: Some(json!({ "listing": l.id, "account": account, "premises": true })), ..Default::default() },
+            )],
+        ))
+    }
+
+    /// The lease offered for premises we applied for: signed, the deposit paid as we sign, the rent by standing order,
+    /// our stock taken there, and our owner told we trade from there now (docs/behaviour/leasing.md). An application with
+    /// no offer in a month is let go.
+    fn take_premises(&mut self, t: i64, account: &str, stock: i64, cx: &Cx) -> Vec<Step<Then>> {
+        let Some((listing, at)) = self.premises_applied.clone() else { return vec![] };
+        let me = self.me.clone();
+        let Some(l) = self.book.get(&listing).cloned() else {
+            self.premises_applied = None;
+            return vec![];
+        };
+        let landlord = l.speaks_for.clone().unwrap_or_default();
+        let offered = self
+            .book
+            .of_type("agreement")
+            .filter(|a| a.at >= at && !self.book.signed_by(&a.id, &me) && !self.book.concluded(&a.id) && matches!(&a.body, oikos_sight::RecordBody::Agreement { terms } if terms.template.as_deref() == Some("lease") && terms.parties.first() == Some(&landlord) && terms.parties.contains(&me)))
+            .last()
+            .cloned();
+        let Some(a) = offered else {
+            if t - at > 30 * DAY {
+                self.premises_applied = None;
+            }
+            return vec![];
+        };
+        let d = data(&l);
+        let (space, structure, cell) = (d.s("space").unwrap_or_default().to_string(), d.s("structure").unwrap_or_default().to_string(), d.s("cell").unwrap_or_default().to_string());
+        let room = d.i("room").unwrap_or(1);
+        let deposit = d.i("deposit").unwrap_or(0);
+        let lt = crate::papers::agreements::lease_terms(&a, &me);
+        let Some(rent_to) = lt.rent_to.clone() else { return vec![] };
+        let mut calls = vec![crate::papers::agreements::sign(&a.id)];
+        if deposit > 0 {
+            calls.push(pay(&rent_to, deposit, Pay { from: Some(account.to_string()), basis: Some(a.id.clone()), for_: Some(format!("Security deposit under lease {}.", a.id)), ..Default::default() }, cx));
+        }
+        calls.push(pay(&rent_to, lt.rent, Pay { from: Some(account.to_string()), every: Some(MONTH), first: Some(0), basis: Some(a.id.clone()), for_: Some(format!("Rent for {space}, monthly in advance.")), ..Default::default() }, cx));
+        if stock > 0 && structure != self.at.premises {
+            calls.push(call("goods", vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&structure))), ("from_at", Some(arg(&self.at.premises)))]));
+        }
+        if let Some(op) = self.p.operator.clone() {
+            calls.push(say(
+                "trading_at",
+                &format!("We trade from {space} now, on a lease: work there."),
+                Say { to: Some(vec![op.clone()]), visible: Some(Visible::Only(vec![me.clone(), op])), basis: Some(a.id.clone()), data: Some(json!({ "space": space, "structure": structure, "cell": cell, "rent": lt.rent, "until": self.book.ends_at(&a.id).unwrap_or(t + 60 * MONTH) })), ..Default::default() },
+            ));
+        }
+        self.lease = Some(Lease { agreement: a.id.clone(), space: space.clone(), structure: structure.clone(), cell: cell.clone(), room, rent: lt.rent });
+        self.premises_applied = None;
+        self.at.premises = structure;
+        self.at.workplace = space.clone();
+        if !cell.is_empty() {
+            self.at.cell = cell;
+        }
+        self.at.nowhere = false;
+        self.published_price = -1;
+        self.body.set_workplace(&space);
+        vec![because(format!("{landlord} offers us a lease of {space} at {} a month: signing it, paying the deposit and the rent, and moving our stock there.", money_words(lt.rent, &cx.ctx.world)), calls)]
     }
 
     fn found(&self, pic: &Picture, channel: &str) -> Option<Vec<String>> {
@@ -710,6 +849,11 @@ impl<B: Body> Plan for Shop<B> {
         if !self.p.rivals_board.is_empty() && self.setup.ready && pic.t >= self.next_rival_look {
             self.next_rival_look = pic.t + 30 * DAY;
             looks.push(ask::board(&self.p.rivals_board, self.p.search_limit, vec![cond("kind", "=", json!("price_list"))], None));
+        }
+        // (A business of one that turned customers away last month: what premises are to let, cheapest first.)
+        if self.p.operator.is_some() && !self.p.premises_board.is_empty() && self.lease.is_none() && self.last_turned_away > 0 && pic.t >= self.next_premises_look {
+            self.next_premises_look = pic.t + 30 * DAY;
+            looks.push(ask::board(&self.p.premises_board, self.p.search_limit, vec![], Some(("data.rent", false))));
         }
         if !self.p.sale_board.is_empty() && !self.setup.ready && self.setup.capital_called && self.setup.asked != pic.t {
             self.setup.asked = pic.t;
@@ -960,12 +1104,15 @@ impl<B: Body> Shop<B> {
             // (a new shop starts by hiring its minimum)
             self.headcount = if operator { 0 } else { (workers.len() as i64).max(self.p.min_staff) };
         }
-        let hands_bps: i64 = if operator { 10_000 } else { workers.iter().map(|w| self.body.hours_bps(w, t)).sum() };
+        let leased = operator && self.lease.is_some();
+        let hands_bps: i64 = if operator { 10_000 + if leased { workers.iter().filter(|w| Some(w.as_str()) != self.p.operator.as_deref()).map(|w| self.body.hours_bps(w, t)).sum::<i64>() } else { 0 } } else { workers.iter().map(|w| self.body.hours_bps(w, t)).sum() };
         if self.month_start < 0 {
             self.month_start = acct.balance;
         }
         // (Its owner has moved home: it trades from there now, and takes its stock along.)
         let moves: Vec<_> = if operator { self.book.all("trading_from").cloned().collect() } else { vec![] };
+        // (Once we trade from premises we lease, the owner's moving home moves nothing of ours; their giving up still closes us.)
+        let moves: Vec<_> = if self.lease.is_some() { moves.into_iter().filter(|r| data(r).flag("closed")).collect() } else { moves };
         while self.at.read < moves.len() {
             let r = &moves[self.at.read];
             self.at.read += 1;
@@ -999,6 +1146,9 @@ impl<B: Body> Shop<B> {
             self.at.workplace = d.s("space").unwrap_or_default().to_string();
             self.at.cell = d.s("cell").map(str::to_string).unwrap_or_else(|| self.at.cell.clone());
             self.at.nowhere = false;
+        }
+        if operator && self.lease.is_none() {
+            steps.extend(self.take_premises(t, &acct.account, held(pic, &self.at.premises, &self.p.kind), cx));
         }
         let stock = held(pic, &self.at.premises, &self.p.kind);
         if trading {
@@ -1106,7 +1256,14 @@ impl<B: Body> Shop<B> {
             let expected = self.expectation.expect(self.last_demand);
             let hpwm = self.p.hours_per_worker_month();
             let needed = if operator {
-                0
+                // (A business of one in premises it leases: those its trade needs beside its owner, up to its room.)
+                match &self.lease {
+                    Some(l) => {
+                        let all = (expected * self.p.serve_labour * 10_000 + hpwm * self.p.utilisation_bps - 1).div_euclid((hpwm * self.p.utilisation_bps).max(1));
+                        (all - 1).clamp(0, (l.room - 1).max(0))
+                    }
+                    None => 0,
+                }
             } else {
                 // (What systems of ours do, our people need not: docs/behaviour/automation.md.)
                 let people_units = expected - self.system_units(expected);
@@ -1158,16 +1315,27 @@ impl<B: Body> Shop<B> {
                 paid
             };
             self.month_start = acct.balance - paid;
+            // A business of one whose owner turned customers away: whether premises to let would pay, with the hands its
+            // trade needs (docs/behaviour/leasing.md).
+            if operator && self.lease.is_none() && self.premises_applied.is_none() && self.last_turned_away > 0 {
+                if let Some(st) = self.apply_for_premises(t, acct.balance, &acct.account, &money) {
+                    steps.push(st);
+                }
+            }
         }
 
         // ---- staff, the bank, the union, debts: the body's routine ----
         let months = self.body.months_in_hand(&self.book);
         let can_post = trading
-            && !operator
+            && (!operator || leased)
             && acct.balance >= months * ((workers.len() as i64 + 1) * self.wage * MONTH / self.p.period)
             && self.room_at_work(pic, workers.len() as i64) > 0;
-        let postable = trading && !operator && self.room_at_work(pic, workers.len() as i64) > 0;
-        let want = Want { target: if trading && !operator { self.p.max_staff.min(self.headcount) } else { 0 }, wage: self.wage, can_post, postable, headcount: self.headcount, headcount_why: self.headcount_why.clone() };
+        let postable = trading && (!operator || leased) && self.room_at_work(pic, workers.len() as i64) > 0;
+        let most = match (&self.lease, operator) {
+            (Some(l), true) => (l.room - 1).max(0),
+            _ => self.p.max_staff,
+        };
+        let want = Want { target: if trading && (!operator || leased) { most.min(self.headcount) } else { 0 }, wage: self.wage, can_post, postable, headcount: self.headcount, headcount_why: self.headcount_why.clone() };
         // (What a day without our work costs in sales, and the share of our work that systems do: the employer's side of bargaining.)
         let system_bps = if self.last_demand > 0 { ((self.system_units(self.last_demand) * 10_000 * 2 + self.last_demand) / (2 * self.last_demand)).clamp(0, 10_000) } else { 0 };
         let house = House { pic, book: &self.book, acct: &acct, want, trading, workers: workers.len(), operator, takings_per_day: self.takings.per_day(t), system_bps };
@@ -1344,7 +1512,9 @@ impl<B: Body> Shop<B> {
                 let top = (self.p.lengnick.phi_high_bps * self.p.stock_for(self.last_demand) + 9999).div_euclid(10_000);
                 let least = offers.first().map_or(0, |o| o.min);
                 let unit = self.unit_cost.max(offers.first().map_or(0, |o| o.unit));
-                let keep = (top.max(least) * unit * 11 + 9).div_euclid(10) + self.payables.owing();
+                // (In premises we lease: the month's rent and a pay period's wages are kept too, before anything is the owner's.)
+                let leased_keep = self.lease.as_ref().map_or(0, |l| l.rent + self.body.workers(&self.book, t).len() as i64 * self.wage);
+                let keep = (top.max(least) * unit * 11 + 9).div_euclid(10) + self.payables.owing() + leased_keep;
                 // (What running it costs beside its stock, the profile's: registration or licence, and the like, paid
                 // for the period, before anything is the owner's: docs/behaviour/entry.md, "What a business costs".)
                 let running = (self.p.fixed_per_month * self.p.draw_days * DAY).div_euclid(MONTH).min(acct.balance.max(0));
@@ -1499,6 +1669,16 @@ impl<B: Body> Shop<B> {
 }
 
 /// The actor: the shop's plan, run as an office's steps, with its body's beliefs for the truth audits.
+/// What premises would leave a business of one a month (docs/behaviour/leasing.md): the custom it wants served by as
+/// many hands as it needs (`per_worker` units a month each) within the unit's room, owner included, each hand beside
+/// the owner paid `wage_month`, less the unit's costs a month. With the hands that takes.
+pub fn premises_pay(wanted: i64, per_worker: i64, margin: i64, wage_month: i64, costs: i64, room: i64) -> (i64, i64) {
+    let per_worker = per_worker.max(1);
+    let hands = ((wanted + per_worker - 1) / per_worker).clamp(1, room.max(1));
+    let units = wanted.min(hands * per_worker);
+    (units * margin - (hands - 1) * wage_month - costs, hands)
+}
+
 pub struct ShopActor<B: Body>(Stepper<Shop<B>>);
 
 impl<B: Body> Actor for ShopActor<B> {

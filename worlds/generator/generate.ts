@@ -647,6 +647,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // time serves (so its price follows from its labour share), and which kind each shop sells. `goods` stands for what the factories make.
   // What running a business of one costs a month beside its stock (registration, a licence and the like), the profile's,
   // paid to the outside world (docs/behaviour/entry.md, "What a business costs"; risk ME-1). None: nothing.
+  // Where a business of one finds shop premises to let, where the town has any (docs/behaviour/leasing.md).
+  const PREMISES_BOARD = V.commercial && landlords.length && Math.round((shops.length * V.commercial.vacant_bps) / Math.max(1, 10_000 - V.commercial.vacant_bps)) > 0
+    ? { channels: [K.board("premises", ["premises_listing"], { title: "Shop premises to let" })], params: { premises_board: "premises" } } : { channels: [] as any[], params: {} };
   const HOME_FIXED: { fixed_per_month?: number; fixed_to?: string } = V.business?.home_fixed_per_month ? { fixed_per_month: V.business.home_fixed_per_month, fixed_to: "acc-outside" } : {};
   const MIX: ShopKind[] | undefined = spec.shop_mix !== false && hasShopTable(V) ? shopMix(V, shops.length, { price: RETAIL_PRICE, wholesale: WORLD.goods_import }, (SERVE * hourly(wages.shop)) / HOUR) : undefined;
   const KIND_OF = new Map<string, ShopKind | undefined>();
@@ -928,6 +931,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // last of the town's, so that every other building stands where it did (a shifted lot put a school on the river's flood plain).
   const officesLot = site();
   structures.push({ id: "town-offices", at: cellOf.get(officesLot), type: "offices", built_by: "builder" });
+  // Shop premises to let (docs/behaviour/leasing.md): beside the town's shops, the profile's share of units standing empty,
+  // each on a lot of a landlord's, who lets it (taken after every other lot, so that nothing else moves).
+  const CM = V.commercial;
+  const LET_UNITS = CM && landlords.length ? Math.round((shops.length * CM.vacant_bps) / Math.max(1, 10_000 - CM.vacant_bps)) : 0;
+  for (let i = 0; i < LET_UNITS; i++) {
+    const lot = site();
+    structures.push({ id: `unit-${i + 1}`, at: cellOf.get(lot), type: "shop-unit", built_by: "builder" });
+    own(lot, landlords[i % landlords.length]!);
+  }
   for (const lot of [...roadLots].sort()) structures.push({ id: `road-${lot.slice(4)}`, at: cellOf.get(lot), type: "road", built_by: "builder" });
   for (const p of parcels) if (!titleOf.has(p.id)) own(p.id, "city");
   // ---- elections: the electors enrolled at the start, and the law that has them elect the mayor (world-expansion 3) ----
@@ -2115,6 +2127,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       spaces: [{ kind: "dwelling", count: 1, capacity: capacityFor(h.bedrooms), attrs: { bedrooms: h.bedrooms } }] })),
     { id: "apartments", category: "residential", materials: { materials: kg(1_000) }, build_labour: 36_000 * HOUR, demolition_labour: 2_000 * HOUR, build_time: 180 * DAY, footprint: { w: 1, h: 1 },
       spaces: units.map((u) => ({ kind: "dwelling", count: u.count, capacity: capacityFor(u.bedrooms), attrs: { bedrooms: u.bedrooms } })) },
+    // (An empty unit to let: room for as many staff as the town's largest shop of goods, the kind a trader would take it for.)
+    ...(LET_UNITS ? [{ id: "shop-unit", category: "commercial", materials: { materials: kg(250) }, build_labour: 8_000 * HOUR, demolition_labour: 500 * HOUR, build_time: 90 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: Math.max(2, ...shopTypes.map((t) => t.capacity)) }], ...(spec.life === false ? {} : { injury_bps: INJURY.shop }) }] : []),
     ...shopTypes.map((t) => ({ id: t.id, category: "commercial", materials: { materials: kg(250) }, build_labour: 8_000 * HOUR, demolition_labour: 500 * HOUR, build_time: 90 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: t.capacity }], ...(spec.life === false ? {} : { injury_bps: INJURY.shop }) })),
     { id: "factory", category: "industrial", materials: { materials: kg(1_600) }, build_labour: 50_000 * HOUR, demolition_labour: 3_000 * HOUR, build_time: 240 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 40 }], ...(spec.life === false ? {} : { injury_bps: INJURY.factory }) },
     { id: "yard", category: "industrial", materials: { materials: kg(30) }, build_labour: 1_000 * HOUR, demolition_labour: 100 * HOUR, build_time: 30 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: CREW.capacity }], ...(spec.life === false ? {} : { injury_bps: INJURY.factory }) },
@@ -2756,7 +2770,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // (Its titles are its own papers, through `mine`; the plan of each lot it looks up in the register. It sees its
       // own buildings and who lives in them; with no land, no building.)
       lotPlans, ...(theirCells.length ? [K.premises("own-sites", theirCells)] : []), deaths, lawBook],
-      code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, outside_account: "acc-outside",
+      code("firm.landlord", { ...(CM && LET_UNITS ? { commercial: { rent: CM.rent_per_month, deposit_months: CM.deposit_months, term_months: CM.term_months, notice_days: CM.notice_days } } : {}), base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, outside_account: "acc-outside",
         city: "city", city_account: "acc-city", builder: "builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000, register: { lots: "lots" },
         // (Whom it will let to: no more people to a bedroom than the place's own standard has, where the profile states one.)
         ...(H.occupancy ? { max_people_per_bedroom: H.occupancy.per_bedroom } : {}),
@@ -2798,8 +2812,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // alone. It sees its own books, papers and stock, its supplier's prices and what producers advertise to the trade.
   // (It is shown no ground: a home or a market is not one business's premises. Its owner knows where they are.)
   for (const b of ownBusinesses) positions.push({ id: `${b.firm}-owner`, entity: b.firm, title: "Owner", holder: `${b.person}-self`,
-    channels: [{ id: "books", kind: "accounts" }, mine(), market("outside"), shopBoards[0], { id: "stock", kind: "holdings" }],
-    role_module: { code: "firm.retailer", params: { premises: b.premises, workplace: b.space, operator: b.person, ...HOME_FIXED, max_staff: 0, min_staff: 0, industry: "retail", wage: wages.shop, period: PAY, working_day: WORKING_DAY,
+    channels: [{ id: "books", kind: "accounts" }, mine(), market("outside"), shopBoards[0], { id: "stock", kind: "holdings" }, ...PREMISES_BOARD.channels],
+    role_module: { code: "firm.retailer", params: { premises: b.premises, workplace: b.space, operator: b.person, ...HOME_FIXED, ...PREMISES_BOARD.params, max_staff: 0, min_staff: 0, industry: "retail", wage: wages.shop, period: PAY, working_day: WORKING_DAY,
       serve_task: "sell", serve_labour: SHOP.serve, suppliers: ["outside"], trade_board: "trade", price: RETAIL_PRICE, demand: OWN.sales, shopfront: true, premises_cell: b.cell, ...(RD && b.space.startsWith(`${MARKET}/`) ? { open_from: RD.work_start_hour * HOUR, open_until: RD.work_end_hour * HOUR } : {}), stock_days: b.days, draw_days: V.pay_period_days, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } } });
   const ownWorkOf = new Map(ownBusinesses.map((b) => [b.person, { firm: b.firm, account: `acc-${b.firm}`, ...(b.space.startsWith(`${MARKET}/`) ? { at: b.space } : { home: b.space }), expect_per_month: OWN.monthly }]));
   // Citizens see petitions and their published counts, not each other's signatures.
@@ -2871,8 +2885,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // world publishes for what it sells in.
   const ownCapital = 2 * Math.ceil((Math.max(Math.ceil((OWN_NEW.sales * 7) / 30), WHOLESALE_LEAST) * WORLD.goods_import * 11) / 10);
   const ownVenture = { kind: "own_account", name: "Trading from home", own: true, expect_per_month: OWN_NEW.monthly, capital: ownCapital, unit_cost: WORLD.goods_import, ...(HOME_FIXED.fixed_per_month ? { fixed_per_month: HOME_FIXED.fixed_per_month } : {}),
-    channels: [{ id: "books", kind: "accounts" }, mine(), market("outside"), shopBoards[0], { id: "stock", kind: "holdings" }],
-    role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{home}", operator: "{founder}", founder: "{founder}", capital: "{capital}", bank: "bank", ...HOME_FIXED, max_staff: 0, min_staff: 0, industry: "retail",
+    channels: [{ id: "books", kind: "accounts" }, mine(), market("outside"), shopBoards[0], { id: "stock", kind: "holdings" }, ...PREMISES_BOARD.channels],
+    role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{home}", operator: "{founder}", founder: "{founder}", capital: "{capital}", bank: "bank", ...HOME_FIXED, ...PREMISES_BOARD.params, max_staff: 0, min_staff: 0, industry: "retail",
       wage: wages.shop, period: PAY, working_day: WORKING_DAY, serve_task: "sell", serve_labour: SHOP.serve, suppliers: ["outside"], trade_board: "trade", price: RETAIL_PRICE, demand: OWN_NEW.sales, shopfront: true,
       premises_cell: "{cell}", stock_days: 7, draw_days: V.pay_period_days, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } } };
   const citizenController = code("citizen.default", { outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,

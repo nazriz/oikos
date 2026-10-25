@@ -213,6 +213,11 @@ export interface Profile {
         seller?: { wholesale_bps?: number; labour_bps?: number; business_share_bps?: number; occupation?: string; wage_vs_shop_bps?: number } }[] } };
     /** An adult's savings (cash and deposits), by age: percentiles 10, 25, 50, 75, 90 (cents). */
     savings_by_age?: { from: number; pct: [number, number, number, number, number] }[];
+    /** Shop premises to let (docs/behaviour/leasing.md; risk ME-1): `vacant_bps`, the share of a place's shop units that
+     * stand empty (the town opens with that share of empty units beside its shops, let by its landlords); a lease's
+     * `rent_per_month` for a small unit, its `deposit_months` (a security deposit, held and given back at the end),
+     * `term_months` and the `notice_days` either side gives at its end. Each with its source; left out, no premises to let. */
+    commercial?: { vacant_bps: number; rent_per_month: number; deposit_months: number; term_months: number; notice_days: number };
     /** How savings lean on pay (risk ME-17; docs/design/market-realism.md): the rank correlation of income and wealth
      * once age is accounted for (basis points), from a wealth survey. A person's savings are drawn from their age's
      * distribution at a rank that leans on their pay's rank by it. Left out: drawn on their own, as before. */

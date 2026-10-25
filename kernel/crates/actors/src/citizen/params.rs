@@ -269,6 +269,9 @@ pub struct OwnWork {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub home: Option<String>,
     pub expect_per_month: i64,
+    /// Premises it leases, as it told us: the rent a month, and when the lease ends (we stay bound by it until then).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lease: Option<(i64, i64)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

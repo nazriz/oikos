@@ -120,6 +120,15 @@ struct Possession {
     warrant_fee: Option<i64>,
 }
 
+/// Shop premises we let (docs/behaviour/leasing.md; risk ME-1): the profile's terms for a small unit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Commercial {
+    rent: i64,
+    deposit_months: i64,
+    term_months: i64,
+    notice_days: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Repair {
     builder: String,
@@ -168,6 +177,7 @@ struct Params {
     city_account: Option<String>,
     outside_account: Option<String>,
     shop_accounts: Vec<String>,
+    commercial: Option<Commercial>,
 }
 
 impl Params {
@@ -213,6 +223,7 @@ impl Params {
             city_account: ctx.param("city_account", None)?,
             outside_account: ctx.param("outside_account", None)?,
             shop_accounts: ctx.param("shop_accounts", vec![])?,
+            commercial: ctx.param("commercial", None)?,
         })
     }
     fn review(&self) -> Review {
@@ -492,6 +503,9 @@ struct Owned {
     type_: String,
     space: String,
     bedrooms: Option<i64>,
+    /// Where it stands (premises: for a tenant to know where to put its sign up).
+    #[serde(default)]
+    cell: Option<String>,
 }
 
 /// What a step does when it is made again for the moment it is sent (a date counts from when the notice is on the
@@ -542,6 +556,12 @@ struct Office {
     org: Option<Org<ArrearsWants>>,
     plan_asked: Asked,
     owned: Vec<Owned>,
+    /// Shop premises of ours to let (workplaces in our buildings), where the world gives us terms for them.
+    #[serde(default)]
+    premises: Vec<Owned>,
+    /// Premises leases whose deposit we have given back.
+    #[serde(default)]
+    deposits_returned: BTreeSet<String>,
     /// tenant account -> each payment received, and when
     received: BTreeMap<String, Vec<(i64, i64)>>,
     /// a lease we've offered to renew -> when its term ends (the new one's rent runs from then)
@@ -603,6 +623,8 @@ impl Office {
             org: None,
             plan_asked: Asked::default(),
             owned: vec![],
+            premises: vec![],
+            deposits_returned: BTreeSet::new(),
             received: BTreeMap::new(),
             renews_at: BTreeMap::new(),
             notice_given: BTreeMap::new(),
@@ -870,14 +892,21 @@ impl Plan for Office {
         let own_cells: BTreeSet<String> = own_lots.iter().flat_map(|l| cells_of(&self.book, l).into_iter().map(String::from)).collect();
         let sites: Vec<&SiteCell> = site_cells(pic).into_iter().filter(|c| own_cells.contains(&c.cell)).collect();
         let mut owned = vec![];
+        let mut premises = vec![];
         let mut seen_structures = BTreeSet::new();
         for site in &sites {
             let Some(st) = site.structure.as_ref().filter(|s| s.complete && seen_structures.insert(s.structure.clone())) else { continue };
             for sp in st.spaces.iter().filter(|sp| sp.kind == "dwelling") {
-                owned.push(Owned { structure: st.structure.clone(), type_: st.structure_type.clone(), space: sp.space.clone(), bedrooms: sp.attrs.as_ref().and_then(|a| a.get("bedrooms")).and_then(Value::as_i64) });
+                owned.push(Owned { structure: st.structure.clone(), type_: st.structure_type.clone(), space: sp.space.clone(), bedrooms: sp.attrs.as_ref().and_then(|a| a.get("bedrooms")).and_then(Value::as_i64), cell: None });
+            }
+            if self.p.commercial.is_some() {
+                for sp in st.spaces.iter().filter(|sp| sp.kind == "workplace") {
+                    premises.push(Owned { structure: st.structure.clone(), type_: st.structure_type.clone(), space: sp.space.clone(), bedrooms: Some(i64::from(sp.capacity)), cell: Some(site.cell.clone()) });
+                }
             }
         }
         self.owned = owned;
+        self.premises = premises;
         // Our leases: in force, or offered by us and still awaiting the tenant's signature (up to a month). Both hold a
         // unit; counting only signed ones would let the same home twice.
         let leases: Vec<Arc<Record>> = self
@@ -886,6 +915,10 @@ impl Plan for Office {
             .filter(|r| matches!(&r.body, RecordBody::Agreement { terms } if terms.template.as_deref() == Some("lease") && terms.parties.first() == Some(&me)) && self.book.signed_by(&r.id, &me))
             .cloned()
             .collect();
+        // (A lease of shop premises is not a home's: the law on a home's tenancy, its reviews and its possession do not
+        // reach it. It is dealt with on its own terms, below.)
+        let premises_spaces: BTreeSet<String> = self.premises.iter().map(|o| o.space.clone()).collect();
+        let (premises_leases, leases): (Vec<Arc<Record>>, Vec<Arc<Record>>) = leases.into_iter().partition(|a| lease_terms(a, tenant_of(a, &me)).space.is_some_and(|s| premises_spaces.contains(&s)));
         let awaiting: Vec<Arc<Record>> = leases.iter().filter(|a| !self.book.concluded(&a.id) && t - a.at < MONTH).cloned().collect();
         let active: Vec<Arc<Record>> = leases.iter().filter(|a| self.book.in_force(&a.id)).cloned().collect();
         // The rent book is gone through once a week of our own: at our first look in it, which is our own day and hour
@@ -898,6 +931,7 @@ impl Plan for Office {
         let mut let_now: BTreeSet<String> = BTreeSet::new();
         let mut offered_now: Vec<String> = vec![];
         self.letting(cx, &e, &mut steps, &mut let_now, &mut offered_now);
+        self.premises_letting(cx, &e, &premises_leases, &mut steps);
         self.renewals(cx, &e, &mut steps);
         self.listings(cx, &e, &mut steps, &let_now, &offered_now);
         self.deaths(cx, &e, &sites, &mut steps);
@@ -1043,7 +1077,8 @@ impl Office {
     /// Applications: pick one at random per listing, offer a lease, withdraw the listing.
     fn letting(&mut self, cx: &mut Cx, e: &Env, steps: &mut Vec<Step<Then>>, let_now: &mut BTreeSet<String>, offered_now: &mut Vec<String>) {
         let me = self.me.clone();
-        let apps: Vec<Arc<Record>> = self.book.open("rental_application").filter(|a| crate::common::addressed_to(a).contains(&me) && !self.handled.contains(&a.id)).cloned().collect();
+        let is_premises = |b: &Book, a: &Record| data(a).s("listing").and_then(|l| b.get(l)).is_some_and(|l| data(l).flag("premises"));
+        let apps: Vec<Arc<Record>> = self.book.open("rental_application").filter(|a| crate::common::addressed_to(a).contains(&me) && !self.handled.contains(&a.id) && !is_premises(&self.book, a)).cloned().collect();
         let mut by_listing: Vec<(String, Vec<Arc<Record>>)> = vec![];
         for a in apps {
             let l = data(&a).s("listing").unwrap_or("").to_string();
@@ -1107,6 +1142,132 @@ impl Office {
                 vec![bound("lease", offer(&tenant, o)), line(withdraw(&listing_id, Some("Let.")))],
             ));
             offered_now.push(space);
+        }
+    }
+
+    /// Shop premises (docs/behaviour/leasing.md): a unit of ours with no lease on it is listed to let at the profile's
+    /// rent for one (or what our other units let for), and a month unlet brings the asking rent down as a home's does; a
+    /// business that applies is offered a lease on the profile's terms, the first to apply first (a landlord takes the
+    /// first tenant who can sign; nothing is drawn): the rent monthly, the term, the notice either side, and a security
+    /// deposit of so many months' rent, paid as the tenant signs and given back when the lease has ended.
+    fn premises_letting(&mut self, cx: &mut Cx, e: &Env, leases: &[Arc<Record>], steps: &mut Vec<Step<Then>>) {
+        let Some(c) = self.p.commercial.clone() else { return };
+        let me = self.me.clone();
+        let t = e.t;
+        let space_of = |a: &Record| lease_terms(a, tenant_of(a, &me)).space;
+        let held = |space: &str| leases.iter().any(|a| space_of(a).as_deref() == Some(space) && (self.book.in_force(&a.id) || (!self.book.concluded(&a.id) && t - a.at < MONTH)));
+        let open: Vec<Arc<Record>> = self.book.open("premises_listing").filter(|l| l.speaks_for.as_deref() == Some(me.as_str())).cloned().collect();
+        let going: Vec<i64> = leases.iter().filter(|a| self.book.in_force(&a.id)).map(|a| self.rent_at(a, t)).collect();
+        let reference = if going.is_empty() { c.rent } else { going.iter().sum::<i64>() / going.len() as i64 };
+        let listing = |o: &Owned, rent: i64, cx: &Cx| -> Call {
+            let deposit = rent * c.deposit_months;
+            let room = o.bedrooms.unwrap_or(0);
+            let terms = json!({ "template": "lease", "commitments": [
+                { "who": me, "does": { "outcome": { "occupancy": { "in": o.space } } } },
+                { "who": "taker", "does": { "outcome": { "money": { "to": e.account, "amount": rent.to_string(), "for": "rent" } } }, "every": MONTH } ] });
+            say(
+                "premises_listing",
+                &format!(
+                    "Shop premises to let: {}, room for {room} at work, {} a month, on a lease of {} months, with a security deposit of {} paid on signing and given back at the end.",
+                    o.space,
+                    money_words(rent, &cx.ctx.world),
+                    c.term_months,
+                    money_words(deposit, &cx.ctx.world)
+                ),
+                Say {
+                    data: Some(json!({ "structure": o.structure, "space": o.space, "type": o.type_, "cell": o.cell, "rent": rent, "premises": true, "room": room, "deposit": deposit, "term_months": c.term_months, "notice_days": c.notice_days })),
+                    extra: vec![("offer", json!({ "by": me, "take_up": "apply", "available": 1, "terms": terms }))],
+                    visible: Some(Visible::Public),
+                    ..Default::default()
+                },
+            )
+        };
+        // Applications for a unit we list: the first filed, offered the lease.
+        let apps: Vec<Arc<Record>> = self.book.open("rental_application").filter(|a| crate::common::addressed_to(a).contains(&me) && !self.handled.contains(&a.id)).cloned().collect();
+        let mut let_now: BTreeSet<String> = BTreeSet::new();
+        for l in &open {
+            let mut mine: Vec<&Arc<Record>> = apps.iter().filter(|a| data(a).s("listing") == Some(l.id.as_str())).collect();
+            if mine.is_empty() {
+                continue;
+            }
+            mine.sort_by(|x, y| crate::common::filed_before(&x.id, &y.id));
+            for a in &mine {
+                self.handled.insert(a.id.clone());
+            }
+            let d = data(l);
+            let space = d.s("space").unwrap_or_default().to_string();
+            if held(&space) {
+                let_now.insert(l.id.clone());
+                steps.push(step("An application for premises that are no longer free: taking the listing down.", vec![withdraw(&l.id, Some("No longer available."))]));
+                continue;
+            }
+            let pick = mine[0];
+            let tenant = pick.speaks_for.clone().unwrap_or_default();
+            let rent = whole(d.get("rent"));
+            let deposit = whole(d.get("deposit"));
+            let o = Offer {
+                template: "lease".into(),
+                term: Some(c.term_months * MONTH),
+                periodic: false,
+                our_notice: Some(c.notice_days * DAY),
+                their_notice: Some(c.notice_days * DAY),
+                we: Some(occupancy(&tenant, &space)),
+                they: Some(rent_payment(&e.account, rent, cx)),
+                text: Some(format!(
+                    "{tenant} leases shop premises {space} from {me} for {} a month, for {} months, and pays a security deposit of {} to {} as it signs, which {me} gives back within 30 days of the lease's end, less any rent then owed.",
+                    e.usd(rent),
+                    c.term_months,
+                    e.usd(deposit),
+                    e.account
+                )),
+                basis: Some(pick.id.clone()),
+                ..Default::default()
+            };
+            let_now.insert(l.id.clone());
+            steps.push(step_lines(
+                format!("Letting premises {space}: the first of {} to apply, for {} months.", mine.len(), c.term_months),
+                vec![bound("lease", offer(&tenant, o)), line(withdraw(&l.id, Some("Let.")))],
+            ));
+        }
+        // Units with no lease and no listing: listed; a month unlet: the asking rent comes down.
+        for o in self.premises.clone() {
+            let listed: Vec<&Arc<Record>> = open.iter().filter(|l| data(l).s("space") == Some(o.space.as_str()) && !let_now.contains(&l.id)).collect();
+            if held(&o.space) || let_now.iter().any(|id| open.iter().any(|l| l.id == *id && data(l).s("space") == Some(o.space.as_str()))) {
+                continue;
+            }
+            if listed.is_empty() {
+                steps.push(step(format!("Listing vacant shop premises at {}.", e.usd(reference)), vec![listing(&o, reference, cx)]));
+            }
+            for l in listed {
+                if t - l.at >= MONTH {
+                    let rent = whole(data(l).get("rent")) * (10_000 - self.p.cut_bps) / 10_000;
+                    steps.push(step(
+                        format!("Premises unlet for a month: cutting the asking rent {}%.", fmt_dec(self.p.cut_bps, 100)),
+                        vec![withdraw(&l.id, Some("Relisting at a lower rent.")), listing(&o, rent, cx)],
+                    ));
+                }
+            }
+        }
+        // A lease that has ended: its deposit given back, to the account the tenant applied from.
+        for a in leases {
+            if self.deposits_returned.contains(&a.id) || !self.book.concluded(&a.id) || self.book.ends_at(&a.id).is_none_or(|end| t < end) {
+                continue;
+            }
+            let tenant = tenant_of(a, &me).to_string();
+            if !self.book.signed_by(&a.id, &tenant) {
+                continue;
+            }
+            self.deposits_returned.insert(a.id.clone());
+            let app = a.basis.as_ref().and_then(|b| self.book.get(b.first())).cloned();
+            let Some(to) = app.as_ref().and_then(|r| data(r).s("account").map(String::from)) else { continue };
+            let rent = lease_terms(a, &tenant).rent;
+            let deposit = rent * c.deposit_months;
+            if deposit > 0 {
+                steps.push(step(
+                    format!("The lease of {} has ended: giving the security deposit of {} back.", lease_terms(a, &tenant).space.unwrap_or_default(), e.usd(deposit)),
+                    vec![pay(&to, deposit, Pay { from: Some(e.account.clone()), basis: Some(a.id.clone()), for_: Some("Security deposit given back at the lease's end.".into()), ..Default::default() }, cx)],
+                ));
+            }
         }
     }
 
@@ -2481,6 +2642,47 @@ mod tests {
         let mut t = Town::new(params);
         t.cells = vec![house("c1", "s1", &[("s1/home", 1)]), house("c2", "s2", &[("s2/home", 1)])];
         t
+    }
+
+    /// A finished shop unit (one workplace) on one cell.
+    fn unit(cell: &str, structure: &str, room: u32) -> Value {
+        json!({ "cell": cell, "x": 0, "y": 0, "structure": { "structure": structure, "type": "shop-unit", "at": cell, "w": 1, "h": 1, "complete": true,
+            "spaces": [{ "space": format!("{structure}/workplace.1"), "kind": "workplace", "capacity": room, "count": 0 }] } })
+    }
+
+    #[test]
+    fn shop_premises_are_listed_let_to_the_first_business_that_applies_on_the_profiles_terms_and_the_deposit_given_back_at_the_end() {
+        let mut params = base_params();
+        params["commercial"] = json!({ "rent": 250_000, "deposit_months": 3, "term_months": 60, "notice_days": 90 });
+        let mut town = Town::new(params);
+        town.cells = vec![unit("c1", "unit-1", 6)];
+        // Listed: at the profile's rent, with its room, deposit and term; not on the homes' list.
+        let made = town.wake(0, "cadence", vec![lot("lot-1", &["c1"]), title("lot-1", ME)], vec![]);
+        let listing = made.iter().find(|m| m.arg("kind") == json!("premises_listing")).expect("listed").clone();
+        assert_eq!((listing.arg("data")["rent"].clone(), listing.arg("data")["room"].clone(), listing.arg("data")["deposit"].clone(), listing.arg("data")["term_months"].clone()), (json!(250_000), json!(6), json!(750_000), json!(60)));
+        assert!(!made.iter().any(|m| m.arg("kind") == json!("rental_listing")));
+        // Two businesses apply: the first to apply is offered the lease, on the terms.
+        let app = |id: &str, who: &str, at: i64| rec(json!({ "id": id, "at": at, "author": format!("{who}-owner"), "record": "statement", "speaks_for": who, "kind": "rental_application", "visible_to": [ME, who], "addressed_to": [ME],
+            "text": "Application.", "data": { "listing": listing.id, "account": format!("acc-{who}"), "premises": true } }));
+        let made = town.wake(DAY, "cadence", vec![app("app-2", "ent.2", DAY - 100), app("app-1", "ent.1", DAY - 200)], vec![]);
+        let offer = made.iter().find(|m| m.call.fn_ == "agreement").expect("a lease offered");
+        assert_eq!(offer.arg("with"), json!("ent.1"));
+        assert_eq!(offer.arg("template"), json!("lease"));
+        let words = offer.arg("terms").as_str().unwrap_or_default().to_string();
+        assert!(words.contains("60 months") && words.contains("7,500.00"), "{words}");
+        assert!(made.iter().any(|m| m.arg("withdraw") == json!(listing.id)));
+        // The lease signed and run to its end: the deposit goes back to the account it was applied from, once.
+        let lease = with_basis(rec(json!({ "id": "PL1", "at": DAY, "author": "landlord-1-office-system", "record": "agreement", "visible_to": [ME, "ent.1"], "terms": { "template": "lease", "parties": [ME, "ent.1"], "commitments": [
+            { "who": ME, "does": { "outcome": { "occupancy": { "who": "ent.1", "in": "unit-1/workplace.1" } } } },
+            { "who": "ent.1", "does": { "outcome": { "money": { "from": "acc-ent.1", "to": "acc-landlord", "amount": "250000", "for": "rent" } } }, "every": MONTH } ] } })), "app-1");
+        let mut records = vec![lease];
+        records.extend(signed("PL1", DAY, "ent.1"));
+        town.readings = vec![("PL1".into(), "in_force", Some(DAY + 60 * MONTH))];
+        let made = town.wake(2 * DAY, "cadence", records, vec![]);
+        assert!(!made.iter().any(|m| m.arg("kind") == json!("premises_listing")), "let: not listed again");
+        town.readings = vec![("PL1".into(), "ended", Some(DAY + 60 * MONTH))];
+        let back: Vec<Made> = town.wake(DAY + 60 * MONTH + DAY, "cadence", vec![], vec![]).into_iter().filter(|m| m.call.fn_ == "payment" || m.arg("for").as_str().is_some_and(|f| f.contains("deposit"))).collect();
+        assert!(back.iter().any(|m| m.arg("to") == json!("acc-ent.1") && m.arg("amount").as_str().is_some_and(|a| a.contains("7500") || a.contains("7,500") || a == "750000")), "{back:?}");
     }
 
     // ---- participants/test/landlord.test.ts

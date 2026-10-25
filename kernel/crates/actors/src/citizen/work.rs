@@ -458,6 +458,20 @@ impl Person {
     /// from there (citizen.ts 1907-1917). Where our new home stands we know from having been there.
     pub fn trading_from(&mut self, w: &mut Week) {
         let Some(own) = self.s.own_work.clone() else { return };
+        // (Our business has taken premises on a lease, and says so: we work there now, and not from home:
+        // docs/behaviour/leasing.md.)
+        let moved = crate::common::latest_by_speaker(&self.book, "trading_at", |r| crate::common::addressed_to(r).contains(&self.me))
+            .get(&Some(own.firm.as_str()))
+            .map(|r| (data(r).s("space").map(String::from), data(r).i("rent"), data(r).i("until")));
+        if let Some((Some(space), rent, until)) = moved.filter(|m| m.0.is_some() && own.at.as_deref() != m.0.as_deref()) {
+            if let Some(o) = self.s.own_work.as_mut() {
+                o.at = Some(space);
+                o.home = None;
+                o.lease = rent.zip(until);
+            }
+            self.work.trading_from = None;
+            return;
+        }
         if own.at.is_some() {
             return;
         }
@@ -799,7 +813,7 @@ impl Person {
                 self.tell(w, mine("venture", "found", "capital_called", facts([("firm", json!(firm)), ("asked", json!(asked)), ("paid", json!(amount.max(0)))])));
                 // (A business of one: our work from now on, trading from our home; what it clears is our income.)
                 if let Some((home, expect)) = f.own.clone() {
-                    self.s.own_work = Some(super::params::OwnWork { firm: firm.clone(), account, at: None, home: Some(home.clone()), expect_per_month: expect });
+                    self.s.own_work = Some(super::params::OwnWork { firm: firm.clone(), account, at: None, home: Some(home.clone()), expect_per_month: expect, lease: None });
                     self.work.trading_from = Some(home);
                     self.work.own_since = t;
                     self.work.next_own_review = t + MONTH;
@@ -927,7 +941,7 @@ impl Person {
         let drawn: i64 = self.absorbed.drawn_log.iter().filter(|d| d.0 >= from).map(|d| d.1).sum();
         let pays = div_round(drawn, window);
         let period = 14 * DAY;
-        let instead = self
+        let job_pay = self
             .s
             .found_jobs
             .iter()
@@ -938,9 +952,11 @@ impl Person {
             })
             .max()
             .unwrap_or(0);
+        // (Under a lease of premises, giving the business up does not end what it owes: the rent runs to the lease's end.)
+        let instead = job_pay - own.lease.filter(|(_, until)| *until > t).map_or(0, |(rent, _)| rent);
         let options = vec![
             Choice { key: "keep".into(), facts: Some(Facts { money_per_month: pays, work_hours_per_month: Some(160), ..Default::default() }), others: None, meaning: Some(self.wk_enterprise(w)) },
-            Choice { key: "give_up".into(), facts: Some(Facts { money_per_month: instead, work_hours_per_month: (instead > 0).then_some(160), ..Default::default() }), others: None, meaning: None },
+            Choice { key: "give_up".into(), facts: Some(Facts { money_per_month: instead, work_hours_per_month: (job_pay > 0).then_some(160), ..Default::default() }), others: None, meaning: None },
         ];
         let life = self.life(w.pic, t, w.acc.as_ref().map(|a| a.balance));
         let d = self.mind.decide(w.cx, &life, Decide { domain: "venture".into(), options, current: Some("keep".into()), purpose: Some("venture".into()), ..Default::default() });
@@ -949,7 +965,7 @@ impl Person {
         }
         self.tell(w, mine("own_work", &own.firm, "given_up", facts([("months", json!(months)), ("drawn", json!(drawn)), ("instead", json!(instead))])));
         let dd = crate::papers::data(&TradingFrom { closed: Some(true), ..Default::default() });
-        let alt = if instead > 0 { format!("a job paying {} a month", Self::wk_usd(w, instead)) } else { "looking for work".to_string() };
+        let alt = if job_pay > 0 { format!("a job paying {} a month", Self::wk_usd(w, job_pay)) } else { "looking for work".to_string() };
         w.push(because(
             format!("Our business has paid us {} a month over {} months: not worth keeping against {alt}. Closing it, and looking for work.", Self::wk_usd(w, pays), window),
             vec![say("trading_from", "Closing: the business is given up.", Say { to: Some(vec![own.firm.clone()]), visible: only(&self.me, &own.firm), data: Some(dd), ..Default::default() })],
@@ -1464,6 +1480,32 @@ mod tests {
             assert!(run(&mut bob, &c, &pic(m * MONTH + 2 * DAY, None, false), 0, |a, w| a.ventures(w)).is_empty(), "month {m}");
         }
         assert!(bob.s.own_work.is_some());
+    }
+
+    #[test]
+    fn an_owner_whose_business_leases_premises_works_there_and_weighs_giving_it_up_against_the_rent_still_owed() {
+        let c = ctx_with(json!({ "own_work": { "firm": "stall-1", "account": "acc.stall", "home": "b1/dwelling.1", "expect_per_month": 100_000 } }));
+        let post = rec(json!({ "id": "rec.1", "record": "statement", "author": "p.x", "speaks_for": "works", "at": 0, "visible_to": "public", "kind": "job_posting", "text": "Hiring", "data": { "wage": 150_000, "period": 14 * DAY } }));
+        let at = st("rec.2", "trading_at", "stall-1", json!({ "space": "unit-1/workplace.1", "structure": "unit-1", "cell": "c.9", "rent": 500_000, "until": 60 * MONTH }));
+        let mut ann = Person::new(&c).unwrap();
+        ann.book.take_all(&[post.clone(), at.clone()]);
+        ann.s.found_jobs = vec!["rec.1".into()];
+        // Told, we work there, not from home.
+        run(&mut ann, &c, &pic(DAY, None, false), 0, |a, w| a.trading_from(w));
+        let own = ann.s.own_work.clone().unwrap();
+        assert_eq!((own.at.as_deref(), own.home.as_deref(), own.lease), (Some("unit-1/workplace.1"), None, Some((500_000, 60 * MONTH))));
+        // Two months that paid nothing, against a job at $3,214 a month: with $5,000 of rent a month owed to the lease's
+        // end whatever we do, giving up leaves us worse: kept.
+        ann.work.next_own_review = 0;
+        assert!(run(&mut ann, &c, &pic(2 * MONTH + DAY, None, false), 0, |a, w| a.ventures(w)).is_empty());
+        assert!(ann.s.own_work.is_some());
+        // The same with no lease: given up (the earlier test).
+        let mut bob = Person::new(&c).unwrap();
+        bob.book.take_all(&[post]);
+        bob.s.found_jobs = vec!["rec.1".into()];
+        bob.work.next_own_review = 0;
+        let out = run(&mut bob, &c, &pic(2 * MONTH + DAY, None, false), 0, |a, w| a.ventures(w));
+        assert!(out.len() == 1 && out[0].contains("\"closed\":true"), "{out:?}");
     }
 
     #[test]
