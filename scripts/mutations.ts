@@ -82,7 +82,7 @@ export const MUTATIONS: Mutation[] = [
   "file": "kernel/crates/world/src/exec.rs",
   "find": "if !(1..=MAX_MONEY).contains(&amount) {",
   "replace": "if !(0..=MAX_MONEY).contains(&amount) {",
-  "why": "A transfer of nothing is accepted and logged as a payment: a bill is marked settled by a payment of 0."
+  "why": "A transfer of nothing is accepted and logged as a payment: a bill is marked settled by a payment of 0. (Equivalent to every act a participant can send, 2026-10-25: the contract's Amount refuses 0 before this check is reached; kept as the second guard, for a transfer the engine makes itself.)"
  },
  {
   "id": "ts-withholding-rounded-to-nearest",
@@ -225,7 +225,10 @@ export const MUTATIONS: Mutation[] = [
   "file": "participants/src/contracts.ts",
   "find": "if (self ? !id.includes(\"/\") : id.startsWith(prefix)) channels[self ? id : id.slice(prefix.length)] = ch;",
   "replace": "if (self ? true : id.startsWith(prefix)) channels[self ? id : id.slice(prefix.length)] = ch;",
-  "why": "A person's own view includes the prefixed channels of the posts they hold, so org accounts and records appear as their own and ownAccount may pick the office's money."
+  "why": "A person's own view includes the prefixed channels of the posts they hold, so org accounts and records appear as their own and ownAccount may pick the office's money.",
+  "tests": [
+   "participants/test/view.test.ts"
+  ]
  },
  {
   "id": "view-cache-stale",
@@ -233,7 +236,10 @@ export const MUTATIONS: Mutation[] = [
   "file": "participants/src/view.ts",
   "find": "if (ch.cells.length || ch.whole) this.cache.delete(id);",
   "replace": "if (ch.whole) this.cache.delete(id);",
-  "why": "A participant's cached cell list is not refreshed when new cells arrive, so it keeps acting on a stale picture of the street."
+  "why": "A participant's cached cell list is not refreshed when new cells arrive, so it keeps acting on a stale picture of the street.",
+  "tests": [
+   "participants/test/view.test.ts"
+  ]
  },
  {
   "id": "kernel-named-sees-private",
@@ -293,8 +299,8 @@ export const MUTATIONS: Mutation[] = [
   "id": "kernel-inbox-across-capacities",
   "kind": "no god's view",
   "file": "kernel/crates/world/src/kernel.rs",
-  "find": "let keys: Vec<Id> = p.pending.keys().filter(|k| only.is_none_or(|o| o == k.as_str())).cloned().collect();",
-  "replace": "let keys: Vec<Id> = p.pending.keys().cloned().collect();",
+  "find": "        let mut visits = vec![];\n        let keys: Vec<Id> = p.pending.keys().filter(|k| only.is_none_or(|o| o == k.as_str())).cloned().collect();",
+  "replace": "        let mut visits = vec![];\n        let keys: Vec<Id> = p.pending.keys().cloned().collect();",
   "why": "A unit stepped in one capacity is handed every capacity's letters and outcomes: a person reads their post's mail as their own, and the post goes without it.",
   "tests": [
    "orchestrator/test/seat-sight.test.ts"
@@ -308,7 +314,8 @@ export const MUTATIONS: Mutation[] = [
   "replace": "|| f.data.office !== undefined;",
   "why": "A form that writes an office's own papers is known to every seat that has seen it, not only to the office's holder: another seat's request is drawn up on stationery it does not keep.",
   "tests": [
-   "translator/test/resolver.test.ts"
+   "translator/test/own-office.test.ts",
+   "translator/test/forms.test.ts"
   ]
  },
  {
@@ -387,6 +394,7 @@ export const MUTATIONS: Mutation[] = [
   "replace": "const day = t;",
   "why": "The host names a seat-side stream for the moment, not the day (the planted bug of the old catalogue's draw-keyed-on-moment, in its new home).",
   "tests": [
+   "orchestrator/test/draws.test.ts",
    "orchestrator/test/twin-draws-seat.test.ts"
   ]
  },
@@ -398,6 +406,7 @@ export const MUTATIONS: Mutation[] = [
   "replace": "return `paper#${id.slice(4)}`;",
   "why": "The host names a paper by its number in the world's file, not by which paper it is to the drawer (the old catalogue's stable-purpose-bypassed, in its new home).",
   "tests": [
+   "orchestrator/test/draws.test.ts",
    "orchestrator/test/twin-draws-seat.test.ts"
   ]
  },

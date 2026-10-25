@@ -21,7 +21,7 @@
 //
 // The bugs are in scripts/mutations.ts. Each is one exact replacement, found once in its file.
 
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { MUTATIONS, type Mutation } from "./mutations";
 
@@ -130,7 +130,9 @@ function kernelBuild(): { ok: boolean; out: string } {
   return sh(["sh", "-c", "cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace && cargo build --release --manifest-path kernel/Cargo.toml --target wasm32-unknown-unknown -p oikos-law"], copy!);
 }
 function kernelTests(): { ok: boolean; failed: string[] } {
-  const r = sh(["cargo", "test", "--profile", "gate", "--manifest-path", "kernel/Cargo.toml", "--workspace", "--no-fail-fast"], copy!);
+  // (With the engine env too: a kernel test that writes its town with the TS generator loads the engine module, and one
+  // built from other sources (the release build, under a mutation) is refused, failing every such test whatever the bug.)
+  const r = sh(["cargo", "test", "--profile", "gate", "--manifest-path", "kernel/Cargo.toml", "--workspace", "--no-fail-fast"], copy!, engineEnv());
   const failed = [...r.out.matchAll(/^test (\S+) \.\.\. FAILED$/gm)].map((m) => `kernel > ${m[1]}`);
   if (!r.ok && !failed.length) failed.push(`kernel (did not build or run: ${r.out.split("\n").filter((l) => /^error/.test(l)).slice(0, 3).join(" | ")})`);
   return { ok: r.ok, failed };
@@ -173,11 +175,11 @@ if (!noBaseline) {
     save();
     console.log(`baseline: ${baseFailed.size} failing unmutated (${Math.round((Date.now() - t0) / 1000)} s)${baseFailed.size ? ": " + [...baseFailed].slice(0, 8).join("; ") : ""}`);
   }
-  // (The kernel's own tests too, once, where a kernel mutation will run them: one failing unmutated catches nothing.)
-  if (tier !== "invariants" && chosen.some((m) => m.file.startsWith("kernel/")) && !(results as any).baselineKernel) {
+  // (The kernel's own tests too, once each run (they may have changed since the last), where a kernel mutation will run
+  // them: one failing unmutated catches nothing.)
+  if (tier !== "invariants" && chosen.some((m) => m.file.startsWith("kernel/"))) {
     const kt = kernelTests();
     for (const f of kt.failed) baseFailed.add(f);
-    (results as any).baselineKernel = true;
     results.baseline = { ...(results.baseline ?? { files: 0, at: new Date().toISOString() }), failed: [...baseFailed] };
     save();
     console.log(`baseline: the kernel's own tests, ${kt.failed.length} failing unmutated${kt.failed.length ? ": " + kt.failed.slice(0, 8).join("; ") : ""}`);
@@ -224,6 +226,8 @@ for (const m of chosen) {
     console.log(`${m.id}: ${r.caught ? `CAUGHT by ${r.by.length} (${byInvariants.length} invariants)` : "not caught"}${note ? ` [${note}]` : ""} (${Math.round(r.ms / 1000)} s)`);
   } finally {
     writeFileSync(path, original);
+    // (The towns the tests ran under this bug: nothing reads them again, and a run of forty bugs left gigabytes.)
+    for (const d of existsSync(join(copy, "runs")) ? readdirSync(join(copy, "runs")).filter((d) => d.startsWith("test-")) : []) rmSync(join(copy, "runs", d), { recursive: true, force: true });
   }
 }
 if (kernelDirty) {

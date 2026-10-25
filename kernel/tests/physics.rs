@@ -61,6 +61,14 @@ fn money_cant_be_conjured_or_overdrawn() {
     assert_eq!(refusal(&r), Some(RefusalCode::InsufficientFunds));
     let r = act(&mut run, "bank-payments", json!([{"block": "transfer", "from": "acc-outside", "to": "acc-bob", "amount": "1"}]));
     assert_eq!(refusal(&r), Some(RefusalCode::NotCustodian), "only the outside world holds its own account");
+    // A payment moves a whole positive amount: one of nothing, or of less, is no payment (a bill is not settled by it).
+    let before = (balance(&run, "acc-bob"), balance(&run, "acc-devco"));
+    for amount in ["0", "-5"] {
+        // (Refused as an act, or not taken as one: either way nothing moves.)
+        let r = run.done(&rb_act("bank-payments", json!([{"block": "transfer", "from": "acc-bob", "to": "acc-devco", "amount": amount}])));
+        assert!(r.as_ref().map_or(true, |r| refusal(r).is_some()), "a transfer of {amount} is refused");
+    }
+    assert_eq!((balance(&run, "acc-bob"), balance(&run, "acc-devco")), before);
 }
 
 #[test]

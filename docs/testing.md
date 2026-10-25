@@ -51,7 +51,7 @@ are behaviours, held by the tests of the module that does them. See "The gaps" b
 
 ## Mutation testing
 
-**Since the cut-over (2026-10-19)** the catalogue's bugs planted in the TypeScript actors (`participants/src/behaviour`, now deleted) aim at files that are gone: they are to be rewritten against `kernel/crates/actors`; those planted in what stays (`shared/`, `readers/`: tax, payments, common) and the kernel's own stand.
+**Rebuilt 2026-10-25** against the code that runs (docs/decisions.md, "The mutation catalogue rebuilt"): 46 bugs in the engine and its actors (`kernel/crates`: 35) and the live TypeScript (the seat host, the seat's readers, the translator, the measures, the generator), each with the hard rule or route it breaks as its `kind` (money, integer cents, the dead, the absent, work's time, sight, twins, review and appeal, the decision law). The bugs planted in the deleted TypeScript actors are gone from it.
 
 `scripts/mutate.ts` plants one realistic bug at a time (`scripts/mutations.ts`: each one exact replacement in one file,
 of a kind that has happened here or would corrupt results) in a scratch copy of the repo, runs the tests, records
@@ -62,10 +62,13 @@ bun scripts/slots.ts --weight 3 --what "mutations" -- bun scripts/mutate.ts --co
 ```
 
 - The copy is a copy-on-write clone (`cp -c -R`), made on first use; files this checkout changed are copied in at
-  every start. Its kernel is rebuilt for a kernel mutation, and rebuilt clean at the end.
+  every start. Its kernel is built in the `gate` profile (no whole-program link: a mutation's rebuild in a minute or
+  two), every test file is pointed at that build, it is rebuilt for a kernel mutation, and rebuilt clean at the end.
 - First, every test file is run unmutated (the baseline, which also times them); a test failing there is never
   counted as catching anything. Then each bug against the files that took under 30 s in the baseline, the slow files
-  the bug names, the invariants, and, for a kernel bug, the kernel's own tests (`cargo test`).
+  the bug names, the invariants, and, for a kernel bug, the kernel's own tests (`cargo test --profile gate`, also run
+  once unmutated). `--tests own` is the quick pass: the files the bug names, the gate's 90-day invariants and the
+  kernel's tests; run the survivors again with the default to be sure nothing else catches them.
 - A file that runs past 25 minutes under a bug counts as catching it (a hang is a failure).
 - Results: `<copy>/mutation-results.json`, written after each bug (a stopped run keeps what it found and resumes).
   `--tests invariants` re-runs only the invariants against every bug and merges the result.
@@ -109,12 +112,13 @@ docs/decisions.md). When one is hit, or about monthly, prune as on 2026-10-24 (d
 4. **Mutations.** `bun scripts/slots.ts --weight 3 -- bun scripts/mutate.ts --copy <scratch>` before and after on the
    bugs that still apply (`--only`; a mutation whose `find` no longer matches its file is not planted). For the before side, `--source` a `git archive` of main with `node_modules` and `kernel/target` cloned in (`cp -c -R`), and a fresh `--out`: an archive alone runs no test, and a reused results file keeps its baseline, so a baseline where every file "did not run" counts every bug missed. A cut must not
    leave a bug that was caught caught by nothing, above all on the hard rules (money, the dead, the absent, work's time,
-   sight, twins). The catalogue's bugs in the TypeScript actors (`participants/src/behaviour`, deleted) are to be
-   rewritten against `kernel/crates/actors`: on 2026-10-24 15 of its 49 still applied.
+   sight, twins).
 5. **Record.** One decisions entry: each file or test cut or replaced, what covers it instead, and what would bring it
    back; the suite's file count, test count and the two tiers' times before and after.
 
 ## The gaps
+
+**2026-10-25, the rebuilt catalogue** (docs/decisions.md, "Test strength"): of 46 bugs, 34 caught for certain, 2 survive (both equivalent or nearly: another guard holds the rule), 10 unconfirmed (their only catchers were the generator-backed town tests, which a harness fault failed under every kernel bug; run them again). What follows is the measurement of 2026-10-17, against the TypeScript actors since deleted.
 
 Measured 2026-10-17 on main at ac99bbba (docs/decisions.md, "What the tests catch"): 49 bugs planted, 32 caught. The
 invariants caught 10 of them (wrong pay, fractional cents, the dead paid or acting or left in their homes and

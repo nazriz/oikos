@@ -8345,3 +8345,79 @@ JSON value and three copies of its canonical bytes.
 - **Change:** `scripts/test.ts` reruns a failed file from the known-flakes list (the two merge.ts names) once alone, and
   accepts it only if it then passes; the line says so.
 - **Revisit if:** a listed file fails twice in a row (then it is a fault, not a flake), or the list grows past these two.
+
+## 2026-10-25 · Test strength: the host's dead paths cut, the mutation catalogue rebuilt against the engine, the gaps it found held (branch `test-strength`; no model called)
+
+**Why.** The test pruning of 2026-10-25 found the catalogue mostly stale (15 of 49 bugs still applied, the rest in the
+TypeScript actors deleted at the cut-over), two twin bugs in host code the Rust world no longer runs, and nothing
+catching `kernel-care-draw-by-number`.
+
+**Dead code removed** (found by reachability: units are made only in `syncUnits`, which since the cut-over makes a unit
+for a seat alone, and an import graph from every tool, CLI and script; no whole library file was unreached):
+- `orchestrator/src/run.ts` (1,724 lines to 1,578): `codeUnit` and every branch for a code unit (`!u.llm`; a unit's
+  `capacity`, never set for a seat: the slice, prefixed looks, `only`, the performers a code unit named), the TS
+  resolver's `ts` and `shadow` modes (`OIKOS_RESOLVER`, `resolverShadow`, `<run>.resolver-diffs.json`; the engine's
+  resolver is the one, docs/design/rebuild.md has the shadow check's record), and `recordChangeOf` with its call (a
+  seat's units only ever returned nothing: a record is the engine's bookkeeping, held by `kernel/tests/entity_record.rs`).
+  Its two tests in `entity-records.test.ts` went; the API test there now says no orchestrator source sends
+  `entity_record` and keeps the participant-API check.
+- `orchestrator/src/rust-world.ts`: `runRustWorld` and `twinBrains` (no caller; experiments drive `RustWorld` directly).
+- Unused exports: `forkLogs` (experiment.ts), `datasetDirFor` (dataset.ts), `onParams` (module.ts: the manifests are no
+  longer written by running TS modules), `smallestNow` (money.ts).
+- **Not dead, contrary to the pruning's note:** the host's draw keying (`drawFor`, `stablePurpose`) still names the
+  streams of what the host runs on a seat's side (a mock seat's signing, `mock.ts`; a seat's office books' readers, e.g.
+  `Directions.standing` through openbooks-townhall). It moved to `orchestrator/src/draws.ts` (the same rules as the
+  engine's `actors/src/draws.rs`) with a unit test, `orchestrator/test/draws.test.ts`, so its twin bugs can be caught.
+
+**The catalogue** (`scripts/mutations.ts`): 46 bugs, 35 in `kernel/crates` and 11 in live TypeScript, each `kind` the rule
+it breaks: money 6, integer cents 3, the dead 6, the absent 1, work's time 4, sight 10, twins 7, review and appeal 4,
+the decision law 2, the generator, the measures and the translator 1 each. 13 kept from the old catalogue (the 10
+kernel bugs, `amounttext-round`, `self-sees-position-channels`, `view-cache-stale`), the two host twin bugs re-planted in
+draws.ts, 31 new (drafted by subagents by area, checked to apply once and to compile). `scripts/mutate.ts` now builds and
+tests the kernel in the `gate` profile (a mutant's rebuild in minutes, not the release link's half hour), points every
+test file and the kernel's tests at that build, runs the kernel's tests once unmutated each run, runs them under `--tests
+own` too (with the gate's 90-day invariants), and empties the copy's `runs/test-*` after each bug.
+
+**Measured** (main at 3f3e16b5 plus this branch): `--tests own` first, then the fast tier for the survivors. One fault
+of the harness was found and fixed on the way: kernel tests that write their town with the TS generator loaded the copy's
+stale release engine module, which is refused when its sources differ, so under any kernel bug they all failed: their
+catches were not catches. Results, 46 bugs: **34 caught for certain** (all 11 TypeScript; 23 kernel, each by a test of its own module, the
+invariants or a twin test; 7 of them only with the tests below), **2 survive**, **10 unconfirmed**.
+- Survive: `kernel-zero-transfer` (equivalent: the contract's Amount refuses 0 before the engine's range check) and
+  `rs-bank-dead-holder-pays-out` (near-equivalent: the bank's check of who may instruct on an account refuses the same
+  payments, so no money moves from a dead holder's account; the bank only writes "cannot" where it would have said
+  nothing).
+- Unconfirmed: the only catchers shown for these in the first pass were the generator-backed town tests (`a1_citizen`,
+  `c2_shop_mix` and the like). The fixed rerun was stopped at its third bug, when free disk fell under the 60 GB floor
+  (the copy's gate build is about 38 GB): `kernel-absent-may-work`, `rs-retailer-hours-used-forgotten`,
+  `rs-utilities-slip-row-misnamed`, `kernel-performer-not-charged`, `kernel-named-sees-private`,
+  `kernel-answer-cap-ignored`, `rs-world-price-moment`, `rs-appeal-window-off-by-one`, `rs-grievance-ignored-in-seconds`,
+  `rs-method-order-inverted`. Run them again with the fixed harness when the disk allows: `--tests own --only <ids>`,
+  about 10 minutes each.
+- The invariants caught 4 (doubled credit, work charged no time, records shown to those not allowed, a capacity handed another's letters); the 90-day gate
+  invariants are what `own` runs.
+
+**Tests added or strengthened**, each for the rule and not a figure:
+- `kernel/tests/services.rs`, `care_draws_on_the_condition_not_its_number`: on 16 seeds, care keeps or calls off a death
+  alike in two towns that differ only by one more injury filed first (the condition's number moves, its onset does not);
+  both outcomes occur across the seeds. Catches `kernel-care-draw-by-number`.
+- `kernel/crates/actors/src/offices/treasury.rs`: the tax clerk's assessment is exactly the law's rate of the rent
+  reported (it was a substring match that a tenfold tax passed). Catches `rs-treasury-rent-tax-tenfold`.
+- `kernel/tests/physics.rs`: a transfer of 0 or less is refused and moves nothing. (`kernel-zero-transfer` stays
+  uncaught and is equivalent for every act a participant sends: the contract's Amount refuses 0 before the engine's own
+  range check; noted in the catalogue.)
+- `participants/test/view.test.ts` (new): a seat's view takes in every change it is shown, and one capacity's slice holds
+  that capacity's channels only. Catches `view-cache-stale`, `self-sees-position-channels`.
+- `participants/test/staff-report.test.ts`: an office-holder's list of standing orders is its own organisation's.
+  Catches `ts-roster-orders-of-any-body` (the seat-side Roster had no test).
+- `translator/test/own-office.test.ts`: an office's own stationery is a form of its holder's only.
+- `orchestrator/test/draws.test.ts` (new, with draws.ts).
+
+**Disk** (`scripts/disk-tidy.ts`, `judgeTarget`): a worktree whose branch and HEAD are in origin/main and that nothing is
+running in (no process working there or using a file in it) loses its `kernel/target` at once, whatever its age or its
+agent lock (the lock names the session that started the agent, which outlives it). Protected names, wave copies and the
+tree it runs in are left. Finished agents' builds filled the disk twice on 2026-10-25.
+
+**Revisit if** a kernel bug is "caught" only by town-wide tests again (look at what they failed on before counting it), a
+catalogue bug stops applying (a refactor moved its line: re-plant it), or the host stops running anything on a seat's
+side (then draws.ts goes too).
