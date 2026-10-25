@@ -167,7 +167,34 @@ fn world(args: &[String]) -> Result<(), String> {
     if let Some(ms) = thread_cpu_ms() {
         eprintln!("main thread cpu {ms} ms");
     }
+    // (And its peak resident memory, for the memory budget: scripts/memory-budget.json.)
+    if let Some(b) = peak_resident_bytes() {
+        eprintln!("peak resident {b} bytes");
+    }
     Ok(())
+}
+
+/// The process's peak resident memory so far, in bytes (`getrusage`'s `ru_maxrss`: bytes on macOS, KiB on Linux).
+fn peak_resident_bytes() -> Option<i64> {
+    #[repr(C)]
+    struct Rusage {
+        utime: [i64; 2],
+        stime: [i64; 2],
+        maxrss: i64,
+        rest: [i64; 13],
+    }
+    extern "C" {
+        fn getrusage(who: i32, usage: *mut Rusage) -> i32;
+    }
+    let mut r = Rusage { utime: [0; 2], stime: [0; 2], maxrss: 0, rest: [0; 13] };
+    // SAFETY: `r` is a valid, writable rusage of the platform's layout (two timevals, then longs) for the call.
+    if unsafe { getrusage(0, &mut r) } != 0 {
+        return None;
+    }
+    #[cfg(target_os = "macos")]
+    return Some(r.maxrss);
+    #[cfg(not(target_os = "macos"))]
+    return Some(r.maxrss * 1024);
 }
 
 /// This thread's CPU time so far, in milliseconds (`clock_gettime` of the thread's CPU clock), where the platform has it.

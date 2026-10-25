@@ -27,6 +27,7 @@
   "orchestrator/test/keepers-answers.test.ts": "several towns run for months (38 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/living-dial.test.ts": "several towns run for months (97 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/llm.test.ts": "several towns run for months (66 s on 2026-10-24, the whole suite at once)",
+  "orchestrator/test/memory-budget.test.ts": "the 1,000-person town for a month on the release kernel, for its peak memory (the memory budget)",
   "orchestrator/test/migration.test.ts": "towns run a year or more (150 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/nature.test.ts": "towns run a year or more (67 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/office-books-walk.test.ts": "towns run a year or more (474 s on 2026-10-24, the whole suite at once)",
