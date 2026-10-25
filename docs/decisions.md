@@ -8678,3 +8678,9 @@ side (then draws.ts goes too).
   the delivered records) take far more off: all of them together are 10% under main at 10,000 and level at 1,000.
 - **Revisit if:** checkpoints become frequent (daily, say): then the records' bytes might be kept compressed between
   them, not whole.
+
+## 2026-10-26 · Two more canaries: hazards and figures
+
+- **Why:** commercial leasing landed with the three canaries green and turned 8 slow-tier files red; the agent that fixed
+  them found `hazards` (a 200-day default-town run, about 50 s) and `figures` (law 11's count) would have caught most.
+- **Revisit if:** a broad change's gate grows past about 5 extra minutes on a quiet machine, or a red main again slips past.
