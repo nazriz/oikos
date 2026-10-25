@@ -69,7 +69,7 @@ Status words: `[x]` landed on main, `[~]` in progress, `[ ]` not started, `[?]` 
 
 - Commercial leases: no remedy for unpaid rent, no early exit, no rent reviews (docs/behaviour/leasing.md).
 - Systems keep the same hours every day (no weekends). A seat cannot yet be a non-resident agency officer (WM-14).
-- No taxpayer account to reclaim an overpayment from (PB-23).
+- [x] A taxpayer account to reclaim an overpayment from (PB-23): the tax collector keeps it (`taxpayer-accounts`, d3eb2bf3, cedc1903); its figures are still placeholders, so PB-23 stays open as mitigated.
 - Candidacy: a field of 19 for about 118 votes (PB-10).
 - One day's crew paperwork ran in series, cause untraced (MT-23).
 - Three tests still pinned to one seed (production, entry, own-venture); two near-duplicate twin cases kept.
