@@ -17,14 +17,14 @@ Status words: `[x]` landed on main, `[~]` in progress, `[ ]` not started, `[?]` 
   - [ ] What people have seen, held compactly (any bound on what they remember is a law: to the owner first).
   - [ ] No whole-world copies during a step.
   - [ ] 50,000 people for a month and 100,000 for a week, measured.
-- [~] **Foundations-2, phase 1: capacity** (law 10). Every act has a time, every system its hours and lanes; casework
-  done by officers' minutes (WM-14). Branch `f2-phase1`; tag `pre-foundations-2` on main before it lands.
+- [x] **Foundations-2, phase 1: capacity** (law 10). Every act has a time, every system its hours and lanes; casework
+  done by officers' minutes (WM-14). Landed at 0824efb6; tag `pre-foundations-2` is main at 8570d699, before it.
 - [~] **Test strength.** Dead TypeScript removed; the planted-bug catalogue rebuilt against the code that runs; tests
   that catch the hard-rule bugs, the kernel twin one first; disk-tidy clears a merged worktree's build at once.
 
 ## Next, in order
 
-- [ ] **Foundations-2, phase 2: conservation** (law 8). Water, energy, materials and waste as stocks with flows;
+- [~] **Foundations-2, phase 2: conservation** (law 8). Water, energy, materials and waste as stocks with flows;
   metered homes; recipes say their energy and water; shortages follow from network, contracts and operators, with no
   allocation rule (docs/design/foundations-2.md §2).
 - [ ] **Foundations-2, phase 3: space** (law 9). Roads, pipes, wires and data lines with capacity and energy; people in
