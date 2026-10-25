@@ -149,3 +149,42 @@ fn a_config_read_participant_by_participant_is_checked_as_the_whole_is() {
     let (l, _) = config::load_from(&twice[..]).unwrap();
     assert_eq!(l.hash, config::load(whole).unwrap().hash);
 }
+
+/// Two worlds in one process, run side by side (a host's arms; tests at once): what each person has seen of a building
+/// is held once for everyone in their world who sees it the same (SC-1), never shared with the other world, whose
+/// building of the same name may stand on another config. The same town twice, the second with its buildings' wear
+/// coming on faster (its catalogue's), stepped a day each in turn on one thread: each is the run it is alone.
+#[test]
+fn two_worlds_side_by_side_are_each_the_world_alone() {
+    use oikos_kernel::engine::{Due, Engine};
+    let base: Value = serde_json::from_slice(&town_text("au-vic-2026")).unwrap();
+    let mut other = base.clone();
+    let wear = other["catalogue"]["variables"].as_array_mut().unwrap().iter_mut().find(|v| v["per_day"].as_i64().is_some_and(|d| d > 0)).expect("a variable that comes on by the day");
+    wear["per_day"] = json!(wear["per_day"].as_i64().unwrap() * 2);
+    let towns = [base, other];
+    let opts = || EngineOptions { threads: 2, until: Some(20 * DAY), ..Default::default() };
+    let alone: Vec<(String, Vec<u8>)> = towns
+        .iter()
+        .map(|t| {
+            let (h, e) = run_code_world(t.clone(), "side", Vec::new(), opts()).unwrap();
+            (h, e.into_log())
+        })
+        .collect();
+    assert_ne!(alone[0].0, alone[1].0, "the two towns are not the same world");
+    let mut worlds: Vec<Engine<Vec<u8>>> = towns.iter().map(|t| Engine::start(t.clone(), "side", Vec::new(), None, opts()).unwrap()).collect();
+    for day in 1..=20 {
+        for e in worlds.iter_mut() {
+            while let Some(due) = e.next_by(day * DAY).unwrap() {
+                assert!(matches!(due, Due::End | Due::Seats(_)), "no seats here");
+                if matches!(due, Due::End) {
+                    break;
+                }
+            }
+        }
+    }
+    let ends: Vec<(String, Vec<u8>)> = worlds.into_iter().map(|mut e| (e.finish().unwrap(), e.into_log())).collect();
+    for (i, (side, solo)) in ends.iter().zip(&alone).enumerate() {
+        assert_eq!(side.0, solo.0, "world {i} side by side");
+        assert!(side.1 == solo.1, "world {i}'s log is its own alone");
+    }
+}
