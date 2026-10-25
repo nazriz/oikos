@@ -8963,7 +8963,7 @@ log against the same town built at 3d113a1f.
   restriction (WM-12, open).
 - **A deviation, accepted by the parent session (2026-10-26):** the `connection` and `link` calls are code's own for now
   (TR-7, new): a seat in a utility or operator post cannot rotate, interrupt or reclose, nor a seated household set its use.
-- **The CLAUDE.md line is not added by this branch** (Naz's decision; it goes in with the commit that lands C4). The line,
+- **The CLAUDE.md line is added in the commit that lands C4** (Naz's decision 1 on foundations-2, 2026-10-25: each law's line joins the hard rules when its enforcement and backstop land; added by the coordinating session, not by the branch's builder). The line,
   worded like the hard rule on time: "**Nothing physical from nothing: every physical quantity is a
   declared kind, held somewhere, and changed only by its holder's move, a process with a recipe, nature's declared
   dynamics or a world edge.** A building's variable is a condition, never a stock; what flows all day flows on a network,
@@ -9000,3 +9000,79 @@ log against the same town built at 3d113a1f.
   scenarios reading it is left for the scenarios' owner).
 - **Revisit if** workplaces are connected (then C5's figures, by industry, with sources; WM-15 closes); a scenario needs a
   scarce kind (then its quantity in the scenario, with its source).
+## 2026-10-26 · Records delivered without their bytes for code actors; a town's channel lists read once (branch `mem-delivered`; no model called)
+
+- **Change:** `Delivered` (kernel/src/kernel.rs) keeps what a record adds to a seat's knowledge from the first time it
+  is shown, and its canonical bytes only once an observation that is written shows it (a seat's, or one whose hash the
+  log keeps); a code actor's look makes none. The config's reader holds each distinct channel list once for all the
+  participants given it.
+- **Measured** (against main `3b87959e`, with the cuts before it beneath): 1,000 au-vic 693 to 512 MB, 10,000 5.25 to
+  2.98 GB, 50,000 34.2 to 17.0 GB resident (857 s wall against 1,004; its own thread 651 s of CPU against 689). The
+  same state hash and log digest on 203 people, three profiles' 1,000 and 10,000, and the same hash at 50,000. The
+  budget at 476 to 477 MB, 366 KB a person: the ceiling lowered from 410 to 390 KB.
+- **No performance loss, and how that was told:** single runs showed this cut 1 to 2% over in instructions, within
+  what one build moves between runs as the load varies. Main and this build in turn, three times on each profile's
+  1,000-person month at 4 threads, at a load of 2 to 6: this build was faster in all nine pairs (wall -1 to -5%, user
+  CPU -5 to -8%, instructions -0.2 to -0.4%) and 22 to 26% smaller.
+- **A version tried and dropped:** the bytes held only while an observation held them (weakly): no smaller, and they
+  were made again for each seat that was shown the same record.
+- **Revisit if:** runs come to have many model seats (their records' bytes are kept for the run, as they always were).
+
+## 2026-10-26 · What's known of a building held once; 100,000 for a week (branch `mem-facts`; no model called)
+
+- **Change:** what a code actor's knowledge keeps of a building it is shown (its type, place and spaces) is one for
+  everyone while it says the same; it was made again whenever the building's view changed, and each person kept their
+  own (0.4 GB at 50,000 in the profile before).
+- **Measured** (14 threads; against the cut before, which was against main): 1,000 au-vic 512 to 499 MB, gb-eng 492
+  to 484, us-oh 456 to 439; 10,000 about the same (2.97 GB); 50,000 16.9 GB, 595 s. The same state hash on all; the log
+  the same but for one line, the engine's list of module versions (police.station 0.6.0 to 0.7.0, main's, merged in
+  beneath). The budget at 474 to 475 MB, 365 KB a person: ceiling 390 to 380 KB.
+- **With the minds' and memories' cut beside** (`mem-minds`, not landed yet; a local build): 1,000 people 322 KB a
+  person; 50,000 for a month 14.7 GB and 604 s; 100,000 for a week 31.0 GB resident and 320 s, its peak the first
+  moment (39 GB footprint).
+- **Tried and dropped:** a round's long prepared annotations held compressed until logged (for the first moment, where
+  every unit's decisions are held at once): no smaller (each decision is held as a value too, while seats are in the
+  round) and slower (100,000 for a week 40.4 GB and 551 s; the run's own thread 9 to 15% slower at 10,000 and 50,000).
+- **Revisit if:** a building's facts come to depend on who is in it (then the view's own would be needed again).
+
+## 2026-10-26 · The memory budget's ceiling raised from 380 to 415 KB a person: the margin was too small (branch `mem-budget-fix`)
+
+- **What happened:** `mem-facts` lowered the ceiling to 380 KB, 4% over what its own branch measured (365 KB at 4
+  threads). On main, with other merges beside it since (foundations-2's main fix, the producer's changes), the same
+  test measures 490 to 495 MB, 380 to 385 KB a person, and failed in CI's slow tier at 55c9528d. My error: the ceiling
+  followed the cut, not main, and its margin was within what other work moves.
+- **Change:** the ceiling 415 KB: main's 385 and about 8%. From now on a ceiling is lowered to about 8% over what main,
+  with the cut merged, measures (two runs), never over what the cut's own branch measures.
+- **Revisit if:** main's measure moves past 400 KB without a cut that explains it (then that change is looked into: a
+  person costing more is what the test is for).
+## 2026-10-26 · A town's first moment decided a window at a time; decisions not kept as values once written (branch `mem-first`; no model called)
+
+- **What it was:** at 100,000 people the week's peak is the first moment: every unit decides at once, and each one's
+  decisions were held (as their canonical bytes for the log, and, in a round with seats, as values too) until the
+  whole round was carried out.
+- **Change** (kernel/src/engine.rs): a round no seat waits in, of more than 2,048 units, is decided a window of 2,048 at
+  a time as it is carried out, not all at once. Each unit decides from what it was shown (made for all before any
+  decides) and its own state, as it did; a unit let go of in the round before it decides (`sync_units`) decides first,
+  as it would have with the others. And a step's decisions, once written for the log, are not kept as values in any
+  round: a round with seats may be saved while they think, and its snapshot reads them back from those bytes
+  (`kept_whole`). The window is an engine option (`decide_window`).
+- **Tests** (`kernel/tests/config_stream.rs`): a window of seven against all at once on three profiles' towns for 60
+  days, the same log; a run saved at its first moment while a seat thinks and taken up again from its bytes is the
+  run, its citizens' decisions all logged (a mutant whose snapshot did not read them back was caught). The path where
+  a unit is let go of before it decides is reached by no town tried (a year at 200 people and at 1,000: zero), so it
+  is held by its construction, not by a test.
+- **Measured:** the same state hash and log digest on 203 people, three profiles' 1,000 and 10,000 for a month. The
+  100,000 week, this build and the one before it in turn, twice each, 14 threads: peak footprint 33.1 to 33.4 GB
+  against 43.3 GB both times, resident about the same (31.0 to 33.6 against 32.8 to 35.8 GB), instructions the same
+  (7,362 G against 7,360 G on average), wall 414 s against 433 s on average (load 6 to 13). Nothing changes at 1,000
+  (no round there has more than 2,048 units), so the budget's ceiling stays at 380 KB.
+- **Revisit if:** a unit's decision comes to read anything another's carrying out changes within a round (then
+  windows would change results; the window test would catch it in the towns it runs).
+## 2026-10-26 · The gate's file-seconds budget is read at the recorded load
+
+- **What we saw:** a branch that added nothing to the gate tier went 32 s over the 1,200 file-second budget at load 20 to
+  27: files share cores, so under load each file's own time grows too.
+- **Change:** the total is divided by the run's load, the median of each gate file's time over its recorded time (when at
+  least ten files have one, and only when it is over 1). The per-file limit is unchanged.
+- **Revisit if:** the recorded times drift (they are rewritten by whole runs), or a real slowdown of every file at once (a
+  slower kernel) is hidden by it; then compare against a quiet-machine run.

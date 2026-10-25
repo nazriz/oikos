@@ -68,6 +68,9 @@ pub struct EngineOptions {
     pub audit: bool,
     /// Fewer actors than this in a round are stepped on one thread (starting threads costs more than it saves).
     pub share_at: usize,
+    /// A round with no seat of more units than this decides a window of this many at a time as it is carried out (not
+    /// all at once: `Engine::pending`). The same results, whatever it is.
+    pub decide_window: usize,
     /// The seats are the mock (no model): a seat that sits as its code twin (`mock.twin` with a `mock.brain`) is
     /// scheduled as its brain's unit would be (run.ts `llmUnit`). A host with a real model says false.
     pub mock_seats: bool,
@@ -158,6 +161,7 @@ impl Default for EngineOptions {
             decision_areas: None,
             audit: false,
             share_at: std::env::var("OIKOS_SHARE_AT").ok().and_then(|x| x.parse::<usize>().ok()).filter(|n| *n > 0).unwrap_or(WORTH_SHARING),
+            decide_window: WINDOW,
             mock_seats: true,
             host_seats: false,
             record_observations: false,
@@ -363,6 +367,14 @@ pub struct Engine<W: Write> {
     until: i64,
     run_end: i64,
     round: Option<Round>,
+    /// A round's code units not yet decided, in the order it is carried out, with what each was shown: a round no seat
+    /// waits in, of more than `WINDOW` units, is decided a window at a time as it is carried out (`decide_window`), not
+    /// all at once (a town's first moment held every unit's decisions together till the round was done: SC-1). Each
+    /// decides from what it was shown and its own state, as it would have at once; the same results.
+    pending: std::collections::VecDeque<(String, crate::observe::Observation, Option<String>)>,
+    pending_keys: BTreeSet<String>,
+    /// Pending units decided early, as they went (`sync_units` lets one go): their decisions, for the round.
+    decided_early: BTreeMap<String, Decided>,
     rounds_at: (i64, u32),
     /// The calls each code actor made in this moment that did not resolve (unit key, program text), by moment: the
     /// same unresolved call again in the same moment ends that actor's wake (its mind decides the same from the same
@@ -399,11 +411,16 @@ pub struct Engine<W: Write> {
     host_going_on: BTreeSet<String>,
     /// For whoever measures: how many steps the actors took (never logged).
     pub steps: u64,
+    /// Units a windowed round decided early, as it let them go (`sync_units`): for its test.
+    pub decided_early_n: u64,
     /// How many acts each of `opts.withhold` has counted so far.
     withheld: Vec<u32>,
     /// The capture of citizens' decisions, where the run makes one (`opts.capture_citizens`).
     capture: Option<capture::Capture>,
 }
+
+/// How many units of a round with no seat are decided at once, as it is carried out (`Engine::pending`).
+const WINDOW: usize = 2048;
 
 /// The canonical bytes of `subject_data(kind, subject, data)`, written from its parts, where the annotation plainly keeps
 /// to the contract (`plain_subject_data`); `None` where the contract's check is to decide (then logged from its value).
@@ -585,6 +602,9 @@ impl<W: Write> Engine<W> {
             until,
             run_end: base.run_end,
             round: None,
+            pending: Default::default(),
+            pending_keys: Default::default(),
+            decided_early: Default::default(),
             rounds_at: (-1, 0),
             unresolved_at: (-1, BTreeSet::new()),
             wakes_by: Default::default(),
@@ -601,6 +621,7 @@ impl<W: Write> Engine<W> {
             for_host_any: false,
             host_going_on: BTreeSet::new(),
             steps: 0,
+            decided_early_n: 0,
             withheld: vec![],
             capture: None,
         }
@@ -818,6 +839,13 @@ impl<W: Write> Engine<W> {
             .collect();
         debug_assert_eq!(gone, self.units.keys().filter(|k| (k.as_str() == pid || k.starts_with(&prefix)) && !want.contains(*k)).cloned().collect::<Vec<_>>());
         for k in &gone {
+            // (One still to decide this round decides first, on what it was shown, as it would have with the others.)
+            if self.pending_keys.contains(k) {
+                let mut early = std::mem::take(&mut self.decided_early);
+                self.decide_pending(0, Some(k), &mut early);
+                self.decided_early = early;
+                self.decided_early_n += 1;
+            }
             self.units.remove(k);
         }
         if !gone.is_empty() {
@@ -1220,13 +1248,32 @@ impl<W: Write> Engine<W> {
             }
             kept_awake.push((key, n));
         }
-        // Decide, all at once.
+        // Decide: all at once; or, a round no seat waits in and of many units, a window at a time as it is carried out.
+        let mut decided = BTreeMap::new();
+        if seats.is_empty() && stepping.len() > self.opts.decide_window {
+            for (u, obs, only) in stepping {
+                self.pending_keys.insert(u.key.clone());
+                self.pending.push_back((u.key.clone(), obs.expect("each unit is shown its observation"), only));
+                self.units.insert(u.key.clone(), u);
+            }
+        } else {
+            self.decide(stepping, &mut decided);
+        }
+        for s in &seats {
+            decided.insert(s.key.clone(), Decided::Seat(None));
+        }
+        self.round = Some(Round { awake: kept_awake, decided, cursor: 0, next: vec![] });
+        Ok((!seats.is_empty()).then_some(Due::Seats(seats)))
+    }
+
+    /// Each unit decides on what it was shown; its decision (and the unit) put back.
+    fn decide(&mut self, mut stepping: Vec<(Unit, Option<crate::observe::Observation>, Option<String>)>, decided: &mut BTreeMap<String, Decided>) {
         let seed = self.seed;
         let (areas, record, lean) = (self.opts.decision_areas.as_ref(), self.opts.record_decisions, self.lean);
         let capturing = self.capture.is_some();
-        // (A round no seat waits in is carried out before anything can save it: its decisions, once written for the
-        // log, need not be kept as values till then. One with seats may be saved while they think, values and all.)
-        let strip = seats.is_empty();
+        // (A step's decisions, once written for the log, are not kept as values till the round is carried out: a round
+        // with seats may be saved while they think, and its snapshot reads them back from those bytes, `kept_whole`.)
+        let strip = true;
         let results = each_mut(&mut stepping, self.opts.threads, self.opts.share_at, |(u, obs, only)| {
             let obs = obs.take().expect("each unit is stepped once");
             let pic = u.view.apply(obs, only.as_deref(), &u.entity, &u.woke_for, u.since);
@@ -1259,7 +1306,6 @@ impl<W: Write> Engine<W> {
             }
         });
         self.steps += results.len() as u64;
-        let mut decided = BTreeMap::new();
         for ((u, _, _), r) in stepping.into_iter().zip(results) {
             let d = match r {
                 Ok((a, kept, prepared)) => Decided::Code(Ok((a, kept)), Some(prepared)),
@@ -1268,11 +1314,33 @@ impl<W: Write> Engine<W> {
             decided.insert(u.key.clone(), d);
             self.units.insert(u.key.clone(), u);
         }
-        for s in &seats {
-            decided.insert(s.key.clone(), Decided::Seat(None));
+    }
+
+    /// The next `n` pending units decided (or the one `only`, wherever it stands), their decisions put in `decided`.
+    fn decide_pending(&mut self, n: usize, only: Option<&str>, decided: &mut BTreeMap<String, Decided>) {
+        let mut stepping = vec![];
+        match only {
+            Some(key) => {
+                if let Some(i) = self.pending.iter().position(|(k, _, _)| k == key) {
+                    let (k, obs, cap) = self.pending.remove(i).expect("found just now");
+                    self.pending_keys.remove(&k);
+                    let u = self.units.remove(&k).expect("a pending unit is in the engine");
+                    stepping.push((u, Some(obs), cap));
+                }
+            }
+            None => {
+                while stepping.len() < n {
+                    let Some((k, obs, cap)) = self.pending.pop_front() else { break };
+                    self.pending_keys.remove(&k);
+                    // (One the round let go of decided as it went: `sync_units`.)
+                    let Some(u) = self.units.remove(&k) else { continue };
+                    stepping.push((u, Some(obs), cap));
+                }
+            }
         }
-        self.round = Some(Round { awake: kept_awake, decided, cursor: 0, next: vec![] });
-        Ok((!seats.is_empty()).then_some(Due::Seats(seats)))
+        if !stepping.is_empty() {
+            self.decide(stepping, decided);
+        }
     }
 
     /// What the round decided, carried out in key order; those whose wakes go on.
@@ -1290,6 +1358,12 @@ impl<W: Write> Engine<W> {
             }
             r.cursor += 1;
             let mut sending: Vec<oikos_actors::Worded> = vec![];
+            if !self.decided_early.is_empty() {
+                r.decided.append(&mut self.decided_early);
+            }
+            if self.pending_keys.contains(&key) {
+                self.decide_pending(self.opts.decide_window.max(1), None, &mut r.decided);
+            }
             let Some(d) = r.decided.remove(&key) else { continue };
             if !self.units.contains_key(&key) {
                 continue; // it ended this round
