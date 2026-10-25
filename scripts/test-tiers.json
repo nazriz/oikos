@@ -59,5 +59,18 @@
   "orchestrator/test/twin-seat-year.test.ts": "towns run a year or more (246 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/unions.test.ts": "towns run a year or more; several seeds or towns (107 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/word-of-mouth.test.ts": "several towns run for months (58 s on 2026-10-24, the whole suite at once)"
+ },
+ "canary": {
+  "orchestrator/test/invariants.test.ts": {
+   "why": "every invariant on a year of three profiles' towns, read from the log alone: what a broad change breaks first",
+   "kernel": true
+  },
+  "orchestrator/test/culture-dial.test.ts": {
+   "why": "pins the whole town's state and config hashes on three profiles: any change that moves every town shows here (the one deliberate alarm, docs/testing.md); went red from a broad change on 2026-10-24",
+   "kernel": true
+  },
+  "orchestrator/test/home-market.test.ts": {
+   "why": "a town's sales, mortgages and leavers' money end to end; on 2026-10-25 it was where a broad change (who the run's seed draws) showed a real bug, a leaver's savings sent before the mortgage payoff"
+  }
  }
 }
