@@ -1,6 +1,8 @@
 # Foundations 2: the world's physics made whole (plan, 2026-10-25)
 
-**Status:** a design for discussion with the owner. Nothing here is built. Owner's direction (Naz, 2026-10-25, close to
+**Status:** approved by the owner (Naz, 2026-10-25), with his decisions in section 9. Phases 0 and 1 are being built
+first. **Each law's line joins the hard rules in `CLAUDE.md` when its enforcement and its backstop test land, not
+before**, so that the hard rules never promise what the platform does not yet enforce. Owner's direction (Naz, 2026-10-25, close to
 his words): realism gaps must become impossible at the kernel and platform layer, not fixed one at a time,
 "eliminating the possibility of whack-a-moles". He agreed the five foundations below; this turns them into laws, tests
 and steps, and adds the few general laws any economy needs (services, technologies, entry, skills), from which an AI
@@ -65,14 +67,14 @@ energy and water. *Kernel enforces:* no act without its row; a system's capacity
 act with no row (`unpriced`); a system with no template seconds, hours or place.
 
 **Law 11. Every figure has a basis, on record.** Every number that reaches a world is *sourced* (with how: opened,
-summary, recalled, to confirm), *derived* (from named figures), *fitted* (to a named target, which then stops being a
-check), a *placeholder* (with why) or a *convention* (seconds in a day). *Kernel enforces:* the world's figure table
+summary, recalled, to confirm), *derived* (from named figures), *fitted* (to a named outcome), a *placeholder* (with why) or a *convention* (seconds in a day). *Kernel enforces:* the world's figure table
 covers every figure the config holds. *Refuses:* a world with a figure that has no basis.
 
-**Law 12. Reality bounds detect; they never steer.** Each profile states real ranges for outcomes (business births,
-unemployment, waits, prices, water a person, commute times) with sources and the measure that reads each from the log.
-A run far outside a range is flagged as a likely missing law. Nothing in the world reads them. *Platform enforces:* no
-generator, module or kernel path reads a bound; every flagged run names the laws its measure rests on.
+**Law 12. A clearly broken world is flagged, never steered.** A light check outside the world reads each run's log
+for states no real place could be in, whatever its figures: everyone starting a business at once, nobody ever hired, a
+stock below nought or growing without bound, a law that never once applies. A flag names the likely missing law. It
+holds no real-world figure or range, and nothing in the world reads it. *Platform enforces:* no generator, module or
+kernel path reads the flags; they never gate a merge.
 
 Laws 8 to 10 are physics, in the kernel, like laws 1 to 3. Law 11 is a property of the world's content, checked by the
 kernel at load. Law 12 lives outside the world, as measurement does, and is enforced by tests and by review.
@@ -81,10 +83,10 @@ kernel at load. Law 12 lives outside the world, as measurement does, and is enfo
 - *A wrong number with a source.* Law 11 shows what rests on a figure; it does not make the figure right.
 - *A wrong decision rule.* How a firm prices, when a person starts a business, how a tenant answers a notice: these
   are behaviour (VISION principle 12), not physics. The laws give every rule real costs to weigh and real limits it
-  cannot cross, and law 12 makes a rule that yields an impossible world visible. They cannot write the rule.
+  cannot cross, and law 12 flags a rule that yields a clearly broken world. They cannot write the rule.
 - *A missing kind.* A world with no notion of a thing (farms, say: no town has one today) cannot conserve it.
-  The backstop of law 8 catches a kind used and never made; it cannot catch a kind nobody thought of. Law 12 is the
-  net for that.
+  The backstop of law 8 catches a kind used and never made; it cannot catch a kind nobody thought of. Law 12 is a
+  coarse net for that, and only for what is clearly broken.
 
 ## 2. Law 8: conservation of everything physical
 
@@ -175,8 +177,8 @@ The second half plants one of each and checks it is named. The kernel side is th
   use becomes what households set their connections to, so a price or a restriction acts through the household's own
   rule, with its source (WM-12's open half). The water bill's payer becomes law data at the same step (WM-12).
 - The river "never restricts water" (WM-2, water): a dry river now lowers the source, and the far end and the high
-  ground lose pressure first, unless the corporation acts (restrictions, rotation, buying water in). Pollution making nobody ill (WM-2) is not conservation: it is a dose-response law, still missing,
-  which law 12 should flag.
+  ground lose pressure first, unless the corporation acts (restrictions, rotation, buying water in). Pollution making nobody ill (WM-2) is not conservation: it is a dose-response law, still missing
+  (WM-2).
 - The waste backlog nobody explained (WM-9): waste becomes a mass from what was consumed, so its size has a cause.
 
 ### 2.4 Migration, each step green
@@ -349,7 +351,7 @@ second" becomes, row by row, what the template's source says.
 |---|---|---|
 | P1 | Kernel and contract: per-template seconds for any row; template `hours`; the charged row recorded on each act | a template's row is charged, not the world's |
 | P2 | Kernel: no implicit default; fixtures state theirs; refusal `unpriced` | a planted unpriced act is refused |
-| P3 | Generator and profiles: the support office's casework as officers' minutes (sourced per place or marked), its lanes from a sourced officers-per-claim ratio, its hours; or the officer as a non-resident person (decision 7) | claim-to-decision days within the place's published range (law 12 checks it) |
+| P3 | Generator and profiles: the support office's casework as officers' minutes (sourced per place or marked), its lanes from a sourced officers-per-claim ratio, its hours; or the officer as a non-resident person (decision 7) | claim-to-decision days come from officers' hours (measured, not aimed at) |
 | P4 | Kernel: `runs_on`, location, energy and water per second of work (needs C3 and E2) | a system without power stops |
 | P5 | The backstop's new findings, planted | it names each |
 
@@ -370,7 +372,7 @@ that touch the town.
 ### 5.1 What the kernel and the contract must enforce
 
 - **A figure table in the world config.** `figures`: each figure an id, a class (`sourced` with `how`: opened, summary,
-  recalled, to confirm; `derived` with the figures it comes from; `fitted` with its target; `placeholder` with why;
+  recalled, to confirm; `derived` with the figures it comes from; `fitted` with the outcome it was fitted to; `placeholder` with why;
   `convention`), and its source text. And `provenance`: patterns over the config's paths (wildcards over participants
   and templates, so the table is sized by kinds of figure, not by people) mapping each numeric leaf to a figure id.
   The generator writes both: a profile value's figure is its source note, a module parameter's is its manifest's
@@ -403,8 +405,8 @@ that touch the town.
 ### 5.2 The backstop
 
 `orchestrator/test/every-number-has-a-basis.test.ts`, fast tier: on every profile's town, fails on a numeric leaf with
-no figure; a figure with no class or a class with a missing part (a `derived` naming nothing, a `fitted` with no
-target); a source note not in the structured form; a literal in the engine's actors, rules or the generator that is
+no figure; a figure with no class or a class with a missing part (a `derived` naming nothing, a `fitted` naming no
+outcome); a source note not in the structured form; a literal in the engine's actors, rules or the generator that is
 not a convention or a registered figure (with today's in the inventory, which only shrinks); a decision with no
 declared parameters in a manifest. Plants one of each, and a kernel refusal fixture for `unbased_figure`.
 
@@ -441,69 +443,60 @@ is not a number and is checked only as a module's stated basis; screening sees o
 most interactions; a seat's run cannot be screened (a model's run is not repeated), so its reliance is read from its
 code twin's.
 
-## 6. Law 12: reality bounds as detectors, not targets
+## 6. Law 12: flags for a clearly broken world, never targets
+
+**Cut down on the owner's word** (2026-10-25: "who cares? I don't care what the real figure is"). The first draft had
+real-world ranges per profile, sourced, with a held-out set. That is gone: no real-world target ranges, no held-out
+set, and no comparison with a place's figures. What is left is a light aid that flags states no world should be in,
+whatever its place.
 
 ### 6.1 What the platform must enforce
 
-- **Bounds in the profile, outside the world.** `targets` (points, read by hand today, 7 to 20 a profile) become
-  `bounds`: each a quantity, a low and a high from sources (a range over years or comparable places, not one figure),
-  the measure that reads it from logs (a query in `measure/`), the population and period it is for, and the laws and
-  mechanisms the measure rests on (`rests_on`: entry, credit, premises for business births; casework, staff, law's
-  waits for claim days). Kinds wanted first: business births and closures per thousand adults, unemployment, job
-  mobility and redundancy, days to a decision on a claim and to a hearing, rent and price growth a year, water and
-  energy a person a day, waste a person, commute minutes, homes' vacancy.
-- **Every run's report runs the detectors** (`oikos bounds`, which `oikos health` becomes): within, outside (by how
-  far, over how many seeds), not measured, or *not enough power* (a 1,000-person town has a few business births a
-  month: a detector says when it cannot tell). A breach names the laws in `rests_on` and opens a candidate entry for
-  the risk register (`docs/risks.md`), worded "a likely missing law", never a fault in a figure.
-- **Never steering.** Nothing in the world reads a bound: the generator, the engine and the modules never load
-  `bounds`, and a generated config holds none. A figure that is `fitted` (law 11) to an outcome takes that outcome off
-  the detectors: it can no longer check anything. A change whose reason is to move a measure into its bound must name
-  the law it adds and its real-world basis in the decisions log (working agreement: calibrate mechanisms, not
-  outcomes), and review refuses one that names only the measure.
-- **Detectors do not gate merges.** A breach is a finding, not a failing test: an outcome test that blocks a merge is
-  a target by another name. The nightly code-only baseline (every profile, a 1,000-person year, three seeds) runs the
-  detectors and keeps their history.
-- **Some bounds held out** (section 9, decision 5): a share of each profile's bounds sealed, read only at owner
-  checkpoints, as the translator's held-out cases are, so that a world fitted, even by accident, to the open bounds is
-  caught by the sealed ones. This is pattern-oriented modelling's test (Grimm et al. 2005, to confirm): patterns the
-  model was not built to match.
+- **Flags, outside the world.** `oikos flags <run>` reads a run's log (as measurement does) and flags, each with the
+  run, the moment and the laws the state rests on (`rests_on`, written beside each flag):
+  - *a stampede or a freeze:* a large share of the eligible doing one thing at once (everyone starting a business in a
+    month, everyone leaving), or nobody ever doing a thing the world offers (nobody hired in a year, no home ever let,
+    no claim ever decided);
+  - *a stock that breaks physics:* a holding below nought outside an edge, or a quantity, a balance or a backlog that
+    grows without bound over the run (a trend that does not level, judged on the run's own course, not against a
+    figure);
+  - *a dead law:* a law in force whose condition never once applies, or a form, an office or a route nobody uses in the
+    run.
+  The thresholds are the run's own (shares of the run's eligible, the run's own course), stated once in the flags'
+  code with their reason, and are conventions, not figures of any place.
+- **Never steering, never gating.** Nothing in the world reads a flag; a flag is a finding for the risk register,
+  worded "a likely missing law", never a failing test or a reason to tune a figure. The nightly code-only run of each
+  profile prints its flags.
 
 ### 6.2 The backstop
 
-`orchestrator/test/bounds-only-detect.test.ts`, fast tier: fails if any generator, engine or module source reads
-`bounds` or `targets`, or a generated config contains them; on a bound with no source, no measure, a measure that does
-not exist, or no `rests_on`; on a `fitted` figure whose target is still a live detector. Plants one of each.
+`orchestrator/test/flags-only-flag.test.ts`, fast tier: fails if any generator, engine or module source reads the
+flags or their output; on a flag with no `rests_on`; and on planted logs of each broken state (a negative stock, a
+month where every adult founds a business, a year with no hire, a law that never applies), each of which must be
+flagged, and a plain town's month, which must raise none of the stampede or physics flags.
 
 ### 6.3 What it replaces or makes redundant
 
-The hand-kept tables of `docs/calibration.md` (they become the detectors' generated history); point targets with
-tolerances in `measure/src/health.ts`; the two fitted figures that today sit beside their own targets (religious
-fading, PC-10; founding's chance, PC-4) are marked, and their targets leave the detectors until the mechanism is
-re-derived. ME-1 (business births at a set rate) is the first detector to watch: the Rust entry rule now follows
-expected profit (risks, ME-1 port note), and a births detector says whether it yields a real place's range.
+Nothing is replaced: the profiles' `targets` and `oikos health` stay as they are, as reading aids, and are not built
+on. Several of today's open risks are of the kind the flags find (ME-1's births, PC-4's founding at pilots' rates,
+PB-7's papers no office reads), so they would surface by themselves.
 
 ### 6.4 Migration, each step green
 
 | # | Step | Lands with |
 |---|---|---|
-| R1 | Contract for `bounds`; today's targets moved into ranges with their sources; `rests_on` written | every target is a bound |
-| R2 | Measures for the first kinds above that have none (several exist) | each bound has its query |
-| R3 | `oikos bounds` with power, breaches naming laws, the candidate risk entry | a report on three profiles |
-| R4 | The backstop | planted cases named |
-| R5 | The nightly baseline in the pipeline; the detectors' history | a history a night |
-| R6 | New bounds sourced for au-vic first, then gb-eng and us-oh; others as found | au-vic has a bound for each kind listed |
+| L1 | `oikos flags` with the three kinds of flag, `rests_on` beside each, on the run summary | flags on three profiles' plain runs, written down |
+| L2 | The backstop with planted logs | each planted state flagged |
+| L3 | The nightly code-only run prints them | a list a night |
 
 ### 6.5 Performance
 
-Outside the run. The nightly baseline is 27 runs of a 1,000-person year, a few hours of the run server's slots;
-measurement already streams by month (SC-3).
+Outside the run, one pass over a log that measurement already streams by month (SC-3).
 
 ### 6.6 What stays a known limit
 
-National ranges on small towns (PS-10); a run inside every bound can still be wrong (many worlds fit one pattern);
-a scenario has no real range (a counterfactual has no data), so detectors read plain towns; detectors find a symptom,
-and `rests_on` only narrows which law is missing.
+Only the clearly broken is caught: a world that is wrong but plausible raises nothing. "Grows without bound" over a
+short run cannot be told from a slow rise.
 
 ## 7. An economy whose AI part emerges
 
@@ -581,7 +574,7 @@ firms (the Rust entry rule, ME-1's port note), the auditor, strikes that weigh w
 Only two things, both outside, as measurement and boundary conditions always are:
 1. **The scenario** of AI's capability and cost (7.2), a boundary condition set from day 0 (`docs/scenarios.md`), with a
    tag naming which templates and hardware kinds count as AI. The tag is read by measurement only; the backstop of
-   law 12 grows to fail on any world code that reads it, as it does for bounds.
+   law 12 grows to fail on any world code that reads it, as it does for the flags.
 2. **The measures** that read logs, fixed before any experiment (added to `gradual-disempowerment.md` section 6):
    - **M7. What the town gives to AI.** Monthly: the share of the town's energy, water, land, grid and main capacity,
      capital invested and residents' working hours that goes to AI-tagged hardware, its hosts, their supply chains and
@@ -612,33 +605,35 @@ precedents are: each chain must be able to complete, never must.
 ## 8. Order and size
 
 **Why this order.** Law 11 first, in count mode, because every later step adds figures and should add them with their
-basis from the first day; law 12's detectors early, because they are measurement only (no state hash moves) and give
-every later step a before and after on the outcomes that matter. Law 10 next: it is the smallest and closes WM-14.
+basis from the first day, and counting changes no result. Law 10 next: it is the smallest and closes WM-14.
 Then law 8, which brings the network into the contract for pipes and wires (C3); law 9 then adds roads, paths and
 carriage to the same network, and is the largest step and the most disruptive to behaviour. Then the general economy
-laws, which need all of them. Strict modes and empty inventories last, when nothing old is left to list.
+laws, which need all of them. Strict modes, the flags and empty inventories last. **The tag `pre-foundations-2` is
+set on main before the first step that changes results** (phase 1's P1 or P3, whichever lands first), so that every
+earlier run replays and re-runs its twins there.
 
 | Phase | Steps | Agent-days | State hashes move? |
 |---|---|---|---|
-| 0. Record and detect | N1, N2, R1 to R4 | 7.5 | No (the config's header grows) |
+| 0. Record | N1, N2 (counting and reporting only) | 3 | No: logs byte-identical |
 | 1. Capacity | P1, P2, P3, P5 | 4.5 | Yes, once (P3) |
 | 2. Conservation, with the network for pipes and wires | C1 to C6, C3b, with the profiles' energy and water figures | 14.5 | Yes (C2, C3, C4) |
 | 3. Space | S1 to S6 (S7 folded into C3) | 16 | Yes (S2 to S5) |
 | 4. The general economy | P4, E1 to E6 | 17.5 | Yes (E1, E3, E4) |
-| 5. Strict and whole | N3 to N6, R5, R6; one rule page for laws 8 to 12, as `no-god-view.md` is | 12 | No |
+| 5. Strict and whole | N3 to N6, L1 to L3; one rule page for laws 8 to 12, as `no-god-view.md` is | 12 | No |
 | Measured before and after | each phase that moves hashes: 1,000 and 3,000 people, three towns, code only | 2 | |
-| **Total** | | **about 74** | |
+| **Total** | | **about 70** | |
+| After phase 4 | ME-16: market power in prices, a general pricing rule with a sourced term for rivals and switching costs | its own item | |
 
 Sourcing figures beyond au-vic, gb-eng and us-oh (energy and water by industry, networks' ratings and heads, link
-capacities, skill half-lives, casework minutes, bounds) is background work of about a day per profile per law, roughly
+capacities, skill half-lives, casework minutes) is background work of about a day per profile per law, roughly
 10 to 15 agent-days more if all nine are done; the rest stay marked, which law 11 now reports. Phases 0 and 1 can run
 in parallel; 2 and 3 overlap after C3; three to four lanes at once would take about four to six weeks of calendar (the
 first foundations' 20 agent-days were built in three days of calendar, so this is an upper estimate).
 
 **What would stop us:** S3 and S5 making a 10,000-person year more than 1.3 times slower with no kernel fix; the
 backstops needing a list of exceptions to pass (then a law is wrong somewhere, as the first foundations said); the
-detectors firing on most bounds in every profile after phase 3 (then the next missing laws are behaviour, and it is a
-checkpoint with the owner, not a chase); energy and water per unit of output unsourceable for most places (then two
+flags firing on most towns after phase 3 (then the next missing laws are behaviour, and it is a checkpoint with the
+owner, not a chase); energy and water per unit of output unsourceable for most places (then two
 sourced profiles carry the experiments and the rest are marked); the tree stand-in for networks giving shortages a
 real town plainly would not have (then the next cheapest model, loops by a fixed number of passes, comes back to the
 owner with its cost).
@@ -663,27 +658,18 @@ of this touches SC-1's real cost (what each citizen keeps and weighs), which sta
 - Shortages follow network physics, contracts in force and operators' acts only; no allocation rule in the kernel.
 - The AI economy emerges from general laws; the only AI-specific parts are the scenario and the measures.
 
-**Still open**, each with a recommendation:
+**Decided at approval (owner, 2026-10-25):**
+1. Laws 8 to 12 become hard rules in `CLAUDE.md`, each line added when that law's enforcement and backstop land.
+2. The outside world's supply is unlimited at its price, except named scarce kinds (a kind of hardware, a grid
+   interconnector, water rights), given a quantity a period in the profile or a scenario and sold by the edge's offers.
+3. The tree model for networks is accepted, as a known limit said in every result that reads a shortage.
+4. Baselines move again; the tag `pre-foundations-2` goes on main before the first result-changing step.
+5. Market power in prices (ME-16) is its own item after phase 4.
+6. Several towns are opt-in; one town with its edge nodes is the default.
+7. Law 12 is cut to a light aid that flags clearly broken states only: no real-world ranges, no held-out set, outside
+   the world, never gating (section 6).
 
-1. **Five new hard rules.** Laws 8 to 12 would join "no god's view" and "all work takes time" in `CLAUDE.md`, each with
-   its page and backstop. *Recommend: yes,* worded as the two existing ones are.
-2. **Is the outside world's supply unlimited at its price?** *Recommend:* yes for ordinary goods (a small town is a
-   price-taker), with named scarce kinds (a kind of hardware, a grid interconnector, water rights) given a quantity a
-   period in the profile or a scenario, sold by the edge's offers.
-3. **The network stand-in** (2.1, 2.6): trees, a linear loss, pressure-driven delivery for water, ratings and trips
-   for power, at an hour's grain. *Recommend:* accept it as the cheapest credible model, said as a known limit in every
-   result that reads a shortage; a loop-aware model only if a run shows the tree misleads.
-4. **Every town's baseline moves again,** at P3, C2 to C4, S2 to S5 and E1, E3, E4: commuting takes people's hours,
-   deliveries cost, the far end of a main can go short, households buy services. Old pilots stay comparable only at
-   their own git ref (tag `pre-foundations-2`). *Recommend: yes,* measured once per phase and never tuned back.
-5. **Held-out bounds.** *Recommend:* about a third of each profile's bounds sealed, checked only at your checkpoints.
-   In git every agent can read them; on the run server outside the repository they stay held out. Where, and who
-   opens them, is yours.
-6. **Market power in prices** (7.3): firms price within Lengnick's band whatever their rivals (ME-16), so a
-   concentrated market shows in shares but not in prices. *Recommend:* a general pricing rule with a sourced term for
-   rivals and switching costs, as its own item after phase 4, not inside it.
-7. **Many towns by default?** *Recommend:* no: one town with its edge nodes by default, several towns as an option of
-   the spec, since cost grows with every town.
+Nothing is open. New questions found while building go to the owner as they arise.
 
 ## 10. Sources
 
@@ -694,8 +680,7 @@ and Leontief (already cited). Networks: Wagner, Shamir and Marks 1988, *Journal 
 Management*, pressure-driven delivery (to confirm); Kersting, *Distribution System Modeling and Analysis*, radial
 feeders (to confirm); Bureau of Public Roads, *Traffic Assignment Manual* (1964), the volume-delay function (to
 confirm); Wardrop 1952 (to confirm). Figures and reliance: Morris 1991, *Technometrics*, elementary effects (to
-confirm); Saltelli et al. 2008, *Global Sensitivity Analysis: The Primer* (to confirm). Bounds: Grimm et al. 2005,
-*Science*, pattern-oriented modelling (to confirm); Goodhart 1975 (to confirm). Economy: Hopenhayn 1992 and Dunne,
+confirm); Saltelli et al. 2008, *Global Sensitivity Analysis: The Primer* (to confirm). Economy: Hopenhayn 1992 and Dunne,
 Roberts and Samuelson 1988, entry (to confirm); Acemoglu and Restrepo 2019 and Kulveit et al. 2025 (already cited);
 Newell and Rosenbloom 1981 (to confirm); Arthur, Bennett, Stanush and McNelly 1998 (to confirm); Bainbridge 1983 (to
 confirm). Figures for a hosting industry's recipe, in profiles: Shehabi et al. 2024, the United States data center

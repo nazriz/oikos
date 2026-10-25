@@ -8099,4 +8099,10 @@ fails every time, not now and then: the property draws new cases each run, and f
   use and fading for every task); only the capability-and-cost scenario and the measures (M7, M8) are AI-specific, both
   outside the world. Recorded rulings: capabilities from an outside scenario for now; suppliers abroad or local by
   profile; WM-14's non-resident officer and national ratio, yes; no separate AI-helper mechanism. About 74 agent-days.
+- **Approved (owner, 2026-10-25).** Laws 8 to 12 become hard rules, each line added to `CLAUDE.md` when its
+  enforcement and backstop land; the edge's supply unlimited at its price except named scarce kinds; the tree model
+  accepted as a known limit; baselines move, with `pre-foundations-2` tagged before the first result-changing step;
+  ME-16 its own item after phase 4; several towns opt-in. Law 12 cut down ("who cares? I don't care what the real
+  figure is"): no real-world ranges and no held-out set, only flags for clearly broken states (a stampede, a freeze, a
+  stock below nought or unbounded, a dead law), outside the world and never gating. About 70 agent-days.
 - **Revisit if** the tree stand-in gives shortages a real town would not have, or phase 3's cost passes its stop rule.
