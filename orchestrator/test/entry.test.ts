@@ -22,7 +22,7 @@ test("a failed shop's premises are bought by someone who founds a new shop there
   config.world.holdings = config.world.holdings.filter((h: any) => h.holder !== "shop-1");
   const shop1 = officeAt(config, "shop-1-manager").params;
   Object.assign(shop1, { short_days: 10, wind_up_days: 10, idle_days: 30, lender: "", max_staff: 0 });
-  for (const p of config.participants) if (p.controller?.impl === "citizen.default") p.controller.params.found_bps = 10_000;
+  // (Whether someone founds a shop there is theirs: its expected profit against what they have, docs/behaviour/entry.md.)
   // Someone of working age in the labour force has the savings to buy the premises (an inheritance, say): in the
   // generated town, working-age savings are far short of a shop's price (docs/behaviour/entry.md).
   const age = (id: string) => -config.world.entities.find((e: any) => e.id === id).born_at / (365 * DAY);
@@ -74,7 +74,7 @@ test("in a living town a shop founded in the run keeps a record of its own, by i
   config.world.holdings = config.world.holdings.filter((h: any) => h.holder !== "shop-1");
   const shop1 = config.positions.find((p: any) => p.id === "shop-1-manager").role_module.params;
   Object.assign(shop1, { short_days: 10, wind_up_days: 10, idle_days: 30, lender: "", max_staff: 0 });
-  for (const p of config.participants) if (p.controller?.impl === "citizen.default") p.controller.params.found_bps = 10_000;
+  // (Whether someone founds a shop there is theirs: its expected profit against what they have, docs/behaviour/entry.md.)
   const age = (id: string) => -config.world.entities.find((e: any) => e.id === id).born_at / (365 * DAY);
   const young = config.participants.find((p: any) => p.controller?.impl === "citizen.default" && p.controller.params.in_labour_force !== false &&
     age(p.person) >= 25 && age(p.person) < 50 && config.world.accounts.some((a: any) => a.id === `acc-${p.person}`))!;

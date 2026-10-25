@@ -2,6 +2,7 @@
 // are all code-written, the world is byte-identical to the world without it, to the state hash; with it on and a seat's
 // (here, a code office's, read as a seat's by a test seam) worded decision, the reading is filed once, as an event, and
 // moves the people it reached. No model is called anywhere here: the readers are the mocks.
+// (The setting, and the dial on in code-written towns of three profiles: reading-dial-profiles.test.ts.)
 
 import { expect, test } from "bun:test";
 import Ajv2020 from "ajv/dist/2020";
@@ -22,39 +23,6 @@ const withDial = (config: any, reading: object = { reader: "mock" }) => ({ ...co
 const out = () => mkdtempSync(join(tmpdir(), "oikos-reading-"));
 const notes = (path: string) => readFileSync(path, "utf8").trim().split("\n").filter((l) => l.includes('"annotation":"note"')).map((l) => JSON.parse(l).body);
 
-// (Until 2026-10-18 this also checked the dial-off state against living-dial.test.ts's pinned STEP_1; the test audit replaced that pin with the property it stood for, so the check here is the property itself: dial on equals dial off.)
-
-test("the dial in the world config is a schema-valid setting, and a setting that would let words outweigh a decision is refused when the run starts", async () => {
-  const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });
-  for (const f of readdirSync(join(root, "contracts")).filter((f) => f.endsWith(".schema.json"))) ajv.addSchema(JSON.parse(readFileSync(join(root, "contracts", f), "utf8")));
-  const v = ajv.getSchema("urn:oikos:contracts:0.8:world-config#/$defs/Dials") ?? ajv.getSchema("urn:oikos:contracts:0.8:world-config")!;
-  const config = withDial(generate(base) as any, { reader: "mock", papers: ["decision"], calls_per_run: 100, step: { tie_bps: 200 } });
-  expect(v(config), JSON.stringify(v.errors)?.slice(0, 600)).toBe(true);
-  expect(v(withDial(generate(base) as any, { papers: ["decision"] }))).toBe(false); // (a reader is required)
-  expect(v(withDial(generate(base) as any, { reader: "mock", papers: ["verdict"] }))).toBe(false);
-  const d = out();
-  try {
-    await expect(runWorld({ config: lean(withDial(generate(base) as any, { reader: "mock", step: { refusal: { floor_milli: 0 } } })), runId: "bad", outDir: d, until: DAY, recordObservations: "none" })).rejects.toThrow(/never reverse or outweigh/);
-    await expect(runWorld({ config: lean(withDial(generate(base) as any, { reader: "claude-code/claude-opus-5-5" })), runId: "opus", outDir: d, until: DAY, recordObservations: "none" })).rejects.toThrow(/never a reader/);
-    await expect(runWorld({ config: lean(withDial(generate(base) as any, { reader: "claude-code/claude-haiku-5-5" })), runId: "model", outDir: d, until: DAY, recordObservations: "none" })).rejects.toThrow(/calls no model/);
-  } finally { rmSync(d, { recursive: true, force: true }); }
-}, 120_000);
-
-test("dial on, in any town whose papers are all code-written: the same world, to the state hash, on three profiles; dial on equals dial off", async () => {
-  const d = out();
-  try {
-    for (const [profile, days] of [["au-vic-2026", 60], ["gb-eng-2026", 30], ["ke-nakuru-2026", 30]] as const) {
-      const config = generate({ ...base, profile }) as any;
-      const off = await runWorld({ config: lean(config), runId: `off-${profile}`, outDir: d, until: days * DAY, recordObservations: "none" });
-      const on = await runWorld({ config: lean(withDial(config)), runId: `on-${profile}`, outDir: d, until: days * DAY, recordObservations: "none" });
-      expect(on.stateHash, profile).toBe(off.stateHash);
-      // Nothing was asked of any reader: no paper in the town is a seat's.
-      expect(on.reading, profile).toMatchObject({ asked: 0, calls: 0 });
-      expect(notes(on.logPath).some((n) => n.data?.reading?.reader === "mock/lexicon")).toBe(true);
-    }
-  } finally { rmSync(d, { recursive: true, force: true }); }
-}, 600_000);
-
 // A code office's papers read as a seat's (a test seam), in a town where people ask: the desk reads each worded decision
 // once, files the reading, and the people it reached are moved from their own records.
 const PLAIN: R.Reading = { respect: 0, reason: 0, answers: null, recourse: 0, threat: 0, appeals: { openness: 0, conservation: 0, enhancement: 0, transcendence: 0 } };
@@ -67,8 +35,13 @@ async function town(reader: any, days = 200, dial = true) {
   return { run, d };
 }
 
+// The town read by the neutral reader (every shift nothing): the world each of the next two tests sets the others beside, run once (the
+// test pruning, 2026-10-24: it was run once for each, from the same config and seed). Its folder is removed by whichever test is last.
+let neutralTown: ReturnType<typeof town> | undefined;
+const neutralWorld = () => (neutralTown ??= town(neutralReader()));
+
 test("a worded decision is read once and filed as an event; kinder and curter readers move the people it reached, and the same run twice is the same run", async () => {
-  const kind = await town(kindestReader()), curt = await town(curtestReader()), neutral = await town(neutralReader()), kind2 = await town(kindestReader());
+  const kind = await town(kindestReader()), curt = await town(curtestReader()), neutral = await neutralWorld(), kind2 = await town(kindestReader());
   try {
     expect(kind.run.reading!.asked).toBeGreaterThan(0);
     expect(kind.run.reading!.read).toBeGreaterThan(0);
@@ -109,14 +82,14 @@ test("a worded decision is read once and filed as an event; kinder and curter re
     // The reader that reads every paper as the plain one shifts nothing: the world with the dial off, to the state hash.
     const off = await town(neutralReader(), 200, false);
     try { expect(neutral.run.stateHash).toBe(off.run.stateHash); } finally { rmSync(off.d, { recursive: true, force: true }); }
-  } finally { for (const x of [kind, curt, neutral, kind2]) rmSync(x.d, { recursive: true, force: true }); }
+  } finally { for (const x of [kind, curt, kind2]) rmSync(x.d, { recursive: true, force: true }); }
 }, 900_000);
 
 test("a reader that declines, fails or is over its calls: the paper is read as the plain one, and it is counted", async () => {
   const declining = { model: "mock/declining", version: "t", read: async () => ({ declined: true }) };
   const failing = { model: "mock/failing", version: "t", read: async () => { throw new Error("no answer"); } };
   const garbled = { model: "mock/garbled", version: "t", read: async () => ({ reading: { ...PLAIN, respect: 9 } }) };
-  const plainWorld = await town(neutralReader());
+  const plainWorld = await neutralWorld();
   try {
     for (const [name, r] of [["declined", declining], ["no_answer", failing], ["unread", garbled]] as const) {
       const x = await town(r);

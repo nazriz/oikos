@@ -45,7 +45,8 @@ function town(more: object = {}) {
     const tenant = l.terms.parties[1] as string, landlord = l.terms.parties[0] as string, rent = rentOf(l);
     chosen.set(c, { lease: l.id, tenant, landlord, rent });
     const space = /rents home (\S+) from/.exec(l.terms.text)?.[1] ?? "", structure = space.split("/")[0]!;
-    const rents = c === "too_much" ? 30 : 2, owed = rents * rent;
+    // (One who offers owes six rents, more than their pay brings in before the hearing: with two, a tenant whose pay is high clears it from wages and the landlord withdraws, which is the rule, not this case: 2026-10-24, savings and pay drawn together, ME-17.)
+    const rents = c === "too_much" ? 30 : c === "offers" ? 6 : 2, owed = rents * rent;
     const given = c === "short_notice" ? 5 : law.notice_days + 3, by = c === "short_notice" ? -1 * DAY : -2 * DAY; // (the short one gave 4 days)
     const both = [landlord, tenant];
     const paper = (id: string, kind: string, speaks: string, to: string[], visible: string[], basis: string, text: string, data: object) =>

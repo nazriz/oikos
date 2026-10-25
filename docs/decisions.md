@@ -7618,6 +7618,33 @@ the turn rows' size), or when step 2's input builder needs a field the turns do 
 
 **Revisit if** the base model trained on the code mind alone cannot keep its spread; no teacher family passes its own scrambled check on the author task; capture costs more than 3% of a run or 2 GB compressed a pilot; or the owner wants the model to write.
 
+## 2026-10-24 · Market realism: entry by expected profit, joint draws of pay and savings, hiring by fit in the manager's time (branch `market-realism`; citizen 0.59.0, generator 0.65.0; risks ME-1, ME-17, ME-2; no model called)
+
+The design note is `docs/design/market-realism.md`. Three stand-ins replaced by general laws; every figure a profile's, with its source.
+
+**ME-1, entry.** No rate of births anywhere: `found_own_ppm` (the profile's birth rate spread over those who could found) and `found_bps` (a flat 2% a month for premises) are gone from the generator, the citizen's parameters and the manifest. A person in the labour force weighs each venture once a month by `rules::entry::expected` (written in the port, never called until now), filled from what they know: the middle price of the kind on the price lists they hold, the trade price (a wholesaler's list they hold, else the venture's published `unit_cost`), their own orders a month, **the homes in view around them** for a business from home (the town's adults, by the census, for a shop in premises on the street), the sellers of it they know, a working day's service, the best posting's wage. The mind decides (`venture`) between the business at that figure and life as it is; nothing is started that does not beat what they have; the old enterprise sways are the option's meaning. A shop in premises for sale is weighed the same way, staffed by every hand who pays, up to its room. A business of one's expected pay, until it has a record, is the figure it was started on. `business.entry_bps_per_year` is a target only. Tests: `citizen/work.rs` (founds where it pays, never where it does not beat pay or has no margin, in a job gives notice first); `own-venture.test.ts`, `entry.test.ts`, `own-account.test.ts` follow the mechanism (no rate to set; the test that needs nobody else to found removes the venture).
+- *A first version counted customers as the town's adults (the census) against the few sellers a person knows.* Every au-vic and gb-eng town hit the world's cap of 50 founded firms within the year (births 81%, jobs agreed 269 to 826, unemployment by agreement 1.9% to 14.1%). Counting a town's whole custom against a sample of its sellers is a mechanism fault, not an emergent outcome: the two counts are now of the same reach (a business from home sells to its neighbourhood first).
+- *Not built, the owner's choice:* a business of one taking on its first hand. A home is the household's and a pitch holds one; real small firms that grow lease premises. **Commercial leasing** (who owns premises to let, at what rent, with a source) is a new institution: for Naz.
+
+**ME-17, joint draws** (`worlds/generator/joint.ts`, a Gaussian copula; each person's own chances are unchanged). Savings are drawn at a rank leaning on pay's rank among those of working age by `income_wealth_rank_bps`: 3,100 in au-vic and gb-eng (Jäntti, Sierminska and Smeeding 2008, LWS: 0.27 to 0.36 once age and education are accounted for; not these places' surveys, to confirm), none in ke-nakuru (no source). Work is shared within households by a factor fitted to `household_work` (ONS 13.9% of households with someone 16 to 64 workless; ABS 18.5% of families jobless). Generated towns of 1,000: the rank correlation of pay and savings among those of working age is about 0.19 in au-vic and gb-eng (0 before; ties at no pay dilute the 0.31), 0 in ke-nakuru. **The household factor is inert in both towns:** each person's own chances already give more workless households than the surveys (au-vic 27% of families, gb-eng 20% of households with someone of working age), so the fit shares nothing; the gap is in the margins (participation, a placeholder; who lives with whom), and fitting the dependence apart from them needs a polarisation index (Gregg, Scutella and Wadsworth 2010), whose figures were not read. Tests: `worlds/test/joint.test.ts` (the fit reaches its target; nothing shared where independence already exceeds it; the copula's rank correlation; a generated town correlates pay and savings where the profile says and not where it does not).
+
+**ME-2, hiring** (`firms/staffing.rs` routine). A posting is for every hand the firm is short of (`openings`, the offer's `available`) and stays up until they are offered the post; one no longer needed comes down; an application to a posting re-published at a new wage stands for the new one (why the 21-day window of 2026-09-30 failed). The manager interviews each one taken on (an `interview` paper, `publish/interview` 45 minutes in the table of work, a placeholder) and offers the post to those whose application names the posting's trade (`JobApplication.trade`: where they work or last worked, else the trade they opened the year in, the citizen's new `trade` parameter), then by who applied first; nothing is drawn. Tests: two in `staffing.rs` (fit before order, one posting for all the hands, interviews; a re-published posting keeps its applicant and its remaining hands). `interview` is a routine kind for the consequential-acts measure (Rust and TypeScript). Not changed: `boundary/environment_staff.rs` (its own copy of the old hiring) and the TypeScript reader copy (MT-18).
+
+**Measured** (a year at 1,000 people, three profiles, three towns each (seeds 1 to 3), lean, no model; `oikos diff` of before (main 1d6e00f8) against after; nothing tuned; runs in the scratchpad, not kept).
+
+| | au-vic before | after | gb-eng before | after | ke-nakuru before | after |
+|---|---|---|---|---|---|---|
+| Business births, % a year (`economy/businesses`) | 12.9 to 16.1 | 25.8 to 37.1 | 4.8 to 12.9 | 51.6 to 59.7 | 10.6 to 14.2 | 2.0 to 4.0 |
+| the profile's rate (a target) | 16.4 | | 11.1 | | 15.0 (placeholder) | |
+| Business deaths, % | 1.6 to 4.8 | 1.6 to 3.2 | 3.2 to 8.1 | 4.8 to 6.5 | 19.2 to 30.8 | 20.5 to 28.4 |
+| Unemployment by agreement, % (mean) | 1.93 | 3.60 (z 5.5) | 1.70 | 5.60 (z 7.0) | 12.7 | 10.2 (z -2.6) |
+| Job mobility, % a year (7.2 sourced for au-vic) | 22.7 to 24.9 | 24.3 to 26.5 | 28.9 to 30.3 | 22.8 to 32.2 | 13.7 to 16.3 | 8.4 to 14.1 |
+
+(Re-taken on the branch's last build, with a shop in premises reaching the town's custom: the same figures to the digit; no premises were sold in any of these towns.) Beyond 3 SE besides: appointments (au-vic up, gb-eng 31 to 61, ke-nakuru 60 to 39), union's firm members last quarter in gb-eng (1.3% to 0.6%), births in ke-nakuru (4.3 to 7). **Read as a note, not chased.** Unemployment by agreement rises where people now work for themselves (their businesses are not agreements; the labour force survey's unemployment in au-vic moved 0.13% to 0.37%). Births follow margins and savings: high where a home business's margin on goods is wide against what founders know of rivals (gb-eng most), low in ke-nakuru, where savings are small and margins thin (its businesses of one die as before). **gb-eng's 52 to 60% is far above its 11.1%**: likely causes, untested, are that founders count only the sellers they know (real excess entry, but larger here, since nobody learns of the many traders already started), that a business from home has no fixed costs at all (no registration, no rent), and that one is not given up before six months; any of them is a mechanism to look at, and none is a rate to add. Job mobility did not move: it comes from employed people's search for better pay, which this branch did not touch (ME-2 stays open on it).
+
+**Decided by Naz (2026-10-25):** the three laws of who else sells it, what a business costs and giving it up are built (next entry); real-world rates are an observation, not a target; commercial leasing is to be built.
+
+**Revisit if** births stay far from a profile's rate once founders learn of rivals as customers do (then fixed costs or the give-up horizon); a place's wealth survey gives its own income-wealth dependence (replace the borrowed 0.31); a polarisation index is read (fit the household factor to it); a source gives the time an interview takes or the staff hours per hire (replace the placeholder); job mobility is calibrated (the employed's search, not hiring).
 ## 2026-10-24 · Main's four red slow-tier files, after the run's seed began to draw who the people are (branch `fix-main-red`)
 
 **Cause, one for all four:** debt-behaviour made a person's dispositions come from the run's seed (it had been seed 0 whatever the run), so the same town on seed 1 has other people, and four tests that read one draw failed on main (the merge gate does not run the slow tier). Confirmed by putting seed 0 back in `world_info`: all four pass.
@@ -8038,6 +8065,31 @@ It fails the same with this branch's kernel changes taken out, so it is on main.
 - **Revisit:** before the next kernel merge, run the case (`ops` beginning `Smart { kind: 70 }, Smart { kind: 187 }`)
   and find which block delivers a standing channel whole twice.
 
+## 2026-10-25 · Test pruning: what each test guards, the pins replaced by their rules, the slow files split, and time budgets (tests; no model called)
+
+**Why.** Naz, 2026-10-24: "the tests should catch for regressions or changes in behaviour... if we just have slop tests, then we're just wasting time... we're trying to unlock velocity." Every test file was read for what it guards (a law, an invariant or a contract, a rule from a profile or a law, a bug we had, a planted mutation) and timed; the inventory (275 files) was the working table, not a document. Most files guard something real: what is cut is what guards nothing or is held elsewhere, and what was slow for no protection.
+
+**Deleted or replaced** (each: why, what holds it instead, what would bring it back):
+- `orchestrator/test/perception.test.ts`, `orchestrator/test/resolver-shadow.test.ts`: no test left in either since the cut-over (the TS view and the TS world's shadow resolver went with the TS world). Held by `kernel/tests/perception.rs` and the engine's one resolver. Back if a TS view or a second resolver returns.
+- `orchestrator/test/port-weather.test.ts`: compared the TS loop's weather module with the Rust kind; both sides are the engine now. One thread against fourteen: the kernel's lane tests (`a1_citizen.rs`, `c1_*.rs`, `a2_founded.rs`); the bureau's warnings: `rust-world.test.ts`. Back never (its subject is gone). `docs/port-guide.md` and the mutation catalogue no longer name it or `perception.test.ts`.
+- `rust-world.test.ts`, "the generator calling the Rust rules makes the same towns ... as with the TS rules": three profiles of `worlds/test/rules-native.test.ts`'s nine. Back if rules-native is deleted before the TS copies are (MT-18).
+- `scenarios.test.ts`: the plain town's sixty-day run after the pool, alone, to show the baseline scenario is the plain town. The configs are the same byte for byte (`worlds/test/scenario.test.ts`, "no scenario, and the baseline, are the town exactly as it was"), and one config and one seed are one run (the twins). Back if a scenario can act at run time rather than in the config.
+- `office-books-walk.test.ts`: its third part (the tribunal member's list as a standing list, a case with its day come named first) needed a ripe case, a rare draw in this town: the walk had gone 150 to 250, 400, 520, 250 and 400 days to find one. The rule is held on papers made by hand (`participants/test/day-list.test.ts`) and in a run whose cases fall ripe by construction (`member-sittings.test.ts`). The walk is back to 150 days (474 s to about a minute). Back if the clerk's list in a run differs from both.
+- `founding.test.ts`, the code founding: "two or more who share the want", a count of the draws (the run's seed hopped nine times for it), replaced by the rule of an occasion: at least the dial's `shared_min` (one here), one of them from beyond the founder's household. Back if `shared_min` changes meaning.
+- `unions.test.ts`: "three or more wage claims" (the seed hopped for the third), replaced by "some claim": the rule (each claim answered by an offer no more than it; accepted offers become agreements with the rise paid net of the law's withholding) is unchanged and runs on every claim.
+- `seat-sight.test.ts`: two ceilings just above the day's largest prompts (76,000 and 66,000 characters, raised at fifteen changes that gave a seat a form or a law more), a change detector, replaced by the rule they stood for: no prompt over `PROMPT_MAX` and no prompt trimmed to it (no `prompt_trimmed` note), so nothing a seat looked up was left out for want of room. The live check it answers was a prompt of 602,000. Back as a cost alarm if prompt size becomes a budget of its own.
+
+**Shared and split** (no assertion changed): `twin-seat-year.test.ts` and `reading-dial.test.ts` each ran one town twice from one config and seed (the code twin of a year; the neutral reader's 200 days): now once, memoised. The slowest files of the slow tier were one file's queue: `twin-draws` is three files (`twin-draws`, `-seat`, `-year`, with `lib/twins.ts`), `twin-seat-year` gives `twin-seat-quiet`, `reading-dial` gives `reading-dial-profiles`, and `scenarios`' generation-only cases are `scenarios-generate.test.ts`. The twin mutations in `scripts/mutations.ts` name the split files.
+
+**Kept, deliberately (asked of the owner):** in `twin-draws`, the ombudsman case of "papers of no effect, held by a system" is near the year's case, and "the world's prices" near the year's prices check; both twins, so kept. Still on one seed for a rare draw, to be replaced by a case made by construction: `production.test.ts` (seed 5, a dividend), `entry.test.ts` (a founded shop that hires and serves by day 300), `own-venture.test.ts` (600 days for an occasion).
+
+**Measured** (this machine, other agents running, `bun scripts/test.ts --tier slow` and `--tier gate`, main at eac4ab51 against the branch, each from main's recorded times; the load moved between runs, so each side is also read at the other's load by the files neither changed): **slow tier** 53 files, 169 tests, 2,161 s wall, 7,493 file-seconds, longest file 689 s (twin-draws) before; 57 files, 167 tests, 2,805 s wall (a busier machine: the unchanged files ran 0.87 of their time before, and the run had longer waits for slots), 6,126 file-seconds, longest file 345 s (395 at the load before) after. The files touched here: 2,583 file-seconds to 1,836 (2,101 at the load before); twin-draws 689 s to three files of 165, 219 and 242; reading-dial 548 to 294 and 45; twin-seat-year 501 to 214 and 62; scenarios 479 to 238; office-books-walk 192 to 45. **Gate tier** 236 files, 1,506 tests, 941 s wall before; 234 files, 1,507 tests, 781 s wall after (both far over the pipeline's minute and a half: three agents and CI ran beside them; the merge worktree's whole gate the day before took 143 s); its longest file 49 s to 34. In all, 289 files and 1,675 tests to 291 and 1,674: the cuts are few (three files and one case gone, five files made by splitting), and the gain is the slow tier's longest file halved and about a fifth of its work gone.
+
+**Mutations.** The catalogue is mostly stale: 15 of its 49 bugs still apply (the rest were planted in `participants/src/behaviour`, deleted at the cut-over; docs/testing.md says so). The twin bugs (`kernel-care-draw-by-number`, `draw-keyed-on-moment`, `stable-purpose-bypassed`), against the files each names and the invariants, before (main eac4ab51, baseline clean) and after (the branch, baseline clean): caught by nothing on either side, 0 of 3 both times, so no catch is lost to the split. That is itself a gap: the two in `orchestrator/src/run.ts` are in code the Rust world no longer runs, and a kernel draw keyed on a record's number (`exec.rs`, care) moves no twin here, likely because no case in these towns reaches it in the runs' length. Each wants a rewrite against the engine: listed with the catalogue's rewrite. `scripts/mutate.ts` stopped at its start on the stale entries (it put back every catalogued file, the gone ones too): it now skips a file that is not there. No file cut here was named by a live mutation but `perception.test.ts`, which had no test left to catch one.
+
+**Budgets** (`scripts/test-budgets.json`, new): the gate fails when the sum of its files' own times is over 1,200 file-seconds, or any file is over 90 s (the pipeline's file limit, now read from the budget); the slow tier warns over 1,000 s of wall, less the seconds it stood waiting on the machine with no file of its own running. File-seconds, not the gate's wall (the owner, through the coordinator, 2026-10-25): a merge must never fail because the machine was busy, and the gate's wall went from 208 s to 781 and 941 s with the load alone; a first budget of 180 s, then 250 s, of wall failed the branch's own gate. The whole gate tier came to 727 to 958 file-seconds as the load varied (file-seconds move with it too, less: a file shares its cores); 1,200 is the most of those and about 25%. The slow tier's 1,000 is this branch's 821 s on 2026-10-24 and about 20%. The first merge of this branch was stopped by its file limit: `orchestrator/test/figures.test.ts` (new on main that day, untimed) took 115 s in the gate, the other files at their recorded times (the median ratio 1.0), so it is a slow file and is named in the slow tier. `scripts/merge.ts` reads a `BUDGET:` line as a failure, never a flake; `scripts/tiers.test.ts` holds the whole gate tier, as last timed, within the file-seconds. Raising one is a decision with its entry here; what to do instead is docs/testing.md, "Pruning: when a budget is hit".
+
+**Revisit if** a budget is hit (prune by the procedure first), the mutation catalogue is rewritten against `kernel/crates/actors` (measure every file again), or one of the seed-pinned tests above needs its seed moved (replace it then).
 ## 2026-10-25 · The perception property's fault, found and mended: a post handed back is shown whole, and says so (branch `view-flake`)
 
 The case above (now in `perception.proptest-regressions`, and as its own test, `a_post_handed_back_is_shown_whole_not_twice`)
@@ -8076,6 +8128,49 @@ fails every time, not now and then: the property draws new cases each run, and f
 - **Revisit if:** a lone heavy run is much slower for it (then elastic slots, PL-4, give it more tokens), or a test that
   needs several threads sets them itself.
 
+## 2026-10-25 · Market realism: who else sells it, what a business costs, giving it up by weighing (branch `market-realism`; no model called)
+
+**Asked (Naz, through the coordinator):** three laws: founders learn of traders who started after them through what they would see; a home business has real fixed costs from sources; an owner may give up early, by the same weighing as entering, not after a fixed six months. Then (2026-10-25): real-world rates are not the yardstick ("I don't care what the real figure is"); what matters is that the mechanisms are real-world laws. The table below is an observation, not a target.
+
+**Built** (commit `fa50689f` and after; docs/behaviour/entry.md "Who else sells it", "What a business costs", "Giving it up"):
+- *Who else sells it.* Someone with the means for a business of one, when its weighing is due, first looks through what sellers advertise (the town's adverts board, which holds price lists placed at a seller's door), newest first, up to `search_limit`: the traders who started since are among them, and their lists are counted from then on. (The paper was the other route named; it reports the public record of the town's government and nothing of trade, so the advertisements, which are published and are what a would-be trader reads, carry it instead.)
+- *What a business costs.* `business.home_fixed_per_month`, counted by the founder and paid by the business at each draw to the outside world: au-vic $3.75 (ASIC's business-name fee, $45 a year from 1 July 2025, opened); gb-eng nothing (registering as self-employed is free, recalled, to confirm); ke-nakuru none sourced (Nakuru's single business permit fee was not found). Other running costs of a sole trader (insurance, a phone, transport) have no source here and are left out (ME-1).
+- *Giving it up.* Each month after its first, the owner weighs keeping it (what it paid them a month over up to six months) against the best job they know of, or nothing; the mind decides (Jovanovic 1982, learning). `give_up_below_bps` is gone, and there is no age before which it may not be given up.
+
+**Observed** (a year at 1,000 people, three profiles, three towns each, lean, no model; births and deaths as % of businesses a year, `economy/businesses`; the profiles' rates for reference only):
+
+| | au-vic | gb-eng | ke-nakuru |
+|---|---|---|---|
+| births, main (1d6e00f8) | 13 to 16 | 5 to 13 | 11 to 14 |
+| births, entry by profit (2026-10-24) | 26 to 37 | 52 to 60 | 2 to 4 |
+| births, with the three laws | 21 to 39 | 45 to 58 | 3 to 8 |
+| the profile's rate | 16.4 | 11.1 | 15 (placeholder) |
+| deaths, main | 2 to 5 | 3 to 8 | 19 to 31 |
+| deaths, with the three laws | 15 to 26 | 40 to 48 | 48 to 57 |
+| the profile's rate | 13.9 | 9.8 | none |
+
+**Read, as an observation:** births barely moved (gb-eng 52-60% to 45-58%); what the laws added is turnover: gb-eng starts and gives up nearly half its businesses a year, and ke-nakuru gives up half the traders it opened with, each weighing a thin margin against a job or nothing. What decides entry is the margin on goods against what a person has, and a business's custom in reach; the three laws leave both as they were. Nothing was tuned.
+
+**Revisit if** a founder's or an owner's weighing is given a mechanism it lacks with a real-world basis (what a household earns besides; what the business holds), or a sole trader's running costs are sourced.
+
+## 2026-10-25 · Commercial leasing: shop premises let by landlords, so a sole trader can take premises and employ (branch `commercial-leasing`; generator 0.67.0, firm.retailer 0.20.0; risk ME-1; no model called)
+
+**Asked (Naz, through the coordinator):** commercial leasing as a real institution, with leases, rent, deposits and terms from the profile's sources where they exist and flagged where not, so that a sole trader can take premises and employ. The design is docs/behaviour/leasing.md.
+
+**Built.**
+- *The premises.* The town opens with the profile's share of shop units empty (`commercial.vacant_bps` of all units) on its landlords' lots (`shop-unit`, a workplace with the room of the town's largest goods shop). Taken after every other lot, so no other building moves.
+- *The landlord* (`firm.landlord`, `commercial`) lists a unit with no lease on it (`premises_listing`, its own kind and board, so households never apply for one as a home), at the profile's rent or what its other units let for, and cuts the asking rent after a month unlet as for a home. It offers the lease to the first business that applies (no draw): rent monthly, the term, notice either side, and a security deposit of so many months' rent, paid as the tenant signs and given back to the account it applied from once the lease has ended. Leases of premises are kept apart from the homes' (no home's law, rent review, possession or tribunal reaches them).
+- *The business of one* (`firm.retailer`, operator): having turned customers away, it looks at what is to let, cheapest first, and weighs each unit (`premises_pay`: the custom it had and turned away, served by as many hands as it needs within the unit's room, each paid the going wage, less rent and running costs, against what its owner alone serves). It applies for the best that beats trading alone and that it holds the deposit, a month's rent and a month's wages for. Offered the lease, it signs, pays the deposit and sets up the rent in one act (refused whole if the money is not there), takes its stock there, tells its owner (`trading_at`) and from then on hires in its room through ordinary hiring; its owner's draw keeps the month's rent and a pay period's wages.
+- *The owner* works where the business trades from then on, and in weighing whether to give the business up counts the rent still owed under the lease, which runs to its end whatever they do.
+- *Figures* (profiles' `commercial`): au-vic's term (five years, Retail Leases Act 2003 s 21) and the deposit's holding and 30-day return are opened; gb-eng's deposit (three to six months, practitioners' guides) is opened; everything else is a placeholder or recalled, marked (ME-1).
+
+**Tests.** `firm.landlord`: premises listed on the profile's terms and not as a home, let to the first applicant, the deposit given back at the end. `firm.retailer`: `premises_pay` (custom beyond one person and a margin that pays the hands and rent; a thin margin or what one person serves gains nothing). Citizen: told by its business, the owner works at the unit, and weighs giving up against the rent still owed (kept where the same business with no lease is given up).
+
+**Observed** (a year at 1,000 people, three towns per profile, lean, no model; as an observation, not a target). Businesses of one that took premises on a lease, and hired there: au-vic 1, 2 and 1 leases, 0, 4 and 2 hires; gb-eng 0, 0 and 3 leases, 1 hire; ke-nakuru 2, 0 and 0 leases, no hire. Business births and deaths (% a year) were in the range of the branch before it: au-vic 21 to 34 and 13 to 27; gb-eng 52 to 65 and 44 to 52; ke-nakuru 4 to 7 and 49 to 55.
+
+**Leaves out** (docs/behaviour/leasing.md): rent reviews within a lease; a landlord's remedies against a tenant behind with the rent (a lease in arrears runs to its end, its deposit given back whole); a tenant's notice to leave early (a business given up while it holds a lease pays out to its owner and its rent order then fails); fitting out; a landlord buying a closed shop's premises to let; shops that own their premises moving into a unit. A unit's serving is not checked against its owner's being there (the business is not shown the unit's site), so the first acts of a day may be refused until the owner arrives.
+
+**Revisit if** a place's commercial rents, vacancy or lease terms are sourced (replace the placeholders); leased businesses' arrears or early exits matter to a study (the remedies above); or a lease should hold a firm's owner liable beyond its business's money.
 ## 2026-10-25 · Seats' working conditions, after the pilots' welfare review (branch `seat-welfare`)
 
 The six pilots' debriefs (runs/pilots-six-2026-10-24/review.md; lv-09 and lv-12 above all) put seats' distress where
@@ -8193,6 +8288,16 @@ started and nothing was spent on RunPod. **A proposal for then, to take the most
    control finished on a host of normal speed, then release by kind as now.
 4. *Cost:* GPU about 2 to 3 USD (three or four runs of about three hours at about 0.22 USD an hour); plan usage about 25
    to 40 USD for the blind reading (about 500 seat-confirmed drafts) and rewriting (about 1,000 examples); no seat calls.
+
+## 2026-10-25 · The merge gate runs the slow-tier files the change reaches, or the canaries (scripts/test.ts; no model called)
+
+**Why.** Main went red three times on 2026-10-25 because merges skip the slow tier (the coordinator's account; one of them is the entry "Main's four red slow-tier files": a broad change, the run's seed drawing who the people are, failed home-market, entry, office-books and seat-diary on main), and each red main stopped every other merge for an hour or more.
+
+**What.** Under `--gate` the runner reads the slow tier by the gate's own reading: a file changed itself, importing a changed file however far down, starting a script by name that does, or naming a changed data file (a config, a profile). Narrower for the slow tier, each file costing minutes: a document brings none (the comments and messages that cite a document made one document reach all 57), and a named folder counts only below the top level (`worlds/profiles/`, not `scripts/`, which every run's code says). **At most eight** (`SLOW_MOST`; the owner's ruling through the coordinator: a merge does not take 15 to 35 minutes): a change that reaches more (a profile, the generator, `orchestrator/src/run.ts`: all 57) runs the **canaries** instead and leaves the rest to CI. The canaries (`scripts/test-tiers.json`, `canary`, each with why) are the slow files that pin whole towns and so catch a broad change: `invariants.test.ts` (every invariant, read from the log alone), `culture-dial.test.ts` (the whole town's state and config hashes, the one deliberate alarm), and `home-market.test.ts` (where the broad change of 2026-10-24 showed a real fault, a leaver's savings sent before the mortgage payoff; the other three files that went red with it held draws, not rules). A kernel or contracts change, whose reach the import graph cannot see, runs the two marked `kernel`: the invariants and culture-dial. They run with the gate's files, slowest first, say their times as the slow tier's, and are left out of the gate's file-seconds and its file limit. `scripts/test-runner.test.ts` holds it (a change one slow test imports brings that one; one nine reach brings the canaries and none of the nine; the kernel its canaries; a document none), and `scripts/tiers.test.ts` that the canaries are slow files, each with why.
+
+**What it costs.** Measured on this branch with a broad change planted (a line in `orchestrator/src/run.ts`, which reaches all 58 slow files; load about 12 on 14 cores, so not a quiet machine): the gate chose the three canaries in place of 58 files and they took 256 file-seconds (invariants 138 s, culture-dial 78 s, home-market 41 s) beside the gate tier's own 795. The runner starts the slowest first, so the invariants run alongside the gate's files: in a merge, uncapped on twelve slots (117 s for the whole gate tier at the landing of test-pruning, 927 file-seconds), the gate's wall goes to about the invariants' own time, some 140 to 210 s, about one to one and a half minutes more. This branch's run took 432 s of wall at its checkout's cap of three slots, which is a branch's gate and not a merge's. A change reaching eight or fewer slow files costs their own times, at most about eight minutes of file-seconds, on top of the gate in parallel. A kernel change costs the two kernel canaries, about the same as a broad change.
+
+**Revisit if** main goes red from a slow file the gate did not run (add it to the canaries if it pins a whole town; otherwise consider `SLOW_MOST`), or the canaries add more than about 5 minutes to the gate on a quiet machine.
 ## 2026-10-25 · Foundations 2: conservation, space, capacity, figures' basis, and bounds as detectors; a plan, awaiting the owner (docs only; no code, no model called)
 
 - **Asked:** the owner agreed (2026-10-25) that realism gaps must become impossible at the kernel and platform layer,
@@ -8250,6 +8355,66 @@ started and nothing was spent on RunPod. **A proposal for then, to take the most
   behaviour code that never reach the config (the engine's own constants) are not counted (N4).
 - **Revisit if** the count's classes are disputed for a profile (then structured notes first, N3), or the test passes
   90 s on the gate (then fewer living towns).
+## 2026-10-25 · SC-1: what held a 10,000-person month's memory, the config read participant by participant, and people's params held once (branch `scale-next`; no model called)
+
+**What held it.** A sampling heap profiler in the kernel binary (`--features heapprof`, `kernel/src/heapprof.rs`;
+`scripts/heapprof.ts` names the stacks) on main's 10,000-person month (au-vic, `living.initiative_bps=10000`, 14 engine
+threads): 8.8 GB live at the high-water mark of a 10.2 GB footprint. The two largest holders were copies of the same
+thing: each person's controller in the typed config, as JSON values (2.5 GB: 23 KB of JSON a person, nearly all the
+same for everyone, the town's ventures alone 17.6 KB), and each citizen's own reading of those params (2.1 GB, the
+ventures again). Citizens' memory and minds were about 0.75 GB (as fix-memory-appeal found, not the cause). The rest
+is the run's own: the state hash's caches of canonical bytes (0.8 GB), what people have seen of buildings and work
+(0.9 GB), the engine (0.9 GB). The start, not live at the peak, made most of 50,000's: the config's text, its whole
+JSON value and three copies of its canonical bytes.
+
+**What changed (each result-identical; contracts unchanged, the config's text, hash and the log the same).**
+- *The config read participant by participant* (`config::load_from`): each participant checked against the schema's
+  own `Participant` definition (the whole schema checks the rest, its participants empty, and the list's limit), its
+  canonical bytes written on, compressed, and read into its type; the rest read as JSON as before. Its canonical bytes
+  are kept compressed in three pieces (`config::Canonical`); the header is written from them, and a snapshot takes
+  them from there. `load` and `load_split` (from a value) take the same path. `oikos-kernel world` and the native
+  `World` read so (a `config_file` option, or the text); `RustWorld.start` writes a config of 10,000 participants or
+  more to a file member by member and participant by participant (one string could not hold 100,000's 2.8 GB).
+- *A controller's long params members held once* (`controller::Controller`, in the config and the world's state): a
+  member of 128 bytes or more of JSON is held once for everyone who has it alike; read whole (its serialisation, its
+  equality, `to_value`) it is the controller as given. The actors' `Params` read a person's own members and the shared
+  ones as one map, in key order; it no longer derefs to a `Map` (twelve call sites changed to `get`, `iter`,
+  `to_map`, or a `&Params` in place of a `&Map`). A first version kept one shared map per person's combination of long
+  members; a person's own long members (values, beliefs) made each combination different, so nothing was shared and
+  the peak did not move: found by the test (one map per person), now one held member per distinct member.
+- *The citizen's ventures read once* for all given the same list (`controller::read_once`, in the contracts crate:
+  the actors may hold no lock, and this is an immutable reading of the same text, which no one can change).
+
+**Measured** (release builds, 14 engine threads, each run alone in a slot, the machine's load 20 to 40):
+- 10,000 x 30 days: **10.21 to 5.19 GB** peak footprint (10.59 to 5.22 GB resident), 184 to 123 s wall,
+  1,052 to 1,068 G instructions (+1.5%: params read through the shared view, the controllers serialised for the hash);
+  the start 6.3 GB at 30 s to 2.4 GB at 42 s. After the first two changes alone: 7.58 GB.
+- 1,000 x 30 days, three profiles: au-vic 0.99 to 0.84 GB, gb-eng 0.96 to 0.83, us-oh 0.65 to 0.61.
+- 50,000 x 30 days: **completes** (main stopped at the start past the 40 GB guard, 44 GB in 104 s): 22.3 minutes wall,
+  about 28 to 33 GB through the month, 30.1 GB peak resident, 41.0 GB peak footprint (a spike at the end, between the
+  guard's 10-second looks), 15,033 G instructions, 4.06 million steps, state `ea006720ed53d36c`. Generating its config:
+  27 s, 2.05 GB, 1.39 GB of JSON.
+- 100,000: **not yet**. Its config is generated in 141 s (5.4 GB; 3.12 GB of JSON) and the start is bounded (8.7 GB at
+  two minutes), but the first moment (everyone's first look, still at t=0 with 4.8 GB of log out) passed the 40 GB
+  guard (44.6 GB footprint, 22 GB resident). At 20,000 the start and first moment peak at 4.8 GB, the hash's caches of
+  canonical bytes the largest holder (1.6 GB of 4.3 live); what grows faster than the town at 100,000 is unprofiled.
+- Identical: the same final state hash and log digest (header's `kernel`, entries' hash and prev stripped) before and
+  after, on 10,000 x 30 d (`d2c58d35f85e747f`, `1d4162c3b258f44f`) and on 1,000 x 30 d of au-vic, gb-eng and us-oh;
+  the profiled build too. Tests: `kernel/tests/config_stream.rs` (three profiles: the streamed read is the whole read,
+  a run from it the same log, the same refusals, one held list of ventures for all), `orchestrator/test/config-file.test.ts`,
+  the controller's own.
+- **Revisit if** a module's params come to be changed per person in place (`Params::make_mut` then copies them, as
+  before, and memory rises with it); a heap profile at 50,000 shows the end-of-run spike (the final state's canonical
+  bytes, likely) to matter; or the run's own holders (the hash's caches, what people have seen) are to be cut: those
+  are changes to what is kept, not copies.
+
+## 2026-10-25 · A known timing flake is rerun once alone in every run, CI's too
+
+- **What we saw:** main went red at 72dbbed0 for `scripts/slots.test.ts` alone (it passed three times in a row by hand);
+  merge.ts already reran that file once alone, CI did not, so a timing flake blocked every merge.
+- **Change:** `scripts/test.ts` reruns a failed file from the known-flakes list (the two merge.ts names) once alone, and
+  accepts it only if it then passes; the line says so.
+- **Revisit if:** a listed file fails twice in a row (then it is a fault, not a flake), or the list grows past these two.
 
 ## 2026-10-25 · Foundations-2 phase 1: capacity for every doer, systems included (law 10: P1, P2, P3, P5; branch `f2-phase1`, stacked on `f2-phase0`; no model called)
 
@@ -8365,3 +8530,6 @@ placeholder on a small town, and a non-resident officer as the seat's body if th
   matters to a result (then hours by weekday, as a person's working days are); a module's decision is found published by a
   machine at its second (then the static audit should follow the module's issues, not only the rows); the order's second
   is to be priced (then a row for ordering, and `ORDER_SECONDS` goes).
+- **Merged with main (2026-10-25, origin/main at 3b87959e: market realism, commercial leasing).** The generator is 0.68.0
+  (this phase on main's 0.67.0), and culture-dial's pins were re-taken once more on the merged tree, with the reason beside
+  them. The measurements above are from before the merge (f2-phase0 tip against this branch), not re-run on main's towns.

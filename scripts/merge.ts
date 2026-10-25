@@ -44,6 +44,7 @@ export const hasMarkers = (text: string) => /^(<{7}( |$)|={7}$|>{7}( |$))/m.test
 export function readFailures(log: string): { files: string[]; other: string[] } {
   const files = new Set<string>(), other = new Set<string>();
   for (const line of log.split("\n")) {
+    if (/^BUDGET: /.test(line)) { other.add("the time budget (scripts/test-budgets.json)"); continue; }
     const m = /^FAIL (\S+)/.exec(line);
     if (!m) continue;
     if (/\.test\.ts$/.test(m[1]!)) files.add(m[1]!); else other.add(m[1]!);

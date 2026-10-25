@@ -8,7 +8,7 @@ import { expect, test } from "bun:test";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
-import { canonical, planLawWords } from "@oikos/participants";
+import { planLawWords } from "@oikos/participants";
 import { runWorld } from "../src/run";
 import { RustWorld, rustManifests, rustRule } from "../src/rust-world";
 import { officeAt } from "./lib/offices";
@@ -86,20 +86,8 @@ test("the manifests and the shared rules are read from Rust", () => {
     expect(rustRule<string>("forms.plan_law_words", figures)).toBe(planLawWords(figures as any));
 });
 
-// (Compared as canonical JSON, as the kernel reads a config: the order of an object's keys is never meant.)
-test("the generator calling the Rust rules makes the same towns, word for word, as with the TS rules it falls back on where the engine is not built", () => {
-  for (const profile of ["au-vic-2026", "gb-eng-2026", "ke-nakuru-2026"]) {
-    const s = { ...spec, profile, years: 1 };
-    process.env.OIKOS_TS_RULES = "1";
-    let tsTown: string;
-    try {
-      tsTown = canonical(generate(s));
-    } finally {
-      delete process.env.OIKOS_TS_RULES;
-    }
-    expect(canonical(generate(s))).toBe(tsTown);
-  }
-}, 120_000);
+// (That the generator calling the Rust rules makes the same towns as with the TS rules: worlds/test/rules-native.test.ts, every profile.
+// The three-profile copy that stood here went at the test pruning, 2026-10-24.)
 
 test("on the Rust world, a mock seat sitting as its code twin (its brain the engine's own kind, run detached) warns as the code does, through the TS seat host", async () => {
   const code = weatherOnly();

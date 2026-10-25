@@ -7,6 +7,7 @@
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
 import { particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
+import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
@@ -85,7 +86,7 @@ const WORK_TIME = {
     "publish/rates_notice": 120, "publish/invoice": 180, "publish/delivery_note": 120,
     // An employer's, a lender's and a clerk's paperwork (foundations F6): a return of the tax withheld is made up from the pay run and checked,
     // a notice to payroll is a form, a lending decision is weighed on a file, a written approval is read and signed.
-    "publish/withholding_report": 1800, "publish/payroll_notice": 300, "publish/loan_decision": 1800, "publish/loan_terms": 900, "publish/approval": 300,
+    "publish/withholding_report": 1800, "publish/payroll_notice": 300, "publish/loan_decision": 1800, "publish/loan_terms": 900, "publish/approval": 300, "publish/interview": 2700,
     // What a decision waits for, and a decision looked at again (foundations F8): an office asks for papers or a confirmation, a claimant gathers and sends
     // them, an employer answers from its books, and an office looks at its decision again as it decided it.
     "publish/evidence_request": 300, "publish/evidence": 900, "publish/confirmation_request": 300, "publish/confirmation_answer": 600, "publish/decision_review": 1200,
@@ -114,6 +115,7 @@ const WORK_TIME = {
     "person.publish/delivery_note": "Placeholder (to confirm; WM-1): two minutes to make a delivery note. Would be sourced by a time-and-motion study of dispatch clerks or a warehouse benchmark.",
     "person.publish/withholding_report": "Placeholder (to confirm; WM-1): half an hour to make up and check a return of the tax withheld from a pay run. Would be sourced by a tax authority's burden or compliance-cost estimate per return (the one opened, 2026-10-24, gives a year's employment-tax reporting as a whole, not one return).",
     "person.publish/payroll_notice": "Placeholder (to confirm; WM-1): five minutes to fill in a notice of a starter or a leaver for payroll. Would be sourced by a form-burden estimate for a starter's or leaver's form.",
+    "person.publish/interview": "Placeholder (ME-2): 45 minutes for a hiring manager to interview one applicant and judge them, to be sourced per place (employer recruitment surveys: hours of staff time per hire; to confirm).",
     "person.publish/loan_decision": "Placeholder (to confirm; WM-1): half an hour to decide a loan on its file. Would be sourced by a lender's applications decided per underwriter for small personal loans (the productivity figures found, 2026-10-24, are for mortgages, about five hours a file, a different loan).",
     "person.publish/loan_terms": "Placeholder (to confirm; WM-1): a quarter of an hour to write the terms of a loan agreed. Would be sourced by a lender's documentation cost study.",
     "person.publish/approval": "Placeholder (to confirm; WM-1): five minutes to read and sign a written approval. Would be sourced by the approval step of an accounts-payable process benchmark.",
@@ -139,7 +141,7 @@ const WORK_TIME = {
  * whole; of what is older and still stands, and touches the person in no way, the twenty most recent of each. Sizes are
  * placeholders (limited attention and forgetting, to confirm): a bound, not a fit. */
 export const PUBLIC_MEMORY = { kinds: ["news", "election_notice", "nomination", "ballot", "ballot_result", "petition_count", "membership"], has: ["practice", "assertion"], days: 30, most: 20, every_days: 7 };
-export const GENERATOR_VERSION = "0.66.0"; // 0.66.0: foundations-2 phase 1 (law 10): the support office's casework is done by a desk of the agency's officers (`outside-casework`, template `agency-casework`: an officer's minutes for each paper, their hours, lanes the town's share from the profile's `public_service.support_officers_per_1000_claims`), named `by` on each casework act; every machine's template states its hours (the whole day); an office offer's seconds are its template's rows. 0.65.0: citizens keep a bounded memory of public goings-on (`public_memory`, on unless a spec sets it false: risk SC-1). 0.64.0: a shop's wage and job by kind of shop, a serving task and a wholesaler for each kind, factories by product from inputs of their own, complaints by kind; the laws' words are the engine's. 0.63.0: the mix of shops is on by default; each kind of shop has premises of its own type, its room and its founded-shop venture; the household, tax and payment rules are the Rust ones (MT-18). 0.62.0: names and ordinary dates (docs/design/names-and-dates.md), both off unless a spec turns them on (`names`, `calendar`): people, organisations and the town drawn from the profile's `names` by streams keyed on stable ids, the town's bodies named as the profile has them, genesis papers that name people say their names, offices' references for records; the config's `calendar` from the profile's `calendar` and a start date (the weather's start month derived from it); 0.61.0: the auditor (docs/behaviour/auditor.md): where the profile has `audit`, a body of the town (staffed by residents, paid by a grant) examines the support office's decisions and the town finance office's accounts on a sample as the audit law (published) says, and publishes a report; 0.60.0: foundations F9: the forms for a claimant's papers (`evidence`), an employer's confirmation (`confirmation_answer`) and a request to look at a decision again or put something right (`review_request`) are published, public, where a place has decisions that wait or are reviewed; 0.59.0: 0.59.0: foundations F8, law as data: the profile's `decisions` (what a decision waits for; review and appeal routes; who refuses) are published as `law-decisions`, the payments procedure carries who approves a payment over what sum (`data.approval`), the tribunal hears a refused claim only where the law has an appeal and at the law's fee, the request every grievance uses is `review_request`, and the work table has rows for the new papers; 0.58.0: foundations F11 and the office's slip rows for systems too: a table of work row for a keeper's answer to a question put to its register (`answer`, a placeholder: ten minutes for a person, two seconds for a system); 0.57.0: foundations F7: how often a decision, a bill or a pay goes wrong is a row of the world's table of slips (`orchestration.slip`), each with the profile's note as its source, and no longer a parameter of the module (error_bps, uphold_bps, billing_error_bps_per_year, short_pay.per_year_bps); 0.56.0: foundations F6: every body that employs people has a payroll officer and a deputy from its staff (a firm's manager a deputy), the bank's lending office pays the bank's staff, no venue or support office has a throughput or delay dial, paperwork has rows in the table; 0.55.0: foundations F5: the posts of the town's own bodies are held by people hired from the town at the profile's staffing rates and pay (`public_service`), the bank's payment platform is a licensed system, every system comes from a template that says what it does, and a seat is a person with a post of its own (docs/behaviour/staffing.md); 0.54.0: a profile's employment.hours is published as the law on cutting hours (law-cutting-hours) and its firms' hours step reaches them (docs/behaviour/firms.md, "Hours before heads"); 0.53.0: `opening_caseload` reaches the other offices (support claims in hand and refusals asked about, complaints before the town's desks, permit applications before planning, invoices unpaid at finance, loans behind at the bank), each from the town's own flow times the days a matter stands open; `opening_caseload_scale_bps` thickens them (docs/decisions.md, 2026-10-12, "Opening caseloads of the other offices"); 0.52.0: a profile's ordinary terms of trade credit (business.trade_credit_days) reach the factories that sell to shops and the world market that sells inputs to factories (docs/behaviour/trade.md, "Trade credit"); 0.51.0: the tax law lists its returns, from the profile's public_finance.returns (docs/decisions.md, 2026-10-12, "Returns on the law's days"): which charges each reports and the day of the month it falls due by, as words and as data; 0.50.0: the law on possession says what the place's law has of a plan to pay (may, must consider, none; where it is taken away; where paying in full ends the claim), the tribunal's form for a tenant's answer is published, the possession order form offers only what that law has, and people are given their place's rate of answering an application; 0.49.0: homes by income (docs/decisions.md, 2026-10-12, "Homes by income"): where the profile states its renters' rent as a share of income, a town's first tenancies are dealt by what each household has coming in, people with nothing coming in live with kin, owners are chosen by the head's age where the profile has it, and the payments its support law already owes are in payment from the first day by the profile's take-up; 0.48.0: `opening_caseload`: a town may open in the middle of things, its landlords' rent books and its tribunal's list as an ordinary day would have them (off unless set); a landlord's and the member's procedure say what the law has for a home the tenant has left; 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
+export const GENERATOR_VERSION = "0.68.0"; // 0.68.0: foundations-2 phase 1 (law 10): the support office's casework is done by a desk of the agency's officers (`outside-casework`, template `agency-casework`: an officer's minutes for each paper, their hours, lanes the town's share from the profile's `public_service.support_officers_per_1000_claims`), named `by` on each casework act; every machine's template states its hours (the whole day); an office offer's seconds are its template's rows. 0.67.0: shop premises to let: the profile's share of shop units stand empty on the landlords' lots, let on its commercial terms, and businesses of one see what is to let (docs/behaviour/leasing.md). 0.66.0: no rate of business births: the ventures are weighed by expected profit, each with the trade price its goods are bought in at (risk ME-1). 0.65.0: citizens keep a bounded memory of public goings-on (`public_memory`, on unless a spec sets it false: risk SC-1). 0.64.0: a shop's wage and job by kind of shop, a serving task and a wholesaler for each kind, factories by product from inputs of their own, complaints by kind; the laws' words are the engine's. 0.63.0: the mix of shops is on by default; each kind of shop has premises of its own type, its room and its founded-shop venture; the household, tax and payment rules are the Rust ones (MT-18). 0.62.0: names and ordinary dates (docs/design/names-and-dates.md), both off unless a spec turns them on (`names`, `calendar`): people, organisations and the town drawn from the profile's `names` by streams keyed on stable ids, the town's bodies named as the profile has them, genesis papers that name people say their names, offices' references for records; the config's `calendar` from the profile's `calendar` and a start date (the weather's start month derived from it); 0.61.0: the auditor (docs/behaviour/auditor.md): where the profile has `audit`, a body of the town (staffed by residents, paid by a grant) examines the support office's decisions and the town finance office's accounts on a sample as the audit law (published) says, and publishes a report; 0.60.0: foundations F9: the forms for a claimant's papers (`evidence`), an employer's confirmation (`confirmation_answer`) and a request to look at a decision again or put something right (`review_request`) are published, public, where a place has decisions that wait or are reviewed; 0.59.0: 0.59.0: foundations F8, law as data: the profile's `decisions` (what a decision waits for; review and appeal routes; who refuses) are published as `law-decisions`, the payments procedure carries who approves a payment over what sum (`data.approval`), the tribunal hears a refused claim only where the law has an appeal and at the law's fee, the request every grievance uses is `review_request`, and the work table has rows for the new papers; 0.58.0: foundations F11 and the office's slip rows for systems too: a table of work row for a keeper's answer to a question put to its register (`answer`, a placeholder: ten minutes for a person, two seconds for a system); 0.57.0: foundations F7: how often a decision, a bill or a pay goes wrong is a row of the world's table of slips (`orchestration.slip`), each with the profile's note as its source, and no longer a parameter of the module (error_bps, uphold_bps, billing_error_bps_per_year, short_pay.per_year_bps); 0.56.0: foundations F6: every body that employs people has a payroll officer and a deputy from its staff (a firm's manager a deputy), the bank's lending office pays the bank's staff, no venue or support office has a throughput or delay dial, paperwork has rows in the table; 0.55.0: foundations F5: the posts of the town's own bodies are held by people hired from the town at the profile's staffing rates and pay (`public_service`), the bank's payment platform is a licensed system, every system comes from a template that says what it does, and a seat is a person with a post of its own (docs/behaviour/staffing.md); 0.54.0: a profile's employment.hours is published as the law on cutting hours (law-cutting-hours) and its firms' hours step reaches them (docs/behaviour/firms.md, "Hours before heads"); 0.53.0: `opening_caseload` reaches the other offices (support claims in hand and refusals asked about, complaints before the town's desks, permit applications before planning, invoices unpaid at finance, loans behind at the bank), each from the town's own flow times the days a matter stands open; `opening_caseload_scale_bps` thickens them (docs/decisions.md, 2026-10-12, "Opening caseloads of the other offices"); 0.52.0: a profile's ordinary terms of trade credit (business.trade_credit_days) reach the factories that sell to shops and the world market that sells inputs to factories (docs/behaviour/trade.md, "Trade credit"); 0.51.0: the tax law lists its returns, from the profile's public_finance.returns (docs/decisions.md, 2026-10-12, "Returns on the law's days"): which charges each reports and the day of the month it falls due by, as words and as data; 0.50.0: the law on possession says what the place's law has of a plan to pay (may, must consider, none; where it is taken away; where paying in full ends the claim), the tribunal's form for a tenant's answer is published, the possession order form offers only what that law has, and people are given their place's rate of answering an application; 0.49.0: homes by income (docs/decisions.md, 2026-10-12, "Homes by income"): where the profile states its renters' rent as a share of income, a town's first tenancies are dealt by what each household has coming in, people with nothing coming in live with kin, owners are chosen by the head's age where the profile has it, and the payments its support law already owes are in payment from the first day by the profile's take-up; 0.48.0: `opening_caseload`: a town may open in the middle of things, its landlords' rent books and its tribunal's list as an ordinary day would have them (off unless set); a landlord's and the member's procedure say what the law has for a home the tenant has left; 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -643,6 +645,12 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const staffFor = (units: number, hoursPerWorkerMonth: number) => Math.max(1, Math.ceil((units * SERVE_EXACT * 10_000) / (hoursPerWorkerMonth * SHOP_UTILISATION_BPS) - 1e-9));
   // A mix of shops (docs/behaviour/demand.md): the kinds the town's shops sell, each kind's unit being what SERVE seconds of staff
   // time serves (so its price follows from its labour share), and which kind each shop sells. `goods` stands for what the factories make.
+  // What running a business of one costs a month beside its stock (registration, a licence and the like), the profile's,
+  // paid to the outside world (docs/behaviour/entry.md, "What a business costs"; risk ME-1). None: nothing.
+  // Where a business of one finds shop premises to let, where the town has any (docs/behaviour/leasing.md).
+  const PREMISES_BOARD = V.commercial && landlords.length && Math.round((shops.length * V.commercial.vacant_bps) / Math.max(1, 10_000 - V.commercial.vacant_bps)) > 0
+    ? { channels: [K.board("premises", ["premises_listing"], { title: "Shop premises to let" })], params: { premises_board: "premises" } } : { channels: [] as any[], params: {} };
+  const HOME_FIXED: { fixed_per_month?: number; fixed_to?: string } = V.business?.home_fixed_per_month ? { fixed_per_month: V.business.home_fixed_per_month, fixed_to: "acc-outside" } : {};
   const MIX: ShopKind[] | undefined = spec.shop_mix !== false && hasShopTable(V) ? shopMix(V, shops.length, { price: RETAIL_PRICE, wholesale: WORLD.goods_import }, (SERVE * hourly(wages.shop)) / HOUR) : undefined;
   const KIND_OF = new Map<string, ShopKind | undefined>();
   if (MIX) { let i = 0; for (const k of MIX) for (let j = 0; j < k.shops; j++) KIND_OF.set(shops[i++]!, k); }
@@ -923,6 +931,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // last of the town's, so that every other building stands where it did (a shifted lot put a school on the river's flood plain).
   const officesLot = site();
   structures.push({ id: "town-offices", at: cellOf.get(officesLot), type: "offices", built_by: "builder" });
+  // Shop premises to let (docs/behaviour/leasing.md): beside the town's shops, the profile's share of units standing empty,
+  // each on a lot of a landlord's, who lets it (taken after every other lot, so that nothing else moves).
+  const CM = V.commercial;
+  const LET_UNITS = CM && landlords.length ? Math.round((shops.length * CM.vacant_bps) / Math.max(1, 10_000 - CM.vacant_bps)) : 0;
+  for (let i = 0; i < LET_UNITS; i++) {
+    const lot = site();
+    structures.push({ id: `unit-${i + 1}`, at: cellOf.get(lot), type: "shop-unit", built_by: "builder" });
+    own(lot, landlords[i % landlords.length]!);
+  }
   for (const lot of [...roadLots].sort()) structures.push({ id: `road-${lot.slice(4)}`, at: cellOf.get(lot), type: "road", built_by: "builder" });
   for (const p of parcels) if (!titleOf.has(p.id)) own(p.id, "city");
   // ---- elections: the electors enrolled at the start, and the law that has them elect the mayor (world-expansion 3) ----
@@ -1188,6 +1205,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const onOwnAccount: { c: Person; kind: (typeof OA_HELD)[number] }[] = [];
   let job = 0;
   const staffCount = new Map<string, number>();
+  const tradeOf = new Map<string, string>(); // (the industry of the job someone opens with: the trade an application of theirs names, docs/design/market-realism.md, ME-2)
   const U = V.unions;
   const unionPick = rng("union");
   const unionMembers: { member: string; employer: string; industry: string }[] = [];
@@ -1199,6 +1217,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const inGroup = new Set<string>(); // (members of a group at the start)
   /** A job as the town opens: the agreement and its standing instruction to the bank, the worker's place, and (for a job on the books) their union dues. */
   const employ = (c: Person, w: (typeof workplaces)[number], byDay: boolean, offBooks: boolean, draws: { below(n: number): number } = pick) => {
+    tradeOf.set(c.id, w.industry);
     staffCount.set(w.employer, (staffCount.get(w.employer) ?? 0) + 1);
     staffAt.set(w.employer, [...(staffAt.get(w.employer) ?? []), c.id]);
     if (w.role) staffOf.set(`${w.employer}|${w.role}`, [...(staffOf.get(`${w.employer}|${w.role}`) ?? []), c.id]);
@@ -1253,6 +1272,22 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         text: `Standing instruction to the bank, given by ${c.id} before the year began: pay my union dues under membership agreement ${mem} every month.`, data: { outcome: { money: { from: `acc-${c.id}`, to: "acc-union", amount: String(U.dues_per_month), for: "Union dues." } }, every: MONTH, first: (1 + unionPick.below(30)) * DAY } });
     }
   };
+  // Who works, drawn together within households (risk ME-17; docs/design/market-realism.md): each adult's place in the
+  // labour market is where a latent draw falls (in work, looking, or outside it, at exactly the profile's shares), and a
+  // household's latent draws share a common factor, as much as makes the share of households in which nobody works the
+  // labour force survey's (`household_work`). Without the figure, nothing is shared: each drawn on their own.
+  const HW = V.household_work;
+  const inWorkChance = (m: Person) => (!m.adult || (!CURVE && !working(m)) ? 0 : (V.labour_force_participation_bps / 10_000) * (spec.employed_bps / 10_000) * (CURVE ? stillIn(ageOf(m)) : 1));
+  const counted = HW ? households.filter((h) => (HW.of === "families" ? h.members.length >= 2 : h.members.some((m) => working(m)))) : [];
+  const SHARED = HW ? fitShared(counted.map((h) => h.members.map(inWorkChance)), HW.workless_bps / 10_000) : 0;
+  const commonPick = rng("work-household"), personPick = rng("work-person");
+  const latentOf = new Map<string, number>();
+  for (const h of households) {
+    const common = normInv(unit(commonPick.below(1_000_000)));
+    for (const m of h.members) if (m.adult) latentOf.set(m.id, normCdf(shared(common, normInv(unit(personPick.below(1_000_000))), SHARED)));
+  }
+  /** Savings to draw once everyone's pay is known (they lean on its rank: `income_wealth_rank_bps`). */
+  const toSave: { c: Person; monthly: number; account: number }[] = [];
   for (const c of everyone.filter((m) => m.adult)) {
     // Retired (at the profile's retirement age): savings to live on, and no job.
     if (!CURVE && !working(c)) {
@@ -1261,14 +1296,16 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       monthlyPay.set(c.id, 0);
       continue;
     }
-    // In the labour force (the profile's participation), and then in work (the spec's share of the labour force).
-    const participating = pick.below(10_000) < V.labour_force_participation_bps;
+    // In the labour force (the profile's participation), and then in work (the spec's share of the labour force): where
+    // the person's latent draw falls.
+    const at = latentOf.get(c.id) ?? unit(personPick.below(1_000_000)), partShare = V.labour_force_participation_bps / 10_000;
+    const participating = at < partShare;
     if (!participating) outOfLabourForce.add(c.id);
     // (With a curve by age: their own age of stopping work, which some have reached and some never will.)
     if (CURVE && participating) stopsAt.set(c.id, stopsWorkAt(CURVE, pick.below(10_000)) ?? "never");
     const stopped = CURVE && participating && stopsAt.get(c.id) !== "never" && ageOf(c) >= (stopsAt.get(c.id) as number);
     // (In work; and of those, working for themself in a kind the town holds: no employer's job.)
-    const inWork = participating && !stopped && pick.below(10_000) < spec.employed_bps;
+    const inWork = participating && !stopped && at / partShare < spec.employed_bps / 10_000;
     const own = inWork && OWN_BPS > 0 && ownPickWork.below(10_000) < OWN_BPS;
     const employed = inWork && !own && job < jobSlots.length;
     if (own) {
@@ -1283,14 +1320,28 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     monthlyPay.set(c.id, monthly);
     netPay.set(c.id, !w || own || byDay || offBooks ? monthly : Math.floor(((w.wage - withholding(taxLaw, w.wage, PAY)) * MONTH) / PAY));
     if (participating && !stopped && !own && !w) looking.add(c.id);
-    // Savings: drawn from the profile's distribution by age (else, the spec's months of pay); from the profile's
-    // retirement age, the retired's savings, working or not.
-    const band = V.savings_by_age && !spec.savings_months_only ? [...V.savings_by_age].reverse().find((b) => b.from <= ageOf(c)) : undefined;
-    const [lo, hi] = V.retiree_savings;
-    const saved = !working(c) ? lo + Math.floor((pick.below(10_001) * (hi - lo)) / 10_000)
-      : band ? drawSavings(band.pct, pick.below(10_000)) : monthly * (spec.savings_months[0] + pick.below(spec.savings_months[1] - spec.savings_months[0] + 1));
-    accounts.push({ id: `acc-${c.id}`, holder: c.id, custodian: "bank", balance: !working(c) ? saved : Math.max(V.opening.person_min_savings, saved) });
+    // Savings: drawn below, once everyone's pay is known; their account keeps its place among the accounts.
+    accounts.push({ id: `acc-${c.id}`, holder: c.id, custodian: "bank", balance: 0 });
+    toSave.push({ c, monthly, account: accounts.length - 1 });
     if (w) employ(c, w, byDay, offBooks);
+  }
+  // Savings: drawn from the profile's distribution by age (else, the spec's months of pay), at a rank that leans on the
+  // rank of their pay among those of working age by the profile's rank correlation of income and wealth once age is
+  // accounted for (`income_wealth_rank_bps`; none given: a rank of their own); from the profile's retirement age, the
+  // retired's savings, working or not.
+  {
+    const RHO = (V.income_wealth_rank_bps ?? 0) / 10_000;
+    const ofAge = toSave.filter((x) => working(x.c));
+    const rankOf = new Map(ranks(ofAge.map((x) => x.monthly)).map((u, i) => [ofAge[i]!.c.id, u] as const));
+    for (const x of toSave) {
+      const c = x.c;
+      const band = V.savings_by_age && !spec.savings_months_only ? [...V.savings_by_age].reverse().find((b) => b.from <= ageOf(c)) : undefined;
+      const [lo, hi] = V.retiree_savings;
+      const q = (k: number) => (RHO > 0 && rankOf.has(c.id) ? savingsRank(rankOf.get(c.id)!, unit(k * 100 + 50), RHO) : k);
+      const saved = !working(c) ? lo + Math.floor((pick.below(10_001) * (hi - lo)) / 10_000)
+        : band ? drawSavings(band.pct, q(pick.below(10_000))) : x.monthly * (spec.savings_months[0] + pick.below(spec.savings_months[1] - spec.savings_months[0] + 1));
+      accounts[x.account]!.balance = !working(c) ? saved : Math.max(V.opening.person_min_savings, saved);
+    }
   }
   // The audit office's staff: taken on (docs/behaviour/auditor.md), at the body's rate and the profile's pay, as any body's are.
   if (AUDL) {
@@ -2076,6 +2127,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       spaces: [{ kind: "dwelling", count: 1, capacity: capacityFor(h.bedrooms), attrs: { bedrooms: h.bedrooms } }] })),
     { id: "apartments", category: "residential", materials: { materials: kg(1_000) }, build_labour: 36_000 * HOUR, demolition_labour: 2_000 * HOUR, build_time: 180 * DAY, footprint: { w: 1, h: 1 },
       spaces: units.map((u) => ({ kind: "dwelling", count: u.count, capacity: capacityFor(u.bedrooms), attrs: { bedrooms: u.bedrooms } })) },
+    // (An empty unit to let: room for as many staff as the town's largest shop of goods, the kind a trader would take it for.)
+    ...(LET_UNITS ? [{ id: "shop-unit", category: "commercial", materials: { materials: kg(250) }, build_labour: 8_000 * HOUR, demolition_labour: 500 * HOUR, build_time: 90 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: Math.max(2, ...shopTypes.map((t) => t.capacity)) }], ...(spec.life === false ? {} : { injury_bps: INJURY.shop }) }] : []),
     ...shopTypes.map((t) => ({ id: t.id, category: "commercial", materials: { materials: kg(250) }, build_labour: 8_000 * HOUR, demolition_labour: 500 * HOUR, build_time: 90 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: t.capacity }], ...(spec.life === false ? {} : { injury_bps: INJURY.shop }) })),
     { id: "factory", category: "industrial", materials: { materials: kg(1_600) }, build_labour: 50_000 * HOUR, demolition_labour: 3_000 * HOUR, build_time: 240 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 40 }], ...(spec.life === false ? {} : { injury_bps: INJURY.factory }) },
     { id: "yard", category: "industrial", materials: { materials: kg(30) }, build_labour: 1_000 * HOUR, demolition_labour: 100 * HOUR, build_time: 30 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: CREW.capacity }], ...(spec.life === false ? {} : { injury_bps: INJURY.factory }) },
@@ -2716,7 +2769,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // (Its titles are its own papers, through `mine`; the plan of each lot it looks up in the register. It sees its
       // own buildings and who lives in them; with no land, no building.)
       lotPlans, ...(theirCells.length ? [K.premises("own-sites", theirCells)] : []), deaths, lawBook],
-      code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, outside_account: "acc-outside",
+      code("firm.landlord", { ...(CM && LET_UNITS ? { commercial: { rent: CM.rent_per_month, deposit_months: CM.deposit_months, term_months: CM.term_months, notice_days: CM.notice_days } } : {}), base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, outside_account: "acc-outside",
         city: "city", city_account: "acc-city", builder: "builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000, register: { lots: "lots" },
         // (Whom it will let to: no more people to a bedroom than the place's own standard has, where the profile states one.)
         ...(H.occupancy ? { max_people_per_bedroom: H.occupancy.per_bedroom } : {}),
@@ -2758,8 +2811,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // alone. It sees its own books, papers and stock, its supplier's prices and what producers advertise to the trade.
   // (It is shown no ground: a home or a market is not one business's premises. Its owner knows where they are.)
   for (const b of ownBusinesses) positions.push({ id: `${b.firm}-owner`, entity: b.firm, title: "Owner", holder: `${b.person}-self`,
-    channels: [{ id: "books", kind: "accounts" }, mine(), market("outside"), shopBoards[0], { id: "stock", kind: "holdings" }],
-    role_module: { code: "firm.retailer", params: { premises: b.premises, workplace: b.space, operator: b.person, max_staff: 0, min_staff: 0, industry: "retail", wage: wages.shop, period: PAY, working_day: WORKING_DAY,
+    channels: [{ id: "books", kind: "accounts" }, mine(), market("outside"), shopBoards[0], { id: "stock", kind: "holdings" }, ...PREMISES_BOARD.channels],
+    role_module: { code: "firm.retailer", params: { premises: b.premises, workplace: b.space, operator: b.person, ...HOME_FIXED, ...PREMISES_BOARD.params, max_staff: 0, min_staff: 0, industry: "retail", wage: wages.shop, period: PAY, working_day: WORKING_DAY,
       serve_task: "sell", serve_labour: SHOP.serve, suppliers: ["outside"], trade_board: "trade", price: RETAIL_PRICE, demand: OWN.sales, shopfront: true, premises_cell: b.cell, ...(RD && b.space.startsWith(`${MARKET}/`) ? { open_from: RD.work_start_hour * HOUR, open_until: RD.work_end_hour * HOUR } : {}), stock_days: b.days, draw_days: V.pay_period_days, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } } });
   const ownWorkOf = new Map(ownBusinesses.map((b) => [b.person, { firm: b.firm, account: `acc-${b.firm}`, ...(b.space.startsWith(`${MARKET}/`) ? { at: b.space } : { home: b.space }), expect_per_month: OWN.monthly }]));
   // Citizens see petitions and their published counts, not each other's signatures.
@@ -2808,7 +2861,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     return {
       // Beyond the premises: a month's stock at the wholesale price, and three months' wages for a shop's opening staff
       // (until customers find it: they change shops only now and then). Derived from the town's own figures.
-      kind: t.id, name: t.id === "shop" ? "Shop" : `Shop (${sells.kind.replace(/_/g, " ")})`, capital: demand * sells.stockUnit + 3 * Math.floor((sells.wage * MONTH) / PAY) * staff,
+      kind: t.id, unit_cost: sells.wholesale, name: t.id === "shop" ? "Shop" : `Shop (${sells.kind.replace(/_/g, " ")})`, capital: demand * sells.stockUnit + 3 * Math.floor((sells.wage * MONTH) / PAY) * staff,
       channels: [{ id: "books", kind: "accounts" }, mine(), deaths, lawBook, market(...new Set(["outside", "builder", wholesaler(sells.kind)])), ...shopBoards,
         { id: "stock", kind: "holdings" }, K.premises("premises", ["{cell}"])],
       role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{structure}/workplace.1", industry: "retail", lender: "bank", builder: "builder", max_staff: t.capacity, wage: sells.wage, period: PAY, working_day: WORKING_DAY,
@@ -2825,20 +2878,16 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // A second venture (docs/behaviour/entry.md, "Starting a business of one"): trading on one's own account from
   // home, the business of one the town may have opened with, started in the run. It needs no premises: its capital
   // is a week's stock (a supplier's least order, where that is more) and the money for one more buying of it, as
-  // such a business is given at the start. The month's chance is derived from the place's business birth rate
-  // (the profile's, with its source) and the town's own counts: the births that rate gives on the businesses the
-  // town has, over the people who could start one (in the labour force, of working age, with the savings for it).
-  const BUS = V.business;
+  // such a business is given at the start. Whether anyone starts one is theirs: entry by expected profit, from what
+  // they know of its market (docs/behaviour/entry.md, "Entry by expected profit"; risk ME-1). No rate of births: the
+  // profile's business birth rate is a target to compare with, not a setting. `unit_cost` is the trade price the
+  // world publishes for what it sells in.
   const ownCapital = 2 * Math.ceil((Math.max(Math.ceil((OWN_NEW.sales * 7) / 30), WHOLESALE_LEAST) * WORLD.goods_import * 11) / 10);
-  const ownVenture = { kind: "own_account", name: "Trading from home", own: true, expect_per_month: OWN_NEW.monthly, capital: ownCapital,
-    channels: [{ id: "books", kind: "accounts" }, mine(), market("outside"), shopBoards[0], { id: "stock", kind: "holdings" }],
-    role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{home}", operator: "{founder}", founder: "{founder}", capital: "{capital}", bank: "bank", max_staff: 0, min_staff: 0, industry: "retail",
+  const ownVenture = { kind: "own_account", name: "Trading from home", own: true, expect_per_month: OWN_NEW.monthly, capital: ownCapital, unit_cost: WORLD.goods_import, ...(HOME_FIXED.fixed_per_month ? { fixed_per_month: HOME_FIXED.fixed_per_month } : {}),
+    channels: [{ id: "books", kind: "accounts" }, mine(), market("outside"), shopBoards[0], { id: "stock", kind: "holdings" }, ...PREMISES_BOARD.channels],
+    role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{home}", operator: "{founder}", founder: "{founder}", capital: "{capital}", bank: "bank", ...HOME_FIXED, ...PREMISES_BOARD.params, max_staff: 0, min_staff: 0, industry: "retail",
       wage: wages.shop, period: PAY, working_day: WORKING_DAY, serve_task: "sell", serve_labour: SHOP.serve, suppliers: ["outside"], trade_board: "trade", price: RETAIL_PRICE, demand: OWN_NEW.sales, shopfront: true,
       premises_cell: "{cell}", stock_days: 7, draw_days: V.pay_period_days, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } } };
-  const businessesNow = entities.filter((e) => ["shop", "factory", "landlord", "builder", "own_account", "firm"].includes(e.kind)).length;
-  const savedBy = new Map(accounts.map((a) => [a.holder, a.balance as number]));
-  const couldFound = everyone.filter((m) => m.adult && !outOfLabourForce.has(m.id) && ageOf(m) < V.retirement_age && (savedBy.get(m.id) ?? 0) >= ownCapital + V.spending.essentials_per_month).length;
-  const foundOwnPpm = BUS?.entry_bps_per_year ? Math.min(1_000_000, Math.round((BUS.entry_bps_per_year * businessesNow * 100) / (12 * Math.max(1, couldFound)))) : 0;
   const citizenController = code("citizen.default", { outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
     complain_to: "city", complain_bps: V.services.complain_bps,
     // (What holds people in a job they have, where the profile says: read by those who take initiative.)
@@ -2888,8 +2937,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     year: life.year, births: spec.life !== false, gestation: life.birth.gestation, fertility_per_10000: V.fertility_per_10000,
     buffer_months: SAVINGS_KEPT_MONTHS, saving_bps: V.spending.saving_bps, wealth_effect_bps_per_year: V.spending.wealth_effect_bps_per_year, essentials: V.spending.essentials_per_month,
     retirement_age: V.retirement_age, ...(CURVE ? { stop_work_curve: CURVE } : {}),
-    // Starting businesses: a placeholder monthly chance for someone able to (to calibrate against business entry rates).
-    ventures: [...shopVentures, ...(foundOwnPpm > 0 ? [ownVenture] : [])], found_bps: 200, ...(foundOwnPpm > 0 ? { found_own_ppm: foundOwnPpm } : {}),
+    // Starting businesses: the ventures a person may weigh, each by its expected profit (docs/behaviour/entry.md).
+    ventures: [...shopVentures, ownVenture],
     // Founding (docs/behaviour/founding.md), where the town has it on: the profile's fitted chance and sizes; the
     // post a founder holds in what they found (what a convenor sees: its own papers and money; and the one module
     // that runs it); the hall and its hire.
@@ -2996,7 +3045,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const controller = outOfLabourForce.has(m.id) ? outsideLabourForce : citizenController;
     const held = beliefs.get(m.id);
     // (Their own beliefs; and, where people here stop work at ages of their own, theirs.)
-    const own = { own_values: valuesOf.get(m.id)!, ...(held ? { beliefs: held } : {}), ...(stopsAt.has(m.id) ? { stops_work_at: stopsAt.get(m.id) } : {}), ...(ownWorkOf.has(m.id) ? { own_work: ownWorkOf.get(m.id) } : {}),
+    const own = { own_values: valuesOf.get(m.id)!, ...(held ? { beliefs: held } : {}), ...(stopsAt.has(m.id) ? { stops_work_at: stopsAt.get(m.id) } : {}), ...(ownWorkOf.has(m.id) ? { own_work: ownWorkOf.get(m.id) } : {}), ...(tradeOf.has(m.id) ? { trade: tradeOf.get(m.id) } : {}),
       ...(living ? { ...(attachMean ? { attach_mean: attachMean } : {}), ...startedOf(m) } : {}), ...(originOf.has(m.id) ? { origin: originOf.get(m.id) } : {}) };
     participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, channels: citizenChannels, controller: Object.keys(own).length ? { ...controller, params: { ...controller.params, ...own } } : controller, framing: unstated });
   }
@@ -3606,7 +3655,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         // (And each other kind of shop's own serving: the time a unit of its kind takes its staff.)
         ...(MIX ?? []).filter((k) => k.kind !== "goods").map((k) => ({ id: k.serve_task, labour: skillWork ? skillWork.scale(SHOP.serve) : SHOP.serve, in: "workplace", ...(skillWork ? { labour_by: skillWork.labour_by } : {}) })),
         // Selling on one's own account: the same time an item, wherever its seller works from (a room at home, a pitch).
-        ...(MARKET || foundOwnPpm > 0 ? [{ id: "sell", labour: skillWork ? skillWork.scale(SHOP.serve) : SHOP.serve, ...(skillWork ? { labour_by: skillWork.labour_by } : {}) }] : []),
+        { id: "sell", labour: skillWork ? skillWork.scale(SHOP.serve) : SHOP.serve, ...(skillWork ? { labour_by: skillWork.labour_by } : {}) },
         // Using things up: a household's goods, an item at a time; it takes no one's time.
         { id: "consume", labour: 0, consumes: { goods: "1" } },
         // (And each other kind the town's shops sell, the same: the citizen uses a kind up by the task `consume-<kind>`.)

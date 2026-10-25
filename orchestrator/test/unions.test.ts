@@ -36,7 +36,9 @@ test("claims are answered by offers; those accepted become enterprise agreements
   const taxLaw = config.world.records.find((r: any) => r.id === "law-income-tax");
   const law = taxLawOf(taxLaw.id, taxLaw.data, taxLaw.speaks_for)!;
   const claims = recs.filter((r) => r.kind === "wage_claim" && r.speaks_for === "union");
-  expect(claims.length).toBeGreaterThanOrEqual(3);
+  // (Some claim to hold the rule on. Until the test pruning, 2026-10-24, three or more, a count of the draws: the run's seed was hopped
+  // for a third claim. The rule is each claim's answer, below.)
+  expect(claims.length).toBeGreaterThanOrEqual(1);
   // Every claim is answered by its employer with an offer no more than the claim.
   for (const c of claims) {
     const offer = recs.find((r) => r.kind === "wage_offer" && r.data.claim === c.id && r.speaks_for === c.data.employer);

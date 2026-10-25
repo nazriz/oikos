@@ -264,7 +264,7 @@ fn div_round(n: i64, d: i64) -> i64 {
 
 impl Person {
     /// What kind of institution someone is to us (citizen.ts `kindOf`).
-    fn recourse_kind_of(&self, who: &str, params: &serde_json::Map<String, Value>) -> String {
+    fn recourse_kind_of(&self, who: &str, params: &crate::Params) -> String {
         if let Some(k) = params.get("institutions").and_then(|i| i.get(who)).and_then(Value::as_str) {
             return k.to_string();
         }
@@ -292,7 +292,7 @@ impl Person {
         .to_string()
     }
     /// A venue's kind, where it is nothing else to us: an office (citizen.ts `civil`).
-    fn civil(&self, who: &str, params: &serde_json::Map<String, Value>) -> String {
+    fn civil(&self, who: &str, params: &crate::Params) -> String {
         match self.recourse_kind_of(who, params) {
             k if k == "other" => "civil_service".into(),
             k => k,

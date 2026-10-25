@@ -64,7 +64,7 @@ How any employer hires and pays (postings, offers, standing orders, notice, a wo
 | Rule | Detail |
 |---|---|
 | **Posting** | If staff plus pending offers are below the target headcount, and the balance covers 2 pay periods of the wage bill, post one job at the firm's wage |
-| **Hiring** | One applicant at random per posting. The offer includes the workplace. |
+| **Hiring** | One posting for every hand short, up until all are offered the post (`openings`); an application to a posting re-published at a new wage stands for the new one. Each one taken on is interviewed first (`interview`, a paper in the manager's time: the table of work's `publish/interview`), and the post goes to those who have worked in its trade (the `trade` their application names) before others, then to who applied first; nothing is drawn (docs/design/market-realism.md, ME-2). The offer includes the workplace. |
 | **Bargaining** (C5) | A union's wage claim gets an offer by capacity to pay; an accepted offer becomes an enterprise agreement and a rise for all staff (new wage orders from the next pay day). Staff on strike aren't paid for the time: their pay stops, and restarts at the return, with what they earned before the stoppage. After each stoppage, the offer rises to what holding out against another would cost the firm in sales, as a year's rise in wages, never above the claim or below its offer (Hicks 1932; unions.md, "Concession"). | [unions.md](unions.md) |
 | **Postings** | A posting says where the work is (`data.workplace`), so someone told about a workplace can find it. A posting still open when the firm's wage has moved (Lengnick's rule raises it for a posting unfilled a month) is withdrawn and published again at the new wage, so the rise reaches applicants. |
 | **Paying** | Once the worker signs, set up a standing order through the firm's bank for wages every 14 days |
@@ -192,7 +192,7 @@ The agreement itself is an ordinary employment agreement: the same notice, a sta
 
 | | |
 |---|---|
-| **Taking on** | A posting is for work by the day with the chance the share gives (drawn for each posting), at the day's pay, which moves as the firm's wage does. It says so (`data.by_the_day`, a period of a day), and its offer carries the terms. One applicant at random, as for any posting |
+| **Taking on** | A posting is for work by the day with the chance the share gives (drawn for each posting), at the day's pay, which moves as the firm's wage does. It says so (`data.by_the_day`, a period of a day), and its offer carries the terms. Chosen as for any posting (above, "Hiring") |
 | **Pay** | No standing order. On each working day, each hand who is at the workplace is paid the day's pay that day, once, by a payment of its own (an instruction to the firm's bank). Not there, not a working day, or no work for them today: no pay, and nothing owed. Short of money for all, the longest with the firm are paid first |
 | **The days there is work** | The builder: the days it has building in hand. The shop and the factory: every working day (a refinement for the factory, an order in hand, is left out) |
 | **What the law takes** | From a registered job by the day, what the charges take from a day's pay, reckoned as a year's over the working days of the week (a day's pay is pay for a working day, not for every day of the year: `dayPayPeriod`); paid over and reported with the rest. An unregistered one: nothing, as above |

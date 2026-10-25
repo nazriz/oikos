@@ -310,6 +310,10 @@ pub struct JobApplication {
     pub posting: String,
     /// The applicant's account.
     pub account: String,
+    /// The trade they work in, or last worked in, as they know it (the industry of that employer's postings), for the
+    /// employer to judge who fits (docs/design/market-realism.md, ME-2). None: no work on record.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trade: Option<String>,
 }
 impl Paper for JobApplication {
     const KIND: &'static str = "job_application";

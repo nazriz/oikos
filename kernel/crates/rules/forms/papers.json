@@ -1026,6 +1026,7 @@
    "data": {
     "wage": "#wage",
     "period": "=period",
+    "openings": "=posts",
     "role": "@role",
     "industry": "@industry",
     "workplace": "@workplace_structure",

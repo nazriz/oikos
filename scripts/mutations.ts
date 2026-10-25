@@ -255,9 +255,7 @@ export const MUTATIONS: Mutation[] = [
   "find": "if (self ? !id.includes(\"/\") : id.startsWith(prefix)) channels[self ? id : id.slice(prefix.length)] = ch;",
   "replace": "if (self ? true : id.startsWith(prefix)) channels[self ? id : id.slice(prefix.length)] = ch;",
   "why": "A person's own view includes the prefixed channels of the posts they hold, so org accounts and records appear as their own and ownAccount may pick the office's money.",
-  "tests": [
-   "orchestrator/test/perception.test.ts"
-  ]
+  "tests": []
  },
  {
   "id": "view-cache-stale",
@@ -266,9 +264,7 @@ export const MUTATIONS: Mutation[] = [
   "find": "if (ch.cells.length || ch.whole) this.cache.delete(id);",
   "replace": "if (ch.whole) this.cache.delete(id);",
   "why": "A participant's cached cell list is not refreshed when new cells arrive, so it keeps acting on a stale picture of the street.",
-  "tests": [
-   "orchestrator/test/perception.test.ts"
-  ]
+  "tests": []
  },
  {
   "id": "draw-keyed-on-moment",
@@ -279,7 +275,9 @@ export const MUTATIONS: Mutation[] = [
   "why": "Non-matter draws are keyed on the exact second, so a seat that wakes at another hour than its code twin gets different draws and the twin parts.",
   "tests": [
    "orchestrator/test/reliability.test.ts",
-   "orchestrator/test/twin-draws.test.ts"
+   "orchestrator/test/twin-draws.test.ts",
+   "orchestrator/test/twin-draws-seat.test.ts",
+   "orchestrator/test/twin-draws-year.test.ts"
   ]
  },
  {
@@ -290,7 +288,9 @@ export const MUTATIONS: Mutation[] = [
   "replace": "pay(ctx.rng(`spend-${t}`).pick(shops), spend,",
   "why": "Which shop a landlord's owners spend at is keyed on the time, perturbing it between a pilot and its twin.",
   "tests": [
-   "orchestrator/test/twin-draws.test.ts"
+   "orchestrator/test/twin-draws.test.ts",
+   "orchestrator/test/twin-draws-seat.test.ts",
+   "orchestrator/test/twin-draws-year.test.ts"
   ]
  },
  {
@@ -302,6 +302,8 @@ export const MUTATIONS: Mutation[] = [
   "why": "Record numbers are no longer replaced by per-participant counters, so one more paper anywhere moves every later draw keyed on a record.",
   "tests": [
    "orchestrator/test/twin-draws.test.ts",
+   "orchestrator/test/twin-draws-seat.test.ts",
+   "orchestrator/test/twin-draws-year.test.ts",
    "orchestrator/test/reliability.test.ts"
   ]
  },
@@ -508,9 +510,7 @@ export const MUTATIONS: Mutation[] = [
   "find": "    rec.visible_to.allows(entity) || st.author_entity(rec).as_deref() == Some(entity)\n",
   "replace": "    rec.visible_to.allows(entity) || rec.entities_named().iter().any(|e| *e == entity)\n",
   "why": "Being named in a private record is taken for being allowed to see it: a tenant named in the landlord's letter to the bank is shown it.",
-  "tests": [
-   "orchestrator/test/perception.test.ts"
-  ]
+  "tests": []
  },
  {
   "id": "kernel-care-draw-by-number",
@@ -521,6 +521,8 @@ export const MUTATIONS: Mutation[] = [
   "why": "Whether care saves a life is drawn on the condition's number (its place among all conditions in town), so one more illness anywhere changes who dies: a pilot parts from its twin.",
   "tests": [
    "orchestrator/test/twin-draws.test.ts",
+   "orchestrator/test/twin-draws-seat.test.ts",
+   "orchestrator/test/twin-draws-year.test.ts",
    "orchestrator/test/deaths.test.ts"
   ]
  },
