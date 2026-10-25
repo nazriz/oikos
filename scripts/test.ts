@@ -19,7 +19,11 @@
 // kernel's own tests of the crates the change reaches (cargo-nextest, the `gate` profile); a change of documents only
 // chooses the tests that read documents, plus the backstops; any other change chooses the fast tier, the tests that
 // are changed, import a changed file or name a changed data file or its folder, and the backstops (BACKSTOPS: the
-// invariant tests, always). Where the release kernel is not current, the gate builds the `gate` profile in seconds and
+// invariant tests, always); and of the slow tier, the files the change reaches by the same reading (changed, importing a
+// changed file, naming a changed data file or its folder), and for a change to the kernel or the contracts the year of
+// canaries that pin whole towns (test-tiers.json, `canary`, those marked `kernel`). A change reaching more than SLOW_MOST of
+// them runs the canaries instead, the rest left to CI. They run in the gate and say their times; the budget does not count them.
+// Where the release kernel is not current, the gate builds the `gate` profile in seconds and
 // points the tests at it. `--tier gate|slow` runs one tier whole. `--list` prints the choice and stops.
 // `--root DIR` runs the *.test.ts under DIR instead of the repo (used by scripts/test-runner.test.ts; no preconditions).
 
@@ -52,6 +56,9 @@ const filters = args;
 const FULL_ON = [/^kernel\//, /^contracts\/(?!.*\.md$)/, /^(package\.json|bun\.lock|bunfig\.toml|tsconfig.*\.json)$/, /^scripts\/(test|slots|slots-preload)\.ts$/, /^\.github\//];
 /** Always run under --affected: the invariants and backstops. */
 const BACKSTOPS = ["orchestrator/test/generality.test.ts", "orchestrator/test/no-god-view.test.ts", "contracts/test/contracts.test.ts", "orchestrator/test/invariants-gate.test.ts", "orchestrator/test/all-work-takes-time.test.ts", "orchestrator/test/risks.test.ts", "orchestrator/test/unstated-run.test.ts", "scripts/tiers.test.ts"]; // (the year of invariants.test.ts is the slow tier's: CI)
+/** The most slow-tier files a change may bring into the gate by its reach; one that reaches more (a profile, the generator,
+ * run.ts) brings the canaries instead (scripts/test-tiers.json, `canary`), and CI runs the rest after the push. */
+const SLOW_MOST = 8;
 const isDoc = (f: string) => /\.md$/.test(f) || (f.startsWith("docs/") && /\.(txt|png|svg|jpg)$/.test(f));
 
 const cores = cpus().length;
@@ -70,7 +77,11 @@ const times: Record<string, number> = !custom && existsSync(timesPath) ? JSON.pa
 // test file is the gate's. The gate never runs the slow tier: CI runs both on every push to main, and nightly
 // (scripts/tiers.test.ts holds that every file is in exactly one, and that CI runs them all).
 const tiersPath = join(root, "scripts", "test-tiers.json");
-const tiers: { slow: Record<string, string> } = existsSync(tiersPath) ? JSON.parse(readFileSync(tiersPath, "utf8")) : { slow: {} };
+const tiers: { slow: Record<string, string>; canary?: Record<string, { why: string; kernel?: boolean }> } = existsSync(tiersPath) ? JSON.parse(readFileSync(tiersPath, "utf8")) : { slow: {} };
+/** The slow files that pin whole towns (their hashes, their invariants) and so catch a broad change: run by the gate in
+ * place of a broad change's reach, and those marked `kernel` for a change to the kernel or the contracts. */
+const canaries = Object.keys(tiers.canary ?? {});
+const kernelCanaries = canaries.filter((f) => tiers.canary![f]!.kernel);
 const isSlowTier = (f: string) => Object.hasOwn(tiers.slow, f);
 /** A file is fast if it took under this long last time (never timed: slow, until it has been). */
 const FAST_SECONDS = 10;
@@ -135,6 +146,8 @@ const all = [...new Glob("**/*.test.ts").scanSync({ cwd: root })]
   // (The gate is the gate tier's; --tier picks one.)
   .filter((f) => (affected || tierFlag === "gate" ? !isSlowTier(f) : tierFlag === "slow" ? isSlowTier(f) : true));
 const untimed = all.filter((f) => times[f] === undefined);
+// (Under --gate, the slow tier's files too: the ones the change reaches join the gate below.)
+const slowAll = affected ? [...new Glob("**/*.test.ts").scanSync({ cwd: root })].filter((f) => isSlowTier(f) && !f.includes("node_modules") && !f.startsWith("runs/") && !f.startsWith("kernel/target") && !f.startsWith(".claude/")).filter((f) => !filters.length || filters.some((x) => f.includes(x))) : [];
 
 // ---- `--changed`: what the branch touched, and the tests that reach it.
 const realRoot = realpathSync(root);
@@ -165,7 +178,9 @@ function byName(): Map<string, string[]> {
   return nameIndex;
 }
 /** For each test file, why it is chosen (undefined: it is not): itself changed, a changed import, a changed data file named. */
-function reasons(tests: string[], deep = false): { why: Map<string, string>; changedFiles: string[]; kernel: boolean; unreached: string[] } {
+/** `narrow` (the slow tier's files under --gate): no document counts, and a folder named counts only below the top level ("worlds/profiles/", not "scripts/"): a
+ * town test whose code says "scripts/" does not read every script's data, and each slow file costs minutes. */
+function reasons(tests: string[], deep = false, narrow = false): { why: Map<string, string>; changedFiles: string[]; kernel: boolean; unreached: string[] } {
   const git = (...a: string[]) => { const p = Bun.spawnSync(["git", ...a], { cwd: root, stdout: "pipe", stderr: "pipe" }); if (p.exitCode !== 0) stop(`git ${a.join(" ")} failed: ${p.stderr.toString().trim()} (--changed compares with ${base}: fetch it, or name another with --base)`); return p.stdout.toString().trim(); };
   const from = git("merge-base", base, "HEAD");
   const changedFiles = [...new Set([...git("diff", "--name-only", from).split("\n"), ...git("ls-files", "--others", "--exclude-standard").split("\n")].filter(Boolean))].sort();
@@ -193,8 +208,9 @@ function reasons(tests: string[], deep = false): { why: Map<string, string>; cha
       // one, "(docs/profiles.md)", does not read this one. Every source file cites a document in its comments, so a test that only
       // imports one does not read documents: 2026-10-24, a change to one document chose 220 files.)
       const named = data.find((c) => {
+        if (narrow && isDoc(c)) return false; // (a document brings no slow test: what a town test reads is code, configs and profiles)
         if (deep && isDoc(c)) { const code = load(f!).code; return code.includes(c.split("/").pop()!) || (f === t ? /["'`](?:[^"'`\n]*\/)?docs(?:\/|["'`])/ : /["'`](?:[^"'`\n]*\/)?docs(?:\/[\w\/-]*)?["'`]/).test(code); }
-        const txt = load(f!).text; return txt.includes(c.split("/").pop()!) || (deep && txt.includes(dirname(c) + "/"));
+        const txt = load(f!).text; return txt.includes(c.split("/").pop()!) || (deep && (!narrow || dirname(c).includes("/")) && txt.includes(dirname(c) + "/"));
       });
       if (named) { reached.add(named); if (!why.has(t)) why.set(t, `names ${named}${f === t ? "" : ` (in ${f})`}`); }
       // (--affected: a test that starts a script by its name -- the command line, a pilot's queue -- reaches what the script imports.
@@ -210,7 +226,7 @@ const pick = changed ? reasons(all, affected) : undefined;
 const fullWhy = affected && pick ? pick.changedFiles.find((f) => FULL_ON.some((r) => r.test(f))) : undefined;
 const docsOnly = affected && !!pick && !fullWhy && pick.changedFiles.length > 0 && pick.changedFiles.every(isDoc);
 const sel = fullWhy || !pick ? undefined : pick;
-if (affected) console.log(fullWhy ? `--gate: ${fullWhy} changed, which could reach any test: the whole gate tier (${all.length} files; the slow tier runs in CI).` : docsOnly ? "--gate: documents only: the tests that read documents, and the backstops." : "");
+if (affected) console.log(fullWhy ? `--gate: ${fullWhy} changed, which could reach any test: the whole gate tier (${all.length} files), and of the slow tier what it reaches (all of it in CI).` : docsOnly ? "--gate: documents only: the tests that read documents, and the backstops." : "");
 if (sel) {
   const isFast = (f: string) => (times[f] ?? Infinity) < FAST_SECONDS;
   const extra = all.filter((f) => pick.why.has(f) && !isFast(f));
@@ -221,13 +237,26 @@ if (sel) {
   if (pick.unreached.length) console.log(`  no test imports or names: ${pick.unreached.slice(0, 12).join(", ")}${pick.unreached.length > 12 ? `, and ${pick.unreached.length - 12} more` : ""}`);
   if (slow.length && extra.length > slow.length / 2) console.log(`  (${extra.length} of the ${slow.length} slow files: this change reaches most of the suite. To run less, name the tests that cover it: bun scripts/test.ts <filter>...)`);
 }
+// The slow tier's files the change reaches (--gate only): by the same reading as the gate's own, and the slow backstops for
+// a change to the kernel or the contracts; never for documents only. They run with the gate; the budget leaves them out.
+const slowPick = affected && pick && !docsOnly && slowAll.length ? reasons(slowAll, true, true) : undefined;
+const kernelOrContracts = !!pick?.changedFiles.some((f) => f.startsWith("kernel/") || /^contracts\/(?!.*\.md$)/.test(f));
+const reached = slowAll.filter((f) => slowPick?.why.has(f));
+const broad = reached.length > SLOW_MOST;
+const slowChosen = slowAll.filter((f) => (broad ? canaries.includes(f) : reached.includes(f)) || (kernelOrContracts && kernelCanaries.includes(f)));
+if (broad) console.log(`--gate: the change reaches ${reached.length} of the slow tier's files, more than ${SLOW_MOST}: the canaries instead (scripts/test-tiers.json), the rest in CI after the push.`);
+const slowChosenSet = new Set(slowChosen);
+if (slowChosen.length) {
+  console.log(`--gate: and ${slowChosen.length} of the slow tier's ${slowAll.length} files, which the change reaches (their times are reported, not counted against the gate's budget):`);
+  for (const f of slowChosen) console.log(`  + ${f} (about ${Math.round(times[f] ?? 0)}s, slow tier): ${broad || !slowPick?.why.has(f) ? `a canary (${tiers.canary?.[f]?.why ?? ""})${!broad ? ": the kernel or the contracts changed" : ""}` : slowPick.why.get(f)}`);
+}
 // The kernel's own tests: under --gate, when the kernel or the contracts it compiles in changed, and then only the crates
 // the change reaches (undefined: all of them; null: none).
 const contractsChanged = !!pick?.changedFiles.some((f) => /^contracts\/(?!.*\.md$)/.test(f));
 const kernelWhich: string[] | undefined | null = !filters.length && !custom && !timeNew && !list && tierFlag !== "slow" && (!pick || pick.kernel || contractsChanged) ? (pick && !contractsChanged ? kernelCrates(pick.changedFiles) : undefined) : null;
 if (!custom && !list) preconditions(affected);
-const files = all
-  .filter((f) => !sel || (affected && BACKSTOPS.includes(f)) || (!docsOnly && (times[f] ?? Infinity) < FAST_SECONDS) || sel.why.has(f))
+const files = [...all, ...slowChosen]
+  .filter((f) => slowChosenSet.has(f) || !sel || (affected && BACKSTOPS.includes(f)) || (!docsOnly && (times[f] ?? Infinity) < FAST_SECONDS) || sel.why.has(f))
   .filter((f) => !fast || (times[f] ?? Infinity) < FAST_SECONDS)
   .filter((f) => !timeNew || times[f] === undefined)
   .sort((a, b) => (times[b] ?? 1e9) - (times[a] ?? 1e9) || (a < b ? -1 : 1));
@@ -387,9 +416,12 @@ if (!custom && !filters.length && !list) {
   const budgets = JSON.parse(readFileSync(join(repo, "scripts", "test-budgets.json"), "utf8")) as { gate: { file_seconds_total: number; file_seconds: number }; slow: { wall_seconds: number } };
   const say = "(docs/testing.md, \"Pruning: when a budget is hit\"; a budget is raised only with an entry in docs/decisions.md)";
   if (affected || tierFlag === "gate") {
-    const long = Object.entries(record).filter(([, r]) => r.secs > budgets.gate.file_seconds).map(([f, r]) => `${f} ${r.secs}s`);
+    const own = Object.entries(record).filter(([f]) => !slowChosenSet.has(f));
+    const slowRan = Object.entries(record).filter(([f]) => slowChosenSet.has(f));
+    if (slowRan.length) console.log(`(budgets: the slow tier's files the change reached took ${slowRan.reduce((n, [, r]) => n + r.secs, 0).toFixed(0)} file-seconds, not counted: ${slowRan.map(([f, r]) => `${f} ${r.secs}s`).join(", ")})`);
+    const long = own.filter(([, r]) => r.secs > budgets.gate.file_seconds).map(([f, r]) => `${f} ${r.secs}s`);
     if (long.length) { over = true; console.log(`BUDGET: gate files over ${budgets.gate.file_seconds}s: ${long.join(", ")} ${say}`); }
-    const total = Object.values(record).reduce((n, r) => n + r.secs, 0);
+    const total = own.reduce((n, [, r]) => n + r.secs, 0);
     console.log(`(budgets: the gate's files took ${total.toFixed(0)} file-seconds of its ${budgets.gate.file_seconds_total})`);
     if (total > budgets.gate.file_seconds_total) { over = true; console.log(`BUDGET: the gate's files took ${total.toFixed(0)} file-seconds, over its ${budgets.gate.file_seconds_total} ${say}`); }
   } else if (tierFlag === "slow") {

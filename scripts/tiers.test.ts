@@ -12,7 +12,7 @@ const list = (...a: string[]) => {
   const p = Bun.spawnSync(["bun", runner, "--list", "--no-build", ...a], { cwd: repo, stdout: "pipe", stderr: "pipe", env: { ...process.env, OIKOS_SLOTS: "off" } });
   return p.stdout.toString().split("\n").filter((l) => /\.test\.ts$/.test(l));
 };
-const tiers = JSON.parse(readFileSync(join(import.meta.dir, "test-tiers.json"), "utf8")) as { slow: Record<string, string> };
+const tiers = JSON.parse(readFileSync(join(import.meta.dir, "test-tiers.json"), "utf8")) as { slow: Record<string, string>; canary: Record<string, { why: string; kernel?: boolean }> };
 const times = JSON.parse(readFileSync(join(import.meta.dir, "test-times.json"), "utf8")) as Record<string, number>;
 /** The most a gate file may take (by test-times.json): the gate's file limit in scripts/test-budgets.json, which the runner also holds at the end of a gate. */
 const budgets = JSON.parse(readFileSync(join(import.meta.dir, "test-budgets.json"), "utf8")) as { gate: { file_seconds_total: number; file_seconds: number }; slow: { wall_seconds: number } };
@@ -41,6 +41,13 @@ test("the slow tier names files that are there, each with why", () => {
     expect({ f, there: existsSync(join(repo, f)) }).toEqual({ f, there: true });
     expect({ f, why: why.length > 10 }).toEqual({ f, why: true });
   }
+});
+
+test("the canaries the gate runs for a broad change are slow-tier files, each with why, and those for the kernel among them", () => {
+  const c = Object.entries(tiers.canary ?? {});
+  expect(c.length).toBeGreaterThanOrEqual(2);
+  for (const [f, x] of c) expect({ f, slow: Object.hasOwn(tiers.slow, f), why: x.why.length > 20 }).toEqual({ f, slow: true, why: true });
+  expect(c.filter(([, x]) => x.kernel).map(([f]) => f)).toEqual(expect.arrayContaining(["orchestrator/test/invariants.test.ts", "orchestrator/test/culture-dial.test.ts"]));
 });
 
 test("the backstops are in the gate, and every gate file is short", () => {
