@@ -17,6 +17,8 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+pub use crate::controller::Controller;
+
 pub const CONTRACTS_VERSION: &str = "0.8";
 
 /// Entity kinds with physical meaning. Every other kind is the world's vocabulary.
@@ -741,8 +743,8 @@ pub struct ParticipantCfg {
     /// are: the state's participant holds the same ones, not copies.)
     #[serde(default, skip_serializing_if = "no_channels")]
     pub channels: Arc<Vec<Channel>>,
-    /// Opaque to the kernel.
-    pub controller: Arc<Value>,
+    /// Opaque to the kernel. (Its params' long members kept once for all who share them: `controller::Controller`.)
+    pub controller: crate::controller::Controller,
     /// Opaque to the kernel.
     pub framing: Arc<Value>,
     /// What happens after an opt-out: absent or "vacant" means it never acts again (and its positions
@@ -1151,20 +1153,330 @@ pub struct LoadedConfig {
     /// (Shared with the world made from it, which keeps it for the run.)
     pub config: Arc<Config>,
     /// The config as it was given, in canonical JSON: what its hash is of, and what the log's header carries.
-    pub canonical: Vec<u8>,
+    pub canonical: Canonical,
     pub hash: String,
 }
 
+/// A config's canonical JSON, kept compressed (zstd, in pieces: what comes before its participants, its participants,
+/// what comes after). A large world's is over a gigabyte as it stands (1.39 GB at 50,000 people) and nearly all
+/// repetition (each person's controller), so it is kept at a few per cent of that; it is wanted whole only for the
+/// log's header and a snapshot, and is read out piece by piece for those. The bytes read out are exactly the
+/// canonical JSON of the config as given (`canon::canonical_value`).
+#[derive(Debug, Clone)]
+pub struct Canonical {
+    pieces: Vec<Arc<[u8]>>,
+    len: u64,
+}
+
+/// How hard the canonical bytes are compressed: the fastest level does as well on a config's repetition (a person's
+/// controller is the same as the last but a few members), and is in step with reading the config.
+const CANON_LEVEL: i32 = 1;
+
+impl Canonical {
+    /// Canonical bytes given whole (a snapshot's, or a test's).
+    pub fn of(bytes: &[u8]) -> Canonical {
+        Canonical { pieces: vec![zstd::bulk::compress(bytes, CANON_LEVEL).expect("compressing to memory").into()], len: bytes.len() as u64 }
+    }
+
+    /// Their length, as they stand.
+    pub fn len(&self) -> u64 {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// What they take as kept.
+    pub fn kept_bytes(&self) -> usize {
+        self.pieces.iter().map(|p| p.len()).sum()
+    }
+
+    /// The bytes, written out in order.
+    pub fn write_to(&self, out: &mut dyn std::io::Write) -> std::io::Result<()> {
+        for p in &self.pieces {
+            zstd::stream::copy_decode(&p[..], &mut *out)?;
+        }
+        Ok(())
+    }
+
+    /// The bytes, to read in order.
+    pub fn reader(&self) -> Box<dyn std::io::Read + '_> {
+        let mut r: Box<dyn std::io::Read + '_> = Box::new(std::io::empty());
+        for p in &self.pieces {
+            r = Box::new(std::io::Read::chain(r, zstd::stream::read::Decoder::with_buffer(&p[..]).expect("a decoder")));
+        }
+        r
+    }
+
+    /// The bytes, whole.
+    pub fn to_vec(&self) -> Vec<u8> {
+        let mut v = Vec::with_capacity(self.len as usize);
+        self.write_to(&mut v).expect("writing to memory");
+        v
+    }
+
+    /// `canon::hash_with_domain(domain, bytes)`, read through.
+    pub fn hash(&self, domain: &str) -> String {
+        use sha2::{Digest, Sha256};
+        struct H(Sha256);
+        impl std::io::Write for H {
+            fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+                self.0.update(b);
+                Ok(b.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut h = H(Sha256::new());
+        h.0.update(domain.as_bytes());
+        self.write_to(&mut h).expect("hashing in memory");
+        canon::to_hex(&h.0.finalize())
+    }
+}
+
+/// The participants of a config being read, one at a time: each checked as the config's schema checks it, its
+/// canonical bytes written on (compressed), and read into its own type; then let go of as JSON.
+struct Parts {
+    list: Vec<ParticipantCfg>,
+    bytes: zstd::stream::Encoder<'static, Vec<u8>>,
+    len: u64,
+    scratch: Vec<u8>,
+    /// What went wrong, told the way the whole config's check tells it (the reader's own error carries no more).
+    failed: Option<String>,
+}
+
+impl Parts {
+    fn new() -> Parts {
+        Parts { list: vec![], bytes: zstd::stream::Encoder::new(vec![], CANON_LEVEL).expect("an encoder"), len: 0, scratch: vec![], failed: None }
+    }
+
+    fn write(&mut self, b: &[u8]) {
+        use std::io::Write;
+        self.bytes.write_all(b).expect("compressing to memory");
+        self.len += b.len() as u64;
+    }
+
+    fn take(&mut self, v: Value) -> Result<(), String> {
+        let i = self.list.len();
+        let at = format!("/participants/{i}");
+        canon::check_integers(&v).map_err(|e| match e {
+            canon::CanonError::Float(p) => canon::CanonError::Float(format!("{at}{p}")),
+            canon::CanonError::UnsafeInteger(p) => canon::CanonError::UnsafeInteger(format!("{at}{p}")),
+            e => e,
+        })
+        .map_err(|e| e.to_string())?;
+        crate::contracts::check_at(&crate::contracts::contracts().participant, &v, &at).map_err(|e| format!("config {e}"))?;
+        let mut b = std::mem::take(&mut self.scratch);
+        b.clear();
+        b.push(if i == 0 { b'[' } else { b',' });
+        canon::write_value(&v, &mut b);
+        self.write(&b);
+        self.scratch = b;
+        self.list.push(ParticipantCfg::deserialize(v).map_err(|e| format!("config does not match contract: {e}"))?);
+        Ok(())
+    }
+
+    fn fail(&mut self, e: String) -> String {
+        self.failed.get_or_insert(e).clone()
+    }
+}
+
+/// A config's members other than its participants, as JSON, for whoever reads them so (the engine's start): all of
+/// them but the world, and of the world only its currencies. Its `participants` is an empty list.
+pub type Rest = serde_json::Map<String, Value>;
+
+/// A config given as JSON, checked and read.
 pub fn load(v: Value) -> Result<LoadedConfig, String> {
+    load_split(v).map(|(l, _)| l)
+}
+
+/// `load`, and the config's other members as JSON (`Rest`). Its participants are taken one at a time, as
+/// `load_from` takes them.
+pub fn load_split(mut v: Value) -> Result<(LoadedConfig, Rest), String> {
+    let mut parts = Parts::new();
+    if let Some(Value::Array(list)) = v.get_mut("participants").map(std::mem::take) {
+        for p in list {
+            parts.take(p)?;
+        }
+        v["participants"] = Value::Array(vec![]);
+    } else if let Some(x) = v.get_mut("participants") {
+        // (Not a list: the whole config's check says what is wrong with it.)
+        *x = Value::Null;
+    }
+    finish(v, parts)
+}
+
+/// A config read from its JSON text participant by participant: none of it is held as JSON but one participant at a
+/// time and the members around them, so a large world's start is bounded by what it keeps (its typed config and its
+/// canonical bytes, compressed), not by its text. The same checks, the same canonical bytes and hash, and the same
+/// config as `load` of the whole (orchestrator/test and kernel/tests/config_stream.rs hold it).
+pub fn load_from<R: std::io::Read>(r: R) -> Result<(LoadedConfig, Rest), String> {
+    use serde::de::{DeserializeSeed, Error as _, MapAccess, SeqAccess, Visitor};
+    struct Top<'a>(&'a mut Parts);
+    struct List<'a>(&'a mut Parts);
+    impl<'de> DeserializeSeed<'de> for Top<'_> {
+        type Value = Value;
+        fn deserialize<D: serde::Deserializer<'de>>(self, d: D) -> Result<Value, D::Error> {
+            d.deserialize_map(self)
+        }
+    }
+    impl<'de> Visitor<'de> for Top<'_> {
+        type Value = Value;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("a world config (an object)")
+        }
+        fn visit_map<A: MapAccess<'de>>(self, mut m: A) -> Result<Value, A::Error> {
+            let mut out = serde_json::Map::new();
+            while let Some(k) = m.next_key::<String>()? {
+                if k == "participants" {
+                    // (Given twice, the last is the config's, as when it is read whole.)
+                    let failed = self.0.failed.take();
+                    *self.0 = Parts::new();
+                    self.0.failed = failed;
+                    m.next_value_seed(List(&mut *self.0))?;
+                    out.insert(k, Value::Array(vec![]));
+                } else {
+                    out.insert(k, m.next_value()?);
+                }
+            }
+            Ok(Value::Object(out))
+        }
+    }
+    impl<'de> DeserializeSeed<'de> for List<'_> {
+        type Value = ();
+        fn deserialize<D: serde::Deserializer<'de>>(self, d: D) -> Result<(), D::Error> {
+            d.deserialize_seq(self)
+        }
+    }
+    impl<'de> Visitor<'de> for List<'_> {
+        type Value = ();
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("a list of participants")
+        }
+        fn visit_seq<A: SeqAccess<'de>>(self, mut s: A) -> Result<(), A::Error> {
+            while let Some(p) = s.next_element::<Value>()? {
+                self.0.take(p).map_err(|e| A::Error::custom(self.0.fail(e)))?;
+            }
+            Ok(())
+        }
+    }
+    let mut parts = Parts::new();
+    let mut de = serde_json::Deserializer::from_reader(std::io::BufReader::with_capacity(1 << 20, r));
+    let read = Top(&mut parts).deserialize(&mut de).and_then(|v| de.end().map(|_| v));
+    let v = match read {
+        Ok(v) => v,
+        Err(e) => return Err(parts.failed.take().unwrap_or_else(|| format!("config: {e}"))),
+    };
+    finish(v, parts)
+}
+
+/// The `Rest` of a config already checked (a snapshot's), read from its JSON text without the rest of it.
+pub fn rest_of<R: std::io::Read>(r: R) -> Result<Rest, String> {
+    use serde::de::{DeserializeSeed, IgnoredAny, MapAccess, Visitor};
+    struct Top;
+    struct World;
+    impl<'de> Visitor<'de> for Top {
+        type Value = Rest;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("a world config (an object)")
+        }
+        fn visit_map<A: MapAccess<'de>>(self, mut m: A) -> Result<Rest, A::Error> {
+            let mut out = Rest::new();
+            while let Some(k) = m.next_key::<String>()? {
+                let v = match k.as_str() {
+                    "participants" => {
+                        m.next_value::<IgnoredAny>()?;
+                        Value::Array(vec![])
+                    }
+                    "world" => m.next_value_seed(World)?,
+                    _ => m.next_value()?,
+                };
+                out.insert(k, v);
+            }
+            Ok(out)
+        }
+    }
+    impl<'de> DeserializeSeed<'de> for World {
+        type Value = Value;
+        fn deserialize<D: serde::Deserializer<'de>>(self, d: D) -> Result<Value, D::Error> {
+            d.deserialize_map(self)
+        }
+    }
+    impl<'de> Visitor<'de> for World {
+        type Value = Value;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("a world (an object)")
+        }
+        fn visit_map<A: MapAccess<'de>>(self, mut m: A) -> Result<Value, A::Error> {
+            let mut currencies = Value::Null;
+            while let Some(k) = m.next_key::<String>()? {
+                if k == "currencies" {
+                    currencies = m.next_value()?;
+                } else {
+                    m.next_value::<IgnoredAny>()?;
+                }
+            }
+            Ok(serde_json::json!({ "currencies": currencies }))
+        }
+    }
+    let mut de = serde_json::Deserializer::from_reader(std::io::BufReader::with_capacity(1 << 20, r));
+    serde::Deserializer::deserialize_map(&mut de, Top).map_err(|e| format!("config: {e}"))
+}
+
+/// The rest of the config checked and read, with its participants (`Parts`) put in.
+fn finish(v: Value, parts: Parts) -> Result<(LoadedConfig, Rest), String> {
     canon::check_integers(&v).map_err(|e| e.to_string())?;
     crate::contracts::check(&crate::contracts::contracts().config, &v).map_err(|e| format!("config {e}"))?;
-    let canonical = canon::canonical_value(&v).map_err(|e| e.to_string())?;
-    // (Read out of the value, which is given up as it's read: a large world's config is held once, not as its JSON
-    // too. Its canonical bytes are all that's kept of how it was given.)
-    let config = Config::deserialize(v).map_err(|e| format!("config does not match contract: {e}"))?;
+    // (The schema's own limit on the list, which its check of the rest saw empty.)
+    if parts.list.len() > 1_000_000 {
+        return Err(format!("config violates the contract: /participants: has more than 1000000 items ({})", parts.list.len()));
+    }
+    let Value::Object(m) = v else { unreachable!("the schema holds a config to be an object") };
+    // The canonical bytes: the rest, with the participants' (written as they were read) where they stand.
+    let mut before = Vec::with_capacity(1 << 20);
+    let mut cut = None;
+    canon::write_object(&m, &mut before, |k, x, out| {
+        if k == "participants" {
+            cut = Some(out.len());
+        } else {
+            canon::write_value(x, out)
+        }
+    });
+    let after = before.split_off(cut.expect("a config has participants (the schema requires them)"));
+    let Parts { mut list, mut bytes, mut len, .. } = parts;
+    if list.is_empty() {
+        use std::io::Write;
+        bytes.write_all(b"[").expect("compressing to memory");
+        len += 1;
+    }
+    {
+        use std::io::Write;
+        bytes.write_all(b"]").expect("compressing to memory");
+        len += 1;
+    }
+    let pieces: Vec<Arc<[u8]>> = vec![
+        zstd::bulk::compress(&before, CANON_LEVEL).expect("compressing to memory").into(),
+        bytes.finish().expect("compressing to memory").into(),
+        zstd::bulk::compress(&after, CANON_LEVEL).expect("compressing to memory").into(),
+    ];
+    let canonical = Canonical { pieces, len: before.len() as u64 + len + after.len() as u64 };
+    drop((before, after));
+    // What the engine reads as JSON (`Rest`): taken before the rest is read into its type, which gives it up.
+    let mut rest = Rest::new();
+    for (k, x) in &m {
+        if k == "world" {
+            rest.insert(k.clone(), serde_json::json!({ "currencies": x.get("currencies").cloned().unwrap_or(Value::Null) }));
+        } else {
+            rest.insert(k.clone(), x.clone());
+        }
+    }
+    let mut config = Config::deserialize(Value::Object(m)).map_err(|e| format!("config does not match contract: {e}"))?;
+    config.participants = std::mem::take(&mut list);
     validate(&config)?;
-    let hash = canon::hash_with_domain(canon::DOMAIN_CONFIG, &canonical);
-    Ok(LoadedConfig { config: Arc::new(config), canonical, hash })
+    let hash = canonical.hash(canon::DOMAIN_CONFIG);
+    Ok((LoadedConfig { config: Arc::new(config), canonical, hash }, rest))
 }
 
 /// Places form one tree over the ground: ids unique, one root, each other place within an existing parent (no cycles)

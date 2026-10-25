@@ -2093,7 +2093,7 @@ impl WorksPlan {
     fn new(ctx: &Ctx) -> Result<Self, String> {
         let mut base = serde_json::to_value(WorksParams::default()).map_err(|e| e.to_string())?;
         if let Some(o) = base.as_object_mut() {
-            for (k, v) in &ctx.params {
+            for (k, v) in ctx.params.iter() {
                 if !v.is_null() {
                     o.insert(k.clone(), v.clone());
                 }

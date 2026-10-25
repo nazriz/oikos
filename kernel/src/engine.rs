@@ -214,7 +214,7 @@ struct Part {
     kind: String,
     person: Option<String>,
     /// (Shared with the kernel's config, or the template it was made from: a town's people have large params.)
-    controller: Arc<Value>,
+    controller: crate::config::Controller,
     traits: Value,
     /// A model's seat in one post of a person (foundations F5): it acts through their body.
     #[serde(default)]
@@ -487,19 +487,37 @@ pub fn each_mut<T: Send, R: Send>(items: &mut [T], threads: usize, share_at: usi
 impl<W: Write> Engine<W> {
     /// A run of this world, its log written to `out`.
     pub fn start(config: Value, run_id: &str, out: W, anchors: Option<Box<dyn Write>>, opts: EngineOptions) -> Result<Self, String> {
+        let (loaded, rest) = crate::config::load_split(config).map_err(|e| crate::run::RunError::Config(e).to_string())?;
+        Self::start_loaded(loaded, rest, run_id, out, anchors, opts)
+    }
+
+    /// A run of a world whose config is checked and read already (`config::load_from`, participant by participant, or
+    /// `load_split`), with the members of it the engine reads as JSON (`config::Rest`).
+    pub fn start_loaded(
+        loaded: crate::config::LoadedConfig,
+        rest: crate::config::Rest,
+        run_id: &str,
+        out: W,
+        anchors: Option<Box<dyn Write>>,
+        opts: EngineOptions,
+    ) -> Result<Self, String> {
+        let config = Value::Object(rest);
         let base = Base::of(&config)?.capturing(opts.capture_citizens.is_some());
         let mut parts = BTreeMap::new();
-        for p in config["participants"].as_array().into_iter().flatten() {
-            let id = p["id"].as_str().ok_or("a participant without an id")?.to_string();
+        for p in &loaded.config.participants {
             parts.insert(
-                id,
+                p.id.to_string(),
                 Part {
-                    kind: p["kind"].as_str().unwrap_or("person").into(),
-                    person: p["person"].as_str().map(String::from),
-                    // (Its controller is the kernel's own, put in once the run is started: not a copy of it.)
-                    controller: Arc::new(Value::Null),
-                    traits: p["traits"].clone(),
-                    shares_body: p["shares_body"].as_bool() == Some(true),
+                    kind: match p.kind {
+                        crate::config::ParticipantKind::Person => "person",
+                        crate::config::ParticipantKind::System => "system",
+                    }
+                    .into(),
+                    person: p.person.as_ref().map(|x| x.to_string()),
+                    // (Its controller is the kernel's own: not a copy of it.)
+                    controller: p.controller.clone(),
+                    traits: p.traits.clone().unwrap_or(Value::Null),
+                    shares_body: p.shares_body,
                     ended: false,
                 },
             );
@@ -518,13 +536,8 @@ impl<W: Write> Engine<W> {
             );
         }
         let thinking_time = config["orchestration"]["thinking_time"].clone();
-        let run = Run::start(config, run_id, out, anchors).map_err(|e| e.to_string())?;
-        let statics = run.kernel().statics();
-        for (id, part) in parts.iter_mut() {
-            if let Some(i) = statics.participant_at.get(id) {
-                part.controller = statics.config.participants[*i].controller.clone();
-            }
-        }
+        drop(config);
+        let run = Run::start_loaded(loaded, run_id, crate::run::KernelIdentity::current(), out, anchors).map_err(|e| e.to_string())?;
         let mut e = Engine::assemble(run, base, opts, Scheduler::new(0));
         e.sched = Scheduler::new(e.tick);
         e.parts = parts;
@@ -729,7 +742,7 @@ impl<W: Write> Engine<W> {
                         Part {
                             kind,
                             person: person.clone(),
-                            controller: Arc::new(tpl.map_or(Value::Null, |t| t["controller"].clone())),
+                            controller: crate::config::Controller::new(tpl.map_or(Value::Null, |t| t["controller"].clone())),
                             traits: traits.clone().unwrap_or(Value::Null),
                             shares_body: false,
                             ended: false,
@@ -777,7 +790,7 @@ impl<W: Write> Engine<W> {
     /// Every capacity of a participant has its unit, and nothing it no longer holds does (run.ts `syncUnits`).
     fn sync_units(&mut self, pid: &str, wake_at: Option<i64>) -> Result<(), String> {
         let Some(p) = self.parts.get(pid).cloned() else { return Ok(()) };
-        let seat = p.controller["type"].as_str() == Some("llm");
+        let seat = p.controller.get("type").and_then(Value::as_str) == Some("llm");
         let mut want = BTreeSet::new();
         if !p.ended {
             if seat {
@@ -828,7 +841,7 @@ impl<W: Write> Engine<W> {
     }
 
     fn seat_unit(&self, pid: &str, p: &Part, wake_at: Option<i64>) -> (Unit, Value) {
-        let pp = &p.controller["params"];
+        let pp = &p.controller.params_value();
         let mut cadence = ceil_to(pp["cadence_days"].as_i64().unwrap_or(7) * DAY, self.tick);
         let held = self.held(pid);
         let office = (held.len() == 1).then(|| held[0].clone());
@@ -894,16 +907,16 @@ impl<W: Write> Engine<W> {
     fn code_unit(&mut self, pid: &str, p: &Part, cap: &str, wake_at: Option<i64>) -> Result<Option<(Unit, Value)>, String> {
         let (impl_, params, entity) = if cap == "self" {
             (
-                p.controller["impl"].as_str().or(p.controller["code"].as_str()).map(String::from),
-                oikos_actors::Params::member_of(p.controller.clone(), "params"),
+                p.controller.get("impl").and_then(Value::as_str).or(p.controller.get("code").and_then(Value::as_str)).map(String::from),
+                oikos_actors::Params::of_controller(&p.controller),
                 p.person.clone().unwrap_or_default(),
             )
         } else {
             let x = self.positions.get(cap).ok_or_else(|| format!("{pid} holds {cap}, which is not a position"))?;
             if p.kind == "system" {
                 (
-                    p.controller["impl"].as_str().or(p.controller["code"].as_str()).map(String::from),
-                    oikos_actors::Params::member_of(p.controller.clone(), "params"),
+                    p.controller.get("impl").and_then(Value::as_str).or(p.controller.get("code").and_then(Value::as_str)).map(String::from),
+                    oikos_actors::Params::of_controller(&p.controller),
                     x.entity.clone(),
                 )
             } else {
@@ -1767,7 +1780,19 @@ impl<W: Write> Engine<W> {
 }
 
 pub fn run_code_world<W: Write>(config: Value, run_id: &str, out: W, opts: EngineOptions) -> Result<(String, Engine<W>), String> {
-    let mut e = Engine::start(config, run_id, out, None, opts)?;
+    let (loaded, rest) = crate::config::load_split(config).map_err(|e| crate::run::RunError::Config(e).to_string())?;
+    run_code_world_loaded(loaded, rest, run_id, out, opts)
+}
+
+/// `run_code_world`, of a config read already (`config::load_from`: a large world's, participant by participant).
+pub fn run_code_world_loaded<W: Write>(
+    loaded: crate::config::LoadedConfig,
+    rest: crate::config::Rest,
+    run_id: &str,
+    out: W,
+    opts: EngineOptions,
+) -> Result<(String, Engine<W>), String> {
+    let mut e = Engine::start_loaded(loaded, rest, run_id, out, None, opts)?;
     loop {
         match e.next()? {
             Due::End => break,

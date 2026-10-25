@@ -752,7 +752,7 @@ fn hears_of(p: &Params) -> Vec<Hears> {
 impl Group {
     /// A group made for this context (its parameters and the entity it acts for).
     pub fn new(ctx: &Ctx) -> Result<Group, String> {
-        let p = params(&Value::Object((*ctx.params).clone()))?;
+        let p = params(&Value::Object(ctx.params.to_map()))?;
         let me = ctx.entity.clone();
         let hears = hears_of(&p);
         let hearings = Hearings::new(&me, hears.clone(), p.cause.answer_days, 28);
