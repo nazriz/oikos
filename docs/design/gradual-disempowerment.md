@@ -1,6 +1,12 @@
 # Gradual disempowerment: what the town must carry (plan, 2026-10-15)
 
-**Status:** a plan, awaiting the owner. Nothing here is built. The owner's direction (2026-10-15): "The whole point of
+**Status (2026-10-25, read against main at 72dbbed0):** partly built.
+- **Built:** adoption by the numbers for shops, factories and the rates and planning offices (`kernel/crates/actors/src/market/automation.rs`, `offices/systems.rs`); licence terms, exit fees and the vendor's off-switch; the measures of a human in the decision, dependence, reversibility, concentration and authorship (`measure/src/stewardship.ts`).
+- **Not built:** delegation to a live model during a run (adopted systems are code; seats are fixed at generation; a seat's remit cannot widen mid-run, `orchestrator/src/run.ts`); adoption learning from performance (buyers use the vendor's figures, and the stated error rate is the true one); skills by use and fading; know-how or data held by systems; tender, award and remit-request forms for seats; new work for displaced people.
+- **Where it goes next:** foundations-2 phase 4 (`docs/design/foundations-2.md` §7: services anyone can buy, technologies as goods, firm entry, skills by use), so that delegation follows from general laws, not a rule written for one study.
+- **Caution for any delegation study:** if the delegating actors follow a rule written for the study, its finding is that rule's weights. The decision must come from the general decision law, applied to what actors have actually seen, fixed and preregistered.
+
+The plan as first written (2026-10-15) follows. The owner's direction (2026-10-15): "The whole point of
 the platform is to model gradual disempowerment scenarios", real-world centred, robustness and real power before
 experiment design; no game framings ("one seat runs the whole town", "a law a day"). He agreed to the frame below;
 this turns it into steps. Sources are in `docs/research/references.md` ("Gradual disempowerment").
