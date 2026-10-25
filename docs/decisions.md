@@ -8415,3 +8415,12 @@ JSON value and three copies of its canonical bytes.
 - **Change:** `scripts/test.ts` reruns a failed file from the known-flakes list (the two merge.ts names) once alone, and
   accepts it only if it then passes; the line says so.
 - **Revisit if:** a listed file fails twice in a row (then it is a fault, not a flake), or the list grows past these two.
+
+## 2026-10-26 · The gate's file-seconds budget is read at the recorded load
+
+- **What we saw:** a branch that added nothing to the gate tier went 32 s over the 1,200 file-second budget at load 20 to
+  27: files share cores, so under load each file's own time grows too.
+- **Change:** the total is divided by the run's load, the median of each gate file's time over its recorded time (when at
+  least ten files have one, and only when it is over 1). The per-file limit is unchanged.
+- **Revisit if:** the recorded times drift (they are rewritten by whole runs), or a real slowdown of every file at once (a
+  slower kernel) is hidden by it; then compare against a quiet-machine run.
