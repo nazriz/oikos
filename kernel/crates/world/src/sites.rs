@@ -126,6 +126,9 @@ pub fn site_cell(s: &Statics, st: &State, id: &Id, c: &crate::state::Cell, me: &
 /// for field (a few ids and numbers), the rest by where they are in memory (the state's own, never changed in place:
 /// a change makes a new one) or as the numbers they are.
 struct MadeFrom {
+    /// The world's config (its building types and their variables), held: two worlds in one process (tests side by
+    /// side, a host's arms) may have a building of the same name, empty in both, and must not share its view.
+    config: Arc<crate::config::Config>,
     structure: crate::state::Structure,
     occupancy: Option<Arc<BTreeMap<Id, std::collections::BTreeSet<Id>>>>,
     departures: Vec<Option<Arc<Vec<crate::state::Departure>>>>,
@@ -133,9 +136,10 @@ struct MadeFrom {
 }
 
 impl MadeFrom {
-    fn of(st: &State, sid: &Id, x: &crate::state::Structure, spaces: &BTreeMap<String, crate::config::SpaceSpec>) -> MadeFrom {
+    fn of(s: &Statics, st: &State, sid: &Id, x: &crate::state::Structure, spaces: &BTreeMap<String, crate::config::SpaceSpec>) -> MadeFrom {
         let space = |local: &String| format!("{sid}/{local}");
         MadeFrom {
+            config: s.config.clone(),
             structure: x.clone(),
             occupancy: st.occupancy.get(sid).cloned(),
             departures: spaces.keys().map(|l| st.departures.get(&space(l)).cloned()).collect(),
@@ -143,7 +147,7 @@ impl MadeFrom {
         }
     }
 
-    fn same(&self, st: &State, sid: &Id, x: &crate::state::Structure, spaces: &BTreeMap<String, crate::config::SpaceSpec>) -> bool {
+    fn same(&self, s: &Statics, st: &State, sid: &Id, x: &crate::state::Structure, spaces: &BTreeMap<String, crate::config::SpaceSpec>) -> bool {
         fn ptr<T>(a: &Option<Arc<T>>, b: Option<&Arc<T>>) -> bool {
             match (a, b) {
                 (None, None) => true,
@@ -151,7 +155,8 @@ impl MadeFrom {
                 _ => false,
             }
         }
-        self.structure == *x
+        Arc::ptr_eq(&self.config, &s.config)
+            && self.structure == *x
             && ptr(&self.occupancy, st.occupancy.get(sid))
             && self.departures.len() == spaces.len()
             && spaces.keys().zip(&self.departures).zip(&self.entered).all(|((l, d), e)| {
@@ -182,13 +187,13 @@ pub fn seen_structure(s: &Statics, st: &State, sid: &Id, me: &str, names: bool) 
     let entry = shard.read().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|m| m.get(&key).cloned());
     if let Some(entry) = entry {
         let (made, held) = &*entry;
-        if let Some(h) = held.upgrade().filter(|_| made.same(st, sid, x, spaces)) {
+        if let Some(h) = held.upgrade().filter(|_| made.same(s, st, sid, x, spaces)) {
             debug_assert!(*h == site_structure(s, st, sid, me, names), "a building as seen, kept, is not as it would be made now: {sid}");
             return h;
         }
     }
     let h = Arc::new(site_structure(s, st, sid, me, names));
-    let made = MadeFrom::of(st, sid, x, spaces);
+    let made = MadeFrom::of(s, st, sid, x, spaces);
     shard.write().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(BTreeMap::new).insert(key, Arc::new((made, Arc::downgrade(&h))));
     h
 }

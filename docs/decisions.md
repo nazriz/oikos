@@ -8757,3 +8757,18 @@ log against the same town built at 3d113a1f.
   production cell on day 151, which the law does not forbid; the test held that no system at all was delivered, and
   now holds that no serving system is (and that the town that ignores the law takes one). Revisit the second if the
   law the test writes is meant to cover every use.
+## 2026-10-26 · A fault in what's been seen, held once: two worlds in one process could share a building's view (branch `mem-seen-fix`; no model called)
+
+- **What was wrong:** `sites::seen_structure` (from `mem-seen`, 7f81ceb3) keeps one view of each building, keyed by the
+  building's id, and takes it again while what it was made from is the same: the building field for field, and its
+  occupancy and departures by where they are in memory. An empty building has neither, so in two worlds in one
+  process with a building of the same name, empty in both, the second took the first's view, made on the first's
+  config (its building types' spaces and variables). Found by a test that failed only beside the others; a run alone,
+  and forks of one run (which share their config), are not affected. Two worlds of different configs in one process
+  (tests side by side; a host running an experiment's arms, if their configs differ) could see the other's buildings.
+- **Fix:** what a view was made from includes the world's config, held and compared by where it is in memory.
+- **Test:** `kernel/tests/config_stream.rs` "two worlds side by side are each the world alone": one town, and the same
+  with its buildings' wear coming on twice as fast, stepped a day each in turn on one thread; each is its run alone.
+  Without the fix it fails (world 0's log differs); with it, it passes.
+- **Revisit if:** anything else in the engine is held across worlds in a process: it must be keyed by what it is made
+  of in full (as the controllers' members and the ventures are, by their text), or by its world.
