@@ -346,6 +346,19 @@
       ],
       "untagged": 1
     },
+    "docs/design/foundations-2.md": {
+      "risks": [
+        "WM-1",
+        "WM-2",
+        "WM-12",
+        "WM-14",
+        "ME-1",
+        "ME-11",
+        "PS-1",
+        "PS-10"
+      ],
+      "untagged": 21
+    },
     "docs/design/foundations.md": {
       "risks": [
         "WM-4",

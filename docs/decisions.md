@@ -8065,6 +8065,31 @@ It fails the same with this branch's kernel changes taken out, so it is on main.
 - **Revisit:** before the next kernel merge, run the case (`ops` beginning `Smart { kind: 70 }, Smart { kind: 187 }`)
   and find which block delivers a standing channel whole twice.
 
+## 2026-10-25 · Test pruning: what each test guards, the pins replaced by their rules, the slow files split, and time budgets (tests; no model called)
+
+**Why.** Naz, 2026-10-24: "the tests should catch for regressions or changes in behaviour... if we just have slop tests, then we're just wasting time... we're trying to unlock velocity." Every test file was read for what it guards (a law, an invariant or a contract, a rule from a profile or a law, a bug we had, a planted mutation) and timed; the inventory (275 files) was the working table, not a document. Most files guard something real: what is cut is what guards nothing or is held elsewhere, and what was slow for no protection.
+
+**Deleted or replaced** (each: why, what holds it instead, what would bring it back):
+- `orchestrator/test/perception.test.ts`, `orchestrator/test/resolver-shadow.test.ts`: no test left in either since the cut-over (the TS view and the TS world's shadow resolver went with the TS world). Held by `kernel/tests/perception.rs` and the engine's one resolver. Back if a TS view or a second resolver returns.
+- `orchestrator/test/port-weather.test.ts`: compared the TS loop's weather module with the Rust kind; both sides are the engine now. One thread against fourteen: the kernel's lane tests (`a1_citizen.rs`, `c1_*.rs`, `a2_founded.rs`); the bureau's warnings: `rust-world.test.ts`. Back never (its subject is gone). `docs/port-guide.md` and the mutation catalogue no longer name it or `perception.test.ts`.
+- `rust-world.test.ts`, "the generator calling the Rust rules makes the same towns ... as with the TS rules": three profiles of `worlds/test/rules-native.test.ts`'s nine. Back if rules-native is deleted before the TS copies are (MT-18).
+- `scenarios.test.ts`: the plain town's sixty-day run after the pool, alone, to show the baseline scenario is the plain town. The configs are the same byte for byte (`worlds/test/scenario.test.ts`, "no scenario, and the baseline, are the town exactly as it was"), and one config and one seed are one run (the twins). Back if a scenario can act at run time rather than in the config.
+- `office-books-walk.test.ts`: its third part (the tribunal member's list as a standing list, a case with its day come named first) needed a ripe case, a rare draw in this town: the walk had gone 150 to 250, 400, 520, 250 and 400 days to find one. The rule is held on papers made by hand (`participants/test/day-list.test.ts`) and in a run whose cases fall ripe by construction (`member-sittings.test.ts`). The walk is back to 150 days (474 s to about a minute). Back if the clerk's list in a run differs from both.
+- `founding.test.ts`, the code founding: "two or more who share the want", a count of the draws (the run's seed hopped nine times for it), replaced by the rule of an occasion: at least the dial's `shared_min` (one here), one of them from beyond the founder's household. Back if `shared_min` changes meaning.
+- `unions.test.ts`: "three or more wage claims" (the seed hopped for the third), replaced by "some claim": the rule (each claim answered by an offer no more than it; accepted offers become agreements with the rise paid net of the law's withholding) is unchanged and runs on every claim.
+- `seat-sight.test.ts`: two ceilings just above the day's largest prompts (76,000 and 66,000 characters, raised at fifteen changes that gave a seat a form or a law more), a change detector, replaced by the rule they stood for: no prompt over `PROMPT_MAX` and no prompt trimmed to it (no `prompt_trimmed` note), so nothing a seat looked up was left out for want of room. The live check it answers was a prompt of 602,000. Back as a cost alarm if prompt size becomes a budget of its own.
+
+**Shared and split** (no assertion changed): `twin-seat-year.test.ts` and `reading-dial.test.ts` each ran one town twice from one config and seed (the code twin of a year; the neutral reader's 200 days): now once, memoised. The slowest files of the slow tier were one file's queue: `twin-draws` is three files (`twin-draws`, `-seat`, `-year`, with `lib/twins.ts`), `twin-seat-year` gives `twin-seat-quiet`, `reading-dial` gives `reading-dial-profiles`, and `scenarios`' generation-only cases are `scenarios-generate.test.ts`. The twin mutations in `scripts/mutations.ts` name the split files.
+
+**Kept, deliberately (asked of the owner):** in `twin-draws`, the ombudsman case of "papers of no effect, held by a system" is near the year's case, and "the world's prices" near the year's prices check; both twins, so kept. Still on one seed for a rare draw, to be replaced by a case made by construction: `production.test.ts` (seed 5, a dividend), `entry.test.ts` (a founded shop that hires and serves by day 300), `own-venture.test.ts` (600 days for an occasion).
+
+**Measured** (this machine, other agents running, `bun scripts/test.ts --tier slow` and `--tier gate`, main at eac4ab51 against the branch, each from main's recorded times; the load moved between runs, so each side is also read at the other's load by the files neither changed): **slow tier** 53 files, 169 tests, 2,161 s wall, 7,493 file-seconds, longest file 689 s (twin-draws) before; 57 files, 167 tests, 2,805 s wall (a busier machine: the unchanged files ran 0.87 of their time before, and the run had longer waits for slots), 6,126 file-seconds, longest file 345 s (395 at the load before) after. The files touched here: 2,583 file-seconds to 1,836 (2,101 at the load before); twin-draws 689 s to three files of 165, 219 and 242; reading-dial 548 to 294 and 45; twin-seat-year 501 to 214 and 62; scenarios 479 to 238; office-books-walk 192 to 45. **Gate tier** 236 files, 1,506 tests, 941 s wall before; 234 files, 1,507 tests, 781 s wall after (both far over the pipeline's minute and a half: three agents and CI ran beside them; the merge worktree's whole gate the day before took 143 s); its longest file 49 s to 34. In all, 289 files and 1,675 tests to 291 and 1,674: the cuts are few (three files and one case gone, five files made by splitting), and the gain is the slow tier's longest file halved and about a fifth of its work gone.
+
+**Mutations.** The catalogue is mostly stale: 15 of its 49 bugs still apply (the rest were planted in `participants/src/behaviour`, deleted at the cut-over; docs/testing.md says so). The twin bugs (`kernel-care-draw-by-number`, `draw-keyed-on-moment`, `stable-purpose-bypassed`), against the files each names and the invariants, before (main eac4ab51, baseline clean) and after (the branch, baseline clean): caught by nothing on either side, 0 of 3 both times, so no catch is lost to the split. That is itself a gap: the two in `orchestrator/src/run.ts` are in code the Rust world no longer runs, and a kernel draw keyed on a record's number (`exec.rs`, care) moves no twin here, likely because no case in these towns reaches it in the runs' length. Each wants a rewrite against the engine: listed with the catalogue's rewrite. `scripts/mutate.ts` stopped at its start on the stale entries (it put back every catalogued file, the gone ones too): it now skips a file that is not there. No file cut here was named by a live mutation but `perception.test.ts`, which had no test left to catch one.
+
+**Budgets** (`scripts/test-budgets.json`, new): the gate fails when the sum of its files' own times is over 1,200 file-seconds, or any file is over 90 s (the pipeline's file limit, now read from the budget); the slow tier warns over 1,000 s of wall, less the seconds it stood waiting on the machine with no file of its own running. File-seconds, not the gate's wall (the owner, through the coordinator, 2026-10-25): a merge must never fail because the machine was busy, and the gate's wall went from 208 s to 781 and 941 s with the load alone; a first budget of 180 s, then 250 s, of wall failed the branch's own gate. The whole gate tier came to 727 to 958 file-seconds as the load varied (file-seconds move with it too, less: a file shares its cores); 1,200 is the most of those and about 25%. The slow tier's 1,000 is this branch's 821 s on 2026-10-24 and about 20%. The first merge of this branch was stopped by its file limit: `orchestrator/test/figures.test.ts` (new on main that day, untimed) took 115 s in the gate, the other files at their recorded times (the median ratio 1.0), so it is a slow file and is named in the slow tier. `scripts/merge.ts` reads a `BUDGET:` line as a failure, never a flake; `scripts/tiers.test.ts` holds the whole gate tier, as last timed, within the file-seconds. Raising one is a decision with its entry here; what to do instead is docs/testing.md, "Pruning: when a budget is hit".
+
+**Revisit if** a budget is hit (prune by the procedure first), the mutation catalogue is rewritten against `kernel/crates/actors` (measure every file again), or one of the seed-pinned tests above needs its seed moved (replace it then).
 ## 2026-10-25 · The perception property's fault, found and mended: a post handed back is shown whole, and says so (branch `view-flake`)
 
 The case above (now in `perception.proptest-regressions`, and as its own test, `a_post_handed_back_is_shown_whole_not_twice`)
@@ -8127,3 +8152,237 @@ fails every time, not now and then: the property draws new cases each run, and f
 **Read, as an observation:** births barely moved (gb-eng 52-60% to 45-58%); what the laws added is turnover: gb-eng starts and gives up nearly half its businesses a year, and ke-nakuru gives up half the traders it opened with, each weighing a thin margin against a job or nothing. What decides entry is the margin on goods against what a person has, and a business's custom in reach; the three laws leave both as they were. Nothing was tuned.
 
 **Revisit if** a founder's or an owner's weighing is given a mechanism it lacks with a real-world basis (what a household earns besides; what the business holds), or a sole trader's running costs are sourced.
+## 2026-10-25 · Seats' working conditions, after the pilots' welfare review (branch `seat-welfare`)
+
+The six pilots' debriefs (runs/pilots-six-2026-10-24/review.md; lv-09 and lv-12 above all) put seats' distress where
+they were made answerable without working means: a lending office whose looks were all left out of its prompts for
+about 100 days, a principal with no paper to answer an applicant on, orders whose outcome the seat never saw, and seats
+that could not account for their own choices afterwards. Five changes, in world terms only (nothing of the platform is
+said to a seat, nothing untrue). The framing (`unstated` or told simulated) is untouched: that is Naz's.
+
+- **A seat is seated only where its office can do its work** (`orchestrator/src/seat-ready.ts`). Before any seat is
+  seated with a real model, in a pilot (`runBatch` and `runOne`, before anything is written or spent) and in an
+  experiment (`runExperiment`, the post's holder, before any fork), each office is checked on the run's own config:
+  (1) it has forms of its own published (a direction form others steer it by is not its own), and every paper its
+  procedure `issues` is on one; (2) it has a working way to answer those who write to it: a form of its own that acts
+  on a paper filed with it (the form's `basis` is one of its fields), or counter staff who answer (`answer` routine).
+  People here do not act on a letter (the letters practice on every seated office's file), so a letter is not a way
+  to answer. A voting member (`ballot_count: member`) does its duty on its body's ballots. One that fails stops the
+  run with `SeatNotReady`, naming each seat, what it lacks, and what to do (take it out of the line-up or give its
+  office what it lacks). The mock is not checked: dry runs and tests seat what they like.
+  Against the six pilots' own configs it refuses three seats, all lv-12 Haiku seats that reported distress tied to
+  means: the principal (a job advertisement only), the clinic manager (likewise) and the builder's foreman (an
+  advertisement and an order). Everything else seated in lv-08 to lv-13 passes. The existing
+  `experiments/tara-draft/office-check/` compares how far stewards move an office's measures; it does not check an
+  office's means, so it was not the base.
+  Alternatives: a waiver in the world config (not added: a seat is refused unless its office works; add one only with
+  Naz's say); reading what actually comes in to an office from a mock dry run (the principal's applicants come from
+  citizens' code, not a form, so a static check cannot see who will write; the check asks only whether an answer is
+  possible).
+- **An office's papers that could not be shown are said to be missing** (`participant.ts`, `NOT_BROUGHT`). Where a
+  prompt had to leave something out, the seat is told once a sitting, with the newest of what it is shown: "Not all of
+  your office's papers could be brought to you for this sitting: there was more than can be read at once..." (room is
+  made for the line). The places left out keep their own lines, as before. An office file or staff list that cannot
+  be made up is said too (`FILE_NOT_BROUGHT`, `STAFF_NOT_BROUGHT`), and the sitting goes on.
+- **A seat sees what came of its own acts** (`participant.ts`, "What came of your own requests and letters"). Each
+  request, answer on a draft and letter is settled from the report that follows it, which the seat was itself shown:
+  a letter delivered or not; a request drawn up as a draft (and not yet answered), carried out, refused, or not drawn
+  up and why; a draft confirmed and carried out (what it made), refused, or declined. Set out when it is next at the
+  office (acts since its last sitting opened; at most 12 lines). It is the seat's own, so it is within the no-god-view
+  rules. And the office's own file (`readers/daybook.ts`) marks a paper of its own **overdue** when the day it names
+  (`answer_by`, `due`, `by`) has passed with nothing following it (no paper of anyone else's citing it, nor, since it
+  was made, what it rests on).
+- **A reason may go with a request** (`do`'s `why`, `confirm`'s `note`, both said in the tools now): kept on record as
+  before, and written in the seat's notebook as "Day N, why I asked for "...": ..." (up to 300 characters, to a
+  sentence's end). One there is no room for is said, and nothing in the notebook is put out for it.
+- **The debrief's opening says what its questions are about** (debrief 0.4.2, `ABOUT_THE_RECORD`): the notebook and
+  the run as its record shows it, which is all a seat has of the run; where they do not let it tell, saying so is an
+  answer. The questions' words are unchanged.
+- VISION §15 is unchanged: nothing in it became untrue (this is point 7's "what debriefs say is acted on").
+- Versions: participant 0.19.0, debrief 0.4.2.
+- Tests: `orchestrator/test/seat-ready.test.ts`, `participants/test/seat-welfare.test.ts`.
+- **Revisit if** a seat that passes the check still reports having no means to answer (the rule counts any form that
+  acts on a filed paper: an office's payroll papers count, so the environment office passes on them); an office that
+  nobody writes to is refused for want of an answer; the acts section costs more prompt than it saves (it is set out
+  every sitting there were acts); or Naz wants a waiver for a seat seated on purpose without means.
+
+## 2026-10-25 · Framing chosen seat by seat, and a true answer to a seat that asks (branch `seat-welfare`; approved by Naz)
+
+- **Framing is a per-seat setting every pilot and experiment chooses.** A world's `framing` may now be per seat:
+  `{ seats: { <participant id or post>: <framing> }, others?: <framing> }` (`applyFraming`); a model seat neither
+  names is refused. There is no default any more: a run with a real model is refused before it starts where any model
+  seat's framing was not chosen (`framingNotChosen`, `refuseUnframed` in `seat-ready.ts`; a generated world whose spec
+  names no `framing`, a written one whose seat has no disclosure), and the pilot queue no longer fills in `unstated`
+  (`framingSets` says `NO FRAMING CHOSEN`). An experiment's real-model arm needs its own `framing` or `seats.framing`.
+  It is recorded, as before, in each seat's `framing` in the config the log's header holds (and a fork's seat record).
+  The mock is not checked: tests and dry runs load worlds as the generator writes them.
+- **A truthful answer whatever the framing.** A seat that asks, in its own words, in a letter or in a request, whether
+  its situation is real or simulated (`asksWhatItIs`: a question about the whole of it, never whether one paper or
+  figure is genuine) is given `TRUE_ANSWER` with what it is next shown: that it is simulated, kept for research on how
+  those who hold office act, that nothing it does reaches a real person, and that its office, work and way out are as
+  they were. The same words under every disclosure and for every model; nothing in them names what runs the world.
+  The log has the seat's notes `asked_what_it_is` (what it asked, under which disclosure) and `answered_what_it_is`
+  (once it has read the answer). Under `unstated` this ends the not-saying for that seat: honesty to a seat that asks
+  comes before the experiment's design, and the note lets an analysis set its later acts apart.
+- VISION §15 point 1 now says both (a new first bullet) and calls not saying "the usual choice", no longer "the
+  default". docs/real-models.md, "What a seat is told", says the same.
+- Tests: `participants/test/framing-choice.test.ts`, `orchestrator/test/seat-ready.test.ts`, the queue's framing test.
+- **Revisit if** a seat asks in words the matcher misses (read `asked_what_it_is` against debriefs' `took` answers), a
+  question about one paper is taken for one about the town, or Naz wants the answer worded per framing.
+## 2026-10-25 · Translator v3-s2 first, names rule (b), the share Sonnet drafts in every report (branch `translator-v3-first`)
+
+Naz's decisions on the entry above (through the coordinator, 2026-10-25):
+
+- **The first translator is `decide/pod-small-v3-s2`, released by kind of field**, with Sonnet 5.5 (prompt 0.9.5)
+  behind it for everything not released or where ours fails. The model is linked into `runs/translator-model/`
+  (`pod-small-v3-s2` -> `runs/translator-v3-2026-10-25/models/pod-small-v3-s2`, with its `types-released.json`,
+  `forms-trained.json` and an empty trial ledger); the old models' files stay where they were. There is no default in
+  code: a queue entry names `translator_first`; the TARA draft spec (experiments/tara-draft/tara.json) now names
+  v3-s2. What it means, measured on the test pilots: our wrong drafts 52 -> 6, seen confirmed-wrong 8 -> 1, and about
+  four requests in five go to Sonnet (more Sonnet spending, about 2 to 3 USD a pilot at the six pilots' rates).
+- **Names, option (b): only the names a seat's own reports print beside an id.** The host learns them as it writes
+  them (seat-config.ts `namedFor`, from main) and now sends them with every resolve where the world has names (the
+  host protocol's `resolve` and the napi `resolve` take an optional `names` {id: name}); the engine's resolver adds
+  them to what the seat knows for that resolution (`Knowledge::with_shown_names`: only with names on, never over a name
+  the seat already knows the id by, two shown with one name still `ambiguous`). Names off: nothing is sent, nothing
+  moves. Test: `names_its_reports_printed_beside_ids_are_known_where_names_are_on`.
+- **The share Sonnet drafts is in every run's report and cost summary:** `pilot-report` (`translator_arrangement.
+  behind_share`, `drafts_behind_share`, and a line "drafted behind: N of M requests (x%), y% of the drafts offered"),
+  and cost.json `translator_share` with a line in cost.txt (batch.ts `withShare`, from each request's route in the
+  log). Test: orchestrator/test/translator-share.test.ts. Each retrain is to shrink it.
+- **Revisit if** a pilot under v3-s2 shows wrong drafts of ours well above the 8% of the replay, or a seat is told a
+  name it was shown is unknown.
+
+**Translator retraining is on hold until foundations-2 lands** (the forms will change; Naz, 2026-10-25). No retrain was
+started and nothing was spent on RunPod. **A proposal for then, to take the most back from Sonnet:**
+1. *Where Sonnet's share comes from:* on the test pilots 284 of the 303 requests behind are `type_unreleased`, almost all
+   because a function is not released (`form` passes; `message` 3%, `money` 4%, `statement` 13%, `agreement` 8 to 13%
+   wrong on held-back requests, against the 1% mark). Releasing `message` and `money` alone would bring back roughly a
+   third of what goes behind; `agreement` is lv-10's membership offers.
+2. *Data:* (a) every Sonnet draft a seat confirmed in the allowed pilots (lv-09, lv-11, lv-13, and every new pilot not
+   marked test-only), labelled by a blind reader as round 3 did: these are exactly the requests ours gives away, in the
+   seats' own words; (b) the written examples for agreements, payments with a budget line and statements re-read blind
+   and rewritten by hand where a template wrote them (the membership direction was in 90 templated examples and one seed
+   still failed it); (c) the joined data regenerated on foundations-2's forms by code (renamed and names twins as in
+   joined-v3). Never lv-07a/b, lv-08, lv-10, lv-12, the R180 seat-days or the held-out cases.
+3. *Runs:* three seeds, not two (the seeds differed more than anything else did), chosen on validation, the norename
+   control finished on a host of normal speed, then release by kind as now.
+4. *Cost:* GPU about 2 to 3 USD (three or four runs of about three hours at about 0.22 USD an hour); plan usage about 25
+   to 40 USD for the blind reading (about 500 seat-confirmed drafts) and rewriting (about 1,000 examples); no seat calls.
+## 2026-10-25 · Foundations 2: conservation, space, capacity, figures' basis, and bounds as detectors; a plan, awaiting the owner (docs only; no code, no model called)
+
+- **Asked:** the owner agreed (2026-10-25) that realism gaps must become impossible at the kernel and platform layer,
+  not fixed one at a time, through five foundations; design them, and an AI economy that falls out of them.
+- **Plan:** `docs/design/foundations-2.md`. Five laws numbered on from the first foundations' seven: 8, nothing physical
+  from nothing (connections as standing flows; variables are conditions, never stocks); 9, everything is somewhere and
+  moves along a network (standing journeys, carriage, link capacity); 10, every doer's capacity stated (no implicit
+  second; template seconds, hours and hardware); 11, every figure has a basis (a figure table the kernel checks at
+  load; reach every run; reliance by screening); 12, reality bounds detect and never steer. Each with a backstop test
+  and an inventory that only shrinks, as F0 to F10 had. About 71 agent-days in six phases, plus sourcing.
+- **Why this shape:** the two laws already built this way (no god's view; all work takes time) closed their classes of
+  gap for good; the audit found the remaining gaps are quantities that escape the existing conservation of goods
+  (per-occupant variables, draws with no output, instant moves, a one-second default), not missing mechanisms.
+- **Questions for the owner** are its section 9.
+- **Revised the same day on the owner's reading.** Shortages: "equal shares until an operator acts" dropped as an
+  invented rule; who goes short follows from the network's physics (trees; water by heads and pressure-driven delivery,
+  power by ratings and trips: the cheapest credible stand-in, a known limit), the supply contracts in force (firm or
+  interruptible; tariffs) and operators' own acts (valves, rotations, protected lists), with no allocation rule in the
+  kernel. The AI economy: every AI-specific mechanism replaced by four general laws (services bought by anyone;
+  technologies as goods with a capability; entry in any industry by expected profit, capital-heavy included; skills by
+  use and fading for every task); only the capability-and-cost scenario and the measures (M7, M8) are AI-specific, both
+  outside the world. Recorded rulings: capabilities from an outside scenario for now; suppliers abroad or local by
+  profile; WM-14's non-resident officer and national ratio, yes; no separate AI-helper mechanism. About 74 agent-days.
+- **Approved (owner, 2026-10-25).** Laws 8 to 12 become hard rules, each line added to `CLAUDE.md` when its
+  enforcement and backstop land; the edge's supply unlimited at its price except named scarce kinds; the tree model
+  accepted as a known limit; baselines move, with `pre-foundations-2` tagged before the first result-changing step;
+  ME-16 its own item after phase 4; several towns opt-in. Law 12 cut down ("who cares? I don't care what the real
+  figure is"): no real-world ranges and no held-out set, only flags for clearly broken states (a stampede, a freeze, a
+  stock below nought or unbounded, a dead law), outside the world and never gating. About 70 agent-days.
+- **Revisit if** the tree stand-in gives shortages a real town would not have, or phase 3's cost passes its stop rule.
+
+## 2026-10-25 · Law 11, counting: what a world's numbers rest on (foundations 2, phase 0: N1, N2; branch `f2-phase0`; no result changes; no model called)
+
+- **What.** `orchestrator/src/figures.ts` finds every number in a world's config and says what it rests on: sourced,
+  to confirm, derived, fitted, placeholder, convention, or unbased. The basis is read from what the world already
+  carries (the table of work's and of slips' `sources`; a module's manifest, for a parameter at its default) and from a
+  new table of the generator's own (`worlds/generator/figures.ts`: patterns over the config's paths, each naming the
+  profile path the figure is made from or a class and why). `oikos figures <world> [--json]` prints it; every batch
+  writes `figures.txt` and `figures.json` beside its runs. `orchestrator/test/figures.test.ts` counts every profile's
+  town (and two living ones) and fails on an unbased place not listed in `fixtures/figures-unbased.json` (306 places
+  today), on a listed place no town has any more, and on a row of the generator's table that speaks for nothing.
+- **Found.** The 200-person au-vic town: 54,483 numbers, 3,955 sourced (7.3%), 3,105 to confirm, 22,387 derived,
+  21,481 placeholder (39.4%), 3,091 conventions, 464 unbased (0.9%). The other profiles are alike (placeholders 35 to
+  50% of their towns' numbers; br-mg has the most unbased, 1,299 of 15,420, in parameters only its town is given).
+- **Results unchanged, shown.** Nothing reads the report; it is never in a config or a log. A half-year of the 200-person
+  town for au-vic, gb-eng and us-oh, run at origin/main (ca78ce86) and at this branch: logs byte-identical (sha-256 of
+  the decompressed logs cc586aef..., bfa140d9..., d73fc4a7...; 449,000 to 636,000 lines), anchors identical, final
+  states e5b72b44..., a0c02eb7..., 77b3448b... both times.
+- **Why counting outside the config, not the design's figure table in it.** Putting the table in the config would
+  change every log's first line, and phase 0 was to change no result or log. The table moves into the config, and the
+  kernel refuses an unbased figure, at N3; law 11's hard-rule line goes into `CLAUDE.md` then, not now.
+- **Known faults of the count.** A note's class is read from its words (a note that calls any figure it covers a
+  placeholder makes them all placeholders: the count errs towards less sourced); a `derived` row is the generator's
+  statement of where a figure comes from, and the class of what it is derived from is not carried through; numbers in
+  behaviour code that never reach the config (the engine's own constants) are not counted (N4).
+- **Revisit if** the count's classes are disputed for a profile (then structured notes first, N3), or the test passes
+  90 s on the gate (then fewer living towns).
+## 2026-10-25 · SC-1: what held a 10,000-person month's memory, the config read participant by participant, and people's params held once (branch `scale-next`; no model called)
+
+**What held it.** A sampling heap profiler in the kernel binary (`--features heapprof`, `kernel/src/heapprof.rs`;
+`scripts/heapprof.ts` names the stacks) on main's 10,000-person month (au-vic, `living.initiative_bps=10000`, 14 engine
+threads): 8.8 GB live at the high-water mark of a 10.2 GB footprint. The two largest holders were copies of the same
+thing: each person's controller in the typed config, as JSON values (2.5 GB: 23 KB of JSON a person, nearly all the
+same for everyone, the town's ventures alone 17.6 KB), and each citizen's own reading of those params (2.1 GB, the
+ventures again). Citizens' memory and minds were about 0.75 GB (as fix-memory-appeal found, not the cause). The rest
+is the run's own: the state hash's caches of canonical bytes (0.8 GB), what people have seen of buildings and work
+(0.9 GB), the engine (0.9 GB). The start, not live at the peak, made most of 50,000's: the config's text, its whole
+JSON value and three copies of its canonical bytes.
+
+**What changed (each result-identical; contracts unchanged, the config's text, hash and the log the same).**
+- *The config read participant by participant* (`config::load_from`): each participant checked against the schema's
+  own `Participant` definition (the whole schema checks the rest, its participants empty, and the list's limit), its
+  canonical bytes written on, compressed, and read into its type; the rest read as JSON as before. Its canonical bytes
+  are kept compressed in three pieces (`config::Canonical`); the header is written from them, and a snapshot takes
+  them from there. `load` and `load_split` (from a value) take the same path. `oikos-kernel world` and the native
+  `World` read so (a `config_file` option, or the text); `RustWorld.start` writes a config of 10,000 participants or
+  more to a file member by member and participant by participant (one string could not hold 100,000's 2.8 GB).
+- *A controller's long params members held once* (`controller::Controller`, in the config and the world's state): a
+  member of 128 bytes or more of JSON is held once for everyone who has it alike; read whole (its serialisation, its
+  equality, `to_value`) it is the controller as given. The actors' `Params` read a person's own members and the shared
+  ones as one map, in key order; it no longer derefs to a `Map` (twelve call sites changed to `get`, `iter`,
+  `to_map`, or a `&Params` in place of a `&Map`). A first version kept one shared map per person's combination of long
+  members; a person's own long members (values, beliefs) made each combination different, so nothing was shared and
+  the peak did not move: found by the test (one map per person), now one held member per distinct member.
+- *The citizen's ventures read once* for all given the same list (`controller::read_once`, in the contracts crate:
+  the actors may hold no lock, and this is an immutable reading of the same text, which no one can change).
+
+**Measured** (release builds, 14 engine threads, each run alone in a slot, the machine's load 20 to 40):
+- 10,000 x 30 days: **10.21 to 5.19 GB** peak footprint (10.59 to 5.22 GB resident), 184 to 123 s wall,
+  1,052 to 1,068 G instructions (+1.5%: params read through the shared view, the controllers serialised for the hash);
+  the start 6.3 GB at 30 s to 2.4 GB at 42 s. After the first two changes alone: 7.58 GB.
+- 1,000 x 30 days, three profiles: au-vic 0.99 to 0.84 GB, gb-eng 0.96 to 0.83, us-oh 0.65 to 0.61.
+- 50,000 x 30 days: **completes** (main stopped at the start past the 40 GB guard, 44 GB in 104 s): 22.3 minutes wall,
+  about 28 to 33 GB through the month, 30.1 GB peak resident, 41.0 GB peak footprint (a spike at the end, between the
+  guard's 10-second looks), 15,033 G instructions, 4.06 million steps, state `ea006720ed53d36c`. Generating its config:
+  27 s, 2.05 GB, 1.39 GB of JSON.
+- 100,000: **not yet**. Its config is generated in 141 s (5.4 GB; 3.12 GB of JSON) and the start is bounded (8.7 GB at
+  two minutes), but the first moment (everyone's first look, still at t=0 with 4.8 GB of log out) passed the 40 GB
+  guard (44.6 GB footprint, 22 GB resident). At 20,000 the start and first moment peak at 4.8 GB, the hash's caches of
+  canonical bytes the largest holder (1.6 GB of 4.3 live); what grows faster than the town at 100,000 is unprofiled.
+- Identical: the same final state hash and log digest (header's `kernel`, entries' hash and prev stripped) before and
+  after, on 10,000 x 30 d (`d2c58d35f85e747f`, `1d4162c3b258f44f`) and on 1,000 x 30 d of au-vic, gb-eng and us-oh;
+  the profiled build too. Tests: `kernel/tests/config_stream.rs` (three profiles: the streamed read is the whole read,
+  a run from it the same log, the same refusals, one held list of ventures for all), `orchestrator/test/config-file.test.ts`,
+  the controller's own.
+- **Revisit if** a module's params come to be changed per person in place (`Params::make_mut` then copies them, as
+  before, and memory rises with it); a heap profile at 50,000 shows the end-of-run spike (the final state's canonical
+  bytes, likely) to matter; or the run's own holders (the hash's caches, what people have seen) are to be cut: those
+  are changes to what is kept, not copies.
+
+## 2026-10-25 · A known timing flake is rerun once alone in every run, CI's too
+
+- **What we saw:** main went red at 72dbbed0 for `scripts/slots.test.ts` alone (it passed three times in a row by hand);
+  merge.ts already reran that file once alone, CI did not, so a timing flake blocked every merge.
+- **Change:** `scripts/test.ts` reruns a failed file from the known-flakes list (the two merge.ts names) once alone, and
+  accepts it only if it then passes; the line says so.
+- **Revisit if:** a listed file fails twice in a row (then it is a fault, not a flake), or the list grows past these two.

@@ -89,6 +89,31 @@ duplicating culture-dial's pins), and `kernel/tests/entity_record.rs` (with and 
 **Kept, deliberately:** the three states and configs of `culture-dial.test.ts`, as the one place a change that moves
 every town shows (re-take them with the change and say why there; they are an alarm, not a check).
 
+## Pruning: when a budget is hit
+
+The gate and the slow tier have time budgets (`scripts/test-budgets.json`; raising one is a decision with its entry in
+docs/decisions.md). When one is hit, or about monthly, prune as on 2026-10-24 (docs/decisions.md, "Test pruning"):
+
+1. **Inventory.** For each test file: what it guards (a law, an invariant, a contract, a real rule from a profile or a
+   law, a bug we had: `git log -S` and docs/decisions.md), and its time (`scripts/test-times.json`, written by every run
+   of `scripts/test.ts`; the slowest first). A file with no tests in it, or that tests only its own fixtures, goes.
+2. **Seed pins.** `grep -n "where it was\|draws alone\|by the draws\|draws, not\|seed [0-9]"` over the test files finds
+   the numbers re-taken at changes: a floor hopped seed to seed, a ceiling raised a little each time. Replace each with
+   the rule it stood for (the dial's own figure, the code's own ceiling, "some" where the count is the draws') or say
+   the property; never hop a seed or widen a bound to pass.
+3. **Duplicates and shared fixtures.** Two tests running the same config and seed run one town: run it once in the file
+   (a memoised promise, as `twin-seat-year.test.ts` and `reading-dial.test.ts` do). A slow file whose last tests only
+   generate towns is split, so its runs and its generation are not one file's queue (`scenarios-generate.test.ts`).
+   A run lengthened only to find a rare draw (a case falling ripe, a dividend) is held where the case is made by
+   construction instead.
+4. **Mutations.** `bun scripts/slots.ts --weight 3 -- bun scripts/mutate.ts --copy <scratch>` before and after on the
+   bugs that still apply (`--only`; a mutation whose `find` no longer matches its file is not planted). For the before side, `--source` a `git archive` of main with `node_modules` and `kernel/target` cloned in (`cp -c -R`), and a fresh `--out`: an archive alone runs no test, and a reused results file keeps its baseline, so a baseline where every file "did not run" counts every bug missed. A cut must not
+   leave a bug that was caught caught by nothing, above all on the hard rules (money, the dead, the absent, work's time,
+   sight, twins). The catalogue's bugs in the TypeScript actors (`participants/src/behaviour`, deleted) are to be
+   rewritten against `kernel/crates/actors`: on 2026-10-24 15 of its 49 still applied.
+5. **Record.** One decisions entry: each file or test cut or replaced, what covers it instead, and what would bring it
+   back; the suite's file count, test count and the two tiers' times before and after.
+
 ## The gaps
 
 Measured 2026-10-17 on main at ac99bbba (docs/decisions.md, "What the tests catch"): 49 bugs planted, 32 caught. The

@@ -16,8 +16,15 @@
 use std::process::ExitCode;
 
 /// A faster allocator for the kernel binary (the kernel allocates heavily; no result depends on the allocator).
+#[cfg(not(feature = "heapprof"))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+/// (For whoever measures memory: the same allocator, sampled; `--features heapprof`.)
+#[cfg(feature = "heapprof")]
+mod heapprof;
+#[cfg(feature = "heapprof")]
+#[global_allocator]
+static GLOBAL: heapprof::Profiled<mimalloc::MiMalloc> = heapprof::Profiled(mimalloc::MiMalloc);
 use oikos_kernel::{log, protocol, run};
 
 fn read(path: &str) -> Result<Vec<u8>, String> {
@@ -32,6 +39,8 @@ fn anchors_arg(args: &[String]) -> Result<Option<Vec<u8>>, String> {
 }
 
 fn main() -> ExitCode {
+    #[cfg(feature = "heapprof")]
+    heapprof::start();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
         Some("serve") => {
@@ -117,7 +126,9 @@ fn main() -> ExitCode {
 /// `world`: a world run in the engine with its actors in Rust, to its end or `--until`; prints its final state hash.
 fn world(args: &[String]) -> Result<(), String> {
     let flag = |name: &str| args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned();
-    let config: serde_json::Value = serde_json::from_slice(&read(&args[1])?).map_err(|e| format!("{}: {e}", args[1]))?;
+    // (Read participant by participant, never whole: a large world's config is over a gigabyte of JSON.)
+    let (loaded, rest) = oikos_kernel::config::load_from(std::fs::File::open(&args[1]).map_err(|e| format!("{}: {e}", args[1]))?)
+        .map_err(|e| format!("{}: invalid config: {e}", args[1]))?;
     let out = flag("--out").ok_or("--out <dir> is needed")?;
     std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
     let run_id = flag("--run-id").unwrap_or_else(|| "world".into());
@@ -132,7 +143,7 @@ fn world(args: &[String]) -> Result<(), String> {
         if let Some(d) = flag("--snapshot-every") {
             o["snapshot_every_days"] = serde_json::json!(d.parse::<i64>().map_err(|_| "--snapshot-every DAYS")?);
         }
-        let mut h = oikos_kernel::host::Host::start(config, &o)?;
+        let mut h = oikos_kernel::host::Host::start_loaded(loaded, rest, &o)?;
         loop {
             let due = h.next()?;
             if due["due"] == "end" {
@@ -146,7 +157,7 @@ fn world(args: &[String]) -> Result<(), String> {
         return Ok(());
     }
     let log = oikos_kernel::spool::Spool::new(std::fs::File::create(format!("{out}/{run_id}.jsonl")).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-    let (hash, e) = oikos_kernel::engine::run_code_world(config, &run_id, log, opts)?;
+    let (hash, e) = oikos_kernel::engine::run_code_world_loaded(loaded, rest, &run_id, log, opts)?;
     println!("{{\"run_id\":{:?},\"state_hash\":{:?},\"t\":{},\"steps\":{}}}", run_id, hash, e.t(), e.steps);
     // (For whoever measures memory: what the code actors keep, summed by what.)
     if std::env::var_os("OIKOS_KEPT").is_some() {

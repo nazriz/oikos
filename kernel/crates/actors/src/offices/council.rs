@@ -56,7 +56,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 fn parse<T: DeserializeOwned>(ctx: &Ctx) -> Result<T, String> {
-    serde_json::from_value(Value::Object((*ctx.params).clone())).map_err(|e| format!("{}'s parameters: {e}", ctx.participant))
+    serde_json::from_value(Value::Object(ctx.params.to_map())).map_err(|e| format!("{}'s parameters: {e}", ctx.participant))
 }
 
 /// An act sent and what it was for: dropped from the guard if it was not applied (a refused act is tried again).

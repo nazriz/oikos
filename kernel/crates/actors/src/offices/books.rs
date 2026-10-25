@@ -331,7 +331,7 @@ fn staff_books(kind: &dyn Kind, ctx: &Ctx) -> Option<(String, Box<dyn OfficeBook
         return None;
     }
     let office = office_of(ctx.position.as_deref());
-    books_of(kind.name(), &ctx.entity, &office, &ctx.params).map(|b| (office, b))
+    books_of(kind.name(), &ctx.entity, &office, &ctx.params.to_map()).map(|b| (office, b))
 }
 
 /// The actor of `kind` for `ctx`: its own, with its staff's clerk where it keeps books and runs as staff.
