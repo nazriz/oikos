@@ -102,7 +102,7 @@ behind one lock per shard and made the 50,000 month 58% slower in wall time (the
 on many threads, and queued for its shard); read under a shared lock, the comparison outside it, it is faster than
 main.
 
-### A plan for what is left: the world's data held compactly (not started: the owner decides, 2026-10-26)
+### A plan for what is left: the world's data held compactly (the owner's target 90 to 120 KB a person; begins after foundations-2 phase 2 lands)
 
 What is left is no longer copies. It is the world's own data and the actors' state, held as general-purpose values:
 every id a `String` of its own wherever it appears (`blocks::Id = String`: in records, ledgers, maps' keys, knowledge),
@@ -120,7 +120,8 @@ each lowering the budget's ceiling.
 | R3 | **Compact ledgers**: a transaction a fixed row (interned ids, integers), accounts' histories in persistent vectors of them | world, perception (accounts channel), sight, actors (statements, books) | 2 agent-days | -5 to -10 |
 | R4 | **The actors' remaining state** in typed forms (offices' and firms' books, held as `Value` maps now), after `mem-minds`'s minds and memories | actors | 2 to 4 agent-days | -10 to -20 |
 
-In all 12 to 18 agent-days, to perhaps 90 to 120 KB a person live at 10,000 (from 195), about 150 resident at the
+In all 12 to 18 agent-days, to perhaps 90 to 120 KB a person live at 10,000 (from 195): the owner's target for it
+(Naz, 2026-10-26), about 150 resident at the
 budget's 1,000 (from 322 with `mem-minds`). **That is not the 50 KB target.** Past it, what is left is what people
 hold (minds, memories, what they have seen, their knowledge of records) as the world gives it to them; holding less
 of that is a bound on what a person remembers, which is a law, the owner's to decide (docs/design/knowing.md), not a
@@ -136,6 +137,25 @@ through contracts, world, rules, perception and actors: the same crates.
 - R2 and R4 touch representations the phases read but do not reshape, and can go beside either phase, each a branch
   of a few days, merged often.
 - Each step's measures and its ceiling go in this table and docs/decisions.md as the earlier cuts' did.
+
+**A later step: tiered storage (R5, after R1 to R4).** What is active stays in memory; what is cold (closed matters,
+ledgers of past months, papers no longer standing) goes to disk, compressed, and is read back on demand, exactly as
+it was, so every result is byte-identical. Engineering, not a law: nothing anyone knows or can find changes, only
+where the world keeps it (a law of what people remember, short-term detail fading into long-term gist, is a separate
+design, its sources and the owner's approval first: not this).
+- *What goes cold, and when:* a record whose matter has closed and that no channel stands to show (a paper withdrawn,
+  an agreement ended a while ago), a ledger's entries before the month that's open, an entity record's history. The
+  state keeps for each its id, where it sits in order, and its canonical bytes' hash, so the state hash is the same
+  (taken from the hashes kept, by the same streamed writer: `World::write_state`).
+- *Read back:* whatever reads it (a look, a register's keeper, a snapshot, a replay) asks the store; a block read
+  back is cached while it is used. Snapshots carry the store or point to it.
+- *Where:* world (the state's maps of records, ledgers, entity records), core (the store: zstd blocks of canonical
+  bytes, by id), kernel (snapshots, replay), perception and resolver (reads go through the state's accessors).
+- *Risks:* reads of something cold on a hot path (a register's whole file, a long statement) are slow; the store's
+  file is per run and must go with its log. Measured before and after on the 50,000 month and the 100,000 week, and a
+  year at 10,000, where history is what grows.
+- *Estimate:* 6 to 10 agent-days, after R1 to R4. *Expected:* history's share of memory held at what is active, so a
+  long run's memory stops growing with its age.
 
 ## What held memory, and the config read participant by participant (branch `scale-next`, 2026-10-25)
 
