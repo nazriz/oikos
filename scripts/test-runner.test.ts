@@ -152,3 +152,59 @@ test("--affected: a planted change in a kernel file chooses the whole suite; a d
     expect(await chosen()).toEqual(expect.arrayContaining(["orchestrator/test/generality.test.ts", "t/scans.test.ts"]));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 120_000);
+
+test("--gate: a change to a file a slow-tier test imports pulls that slow test into the gate, and no other slow test; one that reaches more than eight runs the canaries instead; the kernel the kernel canaries; a document none", async () => {
+  const dir = fixtures({
+    "t/fast.test.ts": `test("f", () => expect(1).toBe(1));`,
+    "t/slow-town.test.ts": `import { one } from "../lib/town";\ntest("s", () => expect(one()).toBe(1));`,
+    "t/slow-other.test.ts": `test("o", () => expect(1).toBe(1));`,
+    "orchestrator/test/invariants.test.ts": `test("i", () => expect(1).toBe(1));`,
+    "t/canary-town.test.ts": `test("c", () => expect(1).toBe(1));`,
+    ...Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`t/wide-${i}.test.ts`, `import { all } from "../lib/shared";\ntest("w", () => expect(all).toBe(1));`])),
+  });
+  const git = (...a: string[]) => { const p = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd: dir, stdout: "pipe", stderr: "pipe" }); if (p.exitCode !== 0) throw new Error(p.stderr.toString()); };
+  const gate = async () => { const r = await runner_(dir, "--gate", "--list", "--base", "base"); return { out: r.out, files: r.out.split("\n").filter((l) => /\.test\.ts$/.test(l)).sort() }; };
+  try {
+    for (const d of ["lib", "scripts", "kernel/src", "docs"]) mkdirSync(join(dir, d), { recursive: true });
+    writeFileSync(join(dir, "lib/town.ts"), `export const one = () => 1;\n`);
+    writeFileSync(join(dir, "lib/alone.ts"), `export const two = () => 2;\n`);
+    writeFileSync(join(dir, "lib/shared.ts"), `export const all = 1;\n`);
+    writeFileSync(join(dir, "kernel/src/lib.rs"), "// kernel\n");
+    writeFileSync(join(dir, "docs/x.md"), "x\n");
+    writeFileSync(join(dir, "scripts/test-tiers.json"), JSON.stringify({ slow: { "t/slow-town.test.ts": "a town", "t/slow-other.test.ts": "another town", "orchestrator/test/invariants.test.ts": "the year", "t/canary-town.test.ts": "a pinned town", ...Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`t/wide-${i}.test.ts`, "a wide town"])) }, canary: { "orchestrator/test/invariants.test.ts": { why: "the invariants", kernel: true }, "t/canary-town.test.ts": { why: "a pinned town" } } }));
+    git("init", "-q", "-b", "main"); git("add", "."); git("commit", "-q", "-m", "base"); git("tag", "base");
+    // A file the slow town test imports: that test joins the gate, said as the slow tier's; the other slow tests do not.
+    writeFileSync(join(dir, "lib/town.ts"), `export const one = () => 1; // changed\n`);
+    const town = await gate();
+    expect(town.files).toContain("t/slow-town.test.ts");
+    expect(town.files).not.toContain("t/slow-other.test.ts");
+    expect(town.files).not.toContain("orchestrator/test/invariants.test.ts");
+    expect(town.out).toMatch(/^  \+ t\/slow-town\.test\.ts .*slow tier\): imports lib\/town\.ts$/m);
+    git("checkout", "-q", ".");
+    // A file nine slow tests reach: more than eight, so the canaries instead, and none of the nine.
+    writeFileSync(join(dir, "lib/shared.ts"), `export const all = 1; // changed\n`);
+    const wide = await gate();
+    expect(wide.files.filter((f) => f !== "t/fast.test.ts")).toEqual(["orchestrator/test/invariants.test.ts", "t/canary-town.test.ts"]);
+    expect(wide.out).toMatch(/reaches 9 of the slow tier.s files, more than 8: the canaries instead/);
+    git("checkout", "-q", ".");
+    // A file no slow test reaches: none of them.
+    writeFileSync(join(dir, "lib/alone.ts"), `export const two = () => 3;\n`);
+    expect((await gate()).files.filter((f) => f !== "t/fast.test.ts")).toEqual([]);
+    git("checkout", "-q", ".");
+    // The kernel: the canaries marked for it (here the invariants), not every slow test, nor the other canary.
+    writeFileSync(join(dir, "kernel/src/lib.rs"), "// kernel changed\n");
+    const kernel = await gate();
+    expect(kernel.files).toContain("orchestrator/test/invariants.test.ts");
+    expect(kernel.files).not.toContain("t/canary-town.test.ts");
+    expect(kernel.files).not.toContain("t/slow-other.test.ts");
+    git("checkout", "-q", ".");
+    // A document: no slow test.
+    writeFileSync(join(dir, "docs/x.md"), "changed\n");
+    expect((await gate()).files.filter((f) => f.startsWith("t/slow") || f.includes("invariants"))).toEqual([]);
+    git("checkout", "-q", ".");
+    // Run, the slow test runs with the gate.
+    writeFileSync(join(dir, "lib/town.ts"), `export const one = () => 1; // changed again\n`);
+    const ran = await runner_(dir, "--gate", "--base", "base");
+    expect(ran.out).toMatch(/^ok +t\/slow-town\.test\.ts/m);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}, 120_000);

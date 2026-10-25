@@ -96,7 +96,13 @@ Not touched: caches in the home folder (huggingface models) and `/private/tmp/cl
   metadata`: each changed crate and every crate above it); for documents only, the tests that read documents; for
   anything else, the fast tier (under 10 s), the tests that reach the change, and always the backstops (`BACKSTOPS`:
   generality, no-god-view, contracts, `invariants-gate`, all-work-takes-time, risks, unstated-run, tiers). `--list`
-  prints the choice.
+  prints the choice. **And the slow tier's files the change reaches** (2026-10-25): changed, importing a changed file
+  however far down, starting a script that does, or naming a changed config or profile (a folder counts only below the
+  top level, and a document never), at most eight of them (`SLOW_MOST`). A change that reaches more (a profile, the
+  generator, `run.ts`) runs the canaries instead (`scripts/test-tiers.json`, `canary`: the slow files that pin whole towns,
+  their hashes or their invariants, each with why) and leaves the rest to CI; a change to the kernel or the contracts
+  runs the canaries marked `kernel` (the invariants and culture-dial). They run in the gate, say their times, and are
+  not counted in its budget.
 - **The slow tier** is named file by file in `scripts/test-tiers.json`, each with why: towns of a year or more, several
   seeds, the 1,000-person town, anything over about 30 s. `bun scripts/test.ts --tier slow`. CI runs it on every push
   to main and nightly. The year of invariants on several seeds is here (`invariants.test.ts`); the gate has its own
