@@ -8415,3 +8415,35 @@ JSON value and three copies of its canonical bytes.
 - **Change:** `scripts/test.ts` reruns a failed file from the known-flakes list (the two merge.ts names) once alone, and
   accepts it only if it then passes; the line says so.
 - **Revisit if:** a listed file fails twice in a row (then it is a fault, not a flake), or the list grows past these two.
+
+## 2026-10-25 · Main's slow tier after commercial leasing: the station's head is a sworn officer, the paper is the council's to fill, and five tests re-taken with their reasons (branch `fix-main-leasing`; no model called)
+
+- **What we saw:** CI's slow tier failed eight files after the commercial-leasing merge (3b87959e); the gate's canaries
+  passed. Market realism moved every default town's draws (who is hired, by interview; incomes and savings drawn
+  together; businesses born by weighing), and the slow files run long default-town scenarios the canaries do not.
+- **Faults fixed in the mechanism:**
+  - *The station's officer in charge did no station work* (seat-acts, hazards). The station staffs its "police officer"
+    role; its head, employed as "officer in charge", was not counted. With the new hiring the one officer of the default
+    town is injured on day 171, and the station carried out no warrant and looked into no report for a month while its
+    head sat at the station. A small station's head is a sworn officer (a sergeant or inspector) who takes the work when
+    the officers are away. `police.station` 0.7.0 counts its staff in `in_charge_role` (default "officer in charge") who
+    are at the station after its officers; `Staffing::in_role` lists those employed in a role other than the one it staffs.
+  - *The paper was a headless one-person body* (deaths; WM-7). Its one person died and nobody filled the post, so it went
+    on paying the dead. The paper is kept on the town's grant as the courts are, so every profile's
+    `public_service.appointed_by` now has `press: council`, sourced as the courts are; bodies run on their own account
+    (bank, union, landlords, shops) are still not covered (WM-7 stays open for them).
+  - *Commercial leasing's figures had no basis rows* (figures). `firm.landlord`'s commercial rent, deposit, term and
+    notice are now read from the profile (`prof` rows); two stale rows of the old founding rate are gone.
+- **Tests re-taken, each with the reason in place:**
+  - production: a factory that bought an automation system has its units `make`; a system is the firm's performer and
+    is not held to a person's working day.
+  - hazards: reports left undealt are counted only while someone who looks into reports is at the station.
+  - unions: one stop where there were two (the town as drawn since puts fewer members at factory-1; not traced further).
+  - police-station-seat: seed 1 where it was 7, measured on the code twin for 330 days over seeds 1 to 10 (in the test).
+  - deaths: a housemate who reports the death and then leaves town the same day counts as living there (a widow's two
+    grown children, in this draw).
+  - seat-diary: the refusal of a crew member not at work is taken from a seat that sits at 07:00 in a town of the usual
+    size, since the 600-person town's works crew now have no home and sleep at the hall.
+- **Also:** culture-dial's config hashes and Rust states re-taken (the profiles and the station moved); manifests regenerated. The whole slow tier passes on the branch (58 files).
+- **Revisit if:** a station is ever seated with a head who should not do officers' work (a civilian manager), or the
+  600-person town gets homes for its people (seat-diary could look in its main run again).
