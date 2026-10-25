@@ -163,9 +163,14 @@ test("founding in code: with the composer off no model is called; a founded thin
     for (const f of founded) check("dataset#/$defs/Founded", f);
     const first = founded[0]!;
     expect(first.composer).toBe("none");
-    expect(first.sharers).toBeGreaterThanOrEqual(2);
     // What a composing model would be shown is on record all the same: the founder's own record and no one else's.
     const brief = first.brief as ComposeBrief;
+    // The rule of an occasion (docs/behaviour/founding.md): at least the dial's `shared_min` others share the want (one, here), and
+    // at least one of them is from beyond the founder's household. (Until the test pruning, 2026-10-24, this asked two or more, which
+    // the rule does not ask here: which seed had two was a matter of draws, and the run's seed was hopped nine times for it.)
+    expect(first.sharers).toBeGreaterThanOrEqual(1);
+    expect(brief.sharers.length).toBe(first.sharers);
+    expect(brief.sharers.some((x: any) => !/^of our household/.test(String(x.how)))).toBe(true);
     expect(brief.founder).toBe(String(first.founder).replace(/-self$/, ""));
     expect(Object.keys(brief.record)).toContain("values");
     expect(brief.sharers.every((x) => Object.keys(x).sort().join() === "how,who")).toBe(true);

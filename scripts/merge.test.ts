@@ -17,6 +17,10 @@ test("keepBoth leaves text without conflicts alone and refuses an unterminated b
 test("readFailures separates test files from other failures", () => {
   const log = "ok   a.test.ts 3s\nFAIL scripts/slots.test.ts 9s\nFAIL kernel (cargo test) 40s\nFAIL scripts/slots.test.ts 9s (failed again on rerun)";
   expect(readFailures(log)).toEqual({ files: ["scripts/slots.test.ts"], other: ["kernel"] });
+  // A gate over its time budget is a failure of its own, never a flake to rerun.
+  const over = readFailures("FAIL scripts/slots.test.ts 9s\nBUDGET: the gate took 200s, over its 180s (docs/testing.md)");
+  expect(over.other).toEqual(["the time budget (scripts/test-budgets.json)"]);
+  expect(flakeCandidate(over)).toBeNull();
 });
 test("flakeCandidate accepts exactly one known flaky file, nothing else", () => {
   expect(flakeCandidate({ files: ["scripts/slots.test.ts"], other: [] })).toBe("scripts/slots.test.ts");
