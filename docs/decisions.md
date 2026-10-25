@@ -8661,3 +8661,20 @@ tree it runs in are left. Finished agents' builds filled the disk twice on 2026-
 **Revisit if** a kernel bug is "caught" only by town-wide tests again (look at what they failed on before counting it), a
 catalogue bug stops applying (a refactor moved its line: re-plant it), or the host stops running anything on a seat's
 side (then draws.ts goes too).
+
+## 2026-10-26 · The state hash written as a stream, with no cache of encoded copies (branch `mem-state-hash`; no model called)
+
+- **Change:** `World::write_state` writes the state's canonical bytes for its hash member by member, and each large map
+  (entities, accounts, cells, structures, occupancy, records, participants, positions...) entry by entry, each entry
+  encoded alone and let go. Nothing is kept between one hash and the next: the cache of every record's encoded bytes,
+  which grew with the run, is gone. The bytes are exactly `canon::canonical` of the state (a test holds it on three
+  profiles' towns, `kernel/tests/config_stream.rs`), so every hash is the same.
+- **Measured** (30 days, 14 threads; main `3b87959e` against this): 1,000 people au-vic 693 to 592 MB, gb-eng 670 to
+  570, us-oh 565 to 514; 10,000 people 5.25 to 4.34 GB. The same state hash and log digest on all of them. At the
+  budget's own settings (4 threads) 1,000 people peak at 553 to 560 MB: 450 KB a person beside 110 MB, so the
+  budget's ceiling is lowered from 590 to 480 KB.
+- **Its cost:** instructions +0.4% at 10,000 people, +0.1 to 2.6% at 1,000: the records are encoded again at each
+  hash (the start's, each checkpoint's, the end's) where the cache had them. The cuts that follow it (what's been seen,
+  the delivered records) take far more off: all of them together are 10% under main at 10,000 and level at 1,000.
+- **Revisit if:** checkpoints become frequent (daily, say): then the records' bytes might be kept compressed between
+  them, not whole.
