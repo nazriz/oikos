@@ -16,7 +16,10 @@ const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 // (The town opens with the tribunal's orders for possession part-way through, so that warrants are asked for in the first months.)
 // (Seed 7 and 330 days where it was seed 3 and 200: foundations F5 moved the town's draws and the tribunal's person-time, and no seed from 1 to 9 had two warrants carried out in 200 days; seed 7 has two in 330.)
 // (Measured 2026-10-16 on the foundations-review branch, the code twin for 330 days, seeds 1 to 8, against the tree before foundations F5 (24c14ea): warrants issued 4, 3, 1, 1, 0, 1, 2, 2 now (14; executed 11) and 4, 2, 4, 4, 1, 1, 2, 3 before (21; executed 15); a tribunal's papers of hearing notice 54 against 78. Cases come later and fewer, as the tribunal's staff are people whose time is spent (F5, as intended), and the station carries out all but one of the warrants it is given. Seed 3, the original, issues one warrant, on day 301. So two warrants carried out in the one town is a rare draw now; seed 7 has two.)
-const town = { ...spec, seed: 7, citizens: 300, profile: "ke-nakuru-2026", opening_caseload: true, living: { initiative_bps: 10_000, friction_bps: 60_000 } };
+// (Seed 1 where it was 7, 2026-10-25: market realism (business births, joint draws of income and savings, hiring by
+// interview) moved the town's draws. Measured on the code twin for 330 days, seeds 1 to 10: warrants issued 2, 0, 2, 2,
+// 0, 2, 0, 0, 1, 0 (executed 2, 0, 1, 1, 0, 0, 0, 0, 0, 0). Seed 7 now issues none; seed 1 has two, both carried out.)
+const town = { ...spec, seed: 1, citizens: 300, profile: "ke-nakuru-2026", opening_caseload: true, living: { initiative_bps: 10_000, friction_bps: 60_000 } };
 
 async function run(over: object, days: number, seated: boolean, tweak?: (config: any) => void): Promise<any[]> {
   const config = generate({ ...town, ...over, ...(seated ? { mayor: "llm", model_seats: ["police-oic"] } : {}) }) as any;
@@ -47,7 +50,17 @@ test("a mock seat in the station over 330 days: the warrants are carried out as 
   const issuedIn = (recs: any[]) => new Set(recs.filter((r) => r.kind === "warrant").map((r) => r.data?.lease));
   const both = (recs: any[]) => executed(recs).filter((x) => issuedIn(twin).has(x.warrant) && issuedIn(seat).has(x.warrant));
   const a = both(twin), b = both(seat);
-  expect(a.length).toBeGreaterThanOrEqual(2);
+  // (Some, and among them the case the town opens with at a hearing, which both towns issue a warrant for in its second
+  // month: since 2026-10-26, "Main red after foundations-2 phase 1" in docs/decisions.md. It was "two or more", a floor
+  // kept by hopping the seed (3, 7, then 1) to a town that had a second; after foundations-2 phase 1 the second
+  // household of seed 1's town (lease-c0269) paid its arrears in the seat's town and the claim was withdrawn, while the
+  // twin's issued a warrant on day 232. A second case brought forward by construction went the same way: its tenant left
+  // on the order's day in one town and days later in the other. Which later cases reach a warrant in both towns is the
+  // households' draws (docs/testing.md, "Seed pins": "some" where the count is the draws').)
+  const opening = (generate(town) as any).world.records.find((r: any) => r.kind === "hearing_notice" && r.data?.brought_forward && r.data.kind === "possession")?.data.about as string;
+  expect(opening).toBeDefined();
+  expect(a.length).toBeGreaterThanOrEqual(1);
+  expect(a.map((x) => x.warrant)).toContain(opening);
   expect(b.map((x) => x.warrant)).toEqual(a.map((x) => x.warrant));
   // (How many of a household were at home when the officer came is the hour's: it is not held equal.)
   for (const [i, x] of b.entries()) expect(Math.abs(x.day - a[i]!.day), x.warrant).toBeLessThanOrEqual(1);

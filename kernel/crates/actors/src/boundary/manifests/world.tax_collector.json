@@ -2,7 +2,16 @@
   "name": "world.tax_collector",
   "version": "0.1.0",
   "doc": "docs/behaviour/public-finance.md",
-  "params": {},
+  "params": {
+    "casework": {
+      "schema": {
+        "type": "object",
+        "description": "who does the collector's casework (law 10): `by`, a system of the office's own organisation named on every step that is only papers of `kinds` (its officers' desk, whose template gives an officer's minutes for each and the officers' hours); absent, whoever acts does it"
+      },
+      "default": null,
+      "source": "the world gives it: the generator's tax collector and its officers' desk (docs/behaviour/public-finance.md)"
+    }
+  },
   "perceives": [],
   "state": "none",
   "issues": [

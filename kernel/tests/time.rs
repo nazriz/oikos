@@ -42,7 +42,7 @@ fn balance(run: &Run<Vec<u8>>, acc: &str) -> i128 {
 #[test]
 fn an_act_takes_effect_when_done() {
     let mut config = riverbend();
-    config["orchestration"]["act_time"] = json!({ "system": { "transfer": 5 }, "person": { "message": 120 } });
+    config["orchestration"]["act_time"] = json!({"default": 1, "system": { "transfer": 5 }, "person": { "message": 120 } });
     let mut run = Run::start(config, "time", Vec::new(), None).unwrap();
     let before = balance(&run, "acc-alice");
     assert_eq!(begun(&mut run, &act("bank-payments-system", Some("bank-payments"), pay(100), None)), (0, 5));

@@ -869,6 +869,19 @@ impl Staffing {
         self.staff(book, t).iter().map(|a| worker_of(a).to_string()).collect()
     }
 
+    /// The people we employ, in force and not yet ended, in another role than the one this office staffs (named in their
+    /// agreement or the job advertised): the head of an office, who is not one of the staff it takes on.
+    pub fn in_role(&self, book: &Book, t: i64, role: &str) -> Vec<String> {
+        book.of_type("agreement")
+            .filter(|r| {
+                let RecordBody::Agreement { terms } = &r.body else { return false };
+                terms.template.as_deref() == Some("employment") && terms.parties.first().map(String::as_str) == Some(self.me.as_str())
+            })
+            .filter(|a| self.role_of(a, book).as_deref() == Some(role) && book.in_force(&a.id) && t < self.end_of(book, a))
+            .map(|a| worker_of(a).to_string())
+            .collect()
+    }
+
     /// Those of our staff we know to have died: by the registry's entry or by our bank's word (docs/behaviour/deaths.md).
     pub fn known_dead(&self, book: &Book, t: i64) -> Vec<String> {
         let dead: BTreeSet<String> = book.all("death_registration").filter_map(|r| data(r).get("deceased").and_then(Value::as_str).map(String::from)).chain(self.bank_says_dead.iter().cloned()).collect();

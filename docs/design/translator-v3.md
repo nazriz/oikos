@@ -140,7 +140,8 @@ generated, the training pilots' real requests at four times: **about 105,000 tra
 
 ## 3. Pilots first: real requests on the Rust world's forms
 
-No pilot has run on the Rust world (the cut-over was 2026-10-19). The 180 real requests are on the TypeScript world's
+(Written before the pilots. Since then the six pilots below have run on the Rust world, 2026-10-24, `runs/pilots-six-2026-10-24/`.)
+At the time no pilot had run on the Rust world (the cut-over was 2026-10-19). The 180 real requests are on the TypeScript world's
 forms; a model for the Rust world must be judged on its requests.
 
 - **Six pilots, 120 days each, town-3000** (lv-08 to lv-13), in two profiles each pair (gb-eng and au-vic, then us-oh and

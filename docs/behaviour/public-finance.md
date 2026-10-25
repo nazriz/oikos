@@ -75,8 +75,11 @@ return. A decision on a claim is reviewed as the place's `decisions` rule for `t
 days, the grounds), published in `law-decisions` with the others.
 
 **Who does the work.** The tax collector (`outside-tax`, an office of the outside world, held by its case system as the
-support office is; its officers are not modelled, so its row in the table of work for a decision is an officer's
-twenty minutes, a placeholder: WM-14). It is shown nobody's register: it keeps each account from what is its own, the
+support office is). Its casework is its officers' (law 10, as the support office's since foundations-2 phase 1): a
+decision on a claim, a review and its answer are named `by` its officers' desk (`outside-tax-casework`, template
+`tax-casework`), each taking the person table's minutes (a decision twenty, a placeholder) in an officer's working day;
+the refund's payment is the case system's, a step of its own. The outside world's officers are not simulated and
+nothing sizes the collector's for a town, so the desk is one officer (a placeholder, PB-23). It is shown nobody's register: it keeps each account from what is its own, the
 returns addressed to it and the payments into the accounts its charges are paid into (its `ledger`), and its own
 decisions. A taxpayer sees its own account only: in a statement the collector sends it when a credit first stands on it
 (and when the figure changes), and in one it asks for on the public request form.

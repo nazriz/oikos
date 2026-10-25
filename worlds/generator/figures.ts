@@ -104,8 +104,6 @@ export const FIGURE_BASIS: Basis[] = [
     prof("retirement_age", "retirement_age"),
     prof("stop_work_curve.**", "labour_force_share_by_age"),
     derived("ventures.**", "a venture's settings: the town's own shops' (their wage the profile's, the rest the generator's)"),
-    placeholder("found_bps", "the monthly chance of founding a shop: the generator's (ME-1)"),
-    derived("found_own_ppm", "from the profile's business.entry_bps_per_year and the town's own counts"),
     prof("founding.**", "founding"),
     derived("own_values", "a person's values, drawn from the profile's values"),
     prof("union_join_bps", "unions.membership_bps"),
@@ -115,6 +113,13 @@ export const FIGURE_BASIS: Basis[] = [
     prof("fertility_per_10000", "fertility_per_10000"),
   ]),
   conv("dials", "a researcher's setting for the run (the spec's dials), not a figure of a place"),
+  // Shop premises a landlord lets (docs/behaviour/leasing.md): the profile's commercial terms.
+  ...of("firm.landlord", [
+    prof("commercial.rent", "commercial.rent_per_month"),
+    prof("commercial.deposit_months", "commercial.deposit_months"),
+    prof("commercial.term_months", "commercial.term_months"),
+    prof("commercial.notice_days", "commercial.notice_days"),
+  ]),
   ...of(CITIZEN, [
     derived("attach_mean", "the town's mean attachment, from the profile's outlook.residence and outlook.job_tenure"),
     placeholder("frictions.*.at", "the level of a variable at which a home is counted as in fault: the generator's"),
@@ -148,5 +153,12 @@ export const FIGURE_BASIS: Basis[] = [
   placeholder("catalogue.structure_types", "buildings' sizes, rooms and build times: the generator's (docs/behaviour/generator.md)"),
   placeholder("catalogue.variables", "a building's variables and their rates: the generator's, or the profile's where it gives them (WM-11)"),
   conv("knowing.keepers.*.answers.*.most", "how many a keeper answers at once: one thing at a time, the platform's design of knowing"),
+  // A system template's own seconds, hours and lanes (law 10, foundations-2 P1 and P3): each with its source in act_time.sources, keyed
+  // `template.<id>.<row>`. The casework desk's minutes are the person table's rows; an office offer's a share of them at its speed; a
+  // machine's hours the whole day (software runs when asked); the desk's hours an officer's day and its lanes the town's share of officers.
+  derived("templates.*.does.*.seconds", "a system's seconds for an act: a person's time for it at an offer's speed, or an officer's (the person table's row); act_time.sources template.<id>.<row>"),
+  derived("templates.*.hours.from", "when a system's day begins: a machine's midnight (all day), or an officer's working day from the profile's round.work_start_hour"),
+  derived("templates.*.hours.seconds", "how long a system's day is: a machine's whole day, or an officer's working day (ordinary_hours_per_week) times the town's share of officers; act_time.sources template.<id>.hours"),
+  prof("participants.*.lanes", "public_service.support_officers_per_1000_claims"),
 ];
 export { conv, derived, placeholder, prof };

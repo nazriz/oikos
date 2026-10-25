@@ -32,10 +32,13 @@ test("a death is seen, reported, registered, and the world's people act on it", 
     ...ev.filter((e) => e.event === "recorded" && e.record.kind === "household").map((e) => ({ t: e.t, data: e.record.data }))];
   const diedAt = new Map<string, number>(died.map((d) => [d.person, d.t]));
   const leftTown = new Map<string, number>(ev.filter((e) => e.event === "person_left").map((e) => [e.person, e.t]));
-  /** The other adults of their household, alive and still in town three days after: living there. */
+  /** The other adults of their household, alive and still in town three days after, or until the death was registered: living there. */
+  // (Or until it was registered: since 2026-10-25 a year of this town has a widow die at home with her two grown children
+  // there; one reports it within the hour, and both leave town the same day. They were living there when it mattered.)
   const housemates = (d: { person: string; t: number }): string[] => {
     const hh = households.filter((h) => h.t <= d.t && h.data.members.some((m: any) => m.person === d.person)).at(-1)?.data;
-    return (hh?.members ?? []).filter((m: any) => m.person !== d.person && (diedAt.get(m.person) ?? Infinity) > d.t && d.t - m.born_at >= 18 * 365 * DAY && (leftTown.get(m.person) ?? Infinity) > d.t + 3 * DAY).map((m: any) => m.person);
+    const stayed = Math.min(d.t + 3 * DAY, regs.get(d.person)?.t ?? Infinity);
+    return (hh?.members ?? []).filter((m: any) => m.person !== d.person && (diedAt.get(m.person) ?? Infinity) > d.t && d.t - m.born_at >= 18 * 365 * DAY && (leftTown.get(m.person) ?? Infinity) > stayed).map((m: any) => m.person);
   };
   const early = died.filter((d) => d.t < 365 * DAY - 14 * DAY && homeOf.has(d.person));
   // (Living there: an adult of the household who had been in that home before the death. Since citizen 0.39.0 a year

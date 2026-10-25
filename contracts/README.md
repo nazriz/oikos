@@ -692,3 +692,34 @@ Additive only; no schema file changed. A log made before is a valid log.
 - **Host protocol and napi `resolve`** (2026-10-25, names rule (b); blanket approval): an optional `names` ({id: name}),
   the names the seat's reports printed beside ids; the engine's resolver knows the seat's people and bodies by them
   where the world has names. Absent, nothing changes.
+
+## Foundations-2, phase 1: capacity for every doer, systems included (2026-10-25; law 10, steps P1, P2, P3, P5; docs/decisions.md, "Foundations-2 phase 1"; under the owner's blanket approval of contract changes, 2026-10-11, and his approval of the foundations-2 design)
+
+- **World config, templates (additive):** a `does` row's `seconds` is now allowed for **any** block, not only `work`: for a
+  block other than `work` it is the seconds one such act takes a system from the template, read before the world's
+  `act_time.system` row (the row naming a kind before the block's own). `work`'s keeps its meaning (seconds a unit, the
+  slowest of a crew of systems). At most a year. A template gains an optional **`hours`** `{ from, seconds }` (from
+  0 to 86,399 s after midnight, 1 to 86,400 s long): a system's lanes work only inside that daily window, and an act not
+  finished by its end goes on in the next day's (a queue, never a refusal). Every day is a working day (a known limit).
+  Never on a person's template. A template row's source is written beside the table's, in `act_time.sources`, keyed
+  `template.<id>.<row>` (and `template.<id>.hours`, `template.<id>.lanes`): the schema's `sources` is free-form.
+- **Breaking, kernel (no implicit second):** `act_time` has no fallback. An act whose rows (the performer's template's,
+  the world's table for their kind) and the world's stated `default` are all absent is **refused `unpriced`** when due,
+  with a reason naming what nobody priced and for whom; it takes nobody's time (`action_started` with `starts = done`).
+  A dry run (`check`) says the same. `contracts/log.schema.json` gains the code. `oikos_time::DEFAULT_ACT_SECONDS` is
+  gone; the second it takes to order an act that others do is `ORDER_SECONDS`, a convention of the platform. Hand-written
+  worlds (`contracts/examples/*/world-config`, the kernel tests' worlds) now state `act_time.default: 1` with a note in
+  `act_time.sources.default` that it is a placeholder for a test world. The generated town states no default.
+- **Behaviour change, kernel:** someone who only orders an act (`by` names others, not them) gives the order when they are
+  free and goes on: their lane holds `ORDER_SECONDS` from then, not from when the work begins (until now it was held to the
+  act's start, so a case system that asked a desk of officers to decide could do nothing else until they had).
+- **Host (the engine's own code units, not a schema):** a code unit's `done_by=<id>` on a call is given to the act as
+  `by` and taken off the call, as the TypeScript host always did (run.ts `performersOf`); until now the engine left it on
+  and the resolver refused the call, so an office's system never did its papers in the engine.
+- **Generator:** the support office's casework (`publish/benefit_decision`, `evidence_request`, `confirmation_request`,
+  `decision_review`) is done `by` a desk, `outside-casework`, from the template `agency-casework` (an officer's minutes for
+  each, the person table's rows; the officers' hours; lanes the town's share of the agency's officers); every machine's
+  template says its hours (the whole day); an office offer's seconds for its papers are its template's rows, not rows of
+  the world's table for every system.
+- **Breaking, replay:** the state hashes of every generated town move. Logs made before this change replay only on a
+  build of their version: the tag `pre-foundations-2`.

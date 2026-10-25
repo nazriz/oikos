@@ -52,6 +52,10 @@ pub struct Delivered {
     /// say), each with its canonical bytes and what's known of it. Used only for a building that's equal to one of
     /// them, field for field: the bytes are what encoding it again would give.
     structures: RwLock<BTreeMap<Id, Vec<Building>>>,
+    /// structure id -> what's known of it (its type, where it is, its spaces): one for everyone told of it, while it is
+    /// the same. It is made of what a building is, not of who is in it, so the many ways a building is shown (as its
+    /// occupants come and go) share it; each person's knowledge held its own (SC-1: 0.4 GB at 50,000 people).
+    facts: RwLock<BTreeMap<Id, Arc<StructureFact>>>,
 }
 
 /// For a host that asked for records by reference: record id -> the record it was last handed whole under that id
@@ -64,10 +68,14 @@ struct Handed {
     whole: BTreeSet<usize>,
 }
 
-/// A record as it's delivered.
+/// A record as it's delivered: what it adds (kept from the first time it is shown: a record is shown to many, and
+/// read again at each look), and its canonical bytes, made the first time an observation that is written shows it (a
+/// seat's, or one whose hash the log keeps) and kept from then on. A code actor's look makes no bytes: they were made
+/// and kept for every record anyone was shown (SC-1). The record is kept with them, so no other comes to be where it
+/// is in memory.
 struct Shared {
     record: Arc<Record>,
-    bytes: Arc<[u8]>,
+    bytes: Option<Arc<[u8]>>,
     facts: Arc<RecordFacts>,
 }
 
@@ -86,29 +94,49 @@ impl Delivered {
     /// A record an observation shows: its canonical bytes, what it adds, and where it's kept here.
     fn record(&self, r: &Arc<Record>) -> Result<(Arc<[u8]>, Arc<RecordFacts>, usize), canon::CanonError> {
         let at = Arc::as_ptr(r) as usize;
-        if let Some(shared) = held(self.records.read()).get(&at) {
-            return Ok((shared.bytes.clone(), shared.facts.clone(), at));
-        }
+        let facts = match held(self.records.read()).get(&at) {
+            Some(shared) => {
+                if let Some(b) = &shared.bytes {
+                    return Ok((b.clone(), shared.facts.clone(), at));
+                }
+                Some(shared.facts.clone())
+            }
+            None => None,
+        };
         let v = serde_json::to_value(&**r).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
         let bytes: Arc<[u8]> = canon::canonical_value(&v)?.into();
-        let facts = Arc::new(RecordFacts::of(&v));
+        let facts = facts.unwrap_or_else(|| Arc::new(RecordFacts::of(&v)));
         // (Encoded by another meanwhile: theirs is kept, and given.)
         let mut records = held(self.records.write());
-        let shared = records.entry(at).or_insert(Shared { record: r.clone(), bytes, facts });
-        Ok((shared.bytes.clone(), shared.facts.clone(), at))
+        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts: facts.clone() });
+        let bytes = shared.bytes.get_or_insert(bytes).clone();
+        Ok((bytes, shared.facts.clone(), at))
+    }
+
+    /// What a record adds to a seat's knowledge, without its bytes (a code actor's look: nothing of it is written).
+    fn record_facts(&self, r: &Arc<Record>) -> Result<Arc<RecordFacts>, canon::CanonError> {
+        let at = Arc::as_ptr(r) as usize;
+        if let Some(shared) = held(self.records.read()).get(&at) {
+            return Ok(shared.facts.clone());
+        }
+        let v = serde_json::to_value(&**r).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
+        let facts = Arc::new(RecordFacts::of(&v));
+        let mut records = held(self.records.write());
+        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts });
+        Ok(shared.facts.clone())
     }
 
     /// Writes a record for a host that keeps what it's handed: whole the first time, its id from then on.
     fn hand_over(&self, handed: &mut Handed, at: usize, bytes: &[u8], out: &mut Vec<u8>) {
-        let records = held(self.records.read());
-        let Some(shared) = records.get(&at) else { return out.extend_from_slice(bytes) };
+        let record = held(self.records.read()).get(&at).map(|shared| shared.record.clone());
+        let Some(record) = record else { return out.extend_from_slice(bytes) };
         if handed.whole.contains(&at) {
-            return canon::write_string(&shared.record.id, out);
+            return canon::write_string(&record.id, out);
         }
         handed.whole.insert(at);
         out.extend_from_slice(bytes);
         // (Another record handed over under this id before, if that could be: the host no longer holds it.)
-        if let Some(was) = handed.by_id.insert(shared.record.id.clone(), at).filter(|was| *was != at) {
+        if let Some(was) = handed.by_id.insert(record.id.clone(), at).filter(|was| *was != at) {
             handed.whole.remove(&was);
         }
     }
@@ -119,7 +147,7 @@ impl Delivered {
             return Ok((bytes.clone(), fact.clone()));
         }
         let bytes: Arc<[u8]> = canon::canonical(&**x)?.into();
-        let fact = Arc::new(StructureFact { type_: x.structure_type.clone(), at: x.at.clone(), spaces: x.spaces.iter().map(|sp| sp.space.clone()).collect() });
+        let fact = self.fact_of(x);
         let mut structures = held(self.structures.write());
         let ways = structures.entry(x.structure.clone()).or_default();
         ways.insert(0, (x.clone(), bytes.clone(), fact.clone()));
@@ -133,7 +161,18 @@ impl Delivered {
         if let Some(fact) = held(self.structures.read()).get(&x.structure).and_then(|ways| ways.iter().find(|(shown, _, _)| Arc::ptr_eq(shown, x)).map(|(_, _, f)| f.clone())) {
             return fact;
         }
-        Arc::new(StructureFact { type_: x.structure_type.clone(), at: x.at.clone(), spaces: x.spaces.iter().map(|sp| sp.space.clone()).collect() })
+        self.fact_of(x)
+    }
+
+    /// What's known of a building as shown: the one held for it, if it still says the same; else made, and held.
+    fn fact_of(&self, x: &SiteStructure) -> Arc<StructureFact> {
+        let same = |f: &StructureFact| f.type_ == x.structure_type && f.at == x.at && f.spaces.len() == x.spaces.len() && f.spaces.iter().zip(&x.spaces).all(|(a, b)| *a == b.space);
+        if let Some(f) = held(self.facts.read()).get(&x.structure).filter(|f| same(f)) {
+            return f.clone();
+        }
+        let f = Arc::new(StructureFact { type_: x.structure_type.clone(), at: x.at.clone(), spaces: x.spaces.iter().map(|sp| sp.space.clone()).collect() });
+        held(self.facts.write()).insert(x.structure.clone(), f.clone());
+        f
     }
 
     /// A cell as a sites channel shows it: its canonical bytes (exactly `canon::canonical` of it, written here member
@@ -496,7 +535,7 @@ impl Kernel {
                 ChannelData::Records { records, .. } if !records.is_empty() => {
                     let facts = shown.entry(path.clone()).or_default();
                     for r in records {
-                        facts.records.push(delivered.record(r)?.1);
+                        facts.records.push(delivered.record_facts(r)?);
                     }
                 }
                 ChannelData::Sites { cells, .. } if !cells.is_empty() => {
@@ -650,6 +689,11 @@ impl Kernel {
 
     pub fn canonical_state(&self) -> Result<Vec<u8>, canon::CanonError> {
         self.world.canonical_state()
+    }
+
+    /// The same bytes made whole by `canon::canonical` (for checking the stream `canonical_state` writes).
+    pub fn canonical_state_whole(&self) -> Result<Vec<u8>, canon::CanonError> {
+        self.world.canonical_state_whole()
     }
 
     pub fn state_hash(&self) -> Result<String, canon::CanonError> {

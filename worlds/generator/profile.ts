@@ -436,6 +436,10 @@ export interface Profile {
         /** The auditor's staff (docs/behaviour/auditor.md): full-time equivalents per 1,000 residents, as any body's (a body keeps at least one). */
         audit?: number };
       licences: { payment_system: { per_resident_per_year: number; term_days: number } };
+      /** The support agency's officers (full-time equivalents who handle claims) per 1,000 claims in payment, nationally: the town's
+       * share of them is its casework desk (law 10; docs/behaviour/boundary.md, "Who decides a claim"). Sourced in
+       * `sources["public_service.support_officers_per_1000_claims"]`, or marked a placeholder. */
+      support_officers_per_1000_claims: number;
       /** Who fills a post of a body when none of its own staff is left (its constitution): "council" (the town's council, which seconds
        * one of its own staff to it). A body not named has none, and a post of it whose staff have all died stays empty. */
       appointed_by?: { [kind in "administration" | "audit" | "courts" | "oversight" | "elections" | "land_registry" | "press" | "banking" | "utilities" | "union" | "property_management" | "police"]?: "council" };

@@ -27,6 +27,7 @@
 //! looked at again when asked inside the days the law's decisions give (`law-decisions`, kind `tax_credit_decision`).
 
 use super::shared::{answering, manifest, restore_answering};
+use super::support::Casework;
 use super::support_law::{Reconsiderations, Redone};
 use crate::common::{addressed_to, cents, data, filed_before, made_at, money_words, when_words, Book, Fields, Occurrences};
 use crate::firms::tax::{income_tax_law, latest_law};
@@ -248,6 +249,7 @@ impl Kind for TaxCollector {
                 stated: BTreeMap::new(),
                 unseen: vec![],
                 nth: Occurrences::default(),
+                casework: ctx.param("casework", None)?,
             },
         )
     }
@@ -269,6 +271,11 @@ struct Collector {
     unseen: Vec<Granted>,
     nth: Occurrences,
     recon: Reconsiderations,
+    /// Who does the collector's casework, where the world says (law 10): its officers' desk, named on every step that is only
+    /// papers of these kinds (a decision, a review and its answer), so that each takes an officer's minutes in the officers'
+    /// hours. A refund's payment is a step of its own, the case system's. Absent: whoever acts does it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    casework: Option<Casework>,
 }
 
 /// The decision on a claim, against the account.
@@ -359,7 +366,7 @@ impl Collector {
 
     /// The decision's paper (and the refund paid with it).
     #[allow(clippy::too_many_arguments)]
-    fn decision(&mut self, book: &Book, claim: &Record, who: &str, refund: bool, asked: i64, d: &Decided, t: i64, cx: &Cx, review: Option<(&str, &str)>) -> Vec<oikos_sight::calls::Call> {
+    fn decision(&mut self, book: &Book, claim: &Record, who: &str, refund: bool, asked: i64, d: &Decided, t: i64, cx: &Cx, review: Option<(&str, &str)>) -> (oikos_sight::calls::Call, Option<oikos_sight::calls::Call>) {
         let world = cx.ctx.world.clone();
         let usd = |n: i64| money_words(n, &world);
         let law = refund_law(book);
@@ -387,18 +394,19 @@ impl Collector {
         } else {
             format!("Claim {} refused: {}.", claim.id, d.reason.clone().unwrap_or_default())
         };
-        let mut calls = vec![say(
+        let paper = say(
             DECISION,
             &text,
             Say { to: Some(vec![who.to_string()]), visible: Some(Visible::Only(vec![who.to_string(), self.me.clone()])), basis: Some(claim.id.clone()), data: Some(dd), ..Default::default() },
-        )];
+        );
+        let mut paying = None;
         if d.granted > 0 {
             self.unseen.push(Granted { claim: claim.id.clone(), taxpayer: who.to_string(), refund, amount: d.granted, at: t });
             if let (true, Some(into), Some(from)) = (refund, into, from.first()) {
-                calls.push(pay(&into, d.granted, Pay { from: Some(from.clone()), for_: Some(format!("Refund of tax paid and not owed (claim {}).", claim.id)), ..Default::default() }, cx));
+                paying = Some(pay(&into, d.granted, Pay { from: Some(from.clone()), for_: Some(format!("Refund of tax paid and not owed (claim {}).", claim.id)), ..Default::default() }, cx));
             }
         }
-        calls
+        (paper, paying)
     }
 }
 
@@ -419,6 +427,18 @@ impl Plan for Collector {
     }
 
     fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<()>> {
+        let mut steps = self.plan_office(pic, cx);
+        if let Some(c) = &self.casework {
+            for s in &mut steps {
+                c.assign(s);
+            }
+        }
+        steps
+    }
+}
+
+impl Collector {
+    fn plan_office(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<()>> {
         let t = pic.t;
         let world = cx.ctx.world.clone();
         let mut steps: Vec<Step<()>> = vec![];
@@ -456,9 +476,12 @@ impl Plan for Collector {
             }
             let why = if d.granted > 0 { format!("{who} claims a credit on its account: {} granted.", money_words(d.granted, &world)) } else { format!("{who} claims a credit on its account: refused.") };
             let book = std::mem::take(&mut self.book);
-            let calls = self.decision(&book, &c, &who, refund, asked, &d, t, cx, None);
+            let (paper, paying) = self.decision(&book, &c, &who, refund, asked, &d, t, cx, None);
             self.book = book;
-            steps.push(because(why, calls));
+            steps.push(because(why, vec![paper]));
+            if let Some(p) = paying {
+                steps.push(because(format!("Paying {who} the refund granted on its claim {}.", c.id), vec![p]));
+            }
         }
         // A credit that stands on an account is stated to its taxpayer, when it first stands and when its figure changes.
         let mut payers: BTreeSet<String> = BTreeSet::new();
@@ -498,8 +521,12 @@ impl Plan for Collector {
             if d.granted <= 0 {
                 return Some(Redone { changed: false, found: d.reason.unwrap_or_else(|| "the account shows no credit".into()), steps: vec![] });
             }
-            let calls = self.decision(b, &claim, &who, refund, asked, &d, t, cx, Some((&req.id, &dec.id)));
-            Some(Redone { changed: true, found: format!("the account is in credit by {}", money_words(l.credit(), &world)), steps: vec![because(format!("Our decision {} looked at again: put right.", dec.id), calls)] })
+            let (paper, paying) = self.decision(b, &claim, &who, refund, asked, &d, t, cx, Some((&req.id, &dec.id)));
+            let mut more = vec![because(format!("Our decision {} looked at again: put right.", dec.id), vec![paper])];
+            if let Some(p) = paying {
+                more.push(because(format!("Paying {who} the refund granted on review of {}.", dec.id), vec![p]));
+            }
+            Some(Redone { changed: true, found: format!("the account is in credit by {}", money_words(l.credit(), &world)), steps: more })
         };
         let more = recon.steps(&book, t, &mut redo);
         self.book = book;
@@ -673,6 +700,23 @@ mod tests {
         let late = st_to("q2", 70 * DAY, "review_request", "clinic", &["outside"], json!({ "matter": "refund_refused", "about": "d1" }));
         let out = at(&mut r, 70 * DAY, vec![late], vec![]);
         assert_eq!(kinds(&out, "decision_review")[0]["outcome"], "out_of_time");
+    }
+
+    #[test]
+    fn the_decision_is_the_officers_desks_work_and_the_refund_the_case_systems() {
+        let mut r = Rig::new(&TaxCollector, "outside", json!({ "casework": { "by": "outside-tax-casework", "kinds": [DECISION, "decision_review", "remedy_answer"] } }));
+        at(&mut r, 31 * DAY, vec![tax_law(), refunds(false), ret("r1", 30 * DAY, 1_000, 1_000, 0)], vec![tx(30 * DAY + 60, "acc-clinic", 1_000, "tax"), tx(30 * DAY + 90, "acc-clinic", 1_000, "tax")]);
+        let out = at(&mut r, 32 * DAY, vec![claim("c1", 31 * DAY, "refund", 0)], vec![]);
+        let calls: Vec<(String, bool)> = out
+            .iter()
+            .filter_map(|a| match a {
+                Action::Call { program: oikos_sight::calls::Program::Lines(lines), .. } => Some(lines),
+                _ => None,
+            })
+            .map(|lines| (lines[0].call.fn_.clone(), lines[0].call.get("done_by").is_some()))
+            .collect();
+        assert_eq!(calls, [("statement".to_string(), true), ("money".to_string(), false)], "the decision by the desk, then the payment by the system");
+        r.save_and_restore();
     }
 
     #[test]

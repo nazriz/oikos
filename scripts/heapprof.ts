@@ -5,6 +5,7 @@
 //   OIKOS_HEAPPROF_OUT=/tmp/hp kernel/target/heapprof/oikos-kernel world <config.json> --out <dir> --until S
 //   bun scripts/heapprof.ts /tmp/hp.peak.txt kernel/target/heapprof/deps/oikos_kernel-<hash>.dSYM/Contents/Resources/DWARF/oikos_kernel-<hash> [TOP] [DEPTH]
 //   bun scripts/heapprof.ts <dump> <dwarf> --focus <regex> [N]     the N largest stacks through a frame matching regex, inlined frames and all
+//   bun scripts/heapprof.ts <dump> <dwarf> --components [PEOPLE]   live bytes by component, and per person
 //
 // Live bytes are summed by the first DEPTH frames that are the kernel's own (a function whose path starts `oikos_`).
 // Names come from `atos` (macOS) and `rustfilt` (`cargo install rustfilt`). docs/design/performance.md says what a
@@ -44,6 +45,42 @@ if (focus) {
     const out = atos(r.a.slice(1, 30), true).split("\n").filter((l) => l && !/heapprof|__rust_alloc|alloc\.rs|boxed\.rs|raw_vec|mimalloc/.test(l));
     for (const l of out.slice(0, 26)) console.log("   " + clean(l).slice(0, 200));
   }
+} else if (args[2] === "--components") {
+  // Live bytes by component (docs/design/performance.md, "Bytes per person"): the state hash's and the log's are known
+  // by any frame of theirs on the stack; the rest by the innermost of the kernel's own frames.
+  const people = Number(args[3] ?? 0);
+  const anywhere: [string, RegExp][] = [
+    ["state hash: encoded copies", /World::(write_state|canonical_state|state_hash|write_records|write_order)|write_map|canonical_state|canon::canonical_members/],
+    ["the log on its way out", /spool::|LogWriter|append_canonical|annotate_canonical/],
+  ];
+  const innermost: [string, RegExp][] = [
+    ["the config (typed, controllers)", /^<?oikos_contracts::(config|controller)/],
+    ["the contract's schemas, compiled and checking (fixed)", /^<?oikos_contracts::contracts/],
+    ["what's been seen (sites, knowledge, views)", /^<?oikos_world::sites|^<?oikos_resolver::knowledge|Knowledge|^<?oikos_sight|View>::apply|::shown/],
+    ["world state: records made, accounts, bodies", /^<?oikos_world::(exec|state)|^<?oikos_world::kernel::World>::(advance|apply)/],
+    ["observations being made", /^<?oikos_perception/],
+    ["citizens' memory (books)", /citizen::memory|common::book|Book/],
+    ["citizens' minds", /^<?oikos_actors::mind::/],
+    ["citizens (person, params)", /^<?oikos_actors::citizen::/],
+    ["offices, firms, other actors", /^<?oikos_actors::/],
+    ["world state", /^<?oikos_(world|nature)/],
+    ["engine (units, rounds, scheduler)", /^<?oikos_kernel::(engine|pool|schedule|run|kernel)/],
+  ];
+  const by = new Map<string, number>();
+  for (const r of rows) {
+    const frames = r.a.slice(1).map((a) => outer.get(a)!).filter((f) => !/heapprof/.test(f));
+    const all = frames.map(bare).join("\n");
+    let k = anywhere.find(([, re]) => re.test(all))?.[0];
+    if (!k) {
+      const own = frames.map(bare).find((f) => /^<?oikos_/.test(f)) ?? "";
+      k = innermost.find(([, re]) => re.test(own))?.[0] ?? "other";
+    }
+    by.set(k, (by.get(k) ?? 0) + r.w);
+  }
+  for (const [k, w] of [...by].sort((a, b) => b[1] - a[1])) {
+    console.log(`${mb(w)} ${(100 * w / live).toFixed(1).padStart(5)}%${people ? `  ${(w / people / 1000).toFixed(1).padStart(7)} KB/person` : ""}  ${k}`);
+  }
+  if (people) console.log(`${mb(live)}         ${(live / people / 1000).toFixed(1).padStart(7)} KB/person  all live (sampled)`);
 } else {
   const [TOP, DEPTH] = [Number(args[2] ?? 40), Number(args[3] ?? 1)];
   const own = (r: { a: string[] }) => {

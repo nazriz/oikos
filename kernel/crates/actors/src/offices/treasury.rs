@@ -2783,7 +2783,8 @@ mod tests {
         let (law, rep) = tax_world();
         let mut clerk = rig(&TaxClerk, "tax-system", "tax", json!({}));
         let first = joined(&clerk.wake(DAY, with_money(papers(vec![law.clone(), rep.clone()]), "0"), vec![]));
-        assert!(first.contains("claim(") && first.contains("10000"), "{first}");
+        // The tax is the law's rate (1,000 bps) of the rent the report gives (100,000): 10,000, no more.
+        assert!(first.contains("claim(") && first.contains(r#""amount":10000,"#), "{first}");
         // The claim reaches the file; a new holder reads it and assesses nothing.
         let claim = tax_claim("rec.9", DAY + 60, "tax", 10_000);
         let mut next = rig(&TaxClerk, "tax-system-2", "tax", json!({}));
