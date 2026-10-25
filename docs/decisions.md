@@ -8840,3 +8840,11 @@ log against the same town built at 3d113a1f.
   (no round there has more than 2,048 units), so the budget's ceiling stays at 380 KB.
 - **Revisit if:** a unit's decision comes to read anything another's carrying out changes within a round (then
   windows would change results; the window test would catch it in the towns it runs).
+## 2026-10-26 · The gate's file-seconds budget is read at the recorded load
+
+- **What we saw:** a branch that added nothing to the gate tier went 32 s over the 1,200 file-second budget at load 20 to
+  27: files share cores, so under load each file's own time grows too.
+- **Change:** the total is divided by the run's load, the median of each gate file's time over its recorded time (when at
+  least ten files have one, and only when it is over 1). The per-file limit is unchanged.
+- **Revisit if:** the recorded times drift (they are rewritten by whole runs), or a real slowdown of every file at once (a
+  slower kernel) is hidden by it; then compare against a quiet-machine run.
