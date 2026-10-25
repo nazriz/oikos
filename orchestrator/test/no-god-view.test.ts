@@ -57,7 +57,9 @@ const KEEPERS = [
   "land.registry: records:withdrawal",
   "school.principal: school_enrolment",
   "school.principal: school_place",
+  "utility.energy: connections",
   "utility.water: acquisition_notice",
+  "utility.water: connections",
   "utility.water: property_roll",
   // (2026-10-12: a town opens with the claims already in payment on the support office's file, docs/behaviour/generator.md.)
   "world.transfers: benefit_claim",

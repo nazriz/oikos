@@ -61,24 +61,26 @@ fn same_on_any_threads(config: &Value) {
 }
 
 fn energy() -> Value {
-    json!({ "depot": "s-shop", "grid": "outside", "units_per_customer_per_day": 10, "price_per_unit": 30, "supply_per_day": 110 })
+    json!({ "depot": "s-shop", "grid": "outside", "price_per_unit": 30, "supply_per_day": 110 })
 }
 
 fn water() -> Value {
-    json!({ "works": "s-shop", "litres_per_person_per_day": 160, "price_per_kl": 300, "service_per_quarter": 9000 })
+    json!({ "works": "s-shop", "storage": 100_000, "price_per_kl": 300, "service_per_quarter": 9000 })
 }
 
 #[test]
-fn a_customer_who_asks_to_be_supplied_is_billed_at_the_end_of_the_round() {
+fn a_customer_who_asks_to_be_supplied_where_there_is_no_network_is_billed_for_nothing() {
     let script = json!([{ "at": 3600, "call": "statement(kind=supply_request, text=\"Please supply me.\", to=[\"city\"], data={\"account\": \"acc-alice\"})" }]);
     let config = world("utility.energy", energy(), script, 40);
     let (_, log) = run(&config, 1);
     let tariffs = statements(&log, "utility_tariff");
     assert_eq!(tariffs.len(), 1, "published once");
     assert_eq!(tariffs[0]["visible_to"], "public");
+    // (Foundations-2 C4, law 8: a customer is a connection on the retailer's network, billed from its meter. A world with
+    // no network has nothing to connect to: the request is kept, nothing flows, and nobody is billed for an assumed use, as
+    // until C4 they were. The network's bills are held in offices/utilities/tests.rs and orchestrator/test/utilities.test.ts.)
     let bills: Vec<_> = statements(&log, "invoice").into_iter().filter(|b| b["data"]["service"] == "energy").collect();
-    assert_eq!(bills.len(), 1, "one customer, one round in 40 days");
-    assert_eq!(bills[0]["addressed_to"], json!(["alice"]).as_array().map_or(bills[0]["addressed_to"].clone(), |_| bills[0]["addressed_to"].clone()));
+    assert!(bills.is_empty(), "{bills:?}");
 }
 
 #[test]

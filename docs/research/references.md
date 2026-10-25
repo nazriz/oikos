@@ -942,3 +942,15 @@ Opened on 2026-10-24 unless marked; each profile's `work_time.sources` carries t
 | An owner learns what a business is worth from what it pays them, and leaves when it is not worth keeping | Jovanovic, B. (1982), "Selection and the evolution of industry", *Econometrica* 50(3), 649-670 (to confirm: read in summaries) | `citizen/work.rs` `give_up_own`; docs/behaviour/entry.md, "Giving it up" |
 | A retail lease runs at least five years unless the tenant waives it; a security deposit is held in an interest-bearing account and returned within 30 days of the lease's end | Retail Leases Act 2003 (Vic) s 21 and the deposit provisions, as the Victorian Small Business Commission's Retail Leases Information Brochure for Tenants states them (opened 2026-10-25) | au-vic `commercial`; docs/behaviour/leasing.md |
 | Landlords of small retail units commonly ask three to six months' rent as a deposit, held under a rent deposit deed (no statutory scheme for business premises) | practitioners' guides (Sprintlaw UK, "Commercial lease deposits in the UK"; Langham Estate, "Commercial lease deposit rules in the UK"; opened 2026-10-25) (to confirm against a survey) | gb-eng `commercial`; docs/behaviour/leasing.md |
+
+## Foundations 2, law 8: nothing physical from nothing (2026-10-26; docs/nothing-from-nothing.md; docs/design/foundations-2.md section 2)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Pressure-driven delivery: what a node gets falls with its head between a least head and a service head, as the square root | Wagner, J. M., Shamir, U. and Marks, D. H. (1988), "Water distribution reliability: simulation methods", *Journal of Water Resources Planning and Management* 114(3) (to confirm) | `kernel/crates/world/src/network.rs` (pressure physics) |
+| Distribution networks as radial feeders (trees from a source), solved by a pass up and a pass down | Kersting, W. H., *Distribution System Modeling and Analysis* (to confirm) | `oikos-contracts::network::Trees`; `network.rs` |
+| Physical supply and use: every flow of a material has a source and a destination in the accounts | UN, *System of Environmental-Economic Accounting 2012: Central Framework*, physical supply and use tables (to confirm); Eurostat, *Economy-wide material flow accounts handbook* (to confirm) | law 8's invariant (`kernel/tests/conservation.rs`) |
+| A minimum service pressure of about 20 m at a customer's tap | Water Services Association of Australia, *Water Supply Code of Australia* (recalled, to confirm) | profiles' `utilities.network.service_head_m` (a placeholder in every profile) |
+| A residential load profile with an evening peak | (recalled, to confirm: a distributor's published typical profile) | profiles' `utilities.network.shape_bps` |
+| The occupier pays water and sewerage charges (England) | Water Industry Act 1991 s 144 (recalled, to confirm) | gb-eng `utilities.water.bill_to` |
+| The owner is billed (Victoria) | Water Act 1989 (Vic); Residential Tenancies Act 1997 (Vic) s 52 (recalled, to confirm) | au-vic `utilities.water.bill_to` |

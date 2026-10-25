@@ -209,17 +209,19 @@ pub fn validate(c: &crate::config::Config) -> Result<(), String> {
             return Err(format!("connection {}: its rate is out of range", x.id));
         }
         if let Some(u) = &x.uses {
-            check_use(&tasks, u, &x.kind).map_err(|e| format!("connection {}: {e}", x.id))?;
+            check_use(&tasks, &c.catalogue.fields.iter().map(|f| f.id.as_str()).collect(), u, &x.kind).map_err(|e| format!("connection {}: {e}", x.id))?;
         }
     }
     Ok(())
 }
 
 /// A use is a recipe that takes no one's time and uses the kind one unit at a time, and nothing else.
-pub fn check_use(tasks: &BTreeMap<&str, &crate::config::TaskCfg>, task: &str, kind: &str) -> Result<(), String> {
+pub fn check_use(tasks: &BTreeMap<&str, &crate::config::TaskCfg>, fields: &BTreeSet<&str>, task: &str, kind: &str) -> Result<(), String> {
     let t = tasks.get(task).ok_or_else(|| format!("its use {task} is no task of the world's"))?;
     let only = t.consumes.len() == 1 && t.consumes.get(kind) == Some(&1);
-    if t.labour != 0 || !only || t.draws.is_some() || !t.changes.is_empty() || t.on_body.is_some() {
+    // (Its emissions reach the world's counters as it is used; one to a field would be put on no cell, so it is refused.)
+    let to_fields = t.emits.keys().any(|k| fields.contains(k.as_str()));
+    if t.labour != 0 || !only || to_fields || t.draws.is_some() || !t.changes.is_empty() || t.on_body.is_some() || t.collects.is_some() {
         return Err(format!("its use {task} is a recipe that takes no time and uses one {kind} a unit, and nothing else"));
     }
     Ok(())

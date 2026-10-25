@@ -690,8 +690,17 @@ impl Resolver<'_> {
         if let Some(m) = Self::str_(c, "meter")? {
             b.insert("meter".into(), json!(m));
         }
-        if let Some(q) = self.quantity(c, "rate")? {
-            b.insert("rate".into(), json!(q.parse::<i64>().unwrap_or(0)));
+        // (A rate may be nought: a household turning its use off.)
+        match Self::str_(c, "rate")? {
+            Some(r) if !r.is_empty() && r.bytes().all(|x| x.is_ascii_digit()) => {
+                b.insert("rate".into(), json!(r.parse::<i64>().unwrap_or(0)));
+            }
+            Some(_) => {
+                if let Some(q) = self.quantity(c, "rate")? {
+                    b.insert("rate".into(), json!(q.parse::<i64>().unwrap_or(0)));
+                }
+            }
+            None => {}
         }
         if op == "set" && !b.contains_key("rate") {
             return ask("Set it to what rate (a day)?");

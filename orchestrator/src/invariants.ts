@@ -156,7 +156,7 @@ export async function checkLog(path: string, opts: { pay_lag_days?: number; queu
   let actTime: { person?: Record<string, number>; system?: Record<string, number>; default?: number | null } = {};
   const programSeconds = (blocks: any[], table: Record<string, number> | undefined) => Math.max(1, blocks.reduce((a, b) => {
     const name = String(b.block ?? "");
-    const makes = name === "publish" ? `publish/${b.kind}` : name === "create_entity" ? `create_entity/${b.kind}` : name === "work" ? `work/${b.task}` : undefined;
+    const makes = name === "publish" ? `publish/${b.kind}` : name === "create_entity" ? `create_entity/${b.kind}` : name === "work" ? `work/${b.task}` : name === "connection" || name === "link" ? `${name}/${b.op}` : undefined;
     return a + ((makes !== undefined ? table?.[makes] : undefined) ?? table?.[name] ?? actTime.default ?? 1);
   }, 0));
   const actBlocks = new Map<string, string[]>();

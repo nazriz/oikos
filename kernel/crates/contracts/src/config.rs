@@ -332,6 +332,18 @@ pub struct TaskCfg {
     /// Per unit: added to a field at the structure's corner cell (pollution), or to a world counter (greenhouse gas).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub emits: BTreeMap<Id, i64>,
+    /// Collection (law 8; a round emptying the bins): per unit, up to `per_unit` of a kind held at the structure worked on
+    /// (`on`) by anyone there is taken into the actor's holding at `at`, from the holders in turn (a different one first each day); what is not there
+    /// is not taken, and nothing is made. What is left is seen by those who did it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collects: Option<Collects>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Collects {
+    pub kind: Id,
+    pub per_unit: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -380,8 +392,8 @@ pub struct LabourBy {
     pub at_max_bps: u32,
 }
 
-/// A state variable of structures, with its dynamics: it changes by `per_day`, and `per_occupant_per_day` for each
-/// body inside, every whole day, within [min, max]. `types`: the structure types it applies to (absent: all).
+/// A state variable of structures, with its dynamics: it changes by `per_day` every whole day, within [min, max]: a
+/// condition (wear, disrepair), never a stock (law 8: nothing grows by its occupants). `types`: the structure types it applies to (absent: all).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VariableCfg {
@@ -391,8 +403,9 @@ pub struct VariableCfg {
     pub initial: i64,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub per_day: i64,
-    #[serde(default, skip_serializing_if = "is_zero")]
-    pub per_occupant_per_day: i64,
+    /// Read only to refuse it (law 8, `stock_as_variable`): a variable does not grow by its occupants.
+    #[serde(default, rename = "per_occupant_per_day", skip_serializing_if = "is_zero")]
+    pub grows_by_occupants: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub types: Option<Vec<Id>>,
 }
@@ -550,6 +563,22 @@ pub struct World {
     /// Connections at the start: a holder's at a structure, on a node, taking a kind at a rate a day.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub connections: Vec<ConnectionCfg>,
+    /// Scarce kinds at the world's edges (foundations-2 C6; decision 2 of section 9): an edge sells no more of a kind than
+    /// `quantity` in each period of `every` seconds (counted from the run's start); every other kind is unlimited at its
+    /// price. To whom it sells what it has is its offers', never the kernel's.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scarce: Vec<ScarceCfg>,
+}
+
+/// A scarce kind at an edge: so much a period.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScarceCfg {
+    pub edge: Id,
+    pub kind: Id,
+    #[serde(with = "oikos_core::money::amount")]
+    pub quantity: oikos_core::money::Money,
+    pub every: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1975,6 +2004,16 @@ fn check_bodies(c: &Config) -> Result<(), String> {
             return Err(format!("counter {}: its id must be unique among counters and fields", x.id));
         }
     }
+    // A building's variable is a condition, never a stock (law 8, `stock_as_variable`): nothing grows by its occupants
+    // (what they use is a flow on a connection, what they throw away a process's output), and none has a kind's name.
+    for v in &cat.variables {
+        if v.grows_by_occupants != 0 {
+            return Err(format!("stock_as_variable: variable {} grows by its occupants (per_occupant_per_day): what occupants use flows on a connection and what they throw away is a process's output (law 8)", v.id));
+        }
+        if cat.resources.iter().any(|r| r.id == v.id) {
+            return Err(format!("stock_as_variable: variable {} has the name of a kind the world holds: a stock is held, not kept as a building's variable (law 8)", v.id));
+        }
+    }
     // Fields that hold a kind (law 8): a kind the world declares, held from nought (nothing below it, nothing assumed
     // at a baseline), one field a kind.
     let mut held_by_field: BTreeSet<&str> = BTreeSet::new();
@@ -1992,6 +2031,11 @@ fn check_bodies(c: &Config) -> Result<(), String> {
         }
     }
     for t in &cat.tasks {
+        if let Some(x) = &t.collects {
+            if !cat.resources.iter().any(|r| r.id == x.kind) || x.per_unit <= 0 {
+                return Err(format!("task {}: collects no kind the world declares ({}), or nothing a unit", t.id, x.kind));
+            }
+        }
         if let Some(d) = &t.draws {
             if !cat.fields.iter().any(|f| f.id == d.field) || d.per_unit < 0 {
                 return Err(format!("task {}: draws from no field {} (or a negative amount)", t.id, d.field));
@@ -2254,6 +2298,14 @@ pub fn validate(c: &Config) -> Result<(), String> {
         validate_travel(t, &c.world)?;
     }
     crate::network::validate(c)?;
+    for x in &c.world.scarce {
+        if !c.world.boundaries.contains(&x.edge) || !c.catalogue.resources.iter().any(|r| r.id == x.kind) || x.quantity < 0 || !(1..=31_622_400 * 100).contains(&x.every) {
+            return Err(format!("scarce: {} of {} is no edge's kind the world declares, or its quantity or period is out of range", x.kind, x.edge));
+        }
+        if c.world.scarce.iter().filter(|y| y.edge == x.edge && y.kind == x.kind).count() > 1 {
+            return Err(format!("scarce: {} of {} is said twice", x.kind, x.edge));
+        }
+    }
     if c.contracts != CONTRACTS_VERSION {
         return Err(format!("contracts version {} is not {}", c.contracts, CONTRACTS_VERSION));
     }
@@ -2490,8 +2542,8 @@ pub fn validate(c: &Config) -> Result<(), String> {
             }
         }
         for (k, q) in t.consumes.iter().chain(t.produces.iter()) {
-            if *q < 1 {
-                return Err(format!("task {}: {k} must be a positive quantity", t.id));
+            if *q < 0 {
+                return Err(format!("task {}: {k} must be a quantity of nought or more (law 8: nought is stated, as a workplace's energy and water are)", t.id));
             }
         }
         for v in t.changes.keys() {

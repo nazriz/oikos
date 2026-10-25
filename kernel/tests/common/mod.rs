@@ -208,7 +208,7 @@ pub fn world(p: &WorldParams) -> Value {
                 {"id": "eat", "labour": 0, "consumes": {"goods": "1"}},
                 {"id": "mend", "labour": 900, "changes": {"wear": -50}}
             ],
-            "variables": [{"id": "wear", "min": 0, "max": 10000, "initial": 100, "per_day": 1, "per_occupant_per_day": 2}],
+            "variables": [{"id": "wear", "min": 0, "max": 10000, "initial": 100, "per_day": 1}],
             "working_day": 8 * 3600,
             "structure_types": [
             {"id": "house", "category": "residential", "materials": {"materials": "300"}, "build_time": 20 * 86_400, "build_labour": 4 * 3600, "demolition_labour": 3600,

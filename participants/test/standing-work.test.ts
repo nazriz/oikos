@@ -97,6 +97,6 @@ test("the works manager, with the crew a post of its own, sets the standing orde
 
 test("every routine a module declares names a task, says what doing it is, and names a parameter of the module's for where", () => {
   const declared = Object.values(modules).flatMap((m) => (m.routines ?? []).map((r) => `${m.name}: ${r.task}`)).sort();
-  expect(declared).toEqual(["city.council_clerk: enact", "city.rates_officer: levy", "city.registry: answer", "city.works: answer", "city.works: collect", "city.works: maintain", "clinic.practice: treat", "office.desk: answer", "police.station: call_at_homes", "police.station: carry_out_warrants", "police.station: look_into_reports", "school.principal: enrol", "school.principal: teach", "tribunal.member: answer", "utility.energy: bill", "utility.energy: supply_energy", "utility.water: bill", "utility.water: draw_water", "world.transfers: pay_claims"]);
+  expect(declared).toEqual(["city.council_clerk: enact", "city.rates_officer: levy", "city.registry: answer", "city.works: answer", "city.works: collect", "city.works: maintain", "clinic.practice: treat", "office.desk: answer", "police.station: call_at_homes", "police.station: carry_out_warrants", "police.station: look_into_reports", "school.principal: enrol", "school.principal: teach", "tribunal.member: answer", "utility.energy: bill", "utility.water: bill", "utility.water: draw_water", "world.transfers: pay_claims"]);
   for (const m of Object.values(modules)) for (const r of m.routines ?? []) expect(r.what.length).toBeGreaterThan(40);
 });

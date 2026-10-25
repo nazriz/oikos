@@ -96,6 +96,8 @@ pub enum RefusalCode {
     /// the world's table for their kind, and no `default` the world states): nobody said what it takes, so it is not done
     /// (law 10, foundations-2 P2; before, it took a second).
     Unpriced,
+    /// An edge asked to sell more of a scarce kind than it has left this period (foundations-2 C6).
+    BeyondSupply,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

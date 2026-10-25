@@ -320,6 +320,7 @@ impl World {
                 .collect(),
             transit: Default::default(),
             network: None,
+            scarce_sold: BTreeMap::new(),
         };
         for p in &c.positions {
             let position = Position { entity: p.entity.clone(), title: p.title.clone(), role: p.role.clone(), channels: Arc::new(p.channels.clone()), role_module: p.role_module.clone(), holder: p.holder.clone(), changed: 0 };

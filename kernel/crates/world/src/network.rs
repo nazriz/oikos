@@ -477,6 +477,12 @@ pub fn settle(s: &Statics, st: &mut State, t: i64) -> Vec<Timed> {
                     for (k2, per) in &task.produces {
                         add_held(st, &holder, &at, k2, per.saturating_mul(amount as Money), stamp);
                     }
+                    // (And what it emits to the world's counters: a kWh's emissions as it is used.)
+                    for (k2, per) in &task.emits {
+                        if let Some(v) = st.totals.get_mut(k2) {
+                            *v = v.saturating_add(per.saturating_mul(amount));
+                        }
+                    }
                 }
                 None => add_held(st, &holder, &at, &kind, amount as Money, stamp),
             }

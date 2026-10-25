@@ -99,6 +99,9 @@ pub struct Params {
     pub fertility_per_10000: Vec<FromRate>,
     pub complain_to: Option<String>,
     pub complain_about: String,
+    /// What is complained of is a kind held at home (waste, law 8: foundations-2 C4), not a building's variable.
+    #[serde(default)]
+    pub complain_about_held: bool,
     pub complain_after_days: i64,
     pub complain_bps: i64,
     pub union: Option<String>,
@@ -195,6 +198,7 @@ impl Default for Params {
             fertility_per_10000: vec![],
             complain_to: None,
             complain_about: "waste".into(),
+            complain_about_held: false,
             complain_after_days: 14,
             complain_bps: 3_000,
             union: None,
@@ -407,6 +411,15 @@ pub struct Tribunal {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Utilities {
     pub energy: String,
+    /// The water corporation, where homes are on the network (foundations-2 C4): asked to connect a home's water.
+    #[serde(default)]
+    pub water: Option<String>,
+    /// The household's own use, which it sets its connections to (its own rule; the profile's figures): litres a person a
+    /// day, and kWh a day for the household.
+    #[serde(default)]
+    pub water_l_a_head: i64,
+    #[serde(default)]
+    pub energy_kwh_a_day: i64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

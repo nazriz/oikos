@@ -256,7 +256,7 @@ pub struct AccountItem {
     pub closed: Option<bool>,
 }
 
-pub use crate::sites::{SiteCell, SiteSpace, SiteStructure, VariableView};
+pub use crate::sites::{MeterView, SiteCell, SiteSpace, SiteStructure, VariableView};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntityItem {

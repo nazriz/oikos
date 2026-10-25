@@ -89,8 +89,12 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-26 at the merge of main (phase 1 landed, 0824efb6) into foundations-2 phase 2, config hashes and Rust states both,
 // on the merged tree; main's dbb34546..., b5082f8c..., 47fed11d... and f49ce487..., ce90d241..., 1605af11..., and this branch's febd3aa0...,
 // 44ce5bcf..., 9ea834be... and fec98d61..., 0152badb..., 7787a6c6..., until then.)
+// (Re-taken on 2026-10-26 at foundations-2 C4 and C5 (law 8), on the tree merged with main at 457f7505, config hashes and Rust states
+// both: homes on water, electricity and sewer connections, use and waste as recipes, waste collected from where it is held, bills
+// from meters, the two variables and the assumed uses gone, every workplace recipe stating its energy and water (generator 0.70.0);
+// 12dfe7e7..., b0f0a2ac..., bd137799... for the configs and 47d84415..., a02d0f45..., 4f88cd1f... for the states, until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "12dfe7e7a4a6e5fc", "gb-eng-2026": "b0f0a2aca7d5af9f", "ke-nakuru-2026": "bd137799df5e52e0" }
+  ? { "au-vic-2026": "b5ce56379e64510d", "gb-eng-2026": "fe55cd7fe6d28506", "ke-nakuru-2026": "c9ee8b474521a041" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -116,9 +120,9 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // (police.station 0.7.0); 772a98b9..., 5704b7de... and da91782e... for the configs, and 1befde62..., cd0ed6c2... and 824018a6... for
 // the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "47d8441592fc8358bd882942393a9b414b92015418250af540e3c15b705b4a54",
-  "gb-eng-2026": "a02d0f45882ca706ace628ca17024d5ed760ffb069f9f3657988e1834d7508c0",
-  "ke-nakuru-2026": "4f88cd1f50159765244b76d6ee0076323f4325563069541281016d0300c7cf59",
+  "au-vic-2026": "1029d2b3cbea01bc26e1716e72b194188db44e915b28d1124598b93d629e9ce7",
+  "gb-eng-2026": "8ceb057e29f99426e9bef12bab01235e47f01043ab344f2d09673fe825e7a9d9",
+  "ke-nakuru-2026": "9ed817f1abcb11254518d24f9480843c427be217cdd4a62233fae30b75f9a350",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

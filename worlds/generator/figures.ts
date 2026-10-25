@@ -147,6 +147,17 @@ export const FIGURE_BASIS: Basis[] = [
     derived("working_day", "the working day, from the profile's ordinary hours a week"),
     derived("per_resident_per_year", "the profile's grants or charges per resident, by the town's count"),
   ].flatMap((r) => ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params"].map((at) => ({ ...r, family: `any module: ${r.at}`, at: `${at}.${r.at}` }))),
+  // The network for what flows (foundations-2 C4, law 8; worlds/generator/network.ts): its engineering figures are the
+  // profile's (`utilities.network`, stand-ins until sourced); capacities and lengths are made from them and the layout.
+  derived("world.network.links.*.capacity", "a pipe's or a wire's capacity: what its users ask at the start, times the profile's peak (pipes) or margin over the peak hour (wires): utilities.network"),
+  derived("world.network.links.*.length_m", "the distance on the ground between its nodes, by the generator's layout of districts"),
+  prof("world.network.links.*.loss_m", "utilities.network"),
+  derived("world.network.supplies.*.storage", "the works' store: the town's use at the start times the profile's storage_days (utilities.network)"),
+  prof("world.network.supplies.*", "utilities.network"),
+  derived("world.connections.*.rate", "a household's own use: the profile's litres a head times its people, and its kWh a day (utilities.water, utilities.energy); a sewer lets out what it holds"),
+  prof("catalogue.resources.*.shape_bps", "utilities.network"),
+  derived("catalogue.tasks.*.emits.*", "what a unit puts out: a kWh used, the grid's emissions (utilities.energy.grid_emissions_g_per_kwh); a kilolitre treated, a kilolitre put back on the land (the unit of the treatment)"),
+  conv("catalogue.tasks.*.collects.per_unit", "a load of 10 kg, the unit the crew's time is reckoned in (services.collect_seconds_per_10kg)"),
   prof("catalogue.fields", "nature"),
   prof("catalogue.species", "nature"),
   prof("catalogue.land_covers", "nature"),
@@ -156,6 +167,8 @@ export const FIGURE_BASIS: Basis[] = [
   // A system template's own seconds, hours and lanes (law 10, foundations-2 P1 and P3): each with its source in act_time.sources, keyed
   // `template.<id>.<row>`. The casework desk's minutes are the person table's rows; an office offer's a share of them at its speed; a
   // machine's hours the whole day (software runs when asked); the desk's hours an officer's day and its lanes the town's share of officers.
+  ...of("utility.water", [derived("storage", "the works' store: the town's use at the start times the profile's storage_days (utilities.network)")]),
+  ...of(CITIZEN, [prof("utilities.water_l_a_head", "utilities.water.litres_per_person_per_day"), prof("utilities.energy_kwh_a_day", "utilities.energy.kwh_per_household_per_day")]),
   derived("templates.*.does.*.seconds", "a system's seconds for an act: a person's time for it at an offer's speed, or an officer's (the person table's row); act_time.sources template.<id>.<row>"),
   derived("templates.*.hours.from", "when a system's day begins: a machine's midnight (all day), or an officer's working day from the profile's round.work_start_hour"),
   derived("templates.*.hours.seconds", "how long a system's day is: a machine's whole day, or an officer's working day (ordinary_hours_per_week) times the town's share of officers; act_time.sources template.<id>.hours"),

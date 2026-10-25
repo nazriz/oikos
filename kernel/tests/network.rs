@@ -329,3 +329,24 @@ fn a_loop_is_cut_to_a_tree_at_load_and_the_same_world_settles_the_same() {
     advance(&mut b, 3 * DAY);
     assert_eq!(a.kernel().state_hash().unwrap(), b.kernel().state_hash().unwrap());
 }
+
+/// A scarce kind at an edge (C6): the outside sells no more of it than its quantity a period, refused `beyond_supply`
+/// beyond it, and sells again in the next period. Every other kind is unlimited at its price.
+#[test]
+fn a_scarce_kind_runs_out_at_the_edge_and_comes_again_the_next_period() {
+    let mut c = world_with_network();
+    c["world"]["scarce"] = json!([{"edge": "outside", "kind": "goods", "quantity": "30", "every": 10 * DAY}]);
+    let mut run = Run::start(c, "network-scarce", Vec::new(), None).unwrap();
+    let sell = |q: i64| json!([{"block": "move_goods", "kind": "goods", "quantity": q.to_string(), "from_at": "outside", "to": "devco", "to_at": "s-shop"}]);
+    act(&mut run, "outside-system", Some("outside-trade"), sell(20)).unwrap();
+    assert!(act(&mut run, "outside-system", Some("outside-trade"), sell(20)).unwrap_err().contains("BeyondSupply"));
+    act(&mut run, "outside-system", Some("outside-trade"), sell(10)).unwrap();
+    // (Materials are not scarce: unlimited at the edge's price.)
+    act(&mut run, "outside-system", Some("outside-trade"), json!([{"block": "move_goods", "kind": "materials", "quantity": "100000", "from_at": "outside", "to": "devco", "to_at": "s-shop"}])).unwrap();
+    { let to = 10 * DAY + 1; advance(&mut run, to); }
+    act(&mut run, "outside-system", Some("outside-trade"), sell(30)).unwrap();
+    // A world that names a scarce kind of no edge, or of no kind, does not load.
+    let mut bad = world_with_network();
+    bad["world"]["scarce"] = json!([{"edge": "devco", "kind": "goods", "quantity": "30", "every": DAY}]);
+    assert!(Run::start(bad, "network-scarce-bad", Vec::new(), None).is_err());
+}

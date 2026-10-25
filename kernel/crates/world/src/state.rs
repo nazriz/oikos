@@ -126,6 +126,9 @@ pub struct State {
     /// an `Arc`, as nature is: settled hourly, and an action's copy of the state shares it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub network: Option<Arc<crate::network::NetState>>,
+    /// What each edge has sold of a scarce kind this period (`edge|kind` -> (the period, how much)): foundations-2 C6.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub scarce_sold: BTreeMap<String, (i64, crate::money::Money)>,
 }
 
 /// A vehicle as the world keeps it (reserved shapes for travel).

@@ -191,7 +191,7 @@
                   "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
                 },
                 "additionalProperties": {
-                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Quantity"
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/RecipeQuantity"
                 },
                 "maxProperties": 100
               },
@@ -201,7 +201,7 @@
                   "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
                 },
                 "additionalProperties": {
-                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Quantity"
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/RecipeQuantity"
                 },
                 "maxProperties": 100
               },
@@ -299,6 +299,16 @@
                   }
                 }
               },
+              "collects": {
+                "description": "Collection (law 8, foundations-2 C4: a round emptying the bins): per unit, up to `per_unit` of a kind held at the structure worked on (`on`) by anyone there is taken into the actor's holding at `at`, from the holders in turn (a different one first each day); what is not there is not taken and nothing is made. What is left is seen by those who did it.",
+                "type": "object",
+                "required": ["kind", "per_unit"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+                  "per_unit": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+                }
+              },
               "draws": {
                 "description": "Per unit: taken from a field, at the cell (of the structure's, or the four around them) with the most of it; refused (field_exhausted) where there isn't enough (water from a river run low).",
                 "type": "object",
@@ -381,6 +391,7 @@
                 "maximum": 9007199254740991
               },
               "per_occupant_per_day": {
+                "description": "Refused at load (law 8, `stock_as_variable`): a variable does not grow by its occupants; what they use flows on a connection and what they throw away is a process's output.",
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
@@ -1905,7 +1916,23 @@
             }
           }
         },
-        "connections": {
+"scarce": {
+          "description": "Scarce kinds at the world's edges (foundations-2 C6; decision 2): an edge sells from outside no more than `quantity` of a kind in each period of `every` seconds counted from the run's start (refused `beyond_supply`); every other kind is unlimited at its price. To whom it sells what it has is its offers', never the kernel's.",
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "required": ["edge", "kind", "quantity", "every"],
+            "additionalProperties": false,
+            "properties": {
+              "edge": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+              "kind": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+              "quantity": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Quantity" },
+              "every": { "type": "integer", "minimum": 1, "maximum": 3162240000 }
+            }
+          }
+        },
+                "connections": {
           "description": "Connections at the start (foundations-2 C3): a holder's at a structure, on a node, taking a kind from the supply whose tree the node is on at `rate` a day (on a drain, the most it lets out), its meter counting what is delivered. `uses`: a recipe that takes no time and uses the kind a unit at a time (use at the user). `meter`: read on the premises (the default) or from afar by its operator.",
           "type": "array",
           "maxItems": 1000000,

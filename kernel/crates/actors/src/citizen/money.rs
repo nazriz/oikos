@@ -1379,6 +1379,8 @@ impl Person {
             // (What was faulty is thrown out with what is used: it is gone, and the week is shorter for it.)
             let out = total.min(each + self.money.spoiled);
             self.money.spoiled = 0;
+            // (What we use up at home goes in the bin there: the bin's reckoning counts it.)
+            self.absorbed.bin_seen.units += out;
             lines.push(call("work", vec![("task", Some(arg("consume"))), ("units", Some(text(out.to_string()))), ("at", Some(arg(home)))]));
         } else {
             let mut left = each;
@@ -1435,6 +1437,9 @@ impl Person {
                 break;
             }
             lines.push(call("work", vec![("task", Some(arg(&task))), ("units", Some(text(u.to_string()))), ("at", Some(arg(at)))]));
+            if self.s.home.as_ref().is_some_and(|h| &h.structure == at) {
+                self.absorbed.bin_seen.units += u;
+            }
             left -= u;
         }
         w.push(because(format!("Using up {each} of the {total} {kind} we have, until we shop again."), lines));

@@ -476,7 +476,10 @@ export interface Profile {
     /** Utilities (world-expansion 6.1): water drawn from the river and billed to owners; energy bought from the grid and
      * billed to households. */
     utilities?: {
-      water: { litres_per_person_per_day: number; price_per_kl: number; service_per_quarter: number; river_inflow_kl_per_cell_per_day: number; river_decay_bps_per_day: number; river_flow_bps_per_day: number };
+      /** The town's network for what flows (foundations-2 C4; worlds/generator/network.ts): its engineering figures, each a stand-in until sourced. */
+      network?: import("./network").NetworkFigures;
+      /** `bill_to`: whom the water bill goes to, the property's owner or its occupant, as the place's law has it (WM-12). */
+      water: { litres_per_person_per_day: number; bill_to?: "owner" | "occupant"; price_per_kl: number; service_per_quarter: number; river_inflow_kl_per_cell_per_day: number; river_decay_bps_per_day: number; river_flow_bps_per_day: number };
       energy: { kwh_per_household_per_day: number; price_per_kwh: number; supply_per_day: number; grid_price_per_kwh: number; grid_emissions_g_per_kwh: number };
     };
     /** Floods (world-expansion 7.3): the river's banks and spill, how deep before a building floods, wetland's soaking. */

@@ -25,6 +25,11 @@
       "type": "string",
       "pattern": "^[1-9][0-9]{0,37}$"
     },
+    "RecipeQuantity": {
+      "description": "A recipe's quantity a unit (law 8): positive, or nought where a recipe states that it takes or gives none of a kind (a workplace's energy and water, with its basis), a decimal-string integer of at most 38 digits.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,37})$"
+    },
     "Quantity": {
       "description": "A strictly positive quantity of a resource, in its kind's unit: a decimal-string integer of at most 38 digits, like an amount of money (D58).",
       "type": "string",

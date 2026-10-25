@@ -8914,3 +8914,89 @@ log against the same town built at 3d113a1f.
   Without the fix it fails (world 0's log differs); with it, it passes.
 - **Revisit if:** anything else in the engine is held across worlds in a process: it must be keyed by what it is made
   of in full (as the controllers' members and the ventures are, by their text), or by its world.
+
+
+## 2026-10-26 · Foundations-2 phase 2, C4 and C3b's behaviour: homes on the network, use and waste as recipes, bills from meters (branch `f2-phase2`; results move; no model called)
+
+- **Generator 0.70.0** (`worlds/generator/network.ts`, new). The town's network: from the water works a main to each
+  district (the quarters of the town around the middle of its homes) and a service to each home; the same for the
+  feeders from the substation and the sewer back to the works. Capacities from what the homes ask at the start times the
+  profile's peak (pipes, 2.5) and margin over the peak hour (wires, 1.5); heads (50 m at the source, 20 m service, 5 m
+  least), losses (10 m a main, 5 m a service at capacity), a store of two days and an hourly load shape are a new profile
+  section, `utilities.network`, the same placeholders in all nine profiles, marked so (WM-1). Each occupied home's
+  leaseholder holds a water, an electricity and a sewer connection at the start, at its own use (the profile's litres a
+  head times its people; kWh a day: the figures that were the utilities' assumed use, now the household's). The works'
+  store starts full and the substation with a fortnight of the town's electricity. New kinds `wastewater`; `water`
+  settled daily, `energy` hourly by the shape. New recipes `use_water` (a litre in, a litre of wastewater out),
+  `use_energy` (dissipated, with the grid's emissions) and `treat_wastewater` (a kilolitre in, put back on the land at the
+  works: an emit of the river's kind, the process's output).
+- **Waste is what is used up.** `consume` and `consume-<kind>` of the stock kinds (goods, food, clothing, a meal out) make
+  waste in kilograms at home: a unit's share of a person's month of waste (the profile's grams a head a day) by its price
+  over what a person spends in the shops a month (derived from the shop wage, less saving, three adults in four:
+  placeholders, WM-9). A service or a fuel
+  makes none. The works' `collect` is now `collects: {waste, 10}`: a kernel field (law 8) by which a unit takes up to 10 kg
+  of what is held at the address worked on, from its holders in turn (a different one first each day), never more than is there, and makes nothing; the
+  crew sees what is left (`left` on the buildings it worked on: only those who did it). The household's bin is what it
+  holds of waste at home (`complain_about_held`), its complaint read from it. `city.works` reads what it left from `left`
+  and knows a home by its dwellings.
+- **Deleted:** the `waste` and `water_used` variables; `per_occupant_per_day` (refused at load, `stock_as_variable`, as is a
+  variable with a kind's name; kept in the schema only to be refused); the water corporation's `litres_per_person_per_day`,
+  draw for the published population, `price_elasticity_bps`, `reference_price_per_kl`, `restriction_cut_bps`,
+  `restriction_review_days` and its `meter` variable; the retailer's `units_per_customer_per_day`, `task`
+  (`supply_energy`), its price response; the `supply_energy` task. The inventory's found lists are empty but for the
+  silent recipes (C5), its C1 to C4 entries stay as guards (`done`).
+- **The utilities (Rust, `offices/utilities.rs`, rewritten: water 0.4.0, energy 0.5.0).** Both operate their networks:
+  open a household's connections on its `supply_request` (now with `kind` and `rate`; water brings the sewer with it) on
+  its home's node, close them when it has gone, died or asked (`supply_end`, now naming the connection). The water
+  corporation draws what keeps its store full, treats what the sewer brings back, announces and lifts restrictions as
+  before, and bills from meters read on a round (visits: the meters on the premises) to whom the place's law says
+  (`bill_to`: the owner by the roll, or the occupant by the connection; law data per profile: au-vic the owner, gb-eng
+  the occupier, both recalled, the rest placeholders, WM-12). The retailer buys from the grid when its stock falls below a
+  fortnight of what its meters say the town uses a day, bills each connection for its days and what its meter moved (a
+  wrong bill a slip on the units), answers a wrong bill from its own readings, recloses a tripped feeder, and puts the
+  feeders under a link that trips again within a week on a rotation (each off an hour in turn), sparing a feeder that
+  serves a connection on its protected list. Their network is their declared register (`keeps: connections`; the
+  no-god-view backstop's KEEPERS and `views.ts` see an operator's holdings channel as it).
+- **The household (Rust, `citizen/housing.rs`).** Its use is its own rule: it sets its connections to its litres a head and
+  kWh a day, again when the household changes; asks to be supplied at a home with no connection of its; turns a connection
+  where it no longer lives down to nothing and asks for it to be stopped. It does not yet read the tariff or a
+  restriction (WM-12, open).
+- **A deviation, accepted by the parent session (2026-10-26):** the `connection` and `link` calls are code's own for now
+  (TR-7, new): a seat in a utility or operator post cannot rotate, interrupt or reclose, nor a seated household set its use.
+- **The CLAUDE.md line is not added by this branch** (Naz's decision; it goes in with the commit that lands C4). The line,
+  worded like the hard rule on time: "**Nothing physical from nothing: every physical quantity is a
+  declared kind, held somewhere, and changed only by its holder's move, a process with a recipe, nature's declared
+  dynamics or a world edge.** A building's variable is a condition, never a stock; what flows all day flows on a network,
+  settled by its physics; who goes short follows from the network, the supply contracts in force and the operators' own
+  acts, never from an allocation rule; every recipe at a workplace states its energy and water. A gap is a missing law:
+  ask what the thing is, who holds it and which process makes or uses it, and make the world say it
+  (docs/nothing-from-nothing.md, docs/design/foundations-2.md). `orchestrator/test/nothing-from-nothing.test.ts` is the
+  backstop." The rule page `docs/nothing-from-nothing.md` is in this commit.
+- **Revisit if** the waste a unit makes is sourced by kind (then a profile figure for each); households read prices and
+  restrictions (then their response, with a source); a town grows past its network's sizing (then the operator's
+  reinforcement, a builder's work); a tree's shortage is one no real town would have (then loops, to the owner first).
+
+## 2026-10-26 · Foundations-2 phase 2, C5 and C6: every workplace recipe states its energy and water; scarce kinds at an edge (branch `f2-phase2`; C5 moves configs only, C6 nothing; no model called)
+
+- **C5, as far as it can go before workplaces are supplied.** Every recipe at a workplace (`in: workplace`: making,
+  serving, collecting, upkeep, repair, care, teaching, investigation) now states `energy` and `water` among its inputs, and
+  its water's `wastewater` among its outputs (`WORKPLACE_USE` in the generator), so `silentRecipes` is empty and the
+  inventory's found lists are all empty. **Every figure is nought**, its basis the generator's note beside it and WM-15 (the
+  figure table reads a recipe's amounts only as `catalogue.tasks.*.consumes.*`, a place already listed unbased: law 11's
+  structured notes, N3, will carry each kind's own basis): no
+  workplace is on the network, no firm or office asks to be supplied, and no firm pays a utility bill, so a figure above
+  nought would stop the work it is in (a factory with no energy held refuses `make`). The design's per-unit figures by
+  industry, sourced from an energy account or an input-output table, need those three things first: **not done, risk
+  WM-15 (new)**. This is a stop short of the brief's C5, recorded rather than worked round: figures above nought with no
+  supply would collapse production, and supplying firms is firm behaviour (asking, setting their rate by their output,
+  paying), its own piece of work.
+- **C6, scarce kinds at an edge.** `world.scarce` (contract): an edge sells from outside no more than `quantity` of a kind
+  in each period of `every` seconds from the run's start; a `move_goods` from the edge's outside beyond it is refused
+  **`beyond_supply`** (new refusal code, with its words in both word lists). What it has sold is state
+  (`scarce_sold`, absent unless a kind is scarce). Which buyer gets what is left is the edge's offers' order (whoever's
+  order its trade desk takes up first), never the kernel's. Refused at load: a scarce kind of no edge or no declared kind,
+  or one said twice. Kernel test: a scarce kind runs out at the edge and comes again the next period; materials stay
+  unlimited. No generated town names a scarce kind; a profile or a scenario does (the falling-price and scarcity
+  scenarios reading it is left for the scenarios' owner).
+- **Revisit if** workplaces are connected (then C5's figures, by industry, with sources; WM-15 closes); a scenario needs a
+  scarce kind (then its quantity in the scenario, with its source).

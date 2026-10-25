@@ -105,7 +105,7 @@ export function vanishing(c: any): string[] {
   for (const t of (c.catalogue.tasks ?? []) as Task[]) {
     if (t.draws && !fields.get(t.draws.field)?.kind) out.push(`${t.id}: draws from ${t.draws.field}, which holds no kind: what is drawn goes nowhere`);
     const stock = Object.keys(t.consumes ?? {}).filter((k) => (resources.get(k)?.class ?? "stock") === "stock");
-    const effect = Object.keys(t.produces ?? {}).length || Object.keys(t.changes ?? {}).length || Object.keys(t.emits ?? {}).some((k) => fields.get(k)?.kind) || t.on_body || t.surveys || t.investigates;
+    const effect = Object.keys(t.produces ?? {}).length || Object.keys(t.changes ?? {}).length || Object.keys(t.emits ?? {}).some((k) => fields.get(k)?.kind) || t.on_body || t.surveys || t.investigates || (t as any).collects;
     if (stock.length && !effect) out.push(`${t.id}: only destroys ${stock.join(", ")} (a stock kind: it must become something, or be a kind that dissipates or a service)`);
   }
   return out;

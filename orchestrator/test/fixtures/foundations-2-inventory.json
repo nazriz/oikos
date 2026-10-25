@@ -2,46 +2,18 @@
   "about": "Law 8, nothing physical from nothing (docs/nothing-from-nothing.md; docs/design/foundations-2.md section 2): today's violations, found by orchestrator/test/nothing-from-nothing.test.ts in every profile's town and in the modules' sources. `found` lists each audit's findings as it names them; `entries` are the special cases the plan deletes, each a literal string `find` in `file` and the step (`step`) that deletes it. The inventory only shrinks: a finding not listed fails the backstop, and so does a listed finding or entry no longer found, so the change that ends a case removes it here, with a line in docs/decisions.md. A step that has landed is in `done`: its entries stay, as guards, and `specialCasesLeft` fails if one stands again.",
   "done": [
     "C1",
-    "C2"
+    "C2",
+    "C3",
+    "C4",
+    "C5"
   ],
   "found": {
-    "stocksAsVariables": [
-      "waste: a variable with the name of a kind the world holds",
-      "waste: grows by its occupants (per_occupant_per_day)",
-      "water_used: grows by its occupants (per_occupant_per_day)"
-    ],
-    "orphanKinds": [
-      "water: made, and nothing uses it or takes it in"
-    ],
-    "silentRecipes": [
-      "collect: states no energy and no water",
-      "investigate: states no energy and no water",
-      "maintain: states no energy and no water",
-      "make-food: states no energy and no water",
-      "make: states no energy and no water",
-      "repair: states no energy and no water",
-      "serve-eating_out: states no energy and no water",
-      "serve-food: states no energy and no water",
-      "serve-personal_services: states no energy and no water",
-      "serve-recreation: states no energy and no water",
-      "serve-transport: states no energy and no water",
-      "serve: states no energy and no water",
-      "teach: states no energy and no water",
-      "treat: states no energy and no water"
-    ],
-    "billsWithoutMeters": [
-      "utility.energy: units_per_customer_per_day (an assumed use, not a meter or a holding)",
-      "utility.water: litres_per_person_per_day (an assumed use, not a meter or a holding)"
-    ],
-    "vanishing": [
-      "consume-eating_out: only destroys eating_out (a stock kind: it must become something, or be a kind that dissipates or a service)",
-      "consume-food: only destroys food (a stock kind: it must become something, or be a kind that dissipates or a service)",
-      "consume: only destroys goods (a stock kind: it must become something, or be a kind that dissipates or a service)"
-    ],
-    "allocationRules": [
-      "kernel/crates/actors/src/offices/utilities.rs: price_elasticity_bps",
-      "kernel/crates/actors/src/offices/utilities.rs: restriction_cut_bps"
-    ]
+    "stocksAsVariables": [],
+    "orphanKinds": [],
+    "silentRecipes": [],
+    "billsWithoutMeters": [],
+    "vanishing": [],
+    "allocationRules": []
   },
   "entries": [
     {

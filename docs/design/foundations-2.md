@@ -149,6 +149,19 @@ stocks of that kind, connections' pipes (nought: settled at once) and edges chan
 outputs less inputs, nature's logged sources less sinks, and nothing else; nobody but an edge holds less than nought;
 every connection's meter equals the sum of its logged deliveries.
 
+**Built (2026-10-26, phase 2: C1 to C6 with C3b; branch `f2-phase2`; decisions "Foundations-2 phase 2"):** the invariant
+(`kernel/tests/conservation.rs`, replacing `goods.rs`) and the backstop with its inventory (C1); kinds' classes, with a third
+class `service` beside the design's two (a unit of a service sold over a counter: a haircut is no stock and need not become
+waste), fields that hold a kind, a draw held, nature's edge (C2); the network, connections settled on trees by pressure,
+ratings and drains, meters in state, the acts on connections and links, rotations as standing schedules (C3, C3b in the
+kernel); the generated town's homes on water, electricity and sewer connections, use and waste as recipes, collection from
+where waste is held, bills from meters, who pays the water bill as law data, the two variables, the assumed use and the
+energy at the depot deleted, and the operators' reclosing and rotation (C4); every workplace recipe states its energy and
+water, each nought with its basis (C5, short of the design: no workplace is supplied yet, WM-15); scarce kinds at an edge,
+refused `beyond_supply` (C6). **Not as designed:** the `connection` and `link` calls are code's own until the
+translator is taught them (TR-7); households do not yet read the tariff or a restriction (WM-12); the CLAUDE.md line is
+drafted in the decisions entry and added when C4 lands.
+
 ### 2.2 The backstop
 
 `orchestrator/test/nothing-from-nothing.test.ts`, fast tier. It generates the town of every profile (code seats, and

@@ -2070,7 +2070,8 @@
         "not_coming_down",
         "coming_down",
         "offer_withdrawn",
-        "unpriced"
+        "unpriced",
+        "beyond_supply"
       ]
     },
     "AnnotationEntry": {

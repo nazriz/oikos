@@ -53,6 +53,9 @@ pub struct SiteStructure {
     /// the dial shows, as a meter reader does); a meter its operator reads from afar is not on the dial here.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub meters: Vec<MeterView>,
+    /// What is left there of a kind collected from it (foundations-2 C4): seen only by those who did the collecting.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "crate::money::amount_map")]
+    pub left: BTreeMap<Id, crate::money::Money>,
     pub spaces: Vec<SiteSpace>,
 }
 
@@ -240,8 +243,9 @@ pub fn site_structure(s: &Statics, st: &State, sid: &Id, me: &str, names: bool) 
                 completes_at: x.completes_at,
                 coming_down: x.demolition.is_some().then_some(true),
                 meters: vec![],
+                left: BTreeMap::new(),
                 variables: {
-                    let occupants = occ.map_or(0, |m| m.values().map(|b| b.len()).sum::<usize>()) as i64;
+                    let _occupants = occ.map_or(0, |m| m.values().map(|b| b.len()).sum::<usize>()) as i64;
                     let v: BTreeMap<Id, VariableView> = s
                         .config
                         .catalogue
@@ -249,7 +253,7 @@ pub fn site_structure(s: &Statics, st: &State, sid: &Id, me: &str, names: bool) 
                         .iter()
                         .filter_map(|c| {
                             let (value, as_of_day) = *x.variables.get(&c.id)?;
-                            let per_day = c.per_day.saturating_add(c.per_occupant_per_day.saturating_mul(occupants));
+                            let per_day = c.per_day;
                             Some((c.id.clone(), VariableView { value, as_of_day, per_day, min: c.min, max: c.max }))
                         })
                         .collect();

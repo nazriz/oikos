@@ -123,8 +123,8 @@ test("an energy seat orders from the grid on its own order form and is delivered
   const price = (market.sells.energy / 100).toFixed(2), least = Math.max(market.min_order ?? 100, 500);
   const sum = (n: number) => ((n * market.sells.energy) / 100).toFixed(2);
   const energy: Sitting[] = [
+    // (Supply is the network's since foundations-2 C4: the staff's routine is billing, and buying for what the meters say.)
     { day: 0, asks: () => [
-      { what: "The staff supply the customers each day.", program: `work(at=${own.depot}, every="every day", task=supply_energy)` },
       { what: "The staff bill the customers each month.", program: `work(at=${own.depot}, every="every 30 days", task=bill)` }] },
     { day: 3, asks: () => [{ what: `Order ${least} energy from outside, paying with the order.`,
       program: `form(account=acc-energy-co, at=${own.depot}, deliver_to=energy-co, form=order, kind="energy", quantity="${least}", seller=outside, to=energy-operations, unit_price="${price}")\nmoney(amount="${sum(least)}", for="Order: ${least} energy.", from=acc-energy-co, to=acc-outside)` }] },
@@ -152,8 +152,8 @@ test("an energy seat orders from the grid on its own order form and is delivered
   expect(form).toContain("How the office buys from a supplier, the outside world's market among them");
   expect(form).toContain("The form pays nothing by itself: pay the whole sum");
   expect(form).toContain("sends back money that comes with no order waiting for it");
-  // And its staff's report says what was supplied and what is held.
-  expect(records.some((r) => r.kind === "staff_report" && r.data.office === "energy-operations" && /supply_energy \(rec\.\d+, every 1 day\): carried out: \d+ days' supply, \d+ units; \d+ energy held/.test(r.text))).toBe(true);
+  // And its staff's report says what is held and what the town uses (its meters).
+  expect(records.some((r) => r.kind === "staff_report" && r.data.office === "energy-operations" && /\d+ energy held.*the town using \d+ a day/.test(r.text))).toBe(true);
 }, 600_000);
 
 // A billing order is followed from when it is made (the shake-down review, fault 7). In the first utilities pilot the

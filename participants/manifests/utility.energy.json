@@ -1,6 +1,6 @@
 {
   "answers": {
-    "acts": "What it acts on: its customers' accounts, each billed each quarter; and notice that a customer has left or has died.",
+    "acts": "What it acts on: its customers' connections, each billed by its meter; a household's request to be supplied; and notice that a customer has left or has died.",
     "office": "the energy retailer"
   },
   "doc": "docs/behaviour/utilities.md",
@@ -285,6 +285,12 @@
       }
     }
   ],
+  "keeps": [
+    {
+      "what": "connections",
+      "why": "Its network: the feeders, services and connections it operates, with the meters it reads from afar and what its instruments read of its links, are its own works and records (foundations-2 C3)."
+    }
+  ],
   "name": "utility.energy",
   "params": {
     "bill_every_days": {
@@ -335,27 +341,10 @@
       },
       "source": "placeholder"
     },
-    "price_elasticity_bps": {
-      "default": 0,
-      "schema": {
-        "description": "by how much use falls for each 100% the price stands over the reference price (to confirm); 0: use does not respond",
-        "type": "integer"
-      },
-      "source": "placeholder",
-      "unit": "bps"
-    },
     "price_per_unit": {
       "default": 0,
       "schema": {
         "description": "the tariff (cents)",
-        "type": "integer"
-      },
-      "source": "placeholder"
-    },
-    "reference_price_per_unit": {
-      "default": 0,
-      "schema": {
-        "description": "the price use was reckoned at (in the smallest unit, a unit); 0: none, so no price response",
         "type": "integer"
       },
       "source": "placeholder"
@@ -374,32 +363,10 @@
         "type": "integer"
       },
       "source": "placeholder"
-    },
-    "task": {
-      "default": "supply_energy",
-      "schema": {
-        "description": "the work that supplies a unit, and the resource it uses",
-        "type": "string"
-      },
-      "source": "placeholder"
-    },
-    "units_per_customer_per_day": {
-      "default": 0,
-      "schema": {
-        "description": "what a household uses (the world's figure)",
-        "type": "integer"
-      },
-      "source": "placeholder"
     }
   },
   "perceives": [],
   "routines": [
-    {
-      "at": "depot",
-      "every": 1,
-      "task": "supply_energy",
-      "what": "Each day the network supplies what the customers use from what the retailer holds, and more is bought from the grid when it runs below a fortnight's use. Those who ask to be supplied are taken on, and those gone taken off."
-    },
     {
       "at": "depot",
       "every": [
@@ -407,9 +374,9 @@
         30
       ],
       "task": "bill",
-      "what": "Each customer is sent a bill for the supply charge and what they used; one who has gone, their last. How often the bills go out is the order's."
+      "what": "Each customer is sent a bill for the supply charge and what their meter shows they used; one who has gone, their last. How often the bills go out is the order's."
     }
   ],
   "state": "none",
-  "version": "0.4.0"
+  "version": "0.5.0"
 }
