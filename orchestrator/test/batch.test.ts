@@ -117,7 +117,7 @@ test("a batch's spending limit caps the whole batch: each run gets what's left o
   process.env.OIKOS_ANTHROPIC_KEY = "test-key";
   try {
     // Three at once: the first two hold $0.02 each, leaving the third $0.005 of the batch's $0.045.
-    const r = await runBatch({ world, seeds: 3, parallel: 3, out, until: 60 * DAY, sets: ["citizens=40", "mayor=llm"], model: "anthropic/claude-haiku-4-5", baseUrl: `http://localhost:${server.port}`,
+    const r = await runBatch({ world, seeds: 3, parallel: 3, out, until: 60 * DAY, sets: ["citizens=40", "mayor=llm", "framing=simulation"], model: "anthropic/claude-haiku-4-5", baseUrl: `http://localhost:${server.port}`,
       budgetUsd: 0.02, batchBudgetUsd: 0.045, measure: false, compress: false });
     expect(r.runs.length).toBe(3);
     const entries = (p: string) => readFileSync(p, "utf8").trim().split("\n").map((l) => JSON.parse(l));
