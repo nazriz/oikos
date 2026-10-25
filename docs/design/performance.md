@@ -67,9 +67,28 @@ seat's knowledge, for the whole run. A code actor's look needs only what it adds
 observation that is written (a seat's, or one whose hash the log keeps), and kept as before. A town's people's
 channel lists (one or two among them) are read once at the start and shared.
 
+*What's known of a building.* A code actor's knowledge keeps, for each building it is shown, its type, place and
+spaces (`StructureFact`); it was made again whenever the building's view changed (someone came or went), and each
+person's knowledge kept its own. It is made of the building, not of who is in it, so it is now one for everyone while
+it says the same.
+
+*Large towns, all of it with the minds' and memories' cut (`mem-minds`) beside (local build, 2026-10-26).* 50,000
+people for a month: 14.7 GB resident, 604 s (main: 34.2 GB, 1,004 s), the same state hash. **100,000 for a week:**
+31.0 GB resident, 320 s wall, state `6fea086aa5d0f8c1`. Its peak is the first moment (the footprint is 39 GB about
+two minutes in, then 22 to 27 GB): every unit decides at once, and with seats awake in that round each one's decisions
+are held, as values and as their canonical bytes, until the round is carried out (16 GB of bytes at 100,000). Holding
+the bytes compressed was tried and dropped: no smaller (the values stay) and slower (40.4 GB, 551 s). The next cut is
+there: a round's decisions held once, as bytes, when seats are in it, or the first moment decided in windows.
+
+*Biggest holders left* (10,000 people, the 10,000 month's peak, with mem-minds; 195 KB a person live): the engine
+(units, rounds, records delivered) 49, world state (records made, accounts) 39, minds 29, citizens' person and params
+25, the typed config 24, other 14, offices and firms 9, the compiled schemas 4, the log's buffer 2, what's been seen
+1, memories 1. At 1,000 people at the budget's settings: 322 KB a person (main 546). The target is 50.
+
 *How the cost was told.* Instructions retired move by 1 to 2% between runs of the same build as the machine's load
 varies (the thread pool's idle threads spin), so a cost of that size is told by running main and the cut in turn on
 the same towns, three times each, at a quiet hour: `pair.sh`, its numbers above.
+| what's known of a building, one per building (`mem-facts`) | 499 MB | 2.97 GB | 16.9 GB (595 s) | 380 KB | |
 
 *What's been seen.* A building as someone sees it (its spaces, who is in each where that can be told, its wear) was
 made at every look and kept by everyone who saw it, each their own copy: at 50,000 people, 408 KB a person. Now it is

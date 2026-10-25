@@ -8721,3 +8721,20 @@ side (then draws.ts goes too).
 - **A version tried and dropped:** the bytes held only while an observation held them (weakly): no smaller, and they
   were made again for each seat that was shown the same record.
 - **Revisit if:** runs come to have many model seats (their records' bytes are kept for the run, as they always were).
+
+## 2026-10-26 · What's known of a building held once; 100,000 for a week (branch `mem-facts`; no model called)
+
+- **Change:** what a code actor's knowledge keeps of a building it is shown (its type, place and spaces) is one for
+  everyone while it says the same; it was made again whenever the building's view changed, and each person kept their
+  own (0.4 GB at 50,000 in the profile before).
+- **Measured** (14 threads; against the cut before, which was against main): 1,000 au-vic 512 to 499 MB, gb-eng 492
+  to 484, us-oh 456 to 439; 10,000 about the same (2.97 GB); 50,000 16.9 GB, 595 s. The same state hash on all; the log
+  the same but for one line, the engine's list of module versions (police.station 0.6.0 to 0.7.0, main's, merged in
+  beneath). The budget at 474 to 475 MB, 365 KB a person: ceiling 390 to 380 KB.
+- **With the minds' and memories' cut beside** (`mem-minds`, not landed yet; a local build): 1,000 people 322 KB a
+  person; 50,000 for a month 14.7 GB and 604 s; 100,000 for a week 31.0 GB resident and 320 s, its peak the first
+  moment (39 GB footprint).
+- **Tried and dropped:** a round's long prepared annotations held compressed until logged (for the first moment, where
+  every unit's decisions are held at once): no smaller (each decision is held as a value too, while seats are in the
+  round) and slower (100,000 for a week 40.4 GB and 551 s; the run's own thread 9 to 15% slower at 10,000 and 50,000).
+- **Revisit if:** a building's facts come to depend on who is in it (then the view's own would be needed again).
