@@ -8447,3 +8447,9 @@ JSON value and three copies of its canonical bytes.
 - **Also:** culture-dial's config hashes and Rust states re-taken (the profiles and the station moved); manifests regenerated. The whole slow tier passes on the branch (58 files).
 - **Revisit if:** a station is ever seated with a head who should not do officers' work (a civilian manager), or the
   600-person town gets homes for its people (seat-diary could look in its main run again).
+
+## 2026-10-26 · Two more canaries: hazards and figures
+
+- **Why:** commercial leasing landed with the three canaries green and turned 8 slow-tier files red; the agent that fixed
+  them found `hazards` (a 200-day default-town run, about 50 s) and `figures` (law 11's count) would have caught most.
+- **Revisit if:** a broad change's gate grows past about 5 extra minutes on a quiet machine, or a red main again slips past.
