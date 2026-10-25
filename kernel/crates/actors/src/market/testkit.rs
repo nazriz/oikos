@@ -76,6 +76,12 @@ impl Harness {
     /// line bound to a name is `rec.<n>` under that name), and it is woken again, until it waits. Returns the programs
     /// sent, as text.
     pub fn wake(&mut self, t: i64, channels: Value) -> Vec<String> {
+        self.wake_leaving(t, channels, None)
+    }
+
+    /// Like `wake`, but an act whose program text contains `pending` is left under way: no outcome comes back for it in
+    /// this wake (as the world goes on with an actor who only ordered work others do, while the work is not yet done).
+    pub fn wake_leaving(&mut self, t: i64, channels: Value, pending: Option<&str>) -> Vec<String> {
         self.t = t;
         let mut out = vec![];
         let mut chans = channels;
@@ -103,9 +109,14 @@ impl Harness {
                     self.actor.sent(&id);
                     let text = program_text(&program);
                     out.push(text.clone());
+                    let left = pending.is_some_and(|p| text.contains(p));
                     self.sent.push(text);
-                    outcomes = json!([{ "action": id, "t": t, "status": "applied", "created": created }]);
-                    woke_for = "done";
+                    if left {
+                        woke_for = "free";
+                    } else {
+                        outcomes = json!([{ "action": id, "t": t, "status": "applied", "created": created }]);
+                        woke_for = "done";
+                    }
                 }
                 Action::Wait { .. } => break,
                 Action::Look { .. } => woke_for = "asked",

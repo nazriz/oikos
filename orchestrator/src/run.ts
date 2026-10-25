@@ -31,10 +31,11 @@ import { readForEnd } from "./run-end";
 import { namedFor, seatConfig } from "./seat-config";
 import { ReadingDesk, type DeskCounts } from "./reading";
 import { culture as cultureNs, reading as readingNs } from "@oikos/participants";
-import { DayBook, calls, canonical, diaryText, forms, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, inCalendar, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
+import { DayBook, calls, canonical, diaryText, forms, DECISIONS, OUTCOMES, WORDS, type Words, inCurrency, inCalendar, modules as builtin, Randomness, Roster, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { lexiconReader, READING_TABLE, Tagger, READING_VERSION, type Reader, type ReadingTable } from "@oikos/participants/llm";
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
+import { Draws } from "./draws";
 import { Kernel } from "./kernel";
 import { DetachedActor, joinRaw, RAW, rustManifests } from "./rust-world";
 import { divergences } from "./truth";
@@ -205,9 +206,6 @@ export interface RunSummary {
   platformOverrun?: { microusd: number; by_subject: { [subject: string]: number } };
   /** Failures to decide that were recovered in place (a module that threw, a model call that failed; D59). */
   participantErrors: number;
-  /** Resolver shadow checks (OIKOS_RESOLVER=shadow): calls resolved both ways, and how many the engine's resolved
-   * differently (examples in <run>.resolver-diffs.json). */
-  resolverShadow?: { checked: number; differed: number };
 }
 
 /** A participant, as the orchestrator runs it. */
@@ -239,12 +237,10 @@ interface Pos {
   keeps_record?: boolean;
 }
 
-/** One scheduled unit: a code participant's capacity, or a language-model participant. */
+/** One scheduled unit: a seat (a language-model participant, or the mock in its place). It perceives all its capacities. */
 interface Unit {
   key: string;
   participant: string;
-  /** "self", or a position; absent for a language-model participant (it perceives all its capacities). */
-  capacity?: string;
   entity: string;
   module: BehaviourModule;
   controller: Controller;
@@ -287,9 +283,6 @@ const ceilTo = (t: number, tick: number) => Math.ceil(t / tick) * tick;
 let kindsInRust: Set<string> | undefined;
 const rustKinds = () => (kindsInRust ??= new Set(Object.keys(rustManifests())));
 
-/** Whose resolver turns calls into acts: the engine's (kernel/crates/resolver; the default), this package's ("ts"), or
- * both, compared ("shadow": every difference recorded, and under test an error). */
-const RESOLVER_MODE = (process.env.OIKOS_RESOLVER ?? "engine") as "engine" | "ts" | "shadow";
 
 const DAY = 86_400;
 /** What a debrief's prompt is taken to come to, for what a run keeps back for it: the seat's standing instructions,
@@ -369,9 +362,6 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const refusedBy: { [code: string]: number } = {};
   const profKernel: { [c: string]: { ms: number; n: number } } = {};
   let participantErrors = 0; // failures to decide, recovered in place (D59)
-  // Resolver shadow checks: calls resolved both ways, and where the engine's resolver differed (the latest 200).
-  let resolverChecked = 0, resolverDiffCount = 0;
-  const resolverDiffs: object[] = [];
   const failures = new Map<string, number>(); // failures to decide in a row, by unit
   // Breadcrumbs (D59): what the run is doing, for the watchdog, at every point where it could hang.
   const mark = (doing: object) => o.watchdog?.mark({ t, ...doing });
@@ -482,48 +472,16 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     used[module.name] = { version: module.version, ...(src ? { sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(src).text()).digest("hex") } : {}) };
   };
   const held = (pid: string) => [...positions.values()].filter((x) => x.holder === pid);
-  // A draw named for a paper is named for which paper it is to whoever draws, never for the paper's number in the
-  // world's file (docs/reliability.md, "Draws and the order papers were filed in"). A record made in a run is
-  // numbered in the order every record of the town was made, so one more paper filed by anyone moves every later
-  // number; a draw keyed on the number then falls differently for people that paper had nothing to do with, and a
-  // pilot and its twin part from the first paper a seat files (the third living pilot: a landlord nobody had dealt
-  // with refused a repair in the pilot and granted it in the twin). So in a draw's purpose a record's number stands
-  // as "the nth such paper this participant has drawn on for this purpose", counted by the participant itself.
-  const drawnOn = new Map<string, Map<string, number>>();
-  const stablePurpose = (who: string, purpose: string): string => {
-    if (!purpose.includes("rec.")) return purpose;
-    const what = `${who}\n${purpose.replace(/rec\.[0-9]+/g, "rec")}`;
-    let seen = drawnOn.get(what);
-    if (!seen) drawnOn.set(what, (seen = new Map()));
-    return purpose.replace(/rec\.[0-9]+/g, (id) => { if (!seen!.has(id)) seen!.set(id, seen!.size + 1); return `paper#${seen!.get(id)}`; });
-  };
-  // A participant's stream is named for who draws (and in what capacity), what it is for, and which time that is: never
-  // the hour it woke at (docs/reliability.md, "Draws and the moment"). A seat acts at other hours than its code twin,
-  // and every person its acts touch wakes at other hours too; a stream keyed on the hour then falls differently for
-  // all of them, and a pilot parts from its twin by noise no steward caused.
-  //  - A draw that names its matter (a paper, a lease: "the nth such paper", a count after #; an event's own time) is
-  //    that matter's: the nth time this participant has drawn for it.
-  //  - Any other draw (a shop, a job, whether to complain) is for the calendar day, and the nth time that day.
-  // The nth is counted by moments (the second, as the world's clock has it): drawing again in the same moment (a second
-  // look of the same wake) is the same occurrence and draws the same; the next moment is the next occurrence, so two
-  // wakes in one hour are two draws, as they were when the moment was in the name. So a wake at 9 and one at 15 in one town,
-  // and one at 11 and one at 16 in its twin, draw alike.
-  const dayOccurrences = new Map<string, { at: number; n: number }>();
-  const matterOccurrences = new Map<string, { at: number; n: number }>();
-  let occurrencesDay = -1;
+  // The streams of what this host runs for a seat in TypeScript (a mock seat's signing, its office books' readers),
+  // named as the engine names its own: for which paper, never its number; for the day and which time, never the hour
+  // (draws.ts; docs/reliability.md, "Draws and the moment").
+  const draws = new Draws();
   const drawFor = (pid: string, cap: string, purpose: string) => {
-    const day = Math.floor(t / DAY);
-    if (day !== occurrencesDay) { dayOccurrences.clear(); occurrencesDay = day; }
-    const matter = /#[0-9]|[0-9]{5}/.test(purpose);
-    const seen = matter ? matterOccurrences : dayOccurrences;
-    const what = `${pid}\n${cap}\n${purpose}`;
-    let occ = seen.get(what);
-    if (!occ) seen.set(what, (occ = { at: t, n: 1 }));
-    else if (occ.at !== t) { occ.at = t; occ.n++; }
-    const key = matter ? ["participant", pid, cap, "", purpose, String(occ.n)] : ["participant", pid, cap, String(day), purpose, String(occ.n)];
+    const key = draws.key(pid, cap, purpose, t);
     o.drawTrace?.(key);
     return randomness.stream(key);
   };
+  const stablePurpose = (who: string, purpose: string) => draws.stable(who, purpose);
   const ctxFor = (pid: string, cap: string, entity: string, params: any): ParticipantContext => ({
     participant: pid,
     ...(parts.get(pid)?.kind === "system" ? { kind: "system" as const } : {}),
@@ -562,45 +520,6 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const x = positions.get(id);
     if (x) return { id, ...(x.title ? { name: x.title } : {}), of: x.entity };
     return entityNames.has(id) ? { id, name: entityNames.get(id)! } : undefined;
-  };
-
-  /** A code unit for one capacity of a participant, if there's a module to run it. */
-  const codeUnit = async (p: Part, cap: string, controller = p.controller, wakeAt?: number): Promise<Unit | undefined> => {
-    let impl: string | undefined, params: any;
-    let entity: string;
-    if (cap === "self") {
-      entity = p.person!;
-      impl = controller?.impl ?? controller?.code;
-      params = controller?.params;
-    } else {
-      const x = positions.get(cap)!;
-      entity = x.entity;
-      if (p.kind === "system") {
-        impl = controller?.impl ?? controller?.code;
-        params = controller?.params;
-      } else {
-        // A person does the job by the position's procedures, in their own way.
-        impl = x.role_module?.code;
-        params = { ...(x.role_module?.params ?? {}), ...(p.traits ?? {}) };
-      }
-    }
-    if (!impl || impl === "test") return undefined;
-    const module = mods[impl];
-    if (!module) throw new Error(`participant ${p.id}: no behaviour module "${impl}"`);
-    // Checked against the module's manifest (participants/manifests): a parameter it doesn't take, or of the wrong type,
-    // is refused at load, not ignored for the run. (A person's traits aren't checked: each role uses what it needs.)
-    const given = cap === "self" || p.kind === "system" ? controller?.params ?? {} : positions.get(cap)?.role_module?.params ?? {};
-    const wrong = paramErrors(impl, given);
-    if (wrong.length) throw new Error(`participant ${p.id}${cap !== "self" ? ` (as ${cap})` : ""}: ${wrong.join("; ")} (its manifest: participants/manifests/${impl}.json)`);
-    await hashSource(module);
-    const ctx = ctxFor(p.id, cap, entity, params);
-    inCurrency(currency);
-    inCalendar(calendar);
-    return {
-      key: `${p.id}|${cap}`, participant: p.id, capacity: cap, entity, module, controller: module.create(ctx), ctx,
-      cadence: ceilTo(module.cadence(ctx), tick), firstWake: wakeAt ?? ceilTo(module.firstWake?.(ctx) ?? 0, tick), wokeFor: "start", since: 0,
-      knowledge: new Knowledge(currency, cfg.names === true), view: new View(), notices: [],
-    };
   };
 
   /** The unit of a language-model participant: it perceives all its capacities. */
@@ -666,27 +585,20 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     };
   };
 
-  /** Make sure every capacity of a participant has its unit (and nothing it no longer holds does). */
+  /** Make sure a seat has its unit while it sits (and none once it has ended). Seats are this host's only units: the
+   * engine runs every code participant (since the cut-over, 2026-10-19). */
   const syncUnits = async (pid: string, wakeAt?: number) => {
     const p = parts.get(pid);
     if (!p) return;
-    const want = new Set<string>();
-    if (!p.ended) {
-      if (isLlm(p)) want.add(pid);
+    const want = !p.ended && isLlm(p);
+    if (!want && units.has(pid)) {
+      units.delete(pid);
+      await k.request({ op: "units_remove", keys: [pid] });
     }
-    const gone = [...units.keys()].filter((key) => (key === pid || key.startsWith(`${pid}|`)) && !want.has(key));
-    for (const key of gone) units.delete(key);
-    if (gone.length) await k.request({ op: "units_remove", keys: gone });
-    const added: Unit[] = [];
-    for (const key of want) {
-      if (units.has(key)) continue;
-      const u = isLlm(p) ? await llmUnit(p, wakeAt) : await codeUnit(p, key.slice(pid.length + 1), p.controller, wakeAt);
-      if (u) {
-        units.set(key, u);
-        added.push(u);
-      }
-    }
-    if (added.length) await k.request({ op: "units_add", units: added.map((u) => ({ key: u.key, participant: u.participant, ...(u.llm ? { llm: true } : { capacity: u.capacity }), cadence: u.cadence, next_wake: u.firstWake, ...(u.module?.deaf ? { deaf: true } : {}), ...(u.hears ? { hears: true } : {}), ...(u.post ? { post: u.post } : {}), ...(u.body ? { body: u.body } : {}), ...(u.sort ? { sort: u.sort } : {}) })) });
+    if (!want || units.has(pid)) return;
+    const u = await llmUnit(p, wakeAt);
+    units.set(pid, u);
+    await k.request({ op: "units_add", units: [{ key: u.key, participant: u.participant, llm: true, cadence: u.cadence, next_wake: u.firstWake, ...(u.hears ? { hears: true } : {}), ...(u.post ? { post: u.post } : {}), ...(u.body ? { body: u.body } : {}), ...(u.sort ? { sort: u.sort } : {}) }] });
   };
   for (const pid of [...parts.keys()].sort()) await syncUnits(pid);
 
@@ -703,12 +615,6 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
    */
   const performersOf = (participant: string, program: calls.Program): { program: calls.Program; by?: string[]; told?: string[] } => {
     const u = units.get(participant);
-    // (A code unit names a system of its organisation by its id: the platform gives it to the act as `by`, and the kernel looks at whose it is.)
-    if (u && !u.llm && "lines" in program) {
-      const ids = [...new Set(program.lines.flatMap((l) => (l.call.args.done_by !== undefined && "id" in l.call.args.done_by ? [l.call.args.done_by.id] : [])))];
-      if (!ids.length) return { program };
-      return { program: { lines: program.lines.map((l) => (l.call.args.done_by !== undefined ? { ...l, call: { ...l.call, args: Object.fromEntries(Object.entries(l.call.args).filter(([name]) => name !== "done_by")) } } : l)) }, by: ids };
-    }
     if (!u?.llm || !("lines" in program)) return { program };
     const asked = program.lines.filter((l) => l.call.args.done_by !== undefined);
     if (!asked.length) return { program };
@@ -734,7 +640,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // each resolve so the engine's resolver knows a person or body by a name the seat was shown: the owner's ruling of
   // 2026-10-25, option (b). Only where the world has names.
   const shownNames = (kn: Knowledge | undefined): { names?: { [id: string]: string } } => (cfg.names === true && kn?.names.size ? { names: Object.fromEntries(kn.names) } : {});
-  const engineResolver: Parameters<typeof createTranslator>[5] = RESOLVER_MODE === "ts" ? undefined : async (req, program0) => {
+  const engineResolver: Parameters<typeof createTranslator>[5] = async (req, program0) => {
     const named = performersOf(req.participant, program0);
     if (named.told?.length) return { ok: false, questions: named.told } as Resolution;
     const program = named.program;
@@ -878,7 +784,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const momentWords = (x: number) => (Math.floor(x / DAY) === Math.floor(t / DAY) ? `at ${clock(x)}` : `on ${forms.dateWords(x)} at ${clock(x)}`);
 
   /** The capacity a language-model participant's acts are made in: its one position, or itself. (Several: see the resolver, D47.) */
-  const capacityOf = (u: Unit) => (u.capacity && u.capacity !== "self" ? u.capacity : held(u.participant).length === 1 && (parts.get(u.participant)?.kind === "system" || parts.get(u.participant)?.shares_body) ? held(u.participant)[0]!.id : undefined);
+  const capacityOf = (u: Unit) => (held(u.participant).length === 1 && (parts.get(u.participant)?.kind === "system" || parts.get(u.participant)?.shares_body) ? held(u.participant)[0]!.id : undefined);
 
   /** An act begun (docs/design/rebuild.md 6.3): after its thinking, if deciding takes world time, it takes its actor the
    * act's time and takes effect when done; the unit's wake goes on then, when it sees the outcome. */
@@ -895,8 +801,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const started = r?.events.find((e: any) => e.event === "action_started");
     if (started) {
       u.acted = true; // (its wake goes on when the act is done: the engine's schedule)
-      if (!u.llm) u.controller.sent?.(started.action); // (so that it can tell which act an outcome is of)
-      else if (u.hears) brains.get(u.participant)?.controller.sent?.(started.action); // (a twin seat's brain too: it is its code unit)
+      if (u.hears) brains.get(u.participant)?.controller.sent?.(started.action); // (a twin seat's brain too: it is its code unit)
       const b = (backlog[u.module.name] ??= { acts: 0, waited: 0, longest: 0 });
       const waited = started.starts - (t + thinking);
       b.acts++;
@@ -904,7 +809,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       b.longest = Math.max(b.longest, waited);
       // A seat is told when its work comes out: a person writing a letter or deciding a case takes the time the town's practice gives it, after what
       // it has begun already, and it is done then and not at once (foundations F9, "outcomes with times").
-      if (u.llm) {
+      {
         const blocks = ((cmd as any).blocks ?? []) as { block?: string }[];
         const letter = blocks.length > 0 && blocks.every((x) => x.block === "message");
         const later = started.starts > t + thinking ? ` It begins ${momentWords(started.starts)}: you have other work before it.` : "";
@@ -917,12 +822,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   /**
    * Something a seat sent that the engine would not take as it was written (it breaks the contract: never logged as an
    * act). Nothing a seat sends is ever lost without a word: it is noted (`not_sent`, with the engine's reason, which is
-   * for the log), and the seat is told at its next turn, in its own terms, what was not sent or done. Code
-   * participants' acts are noted as before (`rejected_action`).
+   * for the log), and the seat is told at its next turn, in its own terms, what was not sent or done.
    */
   const notSent = async (u: Unit, what: "letter" | "act" | "confirmed", text: string, data: object) => {
-    await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { ...data, ...(u.llm ? { not_sent: { what, why: k.lastError.slice(0, 500), told: text } } : {}) } } });
-    if (u.llm) u.notices.push({ t, text });
+    await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { ...data, not_sent: { what, why: k.lastError.slice(0, 500), told: text } } } });
+    u.notices.push({ t, text });
   };
 
   /** A confirmed (or declined) draft: the signoff is recorded, and if accepted the acts go to the kernel with their full provenance. */
@@ -967,23 +871,19 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     } else p.ended = true;
   };
 
-  /** A lean log (the world's log.detail) leaves out a code participant's written reasoning; a model's is always kept. */
+  /** A lean log (the world's log.detail): a model's written reasoning is kept all the same. */
   const lean = cfg.log?.detail === "lean";
   /** Decisions of these areas only (`--record-decisions want,found`): kept whatever the log's detail, with no outcomes. */
   const areas = o.recordDecisions !== undefined && o.recordDecisions !== "full" && o.recordDecisions !== "none" ? new Set(o.recordDecisions.split(",").map((x) => x.trim()).filter((x) => x)) : undefined;
-  const keepReasoning = (u: Unit) => !lean || !!u.llm;
   /** What a unit asks the kernel for when it looks: its own looks, if it asked, or an observation. */
   const perceiveCommand = (u: Unit): { cmd: object; looks?: LookRequest[] } => {
-    const only = u.capacity ? { only: u.capacity } : {};
     const looks = u.looks;
     u.looks = undefined;
-    const prefixed = looks && u.capacity && u.capacity !== "self" ? looks.map((l) => ({ ...l, channel: `${u.capacity}/${l.channel}` })) : looks;
-    return prefixed ? { cmd: { command: "look", participant: u.participant, ...only, looks: prefixed }, looks } : { cmd: { command: "observe", participant: u.participant, ...only } };
+    return looks ? { cmd: { command: "look", participant: u.participant, looks }, looks } : { cmd: { command: "observe", participant: u.participant } };
   };
   /** A unit looks (its own looks first, if it asked), and gets its picture of the world: null if it no longer can.
    * `asked`: its request already sent, with the kernel's reply (a round's are sent together). */
   const perceive = async (u: Unit, asked?: { reply: any | null; looks?: LookRequest[] }): Promise<Observation | null> => {
-    const only = u.capacity ? { only: u.capacity } : {};
     let looks: LookRequest[] | undefined;
     let reply: any | null;
     if (asked) ({ reply, looks } = asked);
@@ -999,14 +899,14 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { look_rejected: JSON.stringify(looks).slice(0, 4000) } } });
       u.notices.push({ t, text: "That couldn't be looked up." });
     }
-    if (looks && reply === null) reply = await command({ command: "observe", participant: u.participant, ...only });
+    if (looks && reply === null) reply = await command({ command: "observe", participant: u.participant });
     if (reply === null) return null; // it can no longer look (its capacity went away)
     const p00 = performance.now();
-    const raw: Observation = u.capacity ? slice(reply.observation, u.capacity, u.entity) : { ...reply.observation, entity: u.entity };
+    const raw: Observation = { ...reply.observation, entity: u.entity };
     // Knowledge takes in the changes themselves; the controller reads the view's full picture.
     // (What a seat knows is the engine's now (the resolver's source); a language-model seat's is kept here too, for its
     // drafts' previews and law warnings.)
-    if (u.llm || RESOLVER_MODE !== "engine") u.knowledge.absorb(raw);
+    u.knowledge.absorb(raw);
     const obs: Observation = { ...u.view.apply(raw), woke_for: u.wokeFor, since: u.since };
     // (What the kernel sent, kept beside the picture for a mock seat's brain run detached on the Rust world: rust-world.ts.)
     if (u.llm) (obs as any)[RAW] = raw;
@@ -1019,13 +919,13 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       u.knowledge.ownStaff = { role: roster.now(obs.t).role, inPost: roster.count(obs.t) };
     }
     platformMs += performance.now() - p00;
-    if (o.inspect) await o.inspect(u.participant, obs, k, u.capacity, raw);
+    if (o.inspect) await o.inspect(u.participant, obs, k, undefined, raw);
     // Recorded in full, if asked: what it received (what's new since its last observation), for training data.
     const rec = recordObs;
-    if (rec !== "none" && (rec === "all" || (rec === "models" && u.llm) || (rec === "code" && !u.llm) || (Array.isArray(rec) && rec.includes(u.participant))))
+    if (rec !== "none" && (rec === "all" || rec === "models" || (Array.isArray(rec) && rec.includes(u.participant))))
       // (Its channels as a list, each with its path: a position's channel paths have a "/", which the log's free-form
       // data doesn't allow in a key.)
-      await k.request({ op: "annotate", annotation: { annotation: "observation", subject: u.participant, data: { t, ...(u.capacity && u.capacity !== "self" ? { as: u.capacity } : {}),
+      await k.request({ op: "annotate", annotation: { annotation: "observation", subject: u.participant, data: { t,
         observation: { ...raw, channels: Object.entries(raw.channels).map(([path, c]) => ({ path, ...c })) } } } });
     if (u.notices.length) obs.notices = u.notices.splice(0);
     if (u.llm) obs.drafts = u.llm.drafts.map((d) => d.draft);
@@ -1080,7 +980,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const asField = as ? { as } : {};
     if (action.type === "act" || action.type === "message") {
       const blocks = action.type === "act" ? action.blocks : [{ block: "message", to: action.to, text: action.text, ...(action.re ? { re: action.re } : {}) }];
-      const r = await begin(u, { command: "act", participant: u.participant, ...asField, blocks, ...(action.type === "act" && action.by?.length ? { by: action.by } : {}), provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
+      const r = await begin(u, { command: "act", participant: u.participant, ...asField, blocks, ...(action.type === "act" && action.by?.length ? { by: action.by } : {}), provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning ? { reasoning: action.reasoning } : {}) });
       if (r === null) {
         // Off-contract: never logged by the kernel, so record the attempt ourselves; and a seat is told (never silence).
         const words = action.type === "message" ? `Your letter to ${action.to.join(", ")} (${JSON.stringify(action.text.length > 60 ? `${action.text.slice(0, 60)}…` : action.text)}) was not sent: it could not be delivered as it was written. Nothing went. You could write it again, to each by their id.`
@@ -1105,35 +1005,16 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         u.notices.push({ t, text: "That request couldn't be read. Could you say it more plainly?" });
         return true;
       }
-      // A code participant that names a system of its organisation to do the work (`done_by=<id>`): the act is done by it and on its time.
-      const system = u.llm ? undefined : performersOf(u.participant, program);
-      if (system?.by) program = system.program;
-      // The resolver: the engine's (kernel/crates/resolver), from what the engine delivered to this seat; or, in
-      // shadow mode (OIKOS_RESOLVER=shadow, while the engine's is checked against it), both, compared.
-      const resolverMode = RESOLVER_MODE;
-      let res: ReturnType<typeof resolve> | undefined = resolverMode === "engine" ? undefined : resolve(program, u.knowledge, typeOf, as);
-      if (resolverMode !== "ts") {
-        const e = await k.request({ op: "resolve", participant: u.participant, ...(u.capacity ? { only: u.capacity } : {}), ...(as ? { as } : {}), ...(u.llm ? shownNames(u.knowledge) : {}), program: calls.programText(program) });
-        const byEngine = (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}), ...(e.ambiguous ? { ambiguous: e.ambiguous } : {}) }) as ReturnType<typeof resolve>;
-        if (res === undefined) res = byEngine;
-        else {
-          resolverChecked++;
-          if (canonical(res) !== canonical(byEngine)) {
-            resolverDiffs.push({ t, unit: u.key, call: calls.programText(program).slice(0, 1000), ts: canonical(res).slice(0, 2000), engine: canonical(byEngine).slice(0, 2000) });
-            if (resolverDiffs.length > 200) resolverDiffs.shift();
-            resolverDiffCount++;
-            if (process.env.NODE_ENV === "test") throw new Error(`the engine's resolver differs on ${calls.programText(program).slice(0, 300)}:\n  here:   ${canonical(res).slice(0, 600)}\n  engine: ${canonical(byEngine).slice(0, 600)}`);
-          }
-        }
-      }
+      // The resolver: the engine's (kernel/crates/resolver), from what the engine delivered to this seat.
+      const e = await k.request({ op: "resolve", participant: u.participant, ...(as ? { as } : {}), ...shownNames(u.knowledge), program: calls.programText(program) });
+      const res = (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}), ...(e.ambiguous ? { ambiguous: e.ambiguous } : {}) }) as ReturnType<typeof resolve>;
       platformMs += performance.now() - p1;
-      if (!res) throw new Error("no resolver ran");
       if (!res.ok) {
         await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}), ...(res.ambiguous ? { ambiguous: res.ambiguous } : {}) } } });
         for (const q of res.questions) u.notices.push({ t, text: q });
         return true;
       }
-      const r = await begin(u, { command: "act", participant: u.participant, ...asField, blocks: res.blocks, ...(system?.by?.length ? { by: system.by } : {}), provenance: { via: "call", call: written ? action.call : calls.programText(program), resolver: RESOLVER }, ...(action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
+      const r = await begin(u, { command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: written ? action.call : calls.programText(program), resolver: RESOLVER }, ...(action.reasoning ? { reasoning: action.reasoning } : {}) });
       if (r === null) await notSent(u, "act", "What you did could not be carried out as it was written, and nothing was done.", { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) });
       return true;
     }
@@ -1214,7 +1095,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const aboutRequest = (asked: string, text: string) => `About what you asked for (${JSON.stringify(asked.length > 120 ? `${asked.slice(0, 120)}…` : asked)}): nothing was filed or done. ${text}`;
 
   /** The capacity an action is done in: the unit's own, or the one it names, or its only one. */
-  const asOf = (u: Unit, action: ParticipantAction): string | undefined => (u.capacity && u.capacity !== "self" ? u.capacity : ("as" in action && action.as) || capacityOf(u));
+  const asOf = (u: Unit, action: ParticipantAction): string | undefined => ("as" in action && action.as) || capacityOf(u);
 
   let unanswered = 0; // model calls failed in a row, with none answered between (any seat's, or the translator's)
 
@@ -1260,7 +1141,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const notes: object[] = [];
       const tr = await translating.run(notes, async () => {
         try {
-          return await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge, called: (id) => whoIs(id)?.name, ...(u.capacity ? { only: u.capacity } : {}) });
+          return await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge, called: (id) => whoIs(id)?.name });
         } catch (e) {
           if (!(e instanceof ModelCallFailed)) throw e;
           return { ok: false as const, notices: ["The translator did not answer."], raw: { model_call_failed: e.message } } as Awaited<ReturnType<typeof translator.translate>>;
@@ -1515,16 +1396,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           // (wages every pay day for every worker are many, and small). Wherever decisions are recorded, and only there.
           const outcomes = (r.value as any)?.[OUTCOMES] as OutcomeRecord[] | undefined;
           if (outcomes?.length && !lean && !areas && o.recordDecisions !== "none") await k.request({ op: "annotate", annotation: { annotation: "outcome", subject: x.u.participant, data: { outcomes } } });
-          // A code mind's change to its own record (docs/design/ai-citizens.md 10d): the kernel holds it and is its
-          // only writer. It is state, so it is written in every run, whatever the log keeps.
-          const change = recordChangeOf(x.u, r.value, positions);
-          if (change) await command({ command: "entity_record", participant: x.u.participant, ...(change.entity ? { entity: change.entity } : {}), set: change.set, ...(change.because?.length ? { because: change.because } : {}) });
+          // (A seat sets no record of anyone's, whatever it or the code behind it returns: a record is the engine's
+          // bookkeeping for its keeper (docs/design/ai-citizens.md 10d; kernel/tests/entity_record.rs).)
           if (thinkingCosts) {
             // Its thinking: a model's by the tokens it just used (logged, so a replay is exact), code's a fixed time.
             const used = (notes.get(x.u.participant) ?? []).filter((a: any) => a.annotation === "usage" && a.purpose === "participant") as any[];
-            x.u.thinking = x.u.llm
-              ? used.reduce((s, a) => s + (a.output_tokens ?? 0) * (rates.model_seconds_per_output_token ?? 0) + (a.input_tokens ?? 0) * (rates.model_seconds_per_input_token ?? 0), 0)
-              : (rates.code_seconds ?? 0);
+            x.u.thinking = used.reduce((s, a) => s + (a.output_tokens ?? 0) * (rates.model_seconds_per_output_token ?? 0) + (a.input_tokens ?? 0) * (rates.model_seconds_per_input_token ?? 0), 0);
           }
           x.u.acted = false;
           x.u.waitUntil = undefined;
@@ -1677,8 +1554,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   participantErrors += Number(end.failures ?? 0); // (and the failures of its own actors it recovered in place)
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
-  if (resolverDiffCount) await Bun.write(join(o.outDir, `${o.runId}.resolver-diffs.json`), JSON.stringify(resolverDiffs, null, 1));
-  return { ...(resolverChecked ? { resolverShadow: { checked: resolverChecked, differed: resolverDiffCount } } : {}), runId: o.runId,
+  return { runId: o.runId,
     end: { reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) }, ...(stopped ? { stopped: { why: stopped, by: stoppedBy! } } : {}), logPath, anchorsPath, stateHash: end.state_hash, ...(composer ? { composer: { ...composer.counts } } : {}), ...(desk ? { reading: { ...desk.counts } } : {}), ...(Object.keys(debriefed).length ? { debriefs: debriefed } : {}), ...(accountsN ? { accounts: accountCounts } : {}), commands, refused, wakes, wakesBy, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
     health: { backlog: { ...backlog }, repeats: { ...repeats }, refused: { ...refusedBy } },
     profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])),
@@ -1699,26 +1575,4 @@ function sortedKeys(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(sortedKeys);
   if (v && typeof v === "object") return Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortedKeys((v as { [k: string]: unknown })[k])]));
   return v;
-}
-
-/**
- * The change to a record that an action carries, and whose record it is (`entity`, absent: the participant's own
- * person's), if it comes from the platform's bookkeeping for that entity (docs/design/ai-citizens.md 10d). A record is
- * written by the platform's bookkeeping for that entity, named in the world's config, and by nothing a model can reach:
- * - a code module acting as itself sets its own person's record;
- * - a code role module acting in a post sets the record of the post's organisation if and only if the world says that
- *   post keeps it (`keeps_record`) and the module is the one the post names; otherwise the change is dropped.
- * Whatever a model returns, and whatever the code behind a model seat returns (a mock's brain, a stand-in), sets nothing.
- * Three locks: (a) the participant API has no act for it, and a symbol cannot come out of a model's JSON; (b) only the
- * named keeper's own output is taken, here; (c) the kernel refuses the command for an entity with no keeper named in
- * the config, and for an organisation unless the participant now holds the keeping post.
- */
-export function recordChangeOf(u: { llm?: unknown; capacity?: string; participant?: string; module?: { name: string } }, action: unknown, positions?: Map<string, Pos>): (RecordChange & { entity?: string }) | undefined {
-  if (u.llm || !u.capacity || !action || typeof action !== "object") return undefined;
-  const c = (action as any)[RECORD] as RecordChange | undefined;
-  if (!c || !c.set || !Object.keys(c.set).length) return undefined;
-  if (u.capacity === "self") return (c as { entity?: string }).entity === undefined ? c : { set: c.set, ...(c.because ? { because: c.because } : {}) };
-  const post = positions?.get(u.capacity);
-  if (!post?.keeps_record || !post.role_module?.code || post.role_module.code !== u.module?.name || post.holder !== u.participant) return undefined;
-  return { ...c, entity: post.entity };
 }

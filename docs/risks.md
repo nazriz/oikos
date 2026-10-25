@@ -171,7 +171,7 @@ The mechanism:
   whose last staff member dies has nobody to appoint a successor (no owner's or member's office). A question to a keeper nobody staffs waits for ever.
 - **Where:** `docs/behaviour/staffing.md`; decisions 2026-10-16 "Foundations: the review's findings fixed" item 6 and 2026-10-17 "Four faults" (six letting offices and shops' deputies vacant at year end, gb-eng seed 1).
 - **Effect:** In long runs a firm or institution can silently stop. Resilience and service measures fall for a reason that is not anyone's decision.
-- **L / I:** medium (long runs) / medium · **Status:** to fix
+- **L / I:** medium (long runs) / medium · **Status:** to fix (the paper, grant-kept, filled by the council since 2026-10-25: its one officer died in a year of the test town and its wage ran on for months; the bank, the union, shops and letting offices still have nobody)
 - **Notice by:** posts vacant at the end of a run; held questions never taken up.
 - **Fix when:** any run past a year, or a body on its own account goes headless in a pilot.
 
@@ -243,7 +243,7 @@ The mechanism:
   `docs/behaviour/staffing.md` ("the outside world's own").
 - **Effect:** Benefit days-to-decision, and every benefit row of the table of work (WM-1), in code towns and in a seat
   in that office (the TARA support-office arm). A seat's speed there is not a person's, unlike every other seat.
-- **L / I:** high / high · **Status:** to fix (staff the office with people at the place's casework rates, or make
+- **L / I:** high / high · **Status:** mitigated for code towns, 2026-10-25 (below); was: to fix (staff the office with people at the place's casework rates, or make
   the boundary's office a supplied system with a stated speed)
 - **Notice by:** claim-to-decision days against the place's published processing times.
 - **Fix when:** before a support-office experiment is read in days or hours, or a seat in it is compared with a seat elsewhere.
@@ -252,6 +252,21 @@ The mechanism:
   for. Law-set waits as support-law data; casework as officers' minutes per case on an `agency-casework` template
   with lanes from a sourced officers-per-claim ratio and a working day (two kernel changes: per-template seconds for
   any block, `hours` on a template); a seat there held as a person (an agency officer). Two questions wait on Naz.
+- **Built (2026-10-25, foundations-2 phase 1, branch `f2-phase1`; decisions "Foundations-2 phase 1"):** the two kernel
+  changes (a template's own seconds for any row, read before the world's system row; `hours` on a template, a queue across
+  days) and no implicit second (`unpriced`). The support office's casework (decision, evidence and confirmation requests,
+  review) is done `by` the desk `outside-casework` (`agency-casework`: the person table's minutes, an officer's working
+  day, lanes the town's share of the agency's officers from a placeholder national ratio, 4 per 1,000 claims in payment,
+  in every profile); the case system keeps its seconds for payments and notices. Claim-to-decision days now come from
+  officers' hours (figures in the decisions entry). **Left:** (1) a model seated in `outside-support` still sits on the
+  case system (`agency-system`) and decides what is put before it at a system's speed: the approved alternative, a
+  non-resident officer as the seat's body, is not built, because a person with a body who is not a resident reaches the
+  census, life events, elections and every module that counts persons (not contained); (2) the officers' ratio is a
+  placeholder everywhere, and the minutes are sourced for us-oh only (gb-eng's and the others' are the generator's
+  placeholders); (3) the law's own waits (Universal Credit's assessment period) are not data yet; (4) a system's hours
+  are every day's (no weekends), so the officers' week is spread evenly over seven days; (5) a generic `publish` row on a
+  machine's template still covers a decision kind at the world's second if a module publishes one without naming the
+  desk: the backstop sees only rows that name a decision kind.
 
 ---
 
@@ -1469,22 +1484,19 @@ The mechanism:
 
 ## Performance and scale
 
-### SC-1 · Untested past a 10,000-person year; 50,000 fits a month at the edge; 100,000 does not start its first moment
-- **Gap:** A ten-year run was never made. A 10,000-person year runs (2026-10-23: 29 minutes, 7.8 GB); its month now
-  peaks at 5.2 GB, was 10.2 (2026-10-25). 50,000 people now run a month (22 minutes, 28 to 33 GB through it, a 41 GB
-  spike at the end): at the edge of the 40 GB guard. 100,000 starts (bounded) but its first moment passes 40 GB. The
-  config is read participant by participant and kept compressed, and people's params are held once for all who have
-  them alike (a heap profile found those copies were 4.6 of 8.8 GB live at 10,000); what is left is the run's own
-  (the hash's caches of canonical bytes, what people have seen, the engine, minds), and what grows past the town's
-  size at 100,000's first moment is unprofiled.
-- **Where:** `docs/design/performance.md` ("What held memory"; "Citizens' minds and memories": 85 to 43 KB a person,
-  the 10,000 month 5.10 to 4.68 GB); docs/decisions.md 2026-10-25 ("SC-1: what held a 10,000-person month's memory";
-  "Citizens' minds and memories held compactly"); `kernel/src/heapprof.rs`, `scripts/heapprof.ts`.
-- **Effect:** A study at 50,000 is possible but has no headroom; one at 100,000 rests on estimates.
-- **L / I:** medium / medium · **Status:** partly fixed: next, a heap profile of 50,000's first moment and end, then
-  the hash's caches kept compressed or the first moment's looks taken in windows.
-- **Notice by:** A 50,000 run stopped by the guard; any run past 50,000 people.
-- **Fix when:** Before a study past 50,000 people, or one at 50,000 that needs room beside it.
+### SC-1 · Memory per person: 50,000 for a month and 100,000 for a week run; the target is far
+- **Gap:** A ten-year run was never made. Each person costs 322 KB at the peak (1,000 people, 4 threads, with the
+  minds' cut; main was 546), against a target of 50 KB (Naz, 2026-10-25), held by a test (`scripts/memory-budget.json`,
+  its ceiling lowered with each cut). 50,000 people for a month: 14.7 to 17 GB. 100,000 for a week: 31 GB, its peak the
+  first moment (a round's decisions held whole while seats are in it). Left: the engine's units and the records
+  delivered, the world's records made, minds, the typed config.
+- **Where:** `docs/design/performance.md` ("Bytes per person"; "Citizens' minds and memories"); docs/decisions.md
+  2026-10-25 and 2026-10-26;
+  `kernel/src/heapprof.rs`, `scripts/heapprof.ts --components`.
+- **Effect:** A study at 100,000 for a month may not fit; one at 50,000 has room.
+- **L / I:** medium / medium · **Status:** partly fixed: the first moment's decisions next, then the engine's units.
+- **Notice by:** The memory budget's test failing; a run past 50,000 near the 40 GB guard.
+- **Fix when:** Before a study at 100,000 for longer than a week.
 
 ### SC-2 · Resume replays from the start
 - **Gap:** No mid-run checkpoint; resume replays the whole log; resume against a real model is untested.

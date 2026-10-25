@@ -283,7 +283,7 @@ pub fn world(p: &WorldParams) -> Value {
             "birth": {"ages": [16, 45], "gestation": 20 * 86_400, "reach": 1}
         },
         "caps": {"max_created_entities": 6},
-        "orchestration": {"thinking_time": "free"}
+        "orchestration": {"thinking_time": "free", "act_time": {"default": 1, "sources": {"default": "PLACEHOLDER for a test world: every act a second, as the platform once took for any act its table did not name (foundations-2 P2: a world now states its default)."}}}
     })
 }
 
