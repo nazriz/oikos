@@ -74,7 +74,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // writes every town's `public_memory` bound (SC-1) and the table of work's rows changed; a3d0ce4e..., a805fb6d... and 2b872ca6... for the configs, and
 // 2ce3e90d..., 5dcf1eab... and 55a4e978... for the states, until then. Not every move is the bound: with `public_memory` left out the configs still differ (the version and work rows).)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "772a98b97b10802a", "gb-eng-2026": "5704b7de4ac8121c", "ke-nakuru-2026": "da91782ee412b18d" }
+  ? { "au-vic-2026": "3d87d8840143b2e1", "gb-eng-2026": "7678ba3175ab2ab5", "ke-nakuru-2026": "c8c73600e328de8d" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -95,10 +95,15 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // births (ventures weighed by expected profit), who works and what they have saved drawn together, hiring by fit with postings
 // for every hand, a business of one's running costs, and empty shop units to let on the landlords' lots (generator 0.67.0);
 // 482f5218..., b002520e... and 86c7a397... for the configs, and cfeeb1be..., d24f6f24... and 261e509d... for the states, until then.)
+// (Re-taken on 2026-10-25 at lease remedies, config hashes and Rust states both: each town's records hold the law on leases of
+// shop premises (law-premises-leases, from the profile's commercial.law), the landlords are told their surrender price and the
+// tribunal, a business of one (and the venture it starts from) is given the ground of premises it holds by agreement, and the
+// generator's version (0.68.0); the genesis records are in the state, so the states move with them. 772a98b9..., 5704b7de... and
+// da91782e... for the configs, and 1befde62..., cd0ed6c2... and 824018a6... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "1befde6244b82041ebbf329b143a15a6f22ad110b7e41cc2d552b80010a1ee41",
-  "gb-eng-2026": "cd0ed6c2f5c4b2a39e835bbff4e51e0a3b24d494ce8ff52d542e76c32188b23d",
-  "ke-nakuru-2026": "824018a608756ea3cc5ae0d43771a885414fafad19b2187685dd015875cc83cb",
+  "au-vic-2026": "478d4cb0734c236dfa739f38d4f102a791c7a9ee4ac3cd4ccf6e0c376caccbfc",
+  "gb-eng-2026": "6668ea208efbb5c5d807d0e68c03c998c6387e6f0a33a9f3ede1bd8e82250ffb",
+  "ke-nakuru-2026": "6d0c3d08705fbd5d8a8ed5b628882e6144545a54db61ddd8df840a6bb0a19a1a",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
