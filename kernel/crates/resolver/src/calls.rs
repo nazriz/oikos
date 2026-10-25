@@ -5,7 +5,7 @@ use serde_json::Value as Json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
-pub const FUNCTIONS: [&str; 19] = ["money", "goods", "work", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system", "take"];
+pub const FUNCTIONS: [&str; 21] = ["money", "goods", "work", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system", "take", "connection", "link"];
 /// (The last, `ambiguous`, is the resolver's answer and never a translator's: contracts/calls.md.)
 pub const LABELS: [&str; 9] = ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form", "not_an_act", "no_such_act", "look_first", "ambiguous"];
 
@@ -245,6 +245,12 @@ struct Args {
     required: Vec<String>,
 }
 
+/// Functions only code writes (foundations-2 C3): each with the arguments it takes and needs.
+pub const CODE_ONLY: [(&str, &[&str], &[&str]); 2] = [
+    ("connection", &["op", "connection", "kind", "node", "to", "at", "rate", "uses", "meter"], &[]),
+    ("link", &["link", "op", "every", "from", "off"], &["link", "op"]),
+];
+
 /// Per function: the arguments it takes and the ones it needs, read from contracts/calls.schema.json.
 fn args_table() -> &'static BTreeMap<String, Args> {
     static T: OnceLock<BTreeMap<String, Args>> = OnceLock::new();
@@ -257,6 +263,11 @@ fn args_table() -> &'static BTreeMap<String, Args> {
             let allowed = args["propertyNames"]["enum"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect());
             let required = args["required"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
             m.insert(fn_, Args { allowed, required });
+        }
+        // (Code's own calls, not yet a seat's: the network's acts, foundations-2 C3. A seat is given them, in the contract's
+        // schema, when the translator is taught them.)
+        for (fn_, allowed, required) in CODE_ONLY {
+            m.insert(fn_.to_string(), Args { allowed: Some(allowed.iter().map(|x| x.to_string()).collect()), required: required.iter().map(|x| x.to_string()).collect() });
         }
         m
     })

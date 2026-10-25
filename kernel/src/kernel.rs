@@ -314,7 +314,7 @@ pub fn seen(obs: &Observation) -> Seen<'_> {
             .map(|(path, ch)| {
                 let channel = match ch {
                     ChannelData::Accounts { accounts, .. } => SeenChannel::Accounts(accounts.iter().map(|a| SeenAccount { account: &a.account, holder: &a.holder, custodian: &a.custodian, closed: a.closed == Some(true) }).collect()),
-                    ChannelData::Holdings { holdings } => SeenChannel::Holdings(holdings.iter().map(|h| SeenHolding { kind: &h.kind, at: &h.at, gone: h.quantity == 0 }).collect()),
+                    ChannelData::Holdings { holdings, .. } => SeenChannel::Holdings(holdings.iter().map(|h| SeenHolding { kind: &h.kind, at: &h.at, gone: h.quantity == 0 }).collect()),
                     ChannelData::Sites { .. } => SeenChannel::Sites(vec![]),
                     ChannelData::Directory { entities, positions } => SeenChannel::Directory {
                         entities: entities.iter().map(|e| SeenEntity { entity: &e.entity, name: &e.name, participant: e.participant.as_deref() }).collect(),

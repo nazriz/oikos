@@ -95,15 +95,29 @@ const WORK_TIME = {
     // The audit office's papers (docs/behaviour/auditor.md): a request for one named item, the examination of one item on the file it is answered with
     // (a decision decided again under the law), the report on a body for a period, and a body's answer from its own books.
     "publish/audit_request": 300, "publish/audit_finding": 1800, "publish/audit_report": 7200, "publish/audit_answer": 900,
+    // What flows (foundations-2 C3 and C3b): a household turning its use up or down is a minute's thing; connecting or
+    // disconnecting a supply is a field visit; a valve or a feeder worked by hand, or reclosed after it tripped, a crew's call.
+    connection: 300, "connection/set": 60, "connection/open": 3600, "connection/close": 3600, "connection/interrupt": 600, "connection/restore": 600,
+    link: 1800, "link/rotate": 900,
   },
   // What a system does takes it a second: it is software that was delivered to do just that (foundations F5: there is no default
   // for a block a system's template does not list, because it cannot do it).
-  system: { message: 1, publish: 1, "publish/audit_answer": 120, transfer: 1, open_account: 1, close_account: 1, arrive: 1, move_goods: 1, withdraw: 1, record_claim: 1, transfer_claim: 1, answer: 2, work: 1, deploy: 1, retire: 1, propose_agreement: 1, sign_agreement: 1 },
+  system: { message: 1, publish: 1, "publish/audit_answer": 120, transfer: 1, open_account: 1, close_account: 1, arrive: 1, move_goods: 1, withdraw: 1, record_claim: 1, transfer_claim: 1, answer: 2, work: 1, deploy: 1, retire: 1, propose_agreement: 1, sign_agreement: 1, connection: 1, link: 1 },
   // Every row here is a placeholder, marked "(to confirm)" with its register tag (WM-1), and says what would source it. A profile replaces
   // a row with its place's figure and source (`values.work_time`); the sources found so far are place-specific (burden estimates under one
   // country's paperwork law, one ombudsman's budget, one state's court workload study), so none is a default here (docs/profiles.md).
   sources: {
     person: "Placeholder (to confirm; WM-1): minutes for a person's act (5 for a message, 15 to fill in or go somewhere, 30 to draft an agreement, an hour to leave or arrive). Would be sourced by a place's time-use survey or its government's form-burden estimates (minutes to complete a form), per block (docs/design/rebuild.md 6.3).",
+    "person.connection": "Placeholder (to confirm; WM-1): five minutes for an act on a connection not otherwise priced. Would be sourced by a utility's service standards.",
+    "person.connection/set": "Placeholder (to confirm; WM-1): a minute: a household turning its use up or down (taps, appliances, a thermostat) is its own choice and takes it no time to speak of.",
+    "person.connection/open": "Placeholder (to confirm; WM-1): an hour's field visit to connect a supply (a meter fitted, a valve or a fuse opened). Would be sourced by a distributor's connection service standards (a regulator's guaranteed service levels: to confirm).",
+    "person.connection/close": "Placeholder (to confirm; WM-1): an hour's field visit to disconnect a supply. Would be sourced as connecting is.",
+    "person.connection/interrupt": "Placeholder (to confirm; WM-1): ten minutes to interrupt an interruptible customer by the operator's call or switch. Would be sourced by a network's interruptible-supply terms.",
+    "person.connection/restore": "Placeholder (to confirm; WM-1): ten minutes to restore one. As interrupting.",
+    "person.link": "Placeholder (to confirm; WM-1): half an hour for a crew to shut or open a valve or a feeder by hand, or reclose one that tripped. Would be sourced by a network operator's switching times.",
+    "person.link/rotate": "Placeholder (to confirm; WM-1): a quarter of an hour to declare a rotation schedule (a standing order for a feeder's hours off). Would be sourced by an operator's load-shedding procedure.",
+    "system.connection": "Placeholder (to confirm; WM-1): a second for a supply's own systems to act on a connection remotely (a smart meter's switch). Would be sourced by the system's specification.",
+    "system.link": "Placeholder (to confirm; WM-1): a second for a supervisory control system to switch a feeder or a valve remotely. Would be sourced by the system's specification.",
     "person.take": "Placeholder (to confirm; WM-1): five minutes to take goods by hand where they are kept (what a theft is); before foundations F10 the table had no row for it and the platform's one second stood in. Would be sourced by a retail-crime study of the time a theft takes.",
     "person.publish/tribunal_application": "Placeholder (to confirm; WM-1): half an hour to fill in a form to a hearing body. Would be sourced per place by a form-burden statement or an impact assessment for the place's application form (none found, 2026-10-24).",
     "person.publish/tribunal_response": "Placeholder (to confirm; WM-1): half an hour to answer one. Would be sourced as the application is, from the place's defence form.",

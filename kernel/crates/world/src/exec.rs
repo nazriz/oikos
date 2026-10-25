@@ -743,6 +743,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
     let t = item.at;
     match item.what {
         Sched::NatureDay { day } => nature_day(s, st, day),
+        Sched::Settle => crate::network::settle(s, st, t),
         Sched::CounterCensus => {
             st.schedule(t + 30 * 86_400, Sched::CounterCensus);
             vec![Timed::new(t, EventBody::CounterCensus { counters: st.totals.clone() })]
@@ -2309,6 +2310,119 @@ impl<'a> Exec<'a> {
                 self.emit(EventBody::MessageDelivered { message: mid, participant: self.participant.into(), to: reached.into_iter().collect() });
                 Ok(())
             }
+
+            Block::Connection { op, connection, kind, node, to, at, rate, uses, meter, bind } => self.connection(*op, connection, kind, node, to, at, *rate, uses, *meter, bind),
+            Block::Link { link, op, every, from, off } => self.link(link, *op, *every, *from, *off),
         }
+    }
+
+    /// An act on a connection (foundations-2 C3): its operator opens, closes, interrupts and restores it; its user or its
+    /// operator sets its rate. Whose a connection is, is the network's: the holder of the supply whose tree its node is on.
+    #[allow(clippy::too_many_arguments)]
+    fn connection(&mut self, op: crate::blocks::ConnOp, connection: &Option<String>, kind: &Option<Id>, node: &Option<Id>, to: &Option<String>, at: &Option<String>, rate: Option<i64>, uses: &Option<Id>, meter: Option<crate::config::MeterKind>, bind: &Option<String>) -> R<()> {
+        use crate::blocks::ConnOp;
+        let (Some(n), Some(net)) = (self.s.config.world.network.as_ref(), self.s.net.clone()) else {
+            return Err(refuse(RefusalCode::NotModelled, "this world has no network for anything to flow on"));
+        };
+        if rate.is_some_and(|r| !(0..=oikos_contracts::network::MAX_FLOW).contains(&r)) {
+            return Err(refuse(RefusalCode::Overflow, "a rate out of range"));
+        }
+        let me = self.entity.clone();
+        let stamp = self.st.stamp();
+        let by: Id = self.participant.into();
+        let mut ns = (**self.st.network.as_ref().expect("a world with a network has its state")).clone();
+        let (id, event) = match (op, connection) {
+            (ConnOp::Open, None) => {
+                let (Some(kind), Some(node), Some(to), Some(at)) = (kind, node, to, at) else {
+                    return Err(refuse(RefusalCode::UnknownRef, "a connection opened says of what, on which node, for whom and where"));
+                };
+                let (to, at) = (self.r(to)?, self.r(at)?);
+                self.entity_exists(&to)?;
+                if !self.st.structures.contains_key(&at) {
+                    return Err(refuse(RefusalCode::UnknownStructure, format!("no structure {at}")));
+                }
+                let supply = net.trees.supply_of(n, kind, node).ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("no supply of {kind} reaches node {node}")))?;
+                if n.supplies[supply].holder != me {
+                    return Err(refuse(RefusalCode::NotTheirs, format!("{me} does not operate the supply of {kind} at {node} ({}'s)", n.supplies[supply].holder)));
+                }
+                if let Some(u) = uses {
+                    let tasks: BTreeMap<&str, &crate::config::TaskCfg> = self.s.config.catalogue.tasks.iter().map(|t| (t.id.as_str(), t)).collect();
+                    oikos_contracts::network::check_use(&tasks, u, kind).map_err(|e| refuse(RefusalCode::UnknownTask, e))?;
+                }
+                ns.opened += 1;
+                let id = format!("conn.{}", ns.opened);
+                let r = rate.unwrap_or(0);
+                ns.add(crate::network::Connection { id: id.clone(), kind: kind.clone(), node: node.clone(), supply: supply as u32, holder: to.clone(), at: at.clone(), rate: r, meter: 0, uses: uses.clone(), reading: meter.unwrap_or_default(), closed: false, interrupted: false, changed: stamp });
+                (id.clone(), EventBody::ConnectionChanged { connection: id, op: "open".into(), rate: Some(r), kind: Some(kind.clone()), node: Some(node.clone()), holder: Some(to), at: Some(at), by })
+            }
+            (op, connection) => {
+                let Some(c) = connection else { return Err(refuse(RefusalCode::UnknownRef, "say which connection")) };
+                let id = self.r(c)?;
+                let ci = *ns.index.by_id.get(&id).ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("no connection {id}")))?;
+                let operator = n.supplies[ns.connections[ci].supply as usize].holder == me;
+                let user = ns.connections[ci].holder == me;
+                let x = &mut ns.connections[ci];
+                match op {
+                    ConnOp::Set => {
+                        if !operator && !user {
+                            return Err(refuse(RefusalCode::NotTheirs, format!("{id} is neither {me}'s nor on a supply {me} operates")));
+                        }
+                        x.rate = rate.ok_or_else(|| refuse(RefusalCode::UnknownRef, "set it to what rate?"))?;
+                    }
+                    _ if !operator => return Err(refuse(RefusalCode::NotTheirs, format!("only its operator may {} {id}", op.name()))),
+                    ConnOp::Open => x.closed = false,
+                    ConnOp::Close => x.closed = true,
+                    ConnOp::Interrupt => x.interrupted = true,
+                    ConnOp::Restore => x.interrupted = false,
+                }
+                x.changed = stamp;
+                let r = (op == ConnOp::Set).then_some(x.rate);
+                (id.clone(), EventBody::ConnectionChanged { connection: id, op: op.name().into(), rate: r, kind: None, node: None, holder: None, at: None, by })
+            }
+        };
+        self.st.network = Some(Arc::new(ns));
+        self.emit(event);
+        self.bind(bind, &id)
+    }
+
+    /// An act on a link by its operator (the holder of the supply whose tree it is in): shut, open, reclose after a trip,
+    /// or a rotation declared (a standing schedule; its effects are state, and only this act is logged).
+    fn link(&mut self, link: &str, op: crate::blocks::LinkOp, every: Option<i64>, from: Option<i64>, off: Option<i64>) -> R<()> {
+        use crate::blocks::LinkOp;
+        let (Some(n), Some(net)) = (self.s.config.world.network.as_ref(), self.s.net.clone()) else {
+            return Err(refuse(RefusalCode::NotModelled, "this world has no network"));
+        };
+        let li = *net.trees.link_ix.get(link).ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("no link {link}")))?;
+        let supply = net.trees.link_tree[li].ok_or_else(|| refuse(RefusalCode::NotModelled, format!("link {link} is on no supply's tree (cut to make the trees, or reached by none)")))?;
+        let me = self.entity.clone();
+        if n.supplies[supply].holder != me {
+            return Err(refuse(RefusalCode::NotTheirs, format!("{me} does not operate link {link} ({}'s)", n.supplies[supply].holder)));
+        }
+        let now = self.now();
+        let mut ns = (**self.st.network.as_ref().expect("a world with a network has its state")).clone();
+        let l = &mut ns.links[li];
+        let mut rotation = None;
+        match op {
+            LinkOp::Shut => l.shut = true,
+            LinkOp::Open => l.shut = false,
+            LinkOp::Reclose => l.tripped = false,
+            LinkOp::Rotate => {
+                let off = off.unwrap_or(0);
+                if off <= 0 {
+                    l.rotation = None;
+                } else {
+                    let every = every.ok_or_else(|| refuse(RefusalCode::UnknownRef, "a rotation says how often it comes round"))?;
+                    if every < off || every > 366 * 86_400 {
+                        return Err(refuse(RefusalCode::Overflow, "a rotation is off for no longer than it comes round, within a year"));
+                    }
+                    let r = crate::network::Rotation { every, from: from.unwrap_or(now), off };
+                    rotation = Some(serde_json::json!({ "every": r.every, "from": r.from, "off": r.off }));
+                    l.rotation = Some(r);
+                }
+            }
+        }
+        self.st.network = Some(Arc::new(ns));
+        self.emit(EventBody::LinkChanged { link: link.into(), op: op.name().into(), by: Some(self.participant.into()), load: None, capacity: None, rotation });
+        Ok(())
     }
 }

@@ -195,6 +195,7 @@ impl World {
                 }
                 at
             },
+            net: c.world.network.as_ref().map(|n| Arc::new(crate::network::NetStatics::of(n, &c.catalogue))),
             config: loaded.config.clone(),
         };
         let person_of: BTreeMap<&str, &str> = c.participants.iter().filter(|p| !p.shares_body).filter_map(|p| p.person.as_deref().map(|e| (e, p.id.as_str()))).collect();
@@ -308,6 +309,7 @@ impl World {
                 .map(|v| (v.id.clone(), crate::state::Vehicle { type_: v.type_.clone(), owner: v.owner.clone(), at: v.at.clone() }))
                 .collect(),
             transit: Default::default(),
+            network: None,
         };
         for p in &c.positions {
             let position = Position { entity: p.entity.clone(), title: p.title.clone(), role: p.role.clone(), channels: Arc::new(p.channels.clone()), role_module: p.role_module.clone(), holder: p.holder.clone(), changed: 0 };
@@ -367,6 +369,11 @@ impl World {
             }
             st.nature = Some(Arc::new(n));
             st.schedule(86_400, crate::state::Sched::NatureDay { day: 1 });
+        }
+        // The network (foundations-2 C3): its links and the world's connections, settled from the first hour.
+        st.network = crate::network::initial(&s);
+        if st.network.is_some() {
+            st.schedule(0, crate::state::Sched::Settle);
         }
         // The world's totals, censused monthly.
         if !c.catalogue.counters.is_empty() {

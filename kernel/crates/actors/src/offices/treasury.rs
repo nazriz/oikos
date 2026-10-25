@@ -2184,7 +2184,7 @@ impl Plan for WorksPlan {
             }
         }
         for c in pic.channels.values() {
-            if let Seen::Holdings { holdings } = c {
+            if let Seen::Holdings { holdings, .. } = c {
                 for h in holdings.iter() {
                     if h.at == self.p.depot && h.kind == self.p.kind {
                         self.at_depot = cents(h.quantity);

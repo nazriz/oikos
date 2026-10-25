@@ -537,6 +537,21 @@ export class Preview {
         return one(`You will move ${b.quantity} ${b.kind} from ${b.from_at} to ${b.to === this.me ? "yourself" : this.who(b.to)} at ${b.to_at}.`, ["quantity", "kind", "from_at", "to", "to_at"]);
       case "take":
         return one(`You will take ${b.quantity} ${b.kind} from ${this.who(b.from)} at ${b.at}, without their agreement.`, ["quantity", "kind", "from", "at"]);
+      case "connection": {
+        // (What flows, foundations-2 C3: a connection's operator opens, closes, interrupts and restores it; its user sets its rate.)
+        const which = b.connection ? `connection ${b.connection}` : "a connection";
+        const said = ["op", "connection", "kind", "node", "to", "at", "rate", "uses", "meter"];
+        if (b.op === "open" && !b.connection) return one(`You will connect ${this.who(b.to)} at ${b.at} to your supply of ${b.kind} at node ${b.node}, at ${b.rate ?? 0} a day${b.uses ? `, used as it comes by ${b.uses}` : ""}${b.meter ? `, its meter read ${b.meter === "remote" ? "from afar" : "on the premises"}` : ""}.`, said);
+        if (b.op === "set") return one(`You will set ${which} to ${b.rate} a day.`, said);
+        const verb: { [op: string]: string } = { open: "open again", close: "disconnect", interrupt: "interrupt (nothing flows until it is restored)", restore: "restore" };
+        return one(`You will ${verb[b.op] ?? b.op} ${which}.`, said);
+      }
+      case "link": {
+        const said = ["link", "op", "every", "from", "off"];
+        if (b.op === "rotate") return one(b.off ? `You will put ${b.link} on a rotation: off for ${span(b.off)} of every ${span(b.every)}${b.from !== undefined ? `, counted from ${b.from}` : ""}.` : `You will take ${b.link} off its rotation.`, said);
+        const verb: { [op: string]: string } = { shut: "shut", open: "open", reclose: "reclose (after it tripped)" };
+        return one(`You will ${verb[b.op] ?? b.op} ${b.link}.`, said);
+      }
       case "occupy":
         return one(b.who ? `You will bring ${this.who(b.who)} into ${b.space}.` : `You will move into ${b.space}.`, ["who", "space"]);
       case "vacate":
@@ -623,7 +638,7 @@ export class Preview {
 const WHAT: { [block: string]: string } = { sign_agreement: "a signature", give_notice: "a notice on an agreement", transfer: "a payment", open_account: "an account opened", close_account: "an account closed", construct: "a building begun",
   demolish: "a demolition", work: "a piece of work", move_goods: "goods moved", take: "a taking", occupy: "a moving in", vacate: "a moving out", create_entity: "an organisation set up", arrive: "an arrival", leave: "a leaving", birth: "a child",
   harm: "a harm", create_position: "a post created", appoint: "an appointment", deploy: "a system put to work", retire: "a system switched off", record_claim: "a claim recorded", transfer_claim: "a claim passed on", release_claim: "a claim released",
-  withdraw: "a withdrawal", vote: "a vote", message: "a letter", publish: "a paper", propose_agreement: "an offer of an agreement" };
+  withdraw: "a withdrawal", vote: "a vote", message: "a letter", publish: "a paper", propose_agreement: "an offer of an agreement", connection: "a connection", link: "a link of a network" };
 
 /** An act as the preview sets it out: what happens, the lines under it, and which of the act's fields they say. */
 interface Act { head: string; lines: string[]; said: string[]; /** What kind of thing it is, in a word or three ("a payment", "a letter"). */ what: string }

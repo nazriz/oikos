@@ -330,6 +330,89 @@ pub enum Block {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         re: Option<Id>,
     },
+    // ---- what flows (foundations-2 C3, law 8) ----
+    /// An act on a connection. Its operator (the holder of the supply whose tree the node is on) opens one (`open`, with
+    /// the kind, the node, the user `to`, where `at`, the rate a day; or, naming a closed `connection`, opens it again),
+    /// closes it (a disconnection), interrupts or restores it (an interruptible customer cut); its user or its operator
+    /// sets its rate (`set`).
+    Connection {
+        op: ConnOp,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        connection: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kind: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        node: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        at: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rate: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        uses: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        meter: Option<crate::network::MeterKind>,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+    },
+    /// An act on a link by its operator: shut it (a valve closed, a feeder switched off), open it, reclose it after it
+    /// tripped, or put it on a rotation (a standing schedule: off for `off` seconds of every `every`, from `from`; `off`
+    /// nought ends it).
+    Link {
+        link: Id,
+        op: LinkOp,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        every: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        off: Option<i64>,
+    },
+}
+
+/// What is done to a connection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnOp {
+    Open,
+    Set,
+    Close,
+    Interrupt,
+    Restore,
+}
+
+impl ConnOp {
+    pub fn name(&self) -> &'static str {
+        match self {
+            ConnOp::Open => "open",
+            ConnOp::Set => "set",
+            ConnOp::Close => "close",
+            ConnOp::Interrupt => "interrupt",
+            ConnOp::Restore => "restore",
+        }
+    }
+}
+
+/// What is done to a link.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LinkOp {
+    Shut,
+    Open,
+    Reclose,
+    Rotate,
+}
+
+impl LinkOp {
+    pub fn name(&self) -> &'static str {
+        match self {
+            LinkOp::Shut => "shut",
+            LinkOp::Open => "open",
+            LinkOp::Reclose => "reclose",
+            LinkOp::Rotate => "rotate",
+        }
+    }
 }
 
 impl Block {
@@ -341,6 +424,8 @@ impl Block {
             Block::Publish { kind, .. } => Some(format!("publish/{kind}")),
             Block::CreateEntity { kind, .. } => Some(format!("create_entity/{kind}")),
             Block::Work { task, .. } => Some(format!("work/{task}")),
+            Block::Connection { op, .. } => Some(format!("connection/{}", op.name())),
+            Block::Link { op, .. } => Some(format!("link/{}", op.name())),
             _ => None,
         }
     }
@@ -376,6 +461,8 @@ impl Block {
             Block::Withdraw { .. } => "withdraw",
             Block::Vote { .. } => "vote",
             Block::Message { .. } => "message",
+            Block::Connection { .. } => "connection",
+            Block::Link { .. } => "link",
         }
     }
 }

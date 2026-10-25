@@ -58,9 +58,9 @@
       "pattern": "^[a-z][a-z0-9_-]{0,63}$"
     },
     "KernelId": {
-      "description": "Identifier minted by the kernel: '<prefix>.<counter>'. ent = entity, acc = account, str = structure, rec = record, act = action, msg = message, par = participant, pos = position, cnd = condition (of a body).",
+      "description": "Identifier minted by the kernel: '<prefix>.<counter>'. ent = entity, acc = account, str = structure, rec = record, act = action, msg = message, par = participant, pos = position, cnd = condition (of a body), conn = connection (foundations-2 C3).",
       "type": "string",
-      "pattern": "^(ent|acc|str|rec|act|msg|par|pos|cnd)\\.[0-9]{1,15}$"
+      "pattern": "^(ent|acc|str|rec|act|msg|par|pos|cnd|conn)\\.[0-9]{1,15}$"
     },
     "Id": {
       "anyOf": [

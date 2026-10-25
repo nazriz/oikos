@@ -816,7 +816,7 @@ pub fn step<W: std::io::Write>(run: &mut Run<W>, cmd: &Command) -> Option<Respon
 
 /// What a test world's systems can do: every kind of act (a system's template must say what it does; F5).
 pub fn all_blocks() -> Value {
-    json!([{"block": "transfer"},{"block": "move_goods"},{"block": "take"},{"block": "work"},{"block": "open_account"},{"block": "close_account"},{"block": "construct"},{"block": "demolish"},{"block": "occupy"},{"block": "vacate"},{"block": "arrive"},{"block": "leave"},{"block": "birth"},{"block": "harm"},{"block": "create_position"},{"block": "appoint"},{"block": "deploy"},{"block": "retire"},{"block": "create_entity"},{"block": "record_claim"},{"block": "transfer_claim"},{"block": "release_claim"},{"block": "propose_agreement"},{"block": "sign_agreement"},{"block": "give_notice"},{"block": "publish"},{"block": "withdraw"},{"block": "vote"},{"block": "message"}])
+    json!([{"block": "transfer"},{"block": "move_goods"},{"block": "take"},{"block": "work"},{"block": "open_account"},{"block": "close_account"},{"block": "construct"},{"block": "demolish"},{"block": "occupy"},{"block": "vacate"},{"block": "arrive"},{"block": "leave"},{"block": "birth"},{"block": "harm"},{"block": "create_position"},{"block": "appoint"},{"block": "deploy"},{"block": "retire"},{"block": "create_entity"},{"block": "record_claim"},{"block": "transfer_claim"},{"block": "release_claim"},{"block": "propose_agreement"},{"block": "sign_agreement"},{"block": "give_notice"},{"block": "publish"},{"block": "withdraw"},{"block": "vote"},{"block": "message"},{"block": "connection"},{"block": "link"}])
 }
 
 /// Riverbend with only these kinds of actor running: every other code participant idles. (Riverbend's offices and

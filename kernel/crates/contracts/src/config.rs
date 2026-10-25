@@ -18,6 +18,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 pub use crate::controller::Controller;
+pub use crate::network::{ConnectionCfg, LinkCfg, MeterKind, NetworkCfg, NodeCfg, Physics, SupplyCfg};
 
 pub const CONTRACTS_VERSION: &str = "0.8";
 
@@ -542,6 +543,13 @@ pub struct World {
     /// in its own balance, not the generator's guess at it (no events; the census begins with the run).
     #[serde(default, skip_serializing_if = "is_zero")]
     pub nature_spin_up_days: i64,
+    /// The network for what flows (foundations-2 C3, law 8): nodes, links, the supplies that feed each tree. Absent: nothing
+    /// flows on a network, and every connection is refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<NetworkCfg>,
+    /// Connections at the start: a holder's at a structure, on a node, taking a kind at a rate a day.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub connections: Vec<ConnectionCfg>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -2245,6 +2253,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
     if let Some(t) = &c.travel {
         validate_travel(t, &c.world)?;
     }
+    crate::network::validate(c)?;
     if c.contracts != CONTRACTS_VERSION {
         return Err(format!("contracts version {} is not {}", c.contracts, CONTRACTS_VERSION));
     }

@@ -8611,3 +8611,66 @@ kinds; the tree model for networks; baselines move). C1 is the invariant over to
   refusal).
 - **Pins re-taken:** culture-dial's three config hashes and three Rust states, with the reason beside them (generator 0.69.0).
 - **Found, not mine:** `figures.test.ts` (slow tier) fails on f2-phase1's tip already: four `commercial.*` parameters from commercial leasing (main) have no row in the figure table. Left to the merge of main (not a law-8 change).
+
+## 2026-10-26 · Foundations-2 phase 2, C3 and C3b's kernel part: the network for what flows, connections settled on trees, and the operators' acts (branch `f2-phase2`; no generated town has a network yet, so no result moves; no model called)
+
+- **Contract (world config).** `world.network`: `nodes` (an id, a cell or an edge, a height in metres), `links` (from,
+  to, `mode`, `length_m`, `capacity` an hour in what flows on it, `loss_m`: a pipe's head lost at capacity), `supplies`
+  (a kind, a mode, a node, the holder and the structure whose holding feeds it, `physics`: `pressure`, `rating` or
+  `drain`; for pressure the head at the source, the store whose level sets it, and the service and least heads).
+  `world.connections`: a holder's at a structure, on a node, a kind, a `rate` a day, an optional `uses` (a recipe of no
+  labour that uses the kind a unit at a time: use at the user) and `meter` (`on_site`, the default, or `remote`). Roads
+  and paths join the same network at law 9 (`mode`, `length_m` and a capacity an hour are already its shape; speed and
+  energy a kilometre by vehicle come with it). Refused at load: a link that joins no two nodes, out-of-range figures, a
+  supply whose kind is not declared or says no `settle`, a pressure supply without its heads, a connection on a node no
+  supply of its kind reaches, a use that is not such a recipe, connections with no network.
+- **Kernel (`oikos-contracts::network`, `oikos-world::network`).** Each supply's tree is found at load, breadth first
+  from its node over the links of its mode in the links' order; a link that would close a loop is cut (the known limit,
+  accepted by Naz). State: each link's (shut, tripped, a rotation, its last load) and each connection's (rate, meter,
+  closed, interrupted), in dense vectors behind an `Arc`, with derived indexes by id, holder, structure and supply.
+  Settled by a scheduled `Settle` each hour (a kind settled daily at midnight): one pass up each tree sums what is asked,
+  one down delivers, in integers.
+  - *Pressure (water).* The source's head is the full head times the store's level (what it holds over its storage); each
+    link loses its `loss_m` times its load over its capacity (a linear stand-in for friction, on what is asked); a node's
+    pressure is the head less its height; a connection there gets what it asks at or above the service head, nothing at or
+    below the least, and between them the square root of how far between (pressure-driven delivery, Wagner, Shamir and
+    Marks 1988, to confirm), by an integer square root. A store that cannot give what that delivers lowers its level until
+    it gives no more than it holds (the highest such head, found by halving): a fall of level, not a share-out.
+  - *Rating (power).* Bottom up, a link asked for more than its rating trips and carries nothing; a supply asked for more
+    than it holds trips its own links and nobody on the tree, at the source included, gets anything. A tripped link stays
+    tripped until its operator recloses it. A kind settled hourly is delivered by its `shape_bps` (24 shares of the day,
+    cumulative, so the 24 hours add to the rate exactly).
+  - *Drain (a sewer).* Each connection lets out what it holds, up to its rate, to the supply's holder.
+  - Deliveries move from the supply's holding to the user's; a connection with a `uses` recipe runs it as delivered (the
+    kind used, its outputs to the user's holding). Separate trees are solved apart from one pre-settlement state and applied
+    in the supplies' order, so the result does not depend on the order or on threads (solved one after another for now:
+    trees are few and small). **No allocation rule anywhere:** the code shares nothing out; who goes short is where they
+    are, what the links carry and what the operator did.
+  - *Logged:* acts on a connection (`connection_changed`) or a link (`link_changed`), and a link's tripping
+    (`link_changed`, op `tripped`, with its load and rating). Settlements are not: meters and loads are state, hashed.
+- **Acts.** `connection` (`open` a new one, or a closed one again; `close`; `interrupt`; `restore`: its operator, the
+  holder of the supply whose tree the node is on; `set` its rate: its user or its operator). `link` (`shut`, `open`,
+  `reclose`, `rotate`: a standing schedule, off for `off` seconds of every `every` from `from`, declared once; its
+  hours are state). Refusals: `not_theirs`, `unknown_ref`, `overflow`, `not_modelled` (a world with no network, or a link
+  on no tree). The engine's resolver has the calls (`connection(...)`, `link(...)`: contracts/calls.md), as **code's own**
+  for now (`calls.rs` `CODE_ONLY`): a seat's call vocabulary (calls.schema.json, the TypeScript parser) gains them when the
+  translator is taught them, since every function of a seat's contract must have its gold and its writer's words (the
+  translator is parked: a decision for its next round). A seat's preview says both acts in words. A connection opened by an act is `conn.<n>` (the kernel's id prefixes gain `conn`, in common.schema.json and the three
+  places that read them). Each act has its rows in the table of work (`connection`, `connection/<op>`, `link`,
+  `link/rotate`, person and system), placeholders with what would source them.
+- **Who sees what** (docs/no-god-view.md). A household sees its own connections, with their meters, through its holdings
+  channel (they are its own, on its premises). A supply's operator sees every connection on its network and its links
+  with their loads (its own register and instruments), with the meters it reads from afar (`remote`); an on-site meter is
+  read by going there: a visit's buildings show their on-site meters (`meters`), and only a visit (never what one sees in
+  passing, which would be stale between looks). Nobody else sees any.
+- **C3b in the kernel:** supply agreements and tariffs are content (agreements and statements the kernel stores and never
+  reads); the operators' acts are the ones above (valves, interruptions, rotations as standing schedules), with their
+  rows. Protected lists are content the operator keeps and reads when it chooses a rotation (C4, the operator's
+  behaviour). Kernel tests (`kernel/tests/network.rs`): the far end of a full main goes short first; a store run low lowers
+  the head and never gives more than it holds, and one all but empty runs dry; an overloaded feeder trips and stays dark
+  until reclosed; a supply short of stock trips its own links; a rotation keeps the main from tripping and an
+  interruptible customer is cut by an act; only whoever may opens, sets, closes; every kind conserved over holdings and
+  uses; meters seen only by their users and operators; load refusals; a loop cut to a tree; one world settles the same.
+- **Revisit if** a shortage a town plainly would not have comes from the tree (then loops by a fixed number of passes, its
+  cost to Naz first); the operator needs to see more than its instruments (then it is a register to declare); many trees
+  make settlement a cost worth threads (then `rayon` over trees, applied in order).

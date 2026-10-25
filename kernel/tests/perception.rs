@@ -39,7 +39,7 @@ impl View {
                 }
             }
             ChannelData::OwnRecord { .. } => {}
-            ChannelData::Holdings { holdings } => {
+            ChannelData::Holdings { holdings, .. } => {
                 // A holding gone to nothing drops out of the picture (as the participant runtime's view does).
                 for h in holdings {
                     if h.quantity == 0 {

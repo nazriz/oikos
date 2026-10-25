@@ -723,3 +723,12 @@ Additive only; no schema file changed. A log made before is a valid log.
   the world's table for every system.
 - **Breaking, replay:** the state hashes of every generated town move. Logs made before this change replay only on a
   build of their version: the tag `pre-foundations-2`.
+
+## Foundations-2, phase 2: nothing physical from nothing (2026-10-26; law 8, steps C2, C3, C3b; docs/decisions.md, "Foundations-2 phase 2"; under the owner's blanket approval of contract changes, 2026-10-11, and his approval of the foundations-2 design)
+
+- **World config: `catalogue.resources[].class`** (`stock`, the default; `dissipates`: energy, fuel; `service`: a unit of a service sold over a counter), **`settle`** (`day`, `hour`: how a connection carrying it is settled) and **`shape_bps`** (24 hourly shares of a day's rate). Reason: law 8 conserves every physical kind and must know which may be used up into nothing.
+- **World config: `catalogue.fields[].kind`.** The field holds that kind, in its unit, from nought (baseline 0, min at least 0; refused at load otherwise, and for a kind undeclared or held by two fields). A `draws` from it goes into the actor's holding; an `emits` to it is the process's output, refused beyond the field's most; nature's day is counted on `nature.edge` (state).
+- **World config: `world.network`** (nodes, links, supplies with their physics: `pressure`, `rating`, `drain`) and **`world.connections`** (a holder's at a structure on a node, a kind, a rate a day, `uses`, `meter`). Refused at load as listed in docs/decisions.md. No allocation rule: who goes short follows from the physics, the contracts in force and the operators' acts.
+- **Blocks: `connection`** (`op`: open, set, close, interrupt, restore) and **`link`** (`op`: shut, open, reclose, rotate with `every`, `from`, `off`). The kernel's ids gain the prefix `conn` (a connection opened by an act). Calls: `connection(...)`, `link(...)` (calls.md), code's own for now (`CODE_ONLY` in the engine's resolver): a seat's vocabulary gains them when the translator is taught them.
+- **Log: `connection_changed`, `link_changed`** (a link's tripping is `link_changed` with op `tripped`, its load and its rating, and no `by`). Settlements are not logged: meters are state.
+- **Observation: a holdings channel's `connections` and `links`**: a holder's own connections with their meters; an operator's whole network (its register and instruments), with the meters it reads from afar. **A visit's buildings show their on-site `meters`.**

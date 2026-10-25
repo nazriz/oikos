@@ -1355,7 +1355,7 @@ impl Person {
             .channels
             .values()
             .flat_map(|c| match c {
-                Seen::Holdings { holdings } => holdings.iter().filter(|h| h.kind == self.p.goods).map(|h| (h.at.clone(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
+                Seen::Holdings { holdings, .. } => holdings.iter().filter(|h| h.kind == self.p.goods).map(|h| (h.at.clone(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
                 _ => vec![],
             })
             .filter(|(at, q)| *q > 0 && (home_at.is_some() || pickups.contains(at)))
@@ -1414,7 +1414,7 @@ impl Person {
             .channels
             .values()
             .flat_map(|c| match c {
-                Seen::Holdings { holdings } => holdings.iter().filter(|h| h.kind == kind).map(|h| (h.at.clone(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
+                Seen::Holdings { holdings, .. } => holdings.iter().filter(|h| h.kind == kind).map(|h| (h.at.clone(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
                 _ => vec![],
             })
             .filter(|(at, q)| *q > 0 && (home_at.as_ref() == Some(at) || pickups.contains(at)))
@@ -1464,7 +1464,7 @@ mod tests {
         let acc = AccountItem { account: "acc-c1".into(), holder: "c1".into(), custodian: "bank".into(), currency: "USD".into(), balance: i128::from(balance), closed: None };
         channels.insert("accounts".to_string(), Seen::Accounts { accounts: Arc::new(vec![acc]), transactions: vec![] });
         let h: Vec<HoldingItem> = holdings.into_iter().map(|(at, q)| HoldingItem { kind: "goods".into(), at: at.into(), quantity: i128::from(q) }).collect();
-        channels.insert("holdings".to_string(), Seen::Holdings { holdings: Arc::new(h) });
+        channels.insert("holdings".to_string(), Seen::Holdings { holdings: Arc::new(h), connections: Default::default(), links: Default::default() });
         Picture {
             participant: "p.c1".into(),
             t,

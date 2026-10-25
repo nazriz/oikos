@@ -637,6 +637,38 @@
         },
         {
           "type": "object",
+          "required": ["event", "cause", "connection", "op", "by"],
+          "additionalProperties": false,
+          "properties": {
+            "event": { "const": "connection_changed" },
+            "cause": { "description": "seq of the command entry that caused this event.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count" },
+            "connection": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "op": { "enum": ["open", "set", "close", "interrupt", "restore"] },
+            "rate": { "type": "integer", "minimum": 0, "maximum": 1000000000000000 },
+            "kind": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+            "node": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+            "holder": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "at": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "by": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["event", "cause", "link", "op"],
+          "additionalProperties": false,
+          "properties": {
+            "event": { "const": "link_changed" },
+            "cause": { "description": "seq of the command entry that caused this event.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count" },
+            "link": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+            "op": { "enum": ["shut", "open", "reclose", "rotate", "tripped"] },
+            "by": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "load": { "type": "integer", "minimum": 0, "maximum": 1000000000000000 },
+            "capacity": { "type": "integer", "minimum": 0, "maximum": 1000000000000000 },
+            "rotation": { "type": "object", "required": ["every", "from", "off"], "additionalProperties": false, "properties": { "every": { "type": "integer" }, "from": { "type": "integer" }, "off": { "type": "integer" } } }
+          }
+        },
+        {
+          "type": "object",
           "required": [
             "event",
             "cause",

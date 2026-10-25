@@ -70,6 +70,10 @@ const SAMPLES: any[] = [
   { block: "move_goods", kind: "gravel", quantity: "40", from_at: "str.7", to: "builder", to_at: "str.8" },
   { block: "work", task: "build", units: 7200, at: "str.2", performers: ["c0042", "builder"], on: "str.5", survey: { of: "glider", cells: ["cell.1.1", "cell.1.2"] }, investigate: { from: "greenco", at: "str.7", kind: "gravel" } },
   { block: "take", kind: "gravel", quantity: "40", from: "greenco", at: "str.7" },
+  { block: "connection", op: "open", kind: "water", node: "n-str-7", to: "greenco", at: "str.7", rate: 400, uses: "use_water", meter: "remote", ref: "c" },
+  { block: "connection", op: "set", connection: "conn.4", rate: 250 },
+  { block: "link", link: "wire-d00", op: "rotate", every: 7200, from: 3600, off: 3600 },
+  { block: "link", link: "pipe-d01", op: "shut" },
 ];
 
 /** Every leaf of a value, as a path. */

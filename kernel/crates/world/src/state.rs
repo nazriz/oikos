@@ -122,6 +122,10 @@ pub struct State {
     /// takes, spent where one set out). Keyed by the body.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub transit: Map<Id, Transit>,
+    /// The network for what flows (foundations-2 C3, law 8): each link's state, each connection with its meter. Behind
+    /// an `Arc`, as nature is: settled hourly, and an action's copy of the state shares it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<Arc<crate::network::NetState>>,
 }
 
 /// A vehicle as the world keeps it (reserved shapes for travel).
@@ -760,6 +764,8 @@ pub struct HeldAsk {
 pub enum Sched {
     /// Held questions looked at again: is someone there now to answer them?
     HeldAsks,
+    /// The network settled (foundations-2 C3): each hour, and a kind settled daily at midnight.
+    Settle,
     StructureComplete { structure: Id },
     /// Nature's day (docs/design/world-expansion.md 2): covers, fields and populations stepped.
     NatureDay { day: i64 },
@@ -952,6 +958,9 @@ impl State {
             }
         }
         self.ground = GroundCache::default();
+        if let Some(n) = self.network.as_mut() {
+            Arc::make_mut(n).reindex();
+        }
     }
 
     /// The quantity of a kind held by an entity at a place (0 if none).

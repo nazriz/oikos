@@ -862,7 +862,7 @@ impl Plan for Retailer {
             .channels
             .values()
             .find_map(|c| match c {
-                Seen::Holdings { holdings } => holdings.iter().find(|x| x.at == self.p.depot && x.kind == self.p.kind).map(|x| cents(x.quantity)),
+                Seen::Holdings { holdings, .. } => holdings.iter().find(|x| x.at == self.p.depot && x.kind == self.p.kind).map(|x| cents(x.quantity)),
                 _ => None,
             })
             .unwrap_or(0);

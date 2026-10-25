@@ -81,8 +81,10 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // litres (its figures a thousand times the profile's kilolitres, so its decay and spills round at a finer grain), and what the water works draws is
 // held at the works (generator 0.69.0); 3c86931d..., 6ee4f4ac... and 58f52331... for the configs, and 4f597e2a..., c2e206a4... and c944d672... for the
 // states, until then.)
+// (Re-taken on 2026-10-26 at foundations-2 C3, the config hashes only: the table of work gained the rows for acts on a connection and a link (and their sources);
+// no town has a network yet, and the states did not move; 910fbe98..., 90e0e68d... and 31bce73d... until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "910fbe9867512e80", "gb-eng-2026": "90e0e68d0fd9db62", "ke-nakuru-2026": "31bce73d414da8bc" }
+  ? { "au-vic-2026": "febd3aa06d37a5a4", "gb-eng-2026": "44ce5bcfc484caed", "ke-nakuru-2026": "9ea834be9096ae42" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its

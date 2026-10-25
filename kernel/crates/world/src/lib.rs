@@ -8,6 +8,7 @@
 pub mod exec;
 pub mod geo;
 pub mod kernel;
+pub mod network;
 pub mod sites;
 pub mod state;
 pub mod statics;

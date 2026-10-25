@@ -11,7 +11,7 @@
 //! `slice` did.
 
 use oikos_perception::{
-    AccountItem, BodyView, ChannelData, EntityItem, HeldPosition, HoldingItem, Observation, OwnRecord, PositionItem, SiteCell,
+    AccountItem, BodyView, ChannelData, ConnectionItem, EntityItem, HeldPosition, HoldingItem, LinkItem, Observation, OwnRecord, PositionItem, SiteCell,
 };
 use oikos_world::blocks::{Id, Record};
 use oikos_world::state::{Message, Outcome, ParticipantStatus, Transaction};
@@ -31,8 +31,9 @@ pub struct Visit {
 pub enum Seen {
     /// Its accounts in full (by id), and the transactions new since the last look.
     Accounts { accounts: Arc<Vec<AccountItem>>, transactions: Vec<Transaction> },
-    /// What it holds where, in full (a holding gone to nothing drops out).
-    Holdings { holdings: Arc<Vec<HoldingItem>> },
+    /// What it holds where, in full (a holding gone to nothing drops out); what flows to it, and for an operator its
+    /// network (foundations-2 C3), whole as last seen.
+    Holdings { holdings: Arc<Vec<HoldingItem>>, connections: Arc<Vec<ConnectionItem>>, links: Arc<Vec<LinkItem>> },
     /// Its own record, when it changed.
     OwnRecord { record: Option<OwnRecord> },
     /// What is new (or a search's results, or everything for a channel kept whole).
@@ -115,6 +116,9 @@ pub struct View {
     full: BTreeSet<Id>,
     accounts: BTreeMap<Id, BTreeMap<Id, AccountItem>>,
     holdings: BTreeMap<Id, BTreeMap<String, HoldingItem>>,
+    /// What flows, each holdings channel's as last delivered (whole at every look).
+    #[serde(default)]
+    flows: BTreeMap<Id, (Arc<Vec<ConnectionItem>>, Arc<Vec<LinkItem>>)>,
     sites: BTreeMap<Id, SitesKept>,
     visits: BTreeMap<Id, Visit>,
     directories: BTreeMap<Id, DirectoryKept>,
@@ -164,7 +168,10 @@ impl View {
                     }
                     new_txs.insert(id, transactions);
                 }
-                ChannelData::Holdings { holdings } => {
+                ChannelData::Holdings { holdings, connections, links } => {
+                    if !connections.is_empty() || !links.is_empty() || self.flows.contains_key(&id) {
+                        self.flows.insert(id.clone(), (Arc::new(connections), Arc::new(links)));
+                    }
                     let m = self.holdings.entry(id.clone()).or_default();
                     if !holdings.is_empty() {
                         self.cache_holdings.remove(&id);
@@ -245,7 +252,8 @@ impl View {
         }
         for (id, m) in &self.holdings {
             let holdings = self.cache_holdings.entry(id.clone()).or_insert_with(|| Arc::new(m.values().cloned().collect())).clone();
-            channels.insert(id.clone(), Seen::Holdings { holdings });
+            let (connections, links) = self.flows.get(id).cloned().unwrap_or_default();
+            channels.insert(id.clone(), Seen::Holdings { holdings, connections, links });
         }
         for (id, v) in &self.sites {
             let cells = self.cache_sites.entry(id.clone()).or_insert_with(|| Arc::new(v.cells.values().cloned().collect())).clone();
