@@ -70,7 +70,7 @@ test("someone out of work with savings and a home starts a business of one, puts
 test("a business of one that does not pay its owner a living is given up: it closes, and its owner looks for work again", async () => {
   // (A business of one the town opens with, as orchestrator/test/own-account.test.ts draws them: whether anyone starts one
   // in a run is now theirs, by its expected profit (docs/behaviour/entry.md, "Entry by expected profit"), and this test is
-  // of giving one up. Judged after two months, against a living nobody's trade from home could clear: for the test.)
+  // of giving one up.)
   const { loadProfile } = await import("@oikos/worlds/generator/profile");
   const { generateFrom } = await import("@oikos/worlds/generator/generate");
   const P = structuredClone(loadProfile("au-vic-2026")) as any;
@@ -78,8 +78,12 @@ test("a business of one that does not pay its owner a living is given up: it clo
   const config = generateFrom({ ...base, profile: "au-vic-2026" }, P);
   const one = config.participants.find((p: any) => p.controller?.impl === "citizen.default" && p.controller.params.own_work?.home)!;
   expect(one).toBeDefined();
-  Object.assign(one.controller.params, { give_up_months: 2, give_up_below_bps: 1_000_000 });
   const person = one.person as string, firm = one.controller.params.own_work.firm as string;
+  // (A business with no stock and no money: it sells nothing and pays its owner nothing, which its owner weighs against
+  // what giving it up leaves them, month by month: docs/behaviour/entry.md, "Giving it up".)
+  config.world.holdings = config.world.holdings.filter((h: any) => h.holder !== firm);
+  const acct = config.world.accounts.find((a: any) => a.holder === firm);
+  if (acct) acct.balance = "0";
   const out = join(root, "runs", "test-own-venture-given-up");
   rmSync(out, { recursive: true, force: true });
   const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "given-up", outDir: out, until: 150 * DAY, recordObservations: "none" });

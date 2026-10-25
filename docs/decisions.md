@@ -8102,3 +8102,30 @@ fails every time, not now and then: the property draws new cases each run, and f
   depend on the thread count (the kernel's tests and the port gate check one thread against fourteen).
 - **Revisit if:** a lone heavy run is much slower for it (then elastic slots, PL-4, give it more tokens), or a test that
   needs several threads sets them itself.
+
+## 2026-10-25 · Market realism, over-entry: Naz's three laws built and measured; births still out of range, stopped for Naz (branch `market-realism`; no model called)
+
+**Asked (Naz, through the coordinator):** before landing, fix gb-eng's over-entry with three laws: founders learn of traders who started after them through what they would see; a home business has real fixed costs from sources; an owner may give up early, by the same weighing as entering, not after a fixed six months. If births are still not in a sensible range on the three profiles, stop and report rather than tune.
+
+**Built** (commit `fa50689f` and after; docs/behaviour/entry.md "Who else sells it", "What a business costs", "Giving it up"):
+- *Who else sells it.* Someone with the means for a business of one, when its weighing is due, first looks through what sellers advertise (the town's adverts board, which holds price lists placed at a seller's door), newest first, up to `search_limit`: the traders who started since are among them, and their lists are counted from then on. (The paper was the other route named; it reports the public record of the town's government and nothing of trade, so the advertisements, which are published and are what a would-be trader reads, carry it instead.)
+- *What a business costs.* `business.home_fixed_per_month`, counted by the founder and paid by the business at each draw to the outside world: au-vic $3.75 (ASIC's business-name fee, $45 a year from 1 July 2025, opened); gb-eng nothing (registering as self-employed is free, recalled, to confirm); ke-nakuru none sourced (Nakuru's single business permit fee was not found). Other running costs of a sole trader (insurance, a phone, transport) have no source here and are left out (ME-1).
+- *Giving it up.* Each month after its first, the owner weighs keeping it (what it paid them a month over up to six months) against the best job they know of, or nothing; the mind decides (Jovanovic 1982, learning). `give_up_below_bps` is gone, and there is no age before which it may not be given up.
+
+**Measured** (a year at 1,000 people, three profiles, three towns each, lean, no model; births and deaths as % of businesses a year, `economy/businesses`):
+
+| | au-vic | gb-eng | ke-nakuru |
+|---|---|---|---|
+| births, main (1d6e00f8) | 13 to 16 | 5 to 13 | 11 to 14 |
+| births, entry by profit (2026-10-24) | 26 to 37 | 52 to 60 | 2 to 4 |
+| births, with the three laws | 21 to 39 | 45 to 58 | 3 to 8 |
+| the profile's rate | 16.4 | 11.1 | 15 (placeholder) |
+| deaths, main | 2 to 5 | 3 to 8 | 19 to 31 |
+| deaths, with the three laws | 15 to 26 | 40 to 48 | 48 to 57 |
+| the profile's rate | 13.9 | 9.8 | none |
+
+**Read:** births barely moved (gb-eng 52-60% to 45-58%); what the laws did is turn over the businesses: gb-eng now starts and gives up nearly half its businesses a year, and ke-nakuru gives up half the traders it opened with (its 39% own-account share, real in Kenya's surveys, is not kept by a code owner weighing a thin margin against a job or nothing each month). Founders who now know the newest traders still enter: what decides entry is the margin on goods against what a person has, and a home business's custom in reach, and those are unchanged. Per the instruction, nothing was tuned and **commercial leasing was not started**: this is the point to hand back. Nothing on the branch is landed.
+
+**For Naz:** which way to go. Candidates, each a mechanism, none tried: (a) the founder's expectation discounts the chance of failing (a sourced first-year survival rate) instead of taking the shares at face value; (b) a home business's custom is only those who see its sign (its realised custom is far below the share founders expect: the give-up rate says so), so founders' reach should be the custom such businesses actually get, which they could know from traders they know; (c) the owner's give-up weighing should count what the business holds as well as what it has paid (a thin draw while stock is built up reads as failure); (d) the household's other income: an owner with a working partner keeps a business that pays little. (c) and (d) bear on the Kenyan deaths; (a) and (b) on gb-eng's births.
+
+**Revisit if** Naz picks one of these, or decides the profile's rates are the wrong yardstick for a town of 1,000 (a town's births are from few businesses, so its rate moves by six points a firm).
