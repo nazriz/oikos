@@ -3518,6 +3518,10 @@
      "required": true,
      "description": "What was refunded for those not delivered."
     },
+    "unit_price": {
+     "type": "amount",
+     "description": "The price charged for each delivered, where it was not the order's own (a price risen since: the money paid bought fewer)."
+    },
     "declined": {
      "type": "choice",
      "options": [
@@ -3544,6 +3548,7 @@
      "ordered": "=ordered",
      "delivered": "=delivered",
      "refund": "#refund",
+     "unit_price": "#unit_price",
      "declined": "=declined"
     }
    }

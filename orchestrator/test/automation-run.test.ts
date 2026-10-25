@@ -82,8 +82,12 @@ test("with the same town\'s offers dearer, nobody takes one: adoption stalls", a
 }, 480_000);
 
 test("with a law against the use in force, a shop that follows the law takes none; one that does not follow it takes one all the same", async () => {
+  // (The law is against taking a system to serve: a system for another task, a factory's production cell, is no breach
+  // of it. Until 2026-10-26 the test held that no system at all was delivered, which was true of the towns it ran; since
+  // "Main red after foundations-2 phase 1" in docs/decisions.md factory-3 of this town takes a production cell on day 151.)
+  const serving = (r: Awaited<ReturnType<typeof run>>) => delivered(r).filter((e) => r.config.templates.find((t: any) => t.id === e.template)?.does?.some((d: any) => d.task === "serve"));
   const kept = await run("auto-law", 200, { times: 0.15, law: true });
-  expect(delivered(kept)).toEqual([]);
+  expect(serving(kept)).toEqual([]);
   const broken = await run("auto-law-broken", 200, { times: 0.15, law: true, tweak: (P) => { P.values.automation.firms.compliance_bps = 0; } });
-  expect(delivered(broken).length).toBeGreaterThan(0);
+  expect(serving(broken).length).toBeGreaterThan(0);
 }, 960_000);
