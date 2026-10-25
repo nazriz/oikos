@@ -65,12 +65,13 @@ struct Handed {
 }
 
 /// A record as it's delivered: what it adds (kept from the first time it is shown: a record is shown to many, and
-/// read again at each look), and its canonical bytes while anyone holds them (an observation being encoded: a seat's,
-/// or one whose hash the log keeps). A code actor's look makes no bytes. (They were kept for every record ever shown,
-/// for the whole run: SC-1.) The record is kept with them, so no other comes to be where it is in memory.
+/// read again at each look), and its canonical bytes, made the first time an observation that is written shows it (a
+/// seat's, or one whose hash the log keeps) and kept from then on. A code actor's look makes no bytes: they were made
+/// and kept for every record anyone was shown (SC-1). The record is kept with them, so no other comes to be where it
+/// is in memory.
 struct Shared {
     record: Arc<Record>,
-    bytes: std::sync::Weak<[u8]>,
+    bytes: Option<Arc<[u8]>>,
     facts: Arc<RecordFacts>,
 }
 
@@ -91,8 +92,8 @@ impl Delivered {
         let at = Arc::as_ptr(r) as usize;
         let facts = match held(self.records.read()).get(&at) {
             Some(shared) => {
-                if let Some(b) = shared.bytes.upgrade() {
-                    return Ok((b, shared.facts.clone(), at));
+                if let Some(b) = &shared.bytes {
+                    return Ok((b.clone(), shared.facts.clone(), at));
                 }
                 Some(shared.facts.clone())
             }
@@ -103,14 +104,9 @@ impl Delivered {
         let facts = facts.unwrap_or_else(|| Arc::new(RecordFacts::of(&v)));
         // (Encoded by another meanwhile: theirs is kept, and given.)
         let mut records = held(self.records.write());
-        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: std::sync::Weak::<[u8; 0]>::new(), facts: facts.clone() });
-        match shared.bytes.upgrade() {
-            Some(b) => Ok((b, shared.facts.clone(), at)),
-            None => {
-                shared.bytes = Arc::downgrade(&bytes);
-                Ok((bytes, shared.facts.clone(), at))
-            }
-        }
+        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts: facts.clone() });
+        let bytes = shared.bytes.get_or_insert(bytes).clone();
+        Ok((bytes, shared.facts.clone(), at))
     }
 
     /// What a record adds to a seat's knowledge, without its bytes (a code actor's look: nothing of it is written).
@@ -122,7 +118,7 @@ impl Delivered {
         let v = serde_json::to_value(&**r).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
         let facts = Arc::new(RecordFacts::of(&v));
         let mut records = held(self.records.write());
-        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: std::sync::Weak::<[u8; 0]>::new(), facts });
+        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts });
         Ok(shared.facts.clone())
     }
 
