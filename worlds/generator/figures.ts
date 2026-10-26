@@ -124,6 +124,8 @@ export const FIGURE_BASIS: Basis[] = [
     derived("attach_mean", "the town's mean attachment, from the profile's outlook.residence and outlook.job_tenure"),
     placeholder("frictions.*.at", "the level of a variable at which a home is counted as in fault: the generator's"),
   ]),
+  // Who comes for the job (world.migration): of working age, from adulthood to the profile's retirement age.
+  ...of("world.migration", [derived("seeker_ages", "from adulthood (18) to the profile's retirement_age")]),
   // The rest of the starting state.
   derived("world.entities.*.born_at", "drawn from the profile's age structure"),
   derived("world.entities.*.variables.skill", "years of schooling, from the profile's education"),

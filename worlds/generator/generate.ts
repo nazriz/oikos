@@ -3225,7 +3225,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   if (spec.migration !== false) {
     office("migration", "outside", "People moving from elsewhere", undefined, [jobBoard, K.lookUp(),
       K.published("statistics", ["support_statistics"])],
-      code("world.migration", { who: "who", households: H, ...(V.savings_by_age && !spec.savings_months_only ? { savings_by_age: V.savings_by_age } : {}), participation_bps: V.labour_force_participation_bps, template_outside_lf: "newcomer-outside-lf", ...(STOPGAPS.length ? { jobseekers_payment: STOPGAPS.map((r) => r.id).join(",") } : {}),
+      code("world.migration", { who: "who", households: H, ...(V.retirement_age ? { seeker_ages: [18, V.retirement_age] } : {}), ...(V.savings_by_age && !spec.savings_months_only ? { savings_by_age: V.savings_by_age } : {}), participation_bps: V.labour_force_participation_bps, template_outside_lf: "newcomer-outside-lf", ...(STOPGAPS.length ? { jobseekers_payment: STOPGAPS.map((r) => r.id).join(",") } : {}),
         ...(ED && HE ? { schooling: { school_ages: ED.school_ages, attainment: ED.attainment, variable: "skill", per_year: SKILL_PER_YEAR } } : {}), ...(spec.migration ?? {}) }));
   }
   // The support office's casework is its officers' (law 10, foundations-2 P3; WM-14): a decision on a claim, the papers it

@@ -9076,3 +9076,20 @@ log against the same town built at 3d113a1f.
   least ten files have one, and only when it is over 1). The per-file limit is unchanged.
 - **Revisit if:** the recorded times drift (they are rewritten by whole runs), or a real slowdown of every file at once (a
   slower kernel) is hidden by it; then compare against a quiet-machine run.
+
+## 2026-10-26 · Who comes for a job is of working age (world.migration; found by migration.test.ts on foundations-2 phase 2; no model called)
+
+- **What failed.** `migration.test.ts:46` on `f2-phase2-land`: in a year, none of the households that moved in for the
+  town's jobs took one. Traced in the log: the households the outside drew were a couple of 79 and 80 (the one who "came
+  for the job" claimed a pension on day 7), a household whose earner was 55 with 134,000 in savings (looked at the jobs
+  board for three weeks, then stopped work by the stop-work curve on day 32), and two more of 72 and 62. Law 8 moved the
+  run's course, so the draws fell on other households than before; nothing in the newcomers' search had changed.
+- **The fault.** `world.migration` drew a household moving *for work* from the town's whole household mix, retired
+  couples included, and made its leaseholder the one who came for the job whatever their age. Migration for work is of
+  working ages (the labour peak of the model migration schedule: Rogers and Castro 1981, to confirm).
+- **The fix.** A new parameter `seeker_ages` (from, below): the household is drawn again, up to 32 times, until the one who
+  comes for the job is of those ages; absent, any age, as before. The generator gives it from adulthood (18) to the
+  profile's retirement age (with a basis row in `worlds/generator/figures.ts`). Unit test:
+  `the_one_who_comes_for_the_job_is_of_working_age`. The test's assertion is unchanged.
+- **Revisit if** a profile states the ages of those who move for work (then that, in place of 18 to retirement), or
+  households that move for other reasons (family, retirement) are wanted (a separate flow, with its own source).

@@ -488,6 +488,7 @@ impl Kind for Migration {
             jobseekers_payment: ctx.param("jobseekers_payment", String::new())?,
             participation_bps: ctx.param("participation_bps", 10_000)?,
             template_outside_lf: ctx.param("template_outside_lf", String::new())?,
+            seeker_ages: ctx.param("seeker_ages", None)?,
             schooling: ctx.param("schooling", None)?,
             who: ctx.param("who", String::new())?,
             asked: Asked::default(),
@@ -596,6 +597,9 @@ struct Newcomers {
     jobseekers_payment: String,
     participation_bps: i64,
     template_outside_lf: String,
+    /// The ages the one who comes for the job is of (from, below): a household that moves for work has its earner of working
+    /// age. Absent: any age, as before.
+    seeker_ages: Option<[i64; 2]>,
     schooling: Option<Schooling>,
     who: String,
     asked: Asked,
@@ -656,7 +660,20 @@ impl Newcomers {
         let chance_pct = round_div(100 * n, competing);
         let mut r = cx.rng("households");
         for _ in 0..come {
-            let d = draw_household(&self.households, &mut |m| r.below(m as u64) as i64);
+            // (A household that moves for work is one whose earner, the one who comes for the job, is of working age: drawn
+            // again while it is not, a few times at most. Until 2026-10-26 a couple of pensioners could move to a town for its
+            // wages and the one who 'came for the job' claim a pension on arriving: migration for work is of working ages,
+            // the model migration schedule's labour peak, Rogers and Castro 1981, to confirm.)
+            let mut d = draw_household(&self.households, &mut |m| r.below(m as u64) as i64);
+            if let Some([from, below]) = self.seeker_ages {
+                for _ in 0..32 {
+                    let age = d.members[d.leaseholder].age;
+                    if age >= from && age < below {
+                        break;
+                    }
+                    d = draw_household(&self.households, &mut |m| r.below(m as u64) as i64);
+                }
+            }
             let refs: Vec<String> = (0..d.members.len()).map(|j| format!("m{j}")).collect();
             let born_at: Vec<i64> = d.members.iter().map(|m| t - (m.age * 365 + m.day) * DAY).collect();
             let mut lines = vec![];
@@ -1093,6 +1110,28 @@ mod migration_tests {
     fn it_needs_the_worlds_household_mix() {
         let ctx = Ctx { participant: "s".into(), performer: Default::default(), entity: "e".into(), position: None, params: Default::default(), world: Default::default() };
         assert!(Migration.create(&ctx).err().unwrap().contains("households is required"));
+    }
+
+    #[test]
+    fn the_one_who_comes_for_the_job_is_of_working_age() {
+        // (Only the one who came for the job looks for work: participation 0, the others outside the labour force.)
+        let mut r = town(json!({ "max_households_per_month": 5, "seeker_ages": [20, 60], "template_outside_lf": "out", "participation_bps": 0 }));
+        let out = found(&mut r, 30 * DAY, postings(10, 100_000 * 14 / 30 + 1), vec![]);
+        let progs = calls(&out);
+        assert_eq!(progs.len(), 5);
+        for p in progs {
+            let Program::Lines(lines) = p else { panic!() };
+            let seekers: Vec<i64> = lines
+                .iter()
+                .filter(|l| l.call.get("template") == Some(&Arg::Id("newcomer".into())))
+                .filter_map(|l| match l.call.get("age") {
+                    Some(Arg::Text(a)) => a.trim_end_matches(" days").parse::<i64>().ok(),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(seekers.len(), 1, "one comes for the job: {lines:?}");
+            assert!((20 * 365..60 * 365).contains(&seekers[0]), "of working age: {} days", seekers[0]);
+        }
     }
 
     #[test]
