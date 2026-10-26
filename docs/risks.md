@@ -1550,7 +1550,7 @@ set the status to `fixed (commit abc1234)` (or the decisions entry), and let a r
 - **What:** The world explorer's next stages, with the engine decision (likely Bevy over the Rust data layer) taken then, not before.
 - **Where:** `docs/design/`; the explorer's notes (the renderer in the stack); the Rust data layer.
 - **Why:** The explorer should sit on the final data layer, so building more of it on the TypeScript layer would be thrown away.
-- **Status:** planned (deferred until after the Rust port) · **Do when:** The Rust port lands; decide the engine then.
+- **Status:** planned (the engine decided and its first build on a branch, decisions 2026-10-25, "The Bevy explorer": Bevy with a web interface, beside the Three.js explorer until the owner reviews it; docs/explorer.md "The Bevy explorer" lists what remains) · **Do when:** The owner has looked at the Bevy explorer on his Mac (frame times, first paint) and decided whether it replaces the Three.js one.
 
 ### PL-3 · The translator rebuild: forms read by name
 - **What:** Rebuild the translator so it reads forms by their names, not by a fixed list learnt in training.

@@ -8848,3 +8848,43 @@ log against the same town built at 3d113a1f.
   least ten files have one, and only when it is over 1). The per-file limit is unchanged.
 - **Revisit if:** the recorded times drift (they are rewritten by whole runs), or a real slowdown of every file at once (a
   slower kernel) is hidden by it; then compare against a quiet-machine run.
+## 2026-10-25 · The Bevy explorer: Bevy for the scene, a web interface round it, one crate for browser and desktop (session branch; no model called)
+
+- **What was asked:** the next explorer, Bevy rendering the town with an HTML/CSS interface round it, browser-first
+  (WebAssembly, WebGPU with WebGL 2 behind it) and a native build from the same code; the map and a researcher
+  workbench; parity with the Three.js explorer, then beyond it in look and scale. It stays beside the Three.js one
+  (the default) until the owner reviews it. docs/explorer.md, "The Bevy explorer" and "The workbench".
+- **Why Bevy plus a web interface:** the data layer is Rust (`kernel/crates/explore`), and Bevy can hold it in the same
+  process natively and read it over HTTP in the browser, with one scene for both; its ECS suits a town of tens of
+  thousands of entities and time-indexed tracks; wgpu gives WebGPU, WebGL 2 and native from one code base. The panels,
+  tables and charts of a research tool are better as HTML (text, selection, links, accessibility, the Three.js
+  explorer's panel code reused as it is) than as an immediate-mode GUI, so the browser's interface is HTML and the
+  scene is the canvas. Natively the interface is egui for now (a webview would bring a second runtime); plainer, the
+  same scene and data.
+- **The architecture:** a crate of its own, `explorer/`, in its own Cargo workspace, so Bevy stays out of the kernel's
+  whole-program-optimised workspace build and the kernel never depends on it (it pins Rust 1.97.1, which Bevy 0.20
+  needs, in `explorer/rust-toolchain.toml`). The scene asks a `Source` and never waits: in the browser the Bun server's
+  `/api` (the Rust service behind it), natively an `Index` in process. The interface speaks to the scene only through
+  a bridge of JSON commands and events (`explorer/src/bridge.rs`). Tracks are streamed a window of days at a time, the
+  overlays' data one day at a time, so a big run's year is never in the browser. People are one mesh and one data
+  texture (one draw). Two WebAssembly builds (Bevy chooses its backend at compile time); the page loads the one the
+  browser can run. Routes along the roads are drawn by shortest path and are a visual only: the log has no routes.
+- **Deviations from the brief, and why:** (1) `load_run` loads through the scene's own source rather than the page
+  handing it the bytes, so the bridge stays small and the native shell is the same. (2) The data layer gained, read-only
+  and tested: `where`, `money`, `agency` by a window of days; a `partial` answer while a log is still being indexed (the
+  town shows from its header on); the workbench's routes (events, cohorts, per-building counts by class). (3) The
+  workbench's measures are computed by measure/'s Ledger in the Bun server (TypeScript), not in Rust: they are
+  measure/'s definitions and must not be written twice. (4) A run with no seats is not read for pilot data before the
+  data layer starts when the engine is Bevy (the Three.js path is unchanged): that read took minutes at 10,000 people
+  and held up the first sight for nothing. (5) A synthetic town (`--synthetic N`) exists to measure the scene at
+  50,000 people, where no such run could be made on the machine it was built on; it is never shown as a run.
+- **Measured** (no GPU here: software rendering only; docs/explorer.md, "Measured"): the scene's own CPU work per frame
+  at 50,000 people mean 0.70 ms, p95 3.2 ms (A* routes; the breadth-first trees cached by destination, tried first,
+  gave p95 8.2 ms at 50,000 as the cache thrashed); first paint of a 10,000-person month 23 s here, about 10 s of it
+  the data layer parsing the run's 222 MB header; the data layer held 8.1 GB resident for that month. Targets at 60 and
+  120 fps not measurable without a GPU.
+- **Revisit if:** the owner's Mac shows the scene GPU-bound well under the targets (then levels of detail: people as
+  per-building counts at far zoom, which the data texture allows); the data layer's memory or header time stays the
+  bound on the size of town (then its header is indexed lazily, by section); the egui interface proves not worth
+  keeping beside the web one (then the native shell wraps the web interface in a webview); Bevy's WebGL 2 path falls
+  behind its WebGPU one (then WebGL 2 is dropped once browsers allow).

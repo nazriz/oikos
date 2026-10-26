@@ -77,11 +77,16 @@ pub fn main() {
     let mut log: Option<PathBuf> = None;
     let mut pilot: Option<PathBuf> = None;
     let mut at: Option<i64> = None;
+    let mut synthetic: Option<usize> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--pilot" => {
                 pilot = args.get(i + 1).map(PathBuf::from);
+                i += 1;
+            }
+            "--synthetic" => {
+                synthetic = args.get(i + 1).and_then(|s| s.parse().ok());
                 i += 1;
             }
             "--at" => {
@@ -92,8 +97,20 @@ pub fn main() {
         }
         i += 1;
     }
+    if let Some(n) = synthetic {
+        // a generated town, for measuring the scene at scale (synthetic.rs); no index, so no panels
+        let mut app = crate::app(Arc::new(crate::synthetic::Synthetic::new(n, 3)), Some(format!("synthetic-{n}")), None);
+        app.insert_resource(MemProbe(rss));
+        crate::ui::add(&mut app, None);
+        push_command(Command::SetTime { t: at.unwrap_or(7 * 3600 + 1800) });
+        push_command(Command::SetSpeed { x: 600.0 });
+        push_command(Command::Play { on: true });
+        push_command(Command::Stats { on: true });
+        app.run();
+        return;
+    }
     let Some(log) = log else {
-        eprintln!("usage: oikos-explorer <run log (.jsonl or .jsonl.zst)> [--pilot pilot.json] [--at SECONDS]");
+        eprintln!("usage: oikos-explorer <run log (.jsonl or .jsonl.zst)> [--pilot pilot.json] [--at SECONDS] | --synthetic PEOPLE");
         std::process::exit(2);
     };
     let index = Arc::new(Index::new());
@@ -114,7 +131,7 @@ pub fn main() {
     let run = log.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let mut app = crate::app(Arc::new(IndexSource { index: index.clone() }), Some(run), None);
     app.insert_resource(MemProbe(rss));
-    crate::ui::add(&mut app, index);
+    crate::ui::add(&mut app, Some(index));
     if let Some(t) = at {
         push_command(Command::SetTime { t });
     }

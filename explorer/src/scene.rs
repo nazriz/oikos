@@ -1545,7 +1545,7 @@ fn light(
             if let Some(mut m) = meshes.get_mut(&t.pools) {
                 if let Some(bevy::mesh::VertexAttributeValues::Float32x4(col)) = m.attribute_mut(Mesh::ATTRIBUTE_COLOR) {
                     for &(st, v0) in &t.pool_of {
-                        let k = level * (t.occupancy.get(st).copied().unwrap_or(0) as f32 / 6.0).min(1.0) * 0.55;
+                        let k = level * (t.occupancy.get(st).copied().unwrap_or(0) as f32 / 6.0).min(1.0) * 1.3;
                         for v in &mut col[v0..v0 + 4] {
                             *v = [k, k * 0.72, k * 0.38, 1.0];
                         }

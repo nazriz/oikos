@@ -67,32 +67,31 @@ it("M1: the town is drawn from the run's index, and the scene reports what it ho
   expect(ev.persons).toBeGreaterThan(100);
   expect(ev.structures).toBeGreaterThan(20);
   expect(ev.backend).toBe("WebGL 2");
-  await page.waitForTimeout(1500);
-  const png: Buffer = await page.locator("#stage").screenshot();
-  // (a blank canvas compresses to almost nothing; the town does not)
-  expect(png.length).toBeGreaterThan(60_000);
+  // (a blank canvas compresses to almost nothing; the town does not. Drawn in software, the first frames can take seconds)
+  let png = 0;
+  for (let i = 0; i < 90 && png <= 60_000; i++) { await page.waitForTimeout(1000); png = (await page.locator("#stage").screenshot()).length; }
+  expect(png).toBeGreaterThan(60_000);
   await shot("m1-town");
 }, 180_000);
 
 it("M2: time plays, pauses and scrubs; the clock and the address follow", async () => {
   const t0 = await page.evaluate(() => Number(new URLSearchParams(location.hash.slice(1)).get("t") ?? 0));
   await page.keyboard.press("]"); // faster
+  const before = await page.locator("#ctime").textContent();
   await page.keyboard.press("Space");
-  await page.waitForTimeout(2500);
+  await page.waitForFunction((b: string) => document.querySelector("#ctime")?.textContent !== b, before, { timeout: 60_000 });
   await page.keyboard.press("Space");
-  await page.waitForTimeout(400);
+  await page.waitForFunction((t: number) => Number(new URLSearchParams(location.hash.slice(1)).get("t")) > t, t0, { timeout: 30_000 });
   const t1 = await page.evaluate(() => Number(new URLSearchParams(location.hash.slice(1)).get("t")));
   expect(t1).toBeGreaterThan(t0);
   // scrub: a click on the timeline at its middle is about the middle of the run
   const box = await page.locator(".tl-canvas").boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height - 12);
-  await page.waitForTimeout(500);
-  const day = await page.locator("#cday").textContent();
-  expect(day).toMatch(/day 1/);
+  await page.waitForFunction(() => /day 1/.test(document.querySelector("#cday")?.textContent ?? ""), null, { timeout: 30_000 });
   // night: the hour's light (a screenshot at 22:00)
   await page.evaluate(() => { location.hash = location.hash.replace(/t=\d+/, "t=165600"); });
-  await page.waitForTimeout(1500);
-  expect(await page.locator("#ctime").textContent()).toBe("22:00");
+  await page.waitForFunction(() => document.querySelector("#ctime")?.textContent === "22:00", null, { timeout: 30_000 });
+  await page.waitForTimeout(3000);
   await shot("m2-night");
 }, 120_000);
 
@@ -117,13 +116,31 @@ it("M3: search opens a person's panel through the bridge, and the address brings
 
 it("M4: the overlays switch, each with its legend and definition", async () => {
   await page.click('#modes button[data-mode="decided"]');
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(3000);
   expect(await page.locator("#legend").textContent()).toContain("last 30 days");
   await shot("m4-decided");
   await page.click('#modes button[data-mode="hardship"]');
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(3000);
   expect(await page.locator("#legend").textContent()).toContain("sense of agency");
   expect(page.url()).toContain("ov=hardship");
   await shot("m4-hardship");
   await page.click('#modes button[data-mode="town"]');
 }, 60_000);
+
+it("M7: the workbench draws a measure over time from the run's log, and its tables export", async () => {
+  await page.click('#ws button[data-ws="bench"]');
+  await page.waitForSelector("#wbchart svg", { timeout: 120_000 });
+  expect(await page.locator(".wb-h").textContent()).toContain("decisions");
+  await page.waitForTimeout(600); // (the address is written a quarter second after a change)
+  expect(page.url()).toContain("ws=bench");
+  await shot("m7-workbench");
+  const csv = await page.evaluate(async () => (await fetch(document.querySelector<HTMLAnchorElement>(".wb-export a")!.href)).text());
+  expect(csv.split("\r\n")[0]).toMatch(/^run,day,decisions/);
+  const pq = await page.evaluate(async () => { const b = new Uint8Array(await (await fetch(document.querySelectorAll<HTMLAnchorElement>(".wb-export a")[1]!.href)).arrayBuffer()); return String.fromCharCode(...b.slice(0, 4)); });
+  expect(pq).toBe("PAR1");
+  await page.click('[data-tab="events"]');
+  await page.waitForSelector(".wb-table.events tbody tr", { timeout: 60_000 });
+  await page.click('[data-tab="cohorts"]');
+  await page.waitForSelector(".wb-grid svg", { timeout: 60_000 });
+  await page.click('#ws button[data-ws="map"]');
+}, 240_000);

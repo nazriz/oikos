@@ -7,7 +7,6 @@
 //! Pure: no Bevy, no I/O.
 
 use crate::data::WorldData;
-use std::collections::{HashMap, VecDeque};
 
 /// Flat structures: drawn on the ground, not as boxes.
 pub fn is_flat(type_: &str) -> bool {
@@ -177,14 +176,16 @@ pub struct Roads {
     pub h: i64,
     /// Per cell: is it road?
     pub road: Vec<bool>,
-    /// Shortest-path trees towards a road cell (the parent's direction per cell, 255 none), cached by root.
-    cache: std::sync::Mutex<TreeCache>,
+    /// The search's working arrays, kept between searches (a stamp marks what this search has seen).
+    scratch: std::sync::Mutex<Scratch>,
 }
 
-struct TreeCache {
-    trees: HashMap<u32, (u64, std::sync::Arc<Vec<u8>>)>,
-    clock: u64,
-    cap: usize,
+#[derive(Default)]
+struct Scratch {
+    stamp: u32,
+    seen: Vec<u32>,
+    g: Vec<u32>,
+    came: Vec<u32>,
 }
 
 const DIRS: [(i64, i64); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
@@ -202,9 +203,7 @@ impl Roads {
                 }
             }
         }
-        // About 20 MB of trees at 10,000 road cells and 2,000 trees; fewer for a bigger grid.
-        let cap = (20_000_000 / road.len().max(1)).clamp(64, 4096);
-        Roads { w, h, road, cache: std::sync::Mutex::new(TreeCache { trees: HashMap::new(), clock: 0, cap }) }
+        Roads { w, h, road, scratch: Default::default() }
     }
 
     pub fn cell(&self, c: u32) -> (i64, i64) {
@@ -243,76 +242,77 @@ impl Roads {
         None
     }
 
-    /// The breadth-first tree of the road network towards `root`: per cell, which way to step (an index into DIRS),
-    /// 254 at the root, 255 unreachable.
-    fn tree(&self, root: u32) -> std::sync::Arc<Vec<u8>> {
-        {
-            let mut c = self.cache.lock().unwrap();
-            c.clock += 1;
-            let now = c.clock;
-            if let Some(t) = c.trees.get_mut(&root) {
-                t.0 = now;
-                return t.1.clone();
-            }
+    /// The cells from `a` to `b` along the roads (both road cells), turning points only; None if not connected. A* on
+    /// the grid (four ways, the distance along the roads as the guide): its work is about the length of the way, not
+    /// the size of the town, so a rush hour of 50,000 people beginning trips costs little a frame.
+    pub fn path(&self, a: u32, b: u32) -> Option<Vec<(i64, i64)>> {
+        use std::cmp::Reverse;
+        use std::collections::BinaryHeap;
+        if a == b {
+            return Some(vec![self.cell(a)]);
         }
-        let n = self.road.len();
-        let mut dir = vec![255u8; n];
-        let mut q = VecDeque::new();
-        dir[root as usize] = 254;
-        q.push_back(root);
-        while let Some(c) = q.pop_front() {
+        let (bx, by) = self.cell(b);
+        let guess = |c: u32| {
             let (x, y) = self.cell(c);
-            for (k, (dx, dy)) in DIRS.iter().enumerate() {
+            ((x - bx).abs() + (y - by).abs()) as u32
+        };
+        let mut sc = self.scratch.lock().unwrap_or_else(|e| e.into_inner());
+        let sc = &mut *sc;
+        if sc.g.len() != self.road.len() {
+            *sc = Scratch { stamp: 0, seen: vec![0; self.road.len()], g: vec![0; self.road.len()], came: vec![0; self.road.len()] };
+        }
+        sc.stamp = sc.stamp.wrapping_add(1).max(1);
+        let stamp = sc.stamp;
+        let mut open = BinaryHeap::new();
+        sc.seen[a as usize] = stamp;
+        sc.g[a as usize] = 0;
+        // (ties go to the deeper node: on a grid it runs straight on rather than flooding the many equal ways)
+        open.push((Reverse(guess(a)), 0u32, a));
+        let mut found = false;
+        while let Some((_, cost, c)) = open.pop() {
+            if c == b {
+                found = true;
+                break;
+            }
+            if sc.g[c as usize] < cost {
+                continue;
+            }
+            let (x, y) = self.cell(c);
+            for (dx, dy) in DIRS {
                 let (nx, ny) = (x + dx, y + dy);
                 if nx < 0 || ny < 0 || nx >= self.w || ny >= self.h {
                     continue;
                 }
-                let ni = (ny * self.w + nx) as usize;
-                if self.road[ni] && dir[ni] == 255 {
-                    // (from ni, step back the way we came: the opposite of k)
-                    dir[ni] = (k ^ 1) as u8;
-                    q.push_back(ni as u32);
+                let n = (ny * self.w + nx) as u32;
+                if !self.road[n as usize] {
+                    continue;
+                }
+                let nc = cost + 1;
+                if sc.seen[n as usize] != stamp || nc < sc.g[n as usize] {
+                    sc.seen[n as usize] = stamp;
+                    sc.g[n as usize] = nc;
+                    sc.came[n as usize] = c;
+                    open.push((Reverse(nc + guess(n)), nc, n));
                 }
             }
         }
-        let t = std::sync::Arc::new(dir);
-        let mut c = self.cache.lock().unwrap();
-        if c.trees.len() >= c.cap {
-            if let Some(old) = c.trees.iter().min_by_key(|x| x.1 .0).map(|x| *x.0) {
-                c.trees.remove(&old);
-            }
-        }
-        let now = c.clock;
-        c.trees.insert(root, (now, t.clone()));
-        t
-    }
-
-    /// The cells from `a` to `b` along the roads (both road cells), turning points only; None if not connected.
-    pub fn path(&self, a: u32, b: u32) -> Option<Vec<(i64, i64)>> {
-        if a == b {
-            return Some(vec![self.cell(a)]);
-        }
-        let tree = self.tree(b);
-        if tree[a as usize] == 255 {
+        if !found {
             return None;
         }
-        let mut out = vec![self.cell(a)];
-        let mut c = a;
-        let mut last_dir = 255u8;
-        let mut guard = 0;
-        while tree[c as usize] != 254 {
-            let k = tree[c as usize];
-            let (x, y) = self.cell(c);
-            let (dx, dy) = DIRS[k as usize];
-            let next = ((y + dy) * self.w + (x + dx)) as u32;
-            if k != last_dir && last_dir != 255 {
-                out.push((x, y));
-            }
-            last_dir = k;
-            c = next;
-            guard += 1;
-            if guard > self.road.len() {
-                return None;
+        let came = |c: u32| sc.came[c as usize];
+        // back from b to a, then turning points only
+        let mut cells = vec![b];
+        let mut c = b;
+        while c != a {
+            c = came(c);
+            cells.push(c);
+        }
+        cells.reverse();
+        let mut out = vec![self.cell(cells[0])];
+        for w in cells.windows(3) {
+            let (p, q, r) = (self.cell(w[0]), self.cell(w[1]), self.cell(w[2]));
+            if (q.0 - p.0, q.1 - p.1) != (r.0 - q.0, r.1 - q.1) {
+                out.push(q);
             }
         }
         out.push(self.cell(b));
@@ -450,7 +450,7 @@ mod tests {
         assert_eq!(r.at(1.0), (4.5, 3.5));
         let mid = r.at(0.5); // 3.5 of 7 along: on the top road
         assert!((mid.1 - 1.5).abs() < 1e-5 && (mid.0 - 3.0).abs() < 1e-5, "{mid:?}");
-        // the reverse is the same way back, from the cache or not
+        // the reverse is the same way back
         assert_eq!(l.route(1, 0).pts.iter().rev().copied().collect::<Vec<_>>(), r.pts);
     }
 

@@ -8,7 +8,8 @@
 //! - tracks.rs: the window of days held, and where everyone is at the moment shown;
 //! - overlays.rs: who decided and hardship, as the Three.js explorer computes them;
 //! - source.rs: asking the data layer, over HTTP or in process;
-//! - scene.rs: the Bevy scene.
+//! - scene.rs: the Bevy scene;
+//! - synthetic.rs: a generated town, for measuring the scene at scale (never shown as a run).
 
 pub mod bridge;
 pub mod data;
@@ -16,6 +17,7 @@ pub mod layout;
 pub mod overlays;
 pub mod scene;
 pub mod source;
+pub mod synthetic;
 pub mod tracks;
 
 #[cfg(feature = "native")]

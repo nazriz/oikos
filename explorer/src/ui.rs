@@ -23,7 +23,7 @@ const CLASSES: [(&str, [u8; 3]); 5] = [
 
 #[derive(Resource)]
 struct Ui {
-    index: Arc<Index>,
+    index: Option<Arc<Index>>,
     world: Option<Value>,
     t: i64,
     end: i64,
@@ -42,7 +42,7 @@ struct Ui {
     persons: Vec<String>,
 }
 
-pub fn add(app: &mut App, index: Arc<Index>) {
+pub fn add(app: &mut App, index: Option<Arc<Index>>) {
     app.add_plugins(EguiPlugin::default())
         .insert_resource(Ui {
             index,
@@ -72,7 +72,7 @@ fn events(mut ui: ResMut<Ui>) {
         match e {
             Event::Ready { last_t, days, .. } => {
                 ui.end = last_t.max(days * DAY);
-                ui.world = ui.index.world_json();
+                ui.world = ui.index.as_ref().and_then(|ix| ix.world_json());
                 ui.persons = ui
                     .world
                     .as_ref()
@@ -100,12 +100,13 @@ fn events(mut ui: ResMut<Ui>) {
     if !ui.selected.is_empty() && (ui.panel_t < 0 || (!ui.playing && (ui.panel_t - ui.t).abs() > 600)) {
         let (k, id) = ui.selected.split_once(':').map(|(a, b)| (a.to_string(), b.to_string())).unwrap_or_default();
         let t = ui.t;
+        let Some(ix) = ui.index.clone() else { return };
         let p = match k.as_str() {
-            "person" => ui.index.panel_json(Panel::Person(id), Some(t)),
-            "org" => ui.index.panel_json(Panel::Org(id), Some(t)),
-            "building" => id.parse().ok().and_then(|n| ui.index.panel_json(Panel::Building(n), Some(t))),
-            "act" => id.parse().ok().and_then(|n| ui.index.panel_json(Panel::SeatAct(n), Some(t))),
-            "seat" => Some(ui.index.seat_json(&id)),
+            "person" => ix.panel_json(Panel::Person(id), Some(t)),
+            "org" => ix.panel_json(Panel::Org(id), Some(t)),
+            "building" => id.parse().ok().and_then(|n| ix.panel_json(Panel::Building(n), Some(t))),
+            "act" => id.parse().ok().and_then(|n| ix.panel_json(Panel::SeatAct(n), Some(t))),
+            "seat" => Some(ix.seat_json(&id)),
             _ => None,
         };
         ui.panel = p;
@@ -387,7 +388,7 @@ fn panel_ui(s: &mut egui::Ui, ui: &mut Ui, p: &Value) {
                     let text = format!("day {d} {hh:02}:{mm:02}  {}", r["text"].as_str().unwrap_or(""));
                     if s.add(egui::Label::new(egui::RichText::new(text).color(col(rgb))).sense(egui::Sense::click())).clicked() {
                         let about = ui.selected.strip_prefix("person:").map(String::from);
-                        ui.trace = ui.index.trace_json(ord, about.as_deref()).map(|v| (ord, v));
+                        ui.trace = ui.index.as_ref().and_then(|ix| ix.trace_json(ord, about.as_deref())).map(|v| (ord, v));
                     }
                     if let Some((o, tr)) = &ui.trace {
                         if *o == ord {
