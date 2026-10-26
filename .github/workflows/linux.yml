@@ -1,0 +1,50 @@
+# Nightly on a GitHub-hosted Linux machine (ubuntu-latest, x86_64): the same build and both tiers as ci.yml, so
+# nothing in Oikos is true only on the Mac it is built on (risk PL-4 (2), docs/decisions.md "Linux"). It holds no
+# secrets and asks for nothing but to read the repository. The pinned state hashes (culture-dial and the other canaries)
+# must be the Mac's to the byte: a difference is a reproducibility fault, never a pin per platform.
+# Mac-only pieces (caffeinate, launchd, scripts/mini) are not used here; the slots run as on any machine.
+name: linux
+
+on:
+  schedule:
+    - cron: "30 4 * * *" # nightly, on main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      CARGO_TERM_COLOR: never
+      # (The machine is this job's alone: the slots take all its cores, and no cap per checkout. The gate's budget is
+      # read at the load it measures against the Mini's recorded times, so a slower machine does not fail it.)
+      OIKOS_SLOTS: "4"
+      OIKOS_SLOT_CAP: none
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - run: bun install
+      - run: bun install
+        working-directory: docs/research/cel-check
+      - run: bun run kernel
+      - run: bun run typecheck
+      - name: Gate tier
+        run: bun scripts/test.ts --tier gate --no-build
+      - name: Slow tier
+        if: ${{ !cancelled() }}
+        run: bun scripts/test.ts --tier slow --no-build

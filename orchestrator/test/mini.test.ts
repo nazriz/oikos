@@ -12,13 +12,15 @@ const mini = join(import.meta.dir, "../../scripts/mini");
 // (Outside the repository: nothing here may ever act on it.)
 const server = realpathSync(mkdtempSync(join(tmpdir(), "oikos-mini-test-")));
 const started: number[] = [];
+// (A zombie has ended: it waits only for a parent to read its status. Where the first process does not reap orphans, as
+// in some Linux containers, a model call ended after its seed is one, and `kill -0` still finds it.)
 const alive = (pid: number) => {
   try {
     process.kill(pid, 0);
-    return true;
   } catch {
     return false;
   }
+  return !Bun.spawnSync(["ps", "-o", "stat=", "-p", String(pid)]).stdout.toString().trim().startsWith("Z");
 };
 afterAll(() => {
   for (const pid of started) if (alive(pid)) process.kill(pid, "SIGKILL"); // (only what this test started)
