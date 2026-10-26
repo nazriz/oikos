@@ -51,7 +51,7 @@ pub fn picture(t: i64, entity: &str, records: Vec<Arc<Record>>, accounts: &[(&st
         .collect();
     let mut channels = BTreeMap::new();
     channels.insert("papers".into(), Seen::Records { records, search: false });
-    channels.insert("treasury".into(), Seen::Accounts { accounts: Arc::new(items), transactions });
+    channels.insert("treasury".into(), Seen::Accounts { accounts: Arc::new(items), transactions: transactions.into_iter().map(Arc::new).collect() });
     Picture {
         participant: "x".into(),
         t,

@@ -30,7 +30,7 @@ pub struct Visit {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Seen {
     /// Its accounts in full (by id), and the transactions new since the last look.
-    Accounts { accounts: Arc<Vec<AccountItem>>, transactions: Vec<Transaction> },
+    Accounts { accounts: Arc<Vec<AccountItem>>, transactions: Vec<Arc<Transaction>> },
     /// What it holds where, in full (a holding gone to nothing drops out); what flows to it, and for an operator its
     /// network (foundations-2 C3), whole as last seen.
     Holdings { holdings: Arc<Vec<HoldingItem>>, connections: Arc<Vec<ConnectionItem>>, links: Arc<Vec<LinkItem>> },
@@ -93,7 +93,7 @@ impl Picture {
         self.channels.values().flat_map(|c| match c {
             Seen::Accounts { transactions, .. } => transactions.as_slice(),
             _ => &[],
-        })
+        }).map(|x| &**x)
     }
 }
 
@@ -162,7 +162,7 @@ impl View {
     /// returns the picture the actor reads. `entity`: whom it acts for in that capacity.
     pub fn apply(&mut self, obs: Observation, capacity: Option<&str>, entity: &str, woke_for: &str, since: i64) -> Picture {
         let mut channels: BTreeMap<Id, Seen> = BTreeMap::new();
-        let mut new_txs: BTreeMap<Id, Vec<Transaction>> = BTreeMap::new();
+        let mut new_txs: BTreeMap<Id, Vec<Arc<Transaction>>> = BTreeMap::new();
         let mut fresh_sites: BTreeSet<Id> = BTreeSet::new();
         for (full_id, ch) in obs.channels {
             let Some(id) = in_capacity(&full_id, capacity) else { continue };

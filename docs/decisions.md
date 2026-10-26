@@ -9341,7 +9341,8 @@ routes as law data, nobody shown more than is theirs.
   off it. What is built (a record's parts, a section) is built as `Value` and frozen once, where it is kept.
   A `Frozen` is read (deserialised) as the `Value` it is and then frozen, so what `Value` took it takes, and a float
   in a seat's data is refused where it was, at its canonical form (the kernel's source names no float type: the
-  determinism lint).
+  determinism lint). That build, paired again against R1 (two rounds of the 1,000-person towns): the run's own thread
+  3 to 6% faster in all six pairs, the same hash and log in each.
 - **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at the state hash and log of main
   at 7230e71.
 - **Cost, paired** against R1 (`scripts/pair.sh`, three rounds of all six towns, then five more of 1,000 us-oh): the
@@ -9356,3 +9357,26 @@ routes as law data, nobody shown more than is theirs.
   that passes (an act's or message's id) would intern every key for the process; then such a map's keys are held as
   text (`Frozen` kept as it is, the keys a `Passing`-like case). Or if a reader in a hot path shows `from_frozen` in a
   profile (then a typed field in place of the JSON, as R4 does for the actors).
+
+## 2026-10-26 · Each transaction held once (SC-1, the representation plan's R3; branch `representation`; no result changes; no model called)
+
+- **Change.** A transfer's `Transaction` is made once, as an `Arc`, and that one copy is what every queue of a
+  capacity told of it (`Participant::new_transactions`), every office's file (`State::ledgers`), the look that
+  delivers it (`ChannelData::Accounts`) and the actor's picture of it (`Seen::Accounts`) hold: before, each held its
+  own copy, a row of some 170 bytes and its memo's text, and a look copied the queue again. Its fields were already
+  interned ids and integers (R1), and the queues and files already persistent vectors; an `Arc` serialises as what it
+  holds, so the state, its hash, the log and what a seat is shown are unchanged. `Picture::transactions` still yields
+  `&Transaction`, so no actor's reading changed.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at main's state hash and log.
+- **Cost, paired** against R2 (three rounds of the 1,000-person towns, one of the 200): the same hash and log in
+  every pair; the run's own thread -4 to +1% (au-vic 29.4 s on average against 29.1, gb-eng 27.0 against 26.0, us-oh
+  21.9 against 21.5).
+- **Memory.** Little in a month: at 1,000 people 11 MB lower to 6 higher, lower on average (au-vic 409 to 412 MB
+  against 411 to 415, about 300 KB a person), level at 200. An office keeps every payment on its organisation's accounts for the run, so the
+  saving grows with its length: 90 days, 1,000 au-vic 622 MB against 638, 200 gb-eng 244 against 258 (same hash).
+  The plan's -5 to -10 KB a person was for a month at 10,000.
+- **The budget.** About 300 KB a person here, some 318 on the Mini, and 8% over that is 343: the ceiling lowered from
+  350 to 345 KB.
+- **Revisit if** a memo's text shows in a heap profile of a long run (then memos interned, as they repeat: "rent",
+  "wages"), or offices' files dominate a ten-year run (then what an office keeps on file is a law of how long records
+  are kept, the owner's to decide, not a representation change).

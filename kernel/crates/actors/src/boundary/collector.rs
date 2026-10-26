@@ -571,7 +571,7 @@ mod tests {
     }
     fn at(r: &mut Rig, t: i64, records: Vec<Arc<Record>>, txs: Vec<Transaction>) -> Vec<Action> {
         let acc = AccountItem { account: "acc-o".into(), holder: "outside".into(), custodian: "bank".into(), currency: "XTS".into(), balance: 1_000_000_000, closed: None };
-        r.wake(t, vec![("taxpayers", Seen::Records { records, search: false }), ("ledger", Seen::Accounts { accounts: Arc::new(vec![acc]), transactions: txs })])
+        r.wake(t, vec![("taxpayers", Seen::Records { records, search: false }), ("ledger", Seen::Accounts { accounts: Arc::new(vec![acc]), transactions: txs.into_iter().map(Arc::new).collect() })])
     }
     fn kinds(a: &[Action], kind: &str) -> Vec<Value> {
         statements(a).into_iter().filter(|s| s.kind == kind).map(|s| s.data).collect()

@@ -1201,7 +1201,7 @@ mod tests {
         let records: Vec<Arc<Record>> = records.into_iter().map(|v| Arc::new(serde_json::from_value(v).expect("a record"))).collect();
         channels.insert("mine".into(), Seen::Records { records, search: false });
         if let Some((accounts, transactions)) = bank {
-            channels.insert("bank".into(), Seen::Accounts { accounts: Arc::new(accounts), transactions });
+            channels.insert("bank".into(), Seen::Accounts { accounts: Arc::new(accounts), transactions: transactions.into_iter().map(Arc::new).collect() });
         }
         Picture {
             participant: format!("{entity}-system").into(),

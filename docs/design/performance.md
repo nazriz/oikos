@@ -129,6 +129,7 @@ each lowering the budget's ceiling.
 | main (7230e71) | 467 to 473 MB | 363 | | 415 |
 | R1, ids interned | 459 to 466 MB (gb-eng 445 to 475 against 463 to 467; us-oh level) | 352 | -8 to -19% on all three profiles | 400 |
 | R2, records' JSON frozen | 409 to 419 MB (gb-eng 400 to 411, us-oh 365 to 380) | 305 | against R1: au-vic -3 to -10%, gb-eng -4 to 0%, us-oh -7 to +5% (-2% on average) | 350 |
+| R3, each transaction held once | 409 to 412 MB (90 days: 622 against 638) | 300 | against R2: -4 to +1% | 345 |
 
 R1 saved little memory because few of the ids held were `Id`s: the actors' are `String`s (R4) and records' JSON holds
 its own strings (R2). Acts' and messages' ids are `Passing` (their own text), as they go with what they name; every

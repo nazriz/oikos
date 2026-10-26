@@ -114,7 +114,7 @@ pub struct OwnRecord {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ChannelData {
-    Accounts { accounts: Vec<AccountItem>, transactions: Vec<Transaction> },
+    Accounts { accounts: Vec<AccountItem>, transactions: Vec<Arc<Transaction>> },
     Holdings {
         holdings: Vec<HoldingItem>,
         /// What flows to it (foundations-2 C3): its own connections, with their meters (it is there: they are its own);

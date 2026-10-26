@@ -1541,7 +1541,7 @@ impl<'a> Exec<'a> {
             b.balance += amount;
             b.changed = c;
         }
-        let tx = Transaction {
+        let tx = Arc::new(Transaction {
             t: self.now(),
             from: from.into(),
             to: to.into(),
@@ -1552,7 +1552,7 @@ impl<'a> Exec<'a> {
             per_instruction,
             memo: memo.clone(),
             line: line.clone(),
-        };
+        });
         // Everyone who acts for an entity concerned hears of it, through that entity's accounts.
         let concerned: BTreeSet<&str> = [src.holder.as_str(), src.custodian.as_str(), dst.holder.as_str(), dst.custodian.as_str()].into();
         let mut told: BTreeSet<(Id, Id)> = BTreeSet::new();

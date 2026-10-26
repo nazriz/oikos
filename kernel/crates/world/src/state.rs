@@ -82,7 +82,7 @@ pub struct State {
     /// holder is handed it as the payments it has not yet been told of, so it reads its office's books and not an empty
     /// memory. Derived from the log (never serialised, so the state and its hash are unchanged).
     #[serde(skip)]
-    pub ledgers: Map<String, imbl::Vector<Transaction>>,
+    pub ledgers: Map<String, imbl::Vector<Arc<Transaction>>>,
     /// Future physical effects and acts in progress, sorted by (at, seq).
     pub schedule: Schedule,
     /// Each actor's timeline (docs/design/rebuild.md 6.3): when each of its lanes is next free. A person's is keyed by
@@ -480,8 +480,9 @@ pub struct Participant {
     pub pending: BTreeMap<crate::blocks::Passing, Pending>,
     /// Delivered by its next look through an accounts channel of a capacity acting for that entity.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    /// (A persistent list: a busy custodian's queue holds a day's transfers, and a copy of the participant shares it.)
-    pub new_transactions: BTreeMap<Id, imbl::Vector<Transaction>>,
+    /// (A persistent list: a busy custodian's queue holds a day's transfers, and a copy of the participant shares it;
+    /// each transaction one copy, shared by every queue and office file it is on and the looks that deliver it.)
+    pub new_transactions: BTreeMap<Id, imbl::Vector<Arc<Transaction>>>,
     /// When it last looked through each channel (`channel`, or `position/channel`), and how far it had seen.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub looks: BTreeMap<Id, Look>,
