@@ -65,9 +65,14 @@ test("households buy from shops and use their goods up; shops serve with their s
     expect(n.data.ordered).toBe(o.data.quantity);
     // (An order its buyer's bank never paid is declined: nothing to refund.)
     // (And an item a system of the shop got wrong is refunded too, at the price paid: a whole number of items more.)
-    const owed = n.data.declined === "unpaid" ? 0 : (o.data.quantity - n.data.delivered) * o.data.unit_price;
+    // (Where the shop's price had risen since the order, the note says the price it charged, `unit_price`: the money paid
+    // bought fewer at it, and what it did not buy comes back. Until 2026-10-26 the note gave as `ordered` the number the
+    // money bought, not the number ordered: docs/decisions.md, "Main red after foundations-2 phase 1".)
+    const price = n.data.unit_price ?? o.data.unit_price;
+    if (n.data.unit_price !== undefined) expect(n.data.unit_price).toBeGreaterThan(o.data.unit_price);
+    const owed = n.data.declined === "unpaid" ? 0 : o.data.quantity * o.data.unit_price - n.data.delivered * price;
     expect(n.data.refund).toBeGreaterThanOrEqual(owed);
-    expect((n.data.refund - owed) % o.data.unit_price).toBe(0);
+    expect((n.data.refund - owed) % price).toBe(0);
     if (n.data.declined === "unpaid") expect(n.data.refund).toBe(0);
   }
   // Goods go where the order says: home, or kept at the shop.

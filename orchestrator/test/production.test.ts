@@ -55,6 +55,13 @@ test("goods are made from inputs by workers' hours, exported within each factory
     const [firm, worker] = a.terms.parties;
     employees.set(firm, (employees.get(firm) ?? new Set()).add(worker));
   }
+  // (Or by a system the firm owns: a factory may adopt an automated production cell, delivered to it by its vendor, as
+  // docs/behaviour/automation.md has it; since 2026-10-25 factory-1 of this town does, on day 242.)
+  const systems = new Set<string>();
+  for (const e of ev.filter((e) => e.event === "participant_created" && e.kind === "system" && e.owner)) {
+    employees.set(e.owner, (employees.get(e.owner) ?? new Set()).add(e.participant));
+    systems.add(e.participant);
+  }
   const made = ev.filter((e) => e.event === "worked" && e.task === "make");
   expect(made.length).toBeGreaterThan(50);
   // The time it took: the task's, scaled by the crew's mean schooling where skill speeds work (labour_by), exactly as the
@@ -68,7 +75,8 @@ test("goods are made from inputs by workers' hours, exported within each factory
   }
   const perDay = new Map<string, number>();
   const startOf = workStarts(ev);
-  for (const w of made) for (const p of w.performers) {
+  // (A person's working day bounds a person; a system works the day round, in the lanes its template gives it.)
+  for (const w of made) for (const p of w.performers.filter((p: string) => !systems.has(p))) {
     // (A work that runs past midnight counts on each day it is done on, as the kernel counts it: review of the foundations, finding 9.)
     for (let at = startOf.get(w)!, left = Math.ceil(w.labour / w.performers.length); left > 0;) {
       const day = Math.floor(at / DAY), take = Math.min(left, (day + 1) * DAY - at);
@@ -177,6 +185,23 @@ test("a town that asks for a retirement fund: the factories pay it as any holder
 test("Lengnick: with too little demand a factory lets workers go and stops making; with plenty it hires", async () => {
   // The world market wants little of what the factories can make, and the town's shops take only part of the rest.
   const slack = generate({ ...base, citizens: 120, exports_per_month: 2_000_000 });
+  // (By construction since 2026-10-26, "Main red after foundations-2 phase 1" in docs/decisions.md: the works that has
+  // too little demand, factory-1, whose export market this town takes away, opens with two months of its wage bill in
+  // hand where the generator gives it some six, so the money that slack demand runs down runs out within the seven
+  // months. It holds its labour through the dip by its rule, losing about a third of its wage bill a month in this town:
+  // with six months' wages it never ran short in seven months, before foundations-2 phase 1 or after. The redundancy the test found in this town until then was factory-2's, the food
+  // works, which had more orders than it could make and ran out of cash on day 80, its second hire having signed on day
+  // 79, 18 days after it was chosen, and paid cash for its inputs; since phase 1 that hire signs the same day, the works
+  // makes and sells more with two, buys its inputs on terms, and borrows when it is short: nobody goes in seven months.)
+  {
+    const f1 = slack.world.accounts.find((a: any) => a.id === "acc-factory-1");
+    const monthly = slack.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "factory-1")
+      .map((r: any) => r.terms.commitments.find((c: any) => c.who === "factory-1" && c.does?.outcome?.money))
+      .reduce((x: number, c: any) => x + Math.round(Number(c.does.outcome.money.amount) * MONTH / Number(c.every)), 0);
+    expect(monthly).toBeGreaterThan(0);
+    expect(Number(f1.balance)).toBeGreaterThan(2 * monthly);
+    f1.balance = String(2 * monthly);
+  }
   // (Seven months where it was five, 2026-10-12, "Returns on the law's days": a payroll now holds what it withheld until the law's day, some days longer, so the cash probably runs out later (not traced).)
   // (Traced, review of foundations finding 10, 2026-10-16: the "redundancy the rule's two reasons do not account for" in seeds 2 and 5 is
   // a third reason, not a fault: a firm wound up (insolvent, or closed by its owners) lets everyone go "Redundancy: the business is being wound up."

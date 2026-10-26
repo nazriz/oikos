@@ -21,7 +21,8 @@
 // inside, nothing working in it, not a wave copy, not the one this runs in), plus: never a protected name (merge-main
 // and the running agents' trees, --protect adds more), never one made in the last day, and an old agent lock
 // ("claude agent ... pid N") is lifted only for the pid given with --unlock-pid, and only if the tree meets the rest.
-// Removal is `git worktree remove` then `git worktree prune`, never rm -rf on a worktree.
+// Removal is `git worktree remove` then `git worktree prune`, never rm -rf on a worktree. A worktree that stays loses its
+// `kernel/target` at once when its branch is merged into origin/main and nothing is running in it (`judgeTarget`).
 // Build folders `.claude/target-*` (a CARGO_TARGET_DIR an agent was given) go whole when nothing has been built in them for
 // a day (--target-hours: the folder, its first two levels of folders, none written since) and no running process uses one
 // (none has a file open in it or its working folder there, none names it in its command line or environment). They hold
@@ -237,6 +238,24 @@ export function judgeWorktree(t: Tree, lockReason: string | undefined, o: { prot
   return { tree: t, action: "remove", reason: "merged into origin/main, clean, unlocked, idle" };
 }
 
+/**
+ * A worktree that stays, whose `kernel/target` goes now: its branch (and HEAD) are in origin/main and nothing is running in
+ * it (no process working there or using a file in it). Finished agents' build folders filled the disk twice on 2026-10-25,
+ * waiting out the day's grace a whole worktree gets. Its agent's lock is no guide: it names the session that started the
+ * agent, which outlives it. Never a protected tree, a wave copy or this one; the build is all cargo makes again.
+ */
+export function judgeTarget(t: Tree, usedNow: boolean, o: { protect?: string[] } = {}): { action: "remove" | "keep"; reason: string } {
+  const no = (reason: string) => ({ action: "keep" as const, reason });
+  if (!t.targetKb) return no("no kernel/target");
+  if ([...PROTECTED, ...(o.protect ?? [])].includes(t.name)) return no("protected name");
+  if (t.wave) return no("wave copy");
+  if (t.self) return no("the tree this runs in");
+  if (!t.merged || !t.branchMerged) return no("not merged into origin/main");
+  if (t.inUse) return no(t.inUse);
+  if (usedNow) return no("a running process uses it");
+  return { action: "remove", reason: "merged into origin/main and nothing running in it" };
+}
+
 function lockReasons(repo: string): Map<string, string> {
   const p = Bun.spawnSync(["git", "worktree", "list", "--porcelain"], { cwd: repo, stdout: "pipe" });
   const m = new Map<string, string>();
@@ -303,7 +322,18 @@ if (import.meta.main) {
   const tmpKb = tmps.filter((t) => t.action === "remove").reduce((s, t) => s + t.kb, 0);
   if (tmpKb || tmps.length) console.log(`${apply ? "REMOVED" : "would remove"} ${tmps.filter((t) => t.action === "remove").length} temp folders in ${tmpRoot} (${gb(tmpKb)}; oikos-*, forms-trained*, sz-* older than a day)`);
   const claudeDir = join(sc.repo, ".claude");
-  const targets = classifyTargets(claudeDir, processUses(), { hours: Number(opt("--target-hours") ?? 24) });
+  const uses = processUses();
+  const targets = classifyTargets(claudeDir, uses, { hours: Number(opt("--target-hours") ?? 24) });
+  // A merged worktree with nothing running in it loses its kernel/target at once, whether or not the tree itself goes
+  // (one that goes takes it along: counted there).
+  for (const w of trees) {
+    if (w.action !== "keep") continue;
+    const j = judgeTarget(w.tree, uses(w.tree.path), { protect });
+    if (j.action === "keep") continue;
+    freeKb += w.tree.targetKb;
+    console.log(`${apply ? "REMOVING" : "would remove"} ${w.tree.name}/kernel/target (${gb(w.tree.targetKb)}) -- ${j.reason}`);
+    if (apply) rmSync(join(w.tree.path, "kernel/target"), { recursive: true, force: true });
+  }
   for (const t of targets) {
     if (t.action === "keep") continue;
     const kb = Number(Bun.spawnSync(["du", "-sk", t.path], { stdout: "pipe" }).stdout.toString().split(/\s/)[0]) || 0;

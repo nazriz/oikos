@@ -75,7 +75,7 @@ fn street() -> Run<Vec<u8>> {
             {"what": "records:withdrawal", "why": "And what is taken down."}
         ]},
         "caps": {"max_created_entities": 1},
-        "orchestration": {"thinking_time": "free"}
+        "orchestration": {"thinking_time": "free", "act_time": {"default": 1, "sources": {"default": "PLACEHOLDER for a test world: every act a second, as the platform once took for any act its table did not name (foundations-2 P2: a world now states its default)."}}}
     });
     Run::start(config, "position", Vec::new(), None).unwrap()
 }

@@ -84,6 +84,15 @@ test("a business of one that does not pay its owner a living is given up: it clo
   config.world.holdings = config.world.holdings.filter((h: any) => h.holder !== firm);
   const acct = config.world.accounts.find((a: any) => a.holder === firm);
   if (acct) acct.balance = "0";
+  // (And the others who open the year out of work, with no work of their own, are out of the labour force, so that the
+  // owner, once looking, is not racing them to a posting: since 2026-10-26, "Main red after foundations-2 phase 1" in
+  // docs/decisions.md. In this town a posting is filled within hours by whoever is looking when it goes up, and after
+  // foundations-2 phase 1 moved the town's timing, no posting stood open at any of the owner's looks at the jobs board
+  // in the 105 days after it closed (they looked at it at nearly every wake; a posting for ten went up and was filled
+  // between two of them). What is held is that giving the business up puts its owner back on the job market, which a
+  // posting then shows; when one is open while they look is the town's.)
+  const employed = new Set(config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment").map((r: any) => r.terms.parties[1]));
+  for (const p of config.participants) if (p.controller?.impl === "citizen.default" && p.person !== person && !employed.has(p.person) && !p.controller.params.own_work) p.controller.params.in_labour_force = false;
   const out = join(root, "runs", "test-own-venture-given-up");
   rmSync(out, { recursive: true, force: true });
   const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "given-up", outDir: out, until: 150 * DAY, recordObservations: "none" });

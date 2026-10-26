@@ -116,7 +116,7 @@ impl CitizenMind {
         }
         // How long we had lived, worked and belonged here when the world began (citizen.ts 1743-1749).
         if first_plan {
-            if let Some(st) = self.p.started.clone() {
+            if let Some(st) = self.p.started.as_ref().map(super::packed::Packed::value) {
                 if let Some(d) = st.get("place_days").and_then(Json::as_i64).filter(|&d| d > 0) {
                     self.s.inner.start_attached(Bond::Place, "town", d, t);
                 }
@@ -933,7 +933,7 @@ impl CitizenMind {
                 })
                 .collect(),
         );
-        s["record"] = Json::Object(self.s.written.iter().filter(|(k, _)| k.as_str() != "hours").map(|(k, v)| (k.clone(), v.clone())).collect());
+        s["record"] = Json::Object(self.s.written.iter().filter(|(k, _)| k.as_str() != "hours").map(|(k, v)| (k.clone(), v.value())).collect());
         let agency = self.p.outlook_json.get("agency").cloned().unwrap_or_else(|| json!({ "mean_bps": self.s.inner.p.agency.mean_bps, "sd_bps": self.s.inner.p.agency.sd_bps }));
         let mut outlook = json!({ "agency": agency });
         if let Some(pl) = self.p.attach_mean_place {
@@ -1092,7 +1092,7 @@ impl CitizenMind {
             cx_intent(&mut self.s.pending_intents, Intent::FoundBusiness { until: t + 180 * DAY });
             return;
         }
-        let record_now: Json = Json::Object(self.s.written.iter().filter(|(k, _)| k.as_str() != "hours").map(|(k, v)| (k.clone(), v.clone())).collect());
+        let record_now: Json = Json::Object(self.s.written.iter().filter(|(k, _)| k.as_str() != "hours").map(|(k, v)| (k.clone(), v.value())).collect());
         let g = ways.grievance(&view_of(w));
         let list: Vec<(String, String)> = sharers.into_iter().collect();
         let wo = founding::WantOf { about: w.about.clone(), whom: w.whom.clone() };

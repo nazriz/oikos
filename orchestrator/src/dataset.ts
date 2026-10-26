@@ -2,7 +2,7 @@
 // streaming pass, joined and flattened into examples a training run can use. The log stays the record: a dataset can
 // always be made again from it. The same log always gives the same dataset, byte for byte.
 
-import { mkdirSync, statSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { actEnds } from "./act-ends";
 import { logLines, runOf } from "./logs";
@@ -584,8 +584,3 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
 
 const sorted = (c: { [event: string]: { [what: string]: number } }) => Object.fromEntries(Object.keys(c).sort().map((e) => [e, Object.fromEntries(Object.keys(c[e]!).sort().map((k) => [k, c[e]![k]!]))]));
 
-/** The dataset folder for a log: next to it, `<run>.dataset/` (or under `outRoot`). */
-export function datasetDirFor(logPath: string, outRoot?: string): string {
-  const name = `${runOf(logPath)}.dataset`;
-  return join(outRoot ?? (statSync(logPath).isDirectory() ? logPath : join(logPath, "..")), name);
-}

@@ -115,6 +115,46 @@ fn care_calls_off_a_death_once_and_nobody_is_told() {
     assert!(run.kernel().state().body("alice").unwrap().conditions.is_empty());
 }
 
+/// Whether care saves a life is the condition's own draw (who, what, since when), never the number it was filed under:
+/// that number is its place among every condition in town, so keyed on it one more injury anywhere would change who
+/// dies, and a pilot would part from its twin (docs/reliability.md, "Draws and the order papers were filed in"). Alice
+/// is hurt and treated in two towns alike but for one more injury, to bob, filed before hers in the second; on every
+/// seed care keeps or calls off her death alike in both.
+#[test]
+fn care_draws_on_the_condition_not_its_number() {
+    let outcome = |seed: u64, other_first: bool| -> (bool, String) {
+        let mut w = services_world();
+        w["seed"] = json!(seed);
+        for t in w["catalogue"]["tasks"].as_array_mut().unwrap() {
+            if t["id"] == "treat" {
+                t["on_body"]["treats"][0]["fatal_kept_bps"] = json!(5000);
+            }
+        }
+        let mut run = start(&w);
+        if other_first {
+            act(&mut run, "alice-self", None, json!([{"block": "harm", "person": "bob"}])).unwrap();
+        }
+        // (Alice is hurt at the same moment in both towns: the condition's onset is part of what it is.)
+        advance(&mut run, DAY);
+        let ev = act(&mut run, "bob-self", None, json!([{"block": "harm", "person": "alice"}])).unwrap();
+        let id = ev.iter().find_map(|e| match e { EventBody::ConditionBegan { person, condition, .. } if person == "alice" => Some(condition.clone()), _ => None }).unwrap();
+        act(&mut run, "alice-self", None, json!([{"block": "occupy", "space": "s-shop/dwelling.1"}])).unwrap();
+        let ev = act(&mut run, "carol-self", None, json!([{"block": "work", "task": "treat", "units": 2, "at": "s-shop", "performers": ["carol"], "on": "alice"}])).unwrap();
+        let off = ev.iter().find_map(|e| match e { EventBody::ConditionTreated { person, death_called_off, .. } if person == "alice" => Some(*death_called_off), _ => None }).unwrap();
+        (off, id)
+    };
+    let mut kept = 0;
+    for seed in 1..=16 {
+        let (alone, id_alone) = outcome(seed, false);
+        let (after, id_after) = outcome(seed, true);
+        assert_ne!(id_alone, id_after, "the second town files her condition under another number");
+        assert_eq!(alone, after, "seed {seed}: one more injury elsewhere changed whether care saved alice");
+        kept += usize::from(!alone);
+    }
+    // (At 5,000 basis points both outcomes happen across the seeds: the draw is a draw, not a constant.)
+    assert!(kept > 0 && kept < 16, "{kept} of 16 kept");
+}
+
 #[test]
 fn skill_makes_work_quicker() {
     let mut run = start(&services_world());

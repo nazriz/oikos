@@ -355,6 +355,20 @@ second" becomes, row by row, what the template's source says.
 | P4 | Kernel: `runs_on`, location, energy and water per second of work (needs C3 and E2) | a system without power stops |
 | P5 | The backstop's new findings, planted | it names each |
 
+**Built (2026-10-25, phase 1: P1, P2, P3, P5; branch `f2-phase1`; decisions "Foundations-2 phase 1"):** a template's
+`does` rows carry seconds for any block (read before the world's system row; `work`'s stay a unit's), and `hours` (a
+pure function, `oikos_time::place_within`, used wherever a system's lanes are placed: an act, a question answered, a
+visit); no implicit second (`unpriced`; test worlds state `default: 1` as a marked placeholder); someone who only orders
+an act goes on at once (`ORDER_SECONDS`); the support office's casework is done `by` the desk `outside-casework`
+(`agency-casework`: the person table's minutes, an officer's working day spread over the week, lanes from a placeholder
+national ratio in every profile); every machine's template states its hours (the whole day); an office offer's seconds
+are its template's rows; and the engine now gives a code unit's `done_by` to the act as `by` (found on the way: it had
+never reached an act in the engine). The backstop gained `decisionsAtTheSystemsSecond`, `systemsWithoutHours`, template rows'
+sources in `unpricedWork`, and (slow tier) `unpricedActs` over a month of each profile's town, each planted. **Not
+built here:** the charged row on each act in the log (P1's third part: the backstop reads `unpriced` refusals instead of
+acts charged by a default, since the generated town states none); the seat as a non-resident officer (decision 7: not
+contained, WM-14); P4 (`runs_on`), as planned.
+
 ### 4.5 Performance
 
 A template's rows become a dense table (template by row) made at load: one index per act, as now. `runs_on` adds one

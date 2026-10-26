@@ -126,5 +126,3 @@ export function inSmallest(a: Amount | number | bigint, cur: Currency): string {
   return words.length ? `${a} ${words[words.length - 1]}` : formatMoney(a, cur);
 }
 
-/** An amount counted out in the smallest unit of the money of the world now being stepped. */
-export const smallestNow = (a: Amount | number | bigint): string => inSmallest(a, currencyNow());

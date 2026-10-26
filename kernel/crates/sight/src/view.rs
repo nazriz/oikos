@@ -99,7 +99,22 @@ impl Picture {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct SitesKept {
     as_of: i64,
-    cells: BTreeMap<Id, SiteCell>,
+    /// In cell order, as the picture gives them: the one list the view keeps and hands out (it was kept as a map and
+    /// copied into the picture's list besides, each cell twice: SC-1). Written as a map by cell, as it always was.
+    #[serde(with = "cells_by_id")]
+    cells: Arc<Vec<SiteCell>>,
+}
+
+/// A list of cells in cell order, written and read as a map by cell (the shape a view's snapshot has always had).
+mod cells_by_id {
+    use super::{Arc, BTreeMap, Id, SiteCell};
+    use serde::{Deserialize, Deserializer, Serializer};
+    pub fn serialize<S: Serializer>(cells: &Arc<Vec<SiteCell>>, s: S) -> Result<S::Ok, S::Error> {
+        s.collect_map(cells.iter().map(|c| (&c.cell, c)))
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Arc<Vec<SiteCell>>, D::Error> {
+        Ok(Arc::new(BTreeMap::<Id, SiteCell>::deserialize(d)?.into_values().collect()))
+    }
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -123,7 +138,6 @@ pub struct View {
     /// Each channel's picture as last made, rebuilt only when the channel changed.
     cache_accounts: BTreeMap<Id, Arc<Vec<AccountItem>>>,
     cache_holdings: BTreeMap<Id, Arc<Vec<HoldingItem>>>,
-    cache_sites: BTreeMap<Id, Arc<Vec<SiteCell>>>,
     cache_directories: BTreeMap<Id, (Arc<Vec<EntityItem>>, Arc<Vec<PositionItem>>)>,
 }
 
@@ -182,7 +196,7 @@ impl View {
                     let changed = !cells.is_empty() || whole == Some(true);
                     let v = self.sites.entry(id.clone()).or_default();
                     if whole == Some(true) {
-                        v.cells.clear();
+                        v.cells = Arc::default();
                     }
                     v.as_of = as_of;
                     if visited == Some(true) {
@@ -192,11 +206,16 @@ impl View {
                         }
                         m.fresh = cells.iter().map(|c| c.cell.clone()).collect();
                     }
-                    for c in cells {
-                        v.cells.insert(c.cell.clone(), c);
-                    }
-                    if changed {
-                        self.cache_sites.remove(&id);
+                    if changed && !cells.is_empty() {
+                        // (Put in place by cell, a cell seen again replacing what was seen of it; copied first only if
+                        // a picture still holds the list.)
+                        let kept = Arc::make_mut(&mut v.cells);
+                        for c in cells {
+                            match kept.binary_search_by(|x| x.cell.cmp(&c.cell)) {
+                                Ok(i) => kept[i] = c,
+                                Err(i) => kept.insert(i, c),
+                            }
+                        }
                     }
                     fresh_sites.insert(id);
                 }
@@ -248,7 +267,7 @@ impl View {
             channels.insert(id.clone(), Seen::Holdings { holdings });
         }
         for (id, v) in &self.sites {
-            let cells = self.cache_sites.entry(id.clone()).or_insert_with(|| Arc::new(v.cells.values().cloned().collect())).clone();
+            let cells = v.cells.clone();
             // (The cells a visit saw are said once, with the observation that brings them.)
             let visit = self
                 .visits
