@@ -21,7 +21,10 @@
     "pilot-view",
     "contracts/test",
     "docs/research/cel-check",
-    "renderer"
+    "renderer",
+    "explorer/web",
+    "explorer/test",
+    "explorer/build.ts"
   ],
   "exclude": [
     "**/node_modules"

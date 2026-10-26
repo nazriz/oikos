@@ -810,6 +810,18 @@ No document was opened for this step; every route below is named from memory and
 | Provenance as a graph of entities, the activities that made them and the agents responsible | W3C (2013), *PROV-DM: The PROV Data Model* **(to confirm)** | the causal trace: an effect, the act that made it, who decided, what it rested on (section 5) |
 | Who decided, human or system, as the thing to watch in gradual disempowerment | Kulveit et al. (2025), cited under "Gradual disempowerment" above | the "who decided" and "where systems are deployed" overlays (section 6) |
 
+## The Bevy explorer and the workbench (docs/explorer.md, "The Bevy explorer", "The workbench"; docs/decisions.md, 2026-10-25, "The Bevy explorer")
+
+| Idea | Citation | Used in |
+|---|---|---|
+| An entity-component-system engine for the scene: entities with components, systems run over them each frame | Bevy (MIT or Apache-2.0), bevy.org, version 0.20 **(to confirm: release notes of the version in use)**; on ECS generally, Martin, A. (2007), "Entity Systems are the future of MMOG development" (t-machine.org) **(to confirm)** | `explorer/src/scene.rs` |
+| WebGPU in the browser, WebGL 2 where it is missing, from one Rust code base | wgpu (MIT or Apache-2.0), wgpu.rs **(to confirm: version 30)**; W3C, *WebGPU*, Candidate Recommendation **(to confirm)** | the two WebAssembly builds (`explorer/build.ts`) |
+| Many lights in one draw: per-instance data in a texture read by the vertex shader, quads that face the camera | GPU instancing as in Carucci, F. (2004), "Inside Geometry Instancing", *GPU Gems 2*, ch. 3 **(to confirm)** | the people (`explorer/src/people.wesl`) |
+| The shortest way on a grid by A*: a best-first search guided by a lower bound on the distance left | Hart, P. E., Nilsson, N. J. & Raphael, B. (1968), "A Formal Basis for the Heuristic Determination of Minimum Cost Paths", *IEEE Transactions on Systems Science and Cybernetics* 4(2), 100–107 | the drawn routes along the roads (`explorer/src/layout.rs`; a visual only) |
+| Student's t interval for a mean over few seeds | Student (1908), "The probable error of a mean", *Biometrika* 6(1), 1–25 | the workbench's bands across seeds, as measure/src/compare.ts |
+| Parquet, a columnar file for tables | Apache Parquet format specification, parquet.apache.org **(to confirm: format version)**; hyparquet-writer (MIT), github.com/hyparam/hyparquet-writer | the workbench's exports (`renderer/src/workbench.ts`) |
+| A categorical palette checked for colour-vision deficiency by distance in a perceptual colour space | Björn Ottosson (2020), "A perceptual color space for image processing" (OKLab), bottosson.github.io **(to confirm)**; Machado, Oliveira & Fernandes (2009), "A Physiologically-based Model for Simulation of Color Vision Deficiency", *IEEE TVCG* 15(6) **(to confirm)** | the workbench's series colours (`explorer/web/workbench.ts`) |
+
 ## Profile figures replaced from opened sources (source check, 2026-10-16; docs/decisions.md; worlds/profiles/)
 
 Each profile's own source notes carry the full citation, table and what was opened; these are the sources a figure now stands on. Entries marked **(to confirm)** were read in a search summary only.

@@ -11,11 +11,17 @@ import { buildingPanel, orgPanel, personPanel, seatActPanel, townPulse } from ".
 import { assertOutside, indexDirOf, indexIsCurrent, logOfRun, type RunEntry } from "./paths";
 import { Store } from "./store";
 import { trace, eventRow } from "./trace";
+import { describeRuns, DEBRIEF_HOOK, measureSeries, toCsv, toParquet, type Series, type Table } from "./workbench";
 
 /** `api`: the base URL of the Rust data layer (`oikos-explore serve`, kernel/crates/explore). When it is set (here, or by the
  * environment's OIKOS_EXPLORE_API) every `/api/*` request is answered by it, byte for byte, and the TS index is not built;
  * otherwise the TS index below answers (the default until the cut-over, docs/explorer.md). */
-export interface ServeOptions { port: number; prefix: string; runs: RunEntry[]; log?: (s: string) => void; single?: string; api?: string }
+export interface ServeOptions { port: number; prefix: string; runs: RunEntry[]; log?: (s: string) => void; single?: string; api?: string; engine?: Engine }
+
+/** Which client the page is: the Three.js explorer (the default until the Bevy one has caught up), or the Bevy explorer
+ * (explorer/: a WebAssembly scene and its HTML interface; docs/explorer.md "The Bevy explorer"). */
+export type Engine = "three" | "bevy";
+const BEVY = join(import.meta.dir, "..", "..", "explorer");
 
 interface Open { entry: RunEntry; dir?: string; store?: Store; pilot?: any; state: "none" | "indexing" | "ready" | "failed"; message?: string; started?: number }
 
@@ -39,12 +45,18 @@ export async function openIndex(entry: RunEntry, o: { log?: (s: string) => void;
   return { dir, store: new Store(dir) };
 }
 
-export async function bundleClient(): Promise<{ js: string; css: string }> {
-  const r = await Bun.build({ entrypoints: [join(import.meta.dir, "client", "main.ts")], target: "browser", minify: true, define: { "process.env.NODE_ENV": '"production"' } });
+export async function bundleClient(engine: Engine = "three"): Promise<{ js: string; css: string }> {
+  const dir = engine === "bevy" ? join(BEVY, "web") : join(import.meta.dir, "client");
+  const r = await Bun.build({ entrypoints: [join(dir, "main.ts")], target: "browser", minify: true, define: { "process.env.NODE_ENV": '"production"' } });
   if (!r.success) throw new Error(r.logs.map(String).join("\n"));
   const js = await r.outputs.find((x) => x.kind === "entry-point")!.text();
-  const css = readFileSync(join(import.meta.dir, "client", "style.css"), "utf8");
+  const css = readFileSync(join(dir, "style.css"), "utf8");
   return { js, css };
+}
+
+/** The Bevy scene's built files (explorer/pkg/<webgl2|webgpu>/, made by `bun explorer/build.ts`), if built. */
+export function bevyBuilt(): string[] {
+  return ["webgl2", "webgpu"].filter((f) => existsSync(join(BEVY, "pkg", f, "oikos_explorer_bg.wasm")));
 }
 
 export function pageHtml(prefix: string): string {
@@ -56,7 +68,9 @@ export function pageHtml(prefix: string): string {
 
 export async function serve(o: ServeOptions) {
   const say = o.log ?? (() => {});
-  const client = await bundleClient();
+  const engine: Engine = o.engine ?? "three";
+  const client = await bundleClient(engine);
+  if (engine === "bevy" && !bevyBuilt().length) throw new Error("the Bevy explorer is not built: run `bun explorer/build.ts`");
   const runs = new Map<string, Open>(o.runs.map((r) => [r.key, { entry: r, state: "none" }]));
   const prefix = o.prefix.replace(/\/+$/, "");
   const gz = (req: Request, body: string | Uint8Array, type: string, cache = "no-cache") => {
@@ -77,6 +91,64 @@ export async function serve(o: ServeOptions) {
   const rustApi = (o.api ?? process.env.OIKOS_EXPLORE_API ?? "").replace(/\/+$/, "");
   if (rustApi && !/^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(rustApi)) throw new Error(`the Rust data layer is only reached on this machine (127.0.0.1), not at ${rustApi}`);
 
+  // ---- the researcher workbench (renderer/src/workbench.ts): runs grouped, measures over time, exports
+  const infos = describeRuns(o.runs);
+  const series = new Map<string, Promise<Series>>();
+  const seriesOf = (k: string) => {
+    const info = infos.find((x) => x.key === k);
+    if (!info) throw new Error(`no such run: ${k}`);
+    if (!series.has(k)) {
+      const spec = info.group ? (() => { try { return JSON.parse(readFileSync(join(info.group!.dir, "spec.json"), "utf8")); } catch { return undefined; } })() : undefined;
+      const p = measureSeries(info.log, { institutions: spec?.institutions, from: spec?.forkDay ? spec.forkDay * DAY : undefined });
+      p.catch(() => series.delete(k));
+      series.set(k, p);
+    }
+    return series.get(k)!;
+  };
+  const tableOf = async (u: URL): Promise<Table> => {
+    const what = u.searchParams.get("what"), run = u.searchParams.get("run") ?? "";
+    if (what === "measures") {
+      const keys = (u.searchParams.get("runs") ?? run).split(",").filter(Boolean);
+      const names = (u.searchParams.get("measures") ?? "").split(",").filter(Boolean);
+      const cols = names.length ? names : (await seriesOf(keys[0]!)).defs.map((d) => d.name);
+      const rows: unknown[][] = [];
+      for (const k of keys) { const s = await seriesOf(k); for (let d = 0; d <= s.days; d++) rows.push([k, d, ...cols.map((c) => s.series[c]?.[d] ?? null)]); }
+      return { columns: ["run", "day", ...cols], rows };
+    }
+    if (!rustApi) throw new Error("the workbench's tables need the Rust data layer (oikos explore --rust, or --engine bevy)");
+    const q = new URLSearchParams(u.searchParams); q.delete("what"); q.delete("run"); q.delete("format");
+    if (what === "events") {
+      q.set("limit", q.get("limit") ?? "100000");
+      const b = await (await fetch(`${rustApi}/api/r/${encodeURIComponent(run)}/events?${q}`)).json();
+      return { columns: ["ord", "t", "day", "kind", "who", "cls", "outcome", "text"], rows: b.rows.map((r: any) => [r.ord, r.t, r.day, r.kind, r.who ?? null, r.cls, r.outcome ?? null, r.text]) };
+    }
+    if (what === "cohort") {
+      const b = await (await fetch(`${rustApi}/api/r/${encodeURIComponent(run)}/cohort?${q}`)).json();
+      const rows: unknown[][] = [];
+      for (const [g, x] of [["cohort", b.cohort], ["comparison", b.comparison]] as const) for (let d = 0; d <= b.days; d++) rows.push([g, d, x.agency_mean_bps[d], x.money_mean_minor[d], x.at_home_share[d], x.hard_per_100[d]]);
+      return { columns: ["group", "day", "agency_mean_bps", "money_mean_minor", "at_home_share", "hard_per_100"], rows };
+    }
+    throw new Error(`no such table: ${what}`);
+  };
+  async function workbench(req: Request, u: URL, what: string): Promise<Response> {
+    try {
+      if (what === "runs") return json(req, { runs: infos.map((i) => ({ key: i.key, name: i.name, group: i.group ?? null })), debriefs: DEBRIEF_HOOK });
+      if (what === "measures") {
+        const keys = (u.searchParams.get("runs") ?? "").split(",").filter(Boolean);
+        const out: Record<string, Series> = {};
+        for (const k of keys) out[k] = await seriesOf(k);
+        return json(req, out);
+      }
+      if (what === "export") {
+        const t = await tableOf(u);
+        const name = `${(u.searchParams.get("run") ?? u.searchParams.get("runs") ?? "runs").replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 60)}.${u.searchParams.get("what")}`;
+        if (u.searchParams.get("format") === "parquet") return new Response(toParquet(t) as Uint8Array<ArrayBuffer>, { headers: { "content-type": "application/vnd.apache.parquet", "content-disposition": `attachment; filename="${name}.parquet"` } });
+        return new Response(toCsv(t), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="${name}.csv"` } });
+      }
+    } catch (e) { return new Response(`error: ${(e as Error).message}`, { status: 500 }); }
+    return new Response("not found", { status: 404 });
+  }
+
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: o.port,
@@ -90,6 +162,14 @@ export async function serve(o: ServeOptions) {
       if (path === "/" || path === "/index.html") return new Response(pageHtml(prefix), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
       if (path === "/app.js") return gz(req, client.js, "text/javascript; charset=utf-8");
       if (path === "/app.css") return gz(req, client.css, "text/css; charset=utf-8");
+      if (engine === "bevy" && path.startsWith("/bevy/")) {
+        // (the scene's WebAssembly and its wasm-bindgen glue: two names in each of two folders, nothing else)
+        const m = /^\/bevy\/(webgl2|webgpu)\/(oikos_explorer\.js|oikos_explorer_bg\.wasm)$/.exec(path);
+        const file = m && join(BEVY, "pkg", m[1]!, m[2]!);
+        if (!file || !existsSync(file)) return new Response("not built", { status: 404 });
+        return gz(req, readFileSync(file), file.endsWith(".wasm") ? "application/wasm" : "text/javascript; charset=utf-8");
+      }
+      if (path.startsWith("/wb/")) return workbench(req, url, path.slice(4));
       if (rustApi && path.startsWith("/api/")) {
         // The Rust service answers every route of this file's /api, with the same shapes; it is only asked, never told.
         try {
