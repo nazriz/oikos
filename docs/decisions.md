@@ -8982,3 +8982,46 @@ routes as law data, nobody shown more than is theirs.
 - **Revisit if** a payment a seat makes for tax in words that do not say so is lost (the words rule missed it); a
   study reads refund times or refusals (source the figures first); a place's figure for tax officers per employer is found
   (size the desk by it); or a place's law allocates payments by period and it matters.
+
+## 2026-10-25 · Law 11: every unbased place given its basis, 310 to none (branch `figures-basis`; no value changed; no result changes; no model called)
+
+- **What was unbased.** On origin/main (3b87959e) the eleven counted towns had 310 unbased places: the 306 listed, and
+  four that the commercial-leasing merge added (`firm.landlord`'s `commercial.*`). By profile's town: au-vic 160, br-mg
+  234, de-ni 153, gb-eng 161, in-tn 165, jp-akita 156, ke-nakuru 166, mx-jal 163, us-oh 154; living au-vic and gb-eng
+  214 each. Now none in any of them, and `fixtures/figures-unbased.json` lists nothing.
+- **Why so few new sources were needed.** Nearly every place was a figure the profiles already speak for, reaching the
+  town through a module's parameter or a catalogue entry that the generator's table (`worlds/generator/figures.ts`) had
+  no row for: the bank's rates, the utilities' tariffs, the tribunal's possession steps, the union's dues, the clinic's
+  and school's staffing. Each now has a row that is true of the line of `generate.ts` that makes it: it names the
+  profile path it copies (the note then gives the class), or says it is derived (and from what), a placeholder (and
+  why) or a convention. The old places' numbers in the eleven towns now count 1,631 placeholder, 705 derived, 193
+  convention, 132 sourced and 71 to confirm. No profile note was added or changed and no value changed, so no town and
+  no log changes (the count is never in a config or a log).
+- **Marked as the generator's own placeholders** (each row says so; ME-11): a run's cap on created entities (50); a
+  child's other parent in the same cell; a let home's opening disrepair, drawn below the level of fault; heat losing
+  half a day; the councillors' leanings (-80 to 80); the budget's lead (45 days, the council's vote, two weeks);
+  casework at 80% of a worker's hours; the support office's statistics every 30 days; the builder's materials and build
+  times (as the structure types, already a placeholder); and the landlords' compliance, the spec's setting
+  (worlds/town.yaml). Conventions: the seed, the tick, the run's length, the log's checkpoints and anchors, a 365-day
+  year, units (an hour of upkeep or repair, 10 kg of waste, a kWh, a kilolitre, one item, 10,000 of skill for a year of
+  schooling), a field's floor and its arithmetic ceiling, a business of one employing nobody, and the grid's and the
+  river's own work taking no one in the town any time.
+- **Three changes to the counting, none to a world.** (1) A row's profile path reads the note of the same part below
+  it where the profile has one (`households.lone_bps` under the row for `households`). br-mg's notes are by part, with
+  no note for a whole section, so its households, nature and life were unbased though each part had a source; and in
+  every profile a part's own note is now read before its section's (a figure can now count as sourced where its
+  section's note calls another part a placeholder). (2) A row may hold for one id only (`id`): the catalogue's tasks and
+  fields share a pattern but are made from different sections (pollution from `nature.pollution`, the river from
+  `utilities` and `hazards`, heat from `climate`; a consultation's time from `health`, a lesson's from `education`),
+  and the old row read every field as `nature`. (3) A row may hold only where the config has a path (`given`): the
+  tribunal's days to a hearing are `frictions.venues.tribunal_days` in a town with frictions and
+  `justice.hearing_after_days` otherwise. Two of the citizen's rows (`found_bps`, `found_own_ppm`) spoke for parameters
+  the generator no longer makes, and the generic `wage` row for any module now matched nothing (each module's wage has
+  its own row: the shop, factory or construction wage, the doctor's, teacher's, officer's or public servant's); the
+  three were removed.
+- **Known faults left.** A row naming a section reads that section's note where the part has none, and some section
+  notes are long and mixed (a profile's `utilities` or `round`): the class is read from the note's words, so it errs
+  towards placeholder, never towards sourced. A `derived` row still does not carry through the class of what it is
+  derived from (N3). Numbers in behaviour code that never reach the config are not counted (N4).
+- **Revisit if** a row is found untrue of the code beside it (fix the row, not the count), or N3 puts the table in the
+  config (these rows are then its first provenance).
