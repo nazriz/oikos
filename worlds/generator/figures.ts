@@ -118,7 +118,7 @@ export const FIGURE_BASIS: Basis[] = [
     prof("commercial.rent", "commercial.rent_per_month"),
     prof("commercial.deposit_months", "commercial.deposit_months"),
     prof("commercial.term_months", "commercial.term_months"),
-    prof("commercial.notice_days", "commercial.notice_days"),
+    prof("commercial.surrender_months", "commercial.surrender_months"),
   ]),
   ...of(CITIZEN, [
     derived("attach_mean", "the town's mean attachment, from the profile's outlook.residence and outlook.job_tenure"),
