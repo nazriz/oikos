@@ -286,7 +286,6 @@ export const FIGURE_BASIS: Basis[] = [
     placeholder("compliance_bps", "the share of the time landlords obey a refusal, fine or order: the spec's setting (worlds/town.yaml), not a figure of any place"),
     prof("rent_review_months", "tenancy"),
     prof("rent_increase_notice_days", "tenancy.rent_increase_notice_days"),
-    prof("commercial", "commercial"),
     prof("repair.units", "frictions.repair_hours"),
     derived("repair.price", "an hour of the construction wage (wages_per_pay_period.construction) with the builder's markup"),
   ]),
