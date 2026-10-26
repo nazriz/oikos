@@ -24,7 +24,7 @@ Status words: `[x]` landed on main, `[~]` in progress, `[ ]` not started, `[?]` 
 
 ## Next, in order
 
-- [~] **Foundations-2, phase 2: conservation** (law 8). Water, energy, materials and waste as stocks with flows;
+- [x] **Foundations-2, phase 2: conservation** (law 8; landed 2026-10-26, its hard-rule line in CLAUDE.md; the before/after measurement and a 10,000-person month next week). Water, energy, materials and waste as stocks with flows;
   metered homes; recipes say their energy and water; shortages follow from network, contracts and operators, with no
   allocation rule (docs/design/foundations-2.md §2).
 - [ ] **Foundations-2, phase 3: space** (law 9). Roads, pipes, wires and data lines with capacity and energy; people in
