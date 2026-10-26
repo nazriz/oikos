@@ -1,7 +1,7 @@
 //! Faults found in the bug hunt of 2026-10-17 (runs/bughunt-2026-10-17.md), kernel side, each with the test that failed
 //! before its fix.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::EventBody;

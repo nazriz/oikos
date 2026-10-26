@@ -1,7 +1,7 @@
 //! police.station: the kind in a small world of the engine (docs/port-guide.md, section 4): the inspector's seat is replaced by
 //! the kind under test, a citizen by a script, every other kind idle; run on 1 thread and on 14, the same hash.
 
-mod common;
+use crate::common;
 
 use oikos_kernel::engine::{run_code_world, EngineOptions};
 use serde_json::{json, Value};

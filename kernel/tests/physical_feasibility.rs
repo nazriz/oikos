@@ -16,7 +16,7 @@
 //!
 //! Also: a refused action changes nothing at all.
 
-mod common;
+use crate::common;
 
 use common::*;
 use proptest::prelude::*;

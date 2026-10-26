@@ -3,7 +3,7 @@
 //! stream; a seat that sits as its code twin through a detached actor deciding exactly as the code would; the shared
 //! rules by name.
 
-mod common;
+use crate::common;
 
 use oikos_kernel::host::{Detached, Host};
 use serde_json::{json, Value};

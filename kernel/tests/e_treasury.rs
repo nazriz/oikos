@@ -2,7 +2,7 @@
 //! invoice addressed to the town within its adopted budget; the rates officer levies on a valuation and writes the
 //! town's claim; every other kind stands idle. Run on one thread and on fourteen: the same world, byte for byte.
 
-mod common;
+use crate::common;
 
 use oikos_kernel::engine::{run_code_world, EngineOptions};
 use serde_json::{json, Value};

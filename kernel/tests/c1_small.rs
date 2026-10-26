@@ -4,7 +4,7 @@
 //! (The libraries of the lane, tax, returns, payments, orgwants and practice, are not kinds: their tests are beside
 //! the code, in `oikos-rules` and `oikos-actors`.)
 
-mod common;
+use crate::common;
 
 use oikos_kernel::engine::{run_code_world, EngineOptions};
 use serde_json::{json, Value};

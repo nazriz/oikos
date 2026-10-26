@@ -1,7 +1,7 @@
 //! The engine with its actors in Rust (docs/design/rust-port.md 2.2; docs/port-guide.md): a world run with code
 //! actors stepped inside the kernel's process, seats handed to a host, the same result on any number of threads.
 
-mod common;
+use crate::common;
 
 use oikos_actors::sight::Action;
 use oikos_kernel::engine::{each_mut, run_code_world, Due, Engine, EngineOptions};
@@ -165,7 +165,7 @@ fn the_weather_manifest_is_the_one_the_ts_module_wrote() {
     }
 }
 
-/// How long the worked example takes to step (printed, never asserted: `cargo test --release --test engine -- --nocapture weather_steps`).
+/// How long the worked example takes to step (printed, never asserted: `cargo test --release --test main engine::weather_steps -- --nocapture`).
 #[test]
 #[allow(clippy::disallowed_methods)] // (a measurement, printed: nothing in the world reads it)
 fn weather_steps_per_second() {

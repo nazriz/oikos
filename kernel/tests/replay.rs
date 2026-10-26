@@ -5,7 +5,7 @@
 //! and the final canonical world state is byte-identical to the live run's.
 //! Running the same inputs twice, in fresh kernels, also gives identical logs.
 
-mod common;
+use crate::common;
 
 use common::*;
 use proptest::prelude::*;

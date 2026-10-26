@@ -2,7 +2,7 @@
 //! summarised (an area, simulated in aggregate). A region the size of a million cells costs nothing where it's
 //! summarised; building happens only on detailed ground; a channel can look at a place; malformed trees are refused.
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};

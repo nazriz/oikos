@@ -2,7 +2,7 @@
 //! order cited; it never asks what any of them is, or whether the act follows from them. One record has one written
 //! form (its id alone), so every record made before a basis could be several reads and hashes as it did.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::blocks::{Basis, BasisArg, Block, Record};

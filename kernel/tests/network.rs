@@ -11,7 +11,7 @@
 //! - only its operator opens, closes, interrupts, restores and reroutes; its user sets its own rate; a rotation is a
 //!   standing schedule, declared once.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::EventBody;
