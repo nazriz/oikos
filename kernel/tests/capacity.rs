@@ -3,7 +3,7 @@
 //! lanes work, and work coming faster than they take it is a queue, never a refusal; an act nobody priced is refused
 //! (`unpriced`), where it once took a second; and someone who only orders an act is not held until it is done.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::EventBody;

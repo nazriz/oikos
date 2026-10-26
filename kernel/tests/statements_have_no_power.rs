@@ -8,7 +8,7 @@
 //! same occupants. Records only matter through what participants *choose* to do,
 //! and a replayed command list is a fixed set of choices.
 
-mod common;
+use crate::common;
 
 use common::*;
 use proptest::prelude::*;

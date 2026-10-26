@@ -4,7 +4,7 @@
 //! directory to read through) does not load, and a look that asks for "everything" is refused before it reaches
 //! the log.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::EventBody;

@@ -2,7 +2,7 @@
 //! class raises skill); care shortens a condition and may call off a death due from it, once, and nobody is told which;
 //! skill makes work quicker; and illness rises with a field where the body is.
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};

@@ -3,7 +3,7 @@
 //! period, the finance office answers from its own books, and the auditor reports in public whether the books and the bank's
 //! record reconcile. Every other kind stands idle. Run on one thread and on fourteen: the same world, byte for byte.
 
-mod common;
+use crate::common;
 
 use oikos_kernel::engine::{run_code_world, EngineOptions};
 use serde_json::{json, Value};

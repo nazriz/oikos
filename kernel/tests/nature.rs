@@ -3,7 +3,7 @@
 //! surveyor sees; passers-by see a conspicuous species, never a count; cleared land grows back; the truth is censused
 //! monthly for measurement; and all of it replays exactly.
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};

@@ -4,13 +4,13 @@
 //! are `#[ignore = "F<n>: ..."]`: written against the INTENDED interface (the plan's section 2: `by` on any act, a
 //! work table keyed by record kind, a template's `does` and `supplier`, `deploy.to`), never red in the suite, and
 //! switched on by the step that builds the thing (remove the `ignore`, adjust the names the step settles on).
-//! `cargo test --test foundations -- --ignored` runs the pending ones, which must all fail today (F0 checked this).
+//! `cargo test --test main foundations:: -- --ignored` runs the pending ones, which must all fail today (F0 checked this).
 //!
 //! Law 6 (who may do what is data) and law 7 (information with its keeper) are kept already and have their own tests:
 //! `statements_have_no_power.rs`, `knowing.rs` and `orchestrator/test/no-god-view.test.ts`. Law 1's money and goods are
 //! `money_conservation.rs` and `conservation.rs`; what is added here is time.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::EventBody;

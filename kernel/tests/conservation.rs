@@ -14,7 +14,7 @@
 //!
 //! This generalises `goods.rs` (phase B) to fields (foundations-2 C1) and to fields that hold a kind (C2).
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::EventBody;

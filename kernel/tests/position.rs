@@ -5,7 +5,7 @@
 //! you see how many are in it, not who. Nothing here knows what a cell,
 //! building or notice is for.
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};

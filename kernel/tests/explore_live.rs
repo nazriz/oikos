@@ -2,7 +2,7 @@
 //! fed line by line to an `oikos_explore::Index` while the run goes on, answering the service's routes mid-run; at the
 //! end it holds what an index built from the finished log holds. Read-only: the stream is pulled, nothing flows back.
 
-mod common;
+use crate::common;
 
 use oikos_explore::service::{RunSpec, Service};
 use oikos_explore::Index;

@@ -1,7 +1,7 @@
 //! Faults the independent review of the foundations found (runs/review-foundations-2026-10-16.md), each with the test that
 //! failed before its fix. One test per finding, named for it.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::EventBody;
