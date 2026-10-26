@@ -36,7 +36,12 @@ test("people go to the gatherings they may come to, while they're on, and go hom
     expect(r).toBeDefined();
     const start = r.practice.first + Math.floor((e.t - r.practice.first) / r.practice.every) * r.practice.every;
     const left = ev.find((x) => x.event === "vacated" && x.occupant === e.occupant && x.space === e.space && x.t >= e.t);
-    if (start + r.practice.lasts < 90 * DAY) expect(left && left.t <= start + r.practice.lasts + 3_600).toBeTruthy();
+    // (By the gathering's end, within the clock's hour, or once the work it had begun there is done: someone whose post's
+    // papers were in hand as it ended leaves when they are finished, since all work takes time. Found 2026-10-26, when law 8
+    // moved the town's course: a member writing an interview and an answer until an hour after the end left a minute late.)
+    const end = start + r.practice.lasts;
+    const busy = Math.max(end, ...ev.filter((x) => x.event === "action_started" && x.participant === `${e.occupant}-self` && x.t < end && x.t >= e.t).map((x) => x.done));
+    if (end < 90 * DAY) expect(left && left.t <= busy + 3_600).toBeTruthy();
   }
   // The union's meeting is for its members.
   const members = new Set(config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes("union")).flatMap((r: any) => r.terms.parties));

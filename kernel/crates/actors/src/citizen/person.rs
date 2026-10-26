@@ -468,7 +468,7 @@ impl Person {
             .channels
             .values()
             .flat_map(|c| match c {
-                Seen::Holdings { holdings } => holdings.iter().filter(|h| h.kind == self.p.goods).map(|h| crate::common::money::cents(h.quantity)).collect::<Vec<_>>(),
+                Seen::Holdings { holdings, .. } => holdings.iter().filter(|h| h.kind == self.p.goods).map(|h| crate::common::money::cents(h.quantity)).collect::<Vec<_>>(),
                 _ => vec![],
             })
             .sum::<i64>();

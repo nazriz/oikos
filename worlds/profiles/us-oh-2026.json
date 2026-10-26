@@ -1133,9 +1133,9 @@
         "floor_bps": 8000
       }
     },
-    "utilities": {
+    "utilities": {"network": {"head_m": 50, "service_head_m": 20, "min_head_m": 5, "storage_days": 2, "pipe_peak_bps": 25000, "wire_margin_bps": 15000, "main_loss_m": 10, "service_loss_m": 5, "shape_bps": [270, 238, 216, 216, 227, 281, 411, 520, 487, 411, 379, 368, 368, 357, 357, 390, 487, 650, 758, 736, 628, 509, 411, 325]}, 
       "water": {
-        "litres_per_person_per_day": 310,
+        "litres_per_person_per_day": 310, "bill_to": "owner",
         "price_per_kl": 277,
         "service_per_quarter": 6300,
         "river_inflow_kl_per_cell_per_day": 1000,
@@ -1384,6 +1384,8 @@
     "work_time": {
       "person": {"publish/benefit_claim": 1140, "publish/benefit_decision": 4500, "publish/evidence_request": 120, "publish/evidence": 1440, "publish/confirmation_answer": 1800, "publish/tribunal_order": 900},
       "sources": {
+    "utilities.network": "PLACEHOLDER (to confirm; WM-1, foundations-2 C4): the network's engineering figures are the generator's stand-ins, the same in every profile: a source head of 50 m, a service head of 20 m (a common minimum service pressure in supply codes, e.g. the Water Services Association of Australia's code: recalled, to confirm) and 5 m below which nothing comes; a store of two days' use; pipes sized for 2.5 times the average flow and wires for 1.5 times the peak hour's; a main losing 10 m and a service 5 m at capacity (linear stand-ins for friction); a household's day of electricity by hour, an evening peak (a typical residential load profile: recalled, to confirm). Would be sourced from a local water authority's and a distributor's design standards and published load profiles.",
+    "utilities.water.bill_to": "PLACEHOLDER (to confirm; WM-12): Ohio municipal water accounts are commonly in the property owner's name, with unpaid charges a lien on the property (Ohio Revised Code 743.04: recalled, to confirm).",
         "person.publish/benefit_claim": "Opened: USDA Food and Nutrition Service, 'Agency Information Collection Activities: SNAP Applications, Periodic Reporting and Notices' (OMB 0584-0064), Federal Register 80(94), 15 May 2015, p. 27886 (govinfo.gov/content/pkg/FR-2015-05-15/pdf/2015-11742.pdf), the households' revised time estimates: 'Initial SNAP Application' 19 minutes = 1,140 s. A burden estimate under the Paperwork Reduction Act, not a measured time; SNAP's form stands for every claim the town's support law lists (to confirm for Ohio's own forms; WM-1).",
         "person.publish/benefit_decision": "Opened: the same FNS notice (OMB 0584-0064, Federal Register 15 May 2015), the state agency's revised time estimates for an initial application: application 19 + interview 30 + verification 24 minutes, and 'Notice of Eligibility or Denial' 2 = 75 minutes = 4,500 s. The town has no separate act for reading, interviewing or verifying, so the decision is the case's whole handling. A burden estimate, not a time-and-motion study; Ohio's counties administer SNAP under it (to confirm against an Ohio eligibility-worker workload standard; WM-1). The text of the PDF was extracted locally: the columns interleave, and the reading here (initial 19, interview 30, verification 24; recertification 15, 20, 10) matches the households' table beside it.",
         "person.publish/evidence_request": "Opened: the same FNS notice, state agency: 'Notice of Missing or Incomplete Report' and 'Request for Contact', 2 minutes each = 120 s (a notice asking a household for what a claim lacks).",

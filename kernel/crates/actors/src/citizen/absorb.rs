@@ -43,6 +43,12 @@ pub struct BinSeen {
     pub emptied_at: i64,
     pub at: i64,
     pub view: Option<VariableView>,
+    /// Where waste is held at home (law 8): the units we have used up at home since we last looked, and what a unit
+    /// leaves in the bin as we have seen it (kilograms, in thousandths), to tell an emptied bin from one we filled again.
+    #[serde(default)]
+    pub units: i64,
+    #[serde(default)]
+    pub per_unit_milli: i64,
 }
 
 /// This part's own memory: what absorb took in for the parts that act on it (each field says whose it is).
@@ -449,12 +455,42 @@ impl Person {
     fn home_seen(&mut self, pic: &Picture) {
         let Some(home) = self.s.home.clone() else { return };
         let t = pic.t;
+        // The bin at home, where waste is a kind we hold (law 8, foundations-2 C4): emptied when we hold less of it than
+        // when we last looked.
+        let held: Option<i64> = pic.channels.values().find_map(|ch| match ch {
+            Seen::Holdings { holdings, .. } => Some(holdings.iter().filter(|h| h.kind == self.p.complain_about && h.at == home.structure).map(|h| crate::common::cents(h.quantity)).sum()),
+            _ => None,
+        });
+        if let Some(now) = held.filter(|_| self.p.complain_about_held) {
+            let bin = &mut self.absorbed.bin_seen;
+            // (What it would hold had nobody come: what it held, and what our use since added. Well under that, or under
+            // what it held: emptied. Over what it held and nobody came: what a unit leaves in it, learned.)
+            let expected = bin.value + bin.units * bin.per_unit_milli / 1000;
+            if bin.structure != home.structure {
+                bin.structure = home.structure.clone();
+                bin.emptied_at = t;
+            } else if now == 0 || now < bin.value || (bin.units > 0 && bin.per_unit_milli > 0 && now * 10 < expected * 6) {
+                // (A bin with nothing in it is as good as emptied: nothing has waited in it. Without this a household
+                // that had thrown nothing out for a fortnight counted the fortnight against its first bag.)
+                bin.emptied_at = t;
+            } else if bin.units > 0 && now > bin.value {
+                bin.per_unit_milli = (now - bin.value) * 1000 / bin.units;
+            }
+            bin.units = 0;
+            bin.value = now;
+            bin.at = t;
+            bin.view = None;
+        }
         for ch in pic.channels.values() {
             let Seen::Sites { cells, .. } = ch else { continue };
             for c in cells.iter() {
                 let Some(st) = c.structure.as_ref().filter(|s| s.structure == home.structure) else { continue };
                 self.absorbed.home_site = Some(st.clone());
                 let view = st.variables.as_ref().and_then(|v| v.get(&self.p.complain_about)).cloned();
+                // (Where what is complained of is a kind we hold at home (waste: law 8), the bin is what we hold of it there.)
+                if view.is_none() {
+                    continue;
+                }
                 let now = view.as_ref().map_or(0, |v| crate::common::variable_today(v, t));
                 let bin = &mut self.absorbed.bin_seen;
                 if bin.structure != home.structure {

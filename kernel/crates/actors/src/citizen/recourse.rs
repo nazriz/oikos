@@ -702,7 +702,12 @@ impl Person {
         let (Some(to), Some(home)) = (self.p.complain_to.clone(), self.s.home.clone()) else { return };
         let site = self.absorbed.home_site.clone().filter(|s| s.structure == home.structure);
         let Some(site) = site.filter(|_| self.is_leaseholder()) else { return };
-        let now = site.variables.as_ref().and_then(|v| v.get(&self.p.complain_about)).map_or(0, |v| crate::common::variable_today(v, t));
+        let now = if self.p.complain_about_held {
+            // (Waste a kind we hold at home, law 8: what is in the bin is what we hold of it there.)
+            if self.absorbed.bin_seen.structure == home.structure { self.absorbed.bin_seen.value } else { 0 }
+        } else {
+            site.variables.as_ref().and_then(|v| v.get(&self.p.complain_about)).map_or(0, |v| crate::common::variable_today(v, t))
+        };
         if self.absorbed.bin_seen.structure != home.structure {
             let b = &mut self.absorbed.bin_seen;
             b.structure = home.structure.clone();

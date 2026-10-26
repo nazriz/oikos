@@ -58,7 +58,7 @@ class Ambiguous extends Ask {
 const writtenAsId = (x: string): boolean => /^[a-z0-9_.:\/-]+$/.test(x);
 /** An id as the contract writes one (common.schema.json: a chosen id, a minted one, a cell, a space), or a name bound
  * in the same act. Anything else written where an id goes can never be recorded: it is asked about, with what it is. */
-const WRITTEN_ID = /^([a-z][a-z0-9_-]{0,63}|(ent|acc|str|rec|act|msg|par|pos|cnd)\.[0-9]{1,15}|cell\.[0-9]{1,6}\.[0-9]{1,6}|([a-z][a-z0-9_-]{0,63}|str\.[0-9]{1,15})\/[a-z][a-z0-9_-]{0,63}\.[0-9]{1,6})$/;
+const WRITTEN_ID = /^([a-z][a-z0-9_-]{0,63}|(ent|acc|str|rec|act|msg|par|pos|cnd|conn)\.[0-9]{1,15}|cell\.[0-9]{1,6}\.[0-9]{1,6}|([a-z][a-z0-9_-]{0,63}|str\.[0-9]{1,15})\/[a-z][a-z0-9_-]{0,63}\.[0-9]{1,6})$/;
 const BOUND_NAME = /^[a-z][a-z0-9_]{0,31}$/;
 const ID_SHAPE = { test: (x: string): boolean => (x.startsWith("$") ? BOUND_NAME.test(x.slice(1)) : WRITTEN_ID.test(x)) };
 /** What is said of something written where an id goes that is no id (a draft's name; a made-up id). */

@@ -1,0 +1,90 @@
+{
+  "about": "Law 8, nothing physical from nothing (docs/nothing-from-nothing.md; docs/design/foundations-2.md section 2): today's violations, found by orchestrator/test/nothing-from-nothing.test.ts in every profile's town and in the modules' sources. `found` lists each audit's findings as it names them; `entries` are the special cases the plan deletes, each a literal string `find` in `file` and the step (`step`) that deletes it. The inventory only shrinks: a finding not listed fails the backstop, and so does a listed finding or entry no longer found, so the change that ends a case removes it here, with a line in docs/decisions.md. A step that has landed is in `done`: its entries stay, as guards, and `specialCasesLeft` fails if one stands again.",
+  "done": [
+    "C1",
+    "C2",
+    "C3",
+    "C4",
+    "C5"
+  ],
+  "found": {
+    "stocksAsVariables": [],
+    "orphanKinds": [],
+    "silentRecipes": [],
+    "billsWithoutMeters": [],
+    "vanishing": [],
+    "allocationRules": []
+  },
+  "entries": [
+    {
+      "id": "water-used-variable",
+      "law": 8,
+      "step": "C4",
+      "kind": "delete",
+      "file": "worlds/generator/generate.ts",
+      "find": "{ id: \"water_used\"",
+      "what": "a home's water use as a building variable that grows per occupant out of nothing (foundations-2 2.3); replaced by a water connection and its meter",
+      "plan": "2.3"
+    },
+    {
+      "id": "waste-variable",
+      "law": 8,
+      "step": "C4",
+      "kind": "delete",
+      "file": "worlds/generator/generate.ts",
+      "find": "{ id: \"waste\", min: 0",
+      "what": "a home's waste as a building variable that grows per occupant (foundations-2 2.3); replaced by waste as the output of what is consumed",
+      "plan": "2.3"
+    },
+    {
+      "id": "per-occupant-per-day",
+      "law": 8,
+      "step": "C4",
+      "kind": "delete",
+      "file": "kernel/crates/contracts/src/config.rs",
+      "find": "pub per_occupant_per_day: i64",
+      "what": "the contract's growth of a variable per occupant (a stock kept as a condition); refused at load as `stock_as_variable`",
+      "plan": "2.1"
+    },
+    {
+      "id": "units-per-customer",
+      "law": 8,
+      "step": "C4",
+      "kind": "delete",
+      "file": "kernel/crates/actors/src/offices/utilities.rs",
+      "find": "units_per_customer_per_day",
+      "what": "the energy retailer bills its customers for an assumed use (foundations-2 2.3); replaced by its meters",
+      "plan": "2.3"
+    },
+    {
+      "id": "litres-per-person",
+      "law": 8,
+      "step": "C4",
+      "kind": "delete",
+      "file": "kernel/crates/actors/src/offices/utilities.rs",
+      "find": "litres_per_person_per_day",
+      "what": "the water corporation draws what an assumed use a head comes to (foundations-2 2.3); replaced by what the homes' connections take",
+      "plan": "2.3"
+    },
+    {
+      "id": "energy-destroyed-at-the-depot",
+      "law": 8,
+      "step": "C4",
+      "kind": "delete",
+      "file": "worlds/generator/generate.ts",
+      "find": "{ id: \"supply_energy\"",
+      "what": "energy used up at the depot instead of reaching homes (foundations-2 2.3); replaced by the homes' energy connections and their use as a recipe at the home",
+      "plan": "2.3"
+    },
+    {
+      "id": "utility-demand-response",
+      "law": 8,
+      "step": "C4",
+      "kind": "replace",
+      "file": "kernel/crates/actors/src/offices/utilities.rs",
+      "find": "restriction_cut_bps",
+      "what": "the utility's own reckoning of how use responds to its price and to a restriction (foundations-2 2.3); use becomes what households set their connections to, by their own rule",
+      "plan": "2.3"
+    }
+  ]
+}

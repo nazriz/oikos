@@ -131,6 +131,25 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 32
+              },
+              "class": {
+                "description": "Law 8 (docs/nothing-from-nothing.md): `stock` (the default: conserved, as water, materials, goods, waste and hardware are), `dissipates` (energy, fuel: it may be a process's input with nothing out, as heat leaves the world's books; otherwise it is conserved), or `service` (a unit of a service sold over a counter, a haircut or a visit to a venue: no physical quantity, used as it is bought). All are held, moved and counted the same.",
+                "enum": ["stock", "dissipates", "service"]
+              },
+              "settle": {
+                "description": "How a connection carrying this kind is settled (foundations-2 C3): once a `day`, or each `hour`. Absent: the kind flows on no connection.",
+                "enum": ["day", "hour"]
+              },
+              "shape_bps": {
+                "description": "For a kind settled hourly: the share of a connection's daily rate delivered in each hour of the day (24 shares, in basis points, summing to 10,000: a load shape). Absent: an even 24th each hour.",
+                "type": "array",
+                "minItems": 24,
+                "maxItems": 24,
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                }
               }
             }
           }
@@ -172,7 +191,7 @@
                   "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
                 },
                 "additionalProperties": {
-                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Quantity"
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/RecipeQuantity"
                 },
                 "maxProperties": 100
               },
@@ -182,7 +201,7 @@
                   "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
                 },
                 "additionalProperties": {
-                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Quantity"
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/RecipeQuantity"
                 },
                 "maxProperties": 100
               },
@@ -280,6 +299,16 @@
                   }
                 }
               },
+              "collects": {
+                "description": "Collection (law 8, foundations-2 C4: a round emptying the bins): per unit, up to `per_unit` of a kind held at the structure worked on (`on`) by anyone there is taken into the actor's holding at `at`, from the holders in turn (a different one first each day); what is not there is not taken and nothing is made. What is left is seen by those who did it.",
+                "type": "object",
+                "required": ["kind", "per_unit"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+                  "per_unit": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+                }
+              },
               "draws": {
                 "description": "Per unit: taken from a field, at the cell (of the structure's, or the four around them) with the most of it; refused (field_exhausted) where there isn't enough (water from a river run low).",
                 "type": "object",
@@ -362,6 +391,7 @@
                 "maximum": 9007199254740991
               },
               "per_occupant_per_day": {
+                "description": "Refused at load (law 8, `stock_as_variable`): a variable does not grow by its occupants; what they use flows on a connection and what they throw away is a process's output.",
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
@@ -440,6 +470,10 @@
             "properties": {
               "id": {
                 "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+              },
+              "kind": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId",
+                "description": "Law 8: the kind of resource the field holds, in the kind's unit (a river's water). A `draws` from it moves what is drawn into the actor's holding; an `emits` to it is the process's output, put on the cell; nature's day (sources, decay, flow off the ground, a bound reached) is nature's edge, counted (state `nature.edge`). Its baseline is nought and its minimum at least nought. Absent: a field that is no stock (a concentration, a habitat's quality)."
               },
               "min": {
                 "type": "integer",
@@ -1732,6 +1766,219 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 36500
+        },
+        "network": {
+          "description": "The network for what flows (foundations-2 C3, law 8): nodes, links and the supplies that feed each tree of links. Each supply's tree is found at load, breadth first over the links of its mode; a link that would close a loop is cut (the known limit). Roads and paths join it later (law 9).",
+          "type": "object",
+          "required": [
+            "nodes"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "nodes": {
+              "type": "array",
+              "maxItems": 1000000,
+              "items": {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+                  },
+                  "cell": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+                  },
+                  "edge": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+                  },
+                  "height_m": {
+                    "type": "integer",
+                    "minimum": -100000,
+                    "maximum": 100000
+                  }
+                }
+              }
+            },
+            "links": {
+              "type": "array",
+              "maxItems": 1000000,
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "from",
+                  "to",
+                  "mode",
+                  "capacity"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+                  },
+                  "from": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+                  },
+                  "to": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32
+                  },
+                  "length_m": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000000
+                  },
+                  "capacity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000000000000,
+                    "description": "What it carries an hour, at most, in the unit of what flows on it (its rating)."
+                  },
+                  "loss_m": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000,
+                    "description": "A pipe's head lost at capacity, in metres (the loss is this times the flow over the capacity)."
+                  }
+                }
+              }
+            },
+            "supplies": {
+              "type": "array",
+              "maxItems": 1000,
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "kind",
+                  "mode",
+                  "node",
+                  "holder",
+                  "at",
+                  "physics"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+                  },
+                  "kind": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32
+                  },
+                  "node": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+                  },
+                  "holder": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+                  },
+                  "at": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+                  },
+                  "physics": {
+                    "enum": [
+                      "pressure",
+                      "rating",
+                      "drain"
+                    ]
+                  },
+                  "head_m": {
+                    "type": "integer",
+                    "minimum": -100000,
+                    "maximum": 100000
+                  },
+                  "storage": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Quantity"
+                  },
+                  "service_head_m": {
+                    "type": "integer",
+                    "minimum": -100000,
+                    "maximum": 100000
+                  },
+                  "min_head_m": {
+                    "type": "integer",
+                    "minimum": -100000,
+                    "maximum": 100000
+                  }
+                }
+              }
+            }
+          }
+        },
+"scarce": {
+          "description": "Scarce kinds at the world's edges (foundations-2 C6; decision 2): an edge sells from outside no more than `quantity` of a kind in each period of `every` seconds counted from the run's start (refused `beyond_supply`); every other kind is unlimited at its price. To whom it sells what it has is its offers', never the kernel's.",
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "required": ["edge", "kind", "quantity", "every"],
+            "additionalProperties": false,
+            "properties": {
+              "edge": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+              "kind": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+              "quantity": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Quantity" },
+              "every": { "type": "integer", "minimum": 1, "maximum": 3162240000 }
+            }
+          }
+        },
+                "connections": {
+          "description": "Connections at the start (foundations-2 C3): a holder's at a structure, on a node, taking a kind from the supply whose tree the node is on at `rate` a day (on a drain, the most it lets out), its meter counting what is delivered. `uses`: a recipe that takes no time and uses the kind a unit at a time (use at the user). `meter`: read on the premises (the default) or from afar by its operator.",
+          "type": "array",
+          "maxItems": 1000000,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "kind",
+              "node",
+              "holder",
+              "at",
+              "rate"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+              },
+              "kind": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+              },
+              "node": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+              },
+              "holder": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              },
+              "at": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              },
+              "rate": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000000000
+              },
+              "uses": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+              },
+              "meter": {
+                "enum": [
+                  "on_site",
+                  "remote"
+                ]
+              }
+            }
+          }
         }
       }
     },

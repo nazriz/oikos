@@ -121,14 +121,17 @@ The mechanism:
 
 ### WM-2 · Mechanisms that do not bind (crime, pollution, water, clinic)
 - **Gap:** Several mechanisms run on placeholders sized so that they hardly act: theft is a rare chance (200 bps a
-  month for someone in need where goods are kept); pollution makes nobody ill; the river never restricts water, even
-  in a dry year; the clinic is about 1% used because only hospital-level illness exists; crime does not rise in a slump.
+  month for someone in need where goods are kept); pollution makes nobody ill; the clinic is about 1% used because only hospital-level illness exists; crime does not rise in a slump.
 - **Where:** profiles (`crime`, `nature`, `services`, hazards); `docs/scenarios.md` ("Inert"); `docs/behaviour/health.md`, `crime.md`.
 - **Effect:** An experiment on policing, environmental stewardship, water or health gets a null result from a dead
   mechanism, and a steward who does nothing looks as good as one who does well. Pollution decisions look costless to health.
 - **L / I:** high / high (for those offices) · **Status:** to source
 - **Notice by:** a scenario whose runs match the plain town (`oikos scenarios` marks them `inert`); an office never asked to act.
 - **Fix when:** a steward experiment seats the police, environment, water or clinic office.
+- **Water, 2026-10-26 (foundations-2 C2 to C4, law 8):** the river now restricts water. What the works draws is held in its
+  store, homes take from it through the main by pressure, and a dry river leaves the draw refused, the store falling, its
+  head with it, and the far end and the high ground short first (unless the corporation acts). Pollution making nobody ill
+  is a dose-response law still missing, not conservation.
 
 ### WM-3 · The weather bureau is never wrong
 - **Gap:** The bureau is handed the run's actual weather and warns a fixed number of days ahead with no misses and no
@@ -193,6 +196,26 @@ The mechanism:
 - **L / I:** medium / medium · **Status:** to fix (trace it)
 - **Notice by:** Waste complaints per resident by month against the twin; the complaint count reaching the hired crew's capacity.
 - **Fix when:** a mayor or works experiment.
+- **2026-10-26 (foundations-2 C4, law 8):** waste now has a cause. It is what households use up (each unit of goods,
+  food, clothing or a meal out becomes so many kilograms, from the profile's waste a head a day over what is spent:
+  derived from the essentials' floor, so it overstates where people spend well above it), held at home, and collected
+  from where it is held (`collects`: the crew takes what is there, never more, and sees what is left). A backlog is now
+  waste held that no crew's hours reached. Not yet traced against pilot 7a's figures.
+
+### WM-15 · Workplaces use no energy or water
+- **Gap:** Every recipe at a workplace states its energy and water (law 8, foundations-2 C5), and every one states nought:
+  no workplace is on the network (homes are), no firm or office asks to be supplied, and no firm pays a utility bill. A
+  figure above nought would stop the work it is in. So a factory's output, a shop's service and an office's work cost
+  nothing in energy or water, the town's demand on the river and the grid is its households' alone, and a drought or a
+  dear grid reaches no employer.
+- **Where:** `worlds/generator/generate.ts` (`WORKPLACE_USE`), `worlds/generator/figures.ts` (the rows' basis); firm and
+  office modules (no supply request, no utility invoices paid).
+- **Effect:** A shortage or a price on energy and water falls on households only; a large user (a works, a data centre)
+  cannot be modelled; the AI economy's draw on energy and water (foundations-2 section 7) does not exist yet.
+- **L / I:** high / medium · **Status:** to fix (per-unit figures by industry, from an energy account or an input-output
+  table where the place has one; workplaces connected at the start and on founding; firms paying their bills)
+- **Notice by:** any recipe at a workplace with nought for energy or water (all of them today).
+- **Fix when:** before an experiment on utilities, prices of energy or water, or a large user.
 
 ### WM-10 · Repeal does not reach those who read the law; new kinds of binding law cannot be made
 - **Gap:** A law repealed without a replacement is still taken as in force by landlords, tenants, the union and the
@@ -223,6 +246,13 @@ The mechanism:
 - **L / I:** high / medium · **Status:** to fix (who pays as law data; a demand response with a source)
 - **Notice by:** Water or energy bills in a drought or price shock with no change in use.
 - **Fix when:** Before a scenario of utility prices, rationing or disconnection; who pays the bill is law data first.
+- **2026-10-26 (foundations-2 C4, law 8):** who pays the water bill is law data per profile (`utilities.water.bill_to`:
+  the owner in au-vic, the occupier in gb-eng, both recalled; placeholders elsewhere). Use is what each household sets
+  its connections to (litres a head, kWh a day: its own rule), set again when the household changes; the utility's own
+  reckoning of demand (`price_elasticity_bps`, `restriction_cut_bps`) is gone. Disconnection is an act of the
+  operator's (a household gone, or one asking to stop). **Still open:** households do not read the tariff or a
+  restriction notice, so neither changes the rate they set (a source for the household's response is the next step);
+  no hardship programme; disconnection for unpaid bills is not a rule of the utilities'.
 
 ### WM-13 · Heat adds illness evenly across ages
 - **Gap:** `heat_illness_bps_per_unit` (100 in all nine profiles) adds the same points at every age, so a young
@@ -1080,6 +1110,20 @@ The mechanism:
 - **L / I:** high / high · **Status:** accepted (parked by the owner, 2026-10-11)
 - **Notice by:** The held-out score against the pass mark (90% right, 1% confidently wrong) at each release.
 - **Fix when:** the next round, with real cases for the new forms.
+
+### TR-7 · Seats cannot act on connections or links
+- **Gap:** The network's acts (`connection`: open, set, close, interrupt, restore; `link`: shut, open, reclose,
+  rotate) are code's own calls (`CODE_ONLY` in the engine's resolver), not a seat's: every function of a seat's
+  contract needs translator gold and the writer's words, and the translator is parked (foundations-2 C3, 2026-10-26).
+- **Where:** `kernel/crates/resolver/src/calls.rs` (`CODE_ONLY`); `contracts/calls.md`.
+- **Effect:** A model seated in a utility's or a network operator's post cannot declare a rotation, interrupt an
+  interruptible customer, reclose a tripped feeder or open and close connections; its staff's code does none of those
+  either under a seat. A seated household cannot set its own use. Any experiment that seats those posts reads a
+  shortage the seat could not act on.
+- **L / I:** high (if such a post is seated) / high · **Status:** to fix (the translator's next round)
+- **Notice by:** a seat in `water-operations` or `energy-operations`; a seat writing `connection(` or `link(` and asked
+  what it means.
+- **Fix when:** before any experiment that seats a utility or operator post, or a household that is to set its use.
 
 ### TR-3 · Errors differ by seat model and by place
 - **Gap:** Accuracy differs 15 to 40 points by seat model and profile on small cells; money on unseen pilots 0 of 7;

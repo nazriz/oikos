@@ -556,6 +556,12 @@ pub struct SupplyRequest {
     pub account: String,
     /// The home (space) supplied.
     pub home: String,
+    /// What is asked for (foundations-2 C4): `water` (with the sewer) or `energy`; absent, energy, as the requests were.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// What the household will use a day (its connection's rate).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate: Option<i64>,
 }
 impl Paper for SupplyRequest {
     const KIND: &'static str = "supply_request";

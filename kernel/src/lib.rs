@@ -24,7 +24,7 @@ pub mod stream;
 // The world (its state, physics and records: the only writer) and perception (read-only), as crates of their own,
 // where the kernel has always had them.
 pub use oikos_perception as observe;
-pub use oikos_world::{exec, geo, state, statics};
+pub use oikos_world::{exec, geo, network, state, statics};
 
 pub use kernel::{Command, Kernel, ProtocolError};
 pub use run::{replay, Run};

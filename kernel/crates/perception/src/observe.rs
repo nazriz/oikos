@@ -115,7 +115,17 @@ pub struct OwnRecord {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ChannelData {
     Accounts { accounts: Vec<AccountItem>, transactions: Vec<Transaction> },
-    Holdings { holdings: Vec<HoldingItem> },
+    Holdings {
+        holdings: Vec<HoldingItem>,
+        /// What flows to it (foundations-2 C3): its own connections, with their meters (it is there: they are its own);
+        /// and, for a supply's operator, every connection on its network, with the meters it reads from afar. Whole at
+        /// every look (a meter moves every settlement).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        connections: Vec<ConnectionItem>,
+        /// A supply's operator's network: each link's state and its last load (its own instruments: the operator keeps it).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        links: Vec<LinkItem>,
+    },
     /// The entity's own record, when it has changed since the last look (or in the full picture); absent otherwise.
     OwnRecord {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -144,6 +154,86 @@ pub enum ChannelData {
     Directory { entities: Vec<EntityItem>, positions: Vec<PositionItem> },
 }
 
+/// A connection as its user or its operator sees it (foundations-2 C3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectionItem {
+    pub id: Id,
+    pub kind: Id,
+    pub at: Id,
+    pub node: Id,
+    /// Its user (shown to its operator; the user's own are its own).
+    pub holder: Id,
+    pub rate: i64,
+    /// What it has delivered since it was opened: shown to its user, and to its operator where it reads it from afar.
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::money::opt_amount")]
+    pub meter: Option<crate::money::Money>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub closed: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub interrupted: bool,
+    /// The looker operates its supply.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub operated: bool,
+}
+
+/// A link of an operator's network as its own instruments show it (foundations-2 C3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LinkItem {
+    pub id: Id,
+    pub mode: String,
+    pub from: Id,
+    pub to: Id,
+    pub capacity: i64,
+    pub load: i64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shut: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub tripped: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rotation: Option<oikos_world::network::Rotation>,
+}
+
+/// What flows to an entity, as it may see it: its own connections (theirs, with their meters), and, where it operates a
+/// supply, the connections on its network (the meters it reads from afar) and its links. Nobody else's (docs/no-god-view.md:
+/// the network's whole map is its operator's register).
+pub fn flows_of(s: &Statics, st: &State, me: &str) -> (Vec<ConnectionItem>, Vec<LinkItem>) {
+    let (Some(ns), Some(n), Some(net)) = (st.network.as_deref(), s.config.world.network.as_ref(), s.net.as_ref()) else { return (vec![], vec![]) };
+    let item = |c: &oikos_world::network::Connection, operated: bool| ConnectionItem {
+        id: c.id.clone(),
+        kind: c.kind.clone(),
+        at: c.at.clone(),
+        node: c.node.clone(),
+        holder: c.holder.clone(),
+        rate: c.rate,
+        meter: (!operated || c.reading == crate::config::MeterKind::Remote || c.holder == me).then_some(c.meter),
+        closed: c.closed,
+        interrupted: c.interrupted,
+        operated,
+    };
+    let mut seen = BTreeSet::new();
+    let mut conns = vec![];
+    let mut links = vec![];
+    for (k, sup) in n.supplies.iter().enumerate().filter(|(_, x)| x.holder == me) {
+        for &ci in ns.index.by_supply.get(&(k as u32)).into_iter().flatten() {
+            if seen.insert(ci) {
+                conns.push((ci, item(&ns.connections[ci], true)));
+            }
+        }
+        let _ = sup;
+        for (li, l) in n.links.iter().enumerate().filter(|(li, _)| net.trees.link_tree[*li] == Some(k)) {
+            let x = &ns.links[li];
+            links.push(LinkItem { id: l.id.clone(), mode: l.mode.clone(), from: l.from.clone(), to: l.to.clone(), capacity: l.capacity, load: x.load, shut: x.shut, tripped: x.tripped, rotation: x.rotation });
+        }
+    }
+    for &ci in ns.index.by_holder.get(me).into_iter().flatten() {
+        if seen.insert(ci) {
+            conns.push((ci, item(&ns.connections[ci], false)));
+        }
+    }
+    conns.sort_by_key(|(ci, _)| *ci);
+    (conns.into_iter().map(|(_, c)| c).collect(), links)
+}
+
 /// A holding the capacity's entity has: how much of a kind, where (0: it's all gone from there).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HoldingItem {
@@ -166,7 +256,7 @@ pub struct AccountItem {
     pub closed: Option<bool>,
 }
 
-pub use crate::sites::{SiteCell, SiteSpace, SiteStructure, VariableView};
+pub use crate::sites::{MeterView, SiteCell, SiteSpace, SiteStructure, VariableView};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntityItem {
@@ -1011,7 +1101,8 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         .filter(|(_, h)| changed(h.changed) && (after.is_some() || anew || h.quantity != 0))
                         .map(|(_, h)| HoldingItem { kind: h.kind.clone(), at: h.at.clone(), quantity: h.quantity })
                         .collect();
-                    ChannelData::Holdings { holdings }
+                    let (connections, links) = flows_of(s, st, &me);
+                    ChannelData::Holdings { holdings, connections, links }
                 }
                 // Its own record, and nobody else's: the channel names no one, and `me` is the capacity's own entity.
                 ChannelKind::OwnRecord => ChannelData::OwnRecord { record: st.entity_records.get(&me).filter(|r| changed(r.changed)).map(|r| OwnRecord { n: r.n, at: r.at, sections: r.sections.clone() }) },

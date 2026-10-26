@@ -1647,7 +1647,13 @@ impl Paper for SchoolDecline {
 /// Written by: a seat (free statement; no code writer or form in the TS). Read by: utilities.ts (the supplier: the
 /// customer is dropped from its roll).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct SupplyEnd {}
+pub struct SupplyEnd {
+    /// The connection to stop, and of what (foundations-2 C4); absent, every supply of the asker's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+}
 impl Paper for SupplyEnd {
     const KIND: &'static str = "supply_end";
 }

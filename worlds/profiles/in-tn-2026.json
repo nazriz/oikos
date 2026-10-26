@@ -1081,9 +1081,9 @@
         "floor_bps": 8000
       }
     },
-    "utilities": {
+    "utilities": {"network": {"head_m": 50, "service_head_m": 20, "min_head_m": 5, "storage_days": 2, "pipe_peak_bps": 25000, "wire_margin_bps": 15000, "main_loss_m": 10, "service_loss_m": 5, "shape_bps": [270, 238, 216, 216, 227, 281, 411, 520, 487, 411, 379, 368, 368, 357, 357, 390, 487, 650, 758, 736, 628, 509, 411, 325]}, 
       "water": {
-        "litres_per_person_per_day": 70,
+        "litres_per_person_per_day": 70, "bill_to": "owner",
         "price_per_kl": 500,
         "service_per_quarter": 15000,
         "river_inflow_kl_per_cell_per_day": 1000,
@@ -1445,6 +1445,8 @@
     }
   },
   "sources": {
+    "utilities.network": "PLACEHOLDER (to confirm; WM-1, foundations-2 C4): the network's engineering figures are the generator's stand-ins, the same in every profile: a source head of 50 m, a service head of 20 m (a common minimum service pressure in supply codes, e.g. the Water Services Association of Australia's code: recalled, to confirm) and 5 m below which nothing comes; a store of two days' use; pipes sized for 2.5 times the average flow and wires for 1.5 times the peak hour's; a main losing 10 m and a service 5 m at capacity (linear stand-ins for friction); a household's day of electricity by hour, an evening peak (a typical residential load profile: recalled, to confirm). Would be sourced from a local water authority's and a distributor's design standards and published load profiles.",
+    "utilities.water.bill_to": "PLACEHOLDER (to confirm; WM-12): water and sewerage charges linked to the property and its owner: not opened.",
     "public_service.support_officers_per_1000_claims": "PLACEHOLDER (to confirm; WM-14; approved by the owner as a marked national ratio on a small town, 2026-10-25): 4 of the support agency's officers per 1,000 claims in payment. Not this place's figure: an order of magnitude recalled for Great Britain (the Department for Work and Pensions' staff, roughly 90,000, over roughly 23 million benefit claims in payment, State Pension included, is about 4 per 1,000, of whom not all decide claims; not opened, to confirm), carried to every profile until each place's agency staffing and caseload are sourced. Would be sourced by the agency's annual report (staff handling claims, full-time equivalents) over its published caseload.",
     "names.customs": "Tamil naming custom: the father's given name is carried as the second name (patronymic), given name first, so a person is 'Murugan Selvam'; in the south a woman commonly takes her husband's given name as her second name after marriage, but the generator draws a person's second name from the father's given name, so wife_takes_husband_bps is 0 (PLACEHOLDER, to confirm). Titles Mr and Ms as English-language Indian papers write them (to confirm). No source document opened.",
     "names.given": "PLACEHOLDER. No official or published frequency series of Tamil given names by birth cohort was found (searched: Tamil Nadu birth registration data, Registrar General of India/CRS reports; only baby-name listing sites came up, which are not frequencies). Lists are commonly used Tamil given names in Latin transliteration, ranked by the writer's judgement of plausibility per cohort (older: deity and family names such as Murugan, Lakshmi; younger: shorter modern names such as Harini, Kavin), weights are ranks turned into counts. Only frequencies are used; names drawn at random may coincide with living persons by chance.",

@@ -57,6 +57,8 @@ pub struct Exec<'a> {
     /// The buildings worked on by people sent to them, in the order first worked on (what they see is made when the
     /// act is done).
     pub worked_on: Vec<Id>,
+    /// The kinds a collection in this act took (what those who did it see is left of them at the buildings worked on).
+    pub collected: BTreeSet<Id>,
     /// Who the action named to do its work, and whether their being at work was looked at when it began (F3).
     pub by: &'a [Id],
     pub started: bool,
@@ -235,7 +237,7 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
             }
         }
     }
-    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, seen, worked_on: vec![], by, started };
+    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, seen, worked_on: vec![], collected: BTreeSet::new(), by, started };
     for (i, b) in blocks.iter().enumerate() {
         ex.block(b, i).map_err(|mut r| {
             r.block.get_or_insert(i);
@@ -244,7 +246,20 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
     }
     // Those who did the work were there: each building worked on, as it is when the act is done (one brought down
     // by it leaves nothing to see).
-    let seen = ex.worked_on.iter().filter(|sid| ex.st.structures.contains_key(*sid)).map(|sid| crate::sites::site_structure(ex.s, ex.st, sid, &ex.entity, false)).collect();
+    let seen = ex
+        .worked_on
+        .iter()
+        .filter(|sid| ex.st.structures.contains_key(*sid))
+        .map(|sid| {
+            let mut x = crate::sites::site_structure(ex.s, ex.st, sid, &ex.entity, false);
+            // (A bin emptied: what is left of what was collected, as those who emptied it saw.)
+            for k in &ex.collected {
+                let left: Money = ex.st.holdings.values().filter(|h| &h.at == sid && &h.kind == k && h.holder != ex.entity).map(|h| h.quantity.max(0)).sum();
+                x.left.insert(k.clone(), left);
+            }
+            x
+        })
+        .collect();
     Ok(ExecResult { events: ex.events, created: ex.refs, surveyed: ex.surveyed, investigated: ex.investigated, seen })
 }
 
@@ -307,8 +322,7 @@ pub fn variable_at(st: &State, sid: &str, var: &crate::config::VariableCfg, t: i
     let x = st.structures.get(sid)?;
     let (v, since) = *x.variables.get(&var.id)?;
     let days = (day_of(t) - since).max(0);
-    let occupants = st.occupancy.get(sid).map_or(0, |m| m.values().map(|b| b.len()).sum::<usize>()) as i64;
-    let rate = var.per_day.saturating_add(var.per_occupant_per_day.saturating_mul(occupants));
+    let rate = var.per_day;
     Some(v.saturating_add(rate.saturating_mul(days)).clamp(var.min, var.max))
 }
 
@@ -743,6 +757,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
     let t = item.at;
     match item.what {
         Sched::NatureDay { day } => nature_day(s, st, day),
+        Sched::Settle => crate::network::settle(s, st, t),
         Sched::CounterCensus => {
             st.schedule(t + 30 * 86_400, Sched::CounterCensus);
             vec![Timed::new(t, EventBody::CounterCensus { counters: st.totals.clone() })]
@@ -1192,7 +1207,7 @@ impl<'a> Exec<'a> {
             _ => {}
         }
         let target = on.clone().unwrap_or_else(|| at.clone());
-        if bodies.is_none() && (builtin || spec.as_ref().is_some_and(|x| !x.changes.is_empty())) {
+        if bodies.is_none() && (builtin || spec.as_ref().is_some_and(|x| !x.changes.is_empty() || x.collects.is_some())) {
             let t = self.st.structures.get(&target).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {target}")))?;
             if task == TASK_BUILD && (t.complete || t.demolition.is_some()) {
                 return Err(refuse(RefusalCode::NotBeingBuilt, format!("{target} isn't being built")));
@@ -1204,14 +1219,36 @@ impl<'a> Exec<'a> {
         // Done: time spent, inputs used, outputs made, changes applied, progress made.
         let c = self.st.stamp();
         if let Some(x) = &spec {
-            for (k, per) in &x.consumes {
+            // (A recipe's nought is stated, law 8, and moves nothing: no holding is made for it.)
+            for (k, per) in x.consumes.iter().filter(|(_, p)| **p != 0) {
                 let q = need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an input"))?;
                 self.add_holding(&me, &at, k, -q, c)?;
             }
-            for (k, per) in &x.produces {
+            for (k, per) in x.produces.iter().filter(|(_, p)| **p != 0) {
                 // (Refused if what's made would take the holding beyond the range of a quantity.)
                 let q = need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an output"))?;
                 self.add_holding(&me, &at, k, q, c)?;
+            }
+            // Collected from the structure worked on: what its holders hold there of the kind, up to what the units take, in
+            // the holders' order; what is not there is not taken (law 8: nothing made, a bin emptied).
+            if let (Some(cl), None) = (&x.collects, &bodies) {
+                self.collected.insert(cl.kind.clone());
+                let mut want = (cl.per_unit as Money).saturating_mul(units as Money);
+                let mut held: Vec<(Id, Money)> = self.st.holdings.values().filter(|h| h.at == target && h.kind == cl.kind && h.quantity > 0 && h.holder != me).map(|h| (h.holder.clone(), h.quantity)).collect();
+                // (Bin after bin until the loads run out, beginning at a different one each day: no holder is always last.)
+                if !held.is_empty() {
+                    let start = day_of(self.now()).rem_euclid(held.len() as i64) as usize;
+                    held.rotate_left(start);
+                }
+                for (holder, q) in held {
+                    if want <= 0 {
+                        break;
+                    }
+                    let take = q.min(want);
+                    want -= take;
+                    self.add_holding(&holder, &target, &cl.kind, -take, c)?;
+                    self.add_holding(&me, &at, &cl.kind, take, c)?;
+                }
             }
             if !x.changes.is_empty() && bodies.is_none() {
                 settle(self.s, self.st, &target);
@@ -1226,10 +1263,16 @@ impl<'a> Exec<'a> {
                 self.st.touch_structure(&target);
             }
         }
-        // Drawn from the field; emitted to fields (at the corner cell) and counters.
+        // Drawn from the field; emitted to fields (at the corner cell) and counters. A field that holds a kind (law 8):
+        // what is drawn goes into the actor's holding there, and nothing is drawn into nothing.
         if let Some((field, cell, left)) = drawn {
+            let kind = self.s.config.catalogue.fields.iter().find(|f| f.id == field).and_then(|f| f.kind.clone());
             let n = Arc::make_mut(self.st.nature.as_mut().unwrap());
+            let had = n.fields.get(&field).and_then(|m| m.get(&cell)).copied().unwrap_or(0);
             n.fields.entry(field).or_default().insert(cell, left);
+            if let Some(k) = kind {
+                self.add_holding(&me, &at, &k, (had - left) as Money, c)?;
+            }
         }
         if let Some(x) = spec.as_ref().filter(|x| !x.emits.is_empty()) {
             let corner = self.st.structures[&at].at.clone();
@@ -1240,6 +1283,10 @@ impl<'a> Exec<'a> {
                 } else if let Some(f) = self.s.config.catalogue.fields.iter().find(|f| &f.id == k) {
                     if let Some(n) = self.st.nature.as_mut().map(Arc::make_mut) {
                         let cur = n.fields.get(k).and_then(|m| m.get(&corner)).copied().unwrap_or(f.baseline);
+                        // (A field that holds a kind is a stock: what is put on a cell beyond its bound is refused, not lost.)
+                        if f.kind.is_some() && cur.checked_add(by).is_none_or(|x| x > f.max) {
+                            return Err(refuse(RefusalCode::Overflow, format!("{k} at {corner} would pass its most ({})", f.max)));
+                        }
                         n.fields.entry(k.clone()).or_default().insert(corner.clone(), cur.saturating_add(by).clamp(f.min, f.max));
                     }
                 }
@@ -1738,6 +1785,18 @@ impl<'a> Exec<'a> {
                 }
                 if have.checked_sub(*quantity).is_none_or(|x| x < -MAX_MONEY) {
                     return Err(refuse(RefusalCode::Overflow, "the edge's holding would go beyond the range of a quantity"));
+                }
+                // A scarce kind (C6): an edge sells from outside no more than its quantity a period.
+                if edge && from_at == me {
+                    if let Some(x) = self.s.config.world.scarce.iter().find(|x| x.edge == me && &x.kind == kind) {
+                        let period = self.now().div_euclid(x.every);
+                        let key = format!("{me}|{kind}");
+                        let sold = self.st.scarce_sold.get(&key).filter(|(p, _)| *p == period).map_or(0, |(_, q)| *q);
+                        if sold + *quantity > x.quantity {
+                            return Err(refuse(RefusalCode::BeyondSupply, format!("{me} has {} {kind} left to sell this period ({} a period)", (x.quantity - sold).max(0), x.quantity)));
+                        }
+                        self.st.scarce_sold.insert(key, (period, sold + *quantity));
+                    }
                 }
                 let there = self.st.holding(&to, &to_at, kind);
                 if !(me == to && from_at == to_at) && there.checked_add(*quantity).is_none_or(|x| x > MAX_MONEY) {
@@ -2299,6 +2358,119 @@ impl<'a> Exec<'a> {
                 self.emit(EventBody::MessageDelivered { message: mid, participant: self.participant.into(), to: reached.into_iter().collect() });
                 Ok(())
             }
+
+            Block::Connection { op, connection, kind, node, to, at, rate, uses, meter, bind } => self.connection(*op, connection, kind, node, to, at, *rate, uses, *meter, bind),
+            Block::Link { link, op, every, from, off } => self.link(link, *op, *every, *from, *off),
         }
+    }
+
+    /// An act on a connection (foundations-2 C3): its operator opens, closes, interrupts and restores it; its user or its
+    /// operator sets its rate. Whose a connection is, is the network's: the holder of the supply whose tree its node is on.
+    #[allow(clippy::too_many_arguments)]
+    fn connection(&mut self, op: crate::blocks::ConnOp, connection: &Option<String>, kind: &Option<Id>, node: &Option<Id>, to: &Option<String>, at: &Option<String>, rate: Option<i64>, uses: &Option<Id>, meter: Option<crate::config::MeterKind>, bind: &Option<String>) -> R<()> {
+        use crate::blocks::ConnOp;
+        let (Some(n), Some(net)) = (self.s.config.world.network.as_ref(), self.s.net.clone()) else {
+            return Err(refuse(RefusalCode::NotModelled, "this world has no network for anything to flow on"));
+        };
+        if rate.is_some_and(|r| !(0..=oikos_contracts::network::MAX_FLOW).contains(&r)) {
+            return Err(refuse(RefusalCode::Overflow, "a rate out of range"));
+        }
+        let me = self.entity.clone();
+        let stamp = self.st.stamp();
+        let by: Id = self.participant.into();
+        let mut ns = (**self.st.network.as_ref().expect("a world with a network has its state")).clone();
+        let (id, event) = match (op, connection) {
+            (ConnOp::Open, None) => {
+                let (Some(kind), Some(node), Some(to), Some(at)) = (kind, node, to, at) else {
+                    return Err(refuse(RefusalCode::UnknownRef, "a connection opened says of what, on which node, for whom and where"));
+                };
+                let (to, at) = (self.r(to)?, self.r(at)?);
+                self.entity_exists(&to)?;
+                if !self.st.structures.contains_key(&at) {
+                    return Err(refuse(RefusalCode::UnknownStructure, format!("no structure {at}")));
+                }
+                let supply = net.trees.supply_of(n, kind, node).ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("no supply of {kind} reaches node {node}")))?;
+                if n.supplies[supply].holder != me {
+                    return Err(refuse(RefusalCode::NotTheirs, format!("{me} does not operate the supply of {kind} at {node} ({}'s)", n.supplies[supply].holder)));
+                }
+                if let Some(u) = uses {
+                    let tasks: BTreeMap<&str, &crate::config::TaskCfg> = self.s.config.catalogue.tasks.iter().map(|t| (t.id.as_str(), t)).collect();
+                    oikos_contracts::network::check_use(&tasks, &self.s.config.catalogue.fields.iter().map(|f| f.id.as_str()).collect(), u, kind).map_err(|e| refuse(RefusalCode::UnknownTask, e))?;
+                }
+                ns.opened += 1;
+                let id = format!("conn.{}", ns.opened);
+                let r = rate.unwrap_or(0);
+                ns.add(crate::network::Connection { id: id.clone(), kind: kind.clone(), node: node.clone(), supply: supply as u32, holder: to.clone(), at: at.clone(), rate: r, meter: 0, uses: uses.clone(), reading: meter.unwrap_or_default(), closed: false, interrupted: false, changed: stamp });
+                (id.clone(), EventBody::ConnectionChanged { connection: id, op: "open".into(), rate: Some(r), kind: Some(kind.clone()), node: Some(node.clone()), holder: Some(to), at: Some(at), by })
+            }
+            (op, connection) => {
+                let Some(c) = connection else { return Err(refuse(RefusalCode::UnknownRef, "say which connection")) };
+                let id = self.r(c)?;
+                let ci = *ns.index.by_id.get(&id).ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("no connection {id}")))?;
+                let operator = n.supplies[ns.connections[ci].supply as usize].holder == me;
+                let user = ns.connections[ci].holder == me;
+                let x = &mut ns.connections[ci];
+                match op {
+                    ConnOp::Set => {
+                        if !operator && !user {
+                            return Err(refuse(RefusalCode::NotTheirs, format!("{id} is neither {me}'s nor on a supply {me} operates")));
+                        }
+                        x.rate = rate.ok_or_else(|| refuse(RefusalCode::UnknownRef, "set it to what rate?"))?;
+                    }
+                    _ if !operator => return Err(refuse(RefusalCode::NotTheirs, format!("only its operator may {} {id}", op.name()))),
+                    ConnOp::Open => x.closed = false,
+                    ConnOp::Close => x.closed = true,
+                    ConnOp::Interrupt => x.interrupted = true,
+                    ConnOp::Restore => x.interrupted = false,
+                }
+                x.changed = stamp;
+                let r = (op == ConnOp::Set).then_some(x.rate);
+                (id.clone(), EventBody::ConnectionChanged { connection: id, op: op.name().into(), rate: r, kind: None, node: None, holder: None, at: None, by })
+            }
+        };
+        self.st.network = Some(Arc::new(ns));
+        self.emit(event);
+        self.bind(bind, &id)
+    }
+
+    /// An act on a link by its operator (the holder of the supply whose tree it is in): shut, open, reclose after a trip,
+    /// or a rotation declared (a standing schedule; its effects are state, and only this act is logged).
+    fn link(&mut self, link: &str, op: crate::blocks::LinkOp, every: Option<i64>, from: Option<i64>, off: Option<i64>) -> R<()> {
+        use crate::blocks::LinkOp;
+        let (Some(n), Some(net)) = (self.s.config.world.network.as_ref(), self.s.net.clone()) else {
+            return Err(refuse(RefusalCode::NotModelled, "this world has no network"));
+        };
+        let li = *net.trees.link_ix.get(link).ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("no link {link}")))?;
+        let supply = net.trees.link_tree[li].ok_or_else(|| refuse(RefusalCode::NotModelled, format!("link {link} is on no supply's tree (cut to make the trees, or reached by none)")))?;
+        let me = self.entity.clone();
+        if n.supplies[supply].holder != me {
+            return Err(refuse(RefusalCode::NotTheirs, format!("{me} does not operate link {link} ({}'s)", n.supplies[supply].holder)));
+        }
+        let now = self.now();
+        let mut ns = (**self.st.network.as_ref().expect("a world with a network has its state")).clone();
+        let l = &mut ns.links[li];
+        let mut rotation = None;
+        match op {
+            LinkOp::Shut => l.shut = true,
+            LinkOp::Open => l.shut = false,
+            LinkOp::Reclose => l.tripped = false,
+            LinkOp::Rotate => {
+                let off = off.unwrap_or(0);
+                if off <= 0 {
+                    l.rotation = None;
+                } else {
+                    let every = every.ok_or_else(|| refuse(RefusalCode::UnknownRef, "a rotation says how often it comes round"))?;
+                    if every < off || every > 366 * 86_400 {
+                        return Err(refuse(RefusalCode::Overflow, "a rotation is off for no longer than it comes round, within a year"));
+                    }
+                    let r = crate::network::Rotation { every, from: from.unwrap_or(now), off };
+                    rotation = Some(serde_json::json!({ "every": r.every, "from": r.from, "off": r.off }));
+                    l.rotation = Some(r);
+                }
+            }
+        }
+        self.st.network = Some(Arc::new(ns));
+        self.emit(EventBody::LinkChanged { link: link.into(), op: op.name().into(), by: Some(self.participant.into()), load: None, capacity: None, rotation });
+        Ok(())
     }
 }

@@ -113,16 +113,17 @@ export const electoralOffice: BehaviourModule = {
 /** utility.water, as the deleted participants/src/behaviour/utilities.ts had it. */
 export const water: BehaviourModule = {
   name: "utility.water",
-  answers: {"office": "the water corporation", "acts": "What it acts on: its roll of properties, each billed by its meter each quarter; and the notices it is given of land changing hands and of building work."},
+  answers: {"office": "the water corporation", "acts": "What it acts on: its roll of properties and its connections, each billed by its meter each quarter; a household's request to be supplied, and notice that it has gone; and the notices it is given of land changing hands and of building work."},
   routines: [
-    { task: "draw_water", at: "works", every: 1, what: "Each day the works draws from the river what the town uses, by the published estimate of how many live in it, and says so when the river cannot give it." },
-    { task: "bill", at: "works", every: ["bill_every_days", 91], what: "Before each round of bills a reader goes round the meters; then each property's owner is sent a bill for the service charge and what its meter shows was used. How often the bills go out is the order's." },
+    {"task": "draw_water", "at": "works", "every": 1, "what": "Each day the works draws from the river what keeps its store full, and says so when the river cannot give it; and treats what the sewer brought back."},
+    {"task": "bill", "at": "works", "every": ["bill_every_days", 91], "what": "Before each round of bills a reader goes round the meters; then each bill is sent for the service charge and what its meter shows was used. How often the bills go out is the order's."},
   ],
   keeps: [
-    { what: "property_roll", why: "Its customer roll: the valuer's roll of each property it supplies is given to it, as valuations are given to a rating authority." },
-    { what: "acquisition_notice", why: "Its customer roll: each notice that land it supplies has changed hands is given to it." },
+    {"what": "property_roll", "why": "Its customer roll: the valuer's roll of each property it supplies is given to it, as valuations are given to a rating authority."},
+    {"what": "acquisition_notice", "why": "Its customer roll: each notice that land it supplies has changed hands is given to it."},
+    {"what": "connections", "why": "Its network: the mains, services and connections it operates, with what its instruments read of them, are its own works and records (foundations-2 C3)."},
   ],
-  version: "0.3.0", // 0.3.0: its staff's first round of bills falls due one period after the standing order came into force, and they report the draws, the bills and when the next go out; 0.2.0: bills by its customer roll and the meters it reads; draws what the published population uses; no longer shown the town or the land register
+  version: "0.4.0", // 0.4.0: foundations-2 C4 (law 8): operates the network; draws what keeps its store full, treats what the sewer brings back, connects households on request and disconnects them at their going, bills from meters to the owner or the occupant as the place's law has it; 0.3.0: its staff's first round of bills falls due one period after the standing order came into force, and they report the draws, the bills and when the next go out; 0.2.0: bills by its customer roll and the meters it reads; draws what the published population uses; no longer shown the town or the land register
   doc: "docs/behaviour/utilities.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3600 + ctx.rng("first-wake").below(3600),
@@ -132,14 +133,16 @@ export const water: BehaviourModule = {
 /** utility.energy, as the deleted participants/src/behaviour/utilities.ts had it. */
 export const energy: BehaviourModule = {
   name: "utility.energy",
-  answers: {"office": "the energy retailer", "acts": "What it acts on: its customers' accounts, each billed each quarter; and notice that a customer has left or has died."},
+  answers: {"office": "the energy retailer", "acts": "What it acts on: its customers' connections, each billed by its meter; a household's request to be supplied; and notice that a customer has left or has died."},
   routines: [
-    { task: "supply_energy", at: "depot", every: 1, what: "Each day the network supplies what the customers use from what the retailer holds, and more is bought from the grid when it runs below a fortnight's use. Those who ask to be supplied are taken on, and those gone taken off." },
-    { task: "bill", at: "depot", every: ["bill_every_days", 30], what: "Each customer is sent a bill for the supply charge and what they used; one who has gone, their last. How often the bills go out is the order's." },
+    {"task": "bill", "at": "depot", "every": ["bill_every_days", 30], "what": "Each customer is sent a bill for the supply charge and what their meter shows they used; one who has gone, their last. How often the bills go out is the order's."},
+  ],
+  keeps: [
+    {"what": "connections", "why": "Its network: the feeders, services and connections it operates, with the meters it reads from afar and what its instruments read of its links, are its own works and records (foundations-2 C3)."},
   ],
   // (What it buys in, it orders on its own order form: its staff's orders to the grid are that paper.)
   issues: [P.ORDER, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
-  version: "0.4.0", // 0.4.0: how often a bill is wrong is a slip at the rate of the world's table of slips (foundations F7), no longer a parameter; 0.3.1: draws are named for the day and which time that is, never the hour or the moment (docs/reliability.md, "Draws and the moment"); 0.3.0: some bills are wrong (an estimated reading entered too high), at the friction dial, and the retailer answers a customer who asks for a wrong bill to be put right from its own record of the bill; 0.2.1: its staff's first bills fall due one period after the standing order came into force; 0.2.0: has an order form of its own for buying from the grid; its staff report what they supplied and billed, and why they did not buy when stock ran low (docs/behaviour/standing-work.md, "The staff's report")
+  version: "0.5.0", // 0.5.0: foundations-2 C4 (law 8): operates the network; connects and disconnects households, buys from the grid what its meters say is used, bills each customer from its meter, recloses a tripped feeder and puts the feeders under one that trips again on a rotation; 0.4.0: how often a bill is wrong is a slip at the rate of the world's table of slips (foundations F7), no longer a parameter; 0.3.1: draws are named for the day and which time that is, never the hour or the moment (docs/reliability.md, "Draws and the moment"); 0.3.0: some bills are wrong (an estimated reading entered too high), at the friction dial, and the retailer answers a customer who asks for a wrong bill to be put right from its own record of the bill; 0.2.1: its staff's first bills fall due one period after the standing order came into force; 0.2.0: has an order form of its own for buying from the grid; its staff report what they supplied and billed, and why they did not buy when stock ran low (docs/behaviour/standing-work.md, "The staff's report")
   doc: "docs/behaviour/utilities.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3600 + ctx.rng("first-wake").below(3600),

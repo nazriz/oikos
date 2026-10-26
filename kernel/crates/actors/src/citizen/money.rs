@@ -1355,7 +1355,7 @@ impl Person {
             .channels
             .values()
             .flat_map(|c| match c {
-                Seen::Holdings { holdings } => holdings.iter().filter(|h| h.kind == self.p.goods).map(|h| (h.at.clone(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
+                Seen::Holdings { holdings, .. } => holdings.iter().filter(|h| h.kind == self.p.goods).map(|h| (h.at.clone(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
                 _ => vec![],
             })
             .filter(|(at, q)| *q > 0 && (home_at.is_some() || pickups.contains(at)))
@@ -1379,6 +1379,8 @@ impl Person {
             // (What was faulty is thrown out with what is used: it is gone, and the week is shorter for it.)
             let out = total.min(each + self.money.spoiled);
             self.money.spoiled = 0;
+            // (What we use up at home goes in the bin there: the bin's reckoning counts it.)
+            self.absorbed.bin_seen.units += out;
             lines.push(call("work", vec![("task", Some(arg("consume"))), ("units", Some(text(out.to_string()))), ("at", Some(arg(home)))]));
         } else {
             let mut left = each;
@@ -1414,7 +1416,7 @@ impl Person {
             .channels
             .values()
             .flat_map(|c| match c {
-                Seen::Holdings { holdings } => holdings.iter().filter(|h| h.kind == kind).map(|h| (h.at.clone(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
+                Seen::Holdings { holdings, .. } => holdings.iter().filter(|h| h.kind == kind).map(|h| (h.at.clone(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
                 _ => vec![],
             })
             .filter(|(at, q)| *q > 0 && (home_at.as_ref() == Some(at) || pickups.contains(at)))
@@ -1435,6 +1437,9 @@ impl Person {
                 break;
             }
             lines.push(call("work", vec![("task", Some(arg(&task))), ("units", Some(text(u.to_string()))), ("at", Some(arg(at)))]));
+            if self.s.home.as_ref().is_some_and(|h| &h.structure == at) {
+                self.absorbed.bin_seen.units += u;
+            }
             left -= u;
         }
         w.push(because(format!("Using up {each} of the {total} {kind} we have, until we shop again."), lines));
@@ -1464,7 +1469,7 @@ mod tests {
         let acc = AccountItem { account: "acc-c1".into(), holder: "c1".into(), custodian: "bank".into(), currency: "USD".into(), balance: i128::from(balance), closed: None };
         channels.insert("accounts".to_string(), Seen::Accounts { accounts: Arc::new(vec![acc]), transactions: vec![] });
         let h: Vec<HoldingItem> = holdings.into_iter().map(|(at, q)| HoldingItem { kind: "goods".into(), at: at.into(), quantity: i128::from(q) }).collect();
-        channels.insert("holdings".to_string(), Seen::Holdings { holdings: Arc::new(h) });
+        channels.insert("holdings".to_string(), Seen::Holdings { holdings: Arc::new(h), connections: Default::default(), links: Default::default() });
         Picture {
             participant: "p.c1".into(),
             t,

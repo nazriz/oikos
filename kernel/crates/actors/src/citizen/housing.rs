@@ -27,7 +27,7 @@ use crate::common::{
 };
 use crate::common::calls::{move_in, move_out, withdraw};
 use crate::papers::agreements::{commitment_of, job_terms, lease_terms, notice, other_party, parties_of, sign, template_of};
-use crate::steps::{arg, because, call, pay, say, Pay, Say, Step, Visible};
+use crate::steps::{arg, because, call, pay, say, text, Pay, Say, Step, Visible};
 use crate::Cx;
 use oikos_sight::{CmpOp, Condition, LookRequest, Record, RecordBody, Seen};
 use serde::{Deserialize, Serialize};
@@ -121,6 +121,11 @@ pub struct Housing {
     stay_asked: BTreeSet<String>,
     next_move_try: i64,
     energy_for: Option<String>,
+    /// What we have asked to be supplied with (`<lease>/<kind>`), and connections we have asked to stop (foundations-2 C4).
+    #[serde(default)]
+    supplied_asked: BTreeSet<String>,
+    #[serde(default)]
+    supply_ended: BTreeSet<String>,
     /// Notices of rent increase weighed for the tribunal; those it upheld (recourse pushes them), to apply after all.
     challenged: BTreeSet<String>,
     pub upheld: Vec<String>,
@@ -1792,8 +1797,14 @@ impl Person {
         ));
     }
 
-    /// Utilities: signed up for energy once we hold a home and live there.
+    /// Utilities: signed up for energy once we hold a home and live there. Where homes are on the network (foundations-2
+    /// C4, law 8), what we use is what we set our connections to, by our own rule: so many litres a head and kWh a day for
+    /// the household, set again when the household changes; a home of ours with no connection is asked for; a connection
+    /// where we no longer live is turned down to nothing and its supplier asked to stop it.
     pub fn utilities(&mut self, w: &mut Week) {
+        if self.p.utilities.as_ref().is_some_and(|u| u.water.is_some()) {
+            return self.connections(w);
+        }
         let (Some(u), Some(h), Some(acc)) = (self.p.utilities.clone(), self.s.home.clone().filter(|h| h.moved_in), w.acc.clone()) else { return };
         if !self.is_leaseholder() || self.housing.energy_for.as_deref() == Some(h.agreement.as_str()) {
             return;
@@ -1807,6 +1818,70 @@ impl Person {
                 Say { to: Some(vec![u.energy.clone()]), visible: Some(Visible::Only(vec![self.me.clone(), u.energy])), data: Some(json!({ "account": acc.account, "home": h.space })), ..Default::default() },
             )],
         ));
+    }
+}
+
+impl Person {
+    /// Our connections, as our holdings channel shows them (our own, on our premises).
+    fn own_connections(pic: &crate::Picture, me: &str) -> Vec<oikos_sight::ConnectionItem> {
+        let mut out = vec![];
+        for ch in pic.channels.values() {
+            if let oikos_sight::Seen::Holdings { connections, .. } = ch {
+                out.extend(connections.iter().filter(|c| c.holder == me && !c.operated).cloned());
+            }
+        }
+        out
+    }
+
+    /// What flows to our home (foundations-2 C4): see `utilities`.
+    fn connections(&mut self, w: &mut Week) {
+        let Some(u) = self.p.utilities.clone() else { return };
+        let me = self.me.clone();
+        let mine = Self::own_connections(w.pic, &me);
+        let home = self.s.home.clone().filter(|h| h.moved_in);
+        let here = home.as_ref().map(|h| crate::common::structure_of(&h.space).to_string());
+        let office_of = |kind: &str| if kind == "energy" { Some(u.energy.clone()) } else { u.water.clone() };
+        // Where we no longer live: our use there ends, and its supplier is asked to stop the connection.
+        for c in mine.iter().filter(|c| !c.closed && here.as_deref() != Some(c.at.as_str())) {
+            if c.rate > 0 && c.kind != "wastewater" {
+                w.push(because(format!("We no longer live at {}: our {} there is turned off.", c.at, c.kind), vec![call("connection", vec![("op", Some(arg("set"))), ("connection", Some(arg(&c.id))), ("rate", Some(text("0")))])]));
+            }
+            if let Some(office) = office_of(&c.kind).filter(|_| c.kind != "wastewater" && self.housing.supply_ended.insert(c.id.clone())) {
+                w.push(because(
+                    format!("We have left {}: asking for its {} to be stopped.", c.at, c.kind),
+                    vec![say("supply_end", &format!("Please stop the {} supply at {}: we have moved out.", c.kind, c.at), Say { to: Some(vec![office.clone()]), visible: Some(Visible::Only(vec![me.clone(), office])), data: Some(json!({ "connection": c.id, "kind": c.kind })), ..Default::default() })],
+                ));
+            }
+        }
+        let (Some(h), Some(here), Some(acc)) = (home, here, w.acc.clone()) else { return };
+        if !self.is_leaseholder() {
+            return;
+        }
+        let people = self.s.household.as_ref().map_or(1, |x| x.members.len().max(1)) as i64;
+        for (kind, want) in [("water", people * u.water_l_a_head), ("energy", u.energy_kwh_a_day)] {
+            let Some(office) = office_of(kind) else { continue };
+            match mine.iter().find(|c| c.kind == kind && c.at == here && !c.closed) {
+                // Our own use, set again when it is not what the household uses (it grew, or someone left).
+                Some(c) if c.rate != want => w.push(because(
+                    format!("Our household of {people} uses about {want} a day of {kind}: setting our connection to it."),
+                    vec![call("connection", vec![("op", Some(arg("set"))), ("connection", Some(arg(&c.id))), ("rate", Some(text(want.to_string())))])],
+                )),
+                Some(_) => {}
+                None => {
+                    if !self.housing.supplied_asked.insert(format!("{}/{kind}", h.agreement)) {
+                        continue;
+                    }
+                    w.push(because(
+                        format!("A home of ours: asking to be supplied with {kind}."),
+                        vec![say(
+                            "supply_request",
+                            &format!("Supply request: {kind} for {}.", h.space),
+                            Say { to: Some(vec![office.clone()]), visible: Some(Visible::Only(vec![me.clone(), office])), data: Some(json!({ "account": acc.account, "home": h.space, "kind": kind, "rate": want })), ..Default::default() },
+                        )],
+                    ));
+                }
+            }
+        }
     }
 }
 

@@ -386,6 +386,8 @@ impl Resolver<'_> {
             "money" => self.money(c, bind),
             "goods" => self.goods(c),
             "take" => self.take(c),
+            "connection" => self.connection(c, bind),
+            "link" => self.link(c),
             "work" => self.work(c, bind),
             "account" => self.account(c, bind),
             "structure" => self.structure(c, bind),
@@ -662,6 +664,78 @@ impl Resolver<'_> {
         let from = self.k.entity_of(&self.need(c, "from", "Whose?")?);
         let at = self.need(c, "at", "Where?")?;
         Ok(vec![json!({ "block": "take", "kind": kind, "quantity": quantity, "from": from, "at": at })])
+    }
+
+    /// An act on a connection (foundations-2 C3): `op` open (with kind, node, to, at, rate, uses, meter), set (rate),
+    /// close, interrupt, restore; the connection named by `connection`, but for a new one.
+    fn connection(&self, c: &Call, bind: Option<&str>) -> R<Vec<Json>> {
+        let op = Self::str_(c, "op")?.unwrap_or_else(|| "set".into());
+        if !["open", "set", "close", "interrupt", "restore"].contains(&op.as_str()) {
+            return ask("op should be open, set, close, interrupt or restore.");
+        }
+        let mut b = serde_json::Map::new();
+        b.insert("block".into(), json!("connection"));
+        b.insert("op".into(), json!(op));
+        for key in ["connection", "node", "at", "uses"] {
+            if let Some(x) = self.id(c, key)? {
+                b.insert(key.into(), json!(x));
+            }
+        }
+        if let Some(k) = Self::str_(c, "kind")? {
+            b.insert("kind".into(), json!(k));
+        }
+        if let Some(to) = self.id(c, "to")? {
+            b.insert("to".into(), json!(self.k.entity_of(&to)));
+        }
+        if let Some(m) = Self::str_(c, "meter")? {
+            b.insert("meter".into(), json!(m));
+        }
+        // (A rate may be nought: a household turning its use off.)
+        match Self::str_(c, "rate")? {
+            Some(r) if !r.is_empty() && r.bytes().all(|x| x.is_ascii_digit()) => {
+                b.insert("rate".into(), json!(r.parse::<i64>().unwrap_or(0)));
+            }
+            Some(_) => {
+                if let Some(q) = self.quantity(c, "rate")? {
+                    b.insert("rate".into(), json!(q.parse::<i64>().unwrap_or(0)));
+                }
+            }
+            None => {}
+        }
+        if op == "set" && !b.contains_key("rate") {
+            return ask("Set it to what rate (a day)?");
+        }
+        if op != "open" && !b.contains_key("connection") {
+            return ask("Which connection?");
+        }
+        if let Some(r) = bind {
+            b.insert("ref".into(), json!(r));
+        }
+        Ok(vec![Json::Object(b)])
+    }
+
+    /// An act on a link of one's network: `op` shut, open, reclose, or rotate (`every`, `off`: lengths of time; `from`:
+    /// when the schedule's count begins, a length of time from now; `off` nothing ends it).
+    fn link(&self, c: &Call) -> R<Vec<Json>> {
+        let link = self.need(c, "link", "Which link?")?;
+        let op = Self::str_(c, "op")?.unwrap_or_default();
+        if !["shut", "open", "reclose", "rotate"].contains(&op.as_str()) {
+            return ask("op should be shut, open, reclose or rotate.");
+        }
+        let mut b = serde_json::Map::new();
+        b.insert("block".into(), json!("link"));
+        b.insert("link".into(), json!(link));
+        b.insert("op".into(), json!(op));
+        if let Some(e) = Self::seconds(c, "every")? {
+            b.insert("every".into(), json!(e));
+        }
+        if let Some(o) = Self::seconds(c, "off")? {
+            b.insert("off".into(), json!(o));
+        }
+        if let Some(f) = Self::seconds(c, "from")? {
+            b.insert("from".into(), json!(self.k.t + f));
+        }
+        Ok(vec![Json::Object(b)])
     }
 
     /// The money outcome of a call, for requests and commitments.
@@ -1439,7 +1513,7 @@ fn id_shape(s: &str) -> bool {
         return true;
     }
     if let Some((prefix, n)) = s.split_once('.') {
-        if ["ent", "acc", "str", "rec", "act", "msg", "par", "pos", "cnd"].contains(&prefix) && digits(n, 15) {
+        if ["ent", "acc", "str", "rec", "act", "msg", "par", "pos", "cnd", "conn"].contains(&prefix) && digits(n, 15) {
             return true;
         }
     }

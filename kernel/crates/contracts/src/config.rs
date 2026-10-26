@@ -18,6 +18,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 pub use crate::controller::Controller;
+pub use crate::network::{ConnectionCfg, LinkCfg, MeterKind, NetworkCfg, NodeCfg, Physics, SupplyCfg};
 
 pub const CONTRACTS_VERSION: &str = "0.8";
 
@@ -194,6 +195,10 @@ pub struct SuccessionCfg {
 #[serde(deny_unknown_fields)]
 pub struct FieldCfg {
     pub id: Id,
+    /// Law 8: the kind the field holds (a river's water, in the kind's unit). A draw moves it into a holding; nature's
+    /// day is nature's edge, counted. Absent: a field that is no stock (a concentration, a habitat's quality).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<Id>,
     pub min: i64,
     pub max: i64,
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -327,6 +332,18 @@ pub struct TaskCfg {
     /// Per unit: added to a field at the structure's corner cell (pollution), or to a world counter (greenhouse gas).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub emits: BTreeMap<Id, i64>,
+    /// Collection (law 8; a round emptying the bins): per unit, up to `per_unit` of a kind held at the structure worked on
+    /// (`on`) by anyone there is taken into the actor's holding at `at`, from the holders in turn (a different one first each day); what is not there
+    /// is not taken, and nothing is made. What is left is seen by those who did it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collects: Option<Collects>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Collects {
+    pub kind: Id,
+    pub per_unit: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -375,8 +392,8 @@ pub struct LabourBy {
     pub at_max_bps: u32,
 }
 
-/// A state variable of structures, with its dynamics: it changes by `per_day`, and `per_occupant_per_day` for each
-/// body inside, every whole day, within [min, max]. `types`: the structure types it applies to (absent: all).
+/// A state variable of structures, with its dynamics: it changes by `per_day` every whole day, within [min, max]: a
+/// condition (wear, disrepair), never a stock (law 8: nothing grows by its occupants). `types`: the structure types it applies to (absent: all).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VariableCfg {
@@ -386,8 +403,9 @@ pub struct VariableCfg {
     pub initial: i64,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub per_day: i64,
-    #[serde(default, skip_serializing_if = "is_zero")]
-    pub per_occupant_per_day: i64,
+    /// Read only to refuse it (law 8, `stock_as_variable`): a variable does not grow by its occupants.
+    #[serde(default, rename = "per_occupant_per_day", skip_serializing_if = "is_zero")]
+    pub grows_by_occupants: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub types: Option<Vec<Id>>,
 }
@@ -406,6 +424,40 @@ fn is_zero(x: &i64) -> bool {
 pub struct ResourceCfg {
     pub id: Id,
     pub unit: String,
+    /// Law 8 (docs/nothing-from-nothing.md): conserved (`stock`, the default), one that may be used up with nothing out
+    /// (`dissipates`: energy, whose heat leaves the world's books), or a unit of a service (`service`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub class: Option<KindClass>,
+    /// How a connection carrying this kind is settled (foundations-2 C3): daily or hourly. Absent: it flows on none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settle: Option<Settle>,
+    /// For a kind settled hourly: each hour's share of a connection's daily rate (24 shares summing to 10,000).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape_bps: Option<Vec<i64>>,
+}
+
+/// A kind's class (law 8): conserved; used up into heat; or a unit of a service sold over a counter (no physical
+/// quantity: used as it is bought). The kernel counts all three alike; the backstop reads the class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KindClass {
+    Stock,
+    Dissipates,
+    Service,
+}
+
+/// How often a connection's flow is settled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Settle {
+    Day,
+    Hour,
+}
+
+impl ResourceCfg {
+    pub fn dissipates(&self) -> bool {
+        self.class == Some(KindClass::Dissipates)
+    }
 }
 
 /// A holding at the start: a quantity of a kind, held by an entity at a structure (or, for an edge, at itself).
@@ -504,6 +556,29 @@ pub struct World {
     /// in its own balance, not the generator's guess at it (no events; the census begins with the run).
     #[serde(default, skip_serializing_if = "is_zero")]
     pub nature_spin_up_days: i64,
+    /// The network for what flows (foundations-2 C3, law 8): nodes, links, the supplies that feed each tree. Absent: nothing
+    /// flows on a network, and every connection is refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<NetworkCfg>,
+    /// Connections at the start: a holder's at a structure, on a node, taking a kind at a rate a day.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub connections: Vec<ConnectionCfg>,
+    /// Scarce kinds at the world's edges (foundations-2 C6; decision 2 of section 9): an edge sells no more of a kind than
+    /// `quantity` in each period of `every` seconds (counted from the run's start); every other kind is unlimited at its
+    /// price. To whom it sells what it has is its offers', never the kernel's.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scarce: Vec<ScarceCfg>,
+}
+
+/// A scarce kind at an edge: so much a period.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScarceCfg {
+    pub edge: Id,
+    pub kind: Id,
+    #[serde(with = "oikos_core::money::amount")]
+    pub quantity: oikos_core::money::Money,
+    pub every: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1976,7 +2051,38 @@ fn check_bodies(c: &Config) -> Result<(), String> {
             return Err(format!("counter {}: its id must be unique among counters and fields", x.id));
         }
     }
+    // A building's variable is a condition, never a stock (law 8, `stock_as_variable`): nothing grows by its occupants
+    // (what they use is a flow on a connection, what they throw away a process's output), and none has a kind's name.
+    for v in &cat.variables {
+        if v.grows_by_occupants != 0 {
+            return Err(format!("stock_as_variable: variable {} grows by its occupants (per_occupant_per_day): what occupants use flows on a connection and what they throw away is a process's output (law 8)", v.id));
+        }
+        if cat.resources.iter().any(|r| r.id == v.id) {
+            return Err(format!("stock_as_variable: variable {} has the name of a kind the world holds: a stock is held, not kept as a building's variable (law 8)", v.id));
+        }
+    }
+    // Fields that hold a kind (law 8): a kind the world declares, held from nought (nothing below it, nothing assumed
+    // at a baseline), one field a kind.
+    let mut held_by_field: BTreeSet<&str> = BTreeSet::new();
+    for f in &cat.fields {
+        if let Some(k) = &f.kind {
+            if !cat.resources.iter().any(|r| &r.id == k) {
+                return Err(format!("field {}: holds no kind the world declares ({k})", f.id));
+            }
+            if f.baseline != 0 || f.min < 0 {
+                return Err(format!("field {}: a field that holds {k} counts it from nought (baseline 0, min at least 0)", f.id));
+            }
+            if !held_by_field.insert(k) {
+                return Err(format!("field {}: {k} is held by another field already", f.id));
+            }
+        }
+    }
     for t in &cat.tasks {
+        if let Some(x) = &t.collects {
+            if !cat.resources.iter().any(|r| r.id == x.kind) || x.per_unit <= 0 {
+                return Err(format!("task {}: collects no kind the world declares ({}), or nothing a unit", t.id, x.kind));
+            }
+        }
         if let Some(d) = &t.draws {
             if !cat.fields.iter().any(|f| f.id == d.field) || d.per_unit < 0 {
                 return Err(format!("task {}: draws from no field {} (or a negative amount)", t.id, d.field));
@@ -2238,6 +2344,15 @@ pub fn validate(c: &Config) -> Result<(), String> {
     if let Some(t) = &c.travel {
         validate_travel(t, &c.world)?;
     }
+    crate::network::validate(c)?;
+    for x in &c.world.scarce {
+        if !c.world.boundaries.contains(&x.edge) || !c.catalogue.resources.iter().any(|r| r.id == x.kind) || x.quantity < 0 || !(1..=31_622_400 * 100).contains(&x.every) {
+            return Err(format!("scarce: {} of {} is no edge's kind the world declares, or its quantity or period is out of range", x.kind, x.edge));
+        }
+        if c.world.scarce.iter().filter(|y| y.edge == x.edge && y.kind == x.kind).count() > 1 {
+            return Err(format!("scarce: {} of {} is said twice", x.kind, x.edge));
+        }
+    }
     if c.contracts != CONTRACTS_VERSION {
         return Err(format!("contracts version {} is not {}", c.contracts, CONTRACTS_VERSION));
     }
@@ -2474,8 +2589,8 @@ pub fn validate(c: &Config) -> Result<(), String> {
             }
         }
         for (k, q) in t.consumes.iter().chain(t.produces.iter()) {
-            if *q < 1 {
-                return Err(format!("task {}: {k} must be a positive quantity", t.id));
+            if *q < 0 {
+                return Err(format!("task {}: {k} must be a quantity of nought or more (law 8: nought is stated, as a workplace's energy and water are)", t.id));
             }
         }
         for v in t.changes.keys() {

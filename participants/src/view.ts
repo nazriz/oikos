@@ -8,7 +8,7 @@
 // invariant test checks that a view built this way always equals the full
 // picture (kernel/tests/perception.rs).
 
-import type { ChannelData, HoldingItem, Observation, PositionItem, Record, SiteCell } from "./contracts";
+import type { ChannelData, ConnectionItem, HoldingItem, LinkItem, Observation, PositionItem, Record, SiteCell } from "./contracts";
 
 type AccountItem = Extract<ChannelData, { kind: "accounts" }>["accounts"][number];
 type DirectoryData = Extract<ChannelData, { kind: "directory" }>;
@@ -19,6 +19,8 @@ const byKey = <T>(m: Map<string, T>) => [...m.keys()].sort().map((k) => m.get(k)
 export class View {
   private accounts = new Map<string, Map<string, AccountItem>>();
   private holdings = new Map<string, Map<string, HoldingItem>>();
+  /** What flows (foundations-2 C3): each holdings channel's connections and links, whole as last delivered. */
+  private flows = new Map<string, { connections?: ConnectionItem[]; links?: LinkItem[] }>();
   private sites = new Map<string, { as_of: number; cells: Map<string, SiteCell> }>();
   /** Places gone to (a visit's channel): when each cell was last seen, and the cells the latest visit saw. */
   private visits = new Map<string, { seen_at: { [cell: string]: number }; fresh: string[] }>();
@@ -56,6 +58,7 @@ export class View {
           else m.set(`${h.at}|${h.kind}`, h);
         }
         if (ch.holdings.length) this.cache.delete(id);
+        if (ch.connections?.length || ch.links?.length || this.flows.has(id)) this.flows.set(id, { ...(ch.connections?.length ? { connections: ch.connections } : {}), ...(ch.links?.length ? { links: ch.links } : {}) });
       } else if (ch.kind === "sites") {
         // A move: the whole of the new surroundings replaces the old (what was seen there is the participant's memory, not its view).
         const v = (!ch.whole && this.sites.get(id)) || { as_of: ch.as_of, cells: new Map() };
@@ -94,7 +97,7 @@ export class View {
       return this.cache.get(id) as T;
     };
     for (const [id, m] of this.accounts) channels[id] = { kind: "accounts", accounts: cached(id, () => byKey(m)), transactions: txs(id) };
-    for (const [id, m] of this.holdings) channels[id] = { kind: "holdings", holdings: cached(id, () => byKey(m)) };
+    for (const [id, m] of this.holdings) channels[id] = { kind: "holdings", holdings: cached(id, () => byKey(m)), ...(this.flows.get(id) ?? {}) };
     for (const [id, v] of this.sites) {
       const visit = this.visits.get(id);
       // (The cells its latest visit saw are said once, with the observation that brings them.)

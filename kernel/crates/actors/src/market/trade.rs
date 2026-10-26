@@ -99,7 +99,7 @@ pub fn held(pic: &Picture, at: &str, kind: &str) -> i64 {
     pic.channels
         .values()
         .filter_map(|c| match c {
-            crate::sight::Seen::Holdings { holdings } => Some(holdings),
+            crate::sight::Seen::Holdings { holdings, .. } => Some(holdings),
             _ => None,
         })
         .flat_map(|h| h.iter())

@@ -297,7 +297,7 @@ fn sites_cells(pic: &Picture) -> Vec<&oikos_sight::SiteCell> {
 fn held(pic: &Picture, at: &str, kind: &str) -> i64 {
     pic.channels
         .values()
-        .flat_map(|c| match c { Seen::Holdings { holdings } => holdings.iter().collect::<Vec<_>>(), _ => vec![] })
+        .flat_map(|c| match c { Seen::Holdings { holdings, .. } => holdings.iter().collect::<Vec<_>>(), _ => vec![] })
         .find(|h| h.at == at && h.kind == kind)
         .map_or(0, |h| h.quantity.clamp(0, i128::from(i64::MAX)) as i64)
 }

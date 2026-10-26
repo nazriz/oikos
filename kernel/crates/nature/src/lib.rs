@@ -116,6 +116,17 @@ pub struct NatureState {
     /// The last day stepped.
     #[serde(default)]
     pub day: i64,
+    /// Nature's edge (law 8), for each field that holds a kind: what nature's own days have taken from the field, less
+    /// what they added (rain and inflow, decay, flow off the ground, a bound reached), since the run began. So the kind's
+    /// total over holdings, fields, edges and this changes only by what processes make and use (kernel/tests/conservation.rs).
+    /// A spin-up before the run is the world's starting state, not counted.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "oikos_core::money::amount_map")]
+    pub edge: BTreeMap<Id, oikos_core::money::Money>,
+}
+
+/// A field's total over the cells (dense), exactly.
+fn total(v: &[i64]) -> i128 {
+    v.iter().map(|x| *x as i128).sum()
 }
 
 /// What a day changed that the world must know: covers that succeeded (the cell's terrain becomes the new cover), and
@@ -159,7 +170,12 @@ pub fn step_day(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureSt
     succession(cat, ground, land, st, day, &mut out);
     let mut values: BTreeMap<Id, Vec<i64>> = BTreeMap::new();
     for f in &cat.fields {
+        // (A field that holds a kind: what its day changed is nature's, counted on its edge.)
+        let before = f.kind.as_ref().map(|_| total(&dense(st.fields.get(&f.id), ground, f.baseline)));
         let v = step_field(f, ground, land, st.fields.get(&f.id), day);
+        if let Some(b) = before {
+            *st.edge.entry(f.id.clone()).or_insert(0) -= total(&v) - b;
+        }
         st.fields.insert(f.id.clone(), sparse(&v, ground, f.baseline));
         if st.fields.get(&f.id).is_some_and(|m| m.is_empty()) {
             st.fields.remove(&f.id);

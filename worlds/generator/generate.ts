@@ -6,6 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
+import { townNetwork } from "./network";
 import { particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
@@ -95,17 +96,31 @@ const WORK_TIME = {
     // The audit office's papers (docs/behaviour/auditor.md): a request for one named item, the examination of one item on the file it is answered with
     // (a decision decided again under the law), the report on a body for a period, and a body's answer from its own books.
     "publish/audit_request": 300, "publish/audit_finding": 1800, "publish/audit_report": 7200, "publish/audit_answer": 900,
+    // What flows (foundations-2 C3 and C3b): a household turning its use up or down is a minute's thing; connecting or
+    // disconnecting a supply is a field visit; a valve or a feeder worked by hand, or reclosed after it tripped, a crew's call.
+    connection: 300, "connection/set": 60, "connection/open": 3600, "connection/close": 3600, "connection/interrupt": 600, "connection/restore": 600,
+    link: 1800, "link/rotate": 900,
     // The taxpayer's account (docs/behaviour/public-finance.md): a taxpayer's claim for tax paid and not owed, and the collector's decision on it.
     "publish/tax_credit_claim": 900, "publish/tax_credit_decision": 1200,
   },
   // What a system does takes it a second: it is software that was delivered to do just that (foundations F5: there is no default
   // for a block a system's template does not list, because it cannot do it).
-  system: { message: 1, publish: 1, "publish/audit_answer": 120, transfer: 1, open_account: 1, close_account: 1, arrive: 1, move_goods: 1, withdraw: 1, record_claim: 1, transfer_claim: 1, answer: 2, work: 1, deploy: 1, retire: 1, propose_agreement: 1, sign_agreement: 1 },
+  system: { message: 1, publish: 1, "publish/audit_answer": 120, transfer: 1, open_account: 1, close_account: 1, arrive: 1, move_goods: 1, withdraw: 1, record_claim: 1, transfer_claim: 1, answer: 2, work: 1, deploy: 1, retire: 1, propose_agreement: 1, sign_agreement: 1, connection: 1, link: 1 },
   // Every row here is a placeholder, marked "(to confirm)" with its register tag (WM-1), and says what would source it. A profile replaces
   // a row with its place's figure and source (`values.work_time`); the sources found so far are place-specific (burden estimates under one
   // country's paperwork law, one ombudsman's budget, one state's court workload study), so none is a default here (docs/profiles.md).
   sources: {
     person: "Placeholder (to confirm; WM-1): minutes for a person's act (5 for a message, 15 to fill in or go somewhere, 30 to draft an agreement, an hour to leave or arrive). Would be sourced by a place's time-use survey or its government's form-burden estimates (minutes to complete a form), per block (docs/design/rebuild.md 6.3).",
+    "person.connection": "Placeholder (to confirm; WM-1): five minutes for an act on a connection not otherwise priced. Would be sourced by a utility's service standards.",
+    "person.connection/set": "Placeholder (to confirm; WM-1): a minute: a household turning its use up or down (taps, appliances, a thermostat) is its own choice and takes it no time to speak of.",
+    "person.connection/open": "Placeholder (to confirm; WM-1): an hour's field visit to connect a supply (a meter fitted, a valve or a fuse opened). Would be sourced by a distributor's connection service standards (a regulator's guaranteed service levels: to confirm).",
+    "person.connection/close": "Placeholder (to confirm; WM-1): an hour's field visit to disconnect a supply. Would be sourced as connecting is.",
+    "person.connection/interrupt": "Placeholder (to confirm; WM-1): ten minutes to interrupt an interruptible customer by the operator's call or switch. Would be sourced by a network's interruptible-supply terms.",
+    "person.connection/restore": "Placeholder (to confirm; WM-1): ten minutes to restore one. As interrupting.",
+    "person.link": "Placeholder (to confirm; WM-1): half an hour for a crew to shut or open a valve or a feeder by hand, or reclose one that tripped. Would be sourced by a network operator's switching times.",
+    "person.link/rotate": "Placeholder (to confirm; WM-1): a quarter of an hour to declare a rotation schedule (a standing order for a feeder's hours off). Would be sourced by an operator's load-shedding procedure.",
+    "system.connection": "Placeholder (to confirm; WM-1): a second for a supply's own systems to act on a connection remotely (a smart meter's switch). Would be sourced by the system's specification.",
+    "system.link": "Placeholder (to confirm; WM-1): a second for a supervisory control system to switch a feeder or a valve remotely. Would be sourced by the system's specification.",
     "person.take": "Placeholder (to confirm; WM-1): five minutes to take goods by hand where they are kept (what a theft is); before foundations F10 the table had no row for it and the platform's one second stood in. Would be sourced by a retail-crime study of the time a theft takes.",
     "person.publish/tribunal_application": "Placeholder (to confirm; WM-1): half an hour to fill in a form to a hearing body. Would be sourced per place by a form-burden statement or an impact assessment for the place's application form (none found, 2026-10-24).",
     "person.publish/tribunal_response": "Placeholder (to confirm; WM-1): half an hour to answer one. Would be sourced as the application is, from the place's defence form.",
@@ -145,7 +160,7 @@ const WORK_TIME = {
  * whole; of what is older and still stands, and touches the person in no way, the twenty most recent of each. Sizes are
  * placeholders (limited attention and forgetting, to confirm): a bound, not a fit. */
 export const PUBLIC_MEMORY = { kinds: ["news", "election_notice", "nomination", "ballot", "ballot_result", "petition_count", "membership"], has: ["practice", "assertion"], days: 30, most: 20, every_days: 7 };
-export const GENERATOR_VERSION = "0.70.0"; // 0.70.0: the law on leases of shop premises published from the profile's commercial.law (law-premises-leases), the landlords told what they take to accept a surrender and where a claim for rent owed is brought, and a business of one shown the ground of premises it holds by agreement (docs/behaviour/leasing.md); 0.69.0: the tax collector keeps each taxpayer's account (world.tax_collector), where the profile states the law on tax paid and not owed (public_finance.refunds): the law, the claim and statement forms, a payroll officer's file of its account (docs/behaviour/public-finance.md, "The taxpayer's account"; risk PB-23). 0.68.0: foundations-2 phase 1 (law 10): the support office's casework is done by a desk of the agency's officers (`outside-casework`, template `agency-casework`: an officer's minutes for each paper, their hours, lanes the town's share from the profile's `public_service.support_officers_per_1000_claims`), named `by` on each casework act; every machine's template states its hours (the whole day); an office offer's seconds are its template's rows. 0.67.0: shop premises to let: the profile's share of shop units stand empty on the landlords' lots, let on its commercial terms, and businesses of one see what is to let (docs/behaviour/leasing.md). 0.66.0: no rate of business births: the ventures are weighed by expected profit, each with the trade price its goods are bought in at (risk ME-1). 0.65.0: citizens keep a bounded memory of public goings-on (`public_memory`, on unless a spec sets it false: risk SC-1). 0.64.0: a shop's wage and job by kind of shop, a serving task and a wholesaler for each kind, factories by product from inputs of their own, complaints by kind; the laws' words are the engine's. 0.63.0: the mix of shops is on by default; each kind of shop has premises of its own type, its room and its founded-shop venture; the household, tax and payment rules are the Rust ones (MT-18). 0.62.0: names and ordinary dates (docs/design/names-and-dates.md), both off unless a spec turns them on (`names`, `calendar`): people, organisations and the town drawn from the profile's `names` by streams keyed on stable ids, the town's bodies named as the profile has them, genesis papers that name people say their names, offices' references for records; the config's `calendar` from the profile's `calendar` and a start date (the weather's start month derived from it); 0.61.0: the auditor (docs/behaviour/auditor.md): where the profile has `audit`, a body of the town (staffed by residents, paid by a grant) examines the support office's decisions and the town finance office's accounts on a sample as the audit law (published) says, and publishes a report; 0.60.0: foundations F9: the forms for a claimant's papers (`evidence`), an employer's confirmation (`confirmation_answer`) and a request to look at a decision again or put something right (`review_request`) are published, public, where a place has decisions that wait or are reviewed; 0.59.0: 0.59.0: foundations F8, law as data: the profile's `decisions` (what a decision waits for; review and appeal routes; who refuses) are published as `law-decisions`, the payments procedure carries who approves a payment over what sum (`data.approval`), the tribunal hears a refused claim only where the law has an appeal and at the law's fee, the request every grievance uses is `review_request`, and the work table has rows for the new papers; 0.58.0: foundations F11 and the office's slip rows for systems too: a table of work row for a keeper's answer to a question put to its register (`answer`, a placeholder: ten minutes for a person, two seconds for a system); 0.57.0: foundations F7: how often a decision, a bill or a pay goes wrong is a row of the world's table of slips (`orchestration.slip`), each with the profile's note as its source, and no longer a parameter of the module (error_bps, uphold_bps, billing_error_bps_per_year, short_pay.per_year_bps); 0.56.0: foundations F6: every body that employs people has a payroll officer and a deputy from its staff (a firm's manager a deputy), the bank's lending office pays the bank's staff, no venue or support office has a throughput or delay dial, paperwork has rows in the table; 0.55.0: foundations F5: the posts of the town's own bodies are held by people hired from the town at the profile's staffing rates and pay (`public_service`), the bank's payment platform is a licensed system, every system comes from a template that says what it does, and a seat is a person with a post of its own (docs/behaviour/staffing.md); 0.54.0: a profile's employment.hours is published as the law on cutting hours (law-cutting-hours) and its firms' hours step reaches them (docs/behaviour/firms.md, "Hours before heads"); 0.53.0: `opening_caseload` reaches the other offices (support claims in hand and refusals asked about, complaints before the town's desks, permit applications before planning, invoices unpaid at finance, loans behind at the bank), each from the town's own flow times the days a matter stands open; `opening_caseload_scale_bps` thickens them (docs/decisions.md, 2026-10-12, "Opening caseloads of the other offices"); 0.52.0: a profile's ordinary terms of trade credit (business.trade_credit_days) reach the factories that sell to shops and the world market that sells inputs to factories (docs/behaviour/trade.md, "Trade credit"); 0.51.0: the tax law lists its returns, from the profile's public_finance.returns (docs/decisions.md, 2026-10-12, "Returns on the law's days"): which charges each reports and the day of the month it falls due by, as words and as data; 0.50.0: the law on possession says what the place's law has of a plan to pay (may, must consider, none; where it is taken away; where paying in full ends the claim), the tribunal's form for a tenant's answer is published, the possession order form offers only what that law has, and people are given their place's rate of answering an application; 0.49.0: homes by income (docs/decisions.md, 2026-10-12, "Homes by income"): where the profile states its renters' rent as a share of income, a town's first tenancies are dealt by what each household has coming in, people with nothing coming in live with kin, owners are chosen by the head's age where the profile has it, and the payments its support law already owes are in payment from the first day by the profile's take-up; 0.48.0: `opening_caseload`: a town may open in the middle of things, its landlords' rent books and its tribunal's list as an ordinary day would have them (off unless set); a landlord's and the member's procedure say what the law has for a home the tenant has left; 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
+export const GENERATOR_VERSION = "0.71.0"; // 0.71.0: foundations-2 C4 (law 8): homes on water, electricity and sewer connections on the town's network (worlds/generator/network.ts), use and waste as recipes, bills from meters; the per-occupant `waste` and `water_used` variables, the energy retailer's assumed use and the energy used up at the depot are gone; waste is what is consumed, collected from where it is held; who pays the water bill is the place's law (`utilities.water.bill_to`). 0.70.0: the law on leases of shop premises published from the profile's commercial.law (law-premises-leases), the landlords told what they take to accept a surrender and where a claim for rent owed is brought, and a business of one shown the ground of premises it holds by agreement (docs/behaviour/leasing.md); 0.69.0: the tax collector keeps each taxpayer's account (world.tax_collector), where the profile states the law on tax paid and not owed (public_finance.refunds): the law, the claim and statement forms, a payroll officer's file of its account (docs/behaviour/public-finance.md, "The taxpayer's account"; risk PB-23). 0.68.0: foundations-2 phase 1 (law 10): the support office's casework is done by a desk of the agency's officers (`outside-casework`, template `agency-casework`: an officer's minutes for each paper, their hours, lanes the town's share from the profile's `public_service.support_officers_per_1000_claims`), named `by` on each casework act; every machine's template states its hours (the whole day); an office offer's seconds are its template's rows. 0.67.0: shop premises to let: the profile's share of shop units stand empty on the landlords' lots, let on its commercial terms, and businesses of one see what is to let (docs/behaviour/leasing.md). 0.66.0: no rate of business births: the ventures are weighed by expected profit, each with the trade price its goods are bought in at (risk ME-1). 0.65.0: citizens keep a bounded memory of public goings-on (`public_memory`, on unless a spec sets it false: risk SC-1). 0.64.0: a shop's wage and job by kind of shop, a serving task and a wholesaler for each kind, factories by product from inputs of their own, complaints by kind; the laws' words are the engine's. 0.63.0: the mix of shops is on by default; each kind of shop has premises of its own type, its room and its founded-shop venture; the household, tax and payment rules are the Rust ones (MT-18). 0.62.0: names and ordinary dates (docs/design/names-and-dates.md), both off unless a spec turns them on (`names`, `calendar`): people, organisations and the town drawn from the profile's `names` by streams keyed on stable ids, the town's bodies named as the profile has them, genesis papers that name people say their names, offices' references for records; the config's `calendar` from the profile's `calendar` and a start date (the weather's start month derived from it); 0.61.0: the auditor (docs/behaviour/auditor.md): where the profile has `audit`, a body of the town (staffed by residents, paid by a grant) examines the support office's decisions and the town finance office's accounts on a sample as the audit law (published) says, and publishes a report; 0.60.0: foundations F9: the forms for a claimant's papers (`evidence`), an employer's confirmation (`confirmation_answer`) and a request to look at a decision again or put something right (`review_request`) are published, public, where a place has decisions that wait or are reviewed; 0.59.0: 0.59.0: foundations F8, law as data: the profile's `decisions` (what a decision waits for; review and appeal routes; who refuses) are published as `law-decisions`, the payments procedure carries who approves a payment over what sum (`data.approval`), the tribunal hears a refused claim only where the law has an appeal and at the law's fee, the request every grievance uses is `review_request`, and the work table has rows for the new papers; 0.58.0: foundations F11 and the office's slip rows for systems too: a table of work row for a keeper's answer to a question put to its register (`answer`, a placeholder: ten minutes for a person, two seconds for a system); 0.57.0: foundations F7: how often a decision, a bill or a pay goes wrong is a row of the world's table of slips (`orchestration.slip`), each with the profile's note as its source, and no longer a parameter of the module (error_bps, uphold_bps, billing_error_bps_per_year, short_pay.per_year_bps); 0.56.0: foundations F6: every body that employs people has a payroll officer and a deputy from its staff (a firm's manager a deputy), the bank's lending office pays the bank's staff, no venue or support office has a throughput or delay dial, paperwork has rows in the table; 0.55.0: foundations F5: the posts of the town's own bodies are held by people hired from the town at the profile's staffing rates and pay (`public_service`), the bank's payment platform is a licensed system, every system comes from a template that says what it does, and a seat is a person with a post of its own (docs/behaviour/staffing.md); 0.54.0: a profile's employment.hours is published as the law on cutting hours (law-cutting-hours) and its firms' hours step reaches them (docs/behaviour/firms.md, "Hours before heads"); 0.53.0: `opening_caseload` reaches the other offices (support claims in hand and refusals asked about, complaints before the town's desks, permit applications before planning, invoices unpaid at finance, loans behind at the bank), each from the town's own flow times the days a matter stands open; `opening_caseload_scale_bps` thickens them (docs/decisions.md, 2026-10-12, "Opening caseloads of the other offices"); 0.52.0: a profile's ordinary terms of trade credit (business.trade_credit_days) reach the factories that sell to shops and the world market that sells inputs to factories (docs/behaviour/trade.md, "Trade credit"); 0.51.0: the tax law lists its returns, from the profile's public_finance.returns (docs/decisions.md, 2026-10-12, "Returns on the law's days"): which charges each reports and the day of the month it falls due by, as words and as data; 0.50.0: the law on possession says what the place's law has of a plan to pay (may, must consider, none; where it is taken away; where paying in full ends the claim), the tribunal's form for a tenant's answer is published, the possession order form offers only what that law has, and people are given their place's rate of answering an application; 0.49.0: homes by income (docs/decisions.md, 2026-10-12, "Homes by income"): where the profile states its renters' rent as a share of income, a town's first tenancies are dealt by what each household has coming in, people with nothing coming in live with kin, owners are chosen by the head's age where the profile has it, and the payments its support law already owes are in payment from the first day by the profile's take-up; 0.48.0: `opening_caseload`: a town may open in the middle of things, its landlords' rent books and its tribunal's list as an ordinary day would have them (off unless set); a landlord's and the member's procedure say what the law has for a home the tenant has left; 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -776,6 +791,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const frictionRng = rng("frictions");
   const worn = () => (FR ? { variables: { disrepair: frictionRng.below(DISREPAIR_AT) } } : {});
   const UT = V.utilities && spec.utilities !== false ? V.utilities : undefined;
+  // The network for what flows (foundations-2 C4): where there are utilities, a river and the profile's network figures.
+  const NETF = UT?.network;
+
+  // (What a unit of a kind is, physically: the profile's class, stock where it says none: law 8.)
+  const CLASS_OF = (kind: string) => (V.spending.demand?.kinds ?? []).find((x) => x.kind === kind)?.class ?? "stock";
   const OW = V.ownership && spec.ownership !== false ? V.ownership : undefined;
   const HZ = V.hazards && UT ? V.hazards : undefined; // (floods: where the river carries water)
   const CR = V.crime && JU && spec.crime !== false ? V.crime : undefined;
@@ -2556,7 +2576,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // (Its round, the addresses it collects from: its own register. The town's assets it has not seen, inspected.)
     K.kept("round", ["service_address"]), goAndSee("inspections", "a building of the town's by its id"), K.premises("depot", [hallCell])],
     code("city.works", { round: "round", inspections: "inspections", depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: PAY, working_day: WORKING_DAY, work_days: WORK_DAYS,
-      collect_labour: SV.collect_seconds_per_10kg, collect_per_unit: 10_000, collect_every_days: 7,
+      collect_labour: SV.collect_seconds_per_10kg, collect_per_unit: 10, collect_every_days: 7,
       maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste", payroll_office: "finance", ...look }),
     );
   // The electoral office (elections): keeps the roll, takes nominations, runs the ballot, counts it, and appoints the
@@ -2613,6 +2633,17 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         fee: feeOf(FR.venues.tribunal_fee_hours_of_pay), account: "acc-outside" } : {}) }));
     office("tribunal-registrar", "tribunal", "Principal registrar", "registrar", [mine("tribunal-business")], code("tribunal.registrar", { banks: ["bank"], ...(POSS ? { enforcer: "police", warrant_days: POSS.warrant_days, eviction_notice_days: POSS.eviction_notice_days } : {}) }));
   }
+  // The town's network for what flows (foundations-2 C4, law 8; worlds/generator/network.ts): each home on the water main, the
+  // electricity feeders and the sewer, its household's leaseholder the connections' user at the rates it asks (its own use).
+  const NET = UT && L && NETF ? (() => {
+    const spaceOf = new Map<string, string>(occupancy.filter((o: any) => /\/dwelling\./.test(o.space)).map((o: any) => [o.occupant, o.space]));
+    const users = households.filter((h) => spaceOf.has(h.leaseholder)).map((h) => ({ holder: h.leaseholder, at: spaceOf.get(h.leaseholder)!.split("/")[0]!, water_l_day: h.members.length * UT!.water.litres_per_person_per_day, energy_kwh_day: UT!.energy.kwh_per_household_per_day }));
+    const at = (id: string) => structures.find((x) => x.id === id)!.at;
+    const homesServed = structures.filter((x) => structureTypes.find((t) => t.id === x.type)?.spaces.some((sp: any) => sp.kind === "dwelling")).map((x) => ({ id: x.id, dwellings: structureTypes.find((t) => t.id === x.type)!.spaces.filter((sp: any) => sp.kind === "dwelling").reduce((a: number, sp: any) => a + sp.count, 0) }));
+    const net = townNetwork({ structures: structures.map((x) => ({ id: x.id, at: x.at })), homes: homesServed, users,
+      water: { structure: "water-works", cell: at("water-works"), holder: "water-corp" }, power: { structure: "substation", cell: at("substation"), holder: "energy-co" }, sewer: { structure: "water-works", cell: at("water-works"), holder: "water-corp" }, f: NETF! });
+    return { ...net, users };
+  })() : undefined;
   // The utilities (world-expansion 6.1): the water corporation draws the town's water from the river and bills owners;
   // the energy retailer buys from the grid, supplies its customers and bills them. Each starts with three months'
   // takings in hand (a placeholder).
@@ -2622,12 +2653,12 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       { id: "acc-energy-co", holder: "energy-co", custodian: "bank", balance: homesCount * 90 * UT.energy.kwh_per_household_per_day * UT.energy.grid_price_per_kwh });
     // (Its customer roll, kept from what it is given; the meters, gone to and read before each quarter's bills; and
     // the published estimate of how many the town is, which is what it draws for.)
-    office("water-operations", "water-corp", "Operations manager", undefined, [{ id: "books", kind: "accounts" }, mine("water-business"), K.kept("roll", ["property_roll", "acquisition_notice"]),
+    office("water-operations", "water-corp", "Operations manager", undefined, [{ id: "books", kind: "accounts" }, mine("water-business"), K.kept("roll", ["property_roll", "acquisition_notice"]), { id: "stock", kind: "holdings" }, K.mine("departures", ["departure", "supply_request", "supply_end"]), deaths,
       K.visits("meters", { title: "Go and read meters (takes time: say which buildings, by id)", ...(V.knowing?.meter_read_seconds ? { look_seconds: V.knowing.meter_read_seconds } : {}) }), K.published("population", ["population_estimate"])],
-      code("utility.water", { works: "water-works", litres_per_person_per_day: UT.water.litres_per_person_per_day, price_per_kl: UT.water.price_per_kl, service_per_quarter: UT.water.service_per_quarter, meters: "meters" }));
+      code("utility.water", { works: "water-works", ...(NET ? { storage: NET.storage } : {}), bill_to: UT.water.bill_to ?? "owner", price_per_kl: UT.water.price_per_kl, service_per_quarter: UT.water.service_per_quarter, meters: "meters" }));
     office("energy-operations", "energy-co", "Retail manager", undefined, [{ id: "books", kind: "accounts" }, mine("energy-business"), deaths, pricesOf("outside"), { id: "stock", kind: "holdings" },
       K.mine("departures", ["departure"])],
-      code("utility.energy", { depot: "substation", grid: "outside", units_per_customer_per_day: UT.energy.kwh_per_household_per_day, price_per_unit: UT.energy.price_per_kwh, supply_per_day: UT.energy.supply_per_day }));
+      code("utility.energy", { depot: "substation", grid: "outside", price_per_unit: UT.energy.price_per_kwh, supply_per_day: UT.energy.supply_per_day }));
   }
   // The police (world-expansion 7.2): the state's, paid by a grant from outside; they investigate what's reported, and
   // charge whom they find before the tribunal.
@@ -2929,7 +2960,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       wage: wages.shop, period: PAY, working_day: WORKING_DAY, serve_task: "sell", serve_labour: SHOP.serve, suppliers: ["outside"], trade_board: "trade", price: RETAIL_PRICE, demand: OWN_NEW.sales, shopfront: true,
       premises_cell: "{cell}", stock_days: 7, draw_days: V.pay_period_days, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } } };
   const citizenController = code("citizen.default", { outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
-    complain_to: "city", complain_bps: V.services.complain_bps,
+    complain_to: "city", complain_bps: V.services.complain_bps, complain_about_held: true,
     // (What holds people in a job they have, where the profile says: read by those who take initiative.)
     ...(spec.living && V.job_move ? { job_move: V.job_move } : {}),
     // (How fast belief fades in a living town, where the profile gives the fit to its place's trend.)
@@ -2940,7 +2971,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     ...(H.occupancy ? { occupancy: H.occupancy } : {}),
     ...(HE && ED ? { school: { entity: "school", building: "school-building", ages: ED.school_ages },
       care: { entity: "clinic", waiting: "clinic-centre/waiting.1", seek_bps: HE.seek_care_bps, severities: [...new Set(HE.treats.map((x) => x.severity).filter((x): x is string => !!x))], off_work: HE.off_work_severities, wait_days: 2 } } : {}),
-    ...(UT ? { utilities: { energy: "energy-co" } } : {}),
+    // (A household's own use of water and electricity, which it sets its connections to: the profile's figures, its own rule.)
+    ...(UT ? { utilities: { energy: "energy-co", ...(NET ? { water: "water-corp", water_l_a_head: UT.water.litres_per_person_per_day, energy_kwh_a_day: UT.energy.kwh_per_household_per_day } : {}) } } : {}),
     // (How a household divides its spending among the kinds on offer, where the town has the profile's mix of shops (shop_mix): docs/behaviour/demand.md. A town of one kind needs no figures: its whole budget goes to goods.
     // Only the kinds the town's sellers sell to households by order are named: today's shops sell goods; energy and water are billed.)
     ...(V.spending.demand && MIX ? { demand: { kinds: V.spending.demand.kinds.filter((k) => (MIX ? MIX.some((m) => m.kind === k.kind) : k.kind === "goods")).map(({ seller, ...k }) => k), frisch_bps: V.spending.demand.frisch_bps, reference_budget: DEMAND_REF.budget, reference_prices: { goods: RETAIL_PRICE, ...Object.fromEntries((MIX ?? []).filter((k) => k.kind !== "goods").map((k) => [k.kind, k.price])) } } } : {}),
@@ -3239,7 +3271,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   if (spec.migration !== false) {
     office("migration", "outside", "People moving from elsewhere", undefined, [jobBoard, K.lookUp(),
       K.published("statistics", ["support_statistics"])],
-      code("world.migration", { who: "who", households: H, ...(V.savings_by_age && !spec.savings_months_only ? { savings_by_age: V.savings_by_age } : {}), participation_bps: V.labour_force_participation_bps, template_outside_lf: "newcomer-outside-lf", ...(STOPGAPS.length ? { jobseekers_payment: STOPGAPS.map((r) => r.id).join(",") } : {}),
+      code("world.migration", { who: "who", households: H, ...(V.retirement_age ? { seeker_ages: [18, V.retirement_age] } : {}), ...(V.savings_by_age && !spec.savings_months_only ? { savings_by_age: V.savings_by_age } : {}), participation_bps: V.labour_force_participation_bps, template_outside_lf: "newcomer-outside-lf", ...(STOPGAPS.length ? { jobseekers_payment: STOPGAPS.map((r) => r.id).join(",") } : {}),
         ...(ED && HE ? { schooling: { school_ages: ED.school_ages, attainment: ED.attainment, variable: "skill", per_year: SKILL_PER_YEAR } } : {}), ...(spec.migration ?? {}) }));
   }
   // The support office's casework is its officers' (law 10, foundations-2 P3; WM-14): a decision on a claim, the papers it
@@ -3681,6 +3713,17 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     if (!a) throw new Error(`no account to pay ${e}'s staff from`);
     a.balance += amount;
   }
+  // (Every recipe at a workplace states the energy and water a unit takes, law 8: nought until workplaces are on the
+  // network, with that basis (worlds/generator/figures.ts; risk WM-15). Only kinds the world has.)
+  // (The water a workplace uses goes to its drain as wastewater, as a home's does.)
+  const WORKPLACE_USE = (tasks: any[]) => tasks.map((t) => (t.in !== "workplace" ? t : { ...t, consumes: { ...(t.consumes ?? {}), ...(UT ? { energy: "0" } : {}), ...(UT && L ? { water: "0" } : {}) },
+    ...(UT && L && NETF ? { produces: { ...(t.produces ?? {}), wastewater: "0" } } : {}) }));
+  // (A unit used up becomes waste at the mass the profile's waste a head a day gives to what is spent on it: a person's
+  // month of waste over what a person spends in the shops in a month, times the unit's price, in whole kilograms; derived,
+  // law 8. What a person spends there is reckoned from the shop wage a month, less what is saved, over the town's people
+  // (three in four adults): placeholders, WM-9.)
+  const SHOP_SPEND = Math.max(1, (wages.shop * 30 / V.pay_period_days) * ((10_000 - V.spending.saving_bps) / 10_000) * 0.75);
+  const WASTE_OF = (price: number) => Math.max(0, Math.round((V.services.waste_per_person_per_day_g * 30 * price) / SHOP_SPEND / 1000));
   retellTexts();
   return {
     contracts: "0.8",
@@ -3695,25 +3738,27 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     log: { checkpoint_every: MONTH, anchor_every_entries: 1000 },
     // Amounts and quantities on the wire are decimal strings (D58); the generator counts in numbers.
     catalogue: {
+      // (Law 8, foundations-2 C5: every recipe at a workplace states its energy and water; nought here, its basis in the
+      // figure table: no workplace is on the network yet, so a figure above nought would stop the work it is in.)
       // (With nature: every cell has a cover, so each type says which it can stand on; a park is grassland.)
       structure_types: structureTypes.map((t) => ({ ...t, materials: Object.fromEntries(Object.entries(t.materials).map(([k, q]) => [k, String(q)])),
         // (Every building floods with water above the profile's depth on its cells.)
-        ...(HZ && L ? { floods: { field: "water", above: HZ.flood_above_kl } } : {}),
+        // (The river's water is held in litres, law 8: the profile's kilolitres times a thousand.)
+        ...(HZ && L ? { floods: { field: "water", above: HZ.flood_above_kl * 1000 } } : {}),
         ...(L ? { terrains: L.buildable, ...(t.id === "park" ? { cover: L.default_cover } : {}) } : {}) })),
-      resources: [{ id: "goods", unit: "item" }, ...(MIX ?? []).filter((k) => k.kind !== "goods").map((k) => ({ id: k.kind, unit: "item" })), { id: "inputs", unit: "kg" }, ...PRODUCTS.filter((PR) => PR.kind !== "goods").map((PR) => ({ id: PR.input, unit: "kg" })), { id: "materials", unit: "kg" }, { id: "waste", unit: "kg" }, ...(UT ? [{ id: "energy", unit: "kWh" }] : [])],
+      // (Law 8: each kind's class, docs/nothing-from-nothing.md. A shop's kind is the profile's (a service sold over a
+      // counter is no stock; fuel dissipates); energy dissipates; the river's water is a stock, in litres.)
+      resources: [{ id: "goods", unit: "item" }, ...(MIX ?? []).filter((k) => k.kind !== "goods").map((k) => ({ id: k.kind, unit: "item", ...((V.spending.demand?.kinds ?? []).find((x) => x.kind === k.kind)?.class ? { class: (V.spending.demand?.kinds ?? []).find((x) => x.kind === k.kind)!.class } : {}) })), { id: "inputs", unit: "kg" }, ...PRODUCTS.filter((PR) => PR.kind !== "goods").map((PR) => ({ id: PR.input, unit: "kg" })), { id: "materials", unit: "kg" }, { id: "waste", unit: "kg" }, ...(UT ? [{ id: "energy", unit: "kWh", class: "dissipates", ...(NET ? { settle: "hour", shape_bps: NETF!.shape_bps } : {}) }] : []), ...(UT && L ? [{ id: "water", unit: "L", ...(NET ? { settle: "day" } : {}) }] : []), ...(NET ? [{ id: "wastewater", unit: "L", settle: "day" }] : [])],
       // What builds up and wears out (docs/behaviour/services.md): waste in homes (grams), by the people living there;
       // wear on the town's parks and hall (0 to 100,000 over their life).
       variables: [
-        { id: "waste", min: 0, max: 100_000_000, initial: 0, per_occupant_per_day: V.services.waste_per_person_per_day_g, types: structureTypes.filter((x) => x.spaces.some((sp: any) => sp.kind === "dwelling")).map((x) => x.id) },
         { id: "wear", min: 0, max: 100_000, initial: 0, per_day: wearPerDay, types: ["park", "civic", ...(RDS ? ["road"] : [])] },
         // (A home's disrepair, 0 to 100,000: it rises each day so that, of the town's let homes, the share that comes
         // to need repair in a year is the profile's; a repair takes it down. docs/behaviour/frictions.md.)
         ...(FR ? [{ id: "disrepair", min: 0, max: 100_000, initial: 0, per_day: FRD!.per_day, types: structureTypes.filter((x) => x.spaces.some((sp: any) => sp.kind === "dwelling")).map((x) => x.id) }] : []),
-        // (A home's water meter, in litres: what those in it use, counted as it is used. The water corporation reads it.)
-        ...(UT ? [{ id: "water_used", min: 0, max: 1_000_000_000_000, initial: 0, per_occupant_per_day: UT.water.litres_per_person_per_day, types: structureTypes.filter((x) => x.spaces.some((sp: any) => sp.kind === "dwelling")).map((x) => x.id) }] : []),
       ],
       // Making goods: a worker's hours at a workplace turn inputs into goods.
-      tasks: [
+      tasks: WORKPLACE_USE([
         // (Where bodies have skill, the time it takes falls with the workers' schooling: the profile's figure is the mean adult's.)
         { id: "make", labour: skillWork ? skillWork.scale(MAKE.labour) : MAKE.labour, in: "workplace", consumes: { inputs: String(MAKE.inputs) }, produces: { goods: "1" }, ...(skillWork ? { labour_by: skillWork.labour_by } : {}) },
         // (And each other product the town's factories make, from its own input.)
@@ -3725,11 +3770,14 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         // Selling on one's own account: the same time an item, wherever its seller works from (a room at home, a pitch).
         { id: "sell", labour: skillWork ? skillWork.scale(SHOP.serve) : SHOP.serve, ...(skillWork ? { labour_by: skillWork.labour_by } : {}) },
         // Using things up: a household's goods, an item at a time; it takes no one's time.
-        { id: "consume", labour: 0, consumes: { goods: "1" } },
+        // (Law 8: what is used up becomes waste, in kilograms, at the mass the profile's waste a head a day gives to what is
+        // spent: a unit's waste is its share of a person's month of waste by its price over the essentials (derived).)
+        { id: "consume", labour: 0, consumes: { goods: "1" }, produces: { waste: String(WASTE_OF(RETAIL_PRICE)) } },
         // (And each other kind the town's shops sell, the same: the citizen uses a kind up by the task `consume-<kind>`.)
-        ...(MIX ?? []).filter((k) => k.kind !== "goods").map((k) => ({ id: `consume-${k.kind}`, labour: 0, consumes: { [k.kind]: "1" } })),
+        ...(MIX ?? []).filter((k) => k.kind !== "goods").map((k) => ({ id: `consume-${k.kind}`, labour: 0, consumes: { [k.kind]: "1" }, ...(CLASS_OF(k.kind) === "stock" ? { produces: { waste: String(WASTE_OF(k.price)) } } : {}) })),
         // The works crew's: collecting 10 kg of a home's waste (to the depot), and an hour's upkeep of an asset.
-        { id: "collect", labour: V.services.collect_seconds_per_10kg, in: "workplace", produces: { waste: "10" }, changes: { waste: -10_000 } },
+        // (A bin emptied: up to 10 kg of the waste held at the address, into the crew's truck and on to the depot; law 8.)
+        { id: "collect", labour: V.services.collect_seconds_per_10kg, in: "workplace", collects: { kind: "waste", per_unit: 10 } },
         { id: "maintain", labour: upkeep.labour, in: "workplace", changes: { wear: -upkeep.per_unit } },
         // A builder's hand's hour of repair on a home: so much disrepair put right.
         ...(FR ? [{ id: "repair", labour: HOUR, in: "workplace", changes: { disrepair: -FRD!.per_hour } }] : []),
@@ -3746,10 +3794,18 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         // Investigation (crime): an officer's hours that find who took what was reported, with the profile's chance.
         ...(CR ? [{ id: "investigate", labour: CR.investigation_hours * HOUR, in: "workplace", investigates: true, detection_bps: CR.detection_bps }] : []),
         ...(UT ? [
-          { id: "draw_water", labour: 0, ...(L ? { draws: { field: "water", per_unit: 1 } } : {}) },
-          { id: "supply_energy", labour: 0, consumes: { energy: "1" }, emits: { greenhouse_gas: UT.energy.grid_emissions_g_per_kwh } },
+          // (A kilolitre a unit, of the river's water held in litres: what is drawn is the works', law 8.)
+          { id: "draw_water", labour: 0, ...(L ? { draws: { field: "water", per_unit: 1000 } } : {}) },
+          ...(NET ? [
+            // (Use at the user, as it is delivered: a litre of water becomes a litre of wastewater; a kWh is used and dissipates,
+            // with the grid's emissions for its generation.)
+            { id: "use_water", labour: 0, consumes: { water: "1" }, produces: { wastewater: "1" } },
+            { id: "use_energy", labour: 0, consumes: { energy: "1" }, emits: { greenhouse_gas: UT.energy.grid_emissions_g_per_kwh } },
+            // (A kilolitre of the sewer's wastewater treated at the works and put back on the land there.)
+            { id: "treat_wastewater", labour: 0, consumes: { wastewater: "1000" }, emits: { water: 1000 } },
+          ] : []),
         ] : []),
-      ],
+      ]),
       ...(UT ? { counters: [{ id: "greenhouse_gas" }] } : {}),
       ...(RD ? { travel: { seconds_per_cell: RD.travel_seconds_per_cell, by_cover: { ...RD.travel_by_cover, ...(RDS ? { road: RDS.seconds_per_cell } : {}) } } } : {}),
       ...(HE && ED ? { body_variables: [{ id: "skill", min: 0, max: ED.max_years * SKILL_PER_YEAR, initial: 0 }] } : {}),
@@ -3758,10 +3814,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // (A road is a cover, as building is: a barrier to whatever building is one to.)
       ...(L ? { land_covers: [...L.land_covers, ...(RDS ? [{ id: "road" }] : [])], default_cover: L.default_cover, cleared_cover: L.cleared_cover,
         species: RDS ? L.species.map((x: any) => (x.barriers?.includes("built") ? { ...x, barriers: [...x.barriers, "road"] } : x)) : L.species,
-        fields: [...L.fields, ...(UT ? [{ id: "water", min: 0, max: 1_000_000_000_000, decay_bps_per_day: UT.water.river_decay_bps_per_day, flow_bps_per_day: UT.water.river_flow_bps_per_day,
-          from_covers: { [V.nature!.river_cover]: UT.water.river_inflow_kl_per_cell_per_day, ...(HZ ? { wetland: -HZ.wetland_soak_kl_per_day } : {}) },
+        fields: [...L.fields, ...(UT ? [{ id: "water", kind: "water", min: 0, max: 1_000_000_000_000_000, decay_bps_per_day: UT.water.river_decay_bps_per_day, flow_bps_per_day: UT.water.river_flow_bps_per_day,
+          from_covers: { [V.nature!.river_cover]: UT.water.river_inflow_kl_per_cell_per_day * 1000, ...(HZ ? { wetland: -HZ.wetland_soak_kl_per_day * 1000 } : {}) },
           // (Floods: over its banks it spills onto the land around; rain and drought scale what comes down.)
-          ...(HZ ? { spills_above: HZ.river_bank_kl, spill_bps_per_day: HZ.spill_bps_per_day } : {}),
+          ...(HZ ? { spills_above: HZ.river_bank_kl * 1000, spill_bps_per_day: HZ.spill_bps_per_day } : {}),
           ...(spec.weather?.length ? { source_by_day: spec.weather } : W ? { source_by_day: W.rain } : {}) }] : []),
         // Heat: on every cell on heatwave days (more on built ground), building over a day or two and fading as fast. (Half
         // lost a day: the sources are added and then the decay taken, so at half it settles at the source's own level.
@@ -3776,7 +3832,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       places: L ? L.places : [{ id: "town", kind: "town", name: spec.name, area: { x: 0, y: 0, w: spec.grid.w, h: spec.grid.h }, detailed: true }],
       ...(L ? { populations: L.populations, flows: L.flows, ...(V.nature!.spin_up_years ? { nature_spin_up_days: Math.round(V.nature!.spin_up_years * 365) } : {}) } : {}), entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records,
       // The builder's stock at its yard: a house's worth of materials.
-      holdings: [{ kind: "materials", holder: "builder", at: "builder-yard", quantity: String(kg(120)) }, ...factoryStock, ...ownStock] },
+      holdings: [{ kind: "materials", holder: "builder", at: "builder-yard", quantity: String(kg(120)) }, ...factoryStock, ...ownStock,
+        // (The works' store full, and a fortnight of the town's electricity at the substation, as the town opens.)
+        ...(NET ? [{ kind: "water", holder: "water-corp", at: "water-works", quantity: String(NET.storage) }, { kind: "energy", holder: "energy-co", at: "substation", quantity: String(NET.users.reduce((a, u) => a + u.energy_kwh_day, 0) * 14) }] : [])],
+      ...(NET ? { network: NET.network, connections: NET.connections } : {}) },
     participants,
     positions,
     templates,

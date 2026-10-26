@@ -49,7 +49,29 @@ pub struct SiteStructure {
     /// (until something about the building changes, which is then seen afresh). No daily re-sending of every building.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub variables: Option<BTreeMap<Id, VariableView>>,
+    /// The meters on its premises (foundations-2 C3): each connection's, read on a visit (whoever goes there reads what
+    /// the dial shows, as a meter reader does); a meter its operator reads from afar is not on the dial here.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub meters: Vec<MeterView>,
+    /// What is left there of a kind collected from it (foundations-2 C4): seen only by those who did the collecting.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "crate::money::amount_map")]
+    pub left: BTreeMap<Id, crate::money::Money>,
     pub spaces: Vec<SiteSpace>,
+}
+
+/// A meter as read on the premises: whose connection, of what, and what it shows.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeterView {
+    pub connection: Id,
+    pub kind: Id,
+    #[serde(with = "crate::money::amount")]
+    pub reading: crate::money::Money,
+}
+
+/// The on-site meters at a structure, now.
+pub fn meters_at(st: &State, sid: &str) -> Vec<MeterView> {
+    let Some(ns) = st.network.as_deref() else { return vec![] };
+    ns.index.by_at.get(sid).into_iter().flatten().map(|&i| &ns.connections[i]).filter(|c| c.reading == crate::config::MeterKind::OnSite).map(|c| MeterView { connection: c.id.clone(), kind: c.kind.clone(), reading: c.meter }).collect()
 }
 
 /// A state variable as perceived: its value on `as_of_day`, how much it changes each whole day since (at the
@@ -220,8 +242,10 @@ pub fn site_structure(s: &Statics, st: &State, sid: &Id, me: &str, names: bool) 
                 complete: x.complete,
                 completes_at: x.completes_at,
                 coming_down: x.demolition.is_some().then_some(true),
+                meters: vec![],
+                left: BTreeMap::new(),
                 variables: {
-                    let occupants = occ.map_or(0, |m| m.values().map(|b| b.len()).sum::<usize>()) as i64;
+                    let _occupants = occ.map_or(0, |m| m.values().map(|b| b.len()).sum::<usize>()) as i64;
                     let v: BTreeMap<Id, VariableView> = s
                         .config
                         .catalogue
@@ -229,7 +253,7 @@ pub fn site_structure(s: &Statics, st: &State, sid: &Id, me: &str, names: bool) 
                         .iter()
                         .filter_map(|c| {
                             let (value, as_of_day) = *x.variables.get(&c.id)?;
-                            let per_day = c.per_day.saturating_add(c.per_occupant_per_day.saturating_mul(occupants));
+                            let per_day = c.per_day;
                             Some((c.id.clone(), VariableView { value, as_of_day, per_day, min: c.min, max: c.max }))
                         })
                         .collect();
@@ -344,7 +368,24 @@ pub fn end(s: &Statics, st: &mut State, participant: &str, position: Option<&str
     seen.sort();
     seen.dedup();
     let mut shown: Shown = vec![];
-    let found = Visited { channel: channel.into(), as_of: t, cells: seen.iter().map(|c| site_cell(s, st, c, &st.cells[c], &me, names, &mut shown)).collect() };
+    let mut found = Visited { channel: channel.into(), as_of: t, cells: seen.iter().map(|c| site_cell(s, st, c, &st.cells[c], &me, names, &mut shown)).collect() };
+    // (Meters are read where one goes, as they stand when one is there: only on a visit, never by passing.)
+    if st.network.is_some() {
+        let mut read: BTreeMap<Id, Arc<SiteStructure>> = BTreeMap::new();
+        for cell in found.cells.iter_mut() {
+            if let Some(x) = cell.structure.as_ref() {
+                let with = read.entry(x.structure.clone()).or_insert_with(|| {
+                    let meters = meters_at(st, &x.structure);
+                    if meters.is_empty() {
+                        x.clone()
+                    } else {
+                        Arc::new(SiteStructure { meters, ..(**x).clone() })
+                    }
+                });
+                cell.structure = Some(with.clone());
+            }
+        }
+    }
     let key = position.map_or_else(|| crate::config::SELF.to_string(), String::from);
     std::sync::Arc::make_mut(st.participants.get_mut(participant).unwrap()).pending.entry(key).or_default().visits.push(found);
     vec![Timed::new(t, EventBody::Visited { participant: participant.into(), position: position.map(String::from), channel: channel.into(), places })]

@@ -135,6 +135,8 @@ export const FIGURE_BASIS: Basis[] = [
     derived("attach_mean", "the town's mean attachment, from the profile's outlook.residence and outlook.job_tenure"),
     placeholder("frictions.*.at", "the level of a variable at which a home is counted as in fault: the generator's"),
   ]),
+  // Who comes for the job (world.migration): of working age, from adulthood to the profile's retirement age.
+  ...of("world.migration", [derived("seeker_ages", "from adulthood (18) to the profile's retirement_age")]),
   // The rest of the starting state.
   derived("world.entities.*.born_at", "drawn from the profile's age structure"),
   derived("world.entities.*.variables.skill", "years of schooling, from the profile's education"),
@@ -172,14 +174,13 @@ export const FIGURE_BASIS: Basis[] = [
   prof("catalogue.travel.by_cover.*", "round.travel_by_cover"),
   derived("catalogue.body_variables.*.max", "the profile's education.max_years of schooling, as skill (a year is 10,000)"),
   conv("catalogue.body_variables", "skill counted from none: nobody is born schooled"),
-  ...task("collect", [prof("labour", "services.collect_seconds_per_10kg"), conv("produces", "10 kg of waste a unit collected"), conv("changes", "10 kg of a home's waste, in grams: what a unit collected takes away")]),
+  ...task("collect", [prof("labour", "services.collect_seconds_per_10kg"), conv("produces", "10 kg of waste a unit collected")]),
   ...task("maintain", [conv("labour", "an hour: the unit upkeep is counted in"), derived("changes", "the wear an hour of upkeep undoes: from services.asset_life_years and services.upkeep_hours_per_week_per_asset")]),
   ...task("repair", [conv("labour", "an hour: the unit a repair is counted in"), derived("changes", "the disrepair an hour puts right: the level of fault over frictions.repair_hours")]),
   ...task("survey", [derived("labour", "the profile's nature.survey_hours_per_ha over a cell's area")]),
   ...task("treat", [prof("labour", "health.consult_minutes"), prof("on_body.treats", "health.treats")]),
   ...task("teach", [prof("labour", "education.hours_per_day"), derived("on_body.changes", "a school day's share of a year's schooling: 10,000 over education.school_days_per_year")]),
   ...task("investigate", [prof("labour", "crime.investigation_hours"), prof("detection_bps", "crime.detection_bps")]),
-  ...task("supply_energy", [conv("labour", "the grid's work, outside the town: a kWh supplied takes no one in the town any time"), conv("consumes", "a kWh a unit supplied"), prof("emits.greenhouse_gas", "utilities.energy.grid_emissions_g_per_kwh")]),
   ...task("draw_water", [conv("labour", "the river's work: a kilolitre drawn takes no one in the town any time (the works' staff are counted as its own)"), conv("draws", "a kilolitre a unit drawn")]),
   ...task("consume", [conv("labour", "using things up is no one's work"), conv("consumes", "one item used up a unit")]),
   derived("catalogue.tasks.*.labour_by", "how much less time the most schooled take: the profile's education.return_per_year_bps, compounded (Mincer 1974)"),
@@ -319,12 +320,10 @@ export const FIGURE_BASIS: Basis[] = [
     derived("pay_per_day", "each industry's wage over the pay period's days (wages_per_pay_period, pay_period_days)"),
   ]),
   ...of("utility.water", [
-    prof("litres_per_person_per_day", "utilities.water.litres_per_person_per_day"),
     prof("price_per_kl", "utilities.water.price_per_kl"),
     prof("service_per_quarter", "utilities.water.service_per_quarter"),
   ]),
   ...of("utility.energy", [
-    prof("units_per_customer_per_day", "utilities.energy.kwh_per_household_per_day"),
     prof("price_per_unit", "utilities.energy.price_per_kwh"),
     prof("supply_per_day", "utilities.energy.supply_per_day"),
     prof("billing_over_bps", "frictions.bill_over_bps"),
@@ -369,6 +368,17 @@ export const FIGURE_BASIS: Basis[] = [
     derived("working_day", "the working day, from the profile's ordinary hours a week"),
     derived("per_resident_per_year", "the profile's grants or charges per resident, by the town's count"),
   ].flatMap((r) => ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params"].map((at) => ({ ...r, family: `any module: ${r.at}`, at: `${at}.${r.at}` }))),
+  // The network for what flows (foundations-2 C4, law 8; worlds/generator/network.ts): its engineering figures are the
+  // profile's (`utilities.network`, stand-ins until sourced); capacities and lengths are made from them and the layout.
+  derived("world.network.links.*.capacity", "a pipe's or a wire's capacity: what its users ask at the start, times the profile's peak (pipes) or margin over the peak hour (wires): utilities.network"),
+  derived("world.network.links.*.length_m", "the distance on the ground between its nodes, by the generator's layout of districts"),
+  prof("world.network.links.*.loss_m", "utilities.network"),
+  derived("world.network.supplies.*.storage", "the works' store: the town's use at the start times the profile's storage_days (utilities.network)"),
+  prof("world.network.supplies.*", "utilities.network"),
+  derived("world.connections.*.rate", "a household's own use: the profile's litres a head times its people, and its kWh a day (utilities.water, utilities.energy); a sewer lets out what it holds"),
+  prof("catalogue.resources.*.shape_bps", "utilities.network"),
+  derived("catalogue.tasks.*.emits.*", "what a unit puts out: a kWh used, the grid's emissions (utilities.energy.grid_emissions_g_per_kwh); a kilolitre treated, a kilolitre put back on the land (the unit of the treatment)"),
+  conv("catalogue.tasks.*.collects.per_unit", "a load of 10 kg, the unit the crew's time is reckoned in (services.collect_seconds_per_10kg)"),
   prof("catalogue.species", "nature.species"),
   prof("catalogue.land_covers", "nature.covers"),
   placeholder("catalogue.structure_types", "buildings' sizes, rooms and build times: the generator's (docs/behaviour/generator.md)"),
@@ -377,6 +387,8 @@ export const FIGURE_BASIS: Basis[] = [
   // A system template's own seconds, hours and lanes (law 10, foundations-2 P1 and P3): each with its source in act_time.sources, keyed
   // `template.<id>.<row>`. The casework desk's minutes are the person table's rows; an office offer's a share of them at its speed; a
   // machine's hours the whole day (software runs when asked); the desk's hours an officer's day and its lanes the town's share of officers.
+  ...of("utility.water", [derived("storage", "the works' store: the town's use at the start times the profile's storage_days (utilities.network)")]),
+  ...of(CITIZEN, [prof("utilities.water_l_a_head", "utilities.water.litres_per_person_per_day"), prof("utilities.energy_kwh_a_day", "utilities.energy.kwh_per_household_per_day")]),
   derived("templates.*.does.*.seconds", "a system's seconds for an act: a person's time for it at an offer's speed, or an officer's (the person table's row); act_time.sources template.<id>.<row>"),
   derived("templates.*.hours.from", "when a system's day begins: a machine's midnight (all day), or an officer's working day from the profile's round.work_start_hour"),
   derived("templates.*.hours.seconds", "how long a system's day is: a machine's whole day, or an officer's working day (ordinary_hours_per_week) times the town's share of officers; act_time.sources template.<id>.hours"),

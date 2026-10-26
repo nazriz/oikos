@@ -80,13 +80,32 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-26 at the merge of main (8570d699: the appointments main took meanwhile, the press among the posts the council
 // fills) into foundations-2 phase 1, config hashes and Rust states both, on the merged tree; neither side's change alone is the town any
 // more; 6a09320a..., d7cf0e19... and f87b1c3a... for the configs, and 46b53dc8..., 4fd33b34... and 3ab351d6... for the states, until then.)
+// (Re-taken on 2026-10-26 at foundations-2 C2 (law 8), config hashes and Rust states both: kinds have a class, the river's water is a kind held in
+// litres (its figures a thousand times the profile's kilolitres, so its decay and spills round at a finer grain), and what the water works draws is
+// held at the works (generator 0.69.0); 3c86931d..., 6ee4f4ac... and 58f52331... for the configs, and 4f597e2a..., c2e206a4... and c944d672... for the
+// states, until then.)
+// (Re-taken on 2026-10-26 at foundations-2 C3, the config hashes only: the table of work gained the rows for acts on a connection and a link (and their sources);
+// no town has a network yet, and the states did not move; 910fbe98..., 90e0e68d... and 31bce73d... until then.)
+// (Re-taken on 2026-10-26 at the merge of main (phase 1 landed, 0824efb6) into foundations-2 phase 2, config hashes and Rust states both,
+// on the merged tree; main's dbb34546..., b5082f8c..., 47fed11d... and f49ce487..., ce90d241..., 1605af11..., and this branch's febd3aa0...,
+// 44ce5bcf..., 9ea834be... and fec98d61..., 0152badb..., 7787a6c6..., until then.)
+// (Re-taken on 2026-10-26 at foundations-2 C4 and C5 (law 8), on the tree merged with main at 457f7505, config hashes and Rust states
+// both: homes on water, electricity and sewer connections, use and waste as recipes, waste collected from where it is held, bills
+// from meters, the two variables and the assumed uses gone, every workplace recipe stating its energy and water (generator 0.70.0);
+// 12dfe7e7..., b0f0a2ac..., bd137799... for the configs and 47d84415..., a02d0f45..., 4f88cd1f... for the states, until then.)
+// (Re-taken on 2026-10-26 at foundations-2 phase 2 on main (law 8: homes on the network, use and waste as recipes, bills from meters)
+// with who comes for a job of working age (world.migration `seeker_ages`), config hashes and Rust states both; b5ce5637..., fe55cd7f...
+// and c9ee8b47... for the configs, and 1029d2b3..., 8ceb057e... and 9ed817f1... for the states, until then.)
 // (Re-taken on 2026-10-26 at taxpayer-accounts (PB-23), on main after foundations-2 phase 1, config hashes and Rust states both: the outside
 // world's tax collector keeps each taxpayer's account (a new office, its system and its officers' desk, the law on tax paid and not owed,
 // two public forms, a payroll officer's file of its account, a row of the table of work; generator 0.69.0). The towns' life did not move:
 // au-vic over 60 days has the same 31,543 records, payments and moves with the collector as with it taken out; the states move with the
 // participants. dbb34546..., b5082f8c... and 47fed11d... for the configs, and f49ce487..., ce90d241... and 1605af11... for the states, until then.)
+// (Re-taken on 2026-10-26 once more, at the merge of main (taxpayer-accounts, lease remedies, figures-basis) into foundations-2
+// phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
+// f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "a6b3618ed78b6968", "gb-eng-2026": "24da9440e154ecbc", "ke-nakuru-2026": "ad040dcf63cb44b2" }
+  ? { "au-vic-2026": "38412f4ebe8ca98e", "gb-eng-2026": "fb039153ba01ef7a", "ke-nakuru-2026": "43665a61892edd2b" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -116,9 +135,9 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // the ground of premises it holds by agreement (generator 0.70.0); the genesis records are in the state. 4c714b3d..., a6a15d31...
 // and dd840c8e... for the configs, and e6916c32..., 47582857... and f94c4358... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "f8aaed1b479af9a5529bdaaab34b019f994a62b7390cb94a2fb57cd504a7c0a0",
-  "gb-eng-2026": "26b39d31b9d711fa07b1c05c5bbb65bbe4977f952d699e4a4c7a3d82bda7c723",
-  "ke-nakuru-2026": "1e3107f01b5a1465717f82014a212791625b83143f218da92e3327a9823d5e24",
+  "au-vic-2026": "ffab69c84b6008517844f2a4a76b0a4cad02b3a12c4ccde3fc92e407849e07ba",
+  "gb-eng-2026": "c5619171a49013887eb5cb032ac0a475f7ccd9c2fc29aa356871156277749c7e",
+  "ke-nakuru-2026": "e5d66985773db518c6182e2b7ed7183eda37e5f6a12051e5e22bb133edc55033",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

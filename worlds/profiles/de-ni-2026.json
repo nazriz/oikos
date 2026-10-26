@@ -1174,9 +1174,9 @@
         "floor_bps": 8000
       }
     },
-    "utilities": {
+    "utilities": {"network": {"head_m": 50, "service_head_m": 20, "min_head_m": 5, "storage_days": 2, "pipe_peak_bps": 25000, "wire_margin_bps": 15000, "main_loss_m": 10, "service_loss_m": 5, "shape_bps": [270, 238, 216, 216, 227, 281, 411, 520, 487, 411, 379, 368, 368, 357, 357, 390, 487, 650, 758, 736, 628, 509, 411, 325]}, 
       "water": {
-        "litres_per_person_per_day": 126,
+        "litres_per_person_per_day": 126, "bill_to": "owner",
         "price_per_kl": 447,
         "service_per_quarter": 2329,
         "river_inflow_kl_per_cell_per_day": 1000,
@@ -1579,6 +1579,8 @@
     }
   },
   "sources": {
+    "utilities.network": "PLACEHOLDER (to confirm; WM-1, foundations-2 C4): the network's engineering figures are the generator's stand-ins, the same in every profile: a source head of 50 m, a service head of 20 m (a common minimum service pressure in supply codes, e.g. the Water Services Association of Australia's code: recalled, to confirm) and 5 m below which nothing comes; a store of two days' use; pipes sized for 2.5 times the average flow and wires for 1.5 times the peak hour's; a main losing 10 m and a service 5 m at capacity (linear stand-ins for friction); a household's day of electricity by hour, an evening peak (a typical residential load profile: recalled, to confirm). Would be sourced from a local water authority's and a distributor's design standards and published load profiles.",
+    "utilities.water.bill_to": "PLACEHOLDER (to confirm; WM-12): the property owner is the water and sewer charge debtor and passes it on in the service charges (Betriebskosten): recalled, to confirm.",
     "public_service.support_officers_per_1000_claims": "PLACEHOLDER (to confirm; WM-14; approved by the owner as a marked national ratio on a small town, 2026-10-25): 4 of the support agency's officers per 1,000 claims in payment. Not this place's figure: an order of magnitude recalled for Great Britain (the Department for Work and Pensions' staff, roughly 90,000, over roughly 23 million benefit claims in payment, State Pension included, is about 4 per 1,000, of whom not all decide claims; not opened, to confirm), carried to every profile until each place's agency staffing and caseload are sourced. Would be sourced by the agency's annual report (staff handling claims, full-time equivalents) over its published caseload.",
     "names.customs": "family_name_from father, given first: German civil-law default (BGB para 1355 lets spouses choose a married name; children take the couple's married name, para 1616). wife_takes_husband_bps 7000 is PLACEHOLDER (to confirm): recalled that a clear majority of couples married recently choose the husband's name, share falling with cohort; no table opened. Titles Herr/Frau as German papers address people (Frau for all adult women, Fraeulein long disused).",
     "names.given": "Opened 2026-10-17: beliebte-vornamen.de decade pages (e.g. https://www.beliebte-vornamen.de/jahr/1970er, 1930er to 2020er), Knud Bielefeld, 'eigene Recherchen anhand einer repraesentativen Stichprobe' (Germany-wide, not Niedersachsen; site copyright is the compiler's, only the rank order is used here as a frequency, no text copied). GfdS lists were not opened. Cohort = the decade of birth (1930 to 2020), top 35 of each sex (30 for the 2010s), weight = round(6000/(rank+6)): ranks turned into counts, an assumed Zipf-like decay (PLACEHOLDER shape, to confirm against counts). Figures were read through a page summariser, so rank order may drift slightly. Names are drawn at random from frequencies only; a drawn name may coincide with a living person by chance. Migrant-community names are thin (Mohammed enters only at rank 21 in the 2020s).",

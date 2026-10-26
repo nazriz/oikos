@@ -2184,7 +2184,7 @@ impl Plan for WorksPlan {
             }
         }
         for c in pic.channels.values() {
-            if let Seen::Holdings { holdings } = c {
+            if let Seen::Holdings { holdings, .. } = c {
                 for h in holdings.iter() {
                     if h.at == self.p.depot && h.kind == self.p.kind {
                         self.at_depot = cents(h.quantity);
@@ -2243,8 +2243,8 @@ impl Plan for WorksPlan {
                 if let (true, Done::Outcome(out)) = (done.applied(), done) {
                     // What the crew found at each address: what they left, and so what had gathered since they were last there.
                     for x in items {
-                        let Some(v) = out.seen.iter().find(|b| b.structure == x.on).and_then(|b| b.variables.as_ref()).and_then(|vs| vs.get(&self.p.waste)) else { continue };
-                        let after = variable_today(v, *t);
+                        // (What the crew left in the bins, as they saw: law 8, waste is held where it is made.)
+                        let Some(after) = out.seen.iter().find(|b| b.structure == x.on).and_then(|b| b.left.get(&self.p.waste)).map(|q| crate::common::cents(*q)) else { continue };
                         let was = self.left_there.get(&x.on).copied();
                         let since = was.map(|w| w.1).or_else(|| self.known_since.get(&x.on).copied()).unwrap_or(*t);
                         let days_milli = ((t - since) * 1000 / DAY).max(1000);
@@ -2498,7 +2498,7 @@ impl Plan for WorksPlan {
                     for s in &due {
                         // An address the crew has been to and found nothing kept of waste at: not a home; off the round.
                         if let Some(st) = self.known.get(s) {
-                            if !st.variables.as_ref().is_some_and(|v| v.contains_key(&p.waste)) {
+                            if !st.spaces.iter().any(|sp| sp.kind == "dwelling") {
                                 self.addresses.remove(s);
                                 self.not_homes.insert(s.clone());
                                 continue;

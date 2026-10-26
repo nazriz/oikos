@@ -117,6 +117,12 @@
         },
         {
           "$ref": "#/$defs/take"
+        },
+        {
+          "$ref": "#/$defs/connection"
+        },
+        {
+          "$ref": "#/$defs/link"
         }
       ]
     },
@@ -1724,6 +1730,104 @@
         },
         "at": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        }
+      }
+    },
+    "connection": {
+      "description": "An act on a connection (foundations-2 C3, law 8; docs/nothing-from-nothing.md). Its operator (the holder of the supply whose tree the node is on) opens one (`open` with `kind`, `node`, `to`, `at`, `rate`; or, naming a closed `connection`, opens it again), closes it, interrupts or restores it; its user or its operator sets its rate (`set`). The kernel stores the supply contracts and never reads them.",
+      "type": "object",
+      "required": [
+        "block",
+        "op"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "connection"
+        },
+        "op": {
+          "enum": [
+            "open",
+            "set",
+            "close",
+            "interrupt",
+            "restore"
+          ]
+        },
+        "connection": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "kind": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+        },
+        "node": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
+        "to": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "at": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "rate": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000000
+        },
+        "uses": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+        },
+        "meter": {
+          "enum": [
+            "on_site",
+            "remote"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    },
+    "link": {
+      "description": "An act on a link by its operator: shut it, open it, reclose it after it tripped, or put it on a rotation (a standing schedule: off for `off` seconds of every `every`, counted from `from`; `off` nought ends it). Only the act is logged; the schedule's effects are state.",
+      "type": "object",
+      "required": [
+        "block",
+        "link",
+        "op"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "link"
+        },
+        "link": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
+        "op": {
+          "enum": [
+            "shut",
+            "open",
+            "reclose",
+            "rotate"
+          ]
+        },
+        "every": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31622400
+        },
+        "from": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "off": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 31622400
         }
       }
     }

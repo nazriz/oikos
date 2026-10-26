@@ -1,6 +1,6 @@
 {
   "answers": {
-    "acts": "What it acts on: its roll of properties, each billed by its meter each quarter; and the notices it is given of land changing hands and of building work.",
+    "acts": "What it acts on: its roll of properties and its connections, each billed by its meter each quarter; a household's request to be supplied, and notice that it has gone; and the notices it is given of land changing hands and of building work.",
     "office": "the water corporation"
   },
   "doc": "docs/behaviour/utilities.md",
@@ -12,6 +12,10 @@
     {
       "what": "acquisition_notice",
       "why": "Its customer roll: each notice that land it supplies has changed hands is given to it."
+    },
+    {
+      "what": "connections",
+      "why": "Its network: the mains, services and connections it operates, with what its instruments read of them, are its own works and records (foundations-2 C3)."
     }
   ],
   "name": "utility.water",
@@ -24,20 +28,13 @@
       "source": "placeholder",
       "unit": "days"
     },
-    "litres_per_person_per_day": {
-      "default": 0,
+    "bill_to": {
+      "default": "owner",
       "schema": {
-        "description": "what a person uses (the world's figure)",
-        "type": "integer"
-      },
-      "source": "placeholder"
-    },
-    "meter": {
-      "default": "water_used",
-      "schema": {
+        "description": "whom the water bill goes to: the property's owner (by the roll) or the occupant (the connection's user), as the place's law has it",
         "type": "string"
       },
-      "source": "placeholder"
+      "source": "law data: the profile's utilities.water.bill_to (WM-12)"
     },
     "meters": {
       "default": "",
@@ -53,15 +50,6 @@
       },
       "source": "placeholder"
     },
-    "price_elasticity_bps": {
-      "default": 0,
-      "schema": {
-        "description": "by how much use falls for each 100% the price stands over the reference price (Dalhuisen et al. 2003: about 4000; to confirm); 0: use does not respond",
-        "type": "integer"
-      },
-      "source": "placeholder",
-      "unit": "bps"
-    },
     "price_per_kl": {
       "default": 0,
       "schema": {
@@ -73,32 +61,6 @@
     "read_days": {
       "default": 21,
       "schema": {
-        "type": "integer"
-      },
-      "source": "placeholder",
-      "unit": "days"
-    },
-    "reference_price_per_kl": {
-      "default": 0,
-      "schema": {
-        "description": "the price use was reckoned at (in the smallest unit, a kilolitre); 0: none, so no price response",
-        "type": "integer"
-      },
-      "source": "placeholder"
-    },
-    "restriction_cut_bps": {
-      "default": 0,
-      "schema": {
-        "description": "by how much use falls while restrictions stand (a published restriction asks for less); 0: none",
-        "type": "integer"
-      },
-      "source": "placeholder",
-      "unit": "bps"
-    },
-    "restriction_review_days": {
-      "default": 7,
-      "schema": {
-        "description": "while restrictions stand with a cut, how often it draws the usual amount to see whether the river can give it",
         "type": "integer"
       },
       "source": "placeholder",
@@ -118,10 +80,26 @@
       },
       "source": "placeholder"
     },
+    "storage": {
+      "default": 0,
+      "schema": {
+        "description": "what the works' store holds when full (litres): what the daily draw keeps it at",
+        "type": "integer"
+      },
+      "source": "placeholder"
+    },
     "task": {
       "default": "draw_water",
       "schema": {
         "description": "the work that draws a kilolitre",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
+    "treat_task": {
+      "default": "treat_wastewater",
+      "schema": {
+        "description": "the work that treats a kilolitre of wastewater and puts it back on the land",
         "type": "string"
       },
       "source": "placeholder"
@@ -142,7 +120,7 @@
       "at": "works",
       "every": 1,
       "task": "draw_water",
-      "what": "Each day the works draws from the river what the town uses, by the published estimate of how many live in it, and says so when the river cannot give it."
+      "what": "Each day the works draws from the river what keeps its store full, and says so when the river cannot give it; and treats what the sewer brought back."
     },
     {
       "at": "works",
@@ -151,9 +129,9 @@
         91
       ],
       "task": "bill",
-      "what": "Before each round of bills a reader goes round the meters; then each property's owner is sent a bill for the service charge and what its meter shows was used. How often the bills go out is the order's."
+      "what": "Before each round of bills a reader goes round the meters; then each bill is sent for the service charge and what its meter shows was used. How often the bills go out is the order's."
     }
   ],
   "state": "none",
-  "version": "0.3.0"
+  "version": "0.4.0"
 }

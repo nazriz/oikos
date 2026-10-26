@@ -34,6 +34,8 @@ pub struct Statics {
     /// For each organisation, the first configured position of it that keeps its record (`keeps_record`), by its
     /// place in `config.positions`.
     pub record_keeping_at: BTreeMap<String, usize>,
+    /// The network for what flows (foundations-2 C3), its trees found at load, when the world has one.
+    pub net: Option<std::sync::Arc<crate::network::NetStatics>>,
 }
 
 impl Statics {

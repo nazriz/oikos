@@ -96,6 +96,8 @@ pub enum RefusalCode {
     /// the world's table for their kind, and no `default` the world states): nobody said what it takes, so it is not done
     /// (law 10, foundations-2 P2; before, it took a second).
     Unpriced,
+    /// An edge asked to sell more of a scarce kind than it has left this period (foundations-2 C6).
+    BeyondSupply,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -208,6 +210,37 @@ pub enum EventBody {
     DemolitionStarted {
         structure: Id,
         by: Id,
+    },
+    /// An act on a connection (foundations-2 C3): opened, set, closed, interrupted, restored. Its settlements are not
+    /// events: the meter is state.
+    ConnectionChanged {
+        connection: Id,
+        op: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rate: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kind: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        node: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        holder: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        at: Option<Id>,
+        by: Id,
+    },
+    /// A link's state changed: by its operator's act (shut, opened, reclosed, put on or taken off a rotation), or by its
+    /// own protection (`tripped`, with the load it was asked for and its rating; no `by`).
+    LinkChanged {
+        link: Id,
+        op: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        by: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        load: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        capacity: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rotation: Option<serde_json::Value>,
     },
     GoodsMoved {
         kind: Id,
@@ -474,6 +507,8 @@ impl EventBody {
             EventBody::ActionRefused { .. } => "action_refused",
             EventBody::Transfer { .. } => "transfer",
             EventBody::GoodsMoved { .. } => "goods_moved",
+            EventBody::ConnectionChanged { .. } => "connection_changed",
+            EventBody::LinkChanged { .. } => "link_changed",
             EventBody::Worked { .. } => "worked",
             EventBody::DemolitionStarted { .. } => "demolition_started",
             EventBody::AccountOpened { .. } => "account_opened",
@@ -523,6 +558,8 @@ impl EventBody {
             self,
             EventBody::Transfer { .. }
                 | EventBody::GoodsMoved { .. }
+                | EventBody::ConnectionChanged { .. }
+                | EventBody::LinkChanged { .. }
                 | EventBody::Worked { .. }
                 | EventBody::DemolitionStarted { .. }
                 | EventBody::AccountOpened { .. }
