@@ -706,14 +706,14 @@ impl<W: Write> Engine<W> {
                 crate::kernel::Observed { canonical: vec![], shown: self.run.shown(obs).map_err(|e| e.to_string())?, wire: None }
             };
             if let Command::Observe { participant, only } | Command::Look { participant, only, .. } = cmd {
-                let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
+                let key = only.as_ref().map_or_else(|| participant.to_string(), |o| format!("{participant}|{o}"));
                 let cur = self.currency.clone();
                 let dated = self.dated.clone();
                 let named = self.named;
-                self.knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(cur).with_dated(dated).with_names(named)).absorb_seen(
+                self.knowledge.entry(key.to_string()).or_insert_with(|| oikos_resolver::Knowledge::new(cur).with_dated(dated).with_names(named)).absorb_seen(
                     &crate::kernel::seen(obs),
                     &o.shown,
-                    &mut self.registers,
+                    &mut self.registers
                 );
             }
             seen = json.then_some(o);
@@ -735,7 +735,7 @@ impl<W: Write> Engine<W> {
                         let to: Vec<String> = self
                             .parts
                             .iter()
-                            .filter(|(_, p)| !p.ended && !p.shares_body && p.person.as_ref().is_some_and(|e| to.contains(e)))
+                            .filter(|(_, p)| !p.ended && !p.shares_body && p.person.as_ref().is_some_and(|e| to.iter().any(|x| x ==e)))
                             .map(|(pid, _)| format!("{pid}|self"))
                             .filter(|k| self.units.contains_key(k))
                             .collect();
@@ -755,44 +755,44 @@ impl<W: Write> Engine<W> {
         for e in events {
             match &e.body {
                 E::ParticipantCreated { participant, kind, person, template, traits, .. } => {
-                    let tpl = self.templates.get(template);
+                    let tpl = self.templates.get(template.as_str());
                     let kind =
                         serde_json::to_value(kind).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_else(|| "person".into());
                     self.parts.insert(
-                        participant.clone(),
+                        participant.to_string(),
                         Part {
                             kind,
-                            person: person.clone(),
+                            person: (*person).map(|x| x.to_string()),
                             controller: crate::config::Controller::new(tpl.map_or(Value::Null, |t| t["controller"].clone())),
                             traits: traits.clone().unwrap_or(Value::Null),
                             shares_body: false,
                             ended: false,
                         },
                     );
-                    changed.insert(participant.clone());
+                    changed.insert(*participant);
                 }
                 E::PositionCreated { position, entity, role_module, .. } => {
                     let rm = role_module.clone().unwrap_or(Value::Null);
                     let keeps = rm["keeps_record"].as_bool() == Some(true);
                     self.positions
-                        .insert(position.clone(), Pos { entity: entity.clone(), holder: None, role_module: rm, keeps_record: keeps });
+                        .insert(position.to_string(), Pos { entity: entity.to_string(), holder: None, role_module: rm, keeps_record: keeps });
                 }
                 E::Appointed { position, holder, .. } => {
-                    if let Some(x) = self.positions.get_mut(position) {
+                    if let Some(x) = self.positions.get_mut(position.as_str()) {
                         if let Some(h) = x.holder.take() {
-                            changed.insert(h);
+                            changed.insert(h.into());
                         }
-                        x.holder = holder.clone();
+                        x.holder = (*holder).map(|x| x.to_string());
                         if let Some(h) = holder {
-                            changed.insert(h.clone());
+                            changed.insert(*h);
                         }
                     }
                 }
                 E::ParticipantEnded { participant, .. } => {
-                    if let Some(p) = self.parts.get_mut(participant) {
+                    if let Some(p) = self.parts.get_mut(participant.as_str()) {
                         p.ended = true;
                     }
-                    changed.insert(participant.clone());
+                    changed.insert(*participant);
                 }
                 _ => {}
             }
@@ -1169,7 +1169,7 @@ impl<W: Write> Engine<W> {
             let Some(mut u) = self.units.remove(&key) else { continue };
             if u.seat() && self.opts.host_seats {
                 // (The host looks for it, through the participant API, as it decides and acts for it.)
-                seats.push(SeatWake { key: key.clone(), participant: u.participant.clone(), t, woke_for: u.woke_for.clone(), since: u.since, observation: Value::Null });
+                seats.push(SeatWake { key: key.clone(), participant: u.participant.clone(), t, woke_for: u.woke_for.clone(), since: u.since, observation: Value::Null, });
                 self.units.insert(key.clone(), u);
                 kept_awake.push((key, n));
                 continue;
@@ -1179,7 +1179,7 @@ impl<W: Write> Engine<W> {
                 Some(c) if c != "self" => ls
                     .into_iter()
                     .map(|mut l| {
-                        l.channel = format!("{c}/{}", l.channel);
+                        l.channel = format!("{c}/{}", l.channel).into();
                         l
                     })
                     .collect(),
@@ -1187,7 +1187,7 @@ impl<W: Write> Engine<W> {
             });
             let mut resp = match looks {
                 Some(looks) => {
-                    match self.command(&Command::Look { participant: u.participant.clone(), only: only.clone(), looks: looks.clone() }) {
+                    match self.command(&Command::Look { participant: u.participant.clone().into(), only: only.clone().map(Into::into), looks: looks.clone(), }) {
                         Ok(r) => Some(r),
                         Err(_) => {
                             self.note(&u.participant, json!({ "look_rejected": serde_json::to_string(&looks).unwrap_or_default().chars().take(4000).collect::<String>() }))?;
@@ -1198,7 +1198,7 @@ impl<W: Write> Engine<W> {
                 None => None,
             };
             if resp.is_none() {
-                resp = self.command(&Command::Observe { participant: u.participant.clone(), only: only.clone() }).ok();
+                resp = self.command(&Command::Observe { participant: u.participant.clone().into(), only: only.clone().map(Into::into) }).ok();
             }
             // (Its capacity may have gone with what it saw: a unit no longer there does not decide.)
             let Some(obs) = resp.and_then(|r| r.observation) else {
@@ -1238,7 +1238,7 @@ impl<W: Write> Engine<W> {
                     // (The capacity it was shown in: its unit's post, or the one post a system holds, which a system's
                     // unit of no capacity sees as run.ts's did.)
                     let held = self.held(&u.participant);
-                    let as_ = only.clone().filter(|c| c != "self").or_else(|| (held.len() == 1 && self.parts.get(&u.participant).is_some_and(|p| p.kind == "system")).then(|| held[0].clone()));
+                    let as_ = only.clone().filter(|c| c != "self").or_else(|| { (held.len() == 1 && self.parts.get(&u.participant).is_some_and(|p| p.kind == "system")).then(|| held[0].clone())});
                     if let Some(c) = as_ {
                         data["as"] = json!(c);
                     }
@@ -1404,7 +1404,7 @@ impl<W: Write> Engine<W> {
                 self.words_note(&pid, &w, if acted { None } else { Some("the acts could not be carried out".into()) })?;
                 if !acted {
                     if let Some(u) = self.units.get_mut(&key) {
-                        u.answers.push(Answer { kind: "words".into(), about: w.about.clone(), body: json!({ "done": false, "why": "the acts could not be carried out" }) });
+                        u.answers.push(Answer { kind: "words".into(), about: w.about.clone(), body: json!({ "done": false, "why": "the acts could not be carried out" }), });
                     }
                 }
             }
@@ -1574,7 +1574,7 @@ impl<W: Write> Engine<W> {
                 Ok((true, false, None))
             }
             Action::OptOut { statement } => {
-                let _ = self.command(&Command::OptOut { participant: pid.clone(), statement: statement.unwrap_or_default() });
+                let _ = self.command(&Command::OptOut { participant: pid.clone().into(), statement: statement.unwrap_or_default() });
                 if let Some(p) = self.parts.get_mut(&pid) {
                     p.ended = true;
                 }
@@ -1595,7 +1595,7 @@ impl<W: Write> Engine<W> {
                     Provenance::Direct => json!({ "via": "direct" }),
                     Provenance::Given(v) => v,
                 };
-                let acted = self.begin(key, &pid, as_.as_deref(), blocks, by, prov, reasoning.filter(|_| seat || !self.lean))?;
+                let acted = self.begin(key, &pid, as_.as_deref(), blocks, by.iter().map(|x| x.to_string()).collect(), prov, reasoning.filter(|_| seat || !self.lean))?;
                 Ok((true, acted, None))
             }
             Action::Call { program, reasoning } => {
@@ -1755,7 +1755,7 @@ impl<W: Write> Engine<W> {
                 .get(p)
                 .into_iter()
                 .flat_map(|v| v.iter())
-                .filter_map(|id| read(id).map(|(t, ps, f)| (id.clone(), t, ps, f)))
+                .filter_map(|id| read(id).map(|(t, ps, f)| (id.to_string(), t, ps, f)))
                 .collect()
         };
         let mut found_now = vec![];

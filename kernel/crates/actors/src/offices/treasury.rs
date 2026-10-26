@@ -1069,9 +1069,9 @@ impl TaxPlan {
             .filter(|c| ours(c, &self.position, &self.participant))
             .filter_map(|c| {
                 let (_, _, payer, about) = claim_parts(c)?;
-                let report = bases_of(c).first()?.clone();
+                let report = bases_of(c).first()?.to_string();
                 let account = self.book.get(&report).map(|r| data(r).s("account").unwrap_or("").to_string()).unwrap_or_default();
-                Some(Assessed { report, claim: c.id.clone(), payer: payer.unwrap_or("").to_string(), account, amount: about.i("amount").unwrap_or(0), at: c.at })
+                Some(Assessed { report, claim: c.id.to_string(), payer: payer.unwrap_or("").to_string(), account, amount: about.i("amount").unwrap_or(0), at: c.at })
             })
             .collect();
         v.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.claim, &b.claim)));
@@ -1091,7 +1091,7 @@ impl Plan for TaxPlan {
         if let Some(acc) = own_account(pic) {
             for tx in pic.transactions() {
                 if tx.to == acc.account {
-                    *self.received.entry(tx.from.clone()).or_insert(0) += cents(tx.amount);
+                    *self.received.entry(tx.from.to_string()).or_insert(0) += cents(tx.amount);
                 }
             }
         }
@@ -1116,7 +1116,7 @@ impl Plan for TaxPlan {
         let rate = law.as_ref().and_then(|l| l.rate_bps).unwrap_or(1000);
         let penalty = law.as_ref().and_then(|l| l.penalty_bps).unwrap_or(2000);
         let assessed = self.assessed();
-        let penalised: BTreeSet<String> = rights_of(&self.book, &me, "tax_penalty").flat_map(|c| bases_of(c).to_vec()).collect();
+        let penalised: BTreeSet<String> = rights_of(&self.book, &me, "tax_penalty").flat_map(|c| bases_of(c).iter().map(|x| x.to_string()).collect::<Vec<_>>()).collect();
         self.in_flight.retain(|k| match k.split_once(':') {
             Some(("assess", r)) => !assessed.iter().any(|a| a.report == r),
             Some(("chase", r)) => !penalised.contains(r),
@@ -1127,15 +1127,15 @@ impl Plan for TaxPlan {
             if repealed {
                 break;
             }
-            if !addressed_to(&rep).contains(&me)
+            if !addressed_to(&rep).iter().any(|x| x == &me)
                 || assessed.iter().any(|a| a.report == rep.id)
                 || self.in_flight.contains(&format!("assess:{}", rep.id))
-                || self.zero.contains(&rep.id)
+                || self.zero.contains(rep.id.as_str())
             {
                 continue;
             }
             let Some(r) = papers::read::<TaxReport>(&rep) else { continue };
-            let payer = rep.speaks_for.clone().unwrap_or_default();
+            let payer = rep.speaks_for.unwrap_or_default();
             let amount = r.rent_received * rate / 10_000;
             if amount > 0 {
                 self.in_flight.insert(format!("assess:{}", rep.id));
@@ -1143,10 +1143,10 @@ impl Plan for TaxPlan {
                     format!("A tax report: recording the tax owed at the law's rate ({}%).", pct(rate)),
                     vec![record("right", &me, json!({ "kind": "tax", "amount": amount, "period_end": r.period_end }), Some(&payer), Some(&rep.id))],
                 );
-                s.then = Some(TaxThen::Assess(rep.id.clone()));
+                s.then = Some(TaxThen::Assess(rep.id.to_string()));
                 steps.push(s);
             } else {
-                self.zero.insert(rep.id.clone());
+                self.zero.insert(rep.id.to_string());
             }
         }
         // Chase: what has arrived from each account is applied to its assessments, oldest first; one still unpaid
@@ -1319,7 +1319,7 @@ impl Plan for RatesPlan {
             for tx in pic.transactions() {
                 if tx.to == acc.account {
                     if let Some(s) = &tx.settles {
-                        self.settled.insert(s.clone());
+                        self.settled.insert(s.to_string());
                         self.received += cents(tx.amount);
                     }
                 }
@@ -1365,7 +1365,7 @@ impl Plan for RatesPlan {
         let mut last_interest: BTreeMap<String, i64> = self.interest_cache.clone();
         for r in rights_of(&self.book, &me, "rates_interest").filter(|r| ours(r, &self.position, &self.participant)) {
             for b in bases_of(r) {
-                let e = last_interest.entry(b.clone()).or_insert(i64::MIN);
+                let e = last_interest.entry(b.to_string()).or_insert(i64::MIN);
                 *e = (*e).max(r.at);
             }
         }
@@ -1415,7 +1415,7 @@ impl Plan for RatesPlan {
                         say(
                             "rates_notice",
                             &format!("Rates notice: {} on {}, due in {} days, into {}.", money_words(*amount, &cx.ctx.world), lots.join(", "), due_days, acc.account),
-                            Say { to: Some(vec![owner.clone()]), visible: Some(Visible::Only(vec![me.clone(), owner.clone()])), basis: Some(law.id.clone()), data: Some(paper_data(&n)), ..Default::default() },
+                            Say { to: Some(vec![owner.clone()]), visible: Some(Visible::Only(vec![me.clone(), owner.clone()])), basis: Some(law.id.to_string()), data: Some(paper_data(&n)), ..Default::default() },
                         ),
                         record("right", &me, json!({ "kind": "rates", "amount": amount, "account": acc.account, "due": due, "lots": lots }), Some(owner), Some(&law.id)),
                     ],
@@ -1472,10 +1472,10 @@ impl Plan for RatesPlan {
                 if self.paid(&c) || t < due {
                     continue;
                 }
-                if t - last_interest.get(&c.id).copied().unwrap_or(due) < 30 * DAY {
+                if t - last_interest.get(c.id.as_str()).copied().unwrap_or(due) < 30 * DAY {
                     continue;
                 }
-                self.interest_cache.insert(c.id.clone(), t);
+                self.interest_cache.insert(c.id.to_string(), t);
                 let amount = about.i("amount").unwrap_or(0);
                 let interest = amount * interest_bps / 10_000 / 12;
                 if interest > 0 {
@@ -1487,7 +1487,7 @@ impl Plan for RatesPlan {
                             message(&[owner.to_string()], &format!("Rates of {} are overdue; interest of {} has been added.", money_words(amount, w), money_words(interest, w)), Some(&c.id)),
                         ],
                     );
-                    s.then = Some(RatesThen::Interest(c.id.clone(), t));
+                    s.then = Some(RatesThen::Interest(c.id.to_string(), t));
                     steps.push(s);
                 }
             }
@@ -1665,14 +1665,14 @@ impl Plan for FinPlan {
             for x in pic.transactions() {
                 let amount = cents(x.amount);
                 if x.to == mine && x.from != mine {
-                    self.flows.push(Flow { t: x.t, amount, party: x.from.clone() });
+                    self.flows.push(Flow { t: x.t, amount, party: x.from.to_string() });
                 }
                 if x.from == mine && x.to != mine {
-                    self.flows.push(Flow { t: x.t, amount: -amount, party: x.to.clone() });
+                    self.flows.push(Flow { t: x.t, amount: -amount, party: x.to.to_string() });
                     if let Some(s) = &x.settles {
-                        self.paid.insert(s.clone(), (amount, age_year(x.t)));
-                        self.banked.insert(s.clone(), (amount, x.t));
-                        self.pending.remove(s);
+                        self.paid.insert(s.to_string(), (amount, age_year(x.t)));
+                        self.banked.insert(s.to_string(), (amount, x.t));
+                        self.pending.remove(s.as_str());
                     }
                 }
             }
@@ -1716,7 +1716,7 @@ impl Plan for FinPlan {
         let mut invoices: Vec<Arc<Record>> = self.book.open("invoice").cloned().collect();
         invoices.sort_by(|a, b| filed_before(&a.id, &b.id));
         for inv in invoices {
-            if self.paid.contains_key(&inv.id) || self.pending.contains_key(&inv.id) || !addressed_to(&inv).contains(&me) {
+            if self.paid.contains_key(inv.id.as_str()) || self.pending.contains_key(inv.id.as_str()) || !addressed_to(&inv).iter().any(|x| x == &me) {
                 continue;
             }
             let Some(owed) = papers::read::<Invoice>(&inv).and_then(|i| i.outcome).and_then(|o| o.money) else { continue };
@@ -1735,7 +1735,7 @@ impl Plan for FinPlan {
                 // Within the budget and over the procedure's figure, with no approval on file: the post is asked for
                 // one, once (nobody else tells it that a payment is waiting on it).
                 if let Some((by, over)) = &rule {
-                    if amount > *over && !approved && within_budget && self.asked.insert(inv.id.clone()) {
+                    if amount > *over && !approved && within_budget && self.asked.insert(inv.id.to_string()) {
                         let w = &cx.ctx.world;
                         steps.push(because(
                             format!("Invoice {} is over the payments procedure's figure and has no written approval on file: asking the mayor for one.", inv.id),
@@ -1758,11 +1758,11 @@ impl Plan for FinPlan {
             if acc.balance < amount {
                 continue;
             }
-            self.pending.insert(inv.id.clone(), (amount, year));
-            self.booked.insert(inv.id.clone(), (amount, t));
+            self.pending.insert(inv.id.to_string(), (amount, year));
+            self.booked.insert(inv.id.to_string(), (amount, t));
             let line = {
                 let by_kind = data(&inv).s("type").and_then(|t| self.lines_by_structure.get(t));
-                by_kind.or_else(|| inv.position.as_ref().and_then(|p| self.lines_by_position.get(p))).cloned()
+                by_kind.or_else(|| inv.position.as_ref().and_then(|p| self.lines_by_position.get(p.as_str()))).cloned()
             };
             let why = if !within_procedure {
                 "Paying an invoice outside the procedure.".to_string()
@@ -1771,9 +1771,9 @@ impl Plan for FinPlan {
             } else {
                 format!("Year {year} has no adopted budget yet: paying an invoice within a twelfth a month of the budget last adopted, as the charter allows (with the mayor's approval where needed).")
             };
-            let c = pay(&owed.to, amount, Pay { from: Some(acc.account.clone()), for_: Some(format!("Paying invoice {}.", inv.id)), settles: Some(inv.id.clone()), line, ..Default::default() }, cx);
+            let c = pay(&owed.to, amount, Pay { from: Some(acc.account.clone()), for_: Some(format!("Paying invoice {}.", inv.id)), settles: Some(inv.id.to_string()), line, ..Default::default() }, cx);
             let mut s = because(why, vec![c]);
-            s.then = Some(FinThen::Paid(inv.id.clone()));
+            s.then = Some(FinThen::Paid(inv.id.to_string()));
             steps.push(s);
         }
         // The audit office's requests of us, answered from our books (the law names the auditor; we cannot refuse).
@@ -1809,7 +1809,7 @@ impl FinPlan {
         let w = &cx.ctx.world;
         let me = &self.me;
         let unpaid: Vec<Arc<Record>> = {
-            let mut v: Vec<Arc<Record>> = self.book.open("invoice").filter(|i| addressed_to(i).contains(me) && !self.paid.contains_key(&i.id)).cloned().collect();
+            let mut v: Vec<Arc<Record>> = self.book.open("invoice").filter(|i| addressed_to(i).iter().any(|x| x ==me) && !self.paid.contains_key(i.id.as_str())).cloned().collect();
             v.sort_by(|a, b| filed_before(&a.id, &b.id));
             v
         };
@@ -2173,13 +2173,13 @@ impl Plan for WorksPlan {
         // What the crew left where it worked, and what an inspection found.
         for o in &pic.outcomes {
             for st in &o.seen {
-                self.known.insert(st.structure.clone(), st.clone());
+                self.known.insert(st.structure.to_string(), st.clone());
             }
         }
         if !self.p.inspections.is_empty() {
             for c in visited(pic, &self.p.inspections) {
                 if let Some(st) = &c.structure {
-                    self.known.insert(st.structure.clone(), (**st).clone());
+                    self.known.insert(st.structure.to_string(), (**st).clone());
                 }
             }
         }
@@ -2192,7 +2192,7 @@ impl Plan for WorksPlan {
                 }
             }
         }
-        if let Some(Seen::Sites { cells, .. }) = pic.channels.get(&self.p.depot_channel) {
+        if let Some(Seen::Sites { cells, .. }) = pic.channels.get(self.p.depot_channel.as_str()) {
             for c in cells.iter() {
                 if let Some(st) = &c.structure {
                     if st.structure == self.p.depot {
@@ -2244,7 +2244,7 @@ impl Plan for WorksPlan {
                     // What the crew found at each address: what they left, and so what had gathered since they were last there.
                     for x in items {
                         // (What the crew left in the bins, as they saw: law 8, waste is held where it is made.)
-                        let Some(after) = out.seen.iter().find(|b| b.structure == x.on).and_then(|b| b.left.get(&self.p.waste)).map(|q| crate::common::cents(*q)) else { continue };
+                        let Some(after) = out.seen.iter().find(|b| b.structure == x.on).and_then(|b| b.left.get(self.p.waste.as_str())).map(|q| crate::common::cents(*q)) else { continue };
                         let was = self.left_there.get(&x.on).copied();
                         let since = was.map(|w| w.1).or_else(|| self.known_since.get(&x.on).copied()).unwrap_or(*t);
                         let days_milli = ((t - since) * 1000 / DAY).max(1000);
@@ -2337,7 +2337,7 @@ impl Plan for WorksPlan {
             // (Notices already given are on the file: a successor does not give them twice.)
             for a in self.staff.staff(&self.book, t) {
                 if let Some(n) = self.book.notices(&a.id).find(|n| n.party == me) {
-                    self.staff.noticed.entry(a.id.clone()).or_insert(n.at);
+                    self.staff.noticed.entry(a.id.to_string()).or_insert(n.at);
                 }
             }
             if self.staff.staying(&self.book, t) > target && !staff_only {
@@ -2347,7 +2347,7 @@ impl Plan for WorksPlan {
         }
         // A staffing direction that stands (from whoever the town says may direct us): whether to recruit, and the most
         // posts to fill. It stands nobody down: the budget's crew is still what we keep.
-        let staffing_dir = self.directions.standing(&self.book, "works_staffing", cx).map(|d| (d.id.clone(), dir_of(d).unwrap_or(Direction { fines: None, fine: None, interest: None, every: None, recruit: None, posts: None })));
+        let staffing_dir = self.directions.standing(&self.book, "works_staffing", cx).map(|d| (d.id, dir_of(d).unwrap_or(Direction { fines: None, fine: None, interest: None, every: None, recruit: None, posts: None })));
         let recruit = staffing_dir.as_ref().is_none_or(|(_, d)| d.recruit.as_deref() != Some("no"));
         let posts = staffing_dir.as_ref().and_then(|(_, d)| d.posts).filter(|n| *n > 0).map(|n| n as usize);
         let hire_to = target.min(posts.unwrap_or(usize::MAX));
@@ -2371,7 +2371,7 @@ impl Plan for WorksPlan {
             steps.extend(self.staff.routine(pic, &self.book, cx, "", &want));
         }
         // How often each address is collected from: as directed, while a direction on it stands; else our own round.
-        let collection_dir = self.directions.standing(&self.book, "works_collection", cx).map(|d| (d.id.clone(), dir_of(d)));
+        let collection_dir = self.directions.standing(&self.book, "works_collection", cx).map(|d| (d.id, dir_of(d)));
         let directed_every = collection_dir.as_ref().and_then(|(_, d)| d.as_ref().and_then(|x| x.every)).filter(|e| *e >= DAY);
         let collect_every = directed_every.unwrap_or(p.collect_every_days * DAY);
         // The routine work, and by what it is done: the whole office by its own practice; its staff by the standing work
@@ -2409,10 +2409,10 @@ impl Plan for WorksPlan {
         if self.counter.works(&self.routines, &self.book, t) {
             let complaints: Vec<Arc<Record>> = self.book.open("complaint").cloned().collect();
             for c in complaints {
-                if self.handled.contains(&c.id) || !addressed_to(&c).contains(&me) {
+                if self.handled.contains(c.id.as_str()) || !addressed_to(&c).iter().any(|x| x == &me) {
                     continue;
                 }
-                self.handled.insert(c.id.clone());
+                self.handled.insert(c.id.to_string());
                 if let Some(s) = data(&c).s("structure") {
                     self.complained.insert(s.to_string());
                 }
@@ -2450,7 +2450,7 @@ impl Plan for WorksPlan {
         let mine: BTreeSet<&String> = workers.iter().collect();
         // (Those here with the most time between them, the work shared evenly: someone who has done a day's work
         // elsewhere today joins tomorrow.)
-        let here: Vec<String> = room.as_ref().and_then(|r| r.occupants.clone()).unwrap_or_default().into_iter().collect::<BTreeSet<_>>().into_iter().filter(|x| mine.contains(x)).collect();
+        let here: Vec<String> = room.as_ref().and_then(|r| r.occupants.clone()).unwrap_or_default().into_iter().collect::<BTreeSet<_>>().into_iter().map(|x| x.to_string()).filter(|x| mine.contains(x)).collect();
         let present: Vec<String> = {
             let used = &self.used;
             team(&here, |x| p.working_day - used.get(x).copied().unwrap_or(0)).0
@@ -2553,7 +2553,7 @@ impl Plan for WorksPlan {
                 let mut worn: Vec<(&SiteStructure, i64)> = assets
                     .iter()
                     .filter_map(|a| self.known.get(a))
-                    .filter_map(|b| b.variables.as_ref().and_then(|v| v.get(&p.wear)).map(|v| (b, variable_today(v, t))))
+                    .filter_map(|b| b.variables.as_ref().and_then(|v| v.get(p.wear.as_str())).map(|v| (b, variable_today(v, t))))
                     .filter(|(_, wear)| *wear > p.maintain_over)
                     .collect();
                 worn.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.structure.cmp(&b.0.structure)));
@@ -2566,7 +2566,7 @@ impl Plan for WorksPlan {
                     }
                     spend(&mut used, units * p.maintain_labour);
                     upkeep.push(job(&p.maintain_task, units, &b.structure));
-                    names.push(b.structure.clone());
+                    names.push(b.structure.to_string());
                     if upkeep.len() <= 30 {
                         self.routines.did(&p.maintain_task, t, units, &present);
                     }
@@ -2624,7 +2624,7 @@ impl Plan for WorksPlan {
                 let state: Vec<String> = assets
                     .iter()
                     .filter_map(|a| self.known.get(a))
-                    .filter_map(|b| b.variables.as_ref().and_then(|v| v.get(&p.wear)).map(|v| format!("{} {}% worn", b.structure, (variable_today(v, t) * 100 + v.max.max(1) / 2) / v.max.max(1))))
+                    .filter_map(|b| b.variables.as_ref().and_then(|v| v.get(p.wear.as_str())).map(|v| format!("{} {}% worn", b.structure, (variable_today(v, t) * 100 + v.max.max(1) / 2) / v.max.max(1))))
                     .collect();
                 let unseen = assets.iter().filter(|a| !self.known.contains_key(*a)).count();
                 let mut standing: Vec<String> = vec![];

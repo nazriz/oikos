@@ -660,7 +660,7 @@ pub struct TerrainArea {
 
 /// A cell's id.
 pub fn cell_id(x: i64, y: i64) -> Id {
-    format!("cell.{x}.{y}")
+    Id::from_string(format!("cell.{x}.{y}"))
 }
 
 /// A cell id's coordinates, if it is one.
@@ -767,7 +767,7 @@ pub struct OccupancyCfg {
 
 /// A space's id: `<structure>/<kind>.<n>`, numbering each kind from 1 in the type's order.
 pub fn space_id(structure: &str, kind: &str, n: u32) -> Id {
-    format!("{structure}/{kind}.{n}")
+    Id::from_string(format!("{structure}/{kind}.{n}"))
 }
 
 /// A space id's structure and its local part (`dwelling.3`).
@@ -1909,7 +1909,7 @@ pub fn premises_of_positions<'a>(positions: impl Iterator<Item = (&'a str, &'a [
             };
             if let Some(Area::Premises(p)) = area {
                 for c in &p.premises {
-                    m.entry(c.clone()).or_insert_with(|| org.to_string());
+                    m.entry(*c).or_insert_with(|| Id::new(org));
                 }
             }
         }
@@ -2299,7 +2299,7 @@ fn validate_travel(t: &Travel, w: &World) -> Result<(), String> {
     };
     let mut ids = std::collections::BTreeSet::new();
     for r in &t.roads {
-        if !ids.insert(r.id.clone()) {
+        if !ids.insert(r.id) {
             return Err(format!("travel: {} is declared twice", r.id));
         }
         if r.cells.len() < 2 || r.capacity_per_hour < 1 || r.lanes.is_some_and(|l| l < 1) || r.seconds_per_cell.is_some_and(|s| s < 1) {
@@ -2317,14 +2317,14 @@ fn validate_travel(t: &Travel, w: &World) -> Result<(), String> {
         }
     }
     for v in &t.vehicle_types {
-        if !ids.insert(v.id.clone()) || v.seats < 0 {
+        if !ids.insert(v.id) || v.seats < 0 {
             return Err(format!("travel: vehicle type {} is declared twice, or has fewer than no seats", v.id));
         }
     }
     let structures: std::collections::BTreeSet<&str> = w.structures.iter().map(|s| s.id.as_str()).collect();
     let entities: std::collections::BTreeSet<&str> = w.entities.iter().map(|e| e.id.as_str()).collect();
     for v in &t.vehicles {
-        if !ids.insert(v.id.clone()) {
+        if !ids.insert(v.id) {
             return Err(format!("travel: {} is declared twice", v.id));
         }
         if !t.vehicle_types.iter().any(|x| x.id == v.type_) {
@@ -2498,7 +2498,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
     }
 
     // Structures: footprints on the ground, on terrain they can stand on, not overlapping.
-    let mut covered: BTreeMap<String, &str> = BTreeMap::new();
+    let mut covered: BTreeMap<Id, &str> = BTreeMap::new();
     let mut structures = BTreeMap::new();
     for s in &w.structures {
         let ty = types.get(s.structure_type.as_str()).ok_or_else(|| format!("structure {} has unknown type {}", s.id, s.structure_type))?;
@@ -2516,7 +2516,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
             if !fits {
                 return Err(format!("structure {} can't stand on {cell} ({})", s.id, t.unwrap_or("no terrain")));
             }
-            if let Some(other) = covered.insert(cell.clone(), s.id.as_str()) {
+            if let Some(other) = covered.insert(cell, s.id.as_str()) {
                 return Err(format!("structures {other} and {} overlap at {cell}", s.id));
             }
         }
@@ -2669,7 +2669,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
     }
     let premises = premises_of_positions(c.positions.iter().map(|p| (p.entity.as_str(), p.channels.as_slice())));
     let entity_exists = |e: &str| entities.contains_key(e);
-    let premises_of = |cell: &str| premises.get(cell).cloned();
+    let premises_of = |cell: &str| premises.get(cell).map(|o| o.to_string());
     macro_rules! seat {
         ($organisation:expr) => {
             Seat { organisation: $organisation, knowing: k, premises_most: None, entity_exists: &entity_exists, cell_exists: &cell_exists, place_exists: &place_exists, premises_of: &premises_of }
@@ -2801,7 +2801,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
         for e in r.entities_named().into_iter().chain(r.visibility_entities()) {
             entity(e).map_err(|x| format!("record {}: {x}", r.id))?;
         }
-        for other in r.body.records_referenced().into_iter().chain(r.basis.iter().flat_map(|b| b.ids()).map(String::as_str)) {
+        for other in r.body.records_referenced().into_iter().chain(r.basis.iter().flat_map(|b| b.ids()).map(Id::as_str)) {
             if !records.contains_key(other) {
                 return Err(format!("record {} references unknown record {other}", r.id));
             }

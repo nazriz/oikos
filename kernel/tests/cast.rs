@@ -23,7 +23,7 @@ fn town() -> Run<Vec<u8>> {
 fn act(run: &mut Run<Vec<u8>>, participant: &str, position: Option<&str>, blocks: Value) -> Response {
     run.done(&Command::Act {
         participant: participant.into(),
-        position: position.map(String::from),
+        position: position.map(Into::into),
         blocks: serde_json::from_value(blocks).unwrap(),
         by: vec![],
         provenance: json!({"via": "direct"}),
@@ -48,7 +48,7 @@ fn created(r: &Response) -> Vec<(String, String)> {
     r.events
         .iter()
         .filter_map(|e| match &e.body {
-            EventBody::PersonCreated { person, participant: Some(p), .. } => Some((person.clone(), p.clone())),
+            EventBody::PersonCreated { person, participant: Some(p), .. } => Some((person.to_string(), p.to_string())),
             _ => None,
         })
         .collect()
@@ -66,14 +66,14 @@ fn someone_arrives_from_outside_carrying_their_money_and_can_leave_and_come_back
     let (dana, par) = created(&r)[0].clone();
     let st = run.kernel().state();
     assert!(st.body(&dana).is_some_and(|b| b.present && b.alive));
-    assert_eq!(st.participants[&par].person.as_deref(), Some(dana.as_str()));
+    assert_eq!(st.participants[par.as_str()].person.as_deref(), Some(dana.as_str()));
     // Her traits were drawn from the template's range, and recorded.
-    let thrift = st.participants[&par].traits.as_ref().unwrap()["thrift"].as_i64().unwrap();
+    let thrift = st.participants[par.as_str()].traits.as_ref().unwrap()["thrift"].as_i64().unwrap();
     assert!((0..=100).contains(&thrift));
-    assert_eq!(st.participants[&par].traits.as_ref().unwrap()["lean"], -20);
+    assert_eq!(st.participants[par.as_str()].traits.as_ref().unwrap()["lean"], -20);
     assert!(r.events.iter().any(|e| matches!(&e.body, EventBody::ParticipantCreated { participant, traits: Some(_), .. } if *participant == par)));
     // Her money is in an account in her own custody; total money is unchanged (it came from outside).
-    let acc = st.accounts.iter().find(|(_, a)| a.holder == dana).map(|(id, a)| (id.clone(), a.balance, a.custodian.clone())).unwrap();
+    let acc = st.accounts.iter().find(|(_, a)| a.holder == dana).map(|(id, a)| (*id, a.balance, a.custodian)).unwrap();
     assert_eq!((acc.1, acc.2.as_str()), (250_000, dana.as_str()));
     assert_eq!(st.total_money(), total);
     // She sees her own body.
@@ -119,7 +119,7 @@ fn a_child_is_born_after_gestation_where_the_parent_is() {
             EventBody::PersonCreated { person, parents, born_at, .. } => {
                 assert_eq!(parents, &vec!["alice".to_string(), "bob".to_string()]);
                 assert_eq!(*born_at, due);
-                Some(person.clone())
+                Some(*person)
             }
             _ => None,
         })
@@ -266,7 +266,7 @@ fn an_office_changes_hands_and_its_files_go_with_it_not_the_holders_memory() {
     let r = act(&mut run, "outside-system", Some("outside-trade"), json!([{"block": "deploy", "template": "clerk-bot", "to": "city", "ref": "bot"}]));
     assert_eq!(refusal(&r), None);
     let bot = match &r.events[0].body {
-        EventBody::ActionApplied { created: Some(c), .. } => c["bot"].clone(),
+        EventBody::ActionApplied { created: Some(c), .. } => c["bot"],
         other => panic!("{other:?}"),
     };
     assert_eq!(refusal(&act(&mut run, "mayor-system", Some("mayor"), json!([{"block": "appoint", "position": "clerk", "participant": bot}]))), None);
@@ -289,7 +289,7 @@ fn an_office_changes_hands_and_its_files_go_with_it_not_the_holders_memory() {
     assert_eq!(refusal(&act(&mut run, &bot, Some("clerk"), json!([{"block": "message", "to": ["bob"], "text": "x"}]))), Some(RefusalCode::NotInPosition));
     assert_eq!(refusal(&act(&mut run, "developer-system", Some("developer"), json!([{"block": "retire", "participant": bot}]))), Some(RefusalCode::NotTheirs));
     assert_eq!(refusal(&act(&mut run, "mayor-system", Some("mayor"), json!([{"block": "retire", "participant": bot}]))), None);
-    assert_eq!(run.kernel().state().participants[&bot].status, ParticipantStatus::Ended);
+    assert_eq!(run.kernel().state().participants[bot.as_str()].status, ParticipantStatus::Ended);
 }
 
 #[test]
@@ -298,7 +298,7 @@ fn a_new_organisation_gets_its_first_position_and_its_founder_acts_for_it() {
     let r = act(&mut run, "carol-self", None, json!([{"block": "create_entity", "kind": "cooperative", "name": "Carol's Co-op", "first_position": {"title": "Founder", "channels": [{"id": "books", "kind": "accounts"}], "ref": "founder"}, "ref": "coop"}]));
     assert_eq!(refusal(&r), None);
     let (coop, founder) = match &r.events[0].body {
-        EventBody::ActionApplied { created: Some(c), .. } => (c["coop"].clone(), c["founder"].clone()),
+        EventBody::ActionApplied { created: Some(c), .. } => (c["coop"], c["founder"]),
         other => panic!("{other:?}"),
     };
     assert_eq!(run.kernel().state().positions[&founder].holder.as_deref(), Some("carol-self"));
@@ -308,7 +308,7 @@ fn a_new_organisation_gets_its_first_position_and_its_founder_acts_for_it() {
     let (m, holder) = {
         let st = run.kernel().state();
         let (id, x) = st.positions.iter().find(|(_, x)| x.entity == coop && x.title.as_deref() == Some("Manager")).unwrap();
-        (id.clone(), x.holder.clone())
+        (*id, x.holder)
     };
     assert_eq!(holder.as_deref(), Some("bob-self"));
     // Records made in the office say so.
@@ -330,7 +330,7 @@ fn picked_traits_follow_their_weights() {
         let r = act(&mut run, "outside-system", Some("outside-trade"), json!([{"block": "arrive", "name": format!("N{i}"), "born_at": -30 * YEAR, "template": "newcomer"}]));
         assert_eq!(refusal(&r), None);
         let (_, par) = created(&r)[0].clone();
-        let sex = run.kernel().state().participants[&par].traits.as_ref().unwrap()["sex"].as_str().unwrap().to_string();
+        let sex = run.kernel().state().participants[par.as_str()].traits.as_ref().unwrap()["sex"].as_str().unwrap().to_string();
         assert!(sex == "female" || sex == "male");
         female += (sex == "female") as usize;
     }
@@ -377,8 +377,8 @@ fn where_bodies_have_a_sex_only_a_female_body_bears_a_child_and_the_other_parent
     assert_eq!(refusal(&act(&mut run, "alice-self", None, birth(Some("bob")))), None);
     run.command(&Command::Advance { to: 21 * DAY }).unwrap();
     let st = run.kernel().state();
-    let kim = st.body("alice").unwrap().children[0].clone();
-    assert_eq!(st.body("bob").unwrap().children, vec![kim.clone()]);
+    let kim = st.body("alice").unwrap().children[0];
+    assert_eq!(st.body("bob").unwrap().children, vec![kim]);
     let sex = st.body(&kim).unwrap().sex;
     assert!(sex.is_some(), "a newborn's sex is drawn where the world models it");
     // Both parents see the child in their own body's view; nobody else does.
@@ -464,7 +464,7 @@ fn a_person_works_alone_in_their_own_business_at_home_or_at_a_pitch() {
         let r = act(run, who, None, json!([{"block": "create_entity", "kind": "own_account", "name": "A stall", "first_position": {"title": "Owner", "channels": [{"id": "books", "kind": "accounts"}], "ref": "owner"}, "ref": "firm"}]));
         assert_eq!(refusal(&r), None);
         match &r.events[0].body {
-            EventBody::ActionApplied { created: Some(c), .. } => c["owner"].clone(),
+            EventBody::ActionApplied { created: Some(c), .. } => c["owner"],
             other => panic!("{other:?}"),
         }
     };
@@ -472,7 +472,7 @@ fn a_person_works_alone_in_their_own_business_at_home_or_at_a_pitch() {
     let owner = found(&mut run, "alice-self");
     let r = act(&mut run, "alice-self", Some(&owner), json!([{"block": "work", "task": "sell", "units": 3, "at": "s-house", "performers": ["alice"]}]));
     assert_eq!(refusal(&r), None);
-    assert!(r.events.iter().any(|e| matches!(&e.body, EventBody::Worked { task, labour: 1800, performers, .. } if task == "sell" && performers == &vec!["alice".to_string()])));
+    assert!(r.events.iter().any(|e| matches!(&e.body, EventBody::Worked { task, labour: 1800, performers, .. } if task == "sell" && performers == &vec![oikos_kernel::blocks::Id::new("alice")])));
     // Her hours are hers once: a working day's, and no more.
     let r = act(&mut run, "alice-self", Some(&owner), json!([{"block": "work", "task": "sell", "units": 46, "at": "s-house", "performers": ["alice"]}]));
     assert_eq!(refusal(&r), Some(RefusalCode::NoTimeLeft));
@@ -494,20 +494,20 @@ fn a_person_works_alone_in_their_own_business_at_home_or_at_a_pitch() {
 #[test]
 fn an_organisation_founded_in_a_run_keeps_a_record_through_the_post_made_with_it() {
     use std::collections::BTreeMap;
-    let set = |participant: &str, entity: &str| Command::EntityRecord { participant: participant.into(), entity: Some(entity.into()), set: serde_json::from_value::<BTreeMap<String, Value>>(json!({"character": {"keep": 5000}})).unwrap(), because: None };
+    let set = |participant: &str, entity: &str| Command::EntityRecord { participant: participant.into(), entity: Some(entity.into()), set: serde_json::from_value::<BTreeMap<String, Value>>(json!({"character": {"keep": 5000}})).unwrap(), because: None, };
     let mut run = town();
     let found = |run: &mut Run<Vec<u8>>, module: Value| {
         let r = act(run, "carol-self", None, json!([{"block": "create_entity", "kind": "cooperative", "name": "Carol's Co-op", "first_position": {"title": "Founder", "channels": [{"id": "books", "kind": "accounts"}], "role_module": module, "ref": "founder"}, "ref": "coop"}]));
         assert_eq!(refusal(&r), None);
         match &r.events[0].body {
-            EventBody::ActionApplied { created: Some(c), .. } => c["coop"].clone(),
+            EventBody::ActionApplied { created: Some(c), .. } => c["coop"],
             other => panic!("{other:?}"),
         }
     };
     let kept = found(&mut run, json!({"code": "firm.retailer", "params": {}, "keeps_record": true}));
     let r = run.command(&set("carol-self", &kept)).unwrap();
     match &r.events[0].body {
-        EventBody::EntityRecorded { entity, keeper, .. } => assert_eq!((entity.as_str(), keeper.as_deref()), (kept.as_str(), Some("firm.retailer"))),
+        EventBody::EntityRecorded { entity, keeper, .. } => { assert_eq!((entity.as_str(), keeper.as_deref()), (kept.as_str(), Some("firm.retailer")))}
         other => panic!("{other:?}"),
     }
     // Nobody but the holder of that post; and an organisation whose post does not say so keeps none.
@@ -531,7 +531,7 @@ fn an_advance_to_news_stops_at_the_moment_a_body_gives_news_and_not_at_the_next_
         let r = stops.command(&Command::AdvanceToNews { to: far }).unwrap();
         let t = stops.kernel().t();
         assert!(t > now || t == far, "time moves on");
-        let began: Vec<i64> = r.events.iter().filter(|e| matches!(e.body, EventBody::ConditionBegan { .. } | EventBody::ConditionEnded { .. } | EventBody::ConditionTreated { .. } | EventBody::MessageDelivered { .. } | EventBody::Recorded { .. })).map(|_| t).collect();
+        let began: Vec<i64> = r.events.iter().filter(|e| { matches!(e.body, EventBody::ConditionBegan { .. } | EventBody::ConditionEnded { .. } | EventBody::ConditionTreated { .. } | EventBody::MessageDelivered { .. } | EventBody::Recorded { .. })}).map(|_| t).collect();
         news += began.len();
         if t < far {
             stopped_early += 1;
@@ -554,11 +554,11 @@ fn an_advance_to_news_stops_at_a_letters_delivery_and_a_papers_recording_not_at_
     // is scheduled for that moment. `Advance` still goes to the time asked, and the same state comes of both.
     let far = 30 * DAY;
     let start = |run: &mut Run<Vec<u8>>| {
-        run.command(&Command::Act { participant: "alice-self".into(), position: None, blocks: serde_json::from_value(json!([{"block": "message", "to": ["bob"], "text": "Hello."}])).unwrap(), by: vec![], provenance: json!({"via": "direct"}), reasoning: None, thinking: None }).unwrap()
+        run.command(&Command::Act { participant: "alice-self".into(), position: None, blocks: serde_json::from_value(json!([{"block": "message", "to": ["bob"], "text": "Hello."}])).unwrap(), by: vec![], provenance: json!({"via": "direct"}), reasoning: None, thinking: None, }).unwrap()
     };
     let mut stops = town();
     let begun = start(&mut stops);
-    let done = begun.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { done, .. } => Some(*done), _ => None }).expect("the act began");
+    let done = begun.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { done, .. } => Some(*done), _ => None, }).expect("the act began");
     assert!(done > 0 && done < far);
     let r = stops.command(&Command::AdvanceToNews { to: far }).unwrap();
     assert_eq!(stops.kernel().t(), done, "it stops where the letter is delivered, not at {far}");

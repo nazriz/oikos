@@ -93,7 +93,7 @@ pub fn audit_law(book: &Book) -> Option<AuditLaw> {
         .filter(|r| data(r).get("audit").is_some_and(Value::is_object))
         .max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&b.id, &a.id)))?;
     let mut law: AuditLaw = serde_json::from_value(data(l).get("audit")?.clone()).ok()?;
-    law.id = l.id.clone();
+    law.id = l.id.to_string();
     Some(law)
 }
 
@@ -103,7 +103,7 @@ pub fn support_payments(book: &Book) -> Vec<PaymentRule> {
     let Some(l) = book.open("law").filter(|r| data(r).get("payments").is_some_and(Value::is_array)).max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&b.id, &a.id))) else {
         return vec![];
     };
-    let maker = l.speaks_for.clone().unwrap_or_default();
+    let maker = l.speaks_for.unwrap_or_default();
     data(l)
         .get("payments")
         .and_then(Value::as_array)
@@ -112,7 +112,7 @@ pub fn support_payments(book: &Book) -> Vec<PaymentRule> {
                 .filter_map(|p| serde_json::from_value::<PaymentRule>(p.clone()).ok())
                 .map(|mut r| {
                     if r.payer.is_empty() {
-                        r.payer = maker.clone();
+                        r.payer = maker.to_string();
                     }
                     r
                 })
@@ -266,14 +266,14 @@ impl Audited {
         let mut asked: Vec<Arc<Record>> = book.open(kind::REQUEST).cloned().collect();
         asked.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
         for r in asked {
-            if self.done.contains(&r.id) || r.speaks_for.as_deref() != Some(law.auditor.as_str()) {
+            if self.done.contains(r.id.as_str()) || r.speaks_for.as_deref() != Some(law.auditor.as_str()) {
                 continue;
             }
             let d = data(&r);
             if !law.bodies.iter().any(|b| b.entity == self.me && Some(b.body.as_str()) == d.s("body")) {
                 continue;
             }
-            self.done.insert(r.id.clone());
+            self.done.insert(r.id.to_string());
             let (from, to) = (d.i("from").unwrap_or(0), d.i("to").unwrap_or(0));
             let ask = d.s("ask").unwrap_or("").to_string();
             let kind_ = d.s("kind").unwrap_or("").to_string();
@@ -317,13 +317,13 @@ impl Audited {
                     p.insert(k.clone(), v.clone());
                 }
             }
-            let auditor = r.speaks_for.clone().unwrap_or_default();
+            let auditor = r.speaks_for.unwrap_or_default();
             steps.push(because(
                 format!("The auditor asks for {what} for an audit the law provides: answering."),
                 vec![say(
                     kind::ANSWER,
                     &format!("Answer to audit request {}: {words}", r.id),
-                    Say { to: Some(vec![auditor.clone()]), visible: Some(Visible::Only(if auditor == self.me { vec![auditor] } else { vec![auditor, self.me.clone()] })), basis: Some(r.id.clone()), data: Some(payload), ..Default::default() },
+                    Say { to: Some(vec![auditor.to_string()]), visible: Some(Visible::Only(if auditor == self.me { vec![auditor.to_string()] } else { vec![auditor.to_string(), self.me.clone()] })), basis: Some(r.id.to_string()), data: Some(payload), ..Default::default() },
                 )],
             ));
         }
@@ -585,7 +585,7 @@ impl Office {
             .open(kind::ANSWER)
             .find(|a| {
                 let d = data(a);
-                addressed_to(a).contains(&self.me)
+                addressed_to(a).iter().any(|x| x == &self.me)
                     && a.speaks_for.as_deref() == Some(run.body.entity.as_str())
                     && d.s("audit") == Some(run.key.as_str())
                     && d.s("ask") == Some(ask)

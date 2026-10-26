@@ -142,7 +142,7 @@ impl Staff {
     /// How many of our staff are staying: those we have not given notice.
     #[allow(dead_code)]
     pub fn staying(&self, book: &Book, t: i64) -> usize {
-        self.staff(book, t).iter().filter(|a| !self.noticed.contains_key(&a.id)).count()
+        self.staff(book, t).iter().filter(|a| !self.noticed.contains_key(a.id.as_str())).count()
     }
     /// Offers made in the last month that the worker has not signed yet.
     pub fn offered(&self, book: &Book, t: i64) -> Vec<Arc<Record>> {
@@ -167,7 +167,7 @@ impl Staff {
         vec![Belief::Held {
             party: self.me.clone(),
             template: agreements::EMPLOYMENT.to_string(),
-            agreements: self.staff(book, book.now).iter().map(|a| a.id.clone()).collect(),
+            agreements: self.staff(book, book.now).iter().map(|a| a.id).map(|x| x.to_string()).collect(),
         }]
     }
     /// What a direction not to recruit does, in the office's words (docs/behaviour/directions.md).
@@ -192,7 +192,7 @@ impl Staff {
         for o in &pic.outcomes {
             for (name, id) in o.created.iter().flatten() {
                 if let Some(a) = self.pending.remove(name) {
-                    self.orders.insert(a, id.clone());
+                    self.orders.insert(a, id.to_string());
                 }
             }
         }
@@ -244,7 +244,7 @@ impl Staff {
         for r in book.open("request") {
             if r.speaks_for.as_deref() == Some(me.as_str()) && crate::common::data(r).get("every").is_some_and(|e| !e.is_null()) {
                 for b in crate::common::bases_of(r) {
-                    self.orders.entry(b.clone()).or_insert_with(|| r.id.clone());
+                    self.orders.entry(b.to_string()).or_insert_with(|| r.id.to_string());
                 }
             }
         }
@@ -267,7 +267,7 @@ impl Staff {
         // Newly signed: wages by standing order.
         if self.o.pay {
             for a in &staff {
-                if self.orders.contains_key(&a.id) || self.noticed.contains_key(&a.id) || self.pending.values().any(|x| *x == a.id) {
+                if self.orders.contains_key(a.id.as_str()) || self.noticed.contains_key(a.id.as_str()) || self.pending.values().any(|x| *x == a.id) {
                     continue;
                 }
                 let worker = Self::worker_of(a);
@@ -280,8 +280,8 @@ impl Staff {
                 let Some(to) = to else { continue };
                 let name = format!("wo{}", self.n);
                 self.n += 1;
-                self.pending.insert(name.clone(), a.id.clone());
-                let c = pay(&to, pays.wage, Pay { from: Some(account.to_string()).filter(|s| !s.is_empty()), every: Some(pays.period), first: Some(pays.period), basis: Some(a.id.clone()), for_: Some(format!("Wages for {worker}.")), ..Default::default() }, cx);
+                self.pending.insert(name.clone(), a.id.to_string());
+                let c = pay(&to, pays.wage, Pay { from: Some(account.to_string()).filter(|s| !s.is_empty()), every: Some(pays.period), first: Some(pays.period), basis: Some(a.id.to_string()), for_: Some(format!("Wages for {worker}.")), ..Default::default() }, cx);
                 let mut s = Step::new(vec![Line { bind: Some(name), call: c }]);
                 s.why = Some(format!("A new hire has signed: starting their wages by standing order ({}).", crate::common::money_words(pays.wage, &cx.ctx.world)));
                 steps.push(s);
@@ -289,7 +289,7 @@ impl Staff {
             // Ended: stop the wages.
             for a in &contracts {
                 if book.concluded(&a.id) && t >= Self::end_of(book, a) {
-                    if let Some(order) = self.orders.remove(&a.id) {
+                    if let Some(order) = self.orders.remove(a.id.as_str()) {
                         steps.push(because("Employment has ended: stopping the wages.", vec![crate::common::withdraw(&order, Some("Employment ended; stop wages."))]));
                     }
                 }
@@ -299,7 +299,7 @@ impl Staff {
         let posts = self.postings(book);
         let apps: Vec<Arc<Record>> = book
             .open("job_application")
-            .filter(|a| crate::common::addressed_to(a).contains(&me) && !self.handled.contains(&a.id))
+            .filter(|a| crate::common::addressed_to(a).iter().any(|x| x == &me) && !self.handled.contains(a.id.as_str()))
             .cloned()
             .collect();
         for post in if does_hire { posts.clone() } else { vec![] } {
@@ -309,13 +309,13 @@ impl Staff {
             let mut mine: Vec<&Arc<Record>> = apps.iter().filter(|a| crate::common::data(a).get("posting").and_then(Value::as_str) == Some(post.id.as_str())).collect();
             mine.sort_by(|x, y| crate::common::filed_before(&x.id, &y.id));
             for a in &mine {
-                self.handled.insert(a.id.clone());
+                self.handled.insert(a.id.to_string());
             }
             if mine.is_empty() {
                 continue;
             }
             let chosen = mine[cx.rng(&format!("hire-{}", post.id)).below(mine.len() as u64) as usize];
-            let worker = chosen.speaks_for.clone().unwrap_or_default();
+            let worker = chosen.speaks_for.unwrap_or_default();
             let wage = crate::common::data(&post).get("wage").and_then(Value::as_i64).unwrap_or(want.wage);
             let to = crate::common::data(chosen).get("account").and_then(Value::as_str).unwrap_or(&worker).to_string();
             let we = pay(&to, wage, Pay { every: Some(self.o.period), for_: Some("wages".into()), ..Default::default() }, cx);
@@ -335,7 +335,7 @@ impl Staff {
                         self.o.period / DAY,
                         self.o.period / DAY
                     )),
-                    basis: Some(chosen.id.clone()),
+                    basis: Some(chosen.id.to_string()),
                     ..Default::default()
                 },
             );
@@ -358,9 +358,9 @@ impl Staff {
 
     /// Let the most recent hire go (notice under their agreement).
     pub fn let_go(&mut self, book: &Book, t: i64, why: &str, reason: &str) -> Vec<Step<StaffThen>> {
-        let staying: Vec<_> = self.staff(book, t).into_iter().filter(|a| !self.noticed.contains_key(&a.id)).collect();
+        let staying: Vec<_> = self.staff(book, t).into_iter().filter(|a| !self.noticed.contains_key(a.id.as_str())).collect();
         let Some(a) = staying.last() else { return vec![] };
-        self.noticed.insert(a.id.clone(), t);
+        self.noticed.insert(a.id.to_string(), t);
         vec![because(why, vec![agreements::notice(&a.id, reason)])]
     }
 }

@@ -6,7 +6,7 @@
 //! the high-water mark of what the samples stand for (each time it passes the last by 2%), the live samples summed by
 //! stack are written to `OIKOS_HEAPPROF_OUT` (default `heapprof`) as `<out>.<n>.txt` and `<out>.peak.txt` (and, by
 //! `oikos-kernel world`, `<out>.end.txt` at the run's end, the world still held), with the image's load address, for `atos` to name (scripts/heapprof.ts). The run's results do not depend on any of this (a
-//! 10,000-person month under it ended at the same state hash and log). macOS only (`backtrace`, dyld's slide).
+//! 10,000-person month under it ended at the same state hash and log). macOS and Linux (libc's `backtrace`).
 
 use std::alloc::{GlobalAlloc, Layout};
 use std::cell::Cell;
@@ -42,8 +42,36 @@ thread_local! {
 }
 
 extern "C" {
-    fn backtrace(buf: *mut *mut std::ffi::c_void, size: i32) -> i32;
-    fn _dyld_get_image_vmaddr_slide(image: u32) -> isize;
+    fn backtrace(buf: *mut *mut std::ffi::c_void, size: i32) -> i32; }
+#[cfg(target_os = "macos")]
+extern "C" {
+    fn _dyld_get_image_vmaddr_slide(image: u32) -> isize; }
+
+/// Where the binary is loaded: macOS, its link address and dyld's slide; Linux, the main object's base (`dl_iterate_phdr`
+/// gives it first), so an address less it is the binary's own, for `llvm-symbolizer`.
+#[cfg(target_os = "macos")]
+fn load_address() -> usize {
+    // SAFETY: dyld's slide of the main image (image 0) is always there to read.
+    (0x1_0000_0000usize as isize + unsafe { _dyld_get_image_vmaddr_slide(0) }) as usize
+}
+#[cfg(not(target_os = "macos"))]
+fn load_address() -> usize {
+    #[repr(C)]
+    struct Info {
+        addr: usize,
+    }
+    extern "C" {
+        fn dl_iterate_phdr(cb: extern "C" fn(*mut Info, usize, *mut std::ffi::c_void) -> i32, data: *mut std::ffi::c_void) -> i32;
+    }
+    extern "C" fn first(info: *mut Info, _: usize, data: *mut std::ffi::c_void) -> i32 {
+        // SAFETY: the loader hands a valid info (its first member the object's base) and our `data`, a `usize`.
+        unsafe { *(data as *mut usize) = (*info).addr };
+        1
+    }
+    let mut base = 0usize;
+    // SAFETY: the callback writes one usize through the pointer it is given, ours, and stops at the first object.
+    unsafe { dl_iterate_phdr(first, &mut base as *mut usize as *mut std::ffi::c_void) };
+    base
 }
 
 fn bit(p: usize) -> (usize, u64) {
@@ -85,11 +113,9 @@ pub fn dump(tag: &str) {
         rows.sort_by(|a, b| b.0.cmp(&a.0));
         rows
     };
-    // SAFETY: dyld's slide of the main image (image 0) is always there to read.
-    let slide = unsafe { _dyld_get_image_vmaddr_slide(0) };
     if let Ok(mut f) = std::fs::File::create(out_path(tag)) {
         let total: u64 = rows.iter().map(|r| r.0).sum();
-        let _ = writeln!(f, "# load 0x{:x} live {} rate {}", 0x1_0000_0000usize as isize + slide, total, RATE.load(Ordering::Relaxed));
+        let _ = writeln!(f, "# load 0x{:x} live {} rate {}", load_address(), total, RATE.load(Ordering::Relaxed));
         for (w, c, s) in rows {
             let addrs: Vec<String> = s.iter().take_while(|a| **a != 0).map(|a| format!("0x{a:x}")).collect();
             let _ = writeln!(f, "{w} {c} {}", addrs.join(" "));

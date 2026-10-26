@@ -435,8 +435,8 @@ impl Plan for Union {
         let against: Vec<String> = self
             .book
             .open("venue_decision")
-            .filter(|r| data(r).s("against") == Some(&me) && data(r).s("matter") == Some("industrial_action") && !self.counted.contains(&r.id))
-            .map(|r| r.id.clone())
+            .filter(|r| data(r).s("against") == Some(&me) && data(r).s("matter") == Some("industrial_action") && !self.counted.contains(r.id.as_str()))
+            .map(|r| r.id).map(|x| x.to_string())
             .collect();
         for id in against {
             self.history.pursued += 1;
@@ -480,17 +480,17 @@ impl Plan for Union {
         }
         let in_force: BTreeSet<String> = self.in_force_members().into_iter().map(String::from).collect();
         // Applications to join: a membership offered, its dues by standing order.
-        let applications: Vec<Arc<Record>> = self.book.open("membership_application").filter(|a| !self.handled.contains(&a.id) && addressed_to(a).contains(&me)).cloned().collect();
+        let applications: Vec<Arc<Record>> = self.book.open("membership_application").filter(|a| !self.handled.contains(a.id.as_str()) && addressed_to(a).iter().any(|x| x == &me)).cloned().collect();
         for a in applications {
-            self.handled.insert(a.id.clone());
-            let who = a.speaks_for.clone().unwrap_or_default();
+            self.handled.insert(a.id.to_string());
+            let who = a.speaks_for.unwrap_or_default();
             if let Some(e) = data(&a).s("employer") {
-                self.employer_of.insert(who.clone(), e.to_string());
+                self.employer_of.insert(who.to_string(), e.to_string());
                 if let Some(i) = data(&a).s("industry") {
                     self.industry_at.insert(e.to_string(), i.to_string());
                 }
             }
-            if in_force.contains(&who) {
+            if in_force.contains(who.as_str()) {
                 continue;
             }
             let mut c = offer(
@@ -501,7 +501,7 @@ impl Plan for Union {
                     their_notice: (self.p.resignation_notice_days > 0).then_some(self.p.resignation_notice_days * DAY),
                     they: Some(pay(&self.p.dues_account, self.p.dues, Pay { every: Some(MONTH), for_: Some("Union dues.".into()), ..Default::default() }, cx)),
                     text: Some(format!("{who} is a member of {me}, paying dues of {} a month.", money(self.p.dues))),
-                    basis: Some(a.id.clone()),
+                    basis: Some(a.id.to_string()),
                     ..Default::default()
                 },
             );
@@ -510,11 +510,11 @@ impl Plan for Union {
             steps.push(because(format!("{who} asks to join: offering membership, {} a month in dues.", money(self.p.dues)), vec![c]));
         }
         // Members who have told us where they now work (or that they are out of work: no employer).
-        let updates: Vec<Arc<Record>> = self.book.open("membership_update").filter(|u| !self.handled.contains(&u.id) && addressed_to(u).contains(&me)).cloned().collect();
+        let updates: Vec<Arc<Record>> = self.book.open("membership_update").filter(|u| !self.handled.contains(u.id.as_str()) && addressed_to(u).iter().any(|x| x == &me)).cloned().collect();
         for u in updates {
-            self.handled.insert(u.id.clone());
+            self.handled.insert(u.id.to_string());
             let employer = data(&u).s("employer").unwrap_or_default().to_string();
-            self.employer_of.insert(u.speaks_for.clone().unwrap_or_default(), employer.clone());
+            self.employer_of.insert(u.speaks_for.unwrap_or_default().to_string(), employer.clone());
             if let (false, Some(i)) = (employer.is_empty(), data(&u).s("industry")) {
                 self.industry_at.insert(employer, i.to_string());
             }
@@ -567,9 +567,9 @@ impl Plan for Union {
             let members = members_at(self, &employer);
             // An enterprise agreement made: the dispute's over.
             let agreements: Vec<Arc<Record>> =
-                self.book.open("enterprise_agreement").filter(|r| !self.handled.contains(&r.id) && addressed_to(r).contains(&me) && data(r).s("employer") == Some(&employer)).cloned().collect();
+                self.book.open("enterprise_agreement").filter(|r| { !self.handled.contains(r.id.as_str()) && addressed_to(r).iter().any(|x| x == &me) && data(r).s("employer") == Some(&employer)}).cloned().collect();
             for ea in agreements {
-                self.handled.insert(ea.id.clone());
+                self.handled.insert(ea.id.to_string());
                 self.disputes.remove(&employer);
                 self.agreed_at.insert(employer.clone(), t);
             }
@@ -619,13 +619,13 @@ impl Plan for Union {
             let mut offers: Vec<Arc<Record>> = self
                 .book
                 .open("wage_offer")
-                .filter(|o| !self.handled.contains(&o.id) && addressed_to(o).contains(&me) && data(o).s("employer") == Some(&employer) && data(o).s("claim").map(String::from) == claim)
+                .filter(|o| !self.handled.contains(o.id.as_str()) && addressed_to(o).iter().any(|x| x == &me) && data(o).s("employer") == Some(&employer) && data(o).s("claim").map(String::from) == claim)
                 .cloned()
                 .collect();
             offers.sort_by(|a, b| b.at.cmp(&a.at));
             let best = offers.first().cloned();
             for o in &offers {
-                self.handled.insert(o.id.clone());
+                self.handled.insert(o.id.to_string());
             }
             let rise_of = |o: &Record| data(o).get("rise_bps").map_or(0, |v| crate::papers::lenient::whole(v).unwrap_or(0));
             // The best offer made so far stands, though the paper it came on is read.
@@ -633,7 +633,7 @@ impl Plan for Union {
                 let x = self.disputes.get_mut(&employer).expect("in hand");
                 for o in &offers {
                     if rise_of(o) > x.standing.as_ref().map_or(-1, |s| s.1) {
-                        x.standing = Some((o.id.clone(), rise_of(o)));
+                        x.standing = Some((o.id.to_string(), rise_of(o)));
                     }
                 }
             }
@@ -652,7 +652,7 @@ impl Plan for Union {
                             Say {
                                 to: Some(vec![employer.clone()]),
                                 visible: Some(Visible::Only(vec![me.clone(), employer.clone()])),
-                                basis: Some(best.id.clone()),
+                                basis: Some(best.id.to_string()),
                                 data: Some(json!({ "employer": employer, "claim": x.claim, "rise_bps": data(best).get("rise_bps") })),
                                 ..Default::default()
                             },
@@ -686,17 +686,17 @@ impl Plan for Union {
             }
             let mut x = x;
             if x.stage == Stage::Balloting && x.closes.is_some_and(|c| t >= c) {
-                let voter = |r: &Record| r.speaks_for.clone().unwrap_or_else(|| r.author.clone());
+                let voter = |r: &Record| r.speaks_for.unwrap_or_else(|| r.author.clone().into());
                 let mut votes: Vec<&Arc<Record>> = self
                     .book
                     .of_type("vote")
-                    .filter(|r| matches!(&r.body, RecordBody::Vote { ballot, .. } if Some(ballot) == x.ballot.as_ref()) && x.members.contains(&voter(r)))
+                    .filter(|r| matches!(&r.body, RecordBody::Vote { ballot, .. } if Some(ballot.as_str()) == x.ballot.as_deref()) && x.members.contains(&voter(r).to_string()))
                     .collect();
                 votes.sort_by_key(|a| a.at);
                 let mut latest: BTreeMap<String, String> = BTreeMap::new();
                 for v in votes {
                     if let RecordBody::Vote { choice, .. } = &v.body {
-                        latest.insert(voter(v), choice.clone());
+                        latest.insert(voter(v).to_string(), choice.clone());
                     }
                 }
                 let voted = latest.len() as i64;
@@ -812,7 +812,7 @@ impl Plan for Union {
                     lead += DAY;
                     broken = breaches(&mut self.book, &act(starts_on(t, lead)), &me, t);
                 }
-                let broke: Vec<String> = broken.iter().map(|l| l.id.clone()).collect();
+                let broke: Vec<String> = broken.iter().map(|l| l.id).map(|x| x.to_string()).collect();
                 if !broke.is_empty() {
                     // (No wait of up to a month makes it lawful: the ballot does not meet the law.)
                     let (breaks, weighed) = self.would_break(members.len() as i64, daily, x.claim_bps - x.standing.as_ref().map_or(0, |s| s.1));
@@ -876,12 +876,12 @@ impl Plan for Union {
         match token {
             Then::Claimed(employer) => {
                 if let (Some(id), Some(d)) = (created("claim"), self.disputes.get_mut(employer)) {
-                    d.claim = Some(id);
+                    d.claim = Some(id.to_string());
                 }
             }
             Then::Balloted(employer) => {
                 if let (Some(id), Some(d)) = (created("ballot"), self.disputes.get_mut(employer)) {
-                    d.ballot = Some(id);
+                    d.ballot = Some(id.to_string());
                 }
             }
             Then::Notice { .. } => {}

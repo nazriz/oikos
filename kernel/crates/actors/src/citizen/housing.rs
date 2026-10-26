@@ -305,12 +305,12 @@ impl Person {
                     && cites(r, &h.agreement)
                     && data(r).get("every").is_some()
                     && !self.book.withdrawn(&r.id)
-                    && !self.housing.old_orders.contains(&r.id)
+                    && !self.housing.old_orders.contains(r.id.as_str())
                     && !h.retiring.iter().any(|(o, _)| *o == r.id)
             })
-            .map(|r| r.id.clone());
+            .map(|r| r.id);
         if let (Some(o), Some(h)) = (found, self.s.home.as_mut()) {
-            h.order = Some(o);
+            h.order = Some(o.to_string());
         }
     }
     /// A rent order of ours replaced or stopped: never the home's order again.
@@ -329,30 +329,30 @@ impl Person {
         }
         let mut transfers: Vec<&Arc<Record>> = self.book.of_type("claim_transfer").filter(|r| matches!(&r.body, RecordBody::ClaimTransfer { claim, .. } if claim == title)).collect();
         transfers.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| crate::common::filed_before(&a.id, &b.id)));
-        let mut h = holder.clone();
+        let mut h = *holder;
         for r in transfers {
             if let RecordBody::ClaimTransfer { to, .. } = &r.body {
                 if r.speaks_for.as_deref() == Some(h.as_str()) || (r.speaks_for.is_some() && r.speaks_for == c.speaks_for) {
-                    h = to.clone();
+                    h = *to;
                 }
             }
         }
-        Some(h)
+        Some(h.to_string())
     }
     /// The titles that are ours, as far as we've read: (title, lot).
     pub fn our_titles(&self) -> Vec<(String, String)> {
         let mut ids: Vec<String> = vec![];
         for c in self.book.claims_by(ClaimKey::Holder, &self.me) {
             if let RecordBody::Claim { about, .. } = &c.body {
-                if about.get("kind").and_then(Value::as_str) == Some("ownership") && !ids.contains(&c.id) {
-                    ids.push(c.id.clone());
+                if about.get("kind").and_then(Value::as_str) == Some("ownership") && !ids.contains(&c.id.to_string()) {
+                    ids.push(c.id.to_string());
                 }
             }
         }
         for r in self.book.of_type("claim_transfer") {
             if let RecordBody::ClaimTransfer { claim, to } = &r.body {
-                if *to == self.me && !ids.contains(claim) {
-                    ids.push(claim.clone());
+                if *to == self.me && !ids.contains(&claim.to_string()) {
+                    ids.push(claim.to_string());
                 }
             }
         }
@@ -375,7 +375,7 @@ impl Person {
                 if *to != self.me || self.housing.title_asked.since(claim) >= r.at {
                     continue;
                 }
-                ask_title = Some(claim.clone());
+                ask_title = Some(*claim);
                 break;
             }
         }
@@ -383,7 +383,7 @@ impl Person {
             self.housing.title_asked.again(&claim, t);
             return vec![
                 ask::one(&reg.titles, &claim),
-                ask::about(&reg.dealings, "claim", claim.clone(), crate::common::asking::ask::About { most: self.p.search_limit, oldest: true, ..Default::default() }),
+                ask::about(&reg.dealings, "claim", claim, crate::common::asking::ask::About { most: self.p.search_limit, oldest: true, ..Default::default() }),
             ];
         }
         for (_, lot) in self.our_titles() {
@@ -402,10 +402,10 @@ impl Person {
         }
         for (title, lot) in self.our_titles() {
             let lot_cells: BTreeSet<String> = self.book.get(&lot).map(|l| data(l).ids("cells").into_iter().map(String::from).collect()).unwrap_or_default();
-            let Some(st) = cells(w.pic, "street").iter().find(|c| lot_cells.contains(&c.cell) && c.structure.is_some()).and_then(|c| c.structure.clone()) else { continue };
-            let Some(space) = st.spaces.iter().find(|sp| sp.kind == "dwelling" && occupants(sp).contains(&self.me)).map(|sp| sp.space.clone()) else { continue };
+            let Some(st) = cells(w.pic, "street").iter().find(|c| lot_cells.contains(c.cell.as_str()) && c.structure.is_some()).and_then(|c| c.structure.clone()) else { continue };
+            let Some(space) = st.spaces.iter().find(|sp| sp.kind == "dwelling" && occupants(sp).iter().any(|x| x == &self.me)).map(|sp| sp.space) else { continue };
             let repay = self.mortgage_for(&space).map_or(0, |l| self.repayment(&l));
-            self.s.home = Some(Home { agreement: title, space, structure: st.structure.clone(), landlord: self.me.clone(), rent: repay, moved_in: true, owned: true, ..Default::default() });
+            self.s.home = Some(Home { agreement: title, space: space.to_string(), structure: st.structure.to_string(), landlord: self.me.clone(), rent: repay, moved_in: true, owned: true, ..Default::default() });
             self.s.living_at = None;
             // (A home of our own ends being without one. The lot it stands on is asked of the register, which takes its time to
             // answer, so at the first plan we may have marked ourselves homeless in the home we own.)
@@ -492,8 +492,8 @@ impl Person {
             return;
         }
         if self.housing.sale_asked {
-            if let Some(Seen::Records { records, search: true }) = pic.channels.get(&self.p.sale_board) {
-                self.housing.on_sale = Some(records.iter().map(|r| r.id.clone()).collect());
+            if let Some(Seen::Records { records, search: true }) = pic.channels.get(self.p.sale_board.as_str()) {
+                self.housing.on_sale = Some(records.iter().map(|r| r.id).map(|x| x.to_string()).collect());
                 self.housing.sale_seen_at = pic.t;
             }
         }
@@ -505,10 +505,10 @@ impl Person {
         self.listing_seen();
         let me = self.me.clone();
         if let Some(s) = self.housing.selling.as_mut().filter(|s| !s.listings.is_empty()) {
-            let sale = self.book.open("property_purchase").find(|r| crate::common::bases_of(r).iter().any(|b| s.listings.contains(b)) && data(r).s("account") == Some(from)).cloned();
+            let sale = self.book.open("property_purchase").find(|r| { crate::common::bases_of(r).iter().any(|b| s.listings.iter().any(|l| l ==b)) && data(r).s("account") == Some(from)}).cloned();
             if let Some(sale) = sale {
                 if s.buyer.is_none() {
-                    s.buyer = sale.speaks_for.clone();
+                    s.buyer = sale.speaks_for.map(|x| x.to_string());
                 }
                 if s.buyer_account.is_none() {
                     s.buyer_account = Some(from.into());
@@ -535,7 +535,7 @@ impl Person {
         let Some(s) = self.housing.selling.as_mut() else { return };
         if s.listing.as_deref() == Some("pending") {
             s.listing = Some(
-                self.book.open("property_for_sale").find(|r| r.speaks_for.as_deref() == Some(me.as_str()) && data(r).s("lot") == Some(s.lot.as_str())).map_or("pending".into(), |r| r.id.clone()),
+                self.book.open("property_for_sale").find(|r| r.speaks_for.as_deref() == Some(me.as_str()) && data(r).s("lot") == Some(s.lot.as_str())).map_or("pending".into(), |r| r.id.to_string()),
             );
         }
         if let Some(l) = s.listing.clone().filter(|l| l != "pending") {
@@ -738,14 +738,14 @@ impl Person {
                 let starts = self.succession_starts(&r, t);
                 let mut lines = vec![
                     oikos_sight::calls::Line { bind: None, call: sign(&r.id) },
-                    bound("so", pay(&rent_to, lt.rent, Pay { from: Some(acc.account.clone()), every: Some(MONTH), first: Some((starts - t).max(0)), basis: Some(r.id.clone()), for_: Some(format!("Rent for {space}, monthly in advance.")), ..Default::default() }, w.cx)),
+                    bound("so", pay(&rent_to, lt.rent, Pay { from: Some(acc.account.clone()), every: Some(MONTH), first: Some((starts - t).max(0)), basis: Some(r.id.to_string()), for_: Some(format!("Rent for {space}, monthly in advance.")), ..Default::default() }, w.cx)),
                 ];
                 if let Some((_, Some(o))) = self.s.share.clone() {
                     lines.push(oikos_sight::calls::Line { bind: None, call: withdraw(&o, Some("We hold the tenancy now: the rent is ours to pay.")) });
                 }
                 w.push(step_of_lines(format!("{other} offers us the tenancy of {space}, where we live, at {} a month: staying, and signing it.", Self::usd(w, lt.rent)), lines));
                 self.s.share = None;
-                self.s.home = Some(Home { agreement: r.id.clone(), space: space.clone(), structure, landlord: other.clone(), rent: lt.rent, order: None, moved_in: true, ..Default::default() });
+                self.s.home = Some(Home { agreement: r.id.to_string(), space: space.clone(), structure, landlord: other.clone(), rent: lt.rent, order: None, moved_in: true, ..Default::default() });
                 self.s.living_at = None;
                 self.s.gave_up.remove(&space);
                 let mut f = json!({ "rent": lt.rent, "succeeded": true });
@@ -769,7 +769,7 @@ impl Person {
                     format!("Our landlord offers a new lease on {} as ours runs out, at {} a month: staying, and signing it.", h.space, Self::usd(w, lt.rent)),
                     vec![
                         oikos_sight::calls::Line { bind: None, call: sign(&r.id) },
-                        bound("so", pay(&rent_to, lt.rent, Pay { from: Some(acc.account.clone()), every: Some(MONTH), first: Some((starts - t).max(0)), basis: Some(r.id.clone()), for_: Some(format!("Rent for {}, monthly in advance.", h.space)), ..Default::default() }, w.cx)),
+                        bound("so", pay(&rent_to, lt.rent, Pay { from: Some(acc.account.clone()), every: Some(MONTH), first: Some((starts - t).max(0)), basis: Some(r.id.to_string()), for_: Some(format!("Rent for {}, monthly in advance.", h.space)), ..Default::default() }, w.cx)),
                     ],
                 ));
                 let mut retiring = h.retiring.clone();
@@ -782,7 +782,7 @@ impl Person {
                     }
                 }
                 self.told(w, "home", &h.space, "renewed", None, json!({ "rent": lt.rent, "was": h.rent }));
-                self.s.home = Some(Home { agreement: r.id.clone(), rent: lt.rent, order: None, retiring, ..h });
+                self.s.home = Some(Home { agreement: r.id.to_string(), rent: lt.rent, order: None, retiring, ..h });
             } else if tpl == "lease" && home.is_none() {
                 let lt = lease_terms(&r, &me);
                 let (Some(space), Some(structure), Some(rent_to)) = (lt.space.clone(), lt.structure.clone(), lt.rent_to.clone()) else { continue };
@@ -796,10 +796,10 @@ impl Person {
                     format!("Signing the lease offered for {space}: {} a month is within our budget (a third of household income, {third}; or six months' rent in savings without income){thanks}.", Self::usd(w, lt.rent)),
                     vec![
                         oikos_sight::calls::Line { bind: None, call: sign(&r.id) },
-                        bound("so", pay(&rent_to, lt.rent, Pay { from: Some(acc.account.clone()), every: Some(MONTH), first: Some(0), basis: Some(r.id.clone()), for_: Some(format!("Rent for {space}, monthly in advance.")), ..Default::default() }, w.cx)),
+                        bound("so", pay(&rent_to, lt.rent, Pay { from: Some(acc.account.clone()), every: Some(MONTH), first: Some(0), basis: Some(r.id.to_string()), for_: Some(format!("Rent for {space}, monthly in advance.")), ..Default::default() }, w.cx)),
                     ],
                 ));
-                self.s.home = Some(Home { agreement: r.id.clone(), space: space.clone(), structure, landlord: other.clone(), rent: lt.rent, moved_in: false, ..Default::default() });
+                self.s.home = Some(Home { agreement: r.id.to_string(), space: space.clone(), structure, landlord: other.clone(), rent: lt.rent, moved_in: false, ..Default::default() });
                 self.s.gave_up.remove(&space);
                 let mut f = json!({ "rent": lt.rent });
                 if let Some(h) = self.s.homeless_since {
@@ -821,7 +821,7 @@ impl Person {
                     format!("Signing the lease offered for {space} ({} a month), and leaving {}{thanks}.", Self::usd(w, lt.rent), old.space),
                     vec![
                         oikos_sight::calls::Line { bind: None, call: sign(&r.id) },
-                        bound("so", pay(&rent_to, lt.rent, Pay { from: Some(acc.account.clone()), every: Some(MONTH), first: Some(0), basis: Some(r.id.clone()), for_: Some(format!("Rent for {space}, monthly in advance.")), ..Default::default() }, w.cx)),
+                        bound("so", pay(&rent_to, lt.rent, Pay { from: Some(acc.account.clone()), every: Some(MONTH), first: Some(0), basis: Some(r.id.to_string()), for_: Some(format!("Rent for {space}, monthly in advance.")), ..Default::default() }, w.cx)),
                     ],
                 ));
                 let open_ended = self.ends(&old.agreement) == i64::MAX;
@@ -841,7 +841,7 @@ impl Person {
                 let orders: Vec<String> = old.order.iter().cloned().chain(old.retiring.iter().map(|x| x.0.clone())).collect();
                 self.housing.left_homes.push((old.agreement.clone(), orders));
                 self.told(w, "home", &old.space, "ended", None, json!({ "by": "self", "rent": old.rent, "moved": true }));
-                self.s.home = Some(Home { agreement: r.id.clone(), space: space.clone(), structure, landlord: other.clone(), rent: lt.rent, moved_in: false, ..Default::default() });
+                self.s.home = Some(Home { agreement: r.id.to_string(), space: space.clone(), structure, landlord: other.clone(), rent: lt.rent, moved_in: false, ..Default::default() });
                 self.s.gave_up.remove(&space);
                 self.s.told_move_in = None;
                 self.s.move_hunt = None;
@@ -854,7 +854,7 @@ impl Person {
                     calls.push(move_in(wp)); // (with the round, we go when work starts)
                 }
                 w.push(because(format!("Taking the job offered: {} every {} days{thanks}.", Self::usd(w, terms.wage), round_div(terms.period, DAY)), calls));
-                self.s.job = Some(super::person::Job { agreement: r.id.clone(), employer: other.clone(), wage: terms.wage, period: terms.period, workplace: terms.workplace.clone(), since: t, ..Default::default() });
+                self.s.job = Some(super::person::Job { agreement: r.id.to_string(), employer: other.clone(), wage: terms.wage, period: terms.period, workplace: terms.workplace.clone(), since: t, ..Default::default() });
                 self.s.employers.insert(other.clone());
                 let mut f = json!({ "wage": terms.wage, "period_days": round_div(terms.period, DAY) });
                 if let Some(j) = self.s.jobless_since {
@@ -875,7 +875,7 @@ impl Person {
                 if hold > 0 && terms.wage * job.period * 10_000 <= job.wage * terms.period * (10_000 + hold) {
                     continue;
                 }
-                self.housing.switching = Some((r.id.clone(), terms.wage));
+                self.housing.switching = Some((r.id.to_string(), terms.wage));
                 w.push(because(
                     format!(
                         "Offered a better-paid job ({} every {} days, against our {} every {}): taking it, and giving our employer the notice our contract asks.",
@@ -932,13 +932,13 @@ impl Person {
             // A rise is something to do something about, for one who takes initiative: the mind's want, pursued at once;
             // asked of the landlord or taken to the tribunal, the notice waits on the answer.
             if self.mind.initiative() && rent > home.rent && !was_upheld {
-                let heard = self.happened(w, Event::RentRise { landlord: home.landlord.clone(), notice: r.id.clone(), rent, was: home.rent, share_bps: rise_share });
+                let heard = self.happened(w, Event::RentRise { landlord: home.landlord.clone(), notice: r.id.to_string(), rent, was: home.rent, share_bps: rise_share, });
                 if let Heard::Took(chosen) = heard {
                     let mut waits = false;
                     for c in chosen {
                         match &c.opening.intent {
                             Intent::AskLandlord { .. } => {
-                                self.s.asked_of.insert(r.id.clone(), (t, home.landlord.clone()));
+                                self.s.asked_of.insert(r.id.to_string(), (t, home.landlord.clone()));
                                 waits = true;
                             }
                             Intent::ChallengeRent { .. } => waits = true,
@@ -954,13 +954,13 @@ impl Person {
             }
             // A notice that breaks the tenancy law (as we read it): some of us take it to the tribunal, and pay the rent
             // as it was meanwhile.
-            if let (Some(trib), Some(by)) = (self.p.tribunal.clone(), r.speaks_for.clone()) {
+            if let (Some(trib), Some(by)) = (self.p.tribunal.clone(), r.speaks_for) {
                 // (One taken to the tribunal as a way chosen for a want is challenged too: recourse keeps those.)
-                if !self.housing.challenged.contains(&r.id) && !self.recourse.challenged.contains(&r.id) {
+                if !self.housing.challenged.contains(r.id.as_str()) && !self.recourse.challenged.contains(r.id.as_str()) {
                     let act = json!({ "block": "publish", "kind": "rent_increase", "data": data(&r).clone() });
                     if !crate::common::breaches(&mut self.book, &act, &by, r.at).is_empty() {
-                        self.housing.challenged.insert(r.id.clone());
-                        self.recourse.challenged.insert(r.id.clone());
+                        self.housing.challenged.insert(r.id.to_string());
+                        self.recourse.challenged.insert(r.id.to_string());
                         let draw = w.cx.rng(&format!("challenge-{}", r.id)).below(10_000) as i64;
                         let life = self.life(w.pic, t, Some(acc.balance));
                         let c = self.mind.choose_conduct(w.cx, &life, ConductAsk { conduct: "take_to_tribunal".into(), base_bps: trib.challenge_bps, draw_bps: draw, who: Some(trib.entity.clone()), lean: true, act: true, ..Default::default() });
@@ -977,8 +977,8 @@ impl Person {
                                     &format!("Application: the notice of rent increase {} from {by} breaks the law; we ask that it be found invalid.", r.id),
                                     Say {
                                         to: Some(vec![trib.entity.clone()]),
-                                        visible: Some(Visible::Only(vec![me.clone(), trib.entity.clone(), by.clone()])),
-                                        basis: Some(r.id.clone()),
+                                        visible: Some(Visible::Only(vec![me.clone(), trib.entity.clone(), by.to_string()])),
+                                        basis: Some(r.id.to_string()),
                                         data: Some(json!({ "kind": "rent_increase", "against": by, "notice": r.id, "evidence": serde_json::to_value(&*r).unwrap_or(Value::Null) })),
                                         ..Default::default()
                                     },
@@ -1091,15 +1091,15 @@ impl Person {
                 {
                     let app = d.get("application").map(|v| v.as_str().map_or(v.to_string(), String::from)).unwrap_or_default();
                     let when = self.days_words(w, left.at);
-                    let tribunal = r.speaks_for.clone().unwrap_or_default();
+                    let tribunal = r.speaks_for.unwrap_or_default();
                     w.push(because(
                         format!("{} has applied for possession of {}, which we left on {when}: telling the tribunal we have gone.", left.landlord, left.space),
                         vec![say(
                             "tribunal_response",
                             &format!("Answer to application {app}: we left {} on {when}, on the landlord's notice to vacate, and gave notice on the lease. We are not there.", left.space),
                             Say {
-                                to: Some(vec![tribunal.clone()]),
-                                visible: Some(Visible::Only(vec![me.clone(), tribunal, left.landlord.clone()])),
+                                to: Some(vec![tribunal.to_string()]),
+                                visible: Some(Visible::Only(vec![me.clone(), tribunal.to_string(), left.landlord.clone()])),
                                 basis: Some(app.clone()),
                                 data: Some(json!({ "application": d.get("application"), "left": true, "left_at": left.at })),
                                 ..Default::default()
@@ -1118,9 +1118,9 @@ impl Person {
                 continue;
             }
             if to_us(&r, "stay_ended", &me) && r.speaks_for.is_some() {
-                let by = r.speaks_for.clone().unwrap_or_default();
+                let by = r.speaks_for.unwrap_or_default();
                 if d.s("by") == Some("guest") {
-                    self.housing.took_in.remove(&by);
+                    self.housing.took_in.remove(by.as_str());
                 } else if let Some(stay) = self.housing.stay.clone().filter(|s| s.host == by) {
                     let from = structure_of(&stay.space).to_string();
                     let kids = self.children(t);
@@ -1150,7 +1150,7 @@ impl Person {
                 let each = d.i("rent").filter(|x| *x > 0).unwrap_or(home.rent).max(1);
                 let mut left = d.i("owed").unwrap_or(0);
                 while left > 0 {
-                    self.s.missed.push(Missed { instruction: r.id.clone(), to: d.s("account").unwrap_or_default().into(), amount: each.min(left), what: "the rent".into() });
+                    self.s.missed.push(Missed { instruction: r.id.to_string(), to: d.s("account").unwrap_or_default().into(), amount: each.min(left), what: "the rent".into() });
                     left -= each;
                 }
             } else if k == "notice_to_vacate" && d.s("lease") == Some(home.agreement.as_str()) && to_us(&r, k, &me) {
@@ -1178,7 +1178,7 @@ impl Person {
                         Say {
                             to: Some(vec![home.landlord.clone()]),
                             visible: Some(Visible::Only(vec![me.clone(), home.landlord.clone()])),
-                            basis: Some(r.id.clone()),
+                            basis: Some(r.id.to_string()),
                             data: Some(json!({ "offer": r.id, "lease": home.agreement, "accepts": accepts, "can_pay": can })),
                             ..Default::default()
                         },
@@ -1191,23 +1191,23 @@ impl Person {
             } else if k == "hearing_notice" && d.s("kind") == Some("possession") && d.s("against") == Some(me.as_str()) && d.s("about") == Some(home.agreement.as_str()) {
                 self.answer_tribunal(w, &r, &home);
             } else if k == "tribunal_order" && d.s("kind") == Some("possession") && d.s("against") == Some(me.as_str()) && d.s("about") == Some(home.agreement.as_str()) {
-                let by = r.speaks_for.clone().unwrap_or_default();
+                let by = r.speaks_for.unwrap_or_default();
                 let app = d.get("application").map(|v| v.as_str().map_or(v.to_string(), String::from)).unwrap_or_default();
                 let answered = self.housing.answered_apps.contains(&app);
                 let kind_by = self.kind_of(&by, &w.cx.ctx.params.clone());
                 if d.s("finding") == Some("possession") {
                     // (How the order's words, where read, move the odds of obeying is the mind's reading: the same draw.)
                     let obeys = self.fixed_bps(w, &format!("obey-{}", home.agreement)) < self.p.possession.as_ref().map_or(10_000, |p| p.obey_bps);
-                    self.happened(w, Event::OrderedOut { by: by.clone() });
+                    self.happened(w, Event::OrderedOut { by: by.to_string() });
                     if answered {
-                        self.tell(w, Outcome { domain: "way".into(), option: "desk".into(), kind: "possession".into(), from: Some(by.clone()), payoff: Some(500), facts: facts(json!({ "about": "possession", "answered": true })), ..Default::default() });
+                        self.tell(w, Outcome { domain: "way".into(), option: "desk".into(), kind: "possession".into(), from: Some(by.to_string()), payoff: Some(500), facts: facts(json!({ "about": "possession", "answered": true })), ..Default::default() });
                     }
                     let vby = d.i("due").filter(|x| *x != 0).unwrap_or(t);
                     if let Some(h) = self.s.home.as_mut() {
-                        h.vacate = Some(Vacate { paper: r.id.clone(), by: vby, stays: !obeys, ordered: true, ..Default::default() });
+                        h.vacate = Some(Vacate { paper: r.id.to_string(), by: vby, stays: !obeys, ordered: true, ..Default::default() });
                     }
                     self.told(w, "home", &home.space, "possession_ordered", Some(&home.landlord), json!({ "by": vby, "obeys": obeys }));
-                    self.treated(w, Treated { who: by.clone(), kind: kind_by, good: false, weight_bps: Some(20_000), done_to: true, paper: Some(r.id.clone()), ..Default::default() });
+                    self.treated(w, Treated { who: by.to_string(), kind: kind_by, good: false, weight_bps: Some(20_000), done_to: true, paper: Some(r.id.to_string()), ..Default::default() });
                 } else {
                     if let Some(h) = self.s.home.as_mut() {
                         h.vacate = None;
@@ -1215,7 +1215,7 @@ impl Person {
                     self.housing.notice_over.insert(home.agreement.clone());
                     let finding = d.s("finding").unwrap_or_default().to_string();
                     if answered {
-                        self.tell(w, Outcome { domain: "way".into(), option: "desk".into(), kind: finding.clone(), from: Some(by.clone()), payoff: Some(10_000), facts: facts(json!({ "about": "possession", "answered": true })), ..Default::default() });
+                        self.tell(w, Outcome { domain: "way".into(), option: "desk".into(), kind: finding.clone(), from: Some(by.to_string()), payoff: Some(10_000), facts: facts(json!({ "about": "possession", "answered": true })), ..Default::default() });
                     }
                     let (kd, f) = if finding == "plan" {
                         ("plan_ordered", json!({ "instalment": d.i("instalment").unwrap_or(0), "owed": d.i("amount").unwrap_or(0) }))
@@ -1223,21 +1223,21 @@ impl Person {
                         ("possession_dismissed", json!({}))
                     };
                     self.told(w, "home", &home.space, kd, Some(&home.landlord), f);
-                    self.treated(w, Treated { who: by.clone(), kind: kind_by, good: true, weight_bps: Some(20_000), paper: Some(r.id.clone()), ..Default::default() });
+                    self.treated(w, Treated { who: by.to_string(), kind: kind_by, good: true, weight_bps: Some(20_000), paper: Some(r.id.to_string()), ..Default::default() });
                 }
             } else if k == "warrant_executed" && d.s("lease") == Some(home.agreement.as_str()) {
                 if let Some(h) = self.s.home.as_mut() {
                     let recorded = h.vacate.as_ref().is_some_and(|v| v.recorded);
-                    h.vacate = Some(Vacate { paper: r.id.clone(), by: t, stays: false, ordered: true, removed: true, recorded });
+                    h.vacate = Some(Vacate { paper: r.id.to_string(), by: t, stays: false, ordered: true, removed: true, recorded });
                 }
                 if let Some(s) = self.record_leaving(w) {
                     w.push(s);
                 }
                 // (Put out by an officer: on our record with who did it.)
-                if let Some(by) = r.speaks_for.clone() {
-                    self.happened(w, Event::PutOut { by: by.clone() });
+                if let Some(by) = r.speaks_for {
+                    self.happened(w, Event::PutOut { by: by.to_string() });
                     let kb = self.kind_of(&by, &w.cx.ctx.params.clone());
-                    self.treated(w, Treated { who: by, kind: kb, good: false, weight_bps: Some(20_000), paper: Some(r.id.clone()), ..Default::default() });
+                    self.treated(w, Treated { who: by.to_string(), kind: kb, good: false, weight_bps: Some(20_000), paper: Some(r.id.to_string()), ..Default::default() });
                 }
             }
         }
@@ -1268,7 +1268,7 @@ impl Person {
             (c.does, c.facts)
         };
         if let Some(h) = self.s.home.as_mut() {
-            h.vacate = Some(Vacate { paper: r.id.clone(), by, stays, ..Default::default() });
+            h.vacate = Some(Vacate { paper: r.id.to_string(), by, stays, ..Default::default() });
         }
         let mut f = json!({ "arrears": d.i("arrears").unwrap_or(0), "by": by, "stays": stays });
         for (k, v) in cfacts {
@@ -1277,7 +1277,7 @@ impl Person {
         self.told(w, "home", &home.space, "notice_to_vacate", Some(&home.landlord), f);
         let kb = self.kind_of(&home.landlord, &w.cx.ctx.params.clone());
         // (Done to us; what being told to leave does to a tenant, once a tenancy, is the mind's: `NoticeSeen`.)
-        self.treated(w, Treated { who: home.landlord.clone(), kind: kb, good: false, done_to: true, paper: Some(r.id.clone()), ..Default::default() });
+        self.treated(w, Treated { who: home.landlord.clone(), kind: kb, good: false, done_to: true, paper: Some(r.id.to_string()), ..Default::default() });
         if self.housing.notice_seen.insert(home.agreement.clone()) {
             self.housing.notice_over.remove(&home.agreement);
             self.happened(w, Event::NoticeSeen { by: home.landlord.clone(), lease: home.agreement.clone() });
@@ -1290,7 +1290,7 @@ impl Person {
         let t = w.t;
         let me = self.me.clone();
         let d = data(r).clone();
-        let tribunal = r.speaks_for.clone().unwrap_or_default();
+        let tribunal = r.speaks_for.unwrap_or_default();
         let app = d.get("application").map(|v| v.as_str().map_or(v.to_string(), String::from)).unwrap_or_default();
         let nth = {
             let n = self.housing.applied_for.entry(home.agreement.clone()).or_insert(0);
@@ -1318,7 +1318,7 @@ impl Person {
             }
             Some(base) => {
                 let draw = self.fixed_bps(w, &format!("answer-{}-{nth}", home.agreement));
-                let c = self.conduct(w, ConductAsk { conduct: "answer_tribunal".into(), base_bps: base, draw_bps: draw, who: Some(tribunal.clone()), lean: true, act: true, ..Default::default() });
+                let c = self.conduct(w, ConductAsk { conduct: "answer_tribunal".into(), base_bps: base, draw_bps: draw, who: Some(tribunal.to_string()), lean: true, act: true, ..Default::default() });
                 (c.does, c.facts)
             }
         };
@@ -1403,8 +1403,8 @@ impl Person {
                 "tribunal_response",
                 &format!("Answer to application {app}: {}.", said.join("; ")),
                 Say {
-                    to: Some(vec![tribunal.clone(), home.landlord.clone()]),
-                    visible: Some(Visible::Only(vec![me, tribunal, home.landlord.clone()])),
+                    to: Some(vec![tribunal.to_string(), home.landlord.clone()]),
+                    visible: Some(Visible::Only(vec![me, tribunal.to_string(), home.landlord.clone()])),
                     basis: Some(app),
                     data: Some(data_),
                     ..Default::default()
@@ -1419,12 +1419,12 @@ impl Person {
         let t = w.t;
         let me = self.me.clone();
         let d = data(r).clone();
-        let speaker = r.speaks_for.clone().unwrap_or_default();
+        let speaker = r.speaks_for.unwrap_or_default();
         let household = self.s.household.clone();
         // (Asked by a member of our own household for someone they know: their word stands for willingness.)
         let vouched = d.s("vouched_by") == Some(speaker.as_str()) && household.as_ref().is_some_and(|h| h.members.iter().any(|m| m.person == speaker)) && d.s("for").is_some();
-        let asker = if vouched { d.s("for").unwrap_or_default().to_string() } else { speaker.clone() };
-        let asking = if vouched { d.s("request").map_or(r.id.clone(), String::from) } else { r.id.clone() };
+        let asker = if vouched { d.s("for").unwrap_or_default().to_string() } else { speaker.to_string() };
+        let asking = if vouched { d.s("request").map_or(r.id, oikos_sight::Id::new) } else { r.id };
         let adults_in = d.i("adults").unwrap_or(1);
         let kids = d.i("children").unwrap_or(0);
         let without = d.i("without_income").unwrap_or(0);
@@ -1449,7 +1449,7 @@ impl Person {
                         Say {
                             to: Some(vec![lh.clone()]),
                             visible: Some(Visible::Only(vec![me.clone(), lh, asker.clone()])),
-                            basis: Some(r.id.clone()),
+                            basis: Some(r.id.to_string()),
                             data: Some(json!({ "adults": adults_in, "children": kids, "without_income": without, "for": asker, "vouched_by": me, "request": r.id })),
                             ..Default::default()
                         },
@@ -1499,7 +1499,7 @@ impl Person {
             Some(y) => json!({ "request": asking, "yes": false, "why": y }),
             None => json!({ "request": asking, "yes": true, "space": place }),
         };
-        w.push(because(reason, vec![say("stay_answer", &words, Say { to: Some(vec![asker.clone()]), visible: Some(Visible::Only(vec![me, asker])), basis: Some(r.id.clone()), data: Some(data_), ..Default::default() })]));
+        w.push(because(reason, vec![say("stay_answer", &words, Say { to: Some(vec![asker.clone()]), visible: Some(Visible::Only(vec![me, asker])), basis: Some(r.id.to_string()), data: Some(data_), ..Default::default() })]));
     }
 
     /// The answer of someone we asked to take us in. Yes, and we still have no dwelling: we go there as their guests,
@@ -1508,12 +1508,12 @@ impl Person {
         let t = w.t;
         let me = self.me.clone();
         let d = data(r);
-        let host = r.speaks_for.clone().unwrap_or_default();
+        let host = r.speaks_for.unwrap_or_default();
         let space = d.s("space").map(String::from);
         let yes = d.get("yes") == Some(&Value::Bool(true)) && space.is_some();
         if yes && self.s.home.is_none() && self.housing.stay.is_none() && self.s.living_at.is_none() && self.is_leaseholder() {
             let space = space.unwrap_or_default();
-            self.housing.stay = Some(Stay { host: host.clone(), space: space.clone(), since: t });
+            self.housing.stay = Some(Stay { host: host.to_string(), space: space.clone(), since: t });
             self.s.living_at = Some(space.clone());
             self.s.gave_up.remove(&space);
             let mut f = json!({ "people": 1 + self.others().len() });
@@ -1521,8 +1521,8 @@ impl Person {
                 f["days_without"] = json!((t - h).div_euclid(DAY));
             }
             self.told(w, "home", &space, "taken_in", Some(&host), f);
-            self.treated(w, Treated { who: host.clone(), kind: "took_us_in".into(), good: true, weight_bps: Some(2_000), tried: true, ..Default::default() });
-            self.s.people_we_know.insert(host.clone());
+            self.treated(w, Treated { who: host.to_string(), kind: "took_us_in".into(), good: true, weight_bps: Some(2_000), tried: true, ..Default::default() });
+            self.s.people_we_know.insert(host.to_string());
             let kids = self.children(t);
             let mut calls = vec![move_in(&space)];
             calls.extend(kids.iter().map(|k| call("occupancy", vec![("in", Some(arg(&space))), ("who", Some(arg(&k.person)))])));
@@ -1534,11 +1534,11 @@ impl Person {
             let why = d.s("why").unwrap_or_default().to_string();
             self.told(w, "home", "stay", "not_taken_in", Some(&host), json!({ "why": why }));
             // (Refused for want of willingness: a little further from them.)
-            self.treated(w, Treated { who: host, kind: if why == "not_willing" { "refused".into() } else { "asked".into() }, good: false, weight_bps: if why == "not_willing" { Some(500) } else { Some(0) }, tried: true, ..Default::default() });
+            self.treated(w, Treated { who: host.to_string(), kind: if why == "not_willing" { "refused".into() } else { "asked".into() }, good: false, weight_bps: if why == "not_willing" { Some(500) } else { Some(0) }, tried: true, ..Default::default() });
         } else if self.housing.stay.as_ref().map(|s| s.host.as_str()) != Some(host.as_str()) {
             w.push(because(
                 format!("{host} would take us in, and we no longer need it: telling them."),
-                vec![say("stay_ended", "Thank you: we do not need to stay after all.", Say { to: Some(vec![host.clone()]), visible: Some(Visible::Only(vec![me, host])), basis: Some(r.id.clone()), data: Some(json!({ "by": "guest" })), ..Default::default() })],
+                vec![say("stay_ended", "Thank you: we do not need to stay after all.", Say { to: Some(vec![host.to_string()]), visible: Some(Visible::Only(vec![me, host.to_string()])), basis: Some(r.id.to_string()), data: Some(json!({ "by": "guest" })), ..Default::default() })],
             ));
         }
     }
@@ -1562,19 +1562,19 @@ impl Person {
                 kind: "ordered_to_pay".into(),
                 from: Some(applicant.clone()),
                 facts: facts(json!({ "amount": amount, "paid": pays, "binding": d.get("binding") != Some(&Value::Bool(false)) })),
-                paper: Some(r.id.clone()),
+                paper: Some(r.id.to_string()),
                 ..Default::default()
             });
-            let by = r.speaks_for.clone().unwrap_or_default();
+            let by = r.speaks_for.unwrap_or_default();
             let kb = self.kind_of(&by, &w.cx.ctx.params.clone());
-            self.treated(w, Treated { who: by.clone(), kind: kb, good: false, done_to: true, paper: Some(r.id.clone()), ..Default::default() });
+            self.treated(w, Treated { who: by.to_string(), kind: kb, good: false, done_to: true, paper: Some(r.id.to_string()), ..Default::default() });
             if let (true, Some(to), Some(acc)) = (pays, to, w.acc.clone()) {
                 if let Some(a) = w.acc.as_mut() {
                     a.balance -= amount;
                 }
                 w.push(because(
                     format!("{by} orders us to pay {applicant} {}: paying it.", Self::usd(w, amount)),
-                    vec![pay(&to, amount, Pay { from: Some(acc.account), for_: Some(format!("Under {}.", r.id)), settles: Some(r.id.clone()), ..Default::default() }, w.cx)],
+                    vec![pay(&to, amount, Pay { from: Some(acc.account), for_: Some(format!("Under {}.", r.id)), settles: Some(r.id.to_string()), ..Default::default() }, w.cx)],
                 ));
             }
         }
@@ -1615,7 +1615,7 @@ impl Person {
         }
         self.housing.uninhabitable = None;
         // (Already there, the round having brought us: in.)
-        let here = w.pic.body.as_ref().and_then(|b| b.in_space.clone());
+        let here = w.pic.body.as_ref().and_then(|b| b.in_space);
         if let Some(h) = self.s.home.as_mut().filter(|h| !h.moved_in) {
             if here.as_deref() == Some(h.space.as_str()) {
                 h.moved_in = true;
@@ -1742,7 +1742,7 @@ impl Person {
             let l = p.book.get(id)?.clone();
             let d = data(&l);
             let rent = d.i("rent")?;
-            (d.s("space").map(String::from) != here && !p.housing.applied.contains(&l.id) && p.affordable(rent, acc.balance, t) && d.i("bedrooms").unwrap_or(0) >= rooms).then_some(l)
+            (d.s("space").map(String::from) != here && !p.housing.applied.contains(l.id.as_str()) && p.affordable(rent, acc.balance, t) && d.i("bedrooms").unwrap_or(0) >= rooms).then_some(l)
         };
         let told: Vec<Arc<Record>> = self.s.lead_homes.iter().filter_map(|id| fits(self, id)).collect();
         let mut listings = told.clone();
@@ -1762,7 +1762,7 @@ impl Person {
             .map(|l| {
                 let d = data(l);
                 Choice {
-                    key: l.id.clone(),
+                    key: l.id.to_string(),
                     facts: Some(Facts { money_per_month: -d.i("rent").unwrap_or(0), home: Some(HomeFacts { bedrooms: d.i("bedrooms") }), ..Default::default() }),
                     others: Some(i64::from(told.iter().any(|x| x.id == l.id))),
                     ..Default::default()
@@ -1771,13 +1771,13 @@ impl Person {
             .collect();
         let life = self.life(w.pic, t, Some(acc.balance));
         let dec = self.mind.decide(w.cx, &life, Decide { domain: "home".into(), options, satisfied_here: Some(0), purpose: Some("home".into()), bedrooms_needed: Some(need.max(0) as u32), ..Default::default() });
-        let Some(best) = listings.iter().find(|l| Some(&l.id) == dec.key.as_ref()).cloned() else { return };
+        let Some(best) = listings.iter().find(|l| Some(l.id.as_str()) == dec.key.as_deref()).cloned() else { return };
         let d = data(&best).clone();
         if let (Some(space), Some(n)) = (d.s("space"), dec.n) {
             self.housing.chose.insert(format!("home:{space}"), n);
         }
-        let Some(to) = best.speaks_for.clone() else { return };
-        self.housing.applied.insert(best.id.clone());
+        let Some(to) = best.speaks_for else { return };
+        self.housing.applied.insert(best.id.to_string());
         let members: Vec<String> = self.s.household.as_ref().map_or(vec![me.clone()], |h| h.members.iter().map(|m| m.person.clone()).collect());
         let how = if dec.strategy == "imitate" { "where someone told us to look" } else { "weighing each home's rent and room" };
         let what = d.s("space").or(d.s("structure")).unwrap_or_default().to_string();
@@ -1787,9 +1787,9 @@ impl Person {
                 "rental_application",
                 &format!("Application for {what}, for a household of {}.", members.len()),
                 Say {
-                    to: Some(vec![to.clone()]),
-                    visible: Some(Visible::Only(vec![me.clone(), to])),
-                    basis: Some(best.id.clone()),
+                    to: Some(vec![to.to_string()]),
+                    visible: Some(Visible::Only(vec![me.clone(), to.to_string()])),
+                    basis: Some(best.id.to_string()),
                     data: Some(json!({ "listing": best.id, "account": acc.account, "members": members, "household": { "people": members.len(), "bedrooms_needed": if self.s.household.is_some() { need } else { 0 } } })),
                     ..Default::default()
                 },
@@ -1846,7 +1846,7 @@ impl Person {
             if c.rate > 0 && c.kind != "wastewater" {
                 w.push(because(format!("We no longer live at {}: our {} there is turned off.", c.at, c.kind), vec![call("connection", vec![("op", Some(arg("set"))), ("connection", Some(arg(&c.id))), ("rate", Some(text("0")))])]));
             }
-            if let Some(office) = office_of(&c.kind).filter(|_| c.kind != "wastewater" && self.housing.supply_ended.insert(c.id.clone())) {
+            if let Some(office) = office_of(&c.kind).filter(|_| c.kind != "wastewater" && self.housing.supply_ended.insert(c.id.to_string())) {
                 w.push(because(
                     format!("We have left {}: asking for its {} to be stopped.", c.at, c.kind),
                     vec![say("supply_end", &format!("Please stop the {} supply at {}: we have moved out.", c.kind, c.at), Say { to: Some(vec![office.clone()]), visible: Some(Visible::Only(vec![me.clone(), office])), data: Some(json!({ "connection": c.id, "kind": c.kind })), ..Default::default() })],
@@ -1911,7 +1911,7 @@ impl Person {
     }
     /// The title to a lot: ours, if one we've read is; else the first.
     fn title_of(&self, lot: &str) -> Option<String> {
-        let all: Vec<String> = self.book.claims_by(ClaimKey::Object, lot).filter(|c| matches!(&c.body, RecordBody::Claim { about, .. } if about.get("kind").and_then(Value::as_str) == Some("ownership"))).map(|c| c.id.clone()).collect();
+        let all: Vec<String> = self.book.claims_by(ClaimKey::Object, lot).filter(|c| matches!(&c.body, RecordBody::Claim { about, .. } if about.get("kind").and_then(Value::as_str) == Some("ownership"))).map(|c| c.id).map(|x| x.to_string()).collect();
         all.iter().find(|c| self.holder_of(c).as_deref() == Some(self.me.as_str())).or(all.first()).cloned()
     }
     fn valuation_of(&self, lot: &str) -> Option<i64> {
@@ -1920,8 +1920,8 @@ impl Person {
     /// The house on a lot (from the street): its building, type and dwelling.
     fn house_on(&self, pic: &oikos_sight::Picture, lot: &str) -> Option<(String, String, Option<String>)> {
         let lc: BTreeSet<String> = self.book.get(lot).map(|l| data(l).ids("cells").into_iter().map(String::from).collect()).unwrap_or_default();
-        let st = cells(pic, "street").iter().find(|c| lc.contains(&c.cell) && c.structure.is_some())?.structure.clone()?;
-        Some((st.structure.clone(), st.structure_type.clone(), st.spaces.iter().find(|sp| sp.kind == "dwelling").map(|sp| sp.space.clone())))
+        let st = cells(pic, "street").iter().find(|c| lc.contains(c.cell.as_str()) && c.structure.is_some())?.structure.clone()?;
+        Some((st.structure.to_string(), st.structure_type.to_string(), (st.spaces.iter().find(|sp| sp.kind == "dwelling").map(|sp| sp.space)).map(|x| x.to_string())))
     }
     /// Put a lot of ours with a house on it up for sale, at its valuation.
     /// The lot of the home we own and live in (citizen.ts `ownLot`).
@@ -1947,8 +1947,8 @@ impl Person {
         let Some((structure, ty, Some(space))) = self.house_on(pic, lot) else { return false };
         let Some(price) = self.valuation_of(lot) else { return false };
         let bedrooms = self.p.market.as_ref().and_then(|m| m.bedrooms_by_type.get(&ty).copied());
-        let loan = self.mortgage_for(&space).map(|l| l.id.clone());
-        self.housing.selling = Some(Box::new(Selling { lot: lot.into(), space: Some(space), structure, bedrooms, price, asked: price, leave_after, loan, ..Default::default() }));
+        let loan = self.mortgage_for(&space).map(|l| l.id);
+        self.housing.selling = Some(Box::new(Selling { lot: lot.into(), space: Some(space), structure, bedrooms, price, asked: price, leave_after, loan: loan.map(|x| x.to_string()), ..Default::default() }));
         true
     }
     /// What is for sale as far as we know: what our last look showed, or, shown listings unasked, those standing.
@@ -1980,7 +1980,7 @@ impl Person {
         let our_loan = self.s.home.as_ref().filter(|h| h.owned).and_then(|h| self.mortgage_for(&h.space));
         if self.housing.selling.is_none() {
             if let (Some(loan), Some(lot)) = (&our_loan, &own_lot) {
-                if self.book.all("loan_default").any(|r| data(r).s("loan") == Some(loan.id.as_str()) && addressed_to(r).contains(&me)) {
+                if self.book.all("loan_default").any(|r| data(r).s("loan") == Some(loan.id.as_str()) && addressed_to(r).iter().any(|x| x == &me)) {
                     self.sell(w.pic, lot, false);
                 }
             }
@@ -1988,9 +1988,9 @@ impl Person {
         // Inherited land with a house we don't live in: sold (not until it's valued in our name).
         if self.housing.selling.is_none() {
             let transfers: Vec<String> = self.book.of_type("claim_transfer").filter_map(|r| match &r.body {
-                RecordBody::ClaimTransfer { claim, to } if *to == me => Some(claim.clone()),
+                RecordBody::ClaimTransfer { claim, to } if *to == me => Some(*claim),
                 _ => None,
-            }).collect();
+            }).map(|x| x.to_string()).collect();
             for claim in transfers {
                 let lot = match self.book.get(&claim).map(|c| &c.body) {
                     Some(RecordBody::Claim { about, .. }) => about.get("object").and_then(Value::as_str).map(String::from),
@@ -2030,10 +2030,10 @@ impl Person {
             } else if s.listing.as_deref() != Some("pending") && s.listing.is_some() && !s.sold {
                 // (A purchase answering any listing we made of it.)
                 if s.buyer.is_none() {
-                    let mut buys: Vec<Arc<Record>> = self.book.open("property_purchase").filter(|r| crate::common::bases_of(r).iter().any(|b| s.listings.contains(b)) && addressed_to(r).contains(&me)).cloned().collect();
+                    let mut buys: Vec<Arc<Record>> = self.book.open("property_purchase").filter(|r| { crate::common::bases_of(r).iter().any(|b| s.listings.iter().any(|l| l ==b)) && addressed_to(r).iter().any(|x| x == &me)}).cloned().collect();
                     buys.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| crate::common::filed_before(&a.id, &b.id)));
                     if let Some(b) = buys.first() {
-                        s.buyer = b.speaks_for.clone();
+                        s.buyer = b.speaks_for.map(|x| x.to_string());
                         s.buyer_account = data(b).s("account").map(String::from);
                     }
                 }
@@ -2075,10 +2075,10 @@ impl Person {
                 }
             } else if s.sold {
                 if let Some(loan) = s.loan.clone() {
-                    let fig = self.book.open("loan_payout").find(|r| data(r).s("loan") == Some(loan.as_str()) && addressed_to(r).contains(&me)).cloned();
+                    let fig = self.book.open("loan_payout").find(|r| data(r).s("loan") == Some(loan.as_str()) && addressed_to(r).iter().any(|x| x == &me)).cloned();
                     if let Some(fig) = fig {
                         let amount = data(&fig).i("amount").unwrap_or(0);
-                        let order = self.book.all("request").find(|r| cites(r, &loan) && r.speaks_for.as_deref() == Some(me.as_str()) && !self.book.withdrawn(&r.id)).map(|r| r.id.clone());
+                        let order = self.book.all("request").find(|r| cites(r, &loan) && r.speaks_for.as_deref() == Some(me.as_str()) && !self.book.withdrawn(&r.id)).map(|r| r.id);
                         let mut calls = vec![pay(data(&fig).s("account").unwrap_or_default(), amount, Pay { from: Some(acc.account.clone()), for_: Some(format!("Paying off {loan}.")), settles: Some(loan.clone()), ..Default::default() }, w.cx)];
                         if let Some(o) = order {
                             calls.push(withdraw(&o, Some("Mortgage paid off.")));
@@ -2100,7 +2100,7 @@ impl Person {
         // ---- buying: a renting household with income that can afford a home that suits it, now and then
         if let Some(mut b) = self.housing.buying.clone() {
             if !b.paid {
-                let declined = self.book.all("loan_decision").any(|r| r.at >= b.since && addressed_to(r).contains(&me) && data(r).get("approved") == Some(&Value::Bool(false)));
+                let declined = self.book.all("loan_decision").any(|r| { r.at >= b.since && addressed_to(r).iter().any(|x| x == &me) && data(r).get("approved") == Some(&Value::Bool(false))});
                 let for_sale = self.for_sale_now().iter().any(|r| r.id == b.listing || (r.speaks_for.as_deref() == Some(b.seller.as_str()) && data(r).s("lot") == Some(b.lot.as_str())));
                 let seen = if self.p.sale_board.is_empty() { t } else { self.housing.sale_seen_at };
                 if for_sale {
@@ -2161,8 +2161,8 @@ impl Person {
                     let space = d.s("space").unwrap_or_default().to_string();
                     let structure = d.s("structure").unwrap_or_default().to_string();
                     self.housing.buying = Some(Box::new(Buying {
-                        listing: l.id.clone(),
-                        seller: l.speaks_for.clone().unwrap_or_default(),
+                        listing: l.id.to_string(),
+                        seller: l.speaks_for.unwrap_or_default().to_string(),
                         account: d.s("account").unwrap_or_default().into(),
                         price,
                         lot: d.s("lot").unwrap_or_default().into(),
@@ -2249,7 +2249,7 @@ mod tests {
     }
     fn pic(t: i64, records: Vec<Arc<Record>>, readings: &[(&str, &'static str, Option<i64>)]) -> Picture {
         let mut channels = BTreeMap::new();
-        channels.insert("papers".to_string(), Seen::Records { records, search: false });
+        channels.insert("papers".into(), Seen::Records { records, search: false });
         Picture {
             participant: "c1-self".into(),
             t,
@@ -2262,7 +2262,7 @@ mod tests {
             inbox: vec![],
             channels,
             asking: vec![],
-            readings: readings.iter().map(|(id, st, e)| (id.to_string(), oikos_sight::Reading { of: "agreement", status: st, ends_at: *e, ended_by: None, reader: "terms" })).collect(),
+            readings: readings.iter().map(|(id, st, e)| (oikos_sight::Id::new(id), oikos_sight::Reading { of: "agreement", status: st, ends_at: *e, ended_by: None, reader: "terms" })).collect(),
             woke_for: "cadence".into(),
             since: 0,
         }

@@ -160,7 +160,7 @@ pub fn text(r: &Record) -> &str {
 }
 
 /// Whom a statement is addressed to.
-pub fn addressed_to(r: &Record) -> &[String] {
+pub fn addressed_to(r: &Record) -> &[oikos_sight::Id] {
     match &r.body {
         RecordBody::Statement { addressed_to: Some(a), .. } => a,
         _ => &[],
@@ -195,7 +195,7 @@ pub enum Piece {
 }
 
 /// The records a record cites, in order (contracts.ts `basesOf`).
-pub fn bases_of(r: &Record) -> &[String] {
+pub fn bases_of(r: &Record) -> &[oikos_sight::Id] {
     r.basis.as_ref().map_or(&[], |b| b.ids())
 }
 
@@ -209,7 +209,7 @@ pub fn cited_words(r: &Record) -> String {
     let b = bases_of(r);
     match b.len() {
         0 => String::new(),
-        1 => b[0].clone(),
+        1 => b[0].to_string(),
         n => format!("{} and {}", b[..n - 1].join(", "), b[n - 1]),
     }
 }

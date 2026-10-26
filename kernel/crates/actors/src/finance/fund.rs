@@ -152,7 +152,7 @@ impl Plan for Fund {
         }
         for r in self.book.all("departure") {
             if let Some(s) = &r.speaks_for {
-                self.away.insert(s.clone());
+                self.away.insert(s.to_string());
             }
         }
         // What has come in: what we hold beyond what is kept for members.

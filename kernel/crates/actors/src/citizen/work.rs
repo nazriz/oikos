@@ -258,7 +258,7 @@ impl Person {
     /// The ground cell a building stands on, as we have seen it (being there).
     fn wk_cell_of(pic: &Picture, structure: &str) -> Option<String> {
         pic.channels.values().find_map(|c| match c {
-            Seen::Sites { cells, .. } => cells.iter().find(|c| c.structure.as_ref().is_some_and(|s| s.structure == structure)).map(|c| c.cell.clone()),
+            Seen::Sites { cells, .. } => cells.iter().find(|c| c.structure.as_ref().is_some_and(|s| s.structure == structure)).map(|c| c.cell.to_string()),
             _ => None,
         })
     }
@@ -460,7 +460,7 @@ impl Person {
         let Some(own) = self.s.own_work.clone() else { return };
         // (Our business has taken premises on a lease, and says so: we work there now, and not from home:
         // docs/behaviour/leasing.md.)
-        let latest = crate::common::latest_by_speaker(&self.book, "trading_at", |r| crate::common::addressed_to(r).contains(&self.me)).get(&Some(own.firm.as_str())).cloned();
+        let latest = crate::common::latest_by_speaker(&self.book, "trading_at", |r| crate::common::addressed_to(r).iter().any(|x| x == &self.me)).get(&Some(own.firm.as_str())).cloned();
         // (Its lease has ended, and it says so: it trades from where it did before, and we work from home again, as we did:
         // where that is, we tell it, as for any move home.)
         if latest.as_ref().is_some_and(|r| data(r).flag("back")) {
@@ -472,7 +472,7 @@ impl Person {
                 self.work.trading_from = None;
             }
         }
-        let moved = latest.filter(|r| !data(r).flag("back")).map(|r| (data(&r).s("space").map(String::from), data(&r).i("rent"), data(&r).i("until")));
+        let moved = latest.filter(|r| !data(r).flag("back")).map(|r| (data(r).s("space").map(String::from), data(r).i("rent"), data(r).i("until")));
         let own = self.s.own_work.clone().unwrap_or(own);
         if let Some((Some(space), rent, until)) = moved.filter(|m| m.0.is_some() && own.at.as_deref() != m.0.as_deref()) {
             if let Some(o) = self.s.own_work.as_mut() {
@@ -588,7 +588,7 @@ impl Person {
         }
         w.push(because(format!("Our notice is worked out: starting the job we took ({} every {} days).", Self::wk_usd(w, terms.wage), div_round(terms.period, DAY)), calls));
         let employer = other_party(&r, &me).unwrap_or_default().to_string();
-        self.s.job = Some(Job { agreement: r.id.clone(), employer: employer.clone(), wage: terms.wage, period: terms.period, workplace: terms.workplace.clone(), since: t, ..Default::default() });
+        self.s.job = Some(Job { agreement: r.id.to_string(), employer: employer.clone(), wage: terms.wage, period: terms.period, workplace: terms.workplace.clone(), since: t, ..Default::default() });
         self.s.employers.insert(employer.clone());
         self.s.jobless_since = None;
         self.tell(w, mine("job", &employer, "hired", facts([("wage", json!(terms.wage)), ("period_days", json!(div_round(terms.period, DAY))), ("after_notice", json!(true))])));
@@ -730,17 +730,17 @@ impl Person {
                 && (held == 0 || wage * j.period * 10_000 > j.wage * period * (10_000 + p.wk_held_in(w, t, d.s("industry"))))
         };
         let told: Vec<Arc<Record>> = if job.is_some() { vec![] } else { self.s.lead_jobs.iter().filter(|id| !self.work.applied.contains(*id)).filter_map(|id| self.wk_record(w.pic, id)).collect() };
-        let told_ids: BTreeSet<String> = told.iter().map(|r| r.id.clone()).collect();
+        let told_ids: BTreeSet<String> = told.iter().map(|r| r.id).map(|x| x.to_string()).collect();
         let mut posts: Vec<Arc<Record>> = told.clone();
         posts.extend(self.s.found_jobs.iter().filter(|id| !told_ids.contains(*id)).filter_map(|id| self.wk_record(w.pic, id)));
-        posts.retain(|r| !self.work.applied.contains(&r.id) && r.speaks_for.is_some() && better(self, r));
+        posts.retain(|r| !self.work.applied.contains(r.id.as_str()) && r.speaks_for.is_some() && better(self, r));
         self.work.searching_work = false;
         // An employer is one option (its first posting: one we were told of, if any).
         let mut by_employer: Vec<(String, Arc<Record>)> = vec![];
         for r in posts {
-            let e = r.speaks_for.clone().unwrap_or_default();
+            let e = r.speaks_for.unwrap_or_default();
             if !by_employer.iter().any(|(x, _)| *x == e) {
-                by_employer.push((e, r));
+                by_employer.push((e.to_string(), r));
             }
         }
         if by_employer.is_empty() {
@@ -758,13 +758,13 @@ impl Person {
                 } else {
                     facts_of(offer)
                 };
-                Choice { key: e.clone(), facts: Some(f), others: Some(i64::from(told_ids.contains(&r.id))), meaning: None }
+                Choice { key: e.clone(), facts: Some(f), others: Some(i64::from(told_ids.contains(r.id.as_str()))), meaning: None }
             })
             .collect();
         let life = self.life(w.pic, t, Some(acc.balance));
         let d = self.mind.decide(w.cx, &life, Decide { domain: "job".into(), options, satisfied_here: Some(if job.is_some() { 10_000 } else { 0 }), purpose: Some("job".into()), ..Default::default() });
         let Some((employer, best)) = d.key.as_ref().and_then(|k| by_employer.iter().find(|(e, _)| e == k)).cloned() else { return };
-        self.work.applied.insert(best.id.clone());
+        self.work.applied.insert(best.id.to_string());
         if let Some(i) = data(&best).s("industry") {
             self.s.industry_of.insert(employer.clone(), i.to_string());
         }
@@ -780,10 +780,10 @@ impl Person {
             .flatten()
             .find_map(|e| self.s.industry_of.get(&e).cloned())
             .or_else(|| self.p.trade.clone());
-        let paper = crate::papers::data(&JobApplication { posting: best.id.clone(), account: acc.account.clone(), trade });
+        let paper = crate::papers::data(&JobApplication { posting: best.id.to_string(), account: acc.account.clone(), trade });
         w.push(because(
             format!("Applying for a job at {} a pay period{ours}{how}.", Self::wk_usd(w, data(&best).i("wage").unwrap_or(0))),
-            vec![say("job_application", "Application for the advertised job.", Say { to: Some(vec![employer.clone()]), visible: only(&me, &employer), data: Some(paper), basis: Some(best.id.clone()), ..Default::default() })],
+            vec![say("job_application", "Application for the advertised job.", Say { to: Some(vec![employer.clone()]), visible: only(&me, &employer), data: Some(paper), basis: Some(best.id.to_string()), ..Default::default() })],
         ));
     }
 
@@ -807,7 +807,7 @@ impl Person {
         // The capital our new business calls for.
         if let Some(f) = self.work.founded.clone().filter(|f| f.firm.is_some() && !f.paid) {
             let firm = f.firm.clone().unwrap_or_default();
-            let calls: Vec<Arc<Record>> = self.book.all("capital_call").filter(|r| r.speaks_for.as_deref() == Some(firm.as_str()) && crate::common::addressed_to(r).contains(&me)).cloned().collect();
+            let calls: Vec<Arc<Record>> = self.book.all("capital_call").filter(|r| r.speaks_for.as_deref() == Some(firm.as_str()) && crate::common::addressed_to(r).iter().any(|x| x == &me)).cloned().collect();
             // (TS paid every call of the firm's addressed to us, without breaking: so here; a firm calls once.)
             for r in calls {
                 let d = data(&r);
@@ -1167,7 +1167,7 @@ mod tests {
             let cell: oikos_sight::SiteCell = serde_json::from_value(json!({ "cell": "c.1", "x": 0, "y": 0, "structure": { "structure": "b1", "type": "house", "at": "c.1", "w": 1, "h": 1, "complete": true,
                 "spaces": [{ "space": "b1/dwelling.1", "kind": "dwelling", "capacity": 4, "count": homes, "occupants": ["ann"] }] } }))
             .unwrap();
-            channels.insert("street".to_string(), Seen::Sites { as_of: t, cells: Arc::new(vec![cell]), visit: None });
+            channels.insert("street".into(), Seen::Sites { as_of: t, cells: Arc::new(vec![cell]), visit: None });
         }
         let body = born_at.map(|b| serde_json::from_value(json!({ "born_at": b, "present": true, "alive": true })).unwrap());
         Picture {

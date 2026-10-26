@@ -27,20 +27,20 @@ pub struct OwnAccount {
 /// Its own account (held by the entity it acts for), the first shown.
 pub fn own_account(pic: &Picture) -> Option<OwnAccount> {
     pic.accounts().find(|a| a.holder == pic.entity).map(|a| OwnAccount {
-        account: a.account.clone(),
+        account: a.account.to_string(),
         balance: cents(a.balance),
-        custodian: a.custodian.clone(),
-        currency: a.currency.clone(),
+        custodian: a.custodian.to_string(),
+        currency: a.currency.to_string(),
     })
 }
 
 /// An entity's own account at a bank (not money it keeps itself).
 pub fn own_banked(pic: &Picture, holder: &str) -> Option<OwnAccount> {
     pic.accounts().find(|a| a.holder == holder && a.custodian != holder).map(|a| OwnAccount {
-        account: a.account.clone(),
+        account: a.account.to_string(),
         balance: cents(a.balance),
-        custodian: a.custodian.clone(),
-        currency: a.currency.clone(),
+        custodian: a.custodian.to_string(),
+        currency: a.currency.to_string(),
     })
 }
 
@@ -49,7 +49,7 @@ pub fn receipts(pic: &Picture, account: &str) -> BTreeMap<String, i64> {
     let mut out = BTreeMap::new();
     for tx in pic.transactions() {
         if tx.to == account && tx.from != account {
-            *out.entry(tx.from.clone()).or_insert(0) += cents(tx.amount);
+            *out.entry(tx.from.to_string()).or_insert(0) += cents(tx.amount);
         }
     }
     out
@@ -66,7 +66,7 @@ pub fn notices_of<'a>(book: &'a Book, claim: &Record) -> Vec<&'a Arc<Record>> {
     let (due, amount) = (about.get("due"), about.i("amount"));
     book.all("rates_notice")
         .filter(|n| {
-            counterparty.as_ref().is_some_and(|c| addressed_to(n).contains(c)) && data(n).get("due") == due && data(n).i("amount") == amount
+            counterparty.as_ref().is_some_and(|c| addressed_to(n).iter().any(|x| x == &c.to_string())) && data(n).get("due") == due && data(n).i("amount") == amount
         })
         .collect()
 }
@@ -74,7 +74,7 @@ pub fn notices_of<'a>(book: &'a Book, claim: &Record) -> Vec<&'a Arc<Record>> {
 /// Is a debt recorded against someone settled by what has been paid? A payment that names the claim, or for a rates
 /// claim the notice that goes with it, settles the bill however many papers mention it.
 pub fn bill_settled(book: &Book, claim: &Record, settled: &BTreeSet<String>) -> bool {
-    settled.contains(&claim.id) || notices_of(book, claim).iter().any(|n| settled.contains(&n.id))
+    settled.contains(claim.id.as_str()) || notices_of(book, claim).iter().any(|n| settled.contains(n.id.as_str()))
 }
 
 /// A builder's published price for a kind of building (`prices`) or for demolishing one (`demolition`): its latest
@@ -95,5 +95,5 @@ pub fn brought_forward(book: &Book, landlord: &str, lease: &str) -> Option<(i64,
         .filter(|x| x.speaks_for.as_deref() == Some(landlord) && data(x).s("lease") == Some(lease) && data(x).flag("brought_forward"))
         .max_by(|a, b| a.at.cmp(&b.at).then_with(|| super::filed_before(&b.id, &a.id)))?;
     let owed = data(r).i("owed").unwrap_or(0);
-    (owed > 0).then(|| (owed, data(r).i("since").unwrap_or(0), r.id.clone()))
+    (owed > 0).then(|| (owed, data(r).i("since").unwrap_or(0), r.id.to_string()))
 }

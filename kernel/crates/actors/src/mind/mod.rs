@@ -32,8 +32,8 @@ pub mod person;
 pub mod plan;
 pub mod reading;
 pub mod talk;
-pub mod voice;
 pub mod townmemory;
+pub mod voice;
 pub mod wants;
 
 use crate::citizen::mind::{Born, Mind};

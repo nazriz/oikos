@@ -357,7 +357,7 @@ impl Firm {
     }
     /// Taken on, declined or begun: no longer for the decision of the wake.
     fn settled(&self, r: &Record, me: &str) -> bool {
-        self.book.signed_by(&r.id, me) || self.declined(me, &r.id) || self.begun_job(me, &r.id) || self.in_flight.contains(&r.id)
+        self.book.signed_by(&r.id, me) || self.declined(me, &r.id) || self.begun_job(me, &r.id) || self.in_flight.contains(r.id.as_str())
     }
     fn agreements(&self, me: &str) -> Vec<Arc<Record>> {
         self.book.of_type("agreement").filter(|r| agreements::parties_of(r).iter().any(|p| p == me)).cloned().collect()
@@ -392,7 +392,7 @@ impl Firm {
     fn pay_debts(&mut self, account: &str, balance: i64, keep: i64, cx: &Cx) -> Vec<Step<Then>> {
         let mut left = balance - keep;
         let mut out = vec![];
-        let debts: Vec<Arc<Record>> = self.dues.debts(&self.book).into_iter().filter(|r| !self.paying.contains(&r.id)).cloned().collect();
+        let debts: Vec<Arc<Record>> = self.dues.debts(&self.book).into_iter().filter(|r| !self.paying.contains(r.id.as_str())).cloned().collect();
         for dbt in debts {
             let RecordBody::Claim { holder, about, .. } = &dbt.body else { continue };
             let amount = about.i("amount").unwrap_or(0);
@@ -401,13 +401,13 @@ impl Firm {
                 break;
             }
             left -= amount;
-            self.paying.insert(dbt.id.clone());
+            self.paying.insert(dbt.id.to_string());
             let kind = about.s("kind").unwrap_or("debt");
             let mut s = because(
                 format!("Paying a debt recorded against us ({}).", about.s("for").unwrap_or(kind)),
-                vec![pay(&to, amount, Pay { from: Some(account.into()), for_: Some(format!("Paying {kind} {}.", dbt.id)), settles: Some(dbt.id.clone()), ..Default::default() }, cx)],
+                vec![pay(&to, amount, Pay { from: Some(account.into()), for_: Some(format!("Paying {kind} {}.", dbt.id)), settles: Some(dbt.id.to_string()), ..Default::default() }, cx)],
             );
-            s.then = Some(Then::Paying(dbt.id.clone()));
+            s.then = Some(Then::Paying(dbt.id.to_string()));
             out.push(s);
         }
         out
@@ -426,7 +426,7 @@ impl Plan for Firm {
             for tx in pic.transactions() {
                 if tx.from == a.account {
                     if let Some(s) = &tx.settles {
-                        self.paying.remove(s);
+                        self.paying.remove(s.as_str());
                     }
                 }
             }
@@ -450,17 +450,17 @@ impl Plan for Firm {
         // What our crew left on the sites it worked on: theirs to know.
         for o in &pic.outcomes {
             for st in &o.seen {
-                self.seen_type.insert(st.structure.clone(), st.structure_type.clone());
+                self.seen_type.insert(st.structure.to_string(), st.structure_type.to_string());
                 if st.complete {
-                    self.finished.insert(st.structure.clone());
+                    self.finished.insert(st.structure.to_string());
                 }
             }
         }
     }
 
     fn looks(&mut self, pic: &Picture) -> Vec<LookRequest> {
-        let me = pic.entity.clone();
-        let built: BTreeMap<String, bool> = sites_cells(pic).iter().map(|c| (c.cell.clone(), c.structure.is_some())).collect();
+        let me = pic.entity;
+        let built: BTreeMap<String, bool> = sites_cells(pic).iter().map(|c| (c.cell.to_string(), c.structure.is_some())).collect();
         let (mut plan, mut visit) = (None, None);
         for r in self.agreements(&me) {
             let Some((client, job, _)) = self.is_job(&r, &me) else { continue };
@@ -488,7 +488,7 @@ impl Plan for Firm {
     }
 
     fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<Then>> {
-        let me = pic.entity.clone();
+        let me = pic.entity;
         let t = pic.t;
         let mut steps: Vec<Step<Then>> = vec![];
         let Some(acc) = own_account(pic) else { return steps };
@@ -498,7 +498,7 @@ impl Plan for Firm {
             .book
             .of_type("agreement")
             .filter(|a| agreements::template_of(a) == Some(agreements::EMPLOYMENT) && agreements::parties_of(a).first().map(String::as_str) == Some(me.as_str()))
-            .flat_map(|a| self.book.notices(&a.id).filter(|n| n.party == me).map(|n| (a.id.clone(), n.at)).collect::<Vec<_>>())
+            .flat_map(|a| self.book.notices(&a.id).filter(|n| n.party == me).map(|n| (a.id.to_string(), n.at)).collect::<Vec<_>>())
             .collect();
         for (id, at) in noticed {
             self.staff.noticed.entry(id).or_insert(at);
@@ -513,14 +513,14 @@ impl Plan for Firm {
         let mut type_of: BTreeMap<String, String> = self.seen_type.clone();
         let mut went: BTreeMap<String, i64> = BTreeMap::new();
         for c in &cells {
-            built_cell.insert(c.cell.clone(), c.structure.is_some());
+            built_cell.insert(c.cell.to_string(), c.structure.is_some());
             if let Some(s) = &c.structure {
-                type_of.insert(s.structure.clone(), s.structure_type.clone());
+                type_of.insert(s.structure.to_string(), s.structure_type.to_string());
             }
         }
         if !self.p.sites.is_empty() {
-            if let Some(Seen::Sites { visit: Some(v), .. }) = pic.channels.get(&self.p.sites) {
-                went = v.seen_at.clone();
+            if let Some(Seen::Sites { visit: Some(v), .. }) = pic.channels.get(self.p.sites.as_str()) {
+                went = v.seen_at.iter().map(|(k, v)| (k.to_string(), *v)).collect();
             }
         }
         let site_on = |book: &Book, lot: &str| -> String {
@@ -530,10 +530,10 @@ impl Plan for Firm {
         // Buildings of ours still going up (a successor finds them where the crew left them).
         for c in &cells {
             if let Some(s) = &c.structure {
-                if s.built_by.as_deref() == Some(me.as_str()) && !s.complete && s.coming_down != Some(true) && !self.over.contains(&s.structure) && !self.finished.contains(&s.structure) && !self.projects.iter().any(|p| p.structure == s.structure) {
-                    let labour = self.p.types.get(&s.structure_type).map_or(0, |x| x.build_labour);
+                if s.built_by.as_deref() == Some(me.as_str()) && !s.complete && s.coming_down != Some(true) && !self.over.contains(s.structure.as_str()) && !self.finished.contains(s.structure.as_str()) && !self.projects.iter().any(|p| p.structure == s.structure) {
+                    let labour = self.p.types.get(s.structure_type.as_str()).map_or(0, |x| x.build_labour);
                     if labour > 0 {
-                        self.projects.push(Project { structure: s.structure.clone(), build: true, left: labour, flying: 0 });
+                        self.projects.push(Project { structure: s.structure.to_string(), build: true, left: labour, flying: 0 });
                     }
                 }
             }
@@ -589,7 +589,7 @@ impl Plan for Firm {
                     our_lots.insert(on.clone());
                 }
                 if !self.begun_job(&me, &r.id) && !self.in_flight_start(&r.id) {
-                    waiting.push(Waiting { agreement: r.id.clone(), client, type_: ty, on, remove, price: agreed });
+                    waiting.push(Waiting { agreement: r.id.to_string(), client, type_: ty, on, remove, price: agreed });
                 }
                 continue;
             }
@@ -604,19 +604,19 @@ impl Plan for Firm {
             }
             // A kind of building we have no figures for, or a job without a site, cannot be done: said so.
             let decline = |reason: &str, words: String, why: String, price: Option<i64>| {
-                let p = OfferDeclined { agreement: r.id.clone(), reason: Some(reason.into()), price };
-                let mut s = because(why, vec![say("offer_declined", &words, Say { to: Some(vec![client.clone()]), visible: Some(Visible::Only(vec![me.clone(), client.clone()])), basis: Some(r.id.clone()), data: Some(paper_data(&p)), ..Default::default() })]);
-                s.then = Some(Then::Agreement(r.id.clone()));
+                let p = OfferDeclined { agreement: r.id.to_string(), reason: Some(reason.into()), price };
+                let mut s = because(why, vec![say("offer_declined", &words, Say { to: Some(vec![client.clone()]), visible: Some(Visible::Only(vec![me.to_string(), client.clone()])), basis: Some(r.id.to_string()), data: Some(paper_data(&p)), ..Default::default() })]);
+                s.then = Some(Then::Agreement(r.id.to_string()));
                 s
             };
             if let Some(ty) = &ty {
                 if !self.p.types.contains_key(ty) {
-                    self.in_flight.insert(r.id.clone());
+                    self.in_flight.insert(r.id.to_string());
                     steps.push(decline("unknown_type", format!("We can't build a {ty}: it is not a kind of building we build."), format!("{client} asks us to build a {ty}, which we have no figures for: declining, and saying so."), None));
                     continue;
                 }
             } else if remove.is_none() {
-                self.in_flight.insert(r.id.clone());
+                self.in_flight.insert(r.id.to_string());
                 steps.push(decline("cannot_build", "We can't take this job: it names no kind of building to build and nothing to bring down.".into(), format!("{client} asks for work that names neither a building nor something to demolish: declining, and saying so."), None));
                 continue;
             }
@@ -629,7 +629,7 @@ impl Plan for Firm {
             if let (Some(ty), Some(on)) = (&ty, &on) {
                 if our_lots.contains(on) || (!lot_cells.is_empty() && lot_cells.iter().all(|c| built_cell.get(*c) == Some(&true))) {
                     let own = if our_lots.contains(on) { " (our own job there)" } else { "" };
-                    self.in_flight.insert(r.id.clone());
+                    self.in_flight.insert(r.id.to_string());
                     steps.push(decline("site_taken", format!("We can't build a {ty} on {on}: it's already built on{}.", if own.is_empty() { "" } else { ", with our own job there" }), format!("{client} asks us to build a {ty} on {on}, which is already built on{own}: declining, and saying so."), None));
                     continue;
                 }
@@ -639,19 +639,19 @@ impl Plan for Firm {
                 let least = self.book.all("price_list").filter(|l| self.ours(l, &me) && t - l.at <= self.p.quote_valid_days * DAY).filter_map(|l| d(l).get("prices").and_then(|p| p.get(ty)).and_then(Value::as_i64)).fold(ours, i64::min);
                 if agreed < least {
                     let w = &cx.ctx.world;
-                    self.in_flight.insert(r.id.clone());
+                    self.in_flight.insert(r.id.to_string());
                     steps.push(decline("price", format!("We can't build a {ty} on {} for {}: our price is {}. Offer us a construction agreement at that price and we'll take it on.", on.clone().unwrap_or_default(), money_words(agreed, w), money_words(ours, w)), format!("{client} offers {} to build a {ty}; our price is {}: declining, and saying so.", money_words(agreed, w), money_words(ours, w)), Some(ours)));
                     continue;
                 }
             }
-            waiting.push(Waiting { agreement: r.id.clone(), client: client.clone(), type_: ty.clone(), on: on.clone(), remove, price: agreed });
+            waiting.push(Waiting { agreement: r.id.to_string(), client: client.clone(), type_: ty.clone(), on: on.clone(), remove, price: agreed });
             if let (Some(_), Some(on)) = (&ty, &on) {
                 our_lots.insert(on.clone());
             }
             if !self.book.signed_by(&r.id, &me) && !self.book.taken_back(&r.id) {
-                self.in_flight.insert(r.id.clone());
+                self.in_flight.insert(r.id.to_string());
                 let mut s = because("A client has signed a construction contract: taking it on.", vec![agreements::sign(&r.id)]);
-                s.then = Some(Then::Agreement(r.id.clone()));
+                s.then = Some(Then::Agreement(r.id.to_string()));
                 steps.push(s);
             }
         }
@@ -682,7 +682,7 @@ impl Plan for Firm {
             self.ordering.push((kind.clone(), short));
             let mut s = trade::order::<Then>(
                 &Ordering {
-                    me: me.clone(),
+                    me: me.to_string(),
                     seller: self.p.supplier.clone(),
                     seller_account: seller_acc.clone(),
                     kind: kind.clone(),
@@ -769,17 +769,17 @@ impl Plan for Firm {
                 .filter(|r| self.ours(r, &me))
                 .filter_map(|r| d(r).s("order").map(String::from))
                 .collect();
-            let mut orders: Vec<Arc<Record>> = self.book.open("repair_order").filter(|r| !self.dealt.contains(&r.id) && !answered.contains(&r.id) && crate::common::addressed_to(r).iter().any(|a| *a == me)).cloned().collect();
+            let mut orders: Vec<Arc<Record>> = self.book.open("repair_order").filter(|r| !self.dealt.contains(r.id.as_str()) && !answered.contains(r.id.as_str()) && crate::common::addressed_to(r).contains(&me)).cloned().collect();
             orders.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
             for r in orders {
-                let orderer = r.speaks_for.clone().unwrap_or_default();
+                let orderer = r.speaks_for.unwrap_or_default();
                 let structure = d(&r).s("structure").map(String::from);
                 let units = d(&r).i("units");
                 let from = d(&r).s("account").map(String::from);
                 let decline = |dealt: &mut BTreeSet<String>, steps: &mut Vec<Step<Then>>, reason: &str, words: String| {
-                    dealt.insert(r.id.clone());
-                    let p = RepairDeclined { order: r.id.clone(), structure: structure.clone(), reason: reason.into() };
-                    steps.push(because(format!("{orderer} ordered a repair of {} and {reason}: declining, and saying so.", structure.clone().unwrap_or("something".into())), vec![say("repair_declined", &words, Say { to: Some(vec![orderer.clone()]), visible: Some(Visible::Only(vec![me.clone(), orderer.clone()])), basis: Some(r.id.clone()), data: Some(paper_data(&p)), ..Default::default() })]));
+                    dealt.insert(r.id.to_string());
+                    let p = RepairDeclined { order: r.id.to_string(), structure: structure.clone(), reason: reason.into() };
+                    steps.push(because(format!("{orderer} ordered a repair of {} and {reason}: declining, and saying so.", structure.clone().unwrap_or("something".into())), vec![say("repair_declined", &words, Say { to: Some(vec![orderer.to_string()]), visible: Some(Visible::Only(vec![me.to_string(), orderer.to_string()])), basis: Some(r.id.to_string()), data: Some(paper_data(&p)), ..Default::default() })]));
                 };
                 let (Some(structure), Some(units), Some(from)) = (structure.clone(), units.filter(|u| *u > 0), from) else {
                     decline(&mut self.dealt, &mut steps, "the order is not one we can read", "We can't take this order: it must name the building, a number of units, and the account it is paid from.".into());
@@ -787,9 +787,9 @@ impl Plan for Firm {
                 };
                 let due = units * self.p.repair_price;
                 if self.paid_in.get(&from).copied().unwrap_or(0) - self.spoken_for.get(&from).copied().unwrap_or(0) >= due {
-                    self.dealt.insert(r.id.clone());
+                    self.dealt.insert(r.id.to_string());
                     *self.spoken_for.entry(from).or_insert(0) += due;
-                    self.repairs.push(Repair { id: r.id.clone(), orderer, structure, units, left: units, refused: 0, flying: 0 });
+                    self.repairs.push(Repair { id: r.id.to_string(), orderer: orderer.to_string(), structure, units, left: units, refused: 0, flying: 0, });
                 } else if t - r.at >= 14 * DAY {
                     decline(&mut self.dealt, &mut steps, "the money has not come", format!("We have not taken your repair order for {structure}: the {} for it has not come into our account in 14 days. Send the order again with the money.", money_words(due, &cx.ctx.world)));
                 }
@@ -808,7 +808,7 @@ impl Plan for Firm {
             .filter_map(|c| c.structure.as_ref())
             .filter(|s| s.structure == self.p.yard)
             .flat_map(|s| s.spaces.iter().flat_map(|sp| sp.occupants.clone().unwrap_or_default()))
-            .filter(|w| ours_crew.contains(w))
+            .filter(|w| ours_crew.contains(w.as_str())).map(|x| x.to_string())
             .collect();
         here.sort();
         here.dedup();
@@ -898,14 +898,14 @@ impl Plan for Firm {
                 self.begun.insert(agreement.clone());
                 let sid = out.and_then(|o| o.created.as_ref()).and_then(|c| c.get("site")).cloned();
                 let Some(sid) = sid else { return vec![] };
-                self.seen_type.insert(sid.clone(), type_.clone());
+                self.seen_type.insert(sid.to_string(), type_.clone());
                 if *labour > 0 {
-                    self.projects.push(Project { structure: sid.clone(), build: true, left: *labour, flying: 0 });
+                    self.projects.push(Project { structure: sid.to_string(), build: true, left: *labour, flying: 0 });
                 }
                 if self.p.notify.is_empty() {
                     return vec![];
                 }
-                let n = BuildingNotice { lot: Some(on.clone()), at: Some(at.clone()), structure: Some(sid.clone()), structure_type: Some(type_.clone()), client: Some(client.clone()), removes: None };
+                let n = BuildingNotice { lot: Some(on.clone()), at: Some(at.clone()), structure: Some(sid.to_string()), structure_type: Some(type_.clone()), client: Some(client.clone()), removes: None };
                 vec![because(format!("Work has begun on a {type_} on {on}: giving notice of it."), vec![say("building_notice", &format!("Notice of building work: a {type_} ({sid}) begun on {on}, for {client}."), Say { to: Some(self.p.notify.clone()), basis: Some(agreement.clone()), data: Some(paper_data(&n)), ..Default::default() })])]
             }
             Then::Demolishing { agreement, sid, labour } => {

@@ -54,7 +54,7 @@ pub fn rb(participant: &str) -> (String, Option<String>) {
 /// An act command for a Riverbend actor (see `rb`).
 pub fn rb_act(participant: &str, blocks: Value) -> Command {
     let (participant, position) = rb(participant);
-    Command::Act { participant, position, blocks: serde_json::from_value(blocks).unwrap(), by: vec![], provenance: json!({"via": "direct"}), reasoning: None, thinking: None }
+    Command::Act { participant: participant.into(), position: position.map(Into::into), blocks: serde_json::from_value(blocks).unwrap(), by: vec![], provenance: json!({"via": "direct"}), reasoning: None, thinking: None }
 }
 
 pub const TICK: i64 = 3600;
@@ -384,20 +384,20 @@ fn pick<T: Clone>(v: &[T], i: u8) -> Option<T> {
 }
 
 pub fn direct(participant: &str, position: Option<&str>, blocks: Vec<Block>) -> Option<Command> {
-    Some(Command::Act { participant: participant.into(), position: position.map(String::from), blocks, by: vec![], provenance: json!({"via": "direct"}), reasoning: None, thinking: None })
+    Some(Command::Act { participant: participant.into(), position: position.map(String::from).map(Into::into), blocks, by: vec![], provenance: json!({"via": "direct"}), reasoning: None, thinking: None })
 }
 
 /// Everyone who can act now, in each capacity: (participant, position, entity acted for).
-pub fn actors<W: std::io::Write>(run: &Run<W>) -> Vec<(String, Option<String>, String)> {
+pub fn actors<W: std::io::Write>(run: &Run<W>) -> Vec<(oikos_kernel::blocks::Id, Option<oikos_kernel::blocks::Id>, oikos_kernel::blocks::Id)> {
     let st = run.kernel().state();
     let mut v = vec![];
     for (id, p) in st.participants.iter() {
         if let Some(person) = &p.person {
-            v.push((id.clone(), None, person.clone()));
+            v.push((*id, None, *person));
         }
         for (pos, x) in st.positions.iter() {
             if x.holder.as_deref() == Some(id.as_str()) {
-                v.push((id.clone(), Some(pos.clone()), x.entity.clone()));
+                v.push((*id, Some(*pos), x.entity));
             }
         }
     }
@@ -408,19 +408,19 @@ pub fn actors<W: std::io::Write>(run: &Run<W>) -> Vec<(String, Option<String>, S
 pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
     let k = run.kernel();
     let st = k.state();
-    let entities: Vec<String> = st.entities.keys().cloned().collect();
-    let persons: Vec<String> = st.entities.iter().filter(|(_, e)| e.body.is_some()).map(|(id, _)| id.clone()).collect();
-    let accounts: Vec<String> = st.accounts.keys().cloned().collect();
-    let cells: Vec<String> = st.cells.keys().cloned().collect();
-    let structures: Vec<String> = st.structures.keys().cloned().collect();
+    let entities: Vec<String> = st.entities.keys().cloned().map(|x| x.to_string()).collect();
+    let persons: Vec<String> = st.entities.iter().filter(|(_, e)| e.body.is_some()).map(|(id, _)| *id).map(|x| x.to_string()).collect();
+    let accounts: Vec<String> = st.accounts.keys().cloned().map(|x| x.to_string()).collect();
+    let cells: Vec<String> = st.cells.keys().cloned().map(|x| x.to_string()).collect();
+    let structures: Vec<String> = st.structures.keys().cloned().map(|x| x.to_string()).collect();
     let spaces: Vec<String> = st
         .structures
         .iter()
         .flat_map(|(sid, x)| k.statics().spaces[&x.structure_type].keys().map(move |l| format!("{sid}/{l}")))
         .collect();
-    let records: Vec<String> = st.records.keys().cloned().collect();
-    let positions: Vec<String> = st.positions.keys().cloned().collect();
-    let participants: Vec<String> = st.participants.keys().cloned().collect();
+    let records: Vec<String> = st.records.keys().cloned().map(|x| x.to_string()).collect();
+    let positions: Vec<String> = st.positions.keys().cloned().map(|x| x.to_string()).collect();
+    let participants: Vec<String> = st.participants.keys().cloned().map(|x| x.to_string()).collect();
     let all = actors(run);
     let types = ["house", "flats", "shop", "park", "jetty", "castle"];
     let kinds = ["trust", "union", "club", "person", "boundary"];
@@ -430,19 +430,19 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
     let living = |id: &str| st.entities.get(id).and_then(|e| e.body.as_ref()).is_some_and(|b| b.alive && b.present);
     match op {
         Op::Advance { ticks } => Some(Command::Advance { to: (k.t() + *ticks as i64 * TICK).min(k.statics().run_end()) }),
-        Op::Observe { actor: a } => Some(Command::Observe { participant: actor(*a).0, only: None }),
+        Op::Observe { actor: a } => Some(Command::Observe { participant: (actor(*a).0), only: None }),
         Op::OptOut { actor: a } => {
             let p = actor(*a).0;
             // The world's edges keep running, so that arrivals stay exercised whichever actor the sequence lands on.
             let edge = ["outside-system", "upriver-system"].contains(&p.as_str());
-            (!edge && st.participants[&p].status == ParticipantStatus::Active).then(|| Command::OptOut { participant: p, statement: "leaving the study".into() })
+            (!edge && st.participants[p.as_str()].status == ParticipantStatus::Active).then(|| Command::OptOut { participant: p, statement: "leaving the study".into() })
         }
         Op::Smart { kind, a, b, flag } => match kind % 13 {
             0 => {
                 // The bank executes a customer's payment.
-                let banked: Vec<String> = st.accounts.iter().filter(|(_, x)| x.custodian == "bank" && x.balance > 0).map(|(id, _)| id.clone()).collect();
+                let banked: Vec<String> = st.accounts.iter().filter(|(_, x)| x.custodian == "bank" && x.balance > 0).map(|(id, _)| *id).map(|x| x.to_string()).collect();
                 let from = pick(&banked, *a)?;
-                let max = st.accounts[&from].balance;
+                let max = st.accounts[from.as_str()].balance;
                 direct("bank-pay-system", Some("bank-pay"), vec![Block::Transfer {
                     from,
                     to: pick(&accounts, *b)?,
@@ -457,8 +457,8 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 // A builder builds on free ground, whoever's lot it is.
                 // Each builds from its own materials: the builder's at the flats, the developer's at the shop.
                 let (p, pos, yard) = if *flag { ("builder-system", "builder", "s-flats") } else { ("developer-system", "developer", "s-shop") };
-                let free: Vec<String> = st.cells.iter().filter(|(_, c)| c.structure.is_none()).map(|(id, _)| id.clone()).collect();
-                direct(p, Some(pos), vec![Block::Construct { at: pick(&free, *a)?, structure_type: types[*b as usize % 5].into(), materials_at: Some(yard.into()), bind: None }])
+                let free: Vec<String> = st.cells.iter().filter(|(_, c)| c.structure.is_none()).map(|(id, _)| *id).map(|x| x.to_string()).collect();
+                direct(p, Some(pos), vec![Block::Construct { at: pick(&free, *a)?.into(), structure_type: types[*b as usize % 5].into(), materials_at: Some(yard.into()), bind: None }])
             }
             2 => {
                 // Someone alive in the world moves into a space with room.
@@ -476,10 +476,10 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
             }
             3 => {
                 // An occupant leaves, or is removed.
-                let present: Vec<(String, String)> = st.occupancy.iter().flat_map(|(sid, m)| m.values().flatten().map(move |o| (sid.clone(), o.clone()))).collect();
+                let present: Vec<(oikos_kernel::blocks::Id, oikos_kernel::blocks::Id)> = st.occupancy.iter().flat_map(|(sid, m)| m.values().flatten().map(move |o| (*sid, *o))).collect();
                 let (structure, occupant) = pick(&present, *a)?;
                 let (p, pos, _) = if *flag { all.iter().find(|(_, pos, e)| pos.is_none() && *e == occupant).cloned().unwrap_or_else(|| actor(*b)) } else { actor(*b) };
-                direct(&p, pos.as_deref(), vec![Block::Vacate { occupant, from: structure }])
+                direct(&p, pos.as_deref(), vec![Block::Vacate { occupant: occupant.to_string(), from: structure.to_string() }])
             }
             4 if a % 3 == 0 => {
                 // One of the world's edges buys something from the town: money enters (D31).
@@ -515,7 +515,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
             }
             5 => {
                 // The outside world brings someone in: a newcomer (carrying money), or someone returning.
-                let outside: Vec<String> = persons.iter().filter(|p| st.entities[*p].body.as_ref().is_some_and(|b| b.alive && !b.present)).cloned().collect();
+                let outside: Vec<String> = persons.iter().filter(|p| st.entities[p.as_str()].body.as_ref().is_some_and(|b| b.alive && !b.present)).cloned().collect();
                 let block = match (flag, pick(&outside, *a)) {
                     (true, Some(p)) => Block::Arrive { person: Some(p), name: None, born_at: None, template: None, carrying: None, sex: None, variables: None, bind: None },
                     _ => Block::Arrive {
@@ -544,7 +544,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                     2 => Some("outside".to_string()),
                     _ => Some("city".to_string()),
                 };
-                direct(&p, None, vec![Block::Leave { person: who, to }])
+                direct(&p, None, vec![Block::Leave { person: who, to: to.map(Into::into) }])
             }
             7 => {
                 // An adult has a child, with another parent near them or alone.
@@ -555,7 +555,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
             8 => {
                 // An organisation hands one of its positions to someone (or to nobody).
                 let (p, pos, org) = all.iter().filter(|(_, pos, _)| pos.is_some()).nth(*a as usize % 7).cloned()?;
-                let theirs: Vec<String> = st.positions.iter().filter(|(_, x)| x.entity == org).map(|(id, _)| id.clone()).collect();
+                let theirs: Vec<String> = st.positions.iter().filter(|(_, x)| x.entity == org).map(|(id, _)| *id).map(|x| x.to_string()).collect();
                 let to = if *flag { pick(&participants, *b) } else { None };
                 direct(&p, pos.as_deref(), vec![Block::Appoint { position: pick(&theirs, *b)?, participant: to }])
             }
@@ -565,9 +565,9 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 match a % 4 {
                     0 => direct("developer-system", Some("developer"), vec![Block::Work { task: "make".into(), units: 1 + (*b as u64 % 6), at: "s-shop".into(), performers: vec!["carol".into()], on: None, survey: None, investigate: None }]),
                     1 => {
-                        let site = st.structures.iter().find(|(_, x)| (!x.complete && x.demolition.is_none()) || x.demolition.is_some()).map(|(id, x)| (id.clone(), x.demolition.is_some()))?;
+                        let site = st.structures.iter().find(|(_, x)| (!x.complete && x.demolition.is_none()) || x.demolition.is_some()).map(|(id, x)| (*id, x.demolition.is_some()))?;
                         let task = if site.1 { "demolish" } else { "build" };
-                        direct("builder-system", Some("builder"), vec![Block::Work { task: task.into(), units: 600 + (*b as u64) * 150, at: "s-flats".into(), performers: vec!["bob".into()], on: Some(site.0), survey: None, investigate: None }])
+                        direct("builder-system", Some("builder"), vec![Block::Work { task: task.into(), units: 600 + (*b as u64) * 150, at: "s-flats".into(), performers: vec!["bob".into()], on: Some(site.0.to_string()), survey: None, investigate: None }])
                     }
                     2 => direct("alice-self", None, vec![Block::Work { task: "eat".into(), units: 1 + (*b as u64 % 3), at: "s-house".into(), performers: vec![], on: None, survey: None, investigate: None }]),
                     _ => direct("developer-system", Some("developer"), vec![Block::Work { task: "mend".into(), units: 1, at: "s-shop".into(), performers: vec!["carol".into()], on: if *flag { Some("s-house".into()) } else { None }, survey: None, investigate: None }]),
@@ -577,7 +577,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 // The bank closes an empty account it keeps: one it has just opened (closure was otherwise too rare to
                 // count on), or, sometimes, one that may not be empty (refused: account_not_empty).
                 if *flag {
-                    let theirs: Vec<String> = st.accounts.iter().filter(|(_, x)| x.custodian == "bank").map(|(id, _)| id.clone()).collect();
+                    let theirs: Vec<String> = st.accounts.iter().filter(|(_, x)| x.custodian == "bank").map(|(id, _)| *id).map(|x| x.to_string()).collect();
                     direct("bank-pay-system", Some("bank-pay"), vec![Block::CloseAccount { account: pick(&theirs, *a)? }])
                 } else {
                     direct("bank-pay-system", Some("bank-pay"), vec![
@@ -599,23 +599,23 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
             }
             _ => {
                 // A party signs an agreement it's named in.
-                let ags: Vec<(String, String)> = st
+                let ags: Vec<(oikos_kernel::blocks::Id, String)> = st
                     .records
                     .iter()
                     .filter_map(|(id, x)| match &x.record.body {
-                        oikos_kernel::blocks::RecordBody::Agreement { terms } => Some(terms.parties.iter().map(|p| (id.clone(), p.clone())).collect::<Vec<_>>()),
+                        oikos_kernel::blocks::RecordBody::Agreement { terms } => Some(terms.parties.iter().map(|p| (*id, p.clone())).collect::<Vec<_>>()),
                         _ => None,
                     })
                     .flatten()
                     .collect();
                 let (agreement, party) = pick(&ags, *a)?;
                 let (p, pos, _) = all.iter().find(|(_, _, e)| *e == party).cloned().unwrap_or_else(|| actor(*b));
-                direct(&p, pos.as_deref(), vec![Block::SignAgreement { agreement, party, bind: None }])
+                direct(&p, pos.as_deref(), vec![Block::SignAgreement { agreement: agreement.to_string(), party, bind: None }])
             }
         },
         Op::Act { actor: a, blocks } => {
             let (p, pos, me) = actor(*a);
-            let mine: Vec<String> = st.accounts.iter().filter(|(_, x)| x.custodian == me || x.holder == me).map(|(id, _)| id.clone()).collect();
+            let mine: Vec<String> = st.accounts.iter().filter(|(_, x)| x.custodian == me || x.holder == me).map(|(id, _)| *id).map(|x| x.to_string()).collect();
             let my = |i: u8| if i % 4 == 0 { pick(&accounts, i).unwrap() } else { pick(&mine, i).unwrap_or_else(|| pick(&accounts, i).unwrap()) };
             let mut out = vec![];
             let mut bound = false;
@@ -625,14 +625,14 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         // Mostly the actor's own places (the structures, or itself for an edge); sometimes nonsense.
                         let kinds = ["goods", "materials", "gold"];
                         let mut places = structures.clone();
-                        places.push(me.clone());
+                        places.push(me.to_string());
                         Block::MoveGoods { kind: kinds[*kind as usize % 3].into(), quantity: *quantity, from_at: pick(&places, *from_at).unwrap(), to: e(*to), to_at: pick(&places, *to_at).unwrap() }
                     }
                     B::Transfer { from, to, amount } => Block::Transfer { from: my(*from), to: pick(&accounts, *to).unwrap(), amount: *amount, settles: None, per_instruction: None, memo: None, line: None },
                     B::OpenAccount { holder, to_new } => Block::OpenAccount { holder: if *to_new && bound { "$new".into() } else { e(*holder) }, currency: None, bind: None },
                     B::CloseAccount { account } => Block::CloseAccount { account: my(*account) },
                     B::Construct { cell, ty, from } => Block::Construct {
-                        at: if cell % 7 == 0 { "cell.9.9".into() } else { pick(&cells, *cell).unwrap() },
+                        at: if cell % 7 == 0 { "cell.9.9".into() } else { pick(&cells, *cell).unwrap().into() },
                         structure_type: types[*ty as usize % types.len()].into(),
                         materials_at: (from % 5 != 0).then(|| if from % 2 == 0 { "s-flats".into() } else { pick(&structures, *from).unwrap_or_else(|| "s-none".into()) }),
                         bind: None,
@@ -675,7 +675,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         counterparty: counterparty.map(e),
                         about: json!({"kind": "test", "n": *position as i64}),
                         basis: None,
-                        speaks_for: Some(me.clone()),
+                        speaks_for: Some(me.to_string()),
                         visible_to: None,
                         bind: None,
                     },
@@ -689,7 +689,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                                 let mut v = vec![e(*a), e(*b)];
                                 v.dedup();
                                 if v.len() < 2 {
-                                    v.push(me.clone());
+                                    v.push(me.to_string());
                                     v.dedup();
                                 }
                                 if v.len() < 2 {
@@ -704,7 +704,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                             text: None,
                             attrs: None,
                         },
-                        speaks_for: Some(me.clone()),
+                        speaks_for: Some(me.to_string()),
                         visible_to: None,
                         bind: None,
                     },
@@ -721,13 +721,13 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         practice: None, assertion: None, registry: None,
                         basis: None,
                         addressed_to: addressed.map(|a| vec![e(a)]),
-                        place: place.map(|p| pick(&cells, p).unwrap()),
-                        speaks_for: Some(me.clone()),
-                        visible_to: private.then(|| Visibility::only([me.to_string()])),
+                        place: (place.map(|p| pick(&cells, p).unwrap())).map(Into::into),
+                        speaks_for: Some(me.to_string()),
+                        visible_to: private.then(|| Visibility::only([me])),
                         bind: None,
                     },
                     B::Withdraw { record } => Block::Withdraw { record: pick(&records, *record).unwrap(), text: None, basis: None, speaks_for: None, visible_to: None, bind: None },
-                    B::Vote { record } => Block::Vote { ballot: pick(&records, *record).unwrap(), choice: "yes".into(), speaks_for: Some(me.clone()), visible_to: None },
+                    B::Vote { record } => Block::Vote { ballot: pick(&records, *record).unwrap(), choice: "yes".into(), speaks_for: Some(me.to_string()), visible_to: None },
                     B::Message { to } => Block::Message {
                         to: {
                             let mut v: Vec<String> = to
@@ -740,7 +740,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                                 .collect();
                             v.sort();
                             v.dedup();
-                            v
+                            v.into_iter().map(Into::into).collect()
                         },
                         text: "é".repeat(to.len()),
                         re: None,

@@ -135,31 +135,31 @@ impl Plan for LandPlan {
         // Land that has changed hands: a notice to those who keep a roll from such notices, once for each dealing (read
         // from the notices of acquisition already on the register's file).
         if !self.notify.is_empty() {
-            let noticed: BTreeSet<String> = self.book.all("acquisition_notice").filter(|r| r.speaks_for.as_deref() == Some(me.as_str())).flat_map(|r| crate::common::bases_of(r).to_vec()).collect();
+            let noticed: BTreeSet<String> = self.book.all("acquisition_notice").filter(|r| r.speaks_for.as_deref() == Some(me.as_str())).flat_map(|r| crate::common::bases_of(r).iter().map(|x| x.to_string()).collect::<Vec<_>>()).collect();
             let transfers: Vec<Arc<Record>> = self.book.of_type("claim_transfer").cloned().collect();
             for r in transfers {
                 let RecordBody::ClaimTransfer { claim, to } = &r.body else { continue };
-                if noticed.contains(&r.id) || self.noticed_now.contains(&r.id) {
+                if noticed.contains(r.id.as_str()) || self.noticed_now.contains(r.id.as_str()) {
                     continue;
                 }
                 let Some((c, lot)) = title(&self.book, claim) else { continue };
                 if super::land::owner_of(&self.book, &lot).as_deref() != Some(to.as_str()) {
                     continue;
                 }
-                self.noticed_now.insert(r.id.clone());
+                self.noticed_now.insert(r.id.to_string());
                 let mut seen = vec![me.clone()];
                 seen.extend(self.notify.clone());
                 steps.push(because(
                     format!("{lot} has passed to {to}: telling {}.", self.notify.join(", ")),
-                    vec![say("acquisition_notice", &format!("Notice of acquisition: {lot} is now {to}'s."), Say { visible: Some(Visible::Only(seen)), basis: Some(r.id.clone()), data: Some(json!({ "lot": lot, "owner": to, "title": c.id })), ..Default::default() })],
+                    vec![say("acquisition_notice", &format!("Notice of acquisition: {lot} is now {to}'s."), Say { visible: Some(Visible::Only(seen)), basis: Some(r.id.to_string()), data: Some(json!({ "lot": lot, "owner": to, "title": c.id })), ..Default::default() })],
                 ));
             }
         }
         // A transmission on death: each title the dead person held passes to the heir named.
-        let done: BTreeSet<String> = self.book.of_type("claim_transfer").filter(|r| r.speaks_for.as_deref() == Some(me.as_str())).flat_map(|r| crate::common::bases_of(r).to_vec()).collect();
-        let apps: Vec<Arc<Record>> = self.book.open("transmission_application").filter(|a| crate::common::addressed_to(a).contains(&me) && !done.contains(&a.id) && !self.passed_now.contains(&a.id)).cloned().collect();
+        let done: BTreeSet<String> = self.book.of_type("claim_transfer").filter(|r| r.speaks_for.as_deref() == Some(me.as_str())).flat_map(|r| crate::common::bases_of(r).iter().map(|x| x.to_string()).collect::<Vec<_>>()).collect();
+        let apps: Vec<Arc<Record>> = self.book.open("transmission_application").filter(|a| { crate::common::addressed_to(a).iter().any(|x| x == &me) && !done.contains(a.id.as_str()) && !self.passed_now.contains(a.id.as_str()) }).cloned().collect();
         for a in apps {
-            self.passed_now.insert(a.id.clone());
+            self.passed_now.insert(a.id.to_string());
             let d = data(&a);
             let (Some(who), Some(heir)) = (d.s("deceased"), d.s("heir")) else { continue };
             let mut lots: BTreeSet<String> = BTreeSet::new();
@@ -304,7 +304,7 @@ impl Plan for RegistryPlan {
         }
     }
     fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<()>> {
-        let (t, me) = (pic.t, pic.entity.clone());
+        let (t, me) = (pic.t, pic.entity);
         let mut steps: Vec<Step<()>> = vec![];
         let office = if !self.office.is_empty() { self.office.clone() } else { cx.ctx.position.clone().unwrap_or_else(|| "office".into()) };
         steps.extend(self.routines.set(&self.book, self.counter.order(&office).as_slice()));
@@ -317,25 +317,25 @@ impl Plan for RegistryPlan {
                 .book
                 .all("death_certificate")
                 .filter(|r| r.speaks_for.as_deref() == Some(me.as_str()))
-                .flat_map(|r| crate::common::addressed_to(r).iter().flat_map(|to| crate::common::bases_of(r).iter().map(|b| (b.clone(), to.clone())).collect::<Vec<_>>()).collect::<Vec<_>>())
+                .flat_map(|r| crate::common::addressed_to(r).iter().flat_map(|to| crate::common::bases_of(r).iter().map(|b| (b.to_string(), to.to_string())).collect::<Vec<_>>()).collect::<Vec<_>>())
                 .collect();
-            let notes: Vec<Arc<Record>> = self.book.open("death_notification").filter(|n| crate::common::addressed_to(n).contains(&me)).cloned().collect();
+            let notes: Vec<Arc<Record>> = self.book.open("death_notification").filter(|n| crate::common::addressed_to(n).iter().any(|x| x == &me.to_string())).cloned().collect();
             for n in notes {
                 let d = data(&n).clone();
                 let Some(who) = d.s("deceased").map(String::from) else { continue };
-                if self.read.contains(&n.id) || entries.iter().any(|e| crate::common::cites(e, &n.id)) {
+                if self.read.contains(n.id.as_str()) || entries.iter().any(|e| crate::common::cites(e, &n.id)) {
                     continue;
                 }
-                self.read.insert(n.id.clone());
+                self.read.insert(n.id.to_string());
                 self.counter.answered(&self.routines, "death_notification");
-                let by = n.speaks_for.clone().unwrap_or_default();
+                let by = n.speaks_for.unwrap_or_default();
                 if registered.contains(&who) {
                     // Already registered, and reported again by someone who was not sent the entry: a certified copy.
                     if let Some(entry) = entries.iter().find(|e| data(e).s("deceased") == Some(who.as_str())) {
-                        if !by.is_empty() && by != me && !crate::common::addressed_to(entry).contains(&by) && !certified.contains(&(entry.id.clone(), by.clone())) {
+                        if !by.is_empty() && by != me && !crate::common::addressed_to(entry).iter().any(|x| x == &by.to_string()) && !certified.contains(&(entry.id.to_string(), by.to_string())) {
                             steps.push(because(
                                 format!("{who}'s death is reported to us again (by {by}): it is registered already; sending them a certified copy of the entry."),
-                                vec![say("death_certificate", &format!("Death of {who}: registered (entry {}).", entry.id), Say { to: Some(vec![by.clone()]), basis: Some(entry.id.clone()), data: Some(json!({ "deceased": who, "registration": entry.id })), ..Default::default() })],
+                                vec![say("death_certificate", &format!("Death of {who}: registered (entry {}).", entry.id), Say { to: Some(vec![by.to_string()]), basis: Some(entry.id.to_string()), data: Some(json!({ "deceased": who, "registration": entry.id })), ..Default::default() })],
                             ));
                         }
                     }
@@ -346,14 +346,14 @@ impl Plan for RegistryPlan {
                 // to those they named as having had dealings with the dead person, to those sent every entry as of right,
                 // and, where nobody of the family reported it, to those the town writes to as the estate's administrator.
                 let family = d.get("children").is_some_and(Value::is_array);
-                let mut told: Vec<String> = vec![by.clone()];
+                let mut told: Vec<String> = vec![by.to_string()];
                 told.extend(d.ids("tell").into_iter().map(String::from));
                 told.extend(self.feeds.clone());
                 if !family {
                     told.extend(self.estate_tells.clone());
                 }
                 let told = dedup(told, &me).into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>();
-                let mut seen = vec![me.clone()];
+                let mut seen = vec![me.to_string()];
                 seen.extend(told.clone());
                 let mut entry = json!({ "deceased": who, "reported_by": by, "children": d.get("children").cloned().unwrap_or(json!([])), "without_adult": d.get("without_adult").cloned().unwrap_or(json!([])) });
                 if let Some(p) = d.get("partner").filter(|v| crate::common::truthy(v)) {
@@ -361,39 +361,39 @@ impl Plan for RegistryPlan {
                 }
                 steps.push(because(
                     format!("A death is reported to us ({who}, by {by}): registering it, and telling {}.", if told.is_empty() { "nobody else".to_string() } else { told.join(", ") }),
-                    vec![say("death_registration", &format!("Death registered: {who}."), Say { basis: Some(n.id.clone()), to: Some(told), visible: Some(Visible::Only(seen)), data: Some(entry), ..Default::default() })],
+                    vec![say("death_registration", &format!("Death registered: {who}."), Say { basis: Some(n.id.to_string()), to: Some(told), visible: Some(Visible::Only(seen.iter().map(|x| x.to_string()).collect())), data: Some(entry), ..Default::default() })],
                 ));
                 // The land the deceased held passes to their heir, as the succession law says (the partner; else the
                 // eldest adult child; else the town). The register of land is the land registry's: we apply to it.
-                let heir = d.s("partner").map(String::from).or_else(|| d.ids("adult_children").first().map(|s| s.to_string())).unwrap_or_else(|| me.clone());
+                let heir = d.s("partner").map(String::from).or_else(|| d.ids("adult_children").first().map(|s| s.to_string())).unwrap_or_else(|| me.to_string());
                 if !self.land_registry.is_empty() {
                     steps.push(because(
                         format!("{who} has died: applying to the land registry for whatever land they held to pass to their heir, {heir}, as the law of succession says."),
-                        vec![say("transmission_application", &format!("Transmission on death: whatever land {who} held passes to {heir}."), Say { to: Some(vec![self.land_registry.clone()]), basis: Some(n.id.clone()), data: Some(json!({ "deceased": who, "heir": heir })), ..Default::default() })],
+                        vec![say("transmission_application", &format!("Transmission on death: whatever land {who} held passes to {heir}."), Say { to: Some(vec![self.land_registry.clone()]), basis: Some(n.id.to_string()), data: Some(json!({ "deceased": who, "heir": heir })), ..Default::default() })],
                     ));
                 }
             }
             // A birth reported to us: registered, and the entry sent to whoever reported it and to those sent every entry.
             let born: BTreeSet<String> = self.book.all("birth_registration").filter_map(|r| data(r).s("child").map(String::from)).collect();
             let mut born = born;
-            let notes: Vec<Arc<Record>> = self.book.open("birth_notification").filter(|n| crate::common::addressed_to(n).contains(&me)).cloned().collect();
+            let notes: Vec<Arc<Record>> = self.book.open("birth_notification").filter(|n| crate::common::addressed_to(n).iter().any(|x| x == &me.to_string())).cloned().collect();
             for n in notes {
                 let d = data(&n).clone();
                 let Some(child) = d.s("child").map(String::from) else { continue };
-                if born.contains(&child) || self.read.contains(&n.id) {
+                if born.contains(&child) || self.read.contains(n.id.as_str()) {
                     continue;
                 }
                 born.insert(child.clone());
-                self.read.insert(n.id.clone());
+                self.read.insert(n.id.to_string());
                 self.counter.answered(&self.routines, "birth_notification");
-                let mut told = vec![n.speaks_for.clone().unwrap_or_default()];
+                let mut told = vec![n.speaks_for.map(|x| x.to_string()).unwrap_or_default()];
                 told.extend(self.feeds.clone());
                 let told = dedup(told, &me).into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>();
-                let mut seen = vec![me.clone()];
+                let mut seen = vec![me.to_string()];
                 seen.extend(told.clone());
                 steps.push(because(
-                    format!("A birth is reported to us ({child}, by {}): registering it.", n.speaks_for.clone().unwrap_or_default()),
-                    vec![say("birth_registration", &format!("Birth registered: {child}."), Say { basis: Some(n.id.clone()), to: Some(told), visible: Some(Visible::Only(seen)), data: Some(json!({ "child": child, "born_at": d.get("born_at"), "mother": d.get("mother") })), ..Default::default() })],
+                    format!("A birth is reported to us ({child}, by {}): registering it.", n.speaks_for.unwrap_or_default()),
+                    vec![say("birth_registration", &format!("Birth registered: {child}."), Say { basis: Some(n.id.to_string()), to: Some(told), visible: Some(Visible::Only(seen.iter().map(|x| x.to_string()).collect())), data: Some(json!({ "child": child, "born_at": d.get("born_at"), "mother": d.get("mother") })), ..Default::default() })],
                 ));
             }
             self.counter.flush(&mut self.routines, t);

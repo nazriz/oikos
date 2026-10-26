@@ -58,9 +58,9 @@ fn everyones_shared_readings_of_their_params_are_what_they_would_have_read_alone
             }
             people += 1;
             let ctx = Ctx {
-                participant: part.id.clone(),
+                participant: part.id.to_string(),
                 performer: Default::default(),
-                entity: part.person.clone().unwrap_or_default(),
+                entity: part.person.unwrap_or_default().to_string(),
                 position: None,
                 params: ActorParams::of_controller(&part.controller),
                 world: world.clone(),

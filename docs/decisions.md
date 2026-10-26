@@ -9288,3 +9288,42 @@ routes as law data, nobody shown more than is theirs.
 **Leaves out** (docs/behaviour/leasing.md): mediation, a valuer's market rent, a tenant's challenge, relief from forfeiture, distress and CRAR, rent lost after forfeiture, a guarantor (a lease holds nothing of the owner's), renewal and security of tenure, assignment; an owner weighing giving up still counts the rent to the lease's end. A business back from a lease trades from its owner's home.
 
 **Revisit if** a place's figures for any of the law's fields are opened (replace the recalled and placeholder ones); leased businesses' arrears or exits matter to a study (then the owner's liability, and what leaving costs in the owner's own weighing); a valuer or mediation office is built; or the `held` area is wanted for notices put up at held premises (records), which it refuses now.
+
+## 2026-10-26 · Ids interned (SC-1, the representation plan's R1; branch `representation`; no result changes; no model called)
+
+- **Change.** `oikos_core::Id` (kernel/crates/core/src/id.rs) replaces `blocks::Id = String`: a handle on the one copy
+  of an id's text the process holds, `Copy`, compared by where that copy is, ordered, hashed and serialised as the
+  text, so every map's order, every hash and the log are what they were. Contracts, world, perception, sight, nature,
+  the resolver's view of what was shown, and the kernel's engine hold it; the actors, which hold ids as `String`, take
+  and give text at their edge (their state is R4's). The texts sit in blocks kept for the process, beside a table
+  sharded by a fixed hash (FNV-1a; nothing depends on where a text is). Ids are never freed, so the ids of what passes
+  are not ids: an act in progress and a message on its way have `blocks::Passing` (their own text), so what the
+  process keeps is what lasts. A 200-person month ends with 22,302 ids (236 KB of text): its cells, records, people,
+  accounts, structures and positions; with acts' and messages' ids interned it was 32,314 and grew about 11,000 a
+  month (`OIKOS_KEPT=1` prints the count).
+- **Results, shown.** `orchestrator/test/representation.test.ts` (slow tier, new): three profiles' towns of 200 and
+  1,000 people (au-vic, gb-eng, us-oh), 30 days at 4 engine threads, end at the state hash and write the log pinned
+  in `scripts/fixtures/representation-results.json`, taken from main at 7230e71. The log is compared whole but for
+  its header's name of the build and the hash chain that runs from it, which every build writes anew
+  (`scripts/same-results.ts logDigest`). All six the same.
+- **Cost, paired.** `scripts/pair.sh` (new): main and this build in turn on the same configs, from a shell, at 4
+  threads (each binary copied afresh first in the last two rounds). This machine: 4 cores, 15 GB, Linux; a 10,000- or
+  50,000-person month does not fit beside the suite here, so 1,000 is the largest measured. Six pairs on each
+  1,000-person town: wall -7 to -18%, the run's own thread -8 to -19%, user CPU -7 to -15%, faster in every pair (the
+  run's own thread on average 35.3 s against 30.5 on au-vic, 31.8 against 27.6 on gb-eng, 26.3 against 22.7 on us-oh);
+  the 200-person towns' own thread -16 to +5%, faster on average on all three. Clones of an id are copies now, and
+  equality a comparison of addresses.
+- **Memory.** At 1,000 people the peak is 10 to 17 MB lower on au-vic and gb-eng (au-vic 461 to 463 MB against 473,
+  352 KB a person against 363), about level on us-oh; at 200 people level within its run to run (plus or minus 15
+  MB). Little, because few of the ids held were `Id`s: most are the actors' `String`s (R4) and strings in records'
+  JSON (R2), so the saving comes with those steps. The plan's -30 to -50 KB a person was for all the ids a run holds.
+- **Measuring on Linux.** `getrusage`'s peak is carried across `exec`, so a kernel started by Bun said Bun's size
+  (580 MB for a 200-person town); the kernel now reads `VmHWM` there, its own process's high-water mark. And a binary
+  whose file has been partly dropped from the page cache maps fewer of its pages per fault: main's hours-old binary
+  read 10 to 15 MB below a fresh copy of itself, which first looked like a cost of this step. `pair.sh` copies both
+  builds before it runs them. The heap profiler runs on Linux too (`llvm-symbolizer`).
+- **The budget.** 352 KB a person here on this build; this machine reads main about 6% below the Mini (363 KB against
+  the 380 to 385 the Mini measured), so about 373 KB there, and 8% over that is 403: the ceiling lowered from 415 to
+  400 KB. Revisit with the Mini's own measure of main with this merged (raise only with its entry here).
+- **Revisit if** a long run's id count grows with its length (an id made for something that passes, which should be
+  `Passing`), or if the interner's locks show in a profile of many engine threads (then a per-thread cache of lookups).

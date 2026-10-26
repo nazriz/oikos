@@ -6,5 +6,8 @@
 
 pub mod canon;
 mod canon_ser;
+pub mod id;
 pub mod money;
 pub mod rng;
+
+pub use id::Id;

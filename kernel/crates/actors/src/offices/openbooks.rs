@@ -239,11 +239,11 @@ impl Money {
         for tx in pic.transactions() {
             if tx.from == acc.account {
                 if let Some(s) = &tx.settles {
-                    self.settled.insert(s.clone());
+                    self.settled.insert(s.to_string());
                 }
             }
             if tx.to == acc.account && tx.from != acc.account {
-                self.received.entry(tx.from.clone()).or_default().push(Receipt {
+                self.received.entry(tx.from.to_string()).or_default().push(Receipt {
                     t: tx.t,
                     amount: crate::common::cents(tx.amount),
                     memo: tx.memo.clone().filter(|m| !m.is_empty()),
@@ -287,7 +287,7 @@ pub fn asked_of_us(book: &Book, me: &str, money: &Money, extra: &[Forms], w: &Wo
             if has(x, "amount") { format!(", {}", usd(amt(x.get("amount")), w)) } else { String::new() },
             when(made_at(r), w),
         );
-        requests.push(OpenItem::new(r.id.clone(), line).since(made_at(r)).amount(has(x, "amount").then(|| amt(x.get("amount")))));
+        requests.push(OpenItem::new(r.id, line).since(made_at(r)).amount(has(x, "amount").then(|| amt(x.get("amount")))));
     }
     let mut all = vec![Forms { notice: paper::NOTICE, response: paper::RESPONSE, decision: paper::DECISION }];
     all.extend(extra.iter().map(|f| Forms { notice: f.notice, response: f.response, decision: f.decision }));
@@ -313,11 +313,11 @@ pub fn asked_of_us(book: &Book, me: &str, money: &Money, extra: &[Forms], w: &Wo
                 app,
                 by.map_or(String::new(), |b| format!(", to be answered by {}", date_words(b, w))),
             );
-            notices.push(OpenItem::new(n.id.clone(), line).since(made_at(n)));
+            notices.push(OpenItem::new(n.id, line).since(made_at(n)));
         }
         for y in book.open(f.decision) {
             let x = d(y);
-            if x.s("against") != Some(me) || x.s("finding") != Some("pay") || money.settled.contains(&y.id) {
+            if x.s("against") != Some(me) || x.s("finding") != Some("pay") || money.settled.contains(y.id.as_str()) {
                 continue;
             }
             let line = format!(
@@ -329,7 +329,7 @@ pub fn asked_of_us(book: &Book, me: &str, money: &Money, extra: &[Forms], w: &Wo
                 usd(amt(x.get("amount")), w),
                 finite_present(x.get("due")).map_or(String::new(), |b| format!(" by {}", date_words(b, w))),
             );
-            decisions.push(OpenItem::new(y.id.clone(), line).since(y.at).amount(has(x, "amount").then(|| amt(x.get("amount")))));
+            decisions.push(OpenItem::new(y.id, line).since(y.at).amount(has(x, "amount").then(|| amt(x.get("amount")))));
         }
     }
     [
@@ -353,12 +353,12 @@ pub fn owed_by_us(book: &Book, me: &str, money: &Money, w: &WorldInfo) -> Vec<Op
     let mut invoices = vec![];
     for r in book.open("invoice") {
         let m = d(r).get("outcome").and_then(|o| o.get("money"));
-        if !addressed(r, me) || !m.is_some_and(crate::common::truthy) || money.settled.contains(&r.id) {
+        if !addressed(r, me) || !m.is_some_and(crate::common::truthy) || money.settled.contains(r.id.as_str()) {
             continue;
         }
         let a = amt(m.and_then(|m| m.get("amount")));
-        let line = format!("{}: invoice from {} for {}, dated {}, not paid", r.id, r.speaks_for.clone().unwrap_or_else(|| r.author.clone()), usd(a, w), when(made_at(r), w));
-        invoices.push(OpenItem::new(r.id.clone(), line).since(made_at(r)).amount(Some(a)));
+        let line = format!("{}: invoice from {} for {}, dated {}, not paid", r.id, r.speaks_for.unwrap_or_else(|| r.author.clone().into()), usd(a, w), when(made_at(r), w));
+        invoices.push(OpenItem::new(r.id, line).since(made_at(r)).amount(Some(a)));
     }
     let mut sums = vec![];
     for r in book.of_type("claim") {
@@ -387,7 +387,7 @@ pub fn owed_by_us(book: &Book, me: &str, money: &Money, w: &WorldInfo) -> Vec<Op
                 format!(" (one bill: the city's notice for it is {}, and paying either settles it)", notices.iter().map(|n| n.id.as_str()).collect::<Vec<_>>().join(", "))
             }
         );
-        sums.push(OpenItem::new(r.id.clone(), line).since(r.at).amount(Some(a)));
+        sums.push(OpenItem::new(r.id, line).since(r.at).amount(Some(a)));
     }
     [heading("Invoices addressed to us, not paid", invoices), heading("Sums recorded against us (rates, fines), not paid", sums)].concat()
 }
@@ -470,7 +470,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
     let mut paying: BTreeMap<String, Option<String>> = BTreeMap::new();
     for r in book.all("rental_application") {
         if let Some(s) = r.speaks_for.as_ref().filter(|s| !s.is_empty()) {
-            paying.entry(s.clone()).or_insert_with(|| d(r).s("account").map(String::from));
+            paying.entry(s.to_string()).or_insert_with(|| d(r).s("account").map(String::from));
         }
     }
     for a in &leases {
@@ -568,7 +568,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
                     None => String::new(),
                 }
             );
-            gone.push(OpenItem::new(a.id.clone(), line).since(left).amount((behind > 0).then_some(behind)));
+            gone.push(OpenItem::new(a.id, line).since(left).amount((behind > 0).then_some(behind)));
             continue;
         }
         if rent <= 0 || behind < rent {
@@ -612,7 +612,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
             asked.get(a.id.as_str()).map_or(String::new(), |at| format!("; we wrote to ask for it {}", date_words(*at, w))),
             if noticed(a) { "; notice has been given on the lease" } else { "" },
         );
-        arrears.push(OpenItem::new(a.id.clone(), line).since(oldest).amount(Some(behind)));
+        arrears.push(OpenItem::new(a.id, line).since(oldest).amount(Some(behind)));
     }
     if let Some(law) = law {
         for a in &leases {
@@ -748,7 +748,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
                     }
                 );
             }
-            ending.push(OpenItem::new(a.id.clone(), format!("{}: {home}; {owes}; {stage}", a.id)).since(since).amount(now));
+            ending.push(OpenItem::new(a.id, format!("{}: {home}; {owes}; {stage}", a.id)).since(since).amount(now));
         }
     }
     // ---- tenancies near their end ----
@@ -770,7 +770,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
             lease_terms(a, &tenant).space.map_or(String::new(), |s| format!(" at {s}")),
             date_words(ends, w)
         );
-        closing.push(OpenItem::new(a.id.clone(), line).since(ends));
+        closing.push(OpenItem::new(a.id, line).since(ends));
     }
     // ---- homes to let ----
     let listings: Vec<&R> = book.open("rental_listing").filter(|l| l.speaks_for.as_deref() == Some(me)).collect();
@@ -781,7 +781,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
         .map(|l| {
             let x = d(l);
             OpenItem::new(
-                l.id.clone(),
+                l.id,
                 format!("{}: {} has been listed at {} a month since {} and is not let", l.id, js(x.get("space")), usd(amt(x.get("rent")), w), date_words(l.at, w)),
             )
             .since(l.at)
@@ -795,7 +795,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
             let what = listings.iter().find(|l| Some(l.id.as_str()) == x.s("listing")).and_then(|l| d(l).get("space")).filter(|v| crate::common::truthy(v)).map_or_else(|| js(x.get("listing")), |v| js(Some(v)));
             let people = x.get("household").and_then(|h| h.get("people")).filter(|v| crate::common::truthy(v));
             OpenItem::new(
-                r.id.clone(),
+                r.id,
                 format!(
                     "{}: {} applied {} for {}{}; no lease offered",
                     r.id,
@@ -816,7 +816,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
         .map(|r| {
             let said: String = crate::common::text(r).chars().take(120).collect();
             OpenItem::new(
-                r.id.clone(),
+                r.id,
                 format!(
                     "{}: {} asks, {}: \"{}\"{}; not answered",
                     r.id,
@@ -834,14 +834,14 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
     let repairs: Vec<OpenItem> = book
         .open("repair_order")
         .filter(|r| r.speaks_for.as_deref() == Some(me) && !finished.iter().any(|x| d(x).get("structure") == d(r).get("structure") && x.at >= r.at))
-        .map(|r| OpenItem::new(r.id.clone(), format!("{}: the repair of {} was ordered {} and is not reported done", r.id, js(d(r).get("structure")), date_words(r.at, w))).since(r.at))
+        .map(|r| OpenItem::new(r.id, format!("{}: the repair of {} was ordered {} and is not reported done", r.id, js(d(r).get("structure")), date_words(r.at, w))).since(r.at))
         .collect();
     // ---- a tenant's death registered, the lease still standing ----
     let dead: BTreeSet<String> = book.all("death_registration").chain(book.all("death_certificate")).map(|r| js(d(r).get("deceased"))).collect();
     let estates: Vec<OpenItem> = active
         .iter()
         .filter(|a| dead.contains(&tenant_of(a)) && !noticed(a))
-        .map(|a| OpenItem::new(a.id.clone(), format!("{}: the tenant {} is registered as having died; the lease still stands", a.id, tenant_of(a))).since(a.at))
+        .map(|a| OpenItem::new(a.id, format!("{}: the tenant {} is registered as having died; the lease still stands", a.id, tenant_of(a))).since(a.at))
         .collect();
     [
         heading("Rent in arrears", arrears),
@@ -915,7 +915,7 @@ fn support(base: &Base, me: &str, w: &WorldInfo) -> Vec<OpenHeading> {
         .map(|r| {
             let x = d(r);
             let by = finite_present(x.get("by"));
-            let who = if matches!(&r.body, RecordBody::Statement { kind, .. } if kind == "evidence_request") { "the claimant".to_string() } else { addressed_to(r).first().cloned().unwrap_or_else(|| "the last employer".into()) };
+            let who = if matches!(&r.body, RecordBody::Statement { kind, .. } if kind == "evidence_request") { "the claimant".to_string() } else { addressed_to(r).first().map(|x| x.to_string()).unwrap_or_else(|| "the last employer".into()) };
             let line = format!(
                 "{}: {} was asked {} for {} ({}), due by {}; not yet answered",
                 js(x.get("claim")),
@@ -925,7 +925,7 @@ fn support(base: &Base, me: &str, w: &WorldInfo) -> Vec<OpenHeading> {
                 r.id,
                 by.map_or("no day given".to_string(), |b| date_words(b, w))
             );
-            OpenItem::new(r.id.clone(), line).since(r.at).due(by)
+            OpenItem::new(r.id, line).since(r.at).due(by)
         })
         .collect();
     [

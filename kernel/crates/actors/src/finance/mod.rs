@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn a_spread_is_by_who_it_is_the_same_on_every_machine_and_within_its_bound() {
-        let ctx = |p: &str| crate::Ctx { participant: p.into(), performer: Default::default(), entity: "e".into(), position: None, params: Default::default(), world: Default::default() };
+        let ctx = |p: &str| crate::Ctx { participant: p.into(), performer: Default::default(), entity: "e".into(), position: None, params: Default::default(), world: Default::default(), };
         let (a, b) = (spread(&ctx("bank-1"), "first-wake", 24), spread(&ctx("bank-2"), "first-wake", 24));
         assert!((0..24).contains(&a) && (0..24).contains(&b));
         assert_eq!(a, spread(&ctx("bank-1"), "first-wake", 24));

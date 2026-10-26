@@ -248,7 +248,7 @@ impl Plan for MemberPlan {
             let mut apps: Vec<Arc<Record>> = self
                 .book
                 .open("tribunal_application")
-                .filter(|x| crate::common::addressed_to(x).contains(&me) && !self.listed.contains_key(&x.id) && !self.decided.contains(&x.id))
+                .filter(|x| crate::common::addressed_to(x).iter().any(|x| x == &me) && !self.listed.contains_key(x.id.as_str()) && !self.decided.contains(x.id.as_str()))
                 .cloned()
                 .collect();
             apps.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
@@ -259,28 +259,28 @@ impl Plan for MemberPlan {
                     continue; // (heard on its lists, above)
                 }
                 let against = d.s("against").unwrap_or("").to_string();
-                let applicant = a.speaks_for.clone().unwrap_or_default();
+                let applicant = a.speaks_for.unwrap_or_default();
                 if !APPLICATION_KINDS.contains(&kind.as_str()) || against.is_empty() || against == applicant {
-                    self.decided.insert(a.id.clone());
+                    self.decided.insert(a.id.to_string());
                     steps.push(because(
                         format!("An application we can't hear ({}{}): rejected.", if kind.is_empty() { "of no kind" } else { &kind }, if against.is_empty() { ", against no one" } else { "" }),
                         vec![say(
                             "tribunal_order",
                             &format!("Application {} rejected: the tribunal can't hear it.", a.id),
-                            Say { to: Some(vec![applicant.clone()]), visible: Some(Visible::Only(vec![applicant.clone(), me.clone()])), basis: Some(a.id.clone()), data: Some(json!({ "application": a.id, "kind": kind, "finding": "rejected" })), ..Default::default() },
+                            Say { to: Some(vec![applicant.to_string()]), visible: Some(Visible::Only(vec![applicant.to_string(), me.clone()])), basis: Some(a.id.to_string()), data: Some(json!({ "application": a.id, "kind": kind, "finding": "rejected" })), ..Default::default() },
                         )],
                     ));
                     continue;
                 }
                 let hearing = t + self.hearing_after_days * DAY;
-                self.listed.insert(a.id.clone(), hearing);
+                self.listed.insert(a.id.to_string(), hearing);
                 self.counter.answered(&self.routines, "tribunal_application");
                 steps.push(because(
                     format!("An application ({kind}) by {applicant} against {against}: listing it for a hearing on {}, and telling both.", when(hearing)),
                     vec![say(
                         "hearing_notice",
                         &format!("Notice of hearing: application {} ({kind}) by {applicant} against {against}, to be heard on {}. The respondent may answer before then.", a.id, when(hearing)),
-                        Say { to: Some(vec![applicant.clone(), against.clone()]), visible: Some(Visible::Only(vec![applicant.clone(), against.clone(), me.clone()])), basis: Some(a.id.clone()), data: Some(json!({ "application": a.id, "kind": kind, "applicant": applicant, "against": against, "hearing_at": hearing })), ..Default::default() },
+                        Say { to: Some(vec![applicant.to_string(), against.clone()]), visible: Some(Visible::Only(vec![applicant.to_string(), against.clone(), me.clone()])), basis: Some(a.id.to_string()), data: Some(json!({ "application": a.id, "kind": kind, "applicant": applicant, "against": against, "hearing_at": hearing })), ..Default::default() },
                     )],
                 ));
             }
@@ -296,7 +296,7 @@ impl Plan for MemberPlan {
             let Some(a) = self.book.get(&id).cloned() else { continue };
             let ad = data(&a).clone();
             let kind = ad.s("kind").unwrap_or("").to_string();
-            let applicant = a.speaks_for.clone().unwrap_or_default();
+            let applicant = a.speaks_for.unwrap_or_default();
             let against = ad.s("against").unwrap_or("").to_string();
             let answer = self
                 .book
@@ -318,7 +318,7 @@ impl Plan for MemberPlan {
                     vec![say(
                         "tribunal_order",
                         &format!("Order on application {id}: {text}"),
-                        Say { to: Some(vec![applicant.clone(), against.clone()]), visible: Some(Visible::Only(vec![applicant.clone(), against.clone(), me.clone()])), basis: Some(id.clone()), data: Some(dd), ..Default::default() },
+                        Say { to: Some(vec![applicant.to_string(), against.clone()]), visible: Some(Visible::Only(vec![applicant.to_string(), against.clone(), me.clone()])), basis: Some(id.clone()), data: Some(dd), ..Default::default() },
                     )],
                 ));
             };
@@ -328,14 +328,14 @@ impl Plan for MemberPlan {
                     // original if we can see it; otherwise the copy the applicant tendered: what passed between the parties.)
                     let nid = ad.s("notice").unwrap_or("").to_string();
                     let n = doc_of(&self.book, &nid, ad.get("evidence"));
-                    let ok = n.as_ref().is_some_and(|n| n.s("record") == Some("statement") && n.s("kind") == Some("rent_increase") && n.s("speaks_for") == Some(against.as_str()) && names(n, "addressed_to").contains(&applicant));
+                    let ok = n.as_ref().is_some_and(|n| n.s("record") == Some("statement") && n.s("kind") == Some("rent_increase") && n.s("speaks_for") == Some(against.as_str()) && names(n, "addressed_to").contains(&applicant.to_string()));
                     let Some(n) = n.filter(|_| ok) else {
                         order("dismissed", "dismissed: no such notice from the respondent to the applicant.", json!({ "notice": ad.get("notice") }), "The notice the application names isn't on the record as the respondent's to the applicant: dismissed.".into());
                         continue;
                     };
                     let nat = n.i("at").unwrap_or(0);
                     let act = json!({ "block": "publish", "kind": "rent_increase", "data": n.get("data").cloned().unwrap_or(Value::Null) });
-                    let broken: Vec<String> = breaches(&mut self.book, &act, &against, nat).iter().map(|l| l.id.clone()).collect();
+                    let broken: Vec<String> = breaches(&mut self.book, &act, &against, nat).iter().map(|l| l.id).map(|x| x.to_string()).collect();
                     let nid = n.s("id").unwrap_or("").to_string();
                     if !broken.is_empty() {
                         let list = broken.join(", ");
@@ -496,12 +496,12 @@ impl Plan for RegistrarPlan {
         let money = |n: i64| money_words(n, &world);
         let mut steps: Vec<Step<()>> = vec![];
         let decline = |r: &Record, me: &str, why: &str, words: &str| -> Step<()> {
-            let rs = r.speaks_for.clone().unwrap_or_default();
-            because(why, vec![say("enforcement_decline", words, Say { to: Some(vec![rs.clone()]), visible: Some(Visible::Only(vec![rs, me.to_string()])), basis: Some(r.id.clone()), ..Default::default() })])
+            let rs = r.speaks_for.unwrap_or_default();
+            because(why, vec![say("enforcement_decline", words, Say { to: Some(vec![rs.to_string()]), visible: Some(Visible::Only(vec![rs.to_string(), me.to_string()])), basis: Some(r.id.to_string()), ..Default::default() })])
         };
         // A creditor asks for an order to pay to be enforced: once it's due, the debtor's banks are ordered to pay it from
         // what they hold for the debtor (what's unpaid, as the creditor says).
-        let mut reqs: Vec<Arc<Record>> = self.book.open("enforcement_request").filter(|x| crate::common::addressed_to(x).contains(&me) && !self.done.contains(&x.id)).cloned().collect();
+        let mut reqs: Vec<Arc<Record>> = self.book.open("enforcement_request").filter(|x| crate::common::addressed_to(x).iter().any(|x| x == &me) && !self.done.contains(x.id.as_str())).cloned().collect();
         reqs.sort_by(|a, b| filed_before(&a.id, &b.id));
         for r in reqs {
             let rd = data(&r).clone();
@@ -513,11 +513,11 @@ impl Plan for RegistrarPlan {
                 continue; // (not due yet)
             }
             if self.dealt_with(&me, &r, &oid, "garnishee_order") {
-                self.done.insert(r.id.clone());
+                self.done.insert(r.id.to_string());
                 continue;
             }
-            self.done.insert(r.id.clone());
-            let rs = r.speaks_for.clone().unwrap_or_default();
+            self.done.insert(r.id.to_string());
+            let rs = r.speaks_for.unwrap_or_default();
             if !is_order || od.s("finding") != Some("pay") || od.s("applicant") != Some(rs.as_str()) || od.get("to").is_none_or(Value::is_null) {
                 steps.push(decline(&r, &me, "A request to enforce something that isn't an order to pay this creditor: declined.", "Declined: no order to pay you to enforce."));
                 continue;
@@ -548,7 +548,7 @@ impl Plan for RegistrarPlan {
         // A landlord asks for a warrant on an order for possession whose date has passed: issued to whoever carries our
         // warrants out (the world's: its police), naming the home, the tenant and their household, and the day it runs
         // out. The tenant is told. Nothing is done by the paper: someone must go.
-        let mut reqs: Vec<Arc<Record>> = self.book.open("warrant_request").filter(|x| crate::common::addressed_to(x).contains(&me) && !self.done.contains(&x.id)).cloned().collect();
+        let mut reqs: Vec<Arc<Record>> = self.book.open("warrant_request").filter(|x| crate::common::addressed_to(x).iter().any(|x| x == &me) && !self.done.contains(x.id.as_str())).cloned().collect();
         reqs.sort_by(|a, b| filed_before(&a.id, &b.id));
         for r in reqs {
             let rd = data(&r).clone();
@@ -560,11 +560,11 @@ impl Plan for RegistrarPlan {
                 continue;
             }
             if self.dealt_with(&me, &r, &oid, "warrant") {
-                self.done.insert(r.id.clone());
+                self.done.insert(r.id.to_string());
                 continue;
             }
-            self.done.insert(r.id.clone());
-            let rs = r.speaks_for.clone().unwrap_or_default();
+            self.done.insert(r.id.to_string());
+            let rs = r.speaks_for.unwrap_or_default();
             if self.enforcer.is_empty() || !is_order || od.s("finding") != Some("possession") || od.s("applicant") != Some(rs.as_str()) {
                 steps.push(decline(&r, &me, "A request for a warrant on something that isn't an order for possession to this applicant: declined.", "Declined: no order for possession to you to enforce."));
                 continue;

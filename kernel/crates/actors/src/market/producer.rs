@@ -141,13 +141,13 @@ pub enum Then {
     /// A system ordered (its outcome says whether the offer is still one it has an order out for).
     Adoption(AdoptionThen),
     /// An order filled: on terms, billed when the goods went; refused, the whole order is refunded.
-    Filled { order: Order, q: i64, t: i64 },
+    Filled { order: Order, q: i64, t: i64, },
     /// An input order sent.
-    Bought { kind: String, quantity: i64, seller_account: String, cost: i64, terms: bool },
+    Bought { kind: String, quantity: i64, seller_account: String, cost: i64, terms: bool, },
     /// The day's making: `units` all told, of which `by_system` were given to our systems.
-    Made { units: i64, qc: i64, share: i64, crew: Vec<String>, by_system: Vec<(String, i64, i64)>, t: i64, started: i64 },
+    Made { units: i64, qc: i64, share: i64, crew: Vec<String>, by_system: Vec<(String, i64, i64)>, t: i64, started: i64, },
     /// A shipment to the outside, of `q` at `unit` each, sent at `t`.
-    Exported { q: i64, unit: i64, t: i64 },
+    Exported { q: i64, unit: i64, t: i64, },
 }
 impl From<TradeThen> for Then {
     fn from(t: TradeThen) -> Then {
@@ -224,7 +224,7 @@ pub struct Factory<B: Body> {
 impl<B: Body> Factory<B> {
     pub fn new(ctx: &Ctx, p: Params, body: B) -> Self {
         let me = ctx.entity.clone();
-        let sells = (p.terms_days > 0).then_some(SellingTerms { days: p.terms_days, stop_after_days: p.terms_stop_after_days, claim_after_days: p.terms_claim_after_days });
+        let sells = (p.terms_days > 0).then_some(SellingTerms { days: p.terms_days, stop_after_days: p.terms_stop_after_days, claim_after_days: p.terms_claim_after_days, });
         Factory {
             expectation: Expectation::new(p.adjust.smooth_months, None),
             orders: OrderBook::new(&me, None, sells),
@@ -280,7 +280,7 @@ impl<B: Body> Factory<B> {
     }
 
     fn premises_of(&self, pic: &Picture) -> Option<(String, String, String)> {
-        sites(pic).find_map(|c| c.structure.as_ref().filter(|s| s.structure == self.p.works).map(|s| (s.structure.clone(), s.structure_type.clone(), c.cell.clone())))
+        sites(pic).find_map(|c| { c.structure.as_ref().filter(|s| s.structure == self.p.works).map(|s| (s.structure.to_string(), s.structure_type.to_string(), c.cell.to_string()))})
     }
     fn room_at_work(&self, pic: &Picture, staff: i64) -> i64 {
         let sp = sites(pic).find(|c| c.structure.as_ref().is_some_and(|s| s.structure == self.p.works)).and_then(|c| c.structure.as_ref().and_then(|s| s.spaces.iter().find(|x| x.kind == "workplace").cloned()));
@@ -293,9 +293,9 @@ impl<B: Body> Factory<B> {
     fn export_offer(&self, t: i64) -> Option<(String, Value)> {
         self.book
             .open("buying_offer")
-            .filter(|r| r.speaks_for.as_deref() == Some(self.p.market.as_str()) && data(r).s("kind") == Some(self.p.output.as_str()) && data(r).i("until").unwrap_or(i64::MAX) > t)
+            .filter(|r| { r.speaks_for.as_deref() == Some(self.p.market.as_str()) && data(r).s("kind") == Some(self.p.output.as_str()) && data(r).i("until").unwrap_or(i64::MAX) > t})
             .max_by(|a, b| a.at.cmp(&b.at).then_with(|| crate::common::filed_before(&b.id, &a.id)))
-            .map(|r| (r.id.clone(), data(r).clone()))
+            .map(|r| (r.id.to_string(), data(r).clone()))
     }
 }
 
@@ -375,7 +375,7 @@ impl<B: Body> Plan for Factory<B> {
                 };
                 match id {
                     Some(id) => {
-                        self.order_qty.insert(id, (kind.clone(), *quantity));
+                        self.order_qty.insert(id.to_string(), (kind.clone(), *quantity));
                     }
                     None => {
                         let e = self.on_order.entry(kind.clone()).or_insert(0);
@@ -410,7 +410,7 @@ impl<B: Body> Plan for Factory<B> {
                     self.sys_used.insert(id.clone(), (used - n * secs).max(0));
                 }
                 // (A system the world refuses is switched off, or not ours: not counted on again.)
-                if !by_system.is_empty() && outcome.and_then(|o| o.refusal.as_ref()).is_some_and(|f| matches!(code_name(f).as_str(), "not_capable" | "participant_inactive" | "unknown_participant" | "not_theirs")) {
+                if !by_system.is_empty() && outcome.and_then(|o| o.refusal.as_ref()).is_some_and(|f| { matches!(code_name(f).as_str(), "not_capable" | "participant_inactive" | "unknown_participant" | "not_theirs")}) {
                     for (id, _, _) in by_system {
                         self.fleet.gone(id);
                     }
@@ -484,7 +484,7 @@ impl<B: Body> Factory<B> {
         if let (Some(a), Standing::Closed) = (&acct, self.body.standing()) {
             let where_ = self.premises_of(pic);
             let worth = where_.as_ref().and_then(|w| published_price(&self.book, &self.p.builder, &w.1, "prices"));
-            let w = Wind { pic, book: &self.book, acct: a, stage: Stage::Closed, premises: where_, sale_price: worth.map(|w| w * self.p.premises_sale_bps / 10_000), paid_suppliers: 0, staying: false };
+            let w = Wind { pic, book: &self.book, acct: a, stage: Stage::Closed, premises: where_, sale_price: worth.map(|w| w * self.p.premises_sale_bps / 10_000), paid_suppliers: 0, staying: false, };
             return lift(self.body.wind_up(&w, cx), Then::Body);
         }
         let Some(acct) = acct else { return steps };
@@ -495,7 +495,7 @@ impl<B: Body> Factory<B> {
             let mut steps: Vec<Step<Then>> = lift(staff_steps, Then::Body);
             let (owed, paid) = self.payables.settle::<Then>(t, &acct.account, acct.balance - staff_paid, Some(&mut self.committed), cx);
             steps.extend(owed);
-            let w = Wind { pic, book: &self.book, acct: &acct, stage: Stage::Due, premises: None, sale_price: None, paid_suppliers: staff_paid + paid, staying: false };
+            let w = Wind { pic, book: &self.book, acct: &acct, stage: Stage::Due, premises: None, sale_price: None, paid_suppliers: staff_paid + paid, staying: false, };
             steps.extend(lift(self.body.wind_up(&w, cx), Then::Body));
             return steps;
         }
@@ -568,7 +568,7 @@ impl<B: Body> Factory<B> {
                 &self.p.lengnick,
                 &self.p.figures,
                 &mut rng,
-                &Signals { price: self.price, marginal_cost, demand: self.last_domestic.max(0), turned_away: self.last_short, stock: self.stock_meter.month(stock), can_supply: None, rivals: &rivals },
+                &Signals { price: self.price, marginal_cost, demand: self.last_domestic.max(0), turned_away: self.last_short, stock: self.stock_meter.month(stock), can_supply: None, rivals: &rivals, },
                 &money,
             );
             self.price = moved.price;
@@ -598,7 +598,7 @@ impl<B: Body> Factory<B> {
             } else {
                 Surplus::OverStaffed
             };
-            let r = Review { needed: nw, trade: demand_words, notice_days: self.p.notice_days, expected, last_demand: self.last_demand, surplus, stock, phi_low_bps: l.phi_low_bps };
+            let r = Review { needed: nw, trade: demand_words, notice_days: self.p.notice_days, expected, last_demand: self.last_demand, surplus, stock, phi_low_bps: l.phi_low_bps, };
             let staffed = self.body.review(&self.book, t, &r, nw, cx);
             self.headcount = staffed.headcount;
             self.headcount_why = format!("{}{}", staffed.why, if why.is_empty() { String::new() } else { format!("; {}", why.join("; ")) });
@@ -643,10 +643,10 @@ impl<B: Body> Factory<B> {
         let months = self.body.months_in_hand(&self.book);
         let can_post = trading && acct.balance >= months * ((nw + 1) * self.wage * MONTH / self.p.period) && self.room_at_work(pic, nw) > 0;
         let postable = trading && self.room_at_work(pic, nw) > 0;
-        let want = Want { target: if trading { self.p.max_staff.min(self.headcount) } else { 0 }, wage: self.wage, can_post, postable, headcount: self.headcount, headcount_why: self.headcount_why.clone() };
+        let want = Want { target: if trading { self.p.max_staff.min(self.headcount) } else { 0 }, wage: self.wage, can_post, postable, headcount: self.headcount, headcount_why: self.headcount_why.clone(), };
         // (What a day without our work costs in output sold, and the share of our work that systems do: the employer's side of bargaining.)
         let system_bps = if self.last_demand > 0 { ((self.system_units(self.last_demand) * 10_000 * 2 + self.last_demand) / (2 * self.last_demand)).clamp(0, 10_000) } else { 0 };
-        let house = House { pic, book: &self.book, acct: &acct, want, trading, workers: workers.len(), operator: false, takings_per_day: self.takings.per_day(t), system_bps };
+        let house = House { pic, book: &self.book, acct: &acct, want, trading, workers: workers.len(), operator: false, takings_per_day: self.takings.per_day(t), system_bps, };
         let dealt = self.body.dealings(&house, cx);
         steps.extend(lift(dealt.steps, Then::Body));
         for rise in dealt.wage_rises {
@@ -663,7 +663,7 @@ impl<B: Body> Factory<B> {
         }
 
         if self.price != self.published_price && trading {
-            let old: Vec<String> = self.book.open("price_list").filter(|r| r.speaks_for.as_deref() == Some(&me)).map(|r| r.id.clone()).collect();
+            let old: Vec<String> = self.book.open("price_list").filter(|r| r.speaks_for.as_deref() == Some(&me)).map(|r| r.id).map(|x| x.to_string()).collect();
             self.published_price = self.price;
             let mut prices = BTreeMap::new();
             prices.insert(self.p.output.clone(), self.price);
@@ -740,7 +740,7 @@ impl<B: Body> Factory<B> {
                 if q < wanted { ", as many as we can pay for".to_string() } else { String::new() }
             );
             let mut st = order::<Then>(
-                &Ordering { me: me.clone(), seller: self.p.supplier.clone(), seller_account: sacct.clone(), kind: kind.clone(), quantity: q, unit_price: unit, to: None, at: self.p.works.clone(), from: acct.account.clone(), why, retry_of: None, for_days: None, terms: (terms > 0).then_some(terms) },
+                &Ordering { me: me.clone(), seller: self.p.supplier.clone(), seller_account: sacct.clone(), kind: kind.clone(), quantity: q, unit_price: unit, to: None, at: self.p.works.clone(), from: acct.account.clone(), why, retry_of: None, for_days: None, terms: (terms > 0).then_some(terms), },
                 cx,
             );
             st.then = Some(Then::Bought { kind: kind.clone(), quantity: q, seller_account: sacct, cost: q * unit, terms: terms > 0 });
@@ -762,12 +762,12 @@ impl<B: Body> Factory<B> {
             let mut v = std::collections::BTreeSet::new();
             for c in sites(pic).filter(|c| c.structure.as_ref().is_some_and(|s| s.structure == self.p.works)) {
                 for sp in c.structure.iter().flat_map(|s| s.spaces.iter()).filter(|sp| sp.kind == "workplace") {
-                    for o in sp.occupants.iter().flatten().filter(|o| workers.contains(o)) {
-                        v.insert(o.clone());
+                    for o in sp.occupants.iter().flatten().filter(|o| workers.contains(&o.to_string())) {
+                        v.insert(*o);
                     }
                 }
             }
-            v.into_iter().collect()
+            v.into_iter().map(|x| x.to_string()).collect()
         };
         let enough = stock * 10_000 > self.p.lengnick.phi_high_bps * self.last_demand;
         // (Systems of ours work whatever the day and hour, within their own day; people only on a working day, those here.)
@@ -775,7 +775,7 @@ impl<B: Body> Factory<B> {
         let sys_room = |s: &Self, id: &str, seconds: i64| (DAY - s.sys_used.get(id).copied().unwrap_or(0)).div_euclid(seconds.max(1));
         let people_work = self.p.work_day(t) && !present.is_empty();
         if (people_work || !sys_working.is_empty()) && !enough && trading {
-            let (crew, each) = if people_work { team(&present, |w| (self.p.working_day * self.body.hours_bps(w, t) / 10_000 - self.used.get(w).copied().unwrap_or(0)).max(0)) } else { (vec![], 0) };
+            let (crew, each) = if people_work { team(&present, |w| { (self.p.working_day * self.body.hours_bps(w, t) / 10_000 - self.used.get(w).copied().unwrap_or(0)).max(0)}) } else { (vec![], 0) };
             let per_unit = if crew.is_empty() { 0 } else { self.pace.per_unit(&crew) };
             let by_hours = if crew.is_empty() { 0 } else { each * crew.len() as i64 / per_unit };
             let by_inputs = self.p.per_unit.iter().map(|(k, q)| held(pic, &self.p.works, k) / q.max(&1)).min().unwrap_or(0);

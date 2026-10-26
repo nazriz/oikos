@@ -363,7 +363,7 @@ impl Hearings {
             let mut notes: Vec<&Arc<Record>> = book.open("case_for_decision").filter(|x| x.speaks_for.as_deref() == Some(me.as_str())).collect();
             notes.sort_by(|a, b| by_time_then_id(a, b));
             for n in notes {
-                if !self.seen.insert(n.id.clone()) {
+                if !self.seen.insert(n.id.to_string()) {
                     continue;
                 }
                 let Some(c) = data(n).get("case").and_then(|c| serde_json::from_value::<Case>(c.clone()).ok()) else { continue };
@@ -432,7 +432,7 @@ impl Hearings {
             Case {
                 id: id.to_string(),
                 matter: matter.clone(),
-                applicant: a.speaks_for.clone().unwrap_or_default(),
+                applicant: a.speaks_for.unwrap_or_default().to_string(),
                 against: d.s("against").or_else(|| data(n).s("against")).unwrap_or("").to_string(),
                 at: a.at,
                 answer_by: data(n).i("answer_by").or_else(|| data(n).i("hearing_at")).unwrap_or(t),
@@ -482,7 +482,7 @@ impl Hearings {
         if part != HearPart::Decide {
             for kind in self.forms.application.clone() {
                 let mut apps: Vec<Arc<Record>> =
-                    book.open(&kind).filter(|x| crate::common::addressed_to(x).contains(&me) && !self.seen.contains(&x.id)).cloned().collect();
+                    book.open(&kind).filter(|x| crate::common::addressed_to(x).iter().any(|x| x == &me) && !self.seen.contains(x.id.as_str())).cloned().collect();
                 apps.sort_by(|a, b| by_time_then_id(a, b));
                 for a in apps {
                     let d = data(&a).clone();
@@ -490,12 +490,12 @@ impl Hearings {
                     if self.leave.contains(&matter) {
                         continue;
                     }
-                    self.seen.insert(a.id.clone());
-                    let applicant = a.speaks_for.clone().unwrap_or_default();
+                    self.seen.insert(a.id.to_string());
+                    let applicant = a.speaks_for.unwrap_or_default();
                     let hears = self.p.hears.iter().find(|h| h.about == matter).cloned();
                     let against = d.s("against").unwrap_or("").to_string();
                     let answer_by = t + self.p.answer_days * DAY;
-                    let c = Case { id: a.id.clone(), matter: matter.clone(), applicant: applicant.clone(), against: against.clone(), at: a.at, answer_by, data: d.clone(), hears: hears.clone().unwrap_or(Hears { about: matter.clone(), ..Default::default() }) };
+                    let c = Case { id: a.id.to_string(), matter: matter.clone(), applicant: applicant.to_string(), against: against.clone(), at: a.at, answer_by, data: d.clone(), hears: hears.clone().unwrap_or(Hears { about: matter.clone(), ..Default::default() }) };
                     self.count("applications");
                     let Some(hears) = hears.filter(|_| against != applicant) else {
                         self.say2(&mut steps, t, &c, "rejected", "we cannot hear it.", json!({}), format!("An application we do not hear ({}): saying so.", if matter.is_empty() { "of no kind" } else { &matter }), true);
@@ -512,7 +512,7 @@ impl Hearings {
                             }
                             steps.push(because(
                                 format!("An application about {}: it is for {} to act on; passing it on.", matter.replace('_', " "), refer.to),
-                                vec![say(&refer.kind, &format!("Passed on from {me}: {}", crate::common::text(&a)), Say { to: Some(vec![refer.to.clone()]), visible: Some(Visible::Only(vec![refer.to.clone(), me.clone(), applicant.clone()])), basis: Some(a.id.clone()), data: Some(pd), ..Default::default() })],
+                                vec![say(&refer.kind, &format!("Passed on from {me}: {}", crate::common::text(&a)), Say { to: Some(vec![refer.to.clone()]), visible: Some(Visible::Only(vec![refer.to.clone(), me.clone(), applicant.to_string()])), basis: Some(a.id.to_string()), data: Some(pd), ..Default::default() })],
                             ));
                             self.say2(&mut steps, t, &c, "referred", &format!("passed to {}, whose it is to act on.", refer.to), json!({ "to": refer.to }), format!("Telling {applicant} where their application went."), false);
                             continue;
@@ -549,7 +549,7 @@ impl Hearings {
                             }
                         }
                     }
-                    self.cases.insert(a.id.clone(), c.clone());
+                    self.cases.insert(a.id.to_string(), c.clone());
                     let mut nd = json!({ "application": a.id, "kind": matter, "matter": matter, "applicant": applicant, "against": against, "hearing_at": answer_by, "answer_by": answer_by });
                     for k in ["about", "amount", "structure", "seeks"] {
                         if let Some(v) = d.get(k).filter(|v| !v.is_null()) {
@@ -562,7 +562,7 @@ impl Hearings {
                         vec![say(
                             &self.forms.notice,
                             &format!("{applicant} has applied to us about {}{seeking} (application {}). You may answer by {}{}.", matter.replace('_', " "), a.id, when(answer_by), if can.contains(&"mediate") { ", and say whether you will meet them with us" } else { "" }),
-                            Say { to: Some(vec![applicant.clone(), against.clone()]), visible: Some(Visible::Only(vec![applicant.clone(), against.clone(), me.clone()])), basis: Some(a.id.clone()), data: Some(nd), ..Default::default() },
+                            Say { to: Some(vec![applicant.to_string(), against.clone()]), visible: Some(Visible::Only(vec![applicant.to_string(), against.clone(), me.clone()])), basis: Some(a.id.to_string()), data: Some(nd), ..Default::default() },
                         )],
                     ));
                 }

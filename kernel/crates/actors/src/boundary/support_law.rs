@@ -171,12 +171,12 @@ pub fn support_law(book: &Book) -> Option<(String, Vec<PaymentRule>)> {
         .filter_map(|x| serde_json::from_value::<PaymentRule>(x.clone()).ok())
         .map(|mut x| {
             if x.payer.is_none() {
-                x.payer.clone_from(&l.speaks_for);
+                x.payer=l.speaks_for.map(|x| x.to_string());
             }
             x
         })
         .collect();
-    Some((l.id.clone(), payments))
+    Some((l.id.to_string(), payments))
 }
 
 // ------------------------------------------------------------------ tax.ts
@@ -590,7 +590,7 @@ impl Waits {
     }
 
     fn came(&self, book: &Book, n: &Need, claim: &Record, who: &str) -> bool {
-        let key = (claim.id.clone(), n.id.clone());
+        let key = (claim.id.to_string(), n.id.clone());
         let Some(c) = self.came.as_ref().filter(|c| c.stamp == Self::stamp(book)) else {
             // (Not read for this book as it stands: read it through, as `read_came` would.)
             let to_me = |r: &Record| addressed_to(r).iter().any(|x| x == &self.me);
@@ -624,7 +624,7 @@ impl Waits {
         let mut c = Came { stamp, ..Default::default() };
         for r in book.open("evidence").filter(|r| to_me(r)) {
             if let Some(k) = about(r) {
-                c.evidence.entry(k).or_default().insert(r.speaks_for.clone());
+                c.evidence.entry(k).or_default().insert(r.speaks_for.map(|x| x.to_string()));
             }
         }
         for r in book.open("confirmation_answer").filter(|r| to_me(r)) {
@@ -640,7 +640,7 @@ impl Waits {
         let empty = vec![];
         let needs = law.map_or(&empty, |l| &l.needs);
         let mut steps = vec![];
-        let Some(who) = c.speaks_for.clone() else { return (Wait::Ready, steps) };
+        let Some(who) = c.speaks_for else { return (Wait::Ready, steps) };
         self.read_came(book);
         let (mut waiting, mut lapsed) = (false, None::<String>);
         for n in needs {
@@ -665,7 +665,7 @@ impl Waits {
                 self.asked.insert(key, (t, by));
                 let mut d = serde_json::json!({ "claim": c.id, "need": n.id, "what": n.what, "by": by });
                 if n.from == "employer" {
-                    d["about"] = Value::from(who.clone());
+                    d["about"] = Value::from(who);
                 }
                 let due = words(by);
                 steps.push(if n.from == "claimant" {
@@ -674,7 +674,7 @@ impl Waits {
                         vec![say(
                             "evidence_request",
                             &format!("For your claim {}: please send {}, within {} days (by {due}).", c.id, n.what, n.within_days),
-                            Say { to: Some(vec![who.clone()]), visible: Some(crate::steps::Visible::Only(vec![who.clone(), self.me.clone()])), basis: Some(c.id.clone()), data: Some(d), ..Default::default() },
+                            Say { to: Some(vec![who.to_string()]), visible: Some(crate::steps::Visible::Only(vec![who.to_string(), self.me.clone()])), basis: Some(c.id.to_string()), data: Some(d), ..Default::default() },
                         )],
                     )
                 } else {
@@ -684,7 +684,7 @@ impl Waits {
                         vec![say(
                             "confirmation_request",
                             &format!("For the claim {} of {who}: please confirm {}, within {} days (by {due}).", c.id, n.what, n.within_days),
-                            Say { to: Some(vec![employer.clone()]), visible: Some(crate::steps::Visible::Only(vec![employer, self.me.clone()])), basis: Some(c.id.clone()), data: Some(d), ..Default::default() },
+                            Say { to: Some(vec![employer.clone()]), visible: Some(crate::steps::Visible::Only(vec![employer, self.me.clone()])), basis: Some(c.id.to_string()), data: Some(d), ..Default::default() },
                         )],
                     )
                 });
@@ -750,7 +750,7 @@ impl Reconsiderations {
 
     pub fn steps<T>(&mut self, book: &Book, t: i64, redo: &mut dyn FnMut(&Record, &Record) -> Option<Redone<T>>) -> Vec<Step<T>> {
         let mut steps = vec![];
-        let mut requests: Vec<&Arc<Record>> = book.open("review_request").filter(|x| addressed_to(x).iter().any(|a| a == &self.me) && !self.handled.contains(&x.id)).collect();
+        let mut requests: Vec<&Arc<Record>> = book.open("review_request").filter(|x| addressed_to(x).iter().any(|a| a == &self.me) && !self.handled.contains(x.id.as_str())).collect();
         requests.sort_by(|a, b| made_at(a).cmp(&made_at(b)).then_with(|| filed_before(&a.id, &b.id)));
         for r in requests {
             let Some(about) = data(r).s("about").and_then(|a| book.get(a)) else { continue };
@@ -762,8 +762,8 @@ impl Reconsiderations {
             }
             let law = decision_law(book, kind, data(about).s("payment"));
             let Some(review) = law.as_ref().and_then(|l| l.review.as_ref()) else { continue };
-            self.handled.insert(r.id.clone());
-            let from = r.speaks_for.clone().unwrap_or_default();
+            self.handled.insert(r.id.to_string());
+            let from = r.speaks_for.unwrap_or_default();
             let matter = data(r).s("matter").unwrap_or("").to_string();
             let left = days_left(about.at, review.within_days, t);
             let say2 = |steps: &mut Vec<Step<T>>, granted: bool, outcome: &str, found: &str, text: &str, more: Vec<Step<T>>| {
@@ -778,9 +778,9 @@ impl Reconsiderations {
                             "decision_review",
                             &format!("Review of {}, asked by {from}: {text}", about.id),
                             Say {
-                                to: Some(vec![from.clone()]),
-                                visible: Some(crate::steps::Visible::Only(vec![from.clone(), self.me.clone()])),
-                                basis: Some(about.id.clone()),
+                                to: Some(vec![from.to_string()]),
+                                visible: Some(crate::steps::Visible::Only(vec![from.to_string(), self.me.clone()])),
+                                basis: Some(about.id.to_string()),
                                 data: Some(serde_json::json!({ "decision": about.id, "kind": kind, "request": r.id, "outcome": outcome, "found": found, "asked_by": from, "decided_on": about.at })),
                                 ..Default::default()
                             },
@@ -788,7 +788,7 @@ impl Reconsiderations {
                         say(
                             "remedy_answer",
                             &format!("Answer to your request {}: {}: {text}", r.id, if granted { "yes" } else { "no" }),
-                            Say { to: Some(vec![from.clone()]), visible: Some(crate::steps::Visible::Only(vec![from.clone(), self.me.clone()])), basis: Some(r.id.clone()), data: Some(answer), ..Default::default() },
+                            Say { to: Some(vec![from.to_string()]), visible: Some(crate::steps::Visible::Only(vec![from.to_string(), self.me.clone()])), basis: Some(r.id.to_string()), data: Some(answer), ..Default::default() },
                         ),
                     ],
                 ));
@@ -806,7 +806,7 @@ impl Reconsiderations {
                 continue;
             }
             // (Looked at already: from the file, which is the record of it; or from this round's, before it shows.)
-            let first = self.done.get(&about.id).copied().or_else(|| self.reviewed(book, &about.id));
+            let first = self.done.get(about.id.as_str()).copied().or_else(|| self.reviewed(book, &about.id));
             if let Some(changed) = first {
                 say2(
                     &mut steps,
@@ -819,10 +819,10 @@ impl Reconsiderations {
                 continue;
             }
             let Some(out) = redo(about, r) else {
-                self.handled.remove(&r.id);
+                self.handled.remove(r.id.as_str());
                 continue;
             };
-            self.done.insert(about.id.clone(), out.changed);
+            self.done.insert(about.id.to_string(), out.changed);
             let text = if out.changed { format!("found wrong: {}; put right.", out.found) } else { format!("looked at again: {}; it stands.", out.found) };
             say2(&mut steps, out.changed, if out.changed { "changed" } else { "upheld" }, &out.found, &text, out.steps);
         }

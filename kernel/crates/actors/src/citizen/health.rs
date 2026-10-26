@@ -187,10 +187,10 @@ impl Plan for Clinic {
     type Then = Seen_;
     fn absorb(&mut self, pic: &Picture, _: &mut Cx) {
         self.book.absorb(pic);
-        if let Some(Seen::Sites { cells, .. }) = pic.channels.get(&self.p.channel) {
+        if let Some(Seen::Sites { cells, .. }) = pic.channels.get(self.p.channel.as_str()) {
             for c in cells.iter() {
                 if let Some(st) = c.structure.as_ref().filter(|s| s.structure == self.p.building) {
-                    self.view = Some(st.spaces.iter().map(|sp| (sp.space.clone(), sp.occupants.clone().unwrap_or_default())).collect());
+                    self.view = Some(st.spaces.iter().map(|sp| (sp.space.to_string(), sp.occupants.iter().flatten().map(|x| x.to_string()).collect())).collect());
                 }
             }
         }
@@ -206,12 +206,12 @@ impl Plan for Clinic {
         let mut asked: Vec<Waiting> = self
             .book
             .open("care_request")
-            .filter(|r| crate::common::addressed_to(r).contains(&self.me) && !self.queued.contains(&r.id))
+            .filter(|r| crate::common::addressed_to(r).iter().any(|x| x == &self.me) && !self.queued.contains(r.id.as_str()))
             .map(|r| {
                 let d = data(r);
                 Waiting {
-                    request: r.id.clone(),
-                    patient: r.speaks_for.clone().unwrap_or_default(),
+                    request: r.id.to_string(),
+                    patient: r.speaks_for.unwrap_or_default().to_string(),
                     kind: d.s("kind").unwrap_or("").into(),
                     severity: d.s("severity").unwrap_or("").into(),
                     at: r.at,

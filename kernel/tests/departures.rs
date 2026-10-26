@@ -15,7 +15,7 @@ type R = Run<Vec<u8>>;
 fn cmd(participant: &str, position: Option<&str>, blocks: Value) -> Command {
     Command::Act {
         participant: participant.into(),
-        position: position.map(String::from),
+        position: position.map(String::from).map(Into::into),
         blocks: serde_json::from_value(blocks).expect("the blocks parse"),
         by: vec![],
         provenance: json!({"via": "direct"}),

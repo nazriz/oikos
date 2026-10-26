@@ -61,8 +61,8 @@ pub fn refund_law(book: &Book) -> Option<RefundLaw> {
     let l = latest_law(book, |r| data(r).get("refunds").is_some_and(Value::is_object))?;
     let d = &data(l)["refunds"];
     Some(RefundLaw {
-        id: l.id.clone(),
-        collector: d.s("collector").map(String::from).or_else(|| l.speaks_for.clone()).unwrap_or_default(),
+        id: l.id.to_string(),
+        collector: d.s("collector").map(String::from).or_else(|| l.speaks_for.map(|x| x.to_string())).unwrap_or_default(),
         set_off: d.get("set_off").and_then(Value::as_bool).unwrap_or(false),
         pay_within_days: d.i("pay_within_days"),
     })
@@ -397,11 +397,11 @@ impl Collector {
         let paper = say(
             DECISION,
             &text,
-            Say { to: Some(vec![who.to_string()]), visible: Some(Visible::Only(vec![who.to_string(), self.me.clone()])), basis: Some(claim.id.clone()), data: Some(dd), ..Default::default() },
+            Say { to: Some(vec![who.to_string()]), visible: Some(Visible::Only(vec![who.to_string(), self.me.clone()])), basis: Some(claim.id.to_string()), data: Some(dd), ..Default::default() },
         );
         let mut paying = None;
         if d.granted > 0 {
-            self.unseen.push(Granted { claim: claim.id.clone(), taxpayer: who.to_string(), refund, amount: d.granted, at: t });
+            self.unseen.push(Granted { claim: claim.id.to_string(), taxpayer: who.to_string(), refund, amount: d.granted, at: t });
             if let (true, Some(into), Some(from)) = (refund, into, from.first()) {
                 paying = Some(pay(&into, d.granted, Pay { from: Some(from.clone()), for_: Some(format!("Refund of tax paid and not owed (claim {}).", claim.id)), ..Default::default() }, cx));
             }
@@ -420,8 +420,8 @@ impl Plan for Collector {
             return;
         }
         for tx in pic.transactions() {
-            if accounts.contains(&tx.to) && !accounts.contains(&tx.from) && says_tax(tx.memo.as_deref().unwrap_or(""), &names) {
-                self.paid.push(Paid { t: tx.t, from: tx.from.clone(), to: tx.to.clone(), amount: cents(tx.amount) });
+            if accounts.contains(&tx.to.to_string()) && !accounts.contains(&tx.from.to_string()) && says_tax(tx.memo.as_deref().unwrap_or(""), &names) {
+                self.paid.push(Paid { t: tx.t, from: tx.from.to_string(), to: tx.to.to_string(), amount: cents(tx.amount) });
             }
         }
     }
@@ -446,22 +446,22 @@ impl Collector {
         let on_file: BTreeSet<String> = self.book.all(DECISION).filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str())).filter_map(|r| data(r).s("claim").map(String::from)).collect();
         self.unseen.retain(|g| !on_file.contains(&g.claim));
         // A taxpayer's request for a statement of its own account: answered with one.
-        let mut asks: Vec<Arc<Record>> = self.book.open(REQUEST).filter(|r| addressed_to(r).iter().any(|a| a == &self.me) && !self.answered.contains(&r.id)).cloned().collect();
+        let mut asks: Vec<Arc<Record>> = self.book.open(REQUEST).filter(|r| addressed_to(r).iter().any(|a| a == &self.me) && !self.answered.contains(r.id.as_str())).cloned().collect();
         asks.sort_by(|a, b| made_at(a).cmp(&made_at(b)).then_with(|| filed_before(&a.id, &b.id)));
         for r in asks {
-            self.answered.insert(r.id.clone());
-            let Some(who) = r.speaks_for.clone() else { continue };
+            self.answered.insert(r.id.to_string());
+            let Some(who) = r.speaks_for else { continue };
             let l = self.account_of(&who);
-            self.stated.insert(who.clone(), l.credit());
-            steps.push(self.statement(&who, &l, t, cx, Some(r.id.clone()), &format!("{who} asks for a statement of its account: sending it.")));
+            self.stated.insert(who.to_string(), l.credit());
+            steps.push(self.statement(&who, &l, t, cx, Some(r.id.to_string()), &format!("{who} asks for a statement of its account: sending it.")));
         }
         // Claims, the oldest first: each decided against the account.
         let law = refund_law(&self.book);
-        let mut claims: Vec<Arc<Record>> = self.book.open(CLAIM).filter(|r| addressed_to(r).iter().any(|a| a == &self.me) && !self.decided.contains(&r.id)).cloned().collect();
+        let mut claims: Vec<Arc<Record>> = self.book.open(CLAIM).filter(|r| addressed_to(r).iter().any(|a| a == &self.me) && !self.decided.contains(r.id.as_str())).cloned().collect();
         claims.sort_by(|a, b| made_at(a).cmp(&made_at(b)).then_with(|| filed_before(&a.id, &b.id)));
         for c in claims {
-            self.decided.insert(c.id.clone());
-            let Some(who) = c.speaks_for.clone() else { continue };
+            self.decided.insert(c.id.to_string());
+            let Some(who) = c.speaks_for else { continue };
             let refund = data(&c).s("use") != Some("set_off");
             let asked = amount(data(&c).get("amount"));
             let l = self.account_of(&who);
@@ -487,7 +487,7 @@ impl Collector {
         let mut payers: BTreeSet<String> = BTreeSet::new();
         for r in self.book.all(RETURN).filter(|r| addressed_to(r).iter().any(|a| a == &self.me)) {
             if let Some(w) = &r.speaks_for {
-                payers.insert(w.clone());
+                payers.insert(w.to_string());
             }
         }
         for who in payers {

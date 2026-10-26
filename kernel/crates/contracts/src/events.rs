@@ -144,7 +144,7 @@ pub enum EventBody {
     /// An act begun (docs/design/rebuild.md 6.3): its actor is busy with it from `starts` (after any thinking) and it
     /// takes effect at `done`, when it's applied or refused.
     ActionStarted {
-        action: Id,
+        action: crate::blocks::Passing,
         participant: Id,
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
@@ -156,7 +156,7 @@ pub enum EventBody {
         free: Option<i64>,
     },
     ActionApplied {
-        action: Id,
+        action: crate::blocks::Passing,
         participant: Id,
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
@@ -168,7 +168,7 @@ pub enum EventBody {
         created: Option<BTreeMap<String, Id>>,
     },
     ActionRefused {
-        action: Id,
+        action: crate::blocks::Passing,
         participant: Id,
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,

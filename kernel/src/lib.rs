@@ -32,6 +32,6 @@ pub use run::{replay, Run};
 // The shared core and the contract types, re-exported where the kernel has always had them.
 pub use oikos_contracts::{blocks, config, contracts, events, vocab};
 pub use oikos_core::{canon, money, rng};
-pub mod schedule;
 pub mod pool;
+pub mod schedule;
 pub mod spool;

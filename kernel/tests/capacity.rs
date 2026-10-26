@@ -19,9 +19,9 @@ const DAY: i64 = 86_400;
 fn cmd(participant: &str, position: Option<&str>, blocks: Value, by: &[&str]) -> Command {
     Command::Act {
         participant: participant.into(),
-        position: position.map(String::from),
+        position: position.map(Into::into),
         blocks: serde_json::from_value(blocks).expect("the blocks parse"),
-        by: by.iter().map(|s| s.to_string()).collect(),
+        by: by.iter().map(|s| s.to_string()).map(Into::into).collect(),
         provenance: json!({"via": "direct"}),
         reasoning: None,
         thinking: None,
@@ -59,7 +59,7 @@ fn begun(run: &mut R, c: &Command) -> (i64, i64) {
 fn refused(run: &mut R, c: &Command) -> Option<(String, String)> {
     let r = step(run, c).expect("the command is accepted");
     r.events.iter().find_map(|e| match &e.body {
-        EventBody::ActionRefused { code, detail, .. } => Some((serde_json::to_value(code).unwrap().as_str().unwrap().to_string(), detail.clone().unwrap_or_default())),
+        EventBody::ActionRefused { code, detail, .. } => { Some((serde_json::to_value(code).unwrap().as_str().unwrap().to_string(), detail.clone().unwrap_or_default()))}
         _ => None,
     })
 }

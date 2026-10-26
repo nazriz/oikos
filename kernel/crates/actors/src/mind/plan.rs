@@ -23,7 +23,7 @@ use serde_json::{json, Map, Value as Json};
 use std::collections::{BTreeMap, BTreeSet};
 
 
-fn statement(r: &Record) -> Option<(&str, &Json, Option<&Json>, Option<&Json>, &[String])> {
+fn statement(r: &Record) -> Option<(&str, &Json, Option<&Json>, Option<&Json>, &[oikos_sight::Id])> {
     match &r.body {
         RecordBody::Statement { kind, data, offer, practice, addressed_to, .. } => {
             Some((kind.as_str(), data.as_ref().unwrap_or(&Json::Null), offer.as_ref(), practice.as_ref(), addressed_to.as_deref().unwrap_or(&[])))
@@ -171,7 +171,7 @@ impl CitizenMind {
         if !self.s.upbringing.settled && adult {
             let parents: Vec<String> = {
                 let ps = pic.body.as_ref().map(|b| b.parents.clone()).unwrap_or_default();
-                let mut v: Vec<String> = life.household_adults.iter().filter(|a| ps.contains(a)).cloned().collect();
+                let mut v: Vec<String> = life.household_adults.iter().filter(|a| ps.iter().any(|p| p == *a)).cloned().collect();
                 v.sort();
                 v
             };
@@ -269,9 +269,9 @@ impl CitizenMind {
         if self.s.town.is_some() {
             for r in &fresh {
                 if let Some(("purpose", data, ..)) = statement(r) {
-                    let by = r.speaks_for.clone();
+                    let by = r.speaks_for;
                     if let Some(by) = by.filter(|b| b != self.me()) {
-                        if r.at > 0 && data.get("for").and_then(Json::as_str) != Some(self.me()) && self.s.read_news.insert(r.id.clone()) {
+                        if r.at > 0 && data.get("for").and_then(Json::as_str) != Some(self.me()) && self.s.read_news.insert(r.id.to_string()) {
                             let strength = townmemory::paper_strength(3, &self.s.culture.as_ref().unwrap().p);
                             self.remember_town("founded", &by, r.at, t, false, strength);
                         }
@@ -529,7 +529,7 @@ impl CitizenMind {
                 holder.as_str() == self.me()
                     && counterparty.as_deref() == Some(whom)
                     && about.get("kind").and_then(Json::as_str) == Some("debt")
-                    && jc(about.get("amount").unwrap_or(&Json::Null)) > *self.s.settled_to_us.get(&c.id).unwrap_or(&0)
+                    && jc(about.get("amount").unwrap_or(&Json::Null)) > *self.s.settled_to_us.get(c.id.as_str()).unwrap_or(&0)
             }
             _ => false,
         })
@@ -627,24 +627,24 @@ impl CitizenMind {
         // Petitions and elections are the mind's own (voice, civic).
         if self.s.willing && life.housed == Housed::Rents {
             for pet in self.petitions_seen(pic) {
-                let id = pet.id.clone();
-                if speaker(&pet) == self.me() || self.s.signed.contains(&id) || !tenant_petition(&pet) {
+                let id = pet.id;
+                if speaker(&pet) == self.me() || self.s.signed.contains(id.as_str()) || !tenant_petition(&pet) {
                     continue;
                 }
                 let lord = life.landlord.clone().unwrap_or_default();
-                let o = Opening { key: format!("petition:{id}"), kind: "petition".into(), on: Some(id.clone()), bears: vec![lord.clone()], intent: Intent::Sign { petition: id }, ..Default::default() };
+                let o = Opening { key: format!("petition:{id}"), kind: "petition".into(), on: Some(id.to_string()), bears: vec![lord.clone()], intent: Intent::Sign { petition: id.to_string() }, ..Default::default() };
                 out.push(Weighed { adj: ag - fear_of(&lord), others: published_count(book, &pet), o });
             }
         }
         if let Some(town) = self.p.electoral_town.clone() {
             for n in book.open("election_notice") {
                 let closes = statement(n).and_then(|(_, d, ..)| d.get("nominations_close_at").and_then(Json::as_i64)).unwrap_or(0);
-                if self.s.stood_for.contains(&n.id) || t >= closes {
+                if self.s.stood_for.contains(n.id.as_str()) || t >= closes {
                     continue;
                 }
                 let mut bears = vec![town.clone()];
                 bears.extend(self.p.complain_to.clone());
-                let o = Opening { key: format!("stand:{}", n.id), kind: "stand".into(), on: Some(n.id.clone()), bears, intent: Intent::Stand { notice: n.id.clone() }, ..Default::default() };
+                let o = Opening { key: format!("stand:{}", n.id), kind: "stand".into(), on: Some(n.id.to_string()), bears, intent: Intent::Stand { notice: n.id.to_string() }, ..Default::default() };
                 out.push(Weighed { adj: ag + round(k.own as f64 * (self.z_value(Value::Achievement) + self.z_value(Value::Power)) / 2.0) - 4 * k.own, others: 0, o });
             }
         }
@@ -677,12 +677,12 @@ impl CitizenMind {
                 let o = Opening {
                     key: format!("join:{host}"),
                     kind: "join".into(),
-                    on: Some(s.id.clone()),
+                    on: Some(s.id.to_string()),
                     by: Some(host.clone()),
                     brings,
                     bears: if takes_up { vec![g.as_ref().unwrap().party.clone()] } else { vec![] },
                     cost: (asks > 0).then_some(asks),
-                    intent: Intent::JoinGroup { host: host.clone(), offer: s.id.clone() },
+                    intent: Intent::JoinGroup { host: host.clone(), offer: s.id.to_string() },
                     ..Default::default()
                 };
                 out.push(Weighed { adj, others: goes(&host), o });
@@ -1276,7 +1276,7 @@ impl CitizenMind {
             }
             for r in fresh {
                 if let Some(("wound_up", ..)) = statement(r) {
-                    if let Some(h) = r.speaks_for.clone().filter(|h| self.s.groups.contains_key(h)) {
+                    if let Some(h) = r.speaks_for.filter(|h| self.s.groups.contains_key(h.as_str())) {
                         self.leave_group(cx, book, life, &h, "It has wound up.", "wound_up", t, out);
                     }
                 }
@@ -1311,26 +1311,26 @@ impl CitizenMind {
         // A fund's answer to our asking (citizen.ts 2739-2752).
         for r in fresh {
             let Some(("fund_decision", data, _, _, to)) = statement(r) else { continue };
-            let Some(host) = r.speaks_for.clone() else { continue };
+            let Some(host) = r.speaks_for else { continue };
             if !to.iter().any(|x| *x == me) {
                 continue;
             }
             let granted = data.get("granted") == Some(&Json::Bool(true));
             let why = data.get("why").and_then(Json::as_str).unwrap_or_default().to_string();
             let stated = book.open("membership").find(|x| x.speaks_for.as_deref() == Some(host.as_str())).and_then(|s| statement(s)).and_then(|(_, d, ..)| d.get("fund").cloned());
-            let m = self.s.groups.get(&host).cloned();
+            let m = self.s.groups.get(host.as_str()).cloned();
             let foretold = stated.as_ref().map_or(false, |st| {
                 why == "the fund has not got it" || m.as_ref().map_or(false, |m| (why == "not yet a member long enough" && t - m.t < st.get("qualify_days").and_then(Json::as_i64).unwrap_or(0) * DAY) || why == "drew not long ago")
             });
             if granted {
-                if let Some(g) = self.s.groups.get_mut(&host) {
+                if let Some(g) = self.s.groups.get_mut(host.as_str()) {
                     g.drew = Some(t);
                 }
             } else if !foretold {
-                self.s.refused_by.insert(host.clone());
+                self.s.refused_by.insert(host.to_string());
             }
             self.read_follows = true; // (the draw's outcome, below, names the paper)
-            self.treated(cx, Treated { who: host.clone(), kind: String::new(), good: granted, weight_bps: Some(if granted || !foretold { 20_000 } else { 10_000 }), paper: Some(r.id.clone()), ..Default::default() });
+            self.treated(cx, Treated { who: host.to_string(), kind: String::new(), good: granted, weight_bps: Some(if granted || !foretold { 20_000 } else { 10_000 }), paper: Some(r.id.to_string()), ..Default::default() });
             let facts = if granted { json!({ "with": host, "amount": jc(data.get("amount").unwrap_or(&Json::Null)) }) } else { json!({ "with": host, "why": why, "foretold": foretold }) };
             let mut o = Map::new();
             o.insert("t".into(), json!(t));
@@ -1358,13 +1358,13 @@ impl CitizenMind {
                     self.out(cx, life, t, "membership", "member", "joined", "mine", facts);
                     let pay_dues = |cx: &Cx, why: &str| -> Vec<oikos_sight::calls::Call> {
                         match (&dues, &account) {
-                            (Some(d), Some(acc)) => vec![steps::pay(d.get("to").and_then(Json::as_str).unwrap_or_default(), jc(d.get("amount").unwrap_or(&Json::Null)), Pay { from: Some(acc.clone()), every: Some(MONTH), first: Some(0), basis: Some(r.id.clone()), for_: Some(why.into()), ..Default::default() }, cx)],
+                            (Some(d), Some(acc)) => vec![steps::pay(d.get("to").and_then(Json::as_str).unwrap_or_default(), jc(d.get("amount").unwrap_or(&Json::Null)), Pay { from: Some(acc.clone()), every: Some(MONTH), first: Some(0), basis: Some(r.id.to_string()), for_: Some(why.into()), ..Default::default() }, cx)],
                             _ => vec![],
                         }
                     };
                     if of_run {
-                        self.s.groups.insert(host.clone(), Group { t, agreement: r.id.clone(), went: t, claimed: None, drew: None });
-                        let ids: Vec<String> = book.practices().filter(|g| speaker(g) == host).map(|g| g.id.clone()).collect();
+                        self.s.groups.insert(host.clone(), Group { t, agreement: r.id.to_string(), went: t, claimed: None, drew: None });
+                        let ids: Vec<String> = book.practices().filter(|g| speaker(g) == host).map(|g| g.id).map(|x| x.to_string()).collect();
                         for id in ids {
                             self.s.stayed_last.remove(&id);
                             self.s.went_last.insert(id);
@@ -1392,10 +1392,10 @@ impl CitizenMind {
             if !to.iter().any(|x| *x == me) {
                 continue;
             }
-            if kind == "ballot_result" && data.get("employer").and_then(Json::as_str).is_some() && data.get("voted").and_then(Json::as_i64).unwrap_or(0) > 0 && !self.s.counted_ballots.contains(&r.id) {
+            if kind == "ballot_result" && data.get("employer").and_then(Json::as_str).is_some() && data.get("voted").and_then(Json::as_i64).unwrap_or(0) > 0 && !self.s.counted_ballots.contains(r.id.as_str()) {
                 if let (Some(yes), Some(voted)) = (data.get("yes").and_then(Json::as_i64), data.get("voted").and_then(Json::as_i64)) {
                     if let Some(c) = &mut self.s.culture {
-                        self.s.counted_ballots.insert(r.id.clone());
+                        self.s.counted_ballots.insert(r.id.to_string());
                         let share = round((yes * 10_000) as f64 / voted as f64);
                         c.see_share(Conduct::Strike, share, Route::Published);
                         c.hear_said(Conduct::Strike, share, Route::Published);
@@ -1466,7 +1466,7 @@ impl CitizenMind {
         let room = (life.household as i64 + 4 - life.household as i64).max(1);
         // (The cell our home stands on, where we see it: a translator can then write the gathering's notice on it.)
         let place_on = match pic.channels.get("street") {
-            Some(Seen::Sites { cells, .. }) => cells.iter().filter_map(|c| c.structure.as_ref()).find(|st| st.spaces.iter().any(|sp| sp.space == place)).map(|st| st.at.clone()),
+            Some(Seen::Sites { cells, .. }) => { cells.iter().filter_map(|c| c.structure.as_ref()).find(|st| st.spaces.iter().any(|sp| sp.space == place)).map(|st| st.at)}
             _ => None,
         };
         let fill = |x: &Json| fill_founder(x, &me);
@@ -1566,8 +1566,8 @@ impl CitizenMind {
     fn gatherings(&mut self, cx: &mut Cx, pic: &Picture, book: &Book, life: &Life, t: i64, out: &mut Planned) {
         let me = self.me().to_string();
         let street = street_spaces(pic);
-        let inside = |space: &str| street.is_none() || street.as_ref().unwrap().iter().any(|sp| sp.space == space && sp.occupants.as_ref().map_or(false, |o| o.contains(&me)));
-        let there = |space: &str| -> Vec<String> { street.as_ref().map_or(vec![], |s| s.iter().find(|sp| sp.space == space).and_then(|sp| sp.occupants.clone()).unwrap_or_default().into_iter().filter(|o| *o != me).collect()) };
+        let inside = |space: &str| street.is_none() || street.as_ref().unwrap().iter().any(|sp| sp.space == space && sp.occupants.as_ref().map_or(false, |o| o.iter().any(|x| *x ==me)));
+        let there = |space: &str| -> Vec<String> { street.as_ref().map_or(vec![], |s| s.iter().find(|sp| sp.space == space).and_then(|sp| sp.occupants.clone()).unwrap_or_default().into_iter().filter(|o| *o != me).map(|x| x.to_string()).collect()) };
         if let Some(a) = self.s.attending.clone().filter(|a| t >= a.until) {
             let others = a.seen.clone().unwrap_or_else(|| there(&a.space));
             let got = a.gone || inside(&a.space);
@@ -1664,18 +1664,18 @@ impl CitizenMind {
                 let at_work = life.workplace.is_some() && pic.body.as_ref().and_then(|b| b.in_space.as_deref()) == life.workplace.as_deref();
                 if at_work {
                     // (kept: we go once out of work, if it is still on)
-                } else if self.s.going.get(&r.id) == Some(&start) && self.s.attending.is_none() && too_late {
-                    self.s.going.remove(&r.id);
-                } else if self.s.going.get(&r.id) == Some(&start) && self.s.attending.is_none() {
-                    self.s.going.remove(&r.id);
-                    self.s.attending = Some(Attending { practice: r.id.clone(), host: host.clone(), space: at.clone(), until: start + lasts, gone: false, seen: None });
+                } else if self.s.going.get(r.id.as_str()) == Some(&start) && self.s.attending.is_none() && too_late {
+                    self.s.going.remove(r.id.as_str());
+                } else if self.s.going.get(r.id.as_str()) == Some(&start) && self.s.attending.is_none() {
+                    self.s.going.remove(r.id.as_str());
+                    self.s.attending = Some(Attending { practice: r.id.to_string(), host: host.clone(), space: at.clone(), until: start + lasts, gone: false, seen: None });
                     if !inside(&at) {
                         out.first.insert(0, because(format!("Going to {host}'s gathering."), vec![common::move_in(&at)]));
                         self.s.setting_off = Some((at.clone(), t));
                     }
                 }
-            } else if start - t <= 7 * DAY && self.s.decided_for.get(&r.id) != Some(&start) {
-                if !self.s.decided_for.contains_key(&r.id) {
+            } else if start - t <= 7 * DAY && self.s.decided_for.get(r.id.as_str()) != Some(&start) {
+                if !self.s.decided_for.contains_key(r.id.as_str()) {
                     if !self.s.mind.learned_known("practice", "stay") {
                         let mut o = Map::new();
                         for (k, v) in [("t", json!(t)), ("kind", json!("expected")), ("way", json!("mine"))] {
@@ -1688,7 +1688,7 @@ impl CitizenMind {
                         _ => false,
                     });
                     if ours {
-                        self.s.went_last.insert(r.id.clone());
+                        self.s.went_last.insert(r.id.to_string());
                         if !self.s.mind.learned_known("practice", &r.id) {
                             let mut o = Map::new();
                             for (k, v) in [("t", json!(t)), ("kind", json!("expected")), ("way", json!("mine")), ("facts", json!({ "host": host, "member": true }))] {
@@ -1698,25 +1698,25 @@ impl CitizenMind {
                             self.learn_rec(cx, life, "practice", &r.id, pay, o, false, false);
                         }
                     } else {
-                        self.s.stayed_last.insert(r.id.clone());
+                        self.s.stayed_last.insert(r.id.to_string());
                     }
                 }
-                self.s.decided_for.insert(r.id.clone(), start);
+                self.s.decided_for.insert(r.id.to_string(), start);
                 let friends = *friends_of.get(&host).unwrap_or(&0);
                 let meaning = round(self.hold_to(&host) as f64 * self.p.belief.meaning);
-                let trying = self.pursuing("try a gathering") && !self.s.went_last.contains(&r.id);
+                let trying = self.pursuing("try a gathering") && !self.s.went_last.contains(r.id.as_str());
                 let d = Decide {
                     domain: "practice".into(),
                     options: vec![
                         Choice {
-                            key: r.id.clone(),
-                            facts: Some(Facts { money_per_month: 0, company: Some((*self.s.company_at.get(&r.id).unwrap_or(&0)).max(friends)), time_hours_per_month: Some(round(((lasts as f64 / 3_600.0) * MONTH as f64) / every as f64)), ..Default::default() }),
+                            key: r.id.to_string(),
+                            facts: Some(Facts { money_per_month: 0, company: Some((*self.s.company_at.get(r.id.as_str()).unwrap_or(&0)).max(friends)), time_hours_per_month: Some(round(((lasts as f64 / 3_600.0) * MONTH as f64) / every as f64)), ..Default::default() }),
                             others: Some(friends),
                             meaning: Some(meaning),
                         },
                         Choice { key: "stay".into(), facts: Some(Facts { money_per_month: 0, ..Default::default() }), ..Default::default() },
                     ],
-                    current: if self.s.went_last.contains(&r.id) { Some(r.id.clone()) } else if self.s.stayed_last.contains(&r.id) { Some("stay".into()) } else { None },
+                    current: if self.s.went_last.contains(r.id.as_str()) { Some(r.id.to_string()) } else if self.s.stayed_last.contains(r.id.as_str()) { Some("stay".into()) } else { None },
                     satisfied_here: trying.then_some(0),
                     doubt: trying.then_some(10_000),
                     purpose: Some(format!("practice-{}-{start}", r.id)),
@@ -1725,12 +1725,12 @@ impl CitizenMind {
                 let levels = self.need_levels(life, t);
                 let got = self.decide_rec(cx, life, &d, levels);
                 if got.key.as_deref() == Some(r.id.as_str()) {
-                    self.s.going.insert(r.id.clone(), start);
-                    self.s.went_last.insert(r.id.clone());
-                    self.s.stayed_last.remove(&r.id);
+                    self.s.going.insert(r.id.to_string(), start);
+                    self.s.went_last.insert(r.id.to_string());
+                    self.s.stayed_last.remove(r.id.as_str());
                 } else {
-                    self.s.went_last.remove(&r.id);
-                    self.s.stayed_last.insert(r.id.clone());
+                    self.s.went_last.remove(r.id.as_str());
+                    self.s.stayed_last.insert(r.id.to_string());
                     let mut o = Map::new();
                     for (k, v) in [("t", json!(t)), ("kind", json!("stayed")), ("way", json!("mine")), ("need", json!("social"))] {
                         o.insert(k.into(), v);
@@ -1739,7 +1739,7 @@ impl CitizenMind {
                     self.learn_rec(cx, life, "practice", "stay", social, o, true, false);
                 }
             }
-            if let Some(&next) = self.s.going.get(&r.id) {
+            if let Some(&next) = self.s.going.get(r.id.as_str()) {
                 if next > t {
                     self.s.practice_wake = Some(self.s.practice_wake.map_or(next, |w| w.min(next)));
                 }

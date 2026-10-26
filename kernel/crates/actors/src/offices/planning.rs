@@ -48,7 +48,7 @@ const STALE: i64 = 4 * DAY;
 /// Whose a record is: made in this position (or, with none, by this participant).
 fn ours(position: &Option<String>, participant: &str, r: &Record) -> bool {
     match position {
-        Some(p) => r.position.as_ref() == Some(p),
+        Some(p) => r.position.as_deref() == Some(p.as_str()),
         None => r.author == participant,
     }
 }
@@ -246,8 +246,8 @@ impl Office {
         let habitat = if habitat_law.is_empty() { None } else { book.current(habitat_law).cloned() };
         let on_habitat = habitat.is_some()
             && book.open("habitat_register").max_by_key(|r| r.at).is_some_and(|r| data(r).ids("lots").contains(&lot));
-        let hit = breaches(book, &granting, applicant, t).first().map(|l| l.id.clone());
-        hit.or_else(|| if on_habitat { habitat.map(|h| h.id.clone()) } else { None })
+        let hit = breaches(book, &granting, applicant, t).first().map(|l| l.id);
+        (hit.or_else(|| if on_habitat { habitat.map(|h| h.id) } else { None })).map(|x| x.to_string())
     }
 
     fn report(&self) -> String {
@@ -308,7 +308,7 @@ impl Office {
         let Some(app) = app.filter(|a| matches!(a.body, RecordBody::Statement { .. }) && a.speaks_for == req.speaks_for) else {
             return (false, "the application is not on our file, or is not the asker's".into(), vec![]);
         };
-        let who = app.speaks_for.clone().unwrap_or_default();
+        let who = app.speaks_for.unwrap_or_default();
         let (lot, st) = (data(&app).s("lot").unwrap_or("").to_string(), data(&app).s("structure_type").unwrap_or("").to_string());
         if let Some(l) = Self::breach(book, habitat_law, &who, &lot, &st, t) {
             return (false, format!("it would still breach {l}"), vec![]);
@@ -317,8 +317,8 @@ impl Office {
             "permit_decision",
             &format!("Permit granted to build {st} on {lot}, on a second look."),
             Say {
-                to: Some(vec![who.clone()]),
-                basis: Some(app.id.clone()),
+                to: Some(vec![who.to_string()]),
+                basis: Some(app.id.to_string()),
                 data: Some(json!({ "application": app.id, "decision": "granted", "on_review": req.id, "replaces": dec.id })),
                 ..Default::default()
             },
@@ -327,7 +327,7 @@ impl Office {
             format!("Asked to look at our refusal {} again: nothing we know of forbids it now; granting.", dec.id),
             vec![record("liberty", &who, json!({ "action": "build", "object": lot, "structure_type": st }), None, Some(&app.id)), grant],
         );
-        s.then = Some(PThen::Decided { app: app.id.clone(), decision: "granted".into(), law: None });
+        s.then = Some(PThen::Decided { app: app.id.to_string(), decision: "granted".into(), law: None });
         (true, "no law in force forbids it now".into(), vec![s])
     }
 }
@@ -349,14 +349,14 @@ impl Plan for Office {
         }
         let rules = planning_rules(&self.book);
         let decided = self.decisions();
-        let mut apps: Vec<Arc<Record>> = self.book.open("permit_application").filter(|a| addressed_to(a).contains(&self.me)).cloned().collect();
+        let mut apps: Vec<Arc<Record>> = self.book.open("permit_application").filter(|a| addressed_to(a).iter().any(|x| x == &self.me)).cloned().collect();
         apps.sort_by(|a, b| filed_before(&a.id, &b.id));
         let mut ready: Vec<Arc<Record>> = vec![];
         for app in apps {
-            if decided.contains_key(&app.id) || self.in_hand.contains_key(&format!("decide:{}", app.id)) {
+            if decided.contains_key(app.id.as_str()) || self.in_hand.contains_key(&format!("decide:{}", app.id)) {
                 continue;
             }
-            let applicant = app.speaks_for.clone().unwrap_or_else(|| app.author.clone());
+            let applicant = app.speaks_for.unwrap_or_else(|| app.author.clone().into());
             let d = data(&app);
             // An application it can't decide gets a reply saying why (§9.3).
             let missing: Vec<&str> = ["lot", "structure_type"].into_iter().filter(|f| d.s(f).is_none()).collect();
@@ -368,10 +368,10 @@ impl Plan for Office {
                     vec![say(
                         "permit_decision",
                         &format!("Application {} can't be decided: it doesn't say {}.", app.id, what.join(" or ")),
-                        Say { to: Some(vec![applicant]), basis: Some(app.id.clone()), data: Some(json!({ "application": app.id, "decision": "incomplete", "missing": missing })), ..Default::default() },
+                        Say { to: Some(vec![applicant.to_string()]), basis: Some(app.id.to_string()), data: Some(json!({ "application": app.id, "decision": "incomplete", "missing": missing })), ..Default::default() },
                     )],
                 );
-                s.then = Some(PThen::Decided { app: app.id.clone(), decision: "incomplete".into(), law: None });
+                s.then = Some(PThen::Decided { app: app.id.to_string(), decision: "incomplete".into(), law: None });
                 steps.push(s);
                 continue;
             }
@@ -391,13 +391,13 @@ impl Plan for Office {
                                     ),
                                     Say {
                                         visible: Some(Visible::Public),
-                                        basis: Some(app.id.clone()),
+                                        basis: Some(app.id.to_string()),
                                         data: Some(json!({ "application": app.id, "lot": d.s("lot"), "structure_type": d.s("structure_type"), "objection_days": r.objection_days })),
                                         ..Default::default()
                                     },
                                 )],
                             );
-                            s.then = Some(PThen::Noticed { app: app.id.clone() });
+                            s.then = Some(PThen::Noticed { app: app.id.to_string() });
                             steps.push(s);
                         }
                         continue;
@@ -412,7 +412,7 @@ impl Plan for Office {
         let n = ready.len() as i64;
         let cap = ((n * self.compliance_bps.clamp(0, 10_000) + 9_999) / 10_000).max(1).min(n) as usize;
         for app in ready.into_iter().take(cap) {
-            let applicant = app.speaks_for.clone().unwrap_or_else(|| app.author.clone());
+            let applicant = app.speaks_for.unwrap_or_else(|| app.author.clone().into());
             let (lot, st) = (data(&app).s("lot").unwrap_or("").to_string(), data(&app).s("structure_type").unwrap_or("").to_string());
             let breached = Self::breach(&mut self.book, &self.habitat_law, &applicant, &lot, &st, t);
             // The objections heard: made in the objection period, about this application.
@@ -433,11 +433,11 @@ impl Plan for Office {
             if let Some(l) = &breached {
                 dd["law"] = json!(l);
             }
-            let mut to = vec![applicant.clone()];
+            let mut to = vec![applicant];
             if rules.is_some_and(|r| r.notice_days > 0) {
-                dd["objections"] = json!(objections.iter().map(|o| o.id.clone()).collect::<Vec<_>>());
+                dd["objections"] = json!(objections.iter().map(|o| o.id).collect::<Vec<_>>());
                 for o in &objections {
-                    let who = o.speaks_for.clone().unwrap_or_else(|| o.author.clone());
+                    let who = o.speaks_for.unwrap_or_else(|| o.author.clone().into());
                     if !to.contains(&who) {
                         to.push(who);
                     }
@@ -457,14 +457,14 @@ impl Plan for Office {
             } else {
                 "Granting: no law we know of forbids it.".to_string()
             };
-            let decision = say("permit_decision", &words, Say { to: Some(to), basis: Some(app.id.clone()), data: Some(dd), ..Default::default() });
+            let decision = say("permit_decision", &words, Say { to: Some(to.iter().map(|x| x.to_string()).collect()), basis: Some(app.id.to_string()), data: Some(dd), ..Default::default() });
             let mut lines = vec![];
             if !refuse {
                 lines.push(record("liberty", &applicant, json!({ "action": "build", "object": lot, "structure_type": st }), None, Some(&app.id)));
             }
             lines.push(decision);
             let mut s = because(why, lines);
-            s.then = Some(PThen::Decided { app: app.id.clone(), decision: if refuse { "refused" } else { "granted" }.into(), law: breached });
+            s.then = Some(PThen::Decided { app: app.id.to_string(), decision: if refuse { "refused" } else { "granted" }.into(), law: breached, });
             self.desk.assign(&mut s, "permit_decision"); // (a system of ours that writes decisions does, if we hold one)
             self.in_hand.insert(format!("decide:{}", app.id), t);
             steps.push(s);
@@ -482,7 +482,7 @@ impl Plan for Office {
         let decided = self.decisions();
         self.book
             .open("permit_application")
-            .filter(|a| addressed_to(a).contains(&self.me) && !decided.contains_key(&a.id))
+            .filter(|a| addressed_to(a).iter().any(|x| x == &self.me) && !decided.contains_key(a.id.as_str()))
             .filter_map(|a| self.notice_at(&a.id).map(|n| n + r.objection_days * DAY))
             .filter(|c| *c > pic.t)
             .min()
@@ -673,13 +673,13 @@ impl Inspecting {
     }
 
     fn notices(&self) -> Vec<Notice> {
-        let mut v: Vec<&Arc<Record>> = self.book.open("building_notice").filter(|n| addressed_to(n).contains(&self.me)).collect();
+        let mut v: Vec<&Arc<Record>> = self.book.open("building_notice").filter(|n| addressed_to(n).iter().any(|x| x == &self.me)).collect();
         v.sort_by(|a, b| filed_before(&a.id, &b.id));
         v.into_iter()
             .map(|n| {
                 let d = data(n);
                 let s = |k: &str| d.s(k).map(String::from);
-                Notice { id: n.id.clone(), lot: s("lot"), at: s("at"), structure: s("structure"), removes: s("removes") }
+                Notice { id: n.id.to_string(), lot: s("lot"), at: s("at"), structure: s("structure"), removes: s("removes") }
             })
             .collect()
     }
@@ -692,7 +692,7 @@ impl Inspecting {
     fn valuations(&self) -> BTreeSet<String> {
         let mut s = self.valued.clone();
         for r in self.book.open("valuation_request").filter(|r| self.ours(r)) {
-            s.extend(crate::common::bases_of(r).iter().cloned());
+            s.extend(crate::common::bases_of(r).iter().map(|x| x.to_string()));
         }
         s
     }
@@ -758,15 +758,15 @@ impl Plan for Inspecting {
             if self.sites_seen.contains_key(&structure) {
                 continue;
             }
-            let here: Vec<_> = back.iter().filter(|c| c.structure.as_ref().is_some_and(|s| s.structure == structure) || Some(&c.cell) == n.at.as_ref()).collect();
+            let here: Vec<_> = back.iter().filter(|c| c.structure.as_ref().is_some_and(|s| s.structure == structure) || Some(c.cell.as_str()) == n.at.as_deref()).collect();
             if !here.is_empty() {
                 let found = here.iter().find_map(|c| c.structure.as_ref().filter(|s| s.structure == structure)).map(|s| Found {
-                    structure: s.structure.clone(),
-                    kind: s.structure_type.clone(),
-                    at: s.at.clone(),
-                    built_by: s.built_by.clone(),
+                    structure: s.structure.to_string(),
+                    kind: s.structure_type.to_string(),
+                    at: s.at.to_string(),
+                    built_by: s.built_by.map(|x| x.to_string()),
                     cells: {
-                        let mut c: Vec<String> = back.iter().filter(|c| c.structure.as_ref().is_some_and(|x| x.structure == s.structure)).map(|c| c.cell.clone()).collect();
+                        let mut c: Vec<String> = back.iter().filter(|c| c.structure.as_ref().is_some_and(|x| x.structure == s.structure)).map(|c| c.cell).map(|x| x.to_string()).collect();
                         c.sort();
                         c
                     },
@@ -784,7 +784,7 @@ impl Plan for Inspecting {
 
     fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<IThen>> {
         let t = pic.t;
-        let me = pic.entity.clone();
+        let me = pic.entity;
         self.in_hand.retain(|_, at| t - *at <= STALE);
         let mut steps: Vec<Step<IThen>> = vec![];
         let valued = self.valuations();
@@ -816,7 +816,7 @@ impl Plan for Inspecting {
                 }
                 let mut s = because(
                     format!("Visited the site of {structure}: {found}; putting the inspection on file."),
-                    vec![say("building_inspection", &format!("Inspection of {structure}: {found}."), Say { visible: Some(Visible::Only(vec![me.clone()])), basis: Some(n.id.clone()), data: Some(d), ..Default::default() })],
+                    vec![say("building_inspection", &format!("Inspection of {structure}: {found}."), Say { visible: Some(Visible::Only(vec![me.to_string()])), basis: Some(n.id.clone()), data: Some(d), ..Default::default() })],
                 );
                 s.then = Some(IThen::Inspected { notice: n.id.clone() });
                 s
@@ -854,7 +854,7 @@ impl Plan for Inspecting {
             };
             // An enforcement direction that stands (from whoever the town says may direct us): whether a breach is
             // fined and ordered down, and at what amount.
-            let direction = self.directions.standing(&self.book, "inspector_enforcement", cx).map(|d| (d.id.clone(), papers::read::<po::Direction>(d)));
+            let direction = self.directions.standing(&self.book, "inspector_enforcement", cx).map(|d| (d.id, papers::read::<po::Direction>(d)));
             let (dir_id, dir) = match direction {
                 Some((i, d)) => (Some(i), d),
                 None => (None, None),
@@ -874,8 +874,8 @@ impl Plan for Inspecting {
                         &format!("Order: demolish {} on {place}, built in breach of {}.", st.structure, law.id),
                         Say {
                             to: Some(vec![owner.clone()]),
-                            basis: Some(law.id.clone()),
-                            data: Some(papers::data(&po::DemolitionOrder { structure: st.structure.clone(), lot: lot.clone(), law: law.id.clone() })),
+                            basis: Some(law.id.to_string()),
+                            data: Some(papers::data(&po::DemolitionOrder { structure: st.structure.clone(), lot: lot.clone(), law: law.id.to_string() })),
                             ..Default::default()
                         },
                     ),
@@ -883,7 +883,7 @@ impl Plan for Inspecting {
                         "building_inspection",
                         &format!("Inspection of {}: built in breach of {}; fined and ordered demolished.", st.structure, law.id),
                         Say {
-                            visible: Some(Visible::Only(vec![me.clone()])),
+                            visible: Some(Visible::Only(vec![me.to_string()])),
                             basis: Some(n.id.clone()),
                             data: Some(json!({ "notice": n.id, "structure": st.structure, "lot": lot, "at": st.at, "found": "breach", "law": law.id, "acted": true })),
                             ..Default::default()

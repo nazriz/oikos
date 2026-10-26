@@ -136,7 +136,7 @@ impl Delivered {
         handed.whole.insert(at);
         out.extend_from_slice(bytes);
         // (Another record handed over under this id before, if that could be: the host no longer holds it.)
-        if let Some(was) = handed.by_id.insert(record.id.clone(), at).filter(|was| *was != at) {
+        if let Some(was) = handed.by_id.insert(record.id, at).filter(|was| *was != at) {
             handed.whole.remove(&was);
         }
     }
@@ -149,7 +149,7 @@ impl Delivered {
         let bytes: Arc<[u8]> = canon::canonical(&**x)?.into();
         let fact = self.fact_of(x);
         let mut structures = held(self.structures.write());
-        let ways = structures.entry(x.structure.clone()).or_default();
+        let ways = structures.entry(x.structure).or_default();
         ways.insert(0, (x.clone(), bytes.clone(), fact.clone()));
         ways.truncate(WAYS);
         Ok((bytes, fact))
@@ -170,8 +170,8 @@ impl Delivered {
         if let Some(f) = held(self.facts.read()).get(&x.structure).filter(|f| same(f)) {
             return f.clone();
         }
-        let f = Arc::new(StructureFact { type_: x.structure_type.clone(), at: x.at.clone(), spaces: x.spaces.iter().map(|sp| sp.space.clone()).collect() });
-        held(self.facts.write()).insert(x.structure.clone(), f.clone());
+        let f = Arc::new(StructureFact { type_: x.structure_type.to_string(), at: x.at.to_string(), spaces: x.spaces.iter().map(|sp| sp.space).map(|x| x.to_string()).collect() });
+        held(self.facts.write()).insert(x.structure, f.clone());
         f
     }
 
@@ -252,8 +252,8 @@ impl Encoded {
         let mut taken: Vec<(Id, Taken)> = vec![];
         for (path, ch) in obs.channels.iter_mut() {
             match ch {
-                ChannelData::Records { records, .. } if !records.is_empty() => taken.push((path.clone(), Taken::Records(std::mem::take(records)))),
-                ChannelData::Sites { cells, .. } if !cells.is_empty() => taken.push((path.clone(), Taken::Cells(std::mem::take(cells)))),
+                ChannelData::Records { records, .. } if !records.is_empty() => taken.push((*path, Taken::Records(std::mem::take(records)))),
+                ChannelData::Sites { cells, .. } if !cells.is_empty() => taken.push((*path, Taken::Cells(std::mem::take(cells)))),
                 _ => {}
             }
         }
@@ -264,8 +264,8 @@ impl Encoded {
         let mut failed = None;
         let mut buildings = vec![];
         for (path, what) in &taken {
-            let (_, list) = elements.entry(path.clone()).or_insert((if matches!(what, Taken::Records(_)) { "records" } else { "cells" }, vec![]));
-            let facts = shown.entry(path.clone()).or_default();
+            let (_, list) = elements.entry(*path).or_insert((if matches!(what, Taken::Records(_)) { "records" } else { "cells" }, vec![]));
+            let facts = shown.entry(*path).or_default();
             match what {
                 Taken::Records(records) => {
                     for r in records {
@@ -298,7 +298,7 @@ impl Encoded {
         let top = canon::canonical_members(&*obs);
         let parts: Result<Vec<Part>, canon::CanonError> = channels
             .iter()
-            .map(|(path, ch)| Ok((path.clone(), if elements.contains_key(path) { Err(canon::canonical_members(ch)?) } else { Ok(canon::canonical(ch)?) })))
+            .map(|(path, ch)| Ok((*path, if elements.contains_key(path) { Err(canon::canonical_members(ch)?) } else { Ok(canon::canonical(ch)?) })))
             .collect();
         obs.channels = channels;
         for (path, what) in taken {
@@ -340,8 +340,8 @@ impl Encoded {
 /// read from the observation itself, as `Seen::of` reads it from the observation's JSON with each records channel's
 /// records and each sites channel's cells left out.
 pub fn seen(obs: &Observation) -> Seen<'_> {
-    fn word(x: &Option<String>) -> &str {
-        x.as_deref().unwrap_or_default()
+    fn word<S: AsRef<str>>(x: &Option<S>) -> &str {
+        x.as_ref().map_or("", |s| s.as_ref())
     }
     Seen {
         entity: word(&obs.entity),
@@ -533,13 +533,13 @@ impl Kernel {
         for (path, ch) in &obs.channels {
             match ch {
                 ChannelData::Records { records, .. } if !records.is_empty() => {
-                    let facts = shown.entry(path.clone()).or_default();
+                    let facts = shown.entry(*path).or_default();
                     for r in records {
                         facts.records.push(delivered.record_facts(r)?);
                     }
                 }
                 ChannelData::Sites { cells, .. } if !cells.is_empty() => {
-                    let facts = shown.entry(path.clone()).or_default();
+                    let facts = shown.entry(*path).or_default();
                     for c in cells {
                         let structure = c.structure.as_ref().map(|x| {
                             let at = Arc::as_ptr(x) as usize;
@@ -615,7 +615,7 @@ impl Kernel {
         if self.planned.is_empty() {
             return None;
         }
-        let key = (participant.to_string(), only.map(String::from));
+        let key = (Id::new(participant), only.map(Id::new));
         // (The next of those planned, or one a little further on: the host may pass over a unit that has gone.)
         if !self.ready.contains_key(&key) {
             if let Some(ahead) = self.planned[self.planned_done.min(self.planned.len())..].iter().take(LOOK_AHEAD).position(|k| *k == key) {
@@ -626,7 +626,7 @@ impl Kernel {
         let ready = self.ready.remove(&key);
         // Whatever else was made ready for this participant was made before this was delivered to it (what it has
         // seen, and what's waiting for it, are about to change): it's built again when asked for.
-        let others: Vec<(Id, Option<Id>)> = self.ready.range((participant.to_string(), None)..).take_while(|(k, _)| k.0 == participant).map(|(k, _)| k.clone()).collect();
+        let others: Vec<(Id, Option<Id>)> = self.ready.range((Id::new(participant), None)..).take_while(|(k, _)| k.0 == participant).map(|(k, _)| *k).collect();
         for k in others {
             self.ready.remove(&k);
         }
@@ -639,7 +639,7 @@ impl Kernel {
         let from = self.planned_done;
         let to = (from + WINDOW).min(self.planned.len());
         self.planned_done = to;
-        let (s, st) = (self.world.statics(), self.world.state());
+        let (_s, st) = (self.world.statics(), self.world.state());
         let mut seen: BTreeSet<&str> = BTreeSet::new();
         let wanted: Vec<&(Id, Option<Id>)> = self.planned[from..to]
             .iter()
@@ -670,7 +670,7 @@ impl Kernel {
         });
         for (key, ready) in wanted.into_iter().zip(made) {
             if let Some(ready) = ready {
-                self.ready.insert(key.clone(), ready);
+                self.ready.insert(*key, ready);
             }
         }
     }

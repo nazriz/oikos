@@ -3,7 +3,7 @@
 //! currency with two decimal places, less than a year of the world's output). Every amount's unit is its account's currency; the kernel never
 //! converts between currencies (an exchange is a trade: two transfers in one action).
 
-use serde::{Deserialize, Deserializer, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// An amount or balance, in the smallest unit of its currency.
 pub type Money = i128;
@@ -52,7 +52,7 @@ pub mod opt_amount {
 pub mod amount_map {
     use super::*;
     use std::collections::BTreeMap;
-    pub fn serialize<S: Serializer>(v: &BTreeMap<String, Money>, s: S) -> Result<S::Ok, S::Error> {
+    pub fn serialize<K: Serialize,S: Serializer>(v: &BTreeMap<K, Money>, s: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap;
         let mut m = s.serialize_map(Some(v.len()))?;
         for (k, x) in v {
@@ -60,8 +60,8 @@ pub mod amount_map {
         }
         m.end()
     }
-    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<BTreeMap<String, Money>, D::Error> {
-        let m = BTreeMap::<String, String>::deserialize(d)?;
+    pub fn deserialize<'de, K: Deserialize<'de> + Ord, D: Deserializer<'de>>(d: D) -> Result<BTreeMap<K, Money>, D::Error> {
+        let m = BTreeMap::<K, String>::deserialize(d)?;
         m.into_iter().map(|(k, x)| parse(&x).map(|v| (k, v)).map_err(serde::de::Error::custom)).collect()
     }
 }

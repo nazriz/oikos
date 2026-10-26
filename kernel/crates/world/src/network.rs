@@ -46,7 +46,7 @@ impl NetStatics {
                     }
                     c
                 });
-                Some((r.id.clone(), (settle, cum)))
+                Some((r.id, (settle, cum)))
             })
             .collect();
         NetStatics { trees: Trees::of(n), height_mm: n.nodes.iter().map(|x| x.height_m * 1000).collect(), kinds }
@@ -159,9 +159,9 @@ impl NetState {
     }
     fn index_one(&mut self, i: usize) {
         let c = &self.connections[i];
-        self.index.by_id.insert(c.id.clone(), i);
-        self.index.by_holder.entry(c.holder.clone()).or_default().push(i);
-        self.index.by_at.entry(c.at.clone()).or_default().push(i);
+        self.index.by_id.insert(c.id, i);
+        self.index.by_holder.entry(c.holder).or_default().push(i);
+        self.index.by_at.entry(c.at).or_default().push(i);
         self.index.by_supply.entry(c.supply).or_default().push(i);
     }
     /// A connection added (opened by an act, or at the start).
@@ -181,7 +181,7 @@ pub fn initial(s: &Statics) -> Option<Arc<NetState>> {
     let mut ns = NetState { links: vec![LinkState::default(); n.links.len()], ..Default::default() };
     for c in &w.connections {
         let supply = net.trees.supply_of(n, &c.kind, &c.node).expect("validated") as u32;
-        ns.add(Connection { id: c.id.clone(), kind: c.kind.clone(), node: c.node.clone(), supply, holder: c.holder.clone(), at: c.at.clone(), rate: c.rate, meter: 0, uses: c.uses.clone(), reading: c.meter, closed: false, interrupted: false, changed: 0 });
+        ns.add(Connection { id: c.id, kind: c.kind, node: c.node, supply, holder: c.holder, at: c.at, rate: c.rate, meter: 0, uses: c.uses, reading: c.meter, closed: false, interrupted: false, changed: 0 });
     }
     Some(Arc::new(ns))
 }
@@ -455,7 +455,7 @@ pub fn settle(s: &Statics, st: &mut State, t: i64) -> Vec<Timed> {
         let sup = &n.supplies[x.supply];
         for (li, load) in &x.trips {
             ns.links[*li].tripped = true;
-            events.push(Timed::new(t, EventBody::LinkChanged { link: n.links[*li].id.clone(), op: "tripped".into(), by: None, load: Some(*load), capacity: Some(n.links[*li].capacity), rotation: None }));
+            events.push(Timed::new(t, EventBody::LinkChanged { link: n.links[*li].id, op: "tripped".into(), by: None, load: Some(*load), capacity: Some(n.links[*li].capacity), rotation: None }));
         }
         for (li, load) in &x.loads {
             ns.links[*li].load = *load;
@@ -464,7 +464,7 @@ pub fn settle(s: &Statics, st: &mut State, t: i64) -> Vec<Timed> {
         for (ci, amount) in x.deliveries {
             let c = &mut ns.connections[ci];
             c.meter = c.meter.saturating_add(amount as Money);
-            let (holder, at, kind, uses) = (c.holder.clone(), c.at.clone(), c.kind.clone(), c.uses.clone());
+            let (holder, at, kind, uses) = (c.holder, c.at, c.kind, c.uses);
             if sup.physics == Physics::Drain {
                 add_held(st, &holder, &at, &kind, -(amount as Money), stamp);
                 out -= amount as Money;

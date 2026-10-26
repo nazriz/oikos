@@ -204,7 +204,7 @@ pub struct Offer {
 pub fn offers_of(book: &Book) -> Vec<Offer> {
     let mut latest: BTreeMap<String, Offer> = BTreeMap::new();
     for r in book.open(OFFER) {
-        let Some(vendor) = r.speaks_for.clone() else { continue };
+        let Some(vendor) = r.speaks_for else { continue };
         let Ok(mut o) = serde_json::from_value::<Offer>(data(r).clone()) else { continue };
         if o.base.id.is_empty() || o.base.template.is_empty() {
             continue;
@@ -213,8 +213,8 @@ pub fn offers_of(book: &Book) -> Vec<Offer> {
         if latest.get(&key).is_some_and(|x| x.at > r.at) {
             continue;
         }
-        o.vendor = vendor;
-        o.record = r.id.clone();
+        o.vendor = vendor.to_string();
+        o.record = r.id.to_string();
         o.at = r.at;
         latest.insert(key, o);
     }
@@ -250,7 +250,7 @@ pub struct Payback {
 
 impl Default for AdoptionParams {
     fn default() -> Self {
-        AdoptionParams { payback_months: Payback { small: 24, large: 36 }, large_from: 10, hurdle_bps: 2000, reference_bps: 200, on_cost_bps: 0, most: 6, compliance_bps: 10_000 }
+        AdoptionParams { payback_months: Payback { small: 24, large: 36 }, large_from: 10, hurdle_bps: 2000, reference_bps: 200, on_cost_bps: 0, most: 6, compliance_bps: 10_000, }
     }
 }
 
@@ -405,13 +405,13 @@ pub struct Dropping {
 /// Whether to end a licence that has run its term: the running cost against what it saves, with the cost of leaving and
 /// of taking people on again.
 pub fn dropping(l: &Lot, task: &Task, a: &AdoptionParams, horizon: i64) -> Dropping {
-    let t = Terms { fee_month: l.fee_month, setup: 0, exit: 0, seconds: l.seconds, scope_bps: l.scope_bps, error_bps: l.error_bps, oversight_hours_per_month: l.oversight_hours_per_month, references: 0 };
+    let t = Terms { fee_month: l.fee_month, setup: 0, exit: 0, seconds: l.seconds, scope_bps: l.scope_bps, error_bps: l.error_bps, oversight_hours_per_month: l.oversight_hours_per_month, references: 0, };
     let x = appraise(&t, l.systems.len() as i64, task, a, horizon, true);
     // rehire = hands x (wage_month x 12 / 52) x hiring_cost_weeks
     let (hn, hd) = hands(x.units, task);
     let rehire = round_div(hn * i128::from(task.wage_month) * 12 * i128::from(task.hiring_cost_weeks), hd * 52);
     let leaving = i128::from(l.exit) + rehire;
-    Dropping { drop: i128::from(x.running - x.saving) * i128::from(horizon) > leaving, saving: x.saving, running: x.running, leaving: leaving as i64 }
+    Dropping { drop: i128::from(x.running - x.saving) * i128::from(horizon) > leaving, saving: x.saving, running: x.running, leaving: leaving as i64, }
 }
 
 // ------------------------------------------------------------------------------------------------ the buyer's fleet
@@ -472,12 +472,12 @@ impl Fleet {
 
     pub fn absorb(&mut self, book: &Book) {
         for r in book.all(DELIVERY) {
-            if !crate::common::addressed_to(r).contains(&self.me) || self.lots.iter().any(|l| l.delivery == r.id) {
+            if !crate::common::addressed_to(r).iter().any(|x| x == &self.me) || self.lots.iter().any(|l| l.delivery == r.id) {
                 continue;
             }
             let Some(d) = papers::read::<SystemDelivery>(r) else { continue };
             self.lots.push(Lot {
-                delivery: r.id.clone(),
+                delivery: r.id.to_string(),
                 order: d.order,
                 offer: d.offer,
                 vendor: d.vendor,
@@ -502,11 +502,11 @@ impl Fleet {
             });
         }
         for lot in &mut self.lots {
-            let a = book.of_type("agreement").find(|x| cites(x, &lot.order) && agreements::template_of(x) == Some("licence") && agreements::parties_of(x).contains(&self.me));
+            let a = book.of_type("agreement").find(|x| { cites(x, &lot.order) && agreements::template_of(x) == Some("licence") && agreements::parties_of(x).contains(&self.me)});
             if let Some(a) = a {
-                lot.agreement = Some(a.id.clone());
+                lot.agreement = Some(a.id.to_string());
             }
-            let ended_by_vendor = book.all("system_ended").any(|r| data(r).get("order").and_then(Value::as_str) == Some(lot.order.as_str()) && crate::common::addressed_to(r).contains(&self.me));
+            let ended_by_vendor = book.all("system_ended").any(|r| { data(r).get("order").and_then(Value::as_str) == Some(lot.order.as_str()) && crate::common::addressed_to(r).iter().any(|x| x == &self.me)});
             lot.ended = lot.agreement.as_deref().is_some_and(|a| book.signed_by(a, &self.me) && !book.in_force(a)) || ended_by_vendor;
         }
     }
@@ -527,7 +527,7 @@ impl Fleet {
     pub fn working(&self, task: &str) -> Vec<Working> {
         self.in_service(Some(task))
             .into_iter()
-            .flat_map(|l| l.systems.iter().filter(|s| !self.dead.contains(*s)).map(|id| Working { id: id.clone(), seconds: l.seconds, scope_bps: l.scope_bps, offer: l.offer.clone() }))
+            .flat_map(|l| { l.systems.iter().filter(|s| !self.dead.contains(*s)).map(|id| Working { id: id.clone(), seconds: l.seconds, scope_bps: l.scope_bps, offer: l.offer.clone(), })})
             .collect()
     }
 
@@ -589,8 +589,8 @@ impl Fleet {
         lot.ending = true;
         let orders: Vec<String> = book
             .open("request")
-            .filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str()) && data(r).get("every").is_some_and(|e| !e.is_null() && e != &json!(0)) && bases_of(r).contains(&agreement))
-            .map(|r| r.id.clone())
+            .filter(|r| { r.speaks_for.as_deref() == Some(self.me.as_str()) && data(r).get("every").is_some_and(|e| !e.is_null() && e != &json!(0)) && bases_of(r).iter().any(|x| x == &agreement)})
+            .map(|r| r.id).map(|x| x.to_string())
             .collect();
         let mut calls = vec![agreements::notice(&agreement, &format!("We are ending the licence of {}.", lot.title))];
         if lot.exit > 0 {
@@ -678,7 +678,7 @@ impl Adoption {
         let due: Vec<(String, Dropping, String, usize)> = fleet
             .in_service(Some(&o.task))
             .into_iter()
-            .filter(|l| !l.ending && l.agreement.as_deref().is_some_and(|a| book.signed_by(a, &self.me)) && t >= l.since + l.term_days * DAY)
+            .filter(|l| { !l.ending && l.agreement.as_deref().is_some_and(|a| book.signed_by(a, &self.me)) && t >= l.since + l.term_days * DAY})
             .map(|l| (l.delivery.clone(), dropping(l, &o.facts, &self.a, horizon), l.title.clone(), l.systems.len()))
             .collect();
         for (delivery, d, title, n) in due {
@@ -1077,7 +1077,7 @@ impl Plan for Selling {
             if let Some((_, Some(old))) = &was {
                 lines.push(Line { bind: None, call: withdraw(old, Some("Superseded.")) });
             }
-            lines.push(Line { bind: Some("listed".into()), call: say(OFFER, &self.words(&x, cx), Say { visible: Some(Visible::Public), data: serde_json::to_value(&x).ok(), ..Default::default() }) });
+            lines.push(Line { bind: Some("listed".into()), call: say(OFFER, &self.words(&x, cx), Say { visible: Some(Visible::Public), data: serde_json::to_value(&x).ok(), ..Default::default() }), });
             let mut st = Step::new(lines).then(Then::Listed { offer: o.id.clone(), key });
             st.why = Some(if was.is_some() { format!("Our prices or clients have changed: publishing {} again.", o.title) } else { format!("What we sell: {}.", o.title) });
             steps.push(st);
@@ -1111,8 +1111,8 @@ impl Plan for Selling {
         let tenders: Vec<(String, String, Tender)> = self
             .book
             .open(Tender::KIND)
-            .filter(|r| !self.answered.contains(&r.id) && r.speaks_for.is_some())
-            .filter_map(|r| papers::read::<Tender>(r).filter(|d| d.closes >= t).map(|d| (r.id.clone(), r.speaks_for.clone().unwrap_or_default(), d)))
+            .filter(|r| !self.answered.contains(r.id.as_str()) && r.speaks_for.is_some())
+            .filter_map(|r| { papers::read::<Tender>(r).filter(|d| d.closes >= t).map(|d| (r.id.to_string(), r.speaks_for.unwrap_or_default().to_string(), d))})
             .collect();
         for (id, by, d) in tenders {
             self.answered.insert(id.clone());
@@ -1157,10 +1157,10 @@ impl Plan for Selling {
             }
             let a: Option<Arc<Record>> = match &l.agreement {
                 Some(id) => self.book.get(id).cloned(),
-                None => self.book.of_type("agreement").find(|r| cites(r, &l.order) && agreements::template_of(r) == Some("licence")).cloned(),
+                None => { self.book.of_type("agreement").find(|r| cites(r, &l.order) && agreements::template_of(r) == Some("licence")).cloned()}
             };
             if let (Some(a), None) = (&a, &l.agreement) {
-                self.licences[i].agreement = Some(a.id.clone());
+                self.licences[i].agreement = Some(a.id.to_string());
             }
             let unsigned = format!("{} has not signed the licence in {} days", l.buyer, self.p.sign_days);
             let waited = t - l.since >= self.p.sign_days * DAY;
@@ -1169,7 +1169,7 @@ impl Plan for Selling {
                 Some(a) if self.book.taken_back(&a.id) => Some("the licence offer was taken back".to_string()),
                 Some(a) if !self.book.signed_by(&a.id, &l.buyer) => waited.then(|| unsigned.clone()),
                 Some(a) if !self.book.in_force(&a.id) => Some("the licence has ended".to_string()),
-                Some(_) if t - l.last_paid >= self.p.grace_days * DAY => Some(format!("the licence fee has not been paid for {} days", (t - l.last_paid) / DAY)),
+                Some(_) if t - l.last_paid >= self.p.grace_days * DAY => { Some(format!("the licence fee has not been paid for {} days", (t - l.last_paid) / DAY))}
                 Some(_) => None,
             };
             let Some(why) = why else { continue };
@@ -1204,7 +1204,7 @@ impl Plan for Selling {
         match tok {
             Then::Listed { offer, key } => {
                 if let Some(id) = out.created.as_ref().and_then(|c| c.get("listed")) {
-                    self.listed.insert(offer.clone(), (key.clone(), Some(id.clone())));
+                    self.listed.insert(offer.clone(), (key.clone(), Some(id.to_string())));
                 }
                 vec![]
             }
@@ -1212,15 +1212,15 @@ impl Plan for Selling {
                 if !done.applied() {
                     return vec![self.refund_delivery(o, cx)];
                 }
-                let ids: Vec<String> = (0..o.quantity).filter_map(|i| out.created.as_ref().and_then(|c| c.get(&format!("sys{i}"))).cloned()).collect();
+                let ids: Vec<String> = (0..o.quantity).filter_map(|i| out.created.as_ref().and_then(|c| c.get(&format!("sys{i}"))).cloned()).map(|x| x.to_string()).collect();
                 self.clients.entry(x.base.id.clone()).or_default().insert(o.buyer.clone());
-                self.licences.push(Granted { order: o.id.clone(), delivery: None, buyer: o.buyer.clone(), offer: x.base.id.clone(), systems: ids.clone(), since: out.t, agreement: None, last_paid: out.t, retired: false });
+                self.licences.push(Granted { order: o.id.clone(), delivery: None, buyer: o.buyer.clone(), offer: x.base.id.clone(), systems: ids.clone(), since: out.t, agreement: None, last_paid: out.t, retired: false, });
                 vec![self.delivery_step(o, x, &ids, cx)]
             }
             Then::Noted { order } => {
                 if let Some(id) = out.created.as_ref().and_then(|c| c.get("delivery")) {
                     if let Some(l) = self.licences.iter_mut().find(|l| &l.order == order) {
-                        l.delivery = Some(id.clone());
+                        l.delivery = Some(id.to_string());
                     }
                 }
                 vec![]

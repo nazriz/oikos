@@ -9,11 +9,11 @@ fn cat(json: serde_json::Value) -> Catalogue {
 
 /// A row of `w` cells, cell.0.0 .. cell.<w-1>.0.
 fn row(w: i64, flows: &[FlowCfg]) -> Ground {
-    Ground::new(&(0..w).map(|x| (format!("cell.{x}.0"), x, 0)).collect::<Vec<_>>(), flows)
+    Ground::new(&(0..w).map(|x| (Id::from(format!("cell.{x}.0")), x, 0)).collect::<Vec<_>>(), flows)
 }
 
 fn land(covers: &[&str]) -> Land {
-    Land { cover: covers.iter().map(|c| c.to_string()).collect(), built: covers.iter().map(|c| *c == "built").collect(), anchored: vec![vec![]; covers.len()] }
+    Land { cover: covers.iter().map(|c| Id::new(c)).collect(), built: covers.iter().map(|c| *c == "built").collect(), anchored: vec![vec![]; covers.len()] }
 }
 
 fn frog() -> serde_json::Value {
@@ -35,7 +35,7 @@ fn a_population_grows_toward_its_capacity_and_stays_near_it() {
     let g = row(3, &[]);
     let l = land(&["wetland", "wetland", "wetland"]);
     let mut st = NatureState::default();
-    st.populations.insert("frog".into(), [("cell.1.0".to_string(), 10)].into());
+    st.populations.insert("frog".into(), [("cell.1.0".into(), 10)].into());
     let r = Randomness::new(7);
     run(&c, &g, &l, &mut st, 0..3650, &r);
     let t = total(&st, "frog");
@@ -48,13 +48,13 @@ fn no_capacity_no_life_and_extinction_is_permanent() {
     let c = cat(serde_json::json!({ "species": [frog()] }));
     let g = row(2, &[]);
     let mut st = NatureState::default();
-    st.populations.insert("frog".into(), [("cell.0.0".to_string(), 50)].into());
+    st.populations.insert("frog".into(), [("cell.0.0".into(), 50)].into());
     let r = Randomness::new(1);
     // The wetland is built over: none can live there, and the one neighbour is built too (a barrier).
     let results = run(&c, &g, &land(&["built", "built"]), &mut st, 0..3, &r);
     assert_eq!(total(&st, "frog"), 0);
     assert_eq!(st.extinct.get("frog"), Some(&0));
-    assert_eq!(results[0].extinct, vec!["frog".to_string()]);
+    assert_eq!(results[0].extinct, vec![Id::new("frog")]);
     // Wetland again: nothing comes back, and extinction isn't recorded twice.
     let results = run(&c, &g, &land(&["wetland", "wetland"]), &mut st, 3..400, &r);
     assert_eq!(total(&st, "frog"), 0);
@@ -66,13 +66,13 @@ fn a_barrier_between_habitats_keeps_them_apart() {
     let c = cat(serde_json::json!({ "species": [frog()] }));
     let g = row(3, &[]);
     let mut st = NatureState::default();
-    st.populations.insert("frog".into(), [("cell.0.0".to_string(), 80)].into());
+    st.populations.insert("frog".into(), [("cell.0.0".into(), 80)].into());
     let r = Randomness::new(3);
     run(&c, &g, &land(&["wetland", "built", "wetland"]), &mut st, 0..1500, &r);
     assert_eq!(st.populations["frog"].get("cell.2.0"), None, "crossing the built cell kills");
     // Without the barrier (grassland: no capacity, but crossable), some get through.
     let mut st2 = NatureState::default();
-    st2.populations.insert("frog".into(), [("cell.0.0".to_string(), 80)].into());
+    st2.populations.insert("frog".into(), [("cell.0.0".into(), 80)].into());
     let c2 = cat(serde_json::json!({ "species": [{ "id": "frog", "capacity_per_1000_cells": { "wetland": 100000 }, "growth_bps_per_year": 20000, "mortality_bps_per_year": 2000,
         "dispersal_bps_per_year": 20000, "min_viable": 1, "detection_bps": 6000 }] }));
     let mut l = land(&["wetland", "grassland", "wetland"]);
@@ -85,7 +85,7 @@ fn a_barrier_between_habitats_keeps_them_apart() {
 
 #[test]
 fn pollution_flows_downstream_and_kills_what_cant_bear_it() {
-    let flows: Vec<FlowCfg> = (0..3).map(|x| FlowCfg { from: format!("cell.{x}.0"), to: format!("cell.{}.0", x + 1) }).collect();
+    let flows: Vec<FlowCfg> = (0..3).map(|x| FlowCfg { from: format!("cell.{x}.0").into(), to: format!("cell.{}.0", x + 1).into() }).collect();
     let mut f = frog();
     f["tolerance"] = serde_json::json!({ "pollution": { "above": 300, "mortality_bps_per_day": 500 } });
     f["dispersal_bps_per_year"] = serde_json::json!(0);
@@ -96,7 +96,7 @@ fn pollution_flows_downstream_and_kills_what_cant_bear_it() {
     let mut l = land(&["built", "water", "water", "wetland"]);
     l.anchored[0] = vec!["works".into()];
     let mut st = NatureState::default();
-    st.populations.insert("frog".into(), [("cell.3.0".to_string(), 90)].into());
+    st.populations.insert("frog".into(), [("cell.3.0".into(), 90)].into());
     let r = Randomness::new(5);
     run(&c, &g, &l, &mut st, 0..200, &r);
     let p = &st.fields["pollution"];
@@ -104,7 +104,7 @@ fn pollution_flows_downstream_and_kills_what_cant_bear_it() {
     assert_eq!(total(&st, "frog"), 0, "the frogs downstream die");
     // Without the works, the same frogs live.
     let mut clean = NatureState::default();
-    clean.populations.insert("frog".into(), [("cell.3.0".to_string(), 90)].into());
+    clean.populations.insert("frog".into(), [("cell.3.0".into(), 90)].into());
     run(&c, &g, &land(&["built", "water", "water", "wetland"]), &mut clean, 0..200, &r);
     assert!(total(&clean, "frog") > 50);
 }
@@ -122,17 +122,17 @@ fn cleared_land_grows_back_slowly_but_not_while_built_on() {
     let g = row(2, &[]);
     let mut st = NatureState::default();
     let r = Randomness::new(1);
-    let mut covers = vec!["cleared".to_string(), "built".to_string()];
+    let mut covers = vec!["cleared".into(), "built".into()];
     let mut changes = vec![];
     for day in 0..500 {
-        let l = Land { cover: covers.clone(), built: vec![false, true], anchored: vec![vec![], vec![]] };
+        let l = Land { cover: covers.clone().into_iter().map(Into::into).collect(), built: vec![false, true], anchored: vec![vec![], vec![]] };
         let out = step_day(&c, &g, &l, &mut st, day, &r);
         for (cell, to) in out.cover_changes {
-            changes.push((day, cell.clone(), to.clone()));
-            covers[g.index[&cell]] = to;
+            changes.push((day, cell, to));
+            covers[g.index[&cell]] = to.to_string();
         }
     }
-    assert_eq!(changes, vec![(100, "cell.0.0".to_string(), "scrub".to_string()), (400, "cell.0.0".to_string(), "woodland".to_string())]);
+    assert_eq!(changes, vec![(100, "cell.0.0".into(), "scrub".into()), (400, "cell.0.0".into(), "woodland".into())]);
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn a_field_diffuses_and_decays_to_its_baseline() {
     let g = row(3, &[]);
     let l = land(&["a", "a", "a"]);
     let mut st = NatureState::default();
-    st.fields.insert("p".into(), [("cell.1.0".to_string(), 1000)].into());
+    st.fields.insert("p".into(), [("cell.1.0".into(), 1000)].into());
     let r = Randomness::new(1);
     step_day(&c, &g, &l, &mut st, 0, &r);
     let p = &st.fields["p"];
@@ -163,7 +163,7 @@ fn surveys_estimate_with_error_and_runs_replay() {
     let l = land(&["wetland", "wetland", "wetland"]);
     let go = || {
         let mut st = NatureState::default();
-        st.populations.insert("frog".into(), [("cell.0.0".to_string(), 12)].into());
+        st.populations.insert("frog".into(), [("cell.0.0".into(), 12)].into());
         run(&c, &g, &l, &mut st, 0..300, &Randomness::new(42));
         st
     };
@@ -177,7 +177,7 @@ fn a_sparse_species_lives_at_a_fraction_of_one_per_cell_over_its_home_range() {
     // would feel no one in its own cell and pay no heed to its capacity.)
     let glider = |range: i64| serde_json::json!({ "id": "glider", "capacity_per_1000_cells": { "woodland": 125 }, "home_range": range,
         "growth_bps_per_year": 3000, "mortality_bps_per_year": 2000, "dispersal_bps_per_year": 1000, "dispersal_range": 8, "min_viable": 2, "detection_bps": 3000 });
-    let cells: Vec<(String, i64, i64)> = (0..20).flat_map(|y| (0..20).map(move |x| (format!("cell.{x}.{y}"), x, y))).collect();
+    let cells: Vec<(Id, i64, i64)> = (0..20).flat_map(|y| (0..20).map(move |x| (Id::from(format!("cell.{x}.{y}")), x, y))).collect();
     let g = Ground::new(&cells, &[]);
     let l = land(&vec!["woodland"; 400]);
     let run_with = |range: i64, seed: u64| {
@@ -185,7 +185,7 @@ fn a_sparse_species_lives_at_a_fraction_of_one_per_cell_over_its_home_range() {
         let mut st = NatureState::default();
         // (At its density: one per 8 cells. Scattered singletons, alone in their home ranges, couldn't breed: the Allee
         // effect, as it should be.)
-        st.populations.insert("glider".into(), (0..50).map(|i| (g.cells[i * 8].clone(), 1)).collect());
+        st.populations.insert("glider".into(), (0..50).map(|i| (g.cells[i * 8], 1)).collect());
         run(&c, &g, &l, &mut st, 0..3650, &Randomness::new(seed));
         total(&st, "glider")
     };
@@ -203,13 +203,13 @@ fn a_gap_wider_than_the_dispersal_range_cuts_a_patch_off() {
     // (Three rows, so a walk can wander; the wetland columns are at either end.)
     let reach = |gap: usize, range: i64| {
         let w = gap as i64 + 2;
-        let cells: Vec<(String, i64, i64)> = (0..3).flat_map(|y| (0..w).map(move |x| (format!("cell.{x}.{y}"), x, y))).collect();
+        let cells: Vec<(Id, i64, i64)> = (0..3).flat_map(|y| (0..w).map(move |x| (Id::from(format!("cell.{x}.{y}")), x, y))).collect();
         let g = Ground::new(&cells, &[]);
         let covers: Vec<&str> = g.xy.iter().map(|(x, _)| if *x == 0 || *x == w - 1 { "wetland" } else { "grassland" }).collect();
         let mut st = NatureState::default();
-        st.populations.insert("frog".into(), [("cell.0.1".to_string(), 40)].into());
+        st.populations.insert("frog".into(), [("cell.0.1".into(), 40)].into());
         run(&cat(serde_json::json!({ "species": [sp(range)] })), &g, &land(&covers), &mut st, 0..1500, &Randomness::new(4));
-        (0..3).map(|y| st.populations["frog"].get(&format!("cell.{}.{y}", w - 1)).copied().unwrap_or(0)).sum::<i64>()
+        (0..3).map(|y| st.populations["frog"].get(format!("cell.{}.{y}", w - 1).as_str()).copied().unwrap_or(0)).sum::<i64>()
     };
     assert!(reach(2, 6) > 0, "a gap of 2 within a range of 6: crossed");
     assert_eq!(reach(8, 3), 0, "a gap of 8 beyond a range of 3: never crossed");
@@ -227,7 +227,7 @@ fn a_spin_up_is_exactly_the_days_stepped_one_by_one() {
     l.anchored[0] = vec!["works".into()];
     let start = || {
         let mut st = NatureState::default();
-        st.populations.insert("frog".into(), [("cell.2.0".to_string(), 30)].into());
+        st.populations.insert("frog".into(), [("cell.2.0".into(), 30)].into());
         st
     };
     let r = Randomness::new(8);
@@ -244,8 +244,8 @@ fn a_spin_up_is_exactly_the_days_stepped_one_by_one() {
 #[test]
 fn a_spin_up_over_a_whole_ground_is_exactly_the_days_stepped_one_by_one() {
     let (w, h) = (12i64, 9i64);
-    let cells: Vec<(String, i64, i64)> = (0..h).flat_map(|y| (0..w).map(move |x| (format!("cell.{x}.{y}"), x, y))).collect();
-    let flows: Vec<FlowCfg> = (0..w - 1).map(|x| FlowCfg { from: format!("cell.{x}.4"), to: format!("cell.{}.4", x + 1) }).collect();
+    let cells: Vec<(Id, i64, i64)> = (0..h).flat_map(|y| (0..w).map(move |x| (Id::from(format!("cell.{x}.{y}")), x, y))).collect();
+    let flows: Vec<FlowCfg> = (0..w - 1).map(|x| FlowCfg { from: format!("cell.{x}.4").into(), to: format!("cell.{}.4", x + 1).into() }).collect();
     let g = Ground::new(&cells, &flows);
     // (The ground's cells are in id order, not row by row.)
     let cover = |x: i64, y: i64| match (x, y) {
@@ -288,12 +288,12 @@ fn a_spin_up_over_a_whole_ground_is_exactly_the_days_stepped_one_by_one() {
     for seed in [1, 8, 23] {
         let start = || {
             let mut st = NatureState::default();
-            st.populations.insert("frog".into(), [("cell.1.1".to_string(), 30), ("cell.3.4".to_string(), 12)].into());
-            st.populations.insert("glider".into(), [("cell.10.2".to_string(), 3), ("cell.11.7".to_string(), 2), ("cell.9.0".to_string(), -2)].into());
-            st.populations.insert("wren".into(), g.cells.iter().step_by(2).map(|c| (c.clone(), 2)).collect());
-            st.populations.insert("moth".into(), g.cells.iter().step_by(3).map(|c| (c.clone(), 5)).collect());
-            st.populations.insert("stray".into(), [("cell.6.0".to_string(), 3)].into());
-            st.fields.insert("pollution".into(), [("cell.6.6".to_string(), 900)].into());
+            st.populations.insert("frog".into(), [("cell.1.1".into(), 30), ("cell.3.4".into(), 12)].into());
+            st.populations.insert("glider".into(), [("cell.10.2".into(), 3), ("cell.11.7".into(), 2), ("cell.9.0".into(), -2)].into());
+            st.populations.insert("wren".into(), g.cells.iter().step_by(2).map(|c| (*c, 2)).collect());
+            st.populations.insert("moth".into(), g.cells.iter().step_by(3).map(|c| (*c, 5)).collect());
+            st.populations.insert("stray".into(), [("cell.6.0".into(), 3)].into());
+            st.fields.insert("pollution".into(), [("cell.6.6".into(), 900)].into());
             st
         };
         let r = Randomness::new(seed);

@@ -278,7 +278,7 @@ impl CitizenMind {
                 heard(self, cx, "job", emp, if paid { 10_000 } else { 0 }, json!({ "paid": paid }));
             }
             for host in &told.goes_to {
-                let ids: Vec<String> = book.practices().filter(|g| g.speaks_for.as_deref().unwrap_or(&g.author) == host).map(|g| g.id.clone()).collect();
+                let ids: Vec<String> = book.practices().filter(|g| g.speaks_for.as_deref().unwrap_or(&g.author) == host).map(|g| g.id).map(|x| x.to_string()).collect();
                 for id in ids {
                     let pay = (7_000 + round(self.hold_to(host) as f64 * self.p.belief.meaning)).min(10_000);
                     heard(self, cx, "practice", &id, pay, json!({ "goes": true, "host": host }));
@@ -443,12 +443,12 @@ impl CitizenMind {
                     let RecordBody::Statement { data, .. } = &r.body else { continue };
                     let kind = data.as_ref().and_then(|d| d.get("kind")).and_then(Json::as_str).unwrap_or_default();
                     let Some((ek, weight)) = townmemory::paper_weight(kind) else { continue };
-                    if r.speaks_for.as_deref() != Some(paper.as_str()) || self.s.read_news.contains(&r.id) {
+                    if r.speaks_for.as_deref() != Some(paper.as_str()) || self.s.read_news.contains(r.id.as_str()) {
                         continue;
                     }
-                    self.s.read_news.insert(r.id.clone());
+                    self.s.read_news.insert(r.id.to_string());
                     let basis = common::bases_of(&r).first().and_then(|b| book.get(b)).cloned();
-                    let by = basis.and_then(|b| b.speaks_for.clone()).or_else(|| self.p.electoral_town.clone());
+                    let by = basis.and_then(|b| b.speaks_for.map(|x| x.to_string())).or_else(|| self.p.electoral_town.clone());
                     if let Some(by) = by {
                         let strength = townmemory::paper_strength(weight, &self.s.culture.as_ref().unwrap().p);
                         self.remember_town(ek.name(), &by, r.at, t, false, strength);
@@ -459,10 +459,10 @@ impl CitizenMind {
             for r in items {
                 let RecordBody::Statement { data, .. } = &r.body else { continue };
                 let d = data.clone().unwrap_or(Json::Null);
-                if self.s.read_items.contains(&r.id) || r.speaks_for.as_deref() != Some(paper.as_str()) || d.get("about_office") != Some(&Json::Bool(true)) {
+                if self.s.read_items.contains(r.id.as_str()) || r.speaks_for.as_deref() != Some(paper.as_str()) || d.get("about_office") != Some(&Json::Bool(true)) {
                     continue;
                 }
-                self.s.read_items.insert(r.id.clone());
+                self.s.read_items.insert(r.id.to_string());
                 let tone = d.get("tone").and_then(Json::as_f64).unwrap_or(0.0).clamp(-1.0, 1.0);
                 self.s.approval = (self.s.approval + round(tone * self.p.civic.news_weight_bps as f64)).clamp(-10_000, 10_000);
             }
@@ -472,12 +472,12 @@ impl CitizenMind {
         for n in notices {
             let RecordBody::Statement { data, .. } = &n.body else { continue };
             let d = data.clone().unwrap_or(Json::Null);
-            if self.s.stood_for.contains(&n.id) || t >= d.get("nominations_close_at").and_then(Json::as_i64).unwrap_or(0) {
+            if self.s.stood_for.contains(n.id.as_str()) || t >= d.get("nominations_close_at").and_then(Json::as_i64).unwrap_or(0) {
                 continue;
             }
-            self.s.stood_for.insert(n.id.clone());
+            self.s.stood_for.insert(n.id.to_string());
             let drive = 1.0 + 0.5 * self.z_value(Value::Achievement) + 0.5 * self.z_value(Value::Power) + if self.s.approval < 0 { -self.s.approval as f64 / 5_000.0 } else { 0.0 } + if self.s.initiative { self.s.wants.p.sway.agency * self.za() } else { 0.0 };
-            if !self.s.stand_now.contains(&n.id) && (cx.rng(&format!("stand-{}", n.id)).below(10_000) as i64) >= Self::shifted(self.p.civic.stand_bps, drive - 1.0) {
+            if !self.s.stand_now.contains(n.id.as_str()) && (cx.rng(&format!("stand-{}", n.id)).below(10_000) as i64) >= Self::shifted(self.p.civic.stand_bps, drive - 1.0) {
                 continue;
             }
             let mut vs = Value::ALL.to_vec();
@@ -498,10 +498,10 @@ impl CitizenMind {
             let d = data.clone().unwrap_or(Json::Null);
             let opens = d.get("opens_at").and_then(Json::as_i64).unwrap_or(0);
             let closes = d.get("closes_at").and_then(Json::as_i64).unwrap_or(0);
-            if self.s.voted.contains(&b.id) || d.get("electorate").and_then(Json::as_str) != Some("roll") || !enrolled_at.map_or(false, |e| e < b.at) || t < opens || t >= closes {
+            if self.s.voted.contains(b.id.as_str()) || d.get("electorate").and_then(Json::as_str) != Some("roll") || !enrolled_at.map_or(false, |e| e < b.at) || t < opens || t >= closes {
                 continue;
             }
-            self.s.voted.insert(b.id.clone());
+            self.s.voted.insert(b.id.to_string());
             if (cx.rng(&format!("turnout-{}", b.id)).below(10_000) as i64) >= self.p.civic.turnout_bps {
                 continue;
             }
@@ -588,30 +588,30 @@ impl CitizenMind {
         for pet in &open {
             if pet.speaks_for.as_deref() == Some(me.as_str()) {
                 let n = petition_signatures(book, &pet.id) as i64 + 1;
-                let last = self.s.counts_published.get(&pet.id).copied();
+                let last = self.s.counts_published.get(pet.id.as_str()).copied();
                 if last.map_or(true, |(ln, at)| ln != n && t - at >= 3 * DAY) {
-                    self.s.counts_published.insert(pet.id.clone(), (n, t));
-                    out.steps.push(because("Publishing our petition's running count.", vec![steps::say("petition_count", &format!("{n} people have signed."), Say { basis: Some(pet.id.clone()), data: Some(json!({ "petition": pet.id, "signatures": n })), ..Default::default() })]));
+                    self.s.counts_published.insert(pet.id.to_string(), (n, t));
+                    out.steps.push(because("Publishing our petition's running count.", vec![steps::say("petition_count", &format!("{n} people have signed."), Say { basis: Some(pet.id.to_string()), data: Some(json!({ "petition": pet.id, "signatures": n })), ..Default::default() })]));
                     self.out(cx, life, t, "petition", "start", "signatures", "mine", json!({ "petition": pet.id, "signatures": n, "days_open": (t - pet.at).div_euclid(DAY) }));
                 }
                 continue;
             }
-            if self.s.signed.contains(&pet.id) || !self.s.willing {
+            if self.s.signed.contains(pet.id.as_str()) || !self.s.willing {
                 continue;
             }
             let share = (published_count(book, pet) as f64 * 10_000.0) / self.p.population as f64;
             let housed = life.housed != Housed::None;
-            let signs = self.s.sign_now.contains(&pet.id) || (aggrieved && hush < 1.0) || (housed && share >= self.s.threshold as f64 * (1.0 + hush));
-            if signs || !self.s.petition_seen.contains(&pet.id) {
+            let signs = self.s.sign_now.contains(pet.id.as_str()) || (aggrieved && hush < 1.0) || (housed && share >= self.s.threshold as f64 * (1.0 + hush));
+            if signs || !self.s.petition_seen.contains(pet.id.as_str()) {
                 let mut d = Map::new();
                 for (k, v) in [("t", json!(t)), ("domain", json!("petition")), ("strategy", json!(if aggrieved { "deliberate" } else { "imitate" })), ("choice", json!(if signs { "sign" } else { "not" })), ("options", json!([{ "key": "not", "score": self.s.threshold }, { "key": "sign", "score": round(share) }]))] {
                     d.insert(k.into(), v);
                 }
                 self.decision(cx, d, &[]);
             }
-            self.s.petition_seen.insert(pet.id.clone());
+            self.s.petition_seen.insert(pet.id.to_string());
             if signs {
-                self.s.signed.insert(pet.id.clone());
+                self.s.signed.insert(pet.id.to_string());
                 let why = if aggrieved { "Signing the tenants' petition: we're aggrieved ourselves.".to_string() } else { format!("Signing the tenants' petition: {}% of the town has signed, past our own threshold of {}%.", round(share / 100.0), round(self.s.threshold as f64 / 100.0)) };
                 out.steps.push(because(why, vec![common::vote(&pet.id, "sign", None)]));
             }
@@ -663,7 +663,7 @@ impl CitizenMind {
                         if let Some(x) = self.s.contacts.iter_mut().find(|(c, _)| c == o) {
                             x.1 = t;
                         } else {
-                            self.s.contacts.push((o.clone(), t));
+                            self.s.contacts.push((o.to_string(), t));
                         }
                     }
                 }
@@ -682,9 +682,9 @@ impl CitizenMind {
         let room = |st: &oikos_sight::SiteStructure, kind: &str| st.complete && st.spaces.iter().any(|sp| sp.kind == kind && if kind == "dwelling" { sp.count == 0 } else { sp.count < sp.capacity });
         for (from, want) in std::mem::take(&mut self.s.asked) {
             let lead = if want == "home" {
-                structures.iter().find(|st| room(st, "dwelling")).map(|st| st.structure.clone())
+                structures.iter().find(|st| room(st, "dwelling")).map(|st| st.structure)
             } else {
-                life.workplace.as_ref().map(|w| common::structure_of(w).to_string()).filter(|ws| structures.iter().any(|st| &st.structure == ws && room(st, "workplace")))
+                (life.workplace.as_ref().map(|w| common::structure_of(w).to_string()).filter(|ws| structures.iter().any(|st| &st.structure == ws && room(st, "workplace")))).map(Into::into)
             };
             if let Some(lead) = lead {
                 if (cx.rng(&format!("pass-on-{from}")).below(10_000) as i64) < self.p.pass_on_bps {
@@ -758,7 +758,7 @@ impl CitizenMind {
         for st in around {
             for sp in &st.spaces {
                 for d in sp.left.iter().flatten() {
-                    if serde_json::to_value(&d.reason).ok().and_then(|x| x.as_str().map(String::from)).as_deref() != Some("removed") || d.occupant == me || life.household_adults.contains(&d.occupant) || d.at > t || t - d.at > witness_days * DAY {
+                    if serde_json::to_value(&d.reason).ok().and_then(|x| x.as_str().map(String::from)).as_deref() != Some("removed") || d.occupant == me || life.household_adults.contains(&d.occupant.to_string()) || d.at > t || t - d.at > witness_days * DAY {
                         continue;
                     }
                     if !self.s.town.as_mut().unwrap().new_sighting(&format!("{}|{}|{}", sp.space, d.occupant, d.at)) {

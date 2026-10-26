@@ -18,10 +18,10 @@ pub fn support_law(book: &Book) -> Option<(String, Vec<PaymentRule>)> {
     let mut payments: Vec<PaymentRule> = serde_json::from_value(data(l)["payments"].clone()).ok()?;
     for p in &mut payments {
         if p.payer.is_empty() {
-            p.payer = l.speaks_for.clone().unwrap_or_default();
+            p.payer = l.speaks_for.unwrap_or_default().to_string();
         }
     }
-    Some((l.id.clone(), payments))
+    Some((l.id.to_string(), payments))
 }
 
 #[cfg(test)]

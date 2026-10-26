@@ -8,7 +8,8 @@
 //   bun scripts/heapprof.ts <dump> <dwarf> --components [PEOPLE]   live bytes by component, and per person
 //
 // Live bytes are summed by the first DEPTH frames that are the kernel's own (a function whose path starts `oikos_`).
-// Names come from `atos` (macOS) and `rustfilt` (`cargo install rustfilt`). docs/design/performance.md says what a
+// Names come from `atos` (macOS) and `rustfilt` (`cargo install rustfilt`), or on Linux `llvm-symbolizer` (DWARF: the
+// binary itself, kernel/target/heapprof/oikos-kernel). docs/design/performance.md says what a
 // profile of a 10,000-person month found.
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -23,7 +24,14 @@ const head = lines[0]!.match(/load (0x[0-9a-f]+) live (\d+) rate (\d+)/);
 if (!head) throw new Error(`${dump}: not a heapprof dump`);
 const load = head[1]!, live = Number(head[2]);
 const rows = lines.slice(1).map((l) => { const [w, c, ...a] = l.split(" "); return { w: Number(w), c: Number(c), a }; });
-const atos = (addrs: string[], inline: boolean) =>
+// (On Linux, `llvm-symbolizer` on the binary itself, each address less the load address; its frames demangled, each
+// address's inlined frames one a line, a blank line after each, so they are read back into `atos`'s shape.)
+const symbolize = (addrs: string[], inline: boolean) => {
+  const rel = addrs.map((a) => "0x" + (BigInt(a) - BigInt(load) - 1n).toString(16));
+  const out = Bun.spawnSync(["llvm-symbolizer", `--obj=${dwarf}`, "--demangle", inline ? "--inlines" : "--no-inlines", ...rel], { stdout: "pipe" }).stdout.toString();
+  return out.split("\n\n").filter((b) => b.trim()).map((b) => b.split("\n").filter((_, i) => i % 2 === 0).map((f) => `${f} (in oikos)`).join("\n")).join("\n");
+};
+const atos = (addrs: string[], inline: boolean) => process.platform !== "darwin" ? symbolize(addrs, inline) :
   Bun.spawnSync(["sh", "-c", `atos -o '${dwarf}' -l ${load} ${inline ? "-i" : ""} ${addrs.join(" ")} | '${filt}'`], { stdout: "pipe" }).stdout.toString();
 const outer = new Map<string, string>();
 const addrs = [...new Set(rows.flatMap((r) => r.a))];

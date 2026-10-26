@@ -148,7 +148,7 @@ impl Kind for Environment {
 pub enum Then {
     Staff(StaffThen),
     /// A survey sent: the species and the cells, and who went.
-    Survey { species: String, cells: Vec<String>, crew: Vec<String> },
+    Survey { species: String, cells: Vec<String>, crew: Vec<String>, },
     /// The register published: its id is kept to be withdrawn by the next.
     Register,
 }
@@ -346,10 +346,10 @@ impl Plan for Office {
         self.staff.absorb(pic);
         let mut maps: Vec<(String, HabitatMap)> = vec![];
         for r in self.book.open("habitat_map") {
-            if self.mapped.contains(&r.id) || r.speaks_for.as_deref() != Some(self.me.as_str()) {
+            if self.mapped.contains(r.id.as_str()) || r.speaks_for.as_deref() != Some(self.me.as_str()) {
                 continue;
             }
-            maps.push((r.id.clone(), papers::read::<HabitatMap>(r).unwrap_or(HabitatMap { areas: vec![], built: vec![] })));
+            maps.push((r.id.to_string(), papers::read::<HabitatMap>(r).unwrap_or(HabitatMap { areas: vec![], built: vec![] })));
         }
         for (id, m) in maps {
             self.mapped.insert(id);
@@ -367,9 +367,9 @@ impl Plan for Office {
         }
         let mut built: Vec<(String, String)> = vec![];
         for n in self.book.open("building_notice") {
-            if !self.mapped.contains(&n.id) {
+            if !self.mapped.contains(n.id.as_str()) {
                 if let Some(at) = data(n).get("at").and_then(Value::as_str) {
-                    built.push((n.id.clone(), at.to_string()));
+                    built.push((n.id.to_string(), at.to_string()));
                 }
             }
         }
@@ -382,7 +382,7 @@ impl Plan for Office {
                 for c in cells.iter() {
                     if let Some(s) = c.structure.as_ref().filter(|s| s.structure == self.p.depot) {
                         if let Some(sp) = s.spaces.iter().find(|sp| sp.space == self.p.workplace) {
-                            let here = sp.occupants.iter().flatten().cloned().collect();
+                            let here = sp.occupants.iter().flatten().cloned().map(|x| x.to_string()).collect();
                             self.room = Some((i64::from(sp.capacity), here));
                         }
                     }
@@ -580,7 +580,7 @@ impl Plan for Office {
             Then::Register => {
                 if let Done::Outcome(o) = done {
                     if let Some(id) = o.created.as_ref().and_then(|c| c.get("register")) {
-                        self.register = Some(id.clone());
+                        self.register = Some(id.to_string());
                     }
                 }
                 vec![]

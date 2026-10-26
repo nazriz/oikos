@@ -128,7 +128,7 @@ impl StandingWork {
     fn orders<'a>(&'a self, book: &'a Book) -> impl Iterator<Item = &'a Arc<Record>> + 'a {
         book.open("work_order").filter(move |x| {
             x.speaks_for.as_deref() == Some(self.me.as_str())
-                && (self.offices.is_empty() || x.position.as_ref().is_none_or(|p| self.offices.contains(p)))
+                && (self.offices.is_empty() || x.position.as_ref().is_none_or(|p| self.offices.contains(p.as_str())))
         })
     }
 
@@ -159,7 +159,7 @@ impl StandingWork {
             _ => vec![],
         };
         Some(WorkOrder {
-            id: r.id.clone(),
+            id: r.id.to_string(),
             task: task.to_string(),
             at: w.s("at").map(String::from),
             on: list("on"),
@@ -299,7 +299,7 @@ impl StandingWork {
             let task = Self::task_of(r).unwrap_or("").to_string();
             let every = data(r).i("every").unwrap_or(0);
             let schedule = data(r).s("schedule").map(String::from);
-            let head = |state, words: String| Line { order: Some(r.id.clone()), task: task.clone(), every, schedule: schedule.clone(), state, why: None, count: None, words };
+            let head = |state, words: String| Line { order: Some(r.id.to_string()), task: task.clone(), every, schedule: schedule.clone(), state, why: None, count: None, words };
             if !named.contains(&task.as_str()) {
                 lines.push(head("no_such_task", format!("not carried out: the staff have no routine called \"{task}\" (their routines: {})", named.join(", "))));
                 continue;
@@ -586,7 +586,7 @@ impl Directions {
     /// whether or not the office's draw of compliance follows it: a clerk reads what is on file and draws nothing.
     pub fn stands<'a>(&self, book: &'a Book, form: &str) -> Option<&'a Arc<Record>> {
         let may = self.may(book);
-        let d = self.filed(book, Some(form)).into_iter().rev().find(|x| x.position.as_ref().is_some_and(|p| may.contains(p)))?;
+        let d = self.filed(book, Some(form)).into_iter().rev().find(|x| x.position.as_ref().is_some_and(|p| may.contains(&p.to_string())))?;
         (!book.on_hold(&d.id, None)).then_some(d)
     }
 
@@ -607,7 +607,7 @@ impl Directions {
     fn filed<'a>(&self, book: &'a Book, form: Option<&str>) -> Vec<&'a Arc<Record>> {
         let mut v: Vec<&Arc<Record>> = book
             .open("direction")
-            .filter(|d| super::addressed_to(d).contains(&self.entity))
+            .filter(|d| super::addressed_to(d).iter().any(|x| x == &self.entity))
             .filter(|d| self.form_of(book, d).is_some_and(|f| form.is_none_or(|x| data(f).s("form") == Some(x))))
             .collect();
         v.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| super::filed_before(&a.id, &b.id)));
@@ -617,7 +617,7 @@ impl Directions {
     /// The direction in force on a form: the latest standing one from a post that may direct us, if we follow it.
     pub fn standing<'a>(&self, book: &'a Book, form: &str, cx: &mut Cx) -> Option<&'a Arc<Record>> {
         let may = self.may(book);
-        let d = self.filed(book, Some(form)).into_iter().rev().find(|x| x.position.as_ref().is_some_and(|p| may.contains(p)))?;
+        let d = self.filed(book, Some(form)).into_iter().rev().find(|x| x.position.as_ref().is_some_and(|p| may.contains(&p.to_string())))?;
         if book.on_hold(&d.id, None) {
             return None;
         }
@@ -634,13 +634,13 @@ impl Directions {
         let may = self.may(book);
         let mut steps = vec![];
         for d in self.filed(book, None) {
-            if self.answered.contains(&d.id) || self.acknowledged.contains(&d.id) || d.author == self.participant {
+            if self.answered.contains(d.id.as_str()) || self.acknowledged.contains(d.id.as_str()) || d.author == self.participant {
                 continue;
             }
             let form = self.form_of(book, d).and_then(|f| data(f).s("form")).unwrap_or("").to_string();
             let author = std::slice::from_ref(&d.author);
-            if d.position.as_ref().is_some_and(|p| may.contains(p)) {
-                self.acknowledged.insert(d.id.clone());
+            if d.position.as_ref().is_some_and(|p| may.contains(&p.to_string())) {
+                self.acknowledged.insert(d.id.to_string());
                 let fw = if form.is_empty() { "form".to_string() } else { form.replace('_', " ") };
                 steps.push(because(
                     format!("A direction from {} on our {fw} form: acknowledging it.", d.position.as_deref().unwrap_or("")),
@@ -651,7 +651,7 @@ impl Directions {
                     )],
                 ));
             } else {
-                self.answered.insert(d.id.clone());
+                self.answered.insert(d.id.to_string());
                 let rule = if !self.under.is_empty() && !may.is_empty() {
                     format!("This office takes directions on its forms only from those {} names.", self.under)
                 } else {

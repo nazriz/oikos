@@ -13,7 +13,10 @@ use serde_json::Value;
 
 /// An id, or a `$name` bound earlier in the same action.
 pub type IdOrRef = String;
-pub type Id = String;
+pub use oikos_core::Id;
+/// The id of what passes (an act in progress, a message on its way): its own text, not interned, so it goes with what
+/// it names (docs/design/performance.md, "A plan for what is left", R1). Every id of what lasts is an `Id`.
+pub type Passing = String;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "block", rename_all = "snake_case", deny_unknown_fields)]
@@ -479,15 +482,15 @@ pub enum Position {
 /// One record, or a list of them: how a basis is written (contracts: common Basis, records Basis).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum BasisForm {
-    One(Id),
-    Several(Vec<Id>),
+pub enum BasisForm<T = Id> {
+    One(T),
+    Several(Vec<T>),
 }
 
 /// The most records one act may cite.
 pub const MAX_BASES: usize = 64;
 
-fn listed(ids: &[Id], at_least: usize) -> Result<(), String> {
+fn listed<T: PartialEq + std::fmt::Display>(ids: &[T], at_least: usize) -> Result<(), String> {
     if ids.len() < at_least || ids.len() > MAX_BASES {
         return Err(format!("a basis written as a list names {at_least} to {MAX_BASES} records, not {}", ids.len()));
     }
@@ -501,8 +504,8 @@ fn listed(ids: &[Id], at_least: usize) -> Result<(), String> {
 /// or a list of them in the order cited (at least one, none twice). It is kept as written, so a command reads in the
 /// log as it was given; the record made from it has the one stored form (`Basis`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(try_from = "BasisForm", into = "BasisForm")]
-pub struct BasisArg(BasisForm);
+#[serde(try_from = "BasisForm<IdOrRef>", into = "BasisForm<IdOrRef>")]
+pub struct BasisArg(BasisForm<IdOrRef>);
 
 impl BasisArg {
     pub fn one(id: impl Into<IdOrRef>) -> Self {
@@ -518,9 +521,9 @@ impl BasisArg {
     }
 }
 
-impl TryFrom<BasisForm> for BasisArg {
+impl TryFrom<BasisForm<IdOrRef>> for BasisArg {
     type Error = String;
-    fn try_from(f: BasisForm) -> Result<Self, String> {
+    fn try_from(f: BasisForm<IdOrRef>) -> Result<Self, String> {
         if let BasisForm::Several(ids) = &f {
             listed(ids, 1)?;
         }
@@ -528,8 +531,8 @@ impl TryFrom<BasisForm> for BasisArg {
     }
 }
 
-impl From<BasisArg> for BasisForm {
-    fn from(b: BasisArg) -> BasisForm {
+impl From<BasisArg> for BasisForm<IdOrRef> {
+    fn from(b: BasisArg) -> BasisForm<IdOrRef> {
         b.0
     }
 }
@@ -846,7 +849,7 @@ impl Record {
                 v.extend(terms.termination.iter().flatten().map(|t| t.party.as_str()));
             }
             RecordBody::Signature { party, .. } | RecordBody::Notice { party, .. } => v.push(party),
-            RecordBody::Statement { addressed_to, .. } => v.extend(addressed_to.iter().flatten().map(String::as_str)),
+            RecordBody::Statement { addressed_to, .. } => v.extend(addressed_to.iter().flatten().map(Id::as_str)),
             RecordBody::EntityDeclaration { entity, .. } => v.push(entity),
             RecordBody::ClaimRelease { .. } | RecordBody::Withdrawal { .. } | RecordBody::Vote { .. } => {}
         }
@@ -857,7 +860,7 @@ impl Record {
     /// "about" someone just because they can see it).
     pub fn visibility_entities(&self) -> Vec<&str> {
         match &self.visible_to {
-            Visibility::Only(ids) => ids.iter().map(String::as_str).collect(),
+            Visibility::Only(ids) => ids.iter().map(Id::as_str).collect(),
             Visibility::Public(_) => vec![],
         }
     }

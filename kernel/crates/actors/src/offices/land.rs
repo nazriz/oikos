@@ -25,19 +25,19 @@ pub fn owner_of(book: &Book, lot: &str) -> Option<String> {
     let mut holder = None;
     for c in &titles {
         if let RecordBody::Claim { holder: h, .. } = &c.body {
-            holder = Some(h.clone());
+            holder = Some(*h);
         }
     }
     for r in book.of_type("claim_transfer") {
         if let RecordBody::ClaimTransfer { claim, to } = &r.body {
             if let Some(c) = titles.iter().find(|x| &x.id == claim) {
                 if r.speaks_for.as_ref() == holder.as_ref() || r.speaks_for == c.speaks_for {
-                    holder = Some(to.clone());
+                    holder = Some(*to);
                 }
             }
         }
     }
-    holder
+    holder.map(|x| x.to_string())
 }
 
 /// The land an owner holds, as its papers show it: its latest asset register, titles that have come to it since, and

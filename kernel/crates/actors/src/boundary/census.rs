@@ -81,7 +81,7 @@ impl Plan for Statistician {
     type Then = ();
     fn absorb(&mut self, pic: &Picture, _: &mut Cx) {
         self.book.absorb(pic);
-        if let Some(Seen::Records { records, search: true }) = pic.channels.get(&self.adverts) {
+        if let Some(Seen::Records { records, search: true }) = pic.channels.get(self.adverts.as_str()) {
             // (Only price lists that list goods and set no minimum order are a shop's prices.)
             let mut prices = vec![];
             for r in records {
@@ -233,16 +233,16 @@ impl Plan for Assessor {
     type Then = ();
     fn absorb(&mut self, pic: &Picture, _: &mut Cx) {
         self.book.absorb(pic);
-        if let Some(Seen::Records { records, .. }) = pic.channels.get(&self.roll_channel) {
+        if let Some(Seen::Records { records, .. }) = pic.channels.get(self.roll_channel.as_str()) {
             let mut sorted: Vec<_> = records.iter().collect();
             sorted.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
             for r in sorted {
                 let d = data(r);
-                if !matches!(r.body, oikos_sight::RecordBody::Statement { .. }) || self.taken.contains(&r.id) {
+                if !matches!(r.body, oikos_sight::RecordBody::Statement { .. }) || self.taken.contains(r.id.as_str()) {
                     continue;
                 }
                 let Some(lot) = d.s("lot") else { continue };
-                self.taken.insert(r.id.clone());
+                self.taken.insert(r.id.to_string());
                 let x = self.roll.entry(lot.to_string()).or_default();
                 if let Some(owner) = d.s("owner") {
                     x.owner = Some(owner.to_string());
@@ -259,10 +259,10 @@ impl Plan for Assessor {
         // What the council asks us to value: something built, or brought down.
         let requests: Vec<_> = by_time(self.book.open("valuation_request").collect());
         for r in requests {
-            if self.taken.contains(&r.id) || !crate::common::addressed_to(r).contains(&self.me) {
+            if self.taken.contains(r.id.as_str()) || !crate::common::addressed_to(r).iter().any(|x| x == &self.me) {
                 continue;
             }
-            self.taken.insert(r.id.clone());
+            self.taken.insert(r.id.to_string());
             let d = data(r);
             if let Some(removed) = d.s("removed") {
                 for x in self.roll.values_mut() {
@@ -407,15 +407,15 @@ impl Plan for Landfill {
         let mut dockets: Vec<_> = self
             .book
             .open("disposal_docket")
-            .filter(|r| crate::common::addressed_to(r).contains(&self.me) && !self.billed.contains(&r.id) && data(r).s("kind") == Some(self.kind.as_str()))
+            .filter(|r| crate::common::addressed_to(r).iter().any(|x| x == &self.me) && !self.billed.contains(r.id.as_str()) && data(r).s("kind") == Some(self.kind.as_str()))
             .collect();
         dockets.sort_by(|a, b| filed_before(&a.id, &b.id));
         for d in dockets {
-            self.billed.insert(d.id.clone());
-            let Some(who) = d.speaks_for.clone() else { continue };
-            let x = due.entry(who).or_default();
+            self.billed.insert(d.id.to_string());
+            let Some(who) = d.speaks_for else { continue };
+            let x = due.entry(who.to_string()).or_default();
             x.0 += data(d).i("quantity").unwrap_or(0).max(0);
-            x.1.push(d.id.clone());
+            x.1.push(d.id.to_string());
         }
         let world = cx.ctx.world.clone();
         let mut steps = vec![];
@@ -753,7 +753,7 @@ impl Actor for Newcomers {
                 if let Seen::Directory { entities, .. } = ch {
                     for e in entities.iter() {
                         if let Some(p) = &e.participant {
-                            self.reach.insert(e.entity.clone(), p.clone());
+                            self.reach.insert(e.entity.to_string(), p.to_string());
                         }
                     }
                 }

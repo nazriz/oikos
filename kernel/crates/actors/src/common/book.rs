@@ -207,7 +207,7 @@ impl Book {
     pub fn absorb(&mut self, pic: &Picture) -> Vec<Arc<Record>> {
         self.now = pic.t;
         for (id, r) in &pic.readings {
-            self.readings.insert(id.clone(), Reading { status: r.status.to_string(), ends_at: r.ends_at });
+            self.readings.insert(id.to_string(), Reading { status: r.status.to_string(), ends_at: r.ends_at });
         }
         let mut fresh = vec![];
         for r in pic.all_records() {
@@ -222,12 +222,12 @@ impl Book {
                 self.last_directory = Some((entities.clone(), positions.clone()));
                 for p in positions.iter() {
                     self.positions
-                        .insert(p.position.clone(), PositionSeen { entity: p.entity.clone(), role: p.role.clone(), holder: p.holder.clone() });
+                        .insert(p.position.to_string(), PositionSeen { entity: p.entity.to_string(), role: p.role.clone(), holder: p.holder.map(|x| x.to_string()) });
                 }
                 for e in entities.iter() {
-                    self.entity_kind.insert(e.entity.clone(), e.kind.clone());
+                    self.entity_kind.insert(e.entity.to_string(), e.kind.clone());
                     if let Some(p) = &e.participant {
-                        self.participant_person.insert(p.clone(), e.entity.clone());
+                        self.participant_person.insert(p.to_string(), e.entity.to_string());
                     }
                 }
             }
@@ -255,16 +255,16 @@ impl Book {
         self.types.entry(r.body.kind_name()).or_default().push(i);
         match &r.body {
             RecordBody::Claim { holder, counterparty, about, .. } => {
-                self.claims_holder.entry(holder.clone()).or_default().push(i);
+                self.claims_holder.entry(holder.to_string()).or_default().push(i);
                 if let Some(c) = counterparty {
-                    self.claims_counterparty.entry(c.clone()).or_default().push(i);
+                    self.claims_counterparty.entry(c.to_string()).or_default().push(i);
                 }
                 if let Some(o) = about.get("object").and_then(Value::as_str) {
                     self.claims_object.entry(o.to_string()).or_default().push(i);
                 }
             }
             RecordBody::Statement { kind, data, .. } => {
-                let withdrawn = self.withdrawn.contains(&r.id);
+                let withdrawn = self.withdrawn.contains(r.id.as_str());
                 let (all, standing) = self.kinds.entry(kind.clone()).or_default();
                 all.push(i);
                 if !withdrawn {
@@ -297,14 +297,14 @@ impl Book {
         let r = self.seen[i as usize].clone();
         match &r.body {
             RecordBody::ClaimRelease { claim } => {
-                self.released.insert(claim.clone());
+                self.released.insert(claim.to_string());
             }
-            RecordBody::Withdrawal { withdraws, .. } => self.take_down(withdraws, r.at),
+            RecordBody::Withdrawal { withdraws, .. } => self.take_down(&withdraws.to_string(), r.at),
             RecordBody::Signature { agreement, party } => {
-                self.signatures.entry(agreement.clone()).or_default().push((party.clone(), r.at));
+                self.signatures.entry(agreement.to_string()).or_default().push((party.to_string(), r.at));
             }
             RecordBody::Notice { agreement, party, .. } => {
-                self.notices.entry(agreement.clone()).or_default().push((party.clone(), r.at));
+                self.notices.entry(agreement.to_string()).or_default().push((party.to_string(), r.at));
             }
             RecordBody::Statement { kind, data, practice, assertion, offer, .. } => {
                 // A statement that says it replaces an earlier one of the same kind from whoever it speaks for (an
@@ -317,11 +317,11 @@ impl Book {
                             && old.speaks_for == r.speaks_for
                     });
                     if same {
-                        self.replaced_by.insert(old_id.to_string(), r.id.clone());
+                        self.replaced_by.insert(old_id.to_string(), r.id.to_string());
                         self.take_down(&old_id.to_string(), r.at);
                     }
                 }
-                if !self.withdrawn.contains(&r.id) {
+                if !self.withdrawn.contains(r.id.as_str()) {
                     if practice.is_some() {
                         self.with_practice.push(i);
                     }
@@ -435,15 +435,15 @@ impl Book {
         // (A withdrawal let go of, and what it withdrew if that is not kept either: no longer known.)
         for r in &gone {
             let named = match &r.body {
-                RecordBody::Withdrawal { withdraws, .. } => Some(withdraws.clone()),
-                RecordBody::Statement { data, .. } => data.as_ref().and_then(|d| d.get("replaces")).and_then(Value::as_str).map(str::to_string),
+                RecordBody::Withdrawal { withdraws, .. } => Some(*withdraws),
+                RecordBody::Statement { data, .. } => (data.as_ref().and_then(|d| d.get("replaces")).and_then(Value::as_str).map(str::to_string)).map(Into::into),
                 _ => None,
             };
             if let Some(id) = named.filter(|id| !self.place.contains_key(&key(id))) {
-                self.withdrawn.remove(&id);
-                self.withdrawn_at.remove(&id);
-                if self.replaced_by.get(&id) == Some(&r.id) {
-                    self.replaced_by.remove(&id);
+                self.withdrawn.remove(id.as_str());
+                self.withdrawn_at.remove(id.as_str());
+                if self.replaced_by.get(id.as_str()) == Some(&r.id.to_string()) {
+                    self.replaced_by.remove(id.as_str());
                 }
             }
         }
@@ -508,7 +508,7 @@ impl Book {
     }
     /// The standing lot (a statement of kind `lot`) that covers a cell: of several, the first seen.
     pub fn lot_over(&self, cell: &str) -> Option<&Arc<Record>> {
-        self.list(self.lots_over.get(cell)).find(|l| !self.withdrawn.contains(&l.id))
+        self.list(self.lots_over.get(cell)).find(|l| !self.withdrawn.contains(l.id.as_str()))
     }
     /// Statements carrying a practice (a gathering), still standing, in the order seen.
     pub fn practices(&self) -> impl Iterator<Item = &Arc<Record>> {
@@ -564,12 +564,12 @@ impl Book {
         let whose: &[String] = match by {
             Some(b) => b,
             None => {
-                own = self.get(id).and_then(|r| r.speaks_for.clone()).into_iter().collect::<Vec<_>>();
+                own = self.get(id).and_then(|r| r.speaks_for).map(|x| x.to_string()).into_iter().collect::<Vec<_>>();
                 &own
             }
         };
         self.open("hold").any(|h| {
-            h.speaks_for.as_ref().is_some_and(|s| whose.contains(s))
+            h.speaks_for.as_ref().is_some_and(|s| whose.iter().any(|w| w ==s))
                 && super::data(h).get("holds").and_then(Value::as_array).is_some_and(|l| l.iter().any(|x| x.as_str() == Some(id)))
         })
     }
@@ -641,7 +641,7 @@ impl Book {
             return r.speaks_for.as_deref();
         }
         match &r.position {
-            Some(p) => self.positions.get(p).map(|x| x.entity.as_str()),
+            Some(p) => self.positions.get(p.as_str()).map(|x| x.entity.as_str()),
             None => self.participant_person.get(&r.author).map(String::as_str),
         }
     }

@@ -491,7 +491,7 @@ impl<'a> Cx<'a> {
     }
     /// What the step left beside its action (the engine's).
     pub fn into_kept(self) -> Kept {
-        Kept { decisions: self.decisions, outcomes: self.outcomes, record: self.record, questions: self.questions, worded: self.worded, drawn: self.drawn.unwrap_or_default(), captured: self.captured }
+        Kept { decisions: self.decisions, outcomes: self.outcomes, record: self.record, questions: self.questions, worded: self.worded, drawn: self.drawn.unwrap_or_default(), captured: self.captured, }
     }
 }
 

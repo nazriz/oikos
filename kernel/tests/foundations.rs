@@ -23,7 +23,7 @@ type R = Run<Vec<u8>>;
 fn cmd(participant: &str, position: Option<&str>, blocks: Value) -> Command {
     Command::Act {
         participant: participant.into(),
-        position: position.map(String::from),
+        position: position.map(String::from).map(Into::into),
         blocks: serde_json::from_value(blocks).expect("the blocks parse"),
         by: vec![],
         provenance: json!({"via": "direct"}),
@@ -81,7 +81,7 @@ fn make(units: u64, performers: &[&str]) -> Command {
 /// A command naming who does the work (`by`, on the action).
 fn cmd_by(participant: &str, position: Option<&str>, blocks: Value, by: &[&str]) -> Command {
     match cmd(participant, position, blocks) {
-        Command::Act { participant, position, blocks, provenance, reasoning, thinking, .. } => Command::Act { participant, position, blocks, by: by.iter().map(|s| s.to_string()).collect(), provenance, reasoning, thinking },
+        Command::Act { participant, position, blocks, provenance, reasoning, thinking, .. } => Command::Act { participant, position, blocks, by: by.iter().map(|s| s.to_string()).map(Into::into).collect(), provenance, reasoning, thinking, },
         c => c,
     }
 }
@@ -296,7 +296,7 @@ fn law3_a_system_that_lists_the_work_does_it_and_frees_the_people() {
     assert!(run.kernel().state().holding("devco", "s-shop", "goods") > goods, "the system made goods");
     let st = run.kernel().state();
     assert!(st.timelines.get("carol").is_none(), "carol's time was not taken");
-    assert_eq!(st.timelines[&bot].lanes.iter().copied().max(), Some(done));
+    assert_eq!(st.timelines[bot.as_str()].lanes.iter().copied().max(), Some(done));
 }
 
 /// A system has no working day (a person's limit): a long work is not refused for the hours it takes (F4).
@@ -361,7 +361,7 @@ fn law3_only_the_templates_supplier_delivers_a_system() {
     assert_eq!(outcome(&mut run, &own).as_deref(), Some("not_supplier"));
     // The supplier delivers, to the city; the system belongs to the city.
     let bot = deliver(&mut run);
-    assert_eq!(run.kernel().state().participants[&bot].owner.as_deref(), Some("city"));
+    assert_eq!(run.kernel().state().participants[bot.as_str()].owner.as_deref(), Some("city"));
 }
 
 #[test]
@@ -572,7 +572,7 @@ fn law5_a_record_names_who_made_it_when_not_its_author() {
         let r = step(run, c).unwrap();
         r.events.iter().find_map(|e| match &e.body { EventBody::Recorded { record } => Some(record.by.clone()), _ => None }).expect("a record")
     };
-    assert_eq!(by_of(&mut run, &publish(&["carol"])), Some(vec!["carol".to_string()]));
+    assert_eq!(by_of(&mut run, &publish(&["carol"])), Some(vec!["carol".into()]));
     assert_eq!(by_of(&mut run, &publish(&[])), None, "the author did it: nothing to add");
 }
 
@@ -590,7 +590,7 @@ fn a_person_holding_two_posts_of_one_organisation_is_told_of_a_payment_in_each()
     applied(&mut run, &pay);
     let told = |run: &mut R, post: &str| -> usize {
         let o = run.command(&Command::Observe { participant: "bob-self".into(), only: Some(post.into()) }).unwrap().observation.unwrap();
-        match o.channels.get(&format!("{post}/money")) {
+        match o.channels.get(format!("{post}/money").as_str()) {
             Some(oikos_kernel::observe::ChannelData::Accounts { transactions, .. }) => transactions.len(),
             other => panic!("no accounts channel: {other:?}"),
         }

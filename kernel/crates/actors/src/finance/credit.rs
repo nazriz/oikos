@@ -210,10 +210,10 @@ impl Borrowing {
     pub fn steps<T>(&mut self, book: &Book, t: i64, account: Option<&str>, cx: &Cx) -> Vec<Step<T>> {
         let mut steps = vec![];
         for r in book.all("loan_decision") {
-            if self.taken.contains(&r.id) || !addressed_to(r).contains(&self.me) {
+            if self.taken.contains(r.id.as_str()) || !addressed_to(r).iter().any(|x| x == &self.me) {
                 continue;
             }
-            self.taken.insert(r.id.clone());
+            self.taken.insert(r.id.to_string());
             self.applied = None;
             if !data(r).flag("approved") {
                 self.refused_at = Some(t);
@@ -223,7 +223,7 @@ impl Borrowing {
                 self.granted_at = Some(t);
             }
         }
-        if book.all("loan_default").any(|r| addressed_to(r).contains(&self.me)) {
+        if book.all("loan_default").any(|r| addressed_to(r).iter().any(|x| x == &self.me)) {
             self.impaired = true;
         }
         let Some(account) = account else { return steps };
@@ -232,13 +232,13 @@ impl Borrowing {
             if terms.template.as_deref() != Some("loan")
                 || !terms.parties.contains(&self.me)
                 || terms.parties.first() != Some(&self.lender)
-                || self.taken.contains(&r.id)
+                || self.taken.contains(r.id.as_str())
                 || book.signed_by(&r.id, &self.me)
                 || book.taken_back(&r.id)
             {
                 continue;
             }
-            self.taken.insert(r.id.clone());
+            self.taken.insert(r.id.to_string());
             self.applied = None;
             let (owe, every) = commitment_of(r, &self.me);
             let Some(m) = owe.and_then(|o| o.money) else { continue };
@@ -247,7 +247,7 @@ impl Borrowing {
                 format!("The loan we applied for is offered: signing, and asking our bank to pay the {} a month.", money_words(m.amount, &cx.ctx.world)),
                 vec![
                     sign(&r.id),
-                    pay(&m.to, m.amount, Pay { from: Some(account.to_string()), every: Some(every.unwrap_or(MONTH)), first: Some(every.unwrap_or(MONTH)), basis: Some(r.id.clone()), for_: Some("Loan repayment.".into()), ..Default::default() }, cx),
+                    pay(&m.to, m.amount, Pay { from: Some(account.to_string()), every: Some(every.unwrap_or(MONTH)), first: Some(every.unwrap_or(MONTH)), basis: Some(r.id.to_string()), for_: Some("Loan repayment.".into()), ..Default::default() }, cx),
                 ],
             ));
         }
@@ -506,10 +506,10 @@ impl Plan for Lender {
             let amount = cents(tx.amount);
             if own.as_deref() == Some(tx.from.as_str()) {
                 if let Some(s) = &tx.settles {
-                    self.paid_out.entry(s.clone()).or_insert(tx.t);
+                    self.paid_out.entry(s.to_string()).or_insert(tx.t);
                 }
             }
-            let list = self.inflows.entry(tx.to.clone()).or_default();
+            let list = self.inflows.entry(tx.to.to_string()).or_default();
             if tx.from != tx.to {
                 list.push_back((tx.t, amount));
             }
@@ -520,14 +520,14 @@ impl Plan for Lender {
             // loan off: docs/behaviour/ownership.md): the loan it names is repaid.
             let to_us = own.as_deref() == Some(tx.to.as_str());
             if let (true, Some(s)) = (to_us, &tx.settles) {
-                if let Some(l) = self.loans.get(s) {
+                if let Some(l) = self.loans.get(s.as_str()) {
                     self.repaid.insert(l.agreement.clone(), l.payment * l.months);
                     continue;
                 }
             }
             if to_us {
                 let mut x = amount;
-                let mut ours: Vec<&Loan> = self.by_account.get(&tx.from).into_iter().flatten().filter_map(|id| self.loans.get(id)).filter(|l| l.start.is_some()).collect();
+                let mut ours: Vec<&Loan> = self.by_account.get(tx.from.as_str()).into_iter().flatten().filter_map(|id| self.loans.get(id)).filter(|l| l.start.is_some()).collect();
                 ours.sort_by_key(|l| l.start);
                 let mut parts = vec![];
                 for l in ours {
@@ -543,9 +543,9 @@ impl Plan for Lender {
                     *self.repaid.entry(id).or_insert(0) += part;
                 }
                 // Funding: the funder's payment settles our draw.
-                if self.draw_id.is_some() && tx.settles == self.draw_id {
+                if self.draw_id.is_some() && tx.settles.as_deref() == self.draw_id.as_deref() {
                     self.funding += amount;
-                    self.funder_account = Some(tx.from.clone());
+                    self.funder_account = Some(tx.from.to_string());
                     self.funding_asked = 0;
                     self.draw_id = None;
                 }
@@ -566,7 +566,7 @@ impl Plan for Lender {
             let agreements: Vec<_> = self.book.of_type("agreement").cloned().collect();
             for r in agreements {
                 let RecordBody::Agreement { terms } = &r.body else { continue };
-                if terms.template.as_deref() != Some("loan") || terms.parties.first() != Some(&me) || self.loans.contains_key(&r.id) || !self.book.in_force(&r.id) {
+                if terms.template.as_deref() != Some("loan") || terms.parties.first() != Some(&me) || self.loans.contains_key(r.id.as_str()) || !self.book.in_force(&r.id) {
                     continue;
                 }
                 let Some(who) = terms.parties.get(1).cloned() else { continue };
@@ -592,7 +592,7 @@ impl Plan for Lender {
                 let lettered = self.book.open("loan_arrears").any(|x| x.speaks_for.as_deref() == Some(&me) && data(x).s("loan") == Some(&r.id) && data(x).flag("brought_forward"));
                 let start = first_due.map_or(t, |f| r.at + f - MONTH) - missed * MONTH;
                 self.add_loan(Loan {
-                    agreement: r.id.clone(),
+                    agreement: r.id.to_string(),
                     borrower: who,
                     account: from,
                     principal: payment * months,
@@ -632,11 +632,11 @@ impl Plan for Lender {
         let accounts: BTreeMap<&str, &oikos_sight::AccountItem> = pic.accounts().map(|a| (a.account.as_str(), a)).collect();
 
         // Applications: decided on the bank's rules.
-        let mut apps: Vec<_> = self.book.open("loan_application").filter(|r| addressed_to(r).contains(&me) && !self.decided.contains(&r.id)).cloned().collect();
+        let mut apps: Vec<_> = self.book.open("loan_application").filter(|r| addressed_to(r).iter().any(|x| x == &me) && !self.decided.contains(r.id.as_str())).cloned().collect();
         apps.sort_by(|x, y| x.at.cmp(&y.at).then_with(|| filed_before(&x.id, &y.id)));
         for a in apps {
-            self.decided.insert(a.id.clone());
-            let who = a.speaks_for.clone().unwrap_or_default();
+            self.decided.insert(a.id.to_string());
+            let who = a.speaks_for.unwrap_or_default();
             let d = data(&a);
             let account = d.s("account").map_or_else(|| "null".to_string(), String::from);
             let amount = num(d.get("amount"));
@@ -655,7 +655,7 @@ impl Plan for Lender {
                 "we don't keep that account for you".to_string()
             } else if amount <= 0 {
                 "it doesn't say how much".into()
-            } else if self.defaulted.contains(&who) {
+            } else if self.defaulted.contains(who.as_str()) {
                 "you're in default on a loan with us".into()
             } else if self.behind(&who, t) {
                 "you're behind on a loan with us".into()
@@ -674,14 +674,14 @@ impl Plan for Lender {
             } else {
                 String::new()
             };
-            let vis = Visible::Only(vec![who.clone(), me.clone()]);
+            let vis = Visible::Only(vec![who.to_string(), me.clone()]);
             if !refuse.is_empty() {
                 steps.push(because(
                     format!("A loan application we can't approve: {refuse}."),
                     vec![say(
                         "loan_decision",
                         &format!("Loan application {} declined: {refuse}.", a.id),
-                        Say { to: Some(vec![who.clone()]), visible: Some(vis), basis: Some(a.id.clone()), data: Some(json!({ "application": a.id, "approved": false, "reason": refuse })), ..Default::default() },
+                        Say { to: Some(vec![who.to_string()]), visible: Some(vis), basis: Some(a.id.to_string()), data: Some(json!({ "application": a.id, "approved": false, "reason": refuse })), ..Default::default() },
                     )],
                 ));
                 continue;
@@ -697,7 +697,7 @@ impl Plan for Lender {
                     we: Some(pay(&account, amount, Pay { for_: Some("Loan principal.".into()), ..Default::default() }, cx)),
                     they: Some(pay(&acc.account, monthly, Pay { from: Some(account.clone()), every: Some(MONTH), for_: Some("Loan repayment.".into()), ..Default::default() }, cx)),
                     text: Some(text),
-                    basis: Some(a.id.clone()),
+                    basis: Some(a.id.to_string()),
                     ..Default::default()
                 },
             );
@@ -716,19 +716,19 @@ impl Plan for Lender {
                     say(
                         "loan_decision",
                         &format!("Loan application {} approved: offered.", a.id),
-                        Say { to: Some(vec![who.clone()]), visible: Some(vis), basis: Some(a.id.clone()), data: Some(json!({ "application": a.id, "approved": true, "amount": amount, "months": months, "rate_bps": rate, "payment": monthly })), ..Default::default() },
+                        Say { to: Some(vec![who.to_string()]), visible: Some(vis), basis: Some(a.id.to_string()), data: Some(json!({ "application": a.id, "approved": true, "amount": amount, "months": months, "rate_bps": rate, "payment": monthly })), ..Default::default() },
                     ),
                 ],
             );
             st.lines[0].bind = Some("loan".into());
-            st.then = Some(Then::Offered { borrower: who, account, principal: amount, payment: monthly, months, rate_bps: rate });
+            st.then = Some(Then::Offered { borrower: who.to_string(), account, principal: amount, payment: monthly, months, rate_bps: rate });
             steps.push(st);
         }
 
         // Asked what paying a loan off takes: its remaining repayments' present value at its rate (a payout figure).
-        let requests: Vec<_> = self.book.open("loan_payout_request").filter(|x| addressed_to(x).contains(&me) && !self.decided.contains(&x.id)).cloned().collect();
+        let requests: Vec<_> = self.book.open("loan_payout_request").filter(|x| addressed_to(x).iter().any(|x| x == &me) && !self.decided.contains(x.id.as_str())).cloned().collect();
         for r in requests {
-            self.decided.insert(r.id.clone());
+            self.decided.insert(r.id.to_string());
             let Some(l) = data(&r).s("loan").and_then(|id| self.loans.get(id)) else { continue };
             if Some(l.borrower.as_str()) != r.speaks_for.as_deref() {
                 continue;
@@ -743,7 +743,7 @@ impl Plan for Lender {
                     Say {
                         to: Some(vec![l.borrower.clone()]),
                         visible: Some(Visible::Only(vec![l.borrower.clone(), me.clone()])),
-                        basis: Some(r.id.clone()),
+                        basis: Some(r.id.to_string()),
                         data: Some(json!({ "loan": l.agreement, "amount": amount, "account": acc.account })),
                         ..Default::default()
                     },
@@ -758,7 +758,7 @@ impl Plan for Lender {
         let agreements: Vec<_> = self.book.of_type("agreement").cloned().collect();
         for r in agreements {
             let RecordBody::Agreement { terms } = &r.body else { continue };
-            if terms.template.as_deref() != Some("loan") || terms.parties.first() != Some(&me) || self.loans.contains_key(&r.id) || r.author == "genesis" {
+            if terms.template.as_deref() != Some("loan") || terms.parties.first() != Some(&me) || self.loans.contains_key(r.id.as_str()) || r.author == "genesis" {
                 continue;
             }
             let Some(who) = terms.parties.get(1).cloned() else { continue };
@@ -768,13 +768,13 @@ impl Plan for Lender {
             let Some(from) = repay.from else { continue };
             let months = ((terms.term.unwrap_or(0) + MONTH / 2).div_euclid(MONTH)).max(1);
             self.add_loan(Loan {
-                agreement: r.id.clone(),
+                agreement: r.id.to_string(),
                 borrower: who,
                 account: lent.to,
                 principal: lent.amount,
                 payment: repay.amount,
                 months,
-                start: self.paid_out.get(&r.id).copied(),
+                start: self.paid_out.get(r.id.as_str()).copied(),
                 arrears_notice_at: None,
                 defaulted: false,
                 rate_bps: terms.text.as_deref().and_then(rate_in),
@@ -934,7 +934,7 @@ impl Plan for Lender {
         let apps: Vec<_> = self.book.open("loan_application").cloned().collect();
         for a in apps {
             let Some(applicant) = a.speaks_for.as_deref() else { continue };
-            if out.len() >= LOOKS_MAX || self.decided.contains(&a.id) || !addressed_to(&a).contains(&pic.entity) {
+            if out.len() >= LOOKS_MAX || self.decided.contains(a.id.as_str()) || !addressed_to(&a).iter().any(|x| x == &pic.entity.to_string()) {
                 continue;
             }
             if self.book.entity_kind(applicant).is_none() && self.asked.first(applicant, pic.t) {
@@ -953,7 +953,7 @@ impl Plan for Lender {
             Then::Offered { borrower, account, principal, payment, months, rate_bps } => {
                 if let Some(id) = created("loan") {
                     self.add_loan(Loan {
-                        agreement: id,
+                        agreement: id.to_string(),
                         borrower: borrower.clone(),
                         account: account.clone(),
                         principal: *principal,
@@ -967,7 +967,7 @@ impl Plan for Lender {
                 }
             }
             Then::Draw => {
-                self.draw_id = created("draw");
+                self.draw_id = created("draw").map(|x| x.to_string());
                 if self.draw_id.is_none() {
                     self.funding_asked = 0;
                 }

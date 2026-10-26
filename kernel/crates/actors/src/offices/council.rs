@@ -511,8 +511,8 @@ impl Plan for Mayor {
     fn absorb(&mut self, pic: &Picture, _cx: &mut Cx) {
         if !self.p.visits.is_empty() {
             for c in visited(pic, &self.p.visits) {
-                self.went_at.insert(c.cell.clone(), pic.t);
-                self.stood_free.insert(c.cell.clone(), c.structure.is_none());
+                self.went_at.insert(c.cell.to_string(), pic.t);
+                self.stood_free.insert(c.cell.to_string(), c.structure.is_none());
             }
         }
         for r in self.book.absorb(pic) {
@@ -520,11 +520,11 @@ impl Plan for Mayor {
                 continue;
             }
             for b in bases_of(&r) {
-                self.acted.insert(b.clone());
+                self.acted.insert(b.to_string());
             }
             let d = data(&r);
             if is_kind(&r, "permit_application") {
-                let a = Applied { at: r.at, id: r.id.clone(), lot: d.s("lot").unwrap_or("").to_string() };
+                let a = Applied { at: r.at, id: r.id.to_string(), lot: d.s("lot").unwrap_or("").to_string() };
                 if d.s("structure_type") == Some(self.p.park_type.as_str()) {
                     self.parks.push(a);
                 } else if d.s("structure_type") == Some(self.p.road_type.as_str()) {
@@ -548,7 +548,7 @@ impl Plan for Mayor {
     }
 
     fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<Sent>> {
-        let me = pic.entity.clone();
+        let me = pic.entity;
         let t = pic.t;
         let world = cx.ctx.world.clone();
         let usd = |n: i64| money_words(n, &world);
@@ -565,7 +565,7 @@ impl Plan for Mayor {
             }
             self.guard.put(&key, t);
             let platform = "Standing again: keeping the town's services running, its parks built and its budget balanced.";
-            let to = if self.p.electoral.is_empty() { me.clone() } else { self.p.electoral.clone() };
+            let to = if self.p.electoral.is_empty() { me } else { self.p.electoral.clone().into() };
             steps.push(sent_step(
                 &key,
                 "An election for this office: nominating, as the incumbent.",
@@ -573,7 +573,7 @@ impl Plan for Mayor {
                     "nomination",
                     &format!("Nomination for {pos}: the incumbent. {platform}"),
                     Say {
-                        to: Some(vec![to]),
+                        to: Some(vec![to.to_string()]),
                         visible: Some(Visible::Public),
                         data: Some(papers::data(&po::Nomination { office: pos.clone(), name: Some("the incumbent mayor".into()), incumbent: Some(true), values: vec!["security".into(), "benevolence".into()] })),
                         extra: vec![("assertion", json!({ "that": platform }))],
@@ -613,7 +613,7 @@ impl Plan for Mayor {
                 steps.push(sent_step(
                     &key,
                     why,
-                    vec![say("proposal", &words, Say { to: Some(vec![me.clone()]), data: Some(json!({ "enact": { "kind": "budget", "text": words, "data": { "year": for_year, "lines": lines_map } }, "tags": ["budget"] })), ..Default::default() })],
+                    vec![say("proposal", &words, Say { to: Some(vec![me.to_string()]), data: Some(json!({ "enact": { "kind": "budget", "text": words, "data": { "year": for_year, "lines": lines_map } }, "tags": ["budget"] })), ..Default::default() })],
                 ));
             }
         }
@@ -655,7 +655,7 @@ impl Plan for Mayor {
         let decisions: Vec<Arc<Record>> = self.book.open("permit_decision").cloned().collect();
         for d in decisions {
             let key = format!("commission:{}", d.id);
-            if self.acted.contains(&d.id) || self.guard.has(&key) || !addressed_to(&d).contains(&me) {
+            if self.acted.contains(d.id.as_str()) || self.guard.has(&key) || !addressed_to(&d).iter().any(|x| x == &me.to_string()) {
                 continue;
             }
             let dd = data(&d);
@@ -693,7 +693,7 @@ impl Plan for Mayor {
         let invoices: Vec<Arc<Record>> = self.book.open("invoice").cloned().collect();
         for inv in invoices {
             let key = format!("approval:{}", inv.id);
-            if self.acted.contains(&inv.id) || self.guard.has(&key) || !addressed_to(&inv).contains(&me) {
+            if self.acted.contains(inv.id.as_str()) || self.guard.has(&key) || !addressed_to(&inv).iter().any(|x| x == &me.to_string()) {
                 continue;
             }
             let ours_ag = bases_of(&inv).iter().filter_map(|b| self.book.get(b)).any(|x| matches!(x.body, RecordBody::Agreement { .. }) && self.ours(x));
@@ -702,20 +702,20 @@ impl Plan for Mayor {
                 steps.push(sent_step(
                     &key,
                     "An invoice for work we commissioned: approving it in writing, as the payments procedure requires.",
-                    vec![say("approval", &format!("Approved: pay invoice {}.", inv.id), Say { to: Some(vec![me.clone()]), basis: Some(inv.id.clone()), data: Some(papers::data(&po::Approval { invoice: inv.id.clone() })), ..Default::default() })],
+                    vec![say("approval", &format!("Approved: pay invoice {}.", inv.id), Say { to: Some(vec![me.to_string()]), basis: Some(inv.id.to_string()), data: Some(papers::data(&po::Approval { invoice: inv.id.to_string() })), ..Default::default() })],
                 ));
             }
         }
         // Petitions with enough signatures become proposals (sometimes).
         let petitions: Vec<Arc<Record>> = self.book.open("petition").cloned().collect();
         for pet in petitions {
-            if self.decided.contains(&pet.id) || self.acted.contains(&pet.id) || self.guard.has(&format!("pet:{}", pet.id)) {
+            if self.decided.contains(pet.id.as_str()) || self.acted.contains(pet.id.as_str()) || self.guard.has(&format!("pet:{}", pet.id)) {
                 continue;
             }
             if published_count(&self.book, &pet) * 10_000 < self.p.petition_threshold_bps * self.p.population {
                 continue;
             }
-            self.decided.insert(pet.id.clone());
+            self.decided.insert(pet.id.to_string());
             if cx.rng(&format!("respond-{}", pet.id)).below(10_000) as i64 >= self.p.responsiveness_bps {
                 continue;
             }
@@ -730,7 +730,7 @@ impl Plan for Mayor {
         if self.p.visits.is_empty() {
             return vec![];
         }
-        let (t, me) = (pic.t, pic.entity.clone());
+        let (t, me) = (pic.t, pic.entity);
         let mut want: Vec<String> = vec![];
         if self.park_wanted(t).is_some() {
             if let Some(l) = self.park_lot(&me) {
@@ -791,10 +791,10 @@ impl Mayor {
                 "petition_response",
                 &format!("Answer to petition {}: {words}", pet.id),
                 Say {
-                    to: pet.speaks_for.clone().map(|x| vec![x]),
+                    to: pet.speaks_for.map(|x| vec![x.to_string()]),
                     visible: Some(Visible::Public),
-                    basis: Some(pet.id.clone()),
-                    data: Some(papers::data(&po::PetitionResponse { petition: pet.id.clone(), answer: words.to_string() })),
+                    basis: Some(pet.id.to_string()),
+                    data: Some(papers::data(&po::PetitionResponse { petition: pet.id.to_string(), answer: words.to_string() })),
                     ..Default::default()
                 },
             )
@@ -859,7 +859,7 @@ impl Mayor {
         Some(vec![sent_step(
             &key,
             format!("A petition passed {}% of the town: putting its demand to the council (we respond to {}% of such petitions).", crate::firms::decimal::fmt_dec(self.p.petition_threshold_bps, 100), crate::firms::decimal::fmt_dec(self.p.responsiveness_bps, 100)),
-            vec![say("proposal", &format!("Proposal (from petition {}): {text_}", pet.id), Say { to: Some(vec![me.to_string()]), basis: Some(pet.id.clone()), data: Some(json!({ "enact": Value::Object(enact), "tags": tags })), ..Default::default() })],
+            vec![say("proposal", &format!("Proposal (from petition {}): {text_}", pet.id), Say { to: Some(vec![me.to_string()]), basis: Some(pet.id.to_string()), data: Some(json!({ "enact": Value::Object(enact), "tags": tags })), ..Default::default() })],
         )])
     }
 }
@@ -1046,7 +1046,7 @@ fn amendment(book: &Book, me: &str, prop: Option<&Arc<Record>>) -> Option<Amendm
             given.insert(k.clone(), held_value(f, v));
         }
     }
-    Some(Amendment { schedule_id: sc.id.clone(), s, law, given })
+    Some(Amendment { schedule_id: sc.id.to_string(), s, law, given })
 }
 
 fn cap(x: &str) -> String {
@@ -1216,7 +1216,7 @@ impl Plan for Clerk {
     }
 
     fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<ClerkThen>> {
-        let me = pic.entity.clone();
+        let me = pic.entity;
         let t = pic.t;
         let mut steps: Vec<Step<ClerkThen>> = vec![];
         let key_step = |key: &str, why: String, calls: Vec<oikos_sight::calls::Call>, enacted: bool| {
@@ -1290,7 +1290,7 @@ impl Plan for Clerk {
         let props: Vec<Arc<Record>> = self.book.open("proposal").cloned().collect();
         for prop in props {
             let key = format!("ballot:{}", prop.id);
-            if !addressed_to(&prop).contains(&me) || self.guard.has(&key) || self.book.open("ballot").any(|b| b.speaks_for.as_deref() == Some(me.as_str()) && data(b).s("proposal") == Some(prop.id.as_str())) {
+            if !addressed_to(&prop).iter().any(|x| x == &me.to_string()) || self.guard.has(&key) || self.book.open("ballot").any(|b| b.speaks_for.as_deref() == Some(me.as_str()) && data(b).s("proposal") == Some(prop.id.as_str())) {
                 continue;
             }
             let am = amendment(&self.book, &me, Some(&prop));
@@ -1328,7 +1328,7 @@ impl Plan for Clerk {
                 bd["proposed_in"] = json!(p);
             }
             self.guard.put(&key, t);
-            steps.push(key_step(&key, "A proposal addressed to the council: opening a ballot.".into(), vec![say("ballot", &words, Say { basis: Some(prop.id.clone()), data: Some(bd), ..Default::default() })], false));
+            steps.push(key_step(&key, "A proposal addressed to the council: opening a ballot.".into(), vec![say("ballot", &words, Say { basis: Some(prop.id.to_string()), data: Some(bd), ..Default::default() })], false));
         }
         // Ballots closed: counted and declared. Only once the council's members are known.
         let ballots: Vec<Arc<Record>> = self.book.open("ballot").cloned().collect();
@@ -1347,8 +1347,8 @@ impl Plan for Clerk {
             let mut latest: BTreeMap<String, (i64, String)> = BTreeMap::new();
             for r in self.book.of_type("vote") {
                 if let (RecordBody::Vote { ballot: b, choice }, Some(pos)) = (&r.body, &r.position) {
-                    if *b == ballot.id && councillors.contains(pos) && r.at < closes && latest.get(pos).is_none_or(|(at, _)| r.at >= *at) {
-                        latest.insert(pos.clone(), (r.at, choice.clone()));
+                    if *b == ballot.id && councillors.contains(pos.as_str()) && r.at < closes && latest.get(pos.as_str()).is_none_or(|(at, _)| r.at >= *at) {
+                        latest.insert(pos.to_string(), (r.at, choice.clone()));
                     }
                 }
             }
@@ -1379,7 +1379,7 @@ impl Plan for Clerk {
             steps.push(key_step(
                 &key,
                 format!("The ballot closed: counting the councillors' latest votes ({}).", if passed { "a majority for" } else { "no majority for" }),
-                vec![say("ballot_result", &words, Say { basis: Some(ballot.id.clone()), data: Some(json!({ "ballot": ballot.id, "yes": yes, "no": no, "passed": passed, "voted_for": voted_for, "voted_against": voted_against })), ..Default::default() })],
+                vec![say("ballot_result", &words, Say { basis: Some(ballot.id.to_string()), data: Some(json!({ "ballot": ballot.id, "yes": yes, "no": no, "passed": passed, "voted_for": voted_for, "voted_against": voted_against })), ..Default::default() })],
                 false,
             ));
         }
@@ -1423,10 +1423,10 @@ impl Plan for Clerk {
             self.examined.retain(|_, at| t - *at <= window);
             let votes: Vec<Arc<Record>> = self.book.of_type("vote").filter(|v| t - v.at <= window).cloned().collect();
             for v in votes {
-                if self.examined.contains_key(&v.id) {
+                if self.examined.contains_key(v.id.as_str()) {
                     continue;
                 }
-                self.examined.insert(v.id.clone(), v.at);
+                self.examined.insert(v.id.to_string(), v.at);
                 let RecordBody::Vote { ballot, .. } = &v.body else { continue };
                 if v.author == oikos_contracts::blocks::GENESIS || v.author == self.participant {
                     continue;
@@ -1438,7 +1438,7 @@ impl Plan for Clerk {
                 }
                 let result = self.declared(&me, &b.id).cloned();
                 let late = bd.get("closed") == Some(&Value::Bool(true)) || v.at >= bd.i("closes_at").unwrap_or(i64::MAX) || result.as_ref().is_some_and(|r| r.at <= v.at);
-                let member = v.position.as_ref().is_some_and(|p| councillors.contains(p));
+                let member = v.position.as_ref().is_some_and(|p| councillors.contains(p.as_str()));
                 if !late && member {
                     continue;
                 }
@@ -1460,7 +1460,7 @@ impl Plan for Clerk {
         }
         // Letters: the standing report.
         if !self.letters.is_empty() {
-            let waiting: Vec<&Arc<Record>> = self.book.open("proposal").filter(|x| addressed_to(x).contains(&me) && !self.book.open("ballot").any(|b| b.speaks_for.as_deref() == Some(me.as_str()) && data(b).s("proposal") == Some(x.id.as_str()))).collect();
+            let waiting: Vec<&Arc<Record>> = self.book.open("proposal").filter(|x| addressed_to(x).iter().any(|x| x == &me.to_string()) && !self.book.open("ballot").any(|b| b.speaks_for.as_deref() == Some(me.as_str()) && data(b).s("proposal") == Some(x.id.as_str()))).collect();
             let open: Vec<&Arc<Record>> = self.book.open("ballot").filter(|b| b.speaks_for.as_deref() == Some(me.as_str()) && data(b).s("electorate") == Some("council") && self.declared(&me, &b.id).is_none()).collect();
             let all: Vec<&Arc<Record>> = self.book.open("ballot_result").collect();
             let results = &all[all.len().saturating_sub(3)..];
@@ -1687,7 +1687,7 @@ impl Member {
                 if p.position.is_none() {
                     return Proposer::Resident;
                 }
-                p.position.clone()
+                p.position.map(|x| x.to_string())
             }
             None => match bd.s("proposed_in") {
                 Some(x) => Some(x.to_string()),
@@ -1795,7 +1795,7 @@ impl Plan for Member {
                 if let RecordBody::Vote { ballot, choice } = &v.body {
                     match rec.iter_mut().find(|x| x.0 == *ballot) {
                         Some(x) => x.1 = choice.clone(),
-                        None => rec.push((ballot.clone(), choice.clone())),
+                        None => rec.push((ballot.to_string(), choice.clone())),
                     }
                 }
             }

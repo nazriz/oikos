@@ -862,10 +862,10 @@ impl CitizenMind {
     pub fn refresh_teachings(&mut self, book: &Book) {
         let mut m: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for r in book.assertions() {
-            m.entry(r.speaks_for.clone().unwrap_or_else(|| r.author.clone())).or_default().push(r.id.clone());
+            m.entry((r.speaks_for.unwrap_or_else(|| r.author.clone().into())).to_string()).or_default().push(r.id.to_string());
         }
         self.s.teachings = m;
-        self.s.practice_hosts = book.practices().map(|r| (r.id.clone(), r.speaks_for.clone().unwrap_or_else(|| r.author.clone()))).collect();
+        self.s.practice_hosts = book.practices().map(|r| (r.id.to_string(), r.speaks_for.map_or_else(|| r.author.clone(), |x| x.to_string()))).collect();
     }
     /// How strongly we hold what a host teaches (the most of its teachings: citizen.ts `holdTo`).
     pub fn hold_to(&self, host: &str) -> i64 {
@@ -1455,7 +1455,7 @@ impl Mind for CitizenMind {
         if self.s.last_seen == 0 && t > DAY {
             self.s.inner.hours_begin(t);
         } else if pic.body.as_ref().map_or(false, |b| b.present) {
-            let here = pic.body.as_ref().and_then(|b| b.in_space.clone());
+            let here = pic.body.as_ref().and_then(|b| b.in_space);
             let cat = self.where_at(here.as_deref(), life);
             self.s.inner.spent(cat, t - self.s.last_seen);
         }
@@ -1482,9 +1482,9 @@ impl Mind for CitizenMind {
             if let Some(id) = id {
                 self.s.pending_group = false;
                 let b = self.s.begun.take().unwrap();
-                self.s.my_group = Some((id.clone(), b.shape.clone(), b.want.about.clone()));
+                self.s.my_group = Some((id.to_string(), b.shape.clone(), b.want.about.clone()));
                 self.tried(true, 20_000);
-                self.s.inner.remember(inner::Remembered { t, what: "founded".into(), about: Some(id.clone()), size: 5_000, by: None });
+                self.s.inner.remember(inner::Remembered { t, what: "founded".into(), about: Some(id.to_string()), size: 5_000, by: None });
                 let piece = b.piece.clone().unwrap_or(Json::Null);
                 let composer = if piece.is_null() { json!("none") } else if piece.get("declined") == Some(&Json::Bool(true)) { json!("declined") } else { piece.get("model").cloned().unwrap_or(json!("none")) };
                 let mut facts = json!({ "org": id, "idea": b.brief["idea"], "about": b.want.about, "sharers": b.sharers.len(), "name_by": b.name_by.clone().unwrap_or_else(|| "code".into()), "composer": composer, "dark": b.brief["dark"].as_array().map_or(0, |d| d.len()) });
@@ -1632,7 +1632,7 @@ impl Mind for CitizenMind {
         self.s.inner.settle(t);
         let kind = if tr.kind.is_empty() { self.kind_of(&tr.who) } else { tr.kind.clone() };
         let rd = tr.paper.as_deref().and_then(|p| self.read_of(p));
-        let rp = self.p.rdial.as_ref().map(|d| d.params.clone());
+        let rp = self.p.rdial.as_ref().map(|d| d.params);
         let mut moved: BTreeMap<String, reading::Moved> = BTreeMap::new();
         let mv = |m: Moved| reading::Moved { after: m.after, plain: m.plain, before: Some(m.before) };
         if tr.tried {

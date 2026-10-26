@@ -79,8 +79,8 @@ fn apps_of(r: &Record) -> Vec<String> {
         v.push(a.to_string());
     }
     for b in bases_of(r) {
-        if !v.contains(b) {
-            v.push(b.clone());
+        if !v.iter().any(|x| x ==b) {
+            v.push(b.to_string());
         }
     }
     v
@@ -184,7 +184,7 @@ fn untaken(book: &Book, filed: &Filed, why: &str, w: &WorldInfo) -> Vec<OpenItem
     let mut out = vec![];
     for kind in filed.forms.application {
         for a in book.open(kind) {
-            if !addressed(a, &filed.me) || filed.noticed(&a.id) || filed.decided.contains(&a.id) {
+            if !addressed(a, &filed.me) || filed.noticed(&a.id) || filed.decided.contains(a.id.as_str()) {
                 continue;
             }
             let x = data_of(a);
@@ -197,7 +197,7 @@ fn untaken(book: &Book, filed: &Filed, why: &str, w: &WorldInfo) -> Vec<OpenItem
                 if on(x, "against") { format!(" against {}", js(x.get("against"))) } else { String::new() },
                 if has(x, "amount") { format!(", seeking {}", usd(money(x.get("amount")), w)) } else { String::new() },
             );
-            out.push(OpenItem::new(a.id.clone(), line).since(a.at).amount(has(x, "amount").then(|| money(x.get("amount")))));
+            out.push(OpenItem::new(a.id, line).since(a.at).amount(has(x, "amount").then(|| money(x.get("amount")))));
         }
     }
     out
@@ -247,7 +247,7 @@ fn taken_in(book: &Book, filed: &Filed, t: i64, aside: &BTreeSet<String>, w: &Wo
                 date_words(by, w),
                 if said.is_empty() { String::new() } else { format!(" ({said})") }
             );
-            waiting.push(OpenItem::new(n.id.clone(), line).since(made_at(n)).due(Some(by)).amount(shown));
+            waiting.push(OpenItem::new(n.id, line).since(made_at(n)).due(Some(by)).amount(shown));
         } else {
             let line = format!(
                 "{}: {what}, taken in {}; the time to answer {} {}{}; not decided",
@@ -257,7 +257,7 @@ fn taken_in(book: &Book, filed: &Filed, t: i64, aside: &BTreeSet<String>, w: &Wo
                 date_words(by, w),
                 if said.is_empty() { String::new() } else { format!(" ({said})") }
             );
-            ran.push(OpenItem::new(n.id.clone(), line).since(by).due(Some(by)).amount(shown));
+            ran.push(OpenItem::new(n.id, line).since(by).due(Some(by)).amount(shown));
         }
     }
     (waiting, ran)
@@ -295,10 +295,10 @@ fn member(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
         let said = if said.is_empty() { "no respondent named".to_string() } else { said };
         if day_come(day, t) {
             let line = format!("{}: {what}, listed {} for hearing on {}, which has come; no order made ({said})", n.id, date_words(n.at, w), date_words(day, w));
-            due.push(OpenItem::new(n.id.clone(), line).since(day).due(Some(day)));
+            due.push(OpenItem::new(n.id, line).since(day).due(Some(day)));
         } else {
             let line = format!("{}: {what}, listed {} to be heard on {} ({said})", n.id, date_words(n.at, w), date_words(day, w));
-            waiting.push(OpenItem::new(n.id.clone(), line).since(n.at).due(Some(day)));
+            waiting.push(OpenItem::new(n.id, line).since(n.at).due(Some(day)));
         }
     }
     // Applications for possession of a let home (docs/behaviour/justice.md, "Possession"): each with the home, what the
@@ -317,7 +317,7 @@ fn member(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
         let who = if !text_of(x.get("applicant")).is_empty() {
             text_of(x.get("applicant")).to_string()
         } else {
-            a.and_then(|r| r.speaks_for.clone()).unwrap_or_else(|| "someone".to_string())
+            (a.and_then(|r| r.speaks_for).unwrap_or_else(|| "someone".into())).to_string()
         };
         let by = finite(nn(x.get("answer_by")).or_else(|| x.get("hearing_at")));
         let answer = super::openbooks::latest(book.open(TRIBUNAL_FORMS.response).filter(|r| apps_of(r).contains(app) && r.speaks_for.as_deref() == Some(against)));
@@ -521,7 +521,7 @@ fn registrar(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
     let mut declined: BTreeSet<&str> = BTreeSet::new();
     for dec in book.open("enforcement_decline") {
         if is_me(dec, me) {
-            declined.extend(bases_of(dec).iter().map(String::as_str));
+            declined.extend(bases_of(dec).iter().map(|x| x.as_str()));
         }
     }
     let mut items = vec![];
@@ -542,7 +542,7 @@ fn registrar(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
                 date_words(r.at, w),
                 js_or(rd.get("order"), "(none named)")
             );
-            items.push(OpenItem::new(r.id.clone(), line).since(r.at));
+            items.push(OpenItem::new(r.id, line).since(r.at));
             continue;
         }
         let o = o.expect("an order");
@@ -562,7 +562,7 @@ fn registrar(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
             date_words(due, w),
             if t >= due { ", and that date has passed" } else { ", and that date has not come" }
         );
-        items.push(OpenItem::new(r.id.clone(), line).since(r.at).amount(Some(unpaid)));
+        items.push(OpenItem::new(r.id, line).since(r.at).amount(Some(unpaid)));
     }
     // Requests for a warrant of possession (docs/behaviour/justice.md, "Possession"): no warrant of ours on that order
     // since, and not declined.
@@ -607,7 +607,7 @@ fn registrar(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
                 js_or(rd.get("order"), "(no order named)")
             )
         };
-        warrants.push(OpenItem::new(r.id.clone(), line).since(r.at));
+        warrants.push(OpenItem::new(r.id, line).since(r.at));
     }
     [heading("Requests to enforce an order, not answered", items), heading("Requests for a warrant of possession, not answered", warrants)].concat()
 }
@@ -638,7 +638,7 @@ fn venue_headings(book: &Book, me: &str, t: i64, for_decision: bool, of: &str, w
                 if claimed != 0 { format!(", seeking {}", usd(claimed, w)) } else { String::new() },
                 date_words(n.at, w)
             );
-            OpenItem::new(n.id.clone(), line).since(n.at).amount((claimed != 0).then_some(claimed))
+            OpenItem::new(n.id, line).since(n.at).amount((claimed != 0).then_some(claimed))
         })
         .collect();
     let put: BTreeSet<String> = before.iter().filter_map(|n| data_of(n).s("application").map(String::from)).collect();
@@ -708,7 +708,7 @@ fn union(book: &Book, me: &str, hears: bool, t: i64, w: &WorldInfo) -> Vec<OpenH
     }
     let mut failed: BTreeSet<&str> = BTreeSet::new(); // claims whose ballot found no mandate
     for b in &ballots {
-        if results.get(&b.id).is_some_and(|r| data_of(r).get("passed") == Some(&Value::Bool(false))) {
+        if results.get(b.id.as_str()).is_some_and(|r| data_of(r).get("passed") == Some(&Value::Bool(false))) {
             if let Some(c) = data_of(b).s("claim") {
                 failed.insert(c);
             }
@@ -725,7 +725,7 @@ fn union(book: &Book, me: &str, hears: bool, t: i64, w: &WorldInfo) -> Vec<OpenH
     let mut accepted: BTreeSet<&str> = BTreeSet::new();
     for a in book.open("offer_accepted") {
         if is_me(a, me) {
-            accepted.extend(bases_of(a).iter().map(String::as_str));
+            accepted.extend(bases_of(a).iter().map(|x| x.as_str()));
         }
     }
     let (mut no_offer, mut unanswered) = (vec![], vec![]);
@@ -736,7 +736,7 @@ fn union(book: &Book, me: &str, hears: bool, t: i64, w: &WorldInfo) -> Vec<OpenH
         let rise = pct(data_of(c).get("rise_bps"));
         let Some(o) = offer_of.get(c.id.as_str()) else {
             no_offer.push(
-                OpenItem::new(c.id.clone(), format!("{}: our claim of {rise}% for everyone at {employer}, made {}, has had no offer from {employer}", c.id, date_words(c.at, w))).since(c.at),
+                OpenItem::new(c.id, format!("{}: our claim of {rise}% for everyone at {employer}, made {}, has had no offer from {employer}", c.id, date_words(c.at, w))).since(c.at),
             );
             continue;
         };
@@ -750,12 +750,12 @@ fn union(book: &Book, me: &str, hears: bool, t: i64, w: &WorldInfo) -> Vec<OpenH
             date_words(o.at, w),
             c.id
         );
-        unanswered.push(OpenItem::new(o.id.clone(), line).since(o.at));
+        unanswered.push(OpenItem::new(o.id, line).since(o.at));
     }
     // ---- ballots ----
     let live: Vec<&&R> = ballots
         .iter()
-        .filter(|b| !results.contains_key(&b.id) && finite(data_of(b).get("closes")).is_some() && !over(text_of(data_of(b).get("employer")), b.at))
+        .filter(|b| !results.contains_key(b.id.as_str()) && finite(data_of(b).get("closes")).is_some() && !over(text_of(data_of(b).get("employer")), b.at))
         .collect();
     let mut voters: BTreeMap<&str, BTreeMap<String, &str>> = BTreeMap::new(); // ballot -> member -> latest choice
     if !live.is_empty() {
@@ -769,12 +769,12 @@ fn union(book: &Book, me: &str, hears: bool, t: i64, w: &WorldInfo) -> Vec<OpenH
             .collect();
         votes.sort_by_key(|(v, _, _)| v.at);
         for (v, ballot, choice) in votes {
-            voters.entry(ballot).or_default().insert(v.speaks_for.clone().unwrap_or_else(|| v.author.clone()), choice);
+            voters.entry(ballot).or_default().insert((v.speaks_for.unwrap_or_else(|| v.author.clone().into())).to_string(), choice);
         }
     }
     let (mut open_ballots, mut undeclared) = (vec![], vec![]);
     for b in live {
-        let eligible: BTreeSet<&str> = addressed_to(b).iter().map(String::as_str).collect();
+        let eligible: BTreeSet<&str> = addressed_to(b).iter().map(|x| x.as_str()).collect();
         let cast: Vec<&str> = voters.get(b.id.as_str()).map(|m| m.iter().filter(|(who, _)| eligible.contains(who.as_str())).map(|(_, c)| *c).collect()).unwrap_or_default();
         let yes = cast.iter().filter(|c| **c == "yes").count();
         let count = format!("{} of {} voted, {yes} yes, {} no", cast.len(), eligible.len(), cast.len() - yes);
@@ -782,10 +782,10 @@ fn union(book: &Book, me: &str, hears: bool, t: i64, w: &WorldInfo) -> Vec<OpenH
         let employer = js(data_of(b).get("employer"));
         if t < closes {
             let line = format!("{}: our ballot of members at {employer} on protected action, called {}, closes {}; {count} on file", b.id, date_words(b.at, w), date_words(closes, w));
-            open_ballots.push(OpenItem::new(b.id.clone(), line).since(b.at));
+            open_ballots.push(OpenItem::new(b.id, line).since(b.at));
         } else {
             let line = format!("{}: our ballot of members at {employer} closed {}; {count} on file; no result declared", b.id, date_words(closes, w));
-            undeclared.push(OpenItem::new(b.id.clone(), line).since(closes));
+            undeclared.push(OpenItem::new(b.id, line).since(closes));
         }
     }
     // ---- action ----
@@ -801,9 +801,9 @@ fn union(book: &Book, me: &str, hears: bool, t: i64, w: &WorldInfo) -> Vec<OpenH
         }
         let span = format!("{employer}, from {} until {}", date_words(from, w), date_words(until, w));
         if t < from && !stopped(employer, n.at) {
-            not_begun.push(OpenItem::new(n.id.clone(), format!("{}: notice of action at {span}, given {}; not yet begun", n.id, date_words(n.at, w))).since(n.at));
+            not_begun.push(OpenItem::new(n.id, format!("{}: notice of action at {span}, given {}; not yet begun", n.id, date_words(n.at, w))).since(n.at));
         } else {
-            not_ended.push(OpenItem::new(n.id.clone(), format!("{}: action at {span}, begun and not yet ended", n.id)).since(from));
+            not_ended.push(OpenItem::new(n.id, format!("{}: action at {span}, begun and not yet ended", n.id)).since(from));
         }
     }
     // ---- joining ----
@@ -813,7 +813,7 @@ fn union(book: &Book, me: &str, hears: bool, t: i64, w: &WorldInfo) -> Vec<OpenH
         if terms.template.as_deref() != Some("membership") || terms.parties.first().map(String::as_str) != Some(me) {
             continue;
         }
-        offered_on.extend(bases_of(a).iter().map(String::as_str));
+        offered_on.extend(bases_of(a).iter().map(|x| x.as_str()));
         if book.in_force(&a.id) {
             if let Some(p) = terms.parties.get(1) {
                 in_force.insert(p.as_str());
@@ -831,7 +831,7 @@ fn union(book: &Book, me: &str, hears: bool, t: i64, w: &WorldInfo) -> Vec<OpenH
                 date_words(a.at, w),
                 data_of(a).s("employer").map_or(String::new(), |e| format!(", working at {e}"))
             );
-            OpenItem::new(a.id.clone(), line).since(a.at)
+            OpenItem::new(a.id, line).since(a.at)
         })
         .collect();
     [
@@ -915,7 +915,7 @@ impl Lend {
         }
         for r in fresh {
             if let RecordBody::Signature { agreement, .. } = &r.body {
-                self.signed.entry(agreement.clone()).or_default().push(r.at);
+                self.signed.entry(agreement.to_string()).or_default().push(r.at);
             }
             let Some(terms) = terms_of(r) else { continue };
             if terms.template.as_deref() != Some("loan") || terms.parties.first().map(String::as_str) != Some(me) || self.loan(&r.id).is_some() {
@@ -929,7 +929,7 @@ impl Lend {
             let payment = money(repay.get("amount"));
             let months = ((2 * terms.term.unwrap_or(0) + MONTH).div_euclid(2 * MONTH)).max(1);
             self.loans.push(Loan {
-                id: r.id.clone(),
+                id: r.id.to_string(),
                 borrower: who.clone(),
                 account: account.to_string(),
                 principal: lent.map_or(payment * months, |m| money(m.get("amount"))),
@@ -971,7 +971,7 @@ impl Lend {
                 continue;
             }
             let mut x = crate::common::cents(tx.amount);
-            let mut ids: Vec<usize> = self.by_account.get(&tx.from).map(|v| v.iter().filter_map(|id| self.loan(id)).collect()).unwrap_or_default();
+            let mut ids: Vec<usize> = self.by_account.get(tx.from.as_str()).map(|v| v.iter().filter_map(|id| self.loan(id)).collect()).unwrap_or_default();
             ids.sort_by_key(|i| self.loans[*i].start.unwrap_or(0));
             for i in ids {
                 if tx.t < self.counted_from(book, i) {
@@ -1008,7 +1008,7 @@ impl Lend {
         }
         let applications: Vec<OpenItem> = book
             .open("loan_application")
-            .filter(|a| addressed(a, me) && !decided.contains(&a.id))
+            .filter(|a| addressed(a, me) && !decided.contains(a.id.as_str()))
             .map(|a| {
                 let x = data_of(a);
                 let amount = num(x.get("amount")).unwrap_or(0);
@@ -1021,7 +1021,7 @@ impl Lend {
                     usd(amount, w),
                     if on(x, "purpose") { format!(", for {}", js(x.get("purpose"))) } else { String::new() }
                 );
-                OpenItem::new(a.id.clone(), line).since(a.at).amount(Some(amount))
+                OpenItem::new(a.id, line).since(a.at).amount(Some(amount))
             })
             .collect();
         // ---- loans signed and not paid out ----
@@ -1047,7 +1047,7 @@ impl Lend {
         for k in ["loan_arrears", "loan_default"] {
             for r in book.open(k) {
                 let named = text_of(data_of(r).get("loan"));
-                let loan = if named.is_empty() { bases_of(r).first().cloned().unwrap_or_default() } else { named.to_string() };
+                let loan = if named.is_empty() { bases_of(r).first().map(|x| x.to_string()).unwrap_or_default() } else { named.to_string() };
                 if is_me(r, me) && !loan.is_empty() && letters.get(&loan) != Some(&true) {
                     letters.insert(loan, k == "loan_default");
                 }
@@ -1088,7 +1088,7 @@ impl Lend {
         let mut answered: BTreeSet<&str> = BTreeSet::new();
         for r in book.open("loan_payout") {
             if is_me(r, me) {
-                answered.extend(bases_of(r).iter().map(String::as_str));
+                answered.extend(bases_of(r).iter().map(|x| x.as_str()));
             }
         }
         let payouts: Vec<OpenItem> = book
@@ -1106,7 +1106,7 @@ impl Lend {
                     date_words(r.at, w),
                     js(data_of(r).get("loan"))
                 );
-                OpenItem::new(r.id.clone(), line).since(r.at)
+                OpenItem::new(r.id, line).since(r.at)
             })
             .collect();
         [
@@ -1200,12 +1200,12 @@ mod tests {
     fn obs(t: i64, entity: &str, records: Vec<Value>, bank: Option<(Vec<AccountItem>, Vec<Transaction>)>) -> Picture {
         let mut channels = BTreeMap::new();
         let records: Vec<Arc<Record>> = records.into_iter().map(|v| Arc::new(serde_json::from_value(v).expect("a record"))).collect();
-        channels.insert("mine".to_string(), Seen::Records { records, search: false });
+        channels.insert("mine".into(), Seen::Records { records, search: false });
         if let Some((accounts, transactions)) = bank {
-            channels.insert("bank".to_string(), Seen::Accounts { accounts: Arc::new(accounts), transactions });
+            channels.insert("bank".into(), Seen::Accounts { accounts: Arc::new(accounts), transactions });
         }
         Picture {
-            participant: format!("{entity}-system"),
+            participant: format!("{entity}-system").into(),
             t,
             status: ParticipantStatus::Active,
             entity: entity.into(),
@@ -1516,7 +1516,7 @@ mod tests {
         json!({ "id": format!("sig-{agr}-{who}"), "at": at, "author": format!("{who}-x"), "record": "signature", "agreement": agr, "as": who, "visible_to": ["bank", "ann"] })
     }
     fn tx(t: i64, from: &str, to: &str, amount: i128, settles: Option<&str>) -> Transaction {
-        Transaction { t, from: from.into(), to: to.into(), amount, currency: "XTS".into(), by: "bank".into(), settles: settles.map(String::from), per_instruction: None, memo: None, line: None }
+        Transaction { t, from: from.into(), to: to.into(), amount, currency: "XTS".into(), by: "bank".into(), settles: settles.map(String::from).map(Into::into), per_instruction: None, memo: None, line: None }
     }
     fn bank(txs: Vec<Transaction>) -> Option<(Vec<AccountItem>, Vec<Transaction>)> {
         Some((accounts(), txs))

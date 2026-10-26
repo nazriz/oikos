@@ -19,7 +19,7 @@ use oikos_kernel::run::Run;
 fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
     let mut run = Run::start(world(params), "money", Vec::new(), None).unwrap();
     let opening = run.kernel().state().total_money();
-    let mut ledger: BTreeMap<String, i128> = run.kernel().state().accounts.iter().map(|(k, a)| (k.clone(), a.balance)).collect();
+    let mut ledger: BTreeMap<oikos_kernel::blocks::Id, i128> = run.kernel().state().accounts.iter().map(|(k, a)| (*k, a.balance)).collect();
     let edges = run.kernel().statics().boundaries.clone();
 
     for op in ops {
@@ -36,12 +36,12 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
                 prop_assert!(*amount > 0);
                 // An account opened earlier in this same action isn't in `before`.
                 let src = before.get(from).or_else(|| run.kernel().state().accounts.get(from)).expect("paying account existed");
-                let by_entity = acting.clone().expect("money moves only in an applied action");
+                let by_entity = acting.expect("money moves only in an applied action");
                 // Every movement of money is executed by the custodian of the account it leaves (construction no longer
                 // moves money: phase B).
                 prop_assert_eq!(by_entity.as_str(), src.custodian.as_str(), "payment not executed by the custodian");
-                *ledger.entry(from.clone()).or_insert(0) -= *amount;
-                *ledger.entry(to.clone()).or_insert(0) += *amount;
+                *ledger.entry(from.to_string().into()).or_insert(0) -= *amount;
+                *ledger.entry(to.to_string().into()).or_insert(0) += *amount;
             }
         }
         let st = run.kernel().state();
@@ -51,7 +51,7 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
                 prop_assert!(a.balance >= 0, "{} went negative ({}) after {:?}", id, a.balance, cmd);
             }
             prop_assert_eq!(
-                ledger.get(id).copied().unwrap_or(0),
+                ledger.get(id.as_str()).copied().unwrap_or(0),
                 a.balance,
                 "{}'s balance moved without a transfer event after {:?}",
                 id,
@@ -59,7 +59,7 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
             );
         }
         for (id, bal) in &ledger {
-            if !st.accounts.contains_key(id) {
+            if !st.accounts.contains_key(id.as_str()) {
                 prop_assert_eq!(*bal, 0, "account {} was closed while holding money", id);
             }
         }

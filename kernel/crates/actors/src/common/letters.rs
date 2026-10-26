@@ -120,10 +120,10 @@ impl Letters {
         for m in &pic.inbox {
             if m.from != pic.participant && !office_note(&m.text) && !news_of_our_request(m, pic, book) {
                 self.pending.push(Letter {
-                    id: m.id.clone(),
-                    from: m.from.clone(),
-                    position: m.from_position.clone(),
-                    entity: m.from_entity.clone(),
+                    id: m.id.to_string(),
+                    from: m.from.to_string(),
+                    position: m.from_position.map(|x| x.to_string()),
+                    entity: m.from_entity.map(|x| x.to_string()),
                     text: m.text.clone(),
                 });
             }
@@ -158,11 +158,11 @@ fn news_of_our_request(m: &Message, pic: &Picture, book: &Book) -> bool {
     if !is_kind(r, "request") || r.speaks_for.as_deref() != Some(pic.entity.as_str()) {
         return false;
     }
-    let sender = m.from_entity.clone().or_else(|| match &m.from_position {
-        Some(p) => book.position(p).map(|x| x.entity.clone()),
-        None => book.person_of(&m.from).map(String::from),
+    let sender = m.from_entity.or_else(|| match &m.from_position {
+        Some(p) => (book.position(p).map(|x| x.entity.clone())).map(Into::into),
+        None => book.person_of(&m.from).map(String::from).map(Into::into),
     });
-    sender.is_some_and(|s| addressed_to(r).contains(&s))
+    sender.is_some_and(|s| addressed_to(r).iter().any(|x| x == &s.to_string()))
 }
 
 /// An office that acknowledges its letters (docs/behaviour/letters.md; common.ts `answering`): one that says how it
@@ -199,7 +199,7 @@ impl<A: crate::Actor> crate::Actor for Answering<A> {
         }
         for l in &pic.inbox {
             if l.from != pic.participant && !office_note(&l.text) {
-                self.letters.push((l.id.clone(), l.from.clone(), l.text.clone()));
+                self.letters.push((l.id.to_string(), l.from.to_string(), l.text.clone()));
             }
         }
         let act = self.inner.step(pic, cx);

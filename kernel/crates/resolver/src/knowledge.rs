@@ -454,26 +454,26 @@ impl Knowledge {
     }
 
     pub fn absorb(&mut self, obs: &Value) {
-        self.absorb_with(obs, &BTreeMap::new());
+        self.absorb_with(obs, &BTreeMap::<String, Shown>::new());
     }
 
     /// As `absorb`, for an observation whose records and cells are handed over beside it: `shown` has, by channel
     /// path, what each record (`RecordFacts::of`) or cell (`CellFacts::of`) that channel delivered adds, in the order
     /// delivered, and the observation's own `records` or `cells` there are empty. The same as absorbing the
     /// observation with them in place.
-    pub fn absorb_with(&mut self, obs: &Value, shown: &BTreeMap<String, Shown>) {
+    pub fn absorb_with<K: std::borrow::Borrow<str> + Ord>(&mut self, obs: &Value, shown: &BTreeMap<K, Shown>) {
         self.absorb_sharing(obs, shown, &mut Registers::default());
     }
 
     /// As `absorb_with`, by a holder of many seats' knowledge: a register of lots a seat is shown whole is held once
     /// between the seats shown it (`Registers`). What the seat knows is the same.
-    pub fn absorb_sharing(&mut self, obs: &Value, shown: &BTreeMap<String, Shown>, registers: &mut Registers) {
+    pub fn absorb_sharing<K: std::borrow::Borrow<str> + Ord>(&mut self, obs: &Value, shown: &BTreeMap<K, Shown>, registers: &mut Registers) {
         self.absorb_seen(&Seen::of(obs), shown, registers);
     }
 
     /// As `absorb_sharing`, for an observation read already (`Seen`): by whoever has it in a shape of its own, and
     /// needn't make JSON of it to say what it holds.
-    pub fn absorb_seen(&mut self, obs: &Seen, shown: &BTreeMap<String, Shown>, registers: &mut Registers) {
+    pub fn absorb_seen<K: std::borrow::Borrow<str> + Ord>(&mut self, obs: &Seen, shown: &BTreeMap<K, Shown>, registers: &mut Registers) {
         self.entity = obs.entity.to_string();
         self.t = obs.t.unwrap_or(self.t);
         for p in &obs.positions {
@@ -848,7 +848,7 @@ mod tests {
         // One by one: what `learn` does with each, from nothing.
         let plain = |before: &Knowledge, list: &[Arc<RecordFacts>]| {
             let mut k = before.clone();
-            k.absorb_with(&obs, &BTreeMap::new());
+            k.absorb_with(&obs, &BTreeMap::<String, Shown>::new());
             for f in list {
                 k.learn(f);
             }
