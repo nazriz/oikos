@@ -1,7 +1,9 @@
 # The CI runner (self-hosted, on the run server)
 
-`.github/workflows/ci.yml` runs on every push to `main` and every pull request: `bun install`, `bun run kernel`,
-`bun run typecheck`, `cargo test`, `bun run test:all`. It runs on a self-hosted runner on the run server (the Mac mini),
+`.github/workflows/ci.yml` runs on every push to `main` and nightly (never on a pull request: the repository is public,
+and a fork's code must not run on this machine): `bun install`, `bun run kernel`, `bun run typecheck`, both tiers of
+the suite. A second workflow, `.github/workflows/linux.yml`, runs the same nightly on a GitHub-hosted `ubuntu-latest`
+machine with no secrets (PL-4). ci.yml runs on a self-hosted runner on the run server (the Mac mini),
 labels `self-hosted`, `macOS`, `oikos-mini`, one job at a time, under the `clawd` user. Until the runner is registered,
 jobs wait in the queue. The runner shares the machine's slots (docs/dev-machine.md), so CI waits its turn with everyone else.
 

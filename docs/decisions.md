@@ -9765,3 +9765,70 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+
+## 2026-10-26 · Linux, and one Rust test program (PL-4 (2) and (3); branch `linux`; no result changes; no model called)
+
+**Asked (Naz):** PL-4's parts (2) and (3): Oikos and its gate build and pass on Linux x86_64, with a nightly hosted job
+and no secrets, any difference of a pinned hash between the Mac and Linux being a fault to find, not to skip; and the
+~50 programs of `kernel/tests/` made one, measured before and after.
+
+**Linux (2).** Built and run on a Linux x86_64 machine (4 cores, 15 GB; Rust 1.97, Bun 1.4.4), from a fresh clone.
+- *The hashes.* `orchestrator/test/culture-dial.test.ts` passes unchanged: the generated configs of three profiles and
+  the Rust state hashes of their towns are the Mac's to the byte. Nothing else was needed, as the design predicts (no
+  floats in the kernel or the contracts, D1, held by `kernel/tests/determinism_lint.rs`; one seeded PRNG; sorted maps;
+  SHA-256 the same with or without the ARM instructions, `sha2`'s `asm` feature on aarch64 only). The merge gate
+  (`bun run test:changed`; a kernel change, so the whole gate tier, 246 files, the kernel's tests and the canaries
+  culture-dial and invariants) passed here but for the two below, neither a hash. No difference of a pinned hash or a
+  log's bytes was found, so none was fixed; the slow tier's other pins were not run here (four cores; about two hours),
+  and the nightly job (below) runs them all.
+- *What was Mac-only, and what was done.* `scripts/disk-tidy.ts` asked `ps -E` for each command's environment, which
+  Linux's `ps` refuses: the listing came back empty and every build folder and worktree read as unused by any process,
+  so `--apply` could have removed a folder a running build was in. It now uses `ps e` off macOS, asks by uid (a user's
+  name may not resolve in a container: `lsof -u unknown` fails), and treats a failed listing as everything in use.
+  Its temp root is `/tmp` off macOS (`/private/tmp` on it) and its disk line reads the repo's own volume.
+  `scripts/status.ts` asks `lsof` by uid too. Already portable and left alone: caffeinate is used only on darwin
+  (`scripts/pilot-wave.ts`), notifications only on darwin (`orchestrator/src/pilot-alerts.ts`), the engine module is
+  found as `.dylib` or `.so`, the slots read `ps -A -o pid=,ppid=` (the same on both), the tests' temp folders come
+  from `os.tmpdir()`. launchd appears only in `docs/ci-runner.md` (the runner's service on the Mini); `scripts/mini` is a
+  tool for reaching the Mini from elsewhere, and its test runs against a local folder, so it runs on Linux as it is.
+- *Two failures in the first gate, and what they were.* `orchestrator/test/risks.test.ts`: this entry's own first edit
+  of PL-4 (its status and "Do when" must share a line). `orchestrator/test/mini.test.ts`: a stopped run's model call
+  (a `sleep`, ended by `scripts/mini stop` after its seed had gone) still answered `kill -0`. It had ended: its parent
+  gone, it was handed to the first process, which in this container (not systemd, not launchd) never reaps, so it
+  stayed a zombie. The test's `alive` now counts a zombie as ended (`ps -o stat=`, the same on both). `scripts/mini`
+  itself was left as it is (its wait on the run's own processes ended as it should here); no assertion was dropped.
+- *The nightly job.* `.github/workflows/linux.yml`: `ubuntu-latest`, nightly at 04:30 UTC and by hand, `permissions:
+  contents: read`, no secrets; Bun pinned to 1.4.4, Rust stable with the wasm target, cargo-nextest; then the same
+  steps as ci.yml (installs, `bun run kernel`, typecheck, the gate tier, the slow tier). It does not record a result
+  for `merge.ts`: main's state stays the Mini's CI. `scripts/tiers.test.ts` now holds that no workflow on the
+  self-hosted runner has a `pull_request` trigger and that the Linux job is hosted, scheduled, secret-free and runs both
+  tiers. (`docs/ci-runner.md` still said ci.yml ran on every pull request; corrected.)
+
+**One Rust test program (3).** `kernel/Cargo.toml` has `autotests = false` and one `[[test]]`, `tests/main.rs`, which
+names each file in `kernel/tests/` as a module and `common` once (each file's `mod common;` became `use crate::common;`;
+no test was changed). The same 284 tests are listed before and after (each program's `--list` against the one's), and
+a new test in `main.rs` fails if a file in `tests/` is named by no `mod` line, since with `autotests = false` it would
+otherwise never run. A file is run alone with `cargo test --test main <file>::`; the comments and port guide that named
+`--test <file>` now say so. The proptest regression files are found by source path, so they still apply.
+
+*Measured* (this Linux machine, 4 cores, the `gate` profile the merge gate builds, warm, `cargo test -p oikos-kernel
+--tests --no-run` after a real one-line change: a public function appended whose body differs each time, then removed):
+
+| change in | 56 programs | one program |
+|---|---|---|
+| `kernel/tests/common` | 45 s, 14 s | 3.4 s, 3.6 s |
+| the kernel's library (`kernel/src/lib.rs`) | 48 s, 48 s | 34 s, 33 s |
+| `oikos-actors` (rebuilds actors, the kernel, its tests) | 169 s, 172 s | 153 s, 153 s |
+| running every test (`cargo test` runs programs in turn) | 353 s | 230 s |
+
+The saving is the link and the per-program build of `common` and the kernel's metadata: 14 s of the kernel's 48, 17 s of
+actors' 170 (where most is the crate itself), and nearly all of a change to the tests. Under nextest the programs ran
+side by side already, so the run time saves less there than under `cargo test`. On the Mini the counts differ (12 cores,
+sccache, more programs linked at once); not measured there.
+
+**Leaves out.** PL-4 (1), the elastic slots, and the trial of sharding the slow tier on hosted runners (setup cold and
+warm, each file's time against the Mini's) — for after the nightly job has a few green nights to read times from.
+
+**Revisit if** the nightly Linux job finds a pinned hash that differs (a reproducibility fault: find the cause, never a
+pin per platform); a crate's own `tests/` grows to many files (the same change there); one test program's single link
+becomes the long pole of a kernel gate (split it in two by what a change reaches).

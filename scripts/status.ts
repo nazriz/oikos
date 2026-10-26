@@ -28,7 +28,7 @@ for (const l of sh(["git", "worktree", "list", "--porcelain"], repo).split("\n")
 }
 const procs = new Map<string, Set<string>>(); // worktree -> commands
 let pid = "";
-for (const l of sh(["lsof", "-a", "-d", "cwd", "-u", process.env.USER ?? "", "-Fpcn"], undefined, 15_000).split("\n")) {
+for (const l of sh(["lsof", "-a", "-d", "cwd", "-u", String(process.getuid?.() ?? process.env.USER ?? ""), "-Fpcn"], undefined, 15_000).split("\n")) {
   if (l.startsWith("p")) pid = l.slice(1);
   else if (l.startsWith("n")) {
     const t = trees.filter((w) => l.slice(1) === w.path || l.slice(1).startsWith(w.path + "/")).sort((a, b) => b.path.length - a.path.length)[0];
