@@ -40,7 +40,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const MANIFEST: &str = include_str!("../../../../../participants/manifests/firm.retailer.json");
 /// The TS module's version (firm.retailer 0.18.0), which this one does what and more (prices from supply and demand).
-pub const VERSION: &str = "0.20.0";
+pub const VERSION: &str = "0.21.0";
 
 /// FNV-1a of who and what, for a draw that is a fact about the shop (see the module's doc).
 pub(crate) fn fact(who: &str, what: &str) -> u64 {
@@ -117,6 +117,8 @@ pub struct Params {
     pub fixed_to: String,
     /// Where shop premises to let are listed (a business of one that outgrows its owner takes a unit: docs/behaviour/leasing.md).
     pub premises_board: String,
+    /// Months running that premises we lease pay us less than trading alone before we ask to leave (a placeholder: ME-1).
+    pub leave_after_months: i64,
     pub premises_cell: String,
     pub open_from: i64,
     pub open_until: i64,
@@ -176,6 +178,7 @@ impl Params {
             fixed_per_month: ctx.param("fixed_per_month", 0)?,
             fixed_to: ctx.param("fixed_to", String::new())?,
             premises_board: ctx.param("premises_board", String::new())?,
+            leave_after_months: ctx.param("leave_after_months", 3)?,
             premises_cell: ctx.param("premises_cell", String::new())?,
             open_from: ctx.param("open_from", 0)?,
             open_until: ctx.param("open_until", 0)?,
@@ -272,6 +275,23 @@ struct Lease {
     cell: String,
     room: i64,
     rent: i64,
+    /// Where we traded from before (our owner's home or pitch): where we go back to when the lease ends.
+    #[serde(default)]
+    from: (String, String, String),
+    /// The landlord's papers about it we have dealt with (a demand for rent, a review, terms of a surrender).
+    #[serde(default)]
+    read: BTreeSet<String>,
+    /// Rent orders to stop once their last payment before a new rent is made: (order, when).
+    #[serde(default)]
+    retiring: Vec<(String, i64)>,
+    /// Months running in which the premises paid us less than trading alone would.
+    #[serde(default)]
+    losing: i64,
+    /// When we asked to leave (a surrender asked for, or our notice given), and whether we must (our business is closing).
+    #[serde(default)]
+    leaving: Option<i64>,
+    #[serde(default)]
+    must_leave: bool,
 }
 
 /// A shop just founded, setting up.
@@ -504,8 +524,21 @@ impl<B: Body> Shop<B> {
     fn present(&self, pic: &Picture, t: i64, workers: &[String]) -> Vec<String> {
         let tod = t.rem_euclid(DAY);
         if let Some(op) = &self.p.operator {
+            // (In premises we lease, we are there, and see who is: our owner and those we have taken on, as they come
+            // to work. Until we see the unit, none: nothing is served there that the kernel would refuse for nobody
+            // being there. docs/behaviour/leasing.md, "Who is at the unit".)
+            // (A world that shows it no such ground: as before, its owner in its hours.)
+            if let Some(l) = self.lease.as_ref().filter(|l| sites(pic).any(|c| c.structure.as_ref().is_some_and(|s| s.structure == l.structure))) {
+                let ours: BTreeSet<&String> = workers.iter().chain(std::iter::once(op)).collect();
+                let mut here: BTreeSet<String> = BTreeSet::new();
+                for c in sites(pic).filter(|c| c.structure.as_ref().is_some_and(|s| s.structure == l.structure)) {
+                    for sp in c.structure.iter().flat_map(|s| s.spaces.iter()).filter(|sp| sp.kind == "workplace") {
+                        here.extend(sp.occupants.iter().flatten().filter(|o| ours.contains(o)).cloned());
+                    }
+                }
+                return here.into_iter().collect();
+            }
             let open = self.p.open_until == 0 || (self.p.work_day(t) && tod >= self.p.open_from && tod < self.p.open_until);
-            // (In premises we lease, those we have taken on work beside the owner, in their hours.)
             let mut here = if open { vec![op.clone()] } else { vec![] };
             if open && self.lease.is_some() {
                 here.extend(workers.iter().filter(|w| *w != op).cloned());
@@ -614,14 +647,20 @@ impl<B: Body> Shop<B> {
         if stock > 0 && structure != self.at.premises {
             calls.push(call("goods", vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&structure))), ("from_at", Some(arg(&self.at.premises)))]));
         }
+        // (Until when it binds us: its term, from now, as its terms say.)
+        let term = match &a.body {
+            oikos_sight::RecordBody::Agreement { terms } => terms.term,
+            _ => None,
+        };
         if let Some(op) = self.p.operator.clone() {
             calls.push(say(
                 "trading_at",
                 &format!("We trade from {space} now, on a lease: work there."),
-                Say { to: Some(vec![op.clone()]), visible: Some(Visible::Only(vec![me.clone(), op])), basis: Some(a.id.clone()), data: Some(json!({ "space": space, "structure": structure, "cell": cell, "rent": lt.rent, "until": self.book.ends_at(&a.id).unwrap_or(t + 60 * MONTH) })), ..Default::default() },
+                Say { to: Some(vec![op.clone()]), visible: Some(Visible::Only(vec![me.clone(), op])), basis: Some(a.id.clone()), data: Some(json!({ "space": space, "structure": structure, "cell": cell, "rent": lt.rent, "until": self.book.ends_at(&a.id).unwrap_or(t + term.unwrap_or(60 * MONTH)) })), ..Default::default() },
             ));
         }
-        self.lease = Some(Lease { agreement: a.id.clone(), space: space.clone(), structure: structure.clone(), cell: cell.clone(), room, rent: lt.rent });
+        let from = (self.at.premises.clone(), self.at.workplace.clone(), self.at.cell.clone());
+        self.lease = Some(Lease { agreement: a.id.clone(), space: space.clone(), structure: structure.clone(), cell: cell.clone(), room, rent: lt.rent, from, ..Default::default() });
         self.premises_applied = None;
         self.at.premises = structure;
         self.at.workplace = space.clone();
@@ -632,6 +671,187 @@ impl<B: Body> Shop<B> {
         self.published_price = -1;
         self.body.set_workplace(&space);
         vec![because(format!("{landlord} offers us a lease of {space} at {} a month: signing it, paying the deposit and the rent, and moving our stock there.", money_words(lt.rent, &cx.ctx.world)), calls)]
+    }
+
+    /// Our rent orders under a lease: the standing requests of ours that cite it and still stand.
+    fn rent_orders(&self, lease: &str) -> Vec<String> {
+        let me = self.me.as_str();
+        self.book
+            .all("request")
+            .filter(|r| r.speaks_for.as_deref() == Some(me) && crate::common::cites(r, lease) && data(r).get("every").is_some() && !self.book.withdrawn(&r.id))
+            .map(|r| r.id.clone())
+            .collect()
+    }
+
+    /// Whether a lease of ours lets us end it by our own notice (the law gives the tenant a clause), and on what notice.
+    fn our_notice(&self, lease: &str) -> Option<i64> {
+        let a = self.book.get(lease)?;
+        match &a.body {
+            oikos_sight::RecordBody::Agreement { terms } => terms.termination.as_ref()?.iter().find(|c| c.party == self.me).map(|c| c.notice),
+            _ => None,
+        }
+    }
+
+    /// Asking to leave the premises we lease (docs/behaviour/leasing.md, "Leaving early"): by our own notice where the
+    /// lease gives us one, else by asking the landlord to accept a surrender.
+    fn ask_to_leave(&mut self, t: i64, why: &str) -> Option<Step<Then>> {
+        let l = self.lease.as_mut()?;
+        if l.leaving.is_some() {
+            return None;
+        }
+        l.leaving = Some(t);
+        let (agreement, space) = (l.agreement.clone(), l.space.clone());
+        let landlord = self.book.get(&agreement).and_then(|a| crate::papers::agreements::other_party(a, &self.me).map(String::from)).unwrap_or_default();
+        if let Some(n) = self.our_notice(&agreement) {
+            return Some(because(
+                format!("{why}: giving notice under our lease of {space}, which ends it in {} days.", n.div_euclid(DAY)),
+                vec![crate::papers::agreements::notice(&agreement, "Notice: we end the lease, as its terms let us.")],
+            ));
+        }
+        let me = self.me.clone();
+        Some(because(
+            format!("{why}: our lease of {space} gives us no notice of our own, so we ask {landlord} to accept its surrender."),
+            vec![say(
+                "surrender_request",
+                &format!("Request: we ask you to accept the surrender of our lease {agreement} of {space}."),
+                Say { to: Some(vec![landlord.clone()]), visible: Some(Visible::Only(vec![me, landlord])), basis: Some(agreement.clone()), data: Some(json!({ "lease": agreement })), ..Default::default() },
+            )],
+        ))
+    }
+
+    /// The affairs of the premises we lease, at each wake (docs/behaviour/leasing.md, "Remedies", "Rent reviews",
+    /// "Leaving early"): the landlord's papers (a demand for rent owed, paid if we hold it; a rent review, our order
+    /// changed to the new rent from its day; the terms of a surrender we asked for, paid if leaving is worth it), and the
+    /// lease's end, however it came (its term, our notice, a surrender, or the landlord's ending it for rent owed): our
+    /// rent orders stopped, our stock taken back where we traded before, and our owner told.
+    fn lease_affairs(&mut self, t: i64, acct: &crate::common::OwnAccount, stock: i64, cx: &Cx, money: &dyn Fn(i64) -> String) -> Vec<Step<Then>> {
+        let Some(l) = self.lease.clone() else { return vec![] };
+        let me = self.me.clone();
+        let mut steps = vec![];
+        // Rent orders whose last payment before a new rent has been made.
+        let (due, keep): (Vec<(String, i64)>, Vec<(String, i64)>) = l.retiring.iter().cloned().partition(|(_, at)| t >= *at);
+        if !due.is_empty() {
+            steps.push(because("The old rent's last payment is made: stopping its order; the new one takes over.", due.iter().map(|(o, _)| withdraw(o, Some("Replaced by a new standing order."))).collect()));
+            if let Some(x) = self.lease.as_mut() {
+                x.retiring = keep;
+            }
+        }
+        // ---- the lease has ended ----
+        if self.book.concluded(&l.agreement) && !self.book.in_force(&l.agreement) {
+            let orders = self.rent_orders(&l.agreement);
+            let mut calls: Vec<Call> = orders.iter().map(|o| withdraw(o, Some("Lease ended; stop this standing order."))).collect();
+            let (back, back_space, back_cell) = l.from.clone();
+            if stock > 0 && !back.is_empty() && back != l.structure {
+                calls.push(call("goods", vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&back))), ("from_at", Some(arg(&l.structure)))]));
+            }
+            if let Some(op) = self.p.operator.clone() {
+                calls.push(say(
+                    "trading_at",
+                    &format!("Our lease of {} has ended: we trade from where we did before, and you work from there.", l.space),
+                    Say { to: Some(vec![op.clone()]), visible: Some(Visible::Only(vec![me.clone(), op])), basis: Some(l.agreement.clone()), data: Some(json!({ "space": back_space, "structure": back, "cell": back_cell, "back": true })), ..Default::default() },
+                ));
+            }
+            steps.push(because(format!("Our lease of {} has ended: stopping its rent, and taking our stock back to {}.", l.space, if back_space.is_empty() { "our owner" } else { back_space.as_str() }), calls));
+            self.lease = None;
+            if !back.is_empty() {
+                self.at.premises = back;
+                self.at.workplace = back_space.clone();
+                self.at.cell = back_cell;
+                self.body.set_workplace(&back_space);
+            }
+            self.published_price = -1;
+            return steps;
+        }
+        // ---- the landlord's papers ----
+        let landlord = self.book.get(&l.agreement).and_then(|a| crate::papers::agreements::other_party(a, &me).map(String::from)).unwrap_or_default();
+        let papers: Vec<(&str, std::sync::Arc<oikos_sight::Record>)> = ["review_request", "rent_review", "surrender_terms"]
+            .iter()
+            .flat_map(|k| self.book.open(k).map(|r| (*k, r.clone())).collect::<Vec<_>>())
+            .filter(|(_, r)| r.speaks_for.as_deref() == Some(landlord.as_str()) && crate::common::addressed_to(r).contains(&me) && !l.read.contains(&r.id))
+            .filter(|(_, r)| data(r).s("lease").or_else(|| data(r).s("about")) == Some(l.agreement.as_str()))
+            .collect();
+        let mut balance = acct.balance;
+        for (kind, r) in papers {
+            if let Some(x) = self.lease.as_mut() {
+                x.read.insert(r.id.clone());
+            }
+            let d = data(&r);
+            let to = d.s("account").unwrap_or_default().to_string();
+            match kind {
+                // A demand for rent owed: paid, if we hold it.
+                "review_request" => {
+                    let owed = d.i("amount").unwrap_or(0);
+                    if owed > 0 && balance >= owed && !to.is_empty() {
+                        balance -= owed;
+                        steps.push(because(
+                            format!("{landlord} asks for {} of rent owed under our lease: paying it.", money(owed)),
+                            vec![pay(&to, owed, Pay { from: Some(acct.account.clone()), basis: Some(l.agreement.clone()), for_: Some("Rent owed.".into()), ..Default::default() }, cx)],
+                        ));
+                    }
+                }
+                // A rent review: the new rent paid on the old one's days from when it starts; the old order stopped once its last payment is made.
+                "rent_review" => {
+                    let (rent, from) = (d.i("rent").unwrap_or(0), d.i("from").unwrap_or(t));
+                    let Some(rent_to) = self.book.get(&l.agreement).and_then(|a| crate::papers::agreements::lease_terms(a, &me).rent_to) else { continue };
+                    if rent <= 0 {
+                        continue;
+                    }
+                    let old = self.rent_orders(&l.agreement);
+                    let stop_at = (from - DAY).max(t);
+                    if let Some(x) = self.lease.as_mut() {
+                        x.rent = rent;
+                        x.retiring.extend(old.into_iter().map(|o| (o, stop_at)));
+                    }
+                    steps.push(because(
+                        format!("{landlord} reviews our rent to {} a month from {}: paying it from then.", money(rent), crate::common::when_words(from, &cx.ctx.world)),
+                        vec![pay(&rent_to, rent, Pay { from: Some(acct.account.clone()), every: Some(MONTH), first: Some((from - t).max(0)), basis: Some(l.agreement.clone()), for_: Some(format!("Rent for {}, monthly in advance.", l.space)), ..Default::default() }, cx)],
+                    ));
+                }
+                // The terms of a surrender we asked for: paid, if we must leave, or if leaving costs less than staying would.
+                "surrender_terms" => {
+                    let price = d.i("price").unwrap_or(0);
+                    let months_left = self.book.ends_at(&l.agreement).map_or(0, |e| (e - t).div_euclid(MONTH));
+                    let worth = l.must_leave || price <= self.lease_loss() * months_left;
+                    if l.leaving.is_some() && worth && balance >= price && !to.is_empty() {
+                        balance -= price;
+                        steps.push(because(
+                            format!("{landlord} will accept our surrender for {}: paying it.", money(price)),
+                            vec![pay(&to, price, Pay { from: Some(acct.account.clone()), basis: Some(l.agreement.clone()), for_: Some("The price of the surrender agreed.".into()), ..Default::default() }, cx)],
+                        ));
+                    } else if let Some(x) = self.lease.as_mut().filter(|x| !x.must_leave) {
+                        // (Not worth it, or not in hand: we stay, and may ask again. One that must leave and cannot pay
+                        // closes when its month of asking is up: the lease runs on.)
+                        x.leaving = None;
+                        x.losing = 0;
+                    }
+                }
+                _ => {}
+            }
+        }
+        steps
+    }
+
+    /// What staying in the premises we lease loses us a month against trading alone, by last month's custom (nought:
+    /// they pay).
+    fn lease_loss(&self) -> i64 {
+        let Some(l) = &self.lease else { return 0 };
+        let (with, alone) = self.premises_weighing(l.rent, l.room);
+        (alone - with).max(0)
+    }
+
+    /// What premises at `rent` with `room` would leave us a month, against what our owner alone serves, by last month's
+    /// custom (docs/behaviour/leasing.md): (with, alone).
+    fn premises_weighing(&self, rent: i64, room: i64) -> (i64, i64) {
+        let wanted = self.last_demand + self.last_turned_away;
+        let hpwm = self.p.hours_per_worker_month();
+        let serve = self.p.serve_labour.max(1);
+        let per_worker = (hpwm * self.p.utilisation_bps / 10_000 / serve).max(1);
+        let alone = (hpwm / serve).max(1);
+        let margin = (self.price - self.unit_cost).max(0);
+        let wage_m = self.wage * MONTH / self.p.period.max(1);
+        let now = wanted.min(alone) * margin - self.p.fixed_per_month;
+        let (with, _) = premises_pay(wanted, per_worker, margin, wage_m, rent + self.p.fixed_per_month, room);
+        (with, now)
     }
 
     fn found(&self, pic: &Picture, channel: &str) -> Option<Vec<String>> {
@@ -1187,6 +1407,8 @@ impl<B: Body> Shop<B> {
         }
         if operator && self.lease.is_none() {
             steps.extend(self.take_premises(t, &acct.account, held(pic, &self.at.premises, &self.p.kind), cx));
+        } else if operator {
+            steps.extend(self.lease_affairs(t, &acct, held(pic, &self.at.premises, &self.p.kind), cx, &money));
         }
         let stock = held(pic, &self.at.premises, &self.p.kind);
         if trading {
@@ -1360,6 +1582,20 @@ impl<B: Body> Shop<B> {
                     steps.push(st);
                 }
             }
+            // A business of one in premises it leases weighs them each month as it weighed taking them: the custom it had,
+            // served by the hands it needs, less their wages and the rent, against what its owner alone would serve. Worse
+            // for `leave_after_months` running: it asks to leave (docs/behaviour/leasing.md, "Leaving early").
+            if operator && self.lease.as_ref().is_some_and(|l| l.leaving.is_none() && self.book.in_force(&l.agreement)) {
+                let loss = self.lease_loss();
+                let losing = if loss > 0 { self.lease.as_ref().map_or(0, |l| l.losing) + 1 } else { 0 };
+                if let Some(l) = self.lease.as_mut() {
+                    l.losing = losing;
+                }
+                if losing >= self.p.leave_after_months.max(1) {
+                    let why = format!("For {losing} months our premises have paid us {} a month less than trading alone would", money(loss));
+                    steps.extend(self.ask_to_leave(t, &why));
+                }
+            }
         }
 
         // ---- staff, the bank, the union, debts: the body's routine ----
@@ -1417,7 +1653,25 @@ impl<B: Body> Shop<B> {
                 steps.push(self.fill_with(cx, o, 0, 0, &[], &[], "We are not trading: refunding the order.", &acct.account));
                 self.settle(&o.id);
             }
-            if self.at.gone && !self.at.closed {
+            // (A business closing while it leases premises leaves them first (docs/behaviour/leasing.md, "Leaving early"): by
+            // its own notice, where the lease gives it one, and it closes when the lease has ended; else by asking the
+            // landlord to accept a surrender, paid for out of what it holds, and it closes when the lease has ended or a
+            // month on with nothing come of asking: the lease then runs on, and the landlord has its remedies.)
+            let leased_still = self.lease.as_ref().filter(|l| self.book.in_force(&l.agreement)).map(|l| (l.agreement.clone(), l.leaving));
+            let mut wait = false;
+            if let (true, false, Some((agreement, asked))) = (self.at.gone, self.at.closed, leased_still) {
+                if let Some(l) = self.lease.as_mut() {
+                    l.must_leave = true;
+                }
+                match asked {
+                    None => {
+                        steps.extend(self.ask_to_leave(t, "Our business is closing"));
+                        wait = true;
+                    }
+                    Some(at) => wait = self.our_notice(&agreement).is_some() || t - at < MONTH,
+                }
+            }
+            if self.at.gone && !self.at.closed && !wait {
                 self.at.closed = true;
                 // (A business that closes pays its suppliers what it owes them first, out of what it holds; the rest is its owner's.)
                 let (owed, paid) = self.payables.settle::<Then>(t, &acct.account, acct.balance, None, cx);

@@ -63,6 +63,8 @@ fn a_whole_view_cannot_be_written() {
         ("a holder's titles, for someone not listed", None, json!({"id": "x", "kind": "records", "way": "ask", "of": "city", "by": ["holder"], "match": {"records": ["claim"]}, "on_request": true})),
         ("a holder's titles, for an office not listed", Some("builder"), json!({"id": "x", "kind": "records", "way": "ask", "of": "city", "by": ["holder"], "match": {"records": ["claim"]}, "on_request": true})),
         ("a person's premises", None, json!({"id": "x", "kind": "sites", "way": "here", "area": {"premises": ["cell.1.1"]}})),
+        ("a person's premises held by agreement", None, json!({"id": "x", "kind": "sites", "way": "here", "area": {"held": "occupancy"}})),
+        ("notices at premises held by agreement", Some("builder"), json!({"id": "x", "kind": "records", "way": "here", "area": {"held": "occupancy"}, "match": {"statement_kinds": ["price_list"]}})),
         ("more publishers than a seat deals with", None, json!({"id": "x", "kind": "records", "way": "published", "match": {"statement_kinds": ["price_list"]}, "from": ["a", "b", "c", "d", "e", "f", "g", "h", "i"]})),
     ] {
         assert!(!refused(with_channel(position, channel)).is_empty(), "{what} should not load");
@@ -71,6 +73,7 @@ fn a_whole_view_cannot_be_written() {
     for (what, position, channel) in [
         ("the ground around one", None, json!({"id": "x", "kind": "sites", "way": "here", "area": {"near": 1}})),
         ("an office's premises", Some("developer"), json!({"id": "x", "kind": "sites", "way": "here", "area": {"premises": ["cell.0.2"]}, "occupants": "names"})),
+        ("an office's premises held by agreement", Some("builder"), json!({"id": "x", "kind": "sites", "way": "here", "area": {"held": "occupancy"}, "occupants": "names"})),
         ("places gone to", None, json!({"id": "x", "kind": "sites", "way": "visit"})),
         ("who's who, looked up", None, json!({"id": "x", "kind": "directory", "way": "ask"})),
         ("its own papers", None, json!({"id": "x", "kind": "records", "way": "mine", "match": {"statement_kinds": ["lot"]}})),
@@ -94,6 +97,36 @@ fn a_whole_view_cannot_be_written() {
     };
     assert!(!made(&mut run, json!([{"id": "x", "kind": "records", "way": "kept", "match": {"statement_kinds": ["lot"]}}])));
     assert!(made(&mut run, json!([{"id": "x", "kind": "records", "way": "mine", "match": {}}])));
+}
+
+#[test]
+fn an_organisation_sees_premises_it_holds_by_an_agreement_in_force_and_no_others_and_not_before() {
+    // The builder's office is shown the ground of premises it holds by agreement: none yet.
+    let c = with_channel(Some("builder"), json!({"id": "unit", "kind": "sites", "way": "here", "area": {"held": "occupancy"}, "occupants": "names"}));
+    let mut run = Run::start(c, "knowing-held", Vec::new(), None).unwrap();
+    let unit = |run: &mut Run<Vec<u8>>| -> Vec<oikos_kernel::observe::SiteCell> {
+        let o = run.command(&Command::Observe { participant: "builder-system".into(), only: None }).unwrap().observation.unwrap();
+        match o.channels.get("builder/unit") {
+            Some(ChannelData::Sites { cells, .. }) => cells.clone(),
+            other => panic!("{other:?} in {:?}", o.channels.keys()),
+        }
+    };
+    assert!(unit(&mut run).is_empty(), "it holds nothing yet");
+    // The developer lets it the shop's workplace: offered, it is not yet the builder's to be in.
+    let offer = direct("developer-system", Some("developer"), serde_json::from_value(json!([
+        {"block": "propose_agreement", "speaks_for": "devco", "ref": "lease", "terms": {"template": "lease", "parties": ["devco", "buildco"], "term": 365 * DAY,
+            "commitments": [{"who": "devco", "does": {"outcome": {"occupancy": {"who": "buildco", "in": "s-shop/workplace.1"}}}}, {"who": "buildco", "does": {"outcome": {"money": {"to": "acc-devco", "amount": "100"}}}, "every": 30 * DAY}]}},
+        {"block": "sign_agreement", "agreement": "$lease", "as": "devco"}])).unwrap()).unwrap();
+    let r = step(&mut run, &offer).unwrap();
+    let id = r.events.iter().find_map(|e| match &e.body { EventBody::Recorded { record } if matches!(record.body, oikos_kernel::blocks::RecordBody::Agreement { .. }) => Some(record.id.clone()), _ => None }).expect("the lease made");
+    assert!(unit(&mut run).is_empty(), "offered, not held");
+    let sign = direct("builder-system", Some("builder"), serde_json::from_value(json!([{"block": "sign_agreement", "agreement": id, "as": "buildco"}])).unwrap()).unwrap();
+    step(&mut run, &sign).unwrap();
+    // In force: the shop's ground, and who is in it, by name; nothing else.
+    let cells = unit(&mut run);
+    assert_eq!(cells.iter().map(|c| c.cell.as_str()).collect::<Vec<_>>(), vec!["cell.0.2"]);
+    let sp = cells[0].structure.as_ref().unwrap().spaces.iter().find(|s| s.space == "s-shop/workplace.1").cloned().unwrap();
+    assert_eq!(sp.occupants, Some(vec!["carol".to_string()]));
 }
 
 #[test]

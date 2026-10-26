@@ -49,6 +49,8 @@ pub struct Harness {
     pub t: i64,
     /// Every program the actor has sent, in order, as text.
     pub sent: Vec<String>,
+    /// The readings of agreements it is shown at each wake (agreement id -> reading), as the kernel gives them.
+    pub readings: Value,
 }
 
 impl Harness {
@@ -56,7 +58,7 @@ impl Harness {
         let ctx = ctx(entity, params);
         let actor = kind.create(&ctx).expect("the actor is made");
         let draws = Draws::new(&ctx.participant, "self");
-        Harness { kind, ctx, actor, draws, view: View::default(), seed: 11, n: 0, t: 0, sent: vec![] }
+        Harness { kind, ctx, actor, draws, view: View::default(), seed: 11, n: 0, t: 0, sent: vec![], readings: json!({}) }
     }
 
     /// Replace the actor with its own saved self (every actor's memory saves).
@@ -68,7 +70,7 @@ impl Harness {
 
     fn observation(&self, t: i64, channels: Value, outcomes: Value) -> Observation {
         serde_json::from_value(json!({ "participant": self.ctx.participant, "t": t, "status": "active", "outcomes": outcomes,
-            "inbox": [], "drafts": [], "channels": channels }))
+            "inbox": [], "drafts": [], "channels": channels, "readings": self.readings }))
         .expect("an observation")
     }
 

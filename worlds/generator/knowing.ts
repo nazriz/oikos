@@ -30,6 +30,9 @@ export const kept = (id: string, match: string[] | Match, extra: Extra = {}) => 
 export const ask = (id: string, of: string, match: string[] | Match, by: string[], extra: Extra = {}) => ({ id, kind: "records", way: "ask", match: kinds(match), of, by, on_request: true, ...extra });
 /** The ground at an organisation's own premises (its cells), and who is there by name. */
 export const premises = (id: string, cells: string[], extra: Extra & { occupants?: "names" | "counts" } = { occupants: "names" }) => ({ id, kind: "sites", way: "here", area: { premises: cells }, ...extra });
+/** The ground at premises an organisation holds by agreement (a unit it leases), and who is there by name: none until
+ * it holds some; it moves as its agreements do. */
+export const held = (id: string, extra: Extra = {}) => ({ id, kind: "sites", way: "here", area: { held: "occupancy" }, occupants: "names", ...extra });
 /** The ground around where a person is. */
 export const around = (id: string, near: number, extra: Extra = {}) => ({ id, kind: "sites", way: "here", area: { near }, ...extra });
 /** Places gone to: nothing until a look names them, which takes the looker's time. `enters`: who is inside, by name. */

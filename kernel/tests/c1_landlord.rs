@@ -45,7 +45,7 @@ fn the_landlord_runs_alone_in_the_engine_and_the_world_is_the_same_on_one_thread
     assert!(l1 == l14, "the logs are byte for byte the same");
     let log = lines(&l1);
     let orch = log.iter().find(|l| l["body"]["annotation"] == "orchestrator").unwrap();
-    assert_eq!(orch["body"]["data"]["modules"]["firm.landlord"]["version"], "0.20.0");
+    assert_eq!(orch["body"]["data"]["modules"]["firm.landlord"]["version"], "0.21.0");
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn the_manifest_is_the_ts_modules_in_every_key_that_file_has() {
     let new = ["pass_up_bps", "pass_down_bps", "soft_vacancy_bps", "evidence_days"];
     for (k, v) in ts.as_object().unwrap() {
         match k.as_str() {
-            "version" => assert_eq!(rust["version"], "0.20.0"),
+            "version" => assert_eq!(rust["version"], "0.21.0"),
             "params" => {
                 for (name, p) in v.as_object().unwrap() {
                     assert_eq!(&rust["params"][name], p, "param {name}");
