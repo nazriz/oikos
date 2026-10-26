@@ -20,6 +20,7 @@
 //! Not done in this port, and why (risk register ME-8): the lender still reads income as the least that came in over any of
 //! the last three months, and draws funding without limit. Neither is a fault that corrupts data; both are listed there.
 
+use oikos_core::frozen::JsonRead;
 use super::{manifest_of, spread};
 use crate::common::{
     addressed_to, cents, data, filed_before, look_up, money_words, own_account, record as right, Answering, Asked, Book, Fields, OwnAccount, DAY, LOOKS_MAX, MONTH,
@@ -113,7 +114,7 @@ pub fn pct(bps: i64) -> String {
 }
 
 /// A number a seat or a form wrote, as `Number(x)` read it and `Math.floor` rounded it (nought where it is not one).
-fn num(v: Option<&Value>) -> i64 {
+fn num<V: JsonRead + ?Sized>(v: Option<&V>) -> i64 {
     v.and_then(super::floor_of).unwrap_or(0)
 }
 
@@ -580,7 +581,7 @@ impl Plan for Lender {
                 // borrower's own day), is counted from that day: a month before it is where its months begin. Until
                 // 2026-10-11 every loan standing at the start was counted from the bank's first look, so every borrower who
                 // had not paid fell into arrears, and then into default, on the same day.)
-                let first_due = terms.attrs.as_ref().and_then(|a| a.get("first_due")).and_then(Value::as_i64).filter(|f| *f > 0);
+                let first_due = terms.attrs.as_ref().and_then(|a| a.get("first_due")).and_then(|x| x.as_i64()).filter(|f| *f > 0);
                 // (Repayments missed before the year began, by our statement of the loan account: counted as due, none repaid;
                 // a letter of arrears already on file is not sent again.)
                 let carried = self

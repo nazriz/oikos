@@ -10,7 +10,7 @@
 //!
 //! Channel paths: a personal channel is its id; a position's is `<position>/<channel>`.
 
-use crate::blocks::{Id, Record};
+use crate::blocks::{Frozen, Id, Record};
 use crate::config::{cell_id, Area, Channel, ChannelKind, CmpOp, LookRequest, Occupants, ParticipantKind, Query, RecordFilter, Way, Who, SELF};
 use crate::geo::{within, Rect};
 use crate::state::{Look, Message, Outcome, ParticipantStatus, State, Transaction};
@@ -108,7 +108,7 @@ pub struct HeldPosition {
 pub struct OwnRecord {
     pub n: u64,
     pub at: i64,
-    pub sections: std::collections::BTreeMap<String, serde_json::Value>,
+    pub sections: std::collections::BTreeMap<Id, Frozen>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -297,10 +297,10 @@ pub fn held_structures(st: &State, entity: &str) -> Vec<Id> {
         }
         for c in terms.commitments.iter().filter(|c| c.who != entity) {
             let Some(o) = c.does.get("outcome").and_then(|o| o.get("occupancy")) else { continue };
-            if o.get("who").and_then(Value::as_str) != Some(entity) || o.get("leave").and_then(Value::as_bool) == Some(true) {
+            if o.get("who").and_then(|x| x.as_str()) != Some(entity) || o.get("leave").and_then(|x| x.as_bool()) == Some(true) {
                 continue;
             }
-            let Some(space) = o.get("in").and_then(Value::as_str) else { continue };
+            let Some(space) = o.get("in").and_then(|x| x.as_str()) else { continue };
             let sid = crate::config::split_space(space).map_or(space, |(s, _)| s);
             if st.structures.contains_key(sid) {
                 out.insert(sid.to_string().into());
@@ -390,7 +390,7 @@ fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&Want>, news
     let rec = if news && (f.statement_kinds.is_some() || f.has.is_some()) { taken_down(st, rec).map_or(rec, |t| &*t.record) } else { rec };
     if let Some(kinds) = &f.statement_kinds {
         match &rec.body {
-            crate::blocks::RecordBody::Statement { kind, .. } if kinds.contains(kind) => {}
+            crate::blocks::RecordBody::Statement { kind, .. } if kinds.iter().any(|k| k == kind) => {}
             _ => return false,
         }
     }
@@ -457,13 +457,13 @@ pub struct RecordIndex {
     /// The records in the order they were made (record with seq q is `by_seq[q - 1]`): the state's own, shared.
     by_seq: Vec<Arc<Record>>,
     by_record: BTreeMap<&'static str, Vec<u64>>,
-    by_kind: BTreeMap<String, Vec<u64>>,
+    by_kind: BTreeMap<Id, Vec<u64>>,
     by_entity: BTreeMap<Id, Vec<u64>>,
     /// Statements by the structured fields they carry (what a channel's `has` asks for): a practice, an offer...
     by_has: BTreeMap<&'static str, Vec<u64>>,
     /// Records still standing (not withdrawn by their own author or whoever they speak for), by
     /// statement kind and by record kind: what a search for standing records scans.
-    standing_kind: BTreeMap<String, BTreeSet<u64>>,
+    standing_kind: BTreeMap<Id, BTreeSet<u64>>,
     standing_record: BTreeMap<&'static str, BTreeSet<u64>>,
     /// cell -> records placed there (and withdrawals of them).
     by_place: BTreeMap<Id, Vec<u64>>,
@@ -643,7 +643,7 @@ impl RecordIndex {
             options.push(k.iter().filter_map(|x| self.by_record.get(x.as_str())).map(|v| tail(v, after)).collect());
         }
         if let Some(k) = &f.statement_kinds {
-            options.push(k.iter().filter_map(|x| self.by_kind.get(x)).map(|v| tail(v, after)).collect());
+            options.push(k.iter().filter_map(|x| self.by_kind.get(x.as_str())).map(|v| tail(v, after)).collect());
         }
         if let Some(w) = want {
             options.push(w.entities().iter().filter_map(|e| self.by_entity.get(*e)).map(|v| tail(v, after)).collect());
@@ -662,7 +662,7 @@ impl RecordIndex {
     /// Standing records that might match the filter, newest first.
     fn standing(&self, f: &RecordFilter) -> Vec<u64> {
         let mut seqs: Vec<u64> = if let Some(kinds) = &f.statement_kinds {
-            kinds.iter().filter_map(|k| self.standing_kind.get(k)).flatten().copied().collect()
+            kinds.iter().filter_map(|k| self.standing_kind.get(k.as_str())).flatten().copied().collect()
         } else if let Some(kinds) = &f.records {
             kinds.iter().filter_map(|k| self.standing_record.get(k.as_str())).flatten().copied().collect()
         } else {
@@ -825,30 +825,30 @@ fn has_directory(st: &State, participant: &str, only: Option<&str>) -> bool {
 /// A field a search can use. Purely mechanical: names a place in a record, and never says what it means.
 pub use oikos_world::kernel::known_field;
 
-fn field(r: &Record, f: &str) -> Option<Value> {
-    let path = |v: &Value, p: &str| p.split('.').try_fold(v, |v, k| v.get(k)).cloned();
+fn field(r: &Record, f: &str) -> Option<Frozen> {
+    let path = |v: &Frozen, p: &str| p.split('.').try_fold(v, |v, k| v.get(k)).cloned();
     match f {
-        "id" => Some(Value::from(r.id.as_str())),
-        "record" => Some(Value::from(r.body.kind_name())),
+        "id" => Some(text(r.id.as_str())),
+        "record" => Some(text(r.body.kind_name())),
         // (The claim a transfer or a release names: how a register is asked what has become of one title.)
         "claim" => match &r.body {
-            crate::blocks::RecordBody::ClaimTransfer { claim, .. } | crate::blocks::RecordBody::ClaimRelease { claim } => Some(Value::from(claim.as_str())),
+            crate::blocks::RecordBody::ClaimTransfer { claim, .. } | crate::blocks::RecordBody::ClaimRelease { claim } => Some(text(claim.as_str())),
             _ => None,
         },
         // (Who holds a claim: how a register is asked for one holder's titles, by those it answers that to.)
         "holder" => match &r.body {
-            crate::blocks::RecordBody::Claim { holder, .. } => Some(Value::from(holder.as_str())),
+            crate::blocks::RecordBody::Claim { holder, .. } => Some(text(holder.as_str())),
             _ => None,
         },
         "kind" => match &r.body {
-            crate::blocks::RecordBody::Statement { kind, .. } => Some(Value::from(kind.as_str())),
+            crate::blocks::RecordBody::Statement { kind, .. } => Some(text(kind.as_str())),
             _ => None,
         },
-        "at" => Some(Value::from(r.at)),
-        "author" => Some(Value::from(r.author.as_str())),
-        "speaks_for" => r.speaks_for.as_deref().map(Value::from),
+        "at" => Some(Frozen::Number(r.at.into())),
+        "author" => Some(text(r.author.as_str())),
+        "speaks_for" => r.speaks_for.as_deref().map(text),
         // (Of several, the one cited first: what a search orders by. Whether one is cited at all is `holds`.)
-        "basis" => r.basis.as_ref().map(|b| Value::from(b.first())),
+        "basis" => r.basis.as_ref().map(|b| text(b.first())),
         _ => {
             if let Some(p) = f.strip_prefix("data.") {
                 match &r.body {
@@ -867,12 +867,41 @@ fn field(r: &Record, f: &str) -> Option<Value> {
     }
 }
 
+/// A field's text (an id, a kind), as a search compares it.
+fn text(s: &str) -> Frozen {
+    Frozen::String(s.into())
+}
+
+/// What a value is, as a search compares it: an integer, a string or a truth; anything else doesn't compare.
+enum Scalar<'a> {
+    Int(Option<i64>),
+    Str(&'a str),
+    Bool(bool),
+    Other,
+}
+fn scalar_of(v: &Value) -> Scalar<'_> {
+    match v {
+        Value::Number(n) => Scalar::Int(n.as_i64()),
+        Value::String(s) => Scalar::Str(s),
+        Value::Bool(b) => Scalar::Bool(*b),
+        _ => Scalar::Other,
+    }
+}
+fn scalar(v: &Frozen) -> Scalar<'_> {
+    match v {
+        Frozen::Number(n) => Scalar::Int(n.as_i64()),
+        Frozen::String(s) => Scalar::Str(s),
+        Frozen::Bool(b) => Scalar::Bool(*b),
+        _ => Scalar::Other,
+    }
+}
+
 /// Compare two JSON values of the same type (integers numerically, strings by bytes); anything else doesn't compare.
-fn compare(a: &Value, b: &Value) -> Option<std::cmp::Ordering> {
+fn compare(a: Scalar<'_>, b: Scalar<'_>) -> Option<std::cmp::Ordering> {
     match (a, b) {
-        (Value::Number(x), Value::Number(y)) => Some(x.as_i64()?.cmp(&y.as_i64()?)),
-        (Value::String(x), Value::String(y)) => Some(x.as_bytes().cmp(y.as_bytes())),
-        (Value::Bool(x), Value::Bool(y)) => Some(x.cmp(y)),
+        (Scalar::Int(x), Scalar::Int(y)) => Some(x?.cmp(&y?)),
+        (Scalar::Str(x), Scalar::Str(y)) => Some(x.as_bytes().cmp(y.as_bytes())),
+        (Scalar::Bool(x), Scalar::Bool(y)) => Some(x.cmp(&y)),
         _ => None,
     }
 }
@@ -885,10 +914,10 @@ fn holds(r: &Record, c: &crate::config::Condition) -> bool {
     }
     let Some(v) = field(r, &c.field) else { return false };
     // A list: it equals a value it holds, and differs from one it does not (a plan's cells: which lot is this cell on).
-    if let (Value::Array(items), CmpOp::Eq | CmpOp::Ne) = (&v, c.op) {
-        return items.iter().any(|x| compare(x, &c.value) == Some(Equal)) == (c.op == CmpOp::Eq);
+    if let (Frozen::Array(items), CmpOp::Eq | CmpOp::Ne) = (&v, c.op) {
+        return items.iter().any(|x| compare(scalar(x), scalar_of(&c.value)) == Some(Equal)) == (c.op == CmpOp::Eq);
     }
-    let Some(o) = compare(&v, &c.value) else { return false };
+    let Some(o) = compare(scalar(&v), scalar_of(&c.value)) else { return false };
     match c.op {
         CmpOp::Eq => o == Equal,
         CmpOp::Ne => o != Equal,
@@ -1364,7 +1393,7 @@ fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want
         // Records without the field sort last; ties keep newest first.
         hits.sort_by(|(sa, a), (sb, b)| match (field(a, &o.field), field(b, &o.field)) {
             (Some(x), Some(y)) => {
-                let c = compare(&x, &y).unwrap_or(std::cmp::Ordering::Equal);
+                let c = compare(scalar(&x), scalar(&y)).unwrap_or(std::cmp::Ordering::Equal);
                 (if o.desc { c.reverse() } else { c }).then(sb.cmp(sa))
             }
             (Some(_), None) => std::cmp::Ordering::Less,

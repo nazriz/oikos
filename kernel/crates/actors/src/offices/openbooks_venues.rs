@@ -10,6 +10,7 @@
 //! as a list in the order the map would have held it. The lender keeps what the TS kept in memory (`loans`, `byAccount`,
 //! where the office's account is, whether it has first looked, when each agreement was signed) and saves it with its book.
 
+use oikos_core::Frozen;
 use super::books::{OfficeBooks, OpenHeading, OpenItem};
 use super::openbooks::{
     addressed, amt, by_day, d as data_of, date_words, finite, has, heading, js, num, on, pressing, terms_of, text_of, usd, when, words, R,
@@ -22,26 +23,24 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
-static NULL: Value = Value::Null;
-
 // ---------------------------------------------------------------- small shared things
 
 /// A value that is there and not null (what `??` takes).
-fn nn(v: Option<&Value>) -> Option<&Value> {
+fn nn(v: Option<&Frozen>) -> Option<&Frozen> {
     v.filter(|x| !x.is_null())
 }
 
 /// a template literal of `x ?? fallback`.
-fn js_or(v: Option<&Value>, fallback: &str) -> String {
+fn js_or(v: Option<&Frozen>, fallback: &str) -> String {
     nn(v).map_or_else(|| fallback.to_string(), |x| js(Some(x)))
 }
 
 /// a template literal of `Number(x) / 100`: basis points as a percentage, written as JavaScript writes the number
 /// (exactly, from the whole number of basis points: "12.5", "7", "0.25"); "NaN" where it is not a whole number.
-fn pct(v: Option<&Value>) -> String {
+fn pct(v: Option<&Frozen>) -> String {
     let n = match v {
-        Some(Value::Null) => Some(0),
-        Some(Value::Bool(b)) => Some(i64::from(*b)),
+        Some(Frozen::Null) => Some(0),
+        Some(Frozen::Bool(b)) => Some(i64::from(*b)),
         Some(x) => crate::papers::lenient::whole(x),
         None => None,
     };
@@ -68,7 +67,7 @@ fn is_me(r: &Record, me: &str) -> bool {
 }
 
 /// An amount in cents, or 0 where what is written is not one (venues' `money`).
-fn money(v: Option<&Value>) -> i64 {
+fn money(v: Option<&Frozen>) -> i64 {
     amt(v)
 }
 
@@ -87,7 +86,7 @@ fn apps_of(r: &Record) -> Vec<String> {
 }
 
 /// The matter an application or a notice is about, as the venue's papers name it.
-fn matter_of(x: &Value) -> String {
+fn matter_of(x: &Frozen) -> String {
     match nn(x.get("matter")).or_else(|| nn(x.get("kind"))) {
         Some(v) => words(Some(v)),
         None => "something".to_string(),
@@ -168,7 +167,7 @@ impl Filed {
 }
 
 /// `who`: the applicant the notice names, else whoever made the application, else "someone".
-fn who_of(book: &Book, x: &Value, app: &str) -> String {
+fn who_of(book: &Book, x: &Frozen, app: &str) -> String {
     let t = text_of(x.get("applicant"));
     if !t.is_empty() {
         return t.to_string();
@@ -308,8 +307,8 @@ fn member(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
     for (app, n) in &filed.notice {
         let x = data_of(n);
         let a = book.get(app).map(|r| &**r);
-        let ad = a.map_or(&NULL, data_of);
-        if filed.decided.contains(app) || nn(x.get("matter")).or_else(|| nn(ad.get("matter"))).and_then(Value::as_str) != Some("possession") || own_day.contains(app) {
+        let ad = a.map_or(&oikos_core::frozen::NULL, data_of);
+        if filed.decided.contains(app) || nn(x.get("matter")).or_else(|| nn(ad.get("matter"))).and_then(|x| x.as_str()) != Some("possession") || own_day.contains(app) {
             continue;
         }
         own_day.insert(app.clone());
@@ -350,8 +349,8 @@ fn member(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
                     rp.id,
                     usd(money(rd.get("owed")), w),
                     match rd.get("takes_plan") {
-                        Some(Value::Bool(true)) => ", and it would take the plan offered",
-                        Some(Value::Bool(false)) => ", and it would not take the plan offered",
+                        Some(Frozen::Bool(true)) => ", and it would take the plan offered",
+                        Some(Frozen::Bool(false)) => ", and it would not take the plan offered",
                         _ => "",
                     },
                     if text_of(rd.get("words")).is_empty() { String::new() } else { format!("; \"{}\"", text_of(rd.get("words"))) },
@@ -404,7 +403,7 @@ fn member(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
 }
 
 /// `String(x ?? "")`.
-fn words_of(v: Option<&Value>) -> String {
+fn words_of(v: Option<&Frozen>) -> String {
     nn(v).map_or_else(String::new, |x| js(Some(x)))
 }
 
@@ -455,7 +454,7 @@ fn answer_words(against: &str, a: &Record, w: &WorldInfo) -> String {
     }
     if finite(x.get("people")).is_some() {
         let ages = match x.get("ages") {
-            Some(Value::Array(a)) if !a.is_empty() => {
+            Some(Frozen::Array(a)) if !a.is_empty() => {
                 format!(" (aged {})", a.iter().map(|v| if v.is_null() { String::new() } else { js(Some(v)) }).collect::<Vec<_>>().join(", "))
             }
             _ => String::new(),
@@ -532,7 +531,7 @@ fn registrar(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
             continue;
         }
         let o = book.get(&order).map(|x| &**x);
-        let od = o.map_or(&NULL, data_of);
+        let od = o.map_or(&oikos_core::frozen::NULL, data_of);
         let pays = o.is_some_and(|o| kind_of(o) == Some("tribunal_order")) && od.s("finding") == Some("pay") && od.s("applicant") == r.speaks_for.as_deref() && on(od, "to");
         if !pays {
             let line = format!(
@@ -582,7 +581,7 @@ fn registrar(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
             continue;
         }
         let o = book.get(&order).map(|x| &**x);
-        let od = o.map_or(&NULL, data_of);
+        let od = o.map_or(&oikos_core::frozen::NULL, data_of);
         let ours = o.is_some_and(|o| kind_of(o) == Some("tribunal_order")) && od.s("finding") == Some("possession") && od.s("applicant") == r.speaks_for.as_deref();
         let line = if ours {
             let o = o.expect("an order");
@@ -708,7 +707,7 @@ fn union(book: &Book, me: &str, hears: bool, t: i64, w: &WorldInfo) -> Vec<OpenH
     }
     let mut failed: BTreeSet<&str> = BTreeSet::new(); // claims whose ballot found no mandate
     for b in &ballots {
-        if results.get(b.id.as_str()).is_some_and(|r| data_of(r).get("passed") == Some(&Value::Bool(false))) {
+        if results.get(b.id.as_str()).is_some_and(|r| data_of(r).get("passed").and_then(|x| x.as_bool()) == Some(false)) {
             if let Some(c) = data_of(b).s("claim") {
                 failed.insert(c);
             }
@@ -883,9 +882,9 @@ fn begins(book: &Book, id: &str) -> i64 {
 }
 
 /// `Number.isSafeInteger(x) && x > 0`.
-fn safe_positive(v: Option<&Value>) -> Option<i64> {
+fn safe_positive(v: Option<&Frozen>) -> Option<i64> {
     let n = match v? {
-        Value::Number(n) => n.as_i64().or_else(|| n.as_f64().filter(|f| f.fract() == 0.0 && f.abs() <= 9_007_199_254_740_991.0).map(|f| f as i64))?,
+        Frozen::Number(n) => n.as_i64().or_else(|| n.as_f64().filter(|f| f.fract() == 0.0 && f.abs() <= 9_007_199_254_740_991.0).map(|f| f as i64))?,
         _ => return None,
     };
     (n > 0).then_some(n)
@@ -924,7 +923,7 @@ impl Lend {
             let Some(who) = terms.parties.get(1) else { continue };
             let money_of = |p: &str| terms.commitments.iter().find(|c| c.who == p).and_then(|c| c.does.get("outcome")).and_then(|o| o.get("money")).filter(|m| !m.is_null());
             let Some(repay) = money_of(who) else { continue };
-            let Some(account) = repay.get("from").filter(|f| crate::common::truthy(f)).and_then(Value::as_str) else { continue };
+            let Some(account) = repay.get("from").filter(|f| crate::common::truthy(f)).and_then(|x| x.as_str()) else { continue };
             let lent = money_of(me).filter(|m| crate::common::truthy(m));
             let payment = money(repay.get("amount"));
             let months = ((2 * terms.term.unwrap_or(0) + MONTH).div_euclid(2 * MONTH)).max(1);
@@ -1144,7 +1143,7 @@ pub fn reader(of: &str, me: &str, _office: &str, params: &serde_json::Map<String
         "tribunal.member" => Which::Member,
         "tribunal.registrar" => Which::Registrar,
         "office.desk" => Which::Desk,
-        "union.organiser" => Which::Union { hears: params.get("hears").and_then(Value::as_array).is_some_and(|a| !a.is_empty()) },
+        "union.organiser" => Which::Union { hears: params.get("hears").and_then(|x| x.as_array()).is_some_and(|a| !a.is_empty()) },
         "bank.lending" => Which::Lending,
         _ => return None,
     };

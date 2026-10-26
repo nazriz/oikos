@@ -26,6 +26,7 @@
 //! against the account, and may wrongly refuse one that is due at the rate of the world's table of slips; a decision is
 //! looked at again when asked inside the days the law's decisions give (`law-decisions`, kind `tax_credit_decision`).
 
+use oikos_core::frozen::{JsonRead, JsonRef};
 use super::shared::{answering, manifest, restore_answering};
 use super::support::Casework;
 use super::support_law::{Reconsiderations, Redone};
@@ -58,21 +59,21 @@ pub struct RefundLaw {
 
 /// The law on refunds in force that has been seen (the latest published and not withdrawn), if any.
 pub fn refund_law(book: &Book) -> Option<RefundLaw> {
-    let l = latest_law(book, |r| data(r).get("refunds").is_some_and(Value::is_object))?;
+    let l = latest_law(book, |r| data(r).get("refunds").is_some_and(|x| x.is_object()))?;
     let d = &data(l)["refunds"];
     Some(RefundLaw {
         id: l.id.to_string(),
         collector: d.s("collector").map(String::from).or_else(|| l.speaks_for.map(|x| x.to_string())).unwrap_or_default(),
-        set_off: d.get("set_off").and_then(Value::as_bool).unwrap_or(false),
+        set_off: d.get("set_off").and_then(|x| x.as_bool()).unwrap_or(false),
         pay_within_days: d.i("pay_within_days"),
     })
 }
 
 /// An amount written in a paper (a number, or a decimal string of the smallest unit).
-fn amount(v: Option<&Value>) -> i64 {
-    match v {
-        Some(Value::Number(n)) => n.as_i64().unwrap_or(0),
-        Some(Value::String(s)) => s.trim().parse().unwrap_or(0),
+fn amount<V: JsonRead + ?Sized>(v: Option<&V>) -> i64 {
+    match v.map(JsonRead::view) {
+        Some(JsonRef::Number(n)) => n.as_i64().unwrap_or(0),
+        Some(JsonRef::String(s)) => s.trim().parse().unwrap_or(0),
         _ => 0,
     }
 }
@@ -155,7 +156,7 @@ pub fn ledger(book: &Book, me: &str, paid: &[Paid], who: &str, unseen: &[(bool, 
     mine.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
     for d in mine {
         let dd = data(d);
-        if dd.get("granted").and_then(Value::as_bool) != Some(true) {
+        if dd.get("granted").and_then(|x| x.as_bool()) != Some(true) {
             continue;
         }
         let g = amount(dd.get("amount"));
@@ -511,7 +512,7 @@ impl Collector {
             let refund = dd.s("use") != Some("set_off");
             let asked = amount(dd.get("asked"));
             let had = amount(dd.get("amount"));
-            if dd.get("granted").and_then(Value::as_bool) == Some(true) && (asked <= 0 || had >= asked) {
+            if dd.get("granted").and_then(|x| x.as_bool()) == Some(true) && (asked <= 0 || had >= asked) {
                 return Some(Redone { changed: false, found: "the claim was granted in full".into(), steps: vec![] });
             }
             let claim = b.get(dd.s("claim")?)?.clone();

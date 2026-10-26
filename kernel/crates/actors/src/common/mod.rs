@@ -21,6 +21,8 @@ pub use money::{bill_settled, brought_forward, cents, notices_of, own_account, o
 pub use work::{approval_of, CounterWork, Directions, Pace, Part, StandingWork, WorkOrder};
 
 use oikos_sight::{Record, RecordBody};
+use oikos_core::frozen::{JsonRead, JsonRef};
+use oikos_core::Frozen;
 use serde_json::Value;
 use std::cmp::Ordering;
 
@@ -128,13 +130,11 @@ pub fn money_words(n: i64, world: &crate::WorldInfo) -> String {
     }
 }
 
-static NULL: Value = Value::Null;
-
 /// A record's data (`Null` where it has none, or is not a statement).
-pub fn data(r: &Record) -> &Value {
+pub fn data(r: &Record) -> &Frozen {
     match &r.body {
         RecordBody::Statement { data: Some(d), .. } => d,
-        _ => &NULL,
+        _ => &oikos_core::frozen::NULL,
     }
 }
 
@@ -168,7 +168,7 @@ pub fn addressed_to(r: &Record) -> &[oikos_sight::Id] {
 }
 
 /// A statement's offer, practice, assertion, formal part or breakdown (`Null` where it has none).
-pub fn part<'a>(r: &'a Record, which: Piece) -> &'a Value {
+pub fn part<'a>(r: &'a Record, which: Piece) -> &'a Frozen {
     match &r.body {
         RecordBody::Statement { offer, practice, assertion, formal, adico, registry, .. } => match which {
             Piece::Offer => offer.as_ref(),
@@ -178,8 +178,8 @@ pub fn part<'a>(r: &'a Record, which: Piece) -> &'a Value {
             Piece::Adico => adico.as_ref(),
             Piece::Registry => registry.as_ref(),
         }
-        .unwrap_or(&NULL),
-        _ => &NULL,
+        .unwrap_or(&oikos_core::frozen::NULL),
+        _ => &oikos_core::frozen::NULL,
     }
 }
 
@@ -218,29 +218,29 @@ pub fn cited_words(r: &Record) -> String {
 /// paper was made), else the paper's time plus `data.first`, else plus `otherwise`.
 pub fn first_due(r: &Record, otherwise: i64) -> i64 {
     let d = data(r);
-    if let Some(f) = d.get("first_at").and_then(Value::as_i64) {
+    if let Some(f) = d.get("first_at").and_then(|x| x.as_i64()) {
         return f.max(r.at - r.at.rem_euclid(DAY));
     }
-    r.at + d.get("first").and_then(Value::as_i64).unwrap_or(otherwise)
+    r.at + d.get("first").and_then(|x| x.as_i64()).unwrap_or(otherwise)
 }
 
 /// When a paper was made: for one brought forward from before the year (`data.brought_forward`, `data.since` a
 /// negative moment), that moment; otherwise when it was filed (common.ts `madeAt`).
 pub fn made_at(r: &Record) -> i64 {
     let d = data(r);
-    match (d.get("brought_forward"), d.get("since").and_then(Value::as_i64)) {
+    match (d.get("brought_forward"), d.get("since").and_then(|x| x.as_i64())) {
         (Some(b), Some(s)) if truthy(b) && s < 0 => s,
         _ => r.at,
     }
 }
 
 /// JavaScript's truthiness of a JSON value, for reading flags TS read with `!!`.
-pub fn truthy(v: &Value) -> bool {
-    match v {
-        Value::Null => false,
-        Value::Bool(b) => *b,
-        Value::Number(n) => n.as_f64().is_some_and(|x| x != 0.0),
-        Value::String(s) => !s.is_empty(),
+pub fn truthy<V: JsonRead + ?Sized>(v: &V) -> bool {
+    match v.view() {
+        JsonRef::Null => false,
+        JsonRef::Bool(b) => b,
+        JsonRef::Number(n) => n.as_f64().is_some_and(|x| x != 0.0),
+        JsonRef::String(s) => !s.is_empty(),
         _ => true,
     }
 }
@@ -253,9 +253,27 @@ pub trait Fields {
     fn ids(&self, key: &str) -> Vec<&str>;
     fn flag(&self, key: &str) -> bool;
 }
+impl Fields for Frozen {
+    fn s(&self, key: &str) -> Option<&str> {
+        self.get(key).and_then(Frozen::as_str)
+    }
+    fn i(&self, key: &str) -> Option<i64> {
+        self.get(key).and_then(JsonRead::whole)
+    }
+    fn ids(&self, key: &str) -> Vec<&str> {
+        match self.get(key) {
+            Some(Frozen::String(s)) => vec![&**s],
+            Some(Frozen::Array(a)) => a.iter().filter_map(Frozen::as_str).collect(),
+            _ => vec![],
+        }
+    }
+    fn flag(&self, key: &str) -> bool {
+        self.get(key).is_some_and(truthy)
+    }
+}
 impl Fields for Value {
     fn s(&self, key: &str) -> Option<&str> {
-        self.get(key).and_then(Value::as_str)
+        self.get(key).and_then(|x| x.as_str())
     }
     fn i(&self, key: &str) -> Option<i64> {
         self.get(key).and_then(crate::papers::lenient::whole)
@@ -263,7 +281,7 @@ impl Fields for Value {
     fn ids(&self, key: &str) -> Vec<&str> {
         match self.get(key) {
             Some(Value::String(s)) => vec![s.as_str()],
-            Some(Value::Array(a)) => a.iter().filter_map(Value::as_str).collect(),
+            Some(Value::Array(a)) => a.iter().filter_map(|x| x.as_str()).collect(),
             _ => vec![],
         }
     }

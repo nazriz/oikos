@@ -25,6 +25,7 @@
 //!   possession), so those branches are left to lane E. Reads of a paper's data are lenient, as TS's were, through
 //!   `Fields`; what it writes goes through the typed papers.
 
+use oikos_core::frozen::JsonRef;
 use super::founding::{accept_gathering, accept_membership, accept_purpose, membership_offer, slice16, words_came, words_question, Came, GatherBounds, Hall, MembershipBounds};
 use crate::common::{
     addressed_to, cites, data, filed_before, money_words, own_banked, part, when_words, withdraw, Book, Fields, Occurrences, OwnAccount, Piece, DAY, MONTH,
@@ -130,13 +131,14 @@ pub struct Hearings {
 
 /// Whether an application says what it is about: it gives its particulars, or names a paper, a place, a sum, what is
 /// sought, or evidence (frictions.ts `hasParticulars`).
-fn has_particulars(d: &Value) -> bool {
+fn has_particulars<V: oikos_core::frozen::JsonRead + ?Sized>(d: &V) -> bool {
+    let d = d.view();
     let num_pos = match d.get("amount") {
-        Some(Value::Number(n)) => n.as_f64().is_some_and(|x| x > 0.0),
-        Some(Value::String(s)) => s.trim().parse::<f64>().is_ok_and(|x| x > 0.0),
+        Some(JsonRef::Number(n)) => n.as_f64().is_some_and(|x| x > 0.0),
+        Some(JsonRef::String(s)) => s.trim().parse::<f64>().is_ok_and(|x| x > 0.0),
         _ => false,
     };
-    d.get("particulars").and_then(Value::as_str).is_some_and(|p| !p.trim().is_empty())
+    d.get("particulars").and_then(|x| x.as_str()).is_some_and(|p| !p.trim().is_empty())
         || d.get("about").is_some()
         || d.get("structure").is_some()
         || d.get("seeks").is_some()
@@ -156,7 +158,7 @@ fn response_to<'a>(book: &'a Book, kind: &str, application: &str, from: &str) ->
 }
 
 /// The truthy string of a data field (`...(d.about ? { about } : {})`).
-fn truthy_s(d: &Value, k: &str) -> Option<String> {
+fn truthy_s<V: Fields + ?Sized>(d: &V, k: &str) -> Option<String> {
     d.s(k).filter(|s| !s.is_empty()).map(String::from)
 }
 
@@ -277,7 +279,7 @@ impl Hearings {
             let against = d.s("against").or_else(|| nd.s("against")).unwrap_or("").to_string();
             let answer_by = nd.i("answer_by").or_else(|| nd.i("hearing_at")).unwrap_or(t);
             let hears = hears_of(&self.hears, &matter).unwrap_or(Hears { about: matter.clone(), ..Default::default() });
-            self.cases.insert(id.clone(), Case { id, matter, applicant: a.speaks_for.unwrap_or_default().to_string(), against, at: a.at, answer_by, data: d.clone(), hears });
+            self.cases.insert(id.clone(), Case { id, matter, applicant: a.speaks_for.unwrap_or_default().to_string(), against, at: a.at, answer_by, data: d.to_value(), hears });
         }
 
         // ---- applications: taken, and the other side told ----
@@ -297,7 +299,7 @@ impl Hearings {
                 against: against.clone(),
                 at: a.at,
                 answer_by: t + self.answer_days * DAY,
-                data: d.clone(),
+                data: d.to_value(),
                 hears: hears.clone().unwrap_or(Hears { about: matter.clone(), ..Default::default() }),
             };
             self.count("applications");
@@ -371,7 +373,7 @@ impl Hearings {
             let binding = can.iter().any(|x| x == "order");
             let due = t + self.within_days * DAY;
             let r = response_to(book, ComplaintResponse::KIND, &c.id, &c.against);
-            let x = r.map_or(&Value::Null, |r| data(r));
+            let x = r.map_or(&oikos_core::frozen::NULL, |r| data(r));
             let claimed = c.data.get("amount").and_then(lenient::whole).unwrap_or(0);
             let verb = if binding { "is to" } else { "should" };
             // An application that says nothing of what it is about is turned away with leave to apply again with its
@@ -723,7 +725,7 @@ impl Kind for Founded {
         })
     }
     fn cadence(&self, ctx: &Ctx) -> i64 {
-        if ctx.params.get("shape").and_then(Value::as_str) == Some("cause") {
+        if ctx.params.get("shape").and_then(|x| x.as_str()) == Some("cause") {
             DAY
         } else {
             7 * DAY
@@ -1120,9 +1122,9 @@ impl Group {
             .and_then(|s| {
                 part(s, Piece::Offer)
                     .pointer("/terms/commitments")
-                    .and_then(Value::as_array)
+                    .and_then(|x| x.as_array())
                     .and_then(|cs| {
-                        cs.iter().find(|x| x.get("who").and_then(Value::as_str) == Some("taker") && x.pointer("/does/outcome/money").is_some_and(|m| !m.is_null()))
+                        cs.iter().find(|x| x.get("who").and_then(|x| x.as_str()) == Some("taker") && x.pointer("/does/outcome/money").is_some_and(|m| !m.is_null()))
                     })
                     .and_then(|x| x.pointer("/does/outcome/money/amount").and_then(lenient::whole))
             })
@@ -1397,7 +1399,7 @@ impl Plan for Group {
             if a.kind != "words" {
                 continue;
             }
-            if a.body.get("done").and_then(Value::as_bool) == Some(false) {
+            if a.body.get("done").and_then(|x| x.as_bool()) == Some(false) {
                 self.redo.insert(part);
             } else if self.asked.contains_key(&part) {
                 self.answers.insert(part, a.body);

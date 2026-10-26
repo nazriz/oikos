@@ -10,6 +10,7 @@
 //! hundredths from the mind, a parameter's float read once as thousandths, a chance in basis points or, for a business
 //! of one, parts per million), rounded half away from zero; postings tie-broken by the order they were seen.
 
+use oikos_core::Frozen;
 use super::mind::{Choice, ConductAsk, Decide, Event, Facts, Outcome, Way};
 use super::params::Params;
 #[allow(unused_imports)]
@@ -100,8 +101,8 @@ fn swayed(bps: i64, z: i64, per_milli: i64) -> i64 {
 }
 
 /// A float parameter read once as thousandths.
-fn milli(v: Option<&Value>, default: i64) -> i64 {
-    v.and_then(Value::as_f64).map_or(default, |f| (f * 1_000.0).round() as i64)
+fn milli(v: Option<&Frozen>, default: i64) -> i64 {
+    v.and_then(|x| x.as_number()).and_then(serde_json::Number::as_f64).map_or(default, |f| (f * 1_000.0).round() as i64)
 }
 
 /// citizen.ts `SWAY`, as the world may set some of it (`params.sway`), in thousandths.
@@ -150,14 +151,14 @@ fn tenths_words(t: i64) -> String {
 }
 
 /// An offer's facts, from its typed terms (mind.ts `factsOf`): money a month for the taker, work hours, a home, goods.
-fn facts_of(offer: &Value) -> Facts {
+fn facts_of(offer: &Frozen) -> Facts {
     let mut f = Facts::default();
-    let Some(cs) = offer.get("terms").and_then(|t| t.get("commitments")).and_then(Value::as_array) else { return f };
+    let Some(cs) = offer.get("terms").and_then(|t| t.get("commitments")).and_then(|x| x.as_array()) else { return f };
     for c in cs {
         let Some(o) = c.get("does").and_then(|d| d.get("outcome")) else { continue };
         let every = c.get("every").and_then(crate::papers::lenient::whole).filter(|e| *e != 0);
         let per_month = |x: i64| every.map_or(x, |e| div_round(x * MONTH, e));
-        let taker = c.get("who").and_then(Value::as_str) == Some("taker");
+        let taker = c.get("who").and_then(|x| x.as_str()) == Some("taker");
         if let Some(m) = o.get("money") {
             let a = m.get("amount").and_then(crate::papers::lenient::whole).unwrap_or(0);
             f.money_per_month += if taker { -per_month(a) } else { per_month(a) };
@@ -217,11 +218,11 @@ impl Person {
         let mut out = serde_json::Map::new();
         // (A citizen's `values` param holds the population's spread under `values`, beside its own.)
         let given = cx.ctx.params.get("values");
-        if let Some(pop) = given.and_then(|v| v.get("values")).or(given).and_then(Value::as_object) {
+        if let Some(pop) = given.and_then(|v| v.get("values")).or(given).and_then(|x| x.as_object()) {
             for (name, spread) in pop {
-                let (Some(mean), Some(sd)) = (spread.get("mean_bps").and_then(Value::as_i64), spread.get("sd_bps").and_then(Value::as_i64)) else { continue };
+                let (Some(mean), Some(sd)) = (spread.get("mean_bps").and_then(|x| x.as_i64()), spread.get("sd_bps").and_then(|x| x.as_i64())) else { continue };
                 let z = self.mind.value_z(name);
-                out.insert(name.clone(), json!((mean + (z * sd).div_euclid(100)).clamp(0, 10_000)));
+                out.insert(name.to_string(), json!((mean + (z * sd).div_euclid(100)).clamp(0, 10_000)));
             }
         }
         Value::Object(out)
@@ -320,7 +321,7 @@ impl Person {
         }
         let pm = v.role_module.get("params").cloned().unwrap_or(Value::Null);
         let g = |k: &str| pm.get(k).and_then(crate::papers::lenient::whole);
-        let kind = pm.get("kind").and_then(Value::as_str).unwrap_or(&self.p.goods).to_string();
+        let kind = pm.get("kind").and_then(|x| x.as_str()).unwrap_or(&self.p.goods).to_string();
         let mine: BTreeSet<String> = self.s.own_work.iter().map(|o| o.firm.clone()).collect();
         let known: Vec<super::money::Shop> = super::money::shops(&self.book, &kind).into_iter().filter(|s| !mine.contains(&s.shop)).collect();
         let mut prices: Vec<i64> = known.iter().map(|s| s.price).collect();
@@ -1037,7 +1038,7 @@ impl Person {
         let with: BTreeMap<&str, Value> = [
             ("{values}", owner_values),
             ("{structure}", json!(structure)),
-            ("{cell}", d.get("cell").cloned().unwrap_or(Value::Null)),
+            ("{cell}", (d.get("cell").cloned().unwrap_or((Value::Null).into())).to_value()),
             ("{listing}", json!(l.id)),
             ("{founder}", json!(me)),
             ("{capital}", json!(capital)),

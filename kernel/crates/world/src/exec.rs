@@ -21,6 +21,7 @@ use crate::state::{transactions_key,
     Scheduled, Sex, State, Structure, Transaction,
 };
 use crate::statics::Statics;
+use oikos_core::Frozen;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -2245,7 +2246,7 @@ impl<'a> Exec<'a> {
             }
 
             Block::RecordClaim { position, holder, counterparty, about, basis, speaks_for, visible_to, bind } => {
-                let body = RecordBody::Claim { position: *position, holder: self.r(holder)?, counterparty: self.ro(counterparty)?, about: about.clone() };
+                let body = RecordBody::Claim { position: *position, holder: self.r(holder)?, counterparty: self.ro(counterparty)?, about: Frozen::of(about) };
                 let id = self.new_record(body, self.ro(speaks_for)?, visible_to.clone(), self.cited(basis)?)?;
                 self.bind(bind, &id)
             }
@@ -2307,15 +2308,15 @@ impl<'a> Exec<'a> {
                     }
                 }
                 let body = RecordBody::Statement {
-                    kind: kind.clone(),
+                    kind: Id::new(kind),
                     text: text.clone(),
-                    data: data.clone(),
-                    adico: adico.clone(),
-                    formal: formal.clone(),
-                    offer: offer.clone(),
-                    practice: practice.clone(),
-                    assertion: assertion.clone(),
-                    registry: registry.clone(),
+                    data: data.as_ref().map(Frozen::of),
+                    adico: adico.as_ref().map(Frozen::of),
+                    formal: formal.as_ref().map(Frozen::of),
+                    offer: offer.as_ref().map(Frozen::of),
+                    practice: practice.as_ref().map(Frozen::of),
+                    assertion: assertion.as_ref().map(Frozen::of),
+                    registry: registry.as_ref().map(Frozen::of),
                     addressed_to,
                     place: *place,
                 };

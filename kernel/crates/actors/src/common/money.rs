@@ -6,7 +6,6 @@
 use super::book::Book;
 use super::{addressed_to, data, Fields};
 use oikos_sight::{Picture, Record, RecordBody};
-use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
@@ -84,7 +83,7 @@ pub fn published_price(book: &Book, builder: &str, kind_of_building: &str, what:
         .open("price_list")
         .filter(|r| (r.speaks_for.as_deref() == Some(builder) || r.author == builder) && data(r).get("prices").is_some())
         .max_by(|a, b| a.at.cmp(&b.at).then_with(|| super::filed_before(&b.id, &a.id)))?;
-    data(list).get(what).and_then(|p| p.get(kind_of_building)).and_then(Value::as_i64)
+    data(list).get(what).and_then(|p| p.get(kind_of_building)).and_then(|x| x.as_i64())
 }
 
 /// Rent owed under a lease when the year began, as the landlord's statement of the rent account has it (a

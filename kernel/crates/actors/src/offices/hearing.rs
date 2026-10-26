@@ -366,7 +366,7 @@ impl Hearings {
                 if !self.seen.insert(n.id.to_string()) {
                     continue;
                 }
-                let Some(c) = data(n).get("case").and_then(|c| serde_json::from_value::<Case>(c.clone()).ok()) else { continue };
+                let Some(c) = data(n).get("case").and_then(|c| serde_json::from_value::<Case>(c.to_value()).ok()) else { continue };
                 let claimed = c.data.i("amount").unwrap_or(0).max(0);
                 let key = self.nth.key(&c.id, &[Some(&c.applicant), Some(&c.against), Some(&c.matter)]);
                 let upheld = slip(cx, "publish/venue_decision", &key, &SlipOptions::default());
@@ -420,7 +420,7 @@ impl Hearings {
         let notices_of_ours = |book: &Book, forms: &Forms| -> Vec<Arc<Record>> {
             let mut v: Vec<Arc<Record>> = book
                 .all(&forms.notice)
-                .filter(|r| r.speaks_for.as_deref() == Some(me.as_str()) && data(r).get("matter").is_some_and(Value::is_string))
+                .filter(|r| r.speaks_for.as_deref() == Some(me.as_str()) && data(r).get("matter").is_some_and(|x| x.is_string()))
                 .cloned()
                 .collect();
             v.sort_by(|a, b| by_time_then_id(a, b));
@@ -436,7 +436,7 @@ impl Hearings {
                 against: d.s("against").or_else(|| data(n).s("against")).unwrap_or("").to_string(),
                 at: a.at,
                 answer_by: data(n).i("answer_by").or_else(|| data(n).i("hearing_at")).unwrap_or(t),
-                data: d,
+                data: d.to_value(),
                 hears: this.hears_for(&matter),
             }
         };
@@ -495,7 +495,7 @@ impl Hearings {
                     let hears = self.p.hears.iter().find(|h| h.about == matter).cloned();
                     let against = d.s("against").unwrap_or("").to_string();
                     let answer_by = t + self.p.answer_days * DAY;
-                    let c = Case { id: a.id.to_string(), matter: matter.clone(), applicant: applicant.to_string(), against: against.clone(), at: a.at, answer_by, data: d.clone(), hears: hears.clone().unwrap_or(Hears { about: matter.clone(), ..Default::default() }) };
+                    let c = Case { id: a.id.to_string(), matter: matter.clone(), applicant: applicant.to_string(), against: against.clone(), at: a.at, answer_by, data: d.to_value(), hears: hears.clone().unwrap_or(Hears { about: matter.clone(), ..Default::default() }) };
                     self.count("applications");
                     let Some(hears) = hears.filter(|_| against != applicant) else {
                         self.say2(&mut steps, t, &c, "rejected", "we cannot hear it.", json!({}), format!("An application we do not hear ({}): saying so.", if matter.is_empty() { "of no kind" } else { &matter }), true);
@@ -505,7 +505,7 @@ impl Hearings {
                     if can.contains(&"refer") {
                         if let Some(refer) = self.p.refer_to.get(&matter).cloned() {
                             // Passed to whoever must act, on that office's own paper; the applicant is told where it went.
-                            let mut pd = d.clone();
+                            let mut pd = d.to_value();
                             if let Some(o) = pd.as_object_mut() {
                                 o.insert("from".into(), json!(applicant));
                                 o.insert("application".into(), json!(a.id));
@@ -553,7 +553,7 @@ impl Hearings {
                     let mut nd = json!({ "application": a.id, "kind": matter, "matter": matter, "applicant": applicant, "against": against, "hearing_at": answer_by, "answer_by": answer_by });
                     for k in ["about", "amount", "structure", "seeks"] {
                         if let Some(v) = d.get(k).filter(|v| !v.is_null()) {
-                            nd[k] = v.clone();
+                            nd[k] = v.to_value();
                         }
                     }
                     let seeking = d.i("amount").filter(|a| *a != 0).map(|a| format!(", seeking {}", money(a))).unwrap_or_default();
@@ -629,7 +629,7 @@ impl Hearings {
         let can = c.hears.can();
         let due = t + self.p.within_days * DAY;
         let r = response_to(book, &self.forms.response, &c.id, &c.against);
-        let x = r.map(|r| data(r).clone()).unwrap_or(Value::Null);
+        let x = r.map(|r| data(r).clone()).unwrap_or_default();
         let claimed = c.data.i("amount").map_or(0, |a| a.max(0));
         let verb = if binding { "is to" } else { "should" };
         let (who, ag) = (&c.applicant, &c.against);
@@ -738,7 +738,7 @@ impl Hearings {
     ///     clears what is owed within the law's longest plan: a plan;
     ///  5. otherwise possession, on the law's day.
     #[allow(clippy::too_many_arguments)]
-    fn decide_possession<T>(&mut self, book: &Book, cx: &mut Cx, c: &Case, answered: bool, x: &Value, claimed: i64, steps: &mut Vec<Step<T>>) {
+    fn decide_possession<T>(&mut self, book: &Book, cx: &mut Cx, c: &Case, answered: bool, x: &oikos_core::Frozen, claimed: i64, steps: &mut Vec<Step<T>>) {
         let t = cx.t;
         let world = cx.ctx.world.clone();
         let when = |v: i64| when_words(v, &world);

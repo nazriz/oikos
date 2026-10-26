@@ -26,6 +26,8 @@
 //! hours left in their working day (docs/risks.md, PB-16); the `compliance_bps` coins live in the planning officer,
 //! the inspector, landlords and the union, which other lanes port.
 
+use oikos_core::frozen::{JsonRead, JsonRef};
+use oikos_core::Frozen;
 use crate::common::{
     addressed_to, data, filed_before, go_see, money_words, next_look, out_of_time, visited, work::ReportOf, work::Routine, Book,
     Fields, Part, StandingWork, DAY, VISIT_MAX,
@@ -62,10 +64,10 @@ pub(crate) fn param(ty: &str, words: Option<&str>, default: Value, unit: Option<
 }
 
 /// The text of a JSON value as TS's `String(x)` writes the ones a paper holds (a string, a number); nothing otherwise.
-pub(crate) fn as_text(v: Option<&Value>) -> String {
-    match v {
-        Some(Value::String(s)) => s.clone(),
-        Some(Value::Number(n)) => n.to_string(),
+pub(crate) fn as_text<V: JsonRead + ?Sized>(v: Option<&V>) -> String {
+    match v.map(JsonRead::view) {
+        Some(JsonRef::String(s)) => s.to_string(),
+        Some(JsonRef::Number(n)) => n.to_string(),
         _ => String::new(),
     }
 }
@@ -320,7 +322,7 @@ impl Plan for Police {
         self.staff.absorb(pic);
         for o in &pic.outcomes {
             if let Some(inv) = &o.investigated {
-                self.results.insert(o.action.to_string(), inv.get("taker").and_then(Value::as_str).map(String::from));
+                self.results.insert(o.action.to_string(), inv.get("taker").and_then(|x| x.as_str()).map(String::from));
             }
         }
         if let Some(Seen::Sites { cells, .. }) = pic.channels.get(self.p.channel.as_str()) {
@@ -511,7 +513,7 @@ impl Plan for Police {
                 let lease = as_text(d.get("lease"));
                 let space = as_text(d.get("space"));
                 let household: Vec<String> = match d.get("household") {
-                    Some(Value::Array(a)) => a.iter().filter_map(|x| x.as_str().map(String::from)).collect(),
+                    Some(Frozen::Array(a)) => a.iter().filter_map(|x| x.as_str().map(String::from)).collect(),
                     _ => vec![tenant.to_string()],
                 };
                 let lapse = |steps: &mut Vec<Step<Then>>, why: String, words: String, reason: Option<&str>| {

@@ -205,7 +205,7 @@ pub fn offers_of(book: &Book) -> Vec<Offer> {
     let mut latest: BTreeMap<String, Offer> = BTreeMap::new();
     for r in book.open(OFFER) {
         let Some(vendor) = r.speaks_for else { continue };
-        let Ok(mut o) = serde_json::from_value::<Offer>(data(r).clone()) else { continue };
+        let Ok(mut o) = serde_json::from_value::<Offer>(data(r).to_value()) else { continue };
         if o.base.id.is_empty() || o.base.template.is_empty() {
             continue;
         }
@@ -506,7 +506,7 @@ impl Fleet {
             if let Some(a) = a {
                 lot.agreement = Some(a.id.to_string());
             }
-            let ended_by_vendor = book.all("system_ended").any(|r| { data(r).get("order").and_then(Value::as_str) == Some(lot.order.as_str()) && crate::common::addressed_to(r).iter().any(|x| x == &self.me)});
+            let ended_by_vendor = book.all("system_ended").any(|r| { data(r).get("order").and_then(|x| x.as_str()) == Some(lot.order.as_str()) && crate::common::addressed_to(r).iter().any(|x| x == &self.me)});
             lot.ended = lot.agreement.as_deref().is_some_and(|a| book.signed_by(a, &self.me) && !book.in_force(a)) || ended_by_vendor;
         }
     }

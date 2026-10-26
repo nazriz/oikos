@@ -155,7 +155,7 @@ struct Rules {
 fn planning_rules(book: &Book) -> Option<Rules> {
     let mut best: Option<&Arc<Record>> = None;
     for p in book.open("procedure") {
-        if data(p).get("planning").is_some_and(Value::is_object) && best.is_none_or(|b| p.at > b.at || (p.at == b.at && filed_before(&b.id, &p.id).is_lt())) {
+        if data(p).get("planning").is_some_and(|x| x.is_object()) && best.is_none_or(|b| p.at > b.at || (p.at == b.at && filed_before(&b.id, &p.id).is_lt())) {
             best = Some(p);
         }
     }
@@ -715,7 +715,7 @@ impl Inspecting {
                 continue;
             }
             let line = format!("{} on {} ({}", d.s("structure").unwrap_or(""), d.s("lot").unwrap_or(d.s("at").unwrap_or("")), d.s("law").unwrap_or(""));
-            if d.get("acted") == Some(&Value::Bool(true)) {
+            if d.get("acted").and_then(|x| x.as_bool()) == Some(true) {
                 found.push(format!("{line})"));
             } else {
                 not_fined.push(format!("{line}; direction {})", d.s("direction").unwrap_or("")));

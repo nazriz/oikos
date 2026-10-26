@@ -124,10 +124,11 @@ each lowering the budget's ceiling.
 1,000 people to the state hash and log of main at 7230e71; each paired against main, `scripts/pair.sh`; measured on a
 4-core Linux machine, where a 10,000-person month does not fit beside the suite, so at 1,000):
 
-| step | 1,000 au-vic peak (4 threads) | KB a person | the run's own thread (1,000, six pairs) | ceiling |
+| step | 1,000 au-vic peak (4 threads) | KB a person | the run's own thread (1,000, three to eight pairs) | ceiling |
 |---|---|---|---|---|
 | main (7230e71) | 467 to 473 MB | 363 | | 415 |
 | R1, ids interned | 459 to 466 MB (gb-eng 445 to 475 against 463 to 467; us-oh level) | 352 | -8 to -19% on all three profiles | 400 |
+| R2, records' JSON frozen | 409 to 419 MB (gb-eng 400 to 411, us-oh 365 to 380) | 305 | against R1: au-vic -3 to -10%, gb-eng -4 to 0%, us-oh -7 to +5% (-2% on average) | 350 |
 
 R1 saved little memory because few of the ids held were `Id`s: the actors' are `String`s (R4) and records' JSON holds
 its own strings (R2). Acts' and messages' ids are `Passing` (their own text), as they go with what they name; every

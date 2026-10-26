@@ -28,6 +28,7 @@
 //!   works office (its next weekly round) and the landfill; `staff_report` by the office-holder. The finance
 //!   officer's letter to the mayor for an approval is read by the mayor.
 
+use oikos_core::Frozen;
 use crate::firms::staffing::{Own, Staffing, StaffingOpts, Want};
 use super::systems::{DeskParams, DeskThen, OfficeDesk};
 use crate::firms::tax::{income_tax_law, withholding};
@@ -108,7 +109,7 @@ fn dir_of(r: &Record) -> Option<Direction> {
     papers::read::<Direction>(r)
 }
 
-fn claim_parts(r: &Record) -> Option<(&Position, &str, Option<&str>, &Value)> {
+fn claim_parts(r: &Record) -> Option<(&Position, &str, Option<&str>, &Frozen)> {
     match &r.body {
         RecordBody::Claim { position, holder, counterparty, about } => Some((position, holder.as_str(), counterparty.as_deref(), about)),
         _ => None,
@@ -1896,8 +1897,8 @@ impl FinPlan {
         }
         // What building costs, as builders have published it.
         for l in self.book.open("price_list").filter(|l| data(l).get("prices").is_some()) {
-            let prices = data(l).get("prices").and_then(Value::as_object).cloned().unwrap_or_default();
-            let mut ks: Vec<(&String, i64)> = prices.iter().map(|(k, v)| (k, v.as_i64().unwrap_or(0))).collect();
+            let prices = data(l).get("prices").and_then(|x| x.as_object()).cloned().unwrap_or_default();
+            let mut ks: Vec<(&str, i64)> = prices.iter().map(|(k, v)| (k.as_str(), v.as_i64().unwrap_or(0))).collect();
             ks.sort();
             out += &format!(
                 "{}'s published prices ({}): {}. ",
@@ -2095,7 +2096,7 @@ impl WorksPlan {
         if let Some(o) = base.as_object_mut() {
             for (k, v) in ctx.params.iter() {
                 if !v.is_null() {
-                    o.insert(k.clone(), v.clone());
+                    o.insert(k.to_string(), v.to_value());
                 }
             }
         }

@@ -13,6 +13,7 @@
 //! - **Snapshots** (`Book::save`, `Book::restore`): the records in the order seen, and what came beside them
 //!   (readings, the directory, laws that could not be read); the rest is rebuilt by taking the records in again.
 
+use oikos_core::Frozen;
 use oikos_sight::{Picture, Record, RecordBody, Seen};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -184,7 +185,7 @@ fn acts(r: &Record) -> bool {
             true
         }
         RecordBody::Statement { data, practice, assertion, offer, .. } => {
-            data.as_ref().and_then(|d| d.get("replaces")).is_some_and(Value::is_string)
+            data.as_ref().and_then(|d| d.get("replaces")).is_some_and(|x| x.is_string())
                 || practice.is_some()
                 || assertion.is_some()
                 || hears(offer.as_ref())
@@ -193,8 +194,8 @@ fn acts(r: &Record) -> bool {
     }
 }
 
-fn hears(offer: Option<&Value>) -> bool {
-    offer.and_then(|o| o.get("hears")).is_some_and(|h| !h.is_null() && h != &Value::Bool(false))
+fn hears(offer: Option<&Frozen>) -> bool {
+    offer.and_then(|o| o.get("hears")).is_some_and(|h| !h.is_null() && h.as_bool() != Some(false))
 }
 
 impl Book {
@@ -259,13 +260,13 @@ impl Book {
                 if let Some(c) = counterparty {
                     self.claims_counterparty.entry(c.to_string()).or_default().push(i);
                 }
-                if let Some(o) = about.get("object").and_then(Value::as_str) {
+                if let Some(o) = about.get("object").and_then(|x| x.as_str()) {
                     self.claims_object.entry(o.to_string()).or_default().push(i);
                 }
             }
             RecordBody::Statement { kind, data, .. } => {
                 let withdrawn = self.withdrawn.contains(r.id.as_str());
-                let (all, standing) = self.kinds.entry(kind.clone()).or_default();
+                let (all, standing) = self.kinds.entry(kind.to_string()).or_default();
                 all.push(i);
                 if !withdrawn {
                     standing.push(i);
@@ -273,8 +274,8 @@ impl Book {
                 if kind == "lot" {
                     // (The cells of a lot are a list; one written as a single name, a plot of one cell, is over that cell, as `cells_of` reads it.)
                     let cells: Option<BTreeSet<&str>> = match data.as_ref().and_then(|d| d.get("cells")) {
-                        Some(Value::Array(cells)) => Some(cells.iter().filter_map(Value::as_str).collect()),
-                        Some(Value::String(cell)) => Some(BTreeSet::from([cell.as_str()])),
+                        Some(Frozen::Array(cells)) => Some(cells.iter().filter_map(|x| x.as_str()).collect()),
+                        Some(Frozen::String(cell)) => Some(BTreeSet::from([&**cell])),
                         _ => None,
                     };
                     if let Some(cells) = cells {
@@ -310,7 +311,7 @@ impl Book {
                 // A statement that says it replaces an earlier one of the same kind from whoever it speaks for (an
                 // amended law): the earlier one no longer stands for this reader, whether or not its withdrawal is
                 // among what it is shown.
-                if let Some(old_id) = data.as_ref().and_then(|d| d.get("replaces")).and_then(Value::as_str) {
+                if let Some(old_id) = data.as_ref().and_then(|d| d.get("replaces")).and_then(|x| x.as_str()) {
                     let same = self.get(old_id).is_some_and(|old| {
                         matches!(&old.body, RecordBody::Statement { kind: k, .. } if k == kind)
                             && old.speaks_for.is_some()
@@ -341,7 +342,7 @@ impl Book {
         if self.withdrawn.insert(id.clone()) {
             if let Some(&i) = self.place.get(&key(id)) {
                 if let RecordBody::Statement { kind, .. } = &self.seen[i as usize].body {
-                    if let Some((_, l)) = self.kinds.get_mut(kind) {
+                    if let Some((_, l)) = self.kinds.get_mut(kind.as_str()) {
                         l.retain(|x| *x != i);
                     }
                 }
@@ -375,7 +376,7 @@ impl Book {
             }
             let names = match &r.body {
                 RecordBody::Withdrawal { withdraws, .. } => Some(withdraws.as_str()),
-                RecordBody::Statement { data, .. } => data.as_ref().and_then(|d| d.get("replaces")).and_then(Value::as_str),
+                RecordBody::Statement { data, .. } => data.as_ref().and_then(|d| d.get("replaces")).and_then(|x| x.as_str()),
                 _ => None,
             };
             if names.and_then(|id| self.place.get(&key(id))).is_some_and(|&j| keeps[j as usize]) {
@@ -436,7 +437,7 @@ impl Book {
         for r in &gone {
             let named = match &r.body {
                 RecordBody::Withdrawal { withdraws, .. } => Some(*withdraws),
-                RecordBody::Statement { data, .. } => (data.as_ref().and_then(|d| d.get("replaces")).and_then(Value::as_str).map(str::to_string)).map(Into::into),
+                RecordBody::Statement { data, .. } => (data.as_ref().and_then(|d| d.get("replaces")).and_then(|x| x.as_str()).map(str::to_string)).map(Into::into),
                 _ => None,
             };
             if let Some(id) = named.filter(|id| !self.place.contains_key(&key(id))) {
@@ -570,7 +571,7 @@ impl Book {
         };
         self.open("hold").any(|h| {
             h.speaks_for.as_ref().is_some_and(|s| whose.iter().any(|w| w ==s))
-                && super::data(h).get("holds").and_then(Value::as_array).is_some_and(|l| l.iter().any(|x| x.as_str() == Some(id)))
+                && super::data(h).get("holds").and_then(|x| x.as_array()).is_some_and(|l| l.iter().any(|x| x.as_str() == Some(id)))
         })
     }
     /// A claim seen to be released.
@@ -642,7 +643,7 @@ impl Book {
         }
         match &r.position {
             Some(p) => self.positions.get(p.as_str()).map(|x| x.entity.as_str()),
-            None => self.participant_person.get(&r.author).map(String::as_str),
+            None => self.participant_person.get(r.author.as_str()).map(String::as_str),
         }
     }
     /// The entities of a kind it has looked up, in id order.

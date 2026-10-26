@@ -22,6 +22,8 @@
 //! lives; on being notified of a death it stops the deceased's standing orders and holds the account for the personal
 //! representative, and pays out to the estate (law-succession: the partner, else the adult children, else the town).
 
+use oikos_core::frozen::JsonRead;
+use oikos_core::Frozen;
 use super::{act, manifest_of, Kept, Note};
 use crate::common::{
     addressed_to, cents, data, filed_before, first_due, message, money_words, when_words, who_wrote, Asked, Book, Fields, Letter, Letters, DAY,
@@ -247,7 +249,7 @@ impl Bank {
     /// The positions an account holder has told the bank may instruct payments from an account (latest standing list), if any.
     fn signatories(&self, holder: &str, account: &str) -> Option<Vec<String>> {
         let list = self.book.open("signatories").rfind(|r| r.speaks_for.as_deref() == Some(holder) && data(r).s("account") == Some(account))?;
-        data(list).get("positions").and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+        data(list).get("positions").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
     }
 
     /// Whether whoever made this record may instruct on this account: written for its holder, by one of the holder's own
@@ -313,8 +315,8 @@ impl Bank {
         let fresh: Vec<Arc<Record>> = self.book.all("request").skip(self.cursor).filter(|r| addressed_to(r).iter().any(|x| x == &me.to_string())).cloned().collect();
         self.cursor = requests;
         for r in &fresh {
-            let every = data(r).get("every").and_then(Value::as_i64).is_some_and(|e| e > 0);
-            if every && !data(r).get("payments").is_some_and(Value::is_array) && !self.ended.contains_key(r.id.as_str()) {
+            let every = data(r).get("every").and_then(|x| x.as_i64()).is_some_and(|e| e > 0);
+            if every && !data(r).get("payments").is_some_and(|x| x.is_array()) && !self.ended.contains_key(r.id.as_str()) {
                 self.standing.insert(r.id.to_string());
                 if !self.next_due.contains_key(r.id.as_str()) {
                     self.undated.insert(r.id.to_string());
@@ -382,7 +384,7 @@ impl Bank {
             }
             let Some(r) = self.book.get(&id).cloned() else { continue };
             let until = self.ended.get(&id).copied().unwrap_or(t);
-            let every = data(&r).get("every").and_then(Value::as_i64).unwrap_or(DAY);
+            let every = data(&r).get("every").and_then(|x| x.as_i64()).unwrap_or(DAY);
             let next = self.next_due.get(&id).copied().unwrap_or_else(|| first_due(&r, every));
             if next <= until {
                 last_call.insert(id.clone(), (r, until));
@@ -399,10 +401,10 @@ impl Bank {
             if !addressed_to(h).iter().any(|x| x == &me.to_string()) {
                 continue;
             }
-            let Some(list) = data(h).get("holds").and_then(Value::as_array) else { continue };
+            let Some(list) = data(h).get("holds").and_then(|x| x.as_array()) else { continue };
             let (mut taken, mut not, mut unsigned): (Vec<String>, Vec<String>, Vec<String>) = (vec![], vec![], vec![]);
             let mut seen = BTreeSet::new();
-            let ids: Vec<&str> = list.iter().filter_map(Value::as_str).filter(|id| seen.insert(*id)).take(64).collect();
+            let ids: Vec<&str> = list.iter().filter_map(|x| x.as_str()).filter(|id| seen.insert(*id)).take(64).collect();
             for id in ids {
                 let order = if self.standing.contains(id) { self.book.get(id).cloned() } else { None };
                 let acc = Self::paying_account(order.as_deref(), &custody);
@@ -419,7 +421,7 @@ impl Bank {
                 let from = h.at + self.p.hold_notice;
                 self.holds_on.entry(id.to_string()).or_default().push((h.id.to_string(), from));
                 // (The first payment it stops: the first due at or after the time it counts from.)
-                let every = data(&order).get("every").and_then(Value::as_i64).unwrap_or(DAY);
+                let every = data(&order).get("every").and_then(|x| x.as_i64()).unwrap_or(DAY);
                 let next = self.next_due.get(id).copied().unwrap_or_else(|| first_due(&order, every));
                 let first = if next >= from { next } else { next + (from - next + every - 1).div_euclid(every) * every };
                 taken.push(format!("{id}, from the payment due on day {}", first.div_euclid(DAY) + 1));
@@ -557,9 +559,9 @@ impl Bank {
             return;
         }
         // A bulk payment (a share registry's dividends, say): one instruction, from one account, to many, once.
-        let bulk: Option<&Vec<Value>> = d.get("payments").and_then(Value::as_array);
+        let bulk: Option<&[Frozen]> = d.get("payments").and_then(|x| x.as_array());
         let money = outcome.and_then(|o| o.get("money"));
-        let amount_of = |v: Option<&Value>| v.and_then(crate::papers::lenient::whole);
+        let amount_of = |v: Option<&Frozen>| v.and_then(JsonRead::whole);
         let (from, to, pay_amount, settles, said_by) = if let Some(b) = bulk {
             (d.s("from"), Some("(many)"), b.iter().map(|x| amount_of(x.get("amount")).unwrap_or(0)).sum::<i64>(), None, None)
         } else {
@@ -578,7 +580,7 @@ impl Bank {
             }
         }
         // (What the payer said it is for goes with the money: the line on the payee's statement.)
-        let said = |x: Option<&Value>| -> (Option<String>, Option<String>) {
+        let said = |x: Option<&Frozen>| -> (Option<String>, Option<String>) {
             let memo = x.and_then(|x| x.s("for")).filter(|s| !s.is_empty()).map(|s| s.strip_suffix('.').unwrap_or(s).chars().take(120).collect());
             (memo, x.and_then(|x| x.s("line")).filter(|s| !s.is_empty()).map(String::from))
         };
@@ -606,7 +608,7 @@ impl Bank {
                 return;
             }
         }
-        let every = if bulk.is_some() { None } else { d.get("every").and_then(Value::as_i64).filter(|e| *e > 0) };
+        let every = if bulk.is_some() { None } else { d.get("every").and_then(|x| x.as_i64()).filter(|e| *e > 0) };
         if let Some(every) = every {
             // A standing order into the account of someone we have been told has died: the payer is told at each payment
             // until it stops it (how an employer comes to know: docs/behaviour/deaths.md; a letter to an office with nobody in
@@ -799,7 +801,7 @@ impl Bank {
         orders.sort_by(|a, b| filed_before(&a.id, &b.id));
         let order = |r: &Arc<Record>| {
             let m = data(r).get("outcome").and_then(|o| o.get("money")).cloned().unwrap_or_default();
-            let every = data(r).get("every").and_then(Value::as_i64).unwrap_or(DAY);
+            let every = data(r).get("every").and_then(|x| x.as_i64()).unwrap_or(DAY);
             let next = self.next_due.get(r.id.as_str());
             let on: Vec<&str> = self.holds_on.get(r.id.as_str()).map(|v| v.iter().filter(|(h, _)| !self.ended.contains_key(h)).map(|(h, _)| h.as_str()).collect()).unwrap_or_default();
             // (Who gave it and when, and what it cites: what the instruction itself says, which is the customer's own paper.)

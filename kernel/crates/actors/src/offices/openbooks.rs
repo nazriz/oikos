@@ -15,6 +15,8 @@
 //!   shows (`num`, `finite`, `js`), and as nothing where TS threw (`amt`: an amount that is not one is 0 here; in TS it
 //!   stopped the clerk's wake).
 
+use oikos_core::frozen::{JsonRead, JsonRef};
+use oikos_core::Frozen;
 use super::books::{OfficeBooks, OpenHeading, OpenItem};
 use crate::common::{
     addressed_to, bases_of, bill_settled, brought_forward, cites, data, made_at, money_words, notices_of, own_account, when_words, Book, Fields, DAY,
@@ -33,15 +35,15 @@ pub(crate) type R = Arc<Record>;
 // ---------------------------------------------------------------- the small readings every reader shares
 
 /// What a template literal writes of a value that may be absent, as JavaScript writes it ("undefined", "null").
-pub fn js(v: Option<&Value>) -> String {
-    match v {
+pub fn js<V: JsonRead + ?Sized>(v: Option<&V>) -> String {
+    match v.map(JsonRead::view) {
         None => "undefined".into(),
-        Some(Value::Null) => "null".into(),
-        Some(Value::String(s)) => s.clone(),
-        Some(Value::Bool(b)) => b.to_string(),
-        Some(Value::Number(n)) => n.to_string(),
-        Some(Value::Array(a)) => a.iter().map(|x| js(Some(x))).collect::<Vec<_>>().join(","),
-        Some(Value::Object(_)) => "[object Object]".into(),
+        Some(JsonRef::Null) => "null".into(),
+        Some(JsonRef::String(s)) => s.to_string(),
+        Some(JsonRef::Bool(b)) => b.to_string(),
+        Some(JsonRef::Number(n)) => n.to_string(),
+        Some(JsonRef::Array(a)) => a.iter().map(|x| js(Some(&x))).collect::<Vec<_>>().join(","),
+        Some(JsonRef::Object(_)) => "[object Object]".into(),
     }
 }
 
@@ -51,25 +53,25 @@ pub fn jss(s: Option<&str>) -> String {
 }
 
 /// `String(x ?? "").replace(/_/g, " ")`: a label written with underscores, in words.
-pub fn words(v: Option<&Value>) -> String {
-    match v {
-        None | Some(Value::Null) => String::new(),
-        Some(x) => js(Some(x)).replace('_', " "),
+pub fn words<V: oikos_core::frozen::JsonRead + ?Sized>(v: Option<&V>) -> String {
+    match v.map(oikos_core::frozen::JsonRead::view) {
+        None | Some(oikos_core::frozen::JsonRef::Null) => String::new(),
+        Some(x) => js(Some(&x)).replace('_', " "),
     }
 }
 
 /// JavaScript's `Number(x)` where it is a whole number of seconds or cents: none is NaN (or not whole here).
-pub fn num(v: Option<&Value>) -> Option<i64> {
-    match v? {
-        Value::Null => Some(0),
-        Value::Bool(b) => Some(i64::from(*b)),
-        Value::Number(n) => n.as_i64().or_else(|| crate::papers::lenient::whole(&Value::Number(n.clone()))),
-        Value::String(s) => {
+pub fn num<V: JsonRead + ?Sized>(v: Option<&V>) -> Option<i64> {
+    match v?.view() {
+        JsonRef::Null => Some(0),
+        JsonRef::Bool(b) => Some(i64::from(b)),
+        JsonRef::Number(n) => n.as_i64().or_else(|| JsonRef::Number(n).whole()),
+        JsonRef::String(s) => {
             let t = s.trim();
             if t.is_empty() {
                 Some(0)
             } else {
-                t.parse::<i64>().ok().or_else(|| crate::papers::lenient::whole(&Value::String(t.to_string())))
+                t.parse::<i64>().ok().or_else(|| JsonRef::String(t).whole())
             }
         }
         _ => None,
@@ -77,35 +79,35 @@ pub fn num(v: Option<&Value>) -> Option<i64> {
 }
 
 /// `Number.isFinite(Number(x))` of a value present and not null or empty (venues' `finite`): its number.
-pub fn finite(v: Option<&Value>) -> Option<i64> {
-    match v {
-        None | Some(Value::Null) => None,
-        Some(Value::String(s)) if s.is_empty() => None,
-        x => num(x),
+pub fn finite<V: JsonRead + ?Sized>(v: Option<&V>) -> Option<i64> {
+    match v.map(JsonRead::view) {
+        None | Some(JsonRef::Null) => None,
+        Some(JsonRef::String(s)) if s.is_empty() => None,
+        x => num(x.as_ref()),
     }
 }
 
 /// An amount in cents (money.ts `cents`): a whole number, or digits; anything else is 0 (TS threw).
-pub fn amt(v: Option<&Value>) -> i64 {
-    match v {
-        Some(Value::Number(n)) => n.as_i64().unwrap_or(0),
-        Some(Value::String(s)) => s.parse::<i64>().unwrap_or(0),
+pub fn amt<V: JsonRead + ?Sized>(v: Option<&V>) -> i64 {
+    match v.map(JsonRead::view) {
+        Some(JsonRef::Number(n)) => n.as_i64().unwrap_or(0),
+        Some(JsonRef::String(s)) => s.parse::<i64>().unwrap_or(0),
         _ => 0,
     }
 }
 
 /// A string field of a paper's data, or "" (venues' `text`).
-pub fn text_of(v: Option<&Value>) -> &str {
-    v.and_then(Value::as_str).unwrap_or("")
+pub fn text_of<V: JsonRead + ?Sized>(v: Option<&V>) -> &str {
+    v.and_then(|x| x.view().as_str()).unwrap_or("")
 }
 
 /// A field present at all (not `undefined`): JSON null counts, as in JavaScript.
-pub fn has(d: &Value, key: &str) -> bool {
+pub fn has(d: &oikos_core::Frozen, key: &str) -> bool {
     d.get(key).is_some()
 }
 
 /// A field that a paper's reader would take as true (`!!x`).
-pub fn on(d: &Value, key: &str) -> bool {
+pub fn on(d: &oikos_core::Frozen, key: &str) -> bool {
     d.get(key).is_some_and(crate::common::truthy)
 }
 
@@ -148,7 +150,7 @@ pub fn latest<'a>(it: impl IntoIterator<Item = &'a R>) -> Option<&'a R> {
 }
 
 /// A statement's kind-specific data, as an object (the `(r.data ?? {})` of TS).
-pub fn d(r: &Record) -> &Value {
+pub fn d(r: &Record) -> &Frozen {
     data(r)
 }
 
@@ -324,7 +326,7 @@ pub fn asked_of_us(book: &Book, me: &str, money: &Money, extra: &[Forms], w: &Wo
                 "{}: {} {} that we pay {} {}{}, not paid",
                 y.id,
                 jss(y.speaks_for.as_deref()),
-                if x.get("binding") == Some(&Value::Bool(false)) { "recommends" } else { "orders" },
+                if x.get("binding").and_then(|x| x.as_bool()) == Some(false) { "recommends" } else { "orders" },
                 if x.get("applicant").is_some_and(|v| !v.is_null()) { js(x.get("applicant")) } else { "the applicant".into() },
                 usd(amt(x.get("amount")), w),
                 finite_present(x.get("due")).map_or(String::new(), |b| format!(" by {}", date_words(b, w))),
@@ -341,7 +343,7 @@ pub fn asked_of_us(book: &Book, me: &str, money: &Money, extra: &[Forms], w: &Wo
 }
 
 /// `Number.isFinite(Number(x))` as TS wrote it for a field that may be absent: absent is not finite.
-fn finite_present(v: Option<&Value>) -> Option<i64> {
+fn finite_present<V: JsonRead + ?Sized>(v: Option<&V>) -> Option<i64> {
     match v {
         None => None,
         x => num(x),
@@ -395,7 +397,7 @@ pub fn owed_by_us(book: &Book, me: &str, money: &Money, w: &WorldInfo) -> Vec<Op
 /// When rent under a lease first falls due, counted from when the lease begins (`begins`): the day the lease itself
 /// names (`attrs.first_due`, so long after it begins: a tenancy's own rent day), or the day it begins.
 pub fn first_due_of(a: &Record, begins: i64) -> i64 {
-    let fd = terms_of(a).and_then(|t| t.attrs.as_ref()).and_then(|x| x.get("first_due")).and_then(Value::as_i64).filter(|n| *n > 0).unwrap_or(0);
+    let fd = terms_of(a).and_then(|t| t.attrs.as_ref()).and_then(|x| x.get("first_due")).and_then(|x| x.as_i64()).filter(|n| *n > 0).unwrap_or(0);
     begins + fd
 }
 
@@ -710,12 +712,12 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
                 }
                 let mut terms: Vec<String> = vec![];
                 for r in book.all("plan_answer") {
-                    if r.speaks_for.as_deref() == Some(tenant.as_str()) && d(r).s("lease") == Some(a.id.as_str()) && d(r).get("accepts") == Some(&Value::Bool(true)) && r.at >= ap.at {
+                    if r.speaks_for.as_deref() == Some(tenant.as_str()) && d(r).s("lease") == Some(a.id.as_str()) && d(r).get("accepts").and_then(|x| x.as_bool()) == Some(true) && r.at >= ap.at {
                         terms.push(format!("{tenant} accepted our offer of a plan {} ({})", date_words(r.at, w), r.id));
                     }
                 }
                 for r in book.all("variation_answer") {
-                    if r.speaks_for.as_deref() == Some(me) && addressed(r, &tenant) && d(r).get("granted") == Some(&Value::Bool(true)) && r.at >= ap.at {
+                    if r.speaks_for.as_deref() == Some(me) && addressed(r, &tenant) && d(r).get("granted").and_then(|x| x.as_bool()) == Some(true) && r.at >= ap.at {
                         terms.push(format!("we granted {tenant}'s request {} ({})", date_words(r.at, w), r.id));
                     }
                 }
@@ -860,9 +862,9 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
 }
 
 /// `String(r.data?.application ?? "")`.
-fn words_app(x: &Value) -> String {
+fn words_app(x: &oikos_core::Frozen) -> String {
     match x.get("application") {
-        None | Some(Value::Null) => String::new(),
+        None | Some(Frozen::Null) => String::new(),
         v => js(v),
     }
 }

@@ -249,7 +249,7 @@ impl Kind for Organiser {
             penalty: ctx.param("penalty", None)?,
             prior_weight: ctx.param::<i64>("prior_weight", 2)?.max(1),
         };
-        let hears = ctx.params.get("hears").and_then(Value::as_array).is_some_and(|h| !h.is_empty());
+        let hears = ctx.params.get("hears").and_then(|x| x.as_array()).is_some_and(|h| !h.is_empty());
         let grievances = match (hears, self.grievances) {
             (true, Some(make)) => Some(make(ctx, &Value::Null)?),
             _ => None,
@@ -276,7 +276,7 @@ impl Kind for Organiser {
         let inner = Stepper::<Union>::restore(saved.get("inner").and_then(|s| s.get("inner")).cloned().ok_or("union.organiser: nothing saved")?)?;
         let mut a = Answering::restore(inner, answers(), saved.get("inner").ok_or("union.organiser: nothing saved")?)?;
         if let Some(make) = self.grievances {
-            let hears = ctx.params.get("hears").and_then(Value::as_array).is_some_and(|h| !h.is_empty());
+            let hears = ctx.params.get("hears").and_then(|x| x.as_array()).is_some_and(|h| !h.is_empty());
             if hears {
                 a.inner.plan.grievances.inner = Some(make(ctx, &a.inner.plan.grievances.saved)?);
             }
@@ -468,7 +468,7 @@ impl Plan for Union {
         // Members: the register at the start, and those who have joined since (membership agreements in force).
         let registers: Vec<Arc<Record>> = self.book.all("membership_register").cloned().collect();
         for r in registers {
-            for m in data(&r).get("members").and_then(Value::as_array).into_iter().flatten() {
+            for m in data(&r).get("members").and_then(|x| x.as_array()).into_iter().flatten() {
                 let (Some(member), Some(employer)) = (m.s("member"), m.s("employer")) else { continue };
                 if !self.employer_of.contains_key(member) {
                     self.employer_of.insert(member.to_string(), employer.to_string());
@@ -529,7 +529,7 @@ impl Plan for Union {
         // Prices: the published index (the statistician's mean of shop prices), as last read, once a month. Nobody is shown
         // every shop's prices (docs/no-god-view.md).
         if self.prices.last().is_none_or(|(at, _)| t - *at >= MONTH) {
-            let index = self.book.open("price_index").filter(|r| data(r).s("kind") == Some(&self.p.price_kind) && data(r).get("mean").is_some_and(Value::is_number)).max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&b.id, &a.id)));
+            let index = self.book.open("price_index").filter(|r| data(r).s("kind") == Some(&self.p.price_kind) && data(r).get("mean").is_some_and(|x| x.is_number())).max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&b.id, &a.id)));
             if let Some(mean) = index.and_then(|i| data(i).get("mean").and_then(|m| super::scaled(m, 1_000))) {
                 self.prices.push((t, mean));
             }
@@ -945,7 +945,7 @@ mod tests {
         day(&mut m, 0, members());
         let claim = day(&mut m, 2, vec![]);
         assert_eq!(kinds(&claim), ["wage_claim"]);
-        assert_eq!(data(&claim[0])["rise_bps"].as_i64(), Some(params.get("claim_margin_bps").and_then(Value::as_i64).unwrap_or(500)));
+        assert_eq!(data(&claim[0])["rise_bps"].as_i64(), Some(params.get("claim_margin_bps").and_then(|x| x.as_i64()).unwrap_or(500)));
         assert_eq!(data(&claim[0])["members"], 3);
         let id = dispute(&m)["claim"].as_str().unwrap().to_string();
         let ballot = day(&mut m, 3, vec![offer_of("o1", 3 * DAY, &id, 100)]);

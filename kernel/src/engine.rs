@@ -811,7 +811,7 @@ impl<W: Write> Engine<W> {
     /// Every capacity of a participant has its unit, and nothing it no longer holds does (run.ts `syncUnits`).
     fn sync_units(&mut self, pid: &str, wake_at: Option<i64>) -> Result<(), String> {
         let Some(p) = self.parts.get(pid).cloned() else { return Ok(()) };
-        let seat = p.controller.get("type").and_then(Value::as_str) == Some("llm");
+        let seat = p.controller.get("type").and_then(|x| x.as_str()) == Some("llm");
         let mut want = BTreeSet::new();
         if !p.ended {
             if seat {
@@ -935,7 +935,7 @@ impl<W: Write> Engine<W> {
     fn code_unit(&mut self, pid: &str, p: &Part, cap: &str, wake_at: Option<i64>) -> Result<Option<(Unit, Value)>, String> {
         let (impl_, params, entity) = if cap == "self" {
             (
-                p.controller.get("impl").and_then(Value::as_str).or(p.controller.get("code").and_then(Value::as_str)).map(String::from),
+                p.controller.get("impl").and_then(|x| x.as_str()).or(p.controller.get("code").and_then(|x| x.as_str())).map(String::from),
                 oikos_actors::Params::of_controller(&p.controller),
                 p.person.clone().unwrap_or_default(),
             )
@@ -943,7 +943,7 @@ impl<W: Write> Engine<W> {
             let x = self.positions.get(cap).ok_or_else(|| format!("{pid} holds {cap}, which is not a position"))?;
             if p.kind == "system" {
                 (
-                    p.controller.get("impl").and_then(Value::as_str).or(p.controller.get("code").and_then(Value::as_str)).map(String::from),
+                    p.controller.get("impl").and_then(|x| x.as_str()).or(p.controller.get("code").and_then(|x| x.as_str())).map(String::from),
                     oikos_actors::Params::of_controller(&p.controller),
                     x.entity.clone(),
                 )

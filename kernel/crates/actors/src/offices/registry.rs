@@ -345,7 +345,7 @@ impl Plan for RegistryPlan {
                 // The entry is the register's, and nobody is shown the register: it is sent to whoever reported the death,
                 // to those they named as having had dealings with the dead person, to those sent every entry as of right,
                 // and, where nobody of the family reported it, to those the town writes to as the estate's administrator.
-                let family = d.get("children").is_some_and(Value::is_array);
+                let family = d.get("children").is_some_and(|x| x.is_array());
                 let mut told: Vec<String> = vec![by.to_string()];
                 told.extend(d.ids("tell").into_iter().map(String::from));
                 told.extend(self.feeds.clone());
@@ -355,9 +355,9 @@ impl Plan for RegistryPlan {
                 let told = dedup(told, &me).into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>();
                 let mut seen = vec![me.to_string()];
                 seen.extend(told.clone());
-                let mut entry = json!({ "deceased": who, "reported_by": by, "children": d.get("children").cloned().unwrap_or(json!([])), "without_adult": d.get("without_adult").cloned().unwrap_or(json!([])) });
+                let mut entry = json!({ "deceased": who, "reported_by": by, "children": d.get("children").cloned().unwrap_or((json!([])).into()), "without_adult": d.get("without_adult").cloned().unwrap_or((json!([])).into()) });
                 if let Some(p) = d.get("partner").filter(|v| crate::common::truthy(v)) {
-                    entry["partner"] = p.clone();
+                    entry["partner"] = p.to_value();
                 }
                 steps.push(because(
                     format!("A death is reported to us ({who}, by {by}): registering it, and telling {}.", if told.is_empty() { "nobody else".to_string() } else { told.join(", ") }),

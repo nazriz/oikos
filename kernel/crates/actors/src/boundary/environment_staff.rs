@@ -101,7 +101,7 @@ impl Staff {
                 }
             }
         }
-        agreements::advertised_job(book, a).and_then(|p| crate::common::data(p).get("role").and_then(Value::as_str).filter(|s| !s.is_empty()).map(String::from))
+        agreements::advertised_job(book, a).and_then(|p| crate::common::data(p).get("role").and_then(|x| x.as_str()).filter(|s| !s.is_empty()).map(String::from))
     }
     fn ours(&self, role: Option<&str>) -> bool {
         match self.o.own {
@@ -154,7 +154,7 @@ impl Staff {
     /// Our standing job postings.
     pub fn postings(&self, book: &Book) -> Vec<Arc<Record>> {
         book.open("job_posting")
-            .filter(|j| j.speaks_for.as_deref() == Some(self.me.as_str()) && self.ours(crate::common::data(j).get("role").and_then(Value::as_str)))
+            .filter(|j| j.speaks_for.as_deref() == Some(self.me.as_str()) && self.ours(crate::common::data(j).get("role").and_then(|x| x.as_str())))
             .cloned()
             .collect()
     }
@@ -275,7 +275,7 @@ impl Staff {
                 let to = agreements::commitment_of(a, &me).0.and_then(|o| o.money).map(|m| m.to).filter(|s| !s.is_empty()).or_else(|| {
                     book.all("job_application")
                         .find(|r| r.speaks_for.as_deref() == Some(worker.as_str()))
-                        .and_then(|r| crate::common::data(r).get("account").and_then(Value::as_str).map(String::from))
+                        .and_then(|r| crate::common::data(r).get("account").and_then(|x| x.as_str()).map(String::from))
                 });
                 let Some(to) = to else { continue };
                 let name = format!("wo{}", self.n);
@@ -306,7 +306,7 @@ impl Staff {
             if book.on_hold(&post.id, Some(std::slice::from_ref(&me))) {
                 continue;
             }
-            let mut mine: Vec<&Arc<Record>> = apps.iter().filter(|a| crate::common::data(a).get("posting").and_then(Value::as_str) == Some(post.id.as_str())).collect();
+            let mut mine: Vec<&Arc<Record>> = apps.iter().filter(|a| crate::common::data(a).get("posting").and_then(|x| x.as_str()) == Some(post.id.as_str())).collect();
             mine.sort_by(|x, y| crate::common::filed_before(&x.id, &y.id));
             for a in &mine {
                 self.handled.insert(a.id.to_string());
@@ -316,8 +316,8 @@ impl Staff {
             }
             let chosen = mine[cx.rng(&format!("hire-{}", post.id)).below(mine.len() as u64) as usize];
             let worker = chosen.speaks_for.unwrap_or_default();
-            let wage = crate::common::data(&post).get("wage").and_then(Value::as_i64).unwrap_or(want.wage);
-            let to = crate::common::data(chosen).get("account").and_then(Value::as_str).unwrap_or(&worker).to_string();
+            let wage = crate::common::data(&post).get("wage").and_then(|x| x.as_i64()).unwrap_or(want.wage);
+            let to = crate::common::data(chosen).get("account").and_then(|x| x.as_str()).unwrap_or(&worker).to_string();
             let we = pay(&to, wage, Pay { every: Some(self.o.period), for_: Some("wages".into()), ..Default::default() }, cx);
             let they = self.o.workplace.as_ref().map(|w| call("occupancy", vec![("who", Some(crate::steps::arg(&worker))), ("in", Some(crate::steps::arg(w)))]));
             let offer = agreements::offer(
@@ -330,7 +330,7 @@ impl Staff {
                     their_notice: Some(self.o.notice_days * DAY),
                     text: Some(format!(
                         "{worker} works for {me} as {} for {} every {} days. First pay {} days after both have signed.",
-                        crate::common::data(&post).get("role").and_then(Value::as_str).unwrap_or("staff"),
+                        crate::common::data(&post).get("role").and_then(|x| x.as_str()).unwrap_or("staff"),
                         crate::common::money_words(wage, &cx.ctx.world),
                         self.o.period / DAY,
                         self.o.period / DAY

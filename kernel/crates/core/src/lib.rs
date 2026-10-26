@@ -6,8 +6,10 @@
 
 pub mod canon;
 mod canon_ser;
+pub mod frozen;
 pub mod id;
 pub mod money;
 pub mod rng;
 
+pub use frozen::Frozen;
 pub use id::Id;

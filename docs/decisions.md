@@ -9327,3 +9327,32 @@ routes as law data, nobody shown more than is theirs.
   400 KB. Revisit with the Mini's own measure of main with this merged (raise only with its entry here).
 - **Revisit if** a long run's id count grows with its length (an id made for something that passes, which should be
   `Passing`), or if the interner's locks show in a profile of many engine threads (then a per-thread cache of lookups).
+
+## 2026-10-26 · Records' JSON held frozen (SC-1, the representation plan's R2; branch `representation`; no result changes; no model called)
+
+- **Change.** `oikos_core::Frozen` (kernel/crates/core/src/frozen.rs) holds what the state keeps as opaque JSON: a
+  record's `about` and its statement's `data`, `adico`, `formal`, `offer`, `practice`, `assertion` and `registry`, an
+  agreement's `attrs`, a commitment's `does`, an entity record's sections, the typed config's controllers and the
+  actors' `Params`. It is immutable: strings and arrays shared (`Arc`), an object a sorted array of interned keys
+  (`Id`) and values, so a clone is a count and a key is the one copy the process holds. It serialises as the
+  `Value` it was made from (objects in key order, as `serde_json` without `preserve_order` writes them), and it has
+  the read calls the code used of `Value` (`get`, `pointer`, `as_*`, `is_*`, indexing, comparison with numbers,
+  text and `Value`); `JsonRead`/`JsonRef` let a reader take either, and `from_frozen` reads a typed value straight
+  off it. What is built (a record's parts, a section) is built as `Value` and frozen once, where it is kept.
+  A `Frozen` is read (deserialised) as the `Value` it is and then frozen, so what `Value` took it takes, and a float
+  in a seat's data is refused where it was, at its canonical form (the kernel's source names no float type: the
+  determinism lint).
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at the state hash and log of main
+  at 7230e71.
+- **Cost, paired** against R1 (`scripts/pair.sh`, three rounds of all six towns, then five more of 1,000 us-oh): the
+  same hash and log in every pair. 1,000 people, the run's own thread: au-vic -3 to -10%, gb-eng -4 to 0%, us-oh
+  -7 to +5% over eight pairs, on average 23.6 s against 23.1 (-2%); 200 people level to faster.
+- **Memory.** 1,000 au-vic peaks at 409 to 419 MB against R1's 460 to 468 (gb-eng 400 to 411 against 451 to 454,
+  us-oh 365 to 380 against 400 to 406), about 305 KB a person against 352: some 47 KB a person, above the plan's
+  25 to 40, as records are many and each one's JSON had its own strings and keys. At 200 people 0 to 20 MB lower.
+- **The budget.** 305 KB a person here; with this machine reading about 6% below the Mini, about 323 KB there, and
+  8% over that is 349: the ceiling lowered from 400 to 350 KB.
+- **Revisit if** the count of interned ids (`OIKOS_KEPT=1`) grows with a run's length: an object keyed by something
+  that passes (an act's or message's id) would intern every key for the process; then such a map's keys are held as
+  text (`Frozen` kept as it is, the keys a `Passing`-like case). Or if a reader in a hot path shows `from_frozen` in a
+  profile (then a typed field in place of the JSON, as R4 does for the actors).

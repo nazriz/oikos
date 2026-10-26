@@ -36,6 +36,7 @@
 //!   still knows who put it.
 //! - Rounding is JavaScript's `Math.round` (half up) where a ratio is rounded; ties are broken by `filed_before`.
 
+use oikos_core::Frozen;
 use super::land::own_land;
 use crate::common::work::{ReportOf, Routine};
 use crate::common::{
@@ -142,7 +143,7 @@ fn budget_for(book: &Book, year: i64) -> Option<&Arc<Record>> {
 }
 
 fn line_of(b: &Record, line: &str) -> i64 {
-    data(b).get("lines").and_then(|l| l.get(line)).and_then(Value::as_i64).unwrap_or(0)
+    data(b).get("lines").and_then(|l| l.get(line)).and_then(|x| x.as_i64()).unwrap_or(0)
 }
 
 fn xy(cell: &str) -> Option<(i64, i64)> {
@@ -772,8 +773,8 @@ impl Mayor {
     fn answer_petition(&mut self, pet: &Arc<Record>, me: &str, cx: &mut Cx) -> Option<Vec<Step<Sent>>> {
         let key = format!("pet:{}", pet.id);
         let t = cx.t;
-        let d = data(pet).get("demand").cloned().unwrap_or(Value::Null);
-        let tags: Vec<String> = d.get("tags").and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(s)).collect()).unwrap_or_default();
+        let d = data(pet).get("demand").cloned().unwrap_or((Value::Null).into());
+        let tags: Vec<String> = d.get("tags").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(s)).collect()).unwrap_or_default();
         let amend = d.get("amend");
         let schedule = amend.and_then(|a| a.s("schedule"));
         let form = schedule.and_then(|sc| self.book.open("form").find(|f| f.speaks_for.as_deref() == Some(me) && data(f).s("amends") == Some(sc)).cloned());
@@ -781,8 +782,8 @@ impl Mayor {
         let asked: Vec<(String, i64)> = match (&fd, amend) {
             (Some(f), Some(a)) => a
                 .get("figures")
-                .and_then(Value::as_object)
-                .map(|m| m.iter().filter(|(k, v)| f.fields.contains_key(*k) && v.is_i64()).map(|(k, v)| (k.clone(), v.as_i64().unwrap_or(0))).collect())
+                .and_then(|x| x.as_object())
+                .map(|m| m.iter().filter(|(k, v)| f.fields.contains_key(k.as_str()) && v.is_i64()).map(|(k, v)| (k.to_string(), v.as_i64().unwrap_or(0))).collect())
                 .unwrap_or_default(),
             _ => vec![],
         };
@@ -850,10 +851,10 @@ impl Mayor {
         enact.insert("kind".into(), json!("law"));
         enact.insert("text".into(), json!(text_));
         if let Some(a) = d.get("adico").filter(|x| !x.is_null()) {
-            enact.insert("adico".into(), a.clone());
+            enact.insert("adico".into(), a.to_value());
         }
         if let Some(f) = d.get("formal").filter(|x| !x.is_null()) {
-            enact.insert("formal".into(), f.clone());
+            enact.insert("formal".into(), f.to_value());
         }
         self.guard.put(&key, t);
         Some(vec![sent_step(
@@ -1018,13 +1019,13 @@ fn law_by_schedule(book: &Book, me: &str, schedule: &str) -> Option<Arc<Record>>
 fn schedules(book: &Book, me: &str) -> Vec<(Arc<Record>, LawSchedule, Option<Arc<Record>>, Option<Arc<Record>>)> {
     let mut v: Vec<_> = book
         .open("law_schedule")
-        .filter(|x| x.speaks_for.as_deref() == Some(me) && data(x).get("figures").is_some() && data(x).get("text").is_some_and(Value::is_string))
+        .filter(|x| x.speaks_for.as_deref() == Some(me) && data(x).get("figures").is_some() && data(x).get("text").is_some_and(|x| x.is_string()))
         .cloned()
         .collect();
     v.sort_by(|a, b| a.id.cmp(&b.id));
     v.into_iter()
         .filter_map(|sc| {
-            let s: LawSchedule = serde_json::from_value(data(&sc).clone()).ok()?;
+            let s: LawSchedule = serde_json::from_value(data(&sc).to_value()).ok()?;
             let form = book.open("form").find(|f| f.speaks_for.as_deref() == Some(me) && data(f).s("amends") == Some(sc.id.as_str())).cloned();
             let law = law_by_schedule(book, me, &sc.id);
             Some((sc, s, form, law))
@@ -1150,10 +1151,10 @@ fn from_form(prop: Option<&Arc<Record>>, t: i64) -> Option<(String, String, Valu
         Some("law") => Some(("law".into(), words.into(), Value::Null)),
         Some("budget") => {
             let mut lines = BTreeMap::new();
-            let line = |x: &Value| -> Option<i64> {
+            let line = |x: &Frozen| -> Option<i64> {
                 match x {
-                    Value::Number(n) => n.as_i64(),
-                    Value::String(sx) => amount_cents(sx),
+                    Frozen::Number(n) => n.as_i64(),
+                    Frozen::String(sx) => amount_cents(sx),
                     _ => None,
                 }
             };
@@ -1162,7 +1163,7 @@ fn from_form(prop: Option<&Arc<Record>>, t: i64) -> Option<(String, String, Valu
                 for (k, v) in o {
                     if !["proposal", "kind", "affects", "form", "year"].contains(&k.as_str()) && (v.is_string() || v.is_number()) {
                         if let Some(x) = line(v) {
-                            lines.insert(k.clone(), x);
+                            lines.insert(k.to_string(), x);
                         }
                     }
                 }
@@ -1233,7 +1234,7 @@ impl Plan for Clerk {
             let results: Vec<Arc<Record>> = self.book.open("ballot_result").cloned().collect();
             for r in results {
                 let Some(ballot_id) = data(&r).s("ballot").map(s) else { continue };
-                if r.speaks_for.as_deref() != Some(me.as_str()) || data(&r).get("passed") != Some(&Value::Bool(true)) {
+                if r.speaks_for.as_deref() != Some(me.as_str()) || data(&r).get("passed").and_then(|x| x.as_bool()) != Some(true) {
                     continue;
                 }
                 let key = format!("enact:{ballot_id}");
@@ -1301,7 +1302,7 @@ impl Plan for Clerk {
                         &key,
                         "A proposal on an amendment form that names no figure to change: not put to a ballot, and saying so.".into(),
                         vec![message(
-                            &[prop.author.clone()],
+                            &[prop.author.to_string()],
                             &format!(
                                 "Your proposal {} to amend {} names no figure to change, so it hasn't been put to a ballot. The figures that can be changed: {}.",
                                 prop.id,
@@ -1319,7 +1320,7 @@ impl Plan for Clerk {
                 Some(am) => format!("Council ballot: to amend {}{}: {}.", am.s.title, am.law.as_ref().map_or(String::new(), |l| format!(" ({})", l.id)), changes(am, false)),
                 None => format!("Council ballot: {}", record_text(&prop)),
             };
-            let tags: Vec<String> = match data(&prop).get("tags").and_then(Value::as_array) {
+            let tags: Vec<String> = match data(&prop).get("tags").and_then(|x| x.as_array()) {
                 Some(a) => a.iter().filter_map(|x| x.as_str().map(s)).collect(),
                 None => form_tags(&prop),
             };
@@ -1336,7 +1337,7 @@ impl Plan for Clerk {
             let bd = data(ballot);
             let key = format!("result:{}", ballot.id);
             let closes = bd.i("closes_at");
-            if ballot.speaks_for.as_deref() != Some(me.as_str()) || bd.s("electorate") != Some("council") || (bd.get("closed") != Some(&Value::Bool(true)) && t < closes.unwrap_or(i64::MAX)) {
+            if ballot.speaks_for.as_deref() != Some(me.as_str()) || bd.s("electorate") != Some("council") || (bd.get("closed").and_then(|x| x.as_bool()) != Some(true) && t < closes.unwrap_or(i64::MAX)) {
                 continue;
             }
             if councillors.is_empty() || self.guard.has(&key) || self.declared(&me, &ballot.id).is_some() {
@@ -1359,7 +1360,7 @@ impl Plan for Clerk {
             let passed = yes > no && yes * 2 > councillors.len();
             let prop = bd.s("proposal").and_then(|p| self.book.get(p)).cloned();
             let am = amendment(&self.book, &me, prop.as_ref());
-            let enact = if am.is_some() { None } else { prop.as_ref().and_then(|p| data(p).get("enact").and_then(|e| e.s("kind").map(|k| (s(k), e.s("text").map(s).unwrap_or_default(), e.clone())))).or_else(|| from_form(prop.as_ref(), t)) };
+            let enact = if am.is_some() { None } else { prop.as_ref().and_then(|p| data(p).get("enact").and_then(|e| e.s("kind").map(|k| (s(k), e.s("text").map(s).unwrap_or_default(), e.to_value())))).or_else(|| from_form(prop.as_ref(), t)) };
             let mut note = String::new();
             if passed {
                 if let Some(am) = &am {
@@ -1369,7 +1370,7 @@ impl Plan for Clerk {
                         enact_amendment(am, &ballot.id, &self.book).1
                     };
                 } else if let Some((kind, _, e)) = &enact {
-                    if kind == "law" && e.get("formal").and_then(|f| f.get("condition")).is_none() && e.get("formal").is_none_or(Value::is_null) {
+                    if kind == "law" && e.get("formal").and_then(|f| f.get("condition")).is_none() && e.get("formal").is_none_or(|x| x.is_null()) {
                         note = format!(" {WORDS_ONLY}{}", amendable(&self.book, &me, false));
                     }
                 }
@@ -1389,7 +1390,7 @@ impl Plan for Clerk {
         for r in results {
             let Some(ballot_id) = data(&r).s("ballot").map(s) else { continue };
             let key = format!("enact:{ballot_id}");
-            if data(&r).get("passed") != Some(&Value::Bool(true)) || self.guard.has(&key) || self.enacted(&me, &ballot_id) {
+            if data(&r).get("passed").and_then(|x| x.as_bool()) != Some(true) || self.guard.has(&key) || self.enacted(&me, &ballot_id) {
                 continue;
             }
             let Some(ballot) = self.book.get(&ballot_id).cloned() else { continue };
@@ -1400,7 +1401,7 @@ impl Plan for Clerk {
                 }
                 enact_amendment(&am, &ballot_id, &self.book).0
             } else {
-                let enact = prop.as_ref().and_then(|p| data(p).get("enact").cloned().filter(|e| e.s("kind").is_some())).or_else(|| from_form(prop.as_ref(), t).map(|(k, w, d)| json!({ "kind": k, "text": w, "data": d })));
+                let enact = prop.as_ref().and_then(|p| data(p).get("enact").map(Frozen::to_value).filter(|e| e.s("kind").is_some())).or_else(|| from_form(prop.as_ref(), t).map(|(k, w, d)| json!({ "kind": k, "text": w, "data": d })));
                 let Some(e) = enact else { continue };
                 let mut extra: Vec<(&'static str, Value)> = vec![];
                 if let Some(a) = e.get("adico").filter(|x| !x.is_null()) {
@@ -1437,7 +1438,7 @@ impl Plan for Clerk {
                     continue;
                 }
                 let result = self.declared(&me, &b.id).cloned();
-                let late = bd.get("closed") == Some(&Value::Bool(true)) || v.at >= bd.i("closes_at").unwrap_or(i64::MAX) || result.as_ref().is_some_and(|r| r.at <= v.at);
+                let late = bd.get("closed").and_then(|x| x.as_bool()) == Some(true) || v.at >= bd.i("closes_at").unwrap_or(i64::MAX) || result.as_ref().is_some_and(|r| r.at <= v.at);
                 let member = v.position.as_ref().is_some_and(|p| councillors.contains(p.as_str()));
                 if !late && member {
                     continue;
@@ -1449,13 +1450,13 @@ impl Plan for Clerk {
                         format!(
                             "From the council clerk: your vote on {} is not counted. {}{declared} A vote counts only when it is cast in a councillor's post while the ballot is open.",
                             b.id,
-                            if bd.get("closed") == Some(&Value::Bool(true)) { "That ballot was held and closed before the year began.".to_string() } else { format!("That ballot closed on {}.", crate::common::when_words(bd.i("closes_at").unwrap_or(0), &cx.ctx.world)) }
+                            if bd.get("closed").and_then(|x| x.as_bool()) == Some(true) { "That ballot was held and closed before the year began.".to_string() } else { format!("That ballot closed on {}.", crate::common::when_words(bd.i("closes_at").unwrap_or(0), &cx.ctx.world)) }
                         ),
                     )
                 } else {
                     (format!("A vote on {} by someone who is not a councillor: not counted, and saying so.", b.id), format!("From the council clerk: your vote on {} is not counted. The council's ballots are voted on by its councillors, each in their own post.", b.id))
                 };
-                steps.push(because(why, vec![message(&[v.author.clone()], &words, Some(&v.id))]));
+                steps.push(because(why, vec![message(&[v.author.to_string()], &words, Some(&v.id))]));
             }
         }
         // Letters: the standing report.
@@ -1481,7 +1482,7 @@ impl Plan for Clerk {
                             .map(|r| {
                                 let d = data(r);
                                 let names = |k: &str| { let v = d.ids(k); if v.is_empty() { "none".to_string() } else { v.join(", ") } };
-                                format!("{}: {} {}-{}{}", d.s("ballot").unwrap_or(""), if d.flag("passed") { "passed" } else { "rejected" }, d.i("yes").unwrap_or(0), d.i("no").unwrap_or(0), if d.get("voted_for").is_some_and(Value::is_array) { format!(" (for: {}; against: {})", names("voted_for"), names("voted_against")) } else { String::new() })
+                                format!("{}: {} {}-{}{}", d.s("ballot").unwrap_or(""), if d.flag("passed") { "passed" } else { "rejected" }, d.i("yes").unwrap_or(0), d.i("no").unwrap_or(0), if d.get("voted_for").is_some_and(|x| x.is_array()) { format!(" (for: {}; against: {})", names("voted_for"), names("voted_against")) } else { String::new() })
                             })
                             .collect::<Vec<_>>()
                             .join("; ")
@@ -1755,13 +1756,13 @@ impl Plan for Member {
         for b in ballots {
             let bd = data(&b);
             let key = format!("vote:{}", b.id);
-            if bd.s("electorate") != Some("council") || bd.get("closed") == Some(&Value::Bool(true)) || t >= bd.i("closes_at").unwrap_or(0) || self.guard.has(&key) || self.on_file(&b.id).is_some() {
+            if bd.s("electorate") != Some("council") || bd.get("closed").and_then(|x| x.as_bool()) == Some(true) || t >= bd.i("closes_at").unwrap_or(0) || self.guard.has(&key) || self.on_file(&b.id).is_some() {
                 continue;
             }
             if self.book.open("ballot_result").any(|r| data(r).s("ballot") == Some(b.id.as_str())) {
                 continue;
             }
-            let tags: Vec<String> = bd.get("tags").and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(s)).collect()).unwrap_or_default();
+            let tags: Vec<String> = bd.get("tags").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(s)).collect()).unwrap_or_default();
             let width = self.p.noise_bps / 100;
             let shock = if width > 0 { cx.rng(&format!("vote-{}", b.id)).below(2 * width as u64 + 1) as i64 - width } else { 0 };
             let who = self.proposer(&b);

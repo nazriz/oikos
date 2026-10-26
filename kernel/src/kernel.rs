@@ -600,7 +600,7 @@ impl Kernel {
             return false;
         }
         log.observations.as_deref() != Some("seats")
-            || !self.world.state().participants.get(participant).is_some_and(|p| p.def.controller.get("type").and_then(serde_json::Value::as_str) == Some("code"))
+            || !self.world.state().participants.get(participant).is_some_and(|p| p.def.controller.get("type").and_then(|x| x.as_str()) == Some("code"))
     }
 
     fn unplan(&mut self) {

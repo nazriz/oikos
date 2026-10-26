@@ -10,6 +10,7 @@
 //! `wages`) are paid first, then the tax withheld (`withheld_tax`), then the rest oldest first. The kinds are the
 //! claims' own, so no place's law is written here; a world whose law orders them otherwise gives `priority`.
 
+use oikos_core::Frozen;
 use super::staffing::Staffing;
 use crate::common::{bases_of, filed_before, money_words, Book};
 use crate::papers::agreements::commitment_of;
@@ -17,7 +18,7 @@ use crate::steps::{arg, because, call, pay, say, Pay, Say, Step, Visible};
 use crate::{Cx, DAY};
 use oikos_sight::{Picture, Record, RecordBody};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
@@ -66,15 +67,15 @@ pub struct WindingUp {
 
 fn about_kind(r: &Record) -> &str {
     match &r.body {
-        RecordBody::Claim { about, .. } => about.get("kind").and_then(Value::as_str).unwrap_or(""),
+        RecordBody::Claim { about, .. } => about.get("kind").and_then(|x| x.as_str()).unwrap_or(""),
         _ => "",
     }
 }
 pub fn about_amount(r: &Record) -> i64 {
     match &r.body {
         RecordBody::Claim { about, .. } => match about.get("amount") {
-            Some(Value::Number(n)) => n.as_i64().unwrap_or(0),
-            Some(Value::String(s)) => s.trim().parse().unwrap_or(0),
+            Some(Frozen::Number(n)) => n.as_i64().unwrap_or(0),
+            Some(Frozen::String(s)) => s.trim().parse().unwrap_or(0),
             _ => 0,
         },
         _ => 0,
@@ -82,7 +83,7 @@ pub fn about_amount(r: &Record) -> i64 {
 }
 fn about_str<'a>(r: &'a Record, k: &str) -> Option<&'a str> {
     match &r.body {
-        RecordBody::Claim { about, .. } => about.get(k).and_then(Value::as_str),
+        RecordBody::Claim { about, .. } => about.get(k).and_then(|x| x.as_str()),
         _ => None,
     }
 }
@@ -142,7 +143,7 @@ impl WindingUp {
             self.since = c.at;
             if let Some(l) = newest("property_for_sale") {
                 self.listed_at = l.at;
-                self.asking = crate::common::data(&l).get("price").and_then(Value::as_i64).unwrap_or(0);
+                self.asking = crate::common::data(&l).get("price").and_then(|x| x.as_i64()).unwrap_or(0);
             }
             self.sold = book.open("property_sold").any(|r| r.speaks_for.as_deref() == Some(self.me.as_str()));
             return;
@@ -150,7 +151,7 @@ impl WindingUp {
         let closing = newest("closing").or_else(|| newest("insolvency"));
         if let Some(c) = closing {
             self.state = State::WindingUp;
-            self.since = crate::common::data(&c).get("since").and_then(Value::as_i64).unwrap_or(c.at);
+            self.since = crate::common::data(&c).get("since").and_then(|x| x.as_i64()).unwrap_or(c.at);
         }
     }
 
@@ -311,7 +312,7 @@ impl WindingUp {
             .filter(|r| {
                 r.speaks_for.as_deref() == Some(self.me.as_str())
                     && !book.withdrawn(&r.id)
-                    && matches!(&r.body, RecordBody::Statement { data: Some(d), .. } if d.pointer("/outcome/money/for").and_then(Value::as_str) == Some("Loan repayment."))
+                    && matches!(&r.body, RecordBody::Statement { data: Some(d), .. } if d.pointer("/outcome/money/for").and_then(|x| x.as_str()) == Some("Loan repayment."))
             })
             .map(|r| r.id).map(|x| x.to_string())
             .collect();
@@ -427,7 +428,7 @@ impl WindingUp {
         purchases.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
         for pch in purchases {
             let from = match &pch.body {
-                RecordBody::Statement { data: Some(d), .. } => d.get("account").and_then(Value::as_str).unwrap_or("").to_string(),
+                RecordBody::Statement { data: Some(d), .. } => d.get("account").and_then(|x| x.as_str()).unwrap_or("").to_string(),
                 _ => String::new(),
             };
             if self.credit.get(&from).copied().unwrap_or(0) < price {

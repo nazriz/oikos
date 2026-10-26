@@ -368,7 +368,7 @@ impl Plan for School {
             steps.extend(self.routines.report::<Then>(&self.book, cx, &o));
         }
         self.telling = false;
-        let _ = as_text;
+        let _ = as_text::<oikos_core::Frozen>;
         steps
     }
 

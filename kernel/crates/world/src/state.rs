@@ -163,7 +163,8 @@ pub struct EntityRecord {
     pub n: u64,
     pub at: i64,
     pub chain: String,
-    pub sections: BTreeMap<String, Value>,
+    /// (Frozen: a record set again shares the sections it does not change with the record before it.)
+    pub sections: BTreeMap<Id, crate::blocks::Frozen>,
     /// The change stamp of its last change.
     pub changed: u64,
 }

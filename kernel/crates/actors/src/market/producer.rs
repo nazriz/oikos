@@ -19,6 +19,7 @@
 //!
 //! Like the shop it is generic over its body (body.rs): its employer, bank, union and failure dealings are lane C1's.
 
+use oikos_core::Frozen;
 use super::automation::{self, params_from, Adoption, AdoptionParams, AdoptionThen, Fleet};
 use super::body::{lift, Body, BodyThen, House, PlainBody, Review, Stage, Standing, Surplus, Want, Wind};
 use super::lengnick::{move_wage, pay_out, Expectation, From as Payer, Lengnick, WageMonth};
@@ -109,7 +110,7 @@ impl Params {
             builder: ctx.param("builder", String::new())?,
             premises_sale_bps: ctx.param("premises_sale_bps", 5000)?,
             export_probe_bps: ctx.param("export_probe_bps", 1000)?,
-            automation: params_from(ctx.params.get("automation").unwrap_or(&Value::Null))?,
+            automation: params_from(&ctx.params.get("automation").map(Frozen::to_value).unwrap_or(Value::Null))?,
             lengnick: Lengnick::read(ctx)?,
             figures: PriceFigures::read(ctx)?,
         };
@@ -290,7 +291,7 @@ impl<B: Body> Factory<B> {
         }
     }
     /// The world market's standing offer for what we make, if one is open: its latest, with its record.
-    fn export_offer(&self, t: i64) -> Option<(String, Value)> {
+    fn export_offer(&self, t: i64) -> Option<(String, Frozen)> {
         self.book
             .open("buying_offer")
             .filter(|r| { r.speaks_for.as_deref() == Some(self.p.market.as_str()) && data(r).s("kind") == Some(self.p.output.as_str()) && data(r).i("until").unwrap_or(i64::MAX) > t})
@@ -507,7 +508,7 @@ impl<B: Body> Factory<B> {
         let offer_now = self.export_offer(t);
         if self.last_demand < 0 {
             let first = self.book.open("buying_offer").find(|r| r.speaks_for.as_deref() == Some(self.p.market.as_str()) && data(r).s("kind") == Some(self.p.output.as_str()));
-            let share = first.and_then(|r| data(r).get("quantities").and_then(|q| q.get(&me)).and_then(Value::as_i64));
+            let share = first.and_then(|r| data(r).get("quantities").and_then(|q| q.get(&me)).and_then(|x| x.as_i64()));
             self.last_demand = share.unwrap_or_else(|| self.p.monthly_units(nw));
         }
         if self.headcount < 0 {
@@ -531,7 +532,7 @@ impl<B: Body> Factory<B> {
         let export_unit = offer_now.as_ref().map_or(0, |(_, d)| d.i("unit_price").unwrap_or(0));
         let export_share = offer_now.as_ref().map_or(0, |(_, d)| {
             let q = d.i("quantity").unwrap_or(0);
-            self.room.share(q, d.get("quantities").and_then(|x| x.get(&me)).and_then(Value::as_i64))
+            self.room.share(q, d.get("quantities").and_then(|x| x.get(&me)).and_then(|x| x.as_i64()))
         });
         let known = self.last_domestic + export_share;
         let home_ok = self.price >= input_cost;
@@ -882,7 +883,7 @@ impl<B: Body> Factory<B> {
                 self.next_shipment = t + 7 * DAY;
                 let l = self.p.lengnick;
                 let keep = ((l.phi_low_bps + l.phi_high_bps) * self.last_domestic / 2 + 9999).div_euclid(10_000);
-                let room = self.room.open(d.i("quantity").unwrap_or(0), d.get("quantities").and_then(|x| x.get(&me)).and_then(Value::as_i64));
+                let room = self.room.open(d.i("quantity").unwrap_or(0), d.get("quantities").and_then(|x| x.get(&me)).and_then(|x| x.as_i64()));
                 let q = (left - keep).min(room);
                 if q > 0 && abroad_ok {
                     let unit = d.i("unit_price").unwrap_or(0);

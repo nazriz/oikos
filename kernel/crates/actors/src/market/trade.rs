@@ -64,7 +64,7 @@ pub struct Offerings {
 
 fn goods_of(r: &Record) -> Option<BTreeMap<String, i64>> {
     let g = data(r).get("goods")?.as_object()?;
-    Some(g.iter().filter_map(|(k, v)| v.as_i64().map(|x| (k.clone(), x))).collect())
+    Some(g.iter().filter_map(|(k, v)| v.as_i64().map(|x| (k.to_string(), x))).collect())
 }
 
 /// A seller's latest standing price list that lists goods (newest by time; of two at the same moment, the later filed).
@@ -89,8 +89,8 @@ pub fn goods_prices(book: &Book, seller: &str) -> Offerings {
         min_order: d.i("min_order"),
         at: d.s("at").map(str::to_string),
         terms_days: d.i("terms_days").filter(|n| *n > 0),
-        clearance: d.get("clearance").and_then(|c| c.get("quantity")).and_then(Value::as_i64).filter(|n| *n > 0),
-        regular: d.get("clearance").and_then(|c| c.get("regular")).and_then(Value::as_i64).filter(|n| *n > 0),
+        clearance: d.get("clearance").and_then(|c| c.get("quantity")).and_then(|x| x.as_i64()).filter(|n| *n > 0),
+        regular: d.get("clearance").and_then(|c| c.get("regular")).and_then(|x| x.as_i64()).filter(|n| *n > 0),
     }
 }
 
@@ -766,7 +766,7 @@ impl Payables {
         if !self.open.is_empty() {
             let claimed: BTreeSet<String> = book
                 .of_type("claim")
-                .filter(|c| matches!(&c.body, RecordBody::Claim { counterparty: Some(cp), about, .. } if *cp == self.me && about.get("kind").and_then(Value::as_str) == Some("debt")))
+                .filter(|c| matches!(&c.body, RecordBody::Claim { counterparty: Some(cp), about, .. } if *cp == self.me && about.get("kind").and_then(|x| x.as_str()) == Some("debt")))
                 .flat_map(|c| bases_of(c).iter().map(|x| x.to_string()).collect::<Vec<_>>())
                 .collect();
             self.open.retain(|x| !claimed.contains(&x.order));

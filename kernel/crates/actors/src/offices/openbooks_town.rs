@@ -16,6 +16,8 @@
 //! - The mayor's office is the position the clerk keeps books for (`office`); the TS fell back to the participant's own
 //!   authorship when there was none, which a clerk never has.
 
+use oikos_core::frozen::{JsonRead, JsonRef};
+use oikos_core::Frozen;
 use super::books::{OfficeBooks, OpenHeading, OpenItem};
 use super::openbooks::{addressed, amt, by_day, d, date_words, heading, js, num, pressing, terms_of, usd, when, R};
 use crate::common::{approval_of, bases_of, cents, duration_words, made_at, text, truthy, Book, Directions, Fields, DAY, YEAR};
@@ -36,10 +38,10 @@ fn is_statement(r: &Record) -> bool {
 }
 
 /// A template literal of `x ?? y` for a field: its words, or the default where it is absent or null.
-fn or_words(v: Option<&Value>, otherwise: &str) -> String {
-    match v {
-        None | Some(Value::Null) => otherwise.to_string(),
-        x => js(x),
+fn or_words<V: JsonRead + ?Sized>(v: Option<&V>, otherwise: &str) -> String {
+    match v.map(JsonRead::view) {
+        None | Some(JsonRef::Null) => otherwise.to_string(),
+        x => js(x.as_ref()),
     }
 }
 
@@ -59,13 +61,13 @@ fn ps(params: &Map<String, Value>, key: &str, otherwise: &str) -> String {
 /// `Number(r.data?.period_end ?? r.at)`.
 fn period_end(r: &Record) -> i64 {
     match d(r).get("period_end") {
-        None | Some(Value::Null) => r.at,
+        None | Some(Frozen::Null) => r.at,
         v => num(v).unwrap_or(r.at),
     }
 }
 
 /// `durationWords(Number(x))`.
-fn dur(v: Option<&Value>) -> String {
+fn dur(v: Option<&Frozen>) -> String {
     num(v).map_or_else(|| "NaN seconds".to_string(), duration_words)
 }
 
@@ -88,7 +90,7 @@ fn year_in_days(year: i64) -> String {
 
 /// A budget's lines as written (`name -> cents`), in the order the paper keeps them.
 fn lines_of(b: Option<&Record>) -> Vec<(String, i64)> {
-    b.and_then(|b| d(b).get("lines")).and_then(Value::as_object).map(|m| m.iter().map(|(k, v)| (k.clone(), amt(Some(v)))).collect()).unwrap_or_default()
+    b.and_then(|b| d(b).get("lines")).and_then(|x| x.as_object()).map(|m| m.iter().map(|(k, v)| (k.to_string(), amt(Some(v)))).collect()).unwrap_or_default()
 }
 
 fn lines_words(lines: &[(String, i64)], w: &WorldInfo) -> String {
@@ -97,7 +99,7 @@ fn lines_words(lines: &[(String, i64)], w: &WorldInfo) -> String {
 
 /// Is a budget's year this year (`b.data?.year === year`).
 fn year_is(b: &Record, year: i64) -> bool {
-    d(b).get("year").and_then(Value::as_i64) == Some(year)
+    d(b).get("year").and_then(|x| x.as_i64()) == Some(year)
 }
 
 /// The town's budget for a year, of those adopted (the latest, if the council adopted more than one for it).
@@ -109,7 +111,7 @@ fn budget_for(book: &Book, year: i64) -> Option<&R> {
 fn dead(book: &Book) -> BTreeMap<String, i64> {
     let mut m = BTreeMap::new();
     for r in book.all("death_registration").chain(book.all("death_certificate")) {
-        if let Some(who) = d(r).get("deceased").and_then(Value::as_str) {
+        if let Some(who) = d(r).get("deceased").and_then(|x| x.as_str()) {
             m.entry(who.to_string()).or_insert(r.at);
         }
     }
@@ -117,23 +119,23 @@ fn dead(book: &Book) -> BTreeMap<String, i64> {
 }
 
 /// `t >= (closes_at ?? Infinity)`.
-fn closed_by(t: i64, closes_at: Option<&Value>) -> bool {
+fn closed_by(t: i64, closes_at: Option<&Frozen>) -> bool {
     match closes_at {
-        None | Some(Value::Null) => false,
+        None | Some(Frozen::Null) => false,
         v => num(v).is_some_and(|c| t >= c),
     }
 }
 
 /// `Number.isFinite(x)` (no coercion: only a number is).
-fn finite_number(v: Option<&Value>) -> Option<i64> {
+fn finite_number(v: Option<&Frozen>) -> Option<i64> {
     match v {
-        Some(Value::Number(n)) => n.as_i64().or_else(|| n.as_f64().filter(|f| f.is_finite()).map(|f| f as i64)),
+        Some(Frozen::Number(n)) => n.as_i64().or_else(|| n.as_f64().filter(|f| f.is_finite()).map(|f| f as i64)),
         _ => None,
     }
 }
 
 /// `dateWords(x)` of something that may not be a number.
-fn date_of(v: Option<&Value>, w: &WorldInfo) -> String {
+fn date_of(v: Option<&Frozen>, w: &WorldInfo) -> String {
     num(v).map_or_else(|| "year NaN, day NaN".to_string(), |t| date_words(t, w))
 }
 
@@ -445,7 +447,7 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
                     "; the hiring office's payroll notice {} names it{}",
                     n.id,
                     match d(n).get("line") {
-                        Some(Value::String(l)) => format!(", as a post the {l} line of the adopted budget pays for"),
+                        Some(Frozen::String(l)) => format!(", as a post the {l} line of the adopted budget pays for"),
                         _ => String::new(),
                     }
                 ),
@@ -517,7 +519,7 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
     let last: Option<&R> = adopted.or_else(|| {
         let mut best: Option<(&R, i64)> = None;
         for b in book.open("budget") {
-            let Some(y) = d(b).get("year").and_then(Value::as_i64).filter(|y| *y < year) else { continue };
+            let Some(y) = d(b).get("year").and_then(|x| x.as_i64()).filter(|y| *y < year) else { continue };
             if best.is_none_or(|(c, cy)| y > cy || (y == cy && b.at > c.at)) {
                 best = Some((b, y));
             }
@@ -765,7 +767,7 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
         let Some(pet) = petitions.iter().rev().find(|p| p.id == id) else { continue };
         let sig = d(c).get("signatures").filter(|v| v.is_number());
         if c.speaks_for == pet.speaks_for {
-            if let Some(n) = sig.and_then(|v| v.as_i64().or_else(|| v.as_f64().map(|f| f as i64))) {
+            if let Some(n) = sig.and_then(|v| v.as_i64().or_else(|| v.as_number().and_then(serde_json::Number::as_f64).map(|f| f as i64))) {
                 counts.insert(pet.id.as_str(), n);
             }
         }
@@ -845,7 +847,7 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
     let mut tabled = vec![];
     for r in book.open("proposal") {
         let enact = d(r).get("enact");
-        if !ours(r) || enact.and_then(|e| e.get("kind")).and_then(Value::as_str) != Some("budget") {
+        if !ours(r) || enact.and_then(|e| e.get("kind")).and_then(|x| x.as_str()) != Some("budget") {
             continue;
         }
         let b = ballot_of.get(r.id.as_str());
@@ -855,7 +857,7 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
         let y = js(enact.and_then(|e| e.get("data")).and_then(|x| x.get("year")));
         let state = match b {
             Some(b) => {
-                if d(b).get("closed") == Some(&Value::Bool(true)) || closed_by(t, d(b).get("closes_at")) {
+                if d(b).get("closed").and_then(|x| x.as_bool()) == Some(true) || closed_by(t, d(b).get("closes_at")) {
                     format!("its ballot {} has closed and no result is on file", b.id)
                 } else {
                     format!("its ballot {} is open until {}", b.id, date_of(d(b).get("closes_at"), w))
@@ -1065,8 +1067,8 @@ fn employer(st: &State, me: &str, payroll_office: &str, staffing: &Staffing, dir
 }
 
 /// `Number.isSafeInteger(x)`.
-fn safe_integer(v: &Value) -> Option<i64> {
-    let n = v.as_i64().or_else(|| v.as_f64().filter(|f| f.fract() == 0.0 && f.is_finite()).map(|f| f as i64))?;
+fn safe_integer(v: &Frozen) -> Option<i64> {
+    let n = v.as_i64().or_else(|| v.as_number().and_then(serde_json::Number::as_f64).filter(|f| f.fract() == 0.0 && f.is_finite()).map(|f| f as i64))?;
     (n.abs() <= (1 << 53) - 1).then_some(n)
 }
 
@@ -1126,7 +1128,7 @@ fn clerk(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
         .collect();
     let closed: Vec<OpenItem> = ballots
         .iter()
-        .filter(|b| d(b).s("electorate") == Some("council") && (d(b).get("closed") == Some(&Value::Bool(true)) || closed_by(t, d(b).get("closes_at"))) && !results.contains(b.id.as_str()))
+        .filter(|b| d(b).s("electorate") == Some("council") && (d(b).get("closed").and_then(|x| x.as_bool()) == Some(true) || closed_by(t, d(b).get("closes_at"))) && !results.contains(b.id.as_str()))
         .map(|b| {
             let closes = finite_number(d(b).get("closes_at"));
             let line = format!(

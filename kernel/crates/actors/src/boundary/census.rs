@@ -89,10 +89,10 @@ impl Plan for Statistician {
                 if !d.get("goods").is_some_and(truthy) || d.get("min_order").is_some_and(truthy) {
                     continue;
                 }
-                if let Some(goods) = d.get("goods").and_then(Value::as_object) {
+                if let Some(goods) = d.get("goods").and_then(|x| x.as_object()) {
                     for (kind, price) in goods {
                         if let Some(p) = price.as_i64() {
-                            prices.push((kind.clone(), p));
+                            prices.push((kind.to_string(), p));
                         }
                     }
                 }
@@ -248,7 +248,7 @@ impl Plan for Assessor {
                     x.owner = Some(owner.to_string());
                 }
                 if is_kind(r, "property_roll") {
-                    for b in d.get("buildings").and_then(Value::as_array).into_iter().flatten() {
+                    for b in d.get("buildings").and_then(|x| x.as_array()).into_iter().flatten() {
                         if let (Some(s), Some(t)) = (b.s("structure"), b.s("type")) {
                             x.buildings.insert(s.to_string(), t.to_string());
                         }
@@ -641,7 +641,7 @@ impl Newcomers {
             .jobseekers_payment
             .split(',')
             .filter(|k| !k.is_empty())
-            .map(|k| stats.and_then(|s| data(s).get("recipients")).and_then(|r| r.get(k)).and_then(Value::as_f64).map_or(0, |x| x as i64))
+            .map(|k| stats.and_then(|s| data(s).get("recipients")).and_then(|r| r.get(k)).and_then(|x| x.as_number().and_then(serde_json::Number::as_f64)).map_or(0, |x| x as i64))
             .sum();
         let competing = n + recent + jobseekers;
         let outside = self.outside_monthly_income;
@@ -732,8 +732,8 @@ impl Actor for Newcomers {
                 .iter()
                 .map(|x| {
                     let d = data(x);
-                    let wage = d.get("wage").and_then(Value::as_i64).unwrap_or(0);
-                    let period = d.get("period").and_then(Value::as_i64).filter(|p| *p > 0).unwrap_or(14 * DAY);
+                    let wage = d.get("wage").and_then(|x| x.as_i64()).unwrap_or(0);
+                    let period = d.get("period").and_then(|x| x.as_i64()).filter(|p| *p > 0).unwrap_or(14 * DAY);
                     (i128::from(wage) * i128::from(30 * DAY)).div_euclid(i128::from(period)) as i64
                 })
                 .collect();

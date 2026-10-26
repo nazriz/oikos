@@ -9,6 +9,7 @@
 
 use crate::config::Channel;
 use serde::{Deserialize, Serialize};
+pub use oikos_core::Frozen;
 use serde_json::Value;
 
 /// An id, or a `$name` bound earlier in the same action.
@@ -678,14 +679,14 @@ pub struct AgreementTerms {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub attrs: Option<Value>,
+    pub attrs: Option<Frozen>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Commitment {
     pub who: IdOrRef,
-    pub does: Value,
+    pub does: Frozen,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub every: Option<i64>,
 }
@@ -707,7 +708,7 @@ pub const GENESIS: &str = "genesis";
 pub struct Record {
     pub id: Id,
     /// A participant id, or "genesis".
-    pub author: String,
+    pub author: Id,
     /// The position the author made it in (absent: as themselves). Not `position`: a claim's
     /// Hohfeld position has that name.
     #[serde(default, rename = "in_position", skip_serializing_if = "Option::is_none")]
@@ -733,7 +734,7 @@ pub enum RecordBody {
         holder: Id,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         counterparty: Option<Id>,
-        about: Value,
+        about: Frozen,
     },
     ClaimTransfer {
         claim: Id,
@@ -758,27 +759,27 @@ pub enum RecordBody {
         text: Option<String>,
     },
     Statement {
-        kind: String,
+        kind: Id,
         text: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        data: Option<Value>,
+        data: Option<Frozen>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        adico: Option<Value>,
+        adico: Option<Frozen>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        formal: Option<Value>,
+        formal: Option<Frozen>,
         /// What someone may take up, on what terms (contracts: Offer; docs/design/ai-citizens.md 2a). Facts only; the
         /// kernel executes none of it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        offer: Option<Value>,
+        offer: Option<Frozen>,
         /// A recurring situation people may take part in (contracts: Practice; 2b). It has no power.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        practice: Option<Value>,
+        practice: Option<Frozen>,
         /// Something put forward to be believed (contracts: Assertion; docs/design/contracts-0.7.md A1). No power.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        assertion: Option<Value>,
+        assertion: Option<Frozen>,
         /// A registry's act: an organisation registered or dissolved (contracts: Registry). Content, never physics.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        registry: Option<Value>,
+        registry: Option<Frozen>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         addressed_to: Option<Vec<Id>>,
         /// The cell it's put up on, if any.

@@ -11,6 +11,7 @@
 //! up; the support law in force is the latest made, of two made at once the later filed (TS compared ids as strings);
 //! benefits are stopped in payment-id order (TS: the order granted); a shop priced at nothing is no shop.
 
+use oikos_core::Frozen;
 use super::mind::{Choice, Decide, Event, Facts, Outcome, Treated, Way};
 use super::params::Params;
 #[allow(unused_imports)]
@@ -96,14 +97,14 @@ impl PaymentRule {
 pub fn support_law(book: &crate::common::Book) -> Vec<PaymentRule> {
     let law = book
         .open("law")
-        .filter(|r| data(r).get("payments").is_some_and(Value::is_array))
+        .filter(|r| data(r).get("payments").is_some_and(|x| x.is_array()))
         .max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
     let Some(l) = law else { return vec![] };
     data(l)["payments"]
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|x| serde_json::from_value::<PaymentRule>(x.clone()).ok())
+        .filter_map(|x| serde_json::from_value::<PaymentRule>(x.to_value()).ok())
         .map(|mut r| {
             if r.payer.is_none() {
                 r.payer = l.speaks_for.map(|x| x.to_string());
@@ -206,20 +207,20 @@ pub fn shops(book: &crate::common::Book, goods: &str) -> Vec<Shop> {
 }
 
 /// A seller's standing offer, if its latest price list that is one makes one (trade.ts `offerOf`).
-fn shop_offer<'a>(book: &'a crate::common::Book, seller: &str) -> Option<&'a Value> {
+fn shop_offer<'a>(book: &'a crate::common::Book, seller: &str) -> Option<&'a Frozen> {
     let lists = latest_by_speaker(book, "price_list", |r| !part(r, Piece::Offer).is_null());
     lists.get(&Some(seller)).map(|r| part(r, Piece::Offer))
 }
 
 /// An offer's facts for its taker, from its typed terms (mind.ts `factsOf`): money a month in and out, goods.
-pub fn facts_of(offer: &Value, units: i64) -> Facts {
+pub fn facts_of(offer: &Frozen, units: i64) -> Facts {
     let mut f = Facts::default();
-    for c in offer.pointer("/terms/commitments").and_then(Value::as_array).into_iter().flatten() {
+    for c in offer.pointer("/terms/commitments").and_then(|x| x.as_array()).into_iter().flatten() {
         let Some(o) = c.pointer("/does/outcome") else { continue };
         let every = c.get("every").and_then(crate::papers::lenient::whole).filter(|e| *e > 0);
-        let per_unit = c.get("per").and_then(Value::as_str) == Some("unit");
+        let per_unit = c.get("per").and_then(|x| x.as_str()) == Some("unit");
         let per_month = |x: i64| every.map_or(x, |e| half_up(x * MONTH, e)) * if per_unit { units } else { 1 };
-        let taker = c.get("who").and_then(Value::as_str) == Some("taker");
+        let taker = c.get("who").and_then(|x| x.as_str()) == Some("taker");
         if let Some(m) = o.get("money") {
             let a = m.get("amount").and_then(crate::papers::lenient::whole).unwrap_or(0);
             f.money_per_month += if taker { -1 } else { 1 } * per_month(a);
@@ -422,8 +423,8 @@ struct Answer {
     every: i64,
 }
 
-fn granted(d: &Value) -> bool {
-    matches!(d.get("granted"), Some(Value::Bool(true))) || d.s("granted") == Some("yes")
+fn granted(d: &Frozen) -> bool {
+    d.get("granted").and_then(|x| x.as_bool()) == Some(true) || d.s("granted") == Some("yes")
 }
 
 impl Person {
@@ -443,7 +444,7 @@ impl Person {
 
     /// What kind of institution someone is to us (citizen.ts `kindOf`).
     fn money_kind_of(&self, who: &str, params: &crate::Params) -> &'static str {
-        if let Some(k) = params.get("institutions").and_then(|i| i.get(who)).and_then(Value::as_str) {
+        if let Some(k) = params.get("institutions").and_then(|i| i.get(who)).and_then(|x| x.as_str()) {
             return match k {
                 "banks" => "banks",
                 "unions" => "unions",
@@ -906,7 +907,7 @@ impl Person {
             let d = data(&inv);
             let service = d.get("service").map(|s| s.as_str().map_or_else(|| s.to_string(), String::from)).unwrap_or_default();
             let amount = d.pointer("/outcome/money/amount").and_then(crate::papers::lenient::whole).unwrap_or(0);
-            let to = d.pointer("/outcome/money/to").and_then(Value::as_str).map(String::from);
+            let to = d.pointer("/outcome/money/to").and_then(|x| x.as_str()).map(String::from);
             let days = d.i("days").unwrap_or(0);
             // A bill well over what the last one came to a day is looked at twice (docs/behaviour/frictions.md): the
             // difference is what we say we were overcharged. It is paid all the same.
@@ -1002,7 +1003,7 @@ impl Person {
             return;
         }
         self.money.next_spend = t + MONTH;
-        let accounts: Vec<String> = w.cx.ctx.params.get("shop_accounts").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect()).unwrap_or_default();
+        let accounts: Vec<String> = w.cx.ctx.params.get("shop_accounts").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str()).map(String::from).collect()).unwrap_or_default();
         let amount = self.monthly_spend(w);
         let Some(acc) = w.acc.clone() else { return };
         if amount > 0 && !accounts.is_empty() {

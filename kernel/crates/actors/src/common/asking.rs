@@ -181,7 +181,7 @@ pub fn owner_looks(book: &Book, asked: &mut Asked, register: &Register, lot: &st
     }
     for c in book.claims_by(ClaimKey::Object, lot) {
         let ownership = match &c.body {
-            oikos_sight::RecordBody::Claim { about, .. } => about.get("kind").and_then(Value::as_str) == Some("ownership"),
+            oikos_sight::RecordBody::Claim { about, .. } => about.get("kind").and_then(|x| x.as_str()) == Some("ownership"),
             _ => false,
         };
         let dk = format!("dealings:{}", c.id);

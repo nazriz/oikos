@@ -16,6 +16,7 @@
 //! be written; a complaint not written is recorded against the norm only the first time (TS also recorded a later
 //! letter written); TS's "inner.experience" weight 2 is `weight_bps` 20,000.
 
+use oikos_core::Frozen;
 use super::mind::{ConductAsk, Event, GrievanceView, Intent, Opening, Openings, Outcome, Treated, WantView, Way};
 use super::params::Params;
 #[allow(unused_imports)]
@@ -148,7 +149,7 @@ fn facts(v: Value) -> BTreeMap<String, Value> {
     }
 }
 
-fn offer_of(r: &Record) -> Option<&Value> {
+fn offer_of(r: &Record) -> Option<&Frozen> {
     match &r.body {
         RecordBody::Statement { offer, .. } => offer.as_ref(),
         _ => None,
@@ -165,10 +166,10 @@ fn friction_dial(cx: &Cx) -> i64 {
 }
 
 /// What an offer would bring, in the typed outcomes a want seeks (wants.ts `bringsOf`, without what it asks now).
-pub fn brings_of(offer: Option<&Value>) -> Vec<String> {
+pub fn brings_of(offer: Option<&Frozen>) -> Vec<String> {
     let mut out = BTreeSet::new();
     let none = vec![];
-    let cs = offer.and_then(|o| o.get("terms")).and_then(|t| t.get("commitments")).and_then(Value::as_array).unwrap_or(&none);
+    let cs = offer.and_then(|o| o.get("terms")).and_then(|t| t.get("commitments")).and_then(|x| x.as_array()).unwrap_or(&none);
     for c in cs {
         let Some(o) = c.get("does").and_then(|d| d.get("outcome")) else { continue };
         let taker = c.s("who") == Some("taker");
@@ -196,19 +197,19 @@ pub fn brings_of(offer: Option<&Value>) -> Vec<String> {
 fn decision_law(book: &crate::common::Book, kind_: &str, payment: Option<&str>) -> Option<Value> {
     let mut best: Option<(i64, Value)> = None;
     for l in book.open("law") {
-        let Some(list) = data(l).get("decisions").and_then(Value::as_array) else { continue };
+        let Some(list) = data(l).get("decisions").and_then(|x| x.as_array()) else { continue };
         for d in list {
             if d.s("kind") != Some(kind_) {
                 continue;
             }
-            let pays = d.get("payments").and_then(Value::as_array);
+            let pays = d.get("payments").and_then(|x| x.as_array());
             let fits = pays.is_none_or(|ps| payment.is_some_and(|p| ps.iter().any(|x| x.as_str() == Some(p))));
             if !fits {
                 continue;
             }
             let score = (if pays.is_some() { 1_000_000_000_000 } else { 0 }) + l.at;
             if best.as_ref().is_none_or(|(b, _)| score > *b) {
-                best = Some((score, d.clone()));
+                best = Some((score, d.to_value()));
             }
         }
     }
@@ -265,7 +266,7 @@ fn div_round(n: i64, d: i64) -> i64 {
 impl Person {
     /// What kind of institution someone is to us (citizen.ts `kindOf`).
     fn recourse_kind_of(&self, who: &str, params: &crate::Params) -> String {
-        if let Some(k) = params.get("institutions").and_then(|i| i.get(who)).and_then(Value::as_str) {
+        if let Some(k) = params.get("institutions").and_then(|i| i.get(who)).and_then(|x| x.as_str()) {
             return k.to_string();
         }
         let p = &self.p;
@@ -556,7 +557,7 @@ impl Person {
             } else if (k == paper::DECISION || k == "tribunal_order") && d.s("applicant") == Some(me.as_str()) && d.s("matter").is_some() {
                 let Some(key) = self.recourse.grievances.values().find(|g| Some(g.matter.as_str()) == d.s("matter") && Some(g.party.as_str()) == d.s("against") && g.applied.contains_key(by.as_str())).map(|g| g.key.clone()) else { continue };
                 let f = d.s("finding").unwrap_or_default().to_string();
-                let binding = d.get("binding") != Some(&Value::Bool(false));
+                let binding = d.get("binding").and_then(|x| x.as_bool()) != Some(false);
                 let (matter, seeks, since_applied) = {
                     let g = self.recourse.grievances.get_mut(&key).unwrap_or_else(|| unreachable!());
                     let a = g.applied.entry(by.to_string()).or_default();
@@ -1002,8 +1003,8 @@ impl Person {
                 if let Some(x) = self.recourse.grievances.get_mut(grievance) {
                     x.applied.insert(venue.clone(), Applied { t, finding: None });
                 }
-                let offer = offer_of(&h).cloned().unwrap_or(Value::Null);
-                let form = offer.get("hears").and_then(Value::as_array).and_then(|a| a.iter().find(|x| x.s("about") == Some(g.matter.as_str()))).and_then(|x| x.s("form")).unwrap_or(paper::APPLICATION).to_string();
+                let offer = offer_of(&h).cloned().unwrap_or_default();
+                let form = offer.get("hears").and_then(|x| x.as_array()).and_then(|a| a.iter().find(|x| x.s("about") == Some(g.matter.as_str()))).and_then(|x| x.s("form")).unwrap_or(paper::APPLICATION).to_string();
                 let fee_to = venue_fee(&offer).map(|f| f.0);
                 let words = g.matter.replace('_', " ");
                 let decided_at = self.decided_at(&g);
@@ -1087,12 +1088,12 @@ impl Person {
 }
 
 /// What applying to a venue costs, where its terms say: (to whom, cents).
-fn venue_fee(offer: &Value) -> Option<(String, i64)> {
+fn venue_fee(offer: &Frozen) -> Option<(String, i64)> {
     let none = vec![];
     offer
         .get("terms")
         .and_then(|t| t.get("commitments"))
-        .and_then(Value::as_array)
+        .and_then(|x| x.as_array())
         .unwrap_or(&none)
         .iter()
         .filter(|c| c.s("who") == Some("taker"))
@@ -1217,7 +1218,7 @@ impl Openings for Ways<'_> {
             for id in &p.s.found_petitions {
                 let Some(pet) = book.get(id) else { continue };
                 let signed = p.s.sign_now.contains(id) || book.of_type("vote").any(|v| v.speaks_for.as_deref() == Some(me) && matches!(&v.body, RecordBody::Vote { ballot, choice } if ballot == id && choice == "sign"));
-                let tagged = data(pet).get("demand").and_then(|d| d.get("tags")).and_then(Value::as_array).is_some_and(|a| a.iter().any(|x| x.as_str() == Some("tenant_protection")));
+                let tagged = data(pet).get("demand").and_then(|d| d.get("tags")).and_then(|x| x.as_array()).is_some_and(|a| a.iter().any(|x| x.as_str() == Some("tenant_protection")));
                 if pet.speaks_for.as_deref() == Some(me) || signed || !tagged {
                     continue;
                 }
@@ -1277,7 +1278,7 @@ impl Openings for Ways<'_> {
                 for h in book.hearings() {
                     let venue = h.speaks_for.unwrap_or_else(|| h.author.clone().into());
                     let Some(offer) = offer_of(h) else { continue };
-                    let hears = offer.get("hears").and_then(Value::as_array).is_some_and(|a| a.iter().any(|x| x.s("about") == Some(g.matter.as_str())));
+                    let hears = offer.get("hears").and_then(|x| x.as_array()).is_some_and(|a| a.iter().any(|x| x.s("about") == Some(g.matter.as_str())));
                     if !hears || venue == g.party || venue == me || g.applied.contains_key(venue.as_str()) {
                         continue;
                     }

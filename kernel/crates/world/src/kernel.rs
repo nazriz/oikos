@@ -727,7 +727,7 @@ impl World {
                 let Some(entity) = p.person.as_ref() else { return perr(format!("{participant} is not a person: it has no record of its own")) };
                 let named = self.s.participant_at.get(participant).and_then(|i| self.s.config.participants[*i].record_keeper.as_deref());
                 debug_assert_eq!(named, self.s.config.participants.iter().find(|x| x.id == participant).and_then(|x| x.record_keeper.as_deref()));
-                let coded = (p.def.controller.get("type").and_then(Value::as_str) == Some("code")).then(|| p.def.controller.get("impl").and_then(Value::as_str)).flatten();
+                let coded = (p.def.controller.get("type").and_then(|x| x.as_str()) == Some("code")).then(|| p.def.controller.get("impl").and_then(|x| x.as_str())).flatten();
                 match named.or(coded) {
                     Some(k) => Ok((*entity, k.to_string())),
                     None => perr(format!("{entity} has no bookkeeping named for its record: nothing can set it")),
@@ -767,10 +767,10 @@ impl World {
     }
 
     /// An entity's record with these sections set: those given in place of those of the same name, the rest as they stand.
-    fn merged_record(&self, entity: &str, set: &BTreeMap<String, Value>) -> BTreeMap<String, Value> {
+    fn merged_record(&self, entity: &str, set: &BTreeMap<String, Value>) -> BTreeMap<Id, crate::blocks::Frozen> {
         let mut sections = self.state.entity_records.get(entity).map(|r| r.sections.clone()).unwrap_or_default();
         for (k, v) in set {
-            sections.insert(k.clone(), v.clone());
+            sections.insert(Id::new(k), crate::blocks::Frozen::of(v));
         }
         sections
     }

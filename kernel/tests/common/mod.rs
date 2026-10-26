@@ -697,7 +697,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                                 }
                                 v
                             },
-                            commitments: vec![Commitment { who: e(*a), does: json!({"outcome": {"money": {"to": "acc-outside", "amount": "100"}}}), every: Some(MONTH) }],
+                            commitments: vec![Commitment { who: e(*a), does: json!({"outcome": {"money": {"to": "acc-outside", "amount": "100"}}}).into(), every: Some(MONTH) }],
                             term: None,
                             then: None,
                             termination: None,

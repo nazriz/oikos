@@ -237,13 +237,13 @@ impl Person {
     fn genesis_share(&self, person: &str) -> i64 {
         self.book
             .all("request")
-            .find(|r| r.speaks_for.as_deref() == Some(person) && data(r).pointer("/outcome/money/for").and_then(Value::as_str) == Some("Household share of the rent."))
+            .find(|r| r.speaks_for.as_deref() == Some(person) && data(r).pointer("/outcome/money/for").and_then(|x| x.as_str()) == Some("Household share of the rent."))
             .and_then(|r| data(r).pointer("/outcome/money/amount").and_then(crate::papers::lenient::whole))
             .unwrap_or(-1)
     }
     /// What kind of institution someone is to us (citizen.ts `kindOf`).
     fn kind_of(&self, who: &str, ctx_params: &crate::Params) -> String {
-        if let Some(k) = ctx_params.get("institutions").and_then(|i| i.get(who)).and_then(Value::as_str) {
+        if let Some(k) = ctx_params.get("institutions").and_then(|i| i.get(who)).and_then(|x| x.as_str()) {
             return k.into();
         }
         let p = &self.p;
@@ -324,7 +324,7 @@ impl Person {
     pub fn holder_of(&self, title: &str) -> Option<String> {
         let c = self.book.get(title)?;
         let RecordBody::Claim { holder, about, .. } = &c.body else { return None };
-        if about.get("kind").and_then(Value::as_str) != Some("ownership") || self.book.released(&c.id) || self.book.withdrawn(&c.id) {
+        if about.get("kind").and_then(|x| x.as_str()) != Some("ownership") || self.book.released(&c.id) || self.book.withdrawn(&c.id) {
             return None;
         }
         let mut transfers: Vec<&Arc<Record>> = self.book.of_type("claim_transfer").filter(|r| matches!(&r.body, RecordBody::ClaimTransfer { claim, .. } if claim == title)).collect();
@@ -344,7 +344,7 @@ impl Person {
         let mut ids: Vec<String> = vec![];
         for c in self.book.claims_by(ClaimKey::Holder, &self.me) {
             if let RecordBody::Claim { about, .. } = &c.body {
-                if about.get("kind").and_then(Value::as_str) == Some("ownership") && !ids.contains(&c.id.to_string()) {
+                if about.get("kind").and_then(|x| x.as_str()) == Some("ownership") && !ids.contains(&c.id.to_string()) {
                     ids.push(c.id.to_string());
                 }
             }
@@ -360,7 +360,7 @@ impl Person {
             .filter(|id| self.holder_of(id).as_deref() == Some(self.me.as_str()))
             .filter_map(|id| {
                 let lot = match &self.book.get(&id)?.body {
-                    RecordBody::Claim { about, .. } => about.get("object").and_then(Value::as_str)?.to_string(),
+                    RecordBody::Claim { about, .. } => about.get("object").and_then(|x| x.as_str())?.to_string(),
                     _ => return None,
                 };
                 Some((id, lot))
@@ -610,7 +610,7 @@ impl Person {
             }
         }
         if self.mind.pursuing("cheaper home") {
-            let bps = w.cx.ctx.params.get("goals").and_then(|g| g.get("cheaper_bps")).and_then(Value::as_i64).unwrap_or(9_000);
+            let bps = w.cx.ctx.params.get("goals").and_then(|g| g.get("cheaper_bps")).and_then(|x| x.as_i64()).unwrap_or(9_000);
             self.s.cheaper_than = Some((home.rent * bps / 10_000, t + MONTH));
         }
         if !home.owned {
@@ -692,7 +692,7 @@ impl Person {
         let mut starts = from;
         let mut stop_at = t;
         if let Some(old) = self.s.home.as_ref().and_then(|h| h.order.as_ref()).and_then(|o| self.book.get(o)) {
-            if let Some(every) = data(old).get("every").and_then(Value::as_i64).filter(|e| *e > 0) {
+            if let Some(every) = data(old).get("every").and_then(|x| x.as_i64()).filter(|e| *e > 0) {
                 let due0 = first_due(old, every);
                 starts = if due0 >= starts { due0 } else { due0 + (starts - due0 + every - 1).div_euclid(every) * every };
                 stop_at = starts - every + DAY;
@@ -707,7 +707,7 @@ impl Person {
         if !self.mind.initiative() {
             return 0;
         }
-        let g = |k: &str| m.get(k).and_then(Value::as_i64).unwrap_or(0);
+        let g = |k: &str| m.get(k).and_then(|x| x.as_i64()).unwrap_or(0);
         let lead = if job.since < 7 * DAY { self.p.started.as_ref().and_then(|s| s.trade_days).unwrap_or(0) * DAY } else { 0 };
         // (Years in the job, capped: the per-year premium in integers, rounded half away from zero.)
         let held = (t - job.since + lead).min(g("cap_years") * self.p.year).max(0);
@@ -901,7 +901,7 @@ impl Person {
         let t = w.t;
         let me = self.me.clone();
         // (A paper we asked the other party about, with no answer in the time the mind gives one: as it stands.)
-        let answer_days = w.cx.ctx.params.get("wants").and_then(|x| x.get("answer_days")).and_then(Value::as_i64).unwrap_or(14);
+        let answer_days = w.cx.ctx.params.get("wants").and_then(|x| x.get("answer_days")).and_then(|x| x.as_i64()).unwrap_or(14);
         for (paper, (at, _)) in self.s.asked_of.clone() {
             if self.book.withdrawn(&paper) || t - at >= answer_days * DAY {
                 self.s.asked_of.remove(&paper);
@@ -1059,7 +1059,7 @@ impl Person {
         (self.mind.affinity(who, t), trust)
     }
     fn people_bps(w: &Week) -> i64 {
-        w.cx.ctx.params.get("outlook").and_then(|o| o.get("people_bps")).and_then(Value::as_i64).unwrap_or(5_000)
+        w.cx.ctx.params.get("outlook").and_then(|o| o.get("people_bps")).and_then(|x| x.as_i64()).unwrap_or(5_000)
     }
     /// A draw that is ours and about one thing (TS `fixed`), in basis points.
     fn fixed_bps(&self, w: &mut Week, purpose: &str) -> i64 {
@@ -1510,7 +1510,7 @@ impl Person {
         let d = data(r);
         let host = r.speaks_for.unwrap_or_default();
         let space = d.s("space").map(String::from);
-        let yes = d.get("yes") == Some(&Value::Bool(true)) && space.is_some();
+        let yes = d.get("yes").and_then(|x| x.as_bool()) == Some(true) && space.is_some();
         if yes && self.s.home.is_none() && self.housing.stay.is_none() && self.s.living_at.is_none() && self.is_leaseholder() {
             let space = space.unwrap_or_default();
             self.housing.stay = Some(Stay { host: host.to_string(), space: space.clone(), since: t });
@@ -1561,7 +1561,7 @@ impl Person {
                 option: d.s("matter").unwrap_or_default().into(),
                 kind: "ordered_to_pay".into(),
                 from: Some(applicant.clone()),
-                facts: facts(json!({ "amount": amount, "paid": pays, "binding": d.get("binding") != Some(&Value::Bool(false)) })),
+                facts: facts(json!({ "amount": amount, "paid": pays, "binding": d.get("binding").and_then(|x| x.as_bool()) != Some(false) })),
                 paper: Some(r.id.to_string()),
                 ..Default::default()
             });
@@ -1905,13 +1905,13 @@ impl Person {
         let last_app = self.book.all("loan_application").filter(|r| r.speaks_for.as_deref() == Some(me)).map(|r| r.at).max();
         let waiting = last_app.is_some_and(|a| t - a < 14 * DAY && !decisions.iter().any(|d| d.at >= a));
         let refused = decisions.iter().any(|d| d.get_flag_false("approved") && t - d.at < 60 * DAY);
-        let repaying = decisions.iter().any(|d| data(d).get("approved") == Some(&Value::Bool(true)) && t < d.at + data(d).i("months").filter(|m| *m > 0).unwrap_or(12) * MONTH);
+        let repaying = decisions.iter().any(|d| data(d).get("approved").and_then(|x| x.as_bool()) == Some(true) && t < d.at + data(d).i("months").filter(|m| *m > 0).unwrap_or(12) * MONTH);
         let defaulted = self.book.all("loan_default").any(|r| addressed_to(r).iter().any(|a| a == me));
         !bank.is_empty() && !waiting && !refused && !repaying && !defaulted
     }
     /// The title to a lot: ours, if one we've read is; else the first.
     fn title_of(&self, lot: &str) -> Option<String> {
-        let all: Vec<String> = self.book.claims_by(ClaimKey::Object, lot).filter(|c| matches!(&c.body, RecordBody::Claim { about, .. } if about.get("kind").and_then(Value::as_str) == Some("ownership"))).map(|c| c.id).map(|x| x.to_string()).collect();
+        let all: Vec<String> = self.book.claims_by(ClaimKey::Object, lot).filter(|c| matches!(&c.body, RecordBody::Claim { about, .. } if about.get("kind").and_then(|x| x.as_str()) == Some("ownership"))).map(|c| c.id).map(|x| x.to_string()).collect();
         all.iter().find(|c| self.holder_of(c).as_deref() == Some(self.me.as_str())).or(all.first()).cloned()
     }
     fn valuation_of(&self, lot: &str) -> Option<i64> {
@@ -1927,7 +1927,7 @@ impl Person {
     /// The lot of the home we own and live in (citizen.ts `ownLot`).
     pub fn own_lot(&self) -> Option<String> {
         self.s.home.as_ref().filter(|h| h.owned).and_then(|h| match &self.book.get(&h.agreement)?.body {
-            RecordBody::Claim { about, .. } => about.get("object").and_then(Value::as_str).map(String::from),
+            RecordBody::Claim { about, .. } => about.get("object").and_then(|x| x.as_str()).map(String::from),
             _ => None,
         })
     }
@@ -1993,7 +1993,7 @@ impl Person {
             }).map(|x| x.to_string()).collect();
             for claim in transfers {
                 let lot = match self.book.get(&claim).map(|c| &c.body) {
-                    Some(RecordBody::Claim { about, .. }) => about.get("object").and_then(Value::as_str).map(String::from),
+                    Some(RecordBody::Claim { about, .. }) => about.get("object").and_then(|x| x.as_str()).map(String::from),
                     _ => None,
                 };
                 let Some(lot) = lot else { continue };
@@ -2100,7 +2100,7 @@ impl Person {
         // ---- buying: a renting household with income that can afford a home that suits it, now and then
         if let Some(mut b) = self.housing.buying.clone() {
             if !b.paid {
-                let declined = self.book.all("loan_decision").any(|r| { r.at >= b.since && addressed_to(r).iter().any(|x| x == &me) && data(r).get("approved") == Some(&Value::Bool(false))});
+                let declined = self.book.all("loan_decision").any(|r| { r.at >= b.since && addressed_to(r).iter().any(|x| x == &me) && data(r).get("approved").and_then(|x| x.as_bool()) == Some(false)});
                 let for_sale = self.for_sale_now().iter().any(|r| r.id == b.listing || (r.speaks_for.as_deref() == Some(b.seller.as_str()) && data(r).s("lot") == Some(b.lot.as_str())));
                 let seen = if self.p.sale_board.is_empty() { t } else { self.housing.sale_seen_at };
                 if for_sale {

@@ -58,7 +58,7 @@ impl PublicMemory {
             return None;
         }
         if self.kinds.iter().any(|k| k == kind) {
-            return Some(kind.clone());
+            return Some(kind.to_string());
         }
         for h in &self.has {
             let has = match h.as_str() {

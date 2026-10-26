@@ -318,7 +318,7 @@ impl Plan for ElectionPlan {
             // (One each: the last nomination of an author counts.)
             let mut by_author: BTreeMap<String, Arc<Record>> = BTreeMap::new();
             for n in noms {
-                by_author.insert(n.author.clone(), n);
+                by_author.insert(n.author.to_string(), n);
             }
             let candidates: Vec<Arc<Record>> = by_author.into_values().collect();
             // (Each candidate's number on the ballot paper, in order: a vote ranks the numbers, as on a real ballot.)
@@ -372,9 +372,9 @@ impl Plan for ElectionPlan {
         if self.stage == Stage::Voting && self.ballot.is_some() && t >= poll {
             let ballot = self.ballot.clone().unwrap_or_default();
             let b = self.book.get(&ballot).cloned();
-            let bd = b.as_ref().map(|b| data(b).clone()).unwrap_or(Value::Null);
+            let bd = b.as_ref().map(|b| data(b).clone()).unwrap_or((Value::Null).into());
             let candidates: Vec<String> = bd.ids("options").into_iter().map(String::from).collect();
-            let cands = bd.get("candidates").and_then(Value::as_array).cloned().unwrap_or_default();
+            let cands = bd.get("candidates").and_then(|x| x.as_array()).map(|a| a.to_vec()).unwrap_or_default();
             let by_number: BTreeMap<String, String> = cands.iter().filter_map(|c| Some((c.s("number").or_else(|| c.s("candidate"))?.to_string(), c.s("candidate")?.to_string()))).collect();
             let electors: BTreeSet<String> = self
                 .book
@@ -453,7 +453,7 @@ impl Plan for ElectionPlan {
             }
             steps.push(because(
                 format!("A vote on {ballot}, cast after the poll closed: not counted, and saying so."),
-                vec![message(std::slice::from_ref(&v.author), &format!("From the electoral office: your vote on {ballot} is not counted. The poll closed on {} and the result is declared.", when(*closed_at)), Some(&v.id))],
+                vec![message(std::slice::from_ref(&v.author.to_string()), &format!("From the electoral office: your vote on {ballot} is not counted. The poll closed on {} and the result is declared.", when(*closed_at)), Some(&v.id))],
             ));
         }
         self.votes_read = votes.len();

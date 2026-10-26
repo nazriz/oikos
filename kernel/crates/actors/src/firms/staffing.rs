@@ -19,6 +19,8 @@
 //!   (`decimal::scaled`), and redundancy pay is reckoned exactly in seconds of pay; percentages and weeks are written
 //!   back as short decimals (`decimal::fmt_dec`).
 
+use oikos_core::frozen::{JsonRead, JsonRef};
+use oikos_core::Frozen;
 use super::decimal::{fmt_dec, round_div, scaled};
 use super::orgwants::{Org, Wanting};
 use super::practice::PracticeOf;
@@ -63,8 +65,8 @@ pub struct StaffingUnder {
 /// `staffingUnder`: the direction standing (if any) as it bears on hiring.
 pub fn staffing_under(direction: Option<&Record>) -> StaffingUnder {
     let d = direction.map(data);
-    let posts = d.and_then(|d| d.get("posts")).and_then(Value::as_i64).filter(|p| *p > 0);
-    StaffingUnder { recruit: d.and_then(|d| d.get("recruit")).and_then(Value::as_str) != Some("no"), posts }
+    let posts = d.and_then(|d| d.get("posts")).and_then(|x| x.as_i64()).filter(|p| *p > 0);
+    StaffingUnder { recruit: d.and_then(|d| d.get("recruit")).and_then(|x| x.as_str()) != Some("no"), posts }
 }
 
 /// A schedule by service: from this much service (seconds: years of 365 days), so many thousandths of a day of pay.
@@ -87,9 +89,9 @@ pub struct TerminationLaw {
     pub small_employer_under: Option<i64>,
 }
 
-fn schedule_of(v: Option<&Value>) -> Vec<ByService> {
+fn schedule_of(v: Option<&Frozen>) -> Vec<ByService> {
     let mut steps: Vec<ByService> = v
-        .and_then(Value::as_array)
+        .and_then(|x| x.as_array())
         .map(|a| a.iter().filter_map(|b| Some(ByService { from_service: scaled(b.get("from_years")?, YEAR)?, milli_days: scaled(b.get("days")?, 1_000)? })).collect())
         .unwrap_or_default();
     steps.sort_by_key(|b| b.from_service);
@@ -97,7 +99,7 @@ fn schedule_of(v: Option<&Value>) -> Vec<ByService> {
 }
 
 pub fn termination_law(book: &Book) -> Option<TerminationLaw> {
-    let l = super::tax::latest_law(book, |r| data(r).get("employment").and_then(Value::as_str) == Some("termination"))?;
+    let l = super::tax::latest_law(book, |r| data(r).get("employment").and_then(|x| x.as_str()) == Some("termination"))?;
     let d = data(l);
     let under = d.get("small_employer_under").and_then(|u| scaled(u, 1_000)).filter(|u| *u > 0);
     Some(TerminationLaw { id: l.id.to_string(), notice: schedule_of(d.get("notice")), redundancy_pay: schedule_of(d.get("redundancy_pay")), small_employer_under: under })
@@ -141,10 +143,10 @@ pub struct HoursLaw {
 }
 
 pub fn hours_law(book: &Book) -> Option<HoursLaw> {
-    let l = super::tax::latest_law(book, |r| data(r).get("employment").and_then(Value::as_str) == Some("hours"))?;
+    let l = super::tax::latest_law(book, |r| data(r).get("employment").and_then(|x| x.as_str()) == Some("hours"))?;
     let d = data(l);
     let n = |k: &str, scale: i64, default: i64| d.get(k).and_then(|v| scaled(v, scale)).filter(|x| *x >= 0).unwrap_or(default);
-    let may_cut = match d.get("may_cut").and_then(Value::as_str) {
+    let may_cut = match d.get("may_cut").and_then(|x| x.as_str()) {
         Some("notice") => MayCut::Notice,
         Some("consent") => MayCut::Consent,
         _ => MayCut::No,
@@ -439,10 +441,10 @@ fn step_lines<T>(why: impl Into<String>, lines: Vec<Line>) -> Step<T> {
 }
 
 /// An amount written in a decision or a record (a number, or a decimal string of the smallest unit).
-fn amount_of(v: Option<&Value>) -> i64 {
-    match v {
-        Some(Value::Number(n)) => n.as_i64().unwrap_or(0),
-        Some(Value::String(s)) => s.trim().parse().unwrap_or(0),
+fn amount_of<V: JsonRead + ?Sized>(v: Option<&V>) -> i64 {
+    match v.map(JsonRead::view) {
+        Some(JsonRef::Number(n)) => n.as_i64().unwrap_or(0),
+        Some(JsonRef::String(s)) => s.trim().parse().unwrap_or(0),
         _ => 0,
     }
 }
@@ -742,7 +744,7 @@ impl Staffing {
         if let Some(r) = named_role(text_of_agreement(a)) {
             return Some(r);
         }
-        advertised_job(book, a).and_then(|j| data(j).get("role").and_then(Value::as_str).filter(|r| !r.is_empty()).map(String::from))
+        advertised_job(book, a).and_then(|j| data(j).get("role").and_then(|x| x.as_str()).filter(|r| !r.is_empty()).map(String::from))
     }
 
     fn ours(&self, role: Option<&str>) -> bool {
@@ -758,7 +760,7 @@ impl Staffing {
         while self.notes_read < notes.len() {
             let r = notes[self.notes_read];
             if r.speaks_for.as_deref() == Some(self.me.as_str()) {
-                if let Some(a) = data(r).get("agreement").and_then(Value::as_str) {
+                if let Some(a) = data(r).get("agreement").and_then(|x| x.as_str()) {
                     self.off_books.insert(a.to_string());
                 }
             }
@@ -884,7 +886,7 @@ impl Staffing {
 
     /// Those of our staff we know to have died: by the registry's entry or by our bank's word (docs/behaviour/deaths.md).
     pub fn known_dead(&self, book: &Book, t: i64) -> Vec<String> {
-        let dead: BTreeSet<String> = book.all("death_registration").filter_map(|r| data(r).get("deceased").and_then(Value::as_str).map(String::from)).chain(self.bank_says_dead.iter().cloned()).collect();
+        let dead: BTreeSet<String> = book.all("death_registration").filter_map(|r| data(r).get("deceased").and_then(|x| x.as_str()).map(String::from)).chain(self.bank_says_dead.iter().cloned()).collect();
         let mut out: Vec<String> = vec![];
         let noticed: Vec<String> = self.contracts(book).into_iter().filter(|a| self.noticed.contains_key(a.id.as_str())).map(|a| worker_of(a).to_string()).collect();
         for w in self.staff(book, t).iter().map(|a| worker_of(a).to_string()).chain(noticed) {
@@ -897,7 +899,7 @@ impl Staffing {
 
     /// Whether we have been told this person has died: by the registry's entry, or by our bank's word.
     pub fn told_dead(&self, book: &Book, who: &str) -> bool {
-        self.bank_says_dead.contains(who) || book.all("death_registration").any(|r| data(r).get("deceased").and_then(Value::as_str) == Some(who))
+        self.bank_says_dead.contains(who) || book.all("death_registration").any(|r| data(r).get("deceased").and_then(|x| x.as_str()) == Some(who))
     }
 
     /// Our staff, as we have them (truth audits).
@@ -935,7 +937,7 @@ impl Staffing {
 
     /// Our standing job postings.
     pub fn postings<'a>(&self, book: &'a Book) -> Vec<&'a Arc<Record>> {
-        book.open("job_posting").filter(|j| j.speaks_for.as_deref() == Some(self.me.as_str()) && self.ours(data(j).get("role").and_then(Value::as_str))).collect()
+        book.open("job_posting").filter(|j| j.speaks_for.as_deref() == Some(self.me.as_str()) && self.ours(data(j).get("role").and_then(|x| x.as_str()))).collect()
     }
 
     /// How many of our staff are staying: those we haven't given notice. (Someone working out their notice is still on
@@ -970,9 +972,9 @@ impl Staffing {
         for r in asked {
             self.confirmed.insert(r.id.to_string());
             let d = data(r);
-            let who = d.get("about").and_then(Value::as_str).unwrap_or("");
+            let who = d.get("about").and_then(|x| x.as_str()).unwrap_or("");
             let Some(office) = r.speaks_for.as_deref().filter(|_| !who.is_empty()) else { continue };
-            let Some(claim) = d.get("claim").and_then(Value::as_str) else { continue };
+            let Some(claim) = d.get("claim").and_then(|x| x.as_str()) else { continue };
             let (employed, known, ended_on) = self.employment(book, t, who);
             let words = if employed {
                 format!("{who} is in our employment")
@@ -981,7 +983,7 @@ impl Staffing {
             } else {
                 format!("we have no record of {who} in our employment")
             };
-            let mut payload = json!({ "claim": claim, "need": d.get("need").cloned().unwrap_or(Value::Null), "request": r.id, "subject": who, "employed": employed, "known": known });
+            let mut payload = json!({ "claim": claim, "need": d.get("need").cloned().unwrap_or((Value::Null).into()), "request": r.id, "subject": who, "employed": employed, "known": known });
             if let Some(e) = ended_on {
                 payload["ended_on"] = json!(e);
             }
@@ -1005,7 +1007,7 @@ impl Staffing {
         }
         book.all("job_application")
             .find(|r| r.speaks_for.as_deref() == Some(worker))
-            .and_then(|r| data(r).get("account").and_then(Value::as_str).map(String::from))
+            .and_then(|r| data(r).get("account").and_then(|x| x.as_str()).map(String::from))
     }
 
     /// The wage an agreement pays now (after any rise).
@@ -1058,7 +1060,7 @@ impl Staffing {
                 };
                 let net = amount_of(d.get("outcome").and_then(|o| o.get("money")).and_then(|m| m.get("amount")));
                 if gross > net && net > 0 {
-                    let every = d.get("every").and_then(Value::as_i64).filter(|e| *e != 0).unwrap_or(self.o.period);
+                    let every = d.get("every").and_then(|x| x.as_i64()).filter(|e| *e != 0).unwrap_or(self.o.period);
                     let w = withheld_owned(law, gross, every);
                     let kept = if w.total == gross - net {
                         w
@@ -1076,7 +1078,7 @@ impl Staffing {
     /// account of someone it has been told has died (nobody is shown the register: docs/behaviour/deaths.md).
     fn stop_dead_wages<T>(&mut self, book: &Book, t: i64) -> Vec<Step<T>> {
         let mut died: Vec<String> = vec![];
-        for who in book.all("death_registration").filter_map(|r| data(r).get("deceased").and_then(Value::as_str).map(String::from)).chain(self.bank_says_dead.iter().cloned()) {
+        for who in book.all("death_registration").filter_map(|r| data(r).get("deceased").and_then(|x| x.as_str()).map(String::from)).chain(self.bank_says_dead.iter().cloned()) {
             if !died.contains(&who) {
                 died.push(who);
             }
@@ -1170,7 +1172,7 @@ impl Staffing {
         // from the first pay day it gives. With no notice after `notice_wait`, it sets the wage up from the agreement
         // on file: docs/behaviour/firms.md, "Payroll notices".)
         let starters: Vec<&Arc<Record>> = if self.o.notice_wait.is_some() {
-            book.open("payroll_notice").filter(|n| n.speaks_for.as_deref() == Some(me.as_str()) && data(n).get("notice").and_then(Value::as_str) == Some("starter")).collect()
+            book.open("payroll_notice").filter(|n| n.speaks_for.as_deref() == Some(me.as_str()) && data(n).get("notice").and_then(|x| x.as_str()) == Some("starter")).collect()
         } else {
             vec![]
         };
@@ -1185,7 +1187,7 @@ impl Staffing {
             let worker = worker_of(a).to_string();
             let mut pays = job_terms(a, &worker, None);
             pays.wage = self.gross.get(a.id.as_str()).copied().unwrap_or(pays.wage);
-            let told = starters.iter().find(|n| data(n).get("agreement").and_then(Value::as_str) == Some(a.id.as_str())).copied();
+            let told = starters.iter().find(|n| data(n).get("agreement").and_then(|x| x.as_str()) == Some(a.id.as_str())).copied();
             let signed = book.signed_at(&a.id).unwrap_or(a.at);
             if let Some(wait) = self.o.notice_wait {
                 if told.is_none() && t - signed < wait {
@@ -1196,8 +1198,8 @@ impl Staffing {
                 .0
                 .and_then(|o| o.money)
                 .map(|m| m.to)
-                .or_else(|| told.and_then(|n| data(n).get("account").and_then(Value::as_str).map(String::from)))
-                .or_else(|| book.all("job_application").find(|r| r.speaks_for.as_deref() == Some(worker.as_str())).and_then(|r| data(r).get("account").and_then(Value::as_str).map(String::from)));
+                .or_else(|| told.and_then(|n| data(n).get("account").and_then(|x| x.as_str()).map(String::from)))
+                .or_else(|| book.all("job_application").find(|r| r.speaks_for.as_deref() == Some(worker.as_str())).and_then(|r| data(r).get("account").and_then(|x| x.as_str()).map(String::from)));
             let Some(to) = to else { continue };
             let reference = format!("wo{}", self.n);
             self.n += 1;
@@ -1211,7 +1213,7 @@ impl Staffing {
             }
             // (The first pay day: the notice's; with none, the agreement's; for an employer that hires and pays itself,
             // a pay period from now, as it has always been.)
-            let first_pay = self.o.notice_wait.map(|_| told.and_then(|n| data(n).get("first_pay").and_then(Value::as_i64)).unwrap_or(signed + pays.period));
+            let first_pay = self.o.notice_wait.map(|_| told.and_then(|n| data(n).get("first_pay").and_then(|x| x.as_i64())).unwrap_or(signed + pays.period));
             let first = match first_pay {
                 None => pays.period,
                 Some(f) => (f - t).max(0),
@@ -1223,7 +1225,7 @@ impl Staffing {
             } else {
                 format!("A new starter's agreement ({}) is on file and no payroll notice has come for it: setting the wage up from the agreement, first pay day {}", a.id, date(first_pay.unwrap()))
             };
-            let line = told.and_then(|n| data(n).get("line").and_then(Value::as_str).map(String::from));
+            let line = told.and_then(|n| data(n).get("line").and_then(|x| x.as_str()).map(String::from));
             let wage_call = |amount: i64, cx: &Cx| {
                 pay(&to, amount, Pay { from: Some(account.to_string()), every: Some(pays.period), first: Some(first), basis: Some(a.id.to_string()), for_: Some(format!("Wages for {worker}.")), line: line.clone(), ..Default::default() }, cx)
             };
@@ -1247,7 +1249,7 @@ impl Staffing {
         if let (Some(payroll), false, true) = (self.o.payroll.clone(), does_pay, self.o.hire) {
             let filed: Vec<&Arc<Record>> = book.open("payroll_notice").filter(|n| n.speaks_for.as_deref() == Some(me.as_str())).collect();
             let sent = |s: &Staffing, what: &str, a: &Record| {
-                s.notified.contains(&format!("{what}:{}", a.id)) || filed.iter().any(|n| data(n).get("notice").and_then(Value::as_str) == Some(what) && data(n).get("agreement").and_then(Value::as_str) == Some(a.id.as_str()))
+                s.notified.contains(&format!("{what}:{}", a.id)) || filed.iter().any(|n| data(n).get("notice").and_then(|x| x.as_str()) == Some(what) && data(n).get("agreement").and_then(|x| x.as_str()) == Some(a.id.as_str()))
             };
             for a in &staff {
                 let Some(signed) = book.signed_at(&a.id) else { continue };
@@ -1287,7 +1289,7 @@ impl Staffing {
                     ],
                 ));
             }
-            let deaths: BTreeSet<String> = book.all("death_registration").filter_map(|r| data(r).get("deceased").and_then(Value::as_str).map(String::from)).collect();
+            let deaths: BTreeSet<String> = book.all("death_registration").filter_map(|r| data(r).get("deceased").and_then(|x| x.as_str()).map(String::from)).collect();
             for a in &contracts {
                 if !book.concluded(&a.id) || sent(self, "leaver", a) {
                     continue;
@@ -1407,9 +1409,9 @@ impl Staffing {
         // that replaced it.
         let posts = self.postings(book);
         let apps: Vec<&Arc<Record>> = book.open("job_application").filter(|a| crate::common::addressed_to(a).iter().any(|x| x == &me) && !self.handled.contains(a.id.as_str())).collect();
-        let kind_of = |p: &Record| (data(p).get("role").and_then(Value::as_str).map(String::from), data(p).get("by_the_day").is_some_and(truthy));
+        let kind_of = |p: &Record| (data(p).get("role").and_then(|x| x.as_str()).map(String::from), data(p).get("by_the_day").is_some_and(truthy));
         let applied_for = |a: &Record| -> Option<String> {
-            let named = data(a).get("posting").and_then(Value::as_str)?.to_string();
+            let named = data(a).get("posting").and_then(|x| x.as_str())?.to_string();
             if posts.iter().any(|p| p.id == named) {
                 return Some(named);
             }
@@ -1428,8 +1430,8 @@ impl Staffing {
             if book.on_hold(&post.id, Some(std::slice::from_ref(&me))) {
                 continue;
             }
-            let trade = data(post).get("industry").and_then(Value::as_str).map(String::from);
-            let fits = |a: &Record| trade.is_some() && data(a).get("trade").and_then(Value::as_str) == trade.as_deref();
+            let trade = data(post).get("industry").and_then(|x| x.as_str()).map(String::from);
+            let fits = |a: &Record| trade.is_some() && data(a).get("trade").and_then(|x| x.as_str()) == trade.as_deref();
             let mut mine: Vec<&Arc<Record>> = apps.iter().filter(|a| applied_for(a).as_deref() == Some(post.id.as_str())).copied().collect();
             mine.sort_by(|x, y| fits(y).cmp(&fits(x)).then_with(|| filed_before(&x.id, &y.id)));
             for a in &mine {
@@ -1438,7 +1440,7 @@ impl Staffing {
             if mine.is_empty() {
                 continue;
             }
-            let openings = data(post).get("openings").and_then(Value::as_i64).unwrap_or(1).max(1);
+            let openings = data(post).get("openings").and_then(|x| x.as_i64()).unwrap_or(1).max(1);
             let made = made_on.get(post.id.as_str()).copied().unwrap_or(0);
             let take = ((openings - made).max(0) as usize).min(mine.len());
             let considered = mine.len();
@@ -1453,8 +1455,8 @@ impl Staffing {
                 Say { to: Some(vec![worker.to_string()]), visible: Some(Visible::Only(vec![me.clone(), worker.to_string()])), basis: Some(chosen.id.to_string()), data: Some(json!({ "posting": post.id, "application": chosen.id })), ..Default::default() },
             );
             *made_now.entry(post.id.to_string()).or_insert(0) += 1;
-            let wage = data(post).get("wage").and_then(Value::as_i64).unwrap_or(want.wage);
-            let account_to = data(chosen).get("account").and_then(Value::as_str).unwrap_or(&worker).to_string();
+            let wage = data(post).get("wage").and_then(|x| x.as_i64()).unwrap_or(want.wage);
+            let account_to = data(chosen).get("account").and_then(|x| x.as_str()).unwrap_or(&worker).to_string();
             let occupancy = self.o.workplace.as_ref().map(|w| call("occupancy", vec![("who", Some(arg(&worker))), ("in", Some(arg(w)))]));
             if data(post).get("by_the_day").is_some_and(truthy) {
                 let o = Offer {
@@ -1484,7 +1486,7 @@ impl Staffing {
                 they: occupancy,
                 text: Some(format!(
                     "{worker} works for {me} as {} for {} every {} days. First pay {} days after both have signed.",
-                    data(post).get("role").and_then(Value::as_str).unwrap_or("staff"),
+                    data(post).get("role").and_then(|x| x.as_str()).unwrap_or("staff"),
                     usd(wage),
                     self.o.period / DAY,
                     self.o.period / DAY
@@ -1508,12 +1510,12 @@ impl Staffing {
         if does_hire {
             for post in &posts {
                 let d = data(post);
-                let Some(was) = d.get("wage").and_then(Value::as_i64) else { continue };
+                let Some(was) = d.get("wage").and_then(|x| x.as_i64()) else { continue };
                 let by_day = d.get("by_the_day").is_some_and(truthy);
                 let now = if by_day { self.day_wage(want.wage) } else { want.wage };
-                if !apps.iter().any(|a| data(a).get("posting").and_then(Value::as_str) == Some(post.id.as_str())) && was != now && want.can_post {
+                if !apps.iter().any(|a| data(a).get("posting").and_then(|x| x.as_str()) == Some(post.id.as_str())) && was != now && want.can_post {
                     // (For the hands it was still for: its applicants carry over, above.)
-                    let left = (d.get("openings").and_then(Value::as_i64).unwrap_or(1) - made_on.get(post.id.as_str()).copied().unwrap_or(0)).max(1);
+                    let left = (d.get("openings").and_then(|x| x.as_i64()).unwrap_or(1) - made_on.get(post.id.as_str()).copied().unwrap_or(0)).max(1);
                     let c = self.posting(cx, want.wage, account, Some(by_day), left);
                     steps.push(step(
                         format!("Our posting is still open, at {}; we offer {} now: posting it again at that.", usd(was), usd(now)),
@@ -1754,9 +1756,9 @@ impl Staffing {
             self.tax_seen.insert(d.id.to_string());
             let dd = data(d);
             let by = d.speaks_for.unwrap_or_default();
-            let granted = dd.get("granted").and_then(Value::as_bool) == Some(true);
+            let granted = dd.get("granted").and_then(|x| x.as_bool()) == Some(true);
             let sum = amount_of(dd.get("amount"));
-            if granted && dd.get("use").and_then(Value::as_str) == Some("set_off") && sum > 0 {
+            if granted && dd.get("use").and_then(|x| x.as_str()) == Some("set_off") && sum > 0 {
                 self.set_offs.push((d.id.to_string(), by.to_string(), sum));
                 continue;
             }
@@ -1768,7 +1770,7 @@ impl Staffing {
                 continue;
             }
             steps.push(because(
-                format!("Our claim was refused ({}), and the collector's own statement shows us in credit by {}: asking for the decision to be looked at again.", dd.get("reason").and_then(Value::as_str).unwrap_or("no reason given"), usd(credit_stated)),
+                format!("Our claim was refused ({}), and the collector's own statement shows us in credit by {}: asking for the decision to be looked at again.", dd.get("reason").and_then(|x| x.as_str()).unwrap_or("no reason given"), usd(credit_stated)),
                 vec![say(
                     "review_request",
                     "Request: please put this right (refund_refused).",
@@ -1815,7 +1817,7 @@ impl Staffing {
     fn next_due(&self, book: &Book, order: &str, t: i64) -> i64 {
         let r = book.get(order);
         let stmt = r.filter(|r| matches!(r.body, RecordBody::Statement { .. }));
-        let every = stmt.and_then(|r| data(r).get("every").and_then(Value::as_i64)).filter(|e| *e != 0).unwrap_or(self.o.period);
+        let every = stmt.and_then(|r| data(r).get("every").and_then(|x| x.as_i64())).filter(|e| *e != 0).unwrap_or(self.o.period);
         let start = match stmt {
             Some(r) => first_due(r, every),
             None => r.map_or(0, |r| r.at) + every,
@@ -2000,7 +2002,7 @@ impl Staffing {
             let Some(agreement) = by_order.get(&order) else { continue };
             let money = book.get(&order).and_then(|r| data(r).get("outcome").and_then(|o| o.get("money")).cloned());
             let Some(money) = money else { continue };
-            let (Some(to), amount) = (money.get("to").and_then(Value::as_str), amount_of(money.get("amount"))) else { continue };
+            let (Some(to), amount) = (money.get("to").and_then(|x| x.as_str()), amount_of(money.get("amount"))) else { continue };
             if amount <= 0 {
                 continue;
             }
@@ -2013,7 +2015,7 @@ impl Staffing {
         // (A worker's own claim for the wages, recorded as a debt against us, replaces our line: it is paid as a debt.)
         let claimed: BTreeSet<String> = book
             .claims_by(crate::common::ClaimKey::Counterparty, &self.me)
-            .filter(|c| matches!(&c.body, RecordBody::Claim { about, .. } if about.get("kind").and_then(Value::as_str) == Some("debt")))
+            .filter(|c| matches!(&c.body, RecordBody::Claim { about, .. } if about.get("kind").and_then(|x| x.as_str()) == Some("debt")))
             .flat_map(|c| crate::common::bases_of(c).iter().map(|x| x.to_string()))
             .collect();
         self.unpaid.retain(|u| !claimed.contains(&u.agreement));
@@ -2112,7 +2114,7 @@ impl Staffing {
             self.asked_answered.insert(r.id.to_string());
             let d = data(r);
             let staff = self.staff(book, t);
-            let Some(a) = staff.iter().find(|x| d.get("agreement").and_then(Value::as_str) == Some(x.id.as_str())).copied() else { continue };
+            let Some(a) = staff.iter().find(|x| d.get("agreement").and_then(|x| x.as_str()) == Some(x.id.as_str())).copied() else { continue };
             let worker = worker_of(a).to_string();
             if r.speaks_for.as_deref() != Some(worker.as_str()) {
                 continue;
@@ -2414,13 +2416,13 @@ impl Staffing {
         let replies: Vec<&Arc<Record>> = book.open("hours_reply").filter(|r| crate::common::addressed_to(r).iter().any(|x| x == &me)).collect();
         let world = cx.ctx.world.clone();
         for r in replies {
-            let agreement = data(r).get("agreement").and_then(Value::as_str).unwrap_or("").to_string();
+            let agreement = data(r).get("agreement").and_then(|x| x.as_str()).unwrap_or("").to_string();
             let Some(i) = self.cuts.iter().position(|c| c.agreement == agreement) else { continue };
             if self.cuts[i].state != CutState::Proposed || r.speaks_for.as_deref() != Some(self.cuts[i].worker.as_str()) || self.handled.contains(r.id.as_str()) {
                 continue;
             }
             self.handled.insert(r.id.to_string());
-            if data(r).get("agree").and_then(Value::as_bool) == Some(true) {
+            if data(r).get("agree").and_then(|x| x.as_bool()) == Some(true) {
                 let c = &mut self.cuts[i];
                 c.state = CutState::Set;
                 c.from = (t + HOURS_GRACE_DAYS * DAY).max(c.from);

@@ -18,6 +18,7 @@
 //! sample of a round is drawn from the stream `sample-<species>-<round>` as the TS did. Its staff are the reduced
 //! `Staff` in environment_staff.rs until C1's `Staffing` lands.
 
+use oikos_core::frozen::{JsonRead, JsonRef};
 use super::environment_staff::{lift, Own, Staff, StaffOpts, StaffThen, Want};
 use crate::common::asking::{ask, Asked};
 use crate::common::{data, lot_of, money_words, next_look, out_of_time, team, withdraw, Book, Directions, DAY, MONTH, YEAR};
@@ -325,15 +326,15 @@ fn percent_words(bps: i64) -> String {
 fn staffing_under(d: Option<&Record>) -> (bool, Option<i64>) {
     let Some(d) = d else { return (true, None) };
     let f = data(d);
-    let posts = f.get("posts").and_then(Value::as_i64).filter(|n| *n > 0);
-    (f.get("recruit").and_then(Value::as_str) != Some("no"), posts)
+    let posts = f.get("posts").and_then(|x| x.as_i64()).filter(|n| *n > 0);
+    (f.get("recruit").and_then(|x| x.as_str()) != Some("no"), posts)
 }
 
 /// A budget line as a number of cents (a figure or the text of one).
-fn amount(v: Option<&Value>) -> i64 {
-    match v {
-        Some(Value::Number(n)) => n.as_i64().unwrap_or(0),
-        Some(Value::String(s)) => s.parse().unwrap_or(0),
+fn amount<V: JsonRead + ?Sized>(v: Option<&V>) -> i64 {
+    match v.map(JsonRead::view) {
+        Some(JsonRef::Number(n)) => n.as_i64().unwrap_or(0),
+        Some(JsonRef::String(s)) => s.parse().unwrap_or(0),
         _ => 0,
     }
 }
@@ -368,7 +369,7 @@ impl Plan for Office {
         let mut built: Vec<(String, String)> = vec![];
         for n in self.book.open("building_notice") {
             if !self.mapped.contains(n.id.as_str()) {
-                if let Some(at) = data(n).get("at").and_then(Value::as_str) {
+                if let Some(at) = data(n).get("at").and_then(|x| x.as_str()) {
                     built.push((n.id.to_string(), at.to_string()));
                 }
             }
@@ -393,9 +394,9 @@ impl Plan for Office {
         for o in &pic.outcomes {
             let Some(sv) = &o.surveyed else { continue };
             self.pending = (self.pending - 1).max(0);
-            let Some(of) = sv.get("of").and_then(Value::as_str) else { continue };
+            let Some(of) = sv.get("of").and_then(|x| x.as_str()) else { continue };
             let m = self.found.entry(of.to_string()).or_default();
-            if let Some(cells) = sv.get("cells").and_then(Value::as_object) {
+            if let Some(cells) = sv.get("cells").and_then(|x| x.as_object()) {
                 for (cell, n) in cells {
                     m.insert(cell.clone(), n.as_i64().unwrap_or(0));
                 }
@@ -408,7 +409,7 @@ impl Plan for Office {
         let mut steps: Vec<Step<Then>> = vec![];
         // ---- staff: what the adopted budget's line pays for ----
         let year = t.div_euclid(YEAR) + 1;
-        let budget = self.book.open("budget").filter(|b| data(b).get("year").and_then(Value::as_i64) == Some(year)).max_by_key(|b| b.at).cloned();
+        let budget = self.book.open("budget").filter(|b| data(b).get("year").and_then(|x| x.as_i64()) == Some(year)).max_by_key(|b| b.at).cloned();
         let line = budget.as_ref().map_or(0, |b| amount(data(b).get("lines").and_then(|l| l.get(&self.p.staff_line))));
         let workers = self.staff.workers(&self.book, t);
         let annual = self.annual();

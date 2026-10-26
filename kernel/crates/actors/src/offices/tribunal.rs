@@ -14,6 +14,7 @@
 //!   (The bug-hunt finding on a dead sole tenant is the landlord's rule, firms.ts: it no longer applies to the tribunal
 //!   for the dead; the tribunal still hears what is brought to it.)
 
+use oikos_core::Frozen;
 use super::hearing::{hearing_notices, Forms, HearPart, Hearings, HearingParams, Hears, NoticeOpts, Possession};
 use super::{spread, Booked, Noting};
 use crate::common::work::ReportOf;
@@ -169,11 +170,11 @@ impl Booked for MemberPlan {
 
 /// A record or a copy of one a party tendered, as plain JSON (`id`, `record`, `kind`, `speaks_for`, `addressed_to`,
 /// `data`, `holder`, `counterparty`, `about`, `at`).
-fn doc_of(book: &Book, id: &str, tendered: Option<&Value>) -> Option<Value> {
+fn doc_of(book: &Book, id: &str, tendered: Option<&Frozen>) -> Option<Value> {
     if let Some(r) = book.get(id) {
         return serde_json::to_value(r.as_ref()).ok();
     }
-    tendered.filter(|e| e.s("id") == Some(id)).cloned()
+    tendered.filter(|e| e.s("id") == Some(id)).map(Frozen::to_value)
 }
 
 fn names(v: &Value, key: &str) -> Vec<String> {
@@ -228,7 +229,7 @@ impl Plan for MemberPlan {
             .filter(|r| r.speaks_for.as_deref() == Some(me.as_str()))
             .filter_map(|r| data(r).s("application").map(String::from))
             .collect();
-        for n in self.book.all("hearing_notice").filter(|r| r.speaks_for.as_deref() == Some(me.as_str()) && !data(r).get("matter").is_some_and(Value::is_string)) {
+        for n in self.book.all("hearing_notice").filter(|r| r.speaks_for.as_deref() == Some(me.as_str()) && !data(r).get("matter").is_some_and(|x| x.is_string())) {
             let Some(id) = data(n).s("application") else { continue };
             if ordered.contains(id) {
                 self.decided.insert(id.to_string());
@@ -352,8 +353,8 @@ impl Plan for MemberPlan {
                 "charge" => {
                     // A charge (crime): the police's evidence that the respondent took goods; proven, the taker makes good
                     // what they were worth to whom they were taken from.
-                    let ev = ad.get("evidence").cloned().unwrap_or(Value::Null);
-                    if ev.s("found") != Some(against.as_str()) || ad.get("account").is_none_or(Value::is_null) {
+                    let ev = ad.get("evidence").cloned().unwrap_or((Value::Null).into());
+                    if ev.s("found") != Some(against.as_str()) || ad.get("account").is_none_or(|x| x.is_null()) {
                         order("dismissed", "dismissed: the evidence doesn't show the respondent took them.", json!({}), "The evidence doesn't name the respondent: dismissed.".into());
                         continue;
                     }
@@ -507,7 +508,7 @@ impl Plan for RegistrarPlan {
             let rd = data(&r).clone();
             let oid = rd.s("order").unwrap_or("").to_string();
             let o = self.book.get(&oid).cloned();
-            let od = o.as_ref().map(|o| data(o).clone()).unwrap_or(Value::Null);
+            let od = o.as_ref().map(|o| data(o).clone()).unwrap_or((Value::Null).into());
             let is_order = o.as_ref().is_some_and(|o| crate::common::is_kind(o, "tribunal_order"));
             if is_order && od.s("finding") == Some("pay") && od.i("due").is_some_and(|d| t < d) {
                 continue; // (not due yet)
@@ -518,7 +519,7 @@ impl Plan for RegistrarPlan {
             }
             self.done.insert(r.id.to_string());
             let rs = r.speaks_for.unwrap_or_default();
-            if !is_order || od.s("finding") != Some("pay") || od.s("applicant") != Some(rs.as_str()) || od.get("to").is_none_or(Value::is_null) {
+            if !is_order || od.s("finding") != Some("pay") || od.s("applicant") != Some(rs.as_str()) || od.get("to").is_none_or(|x| x.is_null()) {
                 steps.push(decline(&r, &me, "A request to enforce something that isn't an order to pay this creditor: declined.", "Declined: no order to pay you to enforce."));
                 continue;
             }
@@ -539,7 +540,7 @@ impl Plan for RegistrarPlan {
                         to: Some(self.banks.clone()),
                         visible: Some(Visible::Only(seen)),
                         basis: Some(oid.clone()),
-                        data: Some(json!({ "order": oid, "debtor": against, "amount": unpaid, "to": od.get("to"), "claim": od.get("claim").cloned().unwrap_or(json!(oid)) })),
+                        data: Some(json!({ "order": oid, "debtor": against, "amount": unpaid, "to": od.get("to"), "claim": od.get("claim").cloned().unwrap_or((json!(oid)).into()) })),
                         ..Default::default()
                     },
                 )],
@@ -554,7 +555,7 @@ impl Plan for RegistrarPlan {
             let rd = data(&r).clone();
             let oid = rd.s("order").unwrap_or("").to_string();
             let o = self.book.get(&oid).cloned();
-            let od = o.as_ref().map(|o| data(o).clone()).unwrap_or(Value::Null);
+            let od = o.as_ref().map(|o| data(o).clone()).unwrap_or((Value::Null).into());
             let is_order = o.as_ref().is_some_and(|o| crate::common::is_kind(o, "tribunal_order"));
             if is_order && od.s("finding") == Some("possession") && od.i("due").is_some_and(|d| t < d) {
                 continue;
@@ -573,7 +574,7 @@ impl Plan for RegistrarPlan {
             let not_before = (t.div_euclid(DAY) + 1 + self.eviction_notice_days) * DAY;
             let until = not_before.max(t + self.warrant_days * DAY);
             let (tenant, landlord) = (od.s("against").unwrap_or("").to_string(), od.s("applicant").unwrap_or("").to_string());
-            let household = od.get("household").cloned().unwrap_or_else(|| json!([tenant]));
+            let household = od.get("household").cloned().unwrap_or_else(|| json!([tenant]).into());
             steps.push(because(
                 format!("An order for possession whose date has passed, and the tenant has not left: a warrant to {}, to be carried out from {} to {}.", self.enforcer, when(not_before), when(until)),
                 vec![say(

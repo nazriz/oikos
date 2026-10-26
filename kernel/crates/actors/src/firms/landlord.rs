@@ -29,6 +29,8 @@
 //! - The first wake is a day of the week drawn from the participant's id (a kind cannot draw before it exists); the day
 //!   and hour of the rent book are drawn at the first wake from `cx.chance`.
 
+use oikos_core::frozen::JsonRead;
+use oikos_core::Frozen;
 use super::decimal::{fmt_dec, round_div, scaled};
 use super::orgwants::{Given, Org, Spread, WantNote, Wanting};
 use super::practice::{PracticeOf, PracticeParams};
@@ -75,7 +77,7 @@ pub struct PossessionLaw {
 }
 
 pub fn possession_law(book: &Book) -> Option<PossessionLaw> {
-    let l = latest_law(book, |r| data(r).get("tenancy").and_then(Value::as_str) == Some("possession"))?;
+    let l = latest_law(book, |r| data(r).get("tenancy").and_then(|x| x.as_str()) == Some("possession"))?;
     let d = data(l);
     let n = |k: &str| d.get(k).and_then(|v| scaled(v, 1)).filter(|x| *x >= 0).unwrap_or(0);
     Some(PossessionLaw {
@@ -86,7 +88,7 @@ pub fn possession_law(book: &Book) -> Option<PossessionLaw> {
         plan_months: n("plan_months"),
         warrant_days: n("warrant_days"),
         eviction_notice_days: n("eviction_notice_days"),
-        enforced_by: d.get("enforced_by").and_then(Value::as_str).map(String::from),
+        enforced_by: d.get("enforced_by").and_then(|x| x.as_str()).map(String::from),
     })
 }
 
@@ -246,7 +248,7 @@ struct Params {
 impl Params {
     fn read(ctx: &Ctx) -> Result<Params, String> {
         let review = oikos_rules::rent::Review::default();
-        let register_lots = ctx.params.get("register").and_then(|r| r.get("lots")).and_then(Value::as_str).map(String::from);
+        let register_lots = ctx.params.get("register").and_then(|r| r.get("lots")).and_then(|x| x.as_str()).map(String::from);
         Ok(Params {
             markup_bps: ctx.param("markup_bps", 500)?,
             cut_bps: ctx.param("cut_bps", 500)?,
@@ -296,7 +298,7 @@ impl Params {
     fn base_rent_for(&self, kind: &str, bedrooms: Option<i64>) -> Option<i64> {
         match self.base_rent.get(kind)? {
             Value::Number(n) => n.as_i64(),
-            Value::Array(list) => list.iter().find(|b| b.get("bedrooms").and_then(Value::as_i64) == bedrooms).and_then(|b| b.get("rent").and_then(Value::as_i64)),
+            Value::Array(list) => list.iter().find(|b| b.get("bedrooms").and_then(|x| x.as_i64()) == bedrooms).and_then(|b| b.get("rent").and_then(|x| x.as_i64())),
             _ => None,
         }
     }
@@ -306,7 +308,7 @@ impl Params {
 /// defaults. Absent dial: none.
 pub(crate) fn practice_params(dials: &Value) -> Option<PracticeParams> {
     let c = dials.get("culture").filter(|c| !c.is_null() && c.as_bool() != Some(false))?;
-    let n = |k: &str, d: i64| c.get(k).and_then(Value::as_i64).unwrap_or(d);
+    let n = |k: &str, d: i64| c.get(k).and_then(|x| x.as_i64()).unwrap_or(d);
     Some(PracticeParams { window_days: n("practice_window_days", 1_825), min_occasions: n("practice_min_occasions", 5), inertia_bps: n("practice_inertia_bps", 5_000), opening: n("practice_opening", 100) })
 }
 
@@ -733,7 +735,7 @@ impl Office {
             .book
             .of_type("claim")
             .filter_map(|r| match &r.body {
-                RecordBody::Claim { holder, about, .. } if *holder == self.me && about.get("kind").and_then(Value::as_str) == Some("ownership") => about.get("object").and_then(Value::as_str).map(String::from),
+                RecordBody::Claim { holder, about, .. } if *holder == self.me && about.get("kind").and_then(|x| x.as_str()) == Some("ownership") => about.get("object").and_then(|x| x.as_str()).map(String::from),
                 _ => None,
             })
             .collect();
@@ -760,7 +762,7 @@ fn tenant_of<'a>(a: &'a Record, me: &str) -> &'a str {
     crate::papers::agreements::parties_of(a).iter().find(|x| *x != me).map_or("", String::as_str)
 }
 
-fn offer_of(r: &Record) -> Option<&Value> {
+fn offer_of(r: &Record) -> Option<&Frozen> {
     match &r.body {
         RecordBody::Statement { offer, .. } => offer.as_ref(),
         _ => None,
@@ -811,7 +813,7 @@ impl Env {
 }
 
 /// An amount written in a paper (a number, or a decimal string of the smallest unit).
-fn whole(v: Option<&Value>) -> i64 {
+fn whole<V: JsonRead + ?Sized>(v: Option<&V>) -> i64 {
     v.and_then(crate::papers::lenient::whole).unwrap_or(0)
 }
 
@@ -964,7 +966,7 @@ impl Plan for Office {
         for site in &sites {
             let Some(st) = site.structure.as_ref().filter(|s| s.complete && seen_structures.insert(s.structure)) else { continue };
             for sp in st.spaces.iter().filter(|sp| sp.kind == "dwelling") {
-                owned.push(Owned { structure: st.structure.to_string(), type_: st.structure_type.to_string(), space: sp.space.to_string(), bedrooms: sp.attrs.as_ref().and_then(|a| a.get("bedrooms")).and_then(Value::as_i64), cell: None });
+                owned.push(Owned { structure: st.structure.to_string(), type_: st.structure_type.to_string(), space: sp.space.to_string(), bedrooms: sp.attrs.as_ref().and_then(|a| a.get("bedrooms")).and_then(|x| x.as_i64()), cell: None });
             }
             if self.p.commercial.is_some() {
                 for sp in st.spaces.iter().filter(|sp| sp.kind == "workplace") {
@@ -1174,7 +1176,7 @@ impl Office {
             let mut eligible: Vec<&Arc<Record>> = applicants
                 .iter()
                 .filter(|a| {
-                    let people = data(a).get("household").and_then(|h| h.get("people")).and_then(Value::as_i64).unwrap_or(1);
+                    let people = data(a).get("household").and_then(|h| h.get("people")).and_then(|x| x.as_i64()).unwrap_or(1);
                     self.p.max_people_per_bedroom == 0 || beds.is_none() || people <= (beds.unwrap() * self.p.max_people_per_bedroom).max(1)
                 })
                 .collect();
@@ -1185,7 +1187,7 @@ impl Office {
             }
             let pick = eligible[cx.rng(&format!("pick-{listing_id}")).below(eligible.len() as u64) as usize].clone();
             let tenant = pick.speaks_for.unwrap_or_default();
-            let household: Vec<String> = data(&pick).get("members").and_then(Value::as_array).map(|m| m.iter().filter_map(Value::as_str).filter(|m| *m != tenant).map(String::from).collect()).unwrap_or_default();
+            let household: Vec<String> = data(&pick).get("members").and_then(|x| x.as_array()).map(|m| m.iter().filter_map(|x| x.as_str()).filter(|m| *m != tenant).map(String::from).collect()).unwrap_or_default();
             let months = self.term_months(cx, &format!("term-{listing_id}"));
             let rent = whole(d.get("rent"));
             let limit = if self.p.max_people_per_bedroom == 0 { "any number of".to_string() } else { self.p.max_people_per_bedroom.to_string() };
@@ -1455,7 +1457,7 @@ impl Office {
                     }
                 } else if let (Some(owed), false) = (case.claimed, case.applied) {
                     // (The debt on the record: brought before the tribunal, where the law sends such a claim and the town has one.)
-                    let claim = self.book.of_type("claim").find(|r| matches!(&r.body, RecordBody::Claim { holder, counterparty, about, .. } if *holder == me && counterparty.as_deref() == Some(tenant.as_str()) && about.get("kind").and_then(Value::as_str) == Some("debt")) && crate::common::cites(r, &a.id)).cloned();
+                    let claim = self.book.of_type("claim").find(|r| matches!(&r.body, RecordBody::Claim { holder, counterparty, about, .. } if *holder == me && counterparty.as_deref() == Some(tenant.as_str()) && about.get("kind").and_then(|x| x.as_str()) == Some("debt")) && crate::common::cites(r, &a.id)).cloned();
                     match (claim, c.tribunal.clone().filter(|_| law.as_ref().is_some_and(|l| l.heard_by.is_some()))) {
                         (Some(claim), Some(tribunal)) => {
                             case.applied = true;
@@ -1806,7 +1808,7 @@ impl Office {
 /// when its rent begins.
 fn first_due_of(a: &Record, begins: i64) -> i64 {
     let extra = match &a.body {
-        RecordBody::Agreement { terms } => terms.attrs.as_ref().and_then(|x| x.get("first_due")).and_then(Value::as_i64).filter(|d| *d > 0).unwrap_or(0),
+        RecordBody::Agreement { terms } => terms.attrs.as_ref().and_then(|x| x.get("first_due")).and_then(|x| x.as_i64()).filter(|d| *d > 0).unwrap_or(0),
         _ => 0,
     };
     begins + extra
@@ -1955,23 +1957,23 @@ impl Office {
                     ));
                 } else if held.as_ref().is_some_and(|h| h.way.as_deref() == Some("ask") && t - h.tried_at.unwrap_or(t) >= 30 * DAY) && character.keep >= character.be_rid {
                     let venue = self.book.hearings().find(|h| {
-                        offer_of(h).and_then(|o| o.get("hears")).and_then(Value::as_array).is_some_and(|x| x.iter().any(|x| x.get("about").and_then(Value::as_str) == Some("arrears")))
+                        offer_of(h).and_then(|o| o.get("hears")).and_then(|x| x.as_array()).is_some_and(|x| x.iter().any(|x| x.get("about").and_then(|x| x.as_str()) == Some("arrears")))
                             && h.speaks_for.as_deref().unwrap_or(&h.author) != me.as_str()
                     });
                     if let Some(venue) = venue.cloned() {
-                        let entry = offer_of(&venue).and_then(|o| o.get("hears")?.as_array()?.iter().find(|x| x.get("about").and_then(Value::as_str) == Some("arrears"))).cloned();
+                        let entry = offer_of(&venue).and_then(|o| o.get("hears")?.as_array()?.iter().find(|x| x.get("about").and_then(|x| x.as_str()) == Some("arrears"))).cloned();
                         let fee = offer_of(&venue)
                             .and_then(|o| o.get("terms")?.get("commitments")?.as_array())
                             .into_iter()
                             .flatten()
-                            .filter(|c| c.get("who").and_then(Value::as_str) == Some("taker"))
+                            .filter(|c| c.get("who").and_then(|x| x.as_str()) == Some("taker"))
                             .filter_map(|c| c.get("does")?.get("outcome")?.get("money").cloned())
                             .find(|m| m.get("to").is_some());
                         let fee_amount = fee.as_ref().map(|f| whole(f.get("amount")));
                         if entry.is_some() && fee_amount.map_or(true, |f| e.balance >= f) {
                             let v = venue.speaks_for.unwrap_or_else(|| venue.author.clone().into());
                             self.org().wants.tried(&a.id, &format!("desk:{v}"), t);
-                            let form = entry.as_ref().and_then(|x| x.get("form")).and_then(Value::as_str).unwrap_or("application").to_string();
+                            let form = entry.as_ref().and_then(|x| x.get("form")).and_then(|x| x.as_str()).unwrap_or("application").to_string();
                             let mut calls = vec![say(
                                 &form,
                                 &format!("Application: {tenant} owes us {} in rent under {}.", e.usd(behind), a.id),
@@ -1984,7 +1986,7 @@ impl Office {
                                 },
                             )];
                             if let Some(f) = &fee {
-                                calls.push(pay(f.get("to").and_then(Value::as_str).unwrap_or(""), fee_amount.unwrap_or(0), Pay { from: Some(e.account.clone()), for_: Some("Application fee.".into()), ..Default::default() }, cx));
+                                calls.push(pay(f.get("to").and_then(|x| x.as_str()).unwrap_or(""), fee_amount.unwrap_or(0), Pay { from: Some(e.account.clone()), for_: Some("Application fee.".into()), ..Default::default() }, cx));
                             }
                             steps.push(step(format!("{tenant} is still {} behind a month after we asked: applying to {v} for an order to pay.", e.usd(behind)), calls));
                         }
@@ -2573,7 +2575,7 @@ impl Office {
         // What it charges now: its standing list, or its letter to us where we hold no list as late as the letter.
         let builder = self.p.builder.clone();
         let told = self.dev.as_ref().and_then(|d| d.told);
-        let list_since = |at: i64| { self.book.open("price_list").any(|r| (r.speaks_for.as_deref() == builder.as_deref() || Some(&r.author) == builder.as_ref()) && r.at >= at)};
+        let list_since = |at: i64| { self.book.open("price_list").any(|r| (r.speaks_for.as_deref() == builder.as_deref() || Some(r.author.as_str()) == builder.as_deref()) && r.at >= at)};
         let price_now = match (told, price) {
             (Some((p, at)), _) if !list_since(at) => Some(p),
             (_, p) => p,
@@ -2642,7 +2644,7 @@ impl Office {
             }
             steps.push(step(
                 "Paying an invoice addressed to us.",
-                vec![pay(money.get("to").and_then(Value::as_str).unwrap_or(""), amount, Pay { from: Some(e.account.clone()), for_: Some("Paying an invoice.".into()), settles: Some(inv.id.to_string()), ..Default::default() }, cx)],
+                vec![pay(money.get("to").and_then(|x| x.as_str()).unwrap_or(""), amount, Pay { from: Some(e.account.clone()), for_: Some("Paying an invoice.".into()), settles: Some(inv.id.to_string()), ..Default::default() }, cx)],
             ));
         }
     }
@@ -2657,9 +2659,9 @@ impl Office {
             }
             // Rates are paid when there's the money for them; a fine or rates we don't mean to pay are let be.
             if let RecordBody::Claim { position, counterparty, about, .. } = &r.body {
-                let kind = about.get("kind").and_then(Value::as_str).unwrap_or("");
+                let kind = about.get("kind").and_then(|x| x.as_str()).unwrap_or("");
                 if format!("{position:?}").to_lowercase() == "right" && counterparty.as_deref() == Some(me.as_str()) && ["fine", "tax_penalty", "rates", "rates_interest"].contains(&kind) {
-                    let to = about.get("account").and_then(Value::as_str).map(String::from).or_else(|| self.p.city_account.clone());
+                    let to = about.get("account").and_then(|x| x.as_str()).map(String::from).or_else(|| self.p.city_account.clone());
                     let amount = whole(about.get("amount"));
                     if !self.obeys(cx, &format!("fine-{}", r.id)) || to.is_none() {
                         self.answered.insert(r.id.to_string());

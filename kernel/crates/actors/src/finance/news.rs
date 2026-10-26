@@ -89,7 +89,7 @@ pub fn tone_of(kind: &str, r: &Record, change_bps: i64) -> i64 {
             _ => 0,
         },
         "environment_report" => {
-            let changes: Vec<i64> = data(r).get("species").and_then(Value::as_object).map(|o| o.values().map(|s| s.i("change_bps").unwrap_or(0)).collect()).unwrap_or_default();
+            let changes: Vec<i64> = data(r).get("species").and_then(|x| x.as_object()).map(|o| o.values().map(|s| s.i("change_bps").unwrap_or(0)).collect()).unwrap_or_default();
             let (fell, rose) = (changes.iter().any(|c| *c <= -change_bps), changes.iter().any(|c| *c >= change_bps));
             match (fell, rose) {
                 (true, false) => -1,

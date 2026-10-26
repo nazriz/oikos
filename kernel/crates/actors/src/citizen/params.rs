@@ -248,7 +248,7 @@ impl Params {
     pub fn of(params: &crate::Params) -> Result<Given, String> {
         // (A null is "the module's default", as TS's `params` read it: dropped before reading.)
         let given = |of: &dyn Fn(&str) -> bool| -> serde_json::Map<String, Value> {
-            params.iter().filter(|(k, v)| !v.is_null() && of(k.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect()
+            params.iter().filter(|(k, v)| !v.is_null() && of(k.as_str())).map(|(k, v)| (k.to_string(), v.to_value())).collect()
         };
         let err = |e: serde_json::Error| format!("citizen.default's parameters: {e}");
         // (Keyed by the text of what it is read from: the same text, the same reading.)

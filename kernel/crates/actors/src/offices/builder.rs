@@ -32,6 +32,7 @@
 //!   arise here; debts recorded against it (a fine, rates, a worker's claim for wages) are paid oldest first before
 //!   any other spending in the wake.
 
+use oikos_core::Frozen;
 use crate::firms::bargaining::{Bargaining, Takings};
 use crate::firms::staffing::{Staffing, StaffingOpts, Want};
 use crate::firms::winding::{creditor_account, WindingParams, WindingUp};
@@ -286,7 +287,7 @@ fn ceil_div(a: i128, b: i128) -> i128 {
 fn round_div(a: i64, b: i64) -> i64 {
     (2 * a + b).div_euclid(2 * b)
 }
-fn d(r: &Record) -> &Value {
+fn d(r: &Record) -> &Frozen {
     data(r)
 }
 
@@ -557,7 +558,7 @@ impl Plan for Firm {
         let key = serde_json::to_string(&(&prices, &demolition)).unwrap_or_default();
         let old: Vec<Arc<Record>> = self.book.open("price_list").filter(|r| self.ours(r, &me)).cloned().collect();
         let on_file = old.iter().max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&b.id, &a.id))).map(|r| {
-            let m = |k: &str| -> BTreeMap<String, i64> { d(r).get(k).and_then(Value::as_object).map(|o| o.iter().filter_map(|(k, v)| v.as_i64().map(|n| (k.clone(), n))).collect()).unwrap_or_default() };
+            let m = |k: &str| -> BTreeMap<String, i64> { d(r).get(k).and_then(|x| x.as_object()).map(|o| o.iter().filter_map(|(k, v)| v.as_i64().map(|n| (k.to_string(), n))).collect()).unwrap_or_default() };
             serde_json::to_string(&(m("prices"), m("demolition"))).unwrap_or_default()
         });
         if !prices.is_empty() && on_file.as_deref() != Some(key.as_str()) && self.publishing.as_deref() != Some(key.as_str()) {
@@ -636,7 +637,7 @@ impl Plan for Firm {
             }
             // Offered less than our price: declined, saying what we charge. A price published in the last `quote_valid_days` is honoured.
             if let (Some(agreed), Some(ours), Some(ty)) = (agreed, ours, &ty) {
-                let least = self.book.all("price_list").filter(|l| self.ours(l, &me) && t - l.at <= self.p.quote_valid_days * DAY).filter_map(|l| d(l).get("prices").and_then(|p| p.get(ty)).and_then(Value::as_i64)).fold(ours, i64::min);
+                let least = self.book.all("price_list").filter(|l| self.ours(l, &me) && t - l.at <= self.p.quote_valid_days * DAY).filter_map(|l| d(l).get("prices").and_then(|p| p.get(ty)).and_then(|x| x.as_i64())).fold(ours, i64::min);
                 if agreed < least {
                     let w = &cx.ctx.world;
                     self.in_flight.insert(r.id.to_string());

@@ -9,6 +9,7 @@
 //! alone (our own listing's buyer; a loan for "their home, "), not from the housing part's state; a lead is a reply that
 //! cites no record we hold and the mind did not take (TS also asked whether we had asked around: that is the mind's).
 
+use oikos_core::Frozen;
 use super::household::hear;
 use super::mind::{Event, Heard, Outcome, Way};
 use super::params::Params;
@@ -139,12 +140,12 @@ fn income_tax_law(book: &crate::common::Book) -> Option<Vec<Value>> {
     let mut laws: Vec<&Record> = book
         .open("law")
         .map(|r| r.as_ref())
-        .filter(|r| data(r).s("tax") == Some("income") && (data(r).get("brackets").is_some_and(Value::is_array) || data(r).get("charges").is_some_and(Value::is_array)))
+        .filter(|r| data(r).s("tax") == Some("income") && (data(r).get("brackets").is_some_and(|x| x.is_array()) || data(r).get("charges").is_some_and(|x| x.is_array())))
         .collect();
     laws.sort_by(|a, b| b.at.cmp(&a.at).then_with(|| b.id.cmp(&a.id)));
     let d = data(laws.first()?);
-    if let Some(c) = d.get("charges").and_then(Value::as_array) {
-        return Some(c.clone());
+    if let Some(c) = d.get("charges").and_then(|x| x.as_array()) {
+        return Some(c.iter().map(Frozen::to_value).collect());
     }
     let brackets = d.get("brackets")?.clone();
     let mut charges = vec![json!({ "id": "income-tax", "schedule": brackets })];
@@ -212,9 +213,9 @@ fn charges_on(charges: &[Value], pay: i64) -> Vec<i64> {
             if let Some(u) = b.i("up_to") {
                 base = base.min(u);
             }
-            for d in b.get("less").and_then(Value::as_array).into_iter().flatten() {
-                if let Some(cs) = d.get("charges").and_then(Value::as_array) {
-                    for o in cs.iter().filter_map(Value::as_str) {
+            for d in b.get("less").and_then(|x| x.as_array()).into_iter().flatten() {
+                if let Some(cs) = d.get("charges").and_then(|x| x.as_array()) {
+                    for o in cs.iter().filter_map(|x| x.as_str()) {
                         base -= of(o, charges, pay, done, doing);
                     }
                 } else if let Some(s) = d.i("share_bps") {
@@ -224,8 +225,8 @@ fn charges_on(charges: &[Value], pay: i64) -> Vec<i64> {
                 }
             }
             base = base.max(0);
-            amount = scheduled(c.get("schedule").and_then(Value::as_array).map_or(&[], |v| v.as_slice()), base);
-            for r in c.get("reliefs").and_then(Value::as_array).into_iter().flatten() {
+            amount = scheduled(c.get("schedule").and_then(|x| x.as_array()).map_or(&[], |v| v.as_slice()), base);
+            for r in c.get("reliefs").and_then(|x| x.as_array()).into_iter().flatten() {
                 amount = match r.i("none_due_up_to") {
                     Some(n) => {
                         if base <= n {
@@ -408,7 +409,7 @@ impl Person {
             if (k == "hours_notice" || k == "hours_restored") && d.s("employer") == Some(job.employer.as_str()) && d.s("agreement") == Some(job.agreement.as_str()) {
                 if let (Some(wage), Some(from)) = (d.i("wage"), d.i("from")) {
                     let minutes = d.i("minutes_week").unwrap_or(0);
-                    if k == "hours_notice" && d.get("consent") == Some(&Value::Bool(true)) {
+                    if k == "hours_notice" && d.get("consent").and_then(|x| x.as_bool()) == Some(true) {
                         // (Hours to a tenth, as TS's Math.round(minutes / 6) / 10: half away from zero.)
                         self.absorbed.hours_asked.push(HoursAsked {
                             notice: r.id.to_string(),
@@ -636,7 +637,7 @@ impl Person {
             let share_order = self.s.share.as_ref().and_then(|s| s.1.clone());
             let ours: Vec<String> = home.and_then(|h| h.order.clone()).into_iter().chain(share_order.clone()).chain(home.into_iter().flat_map(|h| h.retiring.iter().map(|x| x.0.clone()))).collect();
             if let Some(re) = m.re.as_ref().filter(|re| ours.contains(&re.to_string()) && PAYMENT_FAILED::is(&m.text).is_some()) {
-                let money = self.book.get(re).map(|r| data(r)["outcome"]["money"].clone()).unwrap_or(Value::Null);
+                let money = self.book.get(re).map(|r| data(r)["outcome"]["money"].clone()).unwrap_or((Value::Null).into());
                 if let (Some(to), Some(amount)) = (money.s("to"), money.i("amount")) {
                     let what = if share_order.as_deref() == Some(re.as_str()) { "our share of the rent" } else { "the rent" };
                     self.s.missed.push(super::person::Missed { instruction: re.to_string(), to: to.into(), amount, what: what.into() });
@@ -755,7 +756,7 @@ fn refusal_code(c: oikos_contracts::events::RefusalCode) -> String {
 fn household_of(book: &crate::common::Book, person: &str) -> Option<(String, oikos_rules::household::HouseholdData)> {
     let mut best: Option<(&Record, oikos_rules::household::HouseholdData)> = None;
     for r in book.open("household") {
-        let Ok(h) = serde_json::from_value::<oikos_rules::household::HouseholdData>(data(r).clone()) else { continue };
+        let Ok(h) = serde_json::from_value::<oikos_rules::household::HouseholdData>(data(r).to_value()) else { continue };
         if !h.members.iter().any(|m| m.person == person) {
             continue;
         }

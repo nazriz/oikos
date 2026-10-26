@@ -104,7 +104,7 @@ pub struct Matter {
 
 impl Matter {
     pub fn of(r: &Record) -> Matter {
-        serde_json::from_value(data(r).clone()).unwrap_or_default()
+        serde_json::from_value(data(r).to_value()).unwrap_or_default()
     }
     fn label(&self) -> String {
         self.matter.replace('_', " ")
@@ -414,7 +414,7 @@ impl Respondent {
             for dr in decisions {
                 self.handled.insert(dr.id.to_string());
                 let x = data(&dr);
-                let binding = x.get("binding") != Some(&Value::Bool(false));
+                let binding = x.get("binding").and_then(|x| x.as_bool()) != Some(false);
                 let finding = x.s("finding").unwrap_or_default();
                 let matter = x.s("matter").unwrap_or_default();
                 let structure = x.s("structure").map(String::from);
@@ -526,13 +526,9 @@ pub fn particulars_of(g: &Particulars, t: i64, world: &WorldInfo) -> String {
 
 /// Whether an application says what it is about: it gives its particulars, or names a paper, a place, a sum, what is
 /// sought, or evidence.
-pub fn has_particulars(d: &Value) -> bool {
-    d.s("particulars").is_some_and(|p| !p.trim().is_empty())
-        || d.get("about").is_some_and(|v| !v.is_null())
-        || d.get("structure").is_some_and(|v| !v.is_null())
-        || d.get("seeks").is_some_and(|v| !v.is_null())
-        || d.i("amount").is_some_and(|a| a > 0)
-        || d.get("evidence").is_some_and(|v| !v.is_null())
+pub fn has_particulars<V: crate::common::Fields + oikos_core::frozen::JsonRead + ?Sized>(d: &V) -> bool {
+    let set = |k: &str| d.view().get(k).is_some_and(|v| !matches!(v, oikos_core::frozen::JsonRef::Null));
+    d.s("particulars").is_some_and(|p| !p.trim().is_empty()) || set("about") || set("structure") || set("seeks") || d.i("amount").is_some_and(|a| a > 0) || set("evidence")
 }
 
 /// Whether a response on file answers an application (the latest from the respondent).
@@ -549,7 +545,7 @@ pub fn days(seconds: i64) -> i64 {
 trait AsI64 {
     fn i64(&self) -> Option<i64>;
 }
-impl AsI64 for Value {
+impl AsI64 for oikos_core::Frozen {
     fn i64(&self) -> Option<i64> {
         crate::papers::lenient::whole(self)
     }

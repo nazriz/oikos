@@ -158,7 +158,7 @@ impl PaymentRule {
 pub fn support_law(book: &Book) -> Option<(String, Vec<PaymentRule>)> {
     let l = book
         .open("law")
-        .filter(|r| data(r).get("payments").is_some_and(Value::is_array))
+        .filter(|r| data(r).get("payments").is_some_and(|x| x.is_array()))
         .fold(None::<&Arc<Record>>, |a, b| match a {
             // (Newest first; of two made together, the later filed.)
             Some(a) if b.at < a.at || (b.at == a.at && filed_before(&b.id, &a.id).is_le()) => Some(a),
@@ -166,9 +166,9 @@ pub fn support_law(book: &Book) -> Option<(String, Vec<PaymentRule>)> {
         })?;
     let payments = data(l)
         .get("payments")
-        .and_then(Value::as_array)?
+        .and_then(|x| x.as_array())?
         .iter()
-        .filter_map(|x| serde_json::from_value::<PaymentRule>(x.clone()).ok())
+        .filter_map(|x| serde_json::from_value::<PaymentRule>(x.to_value()).ok())
         .map(|mut x| {
             if x.payer.is_none() {
                 x.payer=l.speaks_for.map(|x| x.to_string());
@@ -251,17 +251,17 @@ pub struct IncomeTaxLaw {
 pub fn income_tax_law(book: &Book) -> Option<IncomeTaxLaw> {
     let l = book
         .open("law")
-        .filter(|r| data(r).s("tax") == Some("income") && (data(r).get("brackets").is_some_and(Value::is_array) || data(r).get("charges").is_some_and(Value::is_array)))
+        .filter(|r| data(r).s("tax") == Some("income") && (data(r).get("brackets").is_some_and(|x| x.is_array()) || data(r).get("charges").is_some_and(|x| x.is_array())))
         .fold(None::<&Arc<Record>>, |a, b| match a {
             Some(a) if b.at < a.at || (b.at == a.at && filed_before(&b.id, &a.id).is_le()) => Some(a),
             _ => Some(b),
         })?;
     let d = data(l);
-    if let Some(cs) = d.get("charges").and_then(Value::as_array) {
-        let charges = cs.iter().map(|c| serde_json::from_value::<Charge>(c.clone()).ok()).collect::<Option<Vec<_>>>()?;
+    if let Some(cs) = d.get("charges").and_then(|x| x.as_array()) {
+        let charges = cs.iter().map(|c| serde_json::from_value::<Charge>(c.to_value()).ok()).collect::<Option<Vec<_>>>()?;
         return Some(IncomeTaxLaw { charges });
     }
-    let brackets: Vec<Band> = serde_json::from_value(d.get("brackets")?.clone()).ok()?;
+    let brackets: Vec<Band> = serde_json::from_value(d.get("brackets")?.to_value()).ok()?;
     let mut charges = vec![Charge { id: "income-tax".into(), base: None, schedule: brackets, reliefs: vec![] }];
     let levy = d.i("levy_bps").unwrap_or(0);
     if levy > 0 {
@@ -425,7 +425,7 @@ pub fn decision_law(book: &Book, kind: &str, payment: Option<&str>) -> Option<De
     let mut best: Option<DecisionLaw> = None;
     let mut best_at = -1i64;
     for l in book.open("law") {
-        let Some(list) = data(l).get("decisions").and_then(Value::as_array) else { continue };
+        let Some(list) = data(l).get("decisions").and_then(|x| x.as_array()) else { continue };
         for d in list {
             // (Read in place: the same as reading a copy of it.)
             let Ok(d) = DecisionLaw::deserialize(d) else { continue };
@@ -534,7 +534,7 @@ impl Waits {
             if !addressed_to(r).iter().any(|x| x == me) {
                 continue;
             }
-            let Some(staff) = data(r).get("staff").and_then(Value::as_array) else { continue };
+            let Some(staff) = data(r).get("staff").and_then(|x| x.as_array()) else { continue };
             for w in staff.iter().filter_map(|l| l.s("worker")) {
                 match e.reported.get_mut(w) {
                     Some(b) if r.at <= b.0 => {}
@@ -578,7 +578,7 @@ impl Waits {
             if !addressed_to(r).iter().any(|x| x == me) {
                 continue;
             }
-            let Some(staff) = data(r).get("staff").and_then(Value::as_array) else { continue };
+            let Some(staff) = data(r).get("staff").and_then(|x| x.as_array()) else { continue };
             if !staff.iter().any(|l| l.s("worker") == Some(who)) {
                 continue;
             }

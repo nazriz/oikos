@@ -13,6 +13,7 @@
 //! `Math.round` was used on a non-negative value; ties broken by id; a record's place by `filed_before`; dates by
 //! `rules::calendar` where the world has one.
 
+use oikos_core::Frozen;
 use super::mind::{self, Born, Event, Heard, Housed, Life, Mind, Outcome, Treated};
 use super::params::Params;
 use crate::common::{laws::noted, money::OwnAccount, Book, DAY, MONTH};
@@ -332,7 +333,7 @@ impl Person {
         let mut cx = Cx::new(0, ctx, &mut d, ctx.world.seed, vec![]);
         let stop_age = p.stop_age(cx.rng("stops-work").below(10_000) as i64);
         let life = Life { adult: true, in_labour_force: p.in_labour_force, essentials: p.essentials, ..Default::default() };
-        let m = mind::make(&mut cx, &Born { life: &life, own_values: ctx.params.get("own_values").filter(|v| !v.is_null()), parents: vec![] })?;
+        let m = mind::make(&mut cx, &Born { life: &life, own_values: ctx.params.get("own_values").filter(|v| !v.is_null()).map(Frozen::to_value).as_ref(), parents: vec![] })?;
         let s = State {
             stop_age,
             own_work: p.own_work.clone(),
@@ -1005,7 +1006,7 @@ fn ends_by_our_notice(r: &oikos_sight::Record, me: &str) -> bool {
     match &r.body {
         oikos_sight::RecordBody::Agreement { terms, .. } => {
             let t = serde_json::to_value(terms).unwrap_or(Value::Null);
-            t.get("termination").and_then(Value::as_array).is_some_and(|a| a.iter().any(|x| x.get("party").and_then(Value::as_str) == Some(me)))
+            t.get("termination").and_then(|x| x.as_array()).is_some_and(|a| a.iter().any(|x| x.get("party").and_then(|x| x.as_str()) == Some(me)))
         }
         _ => false,
     }

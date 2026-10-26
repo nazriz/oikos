@@ -363,7 +363,7 @@ impl WaterWorks {
                     if let Some(o) = d.s("owner") {
                         roll.owner.insert(lot.to_string(), o.to_string());
                     }
-                    for b in d.get("buildings").and_then(Value::as_array).into_iter().flatten() {
+                    for b in d.get("buildings").and_then(|x| x.as_array()).into_iter().flatten() {
                         if b.get("dwellings").is_some_and(crate::common::truthy) {
                             if let Some(s) = b.s("structure") {
                                 add(&mut roll, lot, s);
@@ -398,7 +398,7 @@ impl WaterWorks {
         let mut read = self.readings.clone();
         let mut none = BTreeSet::new();
         for r in self.book.open("meter_round").filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str())) {
-            for x in data(r).get("read").and_then(Value::as_array).into_iter().flatten() {
+            for x in data(r).get("read").and_then(|x| x.as_array()).into_iter().flatten() {
                 let key = x.s("connection").or_else(|| x.s("structure"));
                 if let (Some(s), Some(l), Some(at)) = (key, x.i("litres"), x.i("at")) {
                     if read.get(s).is_none_or(|(_, a)| *a <= at) {

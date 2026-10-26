@@ -153,12 +153,12 @@ impl CitizenMind {
             // want met or given up. Until 2026-10-18 the want outlived its grievance: with nothing left to answer it,
             // it was withdrawn again and again, each withdrawal an occasion to found something (port step 3).
             Event::Other { what, about: Some(about), facts } if what == "friction_ended" => {
-                let s = |k: &str| facts.get(k).and_then(Json::as_str).unwrap_or_default().to_string();
+                let s = |k: &str| facts.get(k).and_then(|x| x.as_str()).unwrap_or_default().to_string();
                 let (matter, how) = (s("matter"), s("how"));
-                let days = facts.get("days").and_then(Json::as_i64).unwrap_or(0);
+                let days = facts.get("days").and_then(|x| x.as_i64()).unwrap_or(0);
                 self.s.inner.note(inner::Remembered { t, what: "friction_ended".into(), about: Some(matter.clone()), size: days.clamp(0, 10_000), by: Some(s("by")) });
                 if let Some(w) = self.s.wants.get(&matter, Some(&about)).cloned() {
-                    match facts.get("met").and_then(Json::as_str) {
+                    match facts.get("met").and_then(|x| x.as_str()) {
                         Some("met") => self.s.wants.met(&w, t, Some(&how)),
                         Some("good") => self.want_met(cx, life, &w, &how, t),
                         _ => self.s.wants.give_up(&w, t, Some(&how)),
@@ -441,7 +441,7 @@ impl CitizenMind {
                 let items: Vec<_> = book.open("news").cloned().collect();
                 for r in items {
                     let RecordBody::Statement { data, .. } = &r.body else { continue };
-                    let kind = data.as_ref().and_then(|d| d.get("kind")).and_then(Json::as_str).unwrap_or_default();
+                    let kind = data.as_ref().and_then(|d| d.get("kind")).and_then(|x| x.as_str()).unwrap_or_default();
                     let Some((ek, weight)) = townmemory::paper_weight(kind) else { continue };
                     if r.speaks_for.as_deref() != Some(paper.as_str()) || self.s.read_news.contains(r.id.as_str()) {
                         continue;
@@ -458,12 +458,12 @@ impl CitizenMind {
             let items: Vec<_> = book.open("news").cloned().collect();
             for r in items {
                 let RecordBody::Statement { data, .. } = &r.body else { continue };
-                let d = data.clone().unwrap_or(Json::Null);
-                if self.s.read_items.contains(r.id.as_str()) || r.speaks_for.as_deref() != Some(paper.as_str()) || d.get("about_office") != Some(&Json::Bool(true)) {
+                let d = data.clone().unwrap_or((Json::Null).into());
+                if self.s.read_items.contains(r.id.as_str()) || r.speaks_for.as_deref() != Some(paper.as_str()) || d.get("about_office").and_then(|x| x.as_bool()) != Some(true) {
                     continue;
                 }
                 self.s.read_items.insert(r.id.to_string());
-                let tone = d.get("tone").and_then(Json::as_f64).unwrap_or(0.0).clamp(-1.0, 1.0);
+                let tone = d.get("tone").and_then(|x| x.as_number().and_then(serde_json::Number::as_f64)).unwrap_or(0.0).clamp(-1.0, 1.0);
                 self.s.approval = (self.s.approval + round(tone * self.p.civic.news_weight_bps as f64)).clamp(-10_000, 10_000);
             }
         }
@@ -471,8 +471,8 @@ impl CitizenMind {
         let notices: Vec<_> = book.open("election_notice").cloned().collect();
         for n in notices {
             let RecordBody::Statement { data, .. } = &n.body else { continue };
-            let d = data.clone().unwrap_or(Json::Null);
-            if self.s.stood_for.contains(n.id.as_str()) || t >= d.get("nominations_close_at").and_then(Json::as_i64).unwrap_or(0) {
+            let d = data.clone().unwrap_or((Json::Null).into());
+            if self.s.stood_for.contains(n.id.as_str()) || t >= d.get("nominations_close_at").and_then(|x| x.as_i64()).unwrap_or(0) {
                 continue;
             }
             self.s.stood_for.insert(n.id.to_string());
@@ -483,7 +483,7 @@ impl CitizenMind {
             let mut vs = Value::ALL.to_vec();
             vs.sort_by(|a, b| self.z_value(*b).partial_cmp(&self.z_value(*a)).unwrap_or(std::cmp::Ordering::Equal).then(a.name().cmp(b.name())));
             let top: Vec<&str> = vs[..2].iter().map(|v| v.name()).collect();
-            let office = d.get("office").cloned().unwrap_or(Json::Null);
+            let office = d.get("office").cloned().unwrap_or((Json::Null).into());
             let platform = format!("Standing for {}: for {}.", office.as_str().unwrap_or_default(), top.join(" and "));
             out.steps.push(because(
                 format!("An election: standing for office (drive {drive:.2}; we think the town is run {}).", if self.s.approval >= 0 { "well enough" } else { "badly" }),
@@ -495,28 +495,28 @@ impl CitizenMind {
         let ballots: Vec<_> = book.open("ballot").cloned().collect();
         for b in ballots {
             let RecordBody::Statement { data, .. } = &b.body else { continue };
-            let d = data.clone().unwrap_or(Json::Null);
-            let opens = d.get("opens_at").and_then(Json::as_i64).unwrap_or(0);
-            let closes = d.get("closes_at").and_then(Json::as_i64).unwrap_or(0);
-            if self.s.voted.contains(b.id.as_str()) || d.get("electorate").and_then(Json::as_str) != Some("roll") || !enrolled_at.map_or(false, |e| e < b.at) || t < opens || t >= closes {
+            let d = data.clone().unwrap_or((Json::Null).into());
+            let opens = d.get("opens_at").and_then(|x| x.as_i64()).unwrap_or(0);
+            let closes = d.get("closes_at").and_then(|x| x.as_i64()).unwrap_or(0);
+            if self.s.voted.contains(b.id.as_str()) || d.get("electorate").and_then(|x| x.as_str()) != Some("roll") || !enrolled_at.map_or(false, |e| e < b.at) || t < opens || t >= closes {
                 continue;
             }
             self.s.voted.insert(b.id.to_string());
             if (cx.rng(&format!("turnout-{}", b.id)).below(10_000) as i64) >= self.p.civic.turnout_bps {
                 continue;
             }
-            let cands = d.get("candidates").and_then(Json::as_array).cloned().unwrap_or_default();
+            let cands = d.get("candidates").and_then(|x| x.as_array()).map(|a| a.to_vec()).unwrap_or_default();
             let mut scores: Vec<(String, String, i64)> = cands
                 .iter()
                 .map(|c| {
-                    let cand = c.get("candidate").and_then(Json::as_str).unwrap_or_default().to_string();
-                    let number = c.get("number").and_then(Json::as_str).map(String::from).unwrap_or_else(|| cand.clone());
-                    let nom = c.get("nomination").and_then(Json::as_str).and_then(|id| book.get(id)).and_then(|r| match &r.body {
+                    let cand = c.get("candidate").and_then(|x| x.as_str()).unwrap_or_default().to_string();
+                    let number = c.get("number").and_then(|x| x.as_str()).map(String::from).unwrap_or_else(|| cand.clone());
+                    let nom = c.get("nomination").and_then(|x| x.as_str()).and_then(|id| book.get(id)).and_then(|r| match &r.body {
                         RecordBody::Statement { data, .. } => data.clone(),
                         _ => None,
                     });
                     let incumbent = nom.as_ref().and_then(|n| n.get("incumbent")).map_or(false, common::truthy);
-                    let values: Vec<Value> = nom.as_ref().and_then(|n| n.get("values")).and_then(Json::as_array).map_or(vec![], |vs| vs.iter().filter_map(|v| v.as_str().and_then(Value::from_name)).collect());
+                    let values: Vec<Value> = nom.as_ref().and_then(|n| n.get("values")).and_then(|x| x.as_array()).map_or(vec![], |vs| vs.iter().filter_map(|v| v.as_str().and_then(Value::from_name)).collect());
                     let fit = if values.is_empty() { 0.0 } else { values.iter().map(|v| self.z_value(*v)).sum::<f64>() / values.len() as f64 };
                     let score = (if incumbent { self.s.approval } else { round(fit * self.p.civic.platform_weight_bps as f64) }) + if cand == self.p.participant { 100_000 } else { 0 };
                     (cand, number, score)
@@ -745,7 +745,7 @@ impl CitizenMind {
     /// A removal carried out in a building we are in, seen (citizen.ts `witnessAround`).
     fn witness_around(&mut self, book: &Book, life: &Life, around: &[std::sync::Arc<oikos_sight::SiteStructure>], t: i64) {
         let Some(by) = book.open("law").find_map(|r| match &r.body {
-            RecordBody::Statement { data: Some(d), .. } if d.get("tenancy").and_then(Json::as_str) == Some("possession") => d.get("enforced_by").and_then(Json::as_str).map(String::from),
+            RecordBody::Statement { data: Some(d), .. } if d.get("tenancy").and_then(|x| x.as_str()) == Some("possession") => d.get("enforced_by").and_then(|x| x.as_str()).map(String::from),
             _ => None,
         }) else {
             return;
@@ -960,7 +960,7 @@ impl CitizenMind {
                     };
                     moved(&strip(&v), &strip(&was), 0)
                         || ["income", "savings"].iter().any(|m| {
-                            let (a, b) = (v.get(*m).and_then(Json::as_i64).unwrap_or(0), was.get(*m).and_then(Json::as_i64).unwrap_or(0));
+                            let (a, b) = (v.get(*m).and_then(|x| x.as_i64()).unwrap_or(0), was.get(*m).and_then(|x| x.as_i64()).unwrap_or(0));
                             (a - b).abs() * 20 > b.abs().max(1)
                         })
                 }

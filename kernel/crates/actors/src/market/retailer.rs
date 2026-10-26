@@ -20,6 +20,7 @@
 //! supplier's id; every sum is `i64` with floor division, and a price rises by the ceiling of a step and falls by its
 //! floor, as the TS did.
 
+use oikos_core::Frozen;
 use super::automation::{self, params_from, system_slips, Adoption, AdoptionParams, AdoptionThen, Fleet};
 use super::body::{lift, Body, BodyThen, House, PlainBody, Review, Stage, Standing, Surplus, Want, Wind};
 use super::lengnick::{distribute, move_wage, pay_out, Expectation, From as Payer, Lengnick, WageMonth};
@@ -188,7 +189,7 @@ impl Params {
                 listing: ctx.param("listing", None)?,
                 bank: ctx.param("bank", String::new())?,
             },
-            automation: params_from(ctx.params.get("automation").unwrap_or(&Value::Null))?,
+            automation: params_from(&ctx.params.get("automation").map(Frozen::to_value).unwrap_or(Value::Null))?,
             lengnick: Lengnick::read(ctx)?,
             figures: PriceFigures::read(ctx)?,
             sourcing: SourcingFigures::read(ctx)?,
