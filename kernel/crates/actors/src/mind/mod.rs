@@ -15,6 +15,7 @@
 //! - `citizen`: citizen.ts's deciding half, composing the rest behind the seam (`plan`: the week's mind half;
 //!   `voice`: events, talk, civic life, petitions, word of mouth and the record; `talk`: the citizen's phrasing).
 //! - `math`: deterministic `exp`/`ln` and JavaScript's rounding.
+//! - `packed`: a JSON value kept as its text (what a person last wrote to their record).
 //!
 //! Conventions (all parts): state kept in integers (basis points; fixed point where TS kept a fraction that matters),
 //! so a saved mind restores to the bit; floats only inside a computation, through `math`, rounded with `math::round`
@@ -26,6 +27,7 @@ pub mod founded;
 pub mod founding;
 pub mod inner;
 pub mod math;
+pub mod packed;
 pub mod person;
 pub mod plan;
 pub mod reading;

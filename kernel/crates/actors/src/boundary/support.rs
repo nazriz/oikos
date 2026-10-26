@@ -204,7 +204,7 @@ impl Kind for Transfers {
         "world.transfers"
     }
     fn version(&self) -> &'static str {
-        "0.10.0"
+        "0.11.0"
     }
     fn doc(&self) -> &'static str {
         "docs/behaviour/boundary.md"
@@ -253,6 +253,7 @@ impl Kind for Transfers {
                 decided_on: BTreeMap::new(),
                 lapsed_claims: BTreeSet::new(),
                 audited: Audited::new(&me),
+                casework: ctx.param("casework", None)?,
                 me,
             },
         )
@@ -333,6 +334,32 @@ struct Support {
     lapsed_claims: BTreeSet<String>,
     /// The audit office's questions to us (docs/behaviour/auditor.md).
     audited: Audited,
+    /// Who does the office's casework, where the world says (law 10, foundations-2 P3): a system of the office's own
+    /// organisation (its officers' desk) named in `by` on every act that is only papers of these kinds, so that the
+    /// decision takes an officer's minutes in the officers' hours. Absent: whoever acts does it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    casework: Option<Casework>,
+}
+
+/// The office's casework, and who does it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct Casework {
+    by: String,
+    kinds: Vec<String>,
+}
+
+impl Casework {
+    /// A step that is only casework papers goes to the desk: `done_by` on its first call (the platform gives it to the act
+    /// as `by`). A step with anything else in it (a payment) stays the actor's own, whole.
+    pub(crate) fn assign<T>(&self, step: &mut Step<T>) {
+        let casework = |l: &oikos_sight::calls::Line| {
+            l.call.fn_ == "statement" && matches!(l.call.get("kind"), Some(oikos_sight::calls::Value::Id(k) | oikos_sight::calls::Value::Text(k)) if self.kinds.iter().any(|x| x == k))
+        };
+        if step.lines.is_empty() || !step.lines.iter().all(casework) || step.lines[0].call.get("done_by").is_some() {
+            return;
+        }
+        step.lines[0].call.args.push(("done_by".to_string(), crate::steps::arg(&self.by)));
+    }
 }
 
 /// A figure written in a decision's data as `Number(x)` would take it, if it is one (a number, or a number in a string): whole
@@ -661,6 +688,20 @@ impl Plan for Support {
     }
 
     fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Steps {
+        let mut steps = self.plan_office(pic, cx);
+        // (The casework goes to the officers' desk, where the world has one; never the office-holder's own decisions, which are
+        // theirs: a seat decides what the staff put before it.)
+        if let (Some(c), false) = (&self.casework, self.part == Part::Seat) {
+            for s in &mut steps {
+                c.assign(s);
+            }
+        }
+        steps
+    }
+}
+
+impl Support {
+    fn plan_office(&mut self, pic: &Picture, cx: &mut Cx) -> Steps {
         let t = pic.t;
         let world = cx.ctx.world.clone();
         let mut steps: Steps = vec![];

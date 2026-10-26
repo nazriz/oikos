@@ -61,6 +61,7 @@ pub fn refusal_text(code: Option<&str>) -> &'static str {
         "not_coming_down" => "that isn't being demolished",
         "coming_down" => "it's being demolished",
         "offer_withdrawn" => "the offer has been taken back by whoever made it, so there is nothing to sign",
+        "unpriced" => "nobody here knows what doing that takes, so it can't be done",
         _ => "it isn't possible",
     }
 }

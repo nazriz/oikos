@@ -17,12 +17,13 @@ pub struct Draws {
     participant: String,
     capacity: String,
     day: i64,
-    day_occurrences: BTreeMap<String, (i64, u64)>,
-    matter_occurrences: BTreeMap<String, (i64, u64)>,
-    drawn_on: BTreeMap<String, BTreeMap<String, usize>>,
+    // (Keys held as `Box<str>`, exactly their text: a unit keeps one for every paper it has drawn on, for good. SC-1.)
+    day_occurrences: BTreeMap<Box<str>, (i64, u64)>,
+    matter_occurrences: BTreeMap<Box<str>, (i64, u64)>,
+    drawn_on: BTreeMap<Box<str>, BTreeMap<Box<str>, usize>>,
     /// The same, for draws about one thing (`Cx::chance`; run.ts names those papers apart from the unit's own draws).
     #[serde(default)]
-    chance_drawn_on: BTreeMap<String, BTreeMap<String, usize>>,
+    chance_drawn_on: BTreeMap<Box<str>, BTreeMap<Box<str>, usize>>,
 }
 
 /// Every `rec.<digits>` in `s`, each replaced by `f(the id)`.
@@ -76,15 +77,24 @@ impl Draws {
         Self::stable_in(&mut self.chance_drawn_on, purpose)
     }
 
-    fn stable_in(drawn_on: &mut BTreeMap<String, BTreeMap<String, usize>>, purpose: &str) -> String {
+    fn stable_in(drawn_on: &mut BTreeMap<Box<str>, BTreeMap<Box<str>, usize>>, purpose: &str) -> String {
         if !purpose.contains("rec.") {
             return purpose.to_string();
         }
         let what = replace_records(purpose, |_| "rec".into());
-        let seen = drawn_on.entry(what).or_default();
+        if !drawn_on.contains_key(what.as_str()) {
+            drawn_on.insert(what.as_str().into(), BTreeMap::new());
+        }
+        let seen = drawn_on.get_mut(what.as_str()).expect("just inserted");
         replace_records(purpose, |id| {
             let n = seen.len() + 1;
-            let k = *seen.entry(id.to_string()).or_insert(n);
+            let k = match seen.get(id) {
+                Some(k) => *k,
+                None => {
+                    seen.insert(id.into(), n);
+                    n
+                }
+            };
             format!("paper#{k}")
         })
     }
@@ -99,7 +109,10 @@ impl Draws {
         }
         let matter = names_matter(&purpose);
         let seen = if matter { &mut self.matter_occurrences } else { &mut self.day_occurrences };
-        let occ = seen.entry(purpose.clone()).or_insert((t, 0));
+        if !seen.contains_key(purpose.as_str()) {
+            seen.insert(purpose.as_str().into(), (t, 0));
+        }
+        let occ = seen.get_mut(purpose.as_str()).expect("just inserted");
         if occ.1 == 0 || occ.0 != t {
             occ.0 = t;
             occ.1 += 1;

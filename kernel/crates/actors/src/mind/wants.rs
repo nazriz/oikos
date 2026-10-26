@@ -471,7 +471,7 @@ fn nonempty(s: &Option<String>) -> Option<String> {
 /// decides whether a want long unmet grows or is given up.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Wants {
-    pub p: WantParams,
+    pub p: std::sync::Arc<WantParams>,
     list: Vec<Want>,
     /// id -> not born again before this time (looked up only).
     rested: BTreeMap<String, i64>,
@@ -487,7 +487,8 @@ impl Default for Wants {
 }
 
 impl Wants {
-    pub fn new(p: WantParams) -> Wants {
+    pub fn new(p: impl Into<std::sync::Arc<WantParams>>) -> Wants {
+        let p = p.into();
         Wants { p, list: Vec::new(), rested: BTreeMap::new(), copied: BTreeMap::new(), events: Vec::new() }
     }
 

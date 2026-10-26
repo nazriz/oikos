@@ -160,6 +160,24 @@ impl Params {
         self.len() == 0
     }
 
+    /// The text of every member but those named, in key order (`{"k":v,...}`, as `serde_json` writes a map): a key
+    /// for what is read from them alone, held once for all whose params are alike but for those (SC-1).
+    pub fn text_without(&self, skip: &[&str]) -> String {
+        let mut out = Vec::with_capacity(256);
+        out.push(b'{');
+        for (k, v) in self.iter().filter(|(k, _)| !skip.contains(&k.as_str())) {
+            if out.len() > 1 {
+                out.push(b',');
+            }
+            // (Writing a string or a value to memory cannot fail.)
+            let _ = serde_json::to_writer(&mut out, k);
+            out.push(b':');
+            let _ = serde_json::to_writer(&mut out, v);
+        }
+        out.push(b'}');
+        String::from_utf8(out).unwrap_or_default()
+    }
+
     /// The params as a map of their own (a copy).
     pub fn to_map(&self) -> Map<String, Value> {
         self.iter().map(|(k, v)| (k.clone(), v.clone())).collect()

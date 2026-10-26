@@ -115,10 +115,29 @@ fn an_order_at_a_price_since_raised_buys_what_its_money_buys_at_ours_and_one_for
     let txs = json!([tx("acc-ann", "acc-shop", 800, DAY + 8 * H, "Order"), tx("acc-bob", "acc-shop", 900, DAY + 8 * H, "Order"), tx("acc-cat", "acc-shop", 400, DAY + 8 * H, "Order")]);
     let out = h.wake(DAY + 9 * H, world(&["w1"], vec![cheap, other, too_little], 10, 1_000_000, txs));
     let t = all(&out);
-    assert!(t.contains("Served: 1 bread to ann"), "800 at our 500 buys one: {t}");
+    // (The note says what was ordered and the price charged: until 2026-10-26 it gave the one the money bought as the
+    // number ordered, "Served: 1 bread", and a reader could not tell the order had been cut.)
+    assert!(t.contains("Served 1 of the 2 bread ordered (at our price of $5.00 each); $3.00 refunded"), "800 at our 500 buys one: {t}");
+    assert!(t.contains("\"ordered\":2") && t.contains("\"delivered\":1") && t.contains("\"unit_price\":500"), "ordered two, served one at 500: {t}");
     assert!(t.contains("Refund: what you paid over our price") && t.contains("\"refund\":300"), "the 300 over comes back with the note: {t}");
+    assert!(!t.contains("\"unit_price\":400"), "an order at our price, or refunded whole, says no price of its own: {t}");
     assert!(t.contains("Served 0 of the 1 cake") && t.contains("Refund: 1 cake"), "{t}");
     assert!(t.contains("Served 0 of the 1 bread") && t.contains("Refund: 1 bread"), "400 buys none at 500: refunded whole: {t}");
+}
+
+#[test]
+fn a_serving_the_world_refuses_waits_its_turn_and_its_note_still_refunds_what_was_paid_over_our_price() {
+    // (Found 2026-10-26, "Main red after foundations-2 phase 1" in docs/decisions.md: what a note settles, the money paid
+    // over our price and the number ordered, was forgotten when the serving was sent; a serving refused (a crew's day
+    // short of time) or lapsed at the close waited its turn again, and the note of the one that went out refunded
+    // nothing of the over-payment and gave the number the money bought as the number ordered.)
+    let mut h = harness(json!({}));
+    let txs = json!([tx("acc-ann", "acc-shop", 800, DAY + 8 * H, "Order")]);
+    let first = all(&h.wake_refused(DAY + 9 * H, world(&["w1"], vec![an_order("rec.50", DAY + 8 * H, "ann", 2, 400)], 10, 1_000_000, txs), "no_time_left", "w1 has no time left today."));
+    assert!(first.contains("task=serve"), "it tries to serve: {first}");
+    let t = all(&h.wake(2 * DAY + 9 * H, world(&["w1"], vec![], 10, 1_000_000, json!([]))));
+    assert!(t.contains("Served 1 of the 2 bread ordered (at our price of $5.00 each); $3.00 refunded"), "served next day, the 300 over still refunded: {t}");
+    assert!(t.contains("\"refund\":300") && t.contains("\"ordered\":2") && t.contains("\"unit_price\":500"), "{t}");
 }
 
 #[test]

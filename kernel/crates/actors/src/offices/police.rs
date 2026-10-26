@@ -87,6 +87,9 @@ struct Params {
     account: String,
     officers: i64,
     role: String,
+    /// The role of the station's head in their agreement: a sworn officer, who takes the station's work after its officers.
+    #[serde(default)]
+    in_charge_role: String,
     wage: i64,
     period: i64,
     notice_days: i64,
@@ -111,6 +114,7 @@ impl Params {
             account: ctx.need("account", "police.station")?,
             officers: ctx.param("officers", 0)?,
             role: ctx.param("role", "police officer".to_string())?,
+            in_charge_role: ctx.param("in_charge_role", "officer in charge".to_string())?,
             wage: ctx.param("wage", 0)?,
             period: ctx.param("period", 14 * DAY)?,
             notice_days: ctx.param("notice_days", 14)?,
@@ -135,6 +139,7 @@ impl Kind for Station {
     }
     // Ported to Rust (version string kept as the TS manifest has it): reads what it has done from its own file (reports, warrants, deaths found), so a successor carries on;
     // a warrant against a tenant registered dead is not carried out; a warrant not yet due no longer holds up those behind it.
+    // 0.7.0: the station's head (in_charge_role) is a sworn officer, and takes the station's work after its officers when there;
     // 0.6.0 (TS): run in parts where a model holds the office (part): the officers carry out warrants, look into reports
     // and call at homes under standing work orders in force at the start, and report what they did; 0.5.1: returns of tax
     // withheld are filed on the days the law states; 0.5.0: a warrant carried out says how many of the household were there
@@ -142,7 +147,7 @@ impl Kind for Station {
     // possession, in an officer's hours; 0.3.1: a death that someone at home outlived by more than a day is not "found" at a
     // later call; 0.3.0: calls at a home when asked to (a welfare check), by going there; no longer shown the town's homes.
     fn version(&self) -> &'static str {
-        "0.6.0"
+        "0.7.0"
     }
     fn doc(&self) -> &'static str {
         "docs/behaviour/crime.md"
@@ -157,6 +162,7 @@ impl Kind for Station {
                 "building": param("string", Some("the station, and where its officers work (the world must say)"), json!(""), None, true, None),
                 "calls_channel": param("string", None, json!(""), None, false, None),
                 "channel": param("string", None, json!("premises"), None, false, None),
+                "in_charge_role": param("string", Some("the station head's role in their agreement: a sworn officer, who takes the station's work after its officers"), json!("officer in charge"), None, false, Some("placeholder")),
                 "industry": param("string", None, json!("public_safety"), None, false, None),
                 "look_at": param("integer", None, json!(0), None, false, None),
                 "look_days": param("integer", None, json!(5), Some("days"), false, None),
@@ -450,8 +456,19 @@ impl Plan for Police {
         let mine: BTreeSet<&String> = workers.iter().collect();
         let here: Vec<String> = {
             let occ = self.view.as_ref().and_then(|v| v.spaces.iter().find(|sp| sp.space == self.p.workplace)).and_then(|sp| sp.occupants.clone()).unwrap_or_default();
-            let set: BTreeSet<String> = occ.into_iter().filter(|w| mine.contains(w)).collect();
-            set.into_iter().collect()
+            let set: BTreeSet<String> = occ.iter().filter(|w| mine.contains(w)).cloned().collect();
+            let mut here: Vec<String> = set.into_iter().collect();
+            // (The officer in charge is a sworn officer too: at the station, they take the station's work after its officers,
+            // as the officer in charge of a small station does when the officers are away. 2026-10-25: a one-officer
+            // station whose officer was off injured carried out no warrant and looked into no report for a month.)
+            if !self.p.in_charge_role.is_empty() {
+                for oic in self.staff.in_role(&self.book, t, &self.p.in_charge_role) {
+                    if !here.contains(&oic) && occ.contains(&oic) {
+                        here.push(oic);
+                    }
+                }
+            }
+            here
         };
         let free = |used: &BTreeMap<String, i64>, w: &String| self.p.working_day - used.get(w).copied().unwrap_or(0) >= self.p.task_seconds;
 

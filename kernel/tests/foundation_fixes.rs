@@ -143,7 +143,7 @@ fn f5_by_names_only_someone_the_actor_may_direct() {
 #[test]
 fn f8_each_performer_is_charged_their_own_time() {
     let mut c = world(&default_params());
-    c["orchestration"]["act_time"] = json!({"person": {"message": 2_400}, "system": {"message": 1}});
+    c["orchestration"]["act_time"] = json!({"default": 1, "person": {"message": 2_400}, "system": {"message": 1}});
     let mut run = start(c);
     employ(&mut run, "devco", "developer-system", Some("developer"), "carol");
     // A system names a person: the person is charged the person's 2,400 s, not the system's 1 s.
@@ -167,7 +167,7 @@ fn f8_each_performer_is_charged_their_own_time() {
 #[test]
 fn f2_work_that_could_not_be_checked_when_ordered_takes_effect_after_its_hours() {
     let mut c = world(&default_params());
-    c["orchestration"]["act_time"] = json!({"person": {"occupy": 100, "vacate": 1}, "system": {"message": 200, "work": 1}});
+    c["orchestration"]["act_time"] = json!({"default": 1, "person": {"occupy": 100, "vacate": 1}, "system": {"message": 200, "work": 1}});
     let mut run = start(c);
     let goods = |run: &R| run.kernel().state().holding("devco", "s-shop", "goods");
     // Carol leaves the shop, and starts back (she is there from t=102); the developer is busy for 200 s, then orders her work

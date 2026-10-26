@@ -574,7 +574,7 @@ pub struct OriginShare {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CultureDial {
     pub conducts: Vec<Conduct>,
-    pub params: CultureParams,
+    pub params: std::sync::Arc<CultureParams>,
     /// The profile's figures by conduct name.
     pub figures: BTreeMap<String, ConductFigures>,
     /// By origin group (a group's figures replace the profile's for those who come from it).
@@ -640,7 +640,7 @@ pub fn culture_dial(dials: &Json) -> Result<Option<CultureDial>, String> {
     };
     Ok(Some(CultureDial {
         conducts,
-        params,
+        params: std::sync::Arc::new(params),
         figures: figures_of(profile.and_then(|p| p.get("conducts"))),
         by_origin,
         homophily_bps: profile.and_then(|p| p.get("homophily_bps")).and_then(js_integer).unwrap_or(0),
@@ -787,7 +787,7 @@ const MICRO: f64 = 1_000_000.0;
 /// One person's norms (TS `Culture`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Culture {
-    pub p: CultureParams,
+    pub p: std::sync::Arc<CultureParams>,
     /// The conducts held, in `CONDUCTS`' order.
     pub held: Vec<Conduct>,
     rows: BTreeMap<Conduct, Row>,
@@ -812,7 +812,7 @@ impl Culture {
     /// `rates`: the conducts this person has a rate for in their world, and the rate; `group`: their origin group.
     /// `draw` gives a starting lean for each conduct held (a standard normal on the person's own stream), in order.
     pub fn new(
-        p: CultureParams,
+        p: impl Into<std::sync::Arc<CultureParams>>,
         dial: &CultureDial,
         env: &dyn CultureEnv,
         draw: &mut dyn FnMut(Conduct) -> f64,
@@ -820,6 +820,7 @@ impl Culture {
         group: Option<&str>,
         t: i64,
     ) -> Culture {
+        let p = p.into();
         let mut c = Culture {
             p,
             held: vec![],

@@ -26,7 +26,8 @@ A shop buys goods wholesale and sells them to households. Selling takes its staf
   until then it was refunded whole, and the household went without until its next trip).
 - **Not served within the days the order is for** (a household's order is for until its next trip; 3 days if it doesn't say): the rest is refunded.
 - **Can't be delivered** (the place or person is gone): the whole order is refunded.
-- Every order ends with a delivery note: ordered, delivered, refunded.
+- Every order ends with a delivery note: ordered, delivered, refunded (and, for an order at a price since raised, the
+  price charged: what was ordered stays what was ordered).
 
 **Monthly (Lengnick).**
 - **Demand** is what customers ordered and paid for last month, served or not.

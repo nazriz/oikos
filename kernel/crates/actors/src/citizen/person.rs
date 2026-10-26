@@ -276,7 +276,7 @@ pub enum Said {
 
 /// The person: parameters, memory, book and mind.
 pub struct Person {
-    pub p: Params,
+    pub p: super::params::Given,
     pub me: String,
     pub s: State,
     pub housing: super::housing::Housing,
