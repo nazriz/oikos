@@ -249,7 +249,7 @@ impl CitizenMind {
             self.hear_town(text, t, person);
         }
         if let Some(told) = talk::heard_news(text) {
-            self.s.told_us.insert(person.into(), (told.clone(), t));
+            self.s.told_us.insert(person.into(), (Box::new(told.clone()), t));
             self.s.talked.insert(person.into(), t);
             self.s.ties.add(person, 300, t, Some("talked"));
             self.s.people_known.insert(person.into());
@@ -947,7 +947,7 @@ impl CitizenMind {
         };
         let mut set = Map::new();
         for (k, v) in all {
-            let changed = match self.s.written.get(&k) {
+            let changed = match self.s.written.get(&k).map(|p| p.value()) {
                 None => true,
                 Some(was) if k == "circumstances" => {
                     let strip = |x: &Json| {
@@ -958,16 +958,16 @@ impl CitizenMind {
                         }
                         y
                     };
-                    moved(&strip(&v), &strip(was), 0)
+                    moved(&strip(&v), &strip(&was), 0)
                         || ["income", "savings"].iter().any(|m| {
                             let (a, b) = (v.get(*m).and_then(Json::as_i64).unwrap_or(0), was.get(*m).and_then(Json::as_i64).unwrap_or(0));
                             (a - b).abs() * 20 > b.abs().max(1)
                         })
                 }
-                Some(was) => moved(&v, was, grain(&k)),
+                Some(was) => moved(&v, &was, grain(&k)),
             };
             if changed {
-                self.s.written.insert(k.clone(), v.clone());
+                self.s.written.insert(k.clone(), super::packed::Packed::of(&v));
                 set.insert(k, v);
             }
         }

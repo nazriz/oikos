@@ -34,6 +34,61 @@ fn key(id: &str) -> Key {
     }
 }
 
+/// Where each record stands in the order seen, by id. Minted ids (`rec.<n>`) come mostly in the order they were filed,
+/// so they are kept in a list sorted by number, pushed at its end or put in near it (16 bytes a record, where a map's
+/// node held about 45: risk SC-1); one that would go further back than `NEAR` from the end, and every other id, goes
+/// in a map. Either way a record has one place, found by its id; nothing reads the order they are kept in.
+#[derive(Debug, Default)]
+struct Place {
+    minted: Vec<(u64, u32)>,
+    other: BTreeMap<Key, u32>,
+}
+
+/// How far back from its end a minted id is put into the list (a shift of at most so many entries).
+const NEAR: usize = 64;
+
+impl Place {
+    fn get(&self, k: &Key) -> Option<&u32> {
+        if let Key::N(n) = k {
+            if let Ok(i) = self.minted.binary_search_by_key(n, |e| e.0) {
+                return Some(&self.minted[i].1);
+            }
+        }
+        self.other.get(k)
+    }
+    fn contains_key(&self, k: &Key) -> bool {
+        self.get(k).is_some()
+    }
+    /// (Of an id not held: `Book::take` asks first.)
+    fn insert(&mut self, k: Key, i: u32) {
+        if let Key::N(n) = k {
+            let at = self.minted.partition_point(|e| e.0 < n);
+            if self.minted.len() - at <= NEAR {
+                self.minted.insert(at, (n, i));
+                return;
+            }
+        }
+        self.other.insert(k, i);
+    }
+    /// Gives up the places of these ids.
+    fn remove_all(&mut self, ks: impl Iterator<Item = Key>) {
+        let mut gone: Vec<u64> = vec![];
+        for k in ks {
+            match k {
+                Key::N(n) if self.other.remove(&k).is_none() => gone.push(n),
+                k => {
+                    self.other.remove(&k);
+                }
+            }
+        }
+        gone.sort_unstable();
+        self.minted.retain(|e| gone.binary_search(&e.0).is_err());
+    }
+    fn values_mut(&mut self) -> impl Iterator<Item = &mut u32> {
+        self.minted.iter_mut().map(|e| &mut e.1).chain(self.other.values_mut())
+    }
+}
+
 /// What a claim can be looked up by (`Book::claims_by`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClaimKey {
@@ -72,11 +127,10 @@ pub struct NoticeSeen<'a> {
 #[derive(Debug, Default)]
 pub struct Book {
     seen: Vec<Arc<Record>>,
-    place: BTreeMap<Key, u32>,
+    place: Place,
     types: BTreeMap<&'static str, Vec<u32>>,
-    kinds: BTreeMap<String, Vec<u32>>,
-    /// Statements of each kind not withdrawn, in the order seen.
-    standing: BTreeMap<String, Vec<u32>>,
+    /// Statements of each kind: all seen, and those not withdrawn, in the order seen (one map of both: SC-1).
+    kinds: BTreeMap<String, (Vec<u32>, Vec<u32>)>,
     claims_holder: BTreeMap<String, Vec<u32>>,
     claims_counterparty: BTreeMap<String, Vec<u32>>,
     claims_object: BTreeMap<String, Vec<u32>>,
@@ -210,9 +264,11 @@ impl Book {
                 }
             }
             RecordBody::Statement { kind, data, .. } => {
-                self.kinds.entry(kind.clone()).or_default().push(i);
-                if !self.withdrawn.contains(&r.id) {
-                    self.standing.entry(kind.clone()).or_default().push(i);
+                let withdrawn = self.withdrawn.contains(&r.id);
+                let (all, standing) = self.kinds.entry(kind.clone()).or_default();
+                all.push(i);
+                if !withdrawn {
+                    standing.push(i);
                 }
                 if kind == "lot" {
                     // (The cells of a lot are a list; one written as a single name, a plot of one cell, is over that cell, as `cells_of` reads it.)
@@ -285,7 +341,7 @@ impl Book {
         if self.withdrawn.insert(id.clone()) {
             if let Some(&i) = self.place.get(&key(id)) {
                 if let RecordBody::Statement { kind, .. } = &self.seen[i as usize].body {
-                    if let Some(l) = self.standing.get_mut(kind) {
+                    if let Some((_, l)) = self.kinds.get_mut(kind) {
                         l.retain(|x| *x != i);
                     }
                 }
@@ -355,8 +411,12 @@ impl Book {
             }
             m.retain(|_, v| !v.is_empty());
         };
-        maps(&mut self.kinds);
-        maps(&mut self.standing);
+        for (all, standing) in self.kinds.values_mut() {
+            map(all);
+            map(standing);
+        }
+        // (What stands of a kind is of what was seen of it: none seen, none standing.)
+        self.kinds.retain(|_, v| !v.0.is_empty());
         maps(&mut self.claims_holder);
         maps(&mut self.claims_counterparty);
         maps(&mut self.claims_object);
@@ -368,9 +428,7 @@ impl Book {
         map(&mut self.with_practice);
         map(&mut self.with_assertion);
         map(&mut self.with_hears);
-        for r in &gone {
-            self.place.remove(&key(&r.id));
-        }
+        self.place.remove_all(gone.iter().map(|r| key(&r.id)));
         for i in self.place.values_mut() {
             *i = remap[*i as usize].unwrap_or_else(|| unreachable!("a place kept for a record let go"));
         }
@@ -415,7 +473,7 @@ impl Book {
     }
     /// How many records of each statement kind (and of each other record type) it holds: for whoever measures memory.
     pub fn counts(&self) -> BTreeMap<String, u64> {
-        let mut out: BTreeMap<String, u64> = self.kinds.iter().map(|(k, v)| (k.clone(), v.len() as u64)).collect();
+        let mut out: BTreeMap<String, u64> = self.kinds.iter().map(|(k, v)| (k.clone(), v.0.len() as u64)).collect();
         for (t, v) in &self.types {
             if *t != "statement" {
                 out.insert(format!("[{t}]"), v.len() as u64);
@@ -430,11 +488,11 @@ impl Book {
 
     /// Every statement of a kind seen, withdrawn or not, in the order seen.
     pub fn all(&self, kind: &str) -> impl DoubleEndedIterator<Item = &Arc<Record>> + ExactSizeIterator {
-        self.list(self.kinds.get(kind))
+        self.list(self.kinds.get(kind).map(|v| &v.0))
     }
     /// Statements of a kind still standing (not withdrawn), in the order seen.
     pub fn open(&self, kind: &str) -> impl DoubleEndedIterator<Item = &Arc<Record>> + ExactSizeIterator {
-        self.list(self.standing.get(kind))
+        self.list(self.kinds.get(kind).map(|v| &v.1))
     }
     /// Records of a type (`agreement`, `claim`, `notice`, `vote`...), in the order seen.
     pub fn of_type(&self, record: &str) -> impl DoubleEndedIterator<Item = &Arc<Record>> + ExactSizeIterator {

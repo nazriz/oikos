@@ -2648,7 +2648,7 @@
               "const": "here"
             },
             "area": {
-              "description": "Where the seat is: the ground near where its entity is (`near`: within that distance, in cells, of the cells under a building where it occupies a space; 0: those cells and the ones touching them; it moves with the entity, and after a move the next look delivers the whole of the new surroundings in place of the old), or at an organisation's own premises (`premises`: the cells it occupies or runs). Never everywhere, a place, or a list of other cells: to see anywhere else, go and look (`way: visit`).",
+              "description": "Where the seat is: the ground near where its entity is (`near`: within that distance, in cells, of the cells under a building where it occupies a space; 0: those cells and the ones touching them; it moves with the entity, and after a move the next look delivers the whole of the new surroundings in place of the old), or at an organisation's own premises (`premises`: the cells it occupies or runs), or at the premises an organisation holds by agreement (`held: occupancy`: the buildings where an agreement in force gives it occupancy of a space, such as a lease; it moves as its agreements do, and after a change the next look delivers the whole of it). Never everywhere, a place, or a list of other cells: to see anywhere else, go and look (`way: visit`).",
               "anyOf": [
                 {
                   "type": "object",
@@ -2661,6 +2661,19 @@
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 2
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "held"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "held": {
+                      "description": "What the organisation holds a right to be in: `occupancy`, a space an agreement in force names it the occupant of.",
+                      "const": "occupancy"
                     }
                   }
                 },

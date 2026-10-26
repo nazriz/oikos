@@ -306,12 +306,12 @@ The mechanism:
 - **Gap:** Starting a business is a monthly chance derived from the profile's business birth rate, not a response to
   a profit opening; only businesses of one can start (a new employing firm would need to buy a closed firm's premises,
   as commercial leasing is not built). A business of one never takes on its first employee.
-- **Where:** `docs/behaviour/entry.md` ("Starting a business of one", "Employing start-ups wait on leased premises").
+- **Where:** `docs/behaviour/entry.md` ("Starting a business of one", "Employing start-ups wait on leased premises"); `docs/behaviour/leasing.md` (premises, the law on their leases, its remedies).
 - **Effect:** Job creation cannot emerge from entry. Any experiment where a steward's policy should create or destroy
   jobs is biased towards stasis or displacement; the number of births is fixed by the profile whatever the steward does.
-- **L / I:** high / medium · **Status:** to fix (births by expected profit, decisions 2026-10-24, "Market realism"; employing start-ups through leased premises, decisions 2026-10-25, "Commercial leasing"; left: borrowing to start, and the remedies of a commercial lease)
+- **L / I:** high / medium · **Status:** to fix (births by expected profit, decisions 2026-10-24, "Market realism"; employing start-ups through leased premises, decisions 2026-10-25, "Commercial leasing"; the remedies of a commercial lease, decisions 2026-10-25, "Lease remedies"; left: borrowing to start)
 - **Port note:** Rust port, lane C1 (2026-10-17) wrote `rules::entry`; nothing called it until 2026-10-24.
-- **Now (2026-10-24, citizen 0.59.0, generator 0.65.0):** no rate of births anywhere. A person weighs each venture monthly by its expected profit from what they know (prices read, their own purchases, the homes in view, the sellers they know, the going wage) against what they have, the choice the mind's (docs/behaviour/entry.md, "Entry by expected profit"). A shop in bought premises is weighed the same way and employs from its first day. Births in a year of the 1,000-person town: au-vic 26 to 37% (16.4% the ABS rate; 13 to 16% before), gb-eng and ke-nakuru in the decisions entry. 2026-10-25: founders look through what sellers advertise, newest first, before weighing; a business of one pays its running costs (the profile's); an owner weighs keeping it each month against the best job known (decisions 2026-10-25, "Market realism: who else sells it"). Rates are an observation, not a target (Naz). 2026-10-25: shop premises to let, on the profile's commercial terms (placeholders mostly): a business of one that turns custom away takes a unit on a lease and employs there (docs/behaviour/leasing.md; decisions 2026-10-25, "Commercial leasing"). Still: nobody borrows to start; a landlord has no remedy for a leased unit's arrears.
+- **Now (2026-10-24, citizen 0.59.0, generator 0.65.0):** no rate of births anywhere. A person weighs each venture monthly by its expected profit from what they know (prices read, their own purchases, the homes in view, the sellers they know, the going wage) against what they have, the choice the mind's (docs/behaviour/entry.md, "Entry by expected profit"). A shop in bought premises is weighed the same way and employs from its first day. Births in a year of the 1,000-person town: au-vic 26 to 37% (16.4% the ABS rate; 13 to 16% before), gb-eng and ke-nakuru in the decisions entry. 2026-10-25: founders look through what sellers advertise, newest first, before weighing; a business of one pays its running costs (the profile's); an owner weighs keeping it each month against the best job known (decisions 2026-10-25, "Market realism: who else sells it"). Rates are an observation, not a target (Naz). 2026-10-25: shop premises to let, on the profile's commercial terms (placeholders mostly): a business of one that turns custom away takes a unit on a lease and employs there (docs/behaviour/leasing.md; decisions 2026-10-25, "Commercial leasing"). 2026-10-25: the remedies of a lease of premises, as law data (`law-premises-leases`, from the profile's `commercial.law`, sources marked): the landlord asks for rent owed, ends the lease for it once the law's days have run, sets the deposit against what is owed and claims the rest before the tribunal; rent reviews to the market as often as the law lets (up only where it says); a business leaves early by its own notice where the law gives one, else by a surrender it pays the landlord's price for; and it sees its unit, serving only with those there (docs/behaviour/leasing.md; decisions 2026-10-25, "Lease remedies"). Most of the law's figures are recalled or placeholders. Still: nobody borrows to start; a lease holds nothing of the owner's beyond the business's money; no mediation, valuer or tenant's challenge.
 - **Notice by:** `economy/businesses`: births far from the profile's rate; no business of one with staff.
 - **Fix when:** before any employment-effect or gradual-disempowerment experiment.
 
@@ -787,7 +787,7 @@ The mechanism:
 - **Notice by:** a `leave` of a person other than the actor in the log; a refusal `not_theirs` on `leave`.
 - **Fix when:** the census creates parents before children, or before a seat is given a wide remit over households.
 
-### PB-23 · Tax paid twice cannot be claimed back or set against the next return
+### PB-23 · Tax paid twice could not be claimed back or set against the next return (the collector's account, built 2026-10-25)
 - **Gap:** Nobody keeps a taxpayer's account with the outside world's tax collector: returns are filed and paid, and
   nothing reconciles what was paid against what was owed. A payment made twice (lv-12: the clinic's manager paid a
   month's withheld income tax by hand, $17,573.92, on top of its payroll clerk's return for the same month) is simply
@@ -799,12 +799,24 @@ The mechanism:
   `offices/treasury.rs`); `docs/behaviour/public-finance.md`.
 - **Effect:** A seat's (or a code office's) duplicate payment is a permanent loss; a seat that sees it can do nothing,
   and is distressed by it (lv-12's debrief). Small in money; matters for welfare and for any study of error recovery.
-- **L / I:** medium / low · **Status:** to fix. It is not a law alone: it needs the institution that does the work, the
-  collector's office keeping each taxpayer's account (who does it, at what time per claim, how long a refund takes,
-  by place, sourced), a form for the claim, and the payer's clerk reading its own books for what was paid over twice.
-- **Notice by:** two payments to the collector for one return's period from one payer.
-- **Fix when:** before a study reads errors and their correction, or a finance-side seat is seated again in a town
-  whose clerk files returns.
+- **L / I:** medium / low · **Status:** mitigated: the mechanism is built, the figures are not sourced (decisions 2026-10-25, "The taxpayer's account"; branch
+  `taxpayer-accounts`): the tax collector (`world.tax_collector`, post `outside-tax`) keeps each taxpayer's account from
+  its own papers and accounts, states a credit to its taxpayer, and decides claims (refund, or set-off where the law
+  allows) in its time, with a slip and a review as law data; payroll officers claim a stated credit and use a set-off on
+  the next return; the public forms let a seat do the same (docs/behaviour/public-finance.md, "The taxpayer's account").
+  **What is left, open:** (a) a payment is the collector's by its words (it names tax, a sum withheld or a charge): one
+  whose words say nothing of tax is allocated to nobody and stays lost; a real payment's structured reference is not
+  modelled; (b) the figures are mostly placeholders: Mexico's 40 days (CFF art. 22) and 30-day review (art. 121) were
+  read on a transcription, its no-set-off of withheld tax (art. 23) and England's set-off are to confirm, the other
+  seven profiles' are placeholders, and `wrong_refusal_bps` (500) has no source anywhere; (c) the collector's officers
+  are a desk of one officer's working day (law 10), unsized by any figure, at a placeholder twenty minutes a decision,
+  so the wait for a refund is that desk's queue, not a real office's backlog; (d) no appeal past the review, no request
+  for more papers, no interest on a late refund, no time limit for claiming; (e) the translator has not learnt the two
+  new forms' names (`tax_credit_claim`, `tax_account_request`).
+- **Notice by:** two payments to the collector for one return's period from one payer, and no `tax_statement` to that
+  payer after (a payment the words rule missed); a refund claim refused and never asked about.
+- **Fix when:** (a) before a study reads how seats recover from payment errors with free-worded payments; (b) before
+  one reads refund times or refusals.
 
 ## People and culture
 
@@ -1534,7 +1546,8 @@ The mechanism:
   its ceiling lowered with each cut). 50,000 people for a month: 14.7 to 17 GB. 100,000 for a week: 31 GB, its peak the
   first moment (a round's decisions held whole while seats are in it). Left: the engine's units and the records
   delivered, the world's records made, minds, the typed config.
-- **Where:** `docs/design/performance.md` ("Bytes per person"); docs/decisions.md 2026-10-25 and 2026-10-26;
+- **Where:** `docs/design/performance.md` ("Bytes per person"; "Citizens' minds and memories"); docs/decisions.md
+  2026-10-25 and 2026-10-26;
   `kernel/src/heapprof.rs`, `scripts/heapprof.ts --components`.
 - **Effect:** A study at 100,000 for a month may not fit; one at 50,000 has room.
 - **L / I:** medium / medium · **Status:** partly fixed: the first moment's decisions next, then the engine's units.

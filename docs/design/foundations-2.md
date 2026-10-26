@@ -458,7 +458,9 @@ reads every number of a config and finds its basis in the table of work's and sl
 parameter left at its module's default, the manifest's note; `oikos figures <world>` prints it and every batch writes
 `figures.txt` and `figures.json` beside its runs. A town of 200 (au-vic) has 54,483 numbers: 7% sourced, 6% to confirm,
 41% derived, 39% placeholder, 6% conventions, 0.9% unbased (464 in 156 places, listed in
-`orchestrator/test/fixtures/figures-unbased.json`, which only shrinks). Left for N3, when the table goes into the config
+`orchestrator/test/fixtures/figures-unbased.json`, which only shrinks; emptied on 2026-10-25 by rows for every module
+parameter and catalogue entry the table lacked, with no profile value changed: decisions, "Law 11: every unbased place
+given its basis"). Left for N3, when the table goes into the config
 and the kernel refuses: the kernel's own check, and the profiles' notes in structured form (a note's class is read from
 its words today, and a note that calls any of its figures a placeholder counts all of them as placeholders). The
 `derived` rows are the generator's statements of where a figure comes from; the class of what it is derived from is not

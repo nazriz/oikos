@@ -9093,3 +9093,198 @@ log against the same town built at 3d113a1f.
   `the_one_who_comes_for_the_job_is_of_working_age`. The test's assertion is unchanged.
 - **Revisit if** a profile states the ages of those who move for work (then that, in place of 18 to retirement), or
   households that move for other reasons (family, retirement) are wanted (a separate flow, with its own source).
+## 2026-10-25 · Citizens' minds and memories held compactly (SC-1; branch `mem-minds`; no result changes; no model called)
+
+**Measured first.** A sampling heap profile (`--features heapprof`, 8 KB rate; a dump at the run's end, `heapprof::dump("end")`,
+added to `oikos-kernel world`) of main's 1,000-person month (au-vic, `living.initiative_bps=10000`): what the citizen's
+code holds (stacks through `oikos_actors::citizen` or `::mind`) is **84.8 MB for 1,003 people, about 85 KB a person**, of
+a 663 MB peak footprint. The largest holders: what a person last wrote to their record, kept as `serde_json` values to
+compare the next write with (`State::written`, 16 KB a person); the mind's and the life's readings of their params, each
+person's own copy though nearly all alike (the mind's `P` with the `Inner`, `Wants`, culture and town-memory copies of its
+parts, about 10 KB; the life's `Params`, about 5 KB); the person and the mind themselves (7.7 KB each inline, the params'
+copies part of it); the book's indexes (about 11 KB); their home's building as last seen, copied out of the picture
+(2.8 KB); what others told them (2.1 KB); the unit's draws (3.9 KB).
+
+**What changed (each result-identical; the saved memories unchanged, so snapshots are too).**
+- *The params read once for all who have them alike but for a person's own members* (`citizen::params::PERSONS_OWN`:
+  `beliefs`, `own_values`, `started`, `stops_work_at`, `trade`, the members the generator gives each person their own).
+  The life's `Params::of` gives `Given` (the person's own, by name, and the rest, `Params`, through `Deref`); the mind's
+  `P` holds the person's own and its `Common` through `Deref`. Each rest is read from the params less those members, and
+  looked up by their text (and, for the mind, the world's dials and tick: all `Common::of` reads) with
+  `controller::read_once`: the same text, the same reading, held once. The mind's parts take theirs from it shared
+  (`Arc`): `Inner`'s params, population figures and outlook, `Wants`' params, `Culture`'s and `TownMemory`'s params
+  (from the culture dial's), the founding params (read once by their two members' text).
+- *What a person last wrote to their record kept as text* (`mind::packed::Packed`): read back where it is compared or
+  shown, it is the value it was made from (serde_json writes every number so that it reads back to the same bits, and a
+  map in key order); saved, the value. The mind's `started` figures, read once at the first plan, likewise.
+- *Their home's building shared with the picture* (`Absorbed::home_site` an `Arc`, as the picture holds it).
+- *Boxed where a map's node or the struct held room for nothing*: what others told us (a map node holds eleven of its
+  values, some 250 bytes each), the optional culture and town memory (1 KB a person where the culture dial is off), a
+  home being sold or bought.
+- *The book's places* (`common::book::Place`): minted ids (`rec.<n>`) in a sorted list, pushed at its end or put within
+  64 of it (16 bytes a record against a map node's 45 or so), the rest in a map; the statements of each kind and those
+  standing in one map. *The draws' keys* as `Box<str>` (exactly their text).
+
+**Measured after** (release builds, 8 engine threads, each run alone in a slot; the machine's load 20 to 30):
+- What the citizen's code holds at the 1,000-person month's end: **84.8 MB to 43.4 MB, about 85 KB to 43 KB a person**
+  (the profile of the same run). Of that 43 KB: the person and mind inline (8.5 KB), the book (about 10 KB), the record's
+  text, ties, what they learned, teachings, gatherings, word of mouth and the rest each under 1.5 KB.
+- Peak footprint, 1,000 people x 30 days: au-vic 663 to 609 MB, gb-eng 622 to 591, us-oh 534 to 506.
+- 10,000 people x 30 days (au-vic, a town made as SC-1's was: `town-1000.yaml`, `citizens=10000`): **5.10 to 4.68 GB** peak footprint (5.20 to 4.75 GB
+  resident), 1,180 to 1,161 G instructions, main thread 111 to 97 s of CPU.
+- Identical: the same final state hash and log digest (the log as written, less the header's build id and each entry's
+  own hash and prev) as main (`3b87959e`) on 30-day runs of the 1,000-person towns of au-vic (`b98638694d4b...`,
+  `ec2cc14727186a53`), gb-eng (`0b5859fe...`, `cf781cfa5b33f4cf`) and us-oh (`b5d61ceb...`, `2e29c52dfac0e567`), of the
+  200-person towns of the three, and of the 10,000-person au-vic month (`ce1314d1...`, `71cd6c7043f254ec`); and what
+  every actor keeps, as `OIKOS_KEPT` counts it from their saved memories, the same at the end. Tests:
+  `kernel/tests/mind_memory.rs`: held always, in three profiles' generated towns every person's shared readings are
+  what they would have read of all their params alone, one reading for each set of params alike but for their own; and
+  the proof against main, `#[ignore]`d and run by hand (`cargo test --test mind_memory -- --ignored`: the three
+  200-person living towns run a month to main's state hash and log digest), since a pin of a whole town is a change
+  detector (docs/testing.md) and culture-dial.test.ts is the one alarm kept. Beside them: the book finds every record
+  where it was taken in, in whatever order they come and after letting go (`common/tests.rs`); people given the same
+  params but their own hold one reading (`mind/tests.rs`); `packed`'s round trip, floats to the bit.
+- **Again on main as it moved** (2e3f6277, after scale-next's cuts and foundations 2 phase 1; merged with no
+  overlap in code): the same state hash and log digest on 30-day runs of the three profiles' 1,000-person towns
+  (au-vic `2220ea75...`/`f11b3714e6ae067e`, gb-eng `dca5e9de...`/`3ed720ffc2a55ad1`, us-oh `5e799346...`/
+  `9f1f372c7269a6c2`); peak footprint 512 to 466 MB, 494 to 445, 442 to 400 (about 45 KB a person). The ignored
+  proof's pins taken again from that main.
+- **Not reached:** the owner's 50 KB a person is for the whole run; minds and memories are now about 43 KB of the 10,000
+  town's 468 KB a person. The rest is the run's own (the hash's caches, knowledge, the engine, the log's buffer), the
+  other SC-1 work.
+- **Revisit if** a module comes to read one of `PERSONS_OWN` in the shared part (it would read nothing there: the
+  member must then be read per person), or a generator gives each person another member of their own (then add it, or
+  each person's reading is their own again, as before: memory, not results); a book's records come far out of order
+  (then most go to the map, as before); a profile at 50,000 shows what people keep (the book, the inline state) to
+  matter beside the run's own holders.
+
+## 2026-10-25 · The taxpayer's account: the tax collector keeps it, a credit is claimed back or set off (branch `taxpayer-accounts`; PB-23; world.tax_collector 0.1.0, generator 0.69.0; no model called)
+
+Asked: lv-12's clinic paid a month's withheld tax twice (its manager by hand, its payroll officer with the return) and
+could not get it back; build the real institution, so that an overpayment shows as a credit the taxpayer can claim
+back or set against its next return, done in time by whoever does the collector's work, wrong at a rate, with review
+routes as law data, nobody shown more than is theirs.
+
+- **The law, as data** (`law-tax-refunds`, the outside world's, public; the profile's `public_finance.refunds`:
+  `pay_within_days`, `set_off`, `wrong_refusal_bps`, with its source): the collector keeps each taxpayer's account,
+  tells it of a credit, repays one claimed back within the law's days, and (where `set_off`) agrees that it be set
+  against the next return. The review is the profile's `decisions` rule for `tax_credit_decision` (published in
+  `law-decisions` with the others; `Reconsiderations` reads it as the support office's reviews are read).
+- **Who does it.** A new office of the outside world, `outside-tax` (`world.tax_collector`, Rust,
+  `kernel/crates/actors/src/boundary/collector.rs`), held by the outside world's case system as the support office is.
+  Its casework is its officers' (law 10, as main's foundations-2 phase 1 made the support office's, met at the merge of
+  main): the decision, a review and its answer are named `by` a desk of the outside world's (`outside-tax-casework`,
+  template `tax-casework`: the person table's minutes, a decision twenty as a placeholder, in an officer's working day,
+  one lane, a placeholder since no figure sizes a collector's officers for a town); the refund's payment is a step of its
+  own, the case system's. (Before the merge the decision was a twenty-minute row on the case system; that row is gone.)
+  The decision has a row in the table of slips (a claim that is due refused, "the
+  payment could not be matched to the account", at the profile's rate, in a town with frictions). A taxpayer's claim
+  is a payroll officer's quarter of an hour (placeholder).
+- **What it sees: only its own.** Its channels are its accounts (the `ledger`), the returns, claims, requests and
+  reviews addressed to it, and the laws; it declares no `keeps` because nothing it is shown is anyone else's register.
+  A taxpayer sees its own account in the statements sent to it (when a credit first stands, and when the figure
+  changes) and in one it asks for on the public request form; the payroll officer's file `tax-account` holds the
+  collector's papers to its organisation, nothing else.
+- **The account** (`ledger`): each return a liability (what it says is owed less what the return before it under the
+  same rule left owing, since a payroll short of money carries the rest into the next figure); each payment allocated to
+  what is outstanding, the rest held on account and allocated to the next return; a refund paid out of what is on
+  account; the credit is what is on account less any set-off agreed and not yet used. A payment is the collector's when
+  its words say tax (tax, withheld, or a charge's id or name), into one of its charges' accounts from elsewhere: the
+  outside world's general account also takes orders, licences, repairs and dividends, and only the words tell them apart
+  (a real payment's structured reference is not modelled: PB-23, what is left).
+- **The taxpayer's side** (`Staffing::tax_account`, every payroll that files returns): a statement in credit is claimed
+  (set off where the law allows, repaid where not); a set-off agreed is used on the next return (it pays that much
+  less and says `set_off`, `set_off_of`; its own books carry nothing owed for it); a refusal while the collector's own
+  statement shows a credit is asked about once, inside the review's days. The forms `tax_credit_claim` and
+  `tax_account_request` are public, so a seat in any office that pays tax over can do the same.
+- **Sources.** Mexico (`mx-jal-2026`): refund within 40 days of the claim, CFF art. 22, and recurso de revocación within
+  30 days, art. 121, both read on a transcription (mley.mx), to confirm against the DOF; no set-off of withheld tax, art.
+  23 as a search snippet gives it (offset only against one's own debts of the same tax), to confirm. England: an
+  employer's PAYE credit used against its next payments or repaid (HMRC guidance, search snippets, to confirm); no
+  statutory time to repay found (30 days a placeholder); a review within 30 days (recalled). The other seven profiles:
+  placeholders, marked (30 days, no set-off, a review in 30 days). `wrong_refusal_bps` 500 everywhere, a placeholder.
+  `docs/research/references.md` has both rows.
+- **Left out** (docs/behaviour/public-finance.md, "Leaves out"): the authority's request for more papers (Mexico's 20
+  days), interest on a late refund, the time limit for claiming, the appeal past the review (the collector does not yet
+  carry out a venue's order, so no appeal route is published for it), allocation by period, chasing what is owing.
+- **When nobody overpays, nothing happens.** The collector writes only when a credit stands, a claim or a request comes,
+  or a review is asked for; payroll code writes only on the collector's papers; a return with no set-off is word for word
+  what it was. Checked: au-vic-2026 (town.yaml, seed 1) run 60 days with the collector and with it taken out (its office, system, desk, file, law and forms) has the same records (31,648 before the merge of main, 31,543 after it), payments and moves, line for line; the Mexican town of the new test, 80 days, writes no paper of the account.
+- **Pins re-taken, with this entry as the reason** (on main after foundations-2 phase 1, at the merge of 2026-10-26): `culture-dial.test.ts`, the three config hashes (a new office, its system and its officers' desk, the law and two forms, the payroll officer's file, a row of the table of work, generator 0.69.0: dbb34546..., b5082f8c..., 47fed11d... to 4c714b3d..., a6a15d31..., dd840c8e...) and the three Rust states (the new participants: f49ce487..., ce90d241..., 1605af11... to e6916c32..., 47582857..., f94c4358...). au-vic over 60 days has the same 31,543 records, payments and moves with the collector as with it taken out. No other pin moved in the tests run.
+- **Tests.** `collector.rs` (7: the lv-12 case in the ledger, a short return carried, payments told by their words, a
+  month paid twice stated once, repaid once, a second claim finding nothing; set-off only where the law allows and used
+  by paying less; a refusal reviewed inside the days and put right, and out of time after; a statement on request);
+  `staffing.rs` (2: a stated credit claimed and a set-off paid less on the next return, said; where the law has no
+  set-off a refund claimed and a refusal against the collector's own statement asked about once);
+  `orchestrator/test/taxpayer-account.test.ts` (a Mexican town run 80 days: nobody pays twice and no paper of the account
+  is written; the clinic's manager pays $1,000.00 by hand and the collector states it to the clinic alone, the clinic's
+  payroll officer claims it back, the collector grants it and the refund reaches the clinic's account). Changed:
+  `foundations-laws.test.ts` (F7's list of a living town's slips names the new row).
+- **Not done:** docs/plan.md does not exist (asked to tick PB-23's gap line there); PB-23 is marked mitigated in the
+  register, not fixed, because its figures are placeholders and the payment's reference is words. The translator has
+  not learnt the two new forms.
+- **Revisit if** a payment a seat makes for tax in words that do not say so is lost (the words rule missed it); a
+  study reads refund times or refusals (source the figures first); a place's figure for tax officers per employer is found
+  (size the desk by it); or a place's law allocates payments by period and it matters.
+
+## 2026-10-25 · Law 11: every unbased place given its basis, 310 to none (branch `figures-basis`; no value changed; no result changes; no model called)
+
+- **What was unbased.** On origin/main (3b87959e) the eleven counted towns had 310 unbased places: the 306 listed, and
+  four that the commercial-leasing merge added (`firm.landlord`'s `commercial.*`). By profile's town: au-vic 160, br-mg
+  234, de-ni 153, gb-eng 161, in-tn 165, jp-akita 156, ke-nakuru 166, mx-jal 163, us-oh 154; living au-vic and gb-eng
+  214 each. Now none in any of them, and `fixtures/figures-unbased.json` lists nothing.
+- **Why so few new sources were needed.** Nearly every place was a figure the profiles already speak for, reaching the
+  town through a module's parameter or a catalogue entry that the generator's table (`worlds/generator/figures.ts`) had
+  no row for: the bank's rates, the utilities' tariffs, the tribunal's possession steps, the union's dues, the clinic's
+  and school's staffing. Each now has a row that is true of the line of `generate.ts` that makes it: it names the
+  profile path it copies (the note then gives the class), or says it is derived (and from what), a placeholder (and
+  why) or a convention. The old places' numbers in the eleven towns now count 1,631 placeholder, 705 derived, 193
+  convention, 132 sourced and 71 to confirm. No profile note was added or changed and no value changed, so no town and
+  no log changes (the count is never in a config or a log).
+- **Marked as the generator's own placeholders** (each row says so; ME-11): a run's cap on created entities (50); a
+  child's other parent in the same cell; a let home's opening disrepair, drawn below the level of fault; heat losing
+  half a day; the councillors' leanings (-80 to 80); the budget's lead (45 days, the council's vote, two weeks);
+  casework at 80% of a worker's hours; the support office's statistics every 30 days; the builder's materials and build
+  times (as the structure types, already a placeholder); and the landlords' compliance, the spec's setting
+  (worlds/town.yaml). Conventions: the seed, the tick, the run's length, the log's checkpoints and anchors, a 365-day
+  year, units (an hour of upkeep or repair, 10 kg of waste, a kWh, a kilolitre, one item, 10,000 of skill for a year of
+  schooling), a field's floor and its arithmetic ceiling, a business of one employing nobody, and the grid's and the
+  river's own work taking no one in the town any time.
+- **Three changes to the counting, none to a world.** (1) A row's profile path reads the note of the same part below
+  it where the profile has one (`households.lone_bps` under the row for `households`). br-mg's notes are by part, with
+  no note for a whole section, so its households, nature and life were unbased though each part had a source; and in
+  every profile a part's own note is now read before its section's (a figure can now count as sourced where its
+  section's note calls another part a placeholder). (2) A row may hold for one id only (`id`): the catalogue's tasks and
+  fields share a pattern but are made from different sections (pollution from `nature.pollution`, the river from
+  `utilities` and `hazards`, heat from `climate`; a consultation's time from `health`, a lesson's from `education`),
+  and the old row read every field as `nature`. (3) A row may hold only where the config has a path (`given`): the
+  tribunal's days to a hearing are `frictions.venues.tribunal_days` in a town with frictions and
+  `justice.hearing_after_days` otherwise. Two of the citizen's rows (`found_bps`, `found_own_ppm`) spoke for parameters
+  the generator no longer makes, and the generic `wage` row for any module now matched nothing (each module's wage has
+  its own row: the shop, factory or construction wage, the doctor's, teacher's, officer's or public servant's); the
+  three were removed.
+- **Known faults left.** A row naming a section reads that section's note where the part has none, and some section
+  notes are long and mixed (a profile's `utilities` or `round`): the class is read from the note's words, so it errs
+  towards placeholder, never towards sourced. A `derived` row still does not carry through the class of what it is
+  derived from (N3). Numbers in behaviour code that never reach the config are not counted (N4).
+- **Revisit if** a row is found untrue of the code beside it (fix the row, not the count), or N3 puts the table in the
+  config (these rows are then its first provenance).
+## 2026-10-25 · Lease remedies: arrears, leaving early, rent reviews, and a business that sees its unit (branch `lease-remedies`; firm.landlord 0.21.0, firm.retailer 0.21.0, generator 0.70.0; risk ME-1; contract change: `{held: "occupancy"}`; no model called)
+
+**Asked (Naz, through the coordinator):** the four gaps commercial leasing left written down (a landlord with no remedy for a leased unit's arrears; a tenant who cannot leave early; no rent reviews within a lease; a business that cannot see its unit, so the day's first serving acts are refused until its owner arrives), each as institutions and law data, never kernel rules, as homes' tenancy law is done; each act in its performer's time; the profiles' sources where they exist, flagged where not. The design is docs/behaviour/leasing.md.
+
+**Built.**
+- *The law, as data.* A profile's `commercial.law` is published as `law-premises-leases` (generator): rent owed `arrears_days` before a landlord may end a lease for it, after `forfeiture_notice_days` (0: re-entry the next day); a tenant's own notice (`tenant_notice_days`; 0: only a surrender agreed); a review at most every `review_months`, on `review_notice_days`, `upward_only` or not; claims heard by the town's tribunal (`heard_by`). The landlord, the business and the tribunal read the record (`landlord::premises_law`); the kernel reads nothing of it. The lease's own terms of ending follow it: the landlord's clause (the notice it gives when it ends the lease for rent owed or on a surrender; a day where the law asks none, as the agreement reader needs a period), the tenant's only where the law gives one. `commercial.notice_days` (notice either side at the end) is gone: under the agreement reader a clause can be used at any time, which let either side end a five-year lease on 90 days (nobody did); its sourced figures went to the law (ke-nakuru's two months, Cap 301) or to "leaves out" (gb-eng's s 25 notice, which is about security of tenure at the end).
+- *Arrears* (`firm.landlord`, at its weekly look in the rent book). A premises lease's account: the deposit as signed, the rent monthly in advance to the lease's end at each month's rent, a surrender's price once agreed (paid; one asked for and not paid is no rent owed), against all received from the account it applied from. A month's rent behind: a written demand (`review_request`, matter arrears, as for homes), again a month on; still behind once `arrears_days` have run from when first seen: ended for it (`lease_forfeiture` to the tenant, and the landlord's notice under the lease). At the end, however it came, the deposit is set against what is owed and the rest given back; more owed is recorded as a debt (a `claim`) and brought before the tribunal as a `debt` application where the law sends it there; the tribunal's existing debt list, order to pay and registrar's garnishee do the rest. Nothing puts anyone out: the business moves itself out as its lease ends.
+- *Leaving early* (`firm.retailer`, a business of one in leased premises). Each month it weighs the premises as it weighed taking them (`premises_weighing`, the same sum as applying); worse than trading alone for `leave_after_months` running (3, a placeholder), or closing (its owner has given it up or gone), it asks to leave: its own notice where the lease gives one, else `surrender_request`. The landlord answers with `surrender_terms` (its practice, `surrender_months` of rent, a profile figure, a placeholder in all three) and, once paid, ends the lease by its notice. The business pays if it must leave, or if the price is no more than staying would lose it to the end, and if it holds it; a closing business that cannot pay closes a month on and the lease runs on (the landlord's remedies then apply). When the lease ends it stops its rent orders, takes its stock back where it traded before, and tells its owner (`trading_at` with `back`): the owner works from home again (citizen `trading_from`).
+- *Rent reviews* (`firm.landlord`). As often as the law lets, where the new rent starts before the lease ends: to the market rent from the landlord's own books (its other units' recent lets, its asking rents, how many stand empty; `oikos_rules::rent::reviewed` with the whole gap passed: a market review), never down where reviews are up only; from the first rent day once the notice has run (`rent_review`). The business moves its standing order to the new rent from that day and stops the old one after its last payment. A home's rent-review law does not reach it (its own kind, its own law).
+- *Who is at the unit* (a contract change, under the standing approval to change contracts; the kernel's part is sight, not law). A new `here` area for a `sites` channel: `{held: "occupancy"}`, the cells of the buildings where an agreement in force (or running out its notice) has another party give the capacity's organisation occupancy of a space; an organisation's only, a map only (not notices); nothing until it holds premises, and a change of what it holds delivers the whole of the new area, as a move does for `near` (`observe::held_structures`; `contracts/world-config.schema.json`; `knowing.ts` `held`; docs/no-god-view.md). The business of one's position (and the venture a founder starts one from) has it as `unit`. Leased, it serves with those it sees in the unit's workplace, its owner and its hands, as they come: nothing is served before the owner arrives, so no act is refused for nobody being there. Considered and not done: a premises channel named at generation (a unit's cells are its landlord's premises, and a cell is one organisation's only); a visit (it would take the looker's time to go where it already is); following the post-holder's body (an office is not where its holder sleeps).
+- *Work takes time.* Every new act is an ordinary block in the table of work (a statement `publish`, a notice `give_notice`, a payment `transfer`, a claim `record_claim`), charged to whoever does it (the landlord's letting office, the business's owner, the tribunal's member and registrar). No new rows: none is sourced, and the block rows are the placeholders every other paper uses (WM-1).
+
+**Sources** (in the profiles' notes and docs/research/references.md; most recalled, to confirm, or placeholders, ME-1): au-vic, the Retail Leases Act 2003 (Vic) on reviews at most yearly and no ratchet (s 35), market reviews (s 37), disputes to VCAT after mediation (Part 10), all recalled; a lease's common 14-day re-entry clause, a placeholder. gb-eng, forfeiture by peaceable re-entry under a 21-day clause, a tenant's six-month break and five-yearly upward-only reviews, recalled practice. ke-nakuru, Cap 301's two months' notice to end or alter a controlled tenancy (recalled), placed on the forfeiture, the tenant's and the review notice; the rest placeholders. The tribunal stands for VCAT, the county court and the Business Premises Rent Tribunal, as each profile already said of it.
+
+**Tests** (mechanisms, not draws). `firm.landlord`: a lease offered with the landlord's ending clause and the tenant's only where the law gives one; a tenant behind is asked, ended for it once the law's days have run (not before), and what the deposit does not cover claimed and brought before the tribunal once; one that pays what it is asked keeps its lease; a surrender priced at the landlord's months, ended once paid, the deposit back less what is owed; a review to the market from a rent day after the notice, down where the law allows and not where it is up only, not again within the period; the old deposit test now pays its rent (a lease in arrears no longer gives its deposit back whole). `firm.retailer`: in leased premises nothing is served until it sees its owner there, then served there; a demand paid if held and not if not; a review moves the order from its day and stops the old one after its last payment; a closing business asks to surrender (or gives its notice where the lease gives one), does not close while the lease binds it, and pays the price; at the lease's end the rent stops, the stock goes back and the owner is told; a lease that adds nothing to one person loses its rent in the weighing. Kernel (`kernel/tests/knowing.rs`): a person's held premises, and notices at held premises, do not load; an office's do; an organisation sees nothing until an agreement in force names it the occupant, then the building's ground and who is there by name.
+
+**Leaves out** (docs/behaviour/leasing.md): mediation, a valuer's market rent, a tenant's challenge, relief from forfeiture, distress and CRAR, rent lost after forfeiture, a guarantor (a lease holds nothing of the owner's), renewal and security of tenure, assignment; an owner weighing giving up still counts the rent to the lease's end. A business back from a lease trades from its owner's home.
+
+**Revisit if** a place's figures for any of the law's fields are opened (replace the recalled and placeholder ones); leased businesses' arrears or exits matter to a study (then the owner's liability, and what leaving costs in the owner's own weighing); a valuer or mediation office is built; or the `held` area is wanted for notices put up at held premises (records), which it refuses now.

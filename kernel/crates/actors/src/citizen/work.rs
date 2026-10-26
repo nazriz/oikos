@@ -460,9 +460,20 @@ impl Person {
         let Some(own) = self.s.own_work.clone() else { return };
         // (Our business has taken premises on a lease, and says so: we work there now, and not from home:
         // docs/behaviour/leasing.md.)
-        let moved = crate::common::latest_by_speaker(&self.book, "trading_at", |r| crate::common::addressed_to(r).contains(&self.me))
-            .get(&Some(own.firm.as_str()))
-            .map(|r| (data(r).s("space").map(String::from), data(r).i("rent"), data(r).i("until")));
+        let latest = crate::common::latest_by_speaker(&self.book, "trading_at", |r| crate::common::addressed_to(r).contains(&self.me)).get(&Some(own.firm.as_str())).cloned();
+        // (Its lease has ended, and it says so: it trades from where it did before, and we work from home again, as we did:
+        // where that is, we tell it, as for any move home.)
+        if latest.as_ref().is_some_and(|r| data(r).flag("back")) {
+            if own.lease.is_some() {
+                if let Some(o) = self.s.own_work.as_mut() {
+                    o.at = None;
+                    o.lease = None;
+                }
+                self.work.trading_from = None;
+            }
+        }
+        let moved = latest.filter(|r| !data(r).flag("back")).map(|r| (data(&r).s("space").map(String::from), data(&r).i("rent"), data(&r).i("until")));
+        let own = self.s.own_work.clone().unwrap_or(own);
         if let Some((Some(space), rent, until)) = moved.filter(|m| m.0.is_some() && own.at.as_deref() != m.0.as_deref()) {
             if let Some(o) = self.s.own_work.as_mut() {
                 o.at = Some(space);

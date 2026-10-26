@@ -284,6 +284,32 @@ pub struct PositionItem {
 }
 
 /// Can those acting for `entity` perceive this record? The author's entity always can.
+/// The buildings where an agreement now in force (or running out its notice) has another party give `entity`
+/// occupancy of a space: premises it holds by agreement, such as a lease. By the agreements' own terms, read as they
+/// read now; the meaning of each is nobody's to judge here, only where it puts its occupant.
+pub fn held_structures(st: &State, entity: &str) -> Vec<Id> {
+    let mut out: BTreeSet<Id> = BTreeSet::new();
+    for id in st.agreements_of.get(entity).into_iter().flatten() {
+        let Some(stored) = st.records.get(id) else { continue };
+        let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { continue };
+        if !st.reading(id).is_some_and(|r| r.status == "in_force" || r.status == "ending") {
+            continue;
+        }
+        for c in terms.commitments.iter().filter(|c| c.who != entity) {
+            let Some(o) = c.does.get("outcome").and_then(|o| o.get("occupancy")) else { continue };
+            if o.get("who").and_then(Value::as_str) != Some(entity) || o.get("leave").and_then(Value::as_bool) == Some(true) {
+                continue;
+            }
+            let Some(space) = o.get("in").and_then(Value::as_str) else { continue };
+            let sid = crate::config::split_space(space).map_or(space, |(s, _)| s);
+            if st.structures.contains_key(sid) {
+                out.insert(sid.to_string());
+            }
+        }
+    }
+    out.into_iter().collect()
+}
+
 pub fn can_see(st: &State, rec: &Record, entity: &str) -> bool {
     rec.visible_to.allows(entity) || st.author_entity(rec).as_deref() == Some(entity)
 }
@@ -691,6 +717,17 @@ impl RecordIndex {
         let keep = || self.scopes.write().unwrap_or_else(|e| e.into_inner());
         match area {
             Area::All(_) => Scope::Everywhere,
+            // (Worked out afresh each look: few organisations hold premises by agreement, and each holds few.)
+            Area::Held(_) => {
+                let mut cells = BTreeSet::new();
+                for sid in held_structures(st, me) {
+                    let x = &st.structures[&sid];
+                    if let Some(f) = s.types.get(&x.structure_type).map(|t| t.footprint) {
+                        cells.extend(crate::config::footprint_cells(&s.detailed, &x.at, f).unwrap_or_default());
+                    }
+                }
+                Scope::Cells(std::sync::Arc::new(cells))
+            }
             Area::Cells(cs) | Area::Premises(crate::config::Premises { premises: cs }) => {
                 if let Some(cells) = known().listed_cells.get(cs) {
                     return Scope::Cells(cells.clone());
@@ -1006,7 +1043,13 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             }
             // A channel that looks near the capacity's entity looks from where it is now: if it has moved
             // since the last look, the whole of its new surroundings replaces the old.
-            let from = matches!(area, Some(Area::Near(_))).then(|| st.entities.get(&me).map_or(0, |e| e.moved));
+            // (Premises held by agreement: the area moves when the buildings held do; `from` is which they are, as a
+            // number a config can carry: a look is saved with the run, and its numbers are JSON's safe integers.)
+            let from = match area {
+                Some(Area::Near(_)) => Some(st.entities.get(&me).map_or(0, |e| e.moved)),
+                Some(Area::Held(_)) => Some(held_structures(st, &me).iter().fold(0xcbf2_9ce4_8422_2325u64, |h, s| s.bytes().chain([0u8]).fold(h, |h, b| (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3))) & ((1u64 << 52) - 1)),
+                _ => None,
+            };
             let moved = last.is_some_and(|l| l.from != from);
             let whole = (moved || anew).then_some(true);
             let scope = area.map(|a| index.scope(s, st, a, &me));

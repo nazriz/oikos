@@ -136,18 +136,44 @@ pub struct PetitionDemand {
 
 /// The parameters the mind reads: citizen.ts's, as the world gives them over its defaults (the names and meanings
 /// unchanged). Rebuilt from `ctx.params` at `make` and `restore`, never saved.
+///
+/// A person's own (who they are, the members of their params that are theirs alone: `OWN_MEMBERS`) are here; the
+/// rest (`Common`, read through `Deref`) is read once for everyone whose params and world are alike but for those, and
+/// held once for them all (risk SC-1: a copy each was about 7 KB a person). It is read from the same members the same
+/// way, so it is what each would have read.
 #[derive(Debug, Clone)]
 pub struct P {
     pub me: String,
     pub participant: String,
+    pub own_values: Option<BTreeMap<String, i64>>,
+    pub beliefs: BTreeMap<String, i64>,
+    /// (Kept as its text: read once, at the first plan.)
+    pub started: Option<super::packed::Packed>,
+    pub founding: Option<std::sync::Arc<FoundingParams>>,
+    pub c: std::sync::Arc<Common>,
+}
+
+impl std::ops::Deref for P {
+    type Target = Common;
+    fn deref(&self) -> &Common {
+        &self.c
+    }
+}
+
+/// The members of a citizen's params that are a person's own (`citizen::params::PERSONS_OWN`): those the mind reads
+/// are read for each, and all are left out of what `Common` is read from and keyed by.
+use crate::citizen::params::PERSONS_OWN as OWN_MEMBERS;
+
+/// What the mind reads of its parameters that is not a person's own (`P`).
+#[derive(Debug, Clone)]
+pub struct Common {
     pub year: i64,
     pub essentials: i64,
     pub essentials_units: i64,
     pub goods: String,
     pub in_labour_force: bool,
-    pub values: person::PopulationValues,
-    pub own_values: Option<BTreeMap<String, i64>>,
-    pub outlook: inner::Outlook,
+    pub values: std::sync::Arc<person::PopulationValues>,
+    pub outlook: std::sync::Arc<inner::Outlook>,
     pub outlook_json: Json,
     pub institutions: BTreeMap<String, String>,
     pub bank: Option<String>,
@@ -172,7 +198,6 @@ pub struct P {
     pub ask_work_bps: i64,
     pub ask_again_days: i64,
     pub pass_on_bps: i64,
-    pub beliefs: BTreeMap<String, i64>,
     pub belief: BeliefP,
     pub sway: Sway,
     pub goals: Goals,
@@ -189,15 +214,13 @@ pub struct P {
     pub aggrieved_bps: i64,
     pub attach_mean_place: Option<i64>,
     pub attach_mean_trade: Option<i64>,
-    pub started: Option<Json>,
     pub ventures_any: bool,
     pub can_found_business: bool,
     pub origin: Option<String>,
     pub initiative: Option<bool>,
     pub mind: person::MindParams,
-    pub inner: inner::InnerParams,
-    pub wants: wants::WantParams,
-    pub founding: Option<FoundingParams>,
+    pub inner: std::sync::Arc<inner::InnerParams>,
+    pub wants: std::sync::Arc<wants::WantParams>,
     pub cdial: Option<CultureDial>,
     pub rdial: Option<ReadingDial>,
     /// The culture's rates for the conducts a person's acts are drawn at (citizen.ts 839-853).
@@ -221,8 +244,39 @@ fn of<T: serde::de::DeserializeOwned + Default>(v: &Json, k: &str) -> T {
 }
 
 impl P {
+    /// The person's own members, and the rest read once for all whose params (but for those) and world are alike:
+    /// keyed by the text of those params and of the world's dials and tick, which are all `Common::of` reads.
     pub fn of(ctx: &Ctx) -> P {
-        let v = Json::Object(ctx.params.to_map());
+        let own = |k: &str| ctx.params.get(k).filter(|x| !x.is_null());
+        let mut key = ctx.params.text_without(&OWN_MEMBERS);
+        key.push('\u{0}');
+        key.push_str(&ctx.world.dials.to_string());
+        key.push_str(&format!("\u{0}{}", ctx.world.tick));
+        let c = oikos_contracts::controller::read_once::<Common, std::convert::Infallible>(&key, || Ok(Common::of(ctx))).unwrap_or_else(|e| match e {});
+        P {
+            me: ctx.entity.clone(),
+            participant: ctx.participant.clone(),
+            own_values: own("own_values").and_then(|x| serde_json::from_value(x.clone()).ok()),
+            beliefs: own("beliefs").and_then(|x| serde_json::from_value(x.clone()).ok()).unwrap_or_default(),
+            started: own("started").map(super::packed::Packed::of),
+            founding: None,
+            c,
+        }
+    }
+}
+
+impl Common {
+    /// (Reads no member of `OWN_MEMBERS`, nor the person's entity or participant: what `P::of` keys it by is all it
+    /// depends on.)
+    fn of(ctx: &Ctx) -> Common {
+        Common::read(ctx, &OWN_MEMBERS)
+    }
+
+    /// Read from a person's params less the members named, for this person alone (`P::of` reads it less
+    /// `OWN_MEMBERS`, and shares it; read less none, it is what this person would have read of all their params, which
+    /// kernel/tests/mind_memory.rs holds it to).
+    pub fn read(ctx: &Ctx, skip: &[&str]) -> Common {
+        let v = Json::Object(ctx.params.iter().filter(|(k, _)| !skip.contains(&k.as_str())).map(|(k, x)| (k.clone(), x.clone())).collect());
         let dials = &ctx.world.dials;
         let nested = |k: &str, sub: &str| v.get(k).and_then(|x| s(x, sub));
         let union_join_bps: BTreeMap<String, i64> = of(&v, "union_join_bps");
@@ -260,17 +314,14 @@ impl P {
             }
         }
         let ventures: Vec<Json> = of(&v, "ventures");
-        P {
-            me: ctx.entity.clone(),
-            participant: ctx.participant.clone(),
+        Common {
             year: i(&v, "year").unwrap_or(365 * DAY),
             essentials: i(&v, "essentials").unwrap_or(40_000),
             essentials_units: i(&v, "essentials_units").unwrap_or(10),
             goods: s(&v, "goods").unwrap_or_else(|| "goods".into()),
             in_labour_force: v.get("in_labour_force").and_then(Json::as_bool).unwrap_or(true),
-            values: of(&v, "values"),
-            own_values: v.get("own_values").filter(|x| !x.is_null()).and_then(|x| serde_json::from_value(x.clone()).ok()),
-            outlook: of(&v, "outlook"),
+            values: std::sync::Arc::new(of(&v, "values")),
+            outlook: std::sync::Arc::new(of(&v, "outlook")),
             outlook_json: v.get("outlook").cloned().unwrap_or(json!({})),
             institutions: of(&v, "institutions"),
             bank: s(&v, "bank"),
@@ -295,7 +346,6 @@ impl P {
             ask_work_bps: i(&v, "ask_work_bps").unwrap_or(6_900),
             ask_again_days: i(&v, "ask_again_days").unwrap_or(60),
             pass_on_bps: i(&v, "pass_on_bps").unwrap_or(10_000),
-            beliefs: of(&v, "beliefs"),
             belief: merged(&v, "belief"),
             sway: merged(&v, "sway"),
             goals: merged(&v, "goals"),
@@ -312,15 +362,13 @@ impl P {
             aggrieved_bps: i(&v, "aggrieved_bps").unwrap_or(2_000),
             attach_mean_place: v.get("attach_mean").and_then(|x| i(x, "place_bps")),
             attach_mean_trade: v.get("attach_mean").and_then(|x| i(x, "trade_bps")),
-            started: v.get("started").filter(|x| !x.is_null()).cloned(),
             ventures_any: !ventures.is_empty(),
             can_found_business: !ventures.is_empty(),
             origin: s(&v, "origin"),
             initiative: v.get("initiative").and_then(Json::as_bool),
             mind: person::mind_params(v.get("mind").unwrap_or(&Json::Null)),
-            inner: inner::inner_params(v.get("inner").unwrap_or(&Json::Null)),
-            wants: wants::want_params(v.get("wants").unwrap_or(&Json::Null)),
-            founding: None,
+            inner: std::sync::Arc::new(inner::inner_params(v.get("inner").unwrap_or(&Json::Null))),
+            wants: std::sync::Arc::new(wants::want_params(v.get("wants").unwrap_or(&Json::Null))),
             cdial,
             rdial: reading::reading_dial(&json!({ "dials": dials })).ok().flatten(),
             conduct_rates,
@@ -410,8 +458,9 @@ pub struct State {
     pub ties: Ties,
     pub wants: Wants,
     pub initiative: bool,
-    pub culture: Option<Culture>,
-    pub town: Option<TownMemory>,
+    /// (Boxed, as `town`: 1 KB a person held for nothing where the culture dial is off. SC-1.)
+    pub culture: Option<Box<Culture>>,
+    pub town: Option<Box<TownMemory>>,
     pub beliefs: BTreeMap<String, i64>,
     pub faded_at: Option<i64>,
     pub levels: Needs,
@@ -433,7 +482,8 @@ pub struct State {
     pub recourse_bump: BTreeMap<String, i64>,
     pub last_seen: i64,
     // talk
-    pub told_us: BTreeMap<String, (News, i64)>,
+    /// (Each boxed: a map's node holds room for eleven, and a told item is some 250 bytes. SC-1.)
+    pub told_us: BTreeMap<String, (Box<News>, i64)>,
     pub talked: BTreeMap<String, i64>,
     /// People we have come to know by talking with them, mourning with them or meeting them at a gathering (TS's
     /// `peopleWeKnow`, kept at the same places): those asked whether we may stay when we have no home.
@@ -514,7 +564,7 @@ pub struct State {
     /// Practices in the book, by id, and who holds them.
     pub practice_hosts: BTreeMap<String, String>,
     // the record
-    pub written: BTreeMap<String, Json>,
+    pub written: BTreeMap<String, super::packed::Packed>,
     pub hours_at: i64,
     pub norms_version: u64,
     pub heard_version: u64,
@@ -543,7 +593,7 @@ pub fn make(cx: &mut Cx, born: &Born) -> Result<Box<dyn Mind>, String> {
         .map(|m| Value::ALL.map(|v| m.get(v.name()).copied().unwrap_or(5_000)));
     let expect: BTreeMap<String, i64> = [("shop", 8_000), ("job", 5_000), ("practice", 4_000)].into_iter().map(|(k, v)| (k.to_string(), v)).collect();
     let mind = person::Mind::new(&mut cx.rng("person"), &p.values, p.mind, expect, own);
-    let inner = Inner::new(&mut cx.rng("inner"), &mind.person.values, &p.values, &p.outlook, p.inner.clone());
+    let inner = Inner::new(&mut cx.rng("inner"), &mind.person.values, p.values.clone(), p.outlook.clone(), p.inner.clone());
     let dial = cx.ctx.world.dials.get("initiative_bps").and_then(Json::as_i64).unwrap_or(0);
     let initiative = p.initiative.unwrap_or_else(|| dial > 0 && (cx.rng("initiative").below(10_000) as i64) < dial);
     let wants = Wants::new(p.wants.clone());
@@ -558,8 +608,8 @@ pub fn make(cx: &mut Cx, born: &Born) -> Result<Box<dyn Mind>, String> {
         let env = m.env();
         let t = cx.t;
         let mut draw = |c: Conduct| culture::standard_normal(&mut cx.rng(&format!("culture-own-{}", c.name())));
-        m.s.culture = Some(Culture::new(cd.params.clone(), &cd, &env, &mut draw, &m.p.conduct_rates, m.p.origin.as_deref(), t));
-        m.s.town = Some(TownMemory::new(cd.params.clone()));
+        m.s.culture = Some(Box::new(Culture::new(cd.params.clone(), &cd, &env, &mut draw, &m.p.conduct_rates, m.p.origin.as_deref(), t)));
+        m.s.town = Some(Box::new(TownMemory::new(cd.params.clone())));
     }
     m.s.threshold = {
         let mut tr = cx.rng("threshold");
@@ -577,11 +627,14 @@ pub fn make(cx: &mut Cx, born: &Born) -> Result<Box<dyn Mind>, String> {
     Ok(Box::new(m))
 }
 
-fn founding_of(ctx: &Ctx, initiative: bool) -> Option<FoundingParams> {
+/// (Read once for all given the same two members, as `Common` is.)
+fn founding_of(ctx: &Ctx, initiative: bool) -> Option<std::sync::Arc<FoundingParams>> {
     if !initiative {
         return None;
     }
-    founding::founding_params(ctx.params.get("founding").unwrap_or(&Json::Null), ctx.world.dials.get("founding").unwrap_or(&Json::Null))
+    let (own, dial) = (ctx.params.get("founding").unwrap_or(&Json::Null), ctx.world.dials.get("founding").unwrap_or(&Json::Null));
+    let key = format!("{own}\u{0}{dial}");
+    oikos_contracts::controller::read_once::<FoundingParams, ()>(&key, || founding::founding_params(own, dial).ok_or(())).ok()
 }
 
 pub fn restore(ctx: &Ctx, saved: Json) -> Result<Box<dyn Mind>, String> {
@@ -830,7 +883,7 @@ impl CitizenMind {
     /// What we hear of others now (citizen.ts `newsNow`), by who told it.
     pub fn news_now(&self, t: i64) -> impl Iterator<Item = (&String, &News)> {
         let days = self.p.news_days;
-        self.s.told_us.iter().filter(move |(_, (_, at))| t - at <= days * DAY).map(|(k, (n, _))| (k, n))
+        self.s.told_us.iter().filter(move |(_, (_, at))| t - at <= days * DAY).map(|(k, (n, _))| (k, &**n))
     }
     pub fn fear_of(&self, who: &str, t: i64) -> i64 {
         self.s.feelings.level(Emotion::Fear, who, t)

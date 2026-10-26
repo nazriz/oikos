@@ -137,6 +137,32 @@ through contracts, world, rules, perception and actors: the same crates.
   of a few days, merged often.
 - Each step's measures and its ceiling go in this table and docs/decisions.md as the earlier cuts' did.
 
+## Citizens' minds and memories (branch `mem-minds`, 2026-10-25)
+
+au-vic-2026 from `worlds/town-1000.yaml`, `living.initiative_bps=10000`, seed 1, all code, 30 days, `oikos-kernel world`
+with 8 engine threads. What the citizen's code holds is read from a heap profile at the run's end (`heapprof::dump("end")`,
+8 KB rate): every live sample whose stack runs through `oikos_actors::citizen` or `::mind` (the total:
+`bun scripts/heapprof.ts <out>.end.txt <dwarf> --focus 'oikos_actors::(citizen|mind)::' 0`), split by the innermost
+frame of the actors' own, inlined frames expanded. Details, and what each change is: docs/decisions.md 2026-10-25, "Citizens' minds and memories held compactly".
+
+| what (1,000 people) | main | after |
+|---|---|---|
+| what a person last wrote to their record (`State::written`, JSON values; now their text) | 16.0 MB | 2.6 MB |
+| the mind's and life's readings of their params, each person's own copy (now one for all alike; their heap, the inline part in the next row) | about 15 MB | under 1 MB |
+| the person and the mind inline (`Box<Person>`, `Box<CitizenMind>`) | 15.5 MB | 8.5 MB |
+| the book's indexes | about 11 MB | about 10 MB |
+| their home's building, copied out of the picture (now shared with it) | 2.8 MB | 0 |
+| what others told them | 2.1 MB | 0.6 MB |
+| **all of the citizen's, per person** | **85 KB** | **43 KB** |
+
+| run | main | after |
+|---|---|---|
+| 1,000 x 30 d peak footprint, au-vic / gb-eng / us-oh | 663 / 622 / 534 MB | 609 / 591 / 506 MB |
+| 10,000 x 30 d (`citizens=10000`) | 5.10 GB peak footprint, 1,180 G instructions | **4.68 GB**, 1,161 G |
+
+The same state hash and log digest as main on all of them. Left of the 43 KB: the inline state (8.5 KB) and the book
+(10 KB), then a long tail under 1.5 KB each (ties, what was learned, teachings, gatherings, word of mouth, the draws).
+
 ## What held memory, and the config read participant by participant (branch `scale-next`, 2026-10-25)
 
 au-vic-2026 from `worlds/town-1000.yaml` with `citizens=10000` (and `50000`), `living.initiative_bps=10000`, seed 1,

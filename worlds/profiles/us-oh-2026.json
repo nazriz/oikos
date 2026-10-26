@@ -961,6 +961,7 @@
       "rates_due_days": 30,
       "rates_penalty_interest_bps": 800,
       "median_house_price": 16340000,
+      "refunds": {"pay_within_days": 30, "set_off": false, "wrong_refusal_bps": 500},
       "rates_exempt_kinds": [
         "health_service",
         "school",
@@ -1463,7 +1464,8 @@
           "grounds": "any error of fact or law in the determination",
           "fee_hours_of_pay": 0
         }
-      }
+      },
+      {"kind": "tax_credit_decision", "name": "A decision on a claim for tax paid and not owed", "review": {"within_days": 30, "grounds": "any: the collector looks at its decision again on the account"}}
     ],
     "frictions": {
       "per_adult_bps_per_year": {
@@ -1540,6 +1542,8 @@
     "calendar.fiscal_year_starts": "Ohio's state fiscal year runs 1 July to 30 June (ORC 9.34: the fiscal year begins July 1; to confirm, not opened). Local governments in Ohio use the calendar year, not modelled.",
     "calendar.holidays": "Opened: 5 U.S.C. 6103 (law.cornell.edu/uscode/text/5/6103) for the federal list and Ohio Revised Code 1.14 (codes.ohio.gov/ohio-revised-code/section-1.14, read via Internet Archive copy; the page says last updated July 23, 2021) for the Ohio list of 'legal holidays': the Ohio list is the same eleven days (New Year's, MLK, Washington-Lincoln, Memorial, Juneteenth, Independence, Labor, Columbus, Veterans, Thanksgiving, Christmas), plus any day appointed by the governor or President (not modelled). Federal observance: Saturday holiday observed Friday (5 U.S.C. 6103(b)), Sunday observed Monday; Ohio 1.14: a holiday on Sunday moves to Monday and Saturday does not move. The schema only offers shift_if_rest (next non-rest day), so a Saturday holiday is moved to Monday here, which is wrong for federal offices (they close Friday) and for Ohio (Saturday stays); Sunday to Monday is right for both. Inauguration Day (Jan 20, federal, DC area only) omitted.",
     "decisions.permit_decision": "PLACEHOLDER: an office's own second look at a planning decision within 30 days of it; the place's appeal route for a permit (to a tribunal or an inspectorate) is not built, since no one in the town yet brings a permit to a body that hears it. No source was opened for the days.",
+    "decisions.tax_credit_decision": "(risk PB-23) PLACEHOLDER: the tax collector looks at its decision on a claim for tax paid and not owed again if asked within 30 days; no source was opened for this place's review or appeal of a refund decision. The appeal to a court or tribunal is left out: the collector does not yet carry out a venue's order (docs/behaviour/public-finance.md).",
+    "public_finance.refunds": "(risk PB-23) PLACEHOLDER: no source was opened for this place's law on tax paid and not owed. pay_within_days (30) is a stand-in for the time its law gives the collector to repay; set_off is false (a credit is claimed back, not set against the next return) for want of a source; wrong_refusal_bps (500: one claim that is due in twenty refused) has no source for any place. To be sourced from the place's tax code (refund of payments not owed, offset) and its tax authority's figures on refund claims refused and later allowed.",
     "decisions": "Review and appeal of a decision on a claim for support, and what the decision waits for (docs/behaviour/decisions.md; foundations F8). Recalled, not opened.",
     "work_time": "How long a person's act takes, by what it makes, laid over the generator's placeholders (docs/profiles.md; WM-1, 2026-10-24): six rows from opened US burden estimates and a court workload study, each with its own source under work_time.sources; every other row is the generator's placeholder.",
     "decisions.benefit_decision.pension": "Social Security: reconsideration is asked for within 60 days of the notice, and 5 more are allowed for the post (20 CFR 404.909, 404.901: recalled, to confirm); a hearing before an administrative law judge within 60 days (+5) of the reconsideration notice, and only after it (20 CFR 404.933: recalled, to confirm); no fee. The agency's 10 days to answer a request for evidence is a PLACEHOLDER.",

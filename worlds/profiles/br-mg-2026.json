@@ -923,6 +923,7 @@
    "rates_due_days": 30,
    "rates_penalty_interest_bps": 1200,
    "median_house_price": 25000000,
+   "refunds": {"pay_within_days": 30, "set_off": false, "wrong_refusal_bps": 500},
    "rates_exempt_kinds": [
     "health_service",
     "school",
@@ -1423,7 +1424,8 @@
         "grounds": "any error in the decision, heard on a recurso",
         "fee_hours_of_pay": 0
       }
-    }
+    },
+    {"kind": "tax_credit_decision", "name": "A decision on a claim for tax paid and not owed", "review": {"within_days": 30, "grounds": "any: the collector looks at its decision again on the account"}}
   ],
   "frictions": {
    "per_adult_bps_per_year": {
@@ -1512,6 +1514,8 @@
     "calendar.fiscal_year_starts": "The financial year coincides with the calendar year: Lei 4.320/1964 art. 34, and the Constituicao Federal budget cycle (LOA).",
     "calendar.holidays": "National holidays: Lei 662/1949 as amended by Lei 10.607/2002 (1 Jan, 21 Apr, 1 May, 7 Sep, 2 Nov, 15 Nov, 25 Dec) and Lei 6.802/1980 (12 Oct, Our Lady of Aparecida); Lei 14.759/2023 made 20 Nov (Consciencia Negra) a national holiday (to confirm number and date). Good Friday: Lei 9.093/1995 art. 2 (religious holidays, municipalities may name up to four including Good Friday). Minas Gerais has no state holiday of its own beyond the Data Magna on 21 April, which falls on Tiradentes' Day (found by search, 2026-10-17; the state-law number was not opened; to confirm). Municipal holidays (a patron saint's day, the foundation day) are not listed because the town is invented. Corpus Christi and Carnival are pontos facultativos, not holidays by law, and are left out. Brazil does not move a holiday that falls on a rest day, so shift_if_rest is not set. Dates checked against the search summaries of Serasa and TJMG calendar pages; the laws themselves were not opened.",
    "decisions.permit_decision": "PLACEHOLDER: an office's own second look at a planning decision within 30 days of it; the place's appeal route for a permit (to a tribunal or an inspectorate) is not built, since no one in the town yet brings a permit to a body that hears it. No source was opened for the days.",
+   "decisions.tax_credit_decision": "(risk PB-23) PLACEHOLDER: the tax collector looks at its decision on a claim for tax paid and not owed again if asked within 30 days; no source was opened for this place's review or appeal of a refund decision. The appeal to a court or tribunal is left out: the collector does not yet carry out a venue's order (docs/behaviour/public-finance.md).",
+   "public_finance.refunds": "(risk PB-23) PLACEHOLDER: no source was opened for this place's law on tax paid and not owed. pay_within_days (30) is a stand-in for the time its law gives the collector to repay; set_off is false (a credit is claimed back, not set against the next return) for want of a source; wrong_refusal_bps (500: one claim that is due in twenty refused) has no source for any place. To be sourced from the place's tax code (refund of payments not owed, offset) and its tax authority's figures on refund claims refused and later allowed.",
    "decisions": "Review and appeal of a decision on a claim for support, and what the decision waits for (docs/behaviour/decisions.md; foundations F8). Recalled, not opened.",
    "decisions.benefit_decision.pension": "INSS: a recurso to the board of appeals (Conselho de Recursos da Previdência Social) within 30 days of the decision (Decreto 3.048/1999, art 305: recalled, to confirm); no fee; no review by the office is required first. The 30 days to meet a requirement (exigencia) the office makes on a claim: recalled (to confirm).",
    "decisions.benefit_decision.unemployment": "PLACEHOLDER by analogy with the pension (30 days to appeal, 30 days for papers, no fee): nothing found for the cash-transfer programme's own appeal.",

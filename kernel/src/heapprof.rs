@@ -4,8 +4,8 @@
 //! allocation at least that large, is sampled with its call stack (return addresses, from the libc `backtrace`); a
 //! sample stands for `max(size, rate)` bytes while it lives. Every `OIKOS_HEAPPROF_EVERY` seconds (default 30), and at
 //! the high-water mark of what the samples stand for (each time it passes the last by 2%), the live samples summed by
-//! stack are written to `OIKOS_HEAPPROF_OUT` (default `heapprof`) as `<out>.<n>.txt` and `<out>.peak.txt`, with the
-//! image's load address, for `atos` to name (scripts/heapprof.ts). The run's results do not depend on any of this (a
+//! stack are written to `OIKOS_HEAPPROF_OUT` (default `heapprof`) as `<out>.<n>.txt` and `<out>.peak.txt` (and, by
+//! `oikos-kernel world`, `<out>.end.txt` at the run's end, the world still held), with the image's load address, for `atos` to name (scripts/heapprof.ts). The run's results do not depend on any of this (a
 //! 10,000-person month under it ended at the same state hash and log). macOS only (`backtrace`, dyld's slide).
 
 use std::alloc::{GlobalAlloc, Layout};

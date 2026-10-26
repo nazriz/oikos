@@ -452,15 +452,17 @@ pub struct Inner {
     drifts: i64,
     hours: BTreeMap<String, i64>,
     hours_from: i64,
-    pop: PopulationValues,
-    outlook: Outlook,
-    pub p: InnerParams,
+    pop: std::sync::Arc<PopulationValues>,
+    outlook: std::sync::Arc<Outlook>,
+    pub p: std::sync::Arc<InnerParams>,
 }
 
 impl Inner {
     /// `values`: the person's (the mind's). `rng`: the person's stream for who they are (two normal draws: the lean,
     /// then agency).
-    pub fn new(rng: &mut Rng, values: &Values, pop: &PopulationValues, outlook: &Outlook, p: InnerParams) -> Inner {
+    pub fn new(rng: &mut Rng, values: &Values, pop: impl Into<std::sync::Arc<PopulationValues>>, outlook: impl Into<std::sync::Arc<Outlook>>, p: impl Into<std::sync::Arc<InnerParams>>) -> Inner {
+        let (pop, outlook) = (pop.into(), outlook.into());
+        let p = p.into();
         let mut s: i64 = 0;
         for _ in 0..12 {
             s += rng.below(1_000_001) as i64;
@@ -483,8 +485,8 @@ impl Inner {
             drifts: 0,
             hours: BTreeMap::new(),
             hours_from: 0,
-            pop: pop.clone(),
-            outlook: outlook.clone(),
+            pop,
+            outlook,
             p,
         };
         let a = me.agency_spread();
@@ -925,7 +927,7 @@ mod tests {
     fn person_with(k: &str, outlook: Outlook) -> P {
         let pop = pop();
         let values = draw_values(&mut rng(&format!("v-{k}")), &pop);
-        let inner = Inner::new(&mut rng(&format!("i-{k}")), &values, &pop, &outlook, inner_params(&serde_json::json!({})));
+        let inner = Inner::new(&mut rng(&format!("i-{k}")), &values, pop.clone(), outlook.clone(), inner_params(&serde_json::json!({})));
         P { values, inner }
     }
     fn person(k: &str) -> P {

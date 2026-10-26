@@ -912,7 +912,8 @@
         "school",
         "police"
       ],
-      "median_house_price": 210723200
+      "median_house_price": 210723200,
+      "refunds": {"pay_within_days": 40, "set_off": false, "wrong_refusal_bps": 500}
     },
     "services": {
       "waste_per_person_per_day_g": 944,
@@ -1358,7 +1359,8 @@
           "grounds": "any error in the decision as reviewed, heard by the administrative court",
           "fee_hours_of_pay": 0
         }
-      }
+      },
+      {"kind": "tax_credit_decision", "name": "A decision on a claim for tax paid and not owed", "review": {"within_days": 30, "grounds": "any: the tax authority looks at its decision again on a recurso de revocacion"}}
     ],
     "frictions": {
       "per_adult_bps_per_year": {
@@ -1442,6 +1444,8 @@
     "calendar.fiscal_year_starts": "Calendar year: the federal budget year and Jalisco's municipal budgets run 1 January-31 December (Ley Federal de Presupuesto y Responsabilidad Hacendaria; Jalisco's Ley de Ingresos by year; from general knowledge, to confirm).",
     "calendar.holidays": "Ley Federal del Trabajo art. 74 as amended (2006, 2019, 2022 text; to confirm against the DOF text, not opened): 1 Jan; first Monday of February; third Monday of March; 1 May; 16 Sept; third Monday of November; 1 Dec every six years at the change of federal executive (2024, 2030: none in 2026-2028, so not listed); 25 Dec; and election day (ordinary federal and local, a Sunday, so no weekday effect: left out; the next in Jalisco is 6 June 2027, to confirm). Holy Week (Thursday and Friday) is NOT a statutory holiday, though most schools and public bodies close; no easter_offset used. shift_if_rest not used: Mexico does not move these.",
     "decisions.permit_decision": "PLACEHOLDER: an office's own second look at a planning decision within 30 days of it; the place's appeal route for a permit (to a tribunal or an inspectorate) is not built, since no one in the town yet brings a permit to a body that hears it. No source was opened for the days.",
+    "decisions.tax_credit_decision": "(risk PB-23) [OPENED, a transcription] Codigo Fiscal de la Federacion art. 121 (mley.mx/CFF/articulo/121): the recurso de revocacion is filed 'dentro de los treinta dias siguientes a aquel en que haya surtido efectos su notificacion' (business days under art. 12, to confirm; taken as 30 days). The appeal to the Tribunal Federal de Justicia Administrativa is left out: the collector does not yet carry out a venue's order.",
+    "public_finance.refunds": "(risk PB-23) [OPENED, a transcription, to confirm against the DOF] Codigo Fiscal de la Federacion art. 22 (mley.mx/CFF/articulo/22): 'Las autoridades fiscales devolveran las cantidades pagadas indebidamente' and 'Cuando se solicite la devolucion, esta debera efectuarse dentro del plazo de cuarenta dias'; the authority may ask for more within 20 days of the application, the taxpayer having 20 days to answer (not built). Art. 23 (search snippet, to confirm): a taxpayer may offset what is owed to it only against what it owes 'por adeudo propio' of the same tax; tax withheld from employees is taken as not the employer's own (to confirm), so set_off is false and a payment of withheld ISR made twice is claimed back under art. 22, as the decisions log has it (2026-10-25, 'pilot faults'). wrong_refusal_bps (500) is a PLACEHOLDER: no figure for refund claims wrongly refused was found.",
     "decisions": "Review and appeal of a decision on a claim for support, and what the decision waits for (docs/behaviour/decisions.md; foundations F8). Recalled, not opened.",
     "decisions.benefit_decision.pension": "A request for review within 15 working days (about 21 days) of the notice (Ley Federal de Procedimiento Administrativo, art 85: recalled, to confirm), not required before a suit to the administrative court, which is brought within 30 working days (about 45 days) (Ley Federal de Procedimiento Contencioso Administrativo, art 13: recalled, to confirm); no fee assumed. 15 days for documents is a PLACEHOLDER.",
     "culture.conducts": "What people start out holding right, for the four conducts where a figure in this profile's own outlook speaks to it (the rest start from values alone: no figure was opened). approves_bps is the national share with 'a great deal' or 'quite a lot' of confidence, as `outlook.trust` has it (World Values Survey and European Values Study, joint wave 7, as Our World in Data publishes it; opened 2026-10-11, to confirm against the survey's tables; see sources.outlook for the country and the items). Mapping, ours: answer_tribunal and take_to_tribunal <- confidence in the courts (a person who trusts the courts approves of answering a case there and of taking a wrong to it); complain <- confidence in the civil service (writing to the town is approved where the town's officers are trusted to answer); join_union <- confidence in labour unions. Weak: confidence in an institution is not approval of an act toward it, and the share above a threshold is read as a mean, as outlook does; the figure sets where people start (their own lean and their picture of what others approve), nothing else, and the lean is measured from it, so the rates stay the calibrated ones. No figure for strike, take_in, stay_past_notice, take_from_employer or an organisation's conduct (the survey's items on joining strikes and on the justifiability of stealing property were not opened); no figure by origin group (no source found that gives one). National, not the place's. does_bps is never given: a conduct's own rate in the profile.",

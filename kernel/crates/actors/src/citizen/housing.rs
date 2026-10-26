@@ -135,8 +135,9 @@ pub struct Housing {
     /// The lease whose premises were found flooded (absorb sets it from a refusal; TS's `uninhabitable`).
     pub uninhabitable: Option<String>,
     // ---- homes for sale
-    selling: Option<Selling>,
-    buying: Option<Buying>,
+    /// (Boxed, as `buying`: rarely under way, and 400 bytes a person held for nothing. SC-1.)
+    selling: Option<Box<Selling>>,
+    buying: Option<Box<Buying>>,
     next_buy_chance: i64,
     /// When we sold up to leave (leaving town reads it: TS's `soldAndGoing`).
     pub sold_and_going: Option<i64>,
@@ -1947,7 +1948,7 @@ impl Person {
         let Some(price) = self.valuation_of(lot) else { return false };
         let bedrooms = self.p.market.as_ref().and_then(|m| m.bedrooms_by_type.get(&ty).copied());
         let loan = self.mortgage_for(&space).map(|l| l.id.clone());
-        self.housing.selling = Some(Selling { lot: lot.into(), space: Some(space), structure, bedrooms, price, asked: price, leave_after, loan, ..Default::default() });
+        self.housing.selling = Some(Box::new(Selling { lot: lot.into(), space: Some(space), structure, bedrooms, price, asked: price, leave_after, loan, ..Default::default() }));
         true
     }
     /// What is for sale as far as we know: what our last look showed, or, shown listings unasked, those standing.
@@ -2069,7 +2070,7 @@ impl Person {
                             self.housing.sold_and_going = Some(t);
                         }
                         self.housing.selling = None;
-                        s = Selling::default();
+                        *s = Selling::default();
                     }
                 }
             } else if s.sold {
@@ -2088,7 +2089,7 @@ impl Person {
                             self.housing.sold_and_going = Some(t);
                         }
                         self.housing.selling = None;
-                        s = Selling::default();
+                        *s = Selling::default();
                     }
                 }
             }
@@ -2159,7 +2160,7 @@ impl Person {
                     let loan = loan_for(price, m.deposit_bps);
                     let space = d.s("space").unwrap_or_default().to_string();
                     let structure = d.s("structure").unwrap_or_default().to_string();
-                    self.housing.buying = Some(Buying {
+                    self.housing.buying = Some(Box::new(Buying {
                         listing: l.id.clone(),
                         seller: l.speaks_for.clone().unwrap_or_default(),
                         account: d.s("account").unwrap_or_default().into(),
@@ -2171,7 +2172,7 @@ impl Person {
                         since: t,
                         funded: false,
                         gone_since: None,
-                    });
+                    }));
                     let bank = self.p.bank.clone().unwrap_or_default();
                     w.push(because(
                         format!("{structure} is for sale at {}, and we have the deposit and costs: asking the bank for a mortgage of {}.", Self::usd(w, price), Self::usd(w, loan)),

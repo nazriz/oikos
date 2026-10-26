@@ -918,6 +918,7 @@
       "rates_due_days": 30,
       "rates_penalty_interest_bps": 870,
       "median_house_price": 25000000,
+      "refunds": {"pay_within_days": 30, "set_off": false, "wrong_refusal_bps": 500},
       "rates_exempt_kinds": [
         "health_service",
         "school",
@@ -1390,7 +1391,8 @@
           "grounds": "any error in the decision, heard on a request for examination by the employment insurance examiner",
           "fee_hours_of_pay": 0
         }
-      }
+      },
+      {"kind": "tax_credit_decision", "name": "A decision on a claim for tax paid and not owed", "review": {"within_days": 30, "grounds": "any: the collector looks at its decision again on the account"}}
     ],
     "frictions": {
       "per_adult_bps_per_year": {
@@ -1484,6 +1486,8 @@
     "calendar.fiscal_year_starts": "Japanese national and local government fiscal year runs 1 April to 31 March (Local Autonomy Act art. 208; Public Finance Act art. 11).",
     "calendar.holidays": "Act on National Holidays (Act No. 178 of 1948, as amended), list of the Cabinet Office (https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html, not opened in this session: rules from memory of the Act, to confirm). Happy Monday rules as nth_weekday (Coming of Age 2nd Mon Jan, Marine 3rd Mon Jul, Respect for the Aged 3rd Mon Sep, Sports 2nd Mon Oct). Equinox days are decreed each February by the Cabinet Office: explicit dates 2026-2028 (March 20, 21, 20; September 23, 23, 22; to confirm). Citizens' Holiday (art. 3 para. 3: a day between two holidays) falls on 2026-09-22 only in 2026-28. Substitute holiday (art. 3 para. 2): a holiday on a Sunday moves to the next day that is not a holiday; shift_if_rest approximates it, but also shifts one that falls on a Saturday, which the law does not (affects 2028-01-01 and 2028-04-29); revisit if the mismatch matters. Prefectural holidays: none by law. Emperor's Birthday 23 Feb (since 2020).",
     "decisions.permit_decision": "PLACEHOLDER: an office's own second look at a planning decision within 30 days of it; the place's appeal route for a permit (to a tribunal or an inspectorate) is not built, since no one in the town yet brings a permit to a body that hears it. No source was opened for the days.",
+    "decisions.tax_credit_decision": "(risk PB-23) PLACEHOLDER: the tax collector looks at its decision on a claim for tax paid and not owed again if asked within 30 days; no source was opened for this place's review or appeal of a refund decision. The appeal to a court or tribunal is left out: the collector does not yet carry out a venue's order (docs/behaviour/public-finance.md).",
+    "public_finance.refunds": "(risk PB-23) PLACEHOLDER: no source was opened for this place's law on tax paid and not owed. pay_within_days (30) is a stand-in for the time its law gives the collector to repay; set_off is false (a credit is claimed back, not set against the next return) for want of a source; wrong_refusal_bps (500: one claim that is due in twenty refused) has no source for any place. To be sourced from the place's tax code (refund of payments not owed, offset) and its tax authority's figures on refund claims refused and later allowed.",
     "decisions": "Review and appeal of a decision on a claim for support, and what the decision waits for (docs/behaviour/decisions.md; foundations F8). Recalled, not opened.",
     "decisions.benefit_decision.pension": "A request for examination (shinsa seikyu) to the social insurance examiner within 3 months of knowing the decision (Administrative Complaint Review Act art 18; National Pension Act art 101: recalled, to confirm), no fee; the examiner is a body apart from the office, so there is no review by the office first (the further re-examination, within 2 months, is not built). 14 days for documents is a PLACEHOLDER.",
     "decisions.benefit_decision.unemployment": "As the pension, to the employment insurance examiner (Employment Insurance Act art 69: recalled, to confirm). The employer files the separation certificate (rishokuhyo) within 10 days of the job ending (Employment Insurance Act Enforcement Regulations art 7: recalled, to confirm); the claim is decided without it if it does not come.",

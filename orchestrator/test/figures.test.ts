@@ -54,6 +54,24 @@ test("a number nothing speaks for is counted unbased, and one the work table's n
   expect(figuresText(r)).toContain("made_up.figure");
 });
 
+test("a row's profile path reads the note of the same part below it, and a row may hold for one id, or where a path is given", () => {
+  const c = { h: { lone_bps: 1, group_bps: 2 }, tasks: [{ id: "a", labour: 5 }, { id: "b", labour: 6 }], t: { days: 3 }, dials: { on: 1 } };
+  const profile = { values: {}, sources: { "h.lone_bps": "The census, table 3", h: "PLACEHOLDER: the rest", "x.on": "The law, s 2" } };
+  const table = [
+    { at: "h", profile: "h" },
+    { at: "tasks.*.labour", id: "a", class: "convention" as const, why: "an hour" },
+    { at: "tasks.*.labour", class: "derived" as const, why: "from the wage" },
+    { at: "t.days", profile: "x.on", given: "dials.on" },
+  ];
+  const at = (...path: string[]) => basisOf(c, { path, value: 0 }, profile, table).class;
+  expect(at("h", "lone_bps")).toBe("sourced");
+  expect(at("h", "group_bps")).toBe("placeholder");
+  expect(at("tasks", "0", "labour")).toBe("convention");
+  expect(at("tasks", "1", "labour")).toBe("derived");
+  expect(at("t", "days")).toBe("sourced");
+  expect(basisOf({ ...c, dials: {} }, { path: ["t", "days"], value: 0 }, profile, table).class).toBe("unbased");
+});
+
 test("every profile's town is counted, and the unbased places are only those listed (the list only shrinks)", () => {
   const listed: string[] = JSON.parse(readFileSync(FIXTURE, "utf8")).unbased;
   const found = new Set<string>();
