@@ -9439,3 +9439,28 @@ routes as law data, nobody shown more than is theirs.
   budget is measured, gains nothing, so **the budget's ceiling stays at 335 KB** (this machine's 253 is not the Mini's).
 - **Revisit if** a mimalloc upgrade changes how it maps (re-pair), or a profile shows the purge delay's held memory at
   10,000 people (then memory returned at once, as an opt-in for large runs: about 20 MB more at 1,000 for about 3%).
+
+## 2026-10-27 · The config's schemas let go (SC-1; branch `representation`; no result changes; no model called)
+
+- **What was held.** A heap profile at 1,000 people put 43 to 48 MB in the contract's compiled schemas, kept for the
+  whole run (`contracts()`, a `OnceLock`). Measured alone (the contracts' six schema files, `jsonschema` 0.30): the
+  four validators compile to 21 MB (the config's 12, a participant's 2, a command's 3, an annotation's 3), and the
+  first check of a 1,000-person config compiles 23 MB more (the references `jsonschema` compiles when first used).
+  The pattern engine makes no difference (`fancy_regex`, `regex`, a smaller lazy DFA: 21 and 23 MB each): each
+  `$ref` is compiled where it is used, so the same patterns are compiled many times over.
+- **Change.** The config's two validators (the whole config's and one participant's) are built when a config is
+  first checked and kept for the next (`contracts::config_check`), until `contracts::release_config_check()`: the
+  kernel's `world` command and the engine module (napi) call it once their config is read, and the next read builds
+  them again (some 13 ms, and the first check's own compiling as before). A command's and an annotation's validators
+  are each built when the first is checked (`Contracts::command()`, `::annotation()`), so a run that takes none never
+  builds them. What is checked, and against what, is unchanged.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at main's state hash and log.
+- **Cost, paired** against the allocator's build (three rounds of all six towns): the same hash and log in every
+  pair; the run's own thread -4 to +1%, level (au-vic -1.2% on average, gb-eng +1.2, us-oh -0.4).
+- **Memory.** 1,000 people 33 to 40 MB lower (au-vic 325 to 329 MB against 359 to 366, about 217 KB a person;
+  gb-eng 313 to 317 against 348 to 355; us-oh 283 to 289 against 321 to 329); 200 people 26 to 35 lower (139 to
+  147 MB against 167 to 179). This holds on every OS (the Mini's too).
+- **The budget.** About 217 KB a person here; the Mini, which gains this but not the allocator's, about 307 less 33,
+  274, and 8% over that is 296: the ceiling lowered from 335 to 300 KB.
+- **Revisit if** a process reads configs over and over (the engine module building worlds back to back: then keep
+  them a while), or `jsonschema` learns to compile a `$ref` once (then the four may be cheap to keep).

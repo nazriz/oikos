@@ -1386,7 +1386,7 @@ impl Parts {
             e => e,
         })
         .map_err(|e| e.to_string())?;
-        crate::contracts::check_at(&crate::contracts::contracts().participant, &v, &at).map_err(|e| format!("config {e}"))?;
+        crate::contracts::check_at(&crate::contracts::config_check().participant, &v, &at).map_err(|e| format!("config {e}"))?;
         let mut b = std::mem::take(&mut self.scratch);
         b.clear();
         b.push(if i == 0 { b'[' } else { b',' });
@@ -1563,7 +1563,7 @@ pub fn rest_of<R: std::io::Read>(r: R) -> Result<Rest, String> {
 /// The rest of the config checked and read, with its participants (`Parts`) put in.
 fn finish(v: Value, parts: Parts) -> Result<(LoadedConfig, Rest), String> {
     canon::check_integers(&v).map_err(|e| e.to_string())?;
-    crate::contracts::check(&crate::contracts::contracts().config, &v).map_err(|e| format!("config {e}"))?;
+    crate::contracts::check(&crate::contracts::config_check().config, &v).map_err(|e| format!("config {e}"))?;
     // (The schema's own limit on the list, which its check of the rest saw empty.)
     if parts.list.len() > 1_000_000 {
         return Err(format!("config violates the contract: /participants: has more than 1000000 items ({})", parts.list.len()));

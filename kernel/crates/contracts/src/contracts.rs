@@ -4,7 +4,7 @@
 //! violates the contract, whatever the orchestrator sends.
 
 use serde_json::{json, Value};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 
 const SCHEMAS: [&str; 6] = [
     include_str!("../../../../contracts/common.schema.json"),
@@ -16,12 +16,27 @@ const SCHEMAS: [&str; 6] = [
 ];
 
 pub struct Contracts {
+    /// A command, as each is taken in (built when the first is).
+    pub command: OnceLock<jsonschema::Validator>,
+    /// An annotation, as each is taken in (built when the first is).
+    pub annotation: OnceLock<jsonschema::Validator>,
+}
+
+impl Contracts {
+    pub fn command(&self) -> &jsonschema::Validator {
+        self.command.get_or_init(|| validator("urn:oikos:contracts:0.8:log#/$defs/Command"))
+    }
+    pub fn annotation(&self) -> &jsonschema::Validator {
+        self.annotation.get_or_init(|| validator("urn:oikos:contracts:0.8:log#/$defs/Annotation"))
+    }
+}
+
+/// What a config is checked with: the whole config's schema and one of its participants' (its `participants` items),
+/// for a config read participant by participant (`config::load_from`): the config's own schema checks each with
+/// this same definition.
+pub struct ConfigCheck {
     pub config: jsonschema::Validator,
-    /// One of a config's participants (its `participants` items), for a config read participant by participant
-    /// (`config::load_from`): the config's own schema checks each with this same definition.
     pub participant: jsonschema::Validator,
-    pub command: jsonschema::Validator,
-    pub annotation: jsonschema::Validator,
 }
 
 fn validator(reference: &str) -> jsonschema::Validator {
@@ -35,13 +50,28 @@ fn validator(reference: &str) -> jsonschema::Validator {
 }
 
 pub fn contracts() -> &'static Contracts {
-    static C: OnceLock<Contracts> = OnceLock::new();
-    C.get_or_init(|| Contracts {
-        config: validator("urn:oikos:contracts:0.8:world-config"),
-        participant: validator("urn:oikos:contracts:0.8:world-config#/$defs/Participant"),
-        command: validator("urn:oikos:contracts:0.8:log#/$defs/Command"),
-        annotation: validator("urn:oikos:contracts:0.8:log#/$defs/Annotation"),
+    static C: Contracts = Contracts { command: OnceLock::new(), annotation: OnceLock::new() };
+    &C
+}
+
+/// The config's schemas compiled, built when a config is first checked and kept for the next, until released.
+static CONFIG_CHECK: Mutex<Option<Arc<ConfigCheck>>> = Mutex::new(None);
+
+pub fn config_check() -> Arc<ConfigCheck> {
+    let mut c = CONFIG_CHECK.lock().unwrap_or_else(|e| e.into_inner());
+    c.get_or_insert_with(|| {
+        Arc::new(ConfigCheck {
+            config: validator("urn:oikos:contracts:0.8:world-config"),
+            participant: validator("urn:oikos:contracts:0.8:world-config#/$defs/Participant"),
+        })
     })
+    .clone()
+}
+
+/// Lets the config's compiled schemas go, for a process that has read the one config it runs: some 35 MB, built
+/// again if another config is read (docs/decisions.md 2026-10-27, "The config's schemas let go").
+pub fn release_config_check() {
+    CONFIG_CHECK.lock().unwrap_or_else(|e| e.into_inner()).take();
 }
 
 /// Ok, or the first few violations as one message.
@@ -104,7 +134,7 @@ pub fn plain_subject_data(kind: &str, subject: &str, data: &Value) -> bool {
     SUBJECT_DATA.contains(&kind) && subject.len() <= 128 && opaque(data)
 }
 
-/// Whether an annotation plainly keeps to the contract (`check(&contracts().annotation, ..)` would pass it, and every
+/// Whether an annotation plainly keeps to the contract (`check(contracts().annotation(), ..)` would pass it, and every
 /// integer in it is safe): the commonest shape, a subject and its data (decisions, outcomes, notes, observations), with
 /// data that is plainly `Opaque`. Every other branch of the Annotation's `oneOf` names other kinds, so one that keeps
 /// to the fourth keeps to the contract. `false` says only that the schema must decide.
@@ -114,6 +144,6 @@ pub fn plain_annotation(instance: &Value) -> bool {
         && m.get("annotation").and_then(Value::as_str).is_some_and(|a| SUBJECT_DATA.contains(&a))
         && m.get("subject").and_then(Value::as_str).is_some_and(|s| s.len() <= 128)
         && m.get("data").is_some_and(opaque);
-    debug_assert!(!plain || contracts().annotation.is_valid(instance), "an annotation passed as plainly valid is not: {instance}");
+    debug_assert!(!plain || contracts().annotation().is_valid(instance), "an annotation passed as plainly valid is not: {instance}");
     plain
 }

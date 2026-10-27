@@ -534,7 +534,7 @@ impl World {
     /// `precheck`, for a caller that has the command's JSON (`serde_json::to_value` of it) already.
     pub fn precheck_as(&self, cmd: &Command, body: &Value) -> Result<(), ProtocolError> {
         canon::check_integers(body).map_err(|e| ProtocolError(e.to_string()))?;
-        crate::contracts::check(&crate::contracts::contracts().command, body).map_err(|e| ProtocolError(format!("command {e}")))?;
+        crate::contracts::check(&crate::contracts::contracts().command(), body).map_err(|e| ProtocolError(format!("command {e}")))?;
         self.precheck_in_world(cmd)
     }
 

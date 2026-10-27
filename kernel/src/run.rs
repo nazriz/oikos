@@ -326,7 +326,7 @@ impl<W: Write> Run<W> {
         // (One plainly of the contract has only safe integers: the integers' own check, and its message, are for the rest.)
         if !crate::contracts::plain_annotation(&annotation) {
             canon::check_integers(&annotation).map_err(|e| ProtocolError(e.to_string()))?;
-            crate::contracts::check(&crate::contracts::contracts().annotation, &annotation).map_err(|e| ProtocolError(format!("annotation {e}")))?;
+            crate::contracts::check(&crate::contracts::contracts().annotation(), &annotation).map_err(|e| ProtocolError(format!("annotation {e}")))?;
         }
         Ok(self.log.append(self.kernel.t(), Kind::Annotation, annotation)?.seq)
     }

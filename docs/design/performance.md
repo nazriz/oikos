@@ -132,6 +132,7 @@ each lowering the budget's ceiling.
 | R3, each transaction held once | 409 to 412 MB (90 days: 622 against 638) | 300 | against R2: -4 to +1% | 345 |
 | R4 (first part), the actors' indexes keyed by `Id` | 396 to 403 MB | 290 | against R3: -6 to +1% | 335 |
 | the allocator without huge pages (Linux only) | 358 to 368 MB (200 people: 172 to 177 against 222 to 238) | 253 | +0.5 to +3.9% (200: 4 to 7% faster) | 335 (the Mini gains nothing) |
+| the config's schemas let go | 325 to 329 MB (200 people: 139 to 147) | 217 | -4 to +1%, level | 300 |
 
 R1 saved little memory because few of the ids held were `Id`s: the actors' are `String`s (R4) and records' JSON holds
 its own strings (R2). Acts' and messages' ids are `Passing` (their own text), as they go with what they name; every

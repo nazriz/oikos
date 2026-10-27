@@ -129,6 +129,8 @@ fn world(args: &[String]) -> Result<(), String> {
     // (Read participant by participant, never whole: a large world's config is over a gigabyte of JSON.)
     let (loaded, rest) = oikos_kernel::config::load_from(std::fs::File::open(&args[1]).map_err(|e| format!("{}: {e}", args[1]))?)
         .map_err(|e| format!("{}: invalid config: {e}", args[1]))?;
+    // (Its one config read, the compiled schemas it was checked with go: docs/decisions.md 2026-10-27.)
+    oikos_kernel::contracts::release_config_check();
     let out = flag("--out").ok_or("--out <dir> is needed")?;
     std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
     let run_id = flag("--run-id").unwrap_or_else(|| "world".into());
