@@ -9502,3 +9502,13 @@ routes as law data, nobody shown more than is theirs.
 - **Revisit if** a record shown again after its week is common in some world (then the week longer, or the facts
   kept and only the bytes let go), or the cache's entries themselves (one per record ever shown) show in a profile of
   a ten-year run (then let go with the record, when tiered storage moves it out).
+
+## 2026-10-27 · 10,000 people for a month, main against the branch; tiered storage proposed (SC-1; branch `representation`; no model called)
+
+- **Measured.** au-vic from `worlds/town-1000.yaml` with `citizens=10000`, 30 days, all code, 4 engine threads, on this
+  4-core Linux machine alone (the log discarded: the measure is memory and time): main (7230e71) peaks at 2.48 GB in
+  197 s (the run's own thread 159 s); the branch at 1067de9 at 1.67 GB in 150 s (own thread 120 s): -33% memory,
+  -24% time, the same state hash (`f39cebc9...`). About 156 KB a person at 10,000 against 195 at 1,000: nothing grows
+  faster than the town. 254,889 ids interned (2.8 MB of text).
+- **Tiered storage proposed** (docs/design/tiered-storage.md), from the growth study: at a year, about 550 of the
+  895 MB live at 1,000 people is history (records, payments). Not built; four decisions are Naz's.

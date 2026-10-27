@@ -1556,7 +1556,8 @@ The mechanism:
   R4's first part, the actors' indexes keyed by interned ids: 290 KB; the allocator without huge
   pages: 253 KB on Linux, nothing on macOS; the config's schemas let go once it is read: 217 KB; the delivered records' cache trimmed: 195 KB).
   **A run's length is the larger part now:** a year at 1,000 peaks at 1.1 GB, about 1 MB a day, mostly the world's
-  records (docs/decisions.md 2026-10-27, "What grows with a run's length").
+  records (docs/decisions.md 2026-10-27, "What grows with a run's length"); tiered storage is proposed for it
+  (docs/design/tiered-storage.md). 10,000 people for a month: 1.67 GB against main's 2.48 on the same machine.
 - **Notice by:** The memory budget's test failing; a run past 50,000 near the 40 GB guard.
 - **Fix when:** Before a study at 100,000 for longer than a week.
 
