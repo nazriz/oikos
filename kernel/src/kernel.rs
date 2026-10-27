@@ -13,6 +13,7 @@ use crate::statics::Statics;
 use oikos_resolver::knowledge::{CellFacts, RecordFacts, StructureFact, Seen, SeenAccount, SeenChannel, SeenEntity, SeenHolding, SeenPosition, Shown};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, RwLock};
 
 pub use oikos_world::kernel::{Check, Command, ProtocolError};
@@ -56,6 +57,8 @@ pub struct Delivered {
     /// the same. It is made of what a building is, not of who is in it, so the many ways a building is shown (as its
     /// occupants come and go) share it; each person's knowledge held its own (SC-1: 0.4 GB at 50,000 people).
     facts: RwLock<BTreeMap<Id, Arc<StructureFact>>>,
+    /// The day records shown now are marked with (`trim`).
+    today: AtomicI64,
 }
 
 /// For a host that asked for records by reference: record id -> the record it was last handed whole under that id
@@ -76,8 +79,15 @@ struct Handed {
 struct Shared {
     record: Arc<Record>,
     bytes: Option<Arc<[u8]>>,
-    facts: Arc<RecordFacts>,
+    facts: Option<Arc<RecordFacts>>,
+    /// The day it was last shown: its bytes and facts are let go when it has not been for `KEPT_DAYS` (`trim`).
+    shown: AtomicI64,
 }
+
+/// How many days a record's bytes and facts are kept after it was last shown. They are what its record makes (encoding
+/// it, reading it), made again when it is next shown; the entry itself stays, so its place in memory is never another
+/// record's (`Handed`). What is shown is the same either way: only what's kept to show it again quickly.
+const KEPT_DAYS: i64 = 7;
 
 /// A building as it was shown: its canonical bytes, and what's known of it.
 type Building = (Arc<SiteStructure>, Arc<[u8]>, Arc<StructureFact>);
@@ -94,12 +104,14 @@ impl Delivered {
     /// A record an observation shows: its canonical bytes, what it adds, and where it's kept here.
     fn record(&self, r: &Arc<Record>) -> Result<(Arc<[u8]>, Arc<RecordFacts>, usize), canon::CanonError> {
         let at = Arc::as_ptr(r) as usize;
+        let today = self.today.load(Ordering::Relaxed);
         let facts = match held(self.records.read()).get(&at) {
             Some(shared) => {
-                if let Some(b) = &shared.bytes {
-                    return Ok((b.clone(), shared.facts.clone(), at));
+                shared.shown.store(today, Ordering::Relaxed);
+                if let (Some(b), Some(f)) = (&shared.bytes, &shared.facts) {
+                    return Ok((b.clone(), f.clone(), at));
                 }
-                Some(shared.facts.clone())
+                shared.facts.clone()
             }
             None => None,
         };
@@ -108,22 +120,40 @@ impl Delivered {
         let facts = facts.unwrap_or_else(|| Arc::new(RecordFacts::of(&v)));
         // (Encoded by another meanwhile: theirs is kept, and given.)
         let mut records = held(self.records.write());
-        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts: facts.clone() });
+        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts: None, shown: AtomicI64::new(today) });
         let bytes = shared.bytes.get_or_insert(bytes).clone();
-        Ok((bytes, shared.facts.clone(), at))
+        let facts = shared.facts.get_or_insert(facts).clone();
+        Ok((bytes, facts, at))
     }
 
     /// What a record adds to a seat's knowledge, without its bytes (a code actor's look: nothing of it is written).
     fn record_facts(&self, r: &Arc<Record>) -> Result<Arc<RecordFacts>, canon::CanonError> {
         let at = Arc::as_ptr(r) as usize;
+        let today = self.today.load(Ordering::Relaxed);
         if let Some(shared) = held(self.records.read()).get(&at) {
-            return Ok(shared.facts.clone());
+            shared.shown.store(today, Ordering::Relaxed);
+            if let Some(f) = &shared.facts {
+                return Ok(f.clone());
+            }
         }
         let v = serde_json::to_value(&**r).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
         let facts = Arc::new(RecordFacts::of(&v));
         let mut records = held(self.records.write());
-        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts });
-        Ok(shared.facts.clone())
+        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts: None, shown: AtomicI64::new(today) });
+        Ok(shared.facts.get_or_insert(facts).clone())
+    }
+
+    /// A new day: the bytes and facts of records not shown for `KEPT_DAYS` are let go (made again if they are).
+    fn trim(&self, day: i64) {
+        if self.today.swap(day, Ordering::Relaxed) == day {
+            return;
+        }
+        for shared in held(self.records.write()).values_mut() {
+            if shared.shown.load(Ordering::Relaxed) < day - KEPT_DAYS {
+                shared.bytes = None;
+                shared.facts = None;
+            }
+        }
     }
 
     /// Writes a record for a host that keeps what it's handed: whole the first time, its id from then on.
@@ -636,6 +666,7 @@ impl Kernel {
     /// Build and encode the next of the planned observations, on several threads: each from the state as it is (the
     /// same for all: read, never changed), the first only of any one participant's.
     fn make_ready(&mut self) {
+        self.delivered.trim(self.world.t().div_euclid(86_400));
         let from = self.planned_done;
         let to = (from + WINDOW).min(self.planned.len());
         self.planned_done = to;
@@ -768,6 +799,7 @@ impl Kernel {
     }
 
     fn observe(&mut self, participant: &str, only: Option<&str>, looks: &[LookRequest]) -> Output {
+        self.delivered.trim(self.world.t().div_euclid(86_400));
         // The answers a keeper has given to its questions since (foundations F11) are looked through with this observation.
         let answered = self.world.take_asks(participant, only);
         let looks: Vec<LookRequest> = if answered.is_empty() { looks.to_vec() } else { looks.iter().cloned().chain(answered).collect() };

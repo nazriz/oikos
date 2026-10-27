@@ -9464,3 +9464,41 @@ routes as law data, nobody shown more than is theirs.
   274, and 8% over that is 296: the ceiling lowered from 335 to 300 KB.
 - **Revisit if** a process reads configs over and over (the engine module building worlds back to back: then keep
   them a while), or `jsonschema` learns to compile a `$ref` once (then the four may be cheap to keep).
+
+## 2026-10-27 · What grows with a run's length, measured; the delivered records' cache let go of what is not shown (SC-1; branch `representation`; no result changes; no model called)
+
+- **What grows (the growth study).** 1,000 people (au-vic, 4 threads), runs of 30, 90, 180 and 365 days, each ending
+  with a heap profile (`scripts/heapprof.ts --components`): the peak rises about 3 MB a day, linearly, 365 MB at a
+  month, 587 at three, 914 at six and 1,706 at a year (1.7 MB a person; a year at 10,000 would be some 17 GB). Two
+  holders grow and the rest is about flat: the engine, 63 MB at a month to 562 at a year, and the world's records,
+  26 to 431. Interned ids grow too (60,000 at a month, 441,000 at a year) but their text is 4 MB at a year: no cause.
+  At six months the engine's was mostly the delivered records' cache (`Delivered`): the records themselves (67 MB,
+  the world's), each one's canonical bytes (60 MB) and what each adds to a reader (`RecordFacts`, 96 MB), kept for
+  every record ever shown, for the run.
+- **Change.** A record's bytes and facts are what the record makes (encoding it, reading it), so they are let go
+  when it has not been shown for 7 days (`KEPT_DAYS`) and made again if it is: `Delivered::trim`, called once a day
+  from the observation paths. Each entry stays, holding its record, so a record's place in memory is never another's
+  (what `Handed` relies on), and a register's lots, shown every day, stay held. What is shown and learned is the same.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at main's state hash and log; and a
+  year at 1,000 (au-vic) ends at the same state hash (`f29fb857...`) on both builds (its log discarded: over 3 GB).
+- **Cost and memory, paired** against the config's schemas' build: a month, two rounds of the 1,000-person towns
+  and one of the 200: the same hash and log; 1,000 people 13 to 28 MB lower (au-vic 304 to 305 MB against 326 to
+  332, about 195 KB a person), the run's own thread 0 to +3%; 200 people level. 180 days: 634 MB against 814, own
+  thread -1.6%. A year: 1,081 MB against 1,500 (-28%), own thread +2.3% (with a build beside both).
+- **The budget.** About 195 KB a person here; the Mini about 274 less 24, 250, and 8% over that is 270: the ceiling
+  lowered from 300 to 270 KB. The budget measures a month: no test holds what a run's length adds (proposed: a growth
+  budget on a 90-day run, the slow tier).
+- **What is left of the growth**, at a year after this: the world's records (431 MB: the history kept, whole, for the
+  run; what tiered storage is for), the actors' state (73 MB, offices' and firms' books growing with what they have
+  seen), citizens (56) and their minds (41).
+- **Where the CPU goes** (a perf profile of a 1,000-person month at 4 threads, the run's own thread): no one
+  function above 10%; allocation and freeing about 14%, comparing ids' text (map lookups) about 9%, copying 6%,
+  encoding observations canonically 5%, interning ids 2.6%, SHA-256 2.2% (with the CPU's own instructions; a
+  valgrind profile, which hides them, put it at 23%), the log 2.5%. At 200 people the one-time spin-up of nature is a
+  quarter of the instructions, a fixed cost a long run makes small. No change made from it yet.
+- **8-byte ids, measured before being built.** An `Id` made 8 bytes wider costs 11 to 23 MB at 1,000 (and 0 to 6%
+  of the run's own thread): 8 bytes narrower would save about that, some 5%, against a table read on every
+  comparison of ids' text (9% of the run's own thread now). Held back for Naz's call.
+- **Revisit if** a record shown again after its week is common in some world (then the week longer, or the facts
+  kept and only the bytes let go), or the cache's entries themselves (one per record ever shown) show in a profile of
+  a ten-year run (then let go with the record, when tiered storage moves it out).
