@@ -141,7 +141,7 @@ struct Ledger {
     n: i64,
     paid_in: i64,
     paid_out: i64,
-    latest: Vec<Transaction>,
+    latest: Vec<Arc<Transaction>>,
 }
 
 /// Where an account's ledger stood at the last statement to a writer.
@@ -782,7 +782,7 @@ impl Bank {
                 "Statement of {}, {period}: balance brought forward {}. {}. {}In all {} paid out and {} paid in. Balance carried forward {}.",
                 a.account,
                 usd(balance - paid_in + paid_out),
-                listed.iter().map(entry).collect::<Vec<_>>().join("; "),
+                listed.iter().map(|x| entry(x)).collect::<Vec<_>>().join("; "),
                 if (n as usize) > listed.len() { format!("Those are the latest {} of {n} entries; the {} before them are in the totals. ", listed.len(), n as usize - listed.len()) } else { String::new() },
                 usd(paid_out),
                 usd(paid_in),
@@ -840,7 +840,7 @@ impl Bank {
         )
     }
 
-    fn enter(&mut self, account: &str, x: &Transaction, out: bool) {
+    fn enter(&mut self, account: &str, x: &Arc<Transaction>, out: bool) {
         let keep = self.p.statement_lists;
         let l = self.ledgers.entry(account.to_string()).or_default();
         l.n += 1;
@@ -867,7 +867,7 @@ impl Actor for Bank {
         self.book.absorb(pic);
         // Into the ledger: each payment in or out of an account, as the bank is shown it (once).
         self.ledger_from.get_or_insert(pic.t);
-        let txs: Vec<Transaction> = pic.transactions().cloned().collect();
+        let txs: Vec<Arc<Transaction>> = pic.transactions_held().cloned().collect();
         for x in &txs {
             self.enter(&x.from, x, true);
             if x.to != x.from {

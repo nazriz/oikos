@@ -88,6 +88,13 @@ impl Picture {
             _ => &[],
         })
     }
+    /// Every transaction new in this observation, as held: one copy shared with the world's queues and whoever keeps it.
+    pub fn transactions_held(&self) -> impl Iterator<Item = &Arc<Transaction>> {
+        self.channels.values().flat_map(|c| match c {
+            Seen::Accounts { transactions, .. } => transactions.as_slice(),
+            _ => &[],
+        })
+    }
     /// Every transaction new in this observation.
     pub fn transactions(&self) -> impl Iterator<Item = &Transaction> {
         self.channels.values().flat_map(|c| match c {

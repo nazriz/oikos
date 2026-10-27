@@ -27,7 +27,7 @@ use crate::papers::{self, Paper};
 use crate::steps::{arg, because, call, json, say, Done, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
 use oikos_sight::calls::Line;
-use oikos_sight::{LookRequest, Record, Seen};
+use oikos_sight::{Id, LookRequest, Record, Seen};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -162,7 +162,7 @@ struct Office {
     directions: Directions,
     staff: Staff,
     /// Cell -> its cover.
-    cover: BTreeMap<String, String>,
+    cover: BTreeMap<Id, Id>,
     mapped: BTreeSet<String>,
     asked: Asked,
     /// The workplace as last seen: its capacity and who is in it.
@@ -358,12 +358,12 @@ impl Plan for Office {
             for a in &m.areas {
                 for y in a.y..a.y + a.h {
                     for x in a.x..a.x + a.w {
-                        self.cover.insert(format!("cell.{x}.{y}"), a.cover.clone());
+                        self.cover.insert(Id::new(&format!("cell.{x}.{y}")), Id::new(&a.cover));
                     }
                 }
             }
             for c in m.built {
-                self.cover.insert(c, "built".into());
+                self.cover.insert(Id::new(&c), "built".into());
             }
         }
         let mut built: Vec<(String, String)> = vec![];
@@ -376,7 +376,7 @@ impl Plan for Office {
         }
         for (id, at) in built {
             self.mapped.insert(id);
-            self.cover.insert(at, "built".into());
+            self.cover.insert(Id::new(&at), "built".into());
         }
         for ch in pic.channels.values() {
             if let Seen::Sites { cells, .. } = ch {
@@ -473,12 +473,12 @@ impl Plan for Office {
             self.next_round = t + self.p.survey_every_days * DAY;
             self.found.clear();
             for s in &self.p.species {
-                let mut habitat: Vec<&String> = self.cover.iter().filter(|(_, c)| s.covers.contains(c)).map(|(cell, _)| cell).collect();
+                let mut habitat: Vec<&Id> = self.cover.iter().filter(|(_, c)| s.covers.iter().any(|x| x == c.as_str())).map(|(cell, _)| cell).collect();
                 let mut r = cx.rng(&format!("sample-{}-{}", s.id, self.round));
                 let mut cells: Vec<String> = vec![];
                 while (cells.len() as i64) < self.p.sample_cells && !habitat.is_empty() {
                     let i = r.below(habitat.len() as u64) as usize;
-                    cells.push(habitat.remove(i).clone());
+                    cells.push(habitat.remove(i).to_string());
                 }
                 if !cells.is_empty() {
                     self.queue.push((s.id.clone(), cells));

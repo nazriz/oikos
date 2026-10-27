@@ -9380,3 +9380,37 @@ routes as law data, nobody shown more than is theirs.
 - **Revisit if** a memo's text shows in a heap profile of a long run (then memos interned, as they repeat: "rent",
   "wages"), or offices' files dominate a ten-year run (then what an office keeps on file is a law of how long records
   are kept, the owner's to decide, not a representation change).
+
+## 2026-10-27 · The actors' indexes keyed by interned ids (SC-1, the representation plan's R4, a first part; branch `representation`; no result changes; no model called)
+
+- **What a profile showed.** A heap profile of R3 at 1,000 people (au-vic, 30 days, 4 threads; `scripts/heapprof.ts`)
+  puts 206 MB live at the peak: the compiled schemas 43, the engine 42, unattributed 39, citizens 18, their minds 14,
+  offices, firms and the other actors 14, the world's records and accounts 12, the typed config 9, what's been seen 6.
+  The actors' state is spread thin: no holder of an office's or firm's own is above about 1.5 MB, and the largest
+  are not their JSON (R2 took that) but maps keyed by `String`: a book's indexes (about 15 MB across every actor's
+  book), a person's trust in each institution (2), the environment office's map of cover (1.6), the bank's last
+  entries for each account (1.3).
+- **Change.** Those keys and values are `Id`s, the one copy of the text the process holds (R1): a book's statements
+  by kind, claims by holder, counterparty and object, lots by cell, what is withdrawn, replaced and released, and
+  agreements' signatures and notices (common/book.rs); a person's trust by whom and its kind (mind/inner.rs); cover by
+  cell (boundary/environment.rs). Every one is the id of a record, an entity, a cell or a kind the world already
+  holds, so nothing is interned that would not be. An `Id` orders as its text, so every map iterates as it did. The
+  bank keeps the transactions it lists on statements as the world's shared copy (`Picture::transactions_held`,
+  R3). What is saved and shown is unchanged: an `Id` serialises as its text, and the rows a mind writes (`TrustRow`)
+  are still text.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at main's state hash and log.
+- **Cost, paired** against R3 (three rounds of the 1,000-person towns, one of the 200; the machine was restarted
+  between this and R3's pairs, and runs about a quarter slower since, so only pairs taken together compare): the
+  same hash and log in every pair; the run's own thread -6 to +1%, faster on average on all three profiles; the
+  200-person towns 2 to 6% faster.
+- **Memory.** 1,000 people 3 to 15 MB lower (au-vic 396 to 403 MB against 397 to 417, about 290 KB a person; gb-eng
+  377 to 390 against 391 to 399; us-oh 349 to 353 against 356 to 357); the 200-person towns level.
+- **The budget.** About 290 KB a person here, some 307 on the Mini, and 8% over that is 332: the ceiling lowered from
+  345 to 335 KB.
+- **Left of R4.** The rest of the actors' state is diffuse: many small maps and strings across some 40 actors, each
+  under a megabyte at 1,000. The plan's -10 to -20 KB a person for R4 assumed offices' books held as `Value`; R2
+  took most of that, so what is left of R4 is probably 5 KB a person or less, not worth a rewrite of every actor's
+  state in its own right. The large holders left are not the actors': the compiled schemas (fixed, 43 MB), the
+  engine's units and rounds (42), and what the profile cannot attribute (39).
+- **Revisit if** a profile at 10,000 shows one actor's state growing faster than the town (then that actor's state
+  typed), or the count of interned ids (`OIKOS_KEPT=1`) grows with a run's length.
