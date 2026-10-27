@@ -131,6 +131,7 @@ each lowering the budget's ceiling.
 | R2, records' JSON frozen | 409 to 419 MB (gb-eng 400 to 411, us-oh 365 to 380) | 305 | against R1: au-vic -3 to -10%, gb-eng -4 to 0%, us-oh -7 to +5% (-2% on average) | 350 |
 | R3, each transaction held once | 409 to 412 MB (90 days: 622 against 638) | 300 | against R2: -4 to +1% | 345 |
 | R4 (first part), the actors' indexes keyed by `Id` | 396 to 403 MB | 290 | against R3: -6 to +1% | 335 |
+| the allocator without huge pages (Linux only) | 358 to 368 MB (200 people: 172 to 177 against 222 to 238) | 253 | +0.5 to +3.9% (200: 4 to 7% faster) | 335 (the Mini gains nothing) |
 
 R1 saved little memory because few of the ids held were `Id`s: the actors' are `String`s (R4) and records' JSON holds
 its own strings (R2). Acts' and messages' ids are `Passing` (their own text), as they go with what they name; every

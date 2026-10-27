@@ -1553,7 +1553,8 @@ The mechanism:
 - **L / I:** medium / medium · **Status:** partly fixed: the representation plan begun (R1, ids interned, on branch
   `representation`: 352 KB a person at 1,000 against main's 363, the run's own thread 8 to 19% faster; R2, records' JSON
   frozen: 305 KB; R3, each transaction held once: 300 KB, more over a long run;
-  R4's first part, the actors' indexes keyed by interned ids: 290 KB).
+  R4's first part, the actors' indexes keyed by interned ids: 290 KB; the allocator without huge
+  pages: 253 KB on Linux, nothing on macOS).
 - **Notice by:** The memory budget's test failing; a run past 50,000 near the 40 GB guard.
 - **Fix when:** Before a study at 100,000 for longer than a week.
 

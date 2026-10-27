@@ -9414,3 +9414,28 @@ routes as law data, nobody shown more than is theirs.
   engine's units and rounds (42), and what the profile cannot attribute (39).
 - **Revisit if** a profile at 10,000 shows one actor's state growing faster than the town (then that actor's state
   typed), or the count of interned ids (`OIKOS_KEPT=1`) grows with a run's length.
+
+## 2026-10-27 · The allocator without huge pages (SC-1; branch `representation`; no result changes; no model called)
+
+- **What was held.** At the peak of a 1,000-person month about 206 MB is live (the heap profile) against some 400 MB
+  resident; at 200 people 230 MB resident, most of the "fixed" 110 MB the memory budget allows. mimalloc (v3) asks
+  Linux for transparent huge pages on what it maps (`madvise(MADV_HUGEPAGE)`), so a region it has touched is resident
+  in 2 MB pieces however little of each is in use, and it returns freed memory a second after (`purge_delay`).
+- **Settings tried**, each paired against R4's build (`scripts/pair.sh`, six towns, two to five rounds; the same hash
+  and log in every pair), the run's own thread at 1,000 people: memory returned at once, 30 to 40 MB lower, +3%;
+  that and arenas not committed ahead, 50 lower, 0 to +13%; returned after 10 ms, 20 to 35 lower, +4 to +11%; arenas
+  not committed ahead alone, 35 to 55 lower, level within noise; huge pages off alone, 30 to 45 lower, level. Set at
+  the start of `main` (`mi_option_set`) an option did nothing: the allocator has made its first arena before `main`.
+- **Change.** mimalloc built with `no_thp` (kernel/Cargo.toml and kernel/crates/napi/Cargo.toml): it never asks for
+  huge pages. Paired against R4's build, three rounds of all six towns: the same hash and log; 1,000 people 32 to 42
+  MB lower (au-vic 358 to 368 MB against 400 to 408, about 253 KB a person; gb-eng 353 to 355 against 385 to 388;
+  us-oh 322 to 325 against 360 to 363), the run's own thread +0.5 to +3.9%; 200 people 50 to 58 MB lower (about a
+  quarter), 4 to 7% faster. Naz (2026-10-27): more CPU for less memory is a fair trade where memory is what limits a
+  run (many people, many years); proposed for such trades: up to about 5% more CPU for about 10% less memory or more,
+  results byte-identical always, anything larger put to him.
+- **Where it holds.** Linux with transparent huge pages in `madvise` mode, as here. Where they are `always`, the
+  kernel's own policy gives huge pages without being asked, and this saves less (then `MIMALLOC_ALLOW_THP=0`, which
+  also turns them off for the process, measured the same here). On macOS mimalloc asks for none: the Mini, where the
+  budget is measured, gains nothing, so **the budget's ceiling stays at 335 KB** (this machine's 253 is not the Mini's).
+- **Revisit if** a mimalloc upgrade changes how it maps (re-pair), or a profile shows the purge delay's held memory at
+  10,000 people (then memory returned at once, as an opt-in for large runs: about 20 MB more at 1,000 for about 3%).
