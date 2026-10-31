@@ -9553,3 +9553,27 @@ routes as law data, nobody shown more than is theirs.
   bound on the size of town (then its header is indexed lazily, by section); the egui interface proves not worth
   keeping beside the web one (then the native shell wraps the web interface in a webview); Bevy's WebGL 2 path falls
   behind its WebGPU one (then WebGL 2 is dropped once browsers allow).
+
+## 2026-10-31 · No whole-world copies during a step (SC-1; branch `mem-no-copies`, on `representation`; no result changes; no model called)
+
+- **What was copied.** Every act is worked on a copy of the state (all-or-nothing: a dry run when it begins, the act
+  itself when done), and the state's maps are persistent, so that copy is cheap. Not all of it was: an act that draws
+  from or emits to a field (`work` with a recipe that does) made nature's state its own (`Arc::make_mut` while the
+  state before the act still held it), which copied every field's and every species' cells and the covers' days; an
+  act on a link or connection, and each hour's settlement, copied the network's links, every connection (one a
+  metered home) and its indexes; and every act's copy took its own of the takings (which grow with the run), the
+  flooded buildings and the scarce sales.
+- **Change.** Those are now persistent too: a field's or species' cells an `imbl::OrdMap` (`oikos_nature::Cells`),
+  the covers' days one; the network's links and connections `imbl::Vector`s and its indexes behind an `Arc`; takings
+  a persistent vector, floods a persistent set, scarce sales a persistent map. An act's copy shares them, and a change
+  copies only the path to what it touches. Each is serialised as before (maps in key order, lists as lists). The
+  world's totals stay a plain map: a handful of counters, one for each the catalogue declares.
+- **Results.** The same state hash at 1,000 and 10,000 people (`worlds/town-1000.yaml`, 30 days, 4 threads); the
+  logs the same entry for entry, the header's build id aside.
+- **Memory** (Linux, 4 threads, against `representation` at 01d1798): 1,000 people 306 MB, 195.9 KB a person before
+  and 195.6 after; 10,000 people 1,675 MB, 156.5 KB a person, before and after. Nothing at the peak: the copies were
+  made and let go within an act. What it saves is the copying (an act on a field or the network no longer costs as
+  much as the whole of nature or the network), and a world whose nature or network is large no longer pays it per act.
+  The budget's ceiling is unchanged (270 KB): the measure did not move.
+- **Revisit if** a heap profile shows another part of the state copied whole within an act (any field of `State` that
+  is not a persistent map, vector or set, or behind an `Arc`, is copied by every act).
