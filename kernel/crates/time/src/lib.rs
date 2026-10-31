@@ -6,7 +6,8 @@
 //! Pure functions: the kernel keeps the timelines in its state and applies acts when they're done.
 
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 /// The second it takes to tell someone else to do an act (an act whose work is all others', `by`): the order itself,
 /// not the work, which is charged to whoever does it. A convention of the platform, not read from the table (a known
@@ -24,18 +25,49 @@ pub enum Actor {
 const DAY: i64 = 86_400;
 
 /// A daily window of work (a template's `hours`, law 10): from `from` seconds after midnight, for `seconds`. A system's
-/// lanes work only inside it; work not finished by the window's end goes on in the next day's. Every day is a working
-/// day (a known limit: no weekends or holidays for a system's hours yet).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// lanes work only inside it; work not finished by the window's end goes on in the next working day's. Days it is closed
+/// (`closed`: a working calendar's days of rest and holidays, config data) have no window: the work waits.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hours {
     pub from: i64,
     pub seconds: i64,
+    pub closed: Option<Arc<Closed>>,
+}
+
+/// The days a window does not open (a working calendar, law 10): days of the world's week (day `d` of the run is the
+/// week's day `d mod 7`) and single days of the run (holidays), counted from its first. A day is the window's opening's.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Closed {
+    week: [bool; 7],
+    days: BTreeSet<i64>,
+}
+
+impl Closed {
+    /// The days of rest (days of the world's week, 0 to 6) and the holidays (days of the run). None if every day of the
+    /// week is closed (work could never be done) or a day of the week is out of range.
+    pub fn new(weekdays: &[i64], days: &[i64]) -> Option<Self> {
+        let mut week = [false; 7];
+        for &w in weekdays {
+            *week.get_mut(usize::try_from(w).ok()?)? = true;
+        }
+        (!week.iter().all(|x| *x)).then(|| Closed { week, days: days.iter().copied().collect() })
+    }
+
+    /// Whether day `d` of the run (counted from its first, 0) has no window.
+    pub fn shut(&self, d: i64) -> bool {
+        self.week[d.rem_euclid(7) as usize] || self.days.contains(&d)
+    }
 }
 
 impl Hours {
     /// A window the contract allows: it opens within the day and lasts at least a second and at most the whole day.
     pub fn new(from: i64, seconds: i64) -> Option<Self> {
-        ((0..DAY).contains(&from) && (1..=DAY).contains(&seconds)).then_some(Hours { from, seconds })
+        ((0..DAY).contains(&from) && (1..=DAY).contains(&seconds)).then_some(Hours { from, seconds, closed: None })
+    }
+
+    /// The same window, not opening on a working calendar's closed days.
+    pub fn closed_on(self, closed: Closed) -> Self {
+        Hours { closed: Some(Arc::new(closed)), ..self }
     }
 
     /// When the window that `t` is in opened (the latest opening at or before `t`).
@@ -43,18 +75,32 @@ impl Hours {
         (t - self.from).div_euclid(DAY) * DAY + self.from
     }
 
-    /// The first moment of work at or after `t`: `t` itself inside a window, else the next window's opening.
+    /// Whether the window opening at `opened` opens at all (not on a closed day).
+    fn opens(&self, opened: i64) -> bool {
+        self.closed.as_ref().is_none_or(|c| !c.shut(opened.div_euclid(DAY)))
+    }
+
+    /// The first opening at or after `opened` (an opening) on a day that is not closed. (A week always has an open day,
+    /// `Closed::new`, so the walk ends past the last holiday at the latest.)
+    fn next_open(&self, mut opened: i64) -> i64 {
+        while !self.opens(opened) {
+            opened += DAY;
+        }
+        opened
+    }
+
+    /// The first moment of work at or after `t`: `t` itself inside an open window, else the next open window's opening.
     pub fn open_from(&self, t: i64) -> i64 {
         let opened = self.opened(t);
-        if t - opened < self.seconds {
+        if t - opened < self.seconds && self.opens(opened) {
             t
         } else {
-            opened + DAY
+            self.next_open(opened + DAY)
         }
     }
 
     /// When `seconds` of work begun at `start` (a moment of work) are done: inside the window if they fit, else carried
-    /// on through the next days' windows. Arithmetic, not a walk over the days.
+    /// on through the next open days' windows. Arithmetic where every day is open; a walk over the days where some are not.
     pub fn finish(&self, start: i64, seconds: i64) -> i64 {
         if seconds <= 0 {
             return start;
@@ -65,9 +111,17 @@ impl Hours {
             return start + seconds;
         }
         let rest = seconds - left_today;
-        // (Whole windows after today's, then the part of the last.)
-        let whole = (rest - 1) / self.seconds;
-        opened + DAY * (1 + whole) + (rest - whole * self.seconds)
+        if self.closed.is_none() {
+            // (Whole windows after today's, then the part of the last.)
+            let whole = (rest - 1) / self.seconds;
+            return opened + DAY * (1 + whole) + (rest - whole * self.seconds);
+        }
+        let (mut at, mut rest) = (self.next_open(opened + DAY), rest);
+        while rest > self.seconds {
+            rest -= self.seconds;
+            at = self.next_open(at + DAY);
+        }
+        at + rest
     }
 }
 
@@ -107,7 +161,7 @@ impl ActTimes {
 
     /// A template's hours, if it states them.
     pub fn hours(&self, template: Option<&str>) -> Option<Hours> {
-        self.templates.get(template?)?.hours
+        self.templates.get(template?)?.hours.clone()
     }
 
     fn table(&self, actor: Actor) -> &BTreeMap<String, i64> {
@@ -297,37 +351,64 @@ mod tests {
         let h = Some(Hours::new(9 * H, 8 * H).unwrap());
         let mut tl = vec![];
         // Ready at 3 in the morning: begins at 9, an hour and a quarter's case done at a quarter past ten.
-        assert_eq!(place_within(&mut tl, 1, 3 * H, 4_500, h), (9 * H, 9 * H + 4_500));
+        assert_eq!(place_within(&mut tl, 1, 3 * H, 4_500, h.clone()), (9 * H, 9 * H + 4_500));
         // Ready at 4 in the afternoon, two hours' work: one today, one tomorrow from 9.
         let mut tl = vec![];
-        assert_eq!(place_within(&mut tl, 1, 16 * H, 2 * H, h), (16 * H, DAY + 10 * H));
+        assert_eq!(place_within(&mut tl, 1, 16 * H, 2 * H, h.clone()), (16 * H, DAY + 10 * H));
         // Exactly the rest of the day: done at closing, not tomorrow.
         let mut tl = vec![];
-        assert_eq!(place_within(&mut tl, 1, 16 * H, H, h), (16 * H, 17 * H));
+        assert_eq!(place_within(&mut tl, 1, 16 * H, H, h.clone()), (16 * H, 17 * H));
         // Twenty hours of work begun at opening: 8 + 8 + 4, done at 1 in the afternoon of the third day.
         let mut tl = vec![];
-        assert_eq!(place_within(&mut tl, 1, 9 * H, 20 * H, h), (9 * H, 2 * DAY + 13 * H));
+        assert_eq!(place_within(&mut tl, 1, 9 * H, 20 * H, h.clone()), (9 * H, 2 * DAY + 13 * H));
         // Exactly three windows: done at the third day's closing.
         let mut tl = vec![];
-        assert_eq!(place_within(&mut tl, 1, 0, 24 * H, h), (9 * H, 2 * DAY + 17 * H));
+        assert_eq!(place_within(&mut tl, 1, 0, 24 * H, h.clone()), (9 * H, 2 * DAY + 17 * H));
         // After closing, nothing begins until tomorrow; a queue builds on the lane, and a second lane takes the next.
         let mut tl = vec![];
-        assert_eq!(place_within(&mut tl, 2, 18 * H, 4 * H, h), (DAY + 9 * H, DAY + 13 * H));
-        assert_eq!(place_within(&mut tl, 2, 18 * H, 4 * H, h), (DAY + 9 * H, DAY + 13 * H));
-        assert_eq!(place_within(&mut tl, 2, 18 * H, 6 * H, h), (DAY + 13 * H, 2 * DAY + 11 * H));
+        assert_eq!(place_within(&mut tl, 2, 18 * H, 4 * H, h.clone()), (DAY + 9 * H, DAY + 13 * H));
+        assert_eq!(place_within(&mut tl, 2, 18 * H, 4 * H, h.clone()), (DAY + 9 * H, DAY + 13 * H));
+        assert_eq!(place_within(&mut tl, 2, 18 * H, 6 * H, h.clone()), (DAY + 13 * H, 2 * DAY + 11 * H));
         // Zero seconds: when it could begin (what the kernel asks to learn when a lane is next free for work).
         let mut tl = vec![];
-        assert_eq!(place_within(&mut tl, 1, 20 * H, 0, h), (DAY + 9 * H, DAY + 9 * H));
+        assert_eq!(place_within(&mut tl, 1, 20 * H, 0, h.clone()), (DAY + 9 * H, DAY + 9 * H));
         // A window across midnight: from 10 at night for 8 hours.
         let n = Some(Hours::new(22 * H, 8 * H).unwrap());
         let mut tl = vec![];
-        assert_eq!(place_within(&mut tl, 1, 12 * H, 3 * H, n), (22 * H, DAY + H));
-        assert_eq!(place_within(&mut tl, 1, DAY + 5 * H, 2 * H, n), (DAY + 5 * H, DAY + 22 * H + H));
+        assert_eq!(place_within(&mut tl, 1, 12 * H, 3 * H, n.clone()), (22 * H, DAY + H));
+        assert_eq!(place_within(&mut tl, 1, DAY + 5 * H, 2 * H, n.clone()), (DAY + 5 * H, DAY + 22 * H + H));
         // All day is as no hours.
         let all = Some(Hours::new(0, DAY).unwrap());
         let (mut a, mut b) = (vec![], vec![]);
         for (ready, secs) in [(5, 100), (7, DAY * 3), (DAY * 2, 50)] {
-            assert_eq!(place_within(&mut a, 1, ready, secs, all), place(&mut b, 1, ready, secs));
+            assert_eq!(place_within(&mut a, 1, ready, secs, all.clone()), place(&mut b, 1, ready, secs));
+        }
+    }
+
+    #[test]
+    fn a_working_calendar_closes_its_days_of_rest_and_holidays_and_the_work_waits() {
+        // Days 5 and 6 of each week are its days of rest, and day 9 a holiday: hours from 9 for 8 hours.
+        assert_eq!(Closed::new(&[0, 1, 2, 3, 4, 5, 6], &[]), None, "a week with no working day");
+        assert_eq!(Closed::new(&[7], &[]), None);
+        let h = Hours::new(9 * H, 8 * H).unwrap().closed_on(Closed::new(&[5, 6], &[9]).unwrap());
+        // Ready on day 4 after closing: nothing begins until day 7's opening.
+        assert_eq!(h.open_from(4 * DAY + 18 * H), 7 * DAY + 9 * H);
+        // Ready on a day of rest, in what would be its hours: the same.
+        assert_eq!(h.open_from(5 * DAY + 10 * H), 7 * DAY + 9 * H);
+        // Twelve hours begun at day 4's opening: eight on day 4, four on day 7.
+        let mut tl = vec![];
+        assert_eq!(place_within(&mut tl, 1, 4 * DAY, 12 * H, Some(h.clone())), (4 * DAY + 9 * H, 7 * DAY + 13 * H));
+        // Twenty hours from day 7: 8 on day 7, 8 on day 8, the holiday skipped, 4 on day 10.
+        let mut tl = vec![];
+        assert_eq!(place_within(&mut tl, 1, 7 * DAY, 20 * H, Some(h.clone())), (7 * DAY + 9 * H, 10 * DAY + 13 * H));
+        // Exactly the windows of days 7 and 8: done at day 8's closing.
+        assert_eq!(h.finish(7 * DAY + 9 * H, 16 * H), 8 * DAY + 17 * H);
+        // A calendar with no closed day is as no calendar.
+        let open = Hours::new(9 * H, 8 * H).unwrap();
+        let none = open.clone().closed_on(Closed::new(&[], &[]).unwrap());
+        for (ready, secs) in [(5, 100), (7, DAY * 3), (DAY * 2 + 20 * H, 50 * H)] {
+            let (mut a, mut b) = (vec![], vec![]);
+            assert_eq!(place_within(&mut a, 1, ready, secs, Some(none.clone())), place_within(&mut b, 1, ready, secs, Some(open.clone())));
         }
     }
 }

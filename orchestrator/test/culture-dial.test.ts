@@ -105,7 +105,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
 // f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "b69b5e45f11f6372", "gb-eng-2026": "1c0ed42c71f90f2c", "ke-nakuru-2026": "bee66230724c9cbd" }
+  ? { "au-vic-2026": "c899c8ff16f761b6", "gb-eng-2026": "9b0a54d61900fdd7", "ke-nakuru-2026": "a2f60218588c0078" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -146,10 +146,14 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // both: a road is a way of the network, the ground says a cell's metres, housed households have a vehicle and drive it where
 // they belong (generator 0.72.0), and a child's parents know of its birth at once; ce5432bd..., becc4b5a..., a33d92aa... for the
 // configs and e2f908c0..., 66d41a64..., 29ee83f1... for the states, until then.)
+// (Re-taken on 2026-11-01 at working calendars (gap-weekends), on the tree merged with main at f56d2dbc (delegation, the long-run
+// fixes, business loans, foundations-2 S2), config hashes and Rust states both: the support agency's and the tax collector's desks of officers keep
+// the place's days of rest and public holidays (`hours.closed`), an officer's day on each working day (generator 0.73.0); main's
+// b69b5e45..., 1c0ed42c..., bee66230... for the configs and 001f22ed..., 1a754a5d..., caa00714... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "001f22ede7b41c0bbe711ad365f8678d6be4f40d9e70252a0128ceb48fe26549",
-  "gb-eng-2026": "1a754a5d3c32ddfeafc09a28a84b5b458e86ad21cb122b635954a94e009d3951",
-  "ke-nakuru-2026": "caa00714a0728e19a2fb84f82a7429bdb67037996862e81dc5540b363924758f",
+  "au-vic-2026": "af012071ce20d4e56064b3a261295840bdecd6f82b3616be7f7444842ac9bb15",
+  "gb-eng-2026": "fab20a4d041378d243f93793a5842ad1a8603927f18ca8cc2df401287d168fe3",
+  "ke-nakuru-2026": "e309381464fd3555eff4d3152ab7d0f3abd3e7d2bc5f019eb6f687b71df75e4f",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
