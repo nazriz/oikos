@@ -1,6 +1,7 @@
 {
  "//": "The slow tier (docs/dev-machine.md, \"Tiers\"): run by CI on every push to main and nightly, never by the merge gate. Every other test file is the gate tier. A file moves here when it simulates towns for long (more than ~30 s), with why; scripts/tiers.test.ts holds that every file is in exactly one tier.",
  "slow": {
+  "explorer/test/smoke.test.ts": "the Bevy explorer in headless Chromium, drawn in software (SwiftShader) without a GPU: a town run for three days, then the page driven milestone by milestone (about 170 s on 2026-10-25, 4 cores)",
   "orchestrator/test/all-work-takes-time-runs.test.ts": "nine towns run for a month each, and a planted one: 31 s alone on 2026-10-25, two to three times that under the suite's load (law 10's backstop of acts refused unpriced; foundations-2 P5)",
   "orchestrator/test/auditor.test.ts": "the 1,000-person town (74 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/automation-run.test.ts": "several towns run for months (115 s on 2026-10-24, the whole suite at once)",

@@ -1,0 +1,78 @@
+[package]
+name = "oikos-explorer"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "The Bevy explorer: a run's town in 3D (browser by WebAssembly, and native), read from the explorer's data layer. Read-only."
+
+# Its own workspace: Bevy is kept out of the kernel's (whose release build is whole-program LTO), and the kernel never
+# depends on it. It reads kernel/crates/explore natively; in the browser it reads the same index over the Bun server's /api.
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "oikos-explorer"
+path = "src/main.rs"
+required-features = ["native"]
+
+[features]
+default = []
+native = ["dep:oikos-explore", "bevy/x11", "bevy/multi_threaded", "dep:bevy_egui"]
+webgl2 = ["bevy/webgl2"]
+webgpu = ["bevy/webgpu"]
+# (Linux desktops on Wayland; needs libwayland-dev)
+wayland = ["bevy/wayland"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+crossbeam-channel = "0.5"
+bevy = { version = "0.20", default-features = false, features = ["std", "bevy_render", "bevy_core_pipeline", "bevy_pbr", "bevy_winit", "bevy_window", "bevy_asset", "bevy_log", "bevy_gizmos", "bevy_gizmos_render", "bevy_post_process", "bevy_anti_alias", "bevy_light", "bevy_camera", "tonemapping_luts", "default_app", "ktx2", "zstd_rust", "png"] }
+oikos-explore = { path = "../kernel/crates/explore", optional = true }
+bevy_egui = { version = "0.43", optional = true, default-features = false, features = ["render", "default_fonts"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["Window", "Request", "RequestInit", "Response", "Headers", "Location", "Performance", "console"] }
+console_error_panic_hook = "0.1"
+
+[lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+needless_range_loop = "allow"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+
+# The browser build: small and fast (wasm-opt is not used).
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = false
+strip = true
+
+# For working on it: the browser build in a minute or two, not ten.
+[profile.wasm-quick]
+inherits = "release"
+opt-level = 2
+lto = false
+codegen-units = 16
+debug = false
+strip = true
+incremental = true
+
+[profile.dev]
+opt-level = 1
+# (no debug info: a debug Bevy build with it is over 10 GB on disk)
+debug = false
+[profile.dev.package."*"]
+opt-level = 3

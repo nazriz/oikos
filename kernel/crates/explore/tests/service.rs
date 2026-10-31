@@ -94,11 +94,32 @@ fn serving_a_run_changes_nothing_in_its_folder_and_answers_get_on_loopback_only(
     let (_, a) = http(addr, "GET", "/api/r/fx/bin/agency", None);
     assert_eq!(a.len(), (days + 1) * 2 * 2);
     assert_eq!(i16::from_le_bytes([a[2 * 2 * 2], a[2 * 2 * 2 + 1]]), 4100); // day 2, c1
+                                                                            // a window of days is those days' rows of the whole, for a viewer that streams (explorer/src/tracks.rs)
+    let (_, w12) = http(addr, "GET", "/api/r/fx/bin/where?from=1&to=3", None);
+    assert_eq!(w12, w[2 * 4..(3 * 2) * 4].to_vec());
+    let (_, a2) = http(addr, "GET", "/api/r/fx/bin/agency?from=2&to=3", None);
+    assert_eq!(a2, a[2 * 2 * 2..3 * 2 * 2].to_vec());
+    let (_, m0) = http(addr, "GET", "/api/r/fx/bin/money?from=0&to=1", None);
+    assert_eq!(m0, m[..4 * 8].to_vec());
     let (_, p) = http(addr, "GET", "/api/r/fx/bin/pulses", None);
     assert_eq!(p.len(), 5 * 6 * 4);
     let (_, mv) = http(addr, "GET", "/api/r/fx/bin/moves?from=1&to=2", None);
     assert_eq!(mv.len(), 2 * 3 * 4); // c2 goes to work (vacate + occupy) on day 1
     assert_eq!(http(addr, "GET", "/api/r/fx/bin/nothing", None).0, 404);
+    // a viewer that asks `partial` is answered as any other once the run is read; the status says the header is in
+    assert_eq!(json(addr, "/api/r/fx/status")["header"], true);
+    assert_eq!(http(addr, "GET", "/api/r/fx/bin/where?partial=1", None).1, w);
+    // the workbench's routes (bench.rs): the events table, a group, counts by building
+    let ev = json(addr, "/api/r/fx/events?limit=5&order=desc");
+    assert_eq!(ev["total"], world["meta"]["kept"]);
+    assert_eq!(ev["rows"].as_array().unwrap().len(), 5);
+    assert!(json(addr, "/api/r/fx/events?cls=seat&limit=100")["rows"].as_array().unwrap().iter().all(|r| r["cls"] == "seat"));
+    assert!(json(addr, "/api/r/fx/cohort?rule=reached&hard=1")["members"].as_u64().is_some());
+    let by = json(addr, "/api/r/fx/decided?from=0&to=99");
+    assert_eq!(
+        by.as_array().unwrap().len(),
+        world["world"]["structures"].as_array().unwrap().len() + world["meta"]["extraStructures"].as_array().unwrap().len()
+    );
     // read only, loopback only, and no debrief anywhere
     assert_eq!(http(addr, "POST", "/api/r/fx/world", None).0, 405);
     assert_eq!(http(addr, "GET", "/api/runs", Some("evil.example")).0, 403);
