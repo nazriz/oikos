@@ -1,0 +1,16 @@
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { generate } from "@oikos/worlds/generator/generate";
+import { officeAt } from "./test/lib/offices";
+import { runWorld } from "./src/run";
+const DAY = 86400;
+const base = Bun.YAML.parse(readFileSync("/home/user/oikos/worlds/town.yaml", "utf8")) as any;
+const [factor, days] = [Number(process.argv[2]), Number(process.argv[3])];
+const c = generate({ ...base });
+const tr = officeAt(c, "outside-trade").params;
+tr.buys.goods.unit_price = Math.round(tr.buys.goods.unit_price * factor);
+const out = mkdtempSync(join(tmpdir(), "prod-"));
+const s = await runWorld({ config: c, runId: "p", outDir: out, until: days * DAY });
+const recs = readFileSync(s.logPath, "utf8").split("\n").filter((l) => l.includes("Dividend.")).map((l) => JSON.parse(l)).filter((e) => e.kind === "event" && e.body.event === "recorded" && Array.isArray(e.body.record.data?.payments));
+console.log(factor, "dividends", recs.map((e) => `${Math.floor(e.t / DAY)}:${e.body.record.speaks_for}`).join(" "));

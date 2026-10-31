@@ -1,5 +1,5 @@
 // A pilot and its twin, with an office in a mock seat (the head of twin-draws.test.ts says why): the same requests get the same
-// answers from those the seat did not deal with, and the world's prices are the same month by month over a year.
+// answers from those the seat did not deal with, and the world's prices are the same month by month over eight months.
 // (Split out of twin-draws.test.ts at the test pruning, 2026-10-24.)
 
 import { expect, test } from "bun:test";
@@ -27,13 +27,15 @@ test("with an office in a mock seat, the same requests still get the same answer
   expect(differ.map((k) => `${k}: ${a.get(k)} in the twin, ${b.get(k)} with the seat`)).toEqual([]);
 }, 900_000);
 
-test("the world's prices are the world's: a town and its twin with an office in a mock seat see the same prices month by month over a year", async () => {
+test("the world's prices are the world's: a town and its twin with an office in a mock seat see the same prices month by month over eight months", async () => {
   // (2026-10-12. A month's world price was drawn on the outside market's own stream, which is keyed on the hour it
   // wakes in: anything that moved its first look of a month gave the town another year of prices. Twelve runs of one
   // town before and after an unrelated change had input prices 16% and 21% up in the "same" run, and whether its
   // factories failed turned on it. A price is now named for the good and the month, from the seed.)
   const prev = process.env.TWIN_DAYS;
-  process.env.TWIN_DAYS = "365";
+  // (Eight months, a year until 2026-10-31, the slow tier's budget: the fault moved a month's prices from the second month
+  // on, and eight months' lists are enough for more than six distinct.)
+  process.env.TWIN_DAYS = "240";
   try {
     const [twin, pilot] = await Promise.all([run("twin-prices-code", { living: undefined }), run("twin-prices-seat", { living: undefined, mayor: "llm" })]);
     const prices = (rs: any[]) => rs.filter((r) => r.kind === "price_list" && /at world prices/.test(String(r.text))).map((r) => `${Math.floor(r.at / (30 * DAY))} ${String(r.text).replace(/rec\.[0-9]+/g, "rec")}`);

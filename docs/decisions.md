@@ -9855,6 +9855,19 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   warrants), each a case to be made by construction, as docs/testing.md says. The next payoffs: those cases built,
   `elections.test.ts` (seven towns of 205 days; a paper fuller before the notice would let the election come sooner),
   and the twin files (about 1,000 file-seconds between them). Or the budget raised, with its entry here.
+- **Then, on the coordinator's word (don't raise the budget; build rare cases, shorten the twins where the law allows),**
+  each file alone on the same container: `production.test.ts`'s dividend by construction, the outside paying a fifth
+  more for the town's goods (`profitable`) on the town's own seed, 120 days, where it was seed 5 and 300 days hunting a
+  rare draw (the "every line paid" checks now cover instructions a month before the end, where they were day 170 of
+  300): 246 → 134 s. `police-station-seat.test.ts`: 330 → 120 days (the opening case's warrant is in month two; the
+  rest is held only as both towns agreeing): 203 → 80 s. `twin-draws-seat.test.ts`, the prices twin: a year → 240 days
+  (the fault moved prices from the second month; 8 lists, 8 distinct): about −90 s. Kept: `twin-draws-year`'s mayor
+  floor (0.37 of decisions alike) is set against a year, where the fault it guards gave 35%; at 120 days the town gave
+  72% alike, so a shorter run would not catch it. `twin-seat-year` needs a seated resident's death and its floors are a
+  year's. The elections paper: not cheap (who files what before the notice), not done. With these, about 8,042 → 7,750
+  file-seconds here, 20% under the start (23% leaving own-venture's growth out): on the Mini about 1,526 → 1,200 s,
+  still over the budget. What is left is the twins of a year and the elections, each a law's whole span, or the
+  budget.
 - **Revisit if:** a shortened run's event moves past its end (the test fails on the count, not silently: each asks
   for at least one of what it checks), or a scenario starts acting after its first month.
 
