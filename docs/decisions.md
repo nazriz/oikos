@@ -9554,6 +9554,48 @@ routes as law data, nobody shown more than is theirs.
   keeping beside the web one (then the native shell wraps the web interface in a webview); Bevy's WebGL 2 path falls
   behind its WebGPU one (then WebGL 2 is dropped once browsers allow).
 
+## 2026-10-31 · The owner's TARA proposal as the plan's north star (docs only; no model called)
+
+- **What:** the proposal Naz submitted to TARA on 2026-10-28 ("Better Off, Less in Control?") is kept verbatim in
+  `docs/north-star.md`; `docs/plan.md` gains a "North star" section mapping what the proposal needs against what the
+  platform has; CLAUDE.md's read-first list points to it.
+- **Why:** he asked for it to be the north star for the lines of work, "not completely rigid". The map shows the gap
+  is the delegation capabilities (models as hired assistants, AI interventions in forks, requests for scope), not the
+  world's physics: friction, scale to tens of thousands, forks and debriefs largely exist.
+- **Not decided here:** reordering the plan, and building the delegation capabilities; both are the owner's call.
+- **Revisit if:** the proposal changes (its 15 Nov project plan), or the owner chooses another study.
+
+## 2026-10-31 · Foundations-2 phase 3, S1: law 9's backstop, with today's instant moves in an inventory (branch `f2-phase3`; no result changes; no model called)
+
+Asked: build phase 3 of docs/design/foundations-2.md (law 9, space: roads, pipes, wires and data lines with capacity and
+energy; people in transit; goods need a carrier; several towns as an option), Naz having approved the design on
+2026-10-25 and confirmed on 2026-10-31 that all of it is to be completed. S1 is the backstop with today's violations listed.
+
+- **The backstop: `orchestrator/test/everything-is-somewhere.test.ts`** (gate tier; its audits in `test/lib/law9.ts`). It
+  generates every profile's town and reads the actors' sources, and names: `unlocated` (a body in no space at the start, a
+  holding at no structure or edge, a system whose hardware is held nowhere), `edgesWithoutNode` (in a world with a
+  network, an edge that is no node of it, so imports and exports arrive nowhere), `waysOffNetwork` (ground a cover makes
+  quicker to cross than on foot: a car's speed baked into the cell instead of links with a speed and a capacity),
+  `uncarried` (an actor's move of goods that names no carrier). **`everything-is-somewhere-runs.test.ts`** (slow tier:
+  nine towns of 300 for a month, about 32 s) reads the logs for `uncarriedMoves` (goods moved from one place to another
+  with no carrier) and `workElsewhere` (work on a building done where the crew is not), by the module whose post the act
+  was done in. Each is planted and seen named in the gate file (the log audit on a written log).
+- **The inventory, `orchestrator/test/fixtures/space-inventory.json`, only shrinks**, as law 8's does. Today: the
+  unhoused, who are in no space (about one in twelve at the start, from `housed_bps`); six kinds of system with no place
+  (the casework desks, the payment and market systems, the vendors' and agencies'); every edge (the outside, the
+  vendors, the wholesalers: the town's network has no edge node); the road cover (2 or 3 s a cell against 18 on foot);
+  six actor files whose moves of goods name no carrier, and in the logs the citizen's, the works', the producer's, the
+  retailer's and the world market's moves; the builder's building, the works' collecting and upkeep, done from the
+  depot. Four special cases to delete, each with its step: the road as a cover (S2), a trip spent where one set out
+  (S3), `move_goods` between any two places (S4), work on a building from wherever the crew is (S4).
+- **The kernel's side: `kernel/tests/space.rs`**, grown step by step: over any sequence of operations a body is in at
+  most one building (with a check that bodies do move). The trip's time is already held by `services.rs`.
+- **Not in the design's list, added:** systems' places and the unhoused. Law 9 says every body and machine has a
+  location; the systems have none today (law 10 gave them lanes and hours, not a place), and a person with no home is in
+  no space and so nowhere, travelling from nowhere for nothing. Both are in the inventory, for the steps that end them.
+- **Revisit if** a finding turns out to be a false positive (then the audit is wrong, never the inventory widened); the
+  log audits need more than a month to see a module's moves (then the run grows).
+
 ## 2026-10-31 · No whole-world copies during a step (SC-1; branch `mem-no-copies`, on `representation`; no result changes; no model called)
 
 - **What was copied.** Every act is worked on a copy of the state (all-or-nothing: a dry run when it begins, the act
