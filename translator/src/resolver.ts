@@ -745,12 +745,13 @@ class Resolver {
       ...(this.has(c, "their_notice") ? [{ party: other, notice: this.seconds(c, "their_notice")! }] : []),
     ];
     const text = this.str(c, "terms") ?? this.str(c, "text");
+    const attrs = this.json(c, "attrs");
     const ref = bind ?? this.fresh("offer");
     return [
       {
         block: "propose_agreement", ref, speaks_for: me, ...this.basis(c),
         ...(this.visible(c) ? { visible_to: this.visible(c) } : {}),
-        terms: { ...(this.label(c, "template") ? { template: this.label(c, "template") } : {}), parties: [me, other], commitments, ...(term ? { term } : {}), ...(then ? { then } : {}), ...(termination.length ? { termination } : {}), ...(text ? { text } : {}) },
+        terms: { ...(this.label(c, "template") ? { template: this.label(c, "template") } : {}), parties: [me, other], commitments, ...(term ? { term } : {}), ...(then ? { then } : {}), ...(termination.length ? { termination } : {}), ...(text ? { text } : {}), ...(attrs && typeof attrs === "object" && !Array.isArray(attrs) ? { attrs } : {}) },
       },
       { block: "sign_agreement", agreement: `$${ref}`, as: me },
     ];

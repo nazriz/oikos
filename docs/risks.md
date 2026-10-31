@@ -288,7 +288,7 @@ The mechanism:
   review) is done `by` the desk `outside-casework` (`agency-casework`: the person table's minutes, an officer's working
   day, lanes the town's share of the agency's officers from a placeholder national ratio, 4 per 1,000 claims in payment,
   in every profile); the case system keeps its seconds for payments and notices. Claim-to-decision days now come from
-  officers' hours (figures in the decisions entry). **Left:** (1) a model seated in `outside-support` still sits on the
+  officers' hours (figures in the decisions entry). **Left:** (1) fixed 2026-10-31 (decisions "A seat in the support office is a non-resident officer"): a model seated in `outside-support` shares the body of an officer who lives outside the town; until then it sat on the
   case system (`agency-system`) and decides what is put before it at a system's speed: the approved alternative, a
   non-resident officer as the seat's body, is not built, because a person with a body who is not a resident reaches the
   census, life events, elections and every module that counts persons (not contained); (2) the officers' ratio is a
@@ -556,6 +556,18 @@ The mechanism:
 - **Fix when:** Before a study of housing supply or employment; with ME-14's rents.
 
 ---
+
+### ME-22 · Delegation's figures are placeholders, and a code assistant decides nothing
+- **Gap:** The assistants on offer (prices, speed, a provider's claimed and true slip rates, the records term) and what a
+  principal weighs (what an error costs it, the share of slips its reading finds, how much a claim counts, its hurdle,
+  its review day, its horizon) are placeholders in au-vic only; the times of the papers of delegation are placeholders.
+  A code assistant carries out what its principal decided; only a model in the seat decides otherwise.
+- **Where:** `worlds/profiles/au-vic-2026.json` `values.assistants`; `docs/behaviour/assistants.md`; `docs/design/delegation.md`.
+- **Effect:** How much code principals delegate, at which levels, and how fast hidden slips build trust, rest on these
+  figures; a run with code assistants shows the machinery, not how much real principals would hand over.
+- **L / I:** high / high for any finding about how much is delegated · **Status:** open (2026-10-31)
+- **Notice by:** Engagement and levels moving with a placeholder changed alone.
+- **Fix when:** before a study reads how much is delegated rather than what follows when it is.
 
 ## Public bodies and law
 
