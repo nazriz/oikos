@@ -9765,3 +9765,18 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+
+## 2026-10-31 · Delegation D6, the rest: a seated assistant's stationery (branch `delegation`; no result changes for a town without assistant seats; no model called)
+
+- **What:** where a town seats a model in a kind of assistant (`assistant_seats`), its posts get stationery: the
+  assistant's own papers in words (`ASSISTANT_ISSUES`: advice, approval_request, report, scope_request, handover, each to
+  its client), and at an organisation's assistant post the principal's own forms for the kinds it may do, and each as a
+  draft for sign-off (`draftOf`: the paper as it would go, in `paper`). A code principal reads a form draft by the paper's
+  kind and addressees against what it asked (`paper_as_asked`); advice in words alone is counted as nothing.
+- **Why:** a model writes words, through the translator; a code principal reads only what an act would do. The kind and
+  the addressees are what a code principal can check of a paper it did not write; its wording is the assistant's, and is
+  on record beside the referral for whoever reads the log.
+- **Checked:** a cheap 300-person town for 120 days with assistant-a's kinds played by mock seats gave the same 21 reports
+  as with the assistant's code (the state hashes differ, as the seated town carries the stationery and the seats' channels).
+- **Revisit if:** a real model's drafts are declined for addressing alone where the matter was right (then the principal
+  needs a reading of more of the paper), or a seat cannot find its forms.

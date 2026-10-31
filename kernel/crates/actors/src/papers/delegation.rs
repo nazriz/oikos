@@ -258,6 +258,9 @@ pub struct Draft {
     pub referral: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub calls: Option<String>,
+    /// A draft written on a form (a model's): the paper as it would go (`kind`, `text`, `to`, `data`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paper: Option<Value>,
 }
 impl Paper for Draft {
     const KIND: &'static str = "draft";
