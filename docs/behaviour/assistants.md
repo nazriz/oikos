@@ -36,6 +36,12 @@ records and authority). It does what a seller of a service does, through the ord
 3. **It switches its systems off** (`retire`, the supplier's physical power) when the client has not signed in 30 days,
    when the agreement has ended, or when the fee has not been paid for 75 days, and says so (`service_ended`).
 
+**Later releases.** Where a capability scenario moves the assistants (docs/scenarios.md, "capability"), each release of
+an offer is a kind of system of its own, out on its day: from then the provider publishes the offer again with the
+release's kind, its claims (seconds and slip rate) and its prices, and delivers that kind to an organisation that orders.
+A system already delivered stays what it was. A provider's desk for persons stays the kind it first was (a known limit:
+the desk is not replaced by a newer one).
+
 ## The buyer's paperwork (`Engagements`)
 
 A principal reads what it engaged from its own papers: the delivery addressed to it, the agreement that cites its order

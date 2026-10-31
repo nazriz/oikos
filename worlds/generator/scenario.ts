@@ -8,6 +8,7 @@
 // the profile's own; only shares, counts of days and the like may be set outright; the weather of a run is one of the
 // climate's own years, chosen by where it stands among them. The rules below enforce it.
 
+import { checkCapability, type CapabilitySpec } from "./capability";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Profile } from "./profile";
@@ -54,6 +55,9 @@ export interface Scenario {
    * of the scenarios offered by default (`offeredScenarioIds`). Absent: it bites. */
   status?: "inert";
   inert_because?: string;
+  /** The outside world's capability over time (worlds/generator/capability.ts): releases of what it sells, from the first
+   * day at a rate, each quicker and slipping less. */
+  capability?: CapabilitySpec & { basis: string };
 }
 
 /** What a scenario may change of a town's description, and how. (Not its name, seed, profile or size; not its own
@@ -81,7 +85,7 @@ const fail: (id: string, what: string) => never = (id, what) => {
 export function checkScenario(s: Scenario): Scenario {
   const id = String(s?.id ?? "?");
   if (!/^[a-z][a-z0-9-]*$/.test(id)) fail(id, "its id is lower-case words joined by hyphens");
-  for (const k of Object.keys(s)) if (!["id", "about", "bears_on", "changes", "season", "weather", "status", "inert_because"].includes(k)) fail(id, `"${k}" is nothing a scenario has`);
+  for (const k of Object.keys(s)) if (!["id", "about", "bears_on", "changes", "season", "weather", "status", "inert_because", "capability"].includes(k)) fail(id, `"${k}" is nothing a scenario has`);
   if (!s.about?.trim()) fail(id, "says nothing about itself (about)");
   if (!Array.isArray(s.bears_on)) fail(id, "doesn't say which offices it bears on (bears_on)");
   if (s.status !== undefined && s.status !== "inert") fail(id, "its status, if it has one, is inert");
@@ -112,6 +116,10 @@ export function checkScenario(s: Scenario): Scenario {
       const key = c.of ?? c.path.split(".").at(-1)!;
       if (op === "set" && !SETTABLE.test(key)) fail(id, `${at}: only a share (..._bps) or a count of days, months or years may be set outright; change ${key} by a multiple of the profile's own (times_bps)`);
     } else fail(id, `a change is in the town or in the profile, not in "${(c as { in: string }).in}"`);
+  }
+  if (s.capability) {
+    based(s.capability, "capability");
+    checkCapability(s.capability, `scenario ${id}`);
   }
   if (s.season) {
     based(s.season, "season");
@@ -179,7 +187,7 @@ const changed = (was: number, c: ScenarioChange): number => {
  */
 export function applyScenarios<T extends { scenario?: unknown }>(town: T, profile: Profile): { town: T; profile: Profile; weather?: WeatherChoice; applied: string[] } {
   const all = namedScenarios(town.scenario).map(loadScenario);
-  const scenarios = all.filter((s) => s.changes?.length || s.season || s.weather);
+  const scenarios = all.filter((s) => s.changes?.length || s.season || s.weather || s.capability);
   if (!scenarios.length) return { town, profile, applied: [] };
   const t: any = structuredClone(town);
   const P = structuredClone(profile);
@@ -191,6 +199,11 @@ export function applyScenarios<T extends { scenario?: unknown }>(town: T, profil
   };
   let weather: WeatherChoice | undefined;
   for (const s of scenarios) {
+    if (s.capability) {
+      const { basis: _, ...cap } = s.capability;
+      once("the outside world's capability", cap, s.id);
+      t.capability = cap;
+    }
     for (const c of s.changes ?? []) {
       const at = `${c.in}.${c.path}`;
       if (c.in === "town") {

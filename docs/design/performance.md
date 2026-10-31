@@ -23,17 +23,33 @@ Before the fixes the 10,000 town lost 3,567 people (36%) in 139 days and ran at 
 minute by then; after, 632 in six months (the households the tight housing leaves out, as at 1,000), and its pace
 held.
 
-**After the fixes** (wall time on the loaded machine; resident memory as `ps` gives it, the compressor moving it by a
-gigabyte either way):
+**After the fixes** (wall time on the loaded machine, load 9 to 30; memory as the physical footprint, `footprint`,
+which counts what the compressor holds: `ps`'s resident size read 13 GB when the footprint was 18):
 
-| town | day 30 | day 90 | day 180 | day 365 | growth |
-|---|---|---|---|---|---|
-| 10,000: wall | 6 min | 17 min | 40 min | 1.9 h | 10 to 25 s a simulated day |
-| 10,000: resident | 2.4 GB | 4.0 GB | 6.2 GB | 10.7 GB | about 25 MB a simulated day, steady |
-| 10,000: log (zstd, full) | 0.5 GB | 1.6 GB | 3.3 GB | 6.7 GB | 18 MB a day |
-| 50,000: wall | 37 min | | | | 105 s a simulated day by day 60 |
-| 50,000: resident | 12.6 GB | | | | about 85 MB a simulated day, days 30 to 60 |
-| 50,000: log (zstd, lean) | 1.25 GB | | | | 50 MB a day |
+| town | day 30 | day 90 | day 180 | day 365 | day 730 | day 1,095 |
+|---|---|---|---|---|---|---|
+| 10,000: wall | 6 min | 17 min | 40 min | 1.9 h | 6.0 h | 11.8 h |
+| 10,000: footprint | 2.4 GB | 4.0 GB | 6.2 GB | about 11 GB | about 20 GB | 25 GB (27 GB peak) |
+| 10,000: log (zstd, full) | 0.5 GB | 1.6 GB | 3.3 GB | 6.7 GB | 13.9 GB | 20.1 GB (248 million lines) |
+| 50,000: wall | 37 min | 1.9 h | 7.9 h | | | |
+| 50,000: footprint | 12.6 GB | about 16 GB | 28 GB | | | |
+
+(The 50,000 town at day 215: 12 hours, a 32 GB footprint, about 105 MB a simulated day since day 30, 11.4 GB of lean
+log; still running when this was written, to stop at its guard's 40 GB near day 290: `runs/long-50000-2y`.)
+
+**The 10,000 town's three years** (`runs/long-10000-3y-b`, final state `056f7f9f`): 11.8 hours of wall, of which the
+run's own thread 8.3 hours of CPU (it is the bound: 40,900 s of user CPU in all, so little else runs beside it);
+memory about 25 MB a simulated day, steady from the first month to the last; the log 18 MB a day compressed. A
+simulated day cost 10 to 15 s of wall in the first year and 40 to 80 s in the third, as the machine's load moved and as
+the run grew: 32 s of CPU a day on average, 44 s at day 730, the bank (16 to 17% of the run's own thread at days 536
+and 721, going through every standing order when what it checks has changed) and the building of observations (14%)
+the largest. No crash, no invariant the run checks broken. Its people: 1,054 left town (630 in the first six months,
+the households the tight housing leaves out; 5 to 20 a month after), 334 came (all in the first year: the outside
+world's migration then stops on its own rule, the expected wage below the outside income; its cap of 8 households a
+month does not scale with the town), 144 born, 271 died: about 9,150 at the end. Payments moved about $270 to $340
+million a month in the first year and $235 to $265 million in the third. The hall's 200 places refused 1,200 entries a
+month at first and 20,000 by the end, the town's groups growing in number with one hall to meet in. These are the
+town's, recorded, not tuned.
 
 **What grows with the run's length** (a heap profile of the 10,000 town, `--features heapprof`, four dumps five wall
 minutes apart in its first months): of 1.68 GB added, the world's records 0.91 GB (54%: every record made, kept
@@ -43,9 +59,9 @@ counts of the twins' draws, `Draws::key`'s `matter_occurrences`, 74 MB: a gather
 keeps for the run), citizens' minds 0.18 GB, offices and firms 0.14 GB. None is a copy; each is a record of what
 happened or what was seen. At 2.5 KB a person a day at 10,000 (1 KB at 1,000) it grows faster than the town.
 
-**What it means for the study.** 10,000 people for 3 years: about 30 GB at the end, 20 GB of log, 6 to 8 hours: fits.
-50,000 for 2 years at 85 MB a day: about 75 GB, which does not fit on this 64 GB machine; the run's guard stops it at
-44 GB, near day 350. A study at 50,000 for longer than about a year needs the history out of memory (tiered storage,
+**What it means for the study.** 10,000 people for 3 years fits: 27 GB at the peak, 20 GB of log, 12 hours on a shared
+machine. 50,000 for 2 years at about 105 MB a day (some 86 GB) does not fit on this 64 GB machine: the run's guard stops it at a
+40 GB footprint. A study at 50,000 for longer than about a year needs the history out of memory (tiered storage,
 waiting on the owner) and the twins' per-matter draw counts let go when a matter is over (a design question for
 reliability's owners: a matter would have to say when it ends).
 

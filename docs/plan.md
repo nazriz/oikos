@@ -27,10 +27,11 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 
 ## Now
 
-- [~] **Years at the study's size** (code only): 10,000 people for 3 years and 50,000 for 2 or more; what breaks over
+- [x] **Years at the study's size** (code only): 10,000 people for 3 years and 50,000 for 2 or more; what breaks over
   time fixed with its law, what emerges recorded (docs/design/performance.md, "Years at 10,000 and 50,000"; decisions
   2026-10-31 "Years at 10,000"). First faults fixed: the hall's room, owners homeless while the register answers, the
-  works office's inspections in one moment, the energy retailer's bills read once a connection.
+  works office's inspections in one moment, the energy retailer's bills read once a connection, the rates office's
+  notices indexed. 10,000 for 3 years ran (11.8 h, 27 GB); 50,000 for 2 does not fit in 64 GB (about 105 MB a day: SC-6).
 - [~] **Memory per person.** A 10,000-person month peaked at about 500 KB a person; target about 50 KB, enforced by a
   test like the time budgets, results byte-identical (docs/design/performance.md, risk SC-1).
   - [x] Measure bytes per person at peak by component, at 1,000, 10,000 and 50,000 people (`mem-budget`, 8c28f399).
@@ -71,9 +72,13 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] E1. Services anyone can buy (the delegation capabilities' D1, above).
   - [x] E4. Skills that grow with use and fade without it, for people and staff; off, or on at a run's own rates, a
     factor of a study (docs/behaviour/skills.md). Slips by skill wait for a source.
-  - [ ] E2. Technologies as goods with a capability, and an outside scenario of their capability and cost.
+  - [x] E2a. The outside's capability over time: releases of what it sells from a scenario (`capability`; the first,
+    `rising-capability`), each a kind of system released on its day, sold newest first; tagged `ai` in
+    `meta.study_tags` for measurement only, with a backstop that no world code reads it.
+  - [ ] E2b. Technologies that are goods (machines, hardware a firm holds, `runs_on`'s energy and water), with E5.
   - [ ] E3. Firms enter any industry by expected profit, capital-heavy ones included.
-  - [ ] E5. Compute competing for energy, water and land through laws 8 and 9 (a hosting industry's recipe).
+  - [ ] E5. Compute competing for energy, water and land through laws 8 and 9 (a hosting industry's recipe); first,
+    workplaces on the network with their energy and water by industry (WM-15).
   - [ ] E6. The measures M7 (what the town gives to AI) and M8 (who can still do the work); the tag's backstop.
 - [ ] **Foundations-2, phase 5:** strict modes on, old exception lists empty, each law's line in CLAUDE.md as its
   enforcement lands.
@@ -99,7 +104,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [x] A seat cannot yet be a non-resident agency officer (WM-14): a seat in the support office shares the body of an officer who lives outside the town (`gap-wm14`).
 - [x] A taxpayer account to reclaim an overpayment from (PB-23): the tax collector keeps it (`taxpayer-accounts`, d3eb2bf3, cedc1903); its figures are still placeholders, so PB-23 stays open as mitigated.
 - [x] Candidacy: a field of 19 for about 118 votes (PB-10): traced (`gap-pb10`): the test's own 10% chance of standing, five times the profile's; the fault left is that the field grows with the electorate (a mechanism to the owner: decisions "Candidacy: the field of 19 traced").
-- One day's crew paperwork ran in series, cause untraced (MT-23).
+- [x] One day's crew paperwork ran in series (MT-23): the seat held until each order began, fixed by foundations-2 P1; the seat-diary measure now reads the work's own times.
 - [x] A model steward in a fork is a pilot's seat (MT-22): told what was not taken, the cast followed, thinking in world time, composer and exit accounts; resuming a fork part-way left open.
 - Three tests still pinned to one seed (production, entry, own-venture); two near-duplicate twin cases kept.
 - Haiku against Sonnet welfare: a matched pair (same town, same offices) before more Haiku seats.

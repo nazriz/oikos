@@ -985,3 +985,14 @@ Opened on 2026-10-24 unless marked; each profile's `work_time.sources` carries t
 | What becomes of a provider's records at the end of a service is a term of the contract (data return and deletion clauses) | outsourcing and software-service practice (to confirm: a source on data-return clauses) | the `service` agreement's `records` term |
 | A claim taken as so many observations' worth, updated by what is seen (a beta-binomial prior as pseudo-counts) | Gelman, Carlin, Stern, Dunson, Vehtari and Rubin, *Bayesian Data Analysis*, 3rd ed. (2013), ch. 2 (to confirm) | `delegation/rule.rs` `estimate` |
 | People rely on automated aids more than their record warrants, and miss what the aid gets wrong when they do not check | Parasuraman and Manzey (2010), "Complacency and bias in human use of automation", *Human Factors* 52(3) (to confirm) | why `alone` hides slips: not a bug (design section 5) |
+
+## Foundations 2, phase 4: skills by use and the outside's capability (docs/behaviour/skills.md; docs/scenarios.md, "capability"; docs/decisions.md, "Skills by use", "The outside's capability over time")
+
+| Idea | Source | Where used |
+|---|---|---|
+| Practice makes work quicker with diminishing returns (the power law of practice) | Newell and Rosenbloom (1981), "Mechanisms of skill acquisition and the law of practice", in Anderson (ed.), *Cognitive Skills and Their Acquisition* (to confirm) | `PracticeCfg::practised`; `worlds/generator/skills.ts` |
+| For an individual learner the curve is closer to exponential than to a power law | Heathcote, Brown and Mewhort (2000), "The power law repealed: the case for an exponential law of practice", *Psychonomic Bulletin and Review* 7(2) (to confirm) | the shape of `practised`: each hour closes a share of the gap to mastery |
+| Skills decay with time unused, more the longer the interval | Arthur, Bennett, Stanush and McNelly (1998), "Factors that influence skill decay and retention: a quantitative review and analysis", *Human Performance* 11(1) (to confirm) | `PracticeCfg::faded`; the default half-life (a placeholder) |
+| Automating work leaves the people who must take it back out of practice | Bainbridge (1983), "Ironies of automation", *Automatica* 19(6) (to confirm) | why skills matter to taking work back (foundations-2 7.4) |
+| The length of task frontier AI models complete doubles about every seven months | METR (2025), "Measuring AI Ability to Complete Long Tasks" (to confirm) | `worlds/scenarios/rising-capability.yaml`, the basis for its pace (placeholder) |
+| The price of a given level of language-model performance falls fast | Epoch AI (2025), "LLM inference prices have fallen rapidly but unequally across tasks" (read in a summary only, to confirm) | the same scenario's basis; `falling-system-prices` already cites it |
