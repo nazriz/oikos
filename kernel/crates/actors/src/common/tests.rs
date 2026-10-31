@@ -63,7 +63,7 @@ fn a_book_finds_every_record_where_it_was_taken_in_whatever_order_they_come() {
     // Let go of every other news item: the rest are found at their new places, the others not at all.
     let gone = |r: &Record| matches!(&r.body, oikos_sight::RecordBody::Statement { kind, .. } if kind == "news") && r.at % 2 == 0;
     b.forget(|r| !gone(r));
-    let kept: Vec<&&str> = first.iter().filter(|id| !gone(&recs.iter().find(|r| r.id == **id).unwrap())).collect();
+    let kept: Vec<&&str> = first.iter().filter(|id| !gone(recs.iter().find(|r| r.id == **id).unwrap())).collect();
     assert_eq!(b.len(), kept.len());
     for (place, id) in kept.iter().enumerate() {
         assert_eq!(b.place_of(id), Some(place), "{id} after letting go");
@@ -140,8 +140,8 @@ fn a_book_saved_and_restored_answers_as_before() {
     b.take_all(&[st("rec.1", 0, "law", "city", json!({})), st("rec.2", 1, "law", "city", json!({ "replaces": "rec.1" })), withdrawal("rec.3", 2, "rec.9")]);
     b.note_unread("rec.2", "an act", "no such field");
     let again = Book::restore(b.save()).unwrap();
-    assert_eq!(again.open("law").map(|r| r.id.clone()).collect::<Vec<_>>(), b.open("law").map(|r| r.id.clone()).collect::<Vec<_>>());
-    assert_eq!(again.current("rec.1").map(|r| r.id.clone()), Some("rec.2".into()));
+    assert_eq!(again.open("law").map(|r| r.id).collect::<Vec<_>>(), b.open("law").map(|r| r.id).collect::<Vec<_>>());
+    assert_eq!(again.current("rec.1").map(|r| r.id), Some("rec.2".into()));
     assert!(again.withdrawn("rec.9"));
     assert_eq!(again.unread("rec.2"), 1);
     assert_eq!(again.save(), b.save());
@@ -355,7 +355,7 @@ fn an_act_is_judged_by_the_amended_law_from_when_it_was_made_and_by_the_law_as_i
     let mut b = Book::new();
     b.take_all(&[dog_law("rec.1", 0, 2, 4 * 3600, 2500, None)]);
     let act = |dogs: i64| json!({ "block": "publish", "kind": "dog_registration", "data": { "dogs": dogs, "alone": 3600, "share": 3000 } });
-    let ids = |b: &mut Book, dogs: i64, at: i64| breaches(b, &act(dogs), "c1", at).iter().map(|r| r.id.clone()).collect::<Vec<_>>();
+    let ids = |b: &mut Book, dogs: i64, at: i64| breaches(b, &act(dogs), "c1", at).iter().map(|r| r.id).collect::<Vec<_>>();
     assert_eq!(ids(&mut b, 3, 10 * DAY), ["rec.1"], "three dogs, and a share other than the law's, breach the law in force");
     b.take_all(&[dog_law("rec.2", 15 * DAY, 3, 4 * 3600, 3000, Some("rec.1"))]);
     assert!(ids(&mut b, 3, 20 * DAY).is_empty(), "the amended law allows three, at its share");

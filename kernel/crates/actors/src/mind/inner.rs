@@ -27,6 +27,7 @@
 use super::math;
 use super::person::{as_bps, fine, normal_z, whole, PopulationValues, Value, Values, FINE};
 use oikos_core::rng::Rng;
+use oikos_core::Id;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -417,7 +418,7 @@ pub fn raised_values(rng: &mut Rng, pop: &PopulationValues, adults: &[Values], s
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct Trust {
-    kind: String,
+    kind: Id,
     fine: i64,
     base: i64,
     used: i64,
@@ -438,7 +439,7 @@ pub struct Inner {
     /// The person's own level of agency (basis points), where it returns to.
     pub agency_base: i64,
     agency: i64,
-    trust: BTreeMap<String, Trust>,
+    trust: BTreeMap<Id, Trust>,
     belonging: Dented,
     meaning: Dented,
     attached: BTreeMap<Bond, Attached>,
@@ -531,7 +532,7 @@ impl Inner {
             let z = |v| self.z(values, v);
             let conserving = (z(Value::Conformity) + z(Value::Tradition) + z(Value::Security)) / 3.0 - (z(Value::SelfDirection) + z(Value::Stimulation)) / 2.0;
             let base = math::clamp_bps(start as f64 + self.p.trust.spread_bps as f64 * self.lean_f() + self.p.trust.values_bps as f64 * conserving);
-            self.trust.insert(who.to_string(), Trust { kind: kind.to_string(), fine: base * FINE, base, used: t });
+            self.trust.insert(Id::new(who), Trust { kind: Id::new(kind), fine: base * FINE, base, used: t });
             // (Bounded: the one longest unused gives way; of equals, by id.)
             if self.trust.len() > self.p.trust.kept {
                 let oldest = self.trust.iter().filter(|(k, _)| k.as_str() != who).min_by(|a, b| a.1.used.cmp(&b.1.used).then_with(|| a.0.cmp(b.0))).map(|(k, _)| k.clone());
@@ -900,7 +901,7 @@ impl Inner {
         views.sort_by(|a, b| a.of.cmp(&b.of));
         Sections {
             agency: AgencyNow { now: whole(self.agency), own: self.agency_base },
-            trust: self.trust.iter().map(|(who, e)| TrustRow { in_: who.clone(), kind: e.kind.clone(), bps: whole(e.fine) }).collect(),
+            trust: self.trust.iter().map(|(who, e)| TrustRow { in_: who.to_string(), kind: e.kind.to_string(), bps: whole(e.fine) }).collect(),
             attached: self.attached.iter().map(|(k, a)| (k.name().to_string(), Attachment { to: a.to.clone(), bps: whole(a.fine), since: a.since })).collect(),
             views,
             memory: Memory { recent: self.recent.clone(), defining: self.defining.clone() },

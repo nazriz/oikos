@@ -96,7 +96,7 @@ fn care_calls_off_a_death_once_and_nobody_is_told() {
     let little = act(&mut run, "carol-self", None, json!([{"block": "work", "task": "treat", "units": 1, "at": "s-shop", "performers": ["carol"], "on": "alice"}])).unwrap();
     assert!(!little.iter().any(|e| matches!(e, EventBody::ConditionTreated { .. })));
     let ev = act(&mut run, "carol-self", None, json!([{"block": "work", "task": "treat", "units": 2, "at": "s-shop", "performers": ["carol"], "on": "alice"}])).unwrap();
-    let treated: Vec<_> = ev.iter().filter_map(|e| match e { EventBody::ConditionTreated { person, death_called_off, until, .. } => Some((person.clone(), *death_called_off, *until)), _ => None }).collect();
+    let treated: Vec<_> = ev.iter().filter_map(|e| match e { EventBody::ConditionTreated { person, death_called_off, until, .. } => Some((*person, *death_called_off, *until)), _ => None }).collect();
     assert_eq!(treated.len(), 1);
     assert!(treated[0].1, "the death is called off (fatal_kept_bps 0)");
     // It lasts half its remaining time: 10 days, not 20.
@@ -137,11 +137,11 @@ fn care_draws_on_the_condition_not_its_number() {
         // (Alice is hurt at the same moment in both towns: the condition's onset is part of what it is.)
         advance(&mut run, DAY);
         let ev = act(&mut run, "bob-self", None, json!([{"block": "harm", "person": "alice"}])).unwrap();
-        let id = ev.iter().find_map(|e| match e { EventBody::ConditionBegan { person, condition, .. } if person == "alice" => Some(condition.clone()), _ => None }).unwrap();
+        let id = ev.iter().find_map(|e| match e { EventBody::ConditionBegan { person, condition, .. } if person == "alice" => Some(*condition), _ => None }).unwrap();
         act(&mut run, "alice-self", None, json!([{"block": "occupy", "space": "s-shop/dwelling.1"}])).unwrap();
         let ev = act(&mut run, "carol-self", None, json!([{"block": "work", "task": "treat", "units": 2, "at": "s-shop", "performers": ["carol"], "on": "alice"}])).unwrap();
         let off = ev.iter().find_map(|e| match e { EventBody::ConditionTreated { person, death_called_off, .. } if person == "alice" => Some(*death_called_off), _ => None }).unwrap();
-        (off, id)
+        (off, id.to_string())
     };
     let mut kept = 0;
     for seed in 1..=16 {
@@ -225,7 +225,7 @@ fn a_body_is_in_one_place_and_going_somewhere_takes_the_trip() {
     advance(&mut run, done + 1);
     assert!(r.events.iter().map(|e| &e.body).any(|e| matches!(e, EventBody::Vacated { occupant, space, .. } if occupant == "alice" && space == "s-house/dwelling.1")));
     let st = run.kernel().state();
-    assert_eq!(st.structures_of("alice"), vec!["s-shop".to_string()]);
+    assert_eq!(st.structures_of("alice"), vec![oikos_kernel::blocks::Id::new("s-shop")]);
     assert_eq!(body_view(&mut run, "alice-self")["in"], json!("s-shop/dwelling.1"));
 }
 

@@ -18,7 +18,7 @@ pub fn prohibitions(book: &Book, at: Option<i64>) -> Vec<&Arc<Record>> {
     };
     let mut out: Vec<&Arc<Record>> = laws
         .into_iter()
-        .filter(|l| condition_of(l).is_some() && part(l, Piece::Adico).get("deontic").and_then(Value::as_str) == Some("must_not"))
+        .filter(|l| condition_of(l).is_some() && part(l, Piece::Adico).get("deontic").and_then(|x| x.as_str()) == Some("must_not"))
         .collect();
     out.sort_by(|a, b| super::filed_before(&a.id, &b.id));
     out
@@ -26,7 +26,7 @@ pub fn prohibitions(book: &Book, at: Option<i64>) -> Vec<&Arc<Record>> {
 
 /// A law's formal condition (CEL), if it has one.
 pub fn condition_of(law: &Record) -> Option<&str> {
-    part(law, Piece::Formal).get("condition").and_then(Value::as_str).filter(|c| !c.is_empty())
+    part(law, Piece::Formal).get("condition").and_then(|x| x.as_str()).filter(|c| !c.is_empty())
 }
 
 /// The laws in force at `now`, as far as this reader has seen, that an act it is thinking of would breach:
@@ -44,7 +44,7 @@ pub fn holds_of(book: &mut Book, law: &Record, act: &Value, actor: &str, now: i6
     match evaluate(cond, act, actor, now, claims) {
         Ok(v) => v,
         Err(e) => {
-            let what = [act.get("block"), act.get("kind")].iter().filter_map(|x| x.and_then(Value::as_str)).collect::<Vec<_>>().join(" ");
+            let what = [act.get("block"), act.get("kind")].iter().filter_map(|x| x.and_then(|x| x.as_str())).collect::<Vec<_>>().join(" ");
             book.note_unread(&law.id, if what.is_empty() { "an act" } else { &what }, &e);
             false
         }

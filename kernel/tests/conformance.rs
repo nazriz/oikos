@@ -114,7 +114,7 @@ fn check_outputs(
         }
     }
     for participant in participants {
-        let o = run.command(&Command::Observe { participant: participant.to_string(), only: None }).unwrap().observation.unwrap();
+        let o = run.command(&Command::Observe { participant: participant.to_string().into(), only: None }).unwrap().observation.unwrap();
         assert_valid(&s.observation, &serde_json::to_value(&o).unwrap(), "observation")?;
     }
     run.annotate(json!({"annotation": "usage", "purpose": "translator", "subject": "translator", "provider": "p", "model": "m", "input_tokens": 1, "output_tokens": 2, "cost_microusd": 3})).unwrap();

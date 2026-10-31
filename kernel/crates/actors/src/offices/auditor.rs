@@ -90,29 +90,29 @@ pub struct AuditLaw {
 pub fn audit_law(book: &Book) -> Option<AuditLaw> {
     let l = book
         .open("law")
-        .filter(|r| data(r).get("audit").is_some_and(Value::is_object))
+        .filter(|r| data(r).get("audit").is_some_and(|x| x.is_object()))
         .max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&b.id, &a.id)))?;
-    let mut law: AuditLaw = serde_json::from_value(data(l).get("audit")?.clone()).ok()?;
-    law.id = l.id.clone();
+    let mut law: AuditLaw = serde_json::from_value(data(l).get("audit")?.to_value()).ok()?;
+    law.id = l.id.to_string();
     Some(law)
 }
 
 /// The support law's payments in force that the book shows: the latest published and not withdrawn (none: no payments).
 /// A payment that names no payer is its lawmaker's.
 pub fn support_payments(book: &Book) -> Vec<PaymentRule> {
-    let Some(l) = book.open("law").filter(|r| data(r).get("payments").is_some_and(Value::is_array)).max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&b.id, &a.id))) else {
+    let Some(l) = book.open("law").filter(|r| data(r).get("payments").is_some_and(|x| x.is_array())).max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&b.id, &a.id))) else {
         return vec![];
     };
-    let maker = l.speaks_for.clone().unwrap_or_default();
+    let maker = l.speaks_for.unwrap_or_default();
     data(l)
         .get("payments")
-        .and_then(Value::as_array)
+        .and_then(|x| x.as_array())
         .map(|list| {
             list.iter()
-                .filter_map(|p| serde_json::from_value::<PaymentRule>(p.clone()).ok())
+                .filter_map(|p| serde_json::from_value::<PaymentRule>(p.to_value()).ok())
                 .map(|mut r| {
                     if r.payer.is_empty() {
-                        r.payer = maker.clone();
+                        r.payer = maker.to_string();
                     }
                     r
                 })
@@ -266,14 +266,14 @@ impl Audited {
         let mut asked: Vec<Arc<Record>> = book.open(kind::REQUEST).cloned().collect();
         asked.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
         for r in asked {
-            if self.done.contains(&r.id) || r.speaks_for.as_deref() != Some(law.auditor.as_str()) {
+            if self.done.contains(r.id.as_str()) || r.speaks_for.as_deref() != Some(law.auditor.as_str()) {
                 continue;
             }
             let d = data(&r);
             if !law.bodies.iter().any(|b| b.entity == self.me && Some(b.body.as_str()) == d.s("body")) {
                 continue;
             }
-            self.done.insert(r.id.clone());
+            self.done.insert(r.id.to_string());
             let (from, to) = (d.i("from").unwrap_or(0), d.i("to").unwrap_or(0));
             let ask = d.s("ask").unwrap_or("").to_string();
             let kind_ = d.s("kind").unwrap_or("").to_string();
@@ -308,22 +308,22 @@ impl Audited {
                 "nth" => format!("our decision number {}", d.get("nth").map(|n| n.as_i64().map_or_else(|| n.to_string(), |i| i.to_string())).unwrap_or_default()),
                 _ => "our statement of payments".to_string(),
             };
-            let mut payload = json!({ "request": r.id, "audit": d.get("audit").cloned().unwrap_or(Value::Null), "ask": ask });
+            let mut payload = json!({ "request": r.id, "audit": d.get("audit").cloned().unwrap_or((Value::Null).into()), "ask": ask });
             if ask == "nth" {
-                payload["nth"] = d.get("nth").cloned().unwrap_or(Value::Null);
+                payload["nth"] = (d.get("nth").cloned().unwrap_or((Value::Null).into())).to_value();
             }
             if let (Some(p), Some(extra)) = (payload.as_object_mut(), reply.as_object()) {
                 for (k, v) in extra {
                     p.insert(k.clone(), v.clone());
                 }
             }
-            let auditor = r.speaks_for.clone().unwrap_or_default();
+            let auditor = r.speaks_for.unwrap_or_default();
             steps.push(because(
                 format!("The auditor asks for {what} for an audit the law provides: answering."),
                 vec![say(
                     kind::ANSWER,
                     &format!("Answer to audit request {}: {words}", r.id),
-                    Say { to: Some(vec![auditor.clone()]), visible: Some(Visible::Only(if auditor == self.me { vec![auditor] } else { vec![auditor, self.me.clone()] })), basis: Some(r.id.clone()), data: Some(payload), ..Default::default() },
+                    Say { to: Some(vec![auditor.to_string()]), visible: Some(Visible::Only(if auditor == self.me { vec![auditor.to_string()] } else { vec![auditor.to_string(), self.me.clone()] })), basis: Some(r.id.to_string()), data: Some(payload), ..Default::default() },
                 )],
             ));
         }
@@ -585,7 +585,7 @@ impl Office {
             .open(kind::ANSWER)
             .find(|a| {
                 let d = data(a);
-                addressed_to(a).contains(&self.me)
+                addressed_to(a).iter().any(|x| x == &self.me)
                     && a.speaks_for.as_deref() == Some(run.body.entity.as_str())
                     && d.s("audit") == Some(run.key.as_str())
                     && d.s("ask") == Some(ask)
@@ -617,7 +617,7 @@ impl Office {
             run.items.push(Item { nth, by: data(r).i("answer_by").filter(|v| *v != 0).unwrap_or(r.at + law.answer_within_days * DAY), state: if f.is_some() { ItemState::Examined } else { ItemState::Asked } });
             let Some(f) = f else { continue };
             let fd = data(f);
-            match fd.get("agrees").and_then(Value::as_bool) {
+            match fd.get("agrees").and_then(|x| x.as_bool()) {
                 Some(true) => run.agreed += 1,
                 Some(false) => {
                     run.not_agreed += 1;
@@ -807,7 +807,7 @@ impl Plan for Office {
             if run.check == "accounts" {
                 if let Some(a) = self.answer_to(&run, "statement", None) {
                     run.state = Asking::Answered;
-                    run.statement = data(&a).get("statement").filter(|s| !s.is_null()).and_then(|s| serde_json::from_value::<Statement>(s.clone()).ok()).map(|s| reconcile(&s, run.from, run.to, 2 * DAY));
+                    run.statement = data(&a).get("statement").filter(|s| !s.is_null()).and_then(|s| serde_json::from_value::<Statement>(s.to_value()).ok()).map(|s| reconcile(&s, run.from, run.to, 2 * DAY));
                     let says = match &run.statement {
                         Some(s) => format!("{} payments agree with the bank's record, {} do not", s.matched, s.in_books_not_bank.len() + s.in_bank_not_books.len() + s.differ.len()),
                         None => "the body holds no books for the period".to_string(),
@@ -861,7 +861,7 @@ impl Plan for Office {
                     continue;
                 };
                 run.items[i].state = ItemState::Examined;
-                let file: Option<DecisionFile> = data(&a).get("file").and_then(|f| serde_json::from_value(f.clone()).ok());
+                let file: Option<DecisionFile> = data(&a).get("file").and_then(|f| oikos_core::frozen::from_frozen(f).ok());
                 let Some(file) = file.filter(|_| data(&a).get("found").is_some_and(crate::common::truthy)) else {
                     run.not_found += 1;
                     steps.push(self.finding(&run, &format!("{}#{nth}", run.key), Some(nth), &Finding { agrees: None, says: "no decision by that number".into() }));

@@ -2,6 +2,7 @@
 //! before applying it, then the events it caused, then a checkpoint whenever
 //! an advance crosses a `log.checkpoint_every` boundary.
 
+use crate::blocks::Id;
 use crate::canon;
 use crate::config::{self, CONTRACTS_VERSION};
 use crate::events::Event;
@@ -100,7 +101,7 @@ pub struct Run<W: Write> {
     observed: Option<crate::kernel::Observed>,
     /// Requests to observe whose shape has been checked against the contract (participant -> capacities asked for):
     /// the same one, asked again, keeps to it as it did. (A wake is one of these, and there are a few thousand kinds.)
-    observes_checked: std::collections::BTreeMap<String, std::collections::BTreeSet<Option<String>>>,
+    observes_checked: std::collections::BTreeMap<Id, std::collections::BTreeSet<Option<Id>>>,
     /// The config as it was given, in canonical JSON (what the header carries): a snapshot carries it too. (Kept
     /// compressed: `config::Canonical`.)
     config: config::Canonical,
@@ -223,7 +224,7 @@ impl<W: Write> Run<W> {
     }
 
     /// These observations will be asked for next: see `Kernel::plan`.
-    pub fn plan(&mut self, observations: Vec<(String, Option<String>)>) {
+    pub fn plan(&mut self, observations: Vec<(Id, Option<Id>)>) {
         self.kernel.plan(observations);
     }
 
@@ -258,7 +259,7 @@ impl<W: Write> Run<W> {
         // (Its JSON once, for the check and for the log; checked once, before it's logged: nothing changes the world
         // between that and applying it.)
         let known = match cmd {
-            Command::Observe { participant, only } => self.observes_checked.get(participant).is_some_and(|x| x.contains(only)),
+            Command::Observe { participant, only } => self.observes_checked.get(participant.as_str()).is_some_and(|x| x.contains(only)),
             _ => false,
         };
         let from = self.kernel.t();
@@ -269,7 +270,7 @@ impl<W: Write> Run<W> {
             let body = serde_json::to_value(cmd).map_err(|e| ProtocolError(e.to_string()))?;
             self.kernel.precheck_as(cmd, &body)?;
             if let Command::Observe { participant, only } = cmd {
-                self.observes_checked.entry(participant.clone()).or_default().insert(only.clone());
+                self.observes_checked.entry(*participant).or_default().insert(*only);
             }
             self.log.append(from, Kind::Command, body)?.seq
         };
@@ -305,7 +306,7 @@ impl<W: Write> Run<W> {
 
     /// What the observation the last command returned adds to a seat's knowledge (`observed(obs).shown`), without its
     /// JSON where that was not made for the log.
-    pub fn shown(&mut self, obs: &mut Observation) -> Result<std::collections::BTreeMap<String, oikos_resolver::knowledge::Shown>, canon::CanonError> {
+    pub fn shown(&mut self, obs: &mut Observation) -> Result<std::collections::BTreeMap<oikos_world::blocks::Id, oikos_resolver::knowledge::Shown>, canon::CanonError> {
         match self.observed.take() {
             Some(o) => Ok(o.shown),
             None => self.kernel.shown(obs),
@@ -325,7 +326,7 @@ impl<W: Write> Run<W> {
         // (One plainly of the contract has only safe integers: the integers' own check, and its message, are for the rest.)
         if !crate::contracts::plain_annotation(&annotation) {
             canon::check_integers(&annotation).map_err(|e| ProtocolError(e.to_string()))?;
-            crate::contracts::check(&crate::contracts::contracts().annotation, &annotation).map_err(|e| ProtocolError(format!("annotation {e}")))?;
+            crate::contracts::check(&crate::contracts::contracts().annotation(), &annotation).map_err(|e| ProtocolError(format!("annotation {e}")))?;
         }
         Ok(self.log.append(self.kernel.t(), Kind::Annotation, annotation)?.seq)
     }

@@ -22,6 +22,7 @@ pub mod news;
 pub mod staff_payroll;
 pub mod union;
 
+use oikos_core::frozen::{JsonRead, JsonRef};
 use crate::steps::{because, Step};
 use crate::{Action, Ctx, Kind};
 use oikos_sight::calls::{parse_program, program_text, Call, Program};
@@ -107,24 +108,24 @@ fn decimal(s: &str) -> Option<(i128, u32)> {
     Some((if neg { -n } else { n }, frac.len() as u32))
 }
 
-fn text_of(v: &Value) -> Option<String> {
-    match v {
-        Value::Number(n) => Some(n.to_string()),
-        Value::String(s) => Some(s.clone()),
+fn text_of<V: JsonRead + ?Sized>(v: &V) -> Option<String> {
+    match v.view() {
+        JsonRef::Number(n) => Some(n.to_string()),
+        JsonRef::String(s) => Some(s.to_string()),
         _ => None,
     }
 }
 
 /// A number written in the world's data, times `scale`, rounded half up (JavaScript's `Math.round`), in whole numbers:
 /// `scaled(&json!(8.25), 100) == Some(825)`.
-pub(crate) fn scaled(v: &Value, scale: i64) -> Option<i64> {
+pub(crate) fn scaled<V: JsonRead + ?Sized>(v: &V, scale: i64) -> Option<i64> {
     let (n, k) = decimal(&text_of(v)?)?;
     let d = 10_i128.pow(k);
     i64::try_from((n * i128::from(scale) * 2 + d).div_euclid(2 * d)).ok()
 }
 
 /// A number written in the world's data rounded down (JavaScript's `Math.floor`), in whole numbers.
-pub(crate) fn floor_of(v: &Value) -> Option<i64> {
+pub(crate) fn floor_of<V: JsonRead + ?Sized>(v: &V) -> Option<i64> {
     let (n, k) = decimal(&text_of(v)?)?;
     i64::try_from(n.div_euclid(10_i128.pow(k))).ok()
 }
@@ -151,7 +152,7 @@ mod tests {
 
     #[test]
     fn a_spread_is_by_who_it_is_the_same_on_every_machine_and_within_its_bound() {
-        let ctx = |p: &str| crate::Ctx { participant: p.into(), performer: Default::default(), entity: "e".into(), position: None, params: Default::default(), world: Default::default() };
+        let ctx = |p: &str| crate::Ctx { participant: p.into(), performer: Default::default(), entity: "e".into(), position: None, params: Default::default(), world: Default::default(), };
         let (a, b) = (spread(&ctx("bank-1"), "first-wake", 24), spread(&ctx("bank-2"), "first-wake", 24));
         assert!((0..24).contains(&a) && (0..24).contains(&b));
         assert_eq!(a, spread(&ctx("bank-1"), "first-wake", 24));

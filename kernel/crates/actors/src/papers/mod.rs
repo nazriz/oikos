@@ -52,7 +52,7 @@ pub fn data<P: Paper>(p: &P) -> Value {
 pub fn read<P: Paper>(r: &Record) -> Option<P> {
     match &r.body {
         RecordBody::Statement { kind, data, .. } if kind == P::KIND => {
-            serde_json::from_value(data.clone().unwrap_or_else(|| Value::Object(Default::default()))).ok()
+            oikos_core::frozen::from_frozen(data.as_ref().unwrap_or(&oikos_core::frozen::EMPTY)).ok()
         }
         _ => None,
     }
@@ -90,12 +90,8 @@ pub mod lenient {
     use serde_json::Value;
 
     /// A whole number from a number or from digits (a float or anything else: not a whole number).
-    pub fn whole(v: &Value) -> Option<i64> {
-        match v {
-            Value::Number(n) => n.as_i64(),
-            Value::String(s) => s.trim().parse::<i64>().ok(),
-            _ => None,
-        }
+    pub fn whole<V: oikos_core::frozen::JsonRead + ?Sized>(v: &V) -> Option<i64> {
+        v.whole()
     }
     pub fn int<'de, D: Deserializer<'de>>(d: D) -> Result<i64, D::Error> {
         let v = Value::deserialize(d)?;

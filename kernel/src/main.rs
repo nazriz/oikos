@@ -129,6 +129,8 @@ fn world(args: &[String]) -> Result<(), String> {
     // (Read participant by participant, never whole: a large world's config is over a gigabyte of JSON.)
     let (loaded, rest) = oikos_kernel::config::load_from(std::fs::File::open(&args[1]).map_err(|e| format!("{}: {e}", args[1]))?)
         .map_err(|e| format!("{}: invalid config: {e}", args[1]))?;
+    // (Its one config read, the compiled schemas it was checked with go: docs/decisions.md 2026-10-27.)
+    oikos_kernel::contracts::release_config_check();
     let out = flag("--out").ok_or("--out <dir> is needed")?;
     std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
     let run_id = flag("--run-id").unwrap_or_else(|| "world".into());
@@ -165,6 +167,8 @@ fn world(args: &[String]) -> Result<(), String> {
     // (For whoever measures memory: what the code actors keep, summed by what.)
     if std::env::var_os("OIKOS_KEPT").is_some() {
         eprintln!("kept {}", serde_json::to_string(&e.kept()).unwrap_or_default());
+        let (n, b) = oikos_core::id::interned();
+        eprintln!("ids interned {n} ({b} bytes of text)");
     }
     // (For whoever measures: the run's own thread's CPU time, the critical path when the machine is shared.)
     if let Some(ms) = thread_cpu_ms() {
@@ -177,8 +181,16 @@ fn world(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-/// The process's peak resident memory so far, in bytes (`getrusage`'s `ru_maxrss`: bytes on macOS, KiB on Linux).
+/// The process's peak resident memory so far, in bytes (`getrusage`'s `ru_maxrss`: bytes on macOS, KiB on Linux). On
+/// Linux, the high-water mark of this process's own memory (`VmHWM`): `ru_maxrss` is carried across `exec`, so a kernel
+/// started by a large process (a test's Bun) would say that process's size.
 fn peak_resident_bytes() -> Option<i64> {
+    #[cfg(target_os = "linux")]
+    if let Some(kb) = std::fs::read_to_string("/proc/self/status").ok().and_then(|s| {
+        s.lines().find_map(|l| l.strip_prefix("VmHWM:").and_then(|v| v.trim().trim_end_matches("kB").trim().parse::<i64>().ok()))
+    }) {
+        return Some(kb * 1024);
+    }
     #[repr(C)]
     struct Rusage {
         utime: [i64; 2],
