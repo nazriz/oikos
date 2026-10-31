@@ -63,7 +63,7 @@ pub fn offers_of(book: &Book) -> Vec<(String, ServiceOffer)> {
 
 // ------------------------------------------------------------------------------------------------ the provider
 
-const OUTSIDE: &str = "What assistants can do, at what speed, how often they slip, at what price and on what terms, is the outside world's technology on offer (docs/design/foundations-2.md 7.2: capabilities and costs come from an outside scenario). A provider of the outside world stands for it at the world's edge, as it is held in the profile with its source; nothing in the town can know or change it otherwise, and nothing here sets how much anyone delegates.";
+const OUTSIDE: &str = "What assistants can do, at what speed, how often they slip, at what price and on what terms, is the outside world's technology on offer, as world prices are. A provider of the outside world stands for it at the world's edge, as it is held in the profile with its source; nothing in the town can know or change it otherwise, and nothing here sets how much anyone delegates.";
 
 pub struct Provider;
 
