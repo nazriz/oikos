@@ -299,6 +299,17 @@
                   }
                 }
               },
+              "skill": {
+                "description": "A practised skill (foundations-2 E4): the labour per unit scales with the performers' mean of a practised body variable as well (the stated labour at its initial, novice_bps of it at its minimum, expert_bps at its maximum), and each performer's share of the time is practice.",
+                "type": "object",
+                "required": ["variable", "novice_bps", "expert_bps"],
+                "additionalProperties": false,
+                "properties": {
+                  "variable": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+                  "novice_bps": { "type": "integer", "minimum": 10000, "maximum": 1000000 },
+                  "expert_bps": { "type": "integer", "minimum": 0, "maximum": 10000 }
+                }
+              },
               "collects": {
                 "description": "Collection (law 8, foundations-2 C4: a round emptying the bins): per unit, up to `per_unit` of a kind held at the structure worked on (`on`) by anyone there is taken into the actor's holding at `at`, from the holders in turn (a different one first each day); what is not there is not taken and nothing is made. What is left is seen by those who did it.",
                 "type": "object",
@@ -718,7 +729,34 @@
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
+              },
+              "practice": {
+                "description": "A skill that grows with use and fades without it (foundations-2 E4): each hour of use closes gain_bps_per_hour of the distance to max; each whole day unused, the distance above floor halves every half_life_days. Settled when read or used. No per_day with it.",
+                "type": "object",
+                "required": ["gain_bps_per_hour", "half_life_days", "floor"],
+                "additionalProperties": false,
+                "properties": {
+                  "gain_bps_per_hour": { "type": "integer", "minimum": 0, "maximum": 10000 },
+                  "half_life_days": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+                  "floor": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 }
+                }
               }
+            }
+          }
+        },
+        "act_skills": {
+          "description": "Skill at acts (foundations-2 E4): a person's time for an act keyed this way in the table of work (publish/<kind>, else its block) is the table's at the variable's initial, novice_bps of it at its minimum and expert_bps at its maximum, in a straight line between; doing it is practice. The variable must be practised.",
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "required": ["act", "variable", "novice_bps", "expert_bps"],
+            "additionalProperties": false,
+            "properties": {
+              "act": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "variable": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+              "novice_bps": { "type": "integer", "minimum": 10000, "maximum": 1000000 },
+              "expert_bps": { "type": "integer", "minimum": 0, "maximum": 10000 }
             }
           }
         },

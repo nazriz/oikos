@@ -138,6 +138,10 @@ pub struct Catalogue {
     /// exactly and attaches no meaning to them; work changes them (a task's `on_body`), and they drift by `per_day`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_variables: Vec<BodyVariableCfg>,
+    /// Skill at acts (foundations-2 E4): the person's time for an act the table of work keys this way (`publish/<kind>`,
+    /// else its block) scales with the doer's practised skill, and doing it is practice. Absent: acts take the table's time.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub act_skills: Vec<ActSkill>,
     /// World totals the kernel keeps (tier 2: greenhouse gas).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub counters: Vec<CounterCfg>,
@@ -166,7 +170,104 @@ pub struct BodyVariableCfg {
     pub initial: i64,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub per_day: i64,
+    /// A skill that grows with use and fades without it (foundations-2 E4): absent, the variable changes only as above.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub practice: Option<PracticeCfg>,
 }
+
+/// How a practised skill moves (foundations-2 E4). Each hour of use closes `gain_bps_per_hour` of the distance still to
+/// its maximum (diminishing returns: a law of practice); each whole day it goes unused, its distance above `floor` halves
+/// every `half_life_days` (fading toward what is never lost). Settled when it is read or used, from when it was last
+/// set, so it costs nothing a day.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PracticeCfg {
+    pub gain_bps_per_hour: u32,
+    pub half_life_days: i64,
+    pub floor: i64,
+}
+
+/// A practised skill a piece of work uses (foundations-2 E4): its time is the stated time at the variable's `initial`
+/// (an ordinary hand's), `novice_bps` of it at the variable's minimum and `expert_bps` at its maximum, in a straight line
+/// between; and the performers' time on it is practice.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SkillUse {
+    pub variable: Id,
+    pub novice_bps: u32,
+    pub expert_bps: u32,
+}
+
+/// An act's skill (foundations-2 E4): `act` as the table of work keys it (`publish/<kind>`, or a block).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActSkill {
+    pub act: String,
+    pub variable: Id,
+    pub novice_bps: u32,
+    pub expert_bps: u32,
+}
+
+impl ActSkill {
+    pub fn skill(&self) -> SkillUse {
+        SkillUse { variable: self.variable, novice_bps: self.novice_bps, expert_bps: self.expert_bps }
+    }
+}
+
+impl SkillUse {
+    /// The time a performer at `v` takes, for `seconds` at an ordinary hand's.
+    pub fn scale(&self, cfg: &BodyVariableCfg, v: i64, seconds: i64) -> i64 {
+        let f = skill_factor_bps(cfg, v, self.novice_bps, self.expert_bps);
+        ((seconds as i128 * f as i128 + 9_999) / 10_000).max(if seconds > 0 { 1 } else { 0 }) as i64
+    }
+}
+
+/// The time factor, in basis points, of a performer at `v`: `novice` at the minimum, 10,000 at `initial`, `expert` at the
+/// maximum, in a straight line between.
+pub fn skill_factor_bps(cfg: &BodyVariableCfg, v: i64, novice: u32, expert: u32) -> i64 {
+    let v = v.clamp(cfg.min, cfg.max) as i128;
+    let (min, mid, max) = (cfg.min as i128, cfg.initial as i128, cfg.max as i128);
+    let f = if v <= mid {
+        if mid == min { 10_000 } else { novice as i128 + (10_000 - novice as i128) * (v - min) / (mid - min) }
+    } else if max == mid {
+        10_000
+    } else {
+        10_000 + (expert as i128 - 10_000) * (v - mid) / (max - mid)
+    };
+    f as i64
+}
+
+impl PracticeCfg {
+    /// A value after `seconds` of use: the distance to `max` closed by the hour's share, in proportion to the seconds.
+    pub fn practised(&self, cfg: &BodyVariableCfg, v: i64, seconds: i64) -> i64 {
+        if seconds <= 0 || v >= cfg.max {
+            return v.clamp(cfg.min, cfg.max);
+        }
+        let gap = (cfg.max - v) as i128;
+        let gain = (gap * self.gain_bps_per_hour as i128 * seconds as i128 / (10_000 * 3_600)).min(gap);
+        (v as i128 + gain).clamp(cfg.min as i128, cfg.max as i128) as i64
+    }
+
+    /// A value after `days` without use: its distance above the floor halved every half-life (a whole number of
+    /// halvings, then the rest of a half-life read from a table of 2^-x at sixteenths, in a straight line between).
+    pub fn faded(&self, v: i64, days: i64) -> i64 {
+        if days <= 0 || v <= self.floor || self.half_life_days <= 0 {
+            return v;
+        }
+        let above = (v - self.floor) as i128;
+        let halvings = days / self.half_life_days;
+        if halvings >= 64 {
+            return self.floor;
+        }
+        let rest = (days % self.half_life_days) as i128 * 16 * 65_536 / self.half_life_days as i128; // sixteenths, in 1/65,536
+        let (i, frac) = ((rest / 65_536) as usize, rest % 65_536);
+        let f = POW2_NEG_16THS[i] as i128 + (POW2_NEG_16THS[i + 1] as i128 - POW2_NEG_16THS[i] as i128) * frac / 65_536;
+        self.floor + ((above >> halvings) * f / 1_000_000) as i64
+    }
+}
+
+/// 2^(-k/16) for k = 0..=16, in millionths.
+const POW2_NEG_16THS: [i64; 17] = [1_000_000, 957_603, 917_004, 878_126, 840_896, 805_245, 771_105, 738_413, 707_107, 677_128, 648_420, 620_929, 594_604, 569_394, 545_254, 522_137, 500_000];
 
 /// The reserved cover of a cell with a building whose type names none.
 pub const COVER_BUILT: &str = "built";
@@ -325,6 +426,10 @@ pub struct TaskCfg {
     /// variable's minimum to `at_max_bps` of it at its maximum.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub labour_by: Option<LabourBy>,
+    /// A practised skill (foundations-2 E4): the labour scales with the performers' mean of it as well, and their time on the
+    /// task is practice.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skill: Option<SkillUse>,
     /// Per unit: taken from a field, at the cell (the structure's, or the four around them) that has the most of it
     /// (water from the river).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2025,6 +2130,17 @@ pub fn check_traits(owner: &str, traits: &Option<Value>) -> Result<(), String> {
     Ok(())
 }
 
+/// A practised skill named by work: a variable that is practised, a novice no quicker than an ordinary hand, an expert no slower.
+fn check_skill_use(vars: &BTreeMap<&str, &BodyVariableCfg>, what: &str, variable: &str, novice: u32, expert: u32) -> Result<(), String> {
+    if !vars.get(variable).is_some_and(|v| v.practice.is_some()) {
+        return Err(format!("{what}: skill names no practised body variable {variable}"));
+    }
+    if novice < 10_000 || expert > 10_000 || novice > 1_000_000 {
+        return Err(format!("{what}: a skill's novice_bps is 10000..=1000000 and its expert_bps at most 10000"));
+    }
+    Ok(())
+}
+
 /// Bodies' variables, care and skill at work (docs/design/world-expansion.md 4.2): what they name exists, in range.
 fn check_bodies(c: &Config) -> Result<(), String> {
     let cat = &c.catalogue;
@@ -2033,6 +2149,16 @@ fn check_bodies(c: &Config) -> Result<(), String> {
     for v in &cat.body_variables {
         if v.min > v.max || v.initial < v.min || v.initial > v.max {
             return Err(format!("body variable {}: min <= initial <= max", v.id));
+        }
+        if let Some(p) = &v.practice {
+            // (A skill moves by use and by time unused, never by a drift of its own as well.)
+            if v.per_day != 0 {
+                return Err(format!("body variable {}: a practised skill has no per_day drift", v.id));
+            }
+            if p.half_life_days < 1 || p.floor < v.min || p.floor > v.max {
+                return Err(format!("body variable {}: practice needs half_life_days >= 1 and min <= floor <= max", v.id));
+            }
+            bps(p.gain_bps_per_hour, &format!("body variable {}: practice.gain_bps_per_hour", v.id))?;
         }
         if vars.insert(&v.id, v).is_some() {
             return Err(format!("duplicate body variable {}", v.id));
@@ -2059,6 +2185,16 @@ fn check_bodies(c: &Config) -> Result<(), String> {
             }
             bps(lb.at_max_bps, &format!("task {}: labour_by.at_max_bps", t.id))?;
         }
+        if let Some(sk) = &t.skill {
+            check_skill_use(&vars, &format!("task {}", t.id), &sk.variable, sk.novice_bps, sk.expert_bps)?;
+        }
+    }
+    let mut acts: BTreeSet<&str> = BTreeSet::new();
+    for a in &cat.act_skills {
+        if !acts.insert(&a.act) {
+            return Err(format!("act skill {}: one skill an act", a.act));
+        }
+        check_skill_use(&vars, &format!("act skill {}", a.act), &a.variable, a.novice_bps, a.expert_bps)?;
     }
     let mut counters: BTreeSet<&str> = BTreeSet::new();
     for x in &cat.counters {

@@ -66,9 +66,15 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   allocation rule (docs/design/foundations-2.md §2).
 - [~] **Foundations-2, phase 3: space** (law 9; branch `f2-phase3`: S1, the backstop and its inventory; S2, roads as ways and household vehicles). Roads, pipes, wires and data lines with capacity and energy; people in
   transit; goods need a carrier; several towns as an option (§3). Transport and many towns come from this.
-- [?] **Foundations-2, phase 4: the general economy** (§7). Services anyone can buy (E1: now part of the delegation
-  capabilities, step D1, above); technologies as goods with an outside capability scenario; firms enter any industry;
-  skills by use.
+- [~] **Foundations-2, phase 4: the general economy** (§7; every roadmap item to be done, owner 2026-10-31; branch
+  `f2-economy`). Serves the north star's reversibility: what taking work back costs, and what AI takes of a finite town.
+  - [x] E1. Services anyone can buy (the delegation capabilities' D1, above).
+  - [x] E4. Skills that grow with use and fade without it, for people and staff; off, or on at a run's own rates, a
+    factor of a study (docs/behaviour/skills.md). Slips by skill wait for a source.
+  - [ ] E2. Technologies as goods with a capability, and an outside scenario of their capability and cost.
+  - [ ] E3. Firms enter any industry by expected profit, capital-heavy ones included.
+  - [ ] E5. Compute competing for energy, water and land through laws 8 and 9 (a hosting industry's recipe).
+  - [ ] E6. The measures M7 (what the town gives to AI) and M8 (who can still do the work); the tag's backstop.
 - [ ] **Foundations-2, phase 5:** strict modes on, old exception lists empty, each law's line in CLAUDE.md as its
   enforcement lands.
 - [ ] **Market power in prices** (ME-16), after phase 4.
@@ -94,6 +100,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [x] A taxpayer account to reclaim an overpayment from (PB-23): the tax collector keeps it (`taxpayer-accounts`, d3eb2bf3, cedc1903); its figures are still placeholders, so PB-23 stays open as mitigated.
 - [x] Candidacy: a field of 19 for about 118 votes (PB-10): traced (`gap-pb10`): the test's own 10% chance of standing, five times the profile's; the fault left is that the field grows with the electorate (a mechanism to the owner: decisions "Candidacy: the field of 19 traced").
 - One day's crew paperwork ran in series, cause untraced (MT-23).
+- [x] A model steward in a fork is a pilot's seat (MT-22): told what was not taken, the cast followed, thinking in world time, composer and exit accounts; resuming a fork part-way left open.
 - Three tests still pinned to one seed (production, entry, own-venture); two near-duplicate twin cases kept.
 - Haiku against Sonnet welfare: a matched pair (same town, same offices) before more Haiku seats.
 - The unbased-figures list (orchestrator/test/figures.test.ts) to shrink as figures are sourced.

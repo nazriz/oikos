@@ -287,3 +287,34 @@ fn a_fork_can_withhold_one_named_act_and_is_otherwise_its_parent_to_the_hash() {
     assert!(Host::start(world(), &json!({ "stand_in": "idle", "withhold": [{ "what": "weather_warning", "nth": 0 }] })).is_err());
     assert!(Host::start(world(), &json!({ "stand_in": "idle", "withhold": [{ "nth": 1 }] })).is_err());
 }
+
+#[test]
+fn a_seats_thinking_as_its_host_reckons_it_comes_before_its_act_where_the_world_says_thinking_takes_time() {
+    // (MT-22: a model seat's host sends how long it thought, from its tokens as run.ts reckons a pilot's; the act begins
+    // after it. Where thinking is free, what a host sends is not taken.)
+    let starts = |costs: bool| -> Vec<i64> {
+        let mut c = world();
+        c["clock"]["run_seconds"] = json!(4 * DAY);
+        c["orchestration"]["thinking_time"] = json!(if costs { "costs_world_time" } else { "free" });
+        let mut h = Host::start(c, &json!({ "run_id": "think", "stand_in": "idle", "stream": { "cap": 100000, "kinds": ["event"] } })).unwrap();
+        let mut late = vec![];
+        loop {
+            let due = h.next().unwrap();
+            if due["due"] == "end" {
+                break;
+            }
+            for s in due["seats"].as_array().unwrap() {
+                h.submit(s["key"].as_str().unwrap(), &json!({ "type": "message", "to": ["alice-self"], "text": "Hello", "thinking": 600 })).unwrap();
+            }
+            for e in h.events(100_000)["entries"].as_array().unwrap() {
+                if e["body"]["event"] == "action_started" && e["body"]["participant"] == "mayor-system" {
+                    late.push(e["body"]["starts"].as_i64().unwrap() - e["t"].as_i64().unwrap());
+                }
+            }
+        }
+        late
+    };
+    let (costs, free) = (starts(true), starts(false));
+    assert!(!costs.is_empty() && costs.iter().all(|x| *x >= 600), "{costs:?}");
+    assert!(!free.is_empty() && free.iter().any(|x| *x < 600), "{free:?}");
+}
