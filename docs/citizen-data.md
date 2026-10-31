@@ -68,3 +68,41 @@ alternating order: **no difference beyond the noise** (a few percent between two
 Compression and writing run on a thread of the capture's own; with them on the run's thread, the 10,000-person month
 was 4 to 30% slower in two pairs. The same run writes the same capture, byte for byte (two runs compared). The exporter makes the
 year's 232,706 examples in 4 s (605 MB of rows: each carries the person's whole record).
+
+## The citizen model
+
+Steps 2, 3 and 5 of docs/design/citizen-model.md, round 1's act head only: a small network of our own, trained on the
+code mind's recorded odds, that gives the odds of each way of going after a want (ask the other side, a desk or
+venue, a petition, an offer, telling others, ... or wait). Optional, off by default.
+
+- **The pipeline, one command:** `bun scripts/citizen-model.ts [--name NAME]` gathers every captured want decision,
+  writes `runs/citizen-model/data/<NAME>.jsonl` (with a manifest of every source, its SHA-256 and what was kept out),
+  trains five seeds (`kernel/crates/citizen-train`, one slot) and writes `runs/citizen-model/models/<NAME>/` (the
+  chosen `model.json`, each seed's, and `report.json`: every measure on every split, the noise between seeds, the
+  speed). `bun scripts/citizen-model.ts towns` first makes the code towns it learns from (`worlds/citizen-model.yaml`:
+  1,000 people, living, a year, captured; nine profiles). Nothing is overwritten: a name used is refused.
+- **What goes in:** captured decisions only (never debriefs or exit accounts); never a pilot marked as a held-out test
+  (lv-08, lv-10, lv-12: their PILOT.txt), nor a turn on a day a real translator test case came from; never a turn made
+  with the model on. Decisions with one way open (wait) are left out (they teach nothing). Splits are whole towns: two
+  profiles never trained on (us-oh-2026, ke-nakuru-2026: test), the last town of each other profile (valid, for
+  stopping), one pilot held out whole (lv-13), the rest train.
+- **What it reads** (`kernel/crates/actors/src/mind/model.rs`, `features`): the `situation` exactly as the mind records
+  it with the decision (the want, the matter, home and means against a month's essentials, the openings of each kind
+  with their party's role, trust, fear, cost and what they bring, and the person's record beside the town's figures),
+  and what the person has learned of each way. Never the code mind's scoring (`code.odds`, an opening's `adj`, an
+  option's `score`), never a name or id. The open vocabularies (what a want is about, roles, kinds of trust, memories)
+  are the trainer's, in the model file.
+- **The model:** one scorer, a multilayer perceptron (183 inputs, two layers of 64, ReLU), applied to each option with
+  the person and situation beside it; the odds are their softmax, so the order of the options cannot count. Weights
+  and standardisation are whole numbers in 1/65,536ths in the file; the forward pass is IEEE addition and
+  multiplication in a fixed order and `mind::math::exp`, as the code mind's own logit is.
+- **Deterministic:** training runs on one thread in a fixed order with `mind::math`, and a seeded stream of its own for
+  the initial weights and the shuffle, so the same data and seed give the same file. The data file is the same for the
+  same captures (the manifest's timestamp aside).
+- **The dial:** `living.citizen_model: { weights: <path>, share_bps }` in a spec, `dials.citizen_model: { weights,
+  sha256, share_bps }` in the config (the generator reads the hash when not given; the engine reads the file and
+  refuses one whose hash is not the config's). Each want's way is then drawn, on the same stream, from the code mind's
+  exponents blended with the model's scores in log-odds, the model taking `share_bps` of the way (10,000: its own odds).
+  The decision records both: `situation.code.odds` (the code mind's) and `situation.model` (the odds drawn on, the
+  share, the file's hash). Absent: the world is as before, to the byte; at share 0 the state is the code mind's to the
+  bit (`kernel/tests/citizen_model.rs`).

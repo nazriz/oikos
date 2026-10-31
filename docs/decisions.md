@@ -10021,3 +10021,37 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   town with capability to the plain town but for its releases and its tag).
 - **Revisit if:** a study needs capability as a continuous path rather than releases; a scenario's sizes find sources;
   buyers should replace delivered systems as releases come out (that is a buyer's rule, with a real basis, not this).
+## 2026-11-01 · The citizen model, step 1: a model of our own as an optional citizen mind, and its pipeline (docs/design/citizen-model.md steps 2, 3, 5; contract addition `dials.citizen_model`; a world without it is as before, to the byte; no model called)
+
+- **What:** `kernel/crates/actors/src/mind/model.rs`: the input builder (reads the `situation` the mind records with a
+  want decision, less the code mind's own scoring) and the forward pass of a small network that gives each of a want's
+  ways a score; `dials.citizen_model` (`weights`, `sha256`, `share_bps`), read and hash-checked by the engine
+  (`engine.rs` `citizen_model`), carried to every citizen through `WorldInfo`; in `pursue`, the way is drawn from the
+  code mind's exponents blended in log-odds with the model's (`model::blend`), both odds recorded. The trainer
+  (`kernel/crates/citizen-train`) and the pipeline (`scripts/citizen-model.ts`, one command; `towns` makes the code
+  towns of `worlds/citizen-model.yaml`). `Attractions::choose` now draws through `exponents` and `pick`, the same
+  arithmetic in the same order.
+- **Why this way:**
+  - *The want's way first:* it is the design's round 1 (whether to contest, and where), it is the one decision whose
+    situation the capture types fully, and the code mind's odds are recorded with it as targets.
+  - *An MLP over each option, not attention over items:* with the act head only, the options are a handful of kinds,
+    and a scorer applied to each alone keeps order out by construction. Attention over fact and paper items is for the
+    content heads (grounds, evidence), which need step 2's renderer and the teachers first.
+  - *Floats in a fixed order, weights in 1/65,536ths, not int8:* the code mind already computes its logit with IEEE
+    arithmetic and `mind::math::exp`, which is the same on any machine; whole-number weights make the file exactly
+    what runs, and an int8 forward buys speed this decision does not need (a few thousand calls a day in a town of
+    10,000). Revisit if a head runs on every decision.
+  - *Training in Rust, not PyTorch:* the network is small; one thread, a fixed order and `mind::math` make the same
+    data and seed give the same weights anywhere, and the trainer measures the very forward pass a run computes, so
+    no Python reference or bit-identity test is needed. `crates/citizen-train` is outside the determinism lint (as the
+    explorer is): it is not in the world, and a run reads only the file it writes, by its hash.
+  - *The weights by path and hash, read by the engine:* the actors crate may not touch files; inlining the weights in
+    the config would make every person's parameter key carry them. The hash in the config (and so in the log) says
+    which weights ran; a file that differs refuses to run.
+- **Not built:** the content heads (seeks, amount, grounds, evidence, register: step 2's renderer and teachers); the
+  teachers (paid API, the owner's go-ahead); scrambled-record and edit checks against the code mind's own response
+  (the code mind's odds are recorded, not recomputable from a row: the edits are checked for the direction of the code
+  mind's own sways instead); the content and patterns-not-told checks; twins over two years.
+- **Revisit if:** the model's odds are used past round 1 (a head per domain needs its own situation typed); a head runs
+  on every decision (then int8 and batching); the code mind's want weighing changes (retrain: the model learns the
+  code mind as it was when captured, which the data manifest records by source hash).
