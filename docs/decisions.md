@@ -9792,14 +9792,20 @@ and no secrets, any difference of a pinned hash between the Mac and Linux being 
   from `os.tmpdir()`. launchd appears only in `docs/ci-runner.md` (the runner's service on the Mini); `scripts/mini` is a
   tool for reaching the Mini from elsewhere, and its test runs against a local folder, so it runs on Linux as it is.
 - *Two failures in the first gate, and what they were.* `orchestrator/test/risks.test.ts`: this entry's own first edit
-  of PL-4 (its status and "Do when" must share a line). `orchestrator/test/mini.test.ts`: a stopped run's model call
-  (a `sleep`, ended by `scripts/mini stop` after its seed had gone) still answered `kill -0`. It had ended: its parent
-  gone, it was handed to the first process, which in this container (not systemd, not launchd) never reaps, so it
-  stayed a zombie. The test's `alive` now counts a zombie as ended (`ps -o stat=`, the same on both). `scripts/mini`
-  itself was left as it is (its wait on the run's own processes ended as it should here); no assertion was dropped.
+  of PL-4 (its status and "Do when" must share a line). `orchestrator/test/mini.test.ts`, which then failed on every
+  Linux container: the run's model call (a `sleep`), ended by `scripts/mini stop` after its seed had gone, still
+  answered `kill -0` 300 ms later. Its parent gone, it is the first process's to reap, and this container's first
+  process (`process_api`, not launchd or systemd) reaps orphans only every second or two: until then the call is a
+  zombie. `stop` sent it TERM and said "stopped" at once, before it had left the process table. The fault was the
+  script's: `stop` now waits for what it ended to be gone (up to its wait, polled every 0.2 s), and names any that is
+  still there and not a zombie ("what it left did not end"). The test is main's, unchanged (a first fix had the test
+  count a zombie as ended; dropped for this). On the Mac it changes nothing (launchd reaps at once).
 - *The nightly job.* `.github/workflows/linux.yml`: `ubuntu-latest`, nightly at 04:30 UTC and by hand, `permissions:
   contents: read`, no secrets; Bun pinned to 1.4.4, Rust stable with the wasm target, cargo-nextest; then the same
-  steps as ci.yml (installs, `bun run kernel`, typecheck, the gate tier, the slow tier). It does not record a result
+  steps as ci.yml (installs, `bun run kernel`, typecheck, the gate tier, the slow tier), the cargo build cached from
+  the night before (`Swatinem/rust-cache`). A night with no commit on main in the last 25 hours is skipped by a small
+  first job (the code passed the night before), so a quiet repository costs nothing; a run by hand always goes. Hosted
+  runners are free for a public repository; no paid or larger runner. It does not record a result
   for `merge.ts`: main's state stays the Mini's CI. `scripts/tiers.test.ts` now holds that no workflow on the
   self-hosted runner has a `pull_request` trigger and that the Linux job is hosted, scheduled, secret-free and runs both
   tiers. (`docs/ci-runner.md` still said ci.yml ran on every pull request; corrected.)
@@ -9825,6 +9831,12 @@ The saving is the link and the per-program build of `common` and the kernel's me
 actors' 170 (where most is the crate itself), and nearly all of a change to the tests. Under nextest the programs ran
 side by side already, so the run time saves less there than under `cargo test`. On the Mini the counts differ (12 cores,
 sccache, more programs linked at once); not measured there.
+
+**Brought to main (2026-10-31).** Rebased onto main after the representation rewrite (an interned `oikos_core::Id`)
+and foundations-2 phase 3: both commits applied with one conflict (this file's end). One test file had joined
+`kernel/tests/` since, `space.rs`, and is now a module of `main.rs` (the guard test above names such a file). The gate
+on Linux (4 cores; the checkout's slots, 2 at a time): 1581 tests in 248 files and the kernel's cargo tests, all passing,
+the culture-dial pins still the Mac's to the byte; `mini.test.ts` passed three runs in three on main's test.
 
 **Leaves out.** PL-4 (1), the elastic slots, and the trial of sharding the slow tier on hosted runners (setup cold and
 warm, each file's time against the Mini's) — for after the nightly job has a few green nights to read times from.

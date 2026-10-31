@@ -1653,10 +1653,13 @@ set the status to `fixed (commit abc1234)` (or the decisions entry), and let a r
   the part (3) would cut. A documents-only gate is 15 s, TypeScript only 85-100 s, the slow tier 660 s on 12 slots. A lone
   agent's gate is held to 3 slots for builds and runs today, which (1) would lift. The code has run only on macOS arm64,
   so nothing yet says its logs are the same elsewhere, which (2) would.
-- **Done (2026-10-26, decisions "Linux, and one Rust test program"):** (2) the build and the gate run on Linux x86_64,
+- **Done (2026-10-26, brought to main 2026-10-31; decisions "Linux, and one Rust test program"):** (2) the build and the gate run on Linux x86_64,
   and the culture-dial pins (config hashes and the Rust state hashes of three profiles) are the Mac's to the byte; the
   Mac-only pieces are skipped where absent, and `disk-tidy` no longer reads every folder as unused on Linux (its `ps -E`
-  is macOS's). `.github/workflows/linux.yml` runs both tiers nightly on `ubuntu-latest` with no secrets; no workflow on
+  is macOS's), and `scripts/mini stop` waits for what it ended to leave the process table (a Linux container's first
+  process reaps orphans a second or two late: the cause of `mini.test.ts` failing there every time).
+  `.github/workflows/linux.yml` runs both tiers nightly on a free `ubuntu-latest` runner with no secrets, cached, and
+  skips a night with no new commit on main; no workflow on
   the self-hosted runner takes a pull request (`scripts/tiers.test.ts`). (3) `kernel/tests/` is one program
   (`tests/main.rs`): a one-line change to the kernel's library rebuilds its tests in 34 s against 48 s, one to
   `oikos-actors` in 153 s against 170 s, one to the tests' `common` in 3.5 s against 14 to 45 s, and the tests run in

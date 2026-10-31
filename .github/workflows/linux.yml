@@ -18,7 +18,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Only where it pays off: a night with no new commit on main is skipped (the same code passed the night before); a run
+  # by hand always goes. Hosted runners are free for a public repository.
+  changed:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.fresh.outputs.go }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: fresh
+        run: |
+          if [ "${{ github.event_name }}" != schedule ] || [ $(( $(date +%s) - $(git log -1 --format=%ct) )) -lt 90000 ]; then echo go=1 >> "$GITHUB_OUTPUT"; fi
   test:
+    needs: changed
+    if: ${{ needs.changed.outputs.go == '1' }}
     runs-on: ubuntu-latest
     timeout-minutes: 240
     env:
@@ -35,6 +48,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2 # (the last night's build: a warm build where a cold one takes most of an hour)
+        with:
+          workspaces: kernel
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest

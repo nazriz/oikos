@@ -4,7 +4,7 @@
 //! - **S1:** over any sequence of operations, a body is in one place at a time: in at most one building's spaces, never
 //!   in two. (Going somewhere takes the trip: `services.rs`, `a_body_is_in_one_place_and_going_somewhere_takes_the_trip`.)
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::EventBody;

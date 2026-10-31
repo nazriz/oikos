@@ -58,6 +58,7 @@ mod position;
 mod replay;
 mod services;
 mod snapshot;
+mod space;
 mod statements_have_no_power;
 mod time;
 mod travel;
