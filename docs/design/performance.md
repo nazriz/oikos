@@ -3,6 +3,60 @@
 Two passes. The first (below, "Before the port") measured the TypeScript world on 2026-10-17. The second, here, measures the
 Rust world after the cut-over (branch `perf-2`, 2026-10-23), fixes what it found, and ranks what is left.
 
+## Years at 10,000 and 50,000 (2026-10-31, code only)
+
+**The towns.** `worlds/town-10000.yaml` and `worlds/town-50000.yaml`: town-1000 ten and fifty times over (homes, firms,
+landlords and land in proportion), au-vic-2026, seed 1, `living.initiative_bps=10000`, all code. Every earlier large
+measurement (below) was `town-1000.yaml` with `citizens=10000`: 380 homes for 4,026 households, 3,646 of them without a
+home at the start. Those numbers measure the engine, not a town that lives; use the scaled specs for anything else.
+Run with `oikos-kernel world` at 4 engine threads, the log through a pipe into zstd (the 10,000 town's full log; the
+50,000 town's lean), a sampler writing simulated day, resident memory and log size every minute
+(`runs/<run>/progress.tsv`), on the shared machine (load 12 to 30). Runs: `runs/long-10000-3y` (before the fixes),
+`runs/long-10000-3y-b` and `runs/long-50000-2y` (after), `runs/long-50000-2y-try1` (stopped by fault 3 below).
+
+**What broke, and the fixes** (docs/decisions.md 2026-10-31, "Years at 10,000"): the hall built for 20 of a crew of
+60, so the registrar of titles could not get in to work for a month; owners counting themselves homeless (and stopping
+their own water) while the register answered, so 484 owners left town by day 76; the works office sending every
+inspection in one moment, which stopped the 50,000 town at t=300 (1,000 rounds); and the energy retailer reading its
+whole file of bills once a connection at every wake, 63% of the run's own thread by day 115 (result-identical fix).
+Before the fixes the 10,000 town lost 3,567 people (36%) in 139 days and ran at a third of a simulated day a wall
+minute by then; after, 632 in six months (the households the tight housing leaves out, as at 1,000), and its pace
+held.
+
+**After the fixes** (wall time on the loaded machine; resident memory as `ps` gives it, the compressor moving it by a
+gigabyte either way):
+
+| town | day 30 | day 90 | day 180 | day 365 | growth |
+|---|---|---|---|---|---|
+| 10,000: wall | 6 min | 17 min | 40 min | 1.9 h | 10 to 25 s a simulated day |
+| 10,000: resident | 2.4 GB | 4.0 GB | 6.2 GB | 10.7 GB | about 25 MB a simulated day, steady |
+| 10,000: log (zstd, full) | 0.5 GB | 1.6 GB | 3.3 GB | 6.7 GB | 18 MB a day |
+| 50,000: wall | 37 min | | | | 105 s a simulated day by day 60 |
+| 50,000: resident | 12.6 GB | | | | about 85 MB a simulated day, days 30 to 60 |
+| 50,000: log (zstd, lean) | 1.25 GB | | | | 50 MB a day |
+
+**What grows with the run's length** (a heap profile of the 10,000 town, `--features heapprof`, four dumps five wall
+minutes apart in its first months): of 1.68 GB added, the world's records 0.91 GB (54%: every record made, kept
+whole, and each transaction; docs/design/tiered-storage.md, proposed), the engine 0.33 GB (of it the resolver's
+knowledge of every addressed statement each participant has seen, `Knowledge::learn`, 0.13 GB, and the per-matter
+counts of the twins' draws, `Draws::key`'s `matter_occurrences`, 74 MB: a gathering's every date is a matter each person
+keeps for the run), citizens' minds 0.18 GB, offices and firms 0.14 GB. None is a copy; each is a record of what
+happened or what was seen. At 2.5 KB a person a day at 10,000 (1 KB at 1,000) it grows faster than the town.
+
+**What it means for the study.** 10,000 people for 3 years: about 30 GB at the end, 20 GB of log, 6 to 8 hours: fits.
+50,000 for 2 years at 85 MB a day: about 75 GB, which does not fit on this 64 GB machine; the run's guard stops it at
+44 GB, near day 350. A study at 50,000 for longer than about a year needs the history out of memory (tiered storage,
+waiting on the owner) and the twins' per-matter draw counts let go when a matter is over (a design question for
+reliability's owners: a matter would have to say when it ends).
+
+**Costs that grow with the town, not the run** (sampled on the 50,000 town at day 49, the run's own thread): a person's
+word of mouth (`CitizenMind::word_of_mouth`) 43%, taking in everyone it sees in every space around it into its list of
+contacts by a search of the list for each, before cutting the list back to its 15: quadratic in how crowded the
+spaces it sees are (a hall of 200). Tried indexed (results identical: the 1,000 town for 120 days and the 10,000 for
+30 the same hash and log), it cost the run's own thread 12 to 13% more at 1,000 and 10,000, where spaces are small and
+building the index every wake costs more than the search; dropped. Worth doing only where the spaces seen are large,
+and measured at 50,000.
+
 ## Bytes per person: the budget, and what each person costs (2026-10-25, from branch `mem-budget` on)
 
 **The budget.** A town's memory is a fixed overhead and so much for each person; the goal (Naz, 2026-10-25) is about

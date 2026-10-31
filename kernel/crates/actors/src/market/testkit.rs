@@ -51,6 +51,8 @@ pub struct Harness {
     pub sent: Vec<String>,
     /// The readings of agreements it is shown at each wake (agreement id -> reading), as the kernel gives them.
     pub readings: Value,
+    /// The decisions it recorded (`Cx::decided`), in order.
+    pub decisions: Vec<Value>,
 }
 
 impl Harness {
@@ -58,7 +60,7 @@ impl Harness {
         let ctx = ctx(entity, params);
         let actor = kind.create(&ctx).expect("the actor is made");
         let draws = Draws::new(&ctx.participant, "self");
-        Harness { kind, ctx, actor, draws, view: View::default(), seed: 11, n: 0, t: 0, sent: vec![], readings: json!({}) }
+        Harness { kind, ctx, actor, draws, view: View::default(), seed: 11, n: 0, t: 0, sent: vec![], readings: json!({}), decisions: vec![] }
     }
 
     /// Replace the actor with its own saved self (every actor's memory saves).
@@ -94,6 +96,7 @@ impl Harness {
             let pic: Picture = self.view.apply(obs, None, &self.ctx.entity, woke_for, 0);
             let mut cx = Cx::new(t, &self.ctx, &mut self.draws, self.seed, vec![]);
             let action = self.actor.step(&pic, &mut cx);
+            self.decisions.extend(cx.into_kept().decisions);
             chans = json!({});
             outcomes = json!([]);
             match action {
@@ -140,6 +143,7 @@ impl Harness {
             let pic: Picture = self.view.apply(obs, None, &self.ctx.entity, woke_for, 0);
             let mut cx = Cx::new(t, &self.ctx, &mut self.draws, self.seed, vec![]);
             let action = self.actor.step(&pic, &mut cx);
+            self.decisions.extend(cx.into_kept().decisions);
             chans = json!({});
             outcomes = json!([]);
             match action {

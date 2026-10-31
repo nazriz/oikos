@@ -435,6 +435,9 @@ impl<W: Write> Engine<W> {
             e.round = Some(Round { awake: r.awake.clone(), decided, cursor: r.cursor, next: r.next.clone() });
         }
         e.open_capture()?;
+        if !e.opts.at_fork.is_empty() {
+            e.intervene()?;
+        }
         Ok(e)
     }
 

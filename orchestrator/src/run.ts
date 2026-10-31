@@ -258,6 +258,9 @@ interface Unit {
   sort?: string;
   /** The participant whose body a twin seat sits in (the engine's `body`). */
   body?: string;
+  /** The posts a seat held when its unit was made: a seat whose posts change is given its unit again, with what its new
+   * posts show it (a system appointed after it was delivered: an assistant; docs/design/delegation.md section 8). */
+  posts?: string;
   /** Truth audits: the divergences found at its last audit, by belief, and when each was first found. */
   diverged?: Map<string, number>;
   /** Why the current wake happened (contracts 0.7: woke_for), and how long since the last (the engine says). */
@@ -591,12 +594,20 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const p = parts.get(pid);
     if (!p) return;
     const want = !p.ended && isLlm(p);
+    const posts = held(pid).map((x) => x.id).sort().join(",");
+    if (want && units.has(pid) && (units.get(pid) as Unit).posts !== posts) {
+      // (Its posts changed: its unit is made again for them. What its controller held goes with the old unit, as a new
+      // holder starts from the office's files.)
+      units.delete(pid);
+      await k.request({ op: "units_remove", keys: [pid] });
+    }
     if (!want && units.has(pid)) {
       units.delete(pid);
       await k.request({ op: "units_remove", keys: [pid] });
     }
     if (!want || units.has(pid)) return;
     const u = await llmUnit(p, wakeAt);
+    u.posts = posts;
     units.set(pid, u);
     await k.request({ op: "units_add", units: [{ key: u.key, participant: u.participant, llm: true, cadence: u.cadence, next_wake: u.firstWake, ...(u.hears ? { hears: true } : {}), ...(u.post ? { post: u.post } : {}), ...(u.body ? { body: u.body } : {}), ...(u.sort ? { sort: u.sort } : {}) }] });
   };

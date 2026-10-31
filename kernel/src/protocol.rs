@@ -427,6 +427,7 @@ fn start_engine(session: &mut Session, req: &Value, config: Option<Value>) -> Re
         opts.mock_seats = b;
     }
     opts.withhold = crate::engine::withholds(&o["withhold"])?;
+    opts.at_fork = crate::engine::at_forks(&o["at_fork"])?;
     // (Where to capture the citizens' decisions, for training: docs/citizen-data.md. Changes nothing in the run.)
     opts.capture_citizens = o["capture_citizens"].as_str().filter(|p| !p.is_empty()).map(String::from);
     let  e = crate::engine::Engine::start(config.ok_or("missing config")?, str_field("run_id")?, BufWriter::new(log), anchors, opts)?;

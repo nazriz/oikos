@@ -31,6 +31,8 @@ export interface RustOptions {
   mock_seats?: boolean;
   /** Acts not carried out (a researcher's intervention: kernel/src/engine.rs `Withhold`; docs/experiments.md). */
   withhold?: { what: string; participant?: string; nth?: number; matter?: string; to?: string; has?: string }[];
+  /** Acts carried out at a fork's moment in a participant's name (a researcher's intervention: kernel/src/engine.rs `AtFork`). */
+  at_fork?: { participant: string; as?: string; call: string; why: string }[];
 }
 
 const need = () => {

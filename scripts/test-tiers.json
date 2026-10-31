@@ -3,6 +3,8 @@
  "slow": {
   "explorer/test/smoke.test.ts": "the Bevy explorer in headless Chromium, drawn in software (SwiftShader) without a GPU: a town run for three days, then the page driven milestone by milestone (about 170 s on 2026-10-25, 4 cores)",
   "orchestrator/test/all-work-takes-time-runs.test.ts": "nine towns run for a month each, and a planted one: 31 s alone on 2026-10-25, two to three times that under the suite's load (law 10's backstop of acts refused unpriced; foundations-2 P5)",
+  "orchestrator/test/assistants-fork.test.ts": "a 300-person town run 100 days to a fork, and four forks of 30 days (334 s on 2026-10-31, the machine loaded)",
+  "orchestrator/test/assistants.test.ts": "a 300-person town run 150 days with assistants, and the town generated three times (about 24 s for the run alone on 2026-10-31; minutes under load)",
   "orchestrator/test/auditor.test.ts": "the 1,000-person town (74 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/automation-run.test.ts": "several towns run for months (115 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/batch.test.ts": "several seeds or towns (29 s on 2026-10-24, the whole suite at once)",
