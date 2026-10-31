@@ -1436,6 +1436,7 @@ pub fn known_field(f: &str) -> bool {
 /// An advance that stops at it has the news met when it happens, whoever wakes next; the engine goes on at once where it woke nobody.
 pub fn is_body_news(b: &EventBody) -> bool {
     matches!(b, EventBody::MessageDelivered { .. } | EventBody::Recorded { .. } | EventBody::ConditionBegan { .. } | EventBody::ConditionEnded { .. } | EventBody::ConditionTreated { .. } | EventBody::Vacated { reason: VacateReason::Flooded | VacateReason::Died, .. } | EventBody::AskAnswered { position: Some(_), .. })
+        || matches!(b, EventBody::PersonCreated { parents, .. } if !parents.is_empty())
 }
 
 /// How a stretch of `secs` seconds run on from `start` falls on days: (day, seconds of it on that day).

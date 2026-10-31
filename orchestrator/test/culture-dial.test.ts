@@ -144,8 +144,8 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // until then.)
 // (Re-taken on 2026-10-31 at foundations-2 S2 (law 9), on the tree merged with main at 28c38600, config hashes and Rust states
 // both: a road is a way of the network, the ground says a cell's metres, housed households have a vehicle and drive it where
-// they belong (generator 0.72.0); ce5432bd..., becc4b5a..., a33d92aa... for the configs and e2f908c0..., 66d41a64...,
-// 29ee83f1... for the states, until then.)
+// they belong (generator 0.72.0), and a child's parents know of its birth at once; ce5432bd..., becc4b5a..., a33d92aa... for the
+// configs and e2f908c0..., 66d41a64..., 29ee83f1... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
   "au-vic-2026": "001f22ede7b41c0bbe711ad365f8678d6be4f40d9e70252a0128ceb48fe26549",
   "gb-eng-2026": "1a754a5d3c32ddfeafc09a28a84b5b458e86ad21cb122b635954a94e009d3951",

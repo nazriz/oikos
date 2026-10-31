@@ -9755,6 +9755,10 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   links") but structures that are ways, so that a road the town builds is part of the network when it is finished; links
   declared in `world.network` with a mode for travel (between towns) come with S6. The trip uses the nodes nearest its
   ends, not the best of all entry nodes (a road with a gap is walked whole: the known limit, simple and stable).
+- **Found on the way, mended:** a child's parents now know of its birth at once (`person_created` is news of their body: the
+  engine wakes them, `kernel/src/schedule.rs`); the one who bore it brought it home and put it on the household's record only
+  at her next week's plan, so a child born in a run's last week was of no household at its end (the invariants canary,
+  ke-nakuru seed 2, once S2's moves had shifted the town's births).
 - **Pins re-taken:** culture-dial's three config hashes and Rust states, representation's six towns (their reason there).
 - **Revisit if** the nearest-node rule gives a trip plainly longer than a real one (then the entry node is chosen among
   the few nearest by the whole trip's time); a household's second car matters to a result (then households hold more than
