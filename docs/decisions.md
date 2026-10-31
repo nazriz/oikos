@@ -9722,3 +9722,31 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+
+## 2026-10-31 · Foundations-2 phase 3, S3: bodies on their way (branch `f2-phase3`; results move; no model called)
+
+- **Kernel.** An act that takes a body to another building puts it on its way when the act starts (it leaves its space
+  then, `vacated`) until the act is done (it enters the new one then, `occupied`), in `State.transit` (the reserved shape,
+  now with the space it left and the act that takes it). A body on its way is in no building, so the presence checks that
+  already exist refuse whatever would be done to it or by it at a place, and nobody sees it in either; its vehicle stands
+  with it (`at` the body: nobody else can take it). An act that starts later (its actor busy) sets them out at its start
+  (`Sched::Depart`, before the start's checks). A move refused when it is done (the space filled meanwhile; the act
+  refused when it starts) brings the body back where it set out, into the space it left if there is room (the way there
+  and back is the known limit); dead or gone on the way, it is only taken off the road. A person's visit to go and look
+  is a trip there and back: away from where they were for its whole time. A person knows where they are going and when
+  they arrive (`body.on_way`), and a citizen on their way sets out for nowhere else.
+- **Standing journeys not built** (3.1 has them, to keep the log from growing by a commute's acts): putting bodies on the
+  way adds no event (the `vacated` comes at the start instead of the end, the `occupied` as before), so the log does not
+  grow, and the daily round's wakes already happen at the round's hours. Revisit if a commute's acts show in a profile of
+  a long run or the log.
+- **Kernel tests** (`space.rs`): the property holds that a body on its way is in no building and arrives no sooner than
+  it set out; a trip by car (in no building until it arrives, the car with her, bob cannot take it, she knows where she
+  is going and when); a trip refused on arrival brings her home.
+- **Measured** (10,000 people, 30 days, as S2's; on the tree merged with main at 60c7ab07, so main's years-at-10,000
+  fixes are in it too): 3,337,279 log lines against main's 3,332,887 (+0.13%, within the plan's 5%); wall 99 s, the run's
+  own thread 74.7 s; peak 1.68 GB. 30,376 moves into a space, 6,772 driven; refusals for want of room fell from 1,486 to
+  11 and `no_time_left` from 499 to 139 (a body on its way holds no space: the house is not full of people who have gone
+  out), `not_present` 1,719 (a household's second driver finding the car gone).
+- **Inventory.** S3 done: the trip spent where one set out is gone (the entry a guard).
+- **Revisit if** a refused arrival's way back matters to a result (then the body stands at the door, a place of its own);
+  a body on its way should be met or seen on the road (then a link it is on, S5's flows).
