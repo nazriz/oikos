@@ -249,7 +249,7 @@ impl Plan for Assisting {
                 }
                 Level::Draft => {
                     let wrong = self.slips(&m, cx, &id);
-                    let d = Draft { referral: id.clone(), calls: (!wrong).then(|| calls.clone()) };
+                    let d = Draft { referral: id.clone(), calls: (!wrong).then(|| calls.clone()), paper: None };
                     self.matters.insert(id.clone(), InHand { agreement: x.agreement.clone(), wants: x.wants, kind: x.kind.clone(), calls: if wrong { String::new() } else { calls.clone() }, asked: None });
                     let words = format!("Draft for {id}, for your sign-off.");
                     let mut s = Step::new(vec![Line { bind: Some("asked".into()), call: self.say_to(&m, Draft::KIND, &words, &id, papers::data(&d)) }]).then(Then::Asked { referral: id.clone() });
