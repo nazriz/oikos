@@ -926,6 +926,7 @@ dependencies = [
 name = "oikos-nature"
 version = "0.1.0"
 dependencies = [
+ "imbl",
  "oikos-contracts",
  "oikos-core",
  "serde",

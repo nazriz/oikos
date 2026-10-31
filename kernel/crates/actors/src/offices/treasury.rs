@@ -2077,6 +2077,9 @@ struct WorksPlan {
     left_there: BTreeMap<String, (i64, i64)>,
     fills_milli: BTreeMap<String, i64>,
     inspecting: BTreeSet<String>,
+    /// A visit of inspection out and not yet back: the next is sent when it is (one inspector's round at a time).
+    #[serde(default)]
+    visit_out: bool,
     depot_view: Option<SiteStructure>,
     at_depot: i64,
     collected_at: BTreeMap<String, i64>,
@@ -2136,6 +2139,7 @@ impl WorksPlan {
             left_there: BTreeMap::new(),
             fills_milli: BTreeMap::new(),
             inspecting: BTreeSet::new(),
+            visit_out: false,
             depot_view: None,
             at_depot: 0,
             collected_at: BTreeMap::new(),
@@ -2178,7 +2182,11 @@ impl Plan for WorksPlan {
             }
         }
         if !self.p.inspections.is_empty() {
-            for c in visited(pic, &self.p.inspections) {
+            let back = visited(pic, &self.p.inspections);
+            if !back.is_empty() {
+                self.visit_out = false;
+            }
+            for c in back {
                 if let Some(st) = &c.structure {
                     self.known.insert(st.structure.to_string(), (**st).clone());
                 }
@@ -2206,8 +2214,10 @@ impl Plan for WorksPlan {
 
     fn looks(&mut self, _: &Picture) -> Vec<LookRequest> {
         // An asset of the town's we have never seen (at the start, every one; later, what the town has had built):
-        // someone is sent to inspect it, a visit's worth at a time, once each.
-        if self.p.inspections.is_empty() || self.routines.part == Part::Seat || (self.routines.part == Part::Staff && self.routines.order(&self.book, &self.p.maintain_task, self.book.now).is_none()) {
+        // someone is sent to inspect it, a visit's worth at a time, once each: the next visit when the last is back.
+        // (Until 2026-10-31 every visit was sent at once, one round each in the same moment: a town of 50,000's roads
+        // passed a thousand rounds at its first wake and stopped the run. docs/decisions.md, "Years at 10,000".)
+        if self.visit_out || self.p.inspections.is_empty() || self.routines.part == Part::Seat || (self.routines.part == Part::Staff && self.routines.order(&self.book, &self.p.maintain_task, self.book.now).is_none()) {
             return vec![];
         }
         let go: Vec<String> = crate::offices::land::own_land(&self.book, &self.me)
@@ -2222,6 +2232,7 @@ impl Plan for WorksPlan {
         if go.is_empty() {
             vec![]
         } else {
+            self.visit_out = true;
             vec![crate::common::go_see(&self.p.inspections, &go)]
         }
     }
@@ -3004,6 +3015,51 @@ mod tests {
         let out = joined(&idle.wake(8 * 3600 + 7 * DAY, with_money(chans, "0"), vec![]));
         assert!(!out.contains("work(task"), "{out}");
         assert!(out.contains("no standing work order for collect"), "{out}");
+    }
+
+    #[test]
+    fn the_office_sends_its_inspector_one_visit_at_a_time_and_the_next_when_it_is_back() {
+        // (Years at 10,000: every visit to the town's assets was sent in the first moment, a round each; 50,000 people's
+        // roads passed the engine's thousand rounds and stopped the run.)
+        let assets: Vec<Value> = (0..40).map(|i| json!({ "lot": format!("lot-{i}"), "cells": [format!("c{i}")], "structure": format!("road-{i}"), "type": "road" })).collect();
+        let mut papers = vec![st("reg-1", 0, "asset_register", json!({ "assets": assets }), json!({}))];
+        papers.extend((0..40).map(|i| json!({ "id": format!("title-lot-{i}"), "at": 0, "author": "genesis", "record": "claim", "speaks_for": "land-registry", "position": "right", "holder": "city", "visible_to": "public", "about": { "kind": "ownership", "object": format!("lot-{i}") } })));
+        let chans = |inspect: Value| {
+            let mut c = depot_channels(vec![]);
+            c["papers"] = json!({ "kind": "records", "records": papers.clone() });
+            c["inspect"] = inspect;
+            with_money(c, "0")
+        };
+        let mut p = works_params("whole");
+        p["inspections"] = json!("inspect");
+        let mut office = rig(&Works, "works-system", "works", p);
+        let visits = |r: &mut Rig, t: i64, inspect: Value| -> Vec<usize> {
+            let obs = serde_json::from_value(json!({ "participant": r.ctx.participant, "t": t, "status": "active", "outcomes": [], "inbox": [], "drafts": [], "channels": chans(inspect) })).expect("an observation");
+            let pic = r.view.apply(obs, None, "city", "cadence", DAY);
+            let mut cx = Cx::new(t, &r.ctx, &mut r.draws, 1, vec![]);
+            let mut out = vec![];
+            for _ in 0..40 {
+                match r.actor.step(&pic, &mut cx) {
+                    // (A look is answered with the next observation: this wake ends with it.)
+                    Action::Look { looks } => {
+                        out.extend(looks.iter().filter_map(|l| l.visit.as_ref().map(|v| v.places.len())));
+                        break;
+                    }
+                    Action::Call { .. } => {
+                        r.acts += 1;
+                        r.actor.sent(&format!("act.{}", r.acts));
+                    }
+                    _ => break,
+                }
+            }
+            out
+        };
+        let none = json!({ "kind": "sites", "as_of": 0, "cells": [] });
+        assert_eq!(visits(&mut office, 8 * 3600, none.clone()), vec![crate::common::VISIT_MAX], "one visit's worth, not all forty at once");
+        assert!(visits(&mut office, 8 * 3600, none.clone()).is_empty(), "nothing more in that moment, nor while it is out");
+        assert!(visits(&mut office, 8 * 3600 + 60, none.clone()).is_empty(), "nothing more while it is out");
+        let back = json!({ "kind": "sites", "as_of": DAY, "visited": true, "cells": [{ "cell": "c0", "x": 0, "y": 0 }] });
+        assert_eq!(visits(&mut office, DAY, back), vec![crate::common::VISIT_MAX], "back: the next");
     }
 
     #[test]

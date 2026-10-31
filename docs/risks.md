@@ -288,7 +288,7 @@ The mechanism:
   review) is done `by` the desk `outside-casework` (`agency-casework`: the person table's minutes, an officer's working
   day, lanes the town's share of the agency's officers from a placeholder national ratio, 4 per 1,000 claims in payment,
   in every profile); the case system keeps its seconds for payments and notices. Claim-to-decision days now come from
-  officers' hours (figures in the decisions entry). **Left:** (1) a model seated in `outside-support` still sits on the
+  officers' hours (figures in the decisions entry). **Left:** (1) fixed 2026-10-31 (decisions "A seat in the support office is a non-resident officer"): a model seated in `outside-support` shares the body of an officer who lives outside the town; until then it sat on the
   case system (`agency-system`) and decides what is put before it at a system's speed: the approved alternative, a
   non-resident officer as the seat's body, is not built, because a person with a body who is not a resident reaches the
   census, life events, elections and every module that counts persons (not contained); (2) the officers' ratio is a
