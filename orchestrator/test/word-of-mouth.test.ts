@@ -43,7 +43,10 @@ test("people ask the people they know, and are told only what those people could
     if (street?.kind !== "sites") continue;
     const buildings = street.cells.flatMap((c) => (c.structure ? [c.structure] : []));
     const people = new Set<string>(buildings.flatMap((x) => x.spaces.flatMap((sp) => sp.occupants ?? [])));
-    seen.set(participant, [...(seen.get(participant) ?? []), { t: e.body.data.t, structures: new Set(buildings.map((x) => x.structure)), people, carryingOn: raw.woke_for === "done" }]);
+    // (Carrying on with a plan made earlier: a wake that brings the outcome of one of its own acts. The Rust world's logged
+    // observations say no `woke_for`, so until 2026-10-31 no look counted as carrying on, and a tip planned at the hall and
+    // sent on the way home, one act after another, read as a tip about a building not in sight.)
+    seen.set(participant, [...(seen.get(participant) ?? []), { t: e.body.data.t, structures: new Set(buildings.map((x) => x.structure)), people, carryingOn: raw.woke_for === "done" || (raw.outcomes?.length ?? 0) > 0 }]);
   }
   const said = log.filter((e) => e.kind === "command" && e.body.command === "act" && /^c\d+-self$/.test(e.body.participant))
     .flatMap((e) => e.body.blocks.filter((b: any) => b.block === "message").map((b: any) => ({ t: e.t, participant: e.body.participant, ...b })));

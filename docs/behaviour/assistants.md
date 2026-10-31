@@ -103,6 +103,17 @@ as that person's where its own procedure reads a paper by whom it speaks for (th
 that verifies who wrote an instruction refuses an agent's, as a bank does. The desk serves many clients, each under its
 own agreement and brief.
 
+## A model in an assistant seat
+
+A town that seats a model in a kind of assistant (`assistant_seats`, templates by id) makes every system of that kind a
+seat (the mock plays the assistant's code), told honestly that the town is simulated and for whom it works. Its post has
+its stationery (`participants/src/kinds/assistants.ts`): its own papers in words (advice, a request to go ahead, a
+report, a request for more scope, a handover), each to whom it works for in the matter, and, at an organisation's
+assistant post, the principal's own papers of the kinds it may do, and each of those as a **draft for sign-off** that
+carries the paper as it would go. A code principal reads a draft on a form by what it would send (the paper's kind and to
+whom, against what it asked), signs it off or declines it, and sets advice in words beside nothing (it cannot read words:
+nothing is counted). A desk's seat writes a person's papers through the translator in their name (`for`).
+
 ## Leaves out (for now)
 
 - A local provider (a firm of the town with premises): providers are the outside world's until a profile asks for one.

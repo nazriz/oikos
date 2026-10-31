@@ -7,7 +7,6 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
-import { onRust } from "./lib/doubles";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -105,7 +104,7 @@ test("a business of one that does not pay its owner a living is given up: it clo
   rmSync(out, { recursive: true, force: true });
 }, 600_000);
 
-test("a founding's draw of the shape \"business\" reaches the business of one: someone who has meant to start a business does, when they have a home and the money", async () => {
+test("a founding's draw of the shape \"business\" reaches the business of one: someone who has meant to start a business, and runs none, does, when they have a home and the money", async () => {
   // (Step 3's founding, with only that shape to found and the chance made sure, as its own tests do. Others may start
   // one where it pays; what is held is that everyone who meant one and could, did.)
   const { loadWorld } = await import("../src/batch");
@@ -117,32 +116,28 @@ test("a founding's draw of the shape \"business\" reaches the business of one: s
     const a = config.world.accounts.find((x: any) => x.id === `acc-${p.person}`);
     if (a && Number(a.balance) < 2 * venture.capital) a.balance = String(2 * venture.capital);
   }
-  // (600 days, not 330, since foundations F1 (2026-10-15): the town changed and the runs from seeds 1 to 7 have no such occasion in 330 days; the runs from 1 and 2 have one in 600. And the given-up test is the town drawn from seed 2: in the town from seed 1 the owner starts the next business at once and does not apply, in seeds 1 and 3, and does in 2 and 4.)
-  // (And 1 since draws are named for the day or the matter, not the hour, 2026-10-12: every stream is another, so who is out of work
-  // and when moved again; of seeds 1 to 7 the runs from 1, 3 and 5 have an occasion and those from 2, 4, 6 and 7 none.)
-  // (The run's seed is 2 since 2026-10-12, homes by income: in the town as now drawn the run from seed 1 has no
-  // occasion that draws a business in 330 days; seeds 2, 3 and 4 have one to three. Nothing else is changed.)
-  // (And 6 since the leftovers of the firm-side work, the same day: with a dividend and the tax withheld no longer sent back to the
-  // firms that paid them, and shops closing their months on days of their own, who is out of work and when moved again. Someone who has
-  // meant a business starts one only when out of work (citizen.ts, `venturing ? !job`), so a run needs one such occasion; of seeds 1 to
-  // 6 the runs from 1 to 5 have none in 330 days and the run from 6 has one.)
-  // (Before that 4 since the fifth living pilot's fixes, the same day: tenants who answer and households taken in move who
-  // gives a want up and when; of seeds 1 to 5 the runs from 1 and 4 have such an occasion, those from 2, 3 and 5 none.)
-  // (The run's seed is 4 since F6 (2026-10-16: shops serve in their staff's hours; the draws moved: of seeds 3 and 4 the run from 3 has no occasion in 600 days, that from 4 has.)
-  // (The run's seed was 3 since foundations F5 (2026-10-16): offices are held by people and the town's layout and draws moved again; of seeds 1 to 4 the runs from 1 and 2 have no occasion in 600 days, those from 3 and 4 have.)
-  // (Why a hop and not a fault, 2026-10-16, run as this test runs it for seeds 1 to 8, 600 days: before foundations F5 (24c14ea) someone meant a business in 7 of 8 seeds and one started in 6 of 8 (1, 3, 4, 5, 7, 8); now someone means one in 7 of 8 and one starts in 5 of 8 (2, 3, 4, 6, 7). Seed 1, the original, has the draw and nobody starts: that is the rule (a home and the money), not what is tested. The rate is the same before and after; which seed has the occasion is a matter of draws. Seed 4 kept.)
-  const out = join(root, "runs", "test-own-venture-meant");
-  rmSync(out, { recursive: true, force: true });
-  // (On the Rust world seed 1 from 2026-10-19, the cut-over's fixes: the run from 4 has the draw and nobody starts; run alone, 1, 2, 3, 5 and 6 each start one.)
-  const s = await runWorld({ config: { ...config, seed: onRust ? 1 : 4 }, runId: "meant", outDir: out, until: 600 * DAY, recordObservations: "none" });
-  const log = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes("found_shape") || l.includes('"own_account"') || l.includes("found_own")).map((l) => JSON.parse(l));
-  const meant = log.filter((e) => e.kind === "annotation" && e.body.data?.domain === "found_shape" && e.body.data?.choice === "business").map((e) => ({ t: e.t, who: e.body.subject as string }));
-  expect(meant.length).toBeGreaterThan(0);
-  const started = log.filter((e) => e.kind === "event" && e.body.event === "recorded" && e.body.record?.record === "entity_declaration" && e.body.record.kind === "own_account").map((e) => ({ t: e.t, who: e.body.record.author as string }));
-  expect(started.length).toBeGreaterThan(0);
-  // Someone who meant one started it, within the half year the draw holds. (Others start one where it pays: entry by
-  // expected profit, which this test does not turn off.)
-  expect(started.some((b) => meant.some((m) => m.who === b.who && m.t <= b.t && b.t - m.t <= 181 * DAY))).toBe(true);
-  const sure = log.filter((e) => e.kind === "annotation" && e.body.data?.domain === "venture" && e.body.data?.choice === "found_own");
-  for (const d of sure.filter((x) => /^c\d+-self$/.test(x.body.subject))) expect(d.body.data.options.find((o: any) => o.key === "found_own").score).toBe(10_000);
-}, 900_000);
+  // (Held over three seeds since 2026-10-31, not one: the test had been moved to another seed seven times as changes moved
+  // who is out of work and when, each time because its run had no occasion, not because the rule broke; after the owners'
+  // fix of that day the one person of seed 1 who meant a business already ran one. The occasions are the draws'; the rule
+  // is the same in every run, so the runs together must show it. Seeds 1 to 3 are the first three, not chosen.)
+  let meantFree = 0, kept = 0;
+  for (const seed of [1, 2, 3]) {
+    const out = join(root, "runs", `test-own-venture-meant-${seed}`);
+    rmSync(out, { recursive: true, force: true });
+    const s = await runWorld({ config: { ...config, seed }, runId: "meant", outDir: out, until: 600 * DAY, recordObservations: "none" });
+    const log = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes("found_shape") || l.includes('"own_account"') || l.includes("found_own")).map((l) => JSON.parse(l));
+    const meant = log.filter((e) => e.kind === "annotation" && e.body.data?.domain === "found_shape" && e.body.data?.choice === "business").map((e) => ({ t: e.t, who: e.body.subject as string }));
+    const started = log.filter((e) => e.kind === "event" && e.body.event === "recorded" && e.body.record?.record === "entity_declaration" && e.body.record.kind === "own_account").map((e) => ({ t: e.t, who: e.body.record.author as string }));
+    // (Who meant one while running none: no business of their own declared before. Others start one where it pays: entry
+    // by expected profit, which this test does not turn off.)
+    const free = meant.filter((m) => !started.some((b) => b.who === m.who && b.t < m.t));
+    meantFree += free.length;
+    // Someone who meant one started it, within the half year the draw holds.
+    if (free.some((m) => started.some((b) => b.who === m.who && m.t <= b.t && b.t - m.t <= 181 * DAY))) kept++;
+    const sure = log.filter((e) => e.kind === "annotation" && e.body.data?.domain === "venture" && e.body.data?.choice === "found_own");
+    for (const d of sure.filter((x) => /^c\d+-self$/.test(x.body.subject))) expect(d.body.data.options.find((o: any) => o.key === "found_own").score).toBe(10_000);
+    rmSync(out, { recursive: true, force: true });
+  }
+  expect(meantFree).toBeGreaterThan(0);
+  expect(kept).toBeGreaterThan(0);
+}, 1_800_000);
