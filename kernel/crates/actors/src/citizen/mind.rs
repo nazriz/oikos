@@ -734,7 +734,7 @@ impl Mind for Plain {
 /// A mind for a person, as the world's parameters make it: lane A2's (`crate::mind::make`), or the plain stand-in
 /// where the params say `mind: "plain"` (A1's tests).
 pub fn make(cx: &mut Cx, born: &Born) -> Result<Box<dyn Mind>, String> {
-    if cx.ctx.params.get("mind").and_then(Value::as_str) == Some("plain") {
+    if cx.ctx.params.get("mind").and_then(|x| x.as_str()) == Some("plain") {
         return Ok(Box::new(Plain::default()));
     }
     crate::mind::make(cx, born)
@@ -742,7 +742,7 @@ pub fn make(cx: &mut Cx, born: &Born) -> Result<Box<dyn Mind>, String> {
 
 /// A mind as `Mind::save` left it.
 pub fn restore(ctx: &crate::Ctx, saved: Value) -> Result<Box<dyn Mind>, String> {
-    if ctx.params.get("mind").and_then(Value::as_str) == Some("plain") {
+    if ctx.params.get("mind").and_then(|x| x.as_str()) == Some("plain") {
         return Ok(Box::new(serde_json::from_value::<Plain>(saved).map_err(|e| e.to_string())?));
     }
     crate::mind::restore(ctx, saved)

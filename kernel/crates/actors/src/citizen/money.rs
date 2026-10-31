@@ -11,6 +11,7 @@
 //! up; the support law in force is the latest made, of two made at once the later filed (TS compared ids as strings);
 //! benefits are stopped in payment-id order (TS: the order granted); a shop priced at nothing is no shop.
 
+use oikos_core::Frozen;
 use super::mind::{Choice, Decide, Event, Facts, Outcome, Treated, Way};
 use super::params::Params;
 #[allow(unused_imports)]
@@ -96,17 +97,17 @@ impl PaymentRule {
 pub fn support_law(book: &crate::common::Book) -> Vec<PaymentRule> {
     let law = book
         .open("law")
-        .filter(|r| data(r).get("payments").is_some_and(Value::is_array))
+        .filter(|r| data(r).get("payments").is_some_and(|x| x.is_array()))
         .max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
     let Some(l) = law else { return vec![] };
     data(l)["payments"]
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|x| serde_json::from_value::<PaymentRule>(x.clone()).ok())
+        .filter_map(|x| serde_json::from_value::<PaymentRule>(x.to_value()).ok())
         .map(|mut r| {
             if r.payer.is_none() {
-                r.payer = l.speaks_for.clone();
+                r.payer = l.speaks_for.map(|x| x.to_string());
             }
             r
         })
@@ -206,20 +207,20 @@ pub fn shops(book: &crate::common::Book, goods: &str) -> Vec<Shop> {
 }
 
 /// A seller's standing offer, if its latest price list that is one makes one (trade.ts `offerOf`).
-fn shop_offer<'a>(book: &'a crate::common::Book, seller: &str) -> Option<&'a Value> {
+fn shop_offer<'a>(book: &'a crate::common::Book, seller: &str) -> Option<&'a Frozen> {
     let lists = latest_by_speaker(book, "price_list", |r| !part(r, Piece::Offer).is_null());
     lists.get(&Some(seller)).map(|r| part(r, Piece::Offer))
 }
 
 /// An offer's facts for its taker, from its typed terms (mind.ts `factsOf`): money a month in and out, goods.
-pub fn facts_of(offer: &Value, units: i64) -> Facts {
+pub fn facts_of(offer: &Frozen, units: i64) -> Facts {
     let mut f = Facts::default();
-    for c in offer.pointer("/terms/commitments").and_then(Value::as_array).into_iter().flatten() {
+    for c in offer.pointer("/terms/commitments").and_then(|x| x.as_array()).into_iter().flatten() {
         let Some(o) = c.pointer("/does/outcome") else { continue };
         let every = c.get("every").and_then(crate::papers::lenient::whole).filter(|e| *e > 0);
-        let per_unit = c.get("per").and_then(Value::as_str) == Some("unit");
+        let per_unit = c.get("per").and_then(|x| x.as_str()) == Some("unit");
         let per_month = |x: i64| every.map_or(x, |e| half_up(x * MONTH, e)) * if per_unit { units } else { 1 };
-        let taker = c.get("who").and_then(Value::as_str) == Some("taker");
+        let taker = c.get("who").and_then(|x| x.as_str()) == Some("taker");
         if let Some(m) = o.get("money") {
             let a = m.get("amount").and_then(crate::papers::lenient::whole).unwrap_or(0);
             f.money_per_month += if taker { -1 } else { 1 } * per_month(a);
@@ -422,8 +423,8 @@ struct Answer {
     every: i64,
 }
 
-fn granted(d: &Value) -> bool {
-    matches!(d.get("granted"), Some(Value::Bool(true))) || d.s("granted") == Some("yes")
+fn granted(d: &Frozen) -> bool {
+    d.get("granted").and_then(|x| x.as_bool()) == Some(true) || d.s("granted") == Some("yes")
 }
 
 impl Person {
@@ -443,7 +444,7 @@ impl Person {
 
     /// What kind of institution someone is to us (citizen.ts `kindOf`).
     fn money_kind_of(&self, who: &str, params: &crate::Params) -> &'static str {
-        if let Some(k) = params.get("institutions").and_then(|i| i.get(who)).and_then(Value::as_str) {
+        if let Some(k) = params.get("institutions").and_then(|i| i.get(who)).and_then(|x| x.as_str()) {
             return match k {
                 "banks" => "banks",
                 "unions" => "unions",
@@ -537,7 +538,7 @@ impl Person {
             }
         }
         let fresh: Vec<Arc<Record>> = self.absorbed.fresh.iter().filter_map(|id| self.book.get(id).cloned()).collect();
-        let addressed = |r: &Record| addressed_to(r).contains(&me);
+        let addressed = |r: &Record| addressed_to(r).iter().any(|x| x == &me);
         // (A payment already ours when the year began, granted on paper before it: drawn from the first day, not
         // claimed again. A claim made before the year and not yet decided is waited on; one refused before it is not
         // made again until we are a year older.)
@@ -564,7 +565,7 @@ impl Person {
             let rule = rules.iter().find(|x| x.id == payment);
             let b = Benefit {
                 claim: d.s("claim").unwrap_or_default().into(),
-                payer: rule.and_then(|x| x.payer.clone()).or(r.speaks_for.clone()).unwrap_or_default(),
+                payer: rule.and_then(|x| x.payer.clone()).or(r.speaks_for.map(|x| x.to_string())).unwrap_or_default(),
                 amount: d.i("amount").unwrap_or(0),
                 every: d.i("every").unwrap_or(MONTH),
                 lasting: rule.is_some_and(|x| !x.for_out_of_work()),
@@ -713,7 +714,7 @@ impl Person {
                 let b = Benefit {
                     claim: a.claim.clone(),
                     payment: a.payment.clone(),
-                    payer: rule.and_then(|x| x.payer.clone()).or(r.speaks_for.clone()).unwrap_or_default(),
+                    payer: rule.and_then(|x| x.payer.clone()).or(r.speaks_for.map(|x| x.to_string())).unwrap_or_default(),
                     amount: a.amount,
                     every: a.every,
                     lasting: rule.is_some_and(|x| !x.for_out_of_work()),
@@ -723,7 +724,7 @@ impl Person {
                 self.money.refused_at.insert(payment.clone(), age);
                 self.money.refused_on.insert(payment.clone(), t);
                 // (Refused: to one who believes they qualify, a wrong of the office's, to be looked at again.)
-                if let (true, Some(by)) = (dial > 0, r.speaks_for.clone()) {
+                if let (true, Some(by)) = (dial > 0, r.speaks_for) {
                     if !d.flag("reviewed") {
                         let cause = d.s("reason").unwrap_or("refused").to_string();
                         let evidence = super::recourse::tendered(r);
@@ -737,14 +738,14 @@ impl Person {
                 self.refusals_granted(w, &payment);
             }
             // (A claim answered: what we asked for came, or did not; and the office that decides is trusted more, or less.)
-            if let Some(by) = r.speaks_for.clone() {
+            if let Some(by) = r.speaks_for {
                 let k = match self.money_kind_of(&by, &w.cx.ctx.params) {
                     "other" => "civil_service",
                     k => k,
                 };
                 // (No paper: a claim's decision is not where its words land, as in citizen.ts and docs/behaviour/reading.md,
                 // whose sites are the five where a paper already lands. It made no outcome for a reading to go on.)
-                self.treated(w, Treated { who: by, kind: k.into(), good: a.granted, tried: true, ..Default::default() });
+                self.treated(w, Treated { who: by.to_string(), kind: k.into(), good: a.granted, tried: true, ..Default::default() });
             }
             self.money.claiming.remove(&payment);
         }
@@ -794,10 +795,10 @@ impl Person {
         let lender = self.p.bank.clone().unwrap_or_default();
         let b = &mut self.money.borrowing;
         for r in self.book.all("loan_decision") {
-            if b.taken.contains(&r.id) || !addressed_to(r).contains(&me) {
+            if b.taken.contains(r.id.as_str()) || !addressed_to(r).iter().any(|x| x == &me) {
                 continue;
             }
-            b.taken.insert(r.id.clone());
+            b.taken.insert(r.id.to_string());
             b.applied = None;
             if !data(r).flag("approved") {
                 b.refused_at = Some(t);
@@ -807,26 +808,26 @@ impl Person {
                 b.granted_at = Some(t);
             }
         }
-        if self.book.all("loan_default").any(|r| addressed_to(r).contains(&me)) {
+        if self.book.all("loan_default").any(|r| addressed_to(r).iter().any(|x| x == &me)) {
             b.impaired = true;
         }
         let Some(account) = w.acc.as_ref().map(|a| a.account.clone()) else { return };
         let mut signs = vec![];
         for r in self.book.of_type("agreement") {
             let ps = parties_of(r);
-            if template_of(r) != Some("loan") || !ps.contains(&me) || ps.first() != Some(&lender) || b.taken.contains(&r.id) || self.book.signed_by(&r.id, &me) || self.book.taken_back(&r.id) {
+            if template_of(r) != Some("loan") || !ps.contains(&me) || ps.first() != Some(&lender) || b.taken.contains(r.id.as_str()) || self.book.signed_by(&r.id, &me) || self.book.taken_back(&r.id) {
                 continue;
             }
-            b.taken.insert(r.id.clone());
+            b.taken.insert(r.id.to_string());
             b.applied = None;
             let (owe, every) = commitment_of(r, &me);
             let Some(m) = owe.and_then(|o| o.money) else { continue };
             b.granted_at = Some(t);
-            signs.push((r.id.clone(), m.to, m.amount, every.unwrap_or(MONTH)));
+            signs.push((r.id, m.to, m.amount, every.unwrap_or(MONTH)));
         }
         for (id, to, amount, every) in signs {
             let words = money_words(amount, &w.cx.ctx.world);
-            let p = pay(&to, amount, Pay { from: Some(account.clone()), every: Some(every), first: Some(every), basis: Some(id.clone()), for_: Some("Loan repayment.".into()), ..Default::default() }, w.cx);
+            let p = pay(&to, amount, Pay { from: Some(account.clone()), every: Some(every), first: Some(every), basis: Some(id.to_string()), for_: Some("Loan repayment.".into()), ..Default::default() }, w.cx);
             w.push(because(format!("The loan we applied for is offered: signing, and asking our bank to pay the {words} a month."), vec![sign(&id), p]));
         }
     }
@@ -840,8 +841,8 @@ impl Person {
         let orders: Vec<(String, i64, Option<String>, String)> = self
             .book
             .open("tribunal_order")
-            .filter(|x| data(x).s("against") == Some(me.as_str()) && data(x).s("finding") == Some("pay") && !self.money.bills_paid.contains(&x.id))
-            .map(|o| (o.id.clone(), data(o).i("amount").unwrap_or(0), data(o).s("to").map(String::from), data(o).s("claim").map_or_else(|| o.id.clone(), String::from)))
+            .filter(|x| data(x).s("against") == Some(me.as_str()) && data(x).s("finding") == Some("pay") && !self.money.bills_paid.contains(x.id.as_str()))
+            .map(|o| (o.id.to_string(), data(o).i("amount").unwrap_or(0), data(o).s("to").map(String::from), data(o).s("claim").map_or_else(|| o.id.to_string(), String::from)))
             .collect();
         for (id, amount, to, settles) in orders {
             let Some(acc) = w.acc.clone() else { return };
@@ -873,10 +874,10 @@ impl Person {
             .filter_map(|c| match &c.body {
                 RecordBody::Claim { position: oikos_contracts::blocks::Position::Right, counterparty: Some(cp), about, .. } if *cp == me => {
                     let k = about.s("kind")?;
-                    if !["rates", "rates_interest", "fine"].contains(&k) || self.money.bills_paid.contains(&c.id) {
+                    if !["rates", "rates_interest", "fine"].contains(&k) || self.money.bills_paid.contains(c.id.as_str()) {
                         return None;
                     }
-                    Some((c.id.clone(), about.i("amount").unwrap_or(0), about.s("account").map(String::from), k.to_string(), about.s("for").map_or_else(|| c.id.clone(), String::from)))
+                    Some((c.id.to_string(), about.i("amount").unwrap_or(0), about.s("account").map(String::from), k.to_string(), about.s("for").map_or_else(|| c.id.to_string(), String::from)))
                 }
                 _ => None,
             })
@@ -899,19 +900,19 @@ impl Person {
         let invoices: Vec<Arc<Record>> = self
             .book
             .open("invoice")
-            .filter(|r| addressed_to(r).contains(&me) && data(r).get("service").is_some_and(truthy) && !self.money.bills_paid.contains(&r.id))
+            .filter(|r| addressed_to(r).iter().any(|x| x == &me) && data(r).get("service").is_some_and(truthy) && !self.money.bills_paid.contains(r.id.as_str()))
             .cloned()
             .collect();
         for inv in invoices {
             let d = data(&inv);
             let service = d.get("service").map(|s| s.as_str().map_or_else(|| s.to_string(), String::from)).unwrap_or_default();
             let amount = d.pointer("/outcome/money/amount").and_then(crate::papers::lenient::whole).unwrap_or(0);
-            let to = d.pointer("/outcome/money/to").and_then(Value::as_str).map(String::from);
+            let to = d.pointer("/outcome/money/to").and_then(|x| x.as_str()).map(String::from);
             let days = d.i("days").unwrap_or(0);
             // A bill well over what the last one came to a day is looked at twice (docs/behaviour/frictions.md): the
             // difference is what we say we were overcharged. It is paid all the same.
-            if dial > 0 && amount > 0 && !self.money.bill_seen.contains(&inv.id) && inv.speaks_for.is_some() && days > 0 {
-                self.money.bill_seen.insert(inv.id.clone());
+            if dial > 0 && amount > 0 && !self.money.bill_seen.contains(inv.id.as_str()) && inv.speaks_for.is_some() && days > 0 {
+                self.money.bill_seen.insert(inv.id.to_string());
                 let per_day = half_up(amount, days);
                 let over = 10_000 + self.p.frictions.bill_over_bps.unwrap_or(1_500);
                 match self.money.billed.get(&service).copied() {
@@ -919,7 +920,7 @@ impl Person {
                         // (A grievance of life's, as citizen.ts `grieve`: so it can be asked about, taken to a venue with
                         // the bill as evidence, and told. Until 2026-10-18 only the mind heard of it, and the want it bore
                         // had no way to answer it: withdrawn again and again, each time an occasion to found something.)
-                        let party = inv.speaks_for.clone().unwrap_or_default();
+                        let party = inv.speaks_for.unwrap_or_default();
                         let evidence = super::recourse::tendered(&inv);
                         let g = self.grieve(w, "bill", &party, Some(&inv.id), Some(amount - usual * days), None, 5_000, "security", Some("over the usual"));
                         g.evidence = Some(evidence);
@@ -934,12 +935,12 @@ impl Person {
             if amount <= 0 || bal < amount {
                 continue;
             }
-            self.money.bills_paid.insert(inv.id.clone());
+            self.money.bills_paid.insert(inv.id.to_string());
             self.money.bills.push((t, amount));
             if let Some(a) = w.acc.as_mut() {
                 a.balance -= amount;
             }
-            let p = pay(&to, amount, Pay { from: Some(account.clone()), for_: Some(format!("{service} bill.")), settles: Some(inv.id.clone()), ..Default::default() }, w.cx);
+            let p = pay(&to, amount, Pay { from: Some(account.clone()), for_: Some(format!("{service} bill.")), settles: Some(inv.id.to_string()), ..Default::default() }, w.cx);
             w.push(because(format!("Paying our {service} bill."), vec![p]));
         }
         let housing = self.housing_cost();
@@ -1002,7 +1003,7 @@ impl Person {
             return;
         }
         self.money.next_spend = t + MONTH;
-        let accounts: Vec<String> = w.cx.ctx.params.get("shop_accounts").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect()).unwrap_or_default();
+        let accounts: Vec<String> = w.cx.ctx.params.get("shop_accounts").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str()).map(String::from).collect()).unwrap_or_default();
         let amount = self.monthly_spend(w);
         let Some(acc) = w.acc.clone() else { return };
         if amount > 0 && !accounts.is_empty() {
@@ -1068,13 +1069,13 @@ impl Person {
         // A shop that couldn't serve all we asked: now and then we give up on it; and we try another for what's missing.
         let notes: Vec<Arc<Record>> = self.book.all("delivery_note").skip(self.money.deliveries_read).cloned().collect();
         self.money.deliveries_read += notes.len();
-        for n in notes.iter().filter(|n| addressed_to(n).contains(&me)) {
+        for n in notes.iter().filter(|n| addressed_to(n).iter().any(|x| x == &me)) {
             let d = data(n);
             let delivered = d.i("delivered").unwrap_or(0);
             let ordered = d.i("ordered").unwrap_or(delivered);
             let refund = d.i("refund").unwrap_or(0);
             let order = d.s("order").map(String::from);
-            let seller = n.speaks_for.clone().unwrap_or_default();
+            let seller = n.speaks_for.unwrap_or_default();
             if refund > 0 {
                 self.s.inflows.push((t, -refund)); // (a refund isn't income)
             }
@@ -1089,8 +1090,8 @@ impl Person {
                 if let Some(o) = &order {
                     facts.insert("order".into(), json!(o));
                 }
-                let of = self.money.chose.get(&seller).copied();
-                self.tell(w, Outcome { domain: "shop".into(), option: seller.clone(), kind: "served".into(), way: Way::Mine, facts, payoff: Some(served), of, paper: Some(n.id.clone()), ..Default::default() });
+                let of = self.money.chose.get(seller.as_str()).copied();
+                self.tell(w, Outcome { domain: "shop".into(), option: seller.to_string(), kind: "served".into(), way: Way::Mine, facts, payoff: Some(served), of, paper: Some(n.id.to_string()), ..Default::default() });
                 if let Some(b) = self.money.others.get_mut(&k) {
                     if b.favourite.as_deref() == Some(seller.as_str()) {
                         b.last_served = served;
@@ -1106,7 +1107,7 @@ impl Person {
                         let bad = half_up(delivered * self.p.frictions.faulty_share_bps.unwrap_or(2_500), 10_000).max(1);
                         let price = shops(&self.book, &k).iter().find(|x| x.shop == seller).map_or(0, |s| s.price);
                         let facts: BTreeMap<String, Value> = [("delivered".to_string(), json!(delivered)), ("faulty".to_string(), json!(bad)), ("order".to_string(), json!(oid)), ("kind".to_string(), json!(k))].into();
-                        self.tell(w, Outcome { domain: "shop".into(), option: seller.clone(), kind: "faulty".into(), way: Way::Mine, facts, payoff: Some(half_up(served * (delivered - bad).max(0), delivered)), of, ..Default::default() });
+                        self.tell(w, Outcome { domain: "shop".into(), option: seller.to_string(), kind: "faulty".into(), way: Way::Mine, facts, payoff: Some(half_up(served * (delivered - bad).max(0), delivered)), of, ..Default::default() });
                         if price > 0 {
                             let g = self.grieve(w, "goods", &seller, order.as_deref(), Some(bad * price), None, 4_000, "subsistence", Some("faulty"));
                             g.evidence = Some(json!({ "order": order, "delivered": delivered, "faulty": bad, "kind": k }));
@@ -1127,8 +1128,8 @@ impl Person {
             if let Some(o) = &order {
                 facts.insert("order".into(), json!(o));
             }
-            let of = self.money.chose.get(&seller).copied();
-            self.tell(w, Outcome { domain: "shop".into(), option: seller.clone(), kind: "served".into(), way: Way::Mine, facts, payoff: Some(served), of, paper: Some(n.id.clone()), ..Default::default() });
+            let of = self.money.chose.get(seller.as_str()).copied();
+            self.tell(w, Outcome { domain: "shop".into(), option: seller.to_string(), kind: "served".into(), way: Way::Mine, facts, payoff: Some(served), of, paper: Some(n.id.to_string()), ..Default::default() });
             if self.money.favourite.as_deref() == Some(seller.as_str()) {
                 self.money.last_served = served;
             }
@@ -1141,7 +1142,7 @@ impl Person {
                 let price = price_at(&seller).map_or(0, |s| s.price);
                 self.money.spoiled += bad;
                 let facts: BTreeMap<String, Value> = [("delivered".to_string(), json!(delivered)), ("faulty".to_string(), json!(bad)), ("order".to_string(), json!(oid))].into();
-                self.tell(w, Outcome { domain: "shop".into(), option: seller.clone(), kind: "faulty".into(), way: Way::Mine, facts, payoff: Some(half_up(served * (delivered - bad).max(0), delivered)), of, ..Default::default() });
+                self.tell(w, Outcome { domain: "shop".into(), option: seller.to_string(), kind: "faulty".into(), way: Way::Mine, facts, payoff: Some(half_up(served * (delivered - bad).max(0), delivered)), of, ..Default::default() });
                 if price > 0 {
                     // (life's grievance, as citizen.ts `grieve`, with what was found as its evidence: see the bill's above.)
                     let g = self.grieve(w, "goods", &seller, order.as_deref(), Some(bad * price), None, 4_000, "subsistence", Some("faulty"));
@@ -1355,10 +1356,10 @@ impl Person {
             .channels
             .values()
             .flat_map(|c| match c {
-                Seen::Holdings { holdings, .. } => holdings.iter().filter(|h| h.kind == self.p.goods).map(|h| (h.at.clone(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
+                Seen::Holdings { holdings, .. } => holdings.iter().filter(|h| h.kind == self.p.goods).map(|h| (h.at.to_string(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
                 _ => vec![],
             })
-            .filter(|(at, q)| *q > 0 && (home_at.is_some() || pickups.contains(at)))
+            .filter(|(at, q)| *q > 0 && (home_at.is_some() || pickups.contains(at.as_str())))
             .collect();
         had.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         let total: i64 = had.iter().map(|h| h.1).sum();
@@ -1416,10 +1417,10 @@ impl Person {
             .channels
             .values()
             .flat_map(|c| match c {
-                Seen::Holdings { holdings, .. } => holdings.iter().filter(|h| h.kind == kind).map(|h| (h.at.clone(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
+                Seen::Holdings { holdings, .. } => holdings.iter().filter(|h| h.kind == kind).map(|h| (h.at.to_string(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
                 _ => vec![],
             })
-            .filter(|(at, q)| *q > 0 && (home_at.as_ref() == Some(at) || pickups.contains(at)))
+            .filter(|(at, q)| *q > 0 && (home_at.as_ref() == Some(&at.to_string()) || pickups.contains(at.as_str())))
             .collect();
         had.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         let total: i64 = had.iter().map(|h| h.1).sum();
@@ -1467,9 +1468,9 @@ mod tests {
     fn pic(t: i64, age: i64, balance: i64, holdings: Vec<(&str, i64)>) -> Picture {
         let mut channels = BTreeMap::new();
         let acc = AccountItem { account: "acc-c1".into(), holder: "c1".into(), custodian: "bank".into(), currency: "USD".into(), balance: i128::from(balance), closed: None };
-        channels.insert("accounts".to_string(), Seen::Accounts { accounts: Arc::new(vec![acc]), transactions: vec![] });
+        channels.insert("accounts".into(), Seen::Accounts { accounts: Arc::new(vec![acc]), transactions: vec![] });
         let h: Vec<HoldingItem> = holdings.into_iter().map(|(at, q)| HoldingItem { kind: "goods".into(), at: at.into(), quantity: i128::from(q) }).collect();
-        channels.insert("holdings".to_string(), Seen::Holdings { holdings: Arc::new(h), connections: Default::default(), links: Default::default() });
+        channels.insert("holdings".into(), Seen::Holdings { holdings: Arc::new(h), connections: Default::default(), links: Default::default() });
         Picture {
             participant: "p.c1".into(),
             t,
@@ -1501,7 +1502,7 @@ mod tests {
     /// A person at `t`: what they saw taken in, the part of the plan run, and the steps it planned.
     fn run(p: &mut Person, ctx: &Ctx, t: i64, age: i64, balance: i64, seen: &[Arc<Record>], part: impl Fn(&mut Person, &mut Week)) -> Vec<Step<()>> {
         let fresh = p.book.take_all(seen.iter());
-        p.absorbed.fresh.extend(fresh.iter().map(|r| r.id.clone()));
+        p.absorbed.fresh.extend(fresh.iter().map(|r| r.id.to_string()));
         let picture = pic(t, age, balance, vec![]);
         let mut d = Draws::new("p.c1", "self");
         let mut cx = Cx::new(t, ctx, &mut d, 7, vec![]);

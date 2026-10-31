@@ -32,9 +32,9 @@ impl View {
             ChannelData::Accounts { accounts, .. } => {
                 for a in accounts {
                     if a.closed == Some(true) {
-                        self.accounts.remove(&a.account);
+                        self.accounts.remove(a.account.as_str());
                     } else {
-                        self.accounts.insert(a.account.clone(), a.clone());
+                        self.accounts.insert(a.account.to_string(), a.clone());
                     }
                 }
             }
@@ -43,9 +43,9 @@ impl View {
                 // A holding gone to nothing drops out of the picture (as the participant runtime's view does).
                 for h in holdings {
                     if h.quantity == 0 {
-                        self.holdings.remove(&(h.kind.clone(), h.at.clone()));
+                        self.holdings.remove(&(h.kind.to_string(), h.at.to_string()));
                     } else {
-                        self.holdings.insert((h.kind.clone(), h.at.clone()), h.quantity);
+                        self.holdings.insert((h.kind.to_string(), h.at.to_string()), h.quantity);
                     }
                 }
             }
@@ -53,22 +53,22 @@ impl View {
                 if *whole == Some(true) {
                     self.records.clear();
                 }
-                self.records.extend(records.iter().map(|r| r.id.clone()))
+                self.records.extend(records.iter().map(|r| r.id.to_string()))
             }
             ChannelData::Sites { cells, whole, .. } => {
                 if *whole == Some(true) {
                     self.cells.clear();
                 }
                 for c in cells {
-                    self.cells.insert(c.cell.clone(), c.clone());
+                    self.cells.insert(c.cell.to_string(), c.clone());
                 }
             }
             ChannelData::Directory { entities, positions } => {
                 for e in entities {
-                    self.entities.insert(e.entity.clone(), e.clone());
+                    self.entities.insert(e.entity.to_string(), e.clone());
                 }
                 for p in positions {
-                    self.positions.insert(p.position.clone(), p.clone());
+                    self.positions.insert(p.position.to_string(), p.clone());
                 }
             }
         }
@@ -120,13 +120,13 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<usize, TestCaseError> {
             wire["channels"][&path]["records"] = serde_json::Value::Array(whole);
         }
         prop_assert_eq!(wire, serde_json::from_slice::<serde_json::Value>(&plain).unwrap(), "participant {}'s observation by reference, its records put back, isn't the observation", participant);
-        let (whole, apart) = known.entry(participant.clone()).or_default();
+        let (whole, apart) = known.entry(participant.to_string()).or_default();
         whole.absorb(&serde_json::to_value(&obs).unwrap());
         apart.absorb_seen(&oikos_kernel::kernel::seen(&obs), &observed.shown, &mut Default::default());
         prop_assert_eq!(format!("{whole:?}"), format!("{apart:?}"), "participant {}'s seat knows something else from the observation as delivered", participant);
         let reference = run.full_view(participant).unwrap();
         for (ch, data) in &obs.channels {
-            let v = views.entry((participant.clone(), ch.clone())).or_default();
+            let v = views.entry((participant.to_string(), ch.to_string())).or_default();
             v.apply(data);
             let want = full(&reference.channels[ch]);
             let mut have = View::default();
@@ -177,7 +177,7 @@ fn a_closed_account_leaves_the_view() {
     };
     let r = act(&mut run, serde_json::json!([{"block": "open_account", "holder": "alice", "ref": "a"}]));
     let acc = match &r.events[0].body {
-        oikos_kernel::events::EventBody::ActionApplied { created: Some(c), .. } => c["a"].clone(),
+        oikos_kernel::events::EventBody::ActionApplied { created: Some(c), .. } => c["a"],
         other => panic!("{other:?}"),
     };
     let mut view = View::default();
@@ -190,12 +190,12 @@ fn a_closed_account_leaves_the_view() {
         }
     };
     look(&mut run, &mut view);
-    assert!(view.accounts.contains_key(&acc));
+    assert!(view.accounts.contains_key(acc.as_str()));
     act(&mut run, serde_json::json!([{"block": "close_account", "account": acc}]));
     look(&mut run, &mut view);
-    assert!(!view.accounts.contains_key(&acc), "the closure reached the view");
+    assert!(!view.accounts.contains_key(acc.as_str()), "the closure reached the view");
     let reference = run.full_view("bank-payments-system").unwrap();
-    let want: Vec<String> = reference.channels.values().flat_map(|c| match c { ChannelData::Accounts { accounts, .. } => accounts.iter().map(|a| a.account.clone()).collect(), _ => vec![] }).collect();
+    let want: Vec<String> = reference.channels.values().flat_map(|c| match c { ChannelData::Accounts { accounts, .. } => accounts.iter().map(|a| a.account).collect(), _ => vec![] }).map(|x| x.to_string()).collect();
     assert_eq!(view.accounts.keys().cloned().collect::<Vec<_>>(), want);
 }
 
@@ -230,7 +230,7 @@ fn a_returning_holder_is_told_the_file_is_whole() {
     let laws = |run: &mut Run<Vec<u8>>, who: &str| -> Option<(Option<bool>, Vec<String>)> {
         let obs = run.command(&Command::Observe { participant: who.into(), only: None }).unwrap().observation.unwrap();
         match obs.channels.get("finance/laws")? {
-            ChannelData::Records { records, whole, .. } => Some((*whole, records.iter().map(|r| r.id.clone()).collect())),
+            ChannelData::Records { records, whole, .. } => { Some((*whole, records.iter().map(|r| r.id).map(|x| x.to_string()).collect()))}
             other => panic!("{other:?}"),
         }
     };

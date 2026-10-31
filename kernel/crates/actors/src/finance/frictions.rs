@@ -104,7 +104,7 @@ pub struct Matter {
 
 impl Matter {
     pub fn of(r: &Record) -> Matter {
-        serde_json::from_value(data(r).clone()).unwrap_or_default()
+        serde_json::from_value(data(r).to_value()).unwrap_or_default()
     }
     fn label(&self) -> String {
         self.matter.replace('_', " ")
@@ -267,7 +267,7 @@ impl Respondent {
     }
 
     fn mine(&self, r: &Record) -> bool {
-        addressed_to(r).contains(&self.me) && !self.handled.contains(&r.id)
+        addressed_to(r).iter().any(|x| x == &self.me) && !self.handled.contains(r.id.as_str())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -288,9 +288,9 @@ impl Respondent {
         // ---- asked to put something right ----
         let requests: Vec<_> = if self.requests { book.open(paper::REQUEST).filter(|r| self.mine(r)).cloned().collect() } else { vec![] };
         for r in requests {
-            self.handled.insert(r.id.clone());
+            self.handled.insert(r.id.to_string());
             let m = Matter::of(&r);
-            let from = r.speaks_for.clone().unwrap_or_default();
+            let from = r.speaks_for.unwrap_or_default();
             let truth = with.truth(&m, &from, book, t);
             // (What our books say is owed, where they say; what is asked, where they cannot say; nothing, where they say none is.)
             let owed = match truth.and_then(|x| x.owed) {
@@ -310,9 +310,9 @@ impl Respondent {
                     paper::ANSWER,
                     &format!("Answer to your request {}: yes{}.", r.id, if owed > 0 { format!(", {} is paid to you", usd(owed)) } else { String::new() }),
                     Say {
-                        to: Some(vec![from.clone()]),
-                        visible: Some(Visible::Only(vec![from.clone(), me.clone()])),
-                        basis: Some(r.id.clone()),
+                        to: Some(vec![from.to_string()]),
+                        visible: Some(Visible::Only(vec![from.to_string(), me.clone()])),
+                        basis: Some(r.id.to_string()),
                         data: Some({
                             let mut d = json!({ "request": r.id, "matter": m.matter, "granted": true });
                             if owed > 0 {
@@ -324,7 +324,7 @@ impl Respondent {
                     },
                 )];
                 if let (true, Some(to), Some(acc)) = (owed > 0, m.account.as_deref(), account) {
-                    calls.push(pay(to, owed, Pay { from: Some(acc.to_string()), for_: Some(format!("Putting right: {}.", m.label())), settles: Some(r.id.clone()), ..Default::default() }, cx));
+                    calls.push(pay(to, owed, Pay { from: Some(acc.to_string()), for_: Some(format!("Putting right: {}.", m.label())), settles: Some(r.id.to_string()), ..Default::default() }, cx));
                 }
                 steps.push(because(format!("Asked by {from} to put something right ({}{}): we will.", m.label(), if owed > 0 { format!(", {}", usd(owed)) } else { String::new() }), calls));
                 steps.extend(how);
@@ -343,7 +343,7 @@ impl Respondent {
                     vec![say(
                         paper::ANSWER,
                         &format!("Answer to your request {}: no{}.", r.id, if nothing { ": our records show nothing owed" } else { "" }),
-                        Say { to: Some(vec![from.clone()]), visible: Some(Visible::Only(vec![from.clone(), me.clone()])), basis: Some(r.id.clone()), data: Some(d), ..Default::default() },
+                        Say { to: Some(vec![from.to_string()]), visible: Some(Visible::Only(vec![from.to_string(), me.clone()])), basis: Some(r.id.to_string()), data: Some(d), ..Default::default() },
                     )],
                 ));
                 self.count(&mut org, "remedy_refused");
@@ -368,8 +368,8 @@ impl Respondent {
                 if m.matter.is_empty() || m.against.as_deref() != Some(self.me.as_str()) {
                     continue;
                 }
-                self.handled.insert(n.id.clone());
-                let venue = n.speaks_for.clone().unwrap_or_default();
+                self.handled.insert(n.id.to_string());
+                let venue = n.speaks_for.unwrap_or_default();
                 let which = self.nth.key(&n.id, &[Some(&venue), Some(&applicant), Some(&m.matter), m.structure.as_deref().or(m.about.as_deref())]);
                 let standing = match &org {
                     Some(o) if o.lively() => o.standing(),
@@ -386,9 +386,9 @@ impl Respondent {
                     Some(Truth { wrong: Some(w), .. }) => (if w { "the paper was wrong" } else { "the paper was right" }).to_string(),
                     _ => "we have nothing on our records about it".to_string(),
                 };
-                let mut seen = vec![venue.clone(), me.clone()];
+                let mut seen = vec![venue, me.clone().into()];
                 if !applicant.is_empty() {
-                    seen.push(applicant.clone());
+                    seen.push(applicant.clone().into());
                 }
                 let mut body = json!({ "application": application, "known": truth.is_some() });
                 if let Some(tr) = truth {
@@ -398,7 +398,7 @@ impl Respondent {
                 }
                 steps.push(because(
                     format!("{venue} tells us of a complaint by {applicant} ({}): answering from our books.", m.label()),
-                    vec![say(&f.response, &format!("Answer on {application}: {said}."), Say { to: Some(vec![venue.clone()]), visible: Some(Visible::Only(seen)), basis: Some(application.to_string()), data: Some(body), ..Default::default() })],
+                    vec![say(&f.response, &format!("Answer on {application}: {said}."), Say { to: Some(vec![venue.to_string()]), visible: Some(Visible::Only(seen.iter().map(|x| x.to_string()).collect())), basis: Some(application.to_string()), data: Some(body), ..Default::default() })],
                 ));
                 self.count(&mut org, "complaint_answered");
             }
@@ -407,14 +407,14 @@ impl Respondent {
                 .open(&f.decision)
                 .filter(|r| {
                     let d = data(r);
-                    !self.handled.contains(&r.id) && d.s("against") == Some(self.me.as_str()) && d.s("matter").is_some() && matches!(d.s("finding"), Some("pay" | "do" | "set_aside"))
+                    !self.handled.contains(r.id.as_str()) && d.s("against") == Some(self.me.as_str()) && d.s("matter").is_some() && matches!(d.s("finding"), Some("pay" | "do" | "set_aside"))
                 })
                 .cloned()
                 .collect();
             for dr in decisions {
-                self.handled.insert(dr.id.clone());
+                self.handled.insert(dr.id.to_string());
                 let x = data(&dr);
-                let binding = x.get("binding") != Some(&Value::Bool(false));
+                let binding = x.get("binding").and_then(|x| x.as_bool()) != Some(false);
                 let finding = x.s("finding").unwrap_or_default();
                 let matter = x.s("matter").unwrap_or_default();
                 let structure = x.s("structure").map(String::from);
@@ -423,7 +423,7 @@ impl Respondent {
                 let cost_of = Matter { matter: matter.to_string(), structure: structure.clone(), ..Default::default() };
                 let amount = (if finding == "pay" { x.get("amount").map_or(0, |a| a.i64().unwrap_or_else(|| a.as_str().and_then(|s| s.parse().ok()).unwrap_or(0))) } else { 0 })
                     + if finding == "do" { with.cost(&cost_of) } else { 0 };
-                let venue = dr.speaks_for.clone().unwrap_or_default();
+                let venue = dr.speaks_for.unwrap_or_default();
                 let which = self.nth.key(&dr.id, &[Some(&venue), Some(&applicant), Some(matter), structure.as_deref().or(about.as_deref())]);
                 let lean = match &org {
                     Some(o) if o.lively() => o.standing() - o.pay_less() / 2,
@@ -449,7 +449,7 @@ impl Respondent {
                     }
                 );
                 if let (true, true, Some(to), Some(acc)) = (finding == "pay", amount > 0, x.s("to"), account) {
-                    steps.push(because(why.clone(), vec![pay(to, amount, Pay { from: Some(acc.to_string()), for_: Some(format!("Under {}.", dr.id)), settles: Some(dr.id.clone()), ..Default::default() }, cx)]));
+                    steps.push(because(why.clone(), vec![pay(to, amount, Pay { from: Some(acc.to_string()), for_: Some(format!("Under {}.", dr.id)), settles: Some(dr.id.to_string()), ..Default::default() }, cx)]));
                 }
                 left -= amount;
                 // (And whatever puts it right from here on: the work done, the paper withdrawn, the pay set right.)
@@ -526,13 +526,9 @@ pub fn particulars_of(g: &Particulars, t: i64, world: &WorldInfo) -> String {
 
 /// Whether an application says what it is about: it gives its particulars, or names a paper, a place, a sum, what is
 /// sought, or evidence.
-pub fn has_particulars(d: &Value) -> bool {
-    d.s("particulars").is_some_and(|p| !p.trim().is_empty())
-        || d.get("about").is_some_and(|v| !v.is_null())
-        || d.get("structure").is_some_and(|v| !v.is_null())
-        || d.get("seeks").is_some_and(|v| !v.is_null())
-        || d.i("amount").is_some_and(|a| a > 0)
-        || d.get("evidence").is_some_and(|v| !v.is_null())
+pub fn has_particulars<V: crate::common::Fields + oikos_core::frozen::JsonRead + ?Sized>(d: &V) -> bool {
+    let set = |k: &str| d.view().get(k).is_some_and(|v| !matches!(v, oikos_core::frozen::JsonRef::Null));
+    d.s("particulars").is_some_and(|p| !p.trim().is_empty()) || set("about") || set("structure") || set("seeks") || d.i("amount").is_some_and(|a| a > 0) || set("evidence")
 }
 
 /// Whether a response on file answers an application (the latest from the respondent).
@@ -549,7 +545,7 @@ pub fn days(seconds: i64) -> i64 {
 trait AsI64 {
     fn i64(&self) -> Option<i64>;
 }
-impl AsI64 for Value {
+impl AsI64 for oikos_core::Frozen {
     fn i64(&self) -> Option<i64> {
         crate::papers::lenient::whole(self)
     }

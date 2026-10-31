@@ -49,7 +49,7 @@ fn costs(s: &Statics, st: &State, travel: &oikos_contracts::config::TravelCfg) -
         for (id, c) in st.cells.iter() {
             let Some((x, y)) = placed(id) else { continue };
             let building = c.structure.as_ref().and_then(|x| st.structures.get(x));
-            let cover = oikos_nature::cover_of(&s.config.catalogue, c.terrain.as_deref(), building.map(|b| s.types.get(&b.structure_type).and_then(|t| t.cover.as_deref())));
+            let cover = oikos_nature::cover_of(&s.config.catalogue, c.terrain.as_deref(), building.map(|b| s.types.get(b.structure_type.as_str()).and_then(|t| t.cover.as_deref())));
             costs.seconds[((y - y0) * costs.w + (x - x0)) as usize] = Some(*travel.by_cover.get(&cover).unwrap_or(&travel.seconds_per_cell));
         }
     }

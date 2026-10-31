@@ -13,7 +13,7 @@ use oikos_kernel::run::Run;
 fn act(participant: &str, position: Option<&str>, blocks: Value, thinking: Option<i64>) -> Command {
     Command::Act {
         participant: participant.into(),
-        position: position.map(String::from),
+        position: position.map(Into::into),
         blocks: serde_json::from_value(blocks).unwrap(),
         by: vec![],
         provenance: json!({"via": "direct"}),

@@ -34,7 +34,7 @@ fn keeper_of(r: &oikos_kernel::run::Response) -> Option<String> {
 
 fn recorded(r: &oikos_kernel::run::Response) -> (String, u64, String, String) {
     match &r.events[0].body {
-        EventBody::EntityRecorded { entity, n, chain, digest, .. } => (entity.clone(), *n, chain.clone(), digest.clone()),
+        EventBody::EntityRecorded { entity, n, chain, digest, .. } => (entity.to_string(), *n, chain.clone(), digest.clone()),
         other => panic!("expected entity_recorded, got {other:?}"),
     }
 }

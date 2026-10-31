@@ -257,8 +257,8 @@ pub const ROOT: usize = usize::MAX;
 
 impl Trees {
     pub fn of(n: &NetworkCfg) -> Trees {
-        let node_ix: BTreeMap<Id, usize> = n.nodes.iter().enumerate().map(|(i, x)| (x.id.clone(), i)).collect();
-        let link_ix: BTreeMap<Id, usize> = n.links.iter().enumerate().map(|(i, x)| (x.id.clone(), i)).collect();
+        let node_ix: BTreeMap<Id, usize> = n.nodes.iter().enumerate().map(|(i, x)| (x.id, i)).collect();
+        let link_ix: BTreeMap<Id, usize> = n.links.iter().enumerate().map(|(i, x)| (x.id, i)).collect();
         // (Each node's links, in the links' order.)
         let mut adj: Vec<Vec<usize>> = vec![vec![]; n.nodes.len()];
         for (i, l) in n.links.iter().enumerate() {

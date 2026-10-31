@@ -97,9 +97,9 @@ impl FirmBody {
             let a = ctx.params.get("adjust").filter(|a| a.is_object());
             let get = |k: &str| a.and_then(|a| a.get(k));
             AdjustParams {
-                smooth_months: get("smooth_months").and_then(Value::as_i64).unwrap_or(3),
+                smooth_months: get("smooth_months").and_then(|x| x.as_i64()).unwrap_or(3),
                 hiring_cost_milliweeks: get("hiring_cost_weeks").and_then(|v| scaled(v, 1_000)).unwrap_or(8_000),
-                hours_step_bps: get("hours_step_bps").and_then(Value::as_i64),
+                hours_step_bps: get("hours_step_bps").and_then(|x| x.as_i64()),
             }
         };
         let non_empty = |s: String| Some(s).filter(|s| !s.is_empty());
@@ -112,7 +112,7 @@ impl FirmBody {
             day_wage: Some(int(ctx, "day_wage", 0)?),
             work_days: Some(int(ctx, "work_days", trade.work_days())?),
             week_days: Some(int(ctx, "look_days", 5)?),
-            short_by_bps: short_pay.as_ref().and_then(|s| s.get("by_bps")).and_then(Value::as_i64),
+            short_by_bps: short_pay.as_ref().and_then(|s| s.get("by_bps")).and_then(|x| x.as_i64()),
             ..StaffingOpts::new(period, notice_days, &ctx.param("role", trade.role().to_string())?)
         };
         let lender: String = ctx.param("lender", String::new())?;
@@ -131,7 +131,7 @@ impl FirmBody {
             winding: WindingUp::new(me, winding),
             bargaining: Bargaining::new(me),
             borrowing: Borrowing::new(me, &lender, None, (again >= 0).then_some(again)),
-            answering: Respondent::new(me, &respond, vec![VenueForms { notice: "hearing_notice".into(), response: "tribunal_response".into(), decision: "tribunal_order".into() }], true),
+            answering: Respondent::new(me, &respond, vec![VenueForms { notice: "hearing_notice".into(), response: "tribunal_response".into(), decision: "tribunal_order".into(), }], true),
             org: None,
             p: Params {
                 period,
@@ -216,7 +216,7 @@ impl Answerer<BodyThen> for Pay<'_> {
     }
     fn remedy(&mut self, cx: &mut Cx, m: &Matter, _from: &str, t: i64, why: &str, _basis: &str) -> Option<Vec<Step<BodyThen>>> {
         match (&m.matter[..], &m.about) {
-            ("underpaid", Some(about)) if !self.account.is_empty() => Some(self.staffing.pay_in_full(self.book, t, cx, self.account, about, why)),
+            ("underpaid", Some(about)) if !self.account.is_empty() => { Some(self.staffing.pay_in_full(self.book, t, cx, self.account, about, why))}
             _ => None,
         }
     }
@@ -468,14 +468,14 @@ impl Body for FirmBody {
         match w.stage {
             // Closed: our premises, offered for sale (the proceeds go to what we still owe, then our shareholders).
             Stage::Closed => {
-                let premises = w.premises.as_ref().map(|(structure, type_, cell)| Premises { structure: structure.clone(), type_: type_.clone(), cell: cell.clone() });
-                let distribute_to = |x: i64| distribute::<BodyThen>(w.book, &me, &from, x, "The proceeds of our premises: to our shareholders by their shares", &money).0;
+                let premises = w.premises.as_ref().map(|(structure, type_, cell)| Premises { structure: structure.clone(), type_: type_.clone(), cell: cell.clone(), });
+                let distribute_to = |x: i64| { distribute::<BodyThen>(w.book, &me, &from, x, "The proceeds of our premises: to our shareholders by their shares", &money).0};
                 self.winding.sell(w.pic, w.book, cx, &w.acct.account, w.acct.balance, premises.as_ref(), w.sale_price, &distribute_to)
             }
             // The winding-up is due: what is left of what we have, after our staff and suppliers, pays our other debts and then
             // goes to our shareholders.
             Stage::Due => {
-                let distribute_to = |x: i64| distribute::<BodyThen>(w.book, &me, &from, x, "Wound up: what's left, to our shareholders by their shares", &money).0;
+                let distribute_to = |x: i64| { distribute::<BodyThen>(w.book, &me, &from, x, "Wound up: what's left, to our shareholders by their shares", &money).0};
                 self.winding.finish(w.pic.t, w.book, cx, &w.acct.account, w.acct.balance - w.paid_suppliers, &distribute_to)
             }
         }

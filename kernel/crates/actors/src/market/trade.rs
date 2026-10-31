@@ -64,7 +64,7 @@ pub struct Offerings {
 
 fn goods_of(r: &Record) -> Option<BTreeMap<String, i64>> {
     let g = data(r).get("goods")?.as_object()?;
-    Some(g.iter().filter_map(|(k, v)| v.as_i64().map(|x| (k.clone(), x))).collect())
+    Some(g.iter().filter_map(|(k, v)| v.as_i64().map(|x| (k.to_string(), x))).collect())
 }
 
 /// A seller's latest standing price list that lists goods (newest by time; of two at the same moment, the later filed).
@@ -89,8 +89,8 @@ pub fn goods_prices(book: &Book, seller: &str) -> Offerings {
         min_order: d.i("min_order"),
         at: d.s("at").map(str::to_string),
         terms_days: d.i("terms_days").filter(|n| *n > 0),
-        clearance: d.get("clearance").and_then(|c| c.get("quantity")).and_then(Value::as_i64).filter(|n| *n > 0),
-        regular: d.get("clearance").and_then(|c| c.get("regular")).and_then(Value::as_i64).filter(|n| *n > 0),
+        clearance: d.get("clearance").and_then(|c| c.get("quantity")).and_then(|x| x.as_i64()).filter(|n| *n > 0),
+        regular: d.get("clearance").and_then(|c| c.get("regular")).and_then(|x| x.as_i64()).filter(|n| *n > 0),
     }
 }
 
@@ -271,7 +271,7 @@ impl Deliveries {
                 ordered: d.i("ordered").unwrap_or(delivered),
                 delivered,
                 refund: d.i("refund").unwrap_or(0),
-                seller: n.speaks_for.clone().unwrap_or_default(),
+                seller: n.speaks_for.unwrap_or_default().to_string(),
             });
         }
         self.cursor = notes.len();
@@ -396,7 +396,7 @@ impl OrderBook {
             if other_role(memo) {
                 continue;
             }
-            *self.credit.entry(tx.from.clone()).or_insert(0) += x;
+            *self.credit.entry(tx.from.to_string()).or_insert(0) += x;
         }
     }
 
@@ -472,21 +472,21 @@ impl OrderBook {
     fn open(&mut self, book: &Book) -> Vec<Order> {
         let orders: Vec<_> = book.all("order").collect();
         for r in orders.iter().skip(self.cursor) {
-            if !crate::common::addressed_to(r).iter().any(|a| *a == self.me) || self.settled.contains(&r.id) {
+            if !crate::common::addressed_to(r).iter().any(|a| *a == self.me) || self.settled.contains(r.id.as_str()) {
                 continue;
             }
             let d = data(r);
-            let buyer = r.speaks_for.clone().unwrap_or_default();
+            let buyer = r.speaks_for.unwrap_or_default();
             self.waiting.insert(
-                r.id.clone(),
+                r.id.to_string(),
                 Order {
-                    id: r.id.clone(),
+                    id: r.id.to_string(),
                     seller: self.me.clone(),
-                    buyer: buyer.clone(),
+                    buyer: buyer.to_string(),
                     kind: d.s("kind").unwrap_or_default().to_string(),
                     quantity: d.i("quantity").unwrap_or(0).max(0),
                     unit_price: d.i("unit_price").unwrap_or(0).max(0),
-                    to: d.s("deliver_to").map(str::to_string).unwrap_or(buyer),
+                    to: d.s("deliver_to").map(str::to_string).unwrap_or(buyer.to_string()),
                     at: d.s("at").unwrap_or_default().to_string(),
                     account: d.s("account").unwrap_or_default().to_string(),
                     placed: r.at,
@@ -747,14 +747,14 @@ impl Payables {
             let d = data(n);
             if d.s("declined") == Some("overdue") {
                 if let Some(s) = &n.speaks_for {
-                    self.refused.insert(s.clone(), n.at);
+                    self.refused.insert(s.to_string(), n.at);
                 }
             }
             let (owed, days) = (d.i("owed").unwrap_or(0), d.i("pay_in_days").unwrap_or(0));
             let (true, true, Some(pay_to)) = (owed > 0, days > 0, d.s("pay_to")) else { continue };
             self.open.push(Owed {
                 order: d.s("order").unwrap_or_default().to_string(),
-                seller: n.speaks_for.clone().unwrap_or_default(),
+                seller: n.speaks_for.unwrap_or_default().to_string(),
                 account: pay_to.to_string(),
                 kind: d.s("kind").unwrap_or_default().to_string(),
                 quantity: d.i("delivered").unwrap_or(0),
@@ -766,8 +766,8 @@ impl Payables {
         if !self.open.is_empty() {
             let claimed: BTreeSet<String> = book
                 .of_type("claim")
-                .filter(|c| matches!(&c.body, RecordBody::Claim { counterparty: Some(cp), about, .. } if *cp == self.me && about.get("kind").and_then(Value::as_str) == Some("debt")))
-                .flat_map(|c| bases_of(c).to_vec())
+                .filter(|c| matches!(&c.body, RecordBody::Claim { counterparty: Some(cp), about, .. } if *cp == self.me && about.get("kind").and_then(|x| x.as_str()) == Some("debt")))
+                .flat_map(|c| bases_of(c).iter().map(|x| x.to_string()).collect::<Vec<_>>())
                 .collect();
             self.open.retain(|x| !claimed.contains(&x.order));
         }

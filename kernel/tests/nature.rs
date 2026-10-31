@@ -141,8 +141,8 @@ fn passers_by_see_a_conspicuous_species_but_not_how_many() {
     // (Whoever goes there sees it: nobody is shown ground they are not on.)
     let cells = go_and_see(&mut run, "mayor-system", "mayor/town", &["cell.3.1", "cell.2.1", "cell.1.0"]);
     let river = cells.iter().find(|c| c.cell == "cell.3.1").unwrap();
-    assert_eq!(river.seen, vec!["heron".to_string()]);
-    assert!(cells.iter().all(|c| !c.seen.contains(&"frog".to_string())), "frogs aren't conspicuous");
+    assert_eq!(river.seen, vec![oikos_kernel::blocks::Id::new("heron")]);
+    assert!(cells.iter().all(|c| !c.seen.iter().any(|x| x == "frog")), "frogs aren't conspicuous");
     assert_eq!(cells.iter().find(|c| c.cell == "cell.2.1").unwrap().terrain.as_deref(), Some("wetland"));
 }
 

@@ -67,7 +67,7 @@ impl DeskParams {
                 let mut base = serde_json::to_value(AdoptionParams::default()).map_err(|e| e.to_string())?;
                 if let (Some(b), Some(g)) = (base.as_object_mut(), given.as_object()) {
                     for (k, v) in g {
-                        b.insert(k.clone(), v.clone());
+                        b.insert(k.to_string(), v.to_value());
                     }
                 }
                 Some(serde_json::from_value(base).map_err(|e| format!("automation: {e}"))?)
@@ -199,8 +199,8 @@ impl OfficeAdoption {
             let id = tender.id.clone().unwrap_or_default();
             let bids: Vec<Offer> = book
                 .all("bid")
-                .filter(|r| crate::common::addressed_to(r).contains(&self.me) && data(r).s("tender") == Some(id.as_str()))
-                .filter_map(|r| serde_json::from_value::<Offer>(data(r).clone()).ok())
+                .filter(|r| crate::common::addressed_to(r).iter().any(|x| x == &self.me) && data(r).s("tender") == Some(id.as_str()))
+                .filter_map(|r| serde_json::from_value::<Offer>(data(r).to_value()).ok())
                 .filter(|f| c.kinds.iter().all(|k| f.base.kinds.contains(k)))
                 .collect();
             let mut top: Option<(Offer, Appraisal)> = None;
@@ -320,7 +320,7 @@ impl OfficeAdoption {
             DeskThen::Tendered => {
                 if done.applied() {
                     if let (Some(t), Done::Outcome(o)) = (self.tender.as_mut(), done) {
-                        t.id = o.created.as_ref().and_then(|c| c.get("tender")).cloned();
+                        t.id = (o.created.as_ref().and_then(|c| c.get("tender")).cloned()).map(|x| x.to_string());
                     }
                 } else {
                     self.tender = None;

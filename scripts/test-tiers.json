@@ -47,6 +47,7 @@
   "orchestrator/test/reading-dial.test.ts": "several towns run for months (273 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/recourse-town.test.ts": "several towns run for months, living and not (114 s in the merge gate of 2026-10-24, where it came in untimed)",
   "orchestrator/test/reliability.test.ts": "several seeds or towns (52 s on 2026-10-24, the whole suite at once)",
+  "orchestrator/test/representation.test.ts": "six towns (three profiles, 200 and 1,000 people) for a month on the release kernel, their results against the pinned ones (the representation steps; 2026-10-26)",
   "orchestrator/test/retail.test.ts": "towns run a year or more; the 1,000-person town (32 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/river.test.ts": "several towns run for months (56 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/run-machinery.test.ts": "several seeds or towns (32 s on 2026-10-24, the whole suite at once)",

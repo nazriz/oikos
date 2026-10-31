@@ -89,7 +89,7 @@ pub fn tone_of(kind: &str, r: &Record, change_bps: i64) -> i64 {
             _ => 0,
         },
         "environment_report" => {
-            let changes: Vec<i64> = data(r).get("species").and_then(Value::as_object).map(|o| o.values().map(|s| s.i("change_bps").unwrap_or(0)).collect()).unwrap_or_default();
+            let changes: Vec<i64> = data(r).get("species").and_then(|x| x.as_object()).map(|o| o.values().map(|s| s.i("change_bps").unwrap_or(0)).collect()).unwrap_or_default();
             let (fell, rose) = (changes.iter().any(|c| *c <= -change_bps), changes.iter().any(|c| *c >= change_bps));
             match (fell, rose) {
                 (true, false) => -1,
@@ -195,7 +195,7 @@ impl Plan for Paper {
         let mut items: Vec<Item> = vec![];
         for (kind, weight) in KINDS {
             for r in self.book.open(kind) {
-                if self.run.contains(&r.id) || r.author == self.participant {
+                if self.run.contains(r.id.as_str()) || r.author == self.participant {
                     continue;
                 }
                 let tone = tone_of(kind, r, self.change_bps);
@@ -208,7 +208,7 @@ impl Plan for Paper {
         }
         items.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| filed_before(&a.r.id, &b.r.id)));
         for x in &items {
-            self.run.insert(x.r.id.clone());
+            self.run.insert(x.r.id.to_string());
         }
         let chosen = &items[..items.len().min(self.items_per_edition)];
         if chosen.is_empty() {
@@ -223,7 +223,7 @@ impl Plan for Paper {
                     &x.headline,
                     Say {
                         visible: Some(Visible::Public),
-                        basis: Some(x.r.id.clone()),
+                        basis: Some(x.r.id.to_string()),
                         data: Some(json!({ "kind": x.kind, "tone": x.tone, "about_office": x.kind != "ballot_result" && x.kind != "nomination", "edition": self.edition })),
                         extra: vec![("assertion", json!({ "that": x.headline, "about": [self.town] }))],
                         ..Default::default()

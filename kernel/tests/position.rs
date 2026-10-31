@@ -83,7 +83,7 @@ fn street() -> Run<Vec<u8>> {
 fn act(run: &mut Run<Vec<u8>>, participant: &str, blocks: Value) -> Result<Option<String>, RefusalCode> {
     let r = run.done(&rb_act(participant, blocks)).unwrap();
     match &r.events[0].body {
-        EventBody::ActionApplied { created, .. } => Ok(created.as_ref().and_then(|c| c.values().next().cloned())),
+        EventBody::ActionApplied { created, .. } => Ok((created.as_ref().and_then(|c| c.values().next().cloned())).map(|x| x.to_string())),
         EventBody::ActionRefused { code, .. } => Err(*code),
         other => panic!("{other:?}"),
     }
@@ -102,8 +102,8 @@ fn sites(o: &Observation, ch: &str) -> (Vec<SiteCell>, bool) {
 
 fn ids(o: &Observation, ch: &str) -> Vec<String> {
     match &o.channels[ch] {
-        ChannelData::Records { records, .. } => records.iter().map(|r| r.id.clone()).collect(),
-        ChannelData::Sites { cells, .. } => cells.iter().map(|p| p.cell.clone()).collect(),
+        ChannelData::Records { records, .. } => records.iter().map(|r| r.id).map(|x| x.to_string()).collect(),
+        ChannelData::Sites { cells, .. } => cells.iter().map(|p| p.cell).map(|x| x.to_string()).collect(),
         other => panic!("{other:?}"),
     }
 }
@@ -116,7 +116,7 @@ fn who(p: &SiteCell) -> Vec<String> {
         .spaces
         .iter()
         .flat_map(|sp| match &sp.occupants {
-            Some(names) => names.clone(),
+            Some(names) => names.iter().map(|x| x.to_string()).collect(),
             None if sp.count > 0 => vec![format!("{} {}", sp.count, sp.kind)],
             None => vec![],
         })

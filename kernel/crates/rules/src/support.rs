@@ -531,7 +531,7 @@ mod tests {
     #[test]
     fn the_shared_cases_equal_the_ts_answers() {
         let file: Value = serde_json::from_str(include_str!("../../../../contracts/test/support.json")).unwrap();
-        let tax = tax_law_of("t", &file["tax"], Some("outside"));
+        let tax = tax_law_of("t", &oikos_core::Frozen::of(&file["tax"]), Some("outside"));
         let cases = file["decisions"].as_array().unwrap();
         assert!(cases.len() >= 15);
         for c in cases {

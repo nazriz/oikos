@@ -2,6 +2,7 @@
 //! (a higher government's grant) and world.transfers (the support office). Ported from participants/src/behaviour/
 //! world.ts (docs/behaviour/boundary.md and public-finance.md).
 
+use oikos_core::frozen::JsonRead;
 use super::shared::{answering, manifest, restore_answering};
 use super::support_law::{
     decision_law, income_tax_law, support_law, withholding, AgeMost, Amount, Most, PaymentRule, Reconsiderations, Redone, Wait, Waits,
@@ -67,18 +68,18 @@ impl Plan for Desk {
         self.book.absorb(pic);
     }
     fn plan(&mut self, _: &Picture, cx: &mut Cx) -> Vec<Step<()>> {
-        let mut draws: Vec<_> = self.book.open("funding_draw").filter(|r| addressed_to(r).contains(&self.me) && !self.lent.contains(&r.id)).collect();
+        let mut draws: Vec<_> = self.book.open("funding_draw").filter(|r| addressed_to(r).iter().any(|x| x == &self.me) && !self.lent.contains(r.id.as_str())).collect();
         draws.sort_by(|a, b| filed_before(&a.id, &b.id));
         let mut steps = vec![];
         for d in draws {
-            self.lent.insert(d.id.clone());
+            self.lent.insert(d.id.to_string());
             let amount = data(d).i("amount").unwrap_or(0);
             let Some(account) = data(d).s("account") else { continue };
             if amount > 0 {
-                let from = d.speaks_for.clone().unwrap_or_default();
+                let from = d.speaks_for.unwrap_or_default();
                 steps.push(because(
                     format!("A draw on funding from {from}: lending {}.", money_words(amount, &cx.ctx.world)),
-                    vec![pay(account, amount, Pay { from: Some(self.account.clone()), for_: Some("Funding.".into()), settles: Some(d.id.clone()), ..Default::default() }, cx)],
+                    vec![pay(account, amount, Pay { from: Some(self.account.clone()), for_: Some("Funding.".into()), settles: Some(d.id.to_string()), ..Default::default() }, cx)],
                 ));
             }
         }
@@ -181,7 +182,7 @@ impl Plan for Office {
                     Say {
                         to: Some(vec![self.to.clone()]),
                         visible: Some(Visible::Only(vec![self.me.clone(), self.to.clone()])),
-                        basis: Some(estimate.id.clone()),
+                        basis: Some(estimate.id.to_string()),
                         data: Some(papers::data(&paper)),
                         ..Default::default()
                     },
@@ -364,25 +365,25 @@ impl Casework {
 
 /// A figure written in a decision's data as `Number(x)` would take it, if it is one (a number, or a number in a string): whole
 /// numbers, read by their digits.
-fn finite(v: Option<&Value>) -> Option<i64> {
+fn finite<V: JsonRead + ?Sized>(v: Option<&V>) -> Option<i64> {
     crate::finance::floor_of(v?)
 }
 
 /// Our book of contributions for one person: the monthly pay employers reported for them, newest first.
 fn reported_of(me: &str, book: &Book, who: &str, since: i64) -> Vec<(i64, i64)> {
     let mut reports: Vec<&Arc<Record>> =
-        book.all("withholding_report").filter(|r| addressed_to(r).iter().any(|a| a == me) && r.at >= since && data(r).get("staff").is_some_and(Value::is_array)).collect();
+        book.all("withholding_report").filter(|r| addressed_to(r).iter().any(|a| a == me) && r.at >= since && data(r).get("staff").is_some_and(|x| x.is_array())).collect();
     reports.sort_by(|a, b| b.at.cmp(&a.at).then_with(|| filed_before(&b.id, &a.id)));
     reports
         .iter()
         .flat_map(|r| {
             data(r)
                 .get("staff")
-                .and_then(Value::as_array)
+                .and_then(|x| x.as_array())
                 .into_iter()
                 .flatten()
                 .filter(|l| l.s("worker") == Some(who))
-                .map(|l| (r.at, l.get("gross").and_then(Value::as_f64).map_or(0, |g| g.floor() as i64)))
+                .map(|l| (r.at, l.get("gross").and_then(|x| x.as_number().and_then(serde_json::Number::as_f64)).map_or(0, |g| g.floor() as i64)))
         })
         .collect()
 }
@@ -423,18 +424,18 @@ impl Answerer for OurDecisions<'_> {
         let c = self.book.get(claim_id).filter(|c| matches!(c.body, oikos_sight::RecordBody::Statement { .. }));
         let on = self.decided_on.get(claim_id).into_iter().flatten().copied().filter(|x| *x <= d.at).max().unwrap_or(d.at);
         let decision = DecisionOn {
-            id: d.id.clone(),
+            id: d.id.to_string(),
             at: d.at,
             on,
-            granted: dd.get("granted") == Some(&Value::Bool(true)),
+            granted: dd.get("granted").and_then(|x| x.as_bool()) == Some(true),
             amount: finite(dd.get("amount")),
             every: finite(dd.get("every")),
             until: finite(dd.get("until")),
             reason: dd.s("reason").map(String::from),
-            lapsed: (dd.get("granted") != Some(&Value::Bool(true)) && !dd.get("replaces").is_some_and(truthy) && self.lapsed.contains(claim_id)).then_some(true),
+            lapsed: (dd.get("granted").and_then(|x| x.as_bool()) != Some(true) && !dd.get("replaces").is_some_and(truthy) && self.lapsed.contains(claim_id)).then_some(true),
         };
         let Some(c) = c.filter(|c| c.speaks_for.is_some()) else { return Some(Some(DecisionFile { decision, claim: None, reported: vec![], pays_other: false })) };
-        let who = c.speaks_for.clone().unwrap_or_default();
+        let who = c.speaks_for.unwrap_or_default();
         let payment = dd.s("payment").or_else(|| data(c).s("payment")).unwrap_or("").to_string();
         let rule = self.rules.iter().find(|r| r.id == payment);
         let reported = reported_of(self.me, self.book, &who, i64::MIN).into_iter().filter(|r| r.0 <= on).take(36).map(|(at, gross)| Reported { at, gross }).collect();
@@ -442,12 +443,12 @@ impl Answerer for OurDecisions<'_> {
         Some(Some(DecisionFile {
             decision,
             claim: Some(ClaimOn {
-                id: c.id.clone(),
-                by: who,
+                id: c.id.to_string(),
+                by: who.to_string(),
                 payment,
-                born_at: data(c).get("born_at").and_then(Value::as_i64).unwrap_or(0),
+                born_at: data(c).get("born_at").and_then(|x| x.as_i64()).unwrap_or(0),
                 account: data(c).s("account").unwrap_or("").to_string(),
-                declares: serde_json::from_value(data(c).get("declares").cloned().unwrap_or(Value::Null)).unwrap_or_default(),
+                declares: serde_json::from_value((data(c).get("declares").cloned().unwrap_or((Value::Null).into())).to_value()).unwrap_or_default(),
             }),
             reported,
             pays_other,
@@ -475,22 +476,22 @@ impl Support {
     /// A claim under a rule: granted (with the sum and how long), or why not.
     fn decide(&self, book: &Book, rule: Option<&PaymentRule>, ours: &[PaymentRule], c: &Record, t: i64, world: &WorldInfo) -> Decided {
         let d = data(c);
-        let (Some(rule), Some(_), Some(born), Some(who)) = (rule, d.s("account"), d.get("born_at").and_then(Value::as_i64), c.speaks_for.as_deref()) else {
+        let (Some(rule), Some(_), Some(born), Some(who)) = (rule, d.s("account"), d.get("born_at").and_then(|x| x.as_i64()), c.speaks_for.as_deref()) else {
             return Decided::Refused(None);
         };
         let age = (t - born).div_euclid(self.year);
         let w = rule.who.clone().unwrap_or_default();
-        let said = d.get("declares").cloned().unwrap_or(Value::Null);
+        let said = d.get("declares").cloned().unwrap_or((Value::Null).into());
         if w.from_age.is_some_and(|f| age < f) || w.to_age.is_some_and(|to| age > to) {
             return Decided::Refused(None);
         }
-        let members = said.get("household_members").and_then(Value::as_f64).map_or(1, |x| (x.floor() as i64).max(1));
+        let members = said.get("household_members").and_then(|x| x.as_number().and_then(serde_json::Number::as_f64)).map_or(1, |x| (x.floor() as i64).max(1));
         let children = |under: i64| {
             said.get("children_born_at")
-                .and_then(Value::as_array)
+                .and_then(|x| x.as_array())
                 .into_iter()
                 .flatten()
-                .filter_map(Value::as_i64)
+                .filter_map(|x| x.as_i64())
                 .filter(|b| (t - b).div_euclid(self.year) < under)
                 .count() as i64
         };
@@ -518,7 +519,7 @@ impl Support {
             }
         }
         if let Some(iu) = &w.income_under {
-            let Some(household_income) = said.get("household_income").and_then(Value::as_i64) else {
+            let Some(household_income) = said.get("household_income").and_then(|x| x.as_i64()) else {
                 return Decided::Refused(Some("the claim doesn't state the household's income".into()));
             };
             let income = if iu.per == "head" { household_income.div_euclid(members) } else { household_income };
@@ -531,7 +532,7 @@ impl Support {
             }
         }
         if w.no_other_pension == Some(true) {
-            if said.get("other_pension") != Some(&Value::Bool(false)) {
+            if said.get("other_pension").and_then(|x| x.as_bool()) != Some(false) {
                 return Decided::Refused(Some("the claim doesn't state that no other pension is paid".into()));
             }
             if self.paying.values().any(|x| x.person == who && x.payment != rule.id && ours.iter().any(|r| r.id == x.payment && r.for_age())) {
@@ -590,11 +591,11 @@ impl Support {
     }
 
     fn start_paying(&mut self, claim: &Record, rule: Option<&PaymentRule>, payment: String, amount: i64, every: i64, next: i64, until: Option<i64>) {
-        let Some(person) = claim.speaks_for.clone() else { return };
+        let Some(person) = claim.speaks_for else { return };
         let account = data(claim).s("account").unwrap_or("").to_string();
         let from = self.from_account(rule);
         let then = rule.and_then(|r| r.lasts.as_ref()).and_then(|l| l.then.clone());
-        self.paying.insert(claim.id.clone(), Paying { person, account, payment, from, amount, every, next, until, then });
+        self.paying.insert(claim.id.to_string(), Paying { person: person.to_string(), account, payment, from, amount, every, next, until, then });
     }
 
     /// A claim granted on the office's second look (a review, or a venue setting its refusal aside): the office decides
@@ -610,15 +611,15 @@ impl Support {
             Decided::Granted { amount, until } => (amount, until),
             Decided::Refused(w) => return Redone { changed: false, found: w.unwrap_or_else(|| NOT_MET.into()), steps: vec![] },
         };
-        let who = claim.speaks_for.clone().unwrap_or_default();
-        self.decided_on.entry(claim.id.clone()).or_default().push(t);
-        self.lapsed_claims.remove(&claim.id);
+        let who = claim.speaks_for.unwrap_or_default();
+        self.decided_on.entry(claim.id.to_string()).or_default().push(t);
+        self.lapsed_claims.remove(claim.id.as_str());
         self.paying.retain(|_, x| !(x.person == who && x.payment == rule.id));
         let every = rule.every_days * DAY;
         self.start_paying(&claim, Some(rule), rule.id.clone(), amount, every, t + every, until);
         let lasting = until.map_or(String::new(), |u| format!(" until {}", when_words(u, world)));
         let paper = m::BenefitDecision {
-            claim: claim.id.clone(),
+            claim: claim.id.to_string(),
             claimant: None,
             payment: Some(rule.id.clone()),
             granted: true,
@@ -629,7 +630,7 @@ impl Support {
             until,
             reason: None,
             on_review: Some(basis.to_string()),
-            replaces: Some(refusal.id.clone()),
+            replaces: Some(refusal.id.to_string()),
         };
         Redone {
             changed: true,
@@ -640,9 +641,9 @@ impl Support {
                     "benefit_decision",
                     &format!("Claim {} granted on a second look: {} every {} days{lasting}.", claim.id, money_words(amount, world), rule.every_days),
                     Say {
-                        to: Some(vec![who.clone()]),
-                        visible: Some(Visible::Only(vec![who, self.me.clone()])),
-                        basis: Some(claim.id.clone()),
+                        to: Some(vec![who.to_string()]),
+                        visible: Some(Visible::Only(vec![who.to_string(), self.me.clone()])),
+                        basis: Some(claim.id.to_string()),
                         data: Some(papers::data(&paper)),
                         ..Default::default()
                     },
@@ -660,7 +661,7 @@ impl Support {
             let mine = d.speaks_for.as_deref() == Some(self.me.as_str());
             let Some(claim_id) = dd.s("claim") else { continue };
             let brought = dd.get("brought_forward").is_some_and(truthy);
-            let granted = dd.get("granted") == Some(&Value::Bool(true));
+            let granted = dd.get("granted").and_then(|x| x.as_bool()) == Some(true);
             // (A claim refused before the year began is decided; one in hand, still waiting its time, is not.)
             if mine && brought && !granted {
                 self.decided.insert(claim_id.to_string());
@@ -676,7 +677,7 @@ impl Support {
             }
             let payment = dd.s("payment").unwrap_or("").to_string();
             let rule = ours.iter().find(|r| r.id == payment);
-            self.start_paying(&claim, rule, payment, amount, every, next.unwrap_or(0), dd.get("until").and_then(Value::as_i64));
+            self.start_paying(&claim, rule, payment, amount, every, next.unwrap_or(0), dd.get("until").and_then(|x| x.as_i64()));
         }
     }
 }
@@ -720,10 +721,10 @@ impl Support {
             // Whoever holds the office: what the staff have put before them is decided (a claim that fails the law's conditions
             // is refused, with the reason; so is one that could not be verified, which is the wrong refusal a review may find).
             let mut cases: Vec<Arc<Record>> =
-                self.book.open("case_for_decision").filter(|x| x.speaks_for.as_deref() == Some(self.me.as_str()) && !self.seen.contains(&x.id)).cloned().collect();
+                self.book.open("case_for_decision").filter(|x| x.speaks_for.as_deref() == Some(self.me.as_str()) && !self.seen.contains(x.id.as_str())).cloned().collect();
             cases.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
             for n in cases {
-                self.seen.insert(n.id.clone());
+                self.seen.insert(n.id.to_string());
                 let d = data(&n);
                 let (Some(claim), Some(claimant)) = (d.s("claim"), d.s("claimant")) else { continue };
                 self.decided_on.entry(claim.to_string()).or_default().push(t);
@@ -760,16 +761,16 @@ impl Support {
             }
         }
         let mut waiting: Vec<Arc<Record>> = if working {
-            self.book.open("benefit_claim").filter(|r| addressed_to(r).iter().any(|a| a == &self.me) && !self.decided.contains(&r.id)).cloned().collect()
+            self.book.open("benefit_claim").filter(|r| addressed_to(r).iter().any(|a| a == &self.me) && !self.decided.contains(r.id.as_str())).cloned().collect()
         } else {
             vec![]
         };
         waiting.sort_by(|a, b| made_at(a).cmp(&made_at(b)).then_with(|| filed_before(&a.id, &b.id)));
         for c in waiting {
-            let Some(who) = c.speaks_for.clone() else { continue };
+            let Some(who) = c.speaks_for else { continue };
             let payment = data(&c).s("payment").unwrap_or("").to_string();
             let rule = ours.iter().find(|r| r.id == payment);
-            let age = data(&c).get("born_at").and_then(Value::as_i64).map_or(-1, |b| (t - b).div_euclid(self.year));
+            let age = data(&c).get("born_at").and_then(|x| x.as_i64()).map_or(-1, |b| (t - b).div_euclid(self.year));
             // What the claim waits for before it is decided is the law's: papers from the claimant, a confirmation from their last
             // employer, within so many days, and what comes of it when they do not come. We ask once, for each; the claim stays on
             // our file until it has come, or its time has run. (A claim made before the year opened, brought forward, is decided.)
@@ -786,10 +787,10 @@ impl Support {
                     continue;
                 }
             }
-            self.decided.insert(c.id.clone());
-            self.decided_on.entry(c.id.clone()).or_default().push(t);
+            self.decided.insert(c.id.to_string());
+            self.decided_on.entry(c.id.to_string()).or_default().push(t);
             if matches!(&wait, Some((Wait::Lapsed(_), _))) {
-                self.lapsed_claims.insert(c.id.clone());
+                self.lapsed_claims.insert(c.id.to_string());
             }
             let mut d = match &wait {
                 Some((Wait::Lapsed(why), _)) => Decided::Refused(Some(why.clone())),
@@ -821,8 +822,8 @@ impl Support {
                         applicant: None,
                         against: None,
                         case: None,
-                        claim: Some(c.id.clone()),
-                        claimant: Some(who.clone()),
+                        claim: Some(c.id.to_string()),
+                        claimant: Some(who.to_string()),
                         payment: Some(payment.clone()),
                         fails: Some(why.clone()),
                         doubt: Some(Value::Bool(doubt)),
@@ -845,7 +846,7 @@ impl Support {
                             Say {
                                 to: Some(vec![self.me.clone()]),
                                 visible: Some(Visible::Only(vec![self.me.clone()])),
-                                basis: Some(c.id.clone()),
+                                basis: Some(c.id.to_string()),
                                 data: Some(papers::data(&paper)),
                                 ..Default::default()
                             },
@@ -864,7 +865,7 @@ impl Support {
             // One payment of a kind a person: a new claim replaces the old.
             self.paying.retain(|_, x| !(x.person == who && x.payment == payment));
             let mut paper = m::BenefitDecision {
-                claim: c.id.clone(),
+                claim: c.id.to_string(),
                 claimant: None,
                 payment: Some(payment.clone()),
                 granted: false,
@@ -905,9 +906,9 @@ impl Support {
                     "benefit_decision",
                     &text,
                     Say {
-                        to: Some(vec![who.clone()]),
-                        visible: Some(Visible::Only(vec![who.clone(), self.me.clone()])),
-                        basis: Some(c.id.clone()),
+                        to: Some(vec![who.to_string()]),
+                        visible: Some(Visible::Only(vec![who.to_string(), self.me.clone()])),
+                        basis: Some(c.id.to_string()),
                         data: Some(papers::data(&paper)),
                         ..Default::default()
                     },
@@ -927,7 +928,7 @@ impl Support {
             let book = std::mem::take(&mut self.book);
             let b = &book;
             let mut redo = |dec: &Record, req: &Record| -> Option<Redone<()>> {
-                if data(dec).get("granted") != Some(&Value::Bool(false)) {
+                if data(dec).get("granted").and_then(|x| x.as_bool()) != Some(false) {
                     return Some(Redone { changed: false, found: "the claim was granted".into(), steps: vec![] });
                 }
                 let asked = format!("Asked by {} to look at our refusal {} again", req.speaks_for.as_deref().unwrap_or(""), dec.id);
@@ -943,13 +944,13 @@ impl Support {
         if staff && working {
             let decisions: Vec<Arc<Record>> = self.book.all("benefit_decision").cloned().collect();
             for d in decisions {
-                if self.taken.contains(&d.id) || d.speaks_for.as_deref() != Some(self.me.as_str()) {
+                if self.taken.contains(d.id.as_str()) || d.speaks_for.as_deref() != Some(self.me.as_str()) {
                     continue;
                 }
-                self.taken.insert(d.id.clone());
+                self.taken.insert(d.id.to_string());
                 let dd = data(&d);
                 let Some(claim) = dd.s("claim").and_then(|c| self.book.get(c)).filter(|c| matches!(c.body, oikos_sight::RecordBody::Statement { .. })).cloned() else { continue };
-                if dd.get("granted") != Some(&Value::Bool(true)) || self.paying.contains_key(&claim.id) {
+                if dd.get("granted").and_then(|x| x.as_bool()) != Some(true) || self.paying.contains_key(claim.id.as_str()) {
                     continue;
                 }
                 let (amount, every) = (dd.i("amount").unwrap_or(0), dd.i("every").unwrap_or(0));
@@ -958,7 +959,7 @@ impl Support {
                 }
                 let payment = data(&claim).s("payment").unwrap_or("").to_string();
                 let rule = ours.iter().find(|r| r.id == payment);
-                self.start_paying(&claim, rule, payment, amount, every, d.at + every, dd.get("until").and_then(Value::as_i64));
+                self.start_paying(&claim, rule, payment, amount, every, d.at + every, dd.get("until").and_then(|x| x.as_i64()));
             }
         }
         if !working {
@@ -973,7 +974,7 @@ impl Support {
         }
         // Stopping: the claimant asked, died or left.
         let mut gone: BTreeSet<String> = self.book.all("death_registration").filter_map(|r| data(r).s("deceased").map(String::from)).collect();
-        gone.extend(self.book.all("departure").filter_map(|r| r.speaks_for.clone()));
+        gone.extend(self.book.all("departure").filter_map(|r| r.speaks_for.map(|x| x.to_string())));
         let stops: Vec<String> = self.book.all("benefit_change").filter(|r| data(r).get("stop").is_some_and(truthy)).filter_map(|r| data(r).s("claim").map(String::from)).collect();
         for claim in stops {
             self.paying.remove(&claim);

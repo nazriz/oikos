@@ -9,7 +9,6 @@
 use crate::common::{bases_of, data, is_kind, structure_of, Book, Fields, DAY};
 use oikos_sight::{Record, RecordBody};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::sync::Arc;
 
 /// Employment: the employer pays a wage every period; the worker comes to the workplace (an occupancy), or does work
@@ -110,8 +109,8 @@ pub struct Structure {
 }
 
 /// A commitment's outcome, read from its `does` (`{ outcome: ... }`); none where it is not one this crate reads.
-pub fn outcome_of(does: &Value) -> Option<Outcome> {
-    does.get("outcome").and_then(|o| serde_json::from_value(o.clone()).ok())
+pub fn outcome_of(does: &oikos_core::Frozen) -> Option<Outcome> {
+    does.get("outcome").and_then(|o| oikos_core::frozen::from_frozen(o).ok())
 }
 
 /// An agreement's template, if the record is one.
@@ -283,6 +282,7 @@ pub fn notice(agreement: &str, words: &str) -> oikos_sight::calls::Call {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
     use oikos_sight::Record;
     use serde_json::json;
 

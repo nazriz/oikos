@@ -37,6 +37,7 @@ pub use draws::Draws;
 pub use oikos_sight as sight;
 pub use oikos_sight::{Action, Picture};
 
+use oikos_core::Frozen;
 use oikos_core::rng::{Randomness, Rng};
 use oikos_rules::slip::{Performer, SlipTable, Slipper};
 use oikos_sight::calls::Currency;
@@ -92,7 +93,7 @@ pub struct Ctx {
 /// (Always an object: `member_of` takes one that is not as no params.)
 #[derive(Clone)]
 pub struct Params {
-    of: Arc<Value>,
+    of: Frozen,
     /// The member of `of` they are (absent: `of` itself).
     member: Option<&'static str>,
     /// Members kept apart, shared with others' (their keys are none of `of`'s).
@@ -101,7 +102,7 @@ pub struct Params {
 
 impl Params {
     /// The `member` of this value, shared (one that is not an object: no params).
-    pub fn member_of(of: Arc<Value>, member: &'static str) -> Params {
+    pub fn member_of(of: Frozen, member: &'static str) -> Params {
         if of[member].is_object() {
             Params { of, member: Some(member), shared: Arc::from([]) }
         } else {
@@ -120,18 +121,18 @@ impl Params {
     }
 
     /// The members held in the map itself.
-    fn own(&self) -> &Map<String, Value> {
+    fn own(&self) -> &oikos_core::frozen::Obj {
         let v = match self.member {
             Some(k) => &self.of[k],
-            None => &*self.of,
+            None => &self.of,
         };
         match v {
-            Value::Object(m) => m,
+            Frozen::Object(m) => m,
             _ => unreachable!("params are always an object (`member_of`, `from`)"),
         }
     }
 
-    pub fn get(&self, key: &str) -> Option<&Value> {
+    pub fn get(&self, key: &str) -> Option<&Frozen> {
         self.own().get(key).or_else(|| self.shared.iter().find(|m| m.0 == key).map(|m| &m.1))
     }
 
@@ -140,15 +141,15 @@ impl Params {
     }
 
     /// Every member, in key order (as a map of them all would give them).
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&oikos_core::Id, &Frozen)> {
         oikos_contracts::controller::merged(self.own(), &self.shared)
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = &String> {
+    pub fn keys(&self) -> impl Iterator<Item = &oikos_core::Id> {
         self.iter().map(|(k, _)| k)
     }
 
-    pub fn values(&self) -> impl Iterator<Item = &Value> {
+    pub fn values(&self) -> impl Iterator<Item = &Frozen> {
         self.iter().map(|(_, v)| v)
     }
 
@@ -170,7 +171,7 @@ impl Params {
                 out.push(b',');
             }
             // (Writing a string or a value to memory cannot fail.)
-            let _ = serde_json::to_writer(&mut out, k);
+            let _ = serde_json::to_writer(&mut out, k.as_str());
             out.push(b':');
             let _ = serde_json::to_writer(&mut out, v);
         }
@@ -180,35 +181,31 @@ impl Params {
 
     /// The params as a map of their own (a copy).
     pub fn to_map(&self) -> Map<String, Value> {
-        self.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+        self.iter().map(|(k, v)| (k.to_string(), v.to_value())).collect()
     }
 
-    /// Changed in place, they become the actor's own: copied from what they were shared with, the first time.
-    pub fn make_mut(&mut self) -> &mut Map<String, Value> {
-        if self.member.is_some() || !self.shared.is_empty() {
-            *self = Params::from(self.to_map());
-        }
-        match Arc::make_mut(&mut self.of) {
-            Value::Object(m) => m,
-            _ => unreachable!("made an object just above"),
-        }
-    }
-
+    /// One set (a copy of them, as the actor's own: they are never changed in place).
     pub fn insert(&mut self, key: String, v: Value) -> Option<Value> {
-        self.make_mut().insert(key, v)
+        let mut m = self.to_map();
+        let was = m.insert(key, v);
+        *self = Params::from(m);
+        was
     }
 
+    /// One taken out (a copy, as `insert`).
     pub fn remove(&mut self, key: &str) -> Option<Value> {
-        self.make_mut().remove(key)
+        let mut m = self.to_map();
+        let was = m.remove(key);
+        *self = Params::from(m);
+        was
     }
 }
 
 impl std::ops::Index<&str> for Params {
-    type Output = Value;
+    type Output = Frozen;
     /// (As a JSON object reads: null where there is no such member.)
-    fn index(&self, key: &str) -> &Value {
-        static NULL: Value = Value::Null;
-        self.get(key).unwrap_or(&NULL)
+    fn index(&self, key: &str) -> &Frozen {
+        self.get(key).unwrap_or(&oikos_core::frozen::NULL)
     }
 }
 
@@ -226,13 +223,13 @@ impl Default for Params {
 
 impl From<Map<String, Value>> for Params {
     fn from(m: Map<String, Value>) -> Params {
-        Params { of: Arc::new(Value::Object(m)), member: None, shared: Arc::from([]) }
+        Params { of: Frozen::from(Value::Object(m)), member: None, shared: Arc::from([]) }
     }
 }
 
 impl std::fmt::Debug for Params {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_map().entries(self.iter()).finish()
+        f.debug_map().entries(self.iter().map(|(k, v)| (k.as_str(), v))).finish()
     }
 }
 
@@ -246,20 +243,20 @@ impl Ctx {
     /// A parameter, read as `T`, or `default` when the world does not give it (a module's documented default).
     pub fn param<T: serde::de::DeserializeOwned>(&self, key: &str, default: T) -> Result<T, String> {
         match self.params.get(key) {
-            None | Some(Value::Null) => Ok(default),
-            Some(v) => serde_json::from_value(v.clone()).map_err(|e| format!("{}'s parameter {key}: {e}", self.participant)),
+            None | Some(Frozen::Null) => Ok(default),
+            Some(v) => oikos_core::frozen::from_frozen(v).map_err(|e| format!("{}'s parameter {key}: {e}", self.participant)),
         }
     }
     /// A parameter the world must give (whom an actor deals with: no module assumes a world's names).
     pub fn need<T: serde::de::DeserializeOwned>(&self, key: &str, kind: &str) -> Result<T, String> {
         match self.params.get(key) {
-            None | Some(Value::Null) => {
+            None | Some(Frozen::Null) => {
                 Err(format!("{kind}: the world must say {key} (whom it deals with; no module assumes a world's names)"))
             }
-            Some(Value::String(s)) if s.is_empty() => {
+            Some(Frozen::String(s)) if s.is_empty() => {
                 Err(format!("{kind}: the world must say {key} (whom it deals with; no module assumes a world's names)"))
             }
-            Some(v) => serde_json::from_value(v.clone()).map_err(|e| format!("{}'s parameter {key}: {e}", self.participant)),
+            Some(v) => oikos_core::frozen::from_frozen(v).map_err(|e| format!("{}'s parameter {key}: {e}", self.participant)),
         }
     }
 }
@@ -491,7 +488,7 @@ impl<'a> Cx<'a> {
     }
     /// What the step left beside its action (the engine's).
     pub fn into_kept(self) -> Kept {
-        Kept { decisions: self.decisions, outcomes: self.outcomes, record: self.record, questions: self.questions, worded: self.worded, drawn: self.drawn.unwrap_or_default(), captured: self.captured }
+        Kept { decisions: self.decisions, outcomes: self.outcomes, record: self.record, questions: self.questions, worded: self.worded, drawn: self.drawn.unwrap_or_default(), captured: self.captured, }
     }
 }
 
@@ -506,7 +503,7 @@ impl Slipper for Cx<'_> {
         self.ctx.world.slip.as_ref()
     }
     fn friction_bps(&self) -> i64 {
-        self.ctx.world.dials.get("friction_bps").and_then(Value::as_i64).unwrap_or(0).max(0)
+        self.ctx.world.dials.get("friction_bps").and_then(|x| x.as_i64()).unwrap_or(0).max(0)
     }
 }
 

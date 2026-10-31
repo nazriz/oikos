@@ -9288,6 +9288,231 @@ routes as law data, nobody shown more than is theirs.
 **Leaves out** (docs/behaviour/leasing.md): mediation, a valuer's market rent, a tenant's challenge, relief from forfeiture, distress and CRAR, rent lost after forfeiture, a guarantor (a lease holds nothing of the owner's), renewal and security of tenure, assignment; an owner weighing giving up still counts the rent to the lease's end. A business back from a lease trades from its owner's home.
 
 **Revisit if** a place's figures for any of the law's fields are opened (replace the recalled and placeholder ones); leased businesses' arrears or exits matter to a study (then the owner's liability, and what leaving costs in the owner's own weighing); a valuer or mediation office is built; or the `held` area is wanted for notices put up at held premises (records), which it refuses now.
+
+## 2026-10-26 · Ids interned (SC-1, the representation plan's R1; branch `representation`; no result changes; no model called)
+
+- **Change.** `oikos_core::Id` (kernel/crates/core/src/id.rs) replaces `blocks::Id = String`: a handle on the one copy
+  of an id's text the process holds, `Copy`, compared by where that copy is, ordered, hashed and serialised as the
+  text, so every map's order, every hash and the log are what they were. Contracts, world, perception, sight, nature,
+  the resolver's view of what was shown, and the kernel's engine hold it; the actors, which hold ids as `String`, take
+  and give text at their edge (their state is R4's). The texts sit in blocks kept for the process, beside a table
+  sharded by a fixed hash (FNV-1a; nothing depends on where a text is). Ids are never freed, so the ids of what passes
+  are not ids: an act in progress and a message on its way have `blocks::Passing` (their own text), so what the
+  process keeps is what lasts. A 200-person month ends with 22,302 ids (236 KB of text): its cells, records, people,
+  accounts, structures and positions; with acts' and messages' ids interned it was 32,314 and grew about 11,000 a
+  month (`OIKOS_KEPT=1` prints the count).
+- **Results, shown.** `orchestrator/test/representation.test.ts` (slow tier, new): three profiles' towns of 200 and
+  1,000 people (au-vic, gb-eng, us-oh), 30 days at 4 engine threads, end at the state hash and write the log pinned
+  in `scripts/fixtures/representation-results.json`, taken from main at 7230e71. The log is compared whole but for
+  its header's name of the build and the hash chain that runs from it, which every build writes anew
+  (`scripts/same-results.ts logDigest`). All six the same.
+- **Cost, paired.** `scripts/pair.sh` (new): main and this build in turn on the same configs, from a shell, at 4
+  threads (each binary copied afresh first in the last two rounds). This machine: 4 cores, 15 GB, Linux; a 10,000- or
+  50,000-person month does not fit beside the suite here, so 1,000 is the largest measured. Six pairs on each
+  1,000-person town: wall -7 to -18%, the run's own thread -8 to -19%, user CPU -7 to -15%, faster in every pair (the
+  run's own thread on average 35.3 s against 30.5 on au-vic, 31.8 against 27.6 on gb-eng, 26.3 against 22.7 on us-oh);
+  the 200-person towns' own thread -16 to +5%, faster on average on all three. Clones of an id are copies now, and
+  equality a comparison of addresses.
+- **Memory.** At 1,000 people the peak is 10 to 17 MB lower on au-vic and gb-eng (au-vic 461 to 463 MB against 473,
+  352 KB a person against 363), about level on us-oh; at 200 people level within its run to run (plus or minus 15
+  MB). Little, because few of the ids held were `Id`s: most are the actors' `String`s (R4) and strings in records'
+  JSON (R2), so the saving comes with those steps. The plan's -30 to -50 KB a person was for all the ids a run holds.
+- **Measuring on Linux.** `getrusage`'s peak is carried across `exec`, so a kernel started by Bun said Bun's size
+  (580 MB for a 200-person town); the kernel now reads `VmHWM` there, its own process's high-water mark. And a binary
+  whose file has been partly dropped from the page cache maps fewer of its pages per fault: main's hours-old binary
+  read 10 to 15 MB below a fresh copy of itself, which first looked like a cost of this step. `pair.sh` copies both
+  builds before it runs them. The heap profiler runs on Linux too (`llvm-symbolizer`).
+- **The budget.** 352 KB a person here on this build; this machine reads main about 6% below the Mini (363 KB against
+  the 380 to 385 the Mini measured), so about 373 KB there, and 8% over that is 403: the ceiling lowered from 415 to
+  400 KB. Revisit with the Mini's own measure of main with this merged (raise only with its entry here).
+- **Revisit if** a long run's id count grows with its length (an id made for something that passes, which should be
+  `Passing`), or if the interner's locks show in a profile of many engine threads (then a per-thread cache of lookups).
+
+## 2026-10-26 · Records' JSON held frozen (SC-1, the representation plan's R2; branch `representation`; no result changes; no model called)
+
+- **Change.** `oikos_core::Frozen` (kernel/crates/core/src/frozen.rs) holds what the state keeps as opaque JSON: a
+  record's `about` and its statement's `data`, `adico`, `formal`, `offer`, `practice`, `assertion` and `registry`, an
+  agreement's `attrs`, a commitment's `does`, an entity record's sections, the typed config's controllers and the
+  actors' `Params`. It is immutable: strings and arrays shared (`Arc`), an object a sorted array of interned keys
+  (`Id`) and values, so a clone is a count and a key is the one copy the process holds. It serialises as the
+  `Value` it was made from (objects in key order, as `serde_json` without `preserve_order` writes them), and it has
+  the read calls the code used of `Value` (`get`, `pointer`, `as_*`, `is_*`, indexing, comparison with numbers,
+  text and `Value`); `JsonRead`/`JsonRef` let a reader take either, and `from_frozen` reads a typed value straight
+  off it. What is built (a record's parts, a section) is built as `Value` and frozen once, where it is kept.
+  A `Frozen` is read (deserialised) as the `Value` it is and then frozen, so what `Value` took it takes, and a float
+  in a seat's data is refused where it was, at its canonical form (the kernel's source names no float type: the
+  determinism lint). That build, paired again against R1 (two rounds of the 1,000-person towns): the run's own thread
+  3 to 6% faster in all six pairs, the same hash and log in each.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at the state hash and log of main
+  at 7230e71.
+- **Cost, paired** against R1 (`scripts/pair.sh`, three rounds of all six towns, then five more of 1,000 us-oh): the
+  same hash and log in every pair. 1,000 people, the run's own thread: au-vic -3 to -10%, gb-eng -4 to 0%, us-oh
+  -7 to +5% over eight pairs, on average 23.6 s against 23.1 (-2%); 200 people level to faster.
+- **Memory.** 1,000 au-vic peaks at 409 to 419 MB against R1's 460 to 468 (gb-eng 400 to 411 against 451 to 454,
+  us-oh 365 to 380 against 400 to 406), about 305 KB a person against 352: some 47 KB a person, above the plan's
+  25 to 40, as records are many and each one's JSON had its own strings and keys. At 200 people 0 to 20 MB lower.
+- **The budget.** 305 KB a person here; with this machine reading about 6% below the Mini, about 323 KB there, and
+  8% over that is 349: the ceiling lowered from 400 to 350 KB.
+- **Revisit if** the count of interned ids (`OIKOS_KEPT=1`) grows with a run's length: an object keyed by something
+  that passes (an act's or message's id) would intern every key for the process; then such a map's keys are held as
+  text (`Frozen` kept as it is, the keys a `Passing`-like case). Or if a reader in a hot path shows `from_frozen` in a
+  profile (then a typed field in place of the JSON, as R4 does for the actors).
+
+## 2026-10-26 · Each transaction held once (SC-1, the representation plan's R3; branch `representation`; no result changes; no model called)
+
+- **Change.** A transfer's `Transaction` is made once, as an `Arc`, and that one copy is what every queue of a
+  capacity told of it (`Participant::new_transactions`), every office's file (`State::ledgers`), the look that
+  delivers it (`ChannelData::Accounts`) and the actor's picture of it (`Seen::Accounts`) hold: before, each held its
+  own copy, a row of some 170 bytes and its memo's text, and a look copied the queue again. Its fields were already
+  interned ids and integers (R1), and the queues and files already persistent vectors; an `Arc` serialises as what it
+  holds, so the state, its hash, the log and what a seat is shown are unchanged. `Picture::transactions` still yields
+  `&Transaction`, so no actor's reading changed.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at main's state hash and log.
+- **Cost, paired** against R2 (three rounds of the 1,000-person towns, one of the 200): the same hash and log in
+  every pair; the run's own thread -4 to +1% (au-vic 29.4 s on average against 29.1, gb-eng 27.0 against 26.0, us-oh
+  21.9 against 21.5).
+- **Memory.** Little in a month: at 1,000 people 11 MB lower to 6 higher, lower on average (au-vic 409 to 412 MB
+  against 411 to 415, about 300 KB a person), level at 200. An office keeps every payment on its organisation's accounts for the run, so the
+  saving grows with its length: 90 days, 1,000 au-vic 622 MB against 638, 200 gb-eng 244 against 258 (same hash).
+  The plan's -5 to -10 KB a person was for a month at 10,000.
+- **The budget.** About 300 KB a person here, some 318 on the Mini, and 8% over that is 343: the ceiling lowered from
+  350 to 345 KB.
+- **Revisit if** a memo's text shows in a heap profile of a long run (then memos interned, as they repeat: "rent",
+  "wages"), or offices' files dominate a ten-year run (then what an office keeps on file is a law of how long records
+  are kept, the owner's to decide, not a representation change).
+
+## 2026-10-27 · The actors' indexes keyed by interned ids (SC-1, the representation plan's R4, a first part; branch `representation`; no result changes; no model called)
+
+- **What a profile showed.** A heap profile of R3 at 1,000 people (au-vic, 30 days, 4 threads; `scripts/heapprof.ts`)
+  puts 206 MB live at the peak: the compiled schemas 43, the engine 42, unattributed 39, citizens 18, their minds 14,
+  offices, firms and the other actors 14, the world's records and accounts 12, the typed config 9, what's been seen 6.
+  The actors' state is spread thin: no holder of an office's or firm's own is above about 1.5 MB, and the largest
+  are not their JSON (R2 took that) but maps keyed by `String`: a book's indexes (about 15 MB across every actor's
+  book), a person's trust in each institution (2), the environment office's map of cover (1.6), the bank's last
+  entries for each account (1.3).
+- **Change.** Those keys and values are `Id`s, the one copy of the text the process holds (R1): a book's statements
+  by kind, claims by holder, counterparty and object, lots by cell, what is withdrawn, replaced and released, and
+  agreements' signatures and notices (common/book.rs); a person's trust by whom and its kind (mind/inner.rs); cover by
+  cell (boundary/environment.rs). Every one is the id of a record, an entity, a cell or a kind the world already
+  holds, so nothing is interned that would not be. An `Id` orders as its text, so every map iterates as it did. The
+  bank keeps the transactions it lists on statements as the world's shared copy (`Picture::transactions_held`,
+  R3). What is saved and shown is unchanged: an `Id` serialises as its text, and the rows a mind writes (`TrustRow`)
+  are still text.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at main's state hash and log.
+- **Cost, paired** against R3 (three rounds of the 1,000-person towns, one of the 200; the machine was restarted
+  between this and R3's pairs, and runs about a quarter slower since, so only pairs taken together compare): the
+  same hash and log in every pair; the run's own thread -6 to +1%, faster on average on all three profiles; the
+  200-person towns 2 to 6% faster.
+- **Memory.** 1,000 people 3 to 15 MB lower (au-vic 396 to 403 MB against 397 to 417, about 290 KB a person; gb-eng
+  377 to 390 against 391 to 399; us-oh 349 to 353 against 356 to 357); the 200-person towns level.
+- **The budget.** About 290 KB a person here, some 307 on the Mini, and 8% over that is 332: the ceiling lowered from
+  345 to 335 KB.
+- **Left of R4.** The rest of the actors' state is diffuse: many small maps and strings across some 40 actors, each
+  under a megabyte at 1,000. The plan's -10 to -20 KB a person for R4 assumed offices' books held as `Value`; R2
+  took most of that, so what is left of R4 is probably 5 KB a person or less, not worth a rewrite of every actor's
+  state in its own right. The large holders left are not the actors': the compiled schemas (fixed, 43 MB), the
+  engine's units and rounds (42), and what the profile cannot attribute (39).
+- **Revisit if** a profile at 10,000 shows one actor's state growing faster than the town (then that actor's state
+  typed), or the count of interned ids (`OIKOS_KEPT=1`) grows with a run's length.
+
+## 2026-10-27 · The allocator without huge pages (SC-1; branch `representation`; no result changes; no model called)
+
+- **What was held.** At the peak of a 1,000-person month about 206 MB is live (the heap profile) against some 400 MB
+  resident; at 200 people 230 MB resident, most of the "fixed" 110 MB the memory budget allows. mimalloc (v3) asks
+  Linux for transparent huge pages on what it maps (`madvise(MADV_HUGEPAGE)`), so a region it has touched is resident
+  in 2 MB pieces however little of each is in use, and it returns freed memory a second after (`purge_delay`).
+- **Settings tried**, each paired against R4's build (`scripts/pair.sh`, six towns, two to five rounds; the same hash
+  and log in every pair), the run's own thread at 1,000 people: memory returned at once, 30 to 40 MB lower, +3%;
+  that and arenas not committed ahead, 50 lower, 0 to +13%; returned after 10 ms, 20 to 35 lower, +4 to +11%; arenas
+  not committed ahead alone, 35 to 55 lower, level within noise; huge pages off alone, 30 to 45 lower, level. Set at
+  the start of `main` (`mi_option_set`) an option did nothing: the allocator has made its first arena before `main`.
+- **Change.** mimalloc built with `no_thp` (kernel/Cargo.toml and kernel/crates/napi/Cargo.toml): it never asks for
+  huge pages. Paired against R4's build, three rounds of all six towns: the same hash and log; 1,000 people 32 to 42
+  MB lower (au-vic 358 to 368 MB against 400 to 408, about 253 KB a person; gb-eng 353 to 355 against 385 to 388;
+  us-oh 322 to 325 against 360 to 363), the run's own thread +0.5 to +3.9%; 200 people 50 to 58 MB lower (about a
+  quarter), 4 to 7% faster. Naz (2026-10-27): more CPU for less memory is a fair trade where memory is what limits a
+  run (many people, many years); proposed for such trades: up to about 5% more CPU for about 10% less memory or more,
+  results byte-identical always, anything larger put to him.
+- **Where it holds.** Linux with transparent huge pages in `madvise` mode, as here. Where they are `always`, the
+  kernel's own policy gives huge pages without being asked, and this saves less (then `MIMALLOC_ALLOW_THP=0`, which
+  also turns them off for the process, measured the same here). On macOS mimalloc asks for none: the Mini, where the
+  budget is measured, gains nothing, so **the budget's ceiling stays at 335 KB** (this machine's 253 is not the Mini's).
+- **Revisit if** a mimalloc upgrade changes how it maps (re-pair), or a profile shows the purge delay's held memory at
+  10,000 people (then memory returned at once, as an opt-in for large runs: about 20 MB more at 1,000 for about 3%).
+
+## 2026-10-27 · The config's schemas let go (SC-1; branch `representation`; no result changes; no model called)
+
+- **What was held.** A heap profile at 1,000 people put 43 to 48 MB in the contract's compiled schemas, kept for the
+  whole run (`contracts()`, a `OnceLock`). Measured alone (the contracts' six schema files, `jsonschema` 0.30): the
+  four validators compile to 21 MB (the config's 12, a participant's 2, a command's 3, an annotation's 3), and the
+  first check of a 1,000-person config compiles 23 MB more (the references `jsonschema` compiles when first used).
+  The pattern engine makes no difference (`fancy_regex`, `regex`, a smaller lazy DFA: 21 and 23 MB each): each
+  `$ref` is compiled where it is used, so the same patterns are compiled many times over.
+- **Change.** The config's two validators (the whole config's and one participant's) are built when a config is
+  first checked and kept for the next (`contracts::config_check`), until `contracts::release_config_check()`: the
+  kernel's `world` command and the engine module (napi) call it once their config is read, and the next read builds
+  them again (some 13 ms, and the first check's own compiling as before). A command's and an annotation's validators
+  are each built when the first is checked (`Contracts::command()`, `::annotation()`), so a run that takes none never
+  builds them. What is checked, and against what, is unchanged.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at main's state hash and log.
+- **Cost, paired** against the allocator's build (three rounds of all six towns): the same hash and log in every
+  pair; the run's own thread -4 to +1%, level (au-vic -1.2% on average, gb-eng +1.2, us-oh -0.4).
+- **Memory.** 1,000 people 33 to 40 MB lower (au-vic 325 to 329 MB against 359 to 366, about 217 KB a person;
+  gb-eng 313 to 317 against 348 to 355; us-oh 283 to 289 against 321 to 329); 200 people 26 to 35 lower (139 to
+  147 MB against 167 to 179). This holds on every OS (the Mini's too).
+- **The budget.** About 217 KB a person here; the Mini, which gains this but not the allocator's, about 307 less 33,
+  274, and 8% over that is 296: the ceiling lowered from 335 to 300 KB.
+- **Revisit if** a process reads configs over and over (the engine module building worlds back to back: then keep
+  them a while), or `jsonschema` learns to compile a `$ref` once (then the four may be cheap to keep).
+
+## 2026-10-27 · What grows with a run's length, measured; the delivered records' cache let go of what is not shown (SC-1; branch `representation`; no result changes; no model called)
+
+- **What grows (the growth study).** 1,000 people (au-vic, 4 threads), runs of 30, 90, 180 and 365 days, each ending
+  with a heap profile (`scripts/heapprof.ts --components`): the peak rises about 3 MB a day, linearly, 365 MB at a
+  month, 587 at three, 914 at six and 1,706 at a year (1.7 MB a person; a year at 10,000 would be some 17 GB). Two
+  holders grow and the rest is about flat: the engine, 63 MB at a month to 562 at a year, and the world's records,
+  26 to 431. Interned ids grow too (60,000 at a month, 441,000 at a year) but their text is 4 MB at a year: no cause.
+  At six months the engine's was mostly the delivered records' cache (`Delivered`): the records themselves (67 MB,
+  the world's), each one's canonical bytes (60 MB) and what each adds to a reader (`RecordFacts`, 96 MB), kept for
+  every record ever shown, for the run.
+- **Change.** A record's bytes and facts are what the record makes (encoding it, reading it), so they are let go
+  when it has not been shown for 7 days (`KEPT_DAYS`) and made again if it is: `Delivered::trim`, called once a day
+  from the observation paths. Each entry stays, holding its record, so a record's place in memory is never another's
+  (what `Handed` relies on), and a register's lots, shown every day, stay held. What is shown and learned is the same.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at main's state hash and log; and a
+  year at 1,000 (au-vic) ends at the same state hash (`f29fb857...`) on both builds (its log discarded: over 3 GB).
+- **Cost and memory, paired** against the config's schemas' build: a month, two rounds of the 1,000-person towns
+  and one of the 200: the same hash and log; 1,000 people 13 to 28 MB lower (au-vic 304 to 305 MB against 326 to
+  332, about 195 KB a person), the run's own thread 0 to +3%; 200 people level. 180 days: 634 MB against 814, own
+  thread -1.6%. A year: 1,081 MB against 1,500 (-28%), own thread +2.3% (with a build beside both).
+- **The budget.** About 195 KB a person here; the Mini about 274 less 24, 250, and 8% over that is 270: the ceiling
+  lowered from 300 to 270 KB. The budget measures a month: no test holds what a run's length adds (proposed: a growth
+  budget on a 90-day run, the slow tier).
+- **What is left of the growth**, at a year after this: the world's records (431 MB: the history kept, whole, for the
+  run; what tiered storage is for), the actors' state (73 MB, offices' and firms' books growing with what they have
+  seen), citizens (56) and their minds (41).
+- **Where the CPU goes** (a perf profile of a 1,000-person month at 4 threads, the run's own thread): no one
+  function above 10%; allocation and freeing about 14%, comparing ids' text (map lookups) about 9%, copying 6%,
+  encoding observations canonically 5%, interning ids 2.6%, SHA-256 2.2% (with the CPU's own instructions; a
+  valgrind profile, which hides them, put it at 23%), the log 2.5%. At 200 people the one-time spin-up of nature is a
+  quarter of the instructions, a fixed cost a long run makes small. No change made from it yet.
+- **8-byte ids, measured before being built.** An `Id` made 8 bytes wider costs 11 to 23 MB at 1,000 (and 0 to 6%
+  of the run's own thread): 8 bytes narrower would save about that, some 5%, against a table read on every
+  comparison of ids' text (9% of the run's own thread now). Held back for Naz's call.
+- **Revisit if** a record shown again after its week is common in some world (then the week longer, or the facts
+  kept and only the bytes let go), or the cache's entries themselves (one per record ever shown) show in a profile of
+  a ten-year run (then let go with the record, when tiered storage moves it out).
+
+## 2026-10-27 · 10,000 people for a month, main against the branch; tiered storage proposed (SC-1; branch `representation`; no model called)
+
+- **Measured.** au-vic from `worlds/town-1000.yaml` with `citizens=10000`, 30 days, all code, 4 engine threads, on this
+  4-core Linux machine alone (the log discarded: the measure is memory and time): main (7230e71) peaks at 2.48 GB in
+  197 s (the run's own thread 159 s); the branch at 1067de9 at 1.67 GB in 150 s (own thread 120 s): -33% memory,
+  -24% time, the same state hash (`f39cebc9...`). About 156 KB a person at 10,000 against 195 at 1,000: nothing grows
+  faster than the town. 254,889 ids interned (2.8 MB of text).
+- **Tiered storage proposed** (docs/design/tiered-storage.md), from the growth study: at a year, about 550 of the
+  895 MB live at 1,000 people is history (records, payments). Not built; four decisions are Naz's.
+
 ## 2026-10-25 · The Bevy explorer: Bevy for the scene, a web interface round it, one crate for browser and desktop (session branch; no model called)
 
 - **What was asked:** the next explorer, Bevy rendering the town with an HTML/CSS interface round it, browser-first

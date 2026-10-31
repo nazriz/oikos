@@ -66,9 +66,9 @@ pub fn from_json(v: &serde_json::Value) -> Result<Value, String> {
         serde_json::Value::Number(n) => Value::Int(n.as_i64().ok_or_else(|| format!("{n} is not an integer"))?),
         serde_json::Value::String(s) => Value::Str(s.clone()),
         serde_json::Value::Array(xs) => Value::List(xs.iter().map(from_json).collect::<Result<_, _>>()?),
-        serde_json::Value::Object(m) => {
+        serde_json::Value::Object(m) =>
             Value::Map(m.iter().map(|(k, x)| Ok((k.clone(), from_json(x)?))).collect::<Result<_, String>>()?)
-        }
+        ,
     })
 }
 

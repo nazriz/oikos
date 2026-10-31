@@ -88,9 +88,9 @@ impl Driver {
         let mut first = true;
         for _ in 0..60 {
             let mut channels = BTreeMap::new();
-            channels.insert("mine".to_string(), Seen::Records { records: if first { records.clone() } else { vec![] }, search: false });
+            channels.insert("mine".into(), Seen::Records { records: if first { records.clone() } else { vec![] }, search: false });
             for (k, v) in &extra {
-                channels.insert((*k).to_string(), if first { v.clone() } else { match v { Seen::Sites { .. } => v.clone(), _ => v.clone() } });
+                channels.insert((*k).into(), if first { v.clone() } else { match v { Seen::Sites { .. } => v.clone(), _ => v.clone() } });
             }
             let pic = Picture {
                 participant: "police-oic-system".into(),
@@ -235,8 +235,8 @@ fn an_investigation_that_finds_the_taker_is_charged_and_one_that_does_not_is_clo
     // Two reports; one officer has hours for two a day (8h / 4h).
     let pic = |t: i64, outcomes: Vec<Value>, records: Vec<Arc<Record>>| {
         let mut channels = BTreeMap::new();
-        channels.insert("mine".to_string(), Seen::Records { records, search: false });
-        channels.insert("premises".to_string(), premises(&["officer-1"]));
+        channels.insert("mine".into(), Seen::Records { records, search: false });
+        channels.insert("premises".into(), premises(&["officer-1"]));
         Picture { participant: "police-oic-system".into(), t, status: oikos_sight::ParticipantStatus::Active, entity: ME.into(), as_position: Some("police-oic".into()), body: None, positions: vec![],
             outcomes: outcomes.into_iter().map(|o| serde_json::from_value(o).unwrap()).collect(), inbox: vec![], channels, asking: vec![], readings: BTreeMap::new(), woke_for: "done".into(), since: DAY }
     };
@@ -283,7 +283,7 @@ fn asked_to_call_at_a_home_an_officer_goes_and_whoever_died_alone_is_reported_on
     assert!(w.looks[0].to_string().contains("house-1"));
     // Back: what is there is shown at the next wake.
     let cell = home(1, &[], json!([{ "occupant": "ann", "reason": "died", "at": 3 * DAY }]));
-    let back = Seen::Sites { as_of: 5 * DAY + 13 * 3600, cells: Arc::new(vec![cell]), visit: Some(Visit { seen_at: [("h1".to_string(), 5 * DAY + 13 * 3600)].into(), fresh: vec!["h1".into()] }) };
+    let back = Seen::Sites { as_of: 5 * DAY + 13 * 3600, cells: Arc::new(vec![cell]), visit: Some(Visit { seen_at: [("h1".into(), 5 * DAY + 13 * 3600)].into(), fresh: vec!["h1".into()] }) };
     let w = s.wake(6 * DAY + 10 * 3600, vec![ask2], vec![("premises", premises(&["officer-1"])), ("calls", back)], &|_| false);
     assert_eq!(w.of("death_notification").len(), 1, "{:?}", w.calls);
     assert!(w.looks.is_empty(), "the same silence is not called at twice");

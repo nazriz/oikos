@@ -60,7 +60,7 @@ fn a_config_read_participant_by_participant_is_the_config_read_whole() {
         assert_eq!(config::rest_of(&canonical[..]).unwrap(), rest);
         // The people's controllers keep their params' long members once for all (the town's ventures, demand...): a
         // handful of maps for some hundreds of people, and each controller reads back as given.
-        let people: Vec<_> = streamed.config.participants.iter().filter(|p| p.controller.get("impl").and_then(Value::as_str) == Some("citizen.default")).collect();
+        let people: Vec<_> = streamed.config.participants.iter().filter(|p| p.controller.get("impl").and_then(|x| x.as_str()) == Some("citizen.default")).collect();
         // (Each distinct member, held once: the town's ventures, the same for everyone, are one.)
         let held = |name: &str| -> std::collections::BTreeSet<usize> {
             people.iter().flat_map(|p| p.controller.parts().1.iter().filter(|m| m.0 == name).map(|m| std::sync::Arc::as_ptr(m) as usize)).collect()

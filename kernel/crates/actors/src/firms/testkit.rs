@@ -50,8 +50,8 @@ pub fn picture(t: i64, entity: &str, records: Vec<Arc<Record>>, accounts: &[(&st
         .map(|(a, h, b)| serde_json::from_value(json!({ "account": a, "holder": h, "custodian": "bank", "currency": "XTS", "balance": b.to_string() })).unwrap())
         .collect();
     let mut channels = BTreeMap::new();
-    channels.insert("papers".to_string(), Seen::Records { records, search: false });
-    channels.insert("treasury".to_string(), Seen::Accounts { accounts: Arc::new(items), transactions });
+    channels.insert("papers".into(), Seen::Records { records, search: false });
+    channels.insert("treasury".into(), Seen::Accounts { accounts: Arc::new(items), transactions: transactions.into_iter().map(Arc::new).collect() });
     Picture {
         participant: "x".into(),
         t,
@@ -150,6 +150,6 @@ pub fn with_directory(mut pic: Picture, positions: &[(&str, &str, Option<&str>)]
         .map(|(p, e, h)| serde_json::from_value(json!({ "position": p, "entity": e, "role": "officer", "holder": h })).unwrap())
         .collect();
     let es: Vec<oikos_sight::EntityItem> = entities.iter().map(|(e, k, p)| serde_json::from_value(json!({ "entity": e, "kind": k, "name": e, "participant": p })).unwrap()).collect();
-    pic.channels.insert("who".to_string(), Seen::Directory { entities: Arc::new(es), positions: Arc::new(ps) });
+    pic.channels.insert("who".into(), Seen::Directory { entities: Arc::new(es), positions: Arc::new(ps) });
     pic
 }

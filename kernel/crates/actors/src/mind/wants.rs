@@ -264,7 +264,7 @@ pub fn want_params(given: &Value) -> WantParams {
     let g = |k: &str| given.get(k);
     macro_rules! ints { ($($f:ident),*) => { $( if let Some(x) = int_of(g(stringify!($f))) { p.$f = x; } )* } }
     ints!(kept, unmet_days, met_margin_bps, patience_days, tries, grow_bps, grows, rest_days, event_bps, need_bps, copy_from, ask_again_days, rise_bps, answer_days);
-    if let Some(m) = g("unmet_bps").and_then(Value::as_object) {
+    if let Some(m) = g("unmet_bps").and_then(|x| x.as_object()) {
         for (k, v) in m {
             if let Some(x) = int_of(Some(v)) {
                 p.unmet_bps.insert(k.clone(), x);
@@ -315,25 +315,25 @@ pub struct Opening {
 }
 
 /// JavaScript truthiness of a JSON value (`o.money` in TS is a test of this).
-fn truthy(v: Option<&Value>) -> bool {
-    match v {
-        None | Some(Value::Null) | Some(Value::Bool(false)) => false,
-        Some(Value::Number(n)) => n.as_f64().map_or(true, |f| f != 0.0 && !f.is_nan()),
-        Some(Value::String(s)) => !s.is_empty(),
+fn truthy<V: oikos_core::frozen::JsonRead + ?Sized>(v: Option<&V>) -> bool {
+    match v.map(oikos_core::frozen::JsonRead::view) {
+        None | Some(oikos_core::frozen::JsonRef::Null) | Some(oikos_core::frozen::JsonRef::Bool(false)) => false,
+        Some(oikos_core::frozen::JsonRef::Number(n)) => n.as_f64().map_or(true, |f| f != 0.0 && !f.is_nan()),
+        Some(oikos_core::frozen::JsonRef::String(s)) => !s.is_empty(),
         Some(_) => true,
     }
 }
 
 /// JavaScript's `Number(x)` of a JSON number or numeric string (NaN where it is neither).
-fn number_of(v: Option<&Value>) -> f64 {
-    match v {
-        Some(Value::Number(n)) => n.as_f64().unwrap_or(f64::NAN),
-        Some(Value::String(s)) => {
+fn number_of<V: oikos_core::frozen::JsonRead + ?Sized>(v: Option<&V>) -> f64 {
+    match v.map(oikos_core::frozen::JsonRead::view) {
+        Some(oikos_core::frozen::JsonRef::Number(n)) => n.as_f64().unwrap_or(f64::NAN),
+        Some(oikos_core::frozen::JsonRef::String(s)) => {
             let t = s.trim();
             if t.is_empty() { 0.0 } else { t.parse::<f64>().unwrap_or(f64::NAN) }
         }
-        Some(Value::Bool(b)) => f64::from(u8::from(*b)),
-        None | Some(Value::Null) => 0.0,
+        Some(oikos_core::frozen::JsonRef::Bool(b)) => f64::from(u8::from(b)),
+        None | Some(oikos_core::frozen::JsonRef::Null) => 0.0,
         _ => f64::NAN,
     }
 }
@@ -342,7 +342,7 @@ fn number_of(v: Option<&Value>) -> f64 {
 /// 2c). `offer` is the offer as JSON (`terms.commitments[]`, each `who`, `does.outcome`, optional `every` seconds).
 /// `pays_now`: what the taker pays a month now for the same kind of thing (a lease's rent); an offer asking less
 /// brings money from me. Terms in words bring nothing typed. In `SEEK_KEYS` order.
-pub fn brings_of(offer: &Value, pays_now: Option<i64>) -> Vec<SeekKey> {
+pub fn brings_of(offer: &oikos_core::Frozen, pays_now: Option<i64>) -> Vec<SeekKey> {
     let mut out: Vec<SeekKey> = Vec::new();
     let mut add = |k: SeekKey| {
         if !out.contains(&k) {
@@ -351,10 +351,10 @@ pub fn brings_of(offer: &Value, pays_now: Option<i64>) -> Vec<SeekKey> {
     };
     const MONTH: f64 = (30 * 86_400) as f64;
     let mut asks = 0.0_f64;
-    if let Some(cs) = offer.get("terms").and_then(|t| t.get("commitments")).and_then(Value::as_array) {
+    if let Some(cs) = offer.get("terms").and_then(|t| t.get("commitments")).and_then(|x| x.as_array()) {
         for c in cs {
             let Some(o) = c.get("does").and_then(|d| d.get("outcome")).filter(|o| truthy(Some(o))) else { continue };
-            let taker = c.get("who").and_then(Value::as_str) == Some("taker");
+            let taker = c.get("who").and_then(|x| x.as_str()) == Some("taker");
             let money = truthy(o.get("money"));
             if money && !taker {
                 add(SeekKey::MoneyTo);
@@ -684,15 +684,15 @@ mod tests {
     #[test]
     fn what_an_offer_brings_is_read_from_its_typed_terms() {
         use SeekKey::*;
-        assert_eq!(brings_of(&posting(), None), vec![MoneyTo, Work]);
-        assert_eq!(brings_of(&listing(100_000), None), vec![Occupancy]);
-        assert_eq!(brings_of(&listing(90_000), Some(100_000)), vec![MoneyFrom, Occupancy]);
-        assert_eq!(brings_of(&listing(110_000), Some(100_000)), vec![Occupancy]);
-        assert_eq!(brings_of(&membership(), None), vec![]);
-        assert_eq!(brings_of(&Value::Null, None), vec![]);
+        assert_eq!(brings_of(&oikos_core::Frozen::of(&posting()), None), vec![MoneyTo, Work]);
+        assert_eq!(brings_of(&oikos_core::Frozen::of(&listing(100_000)), None), vec![Occupancy]);
+        assert_eq!(brings_of(&oikos_core::Frozen::of(&listing(90_000)), Some(100_000)), vec![MoneyFrom, Occupancy]);
+        assert_eq!(brings_of(&oikos_core::Frozen::of(&listing(110_000)), Some(100_000)), vec![Occupancy]);
+        assert_eq!(brings_of(&oikos_core::Frozen::of(&membership()), None), vec![]);
+        assert_eq!(brings_of(&oikos_core::Frozen::of(&Value::Null), None), vec![]);
         // A rent asked a fortnight at a time is a month's by the same reckoning.
         let fortnightly = json!({ "terms": { "commitments": [{ "who": "taker", "does": { "outcome": { "money": { "amount": 40_000 } } }, "every": 14 * DAY }] } });
-        assert_eq!(brings_of(&fortnightly, Some(100_000)), vec![MoneyFrom]); // 40,000 x 30/14 = 85,714
+        assert_eq!(brings_of(&oikos_core::Frozen::of(&fortnightly), Some(100_000)), vec![MoneyFrom]); // 40,000 x 30/14 = 85,714
     }
 
     #[test]

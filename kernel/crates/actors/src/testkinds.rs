@@ -214,7 +214,7 @@ impl Actor for Wrapped {
                 for w in self.withdraw.iter_mut().filter(|w| &w.kind == kind) {
                     let mine = if w.by == "author" { r.author == pic.participant } else { r.speaks_for.as_deref() == Some(pic.entity.as_str()) };
                     if mine {
-                        w.seen = Some(r.id.clone());
+                        w.seen = Some(r.id.to_string());
                     }
                 }
             }

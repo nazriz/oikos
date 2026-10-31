@@ -133,7 +133,7 @@ pub mod rig {
                 positions: vec![],
                 outcomes,
                 inbox: vec![],
-                channels: channels.into_iter().map(|(k, v)| (k.to_string(), v)).collect::<BTreeMap<_, _>>(),
+                channels: channels.into_iter().map(|(k, v)| (oikos_sight::Id::new(k), v)).collect::<BTreeMap<_, _>>(),
                 asking: vec![],
                 readings: BTreeMap::new(),
                 woke_for: woke_for.into(),

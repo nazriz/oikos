@@ -49,9 +49,9 @@ fn live_planning(params: &WorldParams, ops: &[Op], finish: bool, every: Option<u
     for (i, op) in ops.iter().enumerate() {
         if every.is_some_and(|n| i % n == 0) {
             let st = run.kernel().state();
-            let mut who: Vec<(String, Option<String>)> = st.participants.keys().flat_map(|p| [(p.clone(), None), (p.clone(), Some("self".to_string()))]).collect();
-            who.extend(st.positions.iter().filter_map(|(id, x)| Some((x.holder.clone()?, Some(id.clone())))));
-            who.push(("nobody".to_string(), None));
+            let mut who: Vec<(oikos_kernel::blocks::Id, Option<oikos_kernel::blocks::Id>)> = st.participants.keys().flat_map(|p| [(*p, None), (*p, Some("self".into()))]).collect();
+            who.extend(st.positions.iter().filter_map(|(id, x)| Some((x.holder?, Some(*id)))));
+            who.push(("nobody".into(), None));
             let n = who.len();
             who.rotate_left(i % n);
             run.plan(who);

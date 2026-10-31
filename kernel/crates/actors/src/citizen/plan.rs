@@ -131,13 +131,13 @@ impl Person {
     /// Deposits, and rent the bank could not pay, paid now, oldest first, once there's enough.
     fn begin_money(&mut self, w: &mut Week) {
         let me = self.me.clone();
-        let ours: Vec<_> = w.pic.accounts().filter(|a| a.holder == me).map(|a| (a.account.clone(), a.custodian.clone(), crate::common::money::cents(a.balance))).collect();
+        let ours: Vec<_> = w.pic.accounts().filter(|a| a.holder == me).map(|a| (a.account, a.custodian, crate::common::money::cents(a.balance))).collect();
         let Some(acc) = w.acc.clone() else { return };
         for (account, custodian, balance) in ours {
             if custodian == me && balance > 0 {
                 w.push(because(
                     "Depositing the money we brought into our bank account.",
-                    vec![pay(&acc.account, balance, Pay { from: Some(account), for_: Some("Deposit.".into()), ..Default::default() }, w.cx)],
+                    vec![pay(&acc.account, balance, Pay { from: Some(account.to_string()), for_: Some("Deposit.".into()), ..Default::default() }, w.cx)],
                 ));
             }
         }
@@ -164,7 +164,7 @@ impl Person {
         let t = w.t;
         let me = self.me.clone();
         if self.s.living_at.is_none() && matches!(w.pic.channels.get("street"), Some(oikos_sight::Seen::Sites { .. })) {
-            self.s.living_at = super::person::spaces(w.pic).find(|sp| sp.kind == "dwelling" && super::person::occupants(sp).contains(&me)).map(|sp| sp.space.clone());
+            self.s.living_at = (super::person::spaces(w.pic).find(|sp| sp.kind == "dwelling" && super::person::occupants(sp).iter().any(|x| x == &me)).map(|sp| sp.space)).map(|x| x.to_string());
         }
         for (_, what) in std::mem::take(&mut self.s.heard) {
             match what {

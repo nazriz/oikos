@@ -23,7 +23,7 @@ use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
-use oikos_kernel::blocks::Block;
+use oikos_kernel::blocks::{Block, Id};
 use oikos_kernel::config::{cell_xy, footprint_cells, split_space};
 use oikos_kernel::events::{EventBody, RefusalCode};
 use oikos_kernel::run::Run;
@@ -33,21 +33,21 @@ use oikos_kernel::Command;
 #[derive(Debug, Clone, PartialEq)]
 struct Mirror {
     /// structure -> (cells, type, complete)
-    structures: BTreeMap<String, (Vec<String>, String, bool)>,
+    structures: BTreeMap<Id, (Vec<Id>, Id, bool)>,
     /// space -> bodies in it
-    occupancy: BTreeMap<String, BTreeSet<String>>,
+    occupancy: BTreeMap<Id, BTreeSet<Id>>,
     /// person -> (present, alive)
-    bodies: BTreeMap<String, (bool, bool)>,
+    bodies: BTreeMap<Id, (bool, bool)>,
     /// position -> holder
-    holders: BTreeMap<String, Option<String>>,
+    holders: BTreeMap<Id, Option<Id>>,
 }
 
 fn mirror_of(st: &State) -> Mirror {
     Mirror {
-        structures: st.structures.iter().map(|(id, x)| (id.clone(), (x.cells.clone(), x.structure_type.clone(), x.complete))).collect(),
-        occupancy: st.occupancy.values().flat_map(|m| m.iter().map(|(sp, b)| (sp.clone(), b.clone()))).filter(|(_, b)| !b.is_empty()).collect(),
-        bodies: st.entities.iter().filter_map(|(id, e)| e.body.as_ref().map(|b| (id.clone(), (b.present, b.alive)))).collect(),
-        holders: st.positions.iter().map(|(id, x)| (id.clone(), x.holder.clone())).collect(),
+        structures: st.structures.iter().map(|(id, x)| (*id, (x.cells.clone(), x.structure_type, x.complete))).collect(),
+        occupancy: st.occupancy.values().flat_map(|m| m.iter().map(|(sp, b)| (*sp, b.clone()))).filter(|(_, b)| !b.is_empty()).collect(),
+        bodies: st.entities.iter().filter_map(|(id, e)| e.body.as_ref().map(|b| (*id, (b.present, b.alive)))).collect(),
+        holders: st.positions.iter().map(|(id, x)| (*id, x.holder)).collect(),
     }
 }
 
@@ -82,9 +82,9 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
         Some(pos) => match st.positions.get(pos) {
             None => return Some(Err(RefusalCode::UnknownPosition)),
             Some(x) if x.holder.as_deref() != Some(participant) => return Some(Err(RefusalCode::NotInPosition)),
-            Some(x) => x.entity.clone(),
+            Some(x) => x.entity,
         },
-        None => p.person.clone()?,
+        None => p.person?,
     };
     let me_person = position.is_none();
     // A system works only for the organisation it belongs to.
@@ -94,7 +94,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
     let types = &s.types;
     Some(match b {
         Block::Transfer { from, to, amount, settles: None, per_instruction: None, .. } => {
-            let (Some(f), Some(t)) = (st.accounts.get(from), st.accounts.get(to)) else { return Some(Err(RefusalCode::UnknownAccount)) };
+            let (Some(f), Some(t)) = (st.accounts.get(from.as_str()), st.accounts.get(to.as_str())) else { return Some(Err(RefusalCode::UnknownAccount)); };
             // v0.5 (D58): amounts are exact to 38 digits, and money moves only within one currency.
             let max = oikos_kernel::money::MAX_MONEY;
             let above = || from != to && t.balance.checked_add(*amount).is_none_or(|x| x > max);
@@ -146,7 +146,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
         Block::Occupy { space, who } => {
             let who = match who {
                 Some(w) => w.clone(),
-                None if me_person => me.clone(),
+                None if me_person => me.to_string(),
                 None => return Some(Err(RefusalCode::NotAPerson)),
             };
             if let Err(e) = living(st, &who) {
@@ -155,10 +155,10 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             let Some((sid, local)) = split_space(space) else { return Some(Err(RefusalCode::UnknownSpace)) };
             let Some(x) = st.structures.get(sid) else { return Some(Err(RefusalCode::UnknownStructure)) };
             let Some(spec) = s.space(&x.structure_type, local) else { return Some(Err(RefusalCode::UnknownSpace)) };
-            let bodies = st.occupancy.get(sid).and_then(|m| m.get(space));
+            let bodies = st.occupancy.get(sid).and_then(|m| m.get(space.as_str()));
             if !x.complete {
                 Err(RefusalCode::StructureIncomplete)
-            } else if bodies.is_some_and(|b| b.contains(&who)) {
+            } else if bodies.is_some_and(|b| b.contains(who.as_str())) {
                 Err(RefusalCode::AlreadyPresent)
             } else if bodies.map_or(0, |b| b.len()) as u32 >= spec.capacity {
                 Err(RefusalCode::CapacityExceeded)
@@ -169,11 +169,11 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             }
         }
         Block::Vacate { occupant, from } => {
-            if !st.entities.contains_key(occupant) {
+            if !st.entities.contains_key(occupant.as_str()) {
                 Err(RefusalCode::UnknownEntity)
             } else {
                 let sid = split_space(from).map_or(from.as_str(), |(s, _)| s);
-                let there = st.occupancy.get(sid).is_some_and(|m| m.iter().any(|(sp, b)| (sp == from || sid == from) && b.contains(occupant)));
+                let there = st.occupancy.get(sid).is_some_and(|m| m.iter().any(|(sp, b)| (sp == from || sid == from) && b.contains(occupant.as_str())));
                 if there {
                     Ok(())
                 } else {
@@ -181,7 +181,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                 }
             }
         }
-        Block::CloseAccount { account } => match st.accounts.get(account) {
+        Block::CloseAccount { account } => match st.accounts.get(account.as_str()) {
             None => Err(RefusalCode::UnknownAccount),
             Some(a) if a.custodian != me => Err(RefusalCode::NotCustodian),
             Some(_) if s.is_boundary_account(account) => Err(RefusalCode::BoundaryProtected),
@@ -196,7 +196,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                 return Some(Err(RefusalCode::UnknownTask));
             }
             let total = spec.map_or(1, |x| x.labour) * *units as i64;
-            let Some(place) = st.structures.get(at) else { return Some(Err(RefusalCode::UnknownStructure)) };
+            let Some(place) = st.structures.get(at.as_str()) else { return Some(Err(RefusalCode::UnknownStructure)) };
             if !place.complete {
                 return Some(Err(RefusalCode::StructureIncomplete));
             }
@@ -212,8 +212,8 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                 if let Err(e) = living(st, p) {
                     return Some(Err(e));
                 }
-                let there = st.occupancy.get(at).is_some_and(|m| {
-                    m.iter().any(|(space, bodies)| bodies.contains(p) && kind.as_ref().is_none_or(|k| split_space(space).is_some_and(|(_, l)| l.split('.').next() == Some(k.as_str()))))
+                let there = st.occupancy.get(at.as_str()).is_some_and(|m| {
+                    m.iter().any(|(space, bodies)| bodies.contains(p.as_str()) && kind.as_ref().is_none_or(|k| split_space(space).is_some_and(|(_, l)| l.split('.').next() == Some(k.as_str()))))
                 });
                 if !there {
                     return Some(Err(RefusalCode::NotAtWork));
@@ -231,8 +231,8 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                     oikos_time::place(&mut l, lanes, st.t, 0).0
                 };
                 let (key, lanes) = match p.kind {
-                    oikos_kernel::config::ParticipantKind::Person => (p.person.clone().unwrap_or_else(|| participant.to_string()), 1),
-                    oikos_kernel::config::ParticipantKind::System => (participant.to_string(), p.def.lanes.unwrap_or(1) as usize),
+                    oikos_kernel::config::ParticipantKind::Person => { (p.person.unwrap_or_else(|| participant.to_string().into()), 1)}
+                    oikos_kernel::config::ParticipantKind::System => (Id::new(participant), p.def.lanes.unwrap_or(1) as usize),
                 };
                 let start = performers.iter().filter(|w| **w != key).map(|w| free(w, 1)).fold(free(&key, lanes), i64::max);
                 let portions = |mut at: i64, mut left: i64| {
@@ -247,7 +247,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                     out
                 };
                 // (And no one work is longer than a day: exec.rs refuses it whenever it would be done.)
-                if share > day || performers.iter().any(|w| portions(start, share).into_iter().any(|(d, take)| st.timelines.get(w).map_or(0, |tl| tl.worked_on(d)) + take > day)) {
+                if share > day || performers.iter().any(|w| portions(start, share).into_iter().any(|(d, take)| st.timelines.get(w.as_str()).map_or(0, |tl| tl.worked_on(d)) + take > day)) {
                     return Some(Err(RefusalCode::NoTimeLeft));
                 }
             }
@@ -256,7 +256,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             }
             if builtin || spec.is_some_and(|x| !x.changes.is_empty()) {
                 let target = on.clone().unwrap_or_else(|| at.clone());
-                let Some(t) = st.structures.get(&target) else { return Some(Err(RefusalCode::UnknownStructure)) };
+                let Some(t) = st.structures.get(target.as_str()) else { return Some(Err(RefusalCode::UnknownStructure)) };
                 if task == "build" && (t.complete || t.demolition.is_some()) {
                     return Some(Err(RefusalCode::NotBeingBuilt));
                 }
@@ -273,9 +273,9 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                 Err(RefusalCode::UnknownResource)
             } else if !(1..=max).contains(quantity) {
                 Err(RefusalCode::Overflow)
-            } else if !st.entities.contains_key(to) {
+            } else if !st.entities.contains_key(to.as_str()) {
                 Err(RefusalCode::UnknownEntity)
-            } else if !(st.structures.contains_key(to_at) || (s.is_boundary(to) && to_at == to)) {
+            } else if !(st.structures.contains_key(to_at.as_str()) || (s.is_boundary(to) && to_at == to)) {
                 Err(RefusalCode::UnknownPlace)
             } else {
                 let have = st.holding(&me, from_at, kind);
@@ -294,7 +294,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
         Block::Leave { person, to } => {
             let who = match person {
                 Some(w) => w.clone(),
-                None if me_person => me.clone(),
+                None if me_person => me.to_string(),
                 None => return Some(Err(RefusalCode::NotAPerson)),
             };
             // Leaving by something that isn't one of the world's edges is refused.
@@ -314,10 +314,10 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             if position.is_none() || st.entities.get(&me).is_some_and(|e| e.body.is_some()) {
                 Err(RefusalCode::NotTheirs)
             } else {
-                match st.positions.get(target) {
+                match st.positions.get(target.as_str()) {
                     None => Err(RefusalCode::UnknownPosition),
                     Some(x) if x.entity != me => Err(RefusalCode::NotTheirs),
-                    Some(_) => match to.as_ref().map(|t| st.participants.get(t)) {
+                    Some(_) => match to.as_ref().map(|t| st.participants.get(t.as_str())) {
                         Some(None) => Err(RefusalCode::UnknownParticipant),
                         Some(Some(q)) if q.status == ParticipantStatus::Ended => Err(RefusalCode::ParticipantInactive),
                         // (A system works only for the organisation it belongs to.)
@@ -355,21 +355,21 @@ fn check(ops: &[Op]) -> Result<BTreeMap<String, usize>, TestCaseError> {
                     let ty = &s.types[structure_type];
                     let cells = footprint_cells(&s.detailed, on, ty.footprint).expect("a building stands on the ground");
                     for c in &cells {
-                        prop_assert!(!m.structures.values().any(|(cs, _, _)| cs.contains(c)), "built on occupied ground {}", c);
+                        prop_assert!(!m.structures.values().any(|(cs, _, _)| cs.iter().any(|x| *x ==c.to_string())), "built on occupied ground {}", c);
                         let (x, y) = cell_xy(c).unwrap();
                         let t = oikos_kernel::config::terrain_at(&s.config.world.ground, x, y);
                         let fits = match &ty.terrains { Some(ok) => t.is_some_and(|t| ok.iter().any(|o| o == t)), None => t.is_none() };
                         prop_assert!(fits, "a {} stood on {:?} terrain", structure_type, t);
                     }
-                    m.structures.insert(structure.clone(), (cells, structure_type.clone(), false));
+                    m.structures.insert(structure.to_string().into(), (cells.iter().map(|x| x.to_string()).map(Into::into).collect(), structure_type.to_string().into(), false));
                 }
                 EventBody::StructureCompleted { structure } => {
-                    let x = m.structures.get_mut(structure).expect("completed structure exists");
+                    let x = m.structures.get_mut(structure.as_str()).expect("completed structure exists");
                     prop_assert!(!x.2, "completed twice");
                     x.2 = true;
                 }
                 EventBody::StructureDemolished { structure, .. } => {
-                    prop_assert!(m.structures.remove(structure).is_some(), "demolished a structure that wasn't there");
+                    prop_assert!(m.structures.remove(structure.as_str()).is_some(), "demolished a structure that wasn't there");
                     let prefix = format!("{structure}/");
                     prop_assert!(!m.occupancy.keys().any(|sp| sp.starts_with(&prefix)), "demolished with bodies still recorded inside");
                 }
@@ -377,46 +377,46 @@ fn check(ops: &[Op]) -> Result<BTreeMap<String, usize>, TestCaseError> {
                     let (sid, local) = split_space(space).unwrap();
                     let (_, ty, complete) = m.structures.get(sid).expect("occupied structure exists").clone();
                     prop_assert!(complete, "occupied an unfinished building");
-                    prop_assert!(m.bodies.get(occupant) == Some(&(true, true)), "{} went into a space without being alive and in the world", occupant);
-                    let cap = s.spaces[&ty][local].capacity as usize;
-                    let b = m.occupancy.entry(space.clone()).or_default();
-                    prop_assert!(b.insert(occupant.clone()), "{} was already in {}", occupant, space);
+                    prop_assert!(m.bodies.get(occupant.as_str()) == Some(&(true, true)), "{} went into a space without being alive and in the world", occupant);
+                    let cap = s.spaces[ty.as_str()][local].capacity as usize;
+                    let b = m.occupancy.entry(space.to_string().into()).or_default();
+                    prop_assert!(b.insert(occupant.to_string().into()), "{} was already in {}", occupant, space);
                     prop_assert!(b.len() <= cap, "over capacity: {} > {}", b.len(), cap);
                 }
                 EventBody::Vacated { occupant, space, .. } => {
-                    let b = m.occupancy.get_mut(space);
-                    prop_assert!(b.is_some_and(|b| b.remove(occupant)), "{} left {} without being there", occupant, space);
+                    let b = m.occupancy.get_mut(space.as_str());
+                    prop_assert!(b.is_some_and(|b| b.remove(occupant.as_str())), "{} left {} without being there", occupant, space);
                     m.occupancy.retain(|_, b| !b.is_empty());
                 }
                 EventBody::PersonCreated { person, parents, .. } => {
                     // A newcomer is in the world; a child is where its birthing parent is.
-                    let present = parents.first().is_none_or(|p| m.bodies.get(p).is_some_and(|b| b.0));
-                    m.bodies.insert(person.clone(), (present, true));
-                    created.insert(person.clone());
+                    let present = parents.first().is_none_or(|p| m.bodies.get(p.as_str()).is_some_and(|b| b.0));
+                    m.bodies.insert(person.to_string().into(), (present, true));
+                    created.insert(person.to_string());
                 }
                 EventBody::PersonArrived { person, .. } => {
-                    let b = m.bodies.get_mut(person).expect("arrived body exists");
+                    let b = m.bodies.get_mut(person.as_str()).expect("arrived body exists");
                     prop_assert!(b.1, "the dead arrived");
-                    prop_assert!(created.contains(person) || !b.0, "{} arrived while already in the world", person);
+                    prop_assert!(created.contains(person.as_str()) || !b.0, "{} arrived while already in the world", person);
                     b.0 = true;
                 }
                 EventBody::PersonLeft { person, .. } => {
-                    let b = m.bodies.get_mut(person).expect("body exists");
+                    let b = m.bodies.get_mut(person.as_str()).expect("body exists");
                     prop_assert!(*b == (true, true), "{} left without being alive and in the world", person);
                     b.0 = false;
-                    prop_assert!(!m.occupancy.values().any(|x| x.contains(person)), "{} left the world still in a space", person);
+                    prop_assert!(!m.occupancy.values().any(|x| x.contains(person.as_str())), "{} left the world still in a space", person);
                 }
                 EventBody::PersonDied { person, .. } => {
-                    let b = m.bodies.get_mut(person).expect("body exists");
+                    let b = m.bodies.get_mut(person.as_str()).expect("body exists");
                     prop_assert!(b.1, "{} died twice", person);
                     b.1 = false;
-                    prop_assert!(!m.occupancy.values().any(|x| x.contains(person)), "{} died still in a space", person);
+                    prop_assert!(!m.occupancy.values().any(|x| x.contains(person.as_str())), "{} died still in a space", person);
                 }
                 EventBody::Appointed { position, holder, .. } => {
-                    m.holders.insert(position.clone(), holder.clone());
+                    m.holders.insert(*position, *holder);
                 }
                 EventBody::PositionCreated { position, .. } => {
-                    m.holders.insert(position.clone(), None);
+                    m.holders.insert(position.to_string().into(), None);
                 }
                 EventBody::ActionApplied { participant, .. } => {
                     // Only a participant that can act does.
@@ -505,7 +505,7 @@ fn the_oracle_is_exercised() {
     let mut run = Run::start(world(&default_params()), "oracle", Vec::new(), None).unwrap();
     let act = |p: &str, pos: Option<&str>, b: serde_json::Value| Command::Act {
         participant: p.into(),
-        position: pos.map(String::from),
+        position: pos.map(String::from).map(Into::into),
         blocks: vec![serde_json::from_value(b).unwrap()],
         by: vec![],
         provenance: json!({"via": "direct"}),

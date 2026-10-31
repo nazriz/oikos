@@ -634,7 +634,7 @@ pub fn culture_dial(dials: &Json) -> Result<Option<CultureDial>, String> {
     let shares = match profile.and_then(|p| p.get("origin_shares")) {
         Some(Json::Array(list)) => list
             .iter()
-            .map(|s| OriginShare { id: s.get("id").and_then(Json::as_str).unwrap_or_default().to_string(), share_bps: s.get("share_bps").and_then(js_integer).unwrap_or(0) })
+            .map(|s| OriginShare { id: s.get("id").and_then(|x| x.as_str()).unwrap_or_default().to_string(), share_bps: s.get("share_bps").and_then(js_integer).unwrap_or(0) })
             .collect(),
         _ => vec![],
     };

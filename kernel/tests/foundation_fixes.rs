@@ -16,9 +16,9 @@ const DAY: i64 = 86_400;
 fn cmd_by(participant: &str, position: Option<&str>, blocks: Value, by: &[&str]) -> Command {
     Command::Act {
         participant: participant.into(),
-        position: position.map(String::from),
+        position: position.map(String::from).map(Into::into),
         blocks: serde_json::from_value(blocks).expect("the blocks parse"),
-        by: by.iter().map(|s| s.to_string()).collect(),
+        by: by.iter().map(|s| s.to_string()).map(Into::into).collect(),
         provenance: json!({"via": "direct"}),
         reasoning: None,
         thinking: None,
