@@ -9595,3 +9595,47 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   no space and so nowhere, travelling from nowhere for nothing. Both are in the inventory, for the steps that end them.
 - **Revisit if** a finding turns out to be a false positive (then the audit is wrong, never the inventory widened); the
   log audits need more than a month to see a module's moves (then the run grows).
+
+## 2026-10-31 · Foundations-2 phase 3, S2: roads are ways of the network, and vehicles are driven (branch `f2-phase3`; results move; no model called)
+
+- **Contract (world config, blocks, log; blanket approval).** A structure type may be a **way** (`way`: its mode, what a
+  link of it carries an hour each way, its speed for vehicles). Standing and complete, each cell of it is a node of the
+  world's ways, joined to the next cell's node of the same mode by a link a cell long; a world with a way says how many
+  metres a cell is (`world.ground.cell`, refused at load otherwise). The reserved `travel.roads` is gone (a road is a
+  built thing, so it is a structure that is a way, and the town's new roads join the ways when finished); a vehicle type
+  states its top speed (`speed_kmh`, for the reserved `seconds_per_cell`), and a vehicle who besides its owner may drive
+  it (`drivers`). `occupy` gains `vehicle` (the call's `by`, code's own until the translator is taught it, as the
+  network's calls are: `CODE_ONLY_ARGS` in the resolver), and `occupied` names it.
+- **Kernel.** A trip (`travel.rs`, `ways.rs`) is on foot over the cells all the way, or on foot to the way's node nearest
+  where it sets out, along the links (driven at the lower of the vehicle's speed and the link's, or walked at the round's
+  pace), and on foot from the node nearest where it goes, whichever is quicker; the ways and each node's quickest times are
+  worked out once a ground epoch (a way finished or pulled down is a new epoch), the trips cached by vehicle speed as
+  before. An `occupy` with a vehicle is refused unless the body may drive it (`not_theirs`) and it stands where the body
+  sets out (`not_present`); the vehicle then stands where the body arrived. A person's view shows the vehicles they may
+  drive and where each stands (theirs: their own things). A world with no way runs as before, to the hash (checked: main's
+  10,000-person config on this build gives main's state hash).
+- **Generator 0.72.0, profiles.** The road type is a way (the profile's `round.roads.speed_kmh`, 45 km/h or 30 where a
+  road cell took 3 s, the speed a road cell was crossed at; `capacity_per_hour` 900, a placeholder); the road cover is no
+  longer quicker than walking; the ground's cell is the nature's `cell_m`. Housed households have a vehicle by the
+  profile's `round.vehicles.households` shares (a car, or a motorcycle where the census counts them; at most one each),
+  owned by the leaseholder or owner, standing at home, the other adults let drive it. Sources in each profile's `round`
+  note, most recalled and to confirm (WM-4).
+- **Citizen.** Going where they belong, a citizen takes a vehicle of theirs that stands where they are; if the world says
+  it was not there to take (another of the household took it first) or not theirs, they go again at once on foot.
+- **Inventory.** S2 done: the road as a cover gone (`waysOffNetwork` empty; the entry `road-by-cover` a guard).
+- **Measured** (au-vic, `worlds/town-1000.yaml` with `citizens=10000`, `living.initiative_bps=10000`, 30 days, all code, 4
+  engine threads, the log discarded; the machine shared and loaded, so paired runs): before (main at cc6103d2) and after,
+  run alternately twice: wall 90 / 96 s and 106 / 108 s; the run's own thread 72.3 / 76.8 s and 82.3 / 85.5 s (+3 to
+  6%); peak 1.81 / 1.82 GB; log 3,332,887 / 3,345,323 lines (+0.4%). 6,460 of 28,075 moves into a space were driven;
+  1,596 drives refused `not_present` (a household's second driver finding the car gone; each then walks). The
+  10,000-person town of `town-1000.yaml` holds 10,000 people in its 380 homes, so most are unhoused and the round's moves
+  are few (28,075 in a month); the 300-person towns of the backstop run drive about four moves in ten.
+- **Not as designed:** roads are not explicit links of `world.network` (3.1: "today's reserved `travel.roads` becomes
+  links") but structures that are ways, so that a road the town builds is part of the network when it is finished; links
+  declared in `world.network` with a mode for travel (between towns) come with S6. The trip uses the nodes nearest its
+  ends, not the best of all entry nodes (a road with a gap is walked whole: the known limit, simple and stable).
+- **Pins re-taken:** culture-dial's three config hashes and Rust states, representation's six towns (their reason there).
+- **Revisit if** the nearest-node rule gives a trip plainly longer than a real one (then the entry node is chosen among
+  the few nearest by the whole trip's time); a household's second car matters to a result (then households hold more than
+  one, by the census's counts); the refused second drives show in a log's size (then a household's adults agree who takes
+  the car, as behaviour with a source).

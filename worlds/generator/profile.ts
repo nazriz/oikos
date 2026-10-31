@@ -482,7 +482,10 @@ export interface Profile {
     round?: { work_start_hour: number; work_end_hour: number; work_days: number; school_start_hour: number; school_end_hour: number; travel_seconds_per_cell: number; travel_by_cover: { [cover: string]: number };
       /** Roads (world-expansion 6.3): a road cell's travel time, how far from one a building may stand before the town builds
        * toward it, and what the town budgets for roads a year per resident (cents). */
-      roads?: { seconds_per_cell: number; within_cells: number; budget_per_resident: number } };
+      roads?: { speed_kmh: number; capacity_per_hour: number; within_cells: number; budget_per_resident: number };
+      /** Law 9 (foundations-2 S2): the kinds of vehicle (seats, top speed) and, of housed households, the share whose vehicle is
+       * of each kind (at most one a household). */
+      vehicles?: { types: { id: string; seats: number; speed_kmh: number }[]; households: { type: string; bps: number }[] } };
     /** Home ownership (world-expansion 6.2): which houses their households own, with a mortgage or outright. */
     /** `owner_bps_by_age`: of households, the share who own their home, by the age of the household's head; read as
      * how much likelier one household is than another to be among the town's owners (their number is the houses'). */

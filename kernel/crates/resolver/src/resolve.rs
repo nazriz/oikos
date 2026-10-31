@@ -965,7 +965,8 @@ impl Resolver<'_> {
         }
         let space = self.space(&inside)?;
         let who = (who != self.k.entity).then_some(who);
-        Ok(vec![obj(vec![("block", some("occupy")), ("space", some(space)), ("who", who.map(Json::from))])])
+        let by = Self::str_(c, "by")?.filter(|v| !v.is_empty());
+        Ok(vec![obj(vec![("block", some("occupy")), ("space", some(space)), ("who", who.map(Json::from)), ("vehicle", by.map(Json::from))])])
     }
 
     fn occupancy_outcome(&self, c: &Call) -> R<Json> {

@@ -109,6 +109,10 @@ pub enum Block {
         space: IdOrRef,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         who: Option<IdOrRef>,
+        /// Law 9 (foundations-2 S2): the vehicle it goes by, driven (one it may drive, standing where it sets out); none, on
+        /// foot.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        vehicle: Option<IdOrRef>,
     },
     /// A body comes out of a structure (every space it's in there) or one space.
     Vacate {

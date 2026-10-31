@@ -143,6 +143,7 @@ export const FIGURE_BASIS: Basis[] = [
   derived("world.records.*.data.members.*.born_at", "drawn from the profile's age structure"),
   placeholder("world.accounts.*.balance", "opening balances: the profile's wealth and savings by age where it has them, the generator's opening months elsewhere (ME-11)"),
   derived("world.records", "a record's terms: the profile's wages, rents, periods and laws, as the generator writes them"),
+  prof("world.ground.cell", "nature.cell_m"),
   derived("world.ground", "the ground's layout, drawn by the generator from the spec's grid"),
   derived("world.places", "the places on the ground, drawn by the generator from the spec's grid"),
   placeholder("world.holdings", "opening stocks: the generator's days of trade"),
@@ -170,7 +171,9 @@ export const FIGURE_BASIS: Basis[] = [
   // The catalogue: what the town's work takes, makes and changes (generate.ts, `catalogue`).
   derived("catalogue.working_day", "the profile's ordinary_hours_per_week over the round's working days (five without a round)"),
   prof("catalogue.travel.seconds_per_cell", "round.travel_seconds_per_cell"),
-  { ...prof("catalogue.travel.by_cover.*", "round.roads.seconds_per_cell"), id: "road", family: "catalogue.travel.by_cover (road)" },
+  prof("catalogue.structure_types.*.way.speed_kmh", "round.roads"),
+  prof("catalogue.structure_types.*.way.capacity", "round.roads"),
+  prof("travel.vehicle_types", "round"),
   prof("catalogue.travel.by_cover.*", "round.travel_by_cover"),
   derived("catalogue.body_variables.*.max", "the profile's education.max_years of schooling, as skill (a year is 10,000)"),
   conv("catalogue.body_variables", "skill counted from none: nobody is born schooled"),

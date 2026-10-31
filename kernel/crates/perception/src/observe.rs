@@ -81,6 +81,18 @@ pub struct BodyView {
     /// Its children, as a parent knows them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<ChildView>,
+    /// The vehicles it may drive (its own, and those their owners let it), each where it stands (law 9: its own things).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vehicles: Vec<VehicleView>,
+}
+
+/// A vehicle as one who may drive it knows it: what it is and where it stands.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VehicleView {
+    pub vehicle: Id,
+    #[serde(rename = "type")]
+    pub type_: Id,
+    pub at: Id,
 }
 
 /// A child, as their parent knows them.
@@ -1248,6 +1260,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             .filter_map(|cfg| b.variables.get(&cfg.id).map(|x| (cfg.id, crate::state::body_variable_at(cfg, *x, st.t).0)))
             .collect(),
         in_space: st.structures_of(person).into_iter().find_map(|sid| st.occupancy.get(&sid)?.iter().find(|(_, bodies)| bodies.contains(person)).map(|(sp, _)| *sp)),
+        vehicles: s.drivers_of.get(person).into_iter().flatten().filter_map(|v| st.vehicles.get(v).map(|x| VehicleView { vehicle: *v, type_: x.type_, at: x.at })).collect(),
     });
     let positions = st
         .held_by(participant)

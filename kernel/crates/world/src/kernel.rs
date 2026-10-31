@@ -206,6 +206,18 @@ impl World {
                 at
             },
             net: c.world.network.as_ref().map(|n| Arc::new(crate::network::NetStatics::of(n, &c.catalogue))),
+            drivers_of: {
+                let mut m: BTreeMap<Id, Vec<Id>> = BTreeMap::new();
+                for v in c.travel.iter().flat_map(|t| t.vehicles.iter()) {
+                    for d in std::iter::once(&v.owner).chain(v.drivers.iter()) {
+                        let e = m.entry(*d).or_default();
+                        if !e.contains(&v.id) {
+                            e.push(v.id);
+                        }
+                    }
+                }
+                m
+            },
             config: loaded.config.clone(),
         };
         let person_of: BTreeMap<&str, &str> = c.participants.iter().filter(|p| !p.shares_body).filter_map(|p| p.person.as_deref().map(|e| (e, p.id.as_str()))).collect();
@@ -316,7 +328,7 @@ impl World {
                 .travel
                 .iter()
                 .flat_map(|t| t.vehicles.iter())
-                .map(|v| (v.id, crate::state::Vehicle { type_: v.type_, owner: v.owner, at: v.at }))
+                .map(|v| (v.id, crate::state::Vehicle { type_: v.type_, owner: v.owner, at: v.at, drivers: v.drivers.clone() }))
                 .collect(),
             transit: Default::default(),
             network: None,
@@ -862,11 +874,13 @@ impl World {
         let trip = blocks
             .iter()
             .filter_map(|b| match b {
-                Block::Occupy { space, who } if !space.starts_with('$') && !who.as_deref().is_some_and(|w| w.starts_with('$')) => {
+                Block::Occupy { space, who, vehicle } if !space.starts_with('$') && !who.as_deref().is_some_and(|w| w.starts_with('$')) => {
                     let body = who.clone().or_else(|| p.person.map(|x| x.to_string()))?;
                     let (to, _) = crate::config::split_space(space)?;
                     let from = self.state.structures_of(&body).into_iter().next()?;
-                    Some(crate::travel::seconds(&self.s, &self.state, &from, to))
+                    // (Driven, if the vehicle named is one the body may drive and it stands where they set out; else on foot.)
+                    let speed = vehicle.as_deref().and_then(|v| crate::exec::driven_speed(&self.s, &self.state, v, &body, &from).ok());
+                    Some(crate::travel::seconds(&self.s, &self.state, &from, to, speed))
                 }
                 _ => None,
             })
