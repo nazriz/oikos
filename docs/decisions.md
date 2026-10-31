@@ -9841,3 +9841,69 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
 - **Why:** the owner's standing permission for test fixes; the plan's gap list had own-venture among the tests pinned to
   one seed. Not a seed hop: the occasion is the draws', the rule is every run's.
 - **Revisit if:** the three seeds all lose the occasion (then the test needs a town that makes one, not more seeds).
+## 2026-10-31 · Delegation D6, the rest: a seated assistant's stationery (branch `delegation`; no result changes for a town without assistant seats; no model called)
+
+- **What:** where a town seats a model in a kind of assistant (`assistant_seats`), its posts get stationery: the
+  assistant's own papers in words (`ASSISTANT_ISSUES`: advice, approval_request, report, scope_request, handover, each to
+  its client), and at an organisation's assistant post the principal's own forms for the kinds it may do, and each as a
+  draft for sign-off (`draftOf`: the paper as it would go, in `paper`). A code principal reads a form draft by the paper's
+  kind and addressees against what it asked (`paper_as_asked`); advice in words alone is counted as nothing.
+- **Why:** a model writes words, through the translator; a code principal reads only what an act would do. The kind and
+  the addressees are what a code principal can check of a paper it did not write; its wording is the assistant's, and is
+  on record beside the referral for whoever reads the log.
+- **Checked:** a cheap 300-person town for 120 days with assistant-a's kinds played by mock seats gave the same 21 reports
+  as with the assistant's code (the state hashes differ, as the seated town carries the stationery and the seats' channels).
+- **Revisit if:** a real model's drafts are declined for addressing alone where the matter was right (then the principal
+  needs a reading of more of the paper), or a seat cannot find its forms.
+## 2026-10-31 · Borrowing to start a business: the founder asks the bank, the lending office decides (branch `gap-me1`; citizen, generator; risk ME-1; no contract change; no model called)
+
+- **What:** a person who would start a business of one by what they expect it to pay them, with a home to trade from,
+  and short only of the money (its capital and the month's buffer), applies to their bank for the shortfall over its
+  longest term (`start_loan_months`, from the profile's `credit.max_months`, the term the bank publishes). The bank's
+  lending office decides it as any application: its rate for people, the serviceability buffer, its share of the least
+  monthly income it can see in the account, nothing to anyone behind or in default. The lending office is staffed by the
+  bank's people, so the decision takes its officer's time (the table of work's `loan_decision` row). Offered, the founder
+  weighs the business again at its expected pay less the repayment and signs only if it still pays; then it starts as
+  for anyone with the means, its later weighing less the repayment. Docs: `docs/behaviour/entry.md`, "Borrowing to start".
+- **Why this route:** most new small businesses are funded from the owner's savings and personal borrowing (in
+  Australia, the ABS's Business Use of Information Technology and the RBA's work on small business finance both find
+  owners' own funds and personal loans the main sources at start-up; to confirm, not opened for this work); an
+  unsecured lender lends against income, so the town's bank lends to the employed founder and refuses the one with
+  nothing coming in. No new figure: the term is the bank's, the rules and rates are its existing ones.
+- **Test:** `citizen::work` "short only of the money for a business that pays, we ask our bank to lend it and take the
+  loan only if it still pays" (the application's purpose, amount and term; nothing without a bank that lends to start
+  one; a loan too dear is not signed, one that leaves the business paying is). The lender's rules are already held by
+  `finance::credit`'s tests.
+- **Left (ME-1 stays open):** no lending against a home (households hold no home equity); a shop in premises, the
+  employing route, is not borrowed for; no start-up grants or microfinance; the lender does not read a business plan,
+  only the account (as ME-8 says of its income reading).
+- **Revisit if:** births move far beyond the profile's rate with borrowing on (the likely cause is what founders expect,
+  not the loan); a profile states lending to new businesses on other terms (a start-up product, security asked).
+## 2026-10-31 · Candidacy: the field of 19 traced, and the fault that is left (branch `gap-pb10`; docs only; risk PB-10; no model called)
+
+- **What was found:** the field of 19 candidates for about 118 formal votes (decisions 2026-10-24, "Two tests that failed in
+  the new town") is not the town's. `elections.test.ts` sets every citizen's `stand_bps` to 1,000 (a 10% chance of standing
+  when an election is called, shifted by the person's drive) to be sure of a contest; the profile's figure is 200
+  (au-vic, a placeholder). The test town (`worlds/town.yaml`, au-vic) has 166 electors: 166 x 10% x a mean drive a little
+  over one is the 17 to 19 seen. At the profile's own figure the same town fields about three or four candidates, which
+  is a handful, as real local elections have. So it is neither the mechanism's outcome nor emergent: it is the test's dial.
+- **The mechanism fault that is there:** the chance is each elector's, fixed, and blind to the field. The field is
+  therefore proportional to the electorate: at the profile's 2%, about 16 to 19 in the 1,000-person town (795 electors)
+  and some 800 in a town of 50,000 (the north star's size), where real fields per vacancy stay a handful whatever the
+  size of the ward (the VEC reports candidates per vacancy for each Victorian council election; about three in 2024, to
+  confirm). Real candidacy is lumpy and organised: a nomination costs a fee or a deposit and signatures (in Victoria a
+  nomination fee, to confirm the sum), a campaign costs time and money, most candidates come through a party or a local
+  group, and those who stand weigh their chance against the field (the citizen-candidate model: Osborne and Slivinski
+  1996; Besley and Coate 1997).
+- **Not built, and why:** fixing it is a new law of the world, not a patch: who stands (the decision weighed against the
+  field already nominated, which needs the decision spread through the nomination window so the field can be seen), the
+  nomination's cost (the law's fee, deposit and signatures, as law data per profile with sources), the time a campaign
+  takes, and backing (parties or groups, which the town does not have). Each needs sourced figures in nine profiles, and
+  the choice of a candidacy model is the owner's. Lowering `stand_bps` with the size of the town would be calibrating an
+  outcome, which the rules forbid. The test's 10% is left as it is: it forces a contest, and the test asserts only what the
+  mechanism guarantees (the incumbent's place in the voters' rankings).
+- **For Naz:** a proposal to approve or change: (1) nominations as law data (fee or deposit, signatures, from each
+  profile, sourced); (2) a person considers standing on a day of the nomination window drawn for them, weighing a
+  candidacy's cost in time and money and their chance against the nominations already public; (3) groups and parties
+  later, with founding (docs/behaviour/founding.md). Calibrated against candidates per vacancy, never set to it.
+- **Revisit if:** an election in a town of more than a few thousand is read; or the owner approves the proposal.

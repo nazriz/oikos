@@ -1,5 +1,6 @@
 export * from "./contracts";
 export * from "./module";
+export { ASSISTANT_ISSUES, draftOf } from "./kinds/assistants";
 export { manifests, paramErrors, type Manifest } from "./manifests";
 export * from "./rng";
 export { slip, slipPpm, slipRow, type SlipRow, type SlipTable, type Slipper, type SlipOptions } from "./slip";
