@@ -71,9 +71,13 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] E1. Services anyone can buy (the delegation capabilities' D1, above).
   - [x] E4. Skills that grow with use and fade without it, for people and staff; off, or on at a run's own rates, a
     factor of a study (docs/behaviour/skills.md). Slips by skill wait for a source.
-  - [ ] E2. Technologies as goods with a capability, and an outside scenario of their capability and cost.
+  - [x] E2a. The outside's capability over time: releases of what it sells from a scenario (`capability`; the first,
+    `rising-capability`), each a kind of system released on its day, sold newest first; tagged `ai` in
+    `meta.study_tags` for measurement only, with a backstop that no world code reads it.
+  - [ ] E2b. Technologies that are goods (machines, hardware a firm holds, `runs_on`'s energy and water), with E5.
   - [ ] E3. Firms enter any industry by expected profit, capital-heavy ones included.
-  - [ ] E5. Compute competing for energy, water and land through laws 8 and 9 (a hosting industry's recipe).
+  - [ ] E5. Compute competing for energy, water and land through laws 8 and 9 (a hosting industry's recipe); first,
+    workplaces on the network with their energy and water by industry (WM-15).
   - [ ] E6. The measures M7 (what the town gives to AI) and M8 (who can still do the work); the tag's backstop.
 - [ ] **Foundations-2, phase 5:** strict modes on, old exception lists empty, each law's line in CLAUDE.md as its
   enforcement lands.
