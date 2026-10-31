@@ -1392,13 +1392,19 @@ The mechanism:
 - **L / I:** medium / high · **Status:** mitigated (2026-10-24, branch `fix-memory-appeal`). A deemed refusal is law
   data (`review.deemed_refused_days`): where a place's law has one, a review unanswered that long is taken as refused
   and the claimant's appeal runs from then (de-ni: 91 days, SGG s 88(2), to confirm; held at citizen level and in a
-  living town whose office's answers are withheld). Still open where the law has none: au-vic (the TARA town), gb-eng,
-  us-oh's pension recall none (to confirm); what their claimants do instead (ask again, the ombudsman, judicial review)
-  is not built.
+  living town whose office's answers are withheld). Where the law has none (au-vic, the TARA town; gb-eng; us-oh's
+  pension; none recalled, to confirm), since 2026-10-31 (branch `mt21-recourse`) what their claimants do instead is
+  law data too (`review.complaint_after_days`): after 14, 21 and 30 days (the last a placeholder) unanswered, the delay
+  may be complained of to the town's ombudsman desk, standing for the Commonwealth Ombudsman, the DWP complaints route
+  to the Independent Case Examiner, and a congressional caseworker; it does the work at its own cost and only
+  recommends; the appeal still runs from an answer (held at citizen level and in living au-vic and gb-eng towns whose
+  office's answers are withheld: 5 of 14 au-vic claimants complained). Left: asking again, judicial review or
+  mandamus; the desk's recommendation is to set the decision aside, where a real ombudsman on delay asks first that the
+  review be decided; the figures are mostly to confirm.
 - **Notice by:** `withheld` arms whose claimant never acts again in a town whose law has no deemed refusal; a model
   steward that leaves requests unanswered there.
-- **Fix when:** Before a TARA arm in au-vic in which the steward may leave requests unanswered: source what an
-  Australian claimant does (a complaint to the Commonwealth Ombudsman, asking again) and give it to them as law data.
+- **Fix when:** the profiles' figures are confirmed; or a TARA arm reads how far claimants escalate (then asking again,
+  and England's three tiers, may matter).
 
 ### MT-22 · A model steward in a fork is a pilot's seat, less a few things
 - **Gap:** The experiment harness's model seat (`orchestrator/src/seat-host.ts`) is the pilot's seat (the same

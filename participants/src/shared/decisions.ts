@@ -56,6 +56,10 @@ export interface ReviewRoute {
   /** Where the law says so: a review asked for and not answered within so many days of the asking is taken as refused (a deemed
    * refusal), and the appeal's days run from then. None: silence is only silence. */
   deemed_refused_days?: number;
+  /** Where the law has no deemed refusal but a body that recommends takes up an agency's delay (an ombudsman, a complaints
+   * examiner, a representative's caseworker): a review not answered within so many days of the asking may be complained of
+   * there. It opens no appeal (MT-21). */
+  complaint_after_days?: number;
 }
 export interface AppealRoute {
   /** The matter a venue that can set the decision aside says it hears. */

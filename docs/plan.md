@@ -113,6 +113,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [x] Disk: each worktree's test scratch tidied by the same rule as the runs.
 - [x] Stand-ins removed (debt-generic-2), the run's seed draws who people are (debt-behaviour), guardianship (debt-risks).
 - [x] Deemed refusal of an unanswered review where the law says so (MT-21); bounded public memory (SC-1).
+- [x] Where the law has no deemed refusal (au-vic, gb-eng, us-oh), a complaint of the delay to a body that recommends (MT-21, `complaint_after_days`).
 - [x] Citizen decisions captured in every model run, for the citizen model.
 - [x] Six pilots on the Rust world ($31.86), their faults fixed (lending office's looks, a work site that is not a
   place, names a seat could not use), a returning holder's view shown whole.

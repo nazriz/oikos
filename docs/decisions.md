@@ -9679,3 +9679,33 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+
+## 2026-10-31 · A review never answered where the law has no deemed refusal: a complaint of the delay (MT-21) (branch `mt21-recourse`; no model called)
+
+**What.** Where a place's law requires a review before an appeal and has no deemed refusal (au-vic, gb-eng, us-oh's
+pension), a claimant whose review was never answered had nowhere to go: the citizen's `may_apply` shut every body that
+hears a refused claim, the town's ombudsman desk included, though the desk opens no appeal. What a real claimant does
+instead is complain of the delay to a body that takes it up and can only recommend: in Australia the Commonwealth
+Ombudsman (it asks that the agency be given 10 business days first, then investigates, free, and may recommend but not
+direct Services Australia); in England a complaint to the DWP office, a senior manager, then the Independent Case
+Examiner (there is no time limit on a mandatory reconsideration); in the US the member of Congress's caseworker, whose
+inquiry SSA answers. That is now law data: the review route's `complaint_after_days` (14, 21, and 30 a placeholder),
+with sources in each profile (most "to confirm"; docs/behaviour/decisions.md has the table). After that many days
+unanswered, a body that hears the matter and does not order (`can` without `order`) is among the claimant's ways; the
+tribunal never is, and the appeal still runs only from an answer. The work is the existing desk's: an officer's hours
+from the table of work, its slips, its asking the agency and its recommendation, which binds nobody. The law's words
+say it. Contract: an additive field on `law` `data.decisions[].review`, **proposed for Naz's sign-off**
+(contracts/README.md).
+- **Guarded:** at citizen level (`recourse.rs`: the ombudsman from day 31 for a review asked on day 10 and 21 days'
+  law, never the tribunal, which opens once an answer comes; the deemed-refusal test sees both bodies, as it should);
+  in the words (`rules/decisions.rs`); and in living towns whose office's answers are withheld
+  (`deemed-refusal-town.test.ts`, au-vic added: the ombudsman open only after the law's days, never the tribunal, and
+  any complaint heard).
+- **Choices.** The three real tiers in England and the US caseworker are one desk in the town (the generator's
+  ombudsman desk), as the town has one body that recommends on a refused claim. The desk's recommendation on a refused
+  claim is its generic one (set the decision aside, the agency not answering); a real ombudsman on delay asks first that
+  the review be decided. The first is a stronger push on the agency than the real one; noted, not built.
+- **Left:** asking again and judicial review / mandamus are not built; the 14 and 21 days read a wait for a complaint as
+  the wait after a request for review; us-oh's 30 days is a placeholder.
+- **Revisit if:** a profile's figure is confirmed otherwise; a study reads how often claimants escalate (then the three
+  tiers in England may matter); or a steward is found to answer the ombudsman and still not the claimant.
