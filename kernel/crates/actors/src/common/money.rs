@@ -76,6 +76,54 @@ pub fn bill_settled(book: &Book, claim: &Record, settled: &BTreeSet<String>) -> 
     settled.contains(claim.id.as_str()) || notices_of(book, claim).iter().any(|n| settled.contains(n.id.as_str()))
 }
 
+/// The rates notices on a file, by whom each is addressed to and what it asks (when due, how much), kept up as the file
+/// grows: `bill_settled` for a rates office's every claim at every plan, without going through every notice for each
+/// (both grow with each round of rates: by the second year of a 10,000-person town the search was the rates office's
+/// whole wake). Answers as `bill_settled` does; a notice whose due date is not a whole number sends every question
+/// back to it.
+#[derive(Debug, Default, Clone)]
+pub struct RatesNotices {
+    seen: usize,
+    odd: bool,
+    by: std::collections::HashMap<(String, Option<i64>, Option<i64>), Vec<String>>,
+}
+
+impl RatesNotices {
+    /// Takes in what has come to the file since last time.
+    pub fn update(&mut self, book: &Book) {
+        let all = book.all("rates_notice");
+        let n = all.len();
+        for r in all.skip(self.seen) {
+            let due = data(r).get("due");
+            let due_i = due.and_then(|d| d.as_i64());
+            if due.is_some() && due_i.is_none() {
+                self.odd = true;
+            }
+            let amount = data(r).i("amount");
+            for a in addressed_to(r) {
+                self.by.entry((a.to_string(), due_i, amount)).or_default().push(r.id.to_string());
+            }
+        }
+        self.seen = n;
+    }
+    /// `bill_settled`, from the index.
+    pub fn settled(&self, book: &Book, claim: &Record, settled: &BTreeSet<String>) -> bool {
+        if settled.contains(claim.id.as_str()) {
+            return true;
+        }
+        let RecordBody::Claim { about, counterparty, .. } = &claim.body else { return false };
+        if about.s("kind") != Some("rates") {
+            return false;
+        }
+        let due = about.get("due");
+        if self.odd || (due.is_some() && due.and_then(|d| d.as_i64()).is_none()) {
+            return bill_settled(book, claim, settled);
+        }
+        let Some(c) = counterparty else { return false };
+        self.by.get(&(c.to_string(), due.and_then(|d| d.as_i64()), about.i("amount"))).is_some_and(|ns| ns.iter().any(|n| settled.contains(n.as_str())))
+    }
+}
+
 /// A builder's published price for a kind of building (`prices`) or for demolishing one (`demolition`): its latest
 /// standing price list's.
 pub fn published_price(book: &Book, builder: &str, kind_of_building: &str, what: &str) -> Option<i64> {
@@ -95,4 +143,40 @@ pub fn brought_forward(book: &Book, landlord: &str, lease: &str) -> Option<(i64,
         .max_by(|a, b| a.at.cmp(&b.at).then_with(|| super::filed_before(&b.id, &a.id)))?;
     let owed = data(r).i("owed").unwrap_or(0);
     (owed > 0).then(|| (owed, data(r).i("since").unwrap_or(0), r.id.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn rec(v: serde_json::Value) -> Arc<Record> {
+        Arc::new(serde_json::from_value(v).expect("a record"))
+    }
+
+    #[test]
+    fn the_rates_notices_index_answers_as_the_search_through_the_file_does() {
+        let notice = |id: &str, to: &str, due: serde_json::Value, amount: i64| {
+            rec(json!({ "id": id, "record": "statement", "author": "rates-system", "speaks_for": "city", "at": 0, "visible_to": "public", "kind": "rates_notice", "text": "Rates.", "addressed_to": [to], "data": { "due": due, "amount": amount, "account": "acc-city" } }))
+        };
+        let claim = |id: &str, of: &str, due: serde_json::Value, amount: i64| {
+            rec(json!({ "id": id, "record": "claim", "author": "rates-system", "speaks_for": "city", "at": 0, "visible_to": "public", "position": "right", "holder": "city", "counterparty": of, "about": { "kind": "rates", "due": due, "amount": amount } }))
+        };
+        let mut book = Book::new();
+        book.take_all(&[notice("n1", "a", json!(100), 50), notice("n2", "b", json!(100), 50), notice("n3", "a", json!(200), 50)]);
+        let mut idx = RatesNotices::default();
+        idx.update(&book);
+        let claims = [claim("c1", "a", json!(100), 50), claim("c2", "a", json!(200), 50), claim("c3", "b", json!(100), 60), claim("c4", "c", json!(100), 50)];
+        for paid in [vec![], vec!["n1"], vec!["n3"], vec!["c3"], vec!["n2", "n3"]] {
+            let settled: BTreeSet<String> = paid.iter().map(|x| x.to_string()).collect();
+            for c in &claims {
+                assert_eq!(idx.settled(&book, c, &settled), bill_settled(&book, c, &settled), "{} with {paid:?}", c.id);
+            }
+        }
+        // (What comes to the file later is taken in.)
+        book.take_all(&[notice("n4", "c", json!(100), 50)]);
+        idx.update(&book);
+        let settled: BTreeSet<String> = ["n4".to_string()].into();
+        assert!(idx.settled(&book, &claims[3], &settled) && bill_settled(&book, &claims[3], &settled));
+    }
 }
