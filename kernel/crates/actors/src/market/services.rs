@@ -94,7 +94,7 @@ impl Kind for Provider {
             "params": {
                 "account": p(json!({ "type": "string", "description": "the account it is paid into (the world must say)" }), Some(json!("")), None, "the account it is paid into (the world must say)"),
                 "offers": p(json!({ "type": "array" }), Some(json!([])), None, "the world gives it (the profile's, with their sources)"),
-                "releases": p(json!({ "type": "object" }), Some(json!({})), None, "the world gives it: the outside world's later releases of what an offer sells, a scenario's (none: the offers as made)"),
+                "releases": p(json!({ "type": "object" }), Some(json!({})), None, "the world gives it: the outside world's later releases of what an offer sells (none: the offers as made)"),
                 "grace_days": p(int("a service unpaid this long (two months' fees and a fortnight) lets the provider switch its systems off"), Some(json!(75)), Some("days"), "placeholder"),
                 "sign_days": p(int("a service whose agreement its client has not signed this long is switched off"), Some(json!(30)), Some("days"), "placeholder"),
                 "unpaid_days": p(int("an order unpaid this long is declined"), Some(json!(7)), Some("days"), "placeholder"),

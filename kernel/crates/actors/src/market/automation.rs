@@ -848,7 +848,7 @@ impl Kind for Vendor {
                 "most_systems": p(int("the most it delivers to one order"), Some(json!(40)), None, "placeholder"),
                 "offers": p(json!({ "type": "array" }), Some(json!([])), None, "placeholder"),
                 "procurement": p(json!({}), None, None, "the world gives it (no default)"),
-                "releases": p(json!({ "type": "object" }), Some(json!({})), None, "the world gives it: the outside world's later releases of what an offer sells, a scenario's (none: the offers as made)"),
+                "releases": p(json!({ "type": "object" }), Some(json!({})), None, "the world gives it: the outside world's later releases of what an offer sells (none: the offers as made)"),
                 "sign_days": p(int("a system whose licence its client has not signed this long is switched off"), Some(json!(30)), Some("days"), "placeholder"),
                 "unpaid_days": p(int("an order unpaid this long is declined"), Some(json!(7)), Some("days"), "placeholder"),
             },

@@ -36,6 +36,13 @@
       },
       "source": "the world gives it (the profile's, with their sources)"
     },
+    "releases": {
+      "default": {},
+      "schema": {
+        "type": "object"
+      },
+      "source": "the world gives it: the outside world's later releases of what an offer sells (none: the offers as made)"
+    },
     "sign_days": {
       "default": 30,
       "schema": {
