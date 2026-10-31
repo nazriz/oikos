@@ -144,10 +144,13 @@ function passes(config: any, path: string[], id: string): boolean {
 }
 
 /** Does a pattern (dotted, `*` for one segment, `**` for any number) match a path's shape? */
+const patterns = new Map<string, RegExp>();
 export function matches(pattern: string, sh: string): boolean {
-  const re = new RegExp(`^${pattern.split(".").map((s) => (s === "**" ? "(?:[^.]+(?:\\.[^.]+)*)?" : s === "*" ? "[^.]+" : s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).join("\\.")}$`);
-  // (A pattern covers everything under it, as a profile's source key does.)
-  return re.test(sh) || sh.startsWith(`${pattern}.`) || (pattern.includes("*") && [...sh.matchAll(/\./g)].some((m) => re.test(sh.slice(0, m.index))));
+  // A pattern covers everything under it, as a profile's source key does: the shape itself, or the shape down to one of its
+  // dots. (Compiled once a pattern: a town's figures ask the generator's table of each of its 20,000 numbers.)
+  let re = patterns.get(pattern);
+  if (!re) patterns.set(pattern, (re = new RegExp(`^${pattern.split(".").map((s) => (s === "**" ? "(?:[^.]+(?:\\.[^.]+)*)?" : s === "*" ? "[^.]+" : s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).join("\\.")}(?:\\..*)?$`)));
+  return re.test(sh);
 }
 
 /** A profile's note for a dotted path: the note of the path itself or of the nearest section above it. */

@@ -55,7 +55,9 @@ async function town(profile: string, days: number) {
 }
 
 test.skipIf(!have)("a review never answered is taken as refused where the place's law says so, and the claimant may appeal from then; where the law has no such rule, nobody can", async () => {
-  const [de, gb] = await Promise.all([town("de-ni-2026", 330), town("gb-eng-2026", 330)]);
+  // (180 days, 330 until 2026-10-31, the slow tier's budget: measured that day over 330, de-ni's residents ask on days 15
+  // and 16 and weigh a venue open to them on days 126, 154 and 162; gb-eng's ask on days 25 to 65, 91 days past by day 156.)
+  const [de, gb] = await Promise.all([town("de-ni-2026", 180), town("gb-eng-2026", 180)]);
   const open = (x: typeof de, early: boolean) => x.weighed.filter((v) => v.venue && (v.t - x.asked.get(v.who)! < 91 * DAY) === early);
   console.log(`deemed refusal: de-ni ${de.asked.size} asked, ${de.answered.length} answered, ${de.weighed.length} weighings after asking, a venue open in ${open(de, false).length} (${open(de, true).length} before 91 days), ${de.appeals.length} appealed; gb-eng ${gb.asked.size} asked, a venue open in ${open(gb, false).length + open(gb, true).length}, ${gb.appeals.length} appealed`);
   for (const x of [de, gb]) {
