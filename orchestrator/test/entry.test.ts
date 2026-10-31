@@ -40,7 +40,9 @@ test("a failed shop's premises are bought by someone who founds a new shop there
   // Of seeds 1 to 6 the file's two cases pass in 6 alone. Which seed has the new shop trade is a matter of draws, not of the rule.)
   // (Run to day 450, 2026-10-24: at seed 6 the premises are sold on day 283 and the new shop, founded there, had 17 days to hire and serve before day 300 ended the run.
   // When in the run a sale falls is a matter of draws; the claim is that the new shop trades once it has the premises, so the run is long enough for a late sale to be followed.)
-  const s = await runWorld({ config: { ...config, seed: 6 }, runId: "entry", outDir: out, until: 450 * DAY });
+  // (160 days, 450 until 2026-10-31, the slow tier's budget: measured that day over 450, shop-1 closes and lists its premises
+  // on day 56, sells them on day 106, and the buyer's shop is staffed and serving there on day 120.)
+  const s = await runWorld({ config: { ...config, seed: 6 }, runId: "entry", outDir: out, until: 160 * DAY });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   expect(log.filter((e) => e.kind === "annotation" && (e.body.data?.call_unresolved || e.body.data?.call_unreadable)).map((e) => e.body.data)).toEqual([]);
   const ev = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
@@ -81,7 +83,9 @@ test("in a living town a shop founded in the run keeps a record of its own, by i
   config.world.accounts.find((a: any) => a.id === `acc-${young.person}`).balance = "60000000";
   const out = join(root, "runs", "test-entry-living");
   rmSync(out, { recursive: true, force: true });
-  const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "entry-living", outDir: out, until: 300 * DAY, recordObservations: "none" });
+  // (120 days, 300 until 2026-10-31, the slow tier's budget: measured that day, the shop is founded, its post made and its
+  // record begun on day 85.)
+  const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "entry-living", outDir: out, until: 120 * DAY, recordObservations: "none" });
   const ev = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes('"event"')).map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   // The post made with the new shop says it keeps the shop's record, and names the module that does.
   const post = ev.find((e) => e.event === "position_created" && e.role_module?.keeps_record === true);

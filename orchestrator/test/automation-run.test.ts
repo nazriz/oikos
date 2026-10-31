@@ -33,6 +33,10 @@ async function run(name: string, days: number, o: { times?: number; fall?: numbe
   const cmds = log.filter((e) => e.kind === "command").map((e) => ({ t: e.t, ...e.body }));
   return { config, ev, cmds, recs: ev.filter((e) => e.event === "recorded").map((e) => e.record) };
 }
+// (Ninety days, 200 until 2026-10-31, the slow tier's budget: measured that day over 200, the shops weigh the offers from
+// day 0, the first self-service point is delivered and serving on day 31 and nine by day 60, with or without the law where
+// it is not kept; where it is, none in 200 days.)
+const DAYS = 90;
 const delivered = (r: Awaited<ReturnType<typeof run>>) => r.ev.filter((e) => e.event === "participant_created" && e.kind === "system" && e.supplier === "vendors");
 
 test("the town has a vendor that sells what its profile lists, at the profile\'s prices, and says so in public", async () => {
@@ -53,7 +57,7 @@ test("the town has a vendor that sells what its profile lists, at the profile\'s
 }, 240_000);
 
 test("a shop takes a system when the comparison favours it: it orders and pays, the vendor delivers, the licence is signed, the system serves, and a mistake is refunded", async () => {
-  const r = await run("auto-adopt", 200, { times: 0.15 });
+  const r = await run("auto-adopt", DAYS, { times: 0.15 });
   const made = delivered(r).filter((e) => e.template === "self-service-point");
   expect(made.length).toBeGreaterThan(0);
   const one = made[0]!;
@@ -76,7 +80,7 @@ test("a shop takes a system when the comparison favours it: it orders and pays, 
 }, 480_000);
 
 test("with the same town\'s offers dearer, nobody takes one: adoption stalls", async () => {
-  const r = await run("auto-dear", 200, { times: 40 });
+  const r = await run("auto-dear", DAYS, { times: 40 });
   expect(delivered(r)).toEqual([]);
   expect(r.recs.filter((x) => x.kind === "order" && String(x.data?.kind).startsWith("system:"))).toEqual([]);
 }, 480_000);
@@ -86,8 +90,8 @@ test("with a law against the use in force, a shop that follows the law takes non
   // of it. Until 2026-10-26 the test held that no system at all was delivered, which was true of the towns it ran; since
   // "Main red after foundations-2 phase 1" in docs/decisions.md factory-3 of this town takes a production cell on day 151.)
   const serving = (r: Awaited<ReturnType<typeof run>>) => delivered(r).filter((e) => r.config.templates.find((t: any) => t.id === e.template)?.does?.some((d: any) => d.task === "serve"));
-  const kept = await run("auto-law", 200, { times: 0.15, law: true });
+  const kept = await run("auto-law", DAYS, { times: 0.15, law: true });
   expect(serving(kept)).toEqual([]);
-  const broken = await run("auto-law-broken", 200, { times: 0.15, law: true, tweak: (P) => { P.values.automation.firms.compliance_bps = 0; } });
+  const broken = await run("auto-law-broken", DAYS, { times: 0.15, law: true, tweak: (P) => { P.values.automation.firms.compliance_bps = 0; } });
   expect(serving(broken).length).toBeGreaterThan(0);
 }, 960_000);
