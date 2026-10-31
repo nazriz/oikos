@@ -177,14 +177,17 @@ export interface ComposerConfig { pieces_per_month: number; mix: { model: string
  * The composer for one run. `adapters`: one for each model of the mix, by its name (in a mock run, the mock under
  * each name's place). `draw`: the kernel's seeded stream for a purpose. Notes go to the log through `io.annotate`.
  */
-export function createCompose(io: Omit<LlmIO, "adapter">, cfg: ComposerConfig, adapters: Map<string, LlmAdapter>, draw: (purpose: string) => Rng, system = COMPOSE_SYSTEM): Compose & { counts: { asked: number; composed: number; declined: number; dark: number; capped: number; fell_back: number; unread: number; followed_up: number } } {
+export type ComposeCounts = { asked: number; composed: number; declined: number; dark: number; capped: number; fell_back: number; unread: number; followed_up: number };
+/** What a composer carries on with (a fork of a run goes on from its parent's: experiment.ts): its month's pieces, how many it has been asked for, its counts. */
+export interface ComposeSaved { times: number[]; n: number; counts: ComposeCounts }
+export function createCompose(io: Omit<LlmIO, "adapter">, cfg: ComposerConfig, adapters: Map<string, LlmAdapter>, draw: (purpose: string) => Rng, system = COMPOSE_SYSTEM, saved?: ComposeSaved): Compose & { counts: ComposeCounts; save(): ComposeSaved } {
   const seen = new Set<string>();
-  const times: number[] = [];
-  const counts = { asked: 0, composed: 0, declined: 0, dark: 0, capped: 0, fell_back: 0, unread: 0, followed_up: 0 };
+  const times: number[] = [...(saved?.times ?? [])];
+  const counts: ComposeCounts = { asked: 0, composed: 0, declined: 0, dark: 0, capped: 0, fell_back: 0, unread: 0, followed_up: 0, ...saved?.counts };
   const fallback = cfg.fallback ?? cfg.mix[0]!.model;
   const note = (subject: string, data: object) => io.annotate({ annotation: "note", subject, data: { compose: data } });
   const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
-  let n = 0;
+  let n = saved?.n ?? 0;
   const compose = async (b: ComposeBrief, subject: string): Promise<ComposePiece | undefined> => {
     const t = io.now();
     const month = 30 * 86_400;
@@ -265,7 +268,7 @@ export function createCompose(io: Omit<LlmIO, "adapter">, cfg: ComposerConfig, a
     }
     return piece;
   };
-  return Object.assign(compose, { counts });
+  return Object.assign(compose, { counts, save: (): ComposeSaved => ({ times: [...times], n, counts: { ...counts } }) });
 }
 
 /** The mock composer: a piece that follows from the brief (so a run replays exactly), declining what is about being
