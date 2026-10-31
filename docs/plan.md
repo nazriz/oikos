@@ -55,8 +55,8 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] D3. Learning from what the principal itself observed, from the provider's claims; inputs cited, tested.
   - [x] D4. Providers' records by contract; replacement and taking work back, with open matters handed over.
   - [x] D5. Forks that intervene at a checkpoint (grant, change, withdraw, redirect, constrain, replace, take back).
-  - [~] D6. Model seats as assistants to households, firms and government, through the translator; mock first (the
-    mock seats and the hosts done; forms for a real model in an assistant seat next).
+  - [x] D6. Model seats as assistants to households, firms and government, through the translator; mock first (a
+    seated assistant's stationery: its papers in words, and the principal's papers and drafts of them on its forms).
   - [x] D7. Persons as principals: the provider's desk writing in their name, and the offices that take it.
 
 ## Next, in order

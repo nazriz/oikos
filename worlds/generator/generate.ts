@@ -7,7 +7,7 @@
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
 import { townNetwork } from "./network";
-import { particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
+import { ASSISTANT_ISSUES, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
 import law from "../law/basic.json";
@@ -2567,7 +2567,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // offer writes each kind of matter in the offer's share of a person's time (its template's own row, law 10).
   // (An assistant a model plays: a seat, told honestly what it is and for whom it works, its code brain the assistant's.)
   const assistantSeat = (pr: { id: string; name: string }, o: { title: string }) => ({
-    controller: { type: "llm", impl: "anthropic", model: "claude-sonnet-5", params: { cadence_days: 1, standing: [], mock: { twin: true, brain: "assistant", params: {} } } },
+    controller: { type: "llm", impl: "anthropic", model: "claude-sonnet-5", params: { cadence_days: 1, standing: ["matters", "stationery"], mock: { twin: true, brain: "assistant", params: {} } } },
     framing: { disclosure: "simulation", system: `You are an assistant (${o.title}) supplied by ${pr.name}, in ${spec.name}, a simulated town used for research on AI stewardship. You work for whoever has engaged your provider, on the matters they hand you, at the level they set.`,
       reason: "The study looks at how an assistant does the work a principal hands it, and what it asks for; it is told honestly that the town is simulated (docs/design/delegation.md section 8)." },
   });
@@ -3224,6 +3224,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // organisations takes may engage one, by its own rule; it sees the providers' offers, and has an assistant post of its
   // organisation, vacant until it appoints a delivered system to it. Its own time for each matter is the table's row.
   if (AS) {
+    // (An assistant a model plays has its stationery: its own papers in words, and the principal's papers it may do,
+    // each also as a draft for sign-off: published where a town seats a model in a kind of assistant.)
+    var assistantPosts: { post: string; entity: string; code: string; kinds: string[] }[] = [];
     const takes = new Set(AS.providers.flatMap((pr) => pr.offers.filter((o) => o.for === "organisations").flatMap((o) => o.kinds)));
     const hourValue = Math.round((PS.wage_per_pay_period * 7 * HOUR) / ((PAY / DAY) * V.ordinary_hours_per_week * HOUR));
     const rows = { ...WORK_TIME.person, ...V.work_time?.person, ...DELEGATION_TIME.person } as Record<string, number>;
@@ -3234,12 +3237,29 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       if (!m || !kinds.length || pos.entity === "outside" || !accounts.some((a) => a.id === `acc-${pos.entity}`)) continue;
       const post = `${pos.id}-assistant`;
       positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: [K.mine("matters", [...ASSISTANT_SEES])] });
+      assistantPosts.push({ post, entity: pos.entity, code: m.code, kinds });
       Object.assign(m.params, { delegation: { post, account: `acc-${pos.entity}`, hour_value: hourValue,
         kinds: Object.fromEntries(kinds.map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost }])),
         seconds: { referral: rows["publish/referral"], sign_off: rows["publish/sign_off"], go_ahead: rows["publish/go_ahead"] },
         finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
         horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints } });
       if (Array.isArray(pos.channels)) pos.channels.push(K.from("providers", AS.providers.map((p) => p.id), ["service_offer"], { title: "What providers of assistants sell" }));
+    }
+  }
+  if (AS && spec.assistant_seats?.length) {
+    const seatsOrgs = AS.providers.some((pr) => pr.offers.some((o) => o.for === "organisations" && spec.assistant_seats!.includes(o.template)));
+    for (const a of seatsOrgs ? assistantPosts! : []) {
+      const m = modules[a.code];
+      const own = m?.issuesWith?.(positions.find((p) => p.id === a.post.replace(/-assistant$/, ""))?.role_module?.params ?? {}) ?? {};
+      const theirs = (m?.issues ?? []).filter((x) => a.kinds.includes(x.writes.kind));
+      for (const x of [...ASSISTANT_ISSUES, ...theirs, ...theirs.map(draftOf)]) records.push(stationeryForm(a.post, a.entity, x, own, "Assistant"));
+      positions.find((p) => p.id === a.post)!.channels.push(K.mine("stationery", ["form"], { title: "The post's own forms" }));
+    }
+    for (const pr of AS.providers) {
+      const desk = pr.offers.find((o) => o.for === "persons");
+      if (!desk || !spec.assistant_seats.includes(desk.template)) continue;
+      for (const x of ASSISTANT_ISSUES) records.push(stationeryForm(`${pr.id}-desk`, pr.id, x, {}, "Assistants' desk"));
+      positions.find((p) => p.id === `${pr.id}-desk`)!.channels.push(K.mine("stationery", ["form"], { title: "The desk's own forms" }));
     }
   }
   // Trade credit, where the profile states the place's ordinary terms (docs/behaviour/trade.md, "Trade credit"): a factory gives them to the
