@@ -36,6 +36,9 @@ pub struct Params {
     #[serde(deserialize_with = "shared_ventures")]
     pub ventures: std::sync::Arc<Vec<Venture>>,
     pub found_own_buffer_months: i64,
+    /// The term a person asks their bank to lend over to start a business of one (the bank's longest; 0: its bank does not
+    /// lend to start one, and nobody borrows to: risk ME-1).
+    pub start_loan_months: i64,
     pub give_up_months: i64,
     pub possession: Option<Possession>,
     pub shop_every_days: i64,
@@ -135,6 +138,7 @@ impl Default for Params {
             participation_bps: 10_000,
             ventures: Default::default(),
             found_own_buffer_months: 1,
+            start_loan_months: 0,
             give_up_months: 6,
             possession: None,
             shop_every_days: 14,

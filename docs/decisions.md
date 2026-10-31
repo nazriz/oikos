@@ -9812,3 +9812,27 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   as with the assistant's code (the state hashes differ, as the seated town carries the stationery and the seats' channels).
 - **Revisit if:** a real model's drafts are declined for addressing alone where the matter was right (then the principal
   needs a reading of more of the paper), or a seat cannot find its forms.
+## 2026-10-31 · Borrowing to start a business: the founder asks the bank, the lending office decides (branch `gap-me1`; citizen, generator; risk ME-1; no contract change; no model called)
+
+- **What:** a person who would start a business of one by what they expect it to pay them, with a home to trade from,
+  and short only of the money (its capital and the month's buffer), applies to their bank for the shortfall over its
+  longest term (`start_loan_months`, from the profile's `credit.max_months`, the term the bank publishes). The bank's
+  lending office decides it as any application: its rate for people, the serviceability buffer, its share of the least
+  monthly income it can see in the account, nothing to anyone behind or in default. The lending office is staffed by the
+  bank's people, so the decision takes its officer's time (the table of work's `loan_decision` row). Offered, the founder
+  weighs the business again at its expected pay less the repayment and signs only if it still pays; then it starts as
+  for anyone with the means, its later weighing less the repayment. Docs: `docs/behaviour/entry.md`, "Borrowing to start".
+- **Why this route:** most new small businesses are funded from the owner's savings and personal borrowing (in
+  Australia, the ABS's Business Use of Information Technology and the RBA's work on small business finance both find
+  owners' own funds and personal loans the main sources at start-up; to confirm, not opened for this work); an
+  unsecured lender lends against income, so the town's bank lends to the employed founder and refuses the one with
+  nothing coming in. No new figure: the term is the bank's, the rules and rates are its existing ones.
+- **Test:** `citizen::work` "short only of the money for a business that pays, we ask our bank to lend it and take the
+  loan only if it still pays" (the application's purpose, amount and term; nothing without a bank that lends to start
+  one; a loan too dear is not signed, one that leaves the business paying is). The lender's rules are already held by
+  `finance::credit`'s tests.
+- **Left (ME-1 stays open):** no lending against a home (households hold no home equity); a shop in premises, the
+  employing route, is not borrowed for; no start-up grants or microfinance; the lender does not read a business plan,
+  only the account (as ME-8 says of its income reading).
+- **Revisit if:** births move far beyond the profile's rate with borrowing on (the likely cause is what founders expect,
+  not the loan); a profile states lending to new businesses on other terms (a start-up product, security asked).
