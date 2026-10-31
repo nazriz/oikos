@@ -557,6 +557,18 @@ The mechanism:
 
 ---
 
+### ME-22 · Delegation's figures are placeholders, and a code assistant decides nothing
+- **Gap:** The assistants on offer (prices, speed, a provider's claimed and true slip rates, the records term) and what a
+  principal weighs (what an error costs it, the share of slips its reading finds, how much a claim counts, its hurdle,
+  its review day, its horizon) are placeholders in au-vic only; the times of the papers of delegation are placeholders.
+  A code assistant carries out what its principal decided; only a model in the seat decides otherwise.
+- **Where:** `worlds/profiles/au-vic-2026.json` `values.assistants`; `docs/behaviour/assistants.md`; `docs/design/delegation.md`.
+- **Effect:** How much code principals delegate, at which levels, and how fast hidden slips build trust, rest on these
+  figures; a run with code assistants shows the machinery, not how much real principals would hand over.
+- **L / I:** high / high for any finding about how much is delegated · **Status:** open (2026-10-31)
+- **Notice by:** Engagement and levels moving with a placeholder changed alone.
+- **Fix when:** before a study reads how much is delegated rather than what follows when it is.
+
 ## Public bodies and law
 
 ### PB-1 · A tribunal's time is often the wrong quantity
