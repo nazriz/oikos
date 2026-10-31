@@ -1776,7 +1776,7 @@ impl<'a> Exec<'a> {
                 self.add_holding(&from, &at, kind, -*quantity, c)?;
                 self.add_holding(&me, &at, kind, *quantity, c)?;
                 let t = self.now();
-                self.st.takings.push(crate::state::Taking { t, by: me, from, kind: *kind, at });
+                self.st.takings.push_back(crate::state::Taking { t, by: me, from, kind: *kind, at });
                 self.emit(EventBody::Taken { by: me, from, kind: *kind, quantity: *quantity, at });
                 Ok(())
             }

@@ -27,6 +27,10 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 
 ## Now
 
+- [~] **Years at the study's size** (code only): 10,000 people for 3 years and 50,000 for 2 or more; what breaks over
+  time fixed with its law, what emerges recorded (docs/design/performance.md, "Years at 10,000 and 50,000"; decisions
+  2026-10-31 "Years at 10,000"). First faults fixed: the hall's room, owners homeless while the register answers, the
+  works office's inspections in one moment, the energy retailer's bills read once a connection.
 - [~] **Memory per person.** A 10,000-person month peaked at about 500 KB a person; target about 50 KB, enforced by a
   test like the time budgets, results byte-identical (docs/design/performance.md, risk SC-1).
   - [x] Measure bytes per person at peak by component, at 1,000, 10,000 and 50,000 people (`mem-budget`, 8c28f399).
@@ -34,7 +38,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [~] Compact minds and memories (a cloud agent, branch `mem-minds`).
   - [x] A state hash worked out as it goes, without the cache of encoded copies (`mem-state-hash`, a60f9ae3).
   - [x] What people have seen, held compactly (any bound on what they remember is a law: to the owner first) (`mem-seen`, 7f81ceb3: held once for all who see it the same; no bound). Records delivered (`mem-delivered`) and buildings' facts (`mem-facts`) the same way.
-  - [ ] No whole-world copies during a step.
+  - [x] No whole-world copies during a step (`mem-no-copies`: what an act's copy of the state still copied whole, nature's fields, the network's lists, takings, floods and scarce sales, now shared; byte-identical, no change at the peak).
   - [x] 50,000 people for a month and 100,000 for a week, measured (with `mem-minds`: 14.7 GB and 604 s; 31.0 GB and 320 s; docs/design/performance.md).
 - [x] **Foundations-2, phase 1: capacity** (law 10). Every act has a time, every system its hours and lanes; casework
   done by officers' minutes (WM-14). Landed at 0824efb6; tag `pre-foundations-2` is main at 8570d699, before it.
@@ -87,7 +91,8 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 ## Gaps in the register, to pick up when they matter (each names its entry in docs/risks.md where it has one)
 
 - Commercial leases: no remedy for unpaid rent, no early exit, no rent reviews (docs/behaviour/leasing.md).
-- Systems keep the same hours every day (no weekends). A seat cannot yet be a non-resident agency officer (WM-14).
+- Systems keep the same hours every day (no weekends).
+- [x] A seat cannot yet be a non-resident agency officer (WM-14): a seat in the support office shares the body of an officer who lives outside the town (`gap-wm14`).
 - [x] A taxpayer account to reclaim an overpayment from (PB-23): the tax collector keeps it (`taxpayer-accounts`, d3eb2bf3, cedc1903); its figures are still placeholders, so PB-23 stays open as mitigated.
 - Candidacy: a field of 19 for about 118 votes (PB-10).
 - One day's crew paperwork ran in series, cause untraced (MT-23).

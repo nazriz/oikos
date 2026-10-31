@@ -116,6 +116,12 @@ test("the support office's staff decide and pay what the law's conditions settle
   expect(seen.some((x) => /pay_claims \(order-outside-support-pay-claims, every 1 day\): carried out: .*claims? granted and \d+ put before the office-holder/.test(x))).toBe(true);
   // Nothing says a routine has no order.
   expect(statements.filter((r) => r.kind === "staff_report" && (r.data?.orders ?? []).some((o: any) => o.state === "no_order")).length).toBe(0);
+  // The seat is a person, an officer of the agency who lives outside the town (WM-14): it shares a body that is not in the world and
+  // holds the post from outside it, so its acts are timed by the person table in a person's day, never at the case system's second.
+  const seat = config.participants.find((p: any) => p.id === "outside-support-system");
+  expect(seat).toMatchObject({ kind: "person", shares_body: true });
+  expect(config.world.entities.find((e: any) => e.id === seat.person)).toMatchObject({ kind: "person", present: false });
+  expect(config.positions.find((p: any) => p.id === "outside-support")).toMatchObject({ holder: "outside-support-system", holds_abroad: true });
 }, 600_000);
 
 test("an office's books are its own: another office of the same organisation is not shown them, and no clerk's paper brings a seat back early", async () => {

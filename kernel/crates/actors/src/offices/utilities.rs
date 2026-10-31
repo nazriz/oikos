@@ -546,6 +546,14 @@ impl Plan for WaterWorks {
                 .filter_map(|r| data(r).s("connection").or_else(|| data(r).s("home")).map(String::from))
                 .chain(self.billed_cache.iter().filter_map(|k| k.strip_suffix(&format!("@{round}")).map(String::from)))
                 .collect();
+            // (What each meter was last read to, from the file in one pass: by connection, or by home for a bill with none.)
+            let mut read_to: BTreeMap<String, i64> = BTreeMap::new();
+            for r in self.book.open("invoice").filter(|r| r.speaks_for.as_deref() == Some(me.as_str())) {
+                let Some(l) = data(r).i("read_litres") else { continue };
+                let Some(k) = data(r).s("connection").or_else(|| data(r).s("home")) else { continue };
+                let e = read_to.entry(k.to_string()).or_insert(l);
+                *e = (*e).max(l);
+            }
             // (Whom each bill goes to, and for which meter: the owner of a building on the roll, or the occupant of a connection.)
             let mut payers: Vec<(String, String, String)> = vec![];
             if self.occupant_pays() {
@@ -566,13 +574,7 @@ impl Plan for WaterWorks {
                     continue;
                 }
                 let read = readings.get(&key);
-                let prev = self
-                    .book
-                    .open("invoice")
-                    .filter(|r| r.speaks_for.as_deref() == Some(me.as_str()) && (data(r).s("connection") == Some(key.as_str()) || (data(r).s("connection").is_none() && data(r).s("home") == Some(key.as_str()))))
-                    .filter_map(|r| data(r).i("read_litres"))
-                    .max()
-                    .unwrap_or(0);
+                let prev = read_to.get(key.as_str()).copied().unwrap_or(0);
                 let kl = read.map_or(0, |(l, _)| (l - prev + 500).div_euclid(1000).max(0));
                 let amount = self.p.service_per_quarter + kl * self.p.price_per_kl;
                 self.routines.did("bill", t, 1, &[]);
@@ -980,9 +982,20 @@ impl Plan for Retailer {
         let next_bill = next_round(last_round, billing_by.as_ref().and_then(|b| b.1.as_ref()), every);
         let billing = billing_by.is_some() && t >= next_bill;
         if let (Some(acc), true) = (acc.as_ref(), billing_by.is_some()) {
+            // (Each connection's last bill, found in one pass over the file: looked for through the whole file once a
+            // connection at every wake, it made a 10,000-person town's retailer the run's long pole by its second
+            // quarter, the file growing by a bill a customer a round. The last of the latest, as `max_by_key` finds.)
+            let mut last_of: BTreeMap<String, Arc<Record>> = BTreeMap::new();
+            for i in self.book.open("invoice").filter(|i| i.speaks_for.as_deref() == Some(me.as_str())) {
+                let Some(conn) = data(i).s("connection") else { continue };
+                let until = data(i).i("until").unwrap_or(0);
+                if last_of.get(conn).is_none_or(|l| until >= data(l).i("until").unwrap_or(0)) {
+                    last_of.insert(conn.to_string(), i.clone());
+                }
+            }
             for c in &mine {
                 let Some(meter) = c.meter.map(cents) else { continue };
-                let last = self.book.open("invoice").filter(|i| i.speaks_for.as_deref() == Some(me.as_str()) && data(i).s("connection") == Some(c.id.as_str())).max_by_key(|i| data(i).i("until").unwrap_or(0));
+                let last = last_of.get(c.id.as_str());
                 // (A connection closed is billed its last once; never again.)
                 if c.closed && last.is_some_and(|l| data(l).i("read_to") == Some(meter)) {
                     continue;

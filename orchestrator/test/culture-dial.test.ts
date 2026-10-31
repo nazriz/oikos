@@ -134,13 +134,18 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // the law on leases of shop premises (law-premises-leases), the landlords their surrender price and tribunal, a business of one
 // the ground of premises it holds by agreement (generator 0.70.0); the genesis records are in the state. 4c714b3d..., a6a15d31...
 // and dd840c8e... for the configs, and e6916c32..., 47582857... and f94c4358... for the states, until then.)
-// (Re-taken on 2026-10-31 at foundations-2 S2 (law 9), config hashes and Rust states both: a road is a way of the network, the
-// ground says a cell's metres, housed households have a vehicle and drive it where they belong (generator 0.72.0); 38412f4e...,
-// fb039153..., 43665a61... for the configs and ffab69c8..., c5619171..., e5d66985... for the states, until then.)
+// (Re-taken on 2026-10-31 at years at 10,000, the states only (the config hashes do not move: a hall's room changes only
+// in towns over 3,333 people): an owner waiting on the register for its lot's plan is not homeless meanwhile and stops
+// no supply, and the works office sends its inspector one visit at a time; ffab69c8..., c5619171... and e5d66985...
+// until then.)
+// (Re-taken on 2026-10-31 at foundations-2 S2 (law 9), on the tree merged with main at 60c7ab07, config hashes and Rust states
+// both: a road is a way of the network, the ground says a cell's metres, housed households have a vehicle and drive it where
+// they belong (generator 0.72.0); 38412f4e..., fb039153..., 43665a61... for the configs and 553de625..., 3aa5f181...,
+// aa994113... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "425a3732b141a9b1a6496a59e2f61332a4ffe349a45da2c8a21cbc6423ed5f6f",
-  "gb-eng-2026": "a7d7c3a069a0cb07aa772cb33efa89ec94b54174003f9a8bb9e1b662cd918460",
-  "ke-nakuru-2026": "ee7d4324bf90fb5c3f8aabcc2d33ea304aefa09893ecf1738ce6709cb0361a2d",
+  "au-vic-2026": "d8c29a5c71318e71397ba61f4522e9a82b141a4c4158c44c491c5c56db8ef787",
+  "gb-eng-2026": "765dd7870c19e63072bcf88b5bead30ca417529d5b7f67b22ce74164f5448300",
+  "ke-nakuru-2026": "ab04457142fb742011eecf23aa4e89d74e9fea3faf6202a645c3c6ab7da569e9",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

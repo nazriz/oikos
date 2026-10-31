@@ -175,3 +175,23 @@ test("people stop work at one age where the profile gives no curve, and at ages 
   // Those who come later draw their own from the same curve.
   expect(many.c.templates.filter((t: any) => t.kind === "person").every((t: any) => JSON.stringify(t.controller.params.stop_work_curve) === JSON.stringify(P.values.labour_force_share_by_age))).toBe(true);
 }, 120_000);
+
+// Every workplace holds the staff it starts with. A 10,000-person town's works crew of 60 had a hall built for 20 of
+// them and its offices' staff (58 places for 98): the registrar never got in, and the owners waiting on the register
+// left town (docs/decisions.md, "Years at 10,000"). Checked on the small town given a crew as large as a big town's.
+test("every workplace has room for those employed there from the start", async () => {
+  const { generateFrom } = await import("../generator/generate");
+  const { loadProfile } = await import("../generator/profile");
+  const P = loadProfile(spec.profile ?? "au-vic-2026");
+  const c = generateFrom(spec, { ...P, values: { ...P.values, services: { ...P.values.services, council_staff_per_1000: 150 } } }) as any;
+  const at = new Map<string, number>();
+  for (const r of c.world.records) {
+    if (r.record !== "agreement" || r.terms?.template !== "employment") continue;
+    for (const x of r.terms.commitments) { const sp = x.does?.outcome?.occupancy?.in; if (sp) at.set(sp, (at.get(sp) ?? 0) + 1); }
+  }
+  const types = new Map<string, any>(c.catalogue.structure_types.map((t: any) => [t.id, t]));
+  const room = new Map<string, number>();
+  for (const s of c.world.structures) for (const sp of types.get(s.type)?.spaces ?? []) for (let i = 1; i <= (sp.count ?? 1); i++) room.set(`${s.id}/${sp.kind}.${i}`, sp.capacity);
+  expect(at.get("town-hall/workplace.1")!).toBeGreaterThan(20);
+  expect([...at].filter(([space, n]) => n > (room.get(space) ?? 0))).toEqual([]);
+});

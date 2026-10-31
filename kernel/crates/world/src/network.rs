@@ -119,15 +119,19 @@ fn is_on_site(m: &MeterKind) -> bool {
 
 /// The network's state: each link's, each connection's, and how many connections acts have opened (their ids are
 /// `conn.<n>`). The indexes by id, holder, structure and supply are derived and never serialised.
+///
+/// Its lists are persistent vectors and its indexes behind an `Arc`: an act's copy of the state, and the copy an act
+/// that changes the network makes of it, share them, and the change copies only the link or connection it touches
+/// (memory per person: no whole-world copies during a step). Serialised as the lists they are.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct NetState {
-    pub links: Vec<LinkState>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub connections: Vec<Connection>,
+    pub links: imbl::Vector<LinkState>,
+    #[serde(default, skip_serializing_if = "imbl::Vector::is_empty")]
+    pub connections: imbl::Vector<Connection>,
     #[serde(default, skip_serializing_if = "is_zero_u64")]
     pub opened: u64,
     #[serde(skip)]
-    pub index: NetIndex,
+    pub index: Arc<NetIndex>,
 }
 
 fn is_zero_u64(x: &u64) -> bool {
@@ -152,21 +156,22 @@ impl Eq for NetState {}
 impl NetState {
     /// The indexes made again from the connections (after a load or a resume).
     pub fn reindex(&mut self) {
-        self.index = NetIndex::default();
+        self.index = Arc::default();
         for i in 0..self.connections.len() {
             self.index_one(i);
         }
     }
     fn index_one(&mut self, i: usize) {
         let c = &self.connections[i];
-        self.index.by_id.insert(c.id, i);
-        self.index.by_holder.entry(c.holder).or_default().push(i);
-        self.index.by_at.entry(c.at).or_default().push(i);
-        self.index.by_supply.entry(c.supply).or_default().push(i);
+        let index = Arc::make_mut(&mut self.index);
+        index.by_id.insert(c.id, i);
+        index.by_holder.entry(c.holder).or_default().push(i);
+        index.by_at.entry(c.at).or_default().push(i);
+        index.by_supply.entry(c.supply).or_default().push(i);
     }
     /// A connection added (opened by an act, or at the start).
     pub fn add(&mut self, c: Connection) -> usize {
-        self.connections.push(c);
+        self.connections.push_back(c);
         let i = self.connections.len() - 1;
         self.index_one(i);
         i
@@ -178,7 +183,7 @@ pub fn initial(s: &Statics) -> Option<Arc<NetState>> {
     let w = &s.config.world;
     let n = w.network.as_ref()?;
     let net = s.net.as_ref()?;
-    let mut ns = NetState { links: vec![LinkState::default(); n.links.len()], ..Default::default() };
+    let mut ns = NetState { links: imbl::Vector::from(vec![LinkState::default(); n.links.len()]), ..Default::default() };
     for c in &w.connections {
         let supply = net.trees.supply_of(n, &c.kind, &c.node).expect("validated") as u32;
         ns.add(Connection { id: c.id, kind: c.kind, node: c.node, supply, holder: c.holder, at: c.at, rate: c.rate, meter: 0, uses: c.uses, reading: c.meter, closed: false, interrupted: false, changed: 0 });

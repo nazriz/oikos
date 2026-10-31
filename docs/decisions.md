@@ -9565,6 +9565,41 @@ routes as law data, nobody shown more than is theirs.
 - **Not decided here:** reordering the plan, and building the delegation capabilities; both are the owner's call.
 - **Revisit if:** the proposal changes (its 15 Nov project plan), or the owner chooses another study.
 
+## 2026-10-31 · Years at 10,000: three faults that only a large town shows (code only; no model called)
+
+- **What:** the first runs of the study's size over months (a scaled 10,000-person town, `worlds/town-10000.yaml`, and
+  50,000, `worlds/town-50000.yaml`: town-1000 ten and fifty times over, homes, firms, landlords and land in proportion)
+  found three faults, each fixed with its law:
+  1. **The hall too small for its crew** (generator). The works crew is the profile's staff per 1,000 residents (60 at
+     10,000, 300 at 50,000), but the hall's workplace held 20 of them plus the offices' staff: 58 places for 98 at
+     10,000. 1,892 "holds 58 at most" refusals in the first month; the registrar of titles never got in to work until
+     day 30. Now the crew's room is the crew the town calls for (20 at the least, as before: towns under 3,334 people are
+     unchanged, config byte for byte). Test: `worlds/test/generate.test.ts`, every workplace has room for its staff.
+  2. **Owners homeless in their own homes** (citizen). An owner learns which building is on its lot from the land
+     register, which takes the officer's time; until it answered, the first plan marked the owner homeless, asked its
+     utilities to stop the supply ("we have moved out") and hunted for a rental. In a 1,000-person town that was 260
+     supply-stop requests on day 1 and four days; at 10,000, 1,420 owners waited on one officer (and, with fault 1, for a
+     month), and 484 of the 1,379 people who left town by day 76 were owners. Now an owner whose title's lot is still to
+     be told is not without a home, does not hunt, and stops no supply meanwhile (`Person::own_plan_pending`).
+     The 1,000 town over 120 days: supply stops 260 to 8, people leaving 79 to 79.
+  3. **The works office sent every inspection at once** (works). A visit's worth of the town's assets was sent, and at
+     the next observation in the same moment the next, one round each: 50,000 people's roads passed the engine's
+     thousand rounds in the first moment and stopped the run at t=300. Now the next visit goes when the last is back
+     (one inspector's round at a time). Test: the office's own, in `offices/treasury.rs`.
+  And one cost, result-identical: **the energy retailer looked through its whole file of bills once for each
+  connection at every wake**, the file growing a bill a customer a round: by day 115 of the 10,000 town it was 63% of
+  the run's own thread and the town ran at a third of a day a minute. Each connection's last bill is now found in one
+  pass (and the water corporation's last readings the same). The same state hash and log on the 1,000 town for 120 days
+  (`8ace88e3`, digest `2568ffd9e6d9bdf5`).
+- **Not faults, recorded:** households without a home leave town after their patience (45 to 80 days): 79 people of
+  1,000 in 120 days, the renters the tight housing leaves out (380 homes for 424 households). The gatherings at the
+  hall fill it (200) at 10,000: one hall for a town ten times the size is the spec's, not a law's.
+- **Why:** a robustness test of the study's size (docs/design/gradual-disempowerment.md §7). Every one of these is
+  invisible at 1,000 people, where the tests run.
+- **Revisit if:** the profile states a works crew's depot of its own (then the crew leaves the hall); the register
+  should answer owners at once (it is the owner's own certificate of title: genesis would hand each owner its lot's
+  plan, a change of what is delivered at the start); another office books a year's work in one moment.
+
 ## 2026-10-31 · Foundations-2 phase 3, S1: law 9's backstop, with today's instant moves in an inventory (branch `f2-phase3`; no result changes; no model called)
 
 Asked: build phase 3 of docs/design/foundations-2.md (law 9, space: roads, pipes, wires and data lines with capacity and
@@ -9639,3 +9674,51 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   the few nearest by the whole trip's time); a household's second car matters to a result (then households hold more than
   one, by the census's counts); the refused second drives show in a log's size (then a household's adults agree who takes
   the car, as behaviour with a source).
+## 2026-10-31 · No whole-world copies during a step (SC-1; branch `mem-no-copies`, on `representation`; no result changes; no model called)
+
+- **What was copied.** Every act is worked on a copy of the state (all-or-nothing: a dry run when it begins, the act
+  itself when done), and the state's maps are persistent, so that copy is cheap. Not all of it was: an act that draws
+  from or emits to a field (`work` with a recipe that does) made nature's state its own (`Arc::make_mut` while the
+  state before the act still held it), which copied every field's and every species' cells and the covers' days; an
+  act on a link or connection, and each hour's settlement, copied the network's links, every connection (one a
+  metered home) and its indexes; and every act's copy took its own of the takings (which grow with the run), the
+  flooded buildings and the scarce sales.
+- **Change.** Those are now persistent too: a field's or species' cells an `imbl::OrdMap` (`oikos_nature::Cells`),
+  the covers' days one; the network's links and connections `imbl::Vector`s and its indexes behind an `Arc`; takings
+  a persistent vector, floods a persistent set, scarce sales a persistent map. An act's copy shares them, and a change
+  copies only the path to what it touches. Each is serialised as before (maps in key order, lists as lists). The
+  world's totals stay a plain map: a handful of counters, one for each the catalogue declares.
+- **Results.** The same state hash at 1,000 and 10,000 people (`worlds/town-1000.yaml`, 30 days, 4 threads); the
+  logs the same entry for entry, the header's build id aside.
+- **Memory** (Linux, 4 threads, against `representation` at 01d1798): 1,000 people 306 MB, 195.9 KB a person before
+  and 195.6 after; 10,000 people 1,675 MB, 156.5 KB a person, before and after. Nothing at the peak: the copies were
+  made and let go within an act. What it saves is the copying (an act on a field or the network no longer costs as
+  much as the whole of nature or the network), and a world whose nature or network is large no longer pays it per act.
+  The budget's ceiling is unchanged (270 KB): the measure did not move.
+- **Revisit if** a heap profile shows another part of the state copied whole within an act (any field of `State` that
+  is not a persistent map, vector or set, or behind an `Arc`, is copied by every act).
+## 2026-10-31 · A seat in the support office is a non-resident officer, not the case system (branch `gap-wm14`; generator; new kind `world.nonresident`; risk WM-14 item 1; no contract change; no model called)
+
+- **What:** where a model is seated in a post of the outside world held by a system (the support office, `outside-support`),
+  the generator gives the seat a person's body: an officer of the agency who lives outside the town, a person entity with
+  `present: false`, their own participant a new kind that does nothing in the world (`world.nonresident`: their life is the
+  boundary's), holding the post with `holds_abroad`. The seat shares that body (`shares_body`), keeping its old id
+  (`outside-support-system`). The case system's participant that held the post is not delivered in that town. Docs:
+  `docs/behaviour/staffing.md`, "A seat in an office of the outside world".
+- **Why it is contained:** the risk entry held this back because a person with a body who is not a resident reaches the
+  census, life events, elections and every module that counts persons. The kernel already has persons outside the world:
+  everyone who leaves it (`leave`) keeps a body with `present: false`, and their participant lives on for their affairs
+  abroad; posts held from abroad exist (a firm owner's, `holds_abroad`). An absent body is not counted by the census (it
+  counts from the generator's population and the registers' events), has no enrolment, home or job, is not exposed to injury
+  or illness (the kernel skips absent bodies), and cannot do physical work (`not_present`). It can still die of other causes,
+  as people abroad do; the post then falls vacant.
+- **Effect:** the support seat works at a person's speed in a person's day, like every other seat (WM-14's "a seat's speed
+  there is not a person's, unlike every other seat"). The code twin is unchanged (the case system holds the post): a town
+  with the seat differs from its twin in the post's holder and one body outside the world.
+- **Test:** `office-books.test.ts` (the support seat): the seat is a person sharing a body not in the world, the post is
+  held from abroad (`holds_abroad`), so the kernel times the seat's acts as a person's (the mock seat makes none in 45 days: its staff do the routine).
+- **Left:** the officer's age is a placeholder draw (25 to 60); no other outside post is seated yet (the rule applies to any
+  post held by a system of an entity of kind boundary); the case system's machine work (payments, notices) is the officer's
+  in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
+- **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
+  agency's officers are simulated as people, when the seat should be one of them.

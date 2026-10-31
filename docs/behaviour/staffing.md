@@ -86,6 +86,17 @@ in seven of the nine places; the administration rate is derived from a published
 price is an estimate that says what it was made from and is marked "(to confirm)". The property-management rate is one placeholder,
 carried unchanged to every profile. Nothing is a place's figure in code (`orchestrator/test/generality.test.ts`).
 
+## A seat in an office of the outside world (2026-10-31; risk WM-14)
+
+A post of the outside world's (an agency of the higher government: the support payments office) is held in a code town by its case
+system. A model seated there is not put on that system, which would work at a system's second: it is given **a person's body, an officer
+of the agency who lives outside the town**. The officer is a person entity that is not in the world (`present: false`): no home, job,
+census count, enrolment, election or life of the town's reaches them, and their own participant (`world.nonresident`) does nothing here,
+their life being the boundary's. They hold the post from outside (`holds_abroad`), acting by letter as an owner who has left does, and the
+seat shares their body, so what it does takes a person's time from the table of work in a person's working day, as every other seat's.
+The case system that held the post is not delivered in that town. Death from other causes still reaches the body (people abroad die);
+then the post falls vacant. The officer's age is drawn between 25 and 60 (a placeholder); nothing else of them is drawn.
+
 ## What a seat sees
 
 A person in the office sees it as before (its papers, its roster, its books). What is new: it is told **its own body** (age, where it is,

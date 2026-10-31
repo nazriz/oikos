@@ -367,6 +367,14 @@ impl Person {
             })
             .collect()
     }
+    /// A title of ours whose lot's plan the register has still to tell us: until it answers we cannot say which
+    /// building on the street is ours, but an owner in the house they own is not without a home for it, and does not
+    /// hunt for another or stop its own water. (Years at 10,000: 1,420 owners asked the one registry officer on the first
+    /// day; waiting weeks for the answer, they counted themselves homeless, turned off their own supplies, and a third
+    /// of them left town. docs/decisions.md, "Years at 10,000".)
+    pub fn own_plan_pending(&self) -> bool {
+        self.p.register.is_some() && self.our_titles().iter().any(|(_, lot)| !self.book.has(lot))
+    }
     pub fn register_looks(&mut self, t: i64) -> Vec<LookRequest> {
         let Some(reg) = self.p.register.clone() else { return vec![] };
         let mut ask_title = None;
@@ -447,7 +455,7 @@ impl Person {
     pub fn need_home(&self, t: i64) -> bool {
         self.is_leaseholder()
             && match &self.s.home {
-                None => true,
+                None => !self.own_plan_pending(),
                 Some(h) => self.s.move_hunt.is_some_and(|(until, _)| t < until) && !h.owned,
             }
     }
@@ -1841,8 +1849,10 @@ impl Person {
         let home = self.s.home.clone().filter(|h| h.moved_in);
         let here = home.as_ref().map(|h| crate::common::structure_of(&h.space).to_string());
         let office_of = |kind: &str| if kind == "energy" { Some(u.energy.clone()) } else { u.water.clone() };
-        // Where we no longer live: our use there ends, and its supplier is asked to stop the connection.
-        for c in mine.iter().filter(|c| !c.closed && here.as_deref() != Some(c.at.as_str())) {
+        // Where we no longer live: our use there ends, and its supplier is asked to stop the connection. (Not while the
+        // register has still to tell us which building our own lot holds: `own_plan_pending`.)
+        let unsure = here.is_none() && self.own_plan_pending();
+        for c in mine.iter().filter(|c| !unsure && !c.closed && here.as_deref() != Some(c.at.as_str())) {
             if c.rate > 0 && c.kind != "wastewater" {
                 w.push(because(format!("We no longer live at {}: our {} there is turned off.", c.at, c.kind), vec![call("connection", vec![("op", Some(arg("set"))), ("connection", Some(arg(&c.id))), ("rate", Some(text("0")))])]));
             }
@@ -2392,6 +2402,21 @@ mod tests {
         let hn = statement("hn-1", 90 * DAY, "hearing_notice", "tribunal", json!({ "kind": "possession", "against": ME, "about": "L1", "application": "app-1" }));
         let out = week(&mut p, &c, &pic(90 * DAY, vec![hn], &[]), 0);
         assert!(out.iter().any(|s| s.1.contains("tribunal_response") && s.1.contains("We are not there")), "{out:?}");
+    }
+
+    #[test]
+    fn an_owner_waiting_on_the_register_for_its_lots_plan_does_not_hunt_for_a_home_meanwhile() {
+        // (Years at 10,000: owners waiting weeks on the register counted themselves homeless and left town.)
+        let c = ctx(json!({ "bank": "bank", "register": { "lots": "lots", "titles": "titles", "dealings": "dealings" } }));
+        let mut p = Person::new(&c).unwrap();
+        let title = rec(json!({ "id": "T1", "record": "claim", "author": "genesis", "speaks_for": "registry", "at": 0, "visible_to": "public", "position": "right", "holder": ME, "about": { "kind": "ownership", "object": "lot-1" } }));
+        p.book.take_all(&[title]);
+        assert!(p.own_plan_pending() && !p.need_home(DAY), "the title is ours and its lot not yet told us");
+        let lot = rec(json!({ "id": "lot-1", "record": "statement", "author": "genesis", "speaks_for": "registry", "at": 0, "visible_to": "public", "kind": "lot", "text": "Lot 1.", "data": { "cells": ["cell.1.1"] } }));
+        p.book.take_all(&[lot]);
+        assert!(!p.own_plan_pending() && p.need_home(DAY), "told the plan and no house of ours stands on it: without a home");
+        let q = Person::new(&ctx(json!({ "bank": "bank" }))).unwrap();
+        assert!(!q.own_plan_pending() && q.need_home(DAY), "no title: without a home");
     }
 
     #[test]
