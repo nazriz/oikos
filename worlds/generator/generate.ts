@@ -3014,6 +3014,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     retirement_age: V.retirement_age, ...(CURVE ? { stop_work_curve: CURVE } : {}),
     // Starting businesses: the ventures a person may weigh, each by its expected profit (docs/behaviour/entry.md).
     ventures: [...shopVentures, ownVenture],
+    // (Borrowing to start one, risk ME-1: asked of the bank over the longest term it lends for, which its published terms say.)
+    start_loan_months: Cr.max_months,
     // Founding (docs/behaviour/founding.md), where the town has it on: the profile's fitted chance and sizes; the
     // post a founder holds in what they found (what a convenor sees: its own papers and money; and the one module
     // that runs it); the hall and its hire.
