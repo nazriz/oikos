@@ -9831,6 +9831,53 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+## 2026-10-31 · Working calendars: a desk of officers keeps the place's week (branch `gap-weekends`; generator 0.73.0; risk WM-14 item 4; contract addition: a template's `hours.closed`; no model called)
+
+- **What:** a system template's `hours` may say the days its window does not open (`closed`: days of the world's week,
+  day d of the run being the week's day d mod 7, and days of the run, its holidays); the kernel's placing of work
+  (`oikos_time::Hours`, `place_within`) skips them, so work not done by a Friday's closing goes on at Monday's opening and
+  a holiday's work waits. Generic in the kernel (a list of closed days, no civil calendar); the law is data. The
+  generator gives both desks of officers (the support agency's casework, `agency-casework`, and the tax collector's,
+  `tax-casework`) the place's working calendar from its profile: `calendar.weekend` and `calendar.holidays` (all nine
+  profiles have them, sourced there), as days of the run from its start date. Each desk now works an officer's day on
+  each working day, where before the week's hours were spread evenly over seven days. A town with dates (`calendar` in
+  the spec) uses the real week from its start date; a town without dates keeps the week its people keep (their working
+  days first: `day % 7 < work_days`, as the actors count), with the profile's holidays from its start date.
+- **The law's backstop:** `all-work-takes-time.test.ts` fails, naming the template, on a desk of people (a system that
+  writes a decision with its own seconds in a day shorter than the whole day) whose hours are open every day of the
+  week. A machine's hours (the whole day) are not held to it: software runs when asked (the case-handling system).
+- **Why only the desks:** they are the only systems that stand for people's work. A machine's lanes run all day, as a
+  payment platform or case system does. People who staff the town's own bodies are persons, whose routines already keep
+  a working week (`work_days`); they do not yet keep public holidays (left, below).
+- **Effect:** the desks' yearly capacity falls by the holidays (eight in gb-eng), and decisions wait over weekends, as a
+  claim made on a Friday evening does. Every town's state hash with a support office or a tax collector moves.
+- **Left:** offices staffed by persons do not keep public holidays (each actor's `work_days` routine would need the
+  calendar's days; `common::next_working` already reads it where a town has dates); a town without dates numbers its
+  week from its people's first working day, not from a weekday (it has no weekdays); banks' settlement days (payments
+  on weekends) are not modelled.
+- **Revisit if:** a profile's officers work another pattern (shifts, a six-day week), which would be a `closed` of its
+  own; or an office of persons is held to the calendar, when the desks and the persons should read the one list.
+- **Pins re-taken on the merge with main (2026-11-01, main at 28c38600 and again at f56d2dbc: delegation, the long-run fixes,
+  business loans, then foundations-2 S2, which took generator 0.72.0, so working calendars are 0.73.0):**
+  `culture-dial.test.ts`'s three config hashes and three Rust states, taken on the merged tree, the working calendars as
+  the reason (the desks' `hours.closed` is in the config; the desks' days move the towns). Main's values are in the
+  comment beside them.
+
+## 2026-10-31 · A crew's day three times as long, traced: the seat held until each order began (MT-23) (branch `mt23-crew`; no model called)
+
+**What.** On 2026-10-24 the seat-diary run's day 21 showed a works crew's forty notices taking 310 minutes where every
+other working day took 106 to 121, the crew's acts one after another. Traced to a mechanism fault already fixed:
+until foundations-2 P1 (`fc5eabd`, 2026-10-25) an actor who only orders an act was held on its own time until the work
+began, so a seat's orders queued behind whichever member of its crew was busy; P1 places the order when the actor is
+free and lets it go on. On current main every working day is alike (105 minutes of crew work a day in the 600-person
+town, days 1 to 22; 31 minutes in the town of the usual size, days 1 to 30). Not re-run on the old kernel (a cold
+build); the trace is from the code, the decision of 2026-10-25 and the dates, and is recorded as such.
+- **The measure was wrong too.** The test's `spanOf` read the log time of `action_started`, which since P1 is when the
+  seat gave the order (16 minutes a day), so its bound held whatever the crew did. It now reads the work's own `starts`
+  and `done`, and every working day is held under three hours, not the middle day (the median was a stand-in while the
+  outlier was untraced). No pinned hash moves: a test-side change only.
+- **Revisit if:** a day over the bound again (then look at who in the crew was busy, and with what, from the log's
+  timelines).
 
 ## 2026-10-31 · Foundations-2 phase 3, S3: bodies on their way (branch `f2-phase3`; results move; no model called)
 
@@ -10056,3 +10103,57 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   come with its sourced rate).
 - **Revisit if** a delivery round's order of stops matters (then the route is ordered by the carrier, not the blocks); the
   outside's freight should take town people's time (then a carrier firm of the town's, its staff and vans).
+## 2026-11-01 · The outside's capability over time: releases of what it sells, from a scenario, tagged for measurement only (foundations-2 E2, its first part; branch `f2-economy`; contract additions; a town under no capability scenario is as before, to the byte; no model called)
+
+- **What:** a scenario may give `capability` (`tag`, `of`, `every_days`, `time_bps`, `slip_bps`, `price_bps`, with its
+  basis): the outside world's technology released anew every so many days from the first, each release's time, slips
+  and prices a share of the one before. The generator (`worlds/generator/capability.ts`) makes each release a kind of
+  system of its own (`<kind>-r<n>`, its rows quicker, its row of the table of slips lower, `released` on its day) and
+  gives its sellers the schedule (`releases` in `world.vendor`'s and `firm.provider`'s parameters); a seller sells the
+  newest out, publishing the offer again when one comes out (a provider's claims move with it), and fills an order
+  from that kind. The kernel refuses to deliver a kind before its release (`unknown_template`: nothing from nothing).
+  The tag lists every kind the capability moves, and its releases, in `meta.study_tags`, for measurement; a backstop
+  (`orchestrator/test/generality.test.ts`) fails on any world code that reads it. The first scenario is
+  `rising-capability`: case-handling systems and assistants, a release every six months, each a fifth quicker and
+  slipping a fifth less, prices held (placeholders, well short of what is measured of language models: METR 2025,
+  Epoch AI 2025, both to confirm).
+- **Why this way:** the owner ruled that AI's capabilities and costs come from an outside scenario for now, and that
+  nothing in the world knows which systems are AI (foundations-2 7.2, 7.5). Discrete releases, each a template, keep the
+  kernel's systems what they are (a template's rows are fixed; a system is what it was delivered as), make upgrading an
+  ordinary purchase, and let the kernel refuse a kind before it exists. The schedule is the seller's parameter, never
+  published: nobody in the world knows of a release before it is out.
+- **Not built, and why:** technologies that are goods (a machine or hardware a firm holds, with `runs_on`'s energy and
+  water) wait for E5, where hardware has to be somewhere on the network (plan, "E2b"); a provider's desk for persons is
+  not replaced by a newer release (the desk's clients keep the first kind); buyers do not trade a delivered system in
+  for a newer one by any rule of their own beyond the comparison they already make; the scenario's sizes are not fitted.
+- **Off, as before:** with no capability the generator returns the config untouched; the vendor's and the provider's
+  saved state carry no `releases` and their published offers' keys are as before (`worlds/test/generate.test.ts` holds a
+  town with capability to the plain town but for its releases and its tag).
+- **Revisit if:** a study needs capability as a continuous path rather than releases; a scenario's sizes find sources;
+  buyers should replace delivered systems as releases come out (that is a buyer's rule, with a real basis, not this).
+## 2026-11-01 · Compute in the town: what a system runs on, and a host on the town's network (foundations-2 P4 and E5; branch `f2-economy`; contract addition; new kind `firm.host`; a town without `hosting` is as before, to the byte; no model called)
+
+- **What:** the kernel's `runs_on` (foundations-2 4.1, P4): a system's template says the hardware it runs on (a kind, so
+  many units a lane), who holds it and where, and the recipe an hour of its work is there. A `deploy` is refused when the
+  hardware held does not cover the lanes of the systems there and the new one's; a hosted system's seconds of work (its
+  own acts, the acts it is named on, its share of a work) add up, and each whole hour is the recipe at the host, its
+  inputs taken from the holding there (refused, `insufficient_quantity`, when they are not there: a host with no power
+  does nothing). The generator's `hosting: "local"` (with `assistants`, the network and the profile's `values.hosting`)
+  puts the providers' systems at a hosting firm in the town: a building on a lot of its own (the last taken), its servers,
+  an electricity, a water and a sewer connection sized by a day at full work, held there rather than used as it comes, and
+  the feeders and mains sized with it; an hour of a server's work (`compute`) is its draw times the building's PUE, with the
+  grid's emissions, and its cooling water out to the sewer. `firm.host` uses each day what came in beyond a day's full work
+  kept in hand (the plant: idle servers, cooling), and pays the bills addressed to it; each provider pays it a fee a month
+  (`hosting` on `firm.provider`), its power and water at the tariffs with a margin. Figures in au-vic, with sources to
+  confirm or marked placeholders (risk ME-24).
+- **Why this way:** foundations-2 asks that compute compete for energy, water and land through laws 8 and 9 with nothing
+  built for AI: a data centre is a building and a firm like any other, on the same network, and the systems on it draw
+  through the same holdings and recipes as any work. The per-act draw with a remainder carried keeps law 8 exact (no part
+  of an hour lost or invented); a delivery refused without hardware keeps a system from running on nothing.
+- **Not built, and why:** the host entering by expected profit (step E3); the households' hourly shape on its connection
+  (the kind's, one shape for every connection: a known limit of C3); evaporation (no recipe carries water to the air yet);
+  its staff and its servers' wear; every other workplace on the network (WM-15, its own item).
+- **Off, as before:** absent `hosting`, the generator emits nothing new (the network's users are the homes as before);
+  the kernel's new paths run only for a template that says what it runs on, and the provider's state carries nothing new.
+- **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
+  connection's rate; the placeholders find sources (ME-24).

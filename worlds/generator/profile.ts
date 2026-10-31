@@ -473,6 +473,9 @@ export interface Profile {
      * `principals`: what a principal weighs that no market gives (what an error costs it, the share of slips it finds in a draft
      * it reads, how much a claim counts against what it has seen, its hurdle); `review_misses_bps` how often a reading misses a
      * slip (a person's row in the table of slips). No figure here sets how much anyone delegates. */
+    /** A hosting firm in the town (docs/behaviour/hosting.md): read only where a town asks for its assistants' systems to run
+     * in the town (`hosting: "local"`). worlds/generator/hosting.ts says what each figure is. */
+    hosting?: import("./hosting").HostingFigures;
     assistants?: {
       providers: { id: string; name: string; offers: { id: string; title: string; for: "organisations" | "persons"; template: string; kinds: string[]; levels: ("advice" | "draft" | "approve" | "alone")[];
         speed_bps: number; claim_slip_bps: number; slip_bps: number; fee_month: number; setup: number; exit: number; notice_days: number; term_days: number; records: "principal" | "provider" | "on_request" }[] }[];

@@ -77,7 +77,7 @@ A change (`changes:`) names where it applies and does one thing:
 | `add: {from_day: 0, kind, what, factor_bps}` | a condition of the world market (to `shocks`): a kind's price, or the demand for it, as a multiple of the profile's. |
 | `where: {field, at_least, at_most}`, `of: f` | of a list of rows in a profile: the rows within the bounds, and the field of each that is changed (the age bands from 65). |
 
-Two more things a scenario may say:
+Three more things a scenario may say:
 
 - **`season.starts_in`**: `wet_half`, `dry_half` (the month from which the next six bring the river most or least, by
   the profile's `rain_by_month_bps`) or `hot_months` (the first of its `summer_months`). It sets the month the run
@@ -87,6 +87,16 @@ Two more things a scenario may say:
   `over_days` days (`wettest_spell`: the most the river is sent in five days running; `inflow`: what it is sent in
   all; `heatwave_days`); the one at `percentile` is the run's. The bureau warns of what that year holds, as of any
   year's. The climate is untouched, so how rare the year is means what it says.
+- **`capability`** (docs/design/foundations-2.md 7.2 and 7.5; `worlds/generator/capability.ts`): the outside world's
+  capability over time, as the owner ruled (2026-10-25: capabilities come from an outside scenario for now). `of` names
+  what it moves (a vendor's offer by id, or `assistants`, every provider's offer where the town has them), `every_days`
+  how often a new release comes out from the first day, and `time_bps`, `slip_bps` and `price_bps` each release's time,
+  slips and prices as shares of the one before. Each release is a kind of system of its own (a template `<kind>-r<n>`,
+  `released` on its day: the kernel refuses to deliver one before), with its rows quicker and its row of the table of
+  slips lower; its seller sells the newest out and publishes the offer again when one comes out; a system delivered
+  stays what it was. `tag` names the technology for measurement (`ai`): every kind it moves, and their releases, are
+  listed in `meta.study_tags`, which nothing in the world reads (`orchestrator/test/generality.test.ts`). A rate from the
+  first day, as a falling price is, never a release made to happen on a day of the scenario's choosing.
 
 Everything is fixed by the description's seed: the same description and scenarios give the same town.
 
@@ -125,6 +135,7 @@ list and of `offeredScenarioIds()`): the conditions hold, and nothing of them re
 |---|---|---|---|
 | `dry-year` | Starts at the dry half-year; the climate's year at the 1st percentile of 199 by inflow. | The bureau's public drought warning (day 108) and nothing more. The supplier restricts only when the river refuses its draw; every river cell is sent the profile's inflow, and the town draws about a thousandth of it, so four tenths of a low season is still hundreds of times the draw. | A river sized against the town's draw, or a supplier that restricts at a level of storage or flow, as suppliers do. |
 | `export-slump` | The world market takes a quarter less of the factories' goods (was 12%). | Slow by the producer's own rule: a factory over-stocked stops making, keeps paying, and lets one worker go a month once stock passes a month's demand. Nine more redundancies in 240 days; unemployment doesn't move; nobody tells the town. | A headcount rule that sheds as fast as firms in a slump do, or a report of short time to someone. |
+| `rising-capability` | A new release of the outside's case-handling systems and assistants every six months, each a fifth quicker and slipping a fifth less, at the same prices (`capability`). | The first release falls on day 182: nothing of it is out in 120 days, and nothing in the world is told of a release before it is out. | Years, not months (the multi-year runs). Not measured yet against the plain town over a year. |
 | `ageing-town` | Half as many again in every age band from 65. | A smaller labour force and an eighth more pension claims (outside). Deaths and hospital-level illness are a handful in 120 days at any age mix; the clinic is far from full; the town provides nothing by age. | Routine and aged care; or years, not months. |
 | `dirty-industry` | Each factory's pollution two and a half times the profile's. | Nothing differs from the plain town, to the count of every species. The unit of pollution is a placeholder, far under the one sensitive species' tolerance where it lives; pollution makes nobody ill; no office measures it. | A sourced unit, an effect at realistic levels, and someone who measures. |
 | `doctor-shortage` | Half the doctors for the town's size. | About thirty requests for care in 120 days; one doctor can give twenty consultations a day. Every patient is seen the day they ask; only the clinic's grant halves. | Routine care, so a doctor's day is full. |
