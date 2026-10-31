@@ -306,6 +306,11 @@ list: systems' places and the unhoused, who are in no space. S2 (2026-10-31): a 
 cells joined into links a cell long; trips along the ways at the vehicle's speed or on foot; vehicles driven by whoever may,
 standing where they went; households' vehicles from the profiles. Not as designed: roads are structures that are ways, not
 links declared in `world.network` (so a road the town builds joins the network); declared travel links come with S6.
+S3 (2026-10-31): bodies on their way, in no building from when an act takes them until it is done, their vehicle with
+them; a refused trip brings them back; a visit is a trip there and back. Not as designed: no standing journeys (the
+transit adds no event, so the log does not grow). S4 (2026-11-01): goods between buildings go only with a carrier,
+taken by both places by the act's journeys; crews go to the building they work on; the outside's freight takes its time
+from the edge's node by the road out. Not as designed: no load limit yet (S5).
 
 ### 3.5 Performance
 

@@ -67,6 +67,14 @@ they are; if the world says it was not there to take (another of the household t
   about $33,000 at the builder's prices (25 m of local road: placeholder).
 - **Nature:** a road is a barrier to whatever building is one to.
 
+## Shopping and carrying (foundations-2 S4)
+
+A citizen's order is collected at the shop where it says it serves from (a seller that names nowhere still delivers
+home), and carried home when it is used: the weekly use takes them there and back (law 9: goods between two buildings
+go only with someone who carries them). A seller that delivers to another business carries what it sells itself, there
+and back; a shop moving its stock to new premises carries it. Crews go to the building they work on. The outside's goods
+come by its freight, in the time the road out takes.
+
 ## The profile
 
 Working hours 9 to 5, Monday to Friday, for everyone (shops included: a liberty; they'd roster Saturday staff). School

@@ -10020,3 +10020,39 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   run only where a world names a practised skill.
 - **Revisit if:** a source gives slip rates by practice, or skill half-lives by kind of work; a study needs papers'
   skills by kind; the opening level's assumption (everyone an ordinary hand) shows in results.
+
+## 2026-11-01 · Foundations-2 phase 3, S4: goods are carried, crews go to the site, the outside's freight takes its time (branch `f2-phase3`; results move; no model called)
+
+- **Contract (blocks, log, world config; blanket approval).** `move_goods` gains `carried` (the acting person carries
+  them), `carrier` (someone the actor may direct does) and `vehicle` (driven by the carrier); `goods_moved` names the
+  `carrier` and, for the outside's freight, when the goods `arrives`; a network link may carry travel (`speed_kmh`: a road
+  out of the town to an edge's node; between towns, S6). A new refusal, `not_carried`. The calls' `carried`, `carrier` and
+  `by` are code's own until the translator is taught them (the resolver's `CODE_ONLY_ARGS`), as S2's `by` is.
+- **Kernel.** In a world one travels (it has `catalogue.travel`; every world in phase 5's strict mode), goods between two
+  buildings go only with a carrier, and an act's journeys (`travel::journeys`) take each body it moves by the buildings
+  its blocks reach, in order: an `occupy`'s body into its building; a `move_goods`'s carrier by where the goods are and
+  where they go; a `work` on a building other than where it is done each performer to it. A body ends in the building it
+  goes into, or back where it set out (`turn_back` when the act is applied). Its trip is leg by leg; the act takes its
+  longest trip; each performer's and carrier's trip is placed on their own timeline. When the act is done the carrier must
+  have been by both places (`Transit.via`), else `not_present`. To or from an edge's outside, goods go by the outside's
+  freight (no town person's time): from the edge's node along the ways to the door, at the links' speeds, on their way
+  meanwhile (`Sched::Arrival`, counted by `State::total_goods`, so the conservation property holds over goods on the
+  road); at once where the world has no node for the edge (the backstop's `edgesWithoutNode` would name it). A vehicle
+  named that the body may not drive, or that is not where it sets out, means the body does not set out and the act is
+  refused when due (it looked, and the car was gone); on arrival the vehicle that went is the one that arrives.
+- **Generator, profiles.** The road out (`round.outside`: how far by road the outside's goods come from, and its freight's
+  speed, placeholders in all nine profiles, with what each would be sourced from), from the street end nearest the
+  town's west edge to a node off the ground, and every edge's node at its end.
+- **Actors.** Every move of goods an actor writes says it is carried (`uncarried` is empty). A citizen's order is collected
+  at the shop (it says where it serves from) and carried home at the weekly use, there and back; a seller delivering to
+  another business, and a shop moving its stock, carry it themselves. The crews (the builder's, the works', the
+  collectors') go to the buildings they work on with no change of their own: the kernel's journeys take them.
+- **Inventory.** S4 done: `edgesWithoutNode`, `uncarried`, `uncarriedMoves` and `workElsewhere` empty in every profile's
+  town and a month of each one's log; the special cases `goods-move-anywhere` and `crews-from-the-depot` gone (guards).
+  Left: the unhoused in no space, and the systems with no place.
+- **Not as designed:** carriage has no load yet (a body's or a vehicle's limit in mass: S5 with link capacity, which needs a
+  mass for each kind); a carrier's goods land when it is back, not when it passes their place (a trip's length late at
+  most); the freight's price is the edge's offer's as before (a freight charge by distance is the outside's behaviour, to
+  come with its sourced rate).
+- **Revisit if** a delivery round's order of stops matters (then the route is ordered by the carrier, not the blocks); the
+  outside's freight should take town people's time (then a carrier firm of the town's, its staff and vans).

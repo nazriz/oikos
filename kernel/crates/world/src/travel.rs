@@ -189,7 +189,15 @@ pub fn journeys(s: &Statics, st: &State, actor_body: Option<Id>, blocks: &[Block
         if route.len() < 2 {
             continue;
         }
-        let speed = vehicle.and_then(|v| crate::exec::driven_speed(s, st, &v, &body, &from).ok());
+        // (A vehicle named that the body may not drive, or that is not where it sets out: it does not set out; the act is
+        // refused when it is due, having found so.)
+        let speed = match vehicle {
+            Some(v) => match crate::exec::driven_speed(s, st, &v, &body, &from) {
+                Ok(x) => Some(x),
+                Err(_) => continue,
+            },
+            None => None,
+        };
         let seconds = route.windows(2).map(|p| seconds(s, st, &p[0], &p[1], speed)).fold(0i64, |a, b| a.saturating_add(b));
         if seconds <= 0 {
             continue;
