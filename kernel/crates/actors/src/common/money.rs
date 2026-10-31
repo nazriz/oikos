@@ -85,7 +85,7 @@ pub fn bill_settled(book: &Book, claim: &Record, settled: &BTreeSet<String>) -> 
 pub struct RatesNotices {
     seen: usize,
     odd: bool,
-    by: std::collections::HashMap<(String, Option<i64>, Option<i64>), Vec<String>>,
+    by: BTreeMap<(String, Option<i64>, Option<i64>), Vec<String>>,
 }
 
 impl RatesNotices {
