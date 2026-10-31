@@ -10,6 +10,7 @@
 //! `wages`) are paid first, then the tax withheld (`withheld_tax`), then the rest oldest first. The kinds are the
 //! claims' own, so no place's law is written here; a world whose law orders them otherwise gives `priority`.
 
+use oikos_core::Frozen;
 use super::staffing::Staffing;
 use crate::common::{bases_of, filed_before, money_words, Book};
 use crate::papers::agreements::commitment_of;
@@ -17,7 +18,7 @@ use crate::steps::{arg, because, call, pay, say, Pay, Say, Step, Visible};
 use crate::{Cx, DAY};
 use oikos_sight::{Picture, Record, RecordBody};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
@@ -66,15 +67,15 @@ pub struct WindingUp {
 
 fn about_kind(r: &Record) -> &str {
     match &r.body {
-        RecordBody::Claim { about, .. } => about.get("kind").and_then(Value::as_str).unwrap_or(""),
+        RecordBody::Claim { about, .. } => about.get("kind").and_then(|x| x.as_str()).unwrap_or(""),
         _ => "",
     }
 }
 pub fn about_amount(r: &Record) -> i64 {
     match &r.body {
         RecordBody::Claim { about, .. } => match about.get("amount") {
-            Some(Value::Number(n)) => n.as_i64().unwrap_or(0),
-            Some(Value::String(s)) => s.trim().parse().unwrap_or(0),
+            Some(Frozen::Number(n)) => n.as_i64().unwrap_or(0),
+            Some(Frozen::String(s)) => s.trim().parse().unwrap_or(0),
             _ => 0,
         },
         _ => 0,
@@ -82,7 +83,7 @@ pub fn about_amount(r: &Record) -> i64 {
 }
 fn about_str<'a>(r: &'a Record, k: &str) -> Option<&'a str> {
     match &r.body {
-        RecordBody::Claim { about, .. } => about.get(k).and_then(Value::as_str),
+        RecordBody::Claim { about, .. } => about.get(k).and_then(|x| x.as_str()),
         _ => None,
     }
 }
@@ -142,7 +143,7 @@ impl WindingUp {
             self.since = c.at;
             if let Some(l) = newest("property_for_sale") {
                 self.listed_at = l.at;
-                self.asking = crate::common::data(&l).get("price").and_then(Value::as_i64).unwrap_or(0);
+                self.asking = crate::common::data(&l).get("price").and_then(|x| x.as_i64()).unwrap_or(0);
             }
             self.sold = book.open("property_sold").any(|r| r.speaks_for.as_deref() == Some(self.me.as_str()));
             return;
@@ -150,7 +151,7 @@ impl WindingUp {
         let closing = newest("closing").or_else(|| newest("insolvency"));
         if let Some(c) = closing {
             self.state = State::WindingUp;
-            self.since = crate::common::data(&c).get("since").and_then(Value::as_i64).unwrap_or(c.at);
+            self.since = crate::common::data(&c).get("since").and_then(|x| x.as_i64()).unwrap_or(c.at);
         }
     }
 
@@ -162,7 +163,7 @@ impl WindingUp {
             .filter(|r| {
                 matches!(&r.body, RecordBody::Claim { position, counterparty: Some(c), .. } if *c == self.me && format!("{position:?}") == "Right")
                     && (DEBT_KINDS.contains(&about_kind(r)) || rank(r) < 2)
-                    && !self.paid.contains(&r.id)
+                    && !self.paid.contains(r.id.as_str())
             })
             .collect();
         v.sort_by(|a, b| rank(a).cmp(&rank(b)).then(a.at.cmp(&b.at)).then_with(|| filed_before(&a.id, &b.id)));
@@ -185,11 +186,11 @@ impl WindingUp {
                 break;
             }
             left -= amount;
-            self.paid.insert(d.id.clone());
+            self.paid.insert(d.id.to_string());
             let what = about_str(d, "for").unwrap_or_else(|| about_kind(d));
             out.push(because(
                 format!("Paying a debt recorded against us ({what})."),
-                vec![pay(&to, amount, Pay { from: Some(account.into()), for_: Some(format!("Paying {} {}.", about_kind(d), d.id)), settles: Some(d.id.clone()), ..Default::default() }, cx)],
+                vec![pay(&to, amount, Pay { from: Some(account.into()), for_: Some(format!("Paying {} {}.", about_kind(d), d.id)), settles: Some(d.id.to_string()), ..Default::default() }, cx)],
             ));
         }
         out
@@ -234,7 +235,7 @@ impl WindingUp {
     pub fn begin<T>(&mut self, t: i64, book: &Book, staffing: &mut Staffing, why: &str, voluntary: bool) -> Vec<Step<T>> {
         self.state = State::WindingUp;
         self.since = t;
-        let lists: Vec<String> = book.open("price_list").filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str())).map(|r| r.id.clone()).collect();
+        let lists: Vec<String> = book.open("price_list").filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str())).map(|r| r.id).map(|x| x.to_string()).collect();
         let withdraw = |why: &str| lists.iter().map(|id| crate::common::withdraw(id, Some(why))).collect::<Vec<_>>();
         let mut steps = vec![];
         if voluntary {
@@ -272,7 +273,7 @@ impl WindingUp {
         let mut pays = vec![];
         let mut paid: Vec<String> = vec![];
         let debts = self.debts(book);
-        let in_default: BTreeSet<String> = debts.iter().flat_map(|d| bases_of(d).iter().cloned()).collect();
+        let in_default: BTreeSet<String> = debts.iter().flat_map(|d| bases_of(d).iter().map(|x| x.to_string())).collect();
         for d in &debts {
             let amount = left.min(about_amount(d));
             let holder = match &d.body {
@@ -283,14 +284,14 @@ impl WindingUp {
             if amount <= 0 {
                 continue;
             }
-            pays.push(pay(&to, amount, Pay { from: Some(account.into()), for_: Some(format!("Winding up: paying {} {}.", about_kind(d), d.id)), settles: Some(d.id.clone()), ..Default::default() }, cx));
+            pays.push(pay(&to, amount, Pay { from: Some(account.into()), for_: Some(format!("Winding up: paying {} {}.", about_kind(d), d.id)), settles: Some(d.id.to_string()), ..Default::default() }, cx));
             left -= amount;
-            paid.push(d.id.clone());
+            paid.push(d.id.to_string());
         }
         // Loans not in default: what is left of the repayments falls due now.
         for a in book.of_type("agreement") {
             let RecordBody::Agreement { terms } = &a.body else { continue };
-            if terms.template.as_deref() != Some("loan") || !terms.parties.iter().any(|p| *p == self.me) || !book.concluded(&a.id) || in_default.contains(&a.id) {
+            if terms.template.as_deref() != Some("loan") || !terms.parties.contains(&self.me) || !book.concluded(&a.id) || in_default.contains(a.id.as_str()) {
                 continue;
             }
             let (owe, _) = commitment_of(a, &self.me);
@@ -311,9 +312,9 @@ impl WindingUp {
             .filter(|r| {
                 r.speaks_for.as_deref() == Some(self.me.as_str())
                     && !book.withdrawn(&r.id)
-                    && matches!(&r.body, RecordBody::Statement { data: Some(d), .. } if d.pointer("/outcome/money/for").and_then(Value::as_str) == Some("Loan repayment."))
+                    && matches!(&r.body, RecordBody::Statement { data: Some(d), .. } if d.pointer("/outcome/money/for").and_then(|x| x.as_str()) == Some("Loan repayment."))
             })
-            .map(|r| r.id.clone())
+            .map(|r| r.id).map(|x| x.to_string())
             .collect();
         let mut steps = vec![];
         for chunk in pays.chunks(30) {
@@ -344,7 +345,7 @@ impl WindingUp {
             for tx in pic.transactions() {
                 if tx.from == acc {
                     if let Some(s) = &tx.settles {
-                        self.paid.insert(s.clone());
+                        self.paid.insert(s.to_string());
                     }
                 }
             }
@@ -355,7 +356,7 @@ impl WindingUp {
         let Some(acc) = account else { return };
         for tx in pic.transactions() {
             if tx.to == acc && tx.from != acc {
-                *self.credit.entry(tx.from.clone()).or_insert(0) += crate::common::cents(tx.amount);
+                *self.credit.entry(tx.from.to_string()).or_insert(0) += crate::common::cents(tx.amount);
             }
         }
     }
@@ -407,9 +408,9 @@ impl WindingUp {
             return vec![listing(self, why, price, vec![])];
         }
         let price = if self.asking > 0 { self.asking } else { price };
-        if !self.sold && self.listed_at >= 0 && t - self.listed_at >= self.p.reprice_days * DAY && !book.open("property_purchase").any(|r| crate::common::addressed_to(r).contains(&self.me)) {
+        if !self.sold && self.listed_at >= 0 && t - self.listed_at >= self.p.reprice_days * DAY && !book.open("property_purchase").any(|r| crate::common::addressed_to(r).iter().any(|x| x == &self.me)) {
             let lower = price * (10_000 - self.p.reprice_bps) / 10_000;
-            let old: Vec<String> = book.open("property_for_sale").filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str())).map(|r| r.id.clone()).collect();
+            let old: Vec<String> = book.open("property_for_sale").filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str())).map(|r| r.id).map(|x| x.to_string()).collect();
             let why = format!("Our premises unsold after {} days at {}: asking {}.", (t - self.listed_at).div_euclid(DAY), usd(price), usd(lower));
             return vec![listing(self, why, lower, old)];
         }
@@ -423,11 +424,11 @@ impl WindingUp {
             }
             return steps;
         }
-        let mut purchases: Vec<&Arc<Record>> = book.open("property_purchase").filter(|r| crate::common::addressed_to(r).contains(&self.me)).collect();
+        let mut purchases: Vec<&Arc<Record>> = book.open("property_purchase").filter(|r| crate::common::addressed_to(r).iter().any(|x| x == &self.me)).collect();
         purchases.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
         for pch in purchases {
             let from = match &pch.body {
-                RecordBody::Statement { data: Some(d), .. } => d.get("account").and_then(Value::as_str).unwrap_or("").to_string(),
+                RecordBody::Statement { data: Some(d), .. } => d.get("account").and_then(|x| x.as_str()).unwrap_or("").to_string(),
                 _ => String::new(),
             };
             if self.credit.get(&from).copied().unwrap_or(0) < price {
@@ -435,12 +436,12 @@ impl WindingUp {
             }
             self.sold = true;
             *self.credit.entry(from).or_insert(0) -= price;
-            let buyer = pch.speaks_for.clone().unwrap_or_default();
+            let buyer = pch.speaks_for.unwrap_or_default();
             let mut calls: Vec<_> = titles.iter().map(|c| call("claim", vec![("transfer", Some(arg(&c.id))), ("to", Some(arg(&buyer)))])).collect();
             calls.push(say(
                 "property_sold",
                 &format!("Sold: {} to {} for {}.", premises.structure, buyer, usd(price)),
-                Say { visible: Some(Visible::Public), basis: Some(pch.id.clone()), data: Some(json!({ "structure": premises.structure, "buyer": buyer, "price": price })), ..Default::default() },
+                Say { visible: Some(Visible::Public), basis: Some(pch.id.to_string()), data: Some(json!({ "structure": premises.structure, "buyer": buyer, "price": price })), ..Default::default() },
             ));
             steps.push(because(format!("{buyer} has bought our premises, paid in full: transferring the title."), calls));
             // The proceeds: what we still owe first (as far as it goes), then our shareholders.

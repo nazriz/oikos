@@ -80,7 +80,7 @@ fn advance(run: &mut Run<Vec<u8>>, to: i64) -> Vec<EventBody> {
 }
 
 fn act(run: &mut Run<Vec<u8>>, participant: &str, position: Option<&str>, blocks: Value) -> Result<(), String> {
-    let cmd = Command::Act { participant: participant.into(), position: position.map(String::from), blocks: serde_json::from_value(blocks).unwrap(), by: vec![], provenance: json!({"via": "direct"}), reasoning: None, thinking: None };
+    let cmd = Command::Act { participant: participant.into(), position: position.map(String::from).map(Into::into), blocks: serde_json::from_value(blocks).unwrap(), by: vec![], provenance: json!({"via": "direct"}), reasoning: None, thinking: None };
     let r = run.command(&cmd).map_err(|e| format!("{e:?}"))?;
     let done = r.events.iter().find_map(|e| match &e.body {
         EventBody::ActionStarted { done, .. } => Some(*done),
@@ -234,7 +234,7 @@ fn connections_are_opened_closed_and_set_only_by_whoever_may() {
     let open = json!([{"block": "connection", "op": "open", "kind": "water", "node": "n2", "to": "carol", "at": "s-shop", "rate": 200, "ref": "c"}]);
     assert!(act(&mut run, "carol-self", None, open.clone()).unwrap_err().contains("NotTheirs"));
     act(&mut run, "mayor-system", Some("mayor"), open).unwrap();
-    let id = run.kernel().state().network.as_deref().unwrap().connections.last().unwrap().id.clone();
+    let id = run.kernel().state().network.as_deref().unwrap().connections.last().unwrap().id;
     assert_eq!(id, "conn.1");
     // Its user sets its rate; someone else may not.
     let why = act(&mut run, "bob-self", None, json!([{"block": "connection", "op": "set", "connection": id, "rate": 5}])).unwrap_err();

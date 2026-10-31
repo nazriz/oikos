@@ -236,7 +236,7 @@ impl ElectionPlan {
         let left: BTreeSet<&str> = self.book.open("departure").filter_map(|r| r.speaks_for.as_deref()).collect();
         let mut v: BTreeSet<String> = BTreeSet::new();
         for e in self.book.open("enrolment") {
-            if crate::common::addressed_to(e).contains(&self.town) {
+            if crate::common::addressed_to(e).iter().any(|x| x == &self.town) {
                 if let Some(s) = e.speaks_for.as_deref() {
                     if !dead.contains(s) && !left.contains(s) {
                         v.insert(s.to_string());
@@ -277,7 +277,7 @@ impl Plan for ElectionPlan {
         if self.notice.is_none() {
             let n = self.filed("election_notice").into_iter().filter(|r| data(r).i("poll_at") == Some(poll)).max_by_key(|r| r.at);
             if let Some(n) = n {
-                self.notice = Some(n.id.clone());
+                self.notice = Some(n.id.to_string());
                 if self.stage == Stage::Waiting {
                     self.stage = Stage::Nominating;
                 }
@@ -286,7 +286,7 @@ impl Plan for ElectionPlan {
         if self.ballot.is_none() {
             let b = self.filed("ballot").into_iter().filter(|r| data(r).i("closes_at") == Some(poll)).max_by_key(|r| r.at);
             if let Some(b) = b {
-                self.ballot = Some(b.id.clone());
+                self.ballot = Some(b.id.to_string());
                 self.stage = Stage::Voting;
             }
         }
@@ -312,13 +312,13 @@ impl Plan for ElectionPlan {
             let noms: Vec<Arc<Record>> = self
                 .book
                 .open("nomination")
-                .filter(|n| n.at >= since && data(n).s("office") == Some(self.office.as_str()) && crate::common::addressed_to(n).contains(&self.town))
+                .filter(|n| n.at >= since && data(n).s("office") == Some(self.office.as_str()) && crate::common::addressed_to(n).iter().any(|x| x == &self.town))
                 .cloned()
                 .collect();
             // (One each: the last nomination of an author counts.)
             let mut by_author: BTreeMap<String, Arc<Record>> = BTreeMap::new();
             for n in noms {
-                by_author.insert(n.author.clone(), n);
+                by_author.insert(n.author.to_string(), n);
             }
             let candidates: Vec<Arc<Record>> = by_author.into_values().collect();
             // (Each candidate's number on the ballot paper, in order: a vote ranks the numbers, as on a real ballot.)
@@ -326,7 +326,7 @@ impl Plan for ElectionPlan {
                 .iter()
                 .enumerate()
                 .map(|(i, n)| {
-                    let name = data(n).s("name").map(String::from).or_else(|| n.speaks_for.clone()).unwrap_or_default();
+                    let name = data(n).s("name").map(String::from).or_else(|| n.speaks_for.map(|x| x.to_string())).unwrap_or_default();
                     json!({ "candidate": n.author, "number": (i + 1).to_string(), "for": n.speaks_for, "name": name, "nomination": n.id })
                 })
                 .collect();
@@ -372,9 +372,9 @@ impl Plan for ElectionPlan {
         if self.stage == Stage::Voting && self.ballot.is_some() && t >= poll {
             let ballot = self.ballot.clone().unwrap_or_default();
             let b = self.book.get(&ballot).cloned();
-            let bd = b.as_ref().map(|b| data(b).clone()).unwrap_or(Value::Null);
+            let bd = b.as_ref().map(|b| data(b).clone()).unwrap_or((Value::Null).into());
             let candidates: Vec<String> = bd.ids("options").into_iter().map(String::from).collect();
-            let cands = bd.get("candidates").and_then(Value::as_array).cloned().unwrap_or_default();
+            let cands = bd.get("candidates").and_then(|x| x.as_array()).map(|a| a.to_vec()).unwrap_or_default();
             let by_number: BTreeMap<String, String> = cands.iter().filter_map(|c| Some((c.s("number").or_else(|| c.s("candidate"))?.to_string(), c.s("candidate")?.to_string()))).collect();
             let electors: BTreeSet<String> = self
                 .book
@@ -390,14 +390,14 @@ impl Plan for ElectionPlan {
             votes.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
             let mut last: BTreeMap<String, Vec<String>> = BTreeMap::new();
             for v in votes {
-                let who = v.speaks_for.clone().unwrap_or_default();
-                if !electors.contains(&who) || v.at < opens || v.at >= closes {
+                let who = v.speaks_for.unwrap_or_default();
+                if !electors.contains(who.as_str()) || v.at < opens || v.at >= closes {
                     continue;
                 }
                 let oikos_sight::RecordBody::Vote { choice, .. } = &v.body else { continue };
                 let ranking: Vec<String> = choice.split('>').map(|x| x.trim().to_string()).filter(|x| candidates.contains(x)).collect();
                 if !ranking.is_empty() {
-                    last.insert(who, if self.method == "plurality" { ranking[..1].to_vec() } else { ranking });
+                    last.insert(who.to_string(), if self.method == "plurality" { ranking[..1].to_vec() } else { ranking });
                 }
             }
             let rankings: Vec<Vec<String>> = last.values().cloned().collect();
@@ -447,13 +447,13 @@ impl Plan for ElectionPlan {
         let votes: Vec<Arc<Record>> = self.book.of_type("vote").cloned().collect();
         for v in votes.iter().skip(self.votes_read) {
             let oikos_sight::RecordBody::Vote { ballot, .. } = &v.body else { continue };
-            let Some(closed_at) = closed.get(ballot) else { continue };
+            let Some(closed_at) = closed.get(ballot.as_str()) else { continue };
             if v.at < *closed_at || v.author == "genesis" || v.at < first - DAY {
                 continue;
             }
             steps.push(because(
                 format!("A vote on {ballot}, cast after the poll closed: not counted, and saying so."),
-                vec![message(std::slice::from_ref(&v.author), &format!("From the electoral office: your vote on {ballot} is not counted. The poll closed on {} and the result is declared.", when(*closed_at)), Some(&v.id))],
+                vec![message(std::slice::from_ref(&v.author.to_string()), &format!("From the electoral office: your vote on {ballot} is not counted. The poll closed on {} and the result is declared.", when(*closed_at)), Some(&v.id))],
             ));
         }
         self.votes_read = votes.len();
@@ -468,11 +468,11 @@ impl Plan for ElectionPlan {
         match tok {
             Then::Notice => {
                 self.stage = Stage::Nominating;
-                self.notice = o.created.as_ref().and_then(|c| c.get("notice").cloned());
+                self.notice = (o.created.as_ref().and_then(|c| c.get("notice").cloned())).map(|x| x.to_string());
             }
             Then::Ballot => {
                 self.stage = Stage::Voting;
-                self.ballot = o.created.as_ref().and_then(|c| c.get("ballot").cloned());
+                self.ballot = (o.created.as_ref().and_then(|c| c.get("ballot").cloned())).map(|x| x.to_string());
             }
             Then::Declared { .. } => {
                 self.stage = Stage::Waiting;

@@ -9,6 +9,7 @@
 //! alone (our own listing's buyer; a loan for "their home, "), not from the housing part's state; a lead is a reply that
 //! cites no record we hold and the mind did not take (TS also asked whether we had asked around: that is the mind's).
 
+use oikos_core::Frozen;
 use super::household::hear;
 use super::mind::{Event, Heard, Outcome, Way};
 use super::params::Params;
@@ -139,12 +140,12 @@ fn income_tax_law(book: &crate::common::Book) -> Option<Vec<Value>> {
     let mut laws: Vec<&Record> = book
         .open("law")
         .map(|r| r.as_ref())
-        .filter(|r| data(r).s("tax") == Some("income") && (data(r).get("brackets").is_some_and(Value::is_array) || data(r).get("charges").is_some_and(Value::is_array)))
+        .filter(|r| data(r).s("tax") == Some("income") && (data(r).get("brackets").is_some_and(|x| x.is_array()) || data(r).get("charges").is_some_and(|x| x.is_array())))
         .collect();
     laws.sort_by(|a, b| b.at.cmp(&a.at).then_with(|| b.id.cmp(&a.id)));
     let d = data(laws.first()?);
-    if let Some(c) = d.get("charges").and_then(Value::as_array) {
-        return Some(c.clone());
+    if let Some(c) = d.get("charges").and_then(|x| x.as_array()) {
+        return Some(c.iter().map(Frozen::to_value).collect());
     }
     let brackets = d.get("brackets")?.clone();
     let mut charges = vec![json!({ "id": "income-tax", "schedule": brackets })];
@@ -212,9 +213,9 @@ fn charges_on(charges: &[Value], pay: i64) -> Vec<i64> {
             if let Some(u) = b.i("up_to") {
                 base = base.min(u);
             }
-            for d in b.get("less").and_then(Value::as_array).into_iter().flatten() {
-                if let Some(cs) = d.get("charges").and_then(Value::as_array) {
-                    for o in cs.iter().filter_map(Value::as_str) {
+            for d in b.get("less").and_then(|x| x.as_array()).into_iter().flatten() {
+                if let Some(cs) = d.get("charges").and_then(|x| x.as_array()) {
+                    for o in cs.iter().filter_map(|x| x.as_str()) {
                         base -= of(o, charges, pay, done, doing);
                     }
                 } else if let Some(s) = d.i("share_bps") {
@@ -224,8 +225,8 @@ fn charges_on(charges: &[Value], pay: i64) -> Vec<i64> {
                 }
             }
             base = base.max(0);
-            amount = scheduled(c.get("schedule").and_then(Value::as_array).map_or(&[], |v| v.as_slice()), base);
-            for r in c.get("reliefs").and_then(Value::as_array).into_iter().flatten() {
+            amount = scheduled(c.get("schedule").and_then(|x| x.as_array()).map_or(&[], |v| v.as_slice()), base);
+            for r in c.get("reliefs").and_then(|x| x.as_array()).into_iter().flatten() {
                 amount = match r.i("none_due_up_to") {
                     Some(n) => {
                         if base <= n {
@@ -285,21 +286,21 @@ impl Person {
                     .book
                     .all("request")
                     .find(|x| cites(x, &r.id) && x.speaks_for.as_deref() == Some(me.as_str()))
-                    .map(|x| x.id.clone());
+                    .map(|x| x.id);
                 self.s.home = Some(super::person::Home {
-                    agreement: r.id.clone(),
+                    agreement: r.id.to_string(),
                     space: lt.space.unwrap_or_default(),
                     structure: lt.structure.unwrap_or_default(),
                     landlord: other.clone(),
                     rent: lt.rent,
-                    order,
+                    order: order.map(|x| x.to_string()),
                     moved_in: true,
                     ..Default::default()
                 });
             }
             if template_of(r) == Some("employment") && self.s.job.is_none() {
                 let jt = job_terms(r, &me, Some(&self.book));
-                self.s.job = Some(Job { agreement: r.id.clone(), employer: other, wage: jt.wage, period: jt.period, workplace: jt.workplace, since, ..Default::default() });
+                self.s.job = Some(Job { agreement: r.id.to_string(), employer: other, wage: jt.wage, period: jt.period, workplace: jt.workplace, since, ..Default::default() });
             }
         }
         // Another adult's share of the rent, if one is already standing.
@@ -308,7 +309,7 @@ impl Person {
         });
         if let (Some(r), None) = (mine, &self.s.share) {
             let cents = data(r)["outcome"]["money"].i("amount").unwrap_or(0);
-            self.s.share = Some((cents, Some(r.id.clone())));
+            self.s.share = Some((cents, Some(r.id.to_string())));
         }
     }
 }
@@ -317,7 +318,7 @@ impl Person {
     /// Everything we observe, at every wake, before anything else (citizen.ts `absorb`).
     pub fn absorb(&mut self, pic: &Picture, cx: &mut Cx) {
         let fresh = self.book.absorb(pic);
-        self.absorbed.fresh.extend(fresh.iter().map(|r| r.id.clone()));
+        self.absorbed.fresh.extend(fresh.iter().map(|r| r.id.to_string()));
         let t = pic.t;
         let mut w = Week { pic, cx, t, acc: crate::common::money::own_banked(pic, &self.me), steps: vec![] };
         let me = self.me.clone();
@@ -325,7 +326,7 @@ impl Person {
         if let Some(acc) = &w.acc {
             for tx in pic.transactions() {
                 if let Some(debt) = tx.settles.as_ref().filter(|_| tx.from != tx.to && tx.to == acc.account) {
-                    *self.absorbed.settled_to_us.entry(debt.clone()).or_insert(0) += crate::common::cents(tx.amount);
+                    *self.absorbed.settled_to_us.entry(debt.to_string()).or_insert(0) += crate::common::cents(tx.amount);
                 }
             }
         }
@@ -359,7 +360,7 @@ impl Person {
             }
             let text = terms_text(r);
             if text.contains(" succeeding ") && bases_of(r).iter().any(|b| text.contains(&format!("(lease {b})"))) {
-                self.absorbed.succession_offers.insert(r.id.clone());
+                self.absorbed.succession_offers.insert(r.id.to_string());
             }
         }
     }
@@ -400,7 +401,7 @@ impl Person {
                     self.tell(w, outcome("membership", "member", "rise_won", Way::Published, f, Some(payoff)));
                 }
             }
-            if !addressed_to(r).contains(&me) {
+            if !addressed_to(r).iter().any(|x| x == &me) {
                 continue;
             }
             // Our hours cut, asked or restored, by our employer's paper (docs/behaviour/firms.md, "Hours before heads"):
@@ -408,10 +409,10 @@ impl Person {
             if (k == "hours_notice" || k == "hours_restored") && d.s("employer") == Some(job.employer.as_str()) && d.s("agreement") == Some(job.agreement.as_str()) {
                 if let (Some(wage), Some(from)) = (d.i("wage"), d.i("from")) {
                     let minutes = d.i("minutes_week").unwrap_or(0);
-                    if k == "hours_notice" && d.get("consent") == Some(&Value::Bool(true)) {
+                    if k == "hours_notice" && d.get("consent").and_then(|x| x.as_bool()) == Some(true) {
                         // (Hours to a tenth, as TS's Math.round(minutes / 6) / 10: half away from zero.)
                         self.absorbed.hours_asked.push(HoursAsked {
-                            notice: r.id.clone(),
+                            notice: r.id.to_string(),
                             agreement: job.agreement.clone(),
                             wage,
                             from,
@@ -486,7 +487,7 @@ impl Person {
             for c in cells.iter() {
                 let Some(st) = c.structure.as_ref().filter(|s| s.structure == home.structure) else { continue };
                 self.absorbed.home_site = Some(st.clone());
-                let view = st.variables.as_ref().and_then(|v| v.get(&self.p.complain_about)).cloned();
+                let view = st.variables.as_ref().and_then(|v| v.get(self.p.complain_about.as_str())).cloned();
                 // (Where what is complained of is a kind we hold at home (waste: law 8), the bin is what we hold of it there.)
                 if view.is_none() {
                     continue;
@@ -518,7 +519,7 @@ impl Person {
         let pic = w.pic;
         if let Some(id) = pic.outcomes.iter().find_map(|o| o.created.as_ref().and_then(|c| c.get("firm")).cloned()) {
             self.absorbed.pending_firm = None;
-            self.absorbed.founded_firm = Some(id.clone());
+            self.absorbed.founded_firm = Some(id.to_string());
             self.tell(w, outcome("venture", "found", "founded", Way::Mine, facts([("firm", json!(id)), ("capital", json!(capital))]), None));
         } else if let Some(o) = pic.outcomes.iter().find(|o| o.status == oikos_sight::OutcomeStatus::Refused) {
             let why = o.refusal.as_ref().map(|r| refusal_code(r.code)).unwrap_or_default();
@@ -564,7 +565,7 @@ impl Person {
                 let since = tx.t - job.paid_at.unwrap_or(job.since);
                 if let Some(j) = self.s.job.as_mut() {
                     j.paid_at = Some(tx.t);
-                    j.paid_from = Some(tx.from.clone());
+                    j.paid_from = Some(tx.from.to_string());
                 }
                 // (Days of the period rounded half up, as TS's Math.round.)
                 let f = facts([
@@ -601,17 +602,17 @@ impl Person {
 
     /// What the market's searches answered (a channel searched now: the view shows a search only when answered).
     fn market_answers(&mut self, pic: &Picture) {
-        if let Some(Seen::Records { records, search: true }) = pic.channels.get(&self.p.adverts) {
-            self.absorbed.looked_up.extend(records.iter().filter_map(|r| r.speaks_for.clone()));
+        if let Some(Seen::Records { records, search: true }) = pic.channels.get(self.p.adverts.as_str()) {
+            self.absorbed.looked_up.extend(records.iter().filter_map(|r| r.speaks_for.map(|x| x.to_string())));
         }
-        if let Some(Seen::Records { records, search: true }) = pic.channels.get(&self.p.sale_board) {
-            self.absorbed.on_sale = Some(records.iter().map(|r| r.id.clone()).collect());
+        if let Some(Seen::Records { records, search: true }) = pic.channels.get(self.p.sale_board.as_str()) {
+            self.absorbed.on_sale = Some(records.iter().map(|r| r.id).map(|x| x.to_string()).collect());
             self.absorbed.sale_seen_at = pic.t;
         }
         let leads = self.s.looking == Some(super::person::Looking::Leads);
         for k in ["homes", "jobs", "petitions"] {
             let Some(Seen::Records { records, search: true }) = pic.channels.get(k) else { continue };
-            let ids: Vec<String> = records.iter().map(|r| r.id.clone()).collect();
+            let ids: Vec<String> = records.iter().map(|r| r.id).map(|x| x.to_string()).collect();
             match (k, leads) {
                 ("homes", true) => self.s.lead_homes = ids,
                 ("jobs", true) => self.s.lead_jobs = ids,
@@ -635,11 +636,11 @@ impl Person {
             let home = self.s.home.as_ref();
             let share_order = self.s.share.as_ref().and_then(|s| s.1.clone());
             let ours: Vec<String> = home.and_then(|h| h.order.clone()).into_iter().chain(share_order.clone()).chain(home.into_iter().flat_map(|h| h.retiring.iter().map(|x| x.0.clone()))).collect();
-            if let Some(re) = m.re.as_ref().filter(|re| ours.contains(re) && PAYMENT_FAILED::is(&m.text).is_some()) {
-                let money = self.book.get(re).map(|r| data(r)["outcome"]["money"].clone()).unwrap_or(Value::Null);
+            if let Some(re) = m.re.as_ref().filter(|re| ours.contains(&re.to_string()) && PAYMENT_FAILED::is(&m.text).is_some()) {
+                let money = self.book.get(re).map(|r| data(r)["outcome"]["money"].clone()).unwrap_or((Value::Null).into());
                 if let (Some(to), Some(amount)) = (money.s("to"), money.i("amount")) {
                     let what = if share_order.as_deref() == Some(re.as_str()) { "our share of the rent" } else { "the rent" };
-                    self.s.missed.push(super::person::Missed { instruction: re.clone(), to: to.into(), amount, what: what.into() });
+                    self.s.missed.push(super::person::Missed { instruction: re.to_string(), to: to.into(), amount, what: what.into() });
                 }
                 continue;
             }
@@ -668,8 +669,8 @@ impl Person {
                 }
             }
             // Who wrote (the directory names their person).
-            let person = m.from_entity.clone().or_else(|| self.book.person_of(&m.from).map(String::from)).unwrap_or_else(|| m.from.clone());
-            let heard = self.happened(w, Event::Talk { from: m.from.clone(), person, text: m.text.clone(), re: m.re.clone() });
+            let person = m.from_entity.or_else(|| self.book.person_of(&m.from).map(String::from).map(Into::into)).unwrap_or(m.from);
+            let heard = self.happened(w, Event::Talk { from: m.from.to_string(), person: person.to_string(), text: m.text.clone(), re: m.re.map(|x| x.to_string()) });
             if heard != Heard::NotMine {
                 continue;
             }
@@ -677,16 +678,16 @@ impl Person {
             // and kept, and on our record that the office wrote, about what paper if it says. We cannot tell what it
             // asks, and do not pretend to: nothing is done on it and nothing is answered.
             let reply_to_asking = m.re.as_ref().is_some_and(|re| !self.book.has(re));
-            let office = m.from_position.as_ref().and_then(|p| m.from_entity.clone().or_else(|| self.book.position(p).map(|x| x.entity.clone())));
+            let office = m.from_position.as_ref().and_then(|p| m.from_entity.or_else(|| (self.book.position(p).map(|x| x.entity.clone())).map(Into::into)));
             if let Some(office) = office.filter(|o| *o != me && !office_note(&m.text) && !reply_to_asking) {
                 let size = (m.text.chars().count() as i64).min(10_000);
                 let mut f = facts([("characters", json!(m.text.chars().count()))]);
                 if let Some(re) = &m.re {
                     f.insert("about".into(), json!(re));
                 }
-                self.happened(w, Event::Other { what: "office_wrote".into(), about: Some(office.clone()), facts: facts([("size", json!(size))]) });
+                self.happened(w, Event::Other { what: "office_wrote".into(), about: Some(office.to_string()), facts: facts([("size", json!(size))]) });
                 let mut o = outcome("letter", &office, "received", Way::Mine, f, None);
-                o.from = Some(office);
+                o.from = Some(office.to_string());
                 self.tell(w, o);
                 continue;
             }
@@ -694,13 +695,13 @@ impl Person {
             // answering requests).
             if let Some(re) = m.re.as_ref().filter(|_| reply_to_asking) {
                 self.s.leads.retain(|x| x != re);
-                self.s.leads.push(re.clone());
+                self.s.leads.push(re.to_string());
                 let n = self.s.leads.len();
                 if n > 5 {
                     self.s.leads.drain(..n - 5);
                 }
-                let who = m.from_entity.clone().or_else(|| self.book.person_of(&m.from).map(String::from)).unwrap_or_else(|| m.from.clone());
-                self.s.lead_from.insert(re.clone(), who);
+                let who = m.from_entity.or_else(|| self.book.person_of(&m.from).map(String::from).map(Into::into)).unwrap_or(m.from);
+                self.s.lead_from.insert(re.to_string(), who.to_string());
             }
         }
     }
@@ -731,14 +732,14 @@ impl Person {
         // The id of a rent-share standing order we just set up.
         if let Some(share) = self.s.share.as_mut().filter(|s| s.1.is_none()) {
             if let Some(id) = pic.outcomes.iter().filter_map(|o| o.created.as_ref().and_then(|c| c.get("share"))).next_back() {
-                share.1 = Some(id.clone());
+                share.1 = Some(id.to_string());
             }
         }
         // The id of a rent standing order we just set up.
         if let (Some(ag), Some(h)) = (self.absorbed.pending_rent_order.clone(), self.s.home.as_mut()) {
             if h.agreement == ag {
                 if let Some(id) = pic.outcomes.iter().filter_map(|o| o.created.as_ref().and_then(|c| c.get("so"))).next_back() {
-                    h.order = Some(id.clone());
+                    h.order = Some(id.to_string());
                     self.absorbed.pending_rent_order = None;
                 }
             }
@@ -755,7 +756,7 @@ fn refusal_code(c: oikos_contracts::events::RefusalCode) -> String {
 fn household_of(book: &crate::common::Book, person: &str) -> Option<(String, oikos_rules::household::HouseholdData)> {
     let mut best: Option<(&Record, oikos_rules::household::HouseholdData)> = None;
     for r in book.open("household") {
-        let Ok(h) = serde_json::from_value::<oikos_rules::household::HouseholdData>(data(r).clone()) else { continue };
+        let Ok(h) = serde_json::from_value::<oikos_rules::household::HouseholdData>(data(r).to_value()) else { continue };
         if !h.members.iter().any(|m| m.person == person) {
             continue;
         }
@@ -764,7 +765,7 @@ fn household_of(book: &crate::common::Book, person: &str) -> Option<(String, oik
             best = Some((r.as_ref(), h));
         }
     }
-    best.map(|(r, h)| (r.id.clone(), h))
+    best.map(|(r, h)| (r.id.to_string(), h))
 }
 
 #[cfg(test)]
@@ -813,10 +814,10 @@ mod tests {
     }
     fn pic(t: i64, records: Vec<Arc<Record>>, inbox: Vec<Value>, txs: Vec<Value>) -> Picture {
         let mut channels = BTreeMap::new();
-        channels.insert("papers".to_string(), Seen::Records { records, search: false });
+        channels.insert("papers".into(), Seen::Records { records, search: false });
         let accounts = vec![serde_json::from_value(json!({ "account": "acc.ann", "holder": "ann", "custodian": "bank", "currency": "XTS", "balance": "500000" })).unwrap()];
         let transactions = txs.into_iter().map(|v| serde_json::from_value(v).unwrap()).collect();
-        channels.insert("bank".to_string(), Seen::Accounts { accounts: Arc::new(accounts), transactions });
+        channels.insert("bank".into(), Seen::Accounts { accounts: Arc::new(accounts), transactions });
         Picture {
             participant: "p.ann".into(),
             t,

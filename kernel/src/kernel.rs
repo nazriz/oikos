@@ -13,6 +13,7 @@ use crate::statics::Statics;
 use oikos_resolver::knowledge::{CellFacts, RecordFacts, StructureFact, Seen, SeenAccount, SeenChannel, SeenEntity, SeenHolding, SeenPosition, Shown};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, RwLock};
 
 pub use oikos_world::kernel::{Check, Command, ProtocolError};
@@ -56,6 +57,8 @@ pub struct Delivered {
     /// the same. It is made of what a building is, not of who is in it, so the many ways a building is shown (as its
     /// occupants come and go) share it; each person's knowledge held its own (SC-1: 0.4 GB at 50,000 people).
     facts: RwLock<BTreeMap<Id, Arc<StructureFact>>>,
+    /// The day records shown now are marked with (`trim`).
+    today: AtomicI64,
 }
 
 /// For a host that asked for records by reference: record id -> the record it was last handed whole under that id
@@ -76,8 +79,15 @@ struct Handed {
 struct Shared {
     record: Arc<Record>,
     bytes: Option<Arc<[u8]>>,
-    facts: Arc<RecordFacts>,
+    facts: Option<Arc<RecordFacts>>,
+    /// The day it was last shown: its bytes and facts are let go when it has not been for `KEPT_DAYS` (`trim`).
+    shown: AtomicI64,
 }
+
+/// How many days a record's bytes and facts are kept after it was last shown. They are what its record makes (encoding
+/// it, reading it), made again when it is next shown; the entry itself stays, so its place in memory is never another
+/// record's (`Handed`). What is shown is the same either way: only what's kept to show it again quickly.
+const KEPT_DAYS: i64 = 7;
 
 /// A building as it was shown: its canonical bytes, and what's known of it.
 type Building = (Arc<SiteStructure>, Arc<[u8]>, Arc<StructureFact>);
@@ -94,12 +104,14 @@ impl Delivered {
     /// A record an observation shows: its canonical bytes, what it adds, and where it's kept here.
     fn record(&self, r: &Arc<Record>) -> Result<(Arc<[u8]>, Arc<RecordFacts>, usize), canon::CanonError> {
         let at = Arc::as_ptr(r) as usize;
+        let today = self.today.load(Ordering::Relaxed);
         let facts = match held(self.records.read()).get(&at) {
             Some(shared) => {
-                if let Some(b) = &shared.bytes {
-                    return Ok((b.clone(), shared.facts.clone(), at));
+                shared.shown.store(today, Ordering::Relaxed);
+                if let (Some(b), Some(f)) = (&shared.bytes, &shared.facts) {
+                    return Ok((b.clone(), f.clone(), at));
                 }
-                Some(shared.facts.clone())
+                shared.facts.clone()
             }
             None => None,
         };
@@ -108,22 +120,40 @@ impl Delivered {
         let facts = facts.unwrap_or_else(|| Arc::new(RecordFacts::of(&v)));
         // (Encoded by another meanwhile: theirs is kept, and given.)
         let mut records = held(self.records.write());
-        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts: facts.clone() });
+        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts: None, shown: AtomicI64::new(today) });
         let bytes = shared.bytes.get_or_insert(bytes).clone();
-        Ok((bytes, shared.facts.clone(), at))
+        let facts = shared.facts.get_or_insert(facts).clone();
+        Ok((bytes, facts, at))
     }
 
     /// What a record adds to a seat's knowledge, without its bytes (a code actor's look: nothing of it is written).
     fn record_facts(&self, r: &Arc<Record>) -> Result<Arc<RecordFacts>, canon::CanonError> {
         let at = Arc::as_ptr(r) as usize;
+        let today = self.today.load(Ordering::Relaxed);
         if let Some(shared) = held(self.records.read()).get(&at) {
-            return Ok(shared.facts.clone());
+            shared.shown.store(today, Ordering::Relaxed);
+            if let Some(f) = &shared.facts {
+                return Ok(f.clone());
+            }
         }
         let v = serde_json::to_value(&**r).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
         let facts = Arc::new(RecordFacts::of(&v));
         let mut records = held(self.records.write());
-        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts });
-        Ok(shared.facts.clone())
+        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts: None, shown: AtomicI64::new(today) });
+        Ok(shared.facts.get_or_insert(facts).clone())
+    }
+
+    /// A new day: the bytes and facts of records not shown for `KEPT_DAYS` are let go (made again if they are).
+    fn trim(&self, day: i64) {
+        if self.today.swap(day, Ordering::Relaxed) == day {
+            return;
+        }
+        for shared in held(self.records.write()).values_mut() {
+            if shared.shown.load(Ordering::Relaxed) < day - KEPT_DAYS {
+                shared.bytes = None;
+                shared.facts = None;
+            }
+        }
     }
 
     /// Writes a record for a host that keeps what it's handed: whole the first time, its id from then on.
@@ -136,7 +166,7 @@ impl Delivered {
         handed.whole.insert(at);
         out.extend_from_slice(bytes);
         // (Another record handed over under this id before, if that could be: the host no longer holds it.)
-        if let Some(was) = handed.by_id.insert(record.id.clone(), at).filter(|was| *was != at) {
+        if let Some(was) = handed.by_id.insert(record.id, at).filter(|was| *was != at) {
             handed.whole.remove(&was);
         }
     }
@@ -149,7 +179,7 @@ impl Delivered {
         let bytes: Arc<[u8]> = canon::canonical(&**x)?.into();
         let fact = self.fact_of(x);
         let mut structures = held(self.structures.write());
-        let ways = structures.entry(x.structure.clone()).or_default();
+        let ways = structures.entry(x.structure).or_default();
         ways.insert(0, (x.clone(), bytes.clone(), fact.clone()));
         ways.truncate(WAYS);
         Ok((bytes, fact))
@@ -170,8 +200,8 @@ impl Delivered {
         if let Some(f) = held(self.facts.read()).get(&x.structure).filter(|f| same(f)) {
             return f.clone();
         }
-        let f = Arc::new(StructureFact { type_: x.structure_type.clone(), at: x.at.clone(), spaces: x.spaces.iter().map(|sp| sp.space.clone()).collect() });
-        held(self.facts.write()).insert(x.structure.clone(), f.clone());
+        let f = Arc::new(StructureFact { type_: x.structure_type.to_string(), at: x.at.to_string(), spaces: x.spaces.iter().map(|sp| sp.space).map(|x| x.to_string()).collect() });
+        held(self.facts.write()).insert(x.structure, f.clone());
         f
     }
 
@@ -252,8 +282,8 @@ impl Encoded {
         let mut taken: Vec<(Id, Taken)> = vec![];
         for (path, ch) in obs.channels.iter_mut() {
             match ch {
-                ChannelData::Records { records, .. } if !records.is_empty() => taken.push((path.clone(), Taken::Records(std::mem::take(records)))),
-                ChannelData::Sites { cells, .. } if !cells.is_empty() => taken.push((path.clone(), Taken::Cells(std::mem::take(cells)))),
+                ChannelData::Records { records, .. } if !records.is_empty() => taken.push((*path, Taken::Records(std::mem::take(records)))),
+                ChannelData::Sites { cells, .. } if !cells.is_empty() => taken.push((*path, Taken::Cells(std::mem::take(cells)))),
                 _ => {}
             }
         }
@@ -264,8 +294,8 @@ impl Encoded {
         let mut failed = None;
         let mut buildings = vec![];
         for (path, what) in &taken {
-            let (_, list) = elements.entry(path.clone()).or_insert((if matches!(what, Taken::Records(_)) { "records" } else { "cells" }, vec![]));
-            let facts = shown.entry(path.clone()).or_default();
+            let (_, list) = elements.entry(*path).or_insert((if matches!(what, Taken::Records(_)) { "records" } else { "cells" }, vec![]));
+            let facts = shown.entry(*path).or_default();
             match what {
                 Taken::Records(records) => {
                     for r in records {
@@ -298,7 +328,7 @@ impl Encoded {
         let top = canon::canonical_members(&*obs);
         let parts: Result<Vec<Part>, canon::CanonError> = channels
             .iter()
-            .map(|(path, ch)| Ok((path.clone(), if elements.contains_key(path) { Err(canon::canonical_members(ch)?) } else { Ok(canon::canonical(ch)?) })))
+            .map(|(path, ch)| Ok((*path, if elements.contains_key(path) { Err(canon::canonical_members(ch)?) } else { Ok(canon::canonical(ch)?) })))
             .collect();
         obs.channels = channels;
         for (path, what) in taken {
@@ -340,8 +370,8 @@ impl Encoded {
 /// read from the observation itself, as `Seen::of` reads it from the observation's JSON with each records channel's
 /// records and each sites channel's cells left out.
 pub fn seen(obs: &Observation) -> Seen<'_> {
-    fn word(x: &Option<String>) -> &str {
-        x.as_deref().unwrap_or_default()
+    fn word<S: AsRef<str>>(x: &Option<S>) -> &str {
+        x.as_ref().map_or("", |s| s.as_ref())
     }
     Seen {
         entity: word(&obs.entity),
@@ -533,13 +563,13 @@ impl Kernel {
         for (path, ch) in &obs.channels {
             match ch {
                 ChannelData::Records { records, .. } if !records.is_empty() => {
-                    let facts = shown.entry(path.clone()).or_default();
+                    let facts = shown.entry(*path).or_default();
                     for r in records {
                         facts.records.push(delivered.record_facts(r)?);
                     }
                 }
                 ChannelData::Sites { cells, .. } if !cells.is_empty() => {
-                    let facts = shown.entry(path.clone()).or_default();
+                    let facts = shown.entry(*path).or_default();
                     for c in cells {
                         let structure = c.structure.as_ref().map(|x| {
                             let at = Arc::as_ptr(x) as usize;
@@ -600,7 +630,7 @@ impl Kernel {
             return false;
         }
         log.observations.as_deref() != Some("seats")
-            || !self.world.state().participants.get(participant).is_some_and(|p| p.def.controller.get("type").and_then(serde_json::Value::as_str) == Some("code"))
+            || !self.world.state().participants.get(participant).is_some_and(|p| p.def.controller.get("type").and_then(|x| x.as_str()) == Some("code"))
     }
 
     fn unplan(&mut self) {
@@ -615,7 +645,7 @@ impl Kernel {
         if self.planned.is_empty() {
             return None;
         }
-        let key = (participant.to_string(), only.map(String::from));
+        let key = (Id::new(participant), only.map(Id::new));
         // (The next of those planned, or one a little further on: the host may pass over a unit that has gone.)
         if !self.ready.contains_key(&key) {
             if let Some(ahead) = self.planned[self.planned_done.min(self.planned.len())..].iter().take(LOOK_AHEAD).position(|k| *k == key) {
@@ -626,7 +656,7 @@ impl Kernel {
         let ready = self.ready.remove(&key);
         // Whatever else was made ready for this participant was made before this was delivered to it (what it has
         // seen, and what's waiting for it, are about to change): it's built again when asked for.
-        let others: Vec<(Id, Option<Id>)> = self.ready.range((participant.to_string(), None)..).take_while(|(k, _)| k.0 == participant).map(|(k, _)| k.clone()).collect();
+        let others: Vec<(Id, Option<Id>)> = self.ready.range((Id::new(participant), None)..).take_while(|(k, _)| k.0 == participant).map(|(k, _)| *k).collect();
         for k in others {
             self.ready.remove(&k);
         }
@@ -636,10 +666,11 @@ impl Kernel {
     /// Build and encode the next of the planned observations, on several threads: each from the state as it is (the
     /// same for all: read, never changed), the first only of any one participant's.
     fn make_ready(&mut self) {
+        self.delivered.trim(self.world.t().div_euclid(86_400));
         let from = self.planned_done;
         let to = (from + WINDOW).min(self.planned.len());
         self.planned_done = to;
-        let (s, st) = (self.world.statics(), self.world.state());
+        let (_s, st) = (self.world.statics(), self.world.state());
         let mut seen: BTreeSet<&str> = BTreeSet::new();
         let wanted: Vec<&(Id, Option<Id>)> = self.planned[from..to]
             .iter()
@@ -670,7 +701,7 @@ impl Kernel {
         });
         for (key, ready) in wanted.into_iter().zip(made) {
             if let Some(ready) = ready {
-                self.ready.insert(key.clone(), ready);
+                self.ready.insert(*key, ready);
             }
         }
     }
@@ -768,6 +799,7 @@ impl Kernel {
     }
 
     fn observe(&mut self, participant: &str, only: Option<&str>, looks: &[LookRequest]) -> Output {
+        self.delivered.trim(self.world.t().div_euclid(86_400));
         // The answers a keeper has given to its questions since (foundations F11) are looked through with this observation.
         let answered = self.world.take_asks(participant, only);
         let looks: Vec<LookRequest> = if answered.is_empty() { looks.to_vec() } else { looks.iter().cloned().chain(answered).collect() };

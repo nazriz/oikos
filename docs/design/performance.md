@@ -102,7 +102,7 @@ behind one lock per shard and made the 50,000 month 58% slower in wall time (the
 on many threads, and queued for its shard); read under a shared lock, the comparison outside it, it is faster than
 main.
 
-### A plan for what is left: the world's data held compactly (not started: the owner decides, 2026-10-26)
+### A plan for what is left: the world's data held compactly (begun on branch `representation`, 2026-10-26)
 
 What is left is no longer copies. It is the world's own data and the actors' state, held as general-purpose values:
 every id a `String` of its own wherever it appears (`blocks::Id = String`: in records, ledgers, maps' keys, knowledge),
@@ -119,6 +119,25 @@ each lowering the budget's ceiling.
 | R2 | **A compact frozen value** for what is opaque JSON in the state: records' `about`/`data`, entity records' sections, the typed config's controllers (`oikos_core::Frozen`: immutable, maps as sorted arrays with interned keys, shared subtrees), with the read API the code uses of `Value` and the same serialisation | core, contracts, world, perception, resolver, sight, actors (readers) | 4 to 6 agent-days | -25 to -40 |
 | R3 | **Compact ledgers**: a transaction a fixed row (interned ids, integers), accounts' histories in persistent vectors of them | world, perception (accounts channel), sight, actors (statements, books) | 2 agent-days | -5 to -10 |
 | R4 | **The actors' remaining state** in typed forms (offices' and firms' books, held as `Value` maps now), after `mem-minds`'s minds and memories | actors | 2 to 4 agent-days | -10 to -20 |
+
+**Landed** (each byte-identical: `orchestrator/test/representation.test.ts` holds three profiles' towns of 200 and
+1,000 people to the state hash and log of main at 7230e71; each paired against main, `scripts/pair.sh`; measured on a
+4-core Linux machine, where a 10,000-person month does not fit beside the suite, so at 1,000):
+
+| step | 1,000 au-vic peak (4 threads) | KB a person | the run's own thread (1,000, three to eight pairs) | ceiling |
+|---|---|---|---|---|
+| main (7230e71) | 467 to 473 MB | 363 | | 415 |
+| R1, ids interned | 459 to 466 MB (gb-eng 445 to 475 against 463 to 467; us-oh level) | 352 | -8 to -19% on all three profiles | 400 |
+| R2, records' JSON frozen | 409 to 419 MB (gb-eng 400 to 411, us-oh 365 to 380) | 305 | against R1: au-vic -3 to -10%, gb-eng -4 to 0%, us-oh -7 to +5% (-2% on average) | 350 |
+| R3, each transaction held once | 409 to 412 MB (90 days: 622 against 638) | 300 | against R2: -4 to +1% | 345 |
+| R4 (first part), the actors' indexes keyed by `Id` | 396 to 403 MB | 290 | against R3: -6 to +1% | 335 |
+| the allocator without huge pages (Linux only) | 358 to 368 MB (200 people: 172 to 177 against 222 to 238) | 253 | +0.5 to +3.9% (200: 4 to 7% faster) | 335 (the Mini gains nothing) |
+| the config's schemas let go | 325 to 329 MB (200 people: 139 to 147) | 217 | -4 to +1%, level | 300 |
+| the delivered records' cache let go of what is not shown (a year: 1,081 MB against 1,500) | 304 to 305 MB | 195 | 0 to +3% (a year +2.3%) | 270 |
+
+R1 saved little memory because few of the ids held were `Id`s: the actors' are `String`s (R4) and records' JSON holds
+its own strings (R2). Acts' and messages' ids are `Passing` (their own text), as they go with what they name; every
+other id is interned for the process (docs/decisions.md 2026-10-26, "Ids interned").
 
 In all 12 to 18 agent-days, to perhaps 90 to 120 KB a person live at 10,000 (from 195), about 150 resident at the
 budget's 1,000 (from 322 with `mem-minds`). **That is not the 50 KB target.** Past it, what is left is what people

@@ -82,7 +82,7 @@ pub struct State {
     /// holder is handed it as the payments it has not yet been told of, so it reads its office's books and not an empty
     /// memory. Derived from the log (never serialised, so the state and its hash are unchanged).
     #[serde(skip)]
-    pub ledgers: Map<String, imbl::Vector<Transaction>>,
+    pub ledgers: Map<String, imbl::Vector<Arc<Transaction>>>,
     /// Future physical effects and acts in progress, sorted by (at, seq).
     pub schedule: Schedule,
     /// Each actor's timeline (docs/design/rebuild.md 6.3): when each of its lanes is next free. A person's is keyed by
@@ -163,7 +163,8 @@ pub struct EntityRecord {
     pub n: u64,
     pub at: i64,
     pub chain: String,
-    pub sections: BTreeMap<String, Value>,
+    /// (Frozen: a record set again shares the sections it does not change with the record before it.)
+    pub sections: BTreeMap<Id, crate::blocks::Frozen>,
     /// The change stamp of its last change.
     pub changed: u64,
 }
@@ -290,7 +291,7 @@ pub struct Body {
 
 /// A body's variables as they start: what's given (clamped to the bounds), else each one's `initial`, as of `t`.
 pub fn body_variables(cat: &crate::config::Catalogue, given: Option<&BTreeMap<Id, i64>>, t: i64) -> BTreeMap<Id, (i64, i64)> {
-    cat.body_variables.iter().map(|v| (v.id.clone(), (given.and_then(|g| g.get(&v.id)).copied().unwrap_or(v.initial).clamp(v.min, v.max), t))).collect()
+    cat.body_variables.iter().map(|v| (v.id, (given.and_then(|g| g.get(&v.id)).copied().unwrap_or(v.initial).clamp(v.min, v.max), t))).collect()
 }
 
 /// A body variable's value at `t`, settled: its drift a whole day at a time since it was last set; and the time it's
@@ -476,11 +477,12 @@ pub struct Participant {
     pub status_changed: u64,
     /// Delivered at its next observation of each capacity ("self", or a position id), then cleared.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub pending: BTreeMap<Id, Pending>,
+    pub pending: BTreeMap<crate::blocks::Passing, Pending>,
     /// Delivered by its next look through an accounts channel of a capacity acting for that entity.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    /// (A persistent list: a busy custodian's queue holds a day's transfers, and a copy of the participant shares it.)
-    pub new_transactions: BTreeMap<Id, imbl::Vector<Transaction>>,
+    /// (A persistent list: a busy custodian's queue holds a day's transfers, and a copy of the participant shares it;
+    /// each transaction one copy, shared by every queue and office file it is on and the looks that deliver it.)
+    pub new_transactions: BTreeMap<Id, imbl::Vector<Arc<Transaction>>>,
     /// When it last looked through each channel (`channel`, or `position/channel`), and how far it had seen.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub looks: BTreeMap<Id, Look>,
@@ -586,7 +588,7 @@ pub struct RefusalInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Outcome {
-    pub action: Id,
+    pub action: crate::blocks::Passing,
     pub t: i64,
     pub status: OutcomeStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -607,7 +609,7 @@ pub struct Outcome {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
-    pub id: Id,
+    pub id: crate::blocks::Passing,
     pub t: i64,
     /// The participant who wrote it, and the position it wrote in (absent: as itself).
     pub from: Id,
@@ -787,7 +789,7 @@ pub enum Sched {
     BirthDue { parents: Vec<Id>, name: String, template: Id },
     /// An act in progress: it takes effect when its actor is done with it (docs/design/rebuild.md 6.2).
     Act {
-        action: Id,
+        action: crate::blocks::Passing,
         participant: Id,
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
@@ -804,7 +806,7 @@ pub enum Sched {
     /// is refused now, the time placed for it is given back, and the item that would have applied it (`done`, `seq`)
     /// is taken out.
     Start {
-        action: Id,
+        action: crate::blocks::Passing,
         participant: Id,
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
@@ -835,6 +837,11 @@ pub enum Sched {
 
 impl State {
     pub fn mint(&mut self, prefix: &str) -> Id {
+        Id::from_string(self.mint_passing(prefix))
+    }
+
+    /// A new id as its text: for what passes (an act, a message: `Passing`), or to be interned by `mint`.
+    pub fn mint_passing(&mut self, prefix: &str) -> String {
         let c = &mut self.counters;
         let n = match prefix {
             "ent" => &mut c.ent,
@@ -894,8 +901,8 @@ impl State {
         self.mark(&record);
         self.counters.record_seq += 1;
         let seq = self.counters.record_seq;
-        self.record_order.push_back(record.id.clone());
-        self.records.insert(record.id.clone(), Stored { seq, record });
+        self.record_order.push_back(record.id);
+        self.records.insert(record.id, Stored { seq, record });
     }
 
     /// What a record adds to the derived lookups (`agreements_of`, `marks`), as it is stored.
@@ -903,26 +910,26 @@ impl State {
         match &record.body {
             crate::blocks::RecordBody::Agreement { terms } => {
                 for p in &terms.parties {
-                    self.agreements_of.entry(p.clone()).or_default().push_back(record.id.clone());
+                    self.agreements_of.entry(p.clone().into()).or_default().push_back(record.id);
                 }
             }
             crate::blocks::RecordBody::Signature { agreement, party } => {
-                let m = self.marks.entry(agreement.clone()).or_default();
-                m.signatures.push(oikos_terms::Mark { party: party.clone(), at: record.at });
+                let m = self.marks.entry(*agreement).or_default();
+                m.signatures.push(oikos_terms::Mark { party: party.to_string(), at: record.at });
             }
             crate::blocks::RecordBody::Notice { agreement, party, .. } => {
-                let m = self.marks.entry(agreement.clone()).or_default();
-                m.notices.push(oikos_terms::Mark { party: party.clone(), at: record.at });
+                let m = self.marks.entry(*agreement).or_default();
+                m.notices.push(oikos_terms::Mark { party: party.to_string(), at: record.at });
             }
             crate::blocks::RecordBody::Withdrawal { withdraws, .. } => {
                 // (Only its owner ends a paper's standing: the same test as perception's `taken_down`.)
                 let by_owner = self.records.get(withdraws).is_some_and(|t| {
-                    let owner = |r: &Record| -> Vec<String> { r.speaks_for.iter().cloned().chain(self.author_entity(r)).collect() };
-                    let by = owner(&record);
+                    let owner = |r: &Record| -> Vec<Id> { r.speaks_for.iter().cloned().chain(self.author_entity(r)).collect() };
+                    let by = owner(record);
                     matches!(t.record.body, crate::blocks::RecordBody::Agreement { .. }) && owner(&t.record).iter().any(|o| by.contains(o))
                 });
                 if by_owner {
-                    let m = self.marks.entry(withdraws.clone()).or_default();
+                    let m = self.marks.entry(*withdraws).or_default();
                     m.withdrawn_at.get_or_insert(record.at);
                 }
             }
@@ -938,16 +945,16 @@ impl State {
         for (sid, spaces) in self.occupancy.iter() {
             for bodies in spaces.values() {
                 for b in bodies {
-                    self.whereabouts.entry(b.clone()).or_default().insert(sid.clone());
+                    self.whereabouts.entry(*b).or_default().insert(*sid);
                 }
             }
         }
         self.positions_of = Map::new();
         self.held = Map::new();
         for (id, x) in self.positions.iter() {
-            self.positions_of.entry(x.entity.clone()).or_default().insert(id.clone());
+            self.positions_of.entry(x.entity).or_default().insert(*id);
             if let Some(h) = &x.holder {
-                self.held.entry(h.clone()).or_default().insert(id.clone());
+                self.held.entry(*h).or_default().insert(*id);
             }
         }
         self.marks = Map::new();
@@ -975,7 +982,7 @@ impl State {
     pub fn total_goods(&self) -> std::collections::BTreeMap<Id, crate::money::Money> {
         let mut t = std::collections::BTreeMap::new();
         for s in self.holdings.values() {
-            *t.entry(s.kind.clone()).or_insert(0) += s.quantity;
+            *t.entry(s.kind).or_insert(0) += s.quantity;
         }
         t
     }
@@ -984,7 +991,7 @@ impl State {
     pub fn total_money(&self) -> std::collections::BTreeMap<Id, crate::money::Money> {
         let mut t = std::collections::BTreeMap::new();
         for a in self.accounts.values() {
-            *t.entry(a.currency.clone()).or_insert(0) += a.balance;
+            *t.entry(a.currency).or_insert(0) += a.balance;
         }
         t
     }
@@ -1005,14 +1012,14 @@ impl State {
     /// The same, by looking through every building: what `whereabouts` must always agree with (checked in debug
     /// builds, so by every kernel test that moves anyone, and by a test of its own).
     pub fn structures_of_by_scan(&self, person: &str) -> Vec<Id> {
-        self.occupancy.iter().filter(|(_, spaces)| spaces.values().any(|b| b.contains(person))).map(|(s, _)| s.clone()).collect()
+        self.occupancy.iter().filter(|(_, spaces)| spaces.values().any(|b| b.contains(person))).map(|(s, _)| *s).collect()
     }
 
     /// Put a body into a space of a structure (the only way into `occupancy`, so `whereabouts` keeps step).
     pub fn enter(&mut self, sid: &str, space: &str, body: &str) {
-        Arc::make_mut(self.occupancy.entry(sid.to_string()).or_default()).entry(space.to_string()).or_default().insert(body.to_string());
-        self.whereabouts.entry(body.to_string()).or_default().insert(sid.to_string());
-        self.entered.insert(space.to_string(), self.t);
+        Arc::make_mut(self.occupancy.entry(sid.to_string().into()).or_default()).entry(space.to_string().into()).or_default().insert(body.to_string().into());
+        self.whereabouts.entry(body.to_string().into()).or_default().insert(sid.to_string().into());
+        self.entered.insert(space.to_string().into(), self.t);
     }
 
     /// A body has been taken out of a space of a structure: if it's in no other space of it, it's no longer there.
@@ -1036,8 +1043,8 @@ impl State {
     /// The entity a participant acts for in a capacity: its person as itself, or a position's organisation.
     pub fn acting_entity(&self, participant: &str, position: Option<&str>) -> Option<Id> {
         match position {
-            Some(p) => self.positions.get(p).map(|x| x.entity.clone()),
-            None => self.participants.get(participant).and_then(|x| x.person.clone()),
+            Some(p) => self.positions.get(p).map(|x| x.entity),
+            None => self.participants.get(participant).and_then(|x| x.person),
         }
     }
 
@@ -1061,10 +1068,10 @@ impl State {
 
     pub fn acting_for(&self, entity: &str) -> Vec<(Id, Id)> {
         if let Some(b) = self.body(entity) {
-            return b.participant.iter().map(|p| (p.clone(), crate::config::SELF.to_string())).collect();
+            return b.participant.iter().map(|p| (*p, Id::new(crate::config::SELF))).collect();
         }
-        let found: Vec<(Id, Id)> = self.positions_of.get(entity).into_iter().flatten().filter_map(|id| self.positions.get(id)?.holder.clone().map(|h| (h, id.clone()))).collect();
-        debug_assert_eq!(found, self.positions.iter().filter(|(_, x)| x.entity == entity).filter_map(|(id, x)| x.holder.clone().map(|h| (h, id.clone()))).collect::<Vec<_>>(), "positions_of out of step with positions for {entity}");
+        let found: Vec<(Id, Id)> = self.positions_of.get(entity).into_iter().flatten().filter_map(|id| self.positions.get(id)?.holder.map(|h| (h, *id))).collect();
+        debug_assert_eq!(found, self.positions.iter().filter(|(_, x)| x.entity == entity).filter_map(|(id, x)| x.holder.map(|h| (h, *id))).collect::<Vec<_>>(), "positions_of out of step with positions for {entity}");
         found
     }
 
@@ -1082,9 +1089,9 @@ impl State {
 
     /// A position made (the only way into `positions`, so `positions_of` and `held` keep step).
     pub fn add_position(&mut self, id: Id, position: Position) {
-        self.positions_of.entry(position.entity.clone()).or_default().insert(id.clone());
+        self.positions_of.entry(position.entity).or_default().insert(id);
         if let Some(h) = &position.holder {
-            self.held.entry(h.clone()).or_default().insert(id.clone());
+            self.held.entry(*h).or_default().insert(id);
         }
         self.positions.insert(id, position);
     }
@@ -1092,7 +1099,7 @@ impl State {
     /// A position changes hands, or falls vacant, at a change stamp (the only way its holder changes).
     pub fn set_holder(&mut self, position: &str, holder: Option<Id>, changed: u64) {
         let Some(x) = self.positions.get_mut(position) else { return };
-        let was = std::mem::replace(&mut x.holder, holder.clone());
+        let was = std::mem::replace(&mut x.holder, holder);
         x.changed = changed;
         if was == holder {
             return;
@@ -1106,12 +1113,12 @@ impl State {
             }
         }
         if let Some(h) = holder {
-            self.held.entry(h.clone()).or_default().insert(position.to_string());
+            self.held.entry(h).or_default().insert(position.to_string().into());
             // The office's file goes with the post: the new holder is told of every payment it has seen, as of any it has not.
             let key = transactions_key(position, &self.positions[position].entity);
             if let Some(ledger) = self.ledgers.get(&key) {
                 if let Some(p) = self.participants.get_mut(&h) {
-                    Arc::make_mut(p).new_transactions.insert(key, ledger.clone());
+                    Arc::make_mut(p).new_transactions.insert(key.into(), ledger.clone());
                 }
             }
             // And so does every channel of it, whole: what the holder looked through before, in an earlier tenure (a person
@@ -1170,11 +1177,11 @@ impl GroundCache {
     }
     pub fn get(&self, from: &str, to: &str) -> Option<i64> {
         let trips = self.trips.lock().ok()?;
-        trips.get(&(from.to_string(), to.to_string())).filter(|(e, _)| *e == self.epoch).map(|(_, s)| *s)
+        trips.get(&(Id::new(from), Id::new(to))).filter(|(e, _)| *e == self.epoch).map(|(_, s)| *s)
     }
     pub fn put(&self, from: &str, to: &str, seconds: i64) {
         if let Ok(mut trips) = self.trips.lock() {
-            trips.insert((from.to_string(), to.to_string()), (self.epoch, seconds));
+            trips.insert((from.to_string().into(), to.to_string().into()), (self.epoch, seconds));
         }
     }
 }

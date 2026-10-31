@@ -58,7 +58,7 @@ impl PublicMemory {
             return None;
         }
         if self.kinds.iter().any(|k| k == kind) {
-            return Some(kind.clone());
+            return Some(kind.to_string());
         }
         for h in &self.has {
             let has = match h.as_str() {
@@ -96,17 +96,17 @@ impl PublicMemory {
         for r in book.records() {
             let Some(class) = self.class_of(r) else {
                 if !matches!(r.body, RecordBody::Withdrawal { .. }) || r.at >= horizon {
-                    keep.insert(r.id.clone());
+                    keep.insert(r.id.to_string());
                 }
                 continue;
             };
             let touches = ours(r)
                 || addressed_to(r).iter().any(|a| a == me)
-                || held.contains(&r.id)
+                || held.contains(r.id.as_str())
                 || r.speaks_for.as_deref().is_some_and(|s| dealings.contains(s))
                 || bases_of(r).iter().any(|b| mine.contains(b.as_str()));
             if touches {
-                keep.insert(r.id.clone());
+                keep.insert(r.id.to_string());
             } else if r.at >= horizon || !book.withdrawn(&r.id) {
                 older.entry(class).or_default().push((r.at, spread(me, &r.id), r.id.as_str()));
             }
@@ -145,7 +145,7 @@ impl Person {
         if keep.len() == self.book.len() {
             return;
         }
-        let remap = self.book.forget(|r| keep.contains(&r.id));
+        let remap = self.book.forget(|r| keep.contains(r.id.as_str()));
         // (Whoever keeps a place in the book: the housing part's last full plan.)
         let moved = |at: usize| remap.iter().take(at).filter(|x| x.is_some()).count();
         self.housing.fresh_from = moved(self.housing.fresh_from.min(remap.len()));

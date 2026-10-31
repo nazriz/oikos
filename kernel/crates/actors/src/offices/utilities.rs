@@ -110,8 +110,8 @@ fn connect_steps<T>(book: &Book, me: &str, kinds: &[(&str, Option<&str>, Option<
     let gone = gone_of(book, me);
     let mut out = vec![];
     for r in book.open("supply_request").filter(|r| addressed_to(r).iter().any(|a| a == me)) {
-        let Some(who) = r.speaks_for.clone() else { continue };
-        if gone.get(&who).is_some_and(|(at, _)| *at >= r.at) {
+        let Some(who) = r.speaks_for else { continue };
+        if gone.get(who.as_str()).is_some_and(|(at, _)| *at >= r.at) {
             continue;
         }
         let d = data(r);
@@ -138,7 +138,7 @@ fn connect_steps<T>(book: &Book, me: &str, kinds: &[(&str, Option<&str>, Option<
         }
     }
     for c in conns.iter().filter(|c| !c.closed && kinds.iter().any(|k| k.0 == c.kind)) {
-        let Some((at, died)) = gone.get(&c.holder) else { continue };
+        let Some((at, died)) = gone.get(c.holder.as_str()) else { continue };
         let opened = book.all("supply_request").filter(|r| r.speaks_for.as_deref() == Some(c.holder.as_str())).map(|r| r.at).max().unwrap_or(-1);
         if *at < opened || !cache.insert(format!("close:{}", c.id)) {
             continue;
@@ -341,7 +341,7 @@ impl WaterWorks {
         for k in ["property_roll", "acquisition_notice", "building_notice"] {
             for r in self.book.open(k) {
                 let rolled = k != "building_notice" && matches!(&r.body, oikos_sight::RecordBody::Statement { .. }) && data(r).s("lot").is_some();
-                let noticed = k == "building_notice" && addressed_to(r).contains(me);
+                let noticed = k == "building_notice" && addressed_to(r).iter().any(|x| x ==me);
                 if rolled || noticed {
                     papers.push(r);
                 }
@@ -363,7 +363,7 @@ impl WaterWorks {
                     if let Some(o) = d.s("owner") {
                         roll.owner.insert(lot.to_string(), o.to_string());
                     }
-                    for b in d.get("buildings").and_then(Value::as_array).into_iter().flatten() {
+                    for b in d.get("buildings").and_then(|x| x.as_array()).into_iter().flatten() {
                         if b.get("dwellings").is_some_and(crate::common::truthy) {
                             if let Some(s) = b.s("structure") {
                                 add(&mut roll, lot, s);
@@ -398,7 +398,7 @@ impl WaterWorks {
         let mut read = self.readings.clone();
         let mut none = BTreeSet::new();
         for r in self.book.open("meter_round").filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str())) {
-            for x in data(r).get("read").and_then(Value::as_array).into_iter().flatten() {
+            for x in data(r).get("read").and_then(|x| x.as_array()).into_iter().flatten() {
                 let key = x.s("connection").or_else(|| x.s("structure"));
                 if let (Some(s), Some(l), Some(at)) = (key, x.i("litres"), x.i("at")) {
                     if read.get(s).is_none_or(|(_, a)| *a <= at) {
@@ -447,23 +447,23 @@ impl Plan for WaterWorks {
             let mut seen: BTreeSet<String> = BTreeSet::new();
             for c in back {
                 let Some(st) = &c.structure else { continue };
-                if !roll.lot_of.contains_key(&st.structure) || !seen.insert(st.structure.clone()) {
+                if !roll.lot_of.contains_key(st.structure.as_str()) || !seen.insert(st.structure.to_string()) {
                     continue;
                 }
                 let water: Vec<&oikos_sight::MeterView> = st.meters.iter().filter(|m| m.kind == "water").collect();
                 if st.complete && !st.spaces.iter().any(|s| s.kind == "dwelling") {
-                    none.push(st.structure.clone());
+                    none.push(st.structure.to_string());
                     continue;
                 }
                 if self.occupant_pays() {
                     for m in water {
                         let litres = cents(m.reading);
-                        self.readings.insert(m.connection.clone(), (litres, pic.t));
+                        self.readings.insert(m.connection.to_string(), (litres, pic.t));
                         read.push(json!({ "connection": m.connection, "structure": st.structure, "litres": litres, "at": pic.t }));
                     }
                 } else {
                     let litres: i64 = water.iter().map(|m| cents(m.reading)).sum();
-                    self.readings.insert(st.structure.clone(), (litres, pic.t));
+                    self.readings.insert(st.structure.to_string(), (litres, pic.t));
                     read.push(json!({ "structure": st.structure, "litres": litres, "at": pic.t }));
                 }
             }
@@ -549,8 +549,8 @@ impl Plan for WaterWorks {
             // (Whom each bill goes to, and for which meter: the owner of a building on the roll, or the occupant of a connection.)
             let mut payers: Vec<(String, String, String)> = vec![];
             if self.occupant_pays() {
-                for c in conns.iter().filter(|c| c.kind == "water" && roll.lot_of.contains_key(&c.at)) {
-                    payers.push((c.id.clone(), c.at.clone(), c.holder.clone()));
+                for c in conns.iter().filter(|c| c.kind == "water" && roll.lot_of.contains_key(c.at.as_str())) {
+                    payers.push((c.id.to_string(), c.at.to_string(), c.holder.to_string()));
                 }
             } else {
                 let mut homes: Vec<&String> = roll.lot_of.keys().collect();
@@ -814,11 +814,11 @@ struct Retailer {
 impl Retailer {
     /// Units on order and not yet delivered: our own `order` papers without a delivery note, and orders just placed.
     fn on_order(&self, t: i64) -> i64 {
-        let delivered: BTreeSet<String> = self.book.all("delivery_note").filter(|n| addressed_to(n).contains(&self.me)).filter_map(|n| data(n).s("order").map(String::from)).collect();
+        let delivered: BTreeSet<String> = self.book.all("delivery_note").filter(|n| addressed_to(n).iter().any(|x| x == &self.me)).filter_map(|n| data(n).s("order").map(String::from)).collect();
         let filed: i64 = self
             .book
             .open("order")
-            .filter(|o| o.speaks_for.as_deref() == Some(self.me.as_str()) && data(o).s("kind") == Some(self.p.kind.as_str()) && !delivered.contains(&o.id) && t - o.at < 30 * DAY)
+            .filter(|o| o.speaks_for.as_deref() == Some(self.me.as_str()) && data(o).s("kind") == Some(self.p.kind.as_str()) && !delivered.contains(o.id.as_str()) && t - o.at < 30 * DAY)
             .map(|o| data(o).i("quantity").unwrap_or(0))
             .sum();
         filed + self.placing.iter().filter(|(_, at)| t - at < DAY).map(|(q, _)| q).sum::<i64>()
@@ -836,11 +836,11 @@ impl Retailer {
         let day = t.div_euclid(DAY);
         for l in links.iter().filter(|l| l.tripped) {
             // (Once a day for a link: the crew is sent, and until it is back the link still shows tripped.)
-            if self.tripped.get(&l.id).is_some_and(|at| at.div_euclid(DAY) == day) {
+            if self.tripped.get(l.id.as_str()).is_some_and(|at| at.div_euclid(DAY) == day) {
                 continue;
             }
-            let again = self.tripped.get(&l.id).is_some_and(|at| t - at < 7 * DAY);
-            self.tripped.insert(l.id.clone(), t);
+            let again = self.tripped.get(l.id.as_str()).is_some_and(|at| t - at < 7 * DAY);
+            self.tripped.insert(l.id.to_string(), t);
             let feeders: Vec<&&LinkItem> = links.iter().filter(|x| x.from == l.to && x.rotation.is_none()).collect();
             if again && feeders.len() >= 2 {
                 // (What each feeder serves: the nodes under it.)
@@ -849,14 +849,14 @@ impl Retailer {
                     let mut todo = vec![root.to_string()];
                     while let Some(n) = todo.pop() {
                         for x in links.iter().filter(|x| x.from == n) {
-                            if seen.insert(x.to.clone()) {
-                                todo.push(x.to.clone());
+                            if seen.insert(x.to.to_string()) {
+                                todo.push(x.to.to_string());
                             }
                         }
                     }
                     seen
                 };
-                let shed: Vec<&&&LinkItem> = feeders.iter().filter(|f| { let nodes = under(&f.to); !conns.iter().any(|c| protected.contains(&c.id) && nodes.contains(&c.node)) }).collect();
+                let shed: Vec<&&&LinkItem> = feeders.iter().filter(|f| { let nodes = under(&f.to); !conns.iter().any(|c| protected.contains(c.id.as_str()) && nodes.contains(c.node.as_str())) }).collect();
                 let k = shed.len() as i64;
                 let hour = (t.div_euclid(3600) + 1) * 3600;
                 for (i, f) in shed.iter().enumerate() {
@@ -1019,7 +1019,7 @@ impl Plan for Retailer {
                     vec![say(
                         "invoice",
                         &format!("Energy bill: {} ({days} days' supply at {}; {units} units at {}).", money_words(amount, w), money_words(self.p.supply_per_day, w), money_words(self.p.price_per_unit, w)),
-                        Say { to: Some(vec![c.holder.clone()]), visible: Some(Visible::Only(vec![c.holder.clone(), me.clone()])), data: Some(d), ..Default::default() },
+                        Say { to: Some(vec![c.holder.to_string()]), visible: Some(Visible::Only(vec![c.holder.to_string(), me.clone()])), data: Some(d), ..Default::default() },
                     )],
                 ));
             }

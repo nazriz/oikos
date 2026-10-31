@@ -231,7 +231,7 @@ pub struct Common {
 }
 
 fn s(v: &Json, k: &str) -> Option<String> {
-    v.get(k).and_then(Json::as_str).filter(|x| !x.is_empty()).map(String::from)
+    v.get(k).and_then(|x| x.as_str()).filter(|x| !x.is_empty()).map(String::from)
 }
 fn i(v: &Json, k: &str) -> Option<i64> {
     v.get(k).and_then(|x| x.as_i64().or_else(|| x.as_f64().map(|f| round(f))))
@@ -256,9 +256,9 @@ impl P {
         P {
             me: ctx.entity.clone(),
             participant: ctx.participant.clone(),
-            own_values: own("own_values").and_then(|x| serde_json::from_value(x.clone()).ok()),
-            beliefs: own("beliefs").and_then(|x| serde_json::from_value(x.clone()).ok()).unwrap_or_default(),
-            started: own("started").map(super::packed::Packed::of),
+            own_values: own("own_values").and_then(|x| oikos_core::frozen::from_frozen(x).ok()),
+            beliefs: own("beliefs").and_then(|x| oikos_core::frozen::from_frozen(x).ok()).unwrap_or_default(),
+            started: own("started").map(|x| super::packed::Packed::of(&x.to_value())),
             founding: None,
             c,
         }
@@ -276,7 +276,7 @@ impl Common {
     /// `OWN_MEMBERS`, and shares it; read less none, it is what this person would have read of all their params, which
     /// kernel/tests/mind_memory.rs holds it to).
     pub fn read(ctx: &Ctx, skip: &[&str]) -> Common {
-        let v = Json::Object(ctx.params.iter().filter(|(k, _)| !skip.contains(&k.as_str())).map(|(k, x)| (k.clone(), x.clone())).collect());
+        let v = Json::Object(ctx.params.iter().filter(|(k, _)| !skip.contains(&k.as_str())).map(|(k, x)| (k.to_string(), x.to_value())).collect());
         let dials = &ctx.world.dials;
         let nested = |k: &str, sub: &str| v.get(k).and_then(|x| s(x, sub));
         let union_join_bps: BTreeMap<String, i64> = of(&v, "union_join_bps");
@@ -319,7 +319,7 @@ impl Common {
             essentials: i(&v, "essentials").unwrap_or(40_000),
             essentials_units: i(&v, "essentials_units").unwrap_or(10),
             goods: s(&v, "goods").unwrap_or_else(|| "goods".into()),
-            in_labour_force: v.get("in_labour_force").and_then(Json::as_bool).unwrap_or(true),
+            in_labour_force: v.get("in_labour_force").and_then(|x| x.as_bool()).unwrap_or(true),
             values: std::sync::Arc::new(of(&v, "values")),
             outlook: std::sync::Arc::new(of(&v, "outlook")),
             outlook_json: v.get("outlook").cloned().unwrap_or(json!({})),
@@ -365,17 +365,17 @@ impl Common {
             ventures_any: !ventures.is_empty(),
             can_found_business: !ventures.is_empty(),
             origin: s(&v, "origin"),
-            initiative: v.get("initiative").and_then(Json::as_bool),
+            initiative: v.get("initiative").and_then(|x| x.as_bool()),
             mind: person::mind_params(v.get("mind").unwrap_or(&Json::Null)),
             inner: std::sync::Arc::new(inner::inner_params(v.get("inner").unwrap_or(&Json::Null))),
             wants: std::sync::Arc::new(wants::want_params(v.get("wants").unwrap_or(&Json::Null))),
             cdial,
             rdial: reading::reading_dial(&json!({ "dials": dials })).ok().flatten(),
             conduct_rates,
-            consult: dials.get("consult").map_or(false, |x| !x.is_null() && x != &Json::Bool(false)) || ctx.params.get("consult").and_then(Json::as_bool) == Some(true),
+            consult: dials.get("consult").map_or(false, |x| !x.is_null() && x != &Json::Bool(false)) || ctx.params.get("consult").and_then(|x| x.as_bool()) == Some(true),
             // (The world's composer dial is `composer`, as the generator writes it and run.ts reads it; the port read
             // `compose`, so a Rust world never asked for a piece.)
-            compose: dials.get("composer").map_or(false, |x| !x.is_null() && x != &Json::Bool(false)) || ctx.params.get("compose").and_then(Json::as_bool) == Some(true),
+            compose: dials.get("composer").map_or(false, |x| !x.is_null() && x != &Json::Bool(false)) || ctx.params.get("compose").and_then(|x| x.as_bool()) == Some(true),
             tick: ctx.world.tick.max(1),
         }
     }
@@ -594,7 +594,7 @@ pub fn make(cx: &mut Cx, born: &Born) -> Result<Box<dyn Mind>, String> {
     let expect: BTreeMap<String, i64> = [("shop", 8_000), ("job", 5_000), ("practice", 4_000)].into_iter().map(|(k, v)| (k.to_string(), v)).collect();
     let mind = person::Mind::new(&mut cx.rng("person"), &p.values, p.mind, expect, own);
     let inner = Inner::new(&mut cx.rng("inner"), &mind.person.values, p.values.clone(), p.outlook.clone(), p.inner.clone());
-    let dial = cx.ctx.world.dials.get("initiative_bps").and_then(Json::as_i64).unwrap_or(0);
+    let dial = cx.ctx.world.dials.get("initiative_bps").and_then(|x| x.as_i64()).unwrap_or(0);
     let initiative = p.initiative.unwrap_or_else(|| dial > 0 && (cx.rng("initiative").below(10_000) as i64) < dial);
     let wants = Wants::new(p.wants.clone());
     let people = p.outlook.people_bps.unwrap_or(5_000);
@@ -632,9 +632,9 @@ fn founding_of(ctx: &Ctx, initiative: bool) -> Option<std::sync::Arc<FoundingPar
     if !initiative {
         return None;
     }
-    let (own, dial) = (ctx.params.get("founding").unwrap_or(&Json::Null), ctx.world.dials.get("founding").unwrap_or(&Json::Null));
+    let (own, dial) = (ctx.params.get("founding").map_or(Json::Null, |x| x.to_value()), ctx.world.dials.get("founding").unwrap_or(&Json::Null));
     let key = format!("{own}\u{0}{dial}");
-    oikos_contracts::controller::read_once::<FoundingParams, ()>(&key, || founding::founding_params(own, dial).ok_or(())).ok()
+    oikos_contracts::controller::read_once::<FoundingParams, ()>(&key, || founding::founding_params(&own, dial).ok_or(())).ok()
 }
 
 pub fn restore(ctx: &Ctx, saved: Json) -> Result<Box<dyn Mind>, String> {
@@ -862,10 +862,10 @@ impl CitizenMind {
     pub fn refresh_teachings(&mut self, book: &Book) {
         let mut m: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for r in book.assertions() {
-            m.entry(r.speaks_for.clone().unwrap_or_else(|| r.author.clone())).or_default().push(r.id.clone());
+            m.entry((r.speaks_for.unwrap_or_else(|| r.author.clone().into())).to_string()).or_default().push(r.id.to_string());
         }
         self.s.teachings = m;
-        self.s.practice_hosts = book.practices().map(|r| (r.id.clone(), r.speaks_for.clone().unwrap_or_else(|| r.author.clone()))).collect();
+        self.s.practice_hosts = book.practices().map(|r| (r.id.to_string(), r.speaks_for.map_or_else(|| r.author.to_string(), |x| x.to_string()))).collect();
     }
     /// How strongly we hold what a host teaches (the most of its teachings: citizen.ts `holdTo`).
     pub fn hold_to(&self, host: &str) -> i64 {
@@ -915,8 +915,8 @@ impl CitizenMind {
         self.s.decisions += 1;
         let n = self.s.decisions;
         d.insert("n".into(), json!(n));
-        let domain = d.get("domain").and_then(Json::as_str).unwrap_or_default().to_string();
-        if let Some(c) = d.get("choice").and_then(Json::as_str) {
+        let domain = d.get("domain").and_then(|x| x.as_str()).unwrap_or_default().to_string();
+        if let Some(c) = d.get("choice").and_then(|x| x.as_str()) {
             self.s.chose.insert(format!("{domain}:{c}"), n);
         }
         for a in also {
@@ -929,15 +929,15 @@ impl CitizenMind {
     /// Something we came to know of how a choice went (citizen.ts `outcome`): numbered by the decision it follows
     /// where ours, then appraised.
     pub fn outcome_rec(&mut self, cx: &mut Cx, life: &Life, book: Option<&Book>, mut o: Map<String, Json>, own: bool) {
-        let domain = o.get("domain").and_then(Json::as_str).unwrap_or_default().to_string();
-        let option = o.get("option").and_then(Json::as_str).unwrap_or_default().to_string();
+        let domain = o.get("domain").and_then(|x| x.as_str()).unwrap_or_default().to_string();
+        let option = o.get("option").and_then(|x| x.as_str()).unwrap_or_default().to_string();
         if own && !o.contains_key("of") {
             if let Some(n) = self.s.chose.get(&format!("{domain}:{option}")) {
                 o.insert("of".into(), json!(n));
             }
         }
         if let Some((paper, read)) = self.s.last_read.take() {
-            if o.get("paper").and_then(Json::as_str) == Some(paper.as_str()) || o.contains_key("read_pending") {
+            if o.get("paper").and_then(|x| x.as_str()) == Some(paper.as_str()) || o.contains_key("read_pending") {
                 o.insert("read".into(), read);
             } else {
                 self.s.last_read = Some((paper, read));
@@ -945,8 +945,8 @@ impl CitizenMind {
         }
         o.remove("paper");
         o.remove("read_pending");
-        let kind = o.get("kind").and_then(Json::as_str).unwrap_or_default().to_string();
-        let t = o.get("t").and_then(Json::as_i64).unwrap_or(cx.t);
+        let kind = o.get("kind").and_then(|x| x.as_str()).unwrap_or_default().to_string();
+        let t = o.get("t").and_then(|x| x.as_i64()).unwrap_or(cx.t);
         let facts = o.get("facts").cloned().unwrap_or(Json::Null);
         cx.learned(Json::Object(o));
         self.appraised(cx, life, book, t, &domain, &option, &kind, &facts, own);
@@ -1020,7 +1020,7 @@ impl CitizenMind {
     /// here once.
     #[allow(clippy::too_many_arguments)]
     pub fn appraised(&mut self, cx: &mut Cx, life: &Life, book: Option<&Book>, t: i64, domain: &str, who: &str, kind: &str, facts: &Json, own: bool) {
-        let fs = |k: &str| facts.get(k).and_then(Json::as_str).unwrap_or_default().to_string();
+        let fs = |k: &str| facts.get(k).and_then(|x| x.as_str()).unwrap_or_default().to_string();
         let key = format!("{domain}:{kind}");
         let retired = life.retired;
         if self.s.initiative && own {
@@ -1084,7 +1084,7 @@ impl CitizenMind {
             }
             "job:told" => {
                 if !own && (self.s.inner.trusted(who).is_some() || life.employer.as_deref() == Some(who)) {
-                    let good = facts.get("paid") != Some(&Json::Bool(false));
+                    let good = facts.get("paid").and_then(|x| x.as_bool()) != Some(false);
                     self.exp_k(who, &k, good, t, 10000, true, None);
                 }
             }
@@ -1102,7 +1102,7 @@ impl CitizenMind {
                 }
             }
             "home:rent_increase" => {
-                let n = |x: &str| facts.get(x).and_then(Json::as_i64).unwrap_or(0);
+                let n = |x: &str| facts.get(x).and_then(|x| x.as_i64()).unwrap_or(0);
                 if let (Some(l), true) = (life.landlord.clone(), n("rent") > n("was")) {
                     let kk = self.kind_of(&l);
                     self.exp_k(&l, &kk, false, t, 10000, false, None);
@@ -1455,7 +1455,7 @@ impl Mind for CitizenMind {
         if self.s.last_seen == 0 && t > DAY {
             self.s.inner.hours_begin(t);
         } else if pic.body.as_ref().map_or(false, |b| b.present) {
-            let here = pic.body.as_ref().and_then(|b| b.in_space.clone());
+            let here = pic.body.as_ref().and_then(|b| b.in_space);
             let cat = self.where_at(here.as_deref(), life);
             self.s.inner.spent(cat, t - self.s.last_seen);
         }
@@ -1482,11 +1482,11 @@ impl Mind for CitizenMind {
             if let Some(id) = id {
                 self.s.pending_group = false;
                 let b = self.s.begun.take().unwrap();
-                self.s.my_group = Some((id.clone(), b.shape.clone(), b.want.about.clone()));
+                self.s.my_group = Some((id.to_string(), b.shape.clone(), b.want.about.clone()));
                 self.tried(true, 20_000);
-                self.s.inner.remember(inner::Remembered { t, what: "founded".into(), about: Some(id.clone()), size: 5_000, by: None });
+                self.s.inner.remember(inner::Remembered { t, what: "founded".into(), about: Some(id.to_string()), size: 5_000, by: None });
                 let piece = b.piece.clone().unwrap_or(Json::Null);
-                let composer = if piece.is_null() { json!("none") } else if piece.get("declined") == Some(&Json::Bool(true)) { json!("declined") } else { piece.get("model").cloned().unwrap_or(json!("none")) };
+                let composer = if piece.is_null() { json!("none") } else if piece.get("declined").and_then(|x| x.as_bool()) == Some(true) { json!("declined") } else { piece.get("model").cloned().unwrap_or(json!("none")) };
                 let mut facts = json!({ "org": id, "idea": b.brief["idea"], "about": b.want.about, "sharers": b.sharers.len(), "name_by": b.name_by.clone().unwrap_or_else(|| "code".into()), "composer": composer, "dark": b.brief["dark"].as_array().map_or(0, |d| d.len()) });
                 if let Some(w) = &b.want.whom {
                     facts["whom"] = json!(w);
@@ -1578,7 +1578,7 @@ impl Mind for CitizenMind {
         }
         // (What life tells us of a debt paid us, of our home complained of, of a notice lapsed: for wants met.)
         if o.domain == "debt" && o.kind == "settled" {
-            if let (Some(c), Some(n)) = (o.facts.get("claim").and_then(Json::as_str), o.facts.get("paid").and_then(Json::as_i64)) {
+            if let (Some(c), Some(n)) = (o.facts.get("claim").and_then(|x| x.as_str()), o.facts.get("paid").and_then(|x| x.as_i64())) {
                 self.s.settled_to_us.insert(c.to_string(), n);
             }
         }
@@ -1607,7 +1607,7 @@ impl Mind for CitizenMind {
         // (A rise in an enterprise agreement, to a member: it paid. Grateful to the union, and surer of what it
         // says: citizen.ts 1263-1272, the mind's half.)
         if let (true, Some(u)) = (rise, self.p.union.clone().filter(|u| life.member_of.contains(u))) {
-            let rise_bps = o.facts.get("rise_bps").and_then(Json::as_i64).unwrap_or(0);
+            let rise_bps = o.facts.get("rise_bps").and_then(|x| x.as_i64()).unwrap_or(0);
             let payoff = (6_000 + rise_bps * 10).min(10_000);
             let (before, first) = self.was("membership", "member");
             self.s.mind.learn("membership", "member", payoff, &BTreeMap::new());
@@ -1632,7 +1632,7 @@ impl Mind for CitizenMind {
         self.s.inner.settle(t);
         let kind = if tr.kind.is_empty() { self.kind_of(&tr.who) } else { tr.kind.clone() };
         let rd = tr.paper.as_deref().and_then(|p| self.read_of(p));
-        let rp = self.p.rdial.as_ref().map(|d| d.params.clone());
+        let rp = self.p.rdial.as_ref().map(|d| d.params);
         let mut moved: BTreeMap<String, reading::Moved> = BTreeMap::new();
         let mv = |m: Moved| reading::Moved { after: m.after, plain: m.plain, before: Some(m.before) };
         if tr.tried {
@@ -1759,14 +1759,14 @@ impl CitizenMind {
                 self.s.consulted.insert(a.about, (!a.body.is_null()).then_some(a.body));
             }
             "compose" => {
-                if let Some(b) = self.s.begun.as_mut().filter(|b| b.brief.get("idea").and_then(Json::as_str) == Some(a.about.as_str())) {
+                if let Some(b) = self.s.begun.as_mut().filter(|b| b.brief.get("idea").and_then(|x| x.as_str()) == Some(a.about.as_str())) {
                     b.piece = Some(a.body);
                 }
             }
             "words" => {
-                if let Some(b) = self.s.begun.as_mut().filter(|b| b.brief.get("idea").and_then(Json::as_str) == Some(a.about.as_str())) {
+                if let Some(b) = self.s.begun.as_mut().filter(|b| b.brief.get("idea").and_then(|x| x.as_str()) == Some(a.about.as_str())) {
                     // (`{done: false}`: the engine could not begin the acts of the draft we accepted: `Words.done(false)`.)
-                    if a.body.get("done").and_then(Json::as_bool) == Some(false) {
+                    if a.body.get("done").and_then(|x| x.as_bool()) == Some(false) {
                         b.redo_plain = b.sent;
                     } else if b.naming {
                         b.words = Some(a.body);
@@ -1802,7 +1802,7 @@ impl CitizenMind {
             Some(Some(a)) => {
                 let mut r = cx.rng(&format!("consult-{about}"));
                 let mut out = BTreeMap::new();
-                if let Some(scores) = a.get("scores").and_then(Json::as_object) {
+                if let Some(scores) = a.get("scores").and_then(|x| x.as_object()) {
                     for (k, x) in scores {
                         let mean = x.get("mean").and_then(Json::as_f64).unwrap_or(0.0);
                         let sd = x.get("sd").and_then(Json::as_f64).unwrap_or(0.0);

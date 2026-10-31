@@ -53,14 +53,14 @@ fn everyones_shared_readings_of_their_params_are_what_they_would_have_read_alone
         let mut held = vec![];
         let mut people = 0;
         for part in &loaded.config.participants {
-            if part.controller.get("impl").and_then(Value::as_str) != Some("citizen.default") {
+            if part.controller.get("impl").and_then(|x| x.as_str()) != Some("citizen.default") {
                 continue;
             }
             people += 1;
             let ctx = Ctx {
-                participant: part.id.clone(),
+                participant: part.id.to_string(),
                 performer: Default::default(),
-                entity: part.person.clone().unwrap_or_default(),
+                entity: part.person.unwrap_or_default().to_string(),
                 position: None,
                 params: ActorParams::of_controller(&part.controller),
                 world: world.clone(),
@@ -68,13 +68,13 @@ fn everyones_shared_readings_of_their_params_are_what_they_would_have_read_alone
             // The mind's: the shared part is the reading of all their params (Debug: every field), their own theirs.
             let p = P::of(&ctx);
             assert_eq!(format!("{:?}", *p.c), format!("{:?}", Common::read(&ctx, &[])), "{profile}: {}", part.id);
-            let own = |k: &str| ctx.params.get(k).filter(|x| !x.is_null()).cloned();
+            let own = |k: &str| ctx.params.get(k).filter(|x| !x.is_null()).map(|x| x.to_value());
             assert_eq!(p.own_values.as_ref().map(|m| serde_json::to_value(m).unwrap()), own("own_values"), "{profile}: {}", part.id);
             assert_eq!(p.started.as_ref().map(|s| s.value()), own("started"));
-            assert_eq!(serde_json::to_value(&p.beliefs).unwrap(), own("beliefs").unwrap_or(serde_json::json!({})));
+            assert_eq!(serde_json::to_value(&p.beliefs).unwrap(), own("beliefs").unwrap_or((serde_json::json!({})).into()));
             minds.insert(Arc::as_ptr(&p.c) as usize);
             // The life's: the shared part is all their params read whole, their own read whole too.
-            let whole: serde_json::Map<String, Value> = ctx.params.iter().filter(|(_, v)| !v.is_null()).map(|(k, v)| (k.clone(), v.clone())).collect();
+            let whole: serde_json::Map<String, Value> = ctx.params.iter().filter(|(_, v)| !v.is_null()).map(|(k, v)| (k.to_string(), v.to_value())).collect();
             let g = Params::of(&ctx.params).unwrap();
             assert!(*g.common == serde_json::from_value::<Params>(Value::Object(whole.clone())).unwrap(), "{profile}: {}", part.id);
             let o: Own = serde_json::from_value(Value::Object(whole)).unwrap();

@@ -49,17 +49,17 @@ fn world_with_a_kind() -> Value {
 
 /// Each field's total over the cells (sparse: cells at the baseline, nought here, are not kept): the fields that hold
 /// no kind (a field that holds one is counted with its kind, `kind_totals`).
-fn field_totals<W: std::io::Write>(run: &Run<W>) -> BTreeMap<String, i128> {
+fn field_totals<W: std::io::Write>(run: &Run<W>) -> BTreeMap<oikos_kernel::blocks::Id, i128> {
     let mut t = BTreeMap::new();
     for f in run.kernel().statics().config.catalogue.fields.iter().filter(|f| f.kind.is_none()) {
         let n = run.kernel().state().nature.as_deref().and_then(|n| n.fields.get(&f.id)).map_or(0, |m| m.values().map(|v| *v as i128).sum());
-        t.insert(f.id.clone(), n);
+        t.insert(f.id, n);
     }
     t
 }
 
 /// Each kind's total: over holdings (edges' included), and for a kind a field holds, over its cells and nature's edge.
-fn kind_totals<W: std::io::Write>(run: &Run<W>) -> BTreeMap<String, i128> {
+fn kind_totals<W: std::io::Write>(run: &Run<W>) -> BTreeMap<oikos_kernel::blocks::Id, i128> {
     let st = run.kernel().state();
     let mut t = st.total_goods();
     for f in &run.kernel().statics().config.catalogue.fields {
@@ -67,7 +67,7 @@ fn kind_totals<W: std::io::Write>(run: &Run<W>) -> BTreeMap<String, i128> {
         let n = st.nature.as_deref();
         let cells: i128 = n.and_then(|n| n.fields.get(&f.id)).map_or(0, |m| m.values().map(|v| *v as i128).sum());
         let edge = n.and_then(|n| n.edge.get(&f.id)).copied().unwrap_or(0);
-        *t.entry(k.clone()).or_insert(0) += cells + edge;
+        *t.entry(*k).or_insert(0) += cells + edge;
     }
     t
 }
@@ -109,7 +109,7 @@ fn work_cmd(task: &str, units: u8) -> Command {
 fn check_run(config: Value, ops: &[COp]) -> Result<(usize, usize), TestCaseError> {
     let mut run = Run::start(config, "conservation", Vec::new(), None).unwrap();
     let mut expected = kind_totals(&run);
-    let kind_of: BTreeMap<String, String> = run.kernel().statics().config.catalogue.fields.iter().filter_map(|f| f.kind.clone().map(|k| (f.id.clone(), k))).collect();
+    let kind_of: BTreeMap<oikos_kernel::blocks::Id, oikos_kernel::blocks::Id> = run.kernel().statics().config.catalogue.fields.iter().filter_map(|f| f.kind.map(|k| (f.id, k))).collect();
     let mut fields = field_totals(&run);
     let tasks = run.kernel().statics().config.catalogue.tasks.clone();
     let types = run.kernel().statics().types.clone();
@@ -130,7 +130,7 @@ fn check_run(config: Value, ops: &[COp]) -> Result<(usize, usize), TestCaseError
             EventBody::ActionApplied { participant, position, .. } => run.kernel().state().acting_entity(participant, position.as_deref()),
             _ => None,
         });
-        let mut field_change: BTreeMap<String, i128> = BTreeMap::new();
+        let mut field_change: BTreeMap<oikos_kernel::blocks::Id, i128> = BTreeMap::new();
         for e in &resp.events {
             match &e.body {
                 EventBody::GoodsMoved { from, quantity, .. } => {
@@ -143,26 +143,26 @@ fn check_run(config: Value, ops: &[COp]) -> Result<(usize, usize), TestCaseError
                 EventBody::Worked { task, units, .. } => {
                     if let Some(t) = tasks.iter().find(|x| &x.id == task) {
                         for (k, per) in &t.consumes {
-                            *expected.entry(k.clone()).or_insert(0) -= per * *units as i128;
+                            *expected.entry(k.to_string().into()).or_insert(0) -= per * *units as i128;
                         }
                         for (k, per) in &t.produces {
-                            *expected.entry(k.clone()).or_insert(0) += per * *units as i128;
+                            *expected.entry(k.to_string().into()).or_insert(0) += per * *units as i128;
                         }
                         if let Some(d) = &t.draws {
                             // (From a field that holds a kind, a draw moves it into a holding: the kind's total is unchanged.)
-                            if fields.contains_key(&d.field) {
-                                *field_change.entry(d.field.clone()).or_insert(0) -= d.per_unit as i128 * *units as i128;
+                            if fields.contains_key(d.field.as_str()) {
+                                *field_change.entry(d.field.to_string().into()).or_insert(0) -= d.per_unit as i128 * *units as i128;
                             }
                             drawn += 1;
                         }
                         for (k, per) in &t.emits {
-                            if fields.contains_key(k) {
-                                *field_change.entry(k.clone()).or_insert(0) += *per as i128 * *units as i128;
+                            if fields.contains_key(k.as_str()) {
+                                *field_change.entry(k.to_string().into()).or_insert(0) += *per as i128 * *units as i128;
                                 drawn += 1;
                             }
                             // (Emitted to a field that holds a kind: the process's output, put on the cell.)
-                            if let Some(kind) = kind_of.get(k) {
-                                *expected.entry(kind.clone()).or_insert(0) += *per as i128 * *units as i128;
+                            if let Some(kind) = kind_of.get(k.as_str()) {
+                                *expected.entry(*kind).or_insert(0) += *per as i128 * *units as i128;
                                 drawn += 1;
                             }
                         }
@@ -170,7 +170,7 @@ fn check_run(config: Value, ops: &[COp]) -> Result<(usize, usize), TestCaseError
                 }
                 EventBody::StructureStarted { structure_type, .. } => {
                     for (k, q) in &types[structure_type].materials {
-                        *expected.entry(k.clone()).or_insert(0) -= q;
+                        *expected.entry(k.to_string().into()).or_insert(0) -= q;
                     }
                 }
                 _ => {}
@@ -179,7 +179,7 @@ fn check_run(config: Value, ops: &[COp]) -> Result<(usize, usize), TestCaseError
         let st = run.kernel().state();
         let mut have = kind_totals(&run);
         for k in expected.keys() {
-            have.entry(k.clone()).or_insert(0);
+            have.entry(*k).or_insert(0);
         }
         prop_assert_eq!(&have, &expected, "a kind not accounted for after {:?}", cmd);
         for h in st.holdings.values() {

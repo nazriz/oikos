@@ -22,6 +22,8 @@
 //! lives; on being notified of a death it stops the deceased's standing orders and holds the account for the personal
 //! representative, and pays out to the estate (law-succession: the partner, else the adult children, else the town).
 
+use oikos_core::frozen::JsonRead;
+use oikos_core::Frozen;
 use super::{act, manifest_of, Kept, Note};
 use crate::common::{
     addressed_to, cents, data, filed_before, first_due, message, money_words, when_words, who_wrote, Asked, Book, Fields, Letter, Letters, DAY,
@@ -139,7 +141,7 @@ struct Ledger {
     n: i64,
     paid_in: i64,
     paid_out: i64,
-    latest: Vec<Transaction>,
+    latest: Vec<Arc<Transaction>>,
 }
 
 /// Where an account's ledger stood at the last statement to a writer.
@@ -247,7 +249,7 @@ impl Bank {
     /// The positions an account holder has told the bank may instruct payments from an account (latest standing list), if any.
     fn signatories(&self, holder: &str, account: &str) -> Option<Vec<String>> {
         let list = self.book.open("signatories").rfind(|r| r.speaks_for.as_deref() == Some(holder) && data(r).s("account") == Some(account))?;
-        data(list).get("positions").and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+        data(list).get("positions").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
     }
 
     /// Whether whoever made this record may instruct on this account: written for its holder, by one of the holder's own
@@ -273,7 +275,7 @@ impl Bank {
 
     /// Who a letter about a record is to: the organisation it speaks for if genesis, else the post or the writer.
     fn to_whom(&self, r: &Record, me: &str) -> Vec<String> {
-        vec![if r.author == "genesis" { r.speaks_for.clone().unwrap_or_else(|| me.to_string()) } else { r.position.clone().unwrap_or_else(|| r.author.clone()) }]
+        vec![if r.author == "genesis" { (r.speaks_for.unwrap_or_else(|| me.to_string().into())).to_string() } else { (r.position.unwrap_or_else(|| r.author.clone().into())).to_string() }]
     }
 
     fn paying_account<'a>(order: Option<&Record>, custody: &Custody<'a>) -> Option<&'a AccountItem> {
@@ -291,15 +293,15 @@ impl Bank {
 
     #[allow(clippy::too_many_lines)]
     fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Payment> {
-        let me = pic.entity.clone();
+        let me = pic.entity;
         let t = pic.t;
         let world = cx.ctx.world.clone();
         let custody: Custody = pic.accounts().filter(|a| a.custodian == me).map(|a| (a.account.as_str(), a)).collect();
         // Has what the checks read changed since the last plan? (Who is who as far as it has been shown or has looked
         // up: who wrote an order it could not place before may be known now.)
-        let signatories: Vec<String> = self.book.open("signatories").map(|r| r.id.clone()).collect();
+        let signatories: Vec<String> = self.book.open("signatories").map(|r| r.id).map(|x| x.to_string()).collect();
         let now_read = Read {
-            accounts: custody.values().map(|a| (a.account.clone(), a.holder.clone())).collect(),
+            accounts: custody.values().map(|a| (a.account.to_string(), a.holder.to_string())).collect(),
             signatories,
             who_is_who: if self.p.who.is_some() { 0 } else { self.book.positions().len() },
         };
@@ -310,14 +312,14 @@ impl Bank {
         // (Only what has come since the last plan is read: the book's lists grow all run, and copying each whole at every
         // plan made the bank's wakes cost more the longer the town had run.)
         let requests = self.book.all("request").len();
-        let fresh: Vec<Arc<Record>> = self.book.all("request").skip(self.cursor).filter(|r| addressed_to(r).contains(&me)).cloned().collect();
+        let fresh: Vec<Arc<Record>> = self.book.all("request").skip(self.cursor).filter(|r| addressed_to(r).iter().any(|x| x == &me.to_string())).cloned().collect();
         self.cursor = requests;
         for r in &fresh {
-            let every = data(r).get("every").and_then(Value::as_i64).is_some_and(|e| e > 0);
-            if every && !data(r).get("payments").is_some_and(Value::is_array) && !self.ended.contains_key(&r.id) {
-                self.standing.insert(r.id.clone());
-                if !self.next_due.contains_key(&r.id) {
-                    self.undated.insert(r.id.clone());
+            let every = data(r).get("every").and_then(|x| x.as_i64()).is_some_and(|e| e > 0);
+            if every && !data(r).get("payments").is_some_and(|x| x.is_array()) && !self.ended.contains_key(r.id.as_str()) {
+                self.standing.insert(r.id.to_string());
+                if !self.next_due.contains_key(r.id.as_str()) {
+                    self.undated.insert(r.id.to_string());
                 }
             }
         }
@@ -333,11 +335,11 @@ impl Bank {
             let RecordBody::Withdrawal { withdraws, .. } = &w.body else { continue };
             let Some(target) = self.book.get(withdraws).cloned() else {
                 if self.unplaced.len() < 256 {
-                    self.unplaced.push(w.id.clone()); // (the paper it names has not reached us yet: looked at again next plan)
+                    self.unplaced.push(w.id.to_string()); // (the paper it names has not reached us yet: looked at again next plan)
                 }
                 continue;
             };
-            if !matches!(target.body, RecordBody::Statement { .. }) || !addressed_to(&target).contains(&me) || self.ended.contains_key(&target.id) {
+            if !matches!(target.body, RecordBody::Statement { .. }) || !addressed_to(&target).iter().any(|x| x == &me.to_string()) || self.ended.contains_key(target.id.as_str()) {
                 continue;
             }
             let to = self.to_whom(&w, &me);
@@ -345,9 +347,9 @@ impl Bank {
                 Some("request") => {
                     let acc = Self::paying_account(Some(&target), &custody);
                     if self.may_instruct(&w, acc) {
-                        self.ended.insert(target.id.clone(), w.at);
-                        just_ended.push(target.id.clone());
-                    } else if self.standing.contains(&target.id) || !self.done.contains(&target.id) {
+                        self.ended.insert(target.id.to_string(), w.at);
+                        just_ended.push(target.id.to_string());
+                    } else if self.standing.contains(target.id.as_str()) || !self.done.contains(target.id.as_str()) {
                         let text = match self.why_not(&w, acc) {
                             Some(why) => format!("Withdrawal {} is not acted on, and {} stands: {why}.", w.id, target.id),
                             None => format!("Withdrawal {} does not apply to {}: we have no standing instruction of yours by that reference.", w.id, target.id),
@@ -364,14 +366,14 @@ impl Bank {
         // for itself, below, as any instruction is.)
         for r in &fresh {
             let Some(old) = data(r).s("replaces").and_then(|id| self.book.get(id)).cloned() else { continue };
-            if crate::common::kind(&old) != Some("request") || !addressed_to(&old).contains(&me) || self.ended.contains_key(&old.id) {
+            if crate::common::kind(&old) != Some("request") || !addressed_to(&old).iter().any(|x| x == &me.to_string()) || self.ended.contains_key(old.id.as_str()) {
                 continue;
             }
             if !self.may_instruct(r, Self::paying_account(Some(&old), &custody)) {
                 continue;
             }
-            self.ended.insert(old.id.clone(), r.at);
-            just_ended.push(old.id.clone());
+            self.ended.insert(old.id.to_string(), r.at);
+            just_ended.push(old.id.to_string());
         }
         // (A payment that fell due before its order was withdrawn is still made: the bank goes through its plans a day
         // apart, and an order replaced in the hours after its pay day, a wage at a new rate say, would lose that pay.)
@@ -382,7 +384,7 @@ impl Bank {
             }
             let Some(r) = self.book.get(&id).cloned() else { continue };
             let until = self.ended.get(&id).copied().unwrap_or(t);
-            let every = data(&r).get("every").and_then(Value::as_i64).unwrap_or(DAY);
+            let every = data(&r).get("every").and_then(|x| x.as_i64()).unwrap_or(DAY);
             let next = self.next_due.get(&id).copied().unwrap_or_else(|| first_due(&r, every));
             if next <= until {
                 last_call.insert(id.clone(), (r, until));
@@ -396,13 +398,13 @@ impl Bank {
         let holds_seen = self.book.all("hold").len();
         let holds: Vec<Arc<Record>> = self.book.all("hold").skip(self.hold_cursor).cloned().collect();
         for h in holds.iter() {
-            if !addressed_to(h).contains(&me) {
+            if !addressed_to(h).iter().any(|x| x == &me.to_string()) {
                 continue;
             }
-            let Some(list) = data(h).get("holds").and_then(Value::as_array) else { continue };
+            let Some(list) = data(h).get("holds").and_then(|x| x.as_array()) else { continue };
             let (mut taken, mut not, mut unsigned): (Vec<String>, Vec<String>, Vec<String>) = (vec![], vec![], vec![]);
             let mut seen = BTreeSet::new();
-            let ids: Vec<&str> = list.iter().filter_map(Value::as_str).filter(|id| seen.insert(*id)).take(64).collect();
+            let ids: Vec<&str> = list.iter().filter_map(|x| x.as_str()).filter(|id| seen.insert(*id)).take(64).collect();
             for id in ids {
                 let order = if self.standing.contains(id) { self.book.get(id).cloned() } else { None };
                 let acc = Self::paying_account(order.as_deref(), &custody);
@@ -417,9 +419,9 @@ impl Bank {
                     continue;
                 };
                 let from = h.at + self.p.hold_notice;
-                self.holds_on.entry(id.to_string()).or_default().push((h.id.clone(), from));
+                self.holds_on.entry(id.to_string()).or_default().push((h.id.to_string(), from));
                 // (The first payment it stops: the first due at or after the time it counts from.)
-                let every = data(&order).get("every").and_then(Value::as_i64).unwrap_or(DAY);
+                let every = data(&order).get("every").and_then(|x| x.as_i64()).unwrap_or(DAY);
                 let next = self.next_due.get(id).copied().unwrap_or_else(|| first_due(&order, every));
                 let first = if next >= from { next } else { next + (from - next + every - 1).div_euclid(every) * every };
                 taken.push(format!("{id}, from the payment due on day {}", first.div_euclid(DAY) + 1));
@@ -448,7 +450,7 @@ impl Bank {
             }
             let accounts: Vec<Option<&AccountItem>> = orders.iter().map(|o| Self::paying_account(self.book.get(o).map(|r| &**r), &custody)).collect();
             if accounts.iter().all(|acc| self.may_instruct(&w, *acc)) {
-                self.ended.insert(hold.id.clone(), w.at);
+                self.ended.insert(hold.id.to_string(), w.at);
             } else {
                 let bad = accounts.iter().find(|acc| !self.may_instruct(&w, **acc)).copied().flatten();
                 let text = match self.why_not(&w, bad) {
@@ -489,7 +491,7 @@ impl Bank {
             }
         }
         for r in &fresh {
-            look.insert(r.id.clone(), r.clone());
+            look.insert(r.id.to_string(), r.clone());
         }
         for (id, (r, _)) in &last_call {
             look.insert(id.clone(), r.clone());
@@ -504,13 +506,13 @@ impl Bank {
             if dead.contains(ins.speaks_for.as_deref().unwrap_or("")) {
                 // (A dead person's instruction is no more carried out. It is ended, so that it is not gone through again
                 // every day for ever; and a one-off not yet made is lapsed. Nobody is told: nobody is there to be.)
-                if self.standing.remove(&ins.id) {
-                    self.undated.remove(&ins.id);
-                    self.ended.entry(ins.id.clone()).or_insert(t);
+                if self.standing.remove(ins.id.as_str()) {
+                    self.undated.remove(ins.id.as_str());
+                    self.ended.entry(ins.id.to_string()).or_insert(t);
                 }
                 continue;
             }
-            if self.ended.contains_key(&ins.id) && !last_call.contains_key(&ins.id) {
+            if self.ended.contains_key(ins.id.as_str()) && !last_call.contains_key(ins.id.as_str()) {
                 continue;
             }
             self.go_through(ins, &custody, &dead, &last_call, t, &me, &world, &mut out);
@@ -535,7 +537,7 @@ impl Bank {
         // Requests the bank cannot carry out get a reply, once, as a real bank's would (docs/behaviour/bank-payment-system.md).
         macro_rules! cannot {
             ($why:expr) => {{
-                if self.done.insert(ins.id.clone()) {
+                if self.done.insert(ins.id.to_string()) {
                     let to = self.to_whom(ins, me);
                     self.refusals.push(Note::new(to, format!("Request {} not carried out: {}", ins.id, $why), Some(&ins.id)));
                 }
@@ -544,7 +546,7 @@ impl Bank {
         // Opening an account: for whoever asks, in their own name (the bank's procedure; no checks beyond that yet).
         let outcome = d.get("outcome");
         if let Some(opening) = outcome.and_then(|o| o.get("account")).filter(|a| a.is_object() && !a.flag("close")) {
-            if !self.done.insert(ins.id.clone()) {
+            if !self.done.insert(ins.id.to_string()) {
                 return;
             }
             let holder = opening.s("holder");
@@ -557,9 +559,9 @@ impl Bank {
             return;
         }
         // A bulk payment (a share registry's dividends, say): one instruction, from one account, to many, once.
-        let bulk: Option<&Vec<Value>> = d.get("payments").and_then(Value::as_array);
+        let bulk: Option<&[Frozen]> = d.get("payments").and_then(|x| x.as_array());
         let money = outcome.and_then(|o| o.get("money"));
-        let amount_of = |v: Option<&Value>| v.and_then(crate::papers::lenient::whole);
+        let amount_of = |v: Option<&Frozen>| v.and_then(JsonRead::whole);
         let (from, to, pay_amount, settles, said_by) = if let Some(b) = bulk {
             (d.s("from"), Some("(many)"), b.iter().map(|x| amount_of(x.get("amount")).unwrap_or(0)).sum::<i64>(), None, None)
         } else {
@@ -578,13 +580,13 @@ impl Bank {
             }
         }
         // (What the payer said it is for goes with the money: the line on the payee's statement.)
-        let said = |x: Option<&Value>| -> (Option<String>, Option<String>) {
+        let said = |x: Option<&Frozen>| -> (Option<String>, Option<String>) {
             let memo = x.and_then(|x| x.s("for")).filter(|s| !s.is_empty()).map(|s| s.strip_suffix('.').unwrap_or(s).chars().take(120).collect());
             (memo, x.and_then(|x| x.s("line")).filter(|s| !s.is_empty()).map(String::from))
         };
         let from_id = from.unwrap_or_default();
         let acc = custody.get(from_id).copied();
-        if acc.is_some_and(|a| dead.contains(&a.holder)) {
+        if acc.is_some_and(|a| dead.contains(a.holder.as_str())) {
             return; // the account holder has died: it pays out only to settle the estate
         }
         let Some(acc) = acc else {
@@ -606,43 +608,43 @@ impl Bank {
                 return;
             }
         }
-        let every = if bulk.is_some() { None } else { d.get("every").and_then(Value::as_i64).filter(|e| *e > 0) };
+        let every = if bulk.is_some() { None } else { d.get("every").and_then(|x| x.as_i64()).filter(|e| *e > 0) };
         if let Some(every) = every {
             // A standing order into the account of someone we have been told has died: the payer is told at each payment
             // until it stops it (how an employer comes to know: docs/behaviour/deaths.md; a letter to an office with nobody in
             // it is lost, so it says so again at the next). It is still carried out, into the estate.
-            let was = self.next_due.get(&ins.id).copied();
+            let was = self.next_due.get(ins.id.as_str()).copied();
             let mut due = was.unwrap_or_else(|| first_due(ins, every));
             // (Said when a payment under it next falls due, so that it is said at the same moment however often the order
             // is gone through.)
             let payee = if due <= t { custody.get(to).copied() } else { None };
-            if let Some(p) = payee.filter(|p| dead.contains(&p.holder)) {
-                if self.told_died.get(&ins.id).is_none_or(|told| *told < due) {
-                    self.told_died.insert(ins.id.clone(), due);
+            if let Some(p) = payee.filter(|p| dead.contains(p.holder.as_str())) {
+                if self.told_died.get(ins.id.as_str()).is_none_or(|told| *told < due) {
+                    self.told_died.insert(ins.id.to_string(), due);
                     let to_payer = self.to_whom(ins, me);
                     self.refusals.push(Note::new(to_payer, PAYEE_DIED::note(&p.holder, to, &ins.id), Some(&ins.id)));
                 }
             }
-            let until = t.min(last_call.get(&ins.id).map_or(t, |(_, u)| *u));
+            let until = t.min(last_call.get(ins.id.as_str()).map_or(t, |(_, u)| *u));
             let (memo, line) = said(said_by);
             while due <= until {
                 // (A due date under a hold is passed over: not paid then, and not made up when the hold is lifted.)
                 if !self.held(&ins.id, due) {
-                    out.push(Payment { instruction: ins.id.clone(), from: from_id.to_string(), to: to.to_string(), amount: pay_amount, due, settles: None, memo: memo.clone(), line: line.clone(), single: false });
+                    out.push(Payment { instruction: ins.id.to_string(), from: from_id.to_string(), to: to.to_string(), amount: pay_amount, due, settles: None, memo: memo.clone(), line: line.clone(), single: false });
                 }
                 due += every;
             }
-            self.next_due.insert(ins.id.clone(), due);
-            if Some(due) != was && self.standing.contains(&ins.id) {
-                self.undated.remove(&ins.id);
-                self.by_due.insert((due, ins.id.clone()));
+            self.next_due.insert(ins.id.to_string(), due);
+            if Some(due) != was && self.standing.contains(ins.id.as_str()) {
+                self.undated.remove(ins.id.as_str());
+                self.by_due.insert((due, ins.id.to_string()));
             }
         } else if let Some(b) = bulk {
-            if self.done.insert(ins.id.clone()) {
+            if self.done.insert(ins.id.to_string()) {
                 for x in b {
                     let (memo, line) = said(Some(x));
                     out.push(Payment {
-                        instruction: ins.id.clone(),
+                        instruction: ins.id.to_string(),
                         from: from_id.to_string(),
                         to: x.s("to").unwrap_or_default().to_string(),
                         amount: amount_of(x.get("amount")).unwrap_or(0),
@@ -654,9 +656,9 @@ impl Bank {
                     });
                 }
             }
-        } else if self.done.insert(ins.id.clone()) {
+        } else if self.done.insert(ins.id.to_string()) {
             let (memo, line) = said(said_by);
-            out.push(Payment { instruction: ins.id.clone(), from: from_id.to_string(), to: to.to_string(), amount: pay_amount, due: ins.at, settles: settles.map(String::from), memo, line, single: false });
+            out.push(Payment { instruction: ins.id.to_string(), from: from_id.to_string(), to: to.to_string(), amount: pay_amount, due: ins.at, settles: settles.map(String::from), memo, line, single: false });
         }
         let _ = world;
     }
@@ -665,23 +667,23 @@ impl Bank {
     /// heirs are settled once; what comes into the estate later (a dividend, a refund) is passed on to them too, as an
     /// estate's administrator does. An estate with nobody yet to receive it is kept, and looked at again at the next plan.
     fn settle_estates(&mut self, deaths: &[Arc<Record>], dead: &BTreeSet<String>, custody: &Custody, t: i64, out: &mut Vec<Payment>) {
-        let account_of = |holder: &str| custody.values().find(|a| a.holder == holder && !dead.contains(holder)).map(|a| a.account.clone());
+        let account_of = |holder: &str| custody.values().find(|a| a.holder == holder && !dead.contains(holder)).map(|a| a.account);
         for r in deaths {
-            if !self.settled.contains_key(&r.id) {
+            if !self.settled.contains_key(r.id.as_str()) {
                 let d = data(r);
-                let mut heirs: Vec<String> = d.s("partner").filter(|x| !x.is_empty()).and_then(account_of).into_iter().collect();
+                let mut heirs: Vec<String> = d.s("partner").filter(|x| !x.is_empty()).and_then(account_of).into_iter().map(|x| x.to_string()).collect();
                 if heirs.is_empty() {
-                    heirs = d.ids("adult_children").into_iter().filter_map(&account_of).collect();
+                    heirs = d.ids("adult_children").into_iter().filter_map(&account_of).map(|x| x.to_string()).collect();
                 }
                 if heirs.is_empty() {
-                    heirs = Some(self.p.town.as_str()).filter(|t| !t.is_empty()).and_then(account_of).into_iter().collect();
+                    heirs = Some(self.p.town.as_str()).filter(|t| !t.is_empty()).and_then(account_of).into_iter().map(|x| x.to_string()).collect();
                 }
                 if heirs.is_empty() {
                     continue;
                 }
-                self.settled.insert(r.id.clone(), heirs);
+                self.settled.insert(r.id.to_string(), heirs);
             }
-            let to = &self.settled[&r.id];
+            let to = &self.settled[r.id.as_str()];
             for acc in custody.values() {
                 if Some(acc.holder.as_str()) != data(r).s("deceased") {
                     continue;
@@ -694,7 +696,7 @@ impl Bank {
                 for (i, account) in to.iter().enumerate() {
                     let amount = if i == 0 { balance - each * (to.len() as i64 - 1) } else { each };
                     if amount > 0 {
-                        out.push(Payment { instruction: r.id.clone(), from: acc.account.clone(), to: account.clone(), amount, due: t, settles: None, memo: None, line: None, single: false });
+                        out.push(Payment { instruction: r.id.to_string(), from: acc.account.to_string(), to: account.clone(), amount, due: t, settles: None, memo: None, line: None, single: false });
                     }
                 }
             }
@@ -708,11 +710,11 @@ impl Bank {
         let orders: Vec<Arc<Record>> = self
             .book
             .open("garnishee_order")
-            .filter(|r| addressed_to(r).iter().any(|a| a == me) && !self.done.contains(&r.id) && self.p.courts.iter().any(|c| Some(c.as_str()) == r.speaks_for.as_deref()))
+            .filter(|r| addressed_to(r).iter().any(|a| a == me) && !self.done.contains(r.id.as_str()) && self.p.courts.iter().any(|c| Some(c.as_str()) == r.speaks_for.as_deref()))
             .cloned()
             .collect();
         for g in orders {
-            self.done.insert(g.id.clone());
+            self.done.insert(g.id.to_string());
             let d = data(&g);
             let mut left = d.get("amount").and_then(crate::papers::lenient::whole).unwrap_or(0);
             let Some(to) = d.s("to") else { continue };
@@ -722,7 +724,7 @@ impl Bank {
             for acc in custody.values().filter(|a| Some(a.holder.as_str()) == d.s("debtor") && cents(a.balance) > 0) {
                 let amount = left.min(cents(acc.balance));
                 left -= amount;
-                out.push(Payment { instruction: g.id.clone(), from: acc.account.clone(), to: to.to_string(), amount, due: t, settles: d.s("claim").map(String::from), memo: None, line: None, single: false });
+                out.push(Payment { instruction: g.id.to_string(), from: acc.account.to_string(), to: to.to_string(), amount, due: t, settles: d.s("claim").map(String::from), memo: None, line: None, single: false });
                 if left <= 0 {
                     break;
                 }
@@ -750,7 +752,7 @@ impl Bank {
         // instruction is not named to whoever was paid: it is the payer's paper.
         let mut statements: Vec<String> = vec![];
         for a in &mine {
-            let l = self.ledgers.get(&a.account).cloned().unwrap_or_default();
+            let l = self.ledgers.get(a.account.as_str()).cloned().unwrap_or_default();
             let key = format!("{writer} {}", a.account);
             let before = self.stated_to.get(&key).copied();
             let since = before.unwrap_or(Stated { n: 0, paid_in: 0, paid_out: 0, t: self.ledger_from.unwrap_or(pic.t) });
@@ -780,7 +782,7 @@ impl Bank {
                 "Statement of {}, {period}: balance brought forward {}. {}. {}In all {} paid out and {} paid in. Balance carried forward {}.",
                 a.account,
                 usd(balance - paid_in + paid_out),
-                listed.iter().map(entry).collect::<Vec<_>>().join("; "),
+                listed.iter().map(|x| entry(x)).collect::<Vec<_>>().join("; "),
                 if (n as usize) > listed.len() { format!("Those are the latest {} of {n} entries; the {} before them are in the totals. ", listed.len(), n as usize - listed.len()) } else { String::new() },
                 usd(paid_out),
                 usd(paid_in),
@@ -799,9 +801,9 @@ impl Bank {
         orders.sort_by(|a, b| filed_before(&a.id, &b.id));
         let order = |r: &Arc<Record>| {
             let m = data(r).get("outcome").and_then(|o| o.get("money")).cloned().unwrap_or_default();
-            let every = data(r).get("every").and_then(Value::as_i64).unwrap_or(DAY);
-            let next = self.next_due.get(&r.id);
-            let on: Vec<&str> = self.holds_on.get(&r.id).map(|v| v.iter().filter(|(h, _)| !self.ended.contains_key(h)).map(|(h, _)| h.as_str()).collect()).unwrap_or_default();
+            let every = data(r).get("every").and_then(|x| x.as_i64()).unwrap_or(DAY);
+            let next = self.next_due.get(r.id.as_str());
+            let on: Vec<&str> = self.holds_on.get(r.id.as_str()).map(|v| v.iter().filter(|(h, _)| !self.ended.contains_key(h)).map(|(h, _)| h.as_str()).collect()).unwrap_or_default();
             // (Who gave it and when, and what it cites: what the instruction itself says, which is the customer's own paper.)
             let cites = crate::common::bases_of(r);
             let given = format!(
@@ -838,7 +840,7 @@ impl Bank {
         )
     }
 
-    fn enter(&mut self, account: &str, x: &Transaction, out: bool) {
+    fn enter(&mut self, account: &str, x: &Arc<Transaction>, out: bool) {
         let keep = self.p.statement_lists;
         let l = self.ledgers.entry(account.to_string()).or_default();
         l.n += 1;
@@ -865,7 +867,7 @@ impl Actor for Bank {
         self.book.absorb(pic);
         // Into the ledger: each payment in or out of an account, as the bank is shown it (once).
         self.ledger_from.get_or_insert(pic.t);
-        let txs: Vec<Transaction> = pic.transactions().cloned().collect();
+        let txs: Vec<Arc<Transaction>> = pic.transactions_held().cloned().collect();
         for x in &txs {
             self.enter(&x.from, x, true);
             if x.to != x.from {
@@ -904,10 +906,10 @@ impl Actor for Bank {
                     self.queue.push_front(Payment { single: true, ..p });
                 }
             } else if let [p] = self.in_flight.as_slice() {
-                if let Some(holder) = pic.accounts().find(|a| a.account == p.from).map(|a| a.holder.clone()) {
+                if let Some(holder) = pic.accounts().find(|a| a.account == p.from).map(|a| a.holder) {
                     let code = last.refusal.as_ref().and_then(|r| serde_json::to_value(r.code).ok()).and_then(|v| v.as_str().map(String::from));
                     self.refusals.push(Note::new(
-                        vec![holder],
+                        vec![holder.to_string()],
                         format!("Payment of {} to {} (request {}) couldn't be made: {}.", money_words(p.amount, &world), p.to, p.instruction, refusal_text(code.as_deref())),
                         Some(&p.instruction),
                     ));
@@ -938,7 +940,7 @@ impl Actor for Bank {
             return r.action();
         }
         if !self.opens.is_empty() {
-            let me = pic.entity.clone();
+            let me = pic.entity;
             let n = self.opens.len().min(32);
             let calls: Vec<Call> = self.opens.drain(..n).map(|h| call("account", vec![("holder", Some(crate::steps::arg(&h))), ("at", Some(crate::steps::arg(&me)))])).collect();
             return act("Opening accounts people asked for.", calls);
@@ -960,7 +962,7 @@ impl Actor for Bank {
                 self.in_flight.push(p.clone());
             } else if let Some(a) = from {
                 // Not enough money: the payment isn't made, and the account holder is told.
-                blocks.push(message(std::slice::from_ref(&a.holder), &PAYMENT_FAILED::note(&money_words(p.amount, &world), &p.to, &p.instruction), Some(&p.instruction)));
+                blocks.push(message(std::slice::from_ref(&a.holder.to_string()), &PAYMENT_FAILED::note(&money_words(p.amount, &world), &p.to, &p.instruction), Some(&p.instruction)));
             }
             if p.single {
                 break;

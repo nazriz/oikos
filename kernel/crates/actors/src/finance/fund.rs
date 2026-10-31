@@ -142,7 +142,7 @@ impl Plan for Fund {
         let mut steps: Vec<Step<()>> = vec![];
         let register = self.book.open("fund_members").filter(|r| r.speaks_for.as_deref() == Some(&self.me)).max_by(|a, b| a.at.cmp(&b.at).then_with(|| crate::common::filed_before(&b.id, &a.id))).cloned();
         if let (None, Some(register)) = (&self.members, &register) {
-            let list: Vec<Member> = data(register).get("members").and_then(Value::as_array).map(|a| a.iter().filter_map(|m| serde_json::from_value(m.clone()).ok()).collect()).unwrap_or_default();
+            let list: Vec<Member> = data(register).get("members").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|m| oikos_core::frozen::from_frozen(m).ok()).collect()).unwrap_or_default();
             self.members = Some(list.into_iter().map(|m| (m.member.clone(), m)).collect());
         }
         let acc = own_account(pic);
@@ -152,7 +152,7 @@ impl Plan for Fund {
         }
         for r in self.book.all("departure") {
             if let Some(s) = &r.speaks_for {
-                self.away.insert(s.clone());
+                self.away.insert(s.to_string());
             }
         }
         // What has come in: what we hold beyond what is kept for members.

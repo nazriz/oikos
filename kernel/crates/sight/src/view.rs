@@ -30,7 +30,7 @@ pub struct Visit {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Seen {
     /// Its accounts in full (by id), and the transactions new since the last look.
-    Accounts { accounts: Arc<Vec<AccountItem>>, transactions: Vec<Transaction> },
+    Accounts { accounts: Arc<Vec<AccountItem>>, transactions: Vec<Arc<Transaction>> },
     /// What it holds where, in full (a holding gone to nothing drops out); what flows to it, and for an operator its
     /// network (foundations-2 C3), whole as last seen.
     Holdings { holdings: Arc<Vec<HoldingItem>>, connections: Arc<Vec<ConnectionItem>>, links: Arc<Vec<LinkItem>> },
@@ -88,12 +88,19 @@ impl Picture {
             _ => &[],
         })
     }
+    /// Every transaction new in this observation, as held: one copy shared with the world's queues and whoever keeps it.
+    pub fn transactions_held(&self) -> impl Iterator<Item = &Arc<Transaction>> {
+        self.channels.values().flat_map(|c| match c {
+            Seen::Accounts { transactions, .. } => transactions.as_slice(),
+            _ => &[],
+        })
+    }
     /// Every transaction new in this observation.
     pub fn transactions(&self) -> impl Iterator<Item = &Transaction> {
         self.channels.values().flat_map(|c| match c {
             Seen::Accounts { transactions, .. } => transactions.as_slice(),
             _ => &[],
-        })
+        }).map(|x| &**x)
     }
 }
 
@@ -162,33 +169,33 @@ impl View {
     /// returns the picture the actor reads. `entity`: whom it acts for in that capacity.
     pub fn apply(&mut self, obs: Observation, capacity: Option<&str>, entity: &str, woke_for: &str, since: i64) -> Picture {
         let mut channels: BTreeMap<Id, Seen> = BTreeMap::new();
-        let mut new_txs: BTreeMap<Id, Vec<Transaction>> = BTreeMap::new();
+        let mut new_txs: BTreeMap<Id, Vec<Arc<Transaction>>> = BTreeMap::new();
         let mut fresh_sites: BTreeSet<Id> = BTreeSet::new();
         for (full_id, ch) in obs.channels {
             let Some(id) = in_capacity(&full_id, capacity) else { continue };
             let id = id.to_string();
             match ch {
                 ChannelData::Accounts { accounts, transactions } => {
-                    let m = self.accounts.entry(id.clone()).or_default();
+                    let m = self.accounts.entry(id.clone().into()).or_default();
                     if !accounts.is_empty() {
-                        self.cache_accounts.remove(&id);
+                        self.cache_accounts.remove(id.as_str());
                     }
                     for a in accounts {
                         if a.closed == Some(true) {
                             m.remove(&a.account);
                         } else {
-                            m.insert(a.account.clone(), a);
+                            m.insert(a.account, a);
                         }
                     }
-                    new_txs.insert(id, transactions);
+                    new_txs.insert(id.into(), transactions);
                 }
                 ChannelData::Holdings { holdings, connections, links } => {
-                    if !connections.is_empty() || !links.is_empty() || self.flows.contains_key(&id) {
-                        self.flows.insert(id.clone(), (Arc::new(connections), Arc::new(links)));
+                    if !connections.is_empty() || !links.is_empty() || self.flows.contains_key(id.as_str()) {
+                        self.flows.insert(id.clone().into(), (Arc::new(connections), Arc::new(links)));
                     }
-                    let m = self.holdings.entry(id.clone()).or_default();
+                    let m = self.holdings.entry(id.clone().into()).or_default();
                     if !holdings.is_empty() {
-                        self.cache_holdings.remove(&id);
+                        self.cache_holdings.remove(id.as_str());
                     }
                     for h in holdings {
                         let k = format!("{}|{}", h.at, h.kind);
@@ -201,17 +208,17 @@ impl View {
                 }
                 ChannelData::Sites { as_of, cells, whole, visited } => {
                     let changed = !cells.is_empty() || whole == Some(true);
-                    let v = self.sites.entry(id.clone()).or_default();
+                    let v = self.sites.entry(id.clone().into()).or_default();
                     if whole == Some(true) {
                         v.cells = Arc::default();
                     }
                     v.as_of = as_of;
                     if visited == Some(true) {
-                        let m = self.visits.entry(id.clone()).or_default();
+                        let m = self.visits.entry(id.clone().into()).or_default();
                         for c in &cells {
-                            m.seen_at.insert(c.cell.clone(), as_of);
+                            m.seen_at.insert(c.cell, as_of);
                         }
-                        m.fresh = cells.iter().map(|c| c.cell.clone()).collect();
+                        m.fresh = cells.iter().map(|c| c.cell).collect();
                     }
                     if changed && !cells.is_empty() {
                         // (Put in place by cell, a cell seen again replacing what was seen of it; copied first only if
@@ -224,28 +231,28 @@ impl View {
                             }
                         }
                     }
-                    fresh_sites.insert(id);
+                    fresh_sites.insert(id.into());
                 }
                 ChannelData::Directory { entities, positions } => {
-                    let v = self.directories.entry(id.clone()).or_default();
+                    let v = self.directories.entry(id.clone().into()).or_default();
                     if !entities.is_empty() || !positions.is_empty() {
-                        self.cache_directories.remove(&id);
+                        self.cache_directories.remove(id.as_str());
                     }
                     for e in entities {
-                        v.entities.insert(e.entity.clone(), e);
+                        v.entities.insert(e.entity, e);
                     }
                     for p in positions {
-                        v.positions.insert(p.position.clone(), p);
+                        v.positions.insert(p.position, p);
                     }
                 }
                 ChannelData::OwnRecord { record } => {
-                    channels.insert(id, Seen::OwnRecord { record });
+                    channels.insert(id.into(), Seen::OwnRecord { record });
                 }
                 ChannelData::Records { records, search, whole } => {
                     if search == Some(true) {
-                        channels.insert(id, Seen::Records { records, search: true });
-                    } else if self.full.contains(&id) {
-                        let (list, at) = self.kept.entry(id).or_default();
+                        channels.insert(id.into(), Seen::Records { records, search: true });
+                    } else if self.full.contains(id.as_str()) {
+                        let (list, at) = self.kept.entry(id.into()).or_default();
                         if whole == Some(true) {
                             list.clear();
                             at.clear();
@@ -254,25 +261,25 @@ impl View {
                             match at.get(&r.id) {
                                 Some(&i) => list[i] = r,
                                 None => {
-                                    at.insert(r.id.clone(), list.len());
+                                    at.insert(r.id, list.len());
                                     list.push(r);
                                 }
                             }
                         }
                     } else {
-                        channels.insert(id, Seen::Records { records, search: false });
+                        channels.insert(id.into(), Seen::Records { records, search: false });
                     }
                 }
             }
         }
         for (id, m) in &self.accounts {
-            let accounts = self.cache_accounts.entry(id.clone()).or_insert_with(|| Arc::new(m.values().cloned().collect())).clone();
-            channels.insert(id.clone(), Seen::Accounts { accounts, transactions: new_txs.remove(id).unwrap_or_default() });
+            let accounts = self.cache_accounts.entry(*id).or_insert_with(|| Arc::new(m.values().cloned().collect())).clone();
+            channels.insert(*id, Seen::Accounts { accounts, transactions: new_txs.remove(id).unwrap_or_default() });
         }
         for (id, m) in &self.holdings {
-            let holdings = self.cache_holdings.entry(id.clone()).or_insert_with(|| Arc::new(m.values().cloned().collect())).clone();
+            let holdings = self.cache_holdings.entry(*id).or_insert_with(|| Arc::new(m.values().cloned().collect())).clone();
             let (connections, links) = self.flows.get(id).cloned().unwrap_or_default();
-            channels.insert(id.clone(), Seen::Holdings { holdings, connections, links });
+            channels.insert(*id, Seen::Holdings { holdings, connections, links });
         }
         for (id, v) in &self.sites {
             let cells = v.cells.clone();
@@ -281,18 +288,18 @@ impl View {
                 .visits
                 .get(id)
                 .map(|m| Visit { seen_at: m.seen_at.clone(), fresh: if fresh_sites.contains(id) { m.fresh.clone() } else { vec![] } });
-            channels.insert(id.clone(), Seen::Sites { as_of: v.as_of, cells, visit });
+            channels.insert(*id, Seen::Sites { as_of: v.as_of, cells, visit });
         }
         for (id, v) in &self.directories {
             let (entities, positions) = self
                 .cache_directories
-                .entry(id.clone())
+                .entry(*id)
                 .or_insert_with(|| (Arc::new(v.entities.values().cloned().collect()), Arc::new(v.positions.values().cloned().collect())))
                 .clone();
-            channels.insert(id.clone(), Seen::Directory { entities, positions });
+            channels.insert(*id, Seen::Directory { entities, positions });
         }
         for (id, (list, _)) in &self.kept {
-            channels.insert(id.clone(), Seen::Records { records: list.clone(), search: false });
+            channels.insert(*id, Seen::Records { records: list.clone(), search: false });
         }
         let as_position = match capacity {
             None | Some("self") => None,
@@ -302,8 +309,8 @@ impl View {
             participant: obs.participant,
             t: obs.t,
             status: obs.status,
-            entity: entity.to_string(),
-            as_position,
+            entity: entity.to_string().into(),
+            as_position: as_position.map(Into::into),
             body: obs.body,
             positions: obs.positions,
             outcomes: obs.outcomes,

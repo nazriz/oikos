@@ -259,17 +259,17 @@ impl Keeping {
         let mut best: Option<(i64, Listed)> = None;
         for r in self.book.all(BOOKS) {
             let d = data(r);
-            let Some(open) = d.get("open").and_then(Value::as_array) else { continue };
-            if d.get("office").and_then(Value::as_str) != Some(self.office.as_str()) {
+            let Some(open) = d.get("open").and_then(|x| x.as_array()) else { continue };
+            if d.get("office").and_then(|x| x.as_str()) != Some(self.office.as_str()) {
                 continue;
             }
-            let at = d.get("at").and_then(Value::as_i64).unwrap_or(r.at);
+            let at = d.get("at").and_then(|x| x.as_i64()).unwrap_or(r.at);
             if best.as_ref().is_some_and(|(t, _)| *t >= at) {
                 continue;
             }
             let mut m: Listed = BTreeMap::new();
             for x in open {
-                let (Some(what), Some(about), Some(says)) = (x.get("what").and_then(Value::as_str), x.get("about").and_then(Value::as_str), x.get("says").and_then(Value::as_str)) else { continue };
+                let (Some(what), Some(about), Some(says)) = (x.get("what").and_then(|x| x.as_str()), x.get("about").and_then(|x| x.as_str()), x.get("says").and_then(|x| x.as_str())) else { continue };
                 m.entry(what.to_string()).or_default().insert(about.to_string(), says.to_string());
             }
             best = Some((at, m));
@@ -327,7 +327,7 @@ pub struct StaffClerk {
 }
 
 fn staff_books(kind: &dyn Kind, ctx: &Ctx) -> Option<(String, Box<dyn OfficeBooks>)> {
-    if ctx.params.get("part").and_then(Value::as_str) != Some("staff") {
+    if ctx.params.get("part").and_then(|x| x.as_str()) != Some("staff") {
         return None;
     }
     let office = office_of(ctx.position.as_deref());

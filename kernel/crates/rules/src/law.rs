@@ -8,7 +8,8 @@
 //!   whoever reads the first reads the second. Nothing here knows any particular law.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use oikos_core::Frozen;
+use serde_json::Value;
 use std::collections::BTreeMap;
 
 const DAY: i64 = 86_400;
@@ -323,10 +324,10 @@ pub fn draft_law(schedule_id: &str, s: &LawSchedule, values: &BTreeMap<String, i
 }
 
 /// A law's figures as its data carries them (`data.figures`), as plain values in the unit each is held in.
-pub fn figures_of(data: &Value) -> BTreeMap<String, i64> {
+pub fn figures_of(data: &Frozen) -> BTreeMap<String, i64> {
     data.get("figures")
-        .and_then(Value::as_object)
-        .map(|m: &Map<String, Value>| m.iter().filter_map(|(k, v)| v.get("value").and_then(Value::as_i64).map(|x| (k.clone(), x))).collect())
+        .and_then(|x| x.as_object())
+        .map(|m| m.iter().filter_map(|(k, v)| v.get("value").and_then(|x| x.as_i64()).map(|x| (k.to_string(), x))).collect())
         .unwrap_or_default()
 }
 

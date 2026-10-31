@@ -157,25 +157,25 @@ impl World {
     pub fn new(loaded: &LoadedConfig) -> Result<World, String> {
         let c = &*loaded.config;
         let w = &c.world;
-        let currency = w.currencies[0].code.clone();
-        let cur_of = |a: &crate::config::AccountCfg| a.currency.clone().unwrap_or_else(|| currency.clone());
+        let currency = w.currencies[0].code;
+        let cur_of = |a: &crate::config::AccountCfg| a.currency.unwrap_or(currency);
         let mut boundary_accounts = BTreeMap::new();
         for a in w.accounts.iter().filter(|a| w.boundaries.contains(&a.holder) && a.custodian == a.holder) {
-            boundary_accounts.entry((a.holder.clone(), cur_of(a))).or_insert_with(|| a.id.clone());
+            boundary_accounts.entry((a.holder, cur_of(a))).or_insert_with(|| a.id);
         }
         let s = Statics {
-            types: c.catalogue.structure_types.iter().map(|t| (t.id.clone(), t.clone())).collect(),
+            types: c.catalogue.structure_types.iter().map(|t| (t.id, t.clone())).collect(),
             spaces: c
                 .catalogue
                 .structure_types
                 .iter()
-                .map(|t| (t.id.clone(), crate::config::spaces_of(t).into_iter().map(|(l, sp)| (l, sp.clone())).collect()))
+                .map(|t| (t.id, crate::config::spaces_of(t).into_iter().map(|(l, sp)| (Id::from(l), sp.clone())).collect()))
                 .collect(),
-            templates: c.templates.iter().map(|t| (t.id.clone(), t.clone())).collect(),
-            boundaries: w.boundaries.clone(),
+            templates: c.templates.iter().map(|t| (t.id, t.clone())).collect(),
+            boundaries: w.boundaries.iter().map(|x| Id::new(x)).collect(),
             detailed: crate::config::detailed_rects(&w.places),
             boundary_accounts,
-            currency: currency.clone(),
+            currency: currency.to_string().into(),
             tick: c.clock.tick_seconds,
             // (A system template's own rows and hours, made into one table at load: law 10, foundations-2 P1.)
             act_times: c.templates.iter().filter(|t| t.kind == ParticipantKind::System).fold(oikos_time::ActTimes::from_orchestration(&c.orchestration), |a, t| {
@@ -194,14 +194,14 @@ impl World {
             participant_at: {
                 let mut at = BTreeMap::new();
                 for (i, x) in c.participants.iter().enumerate() {
-                    at.entry(x.id.clone()).or_insert(i);
+                    at.entry(x.id).or_insert(i);
                 }
                 at
             },
             record_keeping_at: {
                 let mut at = BTreeMap::new();
                 for (i, x) in c.positions.iter().enumerate().filter(|(_, x)| x.keeps_record) {
-                    at.entry(x.entity.clone()).or_insert(i);
+                    at.entry(x.entity).or_insert(i);
                 }
                 at
             },
@@ -218,7 +218,7 @@ impl World {
                 // (A parent named twice has the child once.)
                 if !seen.contains(&parent.as_str()) {
                     seen.push(parent);
-                    children_of.entry(parent).or_default().push(child.id.clone());
+                    children_of.entry(parent).or_default().push(child.id);
                 }
             }
         }
@@ -246,17 +246,17 @@ impl World {
                         alive: true,
                         parents: e.parents.clone().unwrap_or_default(),
                         conditions: vec![],
-                        participant: person_of.get(e.id.as_str()).map(|p| p.to_string()),
+                        participant: (person_of.get(e.id.as_str()).map(|p| p.to_string())).map(Into::into),
                         variables: crate::state::body_variables(&c.catalogue, e.variables.as_ref(), 0),
                     });
-                    (e.id.clone(), Entity { kind: e.kind.clone(), name: e.name.clone(), changed: 0, moved: 0, body })
+                    (e.id, Entity { kind: e.kind.clone(), name: e.name.clone(), changed: 0, moved: 0, body })
                 })
                 .collect(),
-            accounts: w.accounts.iter().map(|a| (a.id.clone(), Arc::new(Account { holder: a.holder.clone(), custodian: a.custodian.clone(), currency: cur_of(a), balance: a.balance, changed: 0 }))).collect(),
+            accounts: w.accounts.iter().map(|a| (a.id, Arc::new(Account { holder: a.holder, custodian: a.custodian, currency: cur_of(a), balance: a.balance, changed: 0 }))).collect(),
             holdings: w
                 .holdings
                 .iter()
-                .map(|x| (crate::state::holding_key(&x.holder, &x.at, &x.kind), crate::state::Holding { kind: x.kind.clone(), holder: x.holder.clone(), at: x.at.clone(), quantity: x.quantity, changed: 0 }))
+                .map(|x| (crate::state::holding_key(&x.holder, &x.at, &x.kind), crate::state::Holding { kind: x.kind, holder: x.holder, at: x.at, quantity: x.quantity, changed: 0 }))
                 .collect(),
             closed_accounts: crate::state::Map::new(),
             cells,
@@ -275,13 +275,13 @@ impl World {
                 .iter()
                 .map(|p| {
                     (
-                        p.id.clone(),
+                        p.id,
                         Arc::new(Participant {
                             kind: p.kind,
-                            person: p.person.clone(),
-                            owner: p.owner.clone(),
-                            template: p.template.clone(),
-                            supplier: p.supplier.clone(),
+                            person: p.person,
+                            owner: p.owner,
+                            template: p.template,
+                            supplier: p.supplier,
                             def: Arc::new(ParticipantDef {
                                 title: p.title.clone(),
                                 channels: p.channels.clone(),
@@ -307,7 +307,7 @@ impl World {
             schedule: Default::default(),
             timelines: Default::default(),
             nature: None,
-            totals: c.catalogue.counters.iter().map(|x| (x.id.clone(), 0)).collect(),
+            totals: c.catalogue.counters.iter().map(|x| (x.id, 0)).collect(),
             flooded: Default::default(),
             takings: vec![],
             asks_held: Default::default(),
@@ -316,27 +316,27 @@ impl World {
                 .travel
                 .iter()
                 .flat_map(|t| t.vehicles.iter())
-                .map(|v| (v.id.clone(), crate::state::Vehicle { type_: v.type_.clone(), owner: v.owner.clone(), at: v.at.clone() }))
+                .map(|v| (v.id, crate::state::Vehicle { type_: v.type_, owner: v.owner, at: v.at }))
                 .collect(),
             transit: Default::default(),
             network: None,
             scarce_sold: BTreeMap::new(),
         };
         for p in &c.positions {
-            let position = Position { entity: p.entity.clone(), title: p.title.clone(), role: p.role.clone(), channels: Arc::new(p.channels.clone()), role_module: p.role_module.clone(), holder: p.holder.clone(), changed: 0 };
-            st.add_position(p.id.clone(), position);
+            let position = Position { entity: p.entity, title: p.title.clone(), role: p.role.clone(), channels: Arc::new(p.channels.clone()), role_module: p.role_module.clone(), holder: p.holder, changed: 0 };
+            st.add_position(p.id, position);
         }
         for x in &w.structures {
-            let f = s.types[&x.structure_type].footprint;
+            let f = s.types[x.structure_type.as_str()].footprint;
             let cells = crate::config::footprint_cells(&crate::config::detailed_rects(&w.places), &x.at, f).expect("validated");
             for cell in &cells {
-                st.cells.get_mut(cell).unwrap().structure = Some(x.id.clone());
+                st.cells.get_mut(cell).unwrap().structure = Some(x.id);
             }
-            st.structures.insert(x.id.clone(), Structure {
-                    at: x.at.clone(),
+            st.structures.insert(x.id, Structure {
+                    at: x.at,
                     cells,
-                    structure_type: x.structure_type.clone(),
-                    built_by: x.built_by.clone(),
+                    structure_type: x.structure_type,
+                    built_by: x.built_by,
                     complete: true,
                     completes_at: None,
                     labour_done: 0,
@@ -347,7 +347,7 @@ impl World {
                         if let Some(given) = &x.variables {
                             for cfg in crate::exec::vars_for(&s, &x.structure_type) {
                                 if let Some(g) = given.get(&cfg.id) {
-                                    v.insert(cfg.id.clone(), ((*g).clamp(cfg.min, cfg.max), 0));
+                                    v.insert(cfg.id, ((*g).clamp(cfg.min, cfg.max), 0));
                                 }
                             }
                         }
@@ -366,10 +366,10 @@ impl World {
         if s.nature.is_some() {
             let mut n = oikos_nature::NatureState::default();
             for p in &w.populations {
-                *n.populations.entry(p.species.clone()).or_default().entry(p.cell.clone()).or_insert(0) += p.count;
+                *n.populations.entry(p.species).or_default().entry(p.cell).or_insert(0) += p.count;
             }
             for f in &w.fields {
-                n.fields.entry(f.field.clone()).or_default().insert(f.cell.clone(), f.value);
+                n.fields.entry(f.field).or_default().insert(f.cell, f.value);
             }
             // (Spun up: days before the start, over the land as it starts; covers don't succeed meanwhile.)
             if w.nature_spin_up_days > 0 {
@@ -391,7 +391,7 @@ impl World {
             st.schedule(30 * 86_400, crate::state::Sched::CounterCensus);
         }
         // Bodies age from the start.
-        let people: Vec<(Id, i64)> = st.entities.iter().filter_map(|(id, e)| e.body.as_ref().map(|b| (id.clone(), b.born_at))).collect();
+        let people: Vec<(Id, i64)> = st.entities.iter().filter_map(|(id, e)| e.body.as_ref().map(|b| (*id, b.born_at))).collect();
         for (id, born) in people {
             schedule_birthday(&s, &mut st, &id, born);
         }
@@ -534,7 +534,7 @@ impl World {
     /// `precheck`, for a caller that has the command's JSON (`serde_json::to_value` of it) already.
     pub fn precheck_as(&self, cmd: &Command, body: &Value) -> Result<(), ProtocolError> {
         canon::check_integers(body).map_err(|e| ProtocolError(e.to_string()))?;
-        crate::contracts::check(&crate::contracts::contracts().command, body).map_err(|e| ProtocolError(format!("command {e}")))?;
+        crate::contracts::check(&crate::contracts::contracts().command(), body).map_err(|e| ProtocolError(format!("command {e}")))?;
         self.precheck_in_world(cmd)
     }
 
@@ -692,7 +692,7 @@ impl World {
                 let chain = canon::hash_with_domain(canon::DOMAIN_ENTITY_RECORD, &link);
                 let digest = canon::hash_with_domain(canon::DOMAIN_ENTITY_RECORD, &canon::canonical(&sections).map_err(|e| ProtocolError(e.to_string()))?);
                 let changed = self.state.stamp();
-                self.state.entity_records.insert(entity.clone(), Arc::new(crate::state::EntityRecord { n, at: t, chain: chain.clone(), sections, changed }));
+                self.state.entity_records.insert(entity, Arc::new(crate::state::EntityRecord { n, at: t, chain: chain.clone(), sections, changed }));
                 Output { events: vec![Timed::new(t, EventBody::EntityRecorded { entity, n, chain, digest, keeper: Some(keeper) })] }
             }
             Command::OptOut { participant, statement } => {
@@ -702,7 +702,7 @@ impl World {
                 p.status = ParticipantStatus::OptedOut;
                 p.status_changed = c;
                 let vacant = p.def.vacant_after_opt_out();
-                let mut events = vec![Timed::new(t, EventBody::ParticipantOptedOut { participant: participant.clone(), statement: statement.clone() })];
+                let mut events = vec![Timed::new(t, EventBody::ParticipantOptedOut { participant: *participant, statement: statement.clone() })];
                 // Without a stand-in, nobody is there to act in its positions any more.
                 if vacant {
                     let held: Vec<Id> = self.state.held_by(participant).into_iter().cloned().collect();
@@ -727,9 +727,9 @@ impl World {
                 let Some(entity) = p.person.as_ref() else { return perr(format!("{participant} is not a person: it has no record of its own")) };
                 let named = self.s.participant_at.get(participant).and_then(|i| self.s.config.participants[*i].record_keeper.as_deref());
                 debug_assert_eq!(named, self.s.config.participants.iter().find(|x| x.id == participant).and_then(|x| x.record_keeper.as_deref()));
-                let coded = (p.def.controller.get("type").and_then(Value::as_str) == Some("code")).then(|| p.def.controller.get("impl").and_then(Value::as_str)).flatten();
+                let coded = (p.def.controller.get("type").and_then(|x| x.as_str()) == Some("code")).then(|| p.def.controller.get("impl").and_then(|x| x.as_str())).flatten();
                 match named.or(coded) {
-                    Some(k) => Ok((entity.clone(), k.to_string())),
+                    Some(k) => Ok((*entity, k.to_string())),
                     None => perr(format!("{entity} has no bookkeeping named for its record: nothing can set it")),
                 }
             }
@@ -754,23 +754,23 @@ impl World {
                     if pos.holder.as_deref() != Some(participant) {
                         return perr(format!("{participant} does not hold the post that keeps the record of {org}"));
                     }
-                    return Ok((org.to_string(), keeper.to_string()));
+                    return Ok((org.to_string().into(), keeper.to_string()));
                 };
                 let Some(keeper) = keeping.record_keeper_name() else { return perr(format!("{org} has no bookkeeping named for its record: nothing can set it")) };
                 let holds = self.state.positions.get(&keeping.id).is_some_and(|x| x.holder.as_deref() == Some(participant));
                 if !holds {
                     return perr(format!("{participant} does not hold the post that keeps the record of {org}"));
                 }
-                Ok((org.to_string(), keeper.to_string()))
+                Ok((org.to_string().into(), keeper.to_string()))
             }
         }
     }
 
     /// An entity's record with these sections set: those given in place of those of the same name, the rest as they stand.
-    fn merged_record(&self, entity: &str, set: &BTreeMap<String, Value>) -> BTreeMap<String, Value> {
+    fn merged_record(&self, entity: &str, set: &BTreeMap<String, Value>) -> BTreeMap<Id, crate::blocks::Frozen> {
         let mut sections = self.state.entity_records.get(entity).map(|r| r.sections.clone()).unwrap_or_default();
         for (k, v) in set {
-            sections.insert(k.clone(), v.clone());
+            sections.insert(Id::new(k), crate::blocks::Frozen::of(v));
         }
         sections
     }
@@ -808,13 +808,13 @@ impl World {
             if at.starts_with('$') || on.starts_with('$') {
                 continue;
             }
-            let Some(m) = self.state.occupancy.get(at) else { continue };
+            let Some(m) = self.state.occupancy.get(at.as_str()) else { continue };
             if self.state.body(on).is_some() {
-                if m.values().any(|bodies| bodies.contains(on)) {
-                    out.insert(on.clone(), vec![on.clone()]);
+                if m.values().any(|bodies| bodies.contains(on.as_str())) {
+                    out.insert(Id::new(on), vec![Id::new(on)]);
                 }
-            } else if let Some(bodies) = m.get(on) {
-                out.insert(on.clone(), bodies.iter().filter(|x| !performers.contains(x)).cloned().collect());
+            } else if let Some(bodies) = m.get(on.as_str()) {
+                out.insert(Id::new(on), bodies.iter().filter(|x| !performers.iter().any(|p| *x== p)).cloned().collect());
             }
         }
         out
@@ -849,13 +849,13 @@ impl World {
 
     /// An act begun: its actor is busy with it for the time it takes (the world's `act_time`), after any thinking, and
     /// it takes effect when done (docs/design/rebuild.md 6.2, 6.3).
-    fn begin(&mut self, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], thinking: i64, again: Option<Id>) -> Output {
-        let action = again.clone().unwrap_or_else(|| self.state.mint("act"));
+    fn begin(&mut self, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], thinking: i64, again: Option<crate::blocks::Passing>) -> Output {
+        let action = again.clone().unwrap_or_else(|| self.state.mint_passing("act"));
         let t = self.state.t;
         let p = &self.state.participants[participant];
         let (actor, key, lanes) = match p.kind {
-            ParticipantKind::Person => (oikos_time::Actor::Person, p.person.clone().unwrap_or_else(|| participant.into()), 1),
-            ParticipantKind::System => (oikos_time::Actor::System, participant.to_string(), p.def.lanes.unwrap_or(1) as usize),
+            ParticipantKind::Person => (oikos_time::Actor::Person, p.person.unwrap_or_else(|| participant.into()), 1),
+            ParticipantKind::System => (oikos_time::Actor::System, Id::new(participant), p.def.lanes.unwrap_or(1) as usize),
         };
         // (Going somewhere takes the trip: the longest of the act's moves, from where each body is to the building it's
         // going to. Literal ids only: a body or space made in the act itself is going nowhere yet.)
@@ -863,7 +863,7 @@ impl World {
             .iter()
             .filter_map(|b| match b {
                 Block::Occupy { space, who } if !space.starts_with('$') && !who.as_deref().is_some_and(|w| w.starts_with('$')) => {
-                    let body = who.clone().or_else(|| p.person.clone())?;
+                    let body = who.clone().or_else(|| p.person.map(|x| x.to_string()))?;
                     let (to, _) = crate::config::split_space(space)?;
                     let from = self.state.structures_of(&body).into_iter().next()?;
                     Some(crate::travel::seconds(&self.s, &self.state, &from, to))
@@ -874,14 +874,14 @@ impl World {
             .unwrap_or(0);
         // (A system's own rows first, from its template; then the world's table for its kind; then a default the world
         // states. Nobody's: the act is refused, `unpriced`.)
-        let template_of = |state: &State, w: &str| state.participants.get(w).filter(|x| x.kind == ParticipantKind::System).and_then(|x| x.template.clone());
+        let template_of = |state: &State, w: &str| state.participants.get(w).filter(|x| x.kind == ParticipantKind::System).and_then(|x| x.template);
         let own_program = self.s.act_times.program(actor, template_of(&self.state, participant).as_deref(), blocks.iter().map(|b| (b.name(), b.makes())));
         let seconds = own_program.clone().unwrap_or(0) + trip;
         let ready = t + thinking;
         // Who else does the act's work (F3): the action's `by`, a person other than the actor. The act's own time is theirs,
         // shared (the actor, if it is among them, takes a share; if not, only the second of ordering it).
         // (Someone the actor may not direct is refused when the act is done, and is charged nothing for it.)
-        let entity = position.and_then(|x| self.state.positions.get(x)).map(|x| x.entity.clone()).or_else(|| p.person.clone());
+        let entity = position.and_then(|x| self.state.positions.get(x)).map(|x| x.entity).or_else(|| p.person);
         let others: Vec<Id> = by
             .iter()
             .filter(|w| **w != key && *w != participant)
@@ -896,8 +896,8 @@ impl World {
         let program_of = |state: &State, w: &str| self.s.act_times.program(kind_of(state, w), template_of(state, w).as_deref(), blocks.iter().map(|b| (b.name(), b.makes())));
         let actor_in = by.iter().any(|w| *w == key || w == participant);
         // (An act nobody priced for whoever is to do it: nobody's time is taken, and it is refused when due, now.)
-        let unpriced = if others.is_empty() || actor_in { own_program.as_ref().err().map(|k| (participant.to_string(), k.clone())) } else { None }
-            .or_else(|| others.iter().find_map(|w| program_of(&self.state, w).err().map(|k| (w.clone(), k))))
+        let unpriced = if others.is_empty() || actor_in { own_program.as_ref().err().map(|k| (Id::new(participant), k.clone())) } else { None }
+            .or_else(|| others.iter().find_map(|w| program_of(&self.state, w).err().map(|k| (*w, k))))
             .map(|(who, k)| {
                 let what = if kind_of(&self.state, &who) == oikos_time::Actor::System { "a system" } else { "a person" };
                 format!("nobody priced {k} for {who}: the world's table of work has no row for it for {what}{}, and states no default", if what == "a system" { " and its template none" } else { "" })
@@ -905,12 +905,12 @@ impl World {
         if let Some(why) = unpriced {
             let pos = position.map(String::from);
             let placed = crate::state::Placed { unpriced: Some(why), day: crate::exec::day_of(ready), ..Default::default() };
-            self.state.schedule(ready, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone(), blocks: blocks.to_vec(), by: by.to_vec(), placed });
-            return Output { events: vec![Timed::new(t, EventBody::ActionStarted { action, participant: participant.into(), position: pos, starts: ready, done: ready, free: None })] };
+            self.state.schedule(ready, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone().map(Into::into), blocks: blocks.to_vec(), by: by.to_vec(), placed });
+            return Output { events: vec![Timed::new(t, EventBody::ActionStarted { action, participant: participant.into(), position: pos.map(Into::into), starts: ready, done: ready, free: None })] };
         }
         let seconds_of = |state: &State, w: &str| program_of(state, w).unwrap_or(0) + trip;
         let n = others.len() as i64 + i64::from(actor_in);
-        let by_shares: Vec<(Id, i64)> = others.iter().map(|w| (w.clone(), (seconds_of(&self.state, w) + n - 1) / n)).collect();
+        let by_shares: Vec<(Id, i64)> = others.iter().map(|w| (*w, (seconds_of(&self.state, w) + n - 1) / n)).collect();
         let only_orders = !others.is_empty() && !actor_in;
         let actor_seconds = if others.is_empty() {
             seconds
@@ -939,7 +939,7 @@ impl World {
             }
         }
         for (w, share) in &by_shares {
-            *shares.entry(w.clone()).or_insert(0) += share;
+            *shares.entry(*w).or_insert(0) += share;
         }
         // (A system's lanes work within its template's hours, law 10: it is free for this from the next moment of work.)
         let free_from = |tl: Option<&crate::state::Timeline>, (lanes, hours): (usize, Option<oikos_time::Hours>)| -> i64 {
@@ -976,10 +976,10 @@ impl World {
                         continue;
                     }
                     let space = self.s.config.catalogue.tasks.iter().find(|x| x.id == *task).and_then(|x| x.in_space.clone());
-                    v.extend(performers.iter().map(|w| crate::state::WorkCheck { who: w.clone(), at: Some(at.clone()), space: space.clone() }));
+                    v.extend(performers.iter().map(|w| crate::state::WorkCheck { who: w.clone().into(), at: Some(at.clone().into()), space: space.clone() }));
                 }
             }
-            v.extend(others.iter().map(|w| crate::state::WorkCheck { who: w.clone(), at: None, space: None }));
+            v.extend(others.iter().map(|w| crate::state::WorkCheck { who: *w, at: None, space: None }));
             v
         };
         let placed = crate::state::Placed { over, day: day_idx, from: start, hours: shares.clone(), seen: self.seen_at_order(blocks), late, unpriced: None };
@@ -992,7 +992,7 @@ impl World {
                     tl.add_worked(d, take);
                 }
             }
-            state.timelines.insert(who.clone(), tl);
+            state.timelines.insert(*who, tl);
             d
         };
         let own = shares.get(&key).copied().unwrap_or(0);
@@ -1009,15 +1009,15 @@ impl World {
         let starts = start;
         let free = (own_done < done).then_some(own_done);
         let pos = position.map(String::from);
-        let seq = self.state.schedule(done, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone(), blocks: blocks.to_vec(), by: by.to_vec(), placed: placed.clone() });
+        let seq = self.state.schedule(done, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone().map(Into::into), blocks: blocks.to_vec(), by: by.to_vec(), placed: placed.clone() });
         if !checks.is_empty() {
-            self.state.schedule(start, crate::state::Sched::Start { action: action.clone(), participant: participant.into(), position: pos.clone(), done, seq, checks, placed });
+            self.state.schedule(start, crate::state::Sched::Start { action: action.clone(), participant: participant.into(), position: pos.clone().map(Into::into), done, seq, checks, placed });
         }
-        Output { events: vec![Timed::new(t, EventBody::ActionStarted { action, participant: participant.into(), position: pos, starts, done, free })] }
+        Output { events: vec![Timed::new(t, EventBody::ActionStarted { action, participant: participant.into(), position: pos.map(Into::into), starts, done, free })] }
     }
 
     /// An act done: applied now, as a whole (or refused), and its outcome delivered at the actor's next observation.
-    fn act(&mut self, action: Id, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], placed: crate::state::Placed) -> Output {
+    fn act(&mut self, action: crate::blocks::Passing, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], placed: crate::state::Placed) -> Output {
         let t = self.state.t;
         // Work the dry run could not place when the act began (a performer or an input not there until it was): its hours are
         // the performers' time, and its effect never comes before them. Now that it can be done, it is begun again, from now: the
@@ -1070,7 +1070,7 @@ impl World {
                     for (d, take) in day_portions(t, *secs) {
                         tl.add_worked(d, take);
                     }
-                    self.state.timelines.insert(who.clone(), tl);
+                    self.state.timelines.insert(*who, tl);
                 }
                 let created = (!res.created.is_empty()).then_some(res.created);
                 // Who did it: whom the action named, else those a work named, else the actor itself.
@@ -1082,7 +1082,7 @@ impl World {
                         if let EventBody::Worked { performers, .. } = &e.event.body {
                             for p in performers {
                                 if !v.contains(p) {
-                                    v.push(p.clone());
+                                    v.push(*p);
                                 }
                             }
                         }
@@ -1092,14 +1092,14 @@ impl World {
                     }
                     v
                 };
-                let mut events = vec![Timed::new(t, EventBody::ActionApplied { action: action.clone(), participant: participant.into(), position: pos.clone(), by: applied_by, created: created.clone() })];
+                let mut events = vec![Timed::new(t, EventBody::ActionApplied { action: action.clone(), participant: participant.into(), position: pos.clone().map(Into::into), by: applied_by, created: created.clone() })];
                 events.extend(res.events);
                 (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None, surveyed: res.surveyed, investigated: res.investigated, seen: res.seen })
             }
             Err(r) => (
                 vec![Timed::new(
                     t,
-                    EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone(), block: r.block, code: r.code, detail: r.detail.clone() },
+                    EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone().map(Into::into), block: r.block, code: r.code, detail: r.detail.clone() },
                 )],
                 Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None, seen: vec![] },
             ),
@@ -1125,14 +1125,14 @@ impl World {
     /// now. If one is not at work, the act is refused now: nobody's time is kept for it, and it is not applied later
     /// (foundations F3; F1 had found that the check at the end refuses work its performers had begun).
     #[allow(clippy::too_many_arguments)]
-    fn start_check(&mut self, action: Id, participant: &str, position: Option<&str>, done: i64, seq: u64, checks: &[crate::state::WorkCheck], placed: &crate::state::Placed) -> Output {
+    fn start_check(&mut self, action: crate::blocks::Passing, participant: &str, position: Option<&str>, done: i64, seq: u64, checks: &[crate::state::WorkCheck], placed: &crate::state::Placed) -> Output {
         let t = self.state.t;
         let failed = checks.iter().find_map(|c| crate::exec::check_at_work(&self.s, &self.state, &c.who, c.at.as_deref(), c.space.as_deref()).err());
         let Some(r) = failed else { return Output::default() };
         self.state.schedule.remove(done, seq);
         self.give_back(placed);
         // (Their time, placed to the end of the work, is given back from now.)
-        let actor_key = self.state.participants[participant].person.clone().unwrap_or_else(|| participant.into());
+        let actor_key = self.state.participants[participant].person.unwrap_or_else(|| participant.into());
         for k in placed.hours.keys().chain(std::iter::once(&actor_key)) {
             if let Some(tl) = self.state.timelines.get_mut(k) {
                 for lane in tl.lanes.iter_mut().filter(|l| **l == done) {
@@ -1141,7 +1141,7 @@ impl World {
             }
         }
         let pos = position.map(String::from);
-        let ev = Timed::new(t, EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone(), block: None, code: r.code, detail: r.detail.clone() });
+        let ev = Timed::new(t, EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone().map(Into::into), block: None, code: r.code, detail: r.detail.clone() });
         let out = Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None, seen: vec![] };
         Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(pos.unwrap_or_else(|| SELF.into())).or_default().outcomes.push(out);
         Output { events: vec![ev] }
@@ -1191,15 +1191,15 @@ impl World {
         let mut outcomes = vec![];
         let mut inbox = vec![];
         let mut visits = vec![];
-        let keys: Vec<Id> = p.pending.keys().filter(|k| only.is_none_or(|o| o == k.as_str())).cloned().collect();
+        let keys: Vec<Id> = p.pending.keys().filter(|k| only.is_none_or(|o| o == k.as_str())).cloned().map(Into::into).collect();
         for k in keys {
-            if let Some(mut x) = p.pending.remove(&k) {
+            if let Some(mut x) = p.pending.remove(k.as_str()) {
                 outcomes.append(&mut x.outcomes);
                 inbox.append(&mut x.inbox);
                 visits.append(&mut x.visits);
                 // (A question still out, or an answer not yet looked through, stays: it is not something delivered.)
                 if !x.asked.is_empty() || !x.asks.is_empty() {
-                    p.pending.insert(k, crate::state::Pending { asked: x.asked, asks: x.asks, ..Default::default() });
+                    p.pending.insert(k.to_string(), crate::state::Pending { asked: x.asked, asks: x.asks, ..Default::default() });
                 }
             }
         }
@@ -1243,26 +1243,26 @@ impl World {
         let t = self.state.t;
         let mut best: Option<(i64, Id, i64)> = None; // (done, performer, seconds)
         for post in self.state.positions_of.get(keeper).into_iter().flatten() {
-            let Some(holder) = self.state.positions.get(post).and_then(|x| x.holder.clone()) else { continue };
+            let Some(holder) = self.state.positions.get(post).and_then(|x| x.holder) else { continue };
             let Some(p) = self.state.participants.get(&holder) else { continue };
             if p.status != ParticipantStatus::Active {
                 continue;
             }
             let (tl_key, lanes, actor) = match p.kind {
                 ParticipantKind::Person => {
-                    let Some(person) = p.person.clone() else { continue };
+                    let Some(person) = p.person else { continue };
                     if crate::exec::check_at_work(&self.s, &self.state, &person, None, None).is_err() {
                         continue;
                     }
                     (person, 1, oikos_time::Actor::Person)
                 }
-                ParticipantKind::System => (holder.clone(), p.def.lanes.unwrap_or(1) as usize, oikos_time::Actor::System),
+                ParticipantKind::System => (holder, p.def.lanes.unwrap_or(1) as usize, oikos_time::Actor::System),
             };
             let seconds = self.s.act_times.row(actor, &format!("answer/{id}")).or_else(|| self.s.act_times.row(actor, "answer"));
             let Some(seconds) = seconds.filter(|s| *s > 0) else { continue };
             let mut lanes_now = self.state.timelines.get(&tl_key).map(|x| x.lanes.clone()).unwrap_or_default();
             let (start, done) = oikos_time::place_within(&mut lanes_now, lanes, t, seconds, self.lane_hours(&tl_key));
-            if actor == oikos_time::Actor::Person && self.over_the_day(&BTreeMap::from([(tl_key.clone(), seconds)]), start).is_some() {
+            if actor == oikos_time::Actor::Person && self.over_the_day(&BTreeMap::from([(tl_key, seconds)]), start).is_some() {
                 continue; // (their working day is full: not on duty)
             }
             if best.as_ref().is_none_or(|b| (done, &holder) < (b.0, &b.1)) {
@@ -1278,8 +1278,8 @@ impl World {
         let t = self.state.t;
         let p = &self.state.participants[&performer];
         let (tl_key, lanes, person) = match p.kind {
-            ParticipantKind::Person => (p.person.clone().unwrap_or_else(|| performer.clone()), 1, true),
-            ParticipantKind::System => (performer.clone(), p.def.lanes.unwrap_or(1) as usize, false),
+            ParticipantKind::Person => (p.person.unwrap_or(performer), 1, true),
+            ParticipantKind::System => (performer, p.def.lanes.unwrap_or(1) as usize, false),
         };
         let mut timeline = self.state.timelines.get(&tl_key).cloned().unwrap_or_default();
         let hours = self.lane_hours(&tl_key);
@@ -1290,13 +1290,13 @@ impl World {
             }
         }
         self.state.timelines.insert(tl_key, timeline);
-        self.state.schedule(done, crate::state::Sched::Answer { participant: participant.into(), position: position.clone(), look: look.clone() });
-        let key = position.clone().unwrap_or_else(|| SELF.to_string());
-        let pending = Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(key).or_default();
+        self.state.schedule(done, crate::state::Sched::Answer { participant: participant.into(), position, look: look.clone() });
+        let key = position.unwrap_or_else(|| SELF.to_string().into());
+        let pending = Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(key.to_string()).or_default();
         if !pending.asked.contains(&look.channel) {
-            pending.asked.push(look.channel.clone());
+            pending.asked.push(look.channel);
         }
-        Timed::new(t, EventBody::AskStarted { participant: participant.into(), position, channel: look.channel.clone(), keeper, by: performer, starts, done })
+        Timed::new(t, EventBody::AskStarted { participant: participant.into(), position, channel: look.channel, keeper, by: performer, starts, done })
     }
 
     /// The questions a look puts to a register's keeper (a channel of `way: ask` whose keeper is an organisation with posts, and a
@@ -1323,12 +1323,12 @@ impl World {
             }
             let position = (key != SELF).then(|| key.clone());
             match self.ask_performer(&keeper, id) {
-                Some((performer, seconds)) => events.push(self.place_ask(participant, position, l, keeper, performer, seconds)),
+                Some((performer, seconds)) => { events.push(self.place_ask(participant, position.map(Into::into), l, keeper, performer, seconds))}
                 None => {
                     let first = self.state.asks_held.is_empty();
-                    Arc::make_mut(&mut self.state.asks_held).push(crate::state::HeldAsk { participant: participant.into(), position, keeper, look: l.clone() });
+                    Arc::make_mut(&mut self.state.asks_held).push(crate::state::HeldAsk { participant: participant.into(), position: position.map(Into::into), keeper, look: l.clone() });
                     let pending = Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(key).or_default();
-                    pending.asked.push(l.channel.clone());
+                    pending.asked.push(l.channel);
                     if first {
                         self.state.schedule(self.state.t + 3_600, crate::state::Sched::HeldAsks);
                     }
@@ -1350,7 +1350,7 @@ impl World {
             }
             let id = h.look.channel.rsplit('/').next().unwrap_or_default().to_string();
             match self.ask_performer(&h.keeper, &id) {
-                Some((performer, seconds)) => events.push(self.place_ask(&h.participant, h.position.clone(), &h.look, h.keeper.clone(), performer, seconds)),
+                Some((performer, seconds)) => events.push(self.place_ask(&h.participant, h.position, &h.look, h.keeper, performer, seconds)),
                 None => Arc::make_mut(&mut self.state.asks_held).push(h),
             }
         }
@@ -1368,13 +1368,13 @@ impl World {
             return vec![];
         }
         let p = Arc::make_mut(self.state.participants.get_mut(participant).unwrap());
-        let keys: Vec<Id> = p.pending.keys().filter(|k| only.is_none_or(|o| o == k.as_str())).cloned().collect();
+        let keys: Vec<Id> = p.pending.keys().filter(|k| only.is_none_or(|o| o == k.as_str())).cloned().map(Into::into).collect();
         let mut out = vec![];
         for k in keys {
-            if let Some(x) = p.pending.get_mut(&k) {
+            if let Some(x) = p.pending.get_mut(k.as_str()) {
                 out.append(&mut x.asks);
                 if x.is_empty() {
-                    p.pending.remove(&k);
+                    p.pending.remove(k.as_str());
                 }
             }
         }
@@ -1456,7 +1456,7 @@ fn work_shares(events: &[Timed]) -> BTreeMap<Id, i64> {
             }
             let share = (labour + performers.len() as i64 - 1) / performers.len() as i64;
             for p in performers {
-                *out.entry(p.clone()).or_insert(0) += share;
+                *out.entry(*p).or_insert(0) += share;
             }
         }
     }

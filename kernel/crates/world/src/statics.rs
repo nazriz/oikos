@@ -1,5 +1,6 @@
 //! Facts fixed for the whole run, derived from the config.
 
+use crate::blocks::Id;
 use crate::config::{Config, Life, SpaceSpec, StructureType, Template};
 use crate::rng::Randomness;
 use std::collections::BTreeMap;
@@ -8,16 +9,16 @@ use std::collections::BTreeMap;
 pub struct Statics {
     /// (The one the run was loaded from: shared, not a copy.)
     pub config: std::sync::Arc<Config>,
-    pub types: BTreeMap<String, StructureType>,
+    pub types: BTreeMap<Id, StructureType>,
     /// Each structure type's spaces, in order: local id (`dwelling.3`) -> spec.
-    pub spaces: BTreeMap<String, BTreeMap<String, SpaceSpec>>,
-    pub templates: BTreeMap<String, Template>,
+    pub spaces: BTreeMap<Id, BTreeMap<Id, SpaceSpec>>,
+    pub templates: BTreeMap<Id, Template>,
     /// The world's edges (the first is the default), and each edge's accounts in its own custody, by currency:
     /// what newcomers' money comes from, and (at the default edge) what construction materials are paid into.
-    pub boundaries: Vec<String>,
-    pub boundary_accounts: BTreeMap<(String, String), String>,
+    pub boundaries: Vec<Id>,
+    pub boundary_accounts: BTreeMap<(Id, Id), Id>,
     /// The world's default currency (its first): materials and newcomers' money are in it.
-    pub currency: String,
+    pub currency: Id,
     pub tick: i64,
     /// How long each act takes its actor (the world's `orchestration.act_time`).
     pub act_times: oikos_time::ActTimes,
@@ -30,10 +31,10 @@ pub struct Statics {
     pub nature: Option<oikos_nature::Ground>,
     /// Each configured participant's place in `config.participants`, by id (the first of an id): looked up, not
     /// searched for, at every write of a record.
-    pub participant_at: BTreeMap<String, usize>,
+    pub participant_at: BTreeMap<Id, usize>,
     /// For each organisation, the first configured position of it that keeps its record (`keeps_record`), by its
     /// place in `config.positions`.
-    pub record_keeping_at: BTreeMap<String, usize>,
+    pub record_keeping_at: BTreeMap<Id, usize>,
     /// The network for what flows (foundations-2 C3), its trees found at load, when the world has one.
     pub net: Option<std::sync::Arc<crate::network::NetStatics>>,
 }
@@ -61,7 +62,7 @@ impl Statics {
 
     /// An edge's own account in the default currency.
     pub fn boundary_account(&self, edge: &str) -> &str {
-        &self.boundary_accounts[&(edge.to_string(), self.currency.clone())]
+        &self.boundary_accounts[&(Id::new(edge), self.currency)]
     }
 
     /// Whether an account id is one of the edges' own (which can never be closed: the world's edges always exist).

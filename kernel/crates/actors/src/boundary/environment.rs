@@ -18,6 +18,7 @@
 //! sample of a round is drawn from the stream `sample-<species>-<round>` as the TS did. Its staff are the reduced
 //! `Staff` in environment_staff.rs until C1's `Staffing` lands.
 
+use oikos_core::frozen::{JsonRead, JsonRef};
 use super::environment_staff::{lift, Own, Staff, StaffOpts, StaffThen, Want};
 use crate::common::asking::{ask, Asked};
 use crate::common::{data, lot_of, money_words, next_look, out_of_time, team, withdraw, Book, Directions, DAY, MONTH, YEAR};
@@ -26,7 +27,7 @@ use crate::papers::{self, Paper};
 use crate::steps::{arg, because, call, json, say, Done, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
 use oikos_sight::calls::Line;
-use oikos_sight::{LookRequest, Record, Seen};
+use oikos_sight::{Id, LookRequest, Record, Seen};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -148,7 +149,7 @@ impl Kind for Environment {
 pub enum Then {
     Staff(StaffThen),
     /// A survey sent: the species and the cells, and who went.
-    Survey { species: String, cells: Vec<String>, crew: Vec<String> },
+    Survey { species: String, cells: Vec<String>, crew: Vec<String>, },
     /// The register published: its id is kept to be withdrawn by the next.
     Register,
 }
@@ -161,7 +162,7 @@ struct Office {
     directions: Directions,
     staff: Staff,
     /// Cell -> its cover.
-    cover: BTreeMap<String, String>,
+    cover: BTreeMap<Id, Id>,
     mapped: BTreeSet<String>,
     asked: Asked,
     /// The workplace as last seen: its capacity and who is in it.
@@ -325,15 +326,15 @@ fn percent_words(bps: i64) -> String {
 fn staffing_under(d: Option<&Record>) -> (bool, Option<i64>) {
     let Some(d) = d else { return (true, None) };
     let f = data(d);
-    let posts = f.get("posts").and_then(Value::as_i64).filter(|n| *n > 0);
-    (f.get("recruit").and_then(Value::as_str) != Some("no"), posts)
+    let posts = f.get("posts").and_then(|x| x.as_i64()).filter(|n| *n > 0);
+    (f.get("recruit").and_then(|x| x.as_str()) != Some("no"), posts)
 }
 
 /// A budget line as a number of cents (a figure or the text of one).
-fn amount(v: Option<&Value>) -> i64 {
-    match v {
-        Some(Value::Number(n)) => n.as_i64().unwrap_or(0),
-        Some(Value::String(s)) => s.parse().unwrap_or(0),
+fn amount<V: JsonRead + ?Sized>(v: Option<&V>) -> i64 {
+    match v.map(JsonRead::view) {
+        Some(JsonRef::Number(n)) => n.as_i64().unwrap_or(0),
+        Some(JsonRef::String(s)) => s.parse().unwrap_or(0),
         _ => 0,
     }
 }
@@ -346,10 +347,10 @@ impl Plan for Office {
         self.staff.absorb(pic);
         let mut maps: Vec<(String, HabitatMap)> = vec![];
         for r in self.book.open("habitat_map") {
-            if self.mapped.contains(&r.id) || r.speaks_for.as_deref() != Some(self.me.as_str()) {
+            if self.mapped.contains(r.id.as_str()) || r.speaks_for.as_deref() != Some(self.me.as_str()) {
                 continue;
             }
-            maps.push((r.id.clone(), papers::read::<HabitatMap>(r).unwrap_or(HabitatMap { areas: vec![], built: vec![] })));
+            maps.push((r.id.to_string(), papers::read::<HabitatMap>(r).unwrap_or(HabitatMap { areas: vec![], built: vec![] })));
         }
         for (id, m) in maps {
             self.mapped.insert(id);
@@ -357,32 +358,32 @@ impl Plan for Office {
             for a in &m.areas {
                 for y in a.y..a.y + a.h {
                     for x in a.x..a.x + a.w {
-                        self.cover.insert(format!("cell.{x}.{y}"), a.cover.clone());
+                        self.cover.insert(Id::new(&format!("cell.{x}.{y}")), Id::new(&a.cover));
                     }
                 }
             }
             for c in m.built {
-                self.cover.insert(c, "built".into());
+                self.cover.insert(Id::new(&c), "built".into());
             }
         }
         let mut built: Vec<(String, String)> = vec![];
         for n in self.book.open("building_notice") {
-            if !self.mapped.contains(&n.id) {
-                if let Some(at) = data(n).get("at").and_then(Value::as_str) {
-                    built.push((n.id.clone(), at.to_string()));
+            if !self.mapped.contains(n.id.as_str()) {
+                if let Some(at) = data(n).get("at").and_then(|x| x.as_str()) {
+                    built.push((n.id.to_string(), at.to_string()));
                 }
             }
         }
         for (id, at) in built {
             self.mapped.insert(id);
-            self.cover.insert(at, "built".into());
+            self.cover.insert(Id::new(&at), "built".into());
         }
         for ch in pic.channels.values() {
             if let Seen::Sites { cells, .. } = ch {
                 for c in cells.iter() {
                     if let Some(s) = c.structure.as_ref().filter(|s| s.structure == self.p.depot) {
                         if let Some(sp) = s.spaces.iter().find(|sp| sp.space == self.p.workplace) {
-                            let here = sp.occupants.iter().flatten().cloned().collect();
+                            let here = sp.occupants.iter().flatten().cloned().map(|x| x.to_string()).collect();
                             self.room = Some((i64::from(sp.capacity), here));
                         }
                     }
@@ -393,9 +394,9 @@ impl Plan for Office {
         for o in &pic.outcomes {
             let Some(sv) = &o.surveyed else { continue };
             self.pending = (self.pending - 1).max(0);
-            let Some(of) = sv.get("of").and_then(Value::as_str) else { continue };
+            let Some(of) = sv.get("of").and_then(|x| x.as_str()) else { continue };
             let m = self.found.entry(of.to_string()).or_default();
-            if let Some(cells) = sv.get("cells").and_then(Value::as_object) {
+            if let Some(cells) = sv.get("cells").and_then(|x| x.as_object()) {
                 for (cell, n) in cells {
                     m.insert(cell.clone(), n.as_i64().unwrap_or(0));
                 }
@@ -408,7 +409,7 @@ impl Plan for Office {
         let mut steps: Vec<Step<Then>> = vec![];
         // ---- staff: what the adopted budget's line pays for ----
         let year = t.div_euclid(YEAR) + 1;
-        let budget = self.book.open("budget").filter(|b| data(b).get("year").and_then(Value::as_i64) == Some(year)).max_by_key(|b| b.at).cloned();
+        let budget = self.book.open("budget").filter(|b| data(b).get("year").and_then(|x| x.as_i64()) == Some(year)).max_by_key(|b| b.at).cloned();
         let line = budget.as_ref().map_or(0, |b| amount(data(b).get("lines").and_then(|l| l.get(&self.p.staff_line))));
         let workers = self.staff.workers(&self.book, t);
         let annual = self.annual();
@@ -472,12 +473,12 @@ impl Plan for Office {
             self.next_round = t + self.p.survey_every_days * DAY;
             self.found.clear();
             for s in &self.p.species {
-                let mut habitat: Vec<&String> = self.cover.iter().filter(|(_, c)| s.covers.contains(c)).map(|(cell, _)| cell).collect();
+                let mut habitat: Vec<&Id> = self.cover.iter().filter(|(_, c)| s.covers.iter().any(|x| x == c.as_str())).map(|(cell, _)| cell).collect();
                 let mut r = cx.rng(&format!("sample-{}-{}", s.id, self.round));
                 let mut cells: Vec<String> = vec![];
                 while (cells.len() as i64) < self.p.sample_cells && !habitat.is_empty() {
                     let i = r.below(habitat.len() as u64) as usize;
-                    cells.push(habitat.remove(i).clone());
+                    cells.push(habitat.remove(i).to_string());
                 }
                 if !cells.is_empty() {
                     self.queue.push((s.id.clone(), cells));
@@ -580,7 +581,7 @@ impl Plan for Office {
             Then::Register => {
                 if let Done::Outcome(o) = done {
                     if let Some(id) = o.created.as_ref().and_then(|c| c.get("register")) {
-                        self.register = Some(id.clone());
+                        self.register = Some(id.to_string());
                     }
                 }
                 vec![]

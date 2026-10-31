@@ -20,6 +20,7 @@
 //! supplier's id; every sum is `i64` with floor division, and a price rises by the ceiling of a step and falls by its
 //! floor, as the TS did.
 
+use oikos_core::Frozen;
 use super::automation::{self, params_from, system_slips, Adoption, AdoptionParams, AdoptionThen, Fleet};
 use super::body::{lift, Body, BodyThen, House, PlainBody, Review, Stage, Standing, Surplus, Want, Wind};
 use super::lengnick::{distribute, move_wage, pay_out, Expectation, From as Payer, Lengnick, WageMonth};
@@ -188,7 +189,7 @@ impl Params {
                 listing: ctx.param("listing", None)?,
                 bank: ctx.param("bank", String::new())?,
             },
-            automation: params_from(ctx.params.get("automation").unwrap_or(&Value::Null))?,
+            automation: params_from(&ctx.params.get("automation").map(Frozen::to_value).unwrap_or(Value::Null))?,
             lengnick: Lengnick::read(ctx)?,
             figures: PriceFigures::read(ctx)?,
             sourcing: SourcingFigures::read(ctx)?,
@@ -234,10 +235,10 @@ pub enum Then {
     /// A system ordered (its outcome says whether the offer is still one it has an order out for).
     Adoption(AdoptionThen),
     /// A restocking order sent (its outcome names the order, or it was not made).
-    Restocked { seller: String, quantity: i64, unit: i64 },
+    Restocked { seller: String, quantity: i64, unit: i64, },
     /// Serving (part of) an order: what was sent (`q` all told, `by_system` of it by our systems), to whom, and what it took of
     /// the crew's day.
-    Served { order: Order, q: i64, share: i64, crew: Vec<String>, by_system: Vec<Sys>, before: i64, finished: bool, since: i64, day: i64, t: i64 },
+    Served { order: Order, q: i64, share: i64, crew: Vec<String>, by_system: Vec<Sys>, before: i64, finished: bool, since: i64, day: i64, t: i64, },
 }
 
 /// Units of an order a system of ours was given.
@@ -504,7 +505,7 @@ impl<B: Body> Shop<B> {
     }
 
     fn premises_of(&self, pic: &Picture) -> Option<(String, String, String)> {
-        sites(pic).find_map(|c| c.structure.as_ref().filter(|s| s.structure == self.at.premises).map(|s| (s.structure.clone(), s.structure_type.clone(), c.cell.clone())))
+        sites(pic).find_map(|c| { c.structure.as_ref().filter(|s| s.structure == self.at.premises).map(|s| (s.structure.to_string(), s.structure_type.to_string(), c.cell.to_string()))})
     }
 
     /// Room in our workplace: its capacity less our staff, or the bodies in it now if more.
@@ -529,11 +530,11 @@ impl<B: Body> Shop<B> {
             // being there. docs/behaviour/leasing.md, "Who is at the unit".)
             // (A world that shows it no such ground: as before, its owner in its hours.)
             if let Some(l) = self.lease.as_ref().filter(|l| sites(pic).any(|c| c.structure.as_ref().is_some_and(|s| s.structure == l.structure))) {
-                let ours: BTreeSet<&String> = workers.iter().chain(std::iter::once(op)).collect();
+                let ours: BTreeSet<&str> = workers.iter().chain(std::iter::once(op)).map(|x| x.as_str()).collect();
                 let mut here: BTreeSet<String> = BTreeSet::new();
                 for c in sites(pic).filter(|c| c.structure.as_ref().is_some_and(|s| s.structure == l.structure)) {
                     for sp in c.structure.iter().flat_map(|s| s.spaces.iter()).filter(|sp| sp.kind == "workplace") {
-                        here.extend(sp.occupants.iter().flatten().filter(|o| ours.contains(o)).cloned());
+                        here.extend(sp.occupants.iter().flatten().filter(|o| ours.contains(o.as_str())).map(|x| x.to_string()));
                     }
                 }
                 return here.into_iter().collect();
@@ -548,13 +549,13 @@ impl<B: Body> Shop<B> {
         if self.p.open_until > 0 && !(self.p.work_day(t) && tod >= self.p.open_from && tod < self.p.open_until) {
             return vec![];
         }
-        let mine: BTreeSet<&String> = workers.iter().collect();
+        let mine: BTreeSet<&str> = workers.iter().map(|x| x.as_str()).collect();
         let mut here: BTreeSet<String> = BTreeSet::new();
         for c in sites(pic).filter(|c| c.structure.as_ref().is_some_and(|s| s.structure == self.p.premises)) {
             for sp in c.structure.iter().flat_map(|s| s.spaces.iter()).filter(|sp| sp.kind == "workplace") {
                 for o in sp.occupants.iter().flatten() {
-                    if mine.contains(o) {
-                        here.insert(o.clone());
+                    if mine.contains(o.as_str()) {
+                        here.insert(o.to_string());
                     }
                 }
             }
@@ -588,9 +589,9 @@ impl<B: Body> Shop<B> {
             }
         }
         let (with, l, hands, deposit) = best?;
-        let landlord = l.speaks_for.clone()?;
+        let landlord = l.speaks_for?;
         let me = self.me.clone();
-        self.premises_applied = Some((l.id.clone(), t));
+        self.premises_applied = Some((l.id.to_string(), t));
         let space = data(&l).s("space").unwrap_or_default().to_string();
         Some(because(
             format!(
@@ -605,7 +606,7 @@ impl<B: Body> Shop<B> {
             vec![say(
                 "rental_application",
                 &format!("Application to lease the premises {space}."),
-                Say { to: Some(vec![landlord.clone()]), visible: Some(Visible::Only(vec![me.clone(), landlord])), basis: Some(l.id.clone()), data: Some(json!({ "listing": l.id, "account": account, "premises": true })), ..Default::default() },
+                Say { to: Some(vec![landlord.to_string()]), visible: Some(Visible::Only(vec![me.clone(), landlord.to_string()])), basis: Some(l.id.to_string()), data: Some(json!({ "listing": l.id, "account": account, "premises": true })), ..Default::default() },
             )],
         ))
     }
@@ -620,11 +621,11 @@ impl<B: Body> Shop<B> {
             self.premises_applied = None;
             return vec![];
         };
-        let landlord = l.speaks_for.clone().unwrap_or_default();
+        let landlord = l.speaks_for.unwrap_or_default();
         let offered = self
             .book
             .of_type("agreement")
-            .filter(|a| a.at >= at && !self.book.signed_by(&a.id, &me) && !self.book.concluded(&a.id) && matches!(&a.body, oikos_sight::RecordBody::Agreement { terms } if terms.template.as_deref() == Some("lease") && terms.parties.first() == Some(&landlord) && terms.parties.contains(&me)))
+            .filter(|a| a.at >= at && !self.book.signed_by(&a.id, &me) && !self.book.concluded(&a.id) && matches!(&a.body, oikos_sight::RecordBody::Agreement { terms } if terms.template.as_deref() == Some("lease") && terms.parties.first() == Some(&landlord.to_string()) && terms.parties.contains(&me)))
             .last()
             .cloned();
         let Some(a) = offered else {
@@ -641,9 +642,9 @@ impl<B: Body> Shop<B> {
         let Some(rent_to) = lt.rent_to.clone() else { return vec![] };
         let mut calls = vec![crate::papers::agreements::sign(&a.id)];
         if deposit > 0 {
-            calls.push(pay(&rent_to, deposit, Pay { from: Some(account.to_string()), basis: Some(a.id.clone()), for_: Some(format!("Security deposit under lease {}.", a.id)), ..Default::default() }, cx));
+            calls.push(pay(&rent_to, deposit, Pay { from: Some(account.to_string()), basis: Some(a.id.to_string()), for_: Some(format!("Security deposit under lease {}.", a.id)), ..Default::default() }, cx));
         }
-        calls.push(pay(&rent_to, lt.rent, Pay { from: Some(account.to_string()), every: Some(MONTH), first: Some(0), basis: Some(a.id.clone()), for_: Some(format!("Rent for {space}, monthly in advance.")), ..Default::default() }, cx));
+        calls.push(pay(&rent_to, lt.rent, Pay { from: Some(account.to_string()), every: Some(MONTH), first: Some(0), basis: Some(a.id.to_string()), for_: Some(format!("Rent for {space}, monthly in advance.")), ..Default::default() }, cx));
         if stock > 0 && structure != self.at.premises {
             calls.push(call("goods", vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&structure))), ("from_at", Some(arg(&self.at.premises)))]));
         }
@@ -656,11 +657,11 @@ impl<B: Body> Shop<B> {
             calls.push(say(
                 "trading_at",
                 &format!("We trade from {space} now, on a lease: work there."),
-                Say { to: Some(vec![op.clone()]), visible: Some(Visible::Only(vec![me.clone(), op])), basis: Some(a.id.clone()), data: Some(json!({ "space": space, "structure": structure, "cell": cell, "rent": lt.rent, "until": self.book.ends_at(&a.id).unwrap_or(t + term.unwrap_or(60 * MONTH)) })), ..Default::default() },
+                Say { to: Some(vec![op.clone()]), visible: Some(Visible::Only(vec![me.clone(), op])), basis: Some(a.id.to_string()), data: Some(json!({ "space": space, "structure": structure, "cell": cell, "rent": lt.rent, "until": self.book.ends_at(&a.id).unwrap_or(t + term.unwrap_or(60 * MONTH)) })), ..Default::default() },
             ));
         }
         let from = (self.at.premises.clone(), self.at.workplace.clone(), self.at.cell.clone());
-        self.lease = Some(Lease { agreement: a.id.clone(), space: space.clone(), structure: structure.clone(), cell: cell.clone(), room, rent: lt.rent, from, ..Default::default() });
+        self.lease = Some(Lease { agreement: a.id.to_string(), space: space.clone(), structure: structure.clone(), cell: cell.clone(), room, rent: lt.rent, from, ..Default::default() });
         self.premises_applied = None;
         self.at.premises = structure;
         self.at.workplace = space.clone();
@@ -678,8 +679,8 @@ impl<B: Body> Shop<B> {
         let me = self.me.as_str();
         self.book
             .all("request")
-            .filter(|r| r.speaks_for.as_deref() == Some(me) && crate::common::cites(r, lease) && data(r).get("every").is_some() && !self.book.withdrawn(&r.id))
-            .map(|r| r.id.clone())
+            .filter(|r| { r.speaks_for.as_deref() == Some(me) && crate::common::cites(r, lease) && data(r).get("every").is_some() && !self.book.withdrawn(&r.id)})
+            .map(|r| r.id).map(|x| x.to_string())
             .collect()
     }
 
@@ -687,7 +688,7 @@ impl<B: Body> Shop<B> {
     fn our_notice(&self, lease: &str) -> Option<i64> {
         let a = self.book.get(lease)?;
         match &a.body {
-            oikos_sight::RecordBody::Agreement { terms } => terms.termination.as_ref()?.iter().find(|c| c.party == self.me).map(|c| c.notice),
+            oikos_sight::RecordBody::Agreement { terms } => { terms.termination.as_ref()?.iter().find(|c| c.party == self.me).map(|c| c.notice)}
             _ => None,
         }
     }
@@ -767,13 +768,13 @@ impl<B: Body> Shop<B> {
         let papers: Vec<(&str, std::sync::Arc<oikos_sight::Record>)> = ["review_request", "rent_review", "surrender_terms"]
             .iter()
             .flat_map(|k| self.book.open(k).map(|r| (*k, r.clone())).collect::<Vec<_>>())
-            .filter(|(_, r)| r.speaks_for.as_deref() == Some(landlord.as_str()) && crate::common::addressed_to(r).contains(&me) && !l.read.contains(&r.id))
+            .filter(|(_, r)| { r.speaks_for.as_deref() == Some(landlord.as_str()) && crate::common::addressed_to(r).iter().any(|x| x == &me) && !l.read.contains(r.id.as_str()) })
             .filter(|(_, r)| data(r).s("lease").or_else(|| data(r).s("about")) == Some(l.agreement.as_str()))
             .collect();
         let mut balance = acct.balance;
         for (kind, r) in papers {
             if let Some(x) = self.lease.as_mut() {
-                x.read.insert(r.id.clone());
+                x.read.insert(r.id.to_string());
             }
             let d = data(&r);
             let to = d.s("account").unwrap_or_default().to_string();
@@ -792,7 +793,7 @@ impl<B: Body> Shop<B> {
                 // A rent review: the new rent paid on the old one's days from when it starts; the old order stopped once its last payment is made.
                 "rent_review" => {
                     let (rent, from) = (d.i("rent").unwrap_or(0), d.i("from").unwrap_or(t));
-                    let Some(rent_to) = self.book.get(&l.agreement).and_then(|a| crate::papers::agreements::lease_terms(a, &me).rent_to) else { continue };
+                    let Some(rent_to) = self.book.get(&l.agreement).and_then(|a| crate::papers::agreements::lease_terms(a, &me).rent_to) else { continue; };
                     if rent <= 0 {
                         continue;
                     }
@@ -859,7 +860,7 @@ impl<B: Body> Shop<B> {
             return None;
         }
         match pic.channels.get(channel) {
-            Some(Seen::Records { records, search: true }) => Some(records.iter().map(|r| r.id.clone()).collect()),
+            Some(Seen::Records { records, search: true }) => Some(records.iter().map(|r| r.id).map(|x| x.to_string()).collect()),
             _ => None,
         }
     }
@@ -991,9 +992,9 @@ impl<B: Body> Shop<B> {
                                 "property_purchase",
                                 &format!("Purchase of {structure}, as listed."),
                                 Say {
-                                    to: l.speaks_for.clone().map(|s| vec![s]),
-                                    visible: l.speaks_for.clone().map(|s| Visible::Only(vec![me.clone(), s])),
-                                    basis: Some(l.id.clone()),
+                                    to: l.speaks_for.map(|s| vec![s.to_string()]),
+                                    visible: l.speaks_for.map(|s| Visible::Only(vec![me.clone(), s.to_string()])),
+                                    basis: Some(l.id.to_string()),
                                     data: Some(json!({ "listing": l.id, "account": acc.account })),
                                     ..Default::default()
                                 },
@@ -1031,8 +1032,8 @@ impl<B: Body> Plan for Shop<B> {
         // What our looks found: producers advertising to the trade; our premises' listings and sale.
         if let Some(ids) = self.found(pic, &self.p.trade_board) {
             for id in ids {
-                if let Some(s) = self.book.get(&id).and_then(|r| r.speaks_for.clone()).filter(|s| *s != self.me) {
-                    self.suppliers.insert(s);
+                if let Some(s) = self.book.get(&id).and_then(|r| r.speaks_for).filter(|s| *s != self.me) {
+                    self.suppliers.insert(s.to_string());
                 }
             }
         }
@@ -1049,7 +1050,7 @@ impl<B: Body> Plan for Shop<B> {
             if let Some(mine) = account {
                 for tx in pic.transactions() {
                     if tx.to == mine && tx.from != mine {
-                        self.setup.founder_account = Some(tx.from.clone());
+                        self.setup.founder_account = Some(tx.from.to_string());
                         break;
                     }
                 }
@@ -1109,14 +1110,14 @@ impl<B: Body> Plan for Shop<B> {
                 };
                 match id {
                     Some(id) => {
-                        self.ours.insert(id, (seller.clone(), *quantity));
+                        self.ours.insert(id.to_string(), (seller.clone(), *quantity));
                         self.unit_cost = *unit;
                     }
                     None => self.on_order = (self.on_order - quantity).max(0),
                 }
                 vec![]
             }
-            Then::Served { order, q, share, crew, by_system, before, finished, since, day, t } => self.served(order, *q, *share, crew, by_system, *before, *finished, *since, *day, *t, done, cx),
+            Then::Served { order, q, share, crew, by_system, before, finished, since, day, t } => { self.served(order, *q, *share, crew, by_system, *before, *finished, *since, *day, *t, done, cx)}
         }
     }
 
@@ -1172,7 +1173,7 @@ impl<B: Body> Shop<B> {
                     let used = self.sys_used.get(&b.id).copied().unwrap_or(0);
                     self.sys_used.insert(b.id.clone(), (used - b.units * secs).max(0));
                 }
-                if res.refusal.as_ref().is_some_and(|f| matches!(code_name(f).as_str(), "not_capable" | "participant_inactive" | "unknown_participant" | "not_theirs")) {
+                if res.refusal.as_ref().is_some_and(|f| { matches!(code_name(f).as_str(), "not_capable" | "participant_inactive" | "unknown_participant" | "not_theirs")}) {
                     for b in by_system {
                         self.fleet.gone(&b.id);
                     }
@@ -1334,7 +1335,7 @@ impl<B: Body> Shop<B> {
             let where_ = self.premises_of(pic);
             let worth = where_.as_ref().and_then(|w| published_price(&self.book, &self.p.builder, &w.1, "prices"));
             let sale_price = worth.map(|w| w * self.p.premises_sale_bps / 10_000);
-            let w = Wind { pic, book: &self.book, acct: a, stage: Stage::Closed, premises: where_, sale_price, paid_suppliers: 0, staying: false };
+            let w = Wind { pic, book: &self.book, acct: a, stage: Stage::Closed, premises: where_, sale_price, paid_suppliers: 0, staying: false, };
             return lift(self.body.wind_up(&w, cx), Then::Body);
         }
         // A shop just founded sets itself up before it trades.
@@ -1349,7 +1350,7 @@ impl<B: Body> Shop<B> {
             let mut steps: Vec<Step<Then>> = lift(std::mem::take(&mut steps), Then::Body);
             let (owed, paid) = self.payables.settle::<Then>(t, &acct.account, acct.balance - staff_paid, None, cx);
             steps.extend(owed);
-            let w = Wind { pic, book: &self.book, acct: &acct, stage: Stage::Due, premises: None, sale_price: None, paid_suppliers: staff_paid + paid, staying: false };
+            let w = Wind { pic, book: &self.book, acct: &acct, stage: Stage::Due, premises: None, sale_price: None, paid_suppliers: staff_paid + paid, staying: false, };
             steps.extend(lift(self.body.wind_up(&w, cx), Then::Body));
             return steps;
         }
@@ -1455,10 +1456,10 @@ impl<B: Body> Shop<B> {
                 let g = goods_prices(&self.book, s);
                 let unit = *g.prices.get(&self.p.kind)?;
                 let weigh_at = if g.clearance.is_some() { g.regular.unwrap_or(unit).max(unit) } else { unit };
-                Some(Offer { seller: s.clone(), account: g.account?, unit, min: g.min_order.unwrap_or(1), terms: g.terms_days.unwrap_or(0), weigh_at })
+                Some(Offer { seller: s.clone(), account: g.account?, unit, min: g.min_order.unwrap_or(1), terms: g.terms_days.unwrap_or(0), weigh_at, })
             })
             .collect();
-        offers.sort_by(|a, b| a.unit.cmp(&b.unit).then(self.standing_of(&a.seller).cmp(&self.standing_of(&b.seller))).then_with(|| a.seller.cmp(&b.seller)));
+        offers.sort_by(|a, b| { a.unit.cmp(&b.unit).then(self.standing_of(&a.seller).cmp(&self.standing_of(&b.seller))).then_with(|| a.seller.cmp(&b.seller))});
         if self.unit_cost == 0 {
             if let Some(o) = offers.first() {
                 self.unit_cost = o.unit;
@@ -1504,7 +1505,7 @@ impl<B: Body> Shop<B> {
                 &self.p.lengnick,
                 &self.p.figures,
                 &mut rng,
-                &Signals { price: self.price, marginal_cost, demand: self.last_demand, turned_away: self.last_turned_away, stock: self.stock_meter.month(stock), can_supply: Some(can_serve), rivals: &rivals },
+                &Signals { price: self.price, marginal_cost, demand: self.last_demand, turned_away: self.last_turned_away, stock: self.stock_meter.month(stock), can_supply: Some(can_serve), rivals: &rivals, },
                 &money,
             );
             self.price = moved.price;
@@ -1530,7 +1531,7 @@ impl<B: Body> Shop<B> {
                 self.p.max_staff.min(self.p.min_staff.max((people_units * self.p.serve_labour * 10_000 + hpwm * self.p.utilisation_bps - 1).div_euclid(hpwm * self.p.utilisation_bps)))
             };
             let trade = if self.p.adjust.smooth_months > 1 { format!("the trade we expect ({expected} a month; last month {})", self.last_demand) } else { format!("last month's sales ({})", self.last_demand) };
-            let r = Review { needed, trade, notice_days: self.p.notice_days, expected, last_demand: self.last_demand, surplus: Surplus::OverStaffed, stock, phi_low_bps: self.p.lengnick.phi_low_bps };
+            let r = Review { needed, trade, notice_days: self.p.notice_days, expected, last_demand: self.last_demand, surplus: Surplus::OverStaffed, stock, phi_low_bps: self.p.lengnick.phi_low_bps, };
             let staffed = self.body.review(&self.book, t, &r, workers.len() as i64, cx);
             self.headcount = staffed.headcount;
             self.headcount_why = format!("{}{}", staffed.why, if why.is_empty() { String::new() } else { format!("; {}", why.join("; ")) });
@@ -1609,10 +1610,10 @@ impl<B: Body> Shop<B> {
             (Some(l), true) => (l.room - 1).max(0),
             _ => self.p.max_staff,
         };
-        let want = Want { target: if trading && (!operator || leased) { most.min(self.headcount) } else { 0 }, wage: self.wage, can_post, postable, headcount: self.headcount, headcount_why: self.headcount_why.clone() };
+        let want = Want { target: if trading && (!operator || leased) { most.min(self.headcount) } else { 0 }, wage: self.wage, can_post, postable, headcount: self.headcount, headcount_why: self.headcount_why.clone(), };
         // (What a day without our work costs in sales, and the share of our work that systems do: the employer's side of bargaining.)
         let system_bps = if self.last_demand > 0 { ((self.system_units(self.last_demand) * 10_000 * 2 + self.last_demand) / (2 * self.last_demand)).clamp(0, 10_000) } else { 0 };
-        let house = House { pic, book: &self.book, acct: &acct, want, trading, workers: workers.len(), operator, takings_per_day: self.takings.per_day(t), system_bps };
+        let house = House { pic, book: &self.book, acct: &acct, want, trading, workers: workers.len(), operator, takings_per_day: self.takings.per_day(t), system_bps, };
         let dealt = self.body.dealings(&house, cx);
         steps.extend(lift(dealt.steps, Then::Body));
         for rise in dealt.wage_rises {
@@ -1632,7 +1633,7 @@ impl<B: Body> Shop<B> {
         // A business of one whose owner has gone from the town, or has nowhere to trade from: its prices come down, what
         // it was to serve is refunded, and (gone) what it holds goes to its owner's account and it says it has closed.
         if operator && (self.at.gone || self.at.nowhere) {
-            let old: Vec<_> = self.book.open("price_list").filter(|r| r.speaks_for.as_deref() == Some(&me)).map(|r| r.id.clone()).collect();
+            let old: Vec<_> = self.book.open("price_list").filter(|r| r.speaks_for.as_deref() == Some(&me)).map(|r| r.id).collect();
             if !old.is_empty() {
                 let why = if self.at.given_up {
                     "Our owner has given the business up: we have stopped trading."
@@ -1695,7 +1696,7 @@ impl<B: Body> Shop<B> {
             return steps;
         }
         if self.price != self.published_price && trading {
-            let old: Vec<String> = self.book.open("price_list").filter(|r| r.speaks_for.as_deref() == Some(&me)).map(|r| r.id.clone()).collect();
+            let old: Vec<String> = self.book.open("price_list").filter(|r| r.speaks_for.as_deref() == Some(&me)).map(|r| r.id).map(|x| x.to_string()).collect();
             self.published_price = self.price;
             let on = if self.p.shopfront { self.premises_of(pic).map(|p| p.2).or_else(|| (!self.at.cell.is_empty()).then(|| self.at.cell.clone())) } else { None };
             let mut prices = BTreeMap::new();
@@ -1735,7 +1736,7 @@ impl<B: Body> Shop<B> {
                 // retailers multi-source), never all of it to the cheapest.
                 let cands: Vec<Candidate> = offers
                     .iter()
-                    .map(|o| Candidate { key: o.seller.clone(), weigh_at: o.weigh_at, min: o.min, fill_bps: self.sources.fill_bps(&o.seller), standing: self.standing_of(&o.seller) })
+                    .map(|o| Candidate { key: o.seller.clone(), weigh_at: o.weigh_at, min: o.min, fill_bps: self.sources.fill_bps(&o.seller), standing: self.standing_of(&o.seller), })
                     .collect();
                 let split = sourcing::split(&self.p.sourcing, &cands, top - have);
                 let mut ordered: BTreeSet<String> = BTreeSet::new();
@@ -1950,7 +1951,7 @@ impl<B: Body> Shop<B> {
                 st.lapses_at = Some(day * DAY + self.p.open_until);
             }
             self.reserved += q;
-            st.then = Some(Then::Served { order: x.o.clone(), q, share, crew: crew.clone(), by_system: by_system.clone(), before, finished, since: x.since, day, t });
+            st.then = Some(Then::Served { order: x.o.clone(), q, share, crew: crew.clone(), by_system: by_system.clone(), before, finished, since: x.since, day, t, });
             steps.push(st);
         }
         for o in due.unpaid {

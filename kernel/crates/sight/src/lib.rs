@@ -17,8 +17,8 @@ pub use view::{Picture, Seen, View, Visit};
 
 /// The observation as the engine builds it (contracts/participant-api.schema.json, Observation), and its parts.
 pub use oikos_perception::{
-    AccountItem, BodyView, ChannelData, ChildView, ConditionView, EntityItem, HeldPosition, HoldingItem, Observation, OwnRecord,
-    PositionItem, SiteCell, SiteSpace, SiteStructure, VariableView, ConnectionItem, LinkItem, MeterView,
+    AccountItem, BodyView, ChannelData, ChildView, ConditionView, ConnectionItem, EntityItem, HeldPosition, HoldingItem, LinkItem, MeterView, Observation, OwnRecord,
+    PositionItem, SiteCell, SiteSpace, SiteStructure, VariableView,
 };
 /// An agreement read by its terms, as an observation carries it.
 pub use oikos_terms::Reading;

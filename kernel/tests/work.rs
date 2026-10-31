@@ -98,7 +98,7 @@ fn a_building_completes_only_with_its_materials_its_labour_and_its_time() {
     let mut run = town();
     // A house needs 300 kg of materials (the builder's, at the flats), 4 hours' building, and 20 days.
     let r = act(&mut run, "builder-system", Some("builder"), json!([{"block": "construct", "at": "cell.2.1", "structure_type": "house", "materials_at": "s-flats", "ref": "h"}])).unwrap();
-    let house = r.iter().find_map(|e| match e { EventBody::StructureStarted { structure, .. } => Some(structure.clone()), _ => None }).unwrap();
+    let house = r.iter().find_map(|e| match e { EventBody::StructureStarted { structure, .. } => Some(*structure), _ => None }).unwrap();
     assert_eq!(run.kernel().state().holding("buildco", "s-flats", "materials"), 5000 - 300);
     let build = |run: &mut Run<Vec<u8>>, seconds: u64| act(run, "builder-system", Some("builder"), json!([{"block": "work", "task": "build", "units": seconds, "at": "s-flats", "performers": ["bob"], "on": house}]));
     // Its time passes, but it isn't built: it waits for its labour.
@@ -123,7 +123,7 @@ fn a_building_completes_only_with_its_materials_its_labour_and_its_time() {
 fn labour_done_first_completes_when_its_time_is_up() {
     let mut run = town();
     let r = act(&mut run, "builder-system", Some("builder"), json!([{"block": "construct", "at": "cell.2.1", "structure_type": "shop", "materials_at": "s-flats", "ref": "s"}])).unwrap();
-    let shop = r.iter().find_map(|e| match e { EventBody::StructureStarted { structure, .. } => Some(structure.clone()), _ => None }).unwrap();
+    let shop = r.iter().find_map(|e| match e { EventBody::StructureStarted { structure, .. } => Some(*structure), _ => None }).unwrap();
     act(&mut run, "builder-system", Some("builder"), json!([{"block": "work", "task": "build", "units": 7200, "at": "s-flats", "performers": ["bob"], "on": shop}])).unwrap();
     assert!(!run.kernel().state().structures[&shop].complete, "labour done, but not its 30 days");
     advance(&mut run, 31 * DAY);

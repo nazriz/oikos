@@ -33,7 +33,9 @@ sha2 = { workspace = true }
 jsonschema = { workspace = true }
 imbl = { version = "7.0.2", features = ["serde"] }
 # A faster allocator: the kernel allocates heavily (JSON values, canonical encoding). Results don't depend on it.
-mimalloc = { version = "0.1", default-features = false }
+# (`no_thp`: it never asks Linux for transparent huge pages, which kept what it had touched resident in 2 MB pieces:
+# docs/decisions.md 2026-10-27, "The allocator without huge pages".)
+mimalloc = { version = "0.1", default-features = false, features = ["no_thp"] }
 # Snapshots and the binary log are compressed (kernel/src/engine/snapshot.rs, kernel/src/blog.rs): zstd, whose output is
 # the same for the same input and level.
 zstd = { version = "0.13", default-features = false }

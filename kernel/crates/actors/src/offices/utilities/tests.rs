@@ -48,7 +48,7 @@ fn roll() -> Vec<Arc<Record>> {
 }
 
 fn ts_manifest_holds(file: &str, rust: Value) {
-    let ts: Value = crate::offices::testing::ts_manifest(&file);
+    let ts: Value = crate::offices::testing::ts_manifest(file);
     for (k, v) in ts.as_object().unwrap() {
         if k == "params" {
             for (name, param) in v.as_object().unwrap() {

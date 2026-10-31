@@ -80,7 +80,7 @@ impl Action {
     pub fn from_json(v: &Value) -> Result<Action, String> {
         let s = |k: &str| v.get(k).and_then(Value::as_str).map(String::from);
         let ids = |k: &str| -> Vec<Id> {
-            v.get(k).and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default()
+            v.get(k).and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(Id::new)).collect()).unwrap_or_default()
         };
         match v.get("type").and_then(Value::as_str) {
             Some("wait") => Ok(Action::Wait { until: v.get("until").and_then(Value::as_i64) }),
@@ -97,7 +97,7 @@ impl Action {
                 by: ids("by"),
                 provenance: v.get("provenance").cloned().map_or(Provenance::Direct, Provenance::Given),
             }),
-            Some("message") => Ok(Action::Message { to: ids("to"), text: s("text").unwrap_or_default(), re: s("re") }),
+            Some("message") => Ok(Action::Message { to: ids("to"), text: s("text").unwrap_or_default(), re: s("re").map(Into::into) }),
             Some("opt_out") => Ok(Action::OptOut { statement: s("statement") }),
             other => Err(format!("not an action the engine takes: {other:?} (a seat's host turns its drafts into acts)")),
         }

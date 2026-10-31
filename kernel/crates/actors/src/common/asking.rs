@@ -119,7 +119,7 @@ pub fn go_see(channel: &str, places: &[String]) -> LookRequest {
         channel: channel.into(),
         query: None,
         who: None,
-        visit: Some(Going { places: places.iter().take(VISIT_MAX).cloned().collect() }),
+        visit: Some(Going { places: places.iter().take(VISIT_MAX).cloned().map(Into::into).collect() }),
     }
 }
 
@@ -127,7 +127,7 @@ pub fn go_see(channel: &str, places: &[String]) -> LookRequest {
 pub fn visited<'a>(pic: &'a Picture, channel: &str) -> Vec<&'a SiteCell> {
     match pic.channels.get(channel) {
         Some(Seen::Sites { cells, visit: Some(v), .. }) if !v.fresh.is_empty() => {
-            let fresh: BTreeSet<&str> = v.fresh.iter().map(String::as_str).collect();
+            let fresh: BTreeSet<&str> = v.fresh.iter().map(|x| x.as_str()).collect();
             cells.iter().filter(|c| fresh.contains(c.cell.as_str())).collect()
         }
         _ => vec![],
@@ -181,7 +181,7 @@ pub fn owner_looks(book: &Book, asked: &mut Asked, register: &Register, lot: &st
     }
     for c in book.claims_by(ClaimKey::Object, lot) {
         let ownership = match &c.body {
-            oikos_sight::RecordBody::Claim { about, .. } => about.get("kind").and_then(Value::as_str) == Some("ownership"),
+            oikos_sight::RecordBody::Claim { about, .. } => about.get("kind").and_then(|x| x.as_str()) == Some("ownership"),
             _ => false,
         };
         let dk = format!("dealings:{}", c.id);

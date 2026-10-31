@@ -175,8 +175,8 @@ fn command(session: &mut Session, req: &Value) -> Result<String, String> {
     };
     // What the seat now knows: each observation delivered to it, as it received it.
     if let (Command::Observe { participant, only } | Command::Look { participant, only, .. }, Some(o), Some(obs)) = (&cmd, &observed, &resp.observation) {
-        let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
-        knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone()).with_dated(dated.clone()).with_names(*named)).absorb_seen(&crate::kernel::seen(obs), &o.shown, registers);
+        let key = only.as_ref().map_or_else(|| participant.to_string(), |o| format!("{participant}|{o}"));
+        knowledge.entry(key.to_string()).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone()).with_dated(dated.clone()).with_names(*named)).absorb_seen(&crate::kernel::seen(obs), &o.shown, registers);
     }
     if let Some(s) = sched.as_mut() {
         s.note_events(Some(r.kernel().state()), &resp.events, r.kernel().t());
@@ -429,7 +429,7 @@ fn start_engine(session: &mut Session, req: &Value, config: Option<Value>) -> Re
     opts.withhold = crate::engine::withholds(&o["withhold"])?;
     // (Where to capture the citizens' decisions, for training: docs/citizen-data.md. Changes nothing in the run.)
     opts.capture_citizens = o["capture_citizens"].as_str().filter(|p| !p.is_empty()).map(String::from);
-    let mut e = crate::engine::Engine::start(config.ok_or("missing config")?, str_field("run_id")?, BufWriter::new(log), anchors, opts)?;
+    let  e = crate::engine::Engine::start(config.ok_or("missing config")?, str_field("run_id")?, BufWriter::new(log), anchors, opts)?;
     // (Records by reference are not kept here: the engine's own actors are handed records the host never sees, so the
     // host is handed every record whole. Only its seats' observations cross, and they are few.)
     let reply = json!({ "ok": true, "seq": 0, "head": e.run().head(), "t": e.t(), "engine": crate::engine::ENGINE_VERSION });
@@ -589,12 +589,12 @@ fn agreements_reply(st: &oikos_world::state::State, req: &Value) -> Result<Value
                 .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
                 .unwrap_or_default();
             if let Some(p) = req.get("party").and_then(Value::as_str) {
-                ids.extend(st.agreements_of.get(p).into_iter().flat_map(|v| v.iter().cloned()));
+                ids.extend(st.agreements_of.get(p).into_iter().flat_map(|v| v.iter().map(|x| x.to_string())));
             }
             let agreements: Vec<Value> = ids
                 .iter()
                 .filter_map(|id| {
-                    let stored = st.records.get(id)?;
+                    let stored = st.records.get(id.as_str())?;
                     let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { return None };
                     Some(json!({ "id": id, "template": terms.template, "parties": terms.parties, "reading": st.reading(id)? }))
                 })

@@ -4,7 +4,6 @@
 
 use super::tax::latest_law;
 use crate::common::{data, Book};
-use serde_json::Value;
 
 pub use oikos_rules::support::{
     age_in, declaration_for, decide, for_age, for_household, for_out_of_work, payer_words, payments_in_words, reads_record, record_since,
@@ -14,14 +13,14 @@ pub use oikos_rules::support::{
 /// The support law in force that we've seen: the latest published and not withdrawn (none: no payments). A payment
 /// that names no payer is its lawmaker's.
 pub fn support_law(book: &Book) -> Option<(String, Vec<PaymentRule>)> {
-    let l = latest_law(book, |r| data(r).get("payments").is_some_and(Value::is_array))?;
-    let mut payments: Vec<PaymentRule> = serde_json::from_value(data(l)["payments"].clone()).ok()?;
+    let l = latest_law(book, |r| data(r).get("payments").is_some_and(|x| x.is_array()))?;
+    let mut payments: Vec<PaymentRule> = serde_json::from_value(data(l)["payments"].to_value()).ok()?;
     for p in &mut payments {
         if p.payer.is_empty() {
-            p.payer = l.speaks_for.clone().unwrap_or_default();
+            p.payer = l.speaks_for.unwrap_or_default().to_string();
         }
     }
-    Some((l.id.clone(), payments))
+    Some((l.id.to_string(), payments))
 }
 
 #[cfg(test)]
