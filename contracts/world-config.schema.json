@@ -3225,7 +3225,7 @@
           "maximum": 9007199254740991
         },
         "hours": {
-          "description": "For a system (law 10, foundations-2 P1): the daily window its lanes work in, from `from` seconds after midnight, for `seconds`. An act begins at the first moment of the window after it is ready and its lane is free, and what is not finished by the window's end goes on in the next day's: work coming faster than the hours take it is a queue, never a refusal. Every day is a working day (a known limit). Absent: any time of day. Never on a person's.",
+          "description": "For a system (law 10, foundations-2 P1): the daily window its lanes work in, from `from` seconds after midnight, for `seconds`. An act begins at the first moment of the window after it is ready and its lane is free, and what is not finished by the window's end goes on in the next working day's: work coming faster than the hours take it is a queue, never a refusal. Its `closed` days (a working calendar: a place's days of rest and public holidays, from its profile) have no window. Absent: any time of day. Never on a person's.",
           "type": "object",
           "required": [
             "from",
@@ -3242,6 +3242,15 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 86400
+            },
+            "closed": {
+              "description": "A working calendar: the days the window does not open. `weekdays`: days of the world's week (day d of the run is the week's day d mod 7), at least one left open; `days`: days of the run (holidays), counted from its first, 0. A day is the one the window opens on.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "weekdays": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 6 }, "uniqueItems": true, "maxItems": 6 },
+                "days": { "type": "array", "items": { "type": "integer", "minimum": 0 } }
+              }
             }
           }
         }

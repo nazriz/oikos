@@ -735,6 +735,16 @@ Additive only; no schema file changed. A log made before is a valid log.
 - **Task `collects`** (`{kind, per_unit}`): a unit takes up to so much of a kind held at the structure worked on, never more than is there (C4: the works' round). **Variables' `per_occupant_per_day` is refused at load** (`stock_as_variable`), as is a variable with a kind's name (C4).
 - **World config: `world.scarce`** (`edge`, `kind`, `quantity`, `every`): a scarce kind at an edge; a `move_goods` from the edge's outside beyond it is refused **`beyond_supply`** (C6).
 
+## Working calendars (2026-10-31; plan gap "Systems keep the same hours every day"; docs/decisions.md, "Working calendars"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- **World config: a template's `hours.closed`** (`weekdays`: days of the world's week, day d of the run being the week's
+  day d mod 7, at least one left open; `days`: days of the run, holidays, from 0): the days its window does not open.
+  Work not done by a window's end goes on at the next open day's opening. Refused at load if every day of the week is
+  closed. Absent: every day is a working day, as before.
+- **Generator:** the support agency's casework desk (`agency-casework`) works the place's working week, closed on its
+  days of rest and its public holidays (the profile's `calendar.weekend` and `calendar.holidays`), so an officer's day is
+  a working day's and not a seventh of the week spread over seven.
+- **Breaking, replay:** the state hashes of every generated town with a support office move.
 ## Delegation: assistants as services (2026-10-31; docs/design/delegation.md; docs/decisions.md, "Delegation D1 to D3"; under the owner's blanket approval of contract changes, 2026-10-11, and his approval of the delegation capabilities, 2026-10-31)
 
 Additive; no hard rule touched; nothing changes for a world that has no providers.

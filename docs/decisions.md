@@ -9831,6 +9831,37 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+## 2026-10-31 · Working calendars: a desk of officers keeps the place's week (branch `gap-weekends`; generator 0.73.0; risk WM-14 item 4; contract addition: a template's `hours.closed`; no model called)
+
+- **What:** a system template's `hours` may say the days its window does not open (`closed`: days of the world's week,
+  day d of the run being the week's day d mod 7, and days of the run, its holidays); the kernel's placing of work
+  (`oikos_time::Hours`, `place_within`) skips them, so work not done by a Friday's closing goes on at Monday's opening and
+  a holiday's work waits. Generic in the kernel (a list of closed days, no civil calendar); the law is data. The
+  generator gives both desks of officers (the support agency's casework, `agency-casework`, and the tax collector's,
+  `tax-casework`) the place's working calendar from its profile: `calendar.weekend` and `calendar.holidays` (all nine
+  profiles have them, sourced there), as days of the run from its start date. Each desk now works an officer's day on
+  each working day, where before the week's hours were spread evenly over seven days. A town with dates (`calendar` in
+  the spec) uses the real week from its start date; a town without dates keeps the week its people keep (their working
+  days first: `day % 7 < work_days`, as the actors count), with the profile's holidays from its start date.
+- **The law's backstop:** `all-work-takes-time.test.ts` fails, naming the template, on a desk of people (a system that
+  writes a decision with its own seconds in a day shorter than the whole day) whose hours are open every day of the
+  week. A machine's hours (the whole day) are not held to it: software runs when asked (the case-handling system).
+- **Why only the desks:** they are the only systems that stand for people's work. A machine's lanes run all day, as a
+  payment platform or case system does. People who staff the town's own bodies are persons, whose routines already keep
+  a working week (`work_days`); they do not yet keep public holidays (left, below).
+- **Effect:** the desks' yearly capacity falls by the holidays (eight in gb-eng), and decisions wait over weekends, as a
+  claim made on a Friday evening does. Every town's state hash with a support office or a tax collector moves.
+- **Left:** offices staffed by persons do not keep public holidays (each actor's `work_days` routine would need the
+  calendar's days; `common::next_working` already reads it where a town has dates); a town without dates numbers its
+  week from its people's first working day, not from a weekday (it has no weekdays); banks' settlement days (payments
+  on weekends) are not modelled.
+- **Revisit if:** a profile's officers work another pattern (shifts, a six-day week), which would be a `closed` of its
+  own; or an office of persons is held to the calendar, when the desks and the persons should read the one list.
+- **Pins re-taken on the merge with main (2026-11-01, main at 28c38600 and again at f56d2dbc: delegation, the long-run fixes,
+  business loans, then foundations-2 S2, which took generator 0.72.0, so working calendars are 0.73.0):**
+  `culture-dial.test.ts`'s three config hashes and three Rust states, taken on the merged tree, the working calendars as
+  the reason (the desks' `hours.closed` is in the config; the desks' days move the towns). Main's values are in the
+  comment beside them.
 
 ## 2026-10-31 · A crew's day three times as long, traced: the seat held until each order began (MT-23) (branch `mt23-crew`; no model called)
 
