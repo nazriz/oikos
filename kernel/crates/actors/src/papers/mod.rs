@@ -31,6 +31,7 @@ use serde_json::Value;
 
 pub mod agreements;
 pub mod citizen;
+pub mod delegation;
 pub mod finance;
 pub mod firms;
 pub mod market;
@@ -58,6 +59,11 @@ pub fn read<P: Paper>(r: &Record) -> Option<P> {
     }
 }
 
+/// Whether a record is a statement of this kind.
+pub fn is_kind(r: &Record, k: &str) -> bool {
+    matches!(&r.body, RecordBody::Statement { kind, .. } if kind.as_str() == k)
+}
+
 /// Whether a record is a statement of `P`'s kind (whatever its data).
 pub fn is<P: Paper>(r: &Record) -> bool {
     matches!(&r.body, RecordBody::Statement { kind, .. } if kind == P::KIND)
@@ -72,6 +78,7 @@ pub fn kinds() -> Vec<(&'static str, &'static str)> {
     v.extend(market::KINDS.iter().map(|k| (*k, "market")));
     v.extend(finance::KINDS.iter().map(|k| (*k, "finance")));
     v.extend(offices::KINDS.iter().map(|k| (*k, "offices")));
+    v.extend(delegation::KINDS.iter().map(|k| (*k, "delegation")));
     v.sort();
     v
 }

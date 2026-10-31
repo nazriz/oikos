@@ -9565,6 +9565,92 @@ routes as law data, nobody shown more than is theirs.
 - **Not decided here:** reordering the plan, and building the delegation capabilities; both are the owner's call.
 - **Revisit if:** the proposal changes (its 15 Nov project plan), or the owner chooses another study.
 
+## 2026-10-31 · Delegation capabilities: the design (D0; docs only; no model called)
+
+- **What:** `docs/design/delegation.md`, the design of the delegation capabilities the owner approved on 2026-10-31
+  ("we need to complete all of that + 1 to 3"): providers as organisations selling assistants as services (phase 4's
+  E1, taken into this work), remits per kind of matter at four levels with no ladder, the sign-off route, the principal's
+  instructions and the assistant's requests for more as records apart from its acts, learning from what the principal
+  itself saw, records by contract, replacement and taking back, forks that intervene at a checkpoint, and model seats as
+  assistants. The plan's item moves to "Now", in steps D0 to D7.
+- **Why this shape:** the owner's ruling of 2026-10-25 (assistants are systems sellers deploy, bought as services; no
+  separate mechanism for AI) and the kernel's own physics decide most of it: a system is delivered only to an
+  organisation and works only for its owner, so an organisation's assistant is a delivered system in an assistant post of
+  its own (its acts are the organisation's, readers unchanged), and a person's is the provider's own system writing in the
+  person's name on a mandate. A remit is a record with no power (D18-D22): an assistant beyond it is on record, not
+  refused. The one kernel addition is `set_channels` (access is a post's channels, and the principal must be able to
+  narrow them); it is checked by the knowing rules as a new post's channels are, so no hard rule changes. A code
+  principal's delegation is a wrapper round the code it already runs, so no kind's work changes until it delegates.
+- **Not decided here:** the study's definition, measures and arms; which principals a study's town has delegating; any
+  framing for a model assistant. All the owner's.
+- **Revisit if:** the wrapper breaks an existing kind's chains (then delegation moves into each kind that carries it);
+  `set_channels` needs any knowing exception (a hard rule: to the owner first); the seat host cannot follow a cast that
+  changes in a fork.
+
+## 2026-10-31 · Delegation D1 to D7: assistants as services, levels per kind of matter, the principal's rule, handover, forks that intervene, assistant seats, persons as principals (branch `delegation`; firm.provider 0.1.0, assistant 0.1.0; a town without `assistants` is generated and runs as before; no model called)
+
+- **What, in one landing** (the steps were built together because each needed the next to be exercised end to end):
+  - **D1, services anyone can buy.** `firm.provider` (`market/services.rs`) publishes `service_offer`s (kinds of matter,
+    levels, its *claimed* seconds and slip rate, fee, set-up, term, notice, exit, records term), delivers a system to an
+    organisation that orders and pays (the system is the client's, kernel F4), offers the `service` agreement
+    (`attrs.records`, `attrs.exit`), and switches its systems off when the agreement is unsigned, ended or unpaid. The
+    buyer's `Engagements` signs, sets the fee up, and leaves (notice, exit, the fee's order taken down).
+  - **D2, responsibilities.** `delegation::Delegating` wraps any module where the world gives `delegation` parameters
+    (offices/books.rs `create`/`restore`, so every code unit): its own work is unchanged; the lines of an act whose kinds
+    are delegated go to the assistant as a `referral` at the strictest of their levels, the rest done by the principal in
+    the same act; its code hears of the act when the assistant reports or when it does the matter itself. `advice`,
+    `draft` (a reading that may miss a slip: the person's row `publish/sign_off` in the table of slips), `approve`
+    (`approval_request`, `go_ahead`), `alone`. The `assistant` kind does each at its level and reports.
+  - **D3, learning.** `delegation/rule.rs`: each level's monthly cost (own time at its hour's value, the fee, expected
+    slips times what an error costs it, a draft's slips less those it finds), the estimate starting at the provider's claim
+    (as `prior_matters` matters) and moving only with what it has seen (caught slips, declined drafts, matters not done,
+    advice it would not have taken, complaints citing a delegated matter). Engage the best offer that pays by the hurdle;
+    set each kind's level; leave; replace. Every decision logged (`decision`, domain `delegation`) with the record ids it
+    rests on.
+  - **D4, records and replacement.** On leaving, the principal briefs the assistant to hand over (`brief.hand_over`);
+    the assistant sends a `handover` of its open matters, with its notes only where the records term is `principal`; the
+    principal takes each up again with the service now in use where its notes came, else does it itself. A replacement is
+    the rule's (another offer pays better by more than the exit and set-up spread over the horizon).
+  - **D5, forks that intervene.** `at_fork` in the engine (`kernel/src/engine.rs` `AtFork`, `Engine::intervene`, run at
+    the end of `resume`; host and stdio options); `intervene` on an arm, expanded by `orchestrator/src/interventions.ts`
+    from what the base's log shows of services (`seed-N/delegation.json`): grant, change, withdraw, take back, redirect,
+    constrain, replace, act. `hold_until` on a remit is the principal's own word, honoured by its rule. The harness
+    refuses an arm that withholds a `scope_request`.
+  - **D6, assistant seats.** `assistant_seats` in a town's description makes the systems of those templates seats (the
+    mock plays the assistant's code); the pilot host remakes a seat's unit when its posts change (a system appointed after
+    it was delivered); the experiment harness takes `post: "template:<id>"`, a steward for every system of that kind, each
+    seat its own controller and twin.
+  - **D7, persons as principals.** A provider that serves persons has a desk (its own post and system); the desk writes a
+    person's papers in their name (`for`), reports to them, and serves many clients, each under their own agreement.
+    Every person's code is wrapped where some provider serves persons (one shared parameter set: the account is read from
+    their own accounts channel).
+  - Generator (only with `assistants: true` and a profile's `values.assistants`: au-vic only, placeholders, ME-22): two
+    providers abroad with the same controller, an offer to organisations (tenancy papers, invoices, returns of tax
+    withheld) and one to persons (claims, applications, answers to the tribunal, requests to look again); the table's rows
+    for the papers (a referral half a minute); the slip rows (a system's truth; a reader's misses); `service_offer`
+    published; a principal of every post whose module issues a kind some organisations' offer takes, with a vacant
+    assistant post of its organisation.
+- **Why this way:** docs/design/delegation.md. The wrapper keeps every kind's work as it was (a test holds a wrapped
+  principal to its unwrapped acts, to the letter, until a kind is handed over) and makes any module a principal. A slip
+  of an assistant loses the matter as written (wrong advice, a draft not as asked, an act never sent though reported
+  done), so `draft` catches what a reading finds and `alone` hides what nothing brings back, by construction.
+- **Not built, and why:** `set_channels` (a new block needs a positive row in every town's table of work, moving every
+  town's hash; narrowing access is done by reorganising the post, `constrain` with `channels`); forms for a real model in
+  an assistant seat (the mock needs none; a real model's seat needs the papers of delegation as forms of its stationery:
+  next); invoicing a public body; local providers.
+- **Found on the way:** the call language's `agreement` had no `attrs` (added: contracts/calls.*, both resolvers); in a
+  300-person town most of an organisation's paperwork is mixed with a payment or a move of goods, so an act is parted
+  (what is handed over, and the rest done by the principal in the same act); at the profile's prices almost nobody's
+  volume pays for an assistant (realistic for small principals; the tests run at a twentieth of the prices).
+- **Without assistants, as before:** the generator emits nothing new for a town that does not ask for them (its generator
+  version is unchanged; `orchestrator/test/assistants.test.ts` holds `assistants: false` to the plain town and finds none
+  of the new kinds in it), and the towns whose states are pinned (culture-dial, living-dial) keep their hashes. A run
+  of one: a 300-person town at a twentieth of the prices, 150 days: 75 engagements (most by persons, whose volume of one
+  claim a month at day 30 pays at those prices, and 55 left again when it did not last), a city office's returns and a
+  landlord's notices handed over at `draft`, persons' claims and loan applications written by the desk in their names and
+  answered by the support office and the bank; at the profile's prices, nobody engages.
+- **Revisit if:** the wrapper breaks a kind's chains (an outcome its code needs that a report cannot carry); a receiver
+  that should take a person's paper by whom it speaks for does not; the placeholders find sources (ME-22).
 ## 2026-10-31 · Years at 10,000: three faults that only a large town shows (code only; no model called)
 
 - **What:** the first runs of the study's size over months (a scaled 10,000-person town, `worlds/town-10000.yaml`, and
@@ -9654,6 +9740,25 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   The budget's ceiling is unchanged (270 KB): the measure did not move.
 - **Revisit if** a heap profile shows another part of the state copied whole within an act (any field of `State` that
   is not a persistent map, vector or set, or behind an `Arc`, is copied by every act).
+
+## 2026-10-31 · Years at 10,000, continued: what grows with a run's length, and the rates office's notices indexed (code only)
+
+- **What:** the scaled towns run on the fixed build (docs/design/performance.md, "Years at 10,000 and 50,000"): 10,000
+  people grow about 25 MB a simulated day, steadily (a year in 1.9 hours, 10.7 GB); 50,000 about 85 MB a day, so two
+  years (about 75 GB) do not fit on the 64 GB machine. A heap profile puts the growth in the world's records (54%),
+  the resolver's knowledge of addressed statements, the twins' per-matter draw counts, minds and offices' files:
+  recorded as SC-6, not cut (each is kept by design; tiered storage waits on the owner). Sampled at day 536 of the
+  10,000 town, the rates office's check of whether each rates claim is paid went through every rates notice on its
+  file for each claim (`bill_settled`, `notices_of`): both grow every round, so the check grows as the square of the
+  run's length. The office now keeps an index of its notices by addressee, due date and amount, taken in as the file
+  grows (`RatesNotices`), answering as the search did (a test holds the two to the same answers; the 1,000 town over
+  400 days ends at the same state and log, `579afb1b`, digest `c121666ae2a9dff8`).
+- **Tried and dropped:** an index of a person's contacts in word of mouth (the 50,000 town's run's own thread was 43% in
+  it): results identical, but 12 to 13% more of the run's own thread at 1,000 and 10,000, where the spaces seen are small.
+- **Revisit if:** the bank (16% of the 10,000 town's own thread at day 536, going through its standing orders) or
+  another office's file search shows the same square growth in a longer run; tiered storage is approved (then SC-6's
+  numbers are taken again).
+
 ## 2026-10-31 · A seat in the support office is a non-resident officer, not the case system (branch `gap-wm14`; generator; new kind `world.nonresident`; risk WM-14 item 1; no contract change; no model called)
 
 - **What:** where a model is seated in a post of the outside world held by a system (the support office, `outside-support`),
@@ -9705,3 +9810,87 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   on weekends) are not modelled.
 - **Revisit if:** a profile's officers work another pattern (shifts, a six-day week), which would be a `closed` of its
   own; or an office of persons is held to the calendar, when the desks and the persons should read the one list.
+- **Pins re-taken on the merge with main (2026-11-01, main at 28c38600: delegation, the long-run fixes, business loans):**
+  `culture-dial.test.ts`'s three config hashes and three Rust states, taken on the merged tree, the working calendars as
+  the reason (the desks' `hours.closed` is in the config; the desks' days move the towns). Main's values are in the
+  comment beside them.
+
+## 2026-10-31 · Main red after years at 10,000: two slow tests, one a test fault, one held to one seed
+
+- **What:** the first merge of years at 10,000 (a521b7ec) left two slow-tier files red in CI, neither run by its gate.
+  `word-of-mouth.test.ts`: its reading of "what the teller could see when it decided" walked back over wakes that carry
+  on a plan by `woke_for === "done"`, which the Rust world's logged observations never say; a tip planned at the hall and
+  sent on the way home, one act after another, read as a tip about a building not in sight. A wake that brings the
+  outcome of one's own act now counts as carrying on. `own-venture.test.ts` ("someone who meant a business starts one"):
+  held to one seed and moved seven times before; after the owners' fix the one person of seed 1 who meant a business
+  already ran one. It now holds the rule over seeds 1 to 3 (the first three, not chosen: 1 has no occasion, 2 and 3
+  have), counting only those who meant one while running none.
+- **Why:** the owner's standing permission for test fixes; the plan's gap list had own-venture among the tests pinned to
+  one seed. Not a seed hop: the occasion is the draws', the rule is every run's.
+- **Revisit if:** the three seeds all lose the occasion (then the test needs a town that makes one, not more seeds).
+## 2026-10-31 · Delegation D6, the rest: a seated assistant's stationery (branch `delegation`; no result changes for a town without assistant seats; no model called)
+
+- **What:** where a town seats a model in a kind of assistant (`assistant_seats`), its posts get stationery: the
+  assistant's own papers in words (`ASSISTANT_ISSUES`: advice, approval_request, report, scope_request, handover, each to
+  its client), and at an organisation's assistant post the principal's own forms for the kinds it may do, and each as a
+  draft for sign-off (`draftOf`: the paper as it would go, in `paper`). A code principal reads a form draft by the paper's
+  kind and addressees against what it asked (`paper_as_asked`); advice in words alone is counted as nothing.
+- **Why:** a model writes words, through the translator; a code principal reads only what an act would do. The kind and
+  the addressees are what a code principal can check of a paper it did not write; its wording is the assistant's, and is
+  on record beside the referral for whoever reads the log.
+- **Checked:** a cheap 300-person town for 120 days with assistant-a's kinds played by mock seats gave the same 21 reports
+  as with the assistant's code (the state hashes differ, as the seated town carries the stationery and the seats' channels).
+- **Revisit if:** a real model's drafts are declined for addressing alone where the matter was right (then the principal
+  needs a reading of more of the paper), or a seat cannot find its forms.
+## 2026-10-31 · Borrowing to start a business: the founder asks the bank, the lending office decides (branch `gap-me1`; citizen, generator; risk ME-1; no contract change; no model called)
+
+- **What:** a person who would start a business of one by what they expect it to pay them, with a home to trade from,
+  and short only of the money (its capital and the month's buffer), applies to their bank for the shortfall over its
+  longest term (`start_loan_months`, from the profile's `credit.max_months`, the term the bank publishes). The bank's
+  lending office decides it as any application: its rate for people, the serviceability buffer, its share of the least
+  monthly income it can see in the account, nothing to anyone behind or in default. The lending office is staffed by the
+  bank's people, so the decision takes its officer's time (the table of work's `loan_decision` row). Offered, the founder
+  weighs the business again at its expected pay less the repayment and signs only if it still pays; then it starts as
+  for anyone with the means, its later weighing less the repayment. Docs: `docs/behaviour/entry.md`, "Borrowing to start".
+- **Why this route:** most new small businesses are funded from the owner's savings and personal borrowing (in
+  Australia, the ABS's Business Use of Information Technology and the RBA's work on small business finance both find
+  owners' own funds and personal loans the main sources at start-up; to confirm, not opened for this work); an
+  unsecured lender lends against income, so the town's bank lends to the employed founder and refuses the one with
+  nothing coming in. No new figure: the term is the bank's, the rules and rates are its existing ones.
+- **Test:** `citizen::work` "short only of the money for a business that pays, we ask our bank to lend it and take the
+  loan only if it still pays" (the application's purpose, amount and term; nothing without a bank that lends to start
+  one; a loan too dear is not signed, one that leaves the business paying is). The lender's rules are already held by
+  `finance::credit`'s tests.
+- **Left (ME-1 stays open):** no lending against a home (households hold no home equity); a shop in premises, the
+  employing route, is not borrowed for; no start-up grants or microfinance; the lender does not read a business plan,
+  only the account (as ME-8 says of its income reading).
+- **Revisit if:** births move far beyond the profile's rate with borrowing on (the likely cause is what founders expect,
+  not the loan); a profile states lending to new businesses on other terms (a start-up product, security asked).
+## 2026-10-31 · Candidacy: the field of 19 traced, and the fault that is left (branch `gap-pb10`; docs only; risk PB-10; no model called)
+
+- **What was found:** the field of 19 candidates for about 118 formal votes (decisions 2026-10-24, "Two tests that failed in
+  the new town") is not the town's. `elections.test.ts` sets every citizen's `stand_bps` to 1,000 (a 10% chance of standing
+  when an election is called, shifted by the person's drive) to be sure of a contest; the profile's figure is 200
+  (au-vic, a placeholder). The test town (`worlds/town.yaml`, au-vic) has 166 electors: 166 x 10% x a mean drive a little
+  over one is the 17 to 19 seen. At the profile's own figure the same town fields about three or four candidates, which
+  is a handful, as real local elections have. So it is neither the mechanism's outcome nor emergent: it is the test's dial.
+- **The mechanism fault that is there:** the chance is each elector's, fixed, and blind to the field. The field is
+  therefore proportional to the electorate: at the profile's 2%, about 16 to 19 in the 1,000-person town (795 electors)
+  and some 800 in a town of 50,000 (the north star's size), where real fields per vacancy stay a handful whatever the
+  size of the ward (the VEC reports candidates per vacancy for each Victorian council election; about three in 2024, to
+  confirm). Real candidacy is lumpy and organised: a nomination costs a fee or a deposit and signatures (in Victoria a
+  nomination fee, to confirm the sum), a campaign costs time and money, most candidates come through a party or a local
+  group, and those who stand weigh their chance against the field (the citizen-candidate model: Osborne and Slivinski
+  1996; Besley and Coate 1997).
+- **Not built, and why:** fixing it is a new law of the world, not a patch: who stands (the decision weighed against the
+  field already nominated, which needs the decision spread through the nomination window so the field can be seen), the
+  nomination's cost (the law's fee, deposit and signatures, as law data per profile with sources), the time a campaign
+  takes, and backing (parties or groups, which the town does not have). Each needs sourced figures in nine profiles, and
+  the choice of a candidacy model is the owner's. Lowering `stand_bps` with the size of the town would be calibrating an
+  outcome, which the rules forbid. The test's 10% is left as it is: it forces a contest, and the test asserts only what the
+  mechanism guarantees (the incumbent's place in the voters' rankings).
+- **For Naz:** a proposal to approve or change: (1) nominations as law data (fee or deposit, signatures, from each
+  profile, sourced); (2) a person considers standing on a day of the nomination window drawn for them, weighing a
+  candidacy's cost in time and money and their chance against the nominations already public; (3) groups and parties
+  later, with founding (docs/behaviour/founding.md). Calibrated against candidates per vacancy, never set to it.
+- **Revisit if:** an election in a town of more than a few thousand is read; or the owner approves the proposal.

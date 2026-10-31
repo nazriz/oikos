@@ -334,8 +334,18 @@ fn staff_books(kind: &dyn Kind, ctx: &Ctx) -> Option<(String, Box<dyn OfficeBook
     books_of(kind.name(), &ctx.entity, &office, &ctx.params.to_map()).map(|b| (office, b))
 }
 
-/// The actor of `kind` for `ctx`: its own, with its staff's clerk where it keeps books and runs as staff.
+/// The actor of `kind` for `ctx`: its own, with its staff's clerk where it keeps books and runs as staff, and as a
+/// principal where the world gives it `delegation` (docs/design/delegation.md: none does unless the town has providers).
 pub fn create(kind: &dyn Kind, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
+    crate::delegation::wrap(ctx, create_kept(kind, ctx)?)
+}
+
+/// The same, taken up again as `save` left it.
+pub fn restore(kind: &dyn Kind, ctx: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
+    crate::delegation::rewrap(ctx, &saved, |inner| restore_kept(kind, ctx, inner))
+}
+
+fn create_kept(kind: &dyn Kind, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
     let inner = kind.create(ctx)?;
     Ok(match staff_books(kind, ctx) {
         Some((office, books)) => Box::new(StaffClerk { inner, keeping: Keeping::new(&ctx.entity, &office), books }),
@@ -343,8 +353,7 @@ pub fn create(kind: &dyn Kind, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
     })
 }
 
-/// The same, taken up again as `save` left it.
-pub fn restore(kind: &dyn Kind, ctx: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
+fn restore_kept(kind: &dyn Kind, ctx: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
     match staff_books(kind, ctx) {
         Some((_, mut books)) => {
             let inner = kind.restore(ctx, saved.get("inner").cloned().unwrap_or(Value::Null))?;

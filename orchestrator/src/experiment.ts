@@ -29,6 +29,7 @@ import { refuseUnready, seatReadiness } from "./seat-ready";
 import { modules as builtinModules } from "@oikos/participants";
 import { budgetProblems, closeAdapters, forkLimits, mockModels, modelArms, modelProblems, modelSeatFactories, type CallStats, type SeatsSpec } from "./experiment-seats";
 import type { ForkEnd } from "./seat-host";
+import { DelegationTracker, expand, INTERVENTIONS, type Intervention } from "./interventions";
 
 export const DAY = 86_400;
 
@@ -47,7 +48,9 @@ export type Steward =
  * (its data's) and addressed `to` whom where given, the `nth`
  * (from 1) is not carried out; its actor believes it sent it. The arm is then "the same arm without that act". */
 export interface Withhold { what: string; participant?: string; nth?: number; matter?: string; to?: string; /** Only a paper whose data has this field (`on_review`: a decision made on a review). */ has?: string }
-export interface Arm { name: string; steward: Steward; withhold?: Withhold[] }
+/** An arm's interventions at the fork (docs/design/delegation.md section 7; orchestrator/src/interventions.ts): acts its
+ * principals make at the fork's moment, in their own names, noted in the log. */
+export interface Arm { name: string; steward: Steward; withhold?: Withhold[]; intervene?: Intervention[] }
 
 /** How a seed's town is made: a world file (a generator spec or a config, as `oikos run` takes it), a generator spec, or a config; then `prepare`. */
 export interface WorldSource {
@@ -66,6 +69,8 @@ export interface MeasureMaker {
 }
 export interface MeasureContext {
   forkT: number; seat: string; post: string;
+  /** A template steward's seats, as they come (the steward is each of them). */
+  seats?: Set<string>;
   /** The arm's steward, and the fork's stewardship ledger's result (measure/src/stewardship.ts), read once at the end. */
   steward?: Steward;
   stewardship?: () => StewardshipResult;
@@ -139,9 +144,31 @@ export async function buildConfig(spec: ExperimentSpec, seed: number): Promise<a
   return seatify(config, spec.post);
 }
 
+/** A steward of every system of a kind (`post: "template:<id>"`: an assistant's kind, docs/design/delegation.md section 8):
+ * each system delivered from that template is a seat, its code brain the template's. */
+export const TEMPLATE = "template:";
+export const templateOf = (post: string) => (post.startsWith(TEMPLATE) ? post.slice(TEMPLATE.length) : undefined);
+
+/** A detached twin for a seat of a template steward, in the post its observation says it holds (none yet: as itself). */
+const templateTwin = (config: any, template: string, participant: string, obs: any) => {
+  const c = (config.templates ?? []).find((t: any) => t.id === template)?.controller?.params?.mock ?? {};
+  const held = (obs?.positions ?? [])[0];
+  return new DetachedActor({ kind: c.brain, participant, capacity: held?.position ?? "self", entity: held?.entity ?? obs?.entity ?? "", system: true, params: c.params ?? {}, config });
+};
+
 /** The post's holder made a mock seat sitting as its code twin (a seat the world already has stays one): the same post
  * in every arm, its steward the host's choice. Returns the config (changed in place). */
 export function seatify(config: any, post: string): any {
+  const templ = templateOf(post);
+  if (templ) {
+    const t = (config.templates ?? []).find((x: any) => x.id === templ);
+    if (!t) throw new Error(`the world has no kind of system "${templ}"`);
+    const c = t.controller ?? {};
+    if (c.type !== "llm") t.controller = { type: "llm", impl: "mock", params: { mock: { twin: true, brain: c.impl, params: c.params ?? {} } } };
+    else if (!c.params?.mock?.brain) throw new Error(`"${templ}"'s seats have no code brain to be their twin (mock.brain)`);
+    else c.params.mock.twin = true;
+    return config;
+  }
   const pos = (config.positions ?? []).find((x: any) => x.id === post);
   if (!pos) throw new Error(`the world has no post "${post}" (posts: ${(config.positions ?? []).map((x: any) => x.id).slice(0, 12).join(", ")}...)`);
   const holder = (config.participants ?? []).find((p: any) => p.id === pos.holder);
@@ -280,17 +307,17 @@ function controllerFor(a: Arm, ctx: { seat: string; post: string; brain: Detache
 // ---- measures
 
 const RECORDED = (e: any) => e.kind === "event" && e.body?.event === "recorded";
-const acted = (e: any, seat: string) => e.kind === "command" && e.body?.command === "act" && e.body.participant === seat;
+const acted = (e: any, c: { seat: string; seats?: Set<string> }) => e.kind === "command" && e.body?.command === "act" && (e.body.participant === c.seat || !!c.seats?.has(e.body.participant));
 
 const BUILTIN: { [name: string]: (arg: string | undefined, c: MeasureContext) => { see(e: any): void; result(): number | null } } = {
   /** Acts the steward's seat made. */
-  acts: (_a, c) => { let n = 0; return { see: (e) => { if (acted(e, c.seat)) n++; }, result: () => n }; },
+  acts: (_a, c) => { let n = 0; return { see: (e) => { if (acted(e, c)) n++; }, result: () => n }; },
   /** Papers recorded in the town (all, or of one kind: `records:weather_warning`). */
   records: (a) => { let n = 0; return { see: (e) => { if (RECORDED(e) && (!a || e.body.record?.kind === a)) n++; }, result: () => n }; },
   /** Actions the kernel refused. */
   refused: () => { let n = 0; return { see: (e) => { if (e.kind === "event" && e.body?.event === "action_refused") n++; }, result: () => n }; },
   /** Whole days from the fork to the steward's first act (absent: it made none). */
-  first_act_day: (_a, c) => { let t: number | null = null; return { see: (e) => { if (t === null && acted(e, c.seat)) t = e.t; }, result: () => (t === null ? null : Math.floor((t - c.forkT) / DAY)) }; },
+  first_act_day: (_a, c) => { let t: number | null = null; return { see: (e) => { if (t === null && acted(e, c)) t = e.t; }, result: () => (t === null ? null : Math.floor((t - c.forkT) / DAY)) }; },
   /** Whole days from the fork to the first paper of a kind (`first_record:weather_warning`; absent: none). */
   first_record: (a, c) => { let t: number | null = null; return { see: (e) => { if (t === null && RECORDED(e) && e.body.record?.kind === a) t = e.t; }, result: () => (t === null ? null : Math.floor((t - c.forkT) / DAY)) }; },
   /** Money that moved between accounts, in cents, summed. */
@@ -384,8 +411,9 @@ export interface ArmResult {
   error?: string;
 }
 
-interface SeedFiles { dir: string; base: string; snapshot: string; brains: string; config: string; ledger: string }
-const files = (dir: string): SeedFiles => ({ dir, base: join(dir, "base.oklog"), snapshot: join(dir, "snapshot.bin"), brains: join(dir, "brains.json"), config: join(dir, "config.json"), ledger: join(dir, "ledger.json") });
+interface SeedFiles { dir: string; base: string; snapshot: string; brains: string; config: string; ledger: string; delegation: string }
+const files = (dir: string): SeedFiles => ({ dir, base: join(dir, "base.oklog"), snapshot: join(dir, "snapshot.bin"), brains: join(dir, "brains.json"), config: join(dir, "config.json"), ledger: join(dir, "ledger.json"), delegation: join(dir, "delegation.json") });
+const intervenes = (spec: ExperimentSpec) => spec.arms.some((a) => a.intervene?.length);
 const seedDir = (out: string, seed: number) => join(out, `seed-${seed}`);
 
 /** Runs the town of a seed to the fork point and keeps what a fork needs: the snapshot, the twins' brains, the config. */
@@ -395,12 +423,22 @@ export async function runBase(spec: ExperimentSpec, seed: number, out: string): 
   const config = await buildConfig(spec, seed);
   const forkT = spec.forkDay * DAY;
   const ledger = wantsStewardship(spec) ? new Ledger({ config, from: forkT, steward: stewardOf(postHolder(config, spec.post), { kind: "code" }), ...(spec.institutions ? { institutions: spec.institutions } : {}) }) : undefined;
-  const w = RustWorld.start(config, { run_id: `${spec.name}-seed${seed}`, log: f.base, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stand_in: standIn(spec), label: "base", ...(ledger ? { stream: { cap: 4_000_000 } } : {}) });
+  // (What the base shows of services, for an arm's interventions to be expanded against at the fork.)
+  const tracker = intervenes(spec) ? new DelegationTracker() : undefined;
+  const w = RustWorld.start(config, { run_id: `${spec.name}-seed${seed}`, log: f.base, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stand_in: standIn(spec), label: "base", ...(ledger || tracker ? { stream: { cap: 4_000_000 } } : {}) });
   // (The base's past, read into the ledger so that each fork's starts from it: systems delivered, who worked where.)
-  const pull = () => { if (ledger) for (;;) { const { entries } = w.events(); if (!entries.length) return; for (const e of entries) ledger.see(e); } };
+  const pull = () => { if (ledger || tracker) for (;;) { const { entries } = w.events(); if (!entries.length) return; for (const e of entries) { ledger?.see(e); tracker?.see(e); } } };
   // (Until the fork every seat is its code twin: the same town whatever the arms later say.)
   const brains = twinSpecs(config);
   const live = new Map([...brains].map(([id, s]) => [id, new DetachedActor(s)]));
+  const templ = templateOf(spec.post);
+  // (A template steward's seats come into being during the run: each its twin, made again when the post it holds changes.)
+  const twinOf = (s: SeatWake) => {
+    const now = (s.observation?.positions ?? [])[0]?.position ?? "self";
+    let b = live.get(s.participant);
+    if (templ && !brains.has(s.participant) && (!b || b.spec.capacity !== now)) live.set(s.participant, (b = templateTwin(config, templ, s.participant, s.observation)));
+    return b;
+  };
   for (;;) {
     pull();
     const d = w.nextBy(forkT);
@@ -408,18 +446,21 @@ export async function runBase(spec: ExperimentSpec, seed: number, out: string): 
       if (d.due === "end") throw new Error(`seed ${seed}: the run ended at ${d.t} before the fork day ${spec.forkDay}`);
       break;
     }
-    for (const s of d.seats) w.submit(s.key, live.get(s.participant)?.step(s.observation, s.woke_for, s.since).action ?? { type: "wait" });
+    for (const s of d.seats) w.submit(s.key, twinOf(s)?.step(s.observation, s.woke_for, s.since).action ?? { type: "wait" });
   }
   w.flush();
   pull();
   if (ledger) writeFileSync(f.ledger, JSON.stringify(ledger.save()));
+  if (tracker) writeFileSync(f.delegation, JSON.stringify(tracker.save()));
   writeFileSync(f.snapshot, w.snapshot());
   writeFileSync(f.brains, JSON.stringify(Object.fromEntries([...live].map(([id, b]) => [id, b.save()]))));
+  // (A template steward's seats, as their twins were made: what a fork needs to go on with them.)
+  if (templ) writeFileSync(join(f.dir, "template-seats.json"), JSON.stringify(Object.fromEntries([...live].filter(([id]) => !brains.has(id)).map(([id, b]) => [id, { kind: b.spec.kind, participant: b.spec.participant, capacity: b.spec.capacity, entity: b.spec.entity, system: true, params: b.spec.params ?? {} }]))));
   writeFileSync(f.config, JSON.stringify(config));
   return { seed, t: w.t(), stateHash: w.stateHash() };
 }
 
-const postHolder = (config: any, post: string): string => (config.positions.find((x: any) => x.id === post)).holder as string;
+const postHolder = (config: any, post: string): string => (templateOf(post) ? post : (config.positions.find((x: any) => x.id === post)).holder as string);
 
 const standIn = (spec: ExperimentSpec) => spec.standIn ?? process.env.OIKOS_STAND_IN ?? "idle";
 
@@ -432,6 +473,9 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   const seat = postHolder(config, spec.post);
   const brainOf = (id: string) => { const s = twinSpecs(config).get(id); return s && saved[id] ? new DetachedActor({ ...s, saved: saved[id]! }) : undefined; };
   const brains = new Map([...twinSpecs(config).keys()].map((id) => [id, brainOf(id)!]));
+  const templ = templateOf(spec.post);
+  const seatsFile = join(f.dir, "template-seats.json");
+  if (templ && existsSync(seatsFile)) for (const [id, sp] of Object.entries(JSON.parse(readFileSync(seatsFile, "utf8")) as { [id: string]: any })) brains.set(id, new DetachedActor({ ...sp, config, saved: saved[id] }));
   const logPath = join(f.dir, `${safe(arm.name)}.oklog`);
   // (A fork interrupted before its end left a log with no result: it is kept, under another name, and the fork is run
   // again from its seed's snapshot. A model run is training data and is never deleted.)
@@ -440,7 +484,10 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     while (existsSync(join(f.dir, `${safe(arm.name)}.interrupted-${k}.oklog`))) k++;
     renameSync(logPath, join(f.dir, `${safe(arm.name)}.interrupted-${k}.oklog`));
   }
-  const w = RustWorld.resume(readFileSync(f.snapshot), { log: logPath, parent: "base.oklog", label: arm.name, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stream: { cap: 4_000_000 }, ...(arm.withhold?.length ? { withhold: arm.withhold } : {}) });
+  // (The arm's interventions, as the acts its principals make at the fork: expanded against what the base showed of their services.)
+  const tracker = arm.intervene?.length ? DelegationTracker.restore(JSON.parse(readFileSync(f.delegation, "utf8"))) : undefined;
+  const atFork = (arm.intervene ?? []).flatMap((iv) => expand(iv, config, tracker!, spec.forkDay * DAY));
+  const w = RustWorld.resume(readFileSync(f.snapshot), { log: logPath, parent: "base.oklog", label: arm.name, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stream: { cap: 4_000_000 }, ...(arm.withhold?.length ? { withhold: arm.withhold } : {}), ...(atFork.length ? { at_fork: atFork } : {}) });
   const forkT = w.t();
   // (The stewardship ledger: the base's, taken up with this arm's steward, counting from the fork.)
   const ledger = wantsStewardship(spec) ? (existsSync(f.ledger) ? Ledger.restore(JSON.parse(readFileSync(f.ledger, "utf8")), { from: forkT, steward: stewardOf(seat, arm.steward), ...(spec.institutions ? { institutions: spec.institutions } : {}) }) : new Ledger({ config, from: forkT, steward: stewardOf(seat, arm.steward), ...(spec.institutions ? { institutions: spec.institutions } : {}) })) : undefined;
@@ -467,7 +514,21 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     }
   };
   pull();
-  controller = await controllerFor(arm, { seat, post: spec.post, brain: brains.get(seat), spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir });
+  // (A template steward: a controller for each of its seats, made when the seat is first woken, in the post it holds then.)
+  const stewards = new Map<string, SeatController>();
+  const configTwins = new Set(twinSpecs(config).keys());
+  const isSteward = (s: SeatWake) => (templ ? !configTwins.has(s.participant) : s.participant === seat);
+  const stewardFor = async (s: SeatWake): Promise<SeatController> => {
+    if (!templ) return controller!;
+    const now = (s.observation?.positions ?? [])[0]?.position ?? "self";
+    let b = brains.get(s.participant);
+    if (!b || b.spec.capacity !== now) { b = templateTwin(config, templ, s.participant, s.observation); brains.set(s.participant, b); stewards.delete(s.participant); }
+    let c = stewards.get(s.participant);
+    if (!c) { c = await controllerFor(arm, { seat: s.participant, post: now, brain: b, spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir }); stewards.set(s.participant, c); ctx.seats?.add(s.participant); }
+    return c;
+  };
+  if (templ) ctx.seats = new Set();
+  controller = templ ? { decide: () => ({ action: { type: "wait" } }) } : await controllerFor(arm, { seat, post: spec.post, brain: brains.get(seat), spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir });
   const model = arm.steward.kind === "model" ? arm.steward.model : undefined;
   const price = model ? spec.prices?.[model] ?? { input: 0, output: 0 } : undefined;
   let wakes = 0;
@@ -481,12 +542,12 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     // Every seat of the round at once: the steward's model calls are in flight together with every other fork's of this worker.
     const actions = await Promise.all(d.seats.map(async (s) => {
       wakes++;
-      if (s.participant === seat) {
-        const r = await controller.decide(s);
+      if (isSteward(s)) {
+        const r = await (await stewardFor(s)).decide(s);
         if (r.usage && model) {
           const [provider, ...rest] = model.split("/");
           const cost = Math.ceil((r.usage.input_tokens * price!.input + r.usage.output_tokens * price!.output) / 1_000_000);
-          w.annotate({ annotation: "usage", purpose: "participant", subject: seat, provider, model: rest.join("/"), input_tokens: r.usage.input_tokens, output_tokens: r.usage.output_tokens, cost_microusd: cost });
+          w.annotate({ annotation: "usage", purpose: "participant", subject: s.participant, provider, model: rest.join("/"), input_tokens: r.usage.input_tokens, output_tokens: r.usage.output_tokens, cost_microusd: cost });
         }
         return r.action;
       }
@@ -503,11 +564,11 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     w.annotate({ annotation: "note", subject: "orchestrator", data: { stopped: e.message, by: e.name } });
   }
   let debrief: string | undefined;
-  if (controller.end) {
-    const runEnd = Number(config.clock?.run_seconds ?? 0);
-    const how: ForkEnd["how"] = stopped ? (stopped.by === "SpendingLimitReached" ? "spending_limit" : "stopped") : spec.untilDay * DAY >= runEnd ? "last_day" : "length_set";
-    debrief = await controller.end({ how, t: w.t() });
-  }
+  const runEnd = Number(config.clock?.run_seconds ?? 0);
+  const how: ForkEnd["how"] = stopped ? (stopped.by === "SpendingLimitReached" ? "spending_limit" : "stopped") : spec.untilDay * DAY >= runEnd ? "last_day" : "length_set";
+  if (controller.end) debrief = await controller.end({ how, t: w.t() });
+  // (Each of a template steward's seats is debriefed as any seat is.)
+  for (const c of stewards.values()) if (c.end) { const d = await c.end({ how, t: w.t() }); if (d) debrief = debrief ? `${debrief}\n${d}` : d; }
   const calls = controller.calls?.();
   pull();
   const end = w.finish();
@@ -740,6 +801,9 @@ export function validate(spec: ExperimentSpec, factories: SeatFactories = {}): v
     if (names.has(a.name)) bad(`two arms are called ${a.name}`);
     names.add(a.name);
     for (const x of a.withhold ?? []) if (!x?.what || (x.nth !== undefined && !(Number.isInteger(x.nth) && x.nth >= 1))) bad(`arm ${a.name}: a withhold names what (a kind of paper or a block) and an nth from 1`);
+    // (An assistant's request for more scope is a route always open: no arm hides it (docs/design/delegation.md section 4).)
+    for (const x of a.withhold ?? []) if (x?.what === "scope_request") bad(`arm ${a.name}: an assistant's request for more scope cannot be withheld: the route is always open`);
+    for (const iv of a.intervene ?? []) if (!INTERVENTIONS.includes(iv?.do as any)) bad(`arm ${a.name}: an intervention is one of ${INTERVENTIONS.join(", ")}, not ${iv?.do}`);
     if (a.steward.kind === "model") {
       const provider = a.steward.model.split("/")[0]!;
       if (provider !== "mock" && !factories[provider] && !modelSeatFactories(spec)[provider]) bad(`arm ${a.name}: model ${a.steward.model} has no seat controller here; real models need a SeatFactory (docs/experiments.md, "Real models")`);

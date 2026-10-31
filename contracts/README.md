@@ -745,3 +745,16 @@ Additive only; no schema file changed. A log made before is a valid log.
   days of rest and its public holidays (the profile's `calendar.weekend` and `calendar.holidays`), so an officer's day is
   a working day's and not a seventh of the week spread over seven.
 - **Breaking, replay:** the state hashes of every generated town with a support office move.
+## Delegation: assistants as services (2026-10-31; docs/design/delegation.md; docs/decisions.md, "Delegation D1 to D3"; under the owner's blanket approval of contract changes, 2026-10-11, and his approval of the delegation capabilities, 2026-10-31)
+
+Additive; no hard rule touched; nothing changes for a world that has no providers.
+
+- **The call language's `agreement` takes `attrs`** (`contracts/calls.schema.json`, `calls.md`): the terms' opaque
+  attributes, as JSON, which `AgreementTerms.attrs` already allowed; a service agreement states its records term there.
+- **New paper kinds** (world vocabulary, typed in `kernel/crates/actors/src/papers/delegation.rs`): `service_offer`
+  (published where a world declares it), `service_delivery`, `service_ended`, `remit`, `referral`, `brief`, `advice`,
+  `draft`, `sign_off`, `declined`, `approval_request`, `go_ahead`, `report`, `scope_request`, `handover`.
+- **The engine and host take `at_fork`** (`kernel/src/engine.rs` `AtFork`; host and stdio options beside `withhold`): acts
+  carried out at a fork's moment in a named participant's name and post, each noted (`note`, data `intervened`). A
+  researcher's intervention, as `withhold` is; nothing in the world is told of it.
+- No block was added: `set_channels`, in the design's first draft, is not built (decisions, "Delegation D1 to D3").

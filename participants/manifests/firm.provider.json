@@ -1,0 +1,61 @@
+{
+  "answers": {
+    "acts": "It publishes what it sells, sets up a service once its set-up is paid with an order (delivering a system to an organisation), offers the service agreement, and switches its systems off when the agreement ends or is not paid for. It takes no requests.",
+    "office": "a provider of assistants"
+  },
+  "boundary": [
+    {
+      "what": "assistants on offer",
+      "why": "What assistants can do, at what speed, how often they slip, at what price and on what terms, is the outside world's technology on offer, as world prices are. A provider of the outside world stands for it at the world's edge, as it is held in the profile with its source; nothing in the town can know or change it otherwise, and nothing here sets how much anyone delegates."
+    }
+  ],
+  "doc": "docs/behaviour/assistants.md",
+  "name": "firm.provider",
+  "params": {
+    "account": {
+      "default": "",
+      "schema": {
+        "description": "the account it is paid into (the world must say)",
+        "type": "string"
+      },
+      "source": "the account it is paid into (the world must say)"
+    },
+    "grace_days": {
+      "default": 75,
+      "schema": {
+        "description": "a service unpaid this long (two months' fees and a fortnight) lets the provider switch its systems off",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "offers": {
+      "default": [],
+      "schema": {
+        "type": "array"
+      },
+      "source": "the world gives it (the profile's, with their sources)"
+    },
+    "sign_days": {
+      "default": 30,
+      "schema": {
+        "description": "a service whose agreement its client has not signed this long is switched off",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
+    "unpaid_days": {
+      "default": 7,
+      "schema": {
+        "description": "an order unpaid this long is declined",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.1.0"
+}

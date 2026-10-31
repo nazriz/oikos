@@ -395,5 +395,7 @@ export const FIGURE_BASIS: Basis[] = [
   derived("templates.*.hours.closed.weekdays.*", "the profile's calendar.weekend: the place's days of rest, when a desk of officers does not work (with the run's dates, the real week from the start date; without, its last days)"),
   derived("templates.*.hours.closed.days.*", "the profile's calendar.holidays: the place's public holidays in the run's years, as days of the run from the start date"),
   prof("participants.*.lanes", "public_service.support_officers_per_1000_claims"),
+  prof("participants.*.controller.params.start_loan_months", "credit.max_months"),
+  prof("templates.*.controller.params.start_loan_months", "credit.max_months"),
 ];
 export { conv, derived, placeholder, prof };

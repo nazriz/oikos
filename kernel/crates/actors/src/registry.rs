@@ -6,7 +6,7 @@ use crate::Kind;
 
 static STAND_INS: &[&dyn Kind] = &[&crate::stub::Idle, &crate::stub::Script];
 
-fn groups() -> [&'static [&'static dyn Kind]; 8] {
+fn groups() -> [&'static [&'static dyn Kind]; 9] {
     [
         STAND_INS,
         crate::boundary::KINDS,
@@ -16,6 +16,7 @@ fn groups() -> [&'static [&'static dyn Kind]; 8] {
         crate::market::KINDS,
         crate::finance::KINDS,
         crate::offices::KINDS,
+        crate::delegation::KINDS,
     ]
 }
 
