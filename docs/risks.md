@@ -569,6 +569,19 @@ The mechanism:
 - **Notice by:** Engagement and levels moving with a placeholder changed alone.
 - **Fix when:** before a study reads how much is delegated rather than what follows when it is.
 
+### ME-23 · Skills by use: every rate a placeholder, everyone an ordinary hand on day one
+- **Gap:** With `skills` on, how fast a skill is learnt and lost, its floor, and how slow a novice and how quick a master
+  are, are placeholders (the shapes from the literature, to confirm; none fitted); every person opens at an ordinary
+  hand's level in every skill, whatever they did before the run; one skill serves all of a person's papers; slips do
+  not move with skill; code minds plan by the table's stated times, not their staff's skill.
+- **Where:** `worlds/generator/skills.ts` (`SKILL_DEFAULTS`); `docs/behaviour/skills.md`; decisions 2026-10-31 "Skills by use".
+- **Effect:** How much slower taking work back is, and how long relearning takes, rest on these rates; with skills on, a
+  household's papers drift slower than the table's time where papers are done rarely; an office that plans a day by the
+  stated time is refused for time more often.
+- **L / I:** high / high for any finding about what taking work back costs · **Status:** open (2026-10-31)
+- **Notice by:** The cost of taking work back moving with a placeholder rate changed alone.
+- **Fix when:** before a study reads the size of what taking work back costs, rather than whether it rises with time unused.
+
 ## Public bodies and law
 
 ### PB-1 · A tribunal's time is often the wrong quantity
@@ -1417,17 +1430,18 @@ The mechanism:
   Australian claimant does (a complaint to the Commonwealth Ombudsman, asking again) and give it to them as law data.
 
 ### MT-22 · A model steward in a fork is a pilot's seat, less a few things
-- **Gap:** The experiment harness's model seat (`orchestrator/src/seat-host.ts`) is the pilot's seat (the same
-  configuration, loop, translator arrangement, drafts, debrief) in the light host, except: who is who is the fork's
-  config, not the cast as it changes; thinking takes no world time; an act the engine will not take as written is noted
-  by the engine (`rejected_action`) and not told to the seat; no exit accounts or composer. An interrupted experiment is taken up again
-  (`--resume`, 2026-10-24) fork by fork from the seeds' snapshots, not from where a fork stopped.
-- **Where:** `orchestrator/src/seat-host.ts`, `experiment.ts`, `experiment-seats.ts`; docs/experiments.md, "Real models".
-- **Effect:** A seat whose rejected act goes untold may try again or wait where a pilot's would be told; small. A
-  fork interrupted part-way is run again whole: its spending so far is lost (it comes off its limit, so the total holds).
-- **L / I:** low / medium · **Status:** open; the dry run of the TARA spec at full size is the check that the path runs.
-- **Notice by:** `rejected_action` notes in a model fork; an experiment's log that stops without "done".
-- **Fix when:** Before the TARA run if a model fork's log shows `rejected_action`s from its seat.
+- **Gap:** Mitigated 2026-10-31 (docs/decisions.md, "A model steward in a fork is a pilot's seat"): the seat is told what
+  the engine would not take, follows the cast through base and fork, thinks in world time where the world says so, and
+  forks have the composer and exit accounts. Left: an interrupted experiment is taken up again (`--resume`) fork by fork
+  from the seeds' snapshots, not from where a fork stopped; a fork answers no `consult`, `reading` or `words` question
+  (a pilot answers them where it has the service).
+- **Where:** `orchestrator/src/seat-host.ts`, `fork-cast.ts`, `fork-composer.ts`, `experiment.ts`; docs/experiments.md, "Real models".
+- **Effect:** A fork interrupted part-way is run again whole: its spending so far is lost (it comes off its limit, so
+  the total holds), and it is a new sample. A world with the sparse mind or reading run as an experiment would differ
+  from its pilot in those answers.
+- **L / I:** low / low · **Status:** mitigated; the dry run of the TARA spec at full size is the check that the path runs.
+- **Notice by:** an experiment's log that stops without "done"; a spec whose world sets reading or the sparse mind.
+- **Fix when:** a long model fork is interrupted often enough that rerunning it whole costs real money or window time.
 
 ### MT-23 · A crew's day of delegated work took three times as long on one day, cause untraced
 - **Gap:** In `orchestrator/test/seat-diary.test.ts` (a works seat naming its crew to write forty notices a working day, 600 citizens, seed 1) the crew's paperwork takes 106 to 121 minutes from the first act of the day to the last on 18 of the 19 working days of days 1 to 28, and 310 minutes on day 21 (found 2026-10-24, after the run's seed began to draw who the people are). On the ordinary days the four crew members who are at work apply their acts side by side; on day 21 they applied one after another, the first four 30 minutes apart (555, 585, 615, 645 minutes into the day), and the day's later acts bunched in fours as well. **Not traced:** whether a crew member was busy with a gathering, a trip or another job that morning, whether the kernel serialised acts through one performer's time, or whether the seat's own sitting was late.

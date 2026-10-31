@@ -19,6 +19,7 @@ import { buildingAddress, calendarConfig, institutionName, nameOrganisations, na
 import { chooseWeather, drawWeather, type WeatherChoice } from "./weather";
 import { applyScenarios } from "./scenario";
 import * as K from "./knowing";
+import { withSkills, type SkillsSpec } from "./skills";
 
 /** The body that keeps the register of land, and the one that keeps the electoral roll: each its own (never the
  * town's: docs/behaviour/knowing.md, section 1). */
@@ -320,6 +321,9 @@ export interface TownSpec {
      * `true`, or which conducts are live and the sizes (`sway_milli`, `step`). The profile's `culture` figures go with the dial; people are
      * given an origin group only where the profile has `culture.origin` (drawn on a stream of its own). */
     culture?: boolean | { conducts?: string[]; sway_milli?: number; step?: object } };
+  /** Skills that grow with use and fade without it (docs/behaviour/skills.md; foundations-2 E4): off unless set; `true`, at
+   * the placeholder rates, or the rates a study sets (a factor of the study, not an assumption). Off: the town as before. */
+  skills?: boolean | SkillsSpec;
   /** How hard a seat's model reasons, where its way in takes that (docs/real-models.md, "A seat's settings"): one word
    * for every seat ("low"), or by office id ({ finance: "low" }). Not given: the model's own default. */
   seat_effort?: string | { [seat: string]: string };
@@ -3874,7 +3878,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const SHOP_SPEND = Math.max(1, (wages.shop * 30 / V.pay_period_days) * ((10_000 - V.spending.saving_bps) / 10_000) * 0.75);
   const WASTE_OF = (price: number) => Math.max(0, Math.round((V.services.waste_per_person_per_day_g * 30 * price) / SHOP_SPEND / 1000));
   retellTexts();
-  return {
+  // (Skills by use, where the town asks for them: docs/behaviour/skills.md. Not asked: the config as it is.)
+  return withSkills({
     contracts: "0.8",
     meta: { name: spec.name, description: `Generated town (generator ${GENERATOR_VERSION}, seed ${spec.seed}): ${everyone.length} people in ${households.length} households, ${homes.length} homes, ${jobSlots.length} jobs.${RS ? ` As the year begins: ${[...inForce.values()].reduce((x, y) => x + y.length, 0)} payments in force; ${start.taken_in} households with nothing coming in live with kin, ${start.on_savings} rent on their savings, ${start.without} households are without a home.` : ""}${OA ? ` ${ownBusinesses.length} people working for themselves, in the kinds the town holds (${OA_HELD.map((k) => k.name).join(", ") || "none"}); of the profile's own-account workers, ${(10_000 - OA_HELD.reduce((x, k) => x + k.share_bps, 0)) / 100}% are in kinds it cannot hold yet and are drawn in jobs.` : ""}${under.applied.length ? ` Starting conditions: ${under.applied.join(", ")}.` : ""}${NM ? ` People and bodies are named from the profile's frequency lists (${everyone.length - 0} people; ${(() => { const seen = new Map<string, number>(); for (const m of everyone) seen.set(nm(m.id), (seen.get(nm(m.id)) ?? 0) + 1); return [...seen.values()].reduce((x, n) => x + (n > 1 ? n * (n - 1) / 2 : 0), 0); })()} pairs share a full name; ${["names.given", "names.family"].filter((k) => P.sources[k]?.startsWith("PLACEHOLDER")).length ? "some lists are placeholders" : "no list is a placeholder"}). The names are drawn, not records of anyone.` : ""}`, canary: CANARY },
     ...(CAL_START ? { calendar: calendarConfig(CAL!, CAL_START, spec.years) } : {}),
@@ -4030,5 +4035,5 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         }
         return t;
       })() } : {}) },
-  };
+  }, spec.skills, (WORKING_DAY * WORK_DAYS) / 7 / HOUR);
 }
