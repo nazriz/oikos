@@ -9339,3 +9339,25 @@ routes as law data, nobody shown more than is theirs.
   world's physics: friction, scale to tens of thousands, forks and debriefs largely exist.
 - **Not decided here:** reordering the plan, and building the delegation capabilities; both are the owner's call.
 - **Revisit if:** the proposal changes (its 15 Nov project plan), or the owner chooses another study.
+
+## 2026-10-31 · Delegation capabilities: the design (D0; docs only; no model called)
+
+- **What:** `docs/design/delegation.md`, the design of the delegation capabilities the owner approved on 2026-10-31
+  ("we need to complete all of that + 1 to 3"): providers as organisations selling assistants as services (phase 4's
+  E1, taken into this work), remits per kind of matter at four levels with no ladder, the sign-off route, the principal's
+  instructions and the assistant's requests for more as records apart from its acts, learning from what the principal
+  itself saw, records by contract, replacement and taking back, forks that intervene at a checkpoint, and model seats as
+  assistants. The plan's item moves to "Now", in steps D0 to D7.
+- **Why this shape:** the owner's ruling of 2026-10-25 (assistants are systems sellers deploy, bought as services; no
+  separate mechanism for AI) and the kernel's own physics decide most of it: a system is delivered only to an
+  organisation and works only for its owner, so an organisation's assistant is a delivered system in an assistant post of
+  its own (its acts are the organisation's, readers unchanged), and a person's is the provider's own system writing in the
+  person's name on a mandate. A remit is a record with no power (D18-D22): an assistant beyond it is on record, not
+  refused. The one kernel addition is `set_channels` (access is a post's channels, and the principal must be able to
+  narrow them); it is checked by the knowing rules as a new post's channels are, so no hard rule changes. A code
+  principal's delegation is a wrapper round the code it already runs, so no kind's work changes until it delegates.
+- **Not decided here:** the study's definition, measures and arms; which principals a study's town has delegating; any
+  framing for a model assistant. All the owner's.
+- **Revisit if:** the wrapper breaks an existing kind's chains (then delegation moves into each kind that carries it);
+  `set_channels` needs any knowing exception (a hard rule: to the owner first); the seat host cannot follow a cast that
+  changes in a fork.

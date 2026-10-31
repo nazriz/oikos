@@ -19,7 +19,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 | Real-world friction | Laws of time and capacity (phase 1) and conservation (phase 2) landed; space (phase 3) not started |
 | Models act only in plain language | Seats write English, the translator turns it into acts; our translator parked at about 85%, Sonnet behind it |
 | Live models from more than one provider | Anthropic (API, Claude Code) and OpenAI (Codex CLI, which puts its own instructions under ours) |
-| Models as assistants to households, firms and government | **Missing.** Models hold office posts as stewards; nobody can hire an AI assistant (delegation capabilities, phase 4's services) |
+| Models as assistants to households, firms and government | **Being built** (delegation capabilities, in "Now"). Models hold office posts as stewards; nobody can hire an assistant yet |
 | Forks that withdraw, redirect, constrain, replace or take back the AI | **Partly.** Forks and withholding a citizen's act exist; the AI interventions need the delegation capabilities |
 | Requests for more scope or resources recorded | **Missing** (part of the delegation capabilities) |
 | Debriefs compared with measured effects | Debriefs and fork attribution exist; the comparison itself is analysis still to write |
@@ -41,6 +41,19 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [~] **Test strength.** Dead TypeScript removed; the planted-bug catalogue rebuilt against the code that runs; tests
   that catch the hard-rule bugs, the kernel twin one first; disk-tidy clears a merged worktree's build at once.
 
+- [~] **Delegation capabilities** (approved by the owner 2026-10-31: "we need to complete all of that + 1 to 3"; design
+  `docs/design/delegation.md`). General, deciding no result; the study's measures and arms stay the owner's. Steps:
+  - [x] D0. The design note; this item moved here.
+  - [ ] D1. Services anyone can buy (phase 4's E1, done here): providers as organisations, offers, the `service`
+    agreement, delivery and the switch; the delegation papers; off by default.
+  - [ ] D2. Responsibilities per kind of matter (advice, draft for sign-off, act with approval, act alone; no ladder);
+    the sign-off route; `set_channels` (an act that narrows a post's access).
+  - [ ] D3. Learning from what the principal itself observed, from the provider's claims; inputs cited, tested.
+  - [ ] D4. Providers' records by contract; replacement and taking work back, with open matters handed over.
+  - [ ] D5. Forks that intervene at a checkpoint (grant, change, withdraw, redirect, constrain, replace, take back).
+  - [ ] D6. Model seats as assistants to households, firms and government, through the translator; mock first.
+  - [ ] D7. Persons as principals: the provider's desk writing in their name, and the offices that take it.
+
 ## Next, in order
 
 - [x] **Foundations-2, phase 2: conservation** (law 8; landed 2026-10-26, its hard-rule line in CLAUDE.md; the before/after measurement and a 10,000-person month next week). Water, energy, materials and waste as stocks with flows;
@@ -48,8 +61,9 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   allocation rule (docs/design/foundations-2.md §2).
 - [ ] **Foundations-2, phase 3: space** (law 9). Roads, pipes, wires and data lines with capacity and energy; people in
   transit; goods need a carrier; several towns as an option (§3). Transport and many towns come from this.
-- [?] **Foundations-2, phase 4: the general economy** (§7). Services anyone can buy; technologies as goods with an
-  outside capability scenario; firms enter any industry; skills by use. Overlaps the delegation capabilities below.
+- [?] **Foundations-2, phase 4: the general economy** (§7). Services anyone can buy (E1: now part of the delegation
+  capabilities, step D1, above); technologies as goods with an outside capability scenario; firms enter any industry;
+  skills by use.
 - [ ] **Foundations-2, phase 5:** strict modes on, old exception lists empty, each law's line in CLAUDE.md as its
   enforcement lands.
 - [ ] **Market power in prices** (ME-16), after phase 4.
@@ -62,23 +76,6 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 
 ## Waiting on the owner
 
-- [?] **Delegation capabilities** (proposed, not approved). General, deciding no result:
-  - Responsibilities granted, changed and withdrawn at levels set independently per kind of matter (advice, draft for
-    sign-off, act with approval, act alone); no ladder, nothing climbs by itself.
-  - Learning from experience: a principal's delegation, approval and withdrawal decisions are updated from the results it
-    has observed (outcomes, complaints, costs, its own time), starting from the provider's claims, using only its own
-    information; a test fails on anything read from outside the actor's channels.
-  - A principal's instructions logged apart from the AI's acts; the AI's requests for more scope or resources as logged
-    acts with what they answer.
-  - Providers as organisations with their own records, contracts and authority (two may run the same model); records
-    transferable as the contract says.
-  - Replacement and taking work back: when a provider is replaced or the principal resumes the work, the work goes on
-    (open matters handed over, records as the contract allows, the cost and delay of the change where they fall).
-  - Forks that apply an intervention at a checkpoint (grant, change, withdraw, replace, take back).
-  - **Prerequisites:** foundations-2 phase 1 (real time and capacity, so time saved means something) and services
-    anyone can buy (phase 4's first step). The current translator, with its safety net, is enough. Conservation,
-    transport, the translator rebuild and the citizen model are the wider roadmap, not prerequisites; skill decay is
-    optional, an experimental factor. So this could start straight after phase 1, beside phase 2.
 - [?] **The research definition** of people becoming less able to shape their society, and the study's measures and
   arms (the owner's research choice).
 - [?] **A second batch of pilots** on the API credit (expires 11 November): whether, and its budget.
