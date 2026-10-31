@@ -27,7 +27,7 @@ export interface Basis {
    * for something. */
   family?: string;
   /** Only for a number under this id (a key of the name, or an element with this `id`): which task, field or kind,
-   * where the pattern's `*` covers several made from different figures. */
+   * where the pattern's `*` covers several made from different figures. Ending in `*`: any id that begins so. */
   id?: string;
   /** Only where the config has this dotted path (a town with frictions has `dials.friction_bps`). */
   given?: string;
@@ -172,6 +172,13 @@ export const FIGURE_BASIS: Basis[] = [
   prof("catalogue.travel.seconds_per_cell", "round.travel_seconds_per_cell"),
   { ...prof("catalogue.travel.by_cover.*", "round.roads.seconds_per_cell"), id: "road", family: "catalogue.travel.by_cover (road)" },
   prof("catalogue.travel.by_cover.*", "round.travel_by_cover"),
+  // Skills by use (worlds/generator/skills.ts; docs/behaviour/skills.md), where a town asks for them: the study's rates.
+  { ...conv("catalogue.body_variables.*.max", "a skill's scale: mastery is 10,000"), id: "skill-*", family: "skills: scale" },
+  { ...conv("catalogue.body_variables.*.min", "a skill's scale: none is nought"), id: "skill-*", family: "skills: scale" },
+  { ...derived("catalogue.body_variables.*.initial", "an ordinary hand's level (the table of work's times are theirs): where a full-time worker settles at the run's rates of practice and fading, over the profile's working week"), id: "skill-*" },
+  { ...placeholder("catalogue.body_variables.*.practice", "the run's rates of practice and fading, or SKILL_DEFAULTS: shapes from the literature (Heathcote, Brown and Mewhort 2000; Arthur et al. 1998; to confirm), sizes not fitted"), id: "skill-*" },
+  placeholder("catalogue.tasks.*.skill", "a novice's and a master's time as shares of an ordinary hand's: the run's, or SKILL_DEFAULTS (not fitted)"),
+  placeholder("catalogue.act_skills", "a novice's and a master's time at a person's papers as shares of an ordinary hand's: the run's, or SKILL_DEFAULTS (not fitted)"),
   derived("catalogue.body_variables.*.max", "the profile's education.max_years of schooling, as skill (a year is 10,000)"),
   conv("catalogue.body_variables", "skill counted from none: nobody is born schooled"),
   ...task("collect", [prof("labour", "services.collect_seconds_per_10kg"), conv("produces", "10 kg of waste a unit collected")]),

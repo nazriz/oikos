@@ -290,3 +290,93 @@ fn two_investigations_in_one_action_draw_independently() {
     }
     assert!(differ > 0 && found_some > 0 && found_none > 0, "the two tries differ on some days ({differ}), and each way happens ({found_some}, {found_none})");
 }
+
+/// A practised skill (foundations-2 E4): the world's craft, ordinary at 5,000 (the stated time), twice as slow at none,
+/// half the time at the most; an hour's use closes a tenth of the gap to the most; unused, the part above 2,000 halves
+/// every 100 days.
+fn practised_world() -> Value {
+    let mut w = services_world();
+    w["catalogue"]["body_variables"].as_array_mut().unwrap().push(json!({"id": "craft", "min": 0, "max": 10000, "initial": 5000,
+        "practice": {"gain_bps_per_hour": 1000, "half_life_days": 100, "floor": 2000}}));
+    for t in w["catalogue"]["tasks"].as_array_mut().unwrap() {
+        if t["id"] == "make" {
+            t.as_object_mut().unwrap().remove("labour_by");
+            t["skill"] = json!({"variable": "craft", "novice_bps": 20000, "expert_bps": 5000});
+        }
+    }
+    w["catalogue"]["act_skills"] = json!([{"act": "message", "variable": "craft", "novice_bps": 20000, "expert_bps": 5000}]);
+    w["orchestration"]["act_time"]["person"] = json!({"message": 600});
+    w
+}
+
+fn craft(run: &Run<Vec<u8>>, who: &str) -> (i64, i64) {
+    run.kernel().state().body(who).unwrap().variables[&oikos_kernel::blocks::Id::new("craft")]
+}
+
+fn labour_of(ev: &[EventBody]) -> i64 {
+    ev.iter().find_map(|e| match e { EventBody::Worked { labour, .. } => Some(*labour), _ => None }).unwrap()
+}
+
+#[test]
+fn a_practised_skill_grows_with_use_and_fades_without_it() {
+    let w = practised_world();
+    let mut run = start(&w);
+    let make = json!([{"block": "work", "task": "make", "units": 2, "at": "s-shop", "performers": ["carol"]}]);
+    // An ordinary hand takes the stated time, and the hour is practice: a tenth of the 5,000 still to learn.
+    let ev = act(&mut run, "developer-system", Some("developer"), make.clone()).unwrap();
+    assert_eq!(labour_of(&ev), 3600);
+    assert_eq!(craft(&run, "carol").0, 5500);
+    // Quicker for it (a tenth of the way to half the time: 95%), and practised again, by less (diminishing returns).
+    let ev = act(&mut run, "developer-system", Some("developer"), make.clone()).unwrap();
+    assert_eq!(labour_of(&ev), 3420);
+    let v = craft(&run, "carol").0;
+    assert_eq!(v, 5500 + 4500 * 1000 * 3420 / (10_000 * 3600));
+    // A hundred days unused: the part above the floor halved, read as it stands (nothing is written until it is used).
+    let t = run.kernel().state().t;
+    advance(&mut run, t + 100 * DAY);
+    let cfg = run.kernel().statics().config.catalogue.body_variables[1].clone();
+    let stored = craft(&run, "carol");
+    assert_eq!(stored.0, v, "fading is read, not written each day");
+    let faded = 2000 + (v - 2000) / 2;
+    assert_eq!(oikos_kernel::state::body_variable_at(&cfg, stored, stored.1 + 100 * DAY).0, faded);
+    // Years without it: never below the floor.
+    assert_eq!(oikos_kernel::state::body_variable_at(&cfg, stored, stored.1 + 20_000 * DAY).0, 2000);
+    // ... and work is slower for it: below the ordinary hand, toward the novice's double time.
+    let now = run.kernel().state().t;
+    let at_now = oikos_kernel::state::body_variable_at(&cfg, stored, now).0;
+    assert!(at_now <= faded + 1 && at_now < 5000);
+    let ev = act(&mut run, "developer-system", Some("developer"), make.clone()).unwrap();
+    assert_eq!(labour_of(&ev), (3600 * (20_000 - 10_000 * at_now / 5000) + 9_999) / 10_000);
+
+    // An act with a skill: a person's time for it is scaled as work is, and doing it is practice.
+    let took = |run: &mut Run<Vec<u8>>| {
+        let cmd = direct("alice-self", None, serde_json::from_value(json!([{"block": "message", "to": ["bob-self"], "text": "hi"}])).unwrap()).unwrap();
+        let r = step(run, &cmd).unwrap();
+        r.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { starts, done, .. } => Some(done - starts), _ => None }).unwrap()
+    };
+    let mut w2 = w.clone();
+    for e in w2["world"]["entities"].as_array_mut().unwrap() {
+        if e["id"] == "alice" {
+            e["variables"] = json!({"craft": 0});
+        }
+    }
+    let mut run = start(&w2);
+    assert_eq!(took(&mut run), 1200, "a novice takes twice the table's ten minutes");
+    assert_eq!(craft(&run, "alice").0, 10_000 * 1000 * 1200 / (10_000 * 3600));
+    // Without the act's skill, the table's time, and no practice.
+    let mut w3 = w2.clone();
+    w3["catalogue"].as_object_mut().unwrap().remove("act_skills");
+    let mut run = start(&w3);
+    assert_eq!(took(&mut run), 600);
+    assert_eq!(craft(&run, "alice").0, 0);
+}
+
+#[test]
+fn a_skill_is_named_only_on_a_practised_variable() {
+    let mut w = practised_world();
+    w["catalogue"]["act_skills"][0]["variable"] = json!("skill");
+    assert!(Run::start(w, "services", Vec::new(), None).is_err(), "schooling is no practised skill");
+    let mut w = practised_world();
+    w["catalogue"]["body_variables"][1]["per_day"] = json!(1);
+    assert!(Run::start(w, "services", Vec::new(), None).is_err(), "a skill fades by its half-life, not a drift as well");
+}
