@@ -92,6 +92,20 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
 /// A person who is to do work: alive and in the world; and, if `at` is given, in that structure (in a space of the
 /// given kind, if given); else in a space of the kind the world says work is done in (`orchestration.performers_in`),
 /// if it says. The one rule for a `work`'s performers and for an action's `by` (foundations F3).
+/// The speed a body drives a vehicle at (law 9, foundations-2 S2): one it may drive (its owner's, or one its owner lets),
+/// standing where the body sets out from; refused otherwise.
+pub fn driven_speed(s: &Statics, st: &State, vehicle: &str, body: &str, from: &str) -> R<i64> {
+    let v = st.vehicles.get(vehicle).ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("no vehicle {vehicle}")))?;
+    if !v.may_drive(body) {
+        return Err(refuse(RefusalCode::NotTheirs, format!("{body} may not drive {vehicle}")));
+    }
+    if v.at != from {
+        return Err(refuse(RefusalCode::NotPresent, format!("{vehicle} is at {}, not at {from}", v.at)));
+    }
+    let t = s.config.travel.as_ref().and_then(|t| t.vehicle_types.iter().find(|x| x.id == v.type_));
+    Ok(t.map_or(1, |t| t.speed_kmh))
+}
+
 pub fn check_at_work(s: &Statics, st: &State, p: &str, at: Option<&str>, space: Option<&str>) -> R<()> {
     // (A system has no body to be anywhere: it does the work while it is in service. Whether its template lists the
     // work is looked at when the act is ordered, `check_system_does`.)
@@ -773,6 +787,10 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
                     return vec![];
                 }
                 x.complete = true;
+                // (A way finished is part of the ways from now: trips are worked out afresh.)
+                if s.types.get(x.structure_type.as_str()).is_some_and(|ty| ty.way.is_some()) {
+                    st.ground.changed();
+                }
                 st.touch_structure(&structure);
                 vec![Timed::new(t, EventBody::StructureCompleted { structure })]
             }
@@ -1346,6 +1364,9 @@ impl<'a> Exec<'a> {
             // Complete once the work is done, if its build time has passed (else when it does).
             if s.labour_done >= needed && s.completes_at.is_none() {
                 s.complete = true;
+                if self.s.types.get(s.structure_type.as_str()).is_some_and(|ty| ty.way.is_some()) {
+                    self.st.ground.changed();
+                }
                 self.st.touch_structure(&target);
                 self.emit(EventBody::StructureCompleted { structure: target });
             } else {
@@ -1978,13 +1999,17 @@ impl<'a> Exec<'a> {
 
             Block::Work { task, units, at, performers, on, survey, investigate } => self.work(index, task, *units, at, performers, on, survey.as_ref(), investigate.as_ref()),
 
-            Block::Occupy { space, who } => {
+            Block::Occupy { space, who, vehicle } => {
                 let space = self.r(space)?;
                 let who = match who {
                     Some(w) => self.r(w)?,
                     None => self.acting_person()?,
                 };
                 self.living_present(&who)?;
+                let vehicle = match vehicle {
+                    Some(v) => Some(self.r(v)?),
+                    None => None,
+                };
                 let (sid, local) = split_space(&space).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{space} isn't a space")))?;
                 let x = self.st.structures.get(sid).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {sid}")))?;
                 let spec = self.s.space(&x.structure_type, local).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{sid} has no space {local}")))?;
@@ -2006,6 +2031,11 @@ impl<'a> Exec<'a> {
                     return Err(refuse(RefusalCode::Flooded, format!("{sid} is under water")));
                 }
                 let sid = sid.to_string();
+                // (Driven here: the vehicle must be one the body may drive, standing where it set out; it stands here now.)
+                if let Some(v) = &vehicle {
+                    let from = self.st.structures_of(&who).into_iter().next().ok_or_else(|| refuse(RefusalCode::NotPresent, format!("{who} is nowhere to drive {v} from")))?;
+                    driven_speed(self.s, self.st, v, &who, &from)?;
+                }
                 // A body is in one place at a time: coming here, it leaves wherever else it was.
                 for other in self.st.structures_of(&who) {
                     leave_spaces(self.s, self.st, &other, Some(&who), None, VacateReason::Left, Some(self.participant), &mut self.events);
@@ -2015,7 +2045,10 @@ impl<'a> Exec<'a> {
                 self.st.enter(&sid, &space, &who);
                 self.st.touch_structure(&sid);
                 self.st.moved(&who);
-                self.emit(EventBody::Occupied { occupant: who, space, by: self.participant.into() });
+                if let Some(v) = &vehicle {
+                    self.st.vehicles.get_mut(v.as_str()).unwrap().at = Id::new(&sid);
+                }
+                self.emit(EventBody::Occupied { occupant: who, space, by: self.participant.into(), vehicle: vehicle.map(|v| Id::new(&v)) });
                 Ok(())
             }
 

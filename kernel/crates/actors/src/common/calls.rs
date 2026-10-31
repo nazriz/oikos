@@ -16,6 +16,11 @@ pub fn move_in(space: &str) -> Call {
     call("occupancy", vec![("in", Some(arg(space)))])
 }
 
+/// Go into a space driving a vehicle (law 9): one we may drive, standing where we set out.
+pub fn move_in_by(space: &str, vehicle: &str) -> Call {
+    call("occupancy", vec![("in", Some(arg(space))), ("by", Some(arg(vehicle)))])
+}
+
 /// Come out of a space, or a whole building.
 pub fn move_out(from: &str, who: &str) -> Call {
     call("occupancy", vec![("in", Some(arg(from))), ("who", Some(arg(who))), ("leave", Some(arg("yes")))])

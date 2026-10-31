@@ -64,7 +64,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [x] **Foundations-2, phase 2: conservation** (law 8; landed 2026-10-26, its hard-rule line in CLAUDE.md; the before/after measurement and a 10,000-person month next week). Water, energy, materials and waste as stocks with flows;
   metered homes; recipes say their energy and water; shortages follow from network, contracts and operators, with no
   allocation rule (docs/design/foundations-2.md §2).
-- [~] **Foundations-2, phase 3: space** (law 9; branch `f2-phase3`: S1, the backstop and its inventory). Roads, pipes, wires and data lines with capacity and energy; people in
+- [~] **Foundations-2, phase 3: space** (law 9; branch `f2-phase3`: S1, the backstop and its inventory; S2, roads as ways and household vehicles). Roads, pipes, wires and data lines with capacity and energy; people in
   transit; goods need a carrier; several towns as an option (§3). Transport and many towns come from this.
 - [~] **Foundations-2, phase 4: the general economy** (§7; every roadmap item to be done, owner 2026-10-31; branch
   `f2-economy`). Serves the north star's reversibility: what taking work back costs, and what AI takes of a finite town.
