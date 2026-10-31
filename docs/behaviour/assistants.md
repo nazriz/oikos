@@ -92,6 +92,9 @@ person's name on a mandate is how a bank acts on one, and how a payment-initiati
 Payment Services Directive (Directive (EU) 2015/2366; to confirm). Who keeps the records an outsourced service makes, and
 whether they pass on at the end, is a term of the contract in practice (to confirm: a source on data-return clauses).
 
+Prices: the published 2026 prices of real general AI assistants (business seats and the consumer tier), in au-vic,
+gb-eng and us-oh, with their sources in each profile; speed, slip rates and principals' figures are placeholders (ME-22).
+
 ## A person as principal (the desk)
 
 Where some provider serves persons, every person's code is wrapped as a principal (the same rule; their own account, as

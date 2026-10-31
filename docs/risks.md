@@ -557,17 +557,24 @@ The mechanism:
 
 ---
 
-### ME-22 · Delegation's figures are placeholders, and a code assistant decides nothing
-- **Gap:** The assistants on offer (prices, speed, a provider's claimed and true slip rates, the records term) and what a
-  principal weighs (what an error costs it, the share of slips its reading finds, how much a claim counts, its hurdle,
-  its review day, its horizon) are placeholders in au-vic only; the times of the papers of delegation are placeholders.
-  A code assistant carries out what its principal decided; only a model in the seat decides otherwise.
-- **Where:** `worlds/profiles/au-vic-2026.json` `values.assistants`; `docs/behaviour/assistants.md`; `docs/design/delegation.md`.
-- **Effect:** How much code principals delegate, at which levels, and how fast hidden slips build trust, rest on these
-  figures; a run with code assistants shows the machinery, not how much real principals would hand over.
-- **L / I:** high / high for any finding about how much is delegated · **Status:** open (2026-10-31)
+### ME-22 · Delegation's speed, slips and principals' figures are placeholders, and a code assistant decides nothing
+- **Gap:** The assistants' prices now rest on published 2026 prices of real assistant products (au-vic, gb-eng, us-oh;
+  2026-10-31, `assistant-prices`), most from secondary pages (to confirm). Still placeholders: an assistant's speed (no
+  provider publishes a time per paper; the one controlled study measures a person with an assistant), a provider's
+  claimed and true slip rates (no published error rate for drafting papers; hallucination benchmarks measure
+  summaries), the records term, and all a principal weighs (what an error costs it, the share of slips its reading
+  finds, how much a claim counts, its hurdle, its review day, its horizon); the times of the papers of delegation; and
+  which real product stands for provider A or B (a convention). A code assistant carries out what its principal
+  decided; only a model in the seat decides otherwise. Other profiles have no assistants.
+- **Where:** `worlds/profiles/{au-vic,gb-eng,us-oh}-2026.json` `values.assistants`; `docs/behaviour/assistants.md`; `docs/design/delegation.md`.
+- **Effect:** How much code principals delegate, at which levels, and how fast hidden slips build trust, rest above all
+  on the speed and slip placeholders and the principals' figures (prices are now real but list prices of general
+  assistants, not of a service that does tenancy papers alone); a run with code assistants shows the machinery, not how
+  much real principals would hand over.
+- **L / I:** high / high for any finding about how much is delegated · **Status:** open (2026-10-31; prices sourced 2026-10-31)
 - **Notice by:** Engagement and levels moving with a placeholder changed alone.
-- **Fix when:** before a study reads how much is delegated rather than what follows when it is.
+- **Fix when:** before a study reads how much is delegated rather than what follows when it is: a measured time and
+  error rate for an assistant doing such papers alone, and a source for what an error costs a landlord or a person.
 
 ## Public bodies and law
 

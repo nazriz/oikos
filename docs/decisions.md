@@ -9765,3 +9765,31 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+
+## 2026-10-31 · The assistants' prices from real products; gb-eng and us-oh get assistants (branch `assistant-prices`; profiles only; a town without `assistants` is unchanged; no model called)
+
+- **What.** Each offer's fee, set-up and exit in au-vic now rest on 2026 published prices of real general AI
+  assistants, and gb-eng and us-oh get the same two providers in their own currencies (sources in each profile's
+  `sources.assistants`; citations in docs/research/references.md). Businesses: A at a ChatGPT Business seat's annual
+  price (US$20; A$31.00 and £15.60 converted at the profiles' rates, no local price found), B at Microsoft 365 Copilot's
+  (A$44.90, £24.70, US$30). Persons: the consumer tier at about US$20, A at the cheaper and B at the dearer local price
+  found (A$29.99 / 32.99; £18.99 / 19.99; US$19.99 / 20.00). Set-up and exit 0 for a business (none listed for these
+  self-serve subscriptions; B's US$200 set-up and US$100 exit had no source), a person's set-up a month's fee (paid a
+  month ahead: a convention). Per use: none (flat subscriptions; an offer has no per-use field). For comparison, not
+  read by any code: what a bookkeeper or clerk costs in each place.
+- **Not changed, and why.** Speed (a tenth of a person's time), the claimed and true slip rates, the records terms and
+  every principal's figure stay placeholders, labelled: no honest source measures an assistant doing such papers alone
+  (Noy and Zhang 2023 measure a person with one; hallucination leaderboards measure summaries, at rates from under 1% to
+  over 10% by dataset), and picking a number out of such a range would be choosing the outcome. gb-eng's and us-oh's
+  error cost is au-vic's placeholder converted. Nothing was tuned: every price is moved to its source whichever way it
+  moves engagement; prices all fell (business fees by a third to a half, set-ups to nothing), so expect more engagement
+  at au-vic's prices than before, recorded, not targeted.
+- **Results.** Towns without `assistants: true` are generated and run as before (no pinned hash moved); towns with it
+  change in the providers' offers only.
+- **Which product stands for A or B** is a convention (the cheaper for A); the world names neither. B's dearer price
+  goes with its records returned to the client and its lower true slip rate, both placeholders, so a principal's choice
+  between them is a choice between placeholders as much as prices.
+- **Revisit if** a provider publishes an error rate or time per document for agent work of this kind, a study measures
+  an assistant working alone on administrative papers, a product sold to landlords or for persons' claims (rather than a
+  general assistant) is priced, or the primary price pages can be opened (most figures are from secondary pages: to
+  confirm).
