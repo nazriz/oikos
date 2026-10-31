@@ -94,7 +94,8 @@ test("the Rust world's actor kinds declare only the keepers and boundaries liste
   // (Declarations a Rust kind makes that its TS module held without declaring, each with its reason: allowed here only,
   // and added to the lists above when the TS modules go. world.vendor: the technology on offer is the outside world's,
   // as world prices are; the TS vendor kept it undeclared. 2026-10-18, integration.)
-  const RUST_ONLY = ["world.vendor: technology on offer"];
+  // (firm.provider: the assistants on offer are the outside world's technology, as world.vendor's systems are; 2026-10-31.)
+  const RUST_ONLY = ["world.vendor: technology on offer", "firm.provider: assistants on offer"];
   const allowed = new Set([...KEEPERS, ...BOUNDARY, ...RUST_ONLY]);
   for (const m of rustManifests()) for (const k of [...(m.keeps ?? []), ...(m.boundary ?? [])]) {
     expect(allowed.has(line(m.name, k.what)), `${line(m.name, k.what)}: a Rust kind's declaration not in the list`).toBe(true);

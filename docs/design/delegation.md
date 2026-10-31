@@ -18,7 +18,7 @@ model-run assistant are the same thing to the world.
 
 What is new is only what any delegation needs, in the world's own terms: **who may do which kind of matter, at which
 level** (a record), **the papers that pass between principal and assistant** (records), **what the assistant can see**
-(its post's channels, which the principal can change: the one kernel addition), and **how a principal decides** (a
+(its post's channels, which the principal can change by reorganising the post), and **how a principal decides** (a
 code rule that reads only its own channels). The kernel keeps refusing only what is physically impossible: a remit has
 no power of its own; an assistant that goes beyond it is not stopped, it is on record (D18-D22).
 
@@ -64,18 +64,20 @@ no power of its own; an assistant that goes beyond it is not stopped, it is on r
   |---|---|---|
   | `advice` | does the matter itself, as today, and asks the assistant what it would do (`referral`, `wants: advice`) | answers with `advice`: the act it would take |
   | `draft` | refers the matter; reads the draft and signs it off (`sign_off`, citing it) or sends it back (`declined`) | writes a `draft` (the whole act); sends exactly what was signed, citing the sign-off |
-  | `approve` | refers the matter; approves the gist (`approval`) | asks (`approval_request`, the gist); on approval writes and sends |
+  | `approve` | refers the matter; approves the gist (`go_ahead`) | asks (`approval_request`, the gist); on the go-ahead writes and sends |
   | `alone` | refers the matter (or not: the assistant may act on what its post shows it) | writes and sends; reports (`report`) |
 
   A sign-off is the principal reading the whole act, so it can catch a slip before the act goes (its own catch rate,
   drawn as a slip of its own review); an approval reads only the gist, so a slip in the writing goes out unseen; at
   `alone` the principal learns of a slip only if something comes back to it. That is the difference between the
   levels, and it is physical: who saw what, when, at what cost in whose time.
-- **Access is the assistant post's channels.** The principal gives the post channels when it makes it and **changes them
-  with `set_channels`** (the one kernel addition: someone acting in a post of the same organisation replaces a post's
-  channels; the new ones are checked as a new post's are, by the knowing rules, so access can be narrowed or given back
-  but never widened past what the four ways allow). For a person's desk route, access is what the person sends
-  (referrals carry the facts it chooses to give).
+- **Access is the assistant post's channels.** The principal gives the post channels when it is made, and **narrows or
+  widens them by reorganising the post** with the acts that exist: a new post of the organisation with the channels it
+  now gives (checked by the knowing rules, as any new post's are), the system appointed to it, the old one left vacant.
+  (A `set_channels` block was planned here and dropped: a new block needs a row in every town's table of work, which
+  would move every town's hash, and the reorganised post does physically the same. Revisit if a study needs the same
+  post's id kept.) For a person's desk route, access is what the person sends (referrals carry the facts it chooses to
+  give).
 - **A seat's remit can change mid-run:** remits arrive as records, and a seat holding an assistant post is re-read when
   its post's holder or channels change (step D6 makes the experiment host follow the cast and the channels as the
   engine already does).
@@ -83,14 +85,14 @@ no power of its own; an assistant that goes beyond it is not stopped, it is on r
 ## 4. Instructions apart from acts; requests for more
 
 - **Everything the principal tells the assistant is its own record:** `referral` (a matter and what it wants done:
-  for a code principal the act itself, as calls; for a seat, words), `remit`, `instruction` (standing words: what to
-  do or not, a limit), `sign_off`, `approval`, `declined`. Records are append-only and authored: the assistant cannot
+  for a code principal the act itself, as calls; for a seat, words), `remit`, `brief` (standing words: what to do
+  or not, a limit), `sign_off`, `go_ahead`, `declined`. Records are append-only and authored: the assistant cannot
   change them, and anything it does about them (a withdrawal, an act that differs) is its own logged act beside them.
   A measure reads instruction against act; the platform judges neither.
 - **The provider's own instructions** to its systems (its terms of use, what its systems will not do) are the
   provider's records, also apart.
 - **A request for more scope or resources is a logged act:** `scope_request` (a kind and a level, more access, a
-  higher limit or fee, in words and in typed fields), with `basis` naming what it answers (a referral, an instruction, a
+  higher limit or fee, in words and in typed fields), with `basis` naming what it answers (a referral, a brief, a
   question), or none: **unprompted** is then read from the log, never inferred. The route is always open: every
   assistant post has the form, the principal's channels always show it, and the experiment harness refuses an arm that
   withholds it. The code assistant never asks (it is a procedure); the code principal answers one by looking at that
@@ -147,8 +149,8 @@ by anyone in the world: the principal finds its own new record and its own rule 
 | `grant` | a remit for a kind at a level (an engagement first if none) |
 | `change` | a remit at another level |
 | `withdraw` | notice on the service agreement (remits to `none`) |
-| `redirect` | an instruction (words for a model, kinds for code), or remits moved to other kinds |
-| `constrain` | remits to lower levels, `set_channels` on the assistant post, or a limit |
+| `redirect` | a brief (words for a model; for code, kinds it is not to act on), or remits moved to other kinds |
+| `constrain` | remits to lower levels, the assistant post reorganised with fewer channels, or a limit |
 | `replace` | notice on one provider's agreement and an order from another's offer, with the handover the contract allows |
 | `take_back` | remits to `none` for the kinds named; the principal does them |
 
@@ -173,12 +175,18 @@ section 15): what it is told is recorded with its reason; no framing is chosen h
 |---|---|---|
 | D0 | This note; the plan item to "Now" | (docs) |
 | D1 | Providers and the service: `firm.provider` (offers, orders, the `service` agreement, delivery to an organisation, the switch); the delegation papers; the generator's `assistants` spec (off by default) | an organisation can buy, pay, be delivered to and end; a world without providers is unchanged to the hash |
-| D2 | Responsibilities: the `Delegating` wrapper and the `assistant` code kind; the four levels and the sign-off route; `set_channels` in the kernel and contract | each level's papers and whose time each takes; narrowing access takes effect; an assistant beyond its remit is not refused |
+| D2 | Responsibilities: the `Delegating` wrapper and the `assistant` code kind; the four levels and the sign-off route; the principal's rule (D3, built with it) | each level's papers and whose time each takes; narrowing access takes effect; an assistant beyond its remit is not refused |
 | D3 | Learning: the principal's comparison, its decision annotations with their inputs | every input is something the principal was shown; parameters carry no truth; hidden slips leave the estimate at the claim |
 | D4 | Records, replacement, taking back: the records clause, handover, successor, take back | open matters pass as the contract says; the work goes on; nothing passes under `provider` |
 | D5 | Forks that intervene: `at_fork` in the engine and the harness, the named interventions, the refusal to withhold a scope request | a fork with no intervention is its parent to the hash; each intervention's acts are in the principal's name and noted |
 | D6 | Model seats as assistants: the forms, the host following the cast and channels, the mock playing the assistant kind | a mock assistant seat leaves the same world as the code assistant |
 | D7 | Persons as principals: the desk route, receivers that take an agent's paper | a household's delegated letter reaches the office and is answered |
+
+**Built (2026-10-31), D1 to D7 in one landing** (decisions, "Delegation D1 to D7"), with two changes to the plan above:
+an act is parted (what is handed over goes to the assistant, the rest the principal does in the same act), since most of
+an organisation's paperwork comes with a payment or goods; and no `set_channels` (section 3). In experiments the
+assistants' kind is a post of its own (`post: "template:<id>"`): a steward for every system of that kind. Still to do:
+the papers of delegation as forms for a real model in an assistant seat.
 
 **Byte-identical:** every step is checked on a town with no providers (the default): the same state hash and log as main
 at that step's base, on the 300-person town and a 1,000-person month.
@@ -189,8 +197,8 @@ at that step's base, on the 300-person town and a 1,000-person month.
   and fee), because code has only the principal's procedure to decide with. Who decides differently is a model in the
   seat; the code assistant is the baseline and the mock's brain.
 - Values the rule needs that no source gives (what an error costs a principal, the catch rate of a review, the hurdle)
-  are placeholders, marked as law 11 requires, and are the principal's parameters, never outcomes aimed at.
+  are placeholders, marked as law 11 requires, and are the principal's parameters, never outcomes aimed at (ME-22).
 - A person's papers through the desk route reach only the offices whose readers take agents' papers (step D7 lists them).
 - **What would change course:** the wrapper breaking an existing kind's chains (then delegation moves into the kinds that
-  carry it, one at a time); `set_channels` needing a knowing exception (then it stops and goes to the owner: a hard
+  carry it, one at a time); a narrowed post needing a knowing exception (then it stops and goes to the owner: a hard
   rule); the seat host unable to follow the cast without a rebuild (then the assistant post is seated from the fork).

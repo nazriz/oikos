@@ -16,10 +16,11 @@ pub mod producer;
 pub mod rent_portal;
 pub mod rents;
 pub mod retailer;
+pub mod services;
 pub mod sourcing;
 pub mod trade;
 #[cfg(test)]
 pub mod testkit;
 
 /// Every kind of this lane, in name order.
-pub static KINDS: &[&dyn Kind] = &[&producer::FirmProducer, &rent_portal::RentPortal, &retailer::FirmRetailer, &automation::Vendor];
+pub static KINDS: &[&dyn Kind] = &[&producer::FirmProducer, &rent_portal::RentPortal, &retailer::FirmRetailer, &services::Provider, &automation::Vendor];

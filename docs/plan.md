@@ -19,9 +19,9 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 | Real-world friction | Laws of time and capacity (phase 1) and conservation (phase 2) landed; space (phase 3) not started |
 | Models act only in plain language | Seats write English, the translator turns it into acts; our translator parked at about 85%, Sonnet behind it |
 | Live models from more than one provider | Anthropic (API, Claude Code) and OpenAI (Codex CLI, which puts its own instructions under ours) |
-| Models as assistants to households, firms and government | **Being built** (delegation capabilities, in "Now"). Models hold office posts as stewards; nobody can hire an assistant yet |
-| Forks that withdraw, redirect, constrain, replace or take back the AI | **Partly.** Forks and withholding a citizen's act exist; the AI interventions need the delegation capabilities |
-| Requests for more scope or resources recorded | **Missing** (part of the delegation capabilities) |
+| Models as assistants to households, firms and government | **Mostly built** (delegation capabilities, in "Now"): providers sell assistants to organisations and persons; mock seats play them; a real model's forms are next |
+| Forks that withdraw, redirect, constrain, replace or take back the AI | Built (2026-10-31): interventions at a fork in the principal's own name (docs/experiments.md, "Interventions") |
+| Requests for more scope or resources recorded | Built: a `scope_request` paper with what it answers, a route no arm can withhold; the code assistant never asks, a model may |
 | Debriefs compared with measured effects | Debriefs and fork attribution exist; the comparison itself is analysis still to write |
 | A measure of "less able to shape their society" | Leverage measures designed (docs/design/gradual-disempowerment.md §6); the definition is the owner's to settle |
 
@@ -44,15 +44,16 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [~] **Delegation capabilities** (approved by the owner 2026-10-31: "we need to complete all of that + 1 to 3"; design
   `docs/design/delegation.md`). General, deciding no result; the study's measures and arms stay the owner's. Steps:
   - [x] D0. The design note; this item moved here.
-  - [ ] D1. Services anyone can buy (phase 4's E1, done here): providers as organisations, offers, the `service`
+  - [x] D1. Services anyone can buy (phase 4's E1, done here): providers as organisations, offers, the `service`
     agreement, delivery and the switch; the delegation papers; off by default.
-  - [ ] D2. Responsibilities per kind of matter (advice, draft for sign-off, act with approval, act alone; no ladder);
-    the sign-off route; `set_channels` (an act that narrows a post's access).
-  - [ ] D3. Learning from what the principal itself observed, from the provider's claims; inputs cited, tested.
-  - [ ] D4. Providers' records by contract; replacement and taking work back, with open matters handed over.
-  - [ ] D5. Forks that intervene at a checkpoint (grant, change, withdraw, redirect, constrain, replace, take back).
-  - [ ] D6. Model seats as assistants to households, firms and government, through the translator; mock first.
-  - [ ] D7. Persons as principals: the provider's desk writing in their name, and the offices that take it.
+  - [x] D2. Responsibilities per kind of matter (advice, draft for sign-off, act with approval, act alone; no ladder);
+    the sign-off route; access narrowed by reorganising the assistant's post (`set_channels` dropped: decisions).
+  - [x] D3. Learning from what the principal itself observed, from the provider's claims; inputs cited, tested.
+  - [x] D4. Providers' records by contract; replacement and taking work back, with open matters handed over.
+  - [x] D5. Forks that intervene at a checkpoint (grant, change, withdraw, redirect, constrain, replace, take back).
+  - [~] D6. Model seats as assistants to households, firms and government, through the translator; mock first (the
+    mock seats and the hosts done; forms for a real model in an assistant seat next).
+  - [x] D7. Persons as principals: the provider's desk writing in their name, and the offices that take it.
 
 ## Next, in order
 
