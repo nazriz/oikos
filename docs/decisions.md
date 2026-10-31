@@ -9832,8 +9832,9 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   - `justice.test.ts`: 300 → 250 and 200 days (rent reviews on day 181, orders on 238).
   - `automation-run.test.ts`: 200 → 90 days (systems delivered and serving from day 31).
   - `founding.test.ts`: 205 → 150 days (the first founding on day 120, code town and composed).
-  - `entry.test.ts`: 450 → 160 and 300 → 120 days (premises sold day 106, the buyer serving day 120; the living shop's
-    record begun day 85).
+  - `entry.test.ts`: 450 → 240 and 300 → 120 days (premises sold day 106, the buyer serving day 120, and day 165 after
+    main's change to citizens' work the same day: 160 days failed then, so the margin is wide; the living shop's record
+    begun day 85).
 - **Tried and kept:** `elections.test.ts` with polling at day 120 fails its paper's four editions (the paper is thin
   until the notice); the twins' 120 days at 60 give 3 answers where the test asks more than 8; `credit` (second loans
   and arrears from day 361), `unions` (a claim cycle a year after the closure), `prices`, `tenancy`, `households`
@@ -9842,12 +9843,12 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   c285778, after on the branch merged with main 1ae2561): 65 files, 9,730 → 8,042 file-seconds, 4,872 → 4,025 s wall,
   all passing after (own-venture and word-of-mouth were red before, as on main). Per file, before → after:
   reading-dial 547 → 59, scenarios 487 → 297, figures 184 → 8, recourse-town 295 → 123, migration 262 → 107,
-  deemed-refusal-town 286 → 134, automation-run 242 → 99, entry 211 → 68, founding 230 → 171, justice 168 → 120; every
+  deemed-refusal-town 286 → 134, automation-run 242 → 99, entry 211 → 68 (at 160 days; at 240 about 90), founding 230 → 171, justice 168 → 120; every
   other file within the load's noise but `own-venture` 197 → 476, main's own change that day (three seeds where it
   held one). Without that, the cut is 20%: on the Mini about 1,526 → 1,220 s, still over the budget.
 - **Mutations:** not run (limited credit; a cloud container, no copy-on-write clone). No planted bug is in `figures.ts`.
-  Three name a shortened file: `kernel-absent-may-work` (migration), `rs-appeal-window-off-by-one` and the next
-  recourse bug in `scripts/mutations.ts` (recourse-town). Owed: `scripts/mutate.ts --only` with those three, before and
+  Three name a shortened file: `kernel-absent-may-work` (migration), `rs-appeal-window-off-by-one` and
+  `rs-grievance-ignored-in-seconds` (recourse-town). Owed: `scripts/mutate.ts --only` with those three, before and
   after, on the Mini; if one is caught before and not after, the run it needs goes back to its old span.
 - **Not done, and what is left:** the rest of the slow tier is runs a law needs whole (twins of a year, three years
   of records, the year of invariants) or held to one seed for a rare draw (production's dividend, the station's
@@ -9856,3 +9857,98 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   and the twin files (about 1,000 file-seconds between them). Or the budget raised, with its entry here.
 - **Revisit if:** a shortened run's event moves past its end (the test fails on the count, not silently: each asks
   for at least one of what it checks), or a scenario starts acting after its first month.
+
+## 2026-10-31 · Borrowing to start a business: the founder asks the bank, the lending office decides (branch `gap-me1`; citizen, generator; risk ME-1; no contract change; no model called)
+
+- **What:** a person who would start a business of one by what they expect it to pay them, with a home to trade from,
+  and short only of the money (its capital and the month's buffer), applies to their bank for the shortfall over its
+  longest term (`start_loan_months`, from the profile's `credit.max_months`, the term the bank publishes). The bank's
+  lending office decides it as any application: its rate for people, the serviceability buffer, its share of the least
+  monthly income it can see in the account, nothing to anyone behind or in default. The lending office is staffed by the
+  bank's people, so the decision takes its officer's time (the table of work's `loan_decision` row). Offered, the founder
+  weighs the business again at its expected pay less the repayment and signs only if it still pays; then it starts as
+  for anyone with the means, its later weighing less the repayment. Docs: `docs/behaviour/entry.md`, "Borrowing to start".
+- **Why this route:** most new small businesses are funded from the owner's savings and personal borrowing (in
+  Australia, the ABS's Business Use of Information Technology and the RBA's work on small business finance both find
+  owners' own funds and personal loans the main sources at start-up; to confirm, not opened for this work); an
+  unsecured lender lends against income, so the town's bank lends to the employed founder and refuses the one with
+  nothing coming in. No new figure: the term is the bank's, the rules and rates are its existing ones.
+- **Test:** `citizen::work` "short only of the money for a business that pays, we ask our bank to lend it and take the
+  loan only if it still pays" (the application's purpose, amount and term; nothing without a bank that lends to start
+  one; a loan too dear is not signed, one that leaves the business paying is). The lender's rules are already held by
+  `finance::credit`'s tests.
+- **Left (ME-1 stays open):** no lending against a home (households hold no home equity); a shop in premises, the
+  employing route, is not borrowed for; no start-up grants or microfinance; the lender does not read a business plan,
+  only the account (as ME-8 says of its income reading).
+- **Revisit if:** births move far beyond the profile's rate with borrowing on (the likely cause is what founders expect,
+  not the loan); a profile states lending to new businesses on other terms (a start-up product, security asked).
+## 2026-10-31 · Candidacy: the field of 19 traced, and the fault that is left (branch `gap-pb10`; docs only; risk PB-10; no model called)
+
+- **What was found:** the field of 19 candidates for about 118 formal votes (decisions 2026-10-24, "Two tests that failed in
+  the new town") is not the town's. `elections.test.ts` sets every citizen's `stand_bps` to 1,000 (a 10% chance of standing
+  when an election is called, shifted by the person's drive) to be sure of a contest; the profile's figure is 200
+  (au-vic, a placeholder). The test town (`worlds/town.yaml`, au-vic) has 166 electors: 166 x 10% x a mean drive a little
+  over one is the 17 to 19 seen. At the profile's own figure the same town fields about three or four candidates, which
+  is a handful, as real local elections have. So it is neither the mechanism's outcome nor emergent: it is the test's dial.
+- **The mechanism fault that is there:** the chance is each elector's, fixed, and blind to the field. The field is
+  therefore proportional to the electorate: at the profile's 2%, about 16 to 19 in the 1,000-person town (795 electors)
+  and some 800 in a town of 50,000 (the north star's size), where real fields per vacancy stay a handful whatever the
+  size of the ward (the VEC reports candidates per vacancy for each Victorian council election; about three in 2024, to
+  confirm). Real candidacy is lumpy and organised: a nomination costs a fee or a deposit and signatures (in Victoria a
+  nomination fee, to confirm the sum), a campaign costs time and money, most candidates come through a party or a local
+  group, and those who stand weigh their chance against the field (the citizen-candidate model: Osborne and Slivinski
+  1996; Besley and Coate 1997).
+- **Not built, and why:** fixing it is a new law of the world, not a patch: who stands (the decision weighed against the
+  field already nominated, which needs the decision spread through the nomination window so the field can be seen), the
+  nomination's cost (the law's fee, deposit and signatures, as law data per profile with sources), the time a campaign
+  takes, and backing (parties or groups, which the town does not have). Each needs sourced figures in nine profiles, and
+  the choice of a candidacy model is the owner's. Lowering `stand_bps` with the size of the town would be calibrating an
+  outcome, which the rules forbid. The test's 10% is left as it is: it forces a contest, and the test asserts only what the
+  mechanism guarantees (the incumbent's place in the voters' rankings).
+- **For Naz:** a proposal to approve or change: (1) nominations as law data (fee or deposit, signatures, from each
+  profile, sourced); (2) a person considers standing on a day of the nomination window drawn for them, weighing a
+  candidacy's cost in time and money and their chance against the nominations already public; (3) groups and parties
+  later, with founding (docs/behaviour/founding.md). Calibrated against candidates per vacancy, never set to it.
+- **Revisit if:** an election in a town of more than a few thousand is read; or the owner approves the proposal.
+## 2026-10-31 · A model steward in a fork is a pilot's seat (MT-22; mock only, no model called)
+
+- **What:** the experiment harness's model seat (`orchestrator/src/seat-host.ts`) closes the gaps it had against a
+  pilot's (run.ts):
+  1. **Told what was not taken.** The engine's notes about the seat's own sending (`rejected_action`,
+     `call_unresolved`) and its `action_started` events reach the seat at its next turn in the words a pilot's seat is
+     given (`toldOf`: run.ts `notSent`, the resolver's questions, `begin`'s "will be done at"), read from the fork's log
+     as the harness passes it on.
+  2. **The cast followed.** Who is who (`fork-cast.ts`, `Cast`) is the config's cast as the log changes it
+     (participants made and ended, posts made, appointments, bodies founded), read through the base and kept at the fork
+     (`seed-N/cast.json`), then through the fork. The reading is run.ts's `noteCast`/`whoIs`. A base kept before this has
+     no `cast.json` and is run again by `--resume`.
+  3. **Thinking takes time where the world says so.** A seat's host now sends `thinking` (world seconds) with its
+     action; the engine (`Engine::seat_thinks`, kernel/src/host.rs `submit`) puts it before the act's start, only where
+     `orchestration.thinking_time` is `costs_world_time`, and never past the round (not in a snapshot). The host reckons
+     it as run.ts does a pilot's: the deciding step's participant calls, output and input tokens at the world's rates.
+     (The engine gave seats no thinking at all; code still thinks `code_seconds`.)
+  4. **The composer and exit accounts** (`fork-composer.ts`): where the world's dial has a composer, the engine's
+     actors' questions are answered as a pilot's host answers them (pieces composed by the mock, the rest with nothing),
+     in the base and in every fork, the engine asked a day at a time as a pilot's is; the composer's month and every
+     person's record are kept at the fork (`seed-N/composer.json`); at a fork's end a sample of people give exit
+     accounts (`account_pieces`), the seat's acts' reach sampled first; the seat's debrief says a composer was on.
+     `readForEnd`'s record reading is now `PeopleAtEndReader`, shared.
+- **Why:** a seat whose act went untold may retry or wait where a pilot's would be told; names that did not follow the
+  cast misnamed posts and bodies made after the town began (most of a fork's day-30 town); thinking that took no time
+  made a model seat faster than a pilot's; and a world with a composer was a different world in a fork.
+- **Proof:** a small weather experiment (2 seeds; code, nobody and a mock-model arm) on origin/main and on this branch:
+  the code and nobody forks and the bases come out byte-identical (log and snapshot hashes, state hashes); the
+  mock-model fork ends in the same state (its log differs by what it is now told and shown). (Both on this branch's
+  engine: a code seat sends no thinking, so the engine's change does not reach it.)
+- **Fixed on the way:** with a composer the base is asked a day at a time; a pause reports the engine's clock, which may
+  be short of what was asked, so the base stops at the fork only when it asked for the fork.
+- **Not done (5):** a fork interrupted part-way is still run again from its seed's snapshot. Taking it up from where it
+  stopped needs snapshots during the fork and the seat's own state kept with them (its translator's arrangement,
+  drafts, notices, knowledge, view, office books, the controller's conversation): not cheap, and a model's answers
+  would not be served again in any case. Recorded in MT-22.
+- **Left as it was:** a fork answers no `consult`, `reading` or `words` question beyond the composer's (a pilot answers
+  them where it has the service: the sparse mind, the reading desk, a founder's words drafted by the translator); the
+  composer's system prompt is logged in full once more in each fork's log (harmless; the base has it too).
+- **Revisit if:** a fork's seat is told something a pilot's is not (or the reverse) in a model fork's log; a world with
+  `consult` or reading is run as an experiment; a fork part-way through needs taking up (a long model fork on a
+  subscription's window).
