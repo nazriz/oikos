@@ -21,6 +21,7 @@
 pub mod boundary;
 pub mod citizen;
 pub mod common;
+pub mod delegation;
 pub mod draws;
 pub mod finance;
 pub mod firms;

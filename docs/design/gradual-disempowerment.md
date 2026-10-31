@@ -141,7 +141,7 @@ firm and office, revenue whose base is residents (6).
 - **Exists.** A 10,000-person month ran: 221 to 410 s on a quiet machine, 624 to 1,033 s loaded; 5.3 to 6.8 GB;
   logs about 2 GB a month raw (decisions 2026-10-08, "A 10,000-person month fits", "The kernel's part of a large
   town"). Longest runs: 5 years at 1,000. Seven costs owed on the way to 100,000 are listed there.
-- **Missing.** No run longer than a month at 10,000; no `town-10000.yaml`; `oikos measure` fails at 3,000 and up
+- **Since (2026-10-31):** `worlds/town-10000.yaml` and `town-50000.yaml`, and runs of years at both (docs/design/performance.md, "Years at 10,000 and 50,000"). **Missing.** `oikos measure` fails at 3,000 and up
   (DuckDB object size, `living-2.review.md`). Ten years at 10,000 projects to about 15 to 25 hours of wall time and
   about 240 GB of raw log: section 7.
 

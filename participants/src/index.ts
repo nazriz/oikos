@@ -37,6 +37,7 @@ import { organiser } from "./kinds/union";
 import { citizen } from "./kinds/citizen";
 import { employer, landlord } from "./kinds/firms";
 import { vendor } from "./kinds/automation";
+import { assistant, provider } from "./kinds/assistants";
 import { builder, childProtection, inspector, landRegistry, planningOfficer, registry } from "./kinds/institutions";
 import { councilClerk, councillor, financeOfficer, mayorCode, ratesOfficer, taxClerk, works } from "./kinds/government";
 import { environment } from "./kinds/environment";
@@ -102,6 +103,8 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [producer, "engine-kinds.ts"],
       [retailer, "engine-kinds.ts"],
       [vendor, "kinds/automation.ts"],
+      [provider, "kinds/assistants.ts"],
+      [assistant, "kinds/assistants.ts"],
       [planningOfficer, "kinds/institutions.ts"],
       [inspector, "kinds/institutions.ts"],
       [builder, "kinds/institutions.ts"],

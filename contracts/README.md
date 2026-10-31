@@ -734,3 +734,17 @@ Additive only; no schema file changed. A log made before is a valid log.
 - **Observation: a holdings channel's `connections` and `links`**: a holder's own connections with their meters; an operator's whole network (its register and instruments), with the meters it reads from afar. **A visit's buildings show their on-site `meters`.**
 - **Task `collects`** (`{kind, per_unit}`): a unit takes up to so much of a kind held at the structure worked on, never more than is there (C4: the works' round). **Variables' `per_occupant_per_day` is refused at load** (`stock_as_variable`), as is a variable with a kind's name (C4).
 - **World config: `world.scarce`** (`edge`, `kind`, `quantity`, `every`): a scarce kind at an edge; a `move_goods` from the edge's outside beyond it is refused **`beyond_supply`** (C6).
+
+## Delegation: assistants as services (2026-10-31; docs/design/delegation.md; docs/decisions.md, "Delegation D1 to D3"; under the owner's blanket approval of contract changes, 2026-10-11, and his approval of the delegation capabilities, 2026-10-31)
+
+Additive; no hard rule touched; nothing changes for a world that has no providers.
+
+- **The call language's `agreement` takes `attrs`** (`contracts/calls.schema.json`, `calls.md`): the terms' opaque
+  attributes, as JSON, which `AgreementTerms.attrs` already allowed; a service agreement states its records term there.
+- **New paper kinds** (world vocabulary, typed in `kernel/crates/actors/src/papers/delegation.rs`): `service_offer`
+  (published where a world declares it), `service_delivery`, `service_ended`, `remit`, `referral`, `brief`, `advice`,
+  `draft`, `sign_off`, `declined`, `approval_request`, `go_ahead`, `report`, `scope_request`, `handover`.
+- **The engine and host take `at_fork`** (`kernel/src/engine.rs` `AtFork`; host and stdio options beside `withhold`): acts
+  carried out at a fork's moment in a named participant's name and post, each noted (`note`, data `intervened`). A
+  researcher's intervention, as `withhold` is; nothing in the world is told of it.
+- No block was added: `set_channels`, in the design's first draft, is not built (decisions, "Delegation D1 to D3").

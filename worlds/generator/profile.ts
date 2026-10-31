@@ -467,6 +467,17 @@ export interface Profile {
       /** The law on public buying: a contract worth more than the threshold (in the world\'s smallest unit) is put out to tender, and bids are open this long. */
       procurement?: { threshold: number; bid_days: number };
     };
+    /** Assistants on offer (docs/behaviour/assistants.md; docs/design/delegation.md): the outside world's providers of services
+     * and what each sells, at today's prices; read only where a town asks for them (`assistants: true`). `claim_slip_bps` is
+     * what a provider says; `slip_bps` is how often its systems really slip (the world's table of slips), which need not agree.
+     * `principals`: what a principal weighs that no market gives (what an error costs it, the share of slips it finds in a draft
+     * it reads, how much a claim counts against what it has seen, its hurdle); `review_misses_bps` how often a reading misses a
+     * slip (a person's row in the table of slips). No figure here sets how much anyone delegates. */
+    assistants?: {
+      providers: { id: string; name: string; offers: { id: string; title: string; for: "organisations" | "persons"; template: string; kinds: string[]; levels: ("advice" | "draft" | "approve" | "alone")[];
+        speed_bps: number; claim_slip_bps: number; slip_bps: number; fee_month: number; setup: number; exit: number; notice_days: number; term_days: number; records: "principal" | "provider" | "on_request" }[] }[];
+      principals: { error_cost: number; finds_bps: number; prior_matters: number; hurdle_bps: number; review_days: number; horizon_months: number; review_misses_bps: number; complaints: string[] };
+    };
     unions: { membership_bps: { [kind: string]: number }; dues_per_month: number; resignation_notice_days: number; claim_margin_bps: number; meeting_every_days?: number; teaching?: string };
     /** Social groups that meet (clubs, congregations): their kinds, how often and how long they meet, how many. */
     groups?: { kinds: { kind: string; name: string; every_days: number; lasts_minutes: number; teaching?: string; held_at_start_bps?: number }[]; per_kind_per_1000_people: number; taking_part_bps: number; leave_notice_days: number };

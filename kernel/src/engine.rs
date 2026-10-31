@@ -86,6 +86,8 @@ pub struct EngineOptions {
     pub record_observations_of: BTreeSet<String>,
     /// Acts withheld: a researcher's intervention (risk MT-19), never a law of the world.
     pub withhold: Vec<Withhold>,
+    /// Acts carried out at a fork's moment in a participant's name: a researcher's intervention, never a law of the world.
+    pub at_fork: Vec<AtFork>,
     /// Capture the citizens' decisions to this file (docs/citizen-data.md: `<run>.citizens.jsonl.zst`, beside the log),
     /// for training. Nothing in the world or the log changes with it.
     pub capture_citizens: Option<String>,
@@ -137,6 +139,35 @@ impl Withhold {
     }
 }
 
+/// An act carried out at the moment a fork (or a resume) begins, in a participant's name and post, as that participant would
+/// make it: `call` in the call language, resolved by what that capacity knows (docs/design/delegation.md section 7; docs/
+/// experiments.md, "Interventions"). A researcher's intervention, never a law of the world: the log notes it (`intervened`),
+/// nothing in the world is told it was one, and the act takes its actor's time as any act does. Its actor hears of its
+/// outcome as of an act it did not send (code: nothing follows from it; its own records show what it made).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct AtFork {
+    pub participant: String,
+    #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+    pub as_: Option<String>,
+    pub call: String,
+    #[serde(default)]
+    pub why: String,
+}
+
+/// The options' `at_fork` (a list of `{participant, as?, call, why?}`), as a host gives it.
+pub fn at_forks(v: &Value) -> Result<Vec<AtFork>, String> {
+    match v {
+        Value::Null => Ok(vec![]),
+        v => {
+            let a: Vec<AtFork> = serde_json::from_value(v.clone()).map_err(|e| format!("at_fork: {e}"))?;
+            for x in &a {
+                oikos_resolver::calls::parse_program(&x.call).map_err(|e| format!("at_fork: {}: {}", x.call, e.0))?;
+            }
+            Ok(a)
+        }
+    }
+}
+
 /// The options' `withhold` (a list of `{what, participant?, nth?}`), as a host gives it.
 pub fn withholds(v: &Value) -> Result<Vec<Withhold>, String> {
     match v {
@@ -167,6 +198,7 @@ impl Default for EngineOptions {
             record_observations: false,
             record_observations_of: BTreeSet::new(),
             withhold: vec![],
+            at_fork: vec![],
             capture_citizens: None,
         }
     }
@@ -1703,6 +1735,23 @@ impl<W: Write> Engine<W> {
             }
         }
         Ok(false)
+    }
+
+    /// The acts `at_fork` asks for, carried out now, each noted (`intervened`) before it is begun.
+    pub fn intervene(&mut self) -> Result<(), String> {
+        for x in self.opts.at_fork.clone() {
+            let key = match &x.as_ {
+                Some(p) if self.units.contains_key(&format!("{}|{p}", x.participant)) => format!("{}|{p}", x.participant),
+                _ if self.units.contains_key(&x.participant) => x.participant.clone(),
+                None if self.units.contains_key(&format!("{}|self", x.participant)) => format!("{}|self", x.participant),
+                _ => return Err(format!("at_fork: {} acts in no capacity {} here", x.participant, x.as_.as_deref().unwrap_or("self"))),
+            };
+            let t = self.t();
+            self.note(&x.participant, json!({ "intervened": { "participant": x.participant, "as": x.as_, "call": x.call, "why": x.why, "t": t } }))?;
+            let program = oikos_resolver::calls::parse_program(&x.call).map_err(|e| format!("at_fork: {}", e.0))?;
+            self.apply(&key, Action::Call { program, reasoning: Some(x.why.clone()).filter(|w| !w.is_empty()) })?;
+        }
+        Ok(())
     }
 
     /// Whether this act is one a `withhold` takes out (counted by each; noted in the log when it is).
