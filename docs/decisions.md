@@ -9328,3 +9328,14 @@ routes as law data, nobody shown more than is theirs.
   bound on the size of town (then its header is indexed lazily, by section); the egui interface proves not worth
   keeping beside the web one (then the native shell wraps the web interface in a webview); Bevy's WebGL 2 path falls
   behind its WebGPU one (then WebGL 2 is dropped once browsers allow).
+
+## 2026-10-31 · The owner's TARA proposal as the plan's north star (docs only; no model called)
+
+- **What:** the proposal Naz submitted to TARA on 2026-10-28 ("Better Off, Less in Control?") is kept verbatim in
+  `docs/north-star.md`; `docs/plan.md` gains a "North star" section mapping what the proposal needs against what the
+  platform has; CLAUDE.md's read-first list points to it.
+- **Why:** he asked for it to be the north star for the lines of work, "not completely rigid". The map shows the gap
+  is the delegation capabilities (models as hired assistants, AI interventions in forks, requests for scope), not the
+  world's physics: friction, scale to tens of thousands, forks and debriefs largely exist.
+- **Not decided here:** reordering the plan, and building the delegation capabilities; both are the owner's call.
+- **Revisit if:** the proposal changes (its 15 Nov project plan), or the owner chooses another study.
