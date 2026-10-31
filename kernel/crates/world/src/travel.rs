@@ -127,7 +127,7 @@ pub fn journeys(s: &Statics, st: &State, actor_body: Option<Id>, blocks: &[Block
     let lit = |x: &str| !x.starts_with('$');
     let mut order: Vec<Id> = vec![];
     let mut legs: BTreeMap<Id, (Vec<Id>, Option<Id>, Option<Id>)> = BTreeMap::new();
-    let mut touch = |order: &mut Vec<Id>, b: Id| {
+    let touch = |order: &mut Vec<Id>, b: Id| {
         if !order.contains(&b) {
             order.push(b);
         }
