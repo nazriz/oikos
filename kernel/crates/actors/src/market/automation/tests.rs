@@ -284,6 +284,21 @@ fn a_falling_price_scenario_republishes_at_the_lower_price_and_never_below_one_c
     assert!(pow12 <= S / 2 && pow12 > S / 2 - S / 1_000_000, "twelve monthly steps are one year's: {pow12}");
 }
 
+/// The outside's later releases (foundations-2 E2): before one is out, nothing of it is said; once out, the offer is
+/// published again as the release is, and an order is filled from its kind of system.
+#[test]
+fn a_release_once_out_is_what_is_sold_and_not_before() {
+    let mut h = harness(json!({ "releases": { "sps": [{ "from": 30 * DAY, "template": "system-sps-r1", "speed_bps": 8000, "seconds": 240, "price_bps": 5000 }] } }));
+    let first = all(&h.wake(H, world(vec![], json!([]))));
+    assert!(first.contains("at 100% of a person's time") && first.contains("23,250.00") && !first.contains("system-sps-r1"), "the first release, and nothing of the next: {first}");
+    assert!(!all(&h.wake(DAY + H, world(vec![], json!([])))).contains("system_offer"), "nothing new until it is out");
+    let out = all(&h.wake(30 * DAY + H, world(vec![], json!([]))));
+    assert!(out.contains("Superseded") && out.contains("at 80% of a person's time") && out.contains("11,625.00"), "published again as released: {out}");
+    let txs = json!([tx("acc-shop", "acc-vendor", 1_162_500, 30 * DAY + 2 * H, "Order: 1 system:sps.")]);
+    let sold = all(&h.wake(31 * DAY + H, world(vec![order("rec.60", 30 * DAY + 2 * H, 1, 1_162_500)], txs)));
+    assert!(sold.contains("template=system-sps-r1"), "{sold}");
+}
+
 #[test]
 fn a_paid_order_is_delivered_then_the_delivery_is_published_and_the_licence_offered() {
     let mut h = harness(json!({}));

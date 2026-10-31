@@ -400,6 +400,8 @@ export const FIGURE_BASIS: Basis[] = [
   ...of("utility.water", [derived("storage", "the works' store: the town's use at the start times the profile's storage_days (utilities.network)")]),
   ...of(CITIZEN, [prof("utilities.water_l_a_head", "utilities.water.litres_per_person_per_day"), prof("utilities.energy_kwh_a_day", "utilities.energy.kwh_per_household_per_day")]),
   derived("templates.*.does.*.seconds", "a system's seconds for an act: a person's time for it at an offer's speed, or an officer's (the person table's row); act_time.sources template.<id>.<row>"),
+  derived("templates.*.released", "a release's day: the capability scenario's every_days times its number (worlds/generator/capability.ts)"),
+  ...["participants.*.controller.params", "positions.*.role_module.params"].map((at) => derived(`${at}.releases`, "an offer's later releases: their days, and their speed, claims and prices from the offer's by the capability scenario's shares a release")).map((r) => ({ ...r, family: "capability: releases" })),
   derived("templates.*.hours.from", "when a system's day begins: a machine's midnight (all day), or an officer's working day from the profile's round.work_start_hour"),
   derived("templates.*.hours.seconds", "how long a system's day is: a machine's whole day, or an officer's working day (ordinary_hours_per_week) times the town's share of officers; act_time.sources template.<id>.hours"),
   derived("templates.*.hours.closed.weekdays.*", "the profile's calendar.weekend: the place's days of rest, when a desk of officers does not work (with the run's dates, the real week from the start date; without, its last days)"),

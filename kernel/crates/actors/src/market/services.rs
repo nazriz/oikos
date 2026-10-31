@@ -94,6 +94,7 @@ impl Kind for Provider {
             "params": {
                 "account": p(json!({ "type": "string", "description": "the account it is paid into (the world must say)" }), Some(json!("")), None, "the account it is paid into (the world must say)"),
                 "offers": p(json!({ "type": "array" }), Some(json!([])), None, "the world gives it (the profile's, with their sources)"),
+                "releases": p(json!({ "type": "object" }), Some(json!({})), None, "the world gives it: the outside world's later releases of what an offer sells (none: the offers as made)"),
                 "grace_days": p(int("a service unpaid this long (two months' fees and a fortnight) lets the provider switch its systems off"), Some(json!(75)), Some("days"), "placeholder"),
                 "sign_days": p(int("a service whose agreement its client has not signed this long is switched off"), Some(json!(30)), Some("days"), "placeholder"),
                 "unpaid_days": p(int("an order unpaid this long is declined"), Some(json!(7)), Some("days"), "placeholder"),
@@ -114,6 +115,7 @@ impl Kind for Provider {
             sign_days: ctx.param("sign_days", 30)?,
             grace_days: ctx.param("grace_days", 75)?,
             desk: ctx.param("desk", None)?,
+            releases: ctx.param("releases", BTreeMap::new())?,
         };
         Ok(Box::new(Stepper::new(Providing {
             orders: OrderBook::new(&ctx.entity, Some(p.unpaid_days), None),
@@ -141,6 +143,9 @@ struct Params {
     /// Its own desk system, which writes a person's papers in their name (none: it serves only organisations).
     #[serde(default)]
     desk: Option<String>,
+    /// Later releases of what an offer sells, by offer (foundations-2 E2): the scenario's. None: the offers as made.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    releases: BTreeMap<String, Vec<crate::market::automation::Release>>,
 }
 
 /// A service the provider has set up.
@@ -181,8 +186,23 @@ struct Providing {
 }
 
 impl Providing {
-    fn now_offer(&self, o: &ServiceOffer) -> ServiceOffer {
-        ServiceOffer { provider: self.me.clone(), account: self.p.account.clone(), references: self.clients.get(&o.id).map_or(0, |c| c.len() as i64), ..o.clone() }
+    /// An offer as it stands at `t`: the release out by then, if what it sells has later ones (its template, its claims, its
+    /// prices), with its clients.
+    fn now_offer(&self, o: &ServiceOffer, t: i64) -> ServiceOffer {
+        use crate::market::automation::{at_release, release_at};
+        let rel = release_at(&self.p.releases, &o.id, t);
+        let mut x = ServiceOffer { provider: self.me.clone(), account: self.p.account.clone(), references: self.clients.get(&o.id).map_or(0, |c| c.len() as i64), ..o.clone() };
+        if let Some(r) = rel {
+            x.template = r.template.clone();
+            x.claim_slip_bps = r.claim_slip_bps.unwrap_or(x.claim_slip_bps);
+            if !r.claim_seconds.is_empty() {
+                x.seconds = r.claim_seconds.clone();
+            }
+            x.fee_month = at_release(x.fee_month, rel);
+            x.setup = at_release(x.setup, rel);
+            x.exit = at_release(x.exit, rel);
+        }
+        x
     }
 
     fn words(&self, o: &ServiceOffer, cx: &Cx) -> String {
@@ -289,8 +309,12 @@ impl Plan for Providing {
         let mut steps: Vec<Step<Then>> = vec![];
         // What it sells: published again when its prices or its clients change.
         for o in self.p.offers.clone() {
-            let x = self.now_offer(&o);
-            let key = format!("{}|{}|{}|{}", x.setup, x.fee_month, x.exit, x.references);
+            let x = self.now_offer(&o, t);
+            let mut key = format!("{}|{}|{}|{}", x.setup, x.fee_month, x.exit, x.references);
+            // (A new release is published as the offer is: what it is, at its prices.)
+            if self.p.releases.contains_key(&o.id) {
+                key = format!("{key}|{}", x.template);
+            }
             let was = self.listed.get(&o.id).cloned();
             if was.as_ref().is_some_and(|(k, _)| *k == key) {
                 continue;
@@ -309,7 +333,7 @@ impl Plan for Providing {
         let due = self.orders.due(&self.book, t, |_| true);
         for o in due.paid {
             let id = o.kind.strip_prefix("service:").unwrap_or("");
-            let Some(x) = self.p.offers.iter().find(|x| x.id == id).map(|b| self.now_offer(b)) else {
+            let Some(x) = self.p.offers.iter().find(|x| x.id == id).map(|b| self.now_offer(b, t)) else {
                 steps.push(self.refund(&o, &format!("{} is not a service we sell", o.kind), cx));
                 continue;
             };

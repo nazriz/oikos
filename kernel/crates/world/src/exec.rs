@@ -2250,6 +2250,10 @@ impl<'a> Exec<'a> {
                 if tpl.supplier.as_deref() != Some(org.as_str()) {
                     return Err(refuse(RefusalCode::NotSupplier, format!("{org} doesn't supply {template}")));
                 }
+                // (A technology not yet released is not made: nothing from nothing, foundations-2 E2.)
+                if let Some(r) = tpl.released.filter(|r| *r > self.now()) {
+                    return Err(refuse(RefusalCode::UnknownTemplate, format!("{template} is not made until {r}: nobody can deliver one yet")));
+                }
                 let client = match to {
                     Some(t) => self.r(t)?,
                     None => org,
