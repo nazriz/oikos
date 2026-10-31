@@ -1526,7 +1526,7 @@ fn draw_hosted(s: &Statics, st: &mut State, participant: &str, by: &[Id], blocks
             *secs.entry(id).or_insert(0) += (own + doers.len() as i64 - 1) / doers.len() as i64;
         }
     }
-    let stamp = st.stamp();
+    // (A change stamp only where something is drawn: an act with no hosted system in it leaves the state as it was.)
     for (w, n) in secs {
         let Some((_, ro)) = hosted(st, &w) else { continue };
         let Some(task) = s.config.catalogue.tasks.iter().find(|x| x.id == ro.hour) else { continue };
@@ -1536,6 +1536,7 @@ fn draw_hosted(s: &Statics, st: &mut State, participant: &str, by: &[Id], blocks
         if hours == 0 {
             continue;
         }
+        let stamp = st.stamp();
         for (k, per) in task.consumes.iter().filter(|(_, p)| **p != 0) {
             let q = per.saturating_mul(hours as crate::money::Money);
             let have = st.holding(&ro.holder, &ro.at, k);
