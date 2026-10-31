@@ -55,8 +55,8 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] D3. Learning from what the principal itself observed, from the provider's claims; inputs cited, tested.
   - [x] D4. Providers' records by contract; replacement and taking work back, with open matters handed over.
   - [x] D5. Forks that intervene at a checkpoint (grant, change, withdraw, redirect, constrain, replace, take back).
-  - [~] D6. Model seats as assistants to households, firms and government, through the translator; mock first (the
-    mock seats and the hosts done; forms for a real model in an assistant seat next).
+  - [x] D6. Model seats as assistants to households, firms and government, through the translator; mock first (a
+    seated assistant's stationery: its papers in words, and the principal's papers and drafts of them on its forms).
   - [x] D7. Persons as principals: the provider's desk writing in their name, and the offices that take it.
 
 ## Next, in order
@@ -92,12 +92,12 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - Systems keep the same hours every day (no weekends).
 - [x] A seat cannot yet be a non-resident agency officer (WM-14): a seat in the support office shares the body of an officer who lives outside the town (`gap-wm14`).
 - [x] A taxpayer account to reclaim an overpayment from (PB-23): the tax collector keeps it (`taxpayer-accounts`, d3eb2bf3, cedc1903); its figures are still placeholders, so PB-23 stays open as mitigated.
-- Candidacy: a field of 19 for about 118 votes (PB-10).
+- [x] Candidacy: a field of 19 for about 118 votes (PB-10): traced (`gap-pb10`): the test's own 10% chance of standing, five times the profile's; the fault left is that the field grows with the electorate (a mechanism to the owner: decisions "Candidacy: the field of 19 traced").
 - One day's crew paperwork ran in series, cause untraced (MT-23).
 - Three tests still pinned to one seed (production, entry, own-venture); two near-duplicate twin cases kept.
 - Haiku against Sonnet welfare: a matched pair (same town, same offices) before more Haiku seats.
 - The unbased-figures list (orchestrator/test/figures.test.ts) to shrink as figures are sourced.
-- Borrowing to start a business (ME-1).
+- [x] Borrowing to start a business (ME-1): a founder short of the capital applies to the bank, whose lending office decides by its rules (`gap-me1`); lending against a home and borrowing for premises left.
 - Dev machine: elastic slots, Linux with a hosted nightly, one Rust test program (PL-4).
 - The explorer's next steps (PL-2).
 

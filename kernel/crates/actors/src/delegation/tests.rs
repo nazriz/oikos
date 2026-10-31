@@ -148,6 +148,22 @@ fn a_draft_not_as_asked_is_declined_and_done_by_the_principal_and_one_as_asked_i
 }
 
 #[test]
+fn a_draft_on_a_form_is_read_by_the_paper_it_would_send() {
+    let (mut h, _, mut remit) = engaged();
+    remit["data"]["level"] = json!("draft");
+    h.wake(34 * DAY + 3600, world(vec![remit]));
+    let referral = last_referral(&h);
+    let other = statement("rec.d1", 34 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "notice_to_vacate", "text": "Leave.", "to": ["t9"] } }));
+    let out = all(&h.wake(35 * DAY + 3600, world(vec![other])));
+    assert!(out.contains("kind=declined"), "to someone else: not what was asked: {out}");
+    h.wake(36 * DAY + 3600, world(vec![]));
+    let referral = last_referral(&h);
+    let same = statement("rec.d2", 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "notice_to_vacate", "text": "Please go.", "to": ["t1"] } }));
+    let out = all(&h.wake(37 * DAY + 3600, world(vec![same])));
+    assert!(out.contains("kind=sign_off"), "the same paper to the same tenant, in its own words: signed off: {out}");
+}
+
+#[test]
 fn a_matter_handed_back_without_its_notes_is_done_by_the_principal() {
     let (mut h, _, mut remit) = engaged();
     remit["data"]["level"] = json!("draft");

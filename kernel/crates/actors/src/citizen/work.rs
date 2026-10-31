@@ -58,6 +58,12 @@ pub struct Work {
     pub next_own_review: i64,
     pub next_venture: i64,
     pub next_take_chance: i64,
+    /// Borrowing to start a business of one (risk ME-1): when we applied to our bank for the capital we were short of, and
+    /// the monthly repayment of the loan we signed for it (weighed against what the business is expected to pay us).
+    #[serde(default)]
+    pub start_loan: Option<i64>,
+    #[serde(default)]
+    pub start_repayment: Option<i64>,
 }
 
 impl Work {
@@ -864,13 +870,18 @@ impl Person {
                 // (Hands only where the business can take them on: its room for staff.)
                 let hires = v.role_module.get("params").and_then(|p| p.get("max_staff")).and_then(crate::papers::lenient::whole).unwrap_or(0) > 0;
                 let e = self.venture_prospect(w.pic, &v, hires).map(|p| oikos_rules::entry::expected(&p));
-                e.is_some_and(|e| e.units > 0 && self.weigh_venture(w, e.profit, false))
+                // (Less what we repay a month on a loan we took to start it.)
+                let owed = self.work.start_repayment.unwrap_or(0);
+                e.is_some_and(|e| e.units > 0 && self.weigh_venture(w, e.profit - owed, false))
             });
         if means && !venturing && wanted {
             self.wk_record_choice(w, "venture", "found_own", "not", 10_000, founds);
         }
         if !means {
             self.work.venturing = None;
+            if dwelling.is_some() && cell.is_some() {
+                self.borrow_to_start(w, acc, &v, housing, wanted);
+            }
             return;
         }
         if !founds {
@@ -911,6 +922,7 @@ impl Person {
         // venture's figure where we know no price.)
         let expect = self.venture_prospect(w.pic, &v, false).map(|p| oikos_rules::entry::expected(&p).profit).filter(|x| *x > 0).or(v.expect_per_month).unwrap_or(0);
         self.work.founded = Some(Founded { firm: None, capital: v.capital, paid: false, own: Some((dwelling.clone(), expect)) });
+        self.work.start_loan = None;
         let entity = call(
             "entity",
             vec![
@@ -926,6 +938,63 @@ impl Person {
             vec![bound("firm", entity)],
         ));
         self.absorbed.pending_firm = Some(v.capital);
+    }
+
+    /// Borrowing to start a business of one (docs/behaviour/entry.md, "Borrowing to start"; risk ME-1): a business we would
+    /// start, by what we expect it to pay us, that we lack only the money for (a home to trade from, and short of its capital
+    /// and the month's buffer): we ask our bank to lend us what we are short of, over the longest term it lends for. The
+    /// bank's lending office decides it by its own rules (what it can see of our account), in its officer's time; whether to
+    /// take the loan it offers is weighed again when we see its repayment (`borrowing`). Nothing if our town's bank does not
+    /// lend to start one (`start_loan_months` 0), or we may not apply (waiting, repaying, refused lately, in default).
+    fn borrow_to_start(&mut self, w: &mut Week, acc: &crate::common::OwnAccount, v: &super::params::Venture, housing: i64, wanted: bool) {
+        let t = w.t;
+        let lender = self.p.bank.clone().unwrap_or_default();
+        if self.p.start_loan_months <= 0 || self.work.start_loan.is_some() || !self.money.borrowing.can_apply(&lender, t) {
+            return;
+        }
+        let short = v.capital + self.p.found_own_buffer_months * (housing + self.p.essentials) - acc.balance;
+        if short <= 0 {
+            return;
+        }
+        let worth = wanted || {
+            let e = self.venture_prospect(w.pic, v, false).map(|p| oikos_rules::entry::expected(&p));
+            e.is_some_and(|e| e.units > 0 && self.weigh_venture(w, e.profit, false))
+        };
+        if !worth {
+            return;
+        }
+        let amount = short.div_euclid(10_000) * 10_000 + if short.rem_euclid(10_000) > 0 { 10_000 } else { 0 };
+        let months = self.p.start_loan_months;
+        let world = &w.cx.ctx.world;
+        let why = format!(
+            "We have {}, and starting a business of our own ({}) takes {} with a month in hand: asking our bank to lend us {} over {months} months to start it.",
+            money_words(acc.balance, world),
+            v.name.to_lowercase(),
+            money_words(acc.balance + short, world),
+            money_words(amount, world)
+        );
+        let text = format!("Application for a loan of {} over {months} months, for a business.", money_words(amount, world));
+        self.money.borrowing.applied = Some(t);
+        self.work.start_loan = Some(t);
+        let app = crate::papers::finance::LoanApplication { amount, months, account: acc.account.clone(), purpose: "a business".into(), price: None, home: None };
+        let me = self.me.clone();
+        w.push(because(why, vec![say("loan_application", &text, Say { to: Some(vec![lender.clone()]), visible: Some(Visible::Only(vec![me, lender])), data: Some(crate::papers::data(&app)), ..Default::default() })]));
+    }
+
+    /// A loan offered for a business we asked to borrow for: whether to take it, weighing the business as for starting it,
+    /// less the loan's repayment (`borrow_to_start`). Meant by a founding's draw: taken.
+    pub fn take_start_loan(&mut self, w: &mut Week, repayment: i64) -> bool {
+        let wanted = w.t < self.s.venture_wanted;
+        let Some(v) = self.p.ventures.iter().find(|v| v.own).cloned() else { return false };
+        let takes = wanted || {
+            let e = self.venture_prospect(w.pic, &v, false).map(|p| oikos_rules::entry::expected(&p));
+            e.is_some_and(|e| e.units > 0 && self.weigh_venture(w, e.profit - repayment, false))
+        };
+        self.work.start_loan = None;
+        if takes {
+            self.work.start_repayment = Some(repayment);
+        }
+        takes
     }
 
     /// Giving a business of one up (docs/behaviour/entry.md, "Giving it up"): each month after its first, its owner
@@ -1372,6 +1441,44 @@ mod tests {
     }
     fn at_home(ann: &mut Person) {
         ann.s.home = Some(Home { agreement: "rec.lease".into(), space: "b1/dwelling.1".into(), structure: "b1".into(), rent: 100_000, moved_in: true, ..Default::default() });
+    }
+
+    #[test]
+    fn short_only_of_the_money_for_a_business_that_pays_we_ask_our_bank_to_lend_it_and_take_the_loan_only_if_it_still_pays() {
+        // (ME-1: the bank's lending office decides the application by its own rules; here, what the founder does.)
+        let c = ctx_with(json!({ "ventures": own_venture(), "bank": "bank", "start_loan_months": 60 }));
+        let mut ann = Person::new(&c).unwrap();
+        at_home(&mut ann);
+        ann.book.take_all(&known_shops(2, 1_200));
+        ann.work.next_own_venture = 0;
+        // The capital (50,000) and a month's housing and essentials (140,000) against 100,000: short by 90,000, asked for over the
+        // bank's longest term, for a business.
+        let out = run(&mut ann, &c, &homes_around(DAY, None, 200), 100_000, |a, w| a.ventures(w));
+        assert!(out.len() == 1 && out[0].contains("loan_application") && out[0].contains("\"purpose\":\"a business\"") && out[0].contains("\"amount\":90000") && out[0].contains("\"months\":60"), "{out:?}");
+        // Not again while it is waiting on the answer, nor next month while we may not apply.
+        ann.work.next_own_venture = 0;
+        assert!(run(&mut ann, &c, &homes_around(2 * DAY, None, 200), 100_000, |a, w| a.ventures(w)).is_empty());
+        // Without a bank that lends to start one: nothing.
+        let none = ctx_with(json!({ "ventures": own_venture(), "bank": "bank" }));
+        let mut bob = Person::new(&none).unwrap();
+        at_home(&mut bob);
+        bob.book.take_all(&known_shops(2, 1_200));
+        bob.work.next_own_venture = 0;
+        assert!(run(&mut bob, &none, &homes_around(DAY, None, 200), 100_000, |a, w| a.ventures(w)).is_empty());
+        // The loan offered: one whose repayment takes all the business would pay us is not taken; one that leaves it paying is.
+        let me = ann.me.clone();
+        let app = st("rec.app", "loan_application", &me, json!({ "amount": 90_000, "months": 60, "account": "acc.ann", "purpose": "a business" }));
+        let offer = |id: &str, repay: i64| rec(json!({ "id": id, "record": "agreement", "author": "p.bank", "at": 3 * DAY, "visible_to": ["bank", me], "basis": "rec.app",
+            "terms": { "template": "loan", "parties": ["bank", me], "commitments": [{ "who": me, "does": { "outcome": { "money": { "to": "acc-bank", "amount": repay.to_string() } } }, "every": MONTH }] } }));
+        ann.book.take_all(&[app, offer("rec.dear", 900_000)]);
+        let out = run(&mut ann, &c, &homes_around(3 * DAY, None, 200), 100_000, |a, w| a.borrowing(w));
+        assert!(out.iter().all(|x| !x.contains("agreement")), "too dear to take: {out:?}");
+        ann.money.borrowing = Default::default();
+        ann.work.start_loan = Some(DAY);
+        ann.book.take_all(&[offer("rec.fair", 2_000)]);
+        let out = run(&mut ann, &c, &homes_around(4 * DAY, None, 200), 100_000, |a, w| a.borrowing(w));
+        assert!(out.iter().any(|x| x.contains("agreement") && x.contains("rec.fair")), "{out:?}");
+        assert_eq!((ann.work.start_loan, ann.work.start_repayment), (None, Some(2_000)));
     }
 
     #[test]

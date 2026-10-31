@@ -33,6 +33,15 @@ test("a town that does not ask for assistants is generated as before; one that d
     // (Only what the principal could know: its own time, its figures, never how often an assistant really slips.)
     expect(JSON.stringify(d)).not.toMatch(/slip/);
   }
+  // A kind of assistant a model plays: its systems are seats, and its posts have their stationery (its own papers in
+  // words, the principal's papers it may do, and each of those as a draft for sign-off).
+  const seated = generate({ ...base, assistants: true, assistant_seats: ["assistant-a", "assistant-a-personal"] }) as any;
+  expect(seated.templates.find((t: any) => t.id === "assistant-a").controller).toMatchObject({ type: "llm", params: { mock: { brain: "assistant" } } });
+  const post = principals[0].role_module.params.delegation.post;
+  const forms = seated.world.records.filter((r: any) => r.kind === "form" && r.data?.office === post).map((r: any) => r.data.form);
+  expect(forms).toEqual(expect.arrayContaining(["advice", "report", "scope_request", "handover"]));
+  expect(forms.some((x: string) => x.startsWith("draft_"))).toBe(true);
+  expect(seated.world.records.some((r: any) => r.kind === "form" && r.data?.office === "provider-a-desk" && r.data.form === "scope_request")).toBe(true);
 });
 
 test("in a town with assistants, principals engage by their own rule, hand matters over and hear back; every decision rests on what they were shown", async () => {
