@@ -92,7 +92,7 @@ venue, a petition, an offer, telling others, ... or wait). Optional, off by defa
   and what the person has learned of each way. Never the code mind's scoring (`code.odds`, an opening's `adj`, an
   option's `score`), never a name or id. The open vocabularies (what a want is about, roles, kinds of trust, memories)
   are the trainer's, in the model file.
-- **The model:** one scorer, a multilayer perceptron (183 inputs, two layers of 64, ReLU), applied to each option with
+- **The model:** one scorer, a multilayer perceptron (214 inputs with round 1's vocabularies, two layers of 64, ReLU: 17,985 weights), applied to each option with
   the person and situation beside it; the odds are their softmax, so the order of the options cannot count. Weights
   and standardisation are whole numbers in 1/65,536ths in the file; the forward pass is IEEE addition and
   multiplication in a fixed order and `mind::math::exp`, as the code mind's own logit is.
@@ -106,3 +106,47 @@ venue, a petition, an offer, telling others, ... or wait). Optional, off by defa
   The decision records both: `situation.code.odds` (the code mind's) and `situation.model` (the odds drawn on, the
   share, the file's hash). Absent: the world is as before, to the byte; at share 0 the state is the code mind's to the
   bit (`kernel/tests/citizen_model.rs`).
+
+### Round 1 (2026-11-01): `want-way-r1`
+
+`runs/citizen-model/models/want-way-r1/` (model SHA-256 `9702b5db...128a`, seed 2 of five chosen by validation loss),
+from `runs/citizen-model/data/want-way-r1.jsonl`: 19,448 decisions to train on (21 code towns of seven profiles and
+the pilots lv-09 and lv-11), 7,447 to stop on (a town of each of those profiles), 6,150 to test on (four towns of
+us-oh-2026 and ke-nakuru-2026, profiles never trained on) and 647 of the pilot lv-13. Measured on the rounded model
+through the forward pass a run computes. Points are of 100.
+
+| On the test towns (profiles never seen) | Model | Code mind | Passes when |
+|---|---|---|---|
+| Distance from the code mind's odds, median (mean; 90th centile) | 1.3 points (1.9; 3.9) | | |
+| Excess cross-entropy over the targets' own (KL) | 0.0024 nats (uniform odds: 0.105) | | |
+| The likeliest way the same | 95.8% | | |
+| Acting at all (not waiting) | 67.30% | 67.32% | within 8 points |
+| Each way's share of the town's decisions | within 0.2 points of the code mind's, every way | | |
+| Spread between two people in the same kind of situation, median | 20.7 points | 21.2 | at least 0.7 of it (0.98) |
+| Agency low to high: acting more | 6,106 of 6,106, +22.9 points | the same sway | 19 in 20 |
+| Trust in the other side low to high: asking them more | 1,478 of 1,478, +25.5 | | 19 in 20 |
+| Trust in the venue low to high: going to it more | 327 of 327, +28.2 | | 19 in 20 |
+| Another person's record, same situation, median move | 13.8 points | (26.2 in 11g, another sample and measure) | reported |
+| Options reversed | the same weights to the millionth | | identical |
+
+The validation towns and the held-out pilot are the same to within a few tenths (pilot: distance 1.0 points, acting
+53.8% against 54.1%). The noise between the five seeds on the test towns: KL 0.0022 to 0.0026, distance 1.19 to 1.40
+points, acting -0.23 to +0.22 points, spread kept 0.97 to 1.00.
+
+- **Determinism:** seed 2 trained again gave the same file, byte for byte.
+- **Speed:** 23 microseconds a decision (input built and every option scored; p99 45; 3.05 options on average) on one
+  core of the loaded machine: inside the design's 0.5 ms. Twins of a us-oh-2026 town of 1,000 for 120 days, one thread,
+  alternating: off 36 s and 66 s, on 34 s and 36 s, so no difference beyond the load's noise (a town of 1,000 makes about
+  3.5 want decisions a day). The same seed gave the same state twice with the model on (and twice off). In that twin,
+  54.0% of want decisions waited with the model off and 53.0% on; the odds drawn on put 54.4% on waiting where the code
+  mind's own put 54.2%.
+- **What this is and is not:** a faithful, fast copy of the code mind's want weighing (the caveat on the plan holds: it
+  inherits the code mind's assumptions, placeholder sways and all, and is no independent evidence of how people act).
+  It is not faster than the code mind's own arithmetic for this decision (a few dozen operations); it is the shape,
+  speed, determinism and spread the design asked step 5 to prove before any teacher, and the mechanism a round with
+  teachers or content heads plugs into.
+- **Not yet measured** (needing the code mind's response to an edited record, which a row does not hold, or more than
+  the act head): scrambled records and edits against the code mind's own sizes; years in town (the code mind does not
+  read it); the content heads; patterns not told; the two-year twins on three profiles and six seeds.
+- **Again:** `bun scripts/citizen-model.ts --name <NAME>` on the same captures writes the same data file (sources in a fixed
+  order, each read in its own order) and, seed for seed, the same models.

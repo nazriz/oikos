@@ -10055,3 +10055,21 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
 - **Revisit if:** the model's odds are used past round 1 (a head per domain needs its own situation typed); a head runs
   on every decision (then int8 and batching); the code mind's want weighing changes (retrain: the model learns the
   code mind as it was when captured, which the data manifest records by source hash).
+## 2026-11-01 · The citizen model, round 1 trained and measured: `want-way-r1` (docs/citizen-data.md, "Round 1"; no model called)
+
+- **What:** 25 code towns made for it (`worlds/citizen-model.yaml`, nine profiles, a year each, captured: runs/citizen-model/towns/)
+  and the pilots' training split; 33,692 want decisions kept (the three held-out test pilots refused whole, decisions
+  with only waiting open left out); five seeds trained; seed 2 chosen. On two profiles never trained on: 1.3 points
+  from the code mind's odds (median), acting at all 67.30% against 67.32%, the spread between people kept (0.98), every
+  edit the code mind's way in every case, 23 microseconds a decision. Retrained, the same file byte for byte. Twins
+  in a town of 1,000: no difference in run time beyond the load's noise; waiting 53.0% against 54.0%.
+- **Why the splits so:** whole towns and whole profiles held out, as 11e asks, so the test says whether it learned the
+  citizen or one town's settings; the held-out pilot says whether seats' towns differ (they do not, here).
+- **What it shows, honestly:** a small net of our own reproduces the code mind's want weighing closely, fast, keeping
+  who people are, and the mechanism is in place for a round that adds teachers or content heads. It shows nothing about
+  real people: it inherits the code mind's placeholder sways (plan caveat). Nor is it faster than the code mind for
+  this decision; its use is as the base the later heads build on.
+- **Revisit if:** the code mind's want weighing changes (retrain from new captures; the manifest records each source's
+  hash); a profile whose parameters differ from all nine shows a larger distance (the model reads no profile parameter
+  directly, e.g. the mind's lambda); the scrambled-record figure (13.8 here) is to be compared with the code mind's own,
+  which needs the code mind run on edited records (a harness of its own).
