@@ -1447,9 +1447,18 @@ The mechanism:
 - **Gap:** In `orchestrator/test/seat-diary.test.ts` (a works seat naming its crew to write forty notices a working day, 600 citizens, seed 1) the crew's paperwork takes 106 to 121 minutes from the first act of the day to the last on 18 of the 19 working days of days 1 to 28, and 310 minutes on day 21 (found 2026-10-24, after the run's seed began to draw who the people are). On the ordinary days the four crew members who are at work apply their acts side by side; on day 21 they applied one after another, the first four 30 minutes apart (555, 585, 615, 645 minutes into the day), and the day's later acts bunched in fours as well. **Not traced:** whether a crew member was busy with a gathering, a trip or another job that morning, whether the kernel serialised acts through one performer's time, or whether the seat's own sitting was late.
 - **Where:** the works crew's time (the kernel's charge of an act to its performers, `docs/all-work-takes-time.md`); `orchestrator/test/seat-diary.test.ts` (its bound is held to the middle working day since then).
 - **Effect:** A study that measures how fast delegated work gets done could read a one-day outlier as a delegation effect. If the cause is a fault, a crew's day is slower than its hours allow on some days.
-- **L / I:** low / medium · **Status:** open; untraced
-- **Notice by:** a day's span in the seat-diary run well above the others (`spanOf`), or a crew member's acts in the log not overlapping on a day when more than one is at work.
-- **Fix when:** a study reads delegated work's speed, or the day shows again at another seed.
+- **L / I:** low / medium · **Status:** closed (2026-10-31, branch `mt23-crew`): a mechanism fault, already fixed. Until
+  foundations-2 P1 (`fc5eabd`, 2026-10-25, the day after this was found) an actor who only orders an act was held on its
+  own time until the work began (docs/decisions.md, 2026-10-25, "Someone who only orders an act was held until it
+  began"), so a seat's orders queued behind whichever member of its crew was busy: the 30-minute steps and the bunching
+  in fours are that queue. On current main the crew's work is 105 minutes on every working day of days 1 to 22 in the
+  600-person town, day 21 included, and 31 minutes (two in post) on every working day of 30 in the town of the usual
+  size. Not re-run at `0e39e83` itself (a cold build of the old kernel): the trace is from the code and the dates. The
+  test's `spanOf` read the log time of `action_started`, which since P1 is when the seat gave the order (16 minutes a
+  day), not the crew's work; it now reads the work's own `starts` and `done`, and every working day is held to the
+  bound, not the middle one.
+- **Notice by:** a day's span in the seat-diary run (`spanOf`, now the work's own times) over three hours.
+- **Fix when:** (closed) a day over the bound again.
 
 ### MT-24 · The citizen capture keeps each decision as the mind recorded it, not yet everything the citizen model will read
 - **Gap:** The capture (docs/citizen-data.md, step 1 of docs/design/citizen-model.md) writes every recorded decision
