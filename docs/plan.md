@@ -98,7 +98,8 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - Haiku against Sonnet welfare: a matched pair (same town, same offices) before more Haiku seats.
 - The unbased-figures list (orchestrator/test/figures.test.ts) to shrink as figures are sourced.
 - [x] Borrowing to start a business (ME-1): a founder short of the capital applies to the bank, whose lending office decides by its rules (`gap-me1`); lending against a home and borrowing for premises left.
-- Dev machine: elastic slots, Linux with a hosted nightly, one Rust test program (PL-4).
+- [x] Dev machine: elastic slots, the pool fitting the machine's load, memory and each job class's measured use (PL-4 (1), `elastic-slots`).
+- Dev machine: Linux with a hosted nightly, one Rust test program (PL-4).
 - The explorer's next steps (PL-2).
 
 ## Done (2026-10-24 to 2026-10-25)

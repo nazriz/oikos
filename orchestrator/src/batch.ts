@@ -503,7 +503,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     while (queue.length) {
       // One of the machine's slots for each run under way (scripts/slots.ts): a batch starts with as many of its P as
       // are free and adds the rest as they free. Waiting changes when a run starts, and nothing in it.
-      const slot = slotted ? await take(1, `oikos run ${o.world} (${seeds.length} run${seeds.length === 1 ? "" : "s"}) into ${out}`, { cancel: () => !queue.length, say: log }) : undefined;
+      const slot = slotted ? await take(1, `oikos run ${o.world} (${seeds.length} run${seeds.length === 1 ? "" : "s"}) into ${out}`, { cls: "run", cancel: () => !queue.length, say: log }) : undefined;
       const next = queue.shift();
       if (next === undefined) { slot?.release(); break; }
       const { seed, town } = next;

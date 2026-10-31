@@ -18,7 +18,14 @@ process id you started.
 ## Slots: a limit on heavy jobs, machine-wide
 
 `scripts/slots.ts` is a pool of tokens shared by every checkout and worktree of the user: files in `~/.oikos/slots`
-(`OIKOS_SLOTS_DIR`), as many as the cores less two (`OIKOS_SLOTS=N`; `OIKOS_SLOTS=off` turns it off). What takes them:
+(`OIKOS_SLOTS_DIR`), as many as the cores (`OIKOS_SLOTS=N` fixes N and reads nothing of the machine; `OIKOS_SLOTS=off`
+turns it off). **Elastic:** how many of them may be held at once follows the machine. A job other than the merge's starts
+only when the load average, plus the expected use of holders younger than a minute (not in the load yet), plus its own
+expected use stay within the cores, and the free memory (less what holders younger than a minute will still take) leaves its expected
+memory and a reserve (a tenth of the machine's, at least 1 GiB). Expected use is per token and per class (test, build,
+run, other), declared at first and then measured from the jobs that end (`usage.json` beside the tokens; `status` shows
+it). A job that does not fit waits; the head of the queue is not passed; a job alone always starts; the merge's is held by
+nothing but the pool and the queue (docs/decisions.md, 2026-10-31, "Elastic slots"). What takes them:
 
 | job | tokens |
 |---|---|
@@ -28,7 +35,8 @@ process id you started.
 | `bun run kernel` | half the cores |
 | anything else heavy | `bun scripts/slots.ts [--weight K] -- <command...>` (K a whole number of tokens, or `half`; anything else is refused at once, with the weights there are) |
 
-- `bun scripts/slots.ts status` lists who holds tokens (pid, how long, what, where) and who waits.
+- `bun scripts/slots.ts status` lists who holds tokens (pid, how long, what, where) and who waits, and the machine's
+  readings: load, free memory, whether another token would start now, and each class's use per token.
 - A job that waits says so once a minute (`slots: waiting 61 s so far for 1 of 12 ...`). Waiting costs time and nothing
   else: a run's state hash is the same with and without (checked on a 30-day run of 1,000 people).
 - A holder that dies leaves its tokens behind; the next taker sees its pid is dead and reclaims them.

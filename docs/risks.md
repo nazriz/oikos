@@ -1675,8 +1675,8 @@ set the status to `fixed (commit abc1234)` (or the decisions entry), and let a r
   the part (3) would cut. A documents-only gate is 15 s, TypeScript only 85-100 s, the slow tier 660 s on 12 slots. A lone
   agent's gate is held to 3 slots for builds and runs today, which (1) would lift. The code has run only on macOS arm64,
   so nothing yet says its logs are the same elsewhere, which (2) would.
-- **Status:** planned (after feature work resumes) · **Do when:** The kernel gate grows past about 4 minutes or agents
-  wait on the cap for (1) and (3); before any result is claimed to reproduce on another machine, for (2).
+- **Status:** planned (after feature work resumes) for (2) and (3); (1) done 2026-10-31 in another form, the pool following the machine (load, free memory, each class's measured use: docs/decisions.md, "Elastic slots"), the cap kept for builds and runs, which cannot give tokens back soon · **Do when:** The kernel gate grows past about 4 minutes or agents
+  wait on the cap for (3); before any result is claimed to reproduce on another machine, for (2).
 
 ---
 
