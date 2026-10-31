@@ -31,7 +31,7 @@ export const SKILL_MAX = 10_000;
 export const PAPERS = "papers";
 
 /** The name of a task's skill: its id's stem (`make-food` is `make`). */
-export const skillOfTask = (task: string) => task.split("-")[0];
+export const skillOfTask = (task: string): string => task.split("-")[0]!;
 
 /** The body variable of a skill. */
 export const skillVariable = (skill: string) => `skill-${skill}`;
@@ -56,7 +56,7 @@ export function withSkills(config: any, spec: boolean | SkillsSpec | undefined, 
   const live = (skill: string) => !s.only || s.only.includes(skill);
   const cat = config.catalogue;
   const tasks = (cat.tasks ?? []).map((t: any) => (t.labour > 0 && live(skillOfTask(t.id)) ? { ...t, skill: { variable: skillVariable(skillOfTask(t.id)), novice_bps: s.novice_bps, expert_bps: s.expert_bps } } : t));
-  const skills = [...new Set(tasks.filter((t: any) => t.skill).map((t: any) => skillOfTask(t.id))), ...(live(PAPERS) ? [PAPERS] : [])];
+  const skills: string[] = [...new Set<string>(tasks.filter((t: any) => t.skill).map((t: any) => skillOfTask(t.id))), ...(live(PAPERS) ? [PAPERS] : [])];
   const known = new Set([...tasks.map((t: any) => skillOfTask(t.id)), PAPERS]);
   for (const x of s.only ?? []) if (!known.has(x)) throw new Error(`skills.only: ${x} is no skill of this town (its skills: ${[...known].join(", ")})`);
   const initial = ordinaryLevel(s, hoursPerDay);
