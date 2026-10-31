@@ -9765,3 +9765,31 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+## 2026-10-31 · Candidacy: the field of 19 traced, and the fault that is left (branch `gap-pb10`; docs only; risk PB-10; no model called)
+
+- **What was found:** the field of 19 candidates for about 118 formal votes (decisions 2026-10-24, "Two tests that failed in
+  the new town") is not the town's. `elections.test.ts` sets every citizen's `stand_bps` to 1,000 (a 10% chance of standing
+  when an election is called, shifted by the person's drive) to be sure of a contest; the profile's figure is 200
+  (au-vic, a placeholder). The test town (`worlds/town.yaml`, au-vic) has 166 electors: 166 x 10% x a mean drive a little
+  over one is the 17 to 19 seen. At the profile's own figure the same town fields about three or four candidates, which
+  is a handful, as real local elections have. So it is neither the mechanism's outcome nor emergent: it is the test's dial.
+- **The mechanism fault that is there:** the chance is each elector's, fixed, and blind to the field. The field is
+  therefore proportional to the electorate: at the profile's 2%, about 16 to 19 in the 1,000-person town (795 electors)
+  and some 800 in a town of 50,000 (the north star's size), where real fields per vacancy stay a handful whatever the
+  size of the ward (the VEC reports candidates per vacancy for each Victorian council election; about three in 2024, to
+  confirm). Real candidacy is lumpy and organised: a nomination costs a fee or a deposit and signatures (in Victoria a
+  nomination fee, to confirm the sum), a campaign costs time and money, most candidates come through a party or a local
+  group, and those who stand weigh their chance against the field (the citizen-candidate model: Osborne and Slivinski
+  1996; Besley and Coate 1997).
+- **Not built, and why:** fixing it is a new law of the world, not a patch: who stands (the decision weighed against the
+  field already nominated, which needs the decision spread through the nomination window so the field can be seen), the
+  nomination's cost (the law's fee, deposit and signatures, as law data per profile with sources), the time a campaign
+  takes, and backing (parties or groups, which the town does not have). Each needs sourced figures in nine profiles, and
+  the choice of a candidacy model is the owner's. Lowering `stand_bps` with the size of the town would be calibrating an
+  outcome, which the rules forbid. The test's 10% is left as it is: it forces a contest, and the test asserts only what the
+  mechanism guarantees (the incumbent's place in the voters' rankings).
+- **For Naz:** a proposal to approve or change: (1) nominations as law data (fee or deposit, signatures, from each
+  profile, sourced); (2) a person considers standing on a day of the nomination window drawn for them, weighing a
+  candidacy's cost in time and money and their chance against the nominations already public; (3) groups and parties
+  later, with founding (docs/behaviour/founding.md). Calibrated against candidates per vacancy, never set to it.
+- **Revisit if:** an election in a town of more than a few thousand is read; or the owner approves the proposal.
