@@ -315,7 +315,7 @@ impl World {
             nature: None,
             totals: c.catalogue.counters.iter().map(|x| (x.id, 0)).collect(),
             flooded: Default::default(),
-            takings: vec![],
+            takings: Default::default(),
             asks_held: Default::default(),
             entity_records: Default::default(),
             vehicles: c
@@ -326,7 +326,7 @@ impl World {
                 .collect(),
             transit: Default::default(),
             network: None,
-            scarce_sold: BTreeMap::new(),
+            scarce_sold: Default::default(),
         };
         for p in &c.positions {
             let position = Position { entity: p.entity, title: p.title.clone(), role: p.role.clone(), channels: Arc::new(p.channels.clone()), role_module: p.role_module.clone(), holder: p.holder, changed: 0 };

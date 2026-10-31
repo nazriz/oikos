@@ -134,14 +134,18 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // the law on leases of shop premises (law-premises-leases), the landlords their surrender price and tribunal, a business of one
 // the ground of premises it holds by agreement (generator 0.70.0); the genesis records are in the state. 4c714b3d..., a6a15d31...
 // and dd840c8e... for the configs, and e6916c32..., 47582857... and f94c4358... for the states, until then.)
-// (Re-taken on 2026-10-31 at working calendars (gap-weekends), config hashes and Rust states both: the support agency's and the tax
-// collector's desks of officers keep the place's days of rest and public holidays (`hours.closed`), an officer's day on each working
-// day (generator 0.72.0); 38412f4e..., fb039153..., 43665a61... for the configs and ffab69c8..., c5619171..., e5d66985... for the
-// states, until then.)
+// (Re-taken on 2026-10-31 at years at 10,000, the states only (the config hashes do not move: a hall's room changes only
+// in towns over 3,333 people): an owner waiting on the register for its lot's plan is not homeless meanwhile and stops
+// no supply, and the works office sends its inspector one visit at a time; ffab69c8..., c5619171... and e5d66985...
+// until then.)
+// (Re-taken on 2026-10-31 at working calendars (gap-weekends), on the tree merged with main at 60c7ab07, config hashes and Rust
+// states both: the support agency's and the tax collector's desks of officers keep the place's days of rest and public holidays
+// (`hours.closed`), an officer's day on each working day (generator 0.72.0); 38412f4e..., fb039153..., 43665a61... for the configs
+// and 553de625..., 3aa5f181..., aa994113... (main's) for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "b6ca2513e56ae4af62c8ea22ef4928529841ac008eee2a01b20d62c1cfc91f1f",
-  "gb-eng-2026": "671ce1bab464e669bb286b31dcd236e8f2ab49843ab99caa9c3ff0b0fcaabf83",
-  "ke-nakuru-2026": "d28a1f40853d1882a1b063b79bec74ba7155d0a22e5cdbd21d77be2b44f80013",
+  "au-vic-2026": "6c25314d73d5908741979c6ebbec1355432260e8d3a9eeffe0ee6edcf08a721e",
+  "gb-eng-2026": "622984eaa55772f80cbff5f6bf91192a0e90b436b56ed9a46e7195b75c60ec12",
+  "ke-nakuru-2026": "6ef983c67ea85f6e4d0a49dabcdf8c10dae0f3d28744c0fed579c52c62762cc1",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

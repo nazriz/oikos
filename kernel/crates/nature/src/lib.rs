@@ -98,21 +98,26 @@ pub struct Land {
     pub anchored: Vec<Vec<Id>>,
 }
 
+/// A field's or a species' cells (sparse), as a persistent map: a copy of nature's state for an act shares them, and an
+/// act that changes a cell copies only the path to it, never the whole field (memory per person: no whole-world copies
+/// during a step). Iterates and serialises in key order, as a `BTreeMap` does.
+pub type Cells = imbl::OrdMap<Id, i64>;
+
 /// Nature's state: sparse (a field's cells at its baseline, and cells with none of a species, aren't kept).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NatureState {
     /// field -> cell -> value.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub fields: BTreeMap<Id, BTreeMap<Id, i64>>,
+    pub fields: BTreeMap<Id, Cells>,
     /// species -> cell -> count (> 0).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub populations: BTreeMap<Id, BTreeMap<Id, i64>>,
+    pub populations: BTreeMap<Id, Cells>,
     /// species -> the day it went extinct. Permanent.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extinct: BTreeMap<Id, i64>,
     /// Unbuilt cells whose cover succeeds: the cover, and the day it became that.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub since: BTreeMap<Id, (Id, i64)>,
+    #[serde(default, skip_serializing_if = "imbl::OrdMap::is_empty")]
+    pub since: imbl::OrdMap<Id, (Id, i64)>,
     /// The last day stepped.
     #[serde(default)]
     pub day: i64,
@@ -147,7 +152,7 @@ fn sround(num: i64, den: i64, rng: &mut Rng) -> i64 {
     q + i64::from(r > 0 && (rng.below(den as u64) as i64) < r)
 }
 
-fn dense(sparse: Option<&BTreeMap<Id, i64>>, ground: &Ground, default: i64) -> Vec<i64> {
+fn dense(sparse: Option<&Cells>, ground: &Ground, default: i64) -> Vec<i64> {
     let mut v = vec![default; ground.cells.len()];
     if let Some(m) = sparse {
         for (c, x) in m {
@@ -159,7 +164,7 @@ fn dense(sparse: Option<&BTreeMap<Id, i64>>, ground: &Ground, default: i64) -> V
     v
 }
 
-fn sparse(v: &[i64], ground: &Ground, default: i64) -> BTreeMap<Id, i64> {
+fn sparse(v: &[i64], ground: &Ground, default: i64) -> Cells {
     v.iter().enumerate().filter(|(_, x)| **x != default).map(|(i, x)| (ground.cells[i], *x)).collect()
 }
 
@@ -209,7 +214,10 @@ fn succession(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureStat
         cat.land_covers.iter().filter_map(|c| c.succeeds_to.as_ref().map(|s| (c.id.as_str(), (s.cover.as_str(), s.after_days)))).collect();
     // A cell whose cover doesn't succeed (or that's built on) keeps no day: those are taken out by going through the
     // days kept (few), not by looking every cell up among them.
-    st.since.retain(|cell, _| ground.index.get(cell).is_none_or(|&i| !land.built[i] && next.contains_key(land.cover[i].as_str())));
+    let gone: Vec<Id> = st.since.keys().filter(|cell| !ground.index.get(*cell).is_none_or(|&i| !land.built[i] && next.contains_key(land.cover[i].as_str()))).cloned().collect();
+    for cell in gone {
+        st.since.remove(&cell);
+    }
     for (i, cell) in ground.cells.iter().enumerate() {
         let cover = &land.cover[i];
         let Some(&(to, after)) = next.get(cover.as_str()).filter(|_| !land.built[i]) else { continue };
@@ -227,7 +235,7 @@ fn succession(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureStat
     }
 }
 
-fn step_field(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land: &Land, now: Option<&BTreeMap<Id, i64>>, day: i64) -> Vec<i64> {
+fn step_field(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land: &Land, now: Option<&Cells>, day: i64) -> Vec<i64> {
     step_field_dense(f, ground, land, dense(now, ground, f.baseline), day)
 }
 
