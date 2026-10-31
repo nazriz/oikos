@@ -76,8 +76,9 @@ test("every profile's town is counted, and the unbased places are only those lis
   const listed: string[] = JSON.parse(readFileSync(FIXTURE, "utf8")).unbased;
   const found = new Set<string>();
   const used = new Set<number>();
-  // (Each profile's plain town, and two living ones, with founding, for the parameters only a living town is given.)
-  const towns = [...ids.map((id) => ({ id, extra: {} })), ...LIVING.map((id) => ({ id, extra: { living: { founding: true } } }))];
+  // (Each profile's plain town, and two living ones, with founding, for the parameters only a living town is given; and one
+  // with skills by use, for their figures.)
+  const towns = [...ids.map((id) => ({ id, extra: {} })), ...LIVING.map((id) => ({ id, extra: { living: { founding: true } } })), { id: LIVING[0]!, extra: { skills: true } }];
   for (const { id, extra } of towns) {
     const config = generate({ ...spec, ...extra, citizens: 60, profile: id });
     const r = figuresFor(config, { profile: id });

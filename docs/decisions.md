@@ -9717,6 +9717,53 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
 - **Revisit if** a finding turns out to be a false positive (then the audit is wrong, never the inventory widened); the
   log audits need more than a month to see a module's moves (then the run grows).
 
+## 2026-10-31 · Foundations-2 phase 3, S2: roads are ways of the network, and vehicles are driven (branch `f2-phase3`; results move; no model called)
+
+- **Contract (world config, blocks, log; blanket approval).** A structure type may be a **way** (`way`: its mode, what a
+  link of it carries an hour each way, its speed for vehicles). Standing and complete, each cell of it is a node of the
+  world's ways, joined to the next cell's node of the same mode by a link a cell long; a world with a way says how many
+  metres a cell is (`world.ground.cell`, refused at load otherwise). The reserved `travel.roads` is gone (a road is a
+  built thing, so it is a structure that is a way, and the town's new roads join the ways when finished); a vehicle type
+  states its top speed (`speed_kmh`, for the reserved `seconds_per_cell`), and a vehicle who besides its owner may drive
+  it (`drivers`). `occupy` gains `vehicle` (the call's `by`, code's own until the translator is taught it, as the
+  network's calls are: `CODE_ONLY_ARGS` in the resolver), and `occupied` names it.
+- **Kernel.** A trip (`travel.rs`, `ways.rs`) is on foot over the cells all the way, or on foot to the way's node nearest
+  where it sets out, along the links (driven at the lower of the vehicle's speed and the link's, or walked at the round's
+  pace), and on foot from the node nearest where it goes, whichever is quicker; the ways and each node's quickest times are
+  worked out once a ground epoch (a way finished or pulled down is a new epoch), the trips cached by vehicle speed as
+  before. An `occupy` with a vehicle is refused unless the body may drive it (`not_theirs`) and it stands where the body
+  sets out (`not_present`); the vehicle then stands where the body arrived. A person's view shows the vehicles they may
+  drive and where each stands (theirs: their own things). A world with no way runs as before, to the hash (checked: main's
+  10,000-person config on this build gives main's state hash).
+- **Generator 0.72.0, profiles.** The road type is a way (the profile's `round.roads.speed_kmh`, 45 km/h or 30 where a
+  road cell took 3 s, the speed a road cell was crossed at; `capacity_per_hour` 900, a placeholder); the road cover is no
+  longer quicker than walking; the ground's cell is the nature's `cell_m`. Housed households have a vehicle by the
+  profile's `round.vehicles.households` shares (a car, or a motorcycle where the census counts them; at most one each),
+  owned by the leaseholder or owner, standing at home, the other adults let drive it. Sources in each profile's `round`
+  note, most recalled and to confirm (WM-4).
+- **Citizen.** Going where they belong, a citizen takes a vehicle of theirs that stands where they are; if the world says
+  it was not there to take (another of the household took it first) or not theirs, they go again at once on foot.
+- **Inventory.** S2 done: the road as a cover gone (`waysOffNetwork` empty; the entry `road-by-cover` a guard).
+- **Measured** (au-vic, `worlds/town-1000.yaml` with `citizens=10000`, `living.initiative_bps=10000`, 30 days, all code, 4
+  engine threads, the log discarded; the machine shared and loaded, so paired runs): before (main at cc6103d2) and after,
+  run alternately twice: wall 90 / 96 s and 106 / 108 s; the run's own thread 72.3 / 76.8 s and 82.3 / 85.5 s (+3 to
+  6%); peak 1.81 / 1.82 GB; log 3,332,887 / 3,345,323 lines (+0.4%). 6,460 of 28,075 moves into a space were driven;
+  1,596 drives refused `not_present` (a household's second driver finding the car gone; each then walks). The
+  10,000-person town of `town-1000.yaml` holds 10,000 people in its 380 homes, so most are unhoused and the round's moves
+  are few (28,075 in a month); the 300-person towns of the backstop run drive about four moves in ten.
+- **Not as designed:** roads are not explicit links of `world.network` (3.1: "today's reserved `travel.roads` becomes
+  links") but structures that are ways, so that a road the town builds is part of the network when it is finished; links
+  declared in `world.network` with a mode for travel (between towns) come with S6. The trip uses the nodes nearest its
+  ends, not the best of all entry nodes (a road with a gap is walked whole: the known limit, simple and stable).
+- **Found on the way, mended:** a child's parents now know of its birth at once (`person_created` is news of their body: the
+  engine wakes them, `kernel/src/schedule.rs`); the one who bore it brought it home and put it on the household's record only
+  at her next week's plan, so a child born in a run's last week was of no household at its end (the invariants canary,
+  ke-nakuru seed 2, once S2's moves had shifted the town's births).
+- **Pins re-taken:** culture-dial's three config hashes and Rust states, representation's six towns (their reason there).
+- **Revisit if** the nearest-node rule gives a trip plainly longer than a real one (then the entry node is chosen among
+  the few nearest by the whole trip's time); a household's second car matters to a result (then households hold more than
+  one, by the census's counts); the refused second drives show in a log's size (then a household's adults agree who takes
+  the car, as behaviour with a source).
 ## 2026-10-31 · No whole-world copies during a step (SC-1; branch `mem-no-copies`, on `representation`; no result changes; no model called)
 
 - **What was copied.** Every act is worked on a copy of the state (all-or-nothing: a dry run when it begins, the act
@@ -9965,3 +10012,43 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
 - **Revisit if:** a fork's seat is told something a pilot's is not (or the reverse) in a model fork's log; a world with
   `consult` or reading is run as an experiment; a fork part-way through needs taking up (a long model fork on a
   subscription's window).
+## 2026-10-31 · Skills by use: practice and fading for every kind of work, a factor a run switches (foundations-2 E4; branch `f2-economy`; contract additions; a town without `skills` is as before, to the byte; no model called)
+
+- **What:** a body variable may be a **practised skill** (`practice`: `gain_bps_per_hour`, `half_life_days`, `floor`).
+  Its use is practice (each hour closes that share of the gap to the maximum: diminishing returns); unused, its part
+  above the floor halves every half-life, worked out when it is read or used (the lazy settling body variables already
+  had, so nothing is written a day). A task names one (`skill`: `variable`, `novice_bps`, `expert_bps`): its labour is
+  the stated labour at the variable's `initial`, in a straight line to `novice_bps` of it at the minimum and
+  `expert_bps` at the maximum, by the crew's mean (multiplying schooling's `labour_by`), and each person's share of the
+  time is practice. An act names one through the catalogue's `act_skills`, keyed as the table of work is (`publish/<kind>`,
+  else the block): a person's time for it scales the same way (`kernel.rs` `act_program`), and the doers practise it when
+  it is done. The contract refuses a skill on a variable that is not practised, and a practised variable that also drifts.
+  The generator's `skills` (off unless set; `true`, or a study's rates; `only` to make some skills live and not others)
+  gives each kind of work in the town a skill (each task that takes time, by the stem of its id) and a person's papers
+  one (`publish`, any kind), with the opening level derived: where a full-time worker settles at the run's rates over
+  the profile's working week, so the table's times stay an ordinary hand's.
+- **Why this way:** the owner's study treats skill decay as an experimental factor, so it is a switch with rates, not a
+  law always on; its shapes are the literature's (a law of practice with diminishing returns, fading by time unused) and
+  every size a placeholder, counted by law 11. Grouping by the stem keeps the generator free of a hand list of trades.
+  An ordinary hand's opening level keeps a town with skills on as quick as one without on its first day, so what differs
+  later is practice and fading, not a start of novices.
+- **Not built, and why:** slips by skill (no source for how a person's slip rate moves with practice: foundations-2 7.4
+  says "where a source gives one"); per-kind skills for papers (the kernel takes them; the generator groups all papers
+  in one, a choice to revisit if a study needs it); the code minds' plans and the delegation rule still use the table's
+  stated times, not their own skill (the kernel refuses work that does not fit the day, as it does for schooling); the
+  measure of who can still do the work (M8, step E6).
+- **Known limits:** everyone opens at the ordinary level in every skill (the generator does not know who did what before
+  the run); a person who does a kind of work part time drifts below the table's time, and someone who files a paper a
+  month drifts toward the floor, so with skills on a household's papers take longer than the table says after a year or
+  two. That is the mechanism at placeholder rates; a study sets its own.
+- **Found on the way:** 90 days of the 300-person town with skills on against off: the same work, a little slower where a
+  skill is used part time (a survey 4% longer, the food factory's making longer), and 116 refusals for time against 20.
+  Nearly all are the environment office asking its crew, every look, for a day's fieldwork sized by the task's stated
+  time when the crew's own is longer: it records the time left but not the crew's pace, so it asks again. The same
+  fault shows off (18 of the 20); fixing it moves every town's hash, so it is left for its own change (the shared
+  `common::Pace`, which learns a crew's pace from such refusals, is the fix).
+- **Off, as before:** absent or `false`, the generator returns the config untouched (`worlds/test/generate.test.ts`
+  holds it to the byte, and holds the town with skills on to the plain town but for the skills); the kernel's new paths
+  run only where a world names a practised skill.
+- **Revisit if:** a source gives slip rates by practice, or skill half-lives by kind of work; a study needs papers'
+  skills by kind; the opening level's assumption (everyone an ordinary hand) shows in results.

@@ -135,9 +135,10 @@ const valueAt = (v: any, path: string[]) => path.reduce((x, k) => x?.[k], v);
 
 /** Does a leaf's path go through `id`: a key of that name, or an element whose `id` it is? */
 function passes(config: any, path: string[], id: string): boolean {
+  const is = (x: unknown) => typeof x === "string" && (id.endsWith("*") ? x.startsWith(id.slice(0, -1)) : x === id);
   let node = config;
   for (const seg of path) {
-    if (seg === id || (node && typeof node === "object" && node.id === id)) return true;
+    if (is(seg) || (node && typeof node === "object" && is(node.id))) return true;
     node = node?.[seg];
   }
   return false;
