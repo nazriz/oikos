@@ -667,16 +667,20 @@ The mechanism:
   candidate's top two values; voting weights placeholders. A mayor who runs the town well was re-elected in the seeds first
   tried; with the mix of shops on, the generated town's well-run mayor lost the count (2026-10-24).
 - **Gap (candidacy):** Whether a person stands is a rate (`stand_bps`), not a decision with a cost, a party, a sponsor or a
-  reason. In the test town it gives a field of 19 candidates for about 118 formal votes, each on 6 to 9% of first
-  preferences, so the count is decided by how the votes split; real local elections have a handful of candidates, often
-  one or two, from a few organised sources. The incumbent's ranking in the voters' lists follows how the town is run
-  (`elections.test.ts` holds that, on three seeds); who wins the count in a field this wide does not. A real mechanism for
-  candidacy is needed (who stands, why, with what backing and at what cost in time); not built here.
+  reason. **Traced 2026-10-31 (decisions "Candidacy: the field of 19 traced"):** the field of 19 for about 118 formal votes is the
+  test's own setting, not the town's: `elections.test.ts` sets `stand_bps` to 1,000 (10%) to force a contest, five times the
+  profile's placeholder (200), on the test town's 166 electors; at the profile's figure the same town fields about three or four,
+  a handful as real local elections do. The mechanism fault is elsewhere: each elector stands with the same chance whatever the
+  field, so **the field grows in proportion to the electorate** (about 16 to 19 in the 1,000-person town's 795 electors, some 800
+  in a town of 50,000), where real fields per vacancy stay a handful at any size. A real mechanism for candidacy is needed (who
+  stands, why, with what backing and at what cost in time, weighing the field already nominated); not built. The incumbent's
+  ranking in the voters' lists follows how the town is run (`elections.test.ts` holds that, on three seeds); who wins a wide
+  field does not.
 - **Where:** `docs/behaviour/elections.md`, `news.md`.
 - **Effect:** Accountability results carry little information; re-election is near certain.
-- **L / I:** medium / medium · **Status:** accepted
-- **Notice by:** Turnout and the winner against a place's municipal elections.
-- **Fix when:** an accountability experiment.
+- **L / I:** medium / medium (high in a town of tens of thousands) · **Status:** accepted; the candidacy fault to fix (traced 2026-10-31)
+- **Notice by:** Turnout and the winner against a place's municipal elections; candidates per vacancy against the place's (the VEC publishes them for Victoria).
+- **Fix when:** an accountability experiment, and before any election in a town much larger than a thousand.
 
 ### PB-11 · The code mayor's building programme has faults
 - **Gap:** After a builder declines a park, the code mayor never offers again; for roads it commissions the same site again and again.

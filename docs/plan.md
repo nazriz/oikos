@@ -92,7 +92,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - Systems keep the same hours every day (no weekends).
 - [x] A seat cannot yet be a non-resident agency officer (WM-14): a seat in the support office shares the body of an officer who lives outside the town (`gap-wm14`).
 - [x] A taxpayer account to reclaim an overpayment from (PB-23): the tax collector keeps it (`taxpayer-accounts`, d3eb2bf3, cedc1903); its figures are still placeholders, so PB-23 stays open as mitigated.
-- Candidacy: a field of 19 for about 118 votes (PB-10).
+- [x] Candidacy: a field of 19 for about 118 votes (PB-10): traced (`gap-pb10`): the test's own 10% chance of standing, five times the profile's; the fault left is that the field grows with the electorate (a mechanism to the owner: decisions "Candidacy: the field of 19 traced").
 - One day's crew paperwork ran in series, cause untraced (MT-23).
 - Three tests still pinned to one seed (production, entry, own-venture); two near-duplicate twin cases kept.
 - Haiku against Sonnet welfare: a matched pair (same town, same offices) before more Haiku seats.
