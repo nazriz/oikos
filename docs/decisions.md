@@ -10116,6 +10116,14 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   occasion is the town's, as the test's own comment already said. It now holds the rule: no search of the board (its
   postings by pay) while the business trades, searches once it is given up, and an application whenever a posting stood
   at one of them. Seed, horizon and set-up unchanged.
+- **Two more red at c46643eb, from working calendars (gap-weekends; both green at b9601b0b, just before it):**
+  `representation.test.ts`'s six 30-day towns moved, as every town with a support office or tax collector does: pins
+  re-taken (`scripts/fixtures/representation-results.json`, its own commit), the 200-person gb-eng state the same as
+  culture-dial's. `production.test.ts` (Lengnick) held a wind-up's redundancy notices to within an hour of the manager's
+  command to wind up; factory-2's two landed 61 minutes after it, the notices being acts in the manager's time. It now
+  holds what it meant, exactly: each such notice is for an agreement that command gave notice on, and comes after it.
+  These two were missed by gap-weekends' gate: the change reached 65 slow-tier files, so the gate ran the canaries and
+  left the rest to CI, as designed.
 - **Found, not fixed:** the owner founded the same business again two minutes after giving it up (day 134.54, $24,200 of
   capital): entry by expected profit reads the profile's venture, not what the person just lived through. A behaviour
   question (does a failed founder try again at once, and how soon?), to settle with a source, not a test.
