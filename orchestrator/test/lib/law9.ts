@@ -83,19 +83,25 @@ export function moduleOf(c: any): (participant: string, post?: string) => string
 }
 
 /** What a month's log shows moved from one place to another with no carrier, and work done on a building somewhere else than where
- * its crew is: by module. Read from a log's lines (an act's effects follow its `action_applied`, which names the post). */
+ * its crew is (a crew that went there is out of every building when the work is done): by module. Read from a log's lines (an
+ * act's effects follow its `action_applied`, which names the post). */
 export function farActs(lines: string[], c: any): { uncarriedMoves: string[]; workElsewhere: string[] } {
   const mod = moduleOf(c);
   const structures = new Set<string>((c.world.structures ?? []).map((s: any) => s.id));
   const moves = new Set<string>(), far = new Set<string>();
   let post: string | undefined;
+  // (Who is away from every building: their last move was out of one. A crew that went to the building it works on is.)
+  const away = new Set<string>();
   for (const l of lines) {
     const applied = l.includes('"action_applied"');
-    if (!applied && !l.includes('"goods_moved"') && !l.includes('"worked"')) continue;
+    if (!applied && !l.includes('"goods_moved"') && !l.includes('"worked"') && !l.includes('"occupied"') && !l.includes('"vacated"')) continue;
     const e = JSON.parse(l);
     if (e.kind !== "event") continue;
     const b = e.body;
     if (b.event === "action_applied") { post = b.as; continue; }
+    if (b.event === "occupied") { away.delete(b.occupant); continue; }
+    if (b.event === "vacated") { away.add(b.occupant); continue; }
+    if (b.event === "worked" && (b.performers ?? []).length && b.performers.every((p: string) => away.has(p))) continue;
     if (b.event === "goods_moved" && b.from_at !== b.to_at && !b.carrier) moves.add(`${mod(b.by, post)}: goods moved from one place to another with no carrier`);
     if (b.event === "worked" && b.on && b.on !== b.at && (structures.has(b.on) || /^str\./.test(b.on)) && !b.on.startsWith(`${b.at}/`)) far.add(`${mod(b.by, post)}: ${b.task} done on a building elsewhere, its crew where they were`);
   }

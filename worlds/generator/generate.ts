@@ -2728,7 +2728,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const OUT = OUTF && roadLots.size ? (() => {
     const mid = Math.floor(spec.grid.h / 2);
     const gate = [...roadLots].map((id) => parcels.find((p) => p.id === id)!).sort((a, b) => a.x - b.x || Math.abs(a.y - mid) - Math.abs(b.y - mid) || a.y - b.y)[0]!;
-    const edges: string[] = ["outside", ...(AUTO?.offers.length ? ["vendors"] : []), ...WHOLESALERS.map((w) => w.entity)];
+    // (Every edge of the world: the same list as `world.boundaries`.)
+    const edges: string[] = ["outside", ...(AUTO?.offers.length ? ["vendors"] : []), ...(AS ? AS.providers.map((p) => p.id) : []), ...WHOLESALERS.map((w) => w.entity)];
     const link = (id: string, from: string, to: string, length_m: number) => ({ id, from, to, mode: "road", length_m, capacity: RDS!.capacity_per_hour, speed_kmh: OUTF.speed_kmh });
     return {
       nodes: [{ id: "n-gate", cell: gate.cell }, { id: "n-far" }, ...edges.map((e) => ({ id: `n-edge-${e}`, edge: e }))],

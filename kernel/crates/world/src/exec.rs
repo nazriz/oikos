@@ -1266,7 +1266,8 @@ impl<'a> Exec<'a> {
                 Some((d.field, best, value(&best) - need))
             }
         };
-        // What's worked on: bodies (a person there, or everyone in a space of the place), or a structure.
+        // What's worked on: bodies (a person there, or everyone in a space of the place), or a structure (where the act took its
+        // crew, law 9 S4: `travel::journeys`).
         let bodies: Option<Vec<Id>> = match &on {
             Some(o) if self.st.body(o).is_some() => {
                 self.living_present(o)?;
@@ -2085,8 +2086,10 @@ impl<'a> Exec<'a> {
                     Some(v) => Some(self.r(v)?),
                     None => None,
                 };
-                // (On its way here, S3: it arrives; its vehicle is with it.)
+                // (On its way here, S3: it arrives, with the vehicle it went by, if it found the one it named where it set out;
+                // if not, it walked: the vehicle it named is not looked for again.)
                 let on_way = self.st.transit.contains_key(who.as_str());
+                let vehicle = if on_way { self.st.transit.get(who.as_str()).and_then(|t| t.vehicle) } else { vehicle };
                 let (sid, local) = split_space(&space).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{space} isn't a space")))?;
                 let x = self.st.structures.get(sid).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {sid}")))?;
                 let spec = self.s.space(&x.structure_type, local).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{sid} has no space {local}")))?;
