@@ -1561,6 +1561,24 @@ The mechanism:
 - **Notice by:** The memory budget's test failing; a run past 50,000 near the 40 GB guard.
 - **Fix when:** Before a study at 100,000 for longer than a week.
 
+### SC-6 · A run's memory grows with its length faster than the town: 50,000 for two years does not fit
+- **Gap:** After the faults of 2026-10-31 were fixed, a 10,000-person town grows about 25 MB a simulated day (2.5 KB
+  a person a day; 1 KB at 1,000 people) and a 50,000-person town about 85 MB: three years at 10,000 ends near 30 GB,
+  two years at 50,000 would need about 75 GB on a 64 GB machine. What grows: the world's records (54%), the resolver's
+  knowledge of every addressed statement each participant has seen, the twins' per-matter draw counts (every
+  gathering's every date, for every person, for the run), minds, offices' files. Each is kept by design; none is a copy.
+  Also seen only at size: one hall of 200 for gatherings in a town of 10,000 is full (2,000 to 4,000 refusals a month),
+  and the water works sometimes finds no water in its field to draw (`field_exhausted`) at 10,000.
+- **Where:** `docs/design/performance.md` ("Years at 10,000 and 50,000"); `docs/design/tiered-storage.md` (proposed);
+  `kernel/crates/actors/src/draws.rs` (`matter_occurrences`); `kernel/crates/resolver/src/knowledge.rs` (`addressed`);
+  runs `runs/long-10000-3y-b`, `runs/long-50000-2y`.
+- **Effect:** A study of 50,000 people is limited to about a year on this machine; a 10,000-person study of three years
+  fits. The hall and the water at 10,000 are the spec's and the network's, so outcomes there are the town's, not faults.
+- **L / I:** high / medium · **Status:** open: tiered storage waits on the owner; the draw counts need a matter that
+  says when it ends (reliability's design); the hall and water are recorded, not tuned
+- **Notice by:** `progress.tsv` of a long run; the run's memory guard stopping it.
+- **Fix when:** Before a study at 50,000 for longer than a year.
+
 ### SC-2 · Resume replays from the start
 - **Gap:** No mid-run checkpoint; resume replays the whole log; resume against a real model is untested.
 - **Where:** `docs/reliability.md` "Limits".
