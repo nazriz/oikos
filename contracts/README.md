@@ -759,3 +759,12 @@ Additive; no hard rule touched; nothing changes for a world that names no practi
   practised variable (the stated labour at its `initial`), and their time is practice.
 - **The catalogue takes `act_skills`** (`act`, keyed as the table of work is; `variable`, `novice_bps`, `expert_bps`):
   a person's time for such an act scales the same way, and doing it is practice.
+
+## Technologies released during a run (2026-11-01; docs/design/foundations-2.md 7.2, step E2; docs/scenarios.md, "capability"; docs/decisions.md, "The outside's capability over time"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing changes for a world whose templates state no release.
+
+- **A template takes `released`** (seconds from the start): the kind first exists then; `deploy` before it is refused
+  (`unknown_template`). Absent: from the start.
+- **`meta` takes `study_tags`** (tag to template ids): what a study counts as one technology, for measurement only. No
+  code of the world reads it (`orchestrator/test/generality.test.ts`), and no participant is shown `meta`.

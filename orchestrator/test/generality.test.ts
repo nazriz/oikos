@@ -44,6 +44,19 @@ test("platform code names no place: its figures and rules come from profiles and
   expect(found).toEqual([]);
 });
 
+// ---- a study's tags are for measurement only (docs/design/foundations-2.md 7.5): which kinds of system a study counts
+// as one technology (`ai`) is `meta.study_tags`, written by the generator from a scenario and read by measures. No code of
+// the world (the kernel, its actors, the participants' side, the translator) reads it, so nothing in the world can know
+// which systems are AI.
+test("no world code reads a study's tags", () => {
+  const world = ["kernel/src", "kernel/crates/actors", "kernel/crates/world", "kernel/crates/perception", "kernel/crates/rules", "kernel/crates/sight", "participants/src", "translator/src"];
+  const found: string[] = [];
+  for (const dir of world) for (const f of files(join(root, dir))) {
+    readFileSync(f, "utf8").split("\n").forEach((line, i) => { if (/study_tags/.test(line)) found.push(`${relative(root, f)}:${i + 1}`); });
+  }
+  expect(found).toEqual([]);
+});
+
 // ---- no origin group in the code: where people come from is profile data (values.culture.origin, docs/behaviour/culture.md);
 // the platform's code names none of a profile's groups, and no figure of theirs.
 test("platform code names no profile's origin group", () => {

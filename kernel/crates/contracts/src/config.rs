@@ -75,6 +75,10 @@ pub struct Meta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub canary: String,
+    /// What a study counts as one technology (foundations-2 7.5: `ai`, say): template ids, by tag. For measurement only:
+    /// nothing in the world reads it (`orchestrator/test/generality.test.ts`), and no participant is shown `meta`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub study_tags: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1021,6 +1025,10 @@ pub struct Template {
     /// a working day. Absent: any time of day.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hours: Option<TemplateHours>,
+    /// A system's (foundations-2 E2): the moment the kind first exists, a technology the outside world releases during the
+    /// run. Before it nobody can deliver one (`deploy` is refused, `unknown_template`). Absent: it exists from the start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub released: Option<i64>,
 }
 
 /// A template's working hours (law 10).

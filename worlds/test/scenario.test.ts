@@ -248,7 +248,7 @@ test("every scenario applies to every profile, or says what the profile doesn't 
     const applies: string[] = [];
     for (const id of ids) {
       try {
-        expect(applyScenarios({ ...spec, profile: P.id, scenario: id }, P).applied).toEqual(loadScenario(id).changes?.length || loadScenario(id).season || loadScenario(id).weather ? [id] : []);
+        expect(applyScenarios({ ...spec, profile: P.id, scenario: id }, P).applied).toEqual(loadScenario(id).changes?.length || loadScenario(id).season || loadScenario(id).weather || loadScenario(id).capability ? [id] : []);
         applies.push(id);
       } catch (e) {
         expect(String(e)).toMatch(new RegExp(`scenario ${id}: the profile ${P.id} has no `));

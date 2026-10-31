@@ -362,6 +362,15 @@ fn law3_only_the_templates_supplier_delivers_a_system() {
     // The supplier delivers, to the city; the system belongs to the city.
     let bot = deliver(&mut run);
     assert_eq!(run.kernel().state().participants[bot.as_str()].owner.as_deref(), Some("city"));
+    // A kind of system released later in the run (foundations-2 E2) is delivered to nobody before it exists.
+    let mut run = with_template(|t| {
+        t["supplier"] = json!("outside");
+        t["released"] = json!(86_400);
+    });
+    let early = cmd("outside-system", Some("outside-trade"), json!([{"block": "deploy", "template": "clerk-bot", "to": "city"}]));
+    assert_eq!(outcome(&mut run, &early).as_deref(), Some("unknown_template"));
+    run.command(&Command::Advance { to: 86_400 }).unwrap();
+    deliver(&mut run);
 }
 
 #[test]

@@ -218,3 +218,24 @@ test("skills: off is the town as before; on, every kind of work and a person's p
   expect(only.catalogue.tasks.some((t: any) => t.skill)).toBe(false);
   expect(() => generate({ ...spec, skills: { only: ["juggling"] } })).toThrow(/no skill of this town/);
 });
+
+// The outside world's capability over time (docs/scenarios.md, "Capability"): each release a kind of system of its own,
+// released on its day, quicker and slipping less; the seller sells the newest out; the study's tag lists them all.
+test("capability: releases are kinds of system released on their days, sold newest first, and tagged for measurement only", () => {
+  const cap = { tag: "ai", of: ["case-handling-system"], every_days: 182, time_bps: 8000, slip_bps: 8000, price_bps: 10_000 };
+  const plain = generate(spec) as any;
+  const on = generate({ ...spec, capability: cap }) as any;
+  const base = plain.templates.find((t: any) => t.id === "case-handling-system");
+  const r2 = on.templates.find((t: any) => t.id === "case-handling-system-r2");
+  expect(r2.released).toBe(2 * 182 * 86_400);
+  expect(r2.does.find((d: any) => d.kind === "permit_decision").seconds).toBe(Math.round(base.does.find((d: any) => d.kind === "permit_decision").seconds * 0.64));
+  expect(on.orchestration.slip.system["case-handling-system-r2"].bps).toBe(Math.round(plain.orchestration.slip.system["case-handling-system"].bps * 0.64));
+  const vendor = on.participants.find((p: any) => p.controller?.impl === "world.vendor").controller.params;
+  expect(vendor.releases["case-handling-system"].map((r: any) => r.template)).toEqual(["case-handling-system-r1", "case-handling-system-r2", "case-handling-system-r3", "case-handling-system-r4"]);
+  expect(on.meta.study_tags.ai).toContain("case-handling-system-r4");
+  // Nothing else moves: the town is the plain town but for the releases and the tag.
+  const strip = (c: any) => JSON.stringify({ ...c, templates: c.templates.filter((t: any) => t.released === undefined) },
+    (k, v) => (k === "releases" || k === "study_tags" || /-r\d+(\.|$)/.test(k) ? undefined : v));
+  expect(strip(on)).toBe(strip(plain));
+  expect(() => generate({ ...spec, capability: { ...cap, of: ["a-machine-nobody-sells"] } })).toThrow(/no offer/);
+});

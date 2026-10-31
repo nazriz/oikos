@@ -9904,3 +9904,31 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   run only where a world names a practised skill.
 - **Revisit if:** a source gives slip rates by practice, or skill half-lives by kind of work; a study needs papers'
   skills by kind; the opening level's assumption (everyone an ordinary hand) shows in results.
+## 2026-11-01 · The outside's capability over time: releases of what it sells, from a scenario, tagged for measurement only (foundations-2 E2, its first part; branch `f2-economy`; contract additions; a town under no capability scenario is as before, to the byte; no model called)
+
+- **What:** a scenario may give `capability` (`tag`, `of`, `every_days`, `time_bps`, `slip_bps`, `price_bps`, with its
+  basis): the outside world's technology released anew every so many days from the first, each release's time, slips
+  and prices a share of the one before. The generator (`worlds/generator/capability.ts`) makes each release a kind of
+  system of its own (`<kind>-r<n>`, its rows quicker, its row of the table of slips lower, `released` on its day) and
+  gives its sellers the schedule (`releases` in `world.vendor`'s and `firm.provider`'s parameters); a seller sells the
+  newest out, publishing the offer again when one comes out (a provider's claims move with it), and fills an order
+  from that kind. The kernel refuses to deliver a kind before its release (`unknown_template`: nothing from nothing).
+  The tag lists every kind the capability moves, and its releases, in `meta.study_tags`, for measurement; a backstop
+  (`orchestrator/test/generality.test.ts`) fails on any world code that reads it. The first scenario is
+  `rising-capability`: case-handling systems and assistants, a release every six months, each a fifth quicker and
+  slipping a fifth less, prices held (placeholders, well short of what is measured of language models: METR 2025,
+  Epoch AI 2025, both to confirm).
+- **Why this way:** the owner ruled that AI's capabilities and costs come from an outside scenario for now, and that
+  nothing in the world knows which systems are AI (foundations-2 7.2, 7.5). Discrete releases, each a template, keep the
+  kernel's systems what they are (a template's rows are fixed; a system is what it was delivered as), make upgrading an
+  ordinary purchase, and let the kernel refuse a kind before it exists. The schedule is the seller's parameter, never
+  published: nobody in the world knows of a release before it is out.
+- **Not built, and why:** technologies that are goods (a machine or hardware a firm holds, with `runs_on`'s energy and
+  water) wait for E5, where hardware has to be somewhere on the network (plan, "E2b"); a provider's desk for persons is
+  not replaced by a newer release (the desk's clients keep the first kind); buyers do not trade a delivered system in
+  for a newer one by any rule of their own beyond the comparison they already make; the scenario's sizes are not fitted.
+- **Off, as before:** with no capability the generator returns the config untouched; the vendor's and the provider's
+  saved state carry no `releases` and their published offers' keys are as before (`worlds/test/generate.test.ts` holds a
+  town with capability to the plain town but for its releases and its tag).
+- **Revisit if:** a study needs capability as a continuous path rather than releases; a scenario's sizes find sources;
+  buyers should replace delivered systems as releases come out (that is a buyer's rule, with a real basis, not this).
