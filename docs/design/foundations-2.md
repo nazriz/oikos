@@ -299,6 +299,11 @@ a profile figure.
 S3 is the largest behavioural change in the plan: every worker's free hours fall by their commute, which moves
 shopping, gatherings and seats' own sittings. It gets its own before and after.
 
+**Built (branch `f2-phase3`; decisions "Foundations-2 phase 3"):** S1 (2026-10-31): the backstop
+(`everything-is-somewhere.test.ts`, its log half `everything-is-somewhere-runs.test.ts` in the slow tier, audits in
+`test/lib/law9.ts`), the inventory (`fixtures/space-inventory.json`) and `kernel/tests/space.rs`. Added to the design's
+list: systems' places and the unhoused, who are in no space.
+
 ### 3.5 Performance
 
 The town's road network is a few hundred nodes, so all shortest paths from every node fit in memory and are made once
