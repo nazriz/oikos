@@ -443,6 +443,7 @@
                     "sign",
                     "notice",
                     "text",
+                    "attrs",
                     "for"
                   ]
                 }

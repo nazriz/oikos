@@ -206,10 +206,7 @@ impl Book {
     /// Takes in what an observation shows: every records channel's records in channel order, the readings, and the
     /// directory. Returns the records new to the book, in the order taken in.
     pub fn absorb(&mut self, pic: &Picture) -> Vec<Arc<Record>> {
-        self.now = pic.t;
-        for (id, r) in &pic.readings {
-            self.readings.insert(id.to_string(), Reading { status: r.status.to_string(), ends_at: r.ends_at });
-        }
+        self.set_moment(pic);
         let mut fresh = vec![];
         for r in pic.all_records() {
             self.take(r, &mut fresh);
@@ -234,6 +231,15 @@ impl Book {
             }
         }
         fresh
+    }
+
+    /// The moment, and the agreements' readings, as an observation gives them (`absorb` takes these with its records;
+    /// a reader that takes only some records takes these first).
+    pub fn set_moment(&mut self, pic: &Picture) {
+        self.now = pic.t;
+        for (id, r) in &pic.readings {
+            self.readings.insert(id.to_string(), Reading { status: r.status.to_string(), ends_at: r.ends_at });
+        }
     }
 
     /// Takes in records shown some other way (a test, a record handed over): as `absorb` takes them.
