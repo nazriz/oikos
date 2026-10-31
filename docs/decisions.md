@@ -10094,3 +10094,22 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   the kernel's new paths run only for a template that says what it runs on, and the provider's state carries nothing new.
 - **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
   connection's rate; the placeholders find sources (ME-24).
+
+## 2026-11-01 · Main red after foundations-2 S2: own-venture held the owner of a failing business to 150 days
+
+- **What:** CI went red at d0105172 on `own-venture.test.ts`, "someone out of work ... starts a business of one": its
+  owner applied for a job more than 14 days after founding it. Bisected on main: green at 9f30b45e, red from f56d2dbc
+  (the merge of f2-s2: roads as ways of the network, vehicles, trips driven or walked). Main went green again at c46643eb
+  by chance (working calendars moved the draws), so the test was fixed, not left.
+- **Why:** not a broken rule. The business's sales were thin from its third month at both commits (it paid its owner
+  nothing in months three and four at 9f30b45e, and nothing in month three at f56d2dbc); with S2's roads its owner gave it
+  up on day 134 rather than after day 150, by the rule the file's third test holds (a business of one that does not pay
+  its owner a living is given up), and then looked for work, as that rule says. The test asserted no application in the whole 150 days, an
+  outcome of how well the business did.
+- **Change:** the test holds what it means: no application for work while the business trades, from 14 days after its
+  founding until its giving up (the wake that takes its price list down, the closure minutes later), and a closure, if
+  any, is a giving up. Same seed, same horizon; nothing loosened beyond the rule.
+- **Found, not fixed:** the owner founded the same business again two minutes after giving it up (day 134.54, $24,200 of
+  capital): entry by expected profit reads the profile's venture, not what the person just lived through. A behaviour
+  question (does a failed founder try again at once, and how soon?), to settle with a source, not a test.
+- **Revisit if:** a founder's own failure is to weigh in their next venture (ME-1).
