@@ -875,7 +875,7 @@ impl World {
         // (A system's own rows first, from its template; then the world's table for its kind; then a default the world
         // states. Nobody's: the act is refused, `unpriced`.)
         let template_of = |state: &State, w: &str| state.participants.get(w).filter(|x| x.kind == ParticipantKind::System).and_then(|x| x.template);
-        let own_program = self.s.act_times.program(actor, template_of(&self.state, participant).as_deref(), blocks.iter().map(|b| (b.name(), b.makes())));
+        let own_program = act_program(&self.s, &self.state, actor, template_of(&self.state, participant).as_deref(), (actor == oikos_time::Actor::Person).then_some(key.as_str()), blocks);
         let seconds = own_program.clone().unwrap_or(0) + trip;
         let ready = t + thinking;
         // Who else does the act's work (F3): the action's `by`, a person other than the actor. The act's own time is theirs,
@@ -893,7 +893,7 @@ impl World {
         // Each performer is charged their own time for the work: a person by the person's row, a system by its template's
         // (the world's table is by who does it), shared among those who do it.
         let kind_of = |state: &State, w: &str| if state.participants.get(w).is_some_and(|x| x.kind == ParticipantKind::System) { oikos_time::Actor::System } else { oikos_time::Actor::Person };
-        let program_of = |state: &State, w: &str| self.s.act_times.program(kind_of(state, w), template_of(state, w).as_deref(), blocks.iter().map(|b| (b.name(), b.makes())));
+        let program_of = |state: &State, w: &str| act_program(&self.s, state, kind_of(state, w), template_of(state, w).as_deref(), (kind_of(state, w) == oikos_time::Actor::Person).then_some(w), blocks);
         let actor_in = by.iter().any(|w| *w == key || w == participant);
         // (An act nobody priced for whoever is to do it: nobody's time is taken, and it is refused when due, now.)
         let unpriced = if others.is_empty() || actor_in { own_program.as_ref().err().map(|k| (Id::new(participant), k.clone())) } else { None }
@@ -1064,6 +1064,12 @@ impl World {
         let (events, outcome) = match result {
             Ok((scratch, res)) => {
                 self.state = scratch;
+                // (An act with a skill is practice for the people who did it: foundations-2 E4.)
+                if !self.s.config.catalogue.act_skills.is_empty() {
+                    let actor_body = self.state.participants.get(participant).and_then(|x| x.person);
+                    let doers: Vec<Id> = if by.is_empty() { actor_body.into_iter().collect() } else { by.iter().filter(|w| self.state.body(w).is_some()).cloned().collect() };
+                    practise_acts(&self.s, &mut self.state, &doers, blocks, t);
+                }
                 for (who, secs) in &late_shares {
                     let mut tl = self.state.timelines.get(who).cloned().unwrap_or_default();
                     oikos_time::place_within(&mut tl.lanes, 1, t, *secs, self.lane_hours(who));
@@ -1447,6 +1453,58 @@ fn day_portions(start: i64, secs: i64) -> Vec<(i64, i64)> {
 
 /// Each performer's hours in the work an act did (one `Worked` event each, a share a performer: the labour split
 /// between them, rounded up).
+/// The skill of an act's step, if the world gives it one (foundations-2 E4): the row for what it makes, else for its block.
+fn act_skill<'a>(s: &'a Statics, b: &Block) -> Option<(&'a crate::config::ActSkill, &'a crate::config::BodyVariableCfg)> {
+    let cat = &s.config.catalogue;
+    let makes = b.makes();
+    let row = makes.as_deref().and_then(|m| cat.act_skills.iter().find(|a| a.act == m)).or_else(|| cat.act_skills.iter().find(|a| a.act == b.name()))?;
+    Some((row, cat.body_variables.iter().find(|v| v.id == row.variable)?))
+}
+
+/// How long an act takes this doer (the world's table of work, `oikos_time`); for a person (`body`), each step with a
+/// skill scaled by the person's skill as it stands (foundations-2 E4). No skills in the world: the table's time.
+fn act_program(s: &Statics, st: &State, actor: oikos_time::Actor, template: Option<&str>, body: Option<&str>, blocks: &[Block]) -> Result<i64, String> {
+    let steps = blocks.iter().map(|b| (b.name(), b.makes()));
+    let Some(body) = body.filter(|_| actor == oikos_time::Actor::Person && !s.config.catalogue.act_skills.is_empty()) else {
+        return s.act_times.program(actor, template, steps);
+    };
+    let mut sum = 0i64;
+    for b in blocks {
+        let makes = b.makes();
+        let secs = s.act_times.seconds(actor, template, b.name(), makes.as_deref()).ok_or_else(|| makes.clone().unwrap_or_else(|| b.name().to_string()))?;
+        sum = sum.saturating_add(match act_skill(s, b) {
+            Some((row, cfg)) => {
+                let v = st.body(body).and_then(|x| x.variables.get(&cfg.id)).map_or(cfg.initial, |x| crate::state::body_variable_at(cfg, *x, st.t).0);
+                row.skill().scale(cfg, v, secs)
+            }
+            None => secs,
+        });
+    }
+    Ok(sum.max(1))
+}
+
+/// An act done is practice at each of its steps' skills, for the people who did it, each their share of the time.
+fn practise_acts(s: &Statics, st: &mut State, doers: &[Id], blocks: &[Block], t: i64) {
+    if doers.is_empty() {
+        return;
+    }
+    for b in blocks {
+        let Some((row, cfg)) = act_skill(s, b) else { continue };
+        let makes = b.makes();
+        let Some(secs) = s.act_times.seconds(oikos_time::Actor::Person, None, b.name(), makes.as_deref()) else { continue };
+        for p in doers {
+            let Some(body) = st.entities.get_mut(p).and_then(|e| e.body.as_mut()) else { continue };
+            let cur = body.variables.get(&cfg.id).copied().unwrap_or((cfg.initial, t));
+            let v = crate::state::body_variable_at(cfg, cur, t).0;
+            let spent = row.skill().scale(cfg, v, secs);
+            let share = (spent + doers.len() as i64 - 1) / doers.len() as i64;
+            if let Some(new) = crate::state::practise(cfg, cur, t, share) {
+                body.variables.insert(cfg.id, new);
+            }
+        }
+    }
+}
+
 fn work_shares(events: &[Timed]) -> BTreeMap<Id, i64> {
     let mut out: BTreeMap<Id, i64> = BTreeMap::new();
     for e in events {

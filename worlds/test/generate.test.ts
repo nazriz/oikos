@@ -195,3 +195,26 @@ test("every workplace has room for those employed there from the start", async (
   expect(at.get("town-hall/workplace.1")!).toBeGreaterThan(20);
   expect([...at].filter(([space, n]) => n > (room.get(space) ?? 0))).toEqual([]);
 });
+
+// Skills by use (docs/behaviour/skills.md): a factor a study switches, so off must be the town as before, to the byte.
+test("skills: off is the town as before; on, every kind of work and a person's papers are practised", () => {
+  const plain = JSON.stringify(generate(spec));
+  expect(JSON.stringify(generate({ ...spec, skills: false }))).toBe(plain);
+  const on = generate({ ...spec, skills: true }) as any;
+  const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });
+  for (const f of ["common", "blocks", "records", "world-config", "participant-api", "log"]) ajv.addSchema(JSON.parse(readFileSync(join(root, `contracts/${f}.schema.json`), "utf8")));
+  expect(ajv.getSchema("urn:oikos:contracts:0.8:world-config")!(on)).toBe(true);
+  const practised = new Map((on.catalogue.body_variables as any[]).filter((v) => v.practice).map((v) => [v.id, v]));
+  // Every task that takes anyone's time has a practised skill; nothing else of the town changed.
+  for (const t of on.catalogue.tasks) expect(t.labour > 0 ? practised.has(t.skill?.variable) : t.skill === undefined).toBe(true);
+  expect(on.catalogue.act_skills).toEqual([expect.objectContaining({ act: "publish", variable: "skill-papers" })]);
+  const strip = (c: any) => ({ ...c, catalogue: { ...c.catalogue, act_skills: undefined, body_variables: c.catalogue.body_variables.filter((v: any) => !v.practice), tasks: c.catalogue.tasks.map(({ skill, ...t }: any) => t) } });
+  expect(JSON.stringify(strip(on))).toBe(JSON.stringify(strip(JSON.parse(plain))));
+  // The opening level is where a full-time hand settles: slower rates of fading open higher.
+  const level = (s: object) => (generate({ ...spec, skills: s }) as any).catalogue.body_variables.find((v: any) => v.id === "skill-papers").initial;
+  expect(level({ half_life_days: 730 })).toBeGreaterThan(level({ half_life_days: 365 }));
+  // Only the skills a study names are live; a name the town has no work for is refused.
+  const only = generate({ ...spec, skills: { only: ["papers"] } }) as any;
+  expect(only.catalogue.tasks.some((t: any) => t.skill)).toBe(false);
+  expect(() => generate({ ...spec, skills: { only: ["juggling"] } })).toThrow(/no skill of this town/);
+});
