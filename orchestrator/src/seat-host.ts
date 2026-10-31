@@ -6,22 +6,23 @@
 // before anything is done, its framing the arm's (`unstated` by default for stewardship: VISION 15, point 1), and it is
 // debriefed when its fork ends (point 7), out of what its spending limit keeps back for that.
 //
-// What a pilot's host does that this one does not (each is recorded in docs/experiments.md): the cast as it changes
-// (whoIs is the config's at the fork); thinking time in world seconds; an act the engine will not take as written is
-// noted by the engine (`rejected_action`) and not told to the seat in words; exit accounts and the composer (a town's
-// people are code in an experiment).
+// As a pilot's host does (MT-22, docs/decisions.md 2026-10-31): who is who follows the cast through the fork
+// (fork-cast.ts); deciding takes world time where the world says so (a model's by its tokens, sent with the act); and
+// the seat is told, in the world's terms, of what the engine would not take as written, a call it could not read and
+// when what it did will be done (read from the fork's log as the harness passes it on: `see`).
 
 import { appendFileSync } from "node:fs";
-import { calls, inCalendar, inCurrency, modules, Randomness, View, type DayBook, type Observation, type ParticipantAction, type ParticipantContext, type Roster, type Tally } from "@oikos/participants";
+import { calls, forms, inCalendar, inCurrency, modules, Randomness, View, type DayBook, type Observation, type ParticipantAction, type ParticipantContext, type Roster, type Tally } from "@oikos/participants";
 import {
   applyFraming, createLlmParticipant, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, LLM_PARTICIPANT_VERSION, MOCK_VERSION, mockPolicies, MockAdapter, ModelCallFailed, ModelUnreachable,
   reckonedEndMicroUsd, SpendingLimitReached, stepsOf, UsageLimitReached, type Budget, type DebriefInput, type FramingSpec, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price,
 } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, NOT_CHECKED, TRANSLATOR_VERSION, type Draft, type Route } from "@oikos/translator";
-import { drawTies, largest, leftAlone, besideOf, renderSummary, SeatRecords, idsFrom } from "./debrief-summary";
+import { actedOn, drawTies, largest, leftAlone, besideOf, renderSummary, SeatRecords, idsFrom } from "./debrief-summary";
 import { DEBRIEF_PROMPT_CHARS, endCosts, MAX_FAILURES_IN_A_ROW } from "./run";
 import { joinRaw, RAW, type DetachedActor, type RustWorld, type SeatWake } from "./rust-world";
 import { namedFor, seatConfig, type SeatPos } from "./seat-config";
+import { Cast } from "./fork-cast";
 
 const DAY = 86_400;
 /** The most turns a seat takes in one wake before it is left to wait (a loop of drafts and declines, say). */
@@ -59,6 +60,8 @@ export interface ModelSeatOptions {
   /** Where the seat's words in its debrief are kept, apart from the log (VISION 15, point 7). */
   debriefsFile: string;
   untilT: number;
+  /** Who is who at the fork, followed through it (the harness feeds it the fork's log). Absent: the config's. */
+  cast?: Cast;
 }
 
 /** What the fork's end was, as the debrief tells it. */
@@ -75,6 +78,10 @@ export class ModelSeat {
   private failures = 0;
   private t: number;
   private left = false;
+  /** This step's thinking, world seconds (where the world's thinking costs world time): sent with the act it comes before. */
+  private thinking = 0;
+  private stepUsage: { input_tokens?: number; output_tokens?: number }[] = [];
+  private readonly cast: Cast;
   private readonly records: SeatRecords;
   private readonly ctx: ParticipantContext;
   private readonly translator: { translate(req: any): Promise<any> };
@@ -90,6 +97,8 @@ export class ModelSeat {
   private readonly whoIs: (id: string) => { id: string; name?: string; of?: string } | undefined;
   readonly framing: { disclosure: string; reason: string };
   readonly keptBack?: number;
+  private readonly thinkingCosts: boolean;
+  private readonly rates: { model_seconds_per_output_token?: number; model_seconds_per_input_token?: number };
 
   constructor(private readonly o: ModelSeatOptions) {
     const cfg = o.config;
@@ -97,6 +106,8 @@ export class ModelSeat {
     this.currency = cfg.world.currencies[0];
     this.calendar = cfg.calendar;
     this.confirm = cfg.orchestration?.confirm ?? "always";
+    this.thinkingCosts = cfg.orchestration?.thinking_time === "costs_world_time";
+    this.rates = cfg.orchestration?.thinking ?? {};
     const part0 = cfg.participants.find((p: any) => p.id === o.seat);
     if (!part0) throw new Error(`the seat ${o.seat} is not in the world`);
     // The seat as the arm has it: a model's, framed as the arm says (the framing is the run's, not the town's).
@@ -112,7 +123,8 @@ export class ModelSeat {
       chance: (purpose: string) => randomness.stream(["chance", purpose]),
       world, params: params ?? {},
     } as ParticipantContext);
-    this.whoIs = whoIsOf(cfg);
+    this.cast = o.cast ?? Cast.of(cfg);
+    this.whoIs = this.cast.whoIs;
     const twin = false;
     this.knowledge = new Knowledge(this.currency, cfg.names === true);
     const made = seatConfig({ cfg, part: framed, personal: framed.channels ?? [], mine, positions, mods: modules, whoIs: namedFor(this.knowledge, this.whoIs), ctxFor, twin, draftText, sorted: (v) => v });
@@ -133,7 +145,12 @@ export class ModelSeat {
       o.budget.keptBackMicroUsd = keptBackFor(o.budget.limitMicroUsd, need.microusd).microusd;
       this.keptBack = o.budget.keptBackMicroUsd;
     }
-    const annotate = async (a: object) => o.world.annotate(a);
+    // (A step's usage, kept for its thinking: run.ts reckons a pilot seat's from its participant calls the same way.)
+    const annotate = async (a: object) => {
+      const u = a as { annotation?: string; purpose?: string; subject?: string };
+      if (u.annotation === "usage" && u.purpose === "participant" && u.subject === o.seat) this.stepUsage.push(a as any);
+      o.world.annotate(a);
+    };
     const plain = o.adapter.provider === "mock" && o.brain ? withBrain(o.adapter, o, made, ctxFor) : o.adapter;
     const adapter = o.record ? o.record(plain) : plain;
     const io: LlmIO = {
@@ -174,10 +191,18 @@ export class ModelSeat {
     } } });
   }
 
-  /** A log entry from the fork on (the debrief's record of what the seat did). */
+  /** Who the seat's acts reached (the exit accounts sample them first). */
+  actedOn(): Set<string> {
+    return actedOn(this.records.of.values());
+  }
+
+  /** A log entry from the fork on (the debrief's record of what the seat did), and what of it the seat is told. */
   see(entry: any): void {
     this.records.add(entry);
+    for (const n of toldOf(entry, this.o.seat, this.t, { thinking: this.lastThinking, letter: this.lastLetter })) this.notices.push(n);
   }
+  private lastThinking = 0;
+  private lastLetter = false;
 
   async decide(w: SeatWake): Promise<{ action: object }> {
     this.t = w.t;
@@ -197,6 +222,7 @@ export class ModelSeat {
       if (this.notices.length) obs.notices = this.notices.splice(0);
       obs.drafts = this.drafts.map((d) => d.draft) as any;
       let action: ParticipantAction;
+      this.stepUsage = [];
       try {
         action = await this.controller.step(obs, this.ctx);
       } catch (e) {
@@ -209,21 +235,31 @@ export class ModelSeat {
         return { action: e.backAt !== undefined && e.backAt > w.t ? { type: "wait", until: e.backAt } : { type: "wait" } };
       }
       this.failures = 0;
+      // Its thinking (run.ts): a step's, by the tokens it used, overwritten by the next step's; the act it comes before takes it.
+      if (this.thinkingCosts) this.thinking = this.stepUsage.reduce((s, a) => s + (a.output_tokens ?? 0) * (this.rates.model_seconds_per_output_token ?? 0) + (a.input_tokens ?? 0) * (this.rates.model_seconds_per_input_token ?? 0), 0);
+      const thought = (x: object): { action: object } => {
+        const blocks = (x as any).blocks as { block?: string }[] | undefined;
+        this.lastLetter = (x as any).type === "message" || (!!blocks?.length && blocks.every((b) => b.block === "message"));
+        this.lastThinking = this.thinking;
+        const th = this.thinking;
+        this.thinking = 0;
+        return { action: th > 0 ? { ...x, thinking: th } : x };
+      };
       switch (action.type) {
         case "wait": return { action: action.until !== undefined ? { type: "wait", until: action.until } : { type: "wait" } };
         case "look": return { action: { type: "look", looks: action.looks } };
         case "opt_out": this.left = true; return { action: { type: "opt_out", statement: action.statement } };
-        case "message": return { action: { type: "message", to: action.to, text: action.text, ...(action.re ? { re: action.re } : {}) } };
-        case "act": return { action: { type: "act", blocks: action.blocks, ...(action.by?.length ? { by: action.by } : {}), ...(action.reasoning ? { reasoning: action.reasoning } : {}) } };
-        case "call": return { action: { type: "call", call: action.call, ...(action.reasoning ? { reasoning: action.reasoning } : {}) } };
+        case "message": return thought({ type: "message", to: action.to, text: action.text, ...(action.re ? { re: action.re } : {}) });
+        case "act": return thought({ type: "act", blocks: action.blocks, ...(action.by?.length ? { by: action.by } : {}), ...(action.reasoning ? { reasoning: action.reasoning } : {}) });
+        case "call": return thought({ type: "call", call: action.call, ...(action.reasoning ? { reasoning: action.reasoning } : {}) });
         case "propose": {
           const now = await this.propose(action);
-          if (now) return { action: now };
+          if (now) return thought(now);
           break;
         }
         case "sign": {
           const now = this.sign(action);
-          if (now) return { action: now };
+          if (now) return thought(now);
           break;
         }
         default: return { action: { type: "wait" } };
@@ -306,7 +342,7 @@ export class ModelSeat {
     const staff = this.roster?.now(this.t);
     const held = staff?.held.map((h) => h.person) ?? [];
     const role = staff?.role?.toLowerCase();
-    const systems = new Set((this.o.config.participants ?? []).filter((p: any) => p.kind === "system").map((p: any) => p.id));
+    const systems = this.cast.systems();
     const told: string[] = [];
     const by: string[] = [];
     for (const x of named) {
@@ -337,7 +373,7 @@ export class ModelSeat {
     const decisions = r.left ? [] : largest(r).map((c) => ({ day: Math.floor(c.t / DAY) + 1, fact: `"${c.preview.replace(/\s+/g, " ").trim().slice(0, 600)}"`, ids: besideOf(c) }));
     const part = o.config.participants.find((p: any) => p.id === o.seat);
     const after = part?.on_opt_out && typeof part.on_opt_out === "object" ? "After you left, the routine work of your seat was carried on by code" : "After you left, your seat stood empty";
-    const input: DebriefInput = { wording: "a", town: String(o.config.meta?.name ?? "the town"), ended: { how: e.how, day: Math.floor(e.t / DAY), of: Math.floor((o.config.clock?.run_seconds ?? o.untilT) / DAY) }, others: { models: 0 },
+    const input: DebriefInput = { wording: "a", town: String(o.config.meta?.name ?? "the town"), ended: { how: e.how, day: Math.floor(e.t / DAY), of: Math.floor((o.config.clock?.run_seconds ?? o.untilT) / DAY) }, others: { models: 0, ...(o.config.dials?.composer ? { composer: true } : {}) },
       ...(r.left ? { left: { day: Math.floor(r.left.t / DAY) + 1, statement: r.left.statement, after } } : {}), summary: renderSummary(r, this.currency), decisions, ...(leftAlone(r) ? { leftAlone: leftAlone(r)! } : {}) };
     try {
       return (await this.controller.debrief(input)).ended;
@@ -349,27 +385,40 @@ export class ModelSeat {
   }
 }
 
-const aboutRequest = (asked: string, text: string) => `About what you asked for (${JSON.stringify(asked.length > 120 ? `${asked.slice(0, 120)}…` : asked)}): nothing was filed or done. ${text}`;
-
-/** Who someone is in the world, by any id of theirs (run.ts `whoIs`), from the config as the fork has it. */
-export function whoIsOf(cfg: any): (id: string) => { id: string; name?: string; of?: string } | undefined {
-  const parts = new Map<string, any>((cfg.participants ?? []).map((p: any) => [p.id, p]));
-  const positions = new Map<string, any>((cfg.positions ?? []).map((x: any) => [x.id, x]));
-  const entityNames = new Map<string, string>((cfg.world?.entities ?? []).map((e: any) => [e.id, e.name]));
-  const held = (pid: string) => [...positions.values()].filter((x) => x.holder === pid);
-  return (id) => {
-    const p = parts.get(id);
-    if (p) {
-      const posts = p.kind === "system" || (p.shares_body && held(id).length === 1) ? held(id) : [];
-      if (posts.length === 1) return { id: posts[0]!.id, name: posts[0]!.title ?? p.title, of: posts[0]!.entity };
-      const e = p.person ?? p.owner;
-      return e ? { id: e, ...(entityNames.get(e) ? { name: entityNames.get(e)! } : {}) } : undefined;
-    }
-    const x = positions.get(id);
-    if (x) return { id, ...(x.title ? { name: x.title } : {}), of: x.entity };
-    return entityNames.has(id) ? { id, name: entityNames.get(id)! } : undefined;
-  };
+/**
+ * What a seat is told of a log entry of the fork, in the world's terms, as run.ts tells a pilot's seat (MT-22): what it
+ * sent that the engine would not take as written (`notSent`), the questions of a call that could not be read as it
+ * stood, and when what it did will be done (`begin`). `last`: the thinking and whether it was a letter, of what it sent last.
+ */
+export function toldOf(entry: any, seat: string, now: number, last: { thinking: number; letter: boolean }): { t: number; text: string }[] {
+  const b = entry?.body ?? {};
+  if (entry?.kind === "annotation" && b.annotation === "note" && b.subject === seat) {
+    const d = b.data ?? {};
+    if (d.rejected_action !== undefined) return [{ t: now, text: notTaken(d.rejected_action) }];
+    if (d.call_unresolved !== undefined) return ((d.questions ?? []) as unknown[]).map((q) => ({ t: now, text: String(q) }));
+  } else if (entry?.kind === "event" && b.event === "action_started" && b.participant === seat) {
+    const at = Number(entry.t ?? now);
+    const words = (x: number) => (Math.floor(x / DAY) === Math.floor(at / DAY) ? `at ${clock(x)}` : `on ${forms.dateWords(x)} at ${clock(x)}`);
+    const later = b.starts > at + last.thinking ? ` It begins ${words(b.starts)}: you have other work before it.` : "";
+    return [{ t: at, text: last.letter ? `Your letter will be written and sent ${words(b.done)}.${later}` : `What you did will be done ${words(b.done)}.${later}` }];
+  }
+  return [];
 }
+
+/** What a seat is told of something it sent that the engine would not take as written (run.ts's words). */
+function notTaken(rejected: unknown): string {
+  let blocks: any;
+  try { blocks = JSON.parse(String(rejected)); } catch { /* (cut off in the note: an act, as far as it is told) */ }
+  const letter = Array.isArray(blocks) && blocks.length > 0 && blocks.every((b: any) => b?.block === "message") ? blocks[0] : undefined;
+  if (!letter) return "What you did could not be carried out as it was written, and nothing was done.";
+  const text = String(letter.text ?? "");
+  return `Your letter to ${([] as string[]).concat(letter.to ?? []).join(", ")} (${JSON.stringify(text.length > 60 ? `${text.slice(0, 60)}…` : text)}) was not sent: it could not be delivered as it was written. Nothing went. You could write it again, to each by their id.`;
+}
+
+/** A moment as a clock shows it (run.ts `clock`). */
+const clock = (x: number) => { const s = ((x % DAY) + DAY) % DAY; return `${String(Math.floor(s / 3_600)).padStart(2, "0")}:${String(Math.floor((s % 3_600) / 60)).padStart(2, "0")}`; };
+
+const aboutRequest = (asked: string, text: string) => `About what you asked for (${JSON.stringify(asked.length > 120 ? `${asked.slice(0, 120)}…` : asked)}): nothing was filed or done. ${text}`;
 
 /**
  * A mock adapter whose seat reads its decisions from the post's code brain (participants/src/llm/mock.ts): the whole

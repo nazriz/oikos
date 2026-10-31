@@ -501,7 +501,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 152
+      "untagged": 147
     },
     "worlds/profiles/br-mg-2026.json": {
       "risks": [
@@ -514,7 +514,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 194
+      "untagged": 182
     },
     "worlds/profiles/de-ni-2026.json": {
       "risks": [
@@ -527,7 +527,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 180
+      "untagged": 174
     },
     "worlds/profiles/gb-eng-2026.json": {
       "risks": [
@@ -540,7 +540,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 178
+      "untagged": 164
     },
     "worlds/profiles/in-tn-2026.json": {
       "risks": [
@@ -553,7 +553,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 183
+      "untagged": 178
     },
     "worlds/profiles/jp-akita-2026.json": {
       "risks": [
@@ -566,7 +566,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 159
+      "untagged": 149
     },
     "worlds/profiles/ke-nakuru-2026.json": {
       "risks": [
@@ -580,7 +580,7 @@
         "WM-1",
         "PS-5"
       ],
-      "untagged": 302
+      "untagged": 290
     },
     "worlds/profiles/mx-jal-2026.json": {
       "risks": [
@@ -593,7 +593,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 179
+      "untagged": 170
     },
     "worlds/profiles/us-oh-2026.json": {
       "risks": [
@@ -606,7 +606,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 156
+      "untagged": 143
     }
   }
 }

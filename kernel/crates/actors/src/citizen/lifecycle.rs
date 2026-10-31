@@ -65,6 +65,12 @@ pub struct Lifecycle {
     /// The daily round: a place the world refused us until then; our home under water until then.
     pub refused_go: Option<(String, i64)>,
     pub flooded_out: Option<(String, i64)>,
+    /// The vehicle the round move we sent last went by, and a vehicle the world said was not ours to take then (law 9:
+    /// another of the household took it, or it is not where we are): that go again on foot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drove: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub walk_next: bool,
     /// The body: the workplace we're off sick from; at the clinic (the condition, since); conditions we sought care for.
     pub off_sick: Option<String>,
     pub at_clinic: Option<(String, i64)>,
@@ -627,7 +633,15 @@ impl Person {
         } else {
             "Going"
         };
-        Some(Todo { step: because(format!("{what}: {to}."), vec![move_in(&to)]), mark: Mark::Go(to) })
+        // (By a vehicle we may drive, if one stands where we are, the first of them; else on foot.)
+        let here = pic.body.as_ref().and_then(|b| b.in_space).map(|sp| structure_of(&sp).to_string());
+        let car = here.and_then(|h| pic.body.as_ref()?.vehicles.iter().find(|v| v.at == h.as_str()).map(|v| v.vehicle)).filter(|_| !std::mem::take(&mut self.lifecycle.walk_next));
+        self.lifecycle.drove = car.map(|v| v.to_string());
+        let go = match car {
+            Some(v) => crate::common::calls::move_in_by(&to, &v),
+            None => move_in(&to),
+        };
+        Some(Todo { step: because(format!("{what}: {to}."), vec![go]), mark: Mark::Go(to) })
     }
 
     /// How the round move we sent last went (the outcome comes with our next look).
@@ -638,8 +652,13 @@ impl Person {
             return;
         }
         let t = pic.t;
-        self.lifecycle.refused_go = Some((to.clone(), self.next_change(t)));
         let code = out.refusal.as_ref().map(|r| r.code);
+        // (By a vehicle that was not there to take, or not ours: on foot, at once.)
+        if self.lifecycle.drove.take().is_some() && matches!(code, Some(RefusalCode::NotPresent | RefusalCode::NotTheirs | RefusalCode::UnknownRef)) {
+            self.lifecycle.walk_next = true;
+            return;
+        }
+        self.lifecycle.refused_go = Some((to.clone(), self.next_change(t)));
         // (Our home under water: to the relief centre at once. Work or school under water: not before things change.)
         let home_now = self.home_now(self.s.last_dwelling.clone());
         if code == Some(RefusalCode::Flooded) && home_now.as_ref() == Some(&to) && self.p.relief.is_some() {

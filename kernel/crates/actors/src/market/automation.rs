@@ -177,6 +177,35 @@ pub struct BaseOffer {
     pub oversight_hours_per_month: i64,
 }
 
+/// A later release of the technology an offer sells (foundations-2 E2): from `from` (seconds into the run) its systems
+/// are made from `template`, at `speed_bps` of a person's time (`seconds` a unit, for a firm's task), at `price_bps` of the
+/// offer's prices; a provider's claims are its `claim_slip_bps` and `claim_seconds`. The outside world's, as a scenario
+/// gives it from the first day; nothing in the world brings one sooner, and nobody is told of one before it is out.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Release {
+    pub from: i64,
+    pub template: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speed_bps: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seconds: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claim_slip_bps: Option<i64>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub claim_seconds: BTreeMap<String, i64>,
+    pub price_bps: i64,
+}
+
+/// The release on sale at `t`: the latest out by then (none: the offer as first made).
+pub fn release_at<'a>(releases: &'a BTreeMap<String, Vec<Release>>, offer: &str, t: i64) -> Option<&'a Release> {
+    releases.get(offer)?.iter().filter(|r| r.from <= t).max_by_key(|r| r.from)
+}
+
+/// A price at a release's share of it (never below one).
+pub fn at_release(x: i64, r: Option<&Release>) -> i64 {
+    r.map_or(x, |r| ((i128::from(x) * i128::from(r.price_bps) + 5_000) / 10_000).max(1) as i64)
+}
+
 /// An offer as published: the base offer at this month's prices. The paper is [`papers::market::SystemOffer`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Offer {
@@ -819,6 +848,7 @@ impl Kind for Vendor {
                 "most_systems": p(int("the most it delivers to one order"), Some(json!(40)), None, "placeholder"),
                 "offers": p(json!({ "type": "array" }), Some(json!([])), None, "placeholder"),
                 "procurement": p(json!({}), None, None, "the world gives it (no default)"),
+                "releases": p(json!({ "type": "object" }), Some(json!({})), None, "the world gives it: the outside world's later releases of what an offer sells (none: the offers as made)"),
                 "sign_days": p(int("a system whose licence its client has not signed this long is switched off"), Some(json!(30)), Some("days"), "placeholder"),
                 "unpaid_days": p(int("an order unpaid this long is declined"), Some(json!(7)), Some("days"), "placeholder"),
             },
@@ -842,6 +872,7 @@ impl Kind for Vendor {
             sign_days: ctx.param("sign_days", 30)?,
             grace_days: ctx.param("grace_days", 75)?,
             most_systems: ctx.param("most_systems", 40)?,
+            releases: ctx.param("releases", BTreeMap::new())?,
         };
         let ratio = monthly_ratio(p.change_bps_per_year);
         Ok(Box::new(Stepper::new(Selling {
@@ -870,6 +901,9 @@ struct Params {
     sign_days: i64,
     grace_days: i64,
     most_systems: i64,
+    /// Later releases of what an offer sells, by offer (foundations-2 E2): the scenario's. None: the offers as made.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    releases: BTreeMap<String, Vec<Release>>,
 }
 
 const S: u128 = 1_000_000_000_000;
@@ -940,16 +974,25 @@ impl Selling {
 
     /// An offer at this month's prices, with the clients it has and the rate the table of slips gives.
     fn now_offer(&self, o: &BaseOffer, t: i64, cx: &Cx) -> Offer {
+        // (The release out by now, if the technology has later ones: its template, speed and prices.)
+        let rel = release_at(&self.p.releases, &o.id, t);
+        let mut o = o.clone();
+        if let Some(r) = rel {
+            o.template = r.template.clone();
+            o.speed_bps = r.speed_bps.unwrap_or(o.speed_bps);
+            o.seconds = r.seconds.unwrap_or(o.seconds);
+        }
         let price = self.price_at(t);
-        let fee_year = price(o.fee_per_year);
-        let error_bps = slip_row(cx, &o.id).map_or(0, |r| r.bps);
+        let fee_year = price(at_release(o.fee_per_year, rel));
+        let error_bps = slip_row(cx, &o.template).or_else(|| slip_row(cx, &o.id)).map_or(0, |r| r.bps);
+        let references = self.clients.get(&o.id).map_or(0, |c| c.len() as i64);
         Offer {
-            base: BaseOffer { setup: price(o.setup), exit: price(o.exit), fee_per_year: fee_year, ..o.clone() },
+            base: BaseOffer { setup: price(at_release(o.setup, rel)), exit: price(at_release(o.exit, rel)), fee_per_year: fee_year, ..o },
             error_bps,
             vendor: self.me.clone(),
             account: self.p.account.clone(),
             fee_month: (round_div(i128::from(fee_year), 12) as i64).max(1),
-            references: self.clients.get(&o.id).map_or(0, |c| c.len() as i64),
+            references,
             record: String::new(),
             at: t,
         }
@@ -1067,7 +1110,11 @@ impl Plan for Selling {
         // What it sells, at this month's prices: published again when they move.
         for o in self.p.offers.clone() {
             let x = self.now_offer(&o, t, cx);
-            let key = format!("{}|{}|{}|{}", x.base.setup, x.fee_month, x.base.exit, x.references);
+            let mut key = format!("{}|{}|{}|{}", x.base.setup, x.fee_month, x.base.exit, x.references);
+            // (A new release is published as the offer is: what it is, at its prices.)
+            if self.p.releases.contains_key(&o.id) {
+                key = format!("{key}|{}", x.base.template);
+            }
             let was = self.listed.get(&o.id).cloned();
             if was.as_ref().is_some_and(|(k, _)| *k == key) {
                 continue;

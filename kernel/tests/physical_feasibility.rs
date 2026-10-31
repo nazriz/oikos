@@ -143,7 +143,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                 Some(_) => Ok(()),
             }
         }
-        Block::Occupy { space, who } => {
+        Block::Occupy { space, who, .. } => {
             let who = match who {
                 Some(w) => w.clone(),
                 None if me_person => me.to_string(),

@@ -37,6 +37,9 @@ pub struct Statics {
     pub record_keeping_at: BTreeMap<Id, usize>,
     /// The network for what flows (foundations-2 C3), its trees found at load, when the world has one.
     pub net: Option<std::sync::Arc<crate::network::NetStatics>>,
+    /// Who may drive which vehicles (law 9, foundations-2 S2): each body's own and those its owner lets it drive, from the
+    /// config (no act yet makes a vehicle or changes who may drive it), so that a person's view finds theirs at once.
+    pub drivers_of: BTreeMap<Id, Vec<Id>>,
 }
 
 impl Statics {

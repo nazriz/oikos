@@ -1057,8 +1057,8 @@
     "woodland": 25,
     "scrub": 25
    },
-   "roads": {
-    "seconds_per_cell": 2,
+   "vehicles": {"types": [{"id": "car", "seats": 5, "speed_kmh": 100}, {"id": "motorcycle", "seats": 2, "speed_kmh": 80}], "households": [{"type": "car", "bps": 4900}, {"type": "motorcycle", "bps": 2000}]}, "roads": {
+    "speed_kmh": 45, "capacity_per_hour": 900,
     "within_cells": 3,
     "budget_per_resident": 16500
    }
@@ -1665,7 +1665,7 @@
   "groups.leave_notice_days": "Placeholder: carried over from the reference profile.",
   "groups.per_kind_per_1000_people": "Placeholder: carried over from the reference profile.",
   "health": "Placeholder: doctor wage R$12,000 a month for a salaried municipal doctor converted to 14 days (x 12 / 26); consultation length, care-seeking and treatment shares carried over from the reference profile. The clinic stands for the Unidade Basica de Saude and the nearest hospital (a liberty).",
-  "round": "Placeholder hours: 8 to 17 (an hour for lunch), Monday to Friday, for everyone (many shops open Saturdays; a liberty); school 7 to 12, the usual morning shift (LDB, Lei 9.394/1996: at least four hours a day, 800 hours over 200 days). Travel speeds and road figures are carried over from the reference profile (physics: a 25 m cell on foot in 18 seconds; roads slower than the reference's by assumption), and the roads budget is scaled by 0.55 (placeholder; see prices).",
+  "round": "Placeholder hours: 8 to 17 (an hour for lunch), Monday to Friday, for everyone (many shops open Saturdays; a liberty); school 7 to 12, the usual morning shift (LDB, Lei 9.394/1996: at least four hours a day, 800 hours over 200 days). Travel speeds and road figures are carried over from the reference profile (physics: a 25 m cell on foot in 18 seconds; roads slower than the reference's by assumption), and the roads budget is scaled by 0.55 (placeholder; see prices). 2026-10-31 (law 9, foundations-2 S2; risk WM-4): a road is a way of the network, not a quicker ground: roads.speed_kmh 45, the speed a road cell was crossed at (2 s a 25 m cell); roads.capacity_per_hour 900 vehicles an hour each way on a local street (PLACEHOLDER: a lane of an urban street carries about 1,800 an hour at saturation, a local street far less; the Highway Capacity Manual's figures, to confirm). round.vehicles: the household's vehicle, at most one each (a liberty: households with two are not modelled), about 49% of households have a car and a further fifth a motorcycle only (IBGE, PNAD Contínua, características dos domicílios: car about 49%, motorcycle about 24%, national; recalled, to confirm for Minas Gerais); a car's top speed 100 km/h and a motorcycle's 80 (placeholders: a way's own speed binds in a town). Walking on a way is at the round's pace on foot.",
   "ownership.house_owner_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9929 (tenure of occupied private dwellings), Aguanil: 1,210 owned of 1,622 (74.6%); 281 rented (17.3%); 106 lent or provided (6.5%).",
   "ownership.mortgage_bps_by_age": "Level from IBGE Censo 2022 table 9929, Aguanil: 109 of 1,210 owned dwellings are \"owned, still paying\" (9.0%; Minas Gerais 12.0%). The split by age (13%, 10%, 2%) is an assumption shaped to that average; no age cross-tabulation was found.",
   "ownership.mortgage_payment_per_month": "Placeholder: R$1,100 a month, estimated for a modest financed house.",

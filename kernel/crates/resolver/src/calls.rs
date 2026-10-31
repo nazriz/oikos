@@ -251,6 +251,9 @@ pub const CODE_ONLY: [(&str, &[&str], &[&str]); 2] = [
     ("link", &["link", "op", "every", "from", "off"], &["link", "op"]),
 ];
 
+/// Arguments of a seat's call that are code's own until the translator is taught them: (the function, the arguments).
+pub const CODE_ONLY_ARGS: [(&str, &[&str]); 1] = [("occupancy", &["by"])];
+
 /// Per function: the arguments it takes and the ones it needs, read from contracts/calls.schema.json.
 fn args_table() -> &'static BTreeMap<String, Args> {
     static T: OnceLock<BTreeMap<String, Args>> = OnceLock::new();
@@ -268,6 +271,12 @@ fn args_table() -> &'static BTreeMap<String, Args> {
         // schema, when the translator is taught them.)
         for (fn_, allowed, required) in CODE_ONLY {
             m.insert(fn_.to_string(), Args { allowed: Some(allowed.iter().map(|x| x.to_string()).collect()), required: required.iter().map(|x| x.to_string()).collect() });
+        }
+        // (Code's own arguments of a seat's call, likewise: a vehicle to go by, law 9 S2.)
+        for (fn_, extra) in CODE_ONLY_ARGS {
+            if let Some(a) = m.get_mut(fn_).and_then(|a| a.allowed.as_mut()) {
+                a.extend(extra.iter().map(|x| x.to_string()));
+            }
         }
         m
     })

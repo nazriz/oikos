@@ -33,7 +33,7 @@ const SAMPLES: any[] = [
   { block: "close_account", account: "acc-old" },
   { block: "construct", at: "cell.3.4", structure_type: "park", materials_at: "str.2", ref: "s" },
   { block: "demolish", structure: "str.9" },
-  { block: "occupy", space: "apts-3/dwelling.2", who: "c0042" },
+  { block: "occupy", space: "apts-3/dwelling.2", who: "c0042", vehicle: "car-c0042" },
   { block: "vacate", occupant: "c0042", from: "apts-3/dwelling.2" },
   { block: "create_entity", kind: "trust", name: "River Land Trust", speaks_for: "greenco", visible_to: ["city", "bank"], ref: "t",
     first_position: { title: "Trustee", role: "trustee", channels: [{ id: "books", kind: "accounts" }], role_module: { module: "x.y", params: { a: 1 } }, ref: "p" } },

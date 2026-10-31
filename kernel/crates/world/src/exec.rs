@@ -92,6 +92,20 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
 /// A person who is to do work: alive and in the world; and, if `at` is given, in that structure (in a space of the
 /// given kind, if given); else in a space of the kind the world says work is done in (`orchestration.performers_in`),
 /// if it says. The one rule for a `work`'s performers and for an action's `by` (foundations F3).
+/// The speed a body drives a vehicle at (law 9, foundations-2 S2): one it may drive (its owner's, or one its owner lets),
+/// standing where the body sets out from; refused otherwise.
+pub fn driven_speed(s: &Statics, st: &State, vehicle: &str, body: &str, from: &str) -> R<i64> {
+    let v = st.vehicles.get(vehicle).ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("no vehicle {vehicle}")))?;
+    if !v.may_drive(body) {
+        return Err(refuse(RefusalCode::NotTheirs, format!("{body} may not drive {vehicle}")));
+    }
+    if v.at != from {
+        return Err(refuse(RefusalCode::NotPresent, format!("{vehicle} is at {}, not at {from}", v.at)));
+    }
+    let t = s.config.travel.as_ref().and_then(|t| t.vehicle_types.iter().find(|x| x.id == v.type_));
+    Ok(t.map_or(1, |t| t.speed_kmh))
+}
+
 pub fn check_at_work(s: &Statics, st: &State, p: &str, at: Option<&str>, space: Option<&str>) -> R<()> {
     // (A system has no body to be anywhere: it does the work while it is in service. Whether its template lists the
     // work is looked at when the act is ordered, `check_system_does`.)
@@ -773,6 +787,10 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
                     return vec![];
                 }
                 x.complete = true;
+                // (A way finished is part of the ways from now: trips are worked out afresh.)
+                if s.types.get(x.structure_type.as_str()).is_some_and(|ty| ty.way.is_some()) {
+                    st.ground.changed();
+                }
                 st.touch_structure(&structure);
                 vec![Timed::new(t, EventBody::StructureCompleted { structure })]
             }
@@ -1125,6 +1143,17 @@ impl<'a> Exec<'a> {
                 total = ((total as i128 * factor + 9_999) / 10_000).max(1) as i64;
             }
         }
+        // A practised skill (foundations-2 E4): the labour scales with the people's mean of it too, as it stands now.
+        if let Some(sk) = spec.as_ref().and_then(|x| x.skill.as_ref()).filter(|_| n_systems < who.len() && total > 0) {
+            if let Some(cfg) = self.s.config.catalogue.body_variables.iter().find(|v| v.id == sk.variable) {
+                let now = self.now();
+                let people: Vec<&Id> = who.iter().filter(|p| self.st.body(p).is_some()).collect();
+                if !people.is_empty() {
+                    let sum: i128 = people.iter().map(|p| self.st.body(p).and_then(|b| b.variables.get(&cfg.id)).map_or(cfg.initial, |x| crate::state::body_variable_at(cfg, *x, now).0) as i128).sum();
+                    total = sk.scale(cfg, (sum / people.len() as i128) as i64, total);
+                }
+            }
+        }
         // (How much of a performer's working day is left is read where the work is placed: on their timeline, when the act
         // begins. Here a work is refused only if it is longer than a day, or the world has no day.)
         let share = if who.is_empty() { 0 } else { (total + who.len() as i64 - 1) / who.len() as i64 };
@@ -1294,6 +1323,13 @@ impl<'a> Exec<'a> {
             }
         }
         let someone_there = !who.is_empty();
+        // Each person's share of the time is practice at the task's skill (foundations-2 E4).
+        if let Some(cfg) = spec.as_ref().and_then(|x| x.skill.as_ref()).and_then(|sk| self.s.config.catalogue.body_variables.iter().find(|v| v.id == sk.variable)) {
+            if total > 0 && !who.is_empty() {
+                let share = (total + who.len() as i64 - 1) / who.len() as i64;
+                self.practise(&who, cfg, share);
+            }
+        }
         self.emit(EventBody::Worked { task: task.into(), units, at, on, performers: who, labour: total, by: self.participant.into() });
         if let (Some(bodies), Some(ob)) = (&bodies, &on_body) {
             for b in bodies {
@@ -1328,6 +1364,9 @@ impl<'a> Exec<'a> {
             // Complete once the work is done, if its build time has passed (else when it does).
             if s.labour_done >= needed && s.completes_at.is_none() {
                 s.complete = true;
+                if self.s.types.get(s.structure_type.as_str()).is_some_and(|ty| ty.way.is_some()) {
+                    self.st.ground.changed();
+                }
                 self.st.touch_structure(&target);
                 self.emit(EventBody::StructureCompleted { structure: target });
             } else {
@@ -1350,6 +1389,18 @@ impl<'a> Exec<'a> {
             }
         }
         Ok(())
+    }
+
+    /// Time spent at a practised skill (foundations-2 E4): each person's skill settled to now and the practice added.
+    fn practise(&mut self, who: &[Id], cfg: &crate::config::BodyVariableCfg, seconds: i64) {
+        let now = self.now();
+        for p in who {
+            let Some(b) = self.st.entities.get_mut(p).and_then(|e| e.body.as_mut()) else { continue };
+            let cur = b.variables.get(&cfg.id).copied().unwrap_or((cfg.initial, now));
+            if let Some(new) = crate::state::practise(cfg, cur, now, seconds) {
+                b.variables.insert(cfg.id, new);
+            }
+        }
     }
 
     /// Work done to a body (services): its variables changed, and care given for its conditions (each once).
@@ -1948,13 +1999,17 @@ impl<'a> Exec<'a> {
 
             Block::Work { task, units, at, performers, on, survey, investigate } => self.work(index, task, *units, at, performers, on, survey.as_ref(), investigate.as_ref()),
 
-            Block::Occupy { space, who } => {
+            Block::Occupy { space, who, vehicle } => {
                 let space = self.r(space)?;
                 let who = match who {
                     Some(w) => self.r(w)?,
                     None => self.acting_person()?,
                 };
                 self.living_present(&who)?;
+                let vehicle = match vehicle {
+                    Some(v) => Some(self.r(v)?),
+                    None => None,
+                };
                 let (sid, local) = split_space(&space).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{space} isn't a space")))?;
                 let x = self.st.structures.get(sid).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {sid}")))?;
                 let spec = self.s.space(&x.structure_type, local).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{sid} has no space {local}")))?;
@@ -1976,6 +2031,11 @@ impl<'a> Exec<'a> {
                     return Err(refuse(RefusalCode::Flooded, format!("{sid} is under water")));
                 }
                 let sid = sid.to_string();
+                // (Driven here: the vehicle must be one the body may drive, standing where it set out; it stands here now.)
+                if let Some(v) = &vehicle {
+                    let from = self.st.structures_of(&who).into_iter().next().ok_or_else(|| refuse(RefusalCode::NotPresent, format!("{who} is nowhere to drive {v} from")))?;
+                    driven_speed(self.s, self.st, v, &who, &from)?;
+                }
                 // A body is in one place at a time: coming here, it leaves wherever else it was.
                 for other in self.st.structures_of(&who) {
                     leave_spaces(self.s, self.st, &other, Some(&who), None, VacateReason::Left, Some(self.participant), &mut self.events);
@@ -1985,7 +2045,10 @@ impl<'a> Exec<'a> {
                 self.st.enter(&sid, &space, &who);
                 self.st.touch_structure(&sid);
                 self.st.moved(&who);
-                self.emit(EventBody::Occupied { occupant: who, space, by: self.participant.into() });
+                if let Some(v) = &vehicle {
+                    self.st.vehicles.get_mut(v.as_str()).unwrap().at = Id::new(&sid);
+                }
+                self.emit(EventBody::Occupied { occupant: who, space, by: self.participant.into(), vehicle: vehicle.map(|v| Id::new(&v)) });
                 Ok(())
             }
 
@@ -2186,6 +2249,20 @@ impl<'a> Exec<'a> {
                 };
                 if tpl.supplier.as_deref() != Some(org.as_str()) {
                     return Err(refuse(RefusalCode::NotSupplier, format!("{org} doesn't supply {template}")));
+                }
+                // (A technology not yet released is not made: nothing from nothing, foundations-2 E2.)
+                if let Some(r) = tpl.released.filter(|r| *r > self.now()) {
+                    return Err(refuse(RefusalCode::UnknownTemplate, format!("{template} is not made until {r}: nobody can deliver one yet")));
+                }
+                // (A system that runs on hardware in the world is delivered only where there is hardware for its lanes beside
+                // the systems already there: foundations-2 P4.)
+                if let Some(ro) = &tpl.runs_on {
+                    let on_it = |p: &Participant| p.status != ParticipantStatus::Ended && p.template.as_deref().and_then(|t| self.s.templates.get(t)).and_then(|t| t.runs_on.as_ref()).is_some_and(|r| r.holder == ro.holder && r.at == ro.at && r.hardware == ro.hardware);
+                    let used: i64 = self.st.participants.values().filter(|p| on_it(p)).map(|p| p.def.lanes.unwrap_or(1) as i64 * ro.per_lane).sum();
+                    let held = self.st.holding(&ro.holder, &ro.at, &ro.hardware);
+                    if held < (used + ro.per_lane) as Money {
+                        return Err(refuse(RefusalCode::InsufficientQuantity, format!("{} holds {held} {} at {}, and the systems there take {used}: no room to run another {template}", ro.holder, ro.hardware, ro.at)));
+                    }
                 }
                 let client = match to {
                     Some(t) => self.r(t)?,

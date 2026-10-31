@@ -372,7 +372,11 @@ impl State {
         } else if let Some(x) = papers::read::<Draft>(r) {
             let Some(action) = self.by_referral.get(&x.referral).cloned() else { return };
             let Some(m) = self.matters.get(&action).cloned() else { return };
-            let wrong = x.calls.as_deref().map(norm) != Some(norm(&m.program));
+            // (A draft on a form, a model's, is read by what it would send: the paper's kind and to whom, against what was asked.)
+            let wrong = match (&x.calls, &x.paper) {
+                (None, Some(p)) => !paper_as_asked(p, &m.program),
+                _ => x.calls.as_deref().map(norm) != Some(norm(&m.program)),
+            };
             // (Reading it whole: a slip in it is found unless the review itself slips, the world's row for a sign-off.)
             let missed = wrong && slip(cx, "publish/sign_off", &r.id, &SlipOptions::default());
             if wrong && !missed {
@@ -807,6 +811,25 @@ impl State {
 
 fn terms(o: &ServiceOffer) -> Terms<'_> {
     Terms { kinds: &o.kinds, levels: &o.levels, claim_bps: o.claim_slip_bps, fee_month: o.fee_month, setup: o.setup, exit: o.exit }
+}
+
+/// Whether a paper drafted on a form is the one a program asked for: a paper of the same kind, to the same addressees.
+fn paper_as_asked(paper: &Value, program: &str) -> bool {
+    let Ok(Program::Lines(lines)) = parse_program(program) else { return false };
+    let kind = paper.get("kind").and_then(Value::as_str).unwrap_or_default();
+    let to = |v: Option<&Value>| -> Vec<String> {
+        let mut x: Vec<String> = v.and_then(Value::as_array).map(|a| a.iter().filter_map(|y| y.as_str().map(String::from)).collect()).unwrap_or_default();
+        x.sort();
+        x
+    };
+    lines.iter().any(|l| {
+        super::kind_of(l).as_deref() == Some(kind)
+            && match l.call.get("to") {
+                Some(oikos_sight::calls::Value::Json(v)) => to(Some(v)) == to(paper.get("to")),
+                Some(oikos_sight::calls::Value::Id(i)) => to(paper.get("to")) == vec![i.clone()],
+                _ => to(paper.get("to")).is_empty(),
+            }
+    })
 }
 
 /// A program as its canonical text (two writings of one act compare equal).

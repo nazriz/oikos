@@ -472,7 +472,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                     })
                     .cloned()
                     .collect();
-                direct(&p, None, vec![Block::Occupy { space: pick(&open, *b)?, who: None }])
+                direct(&p, None, vec![Block::Occupy { space: pick(&open, *b)?, who: None, vehicle: None }])
             }
             3 => {
                 // An occupant leaves, or is removed.
@@ -655,6 +655,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                             _ => pick(&spaces, *space).unwrap_or_else(|| "s-none/dwelling.1".into()),
                         },
                         who: who.map(e),
+                        vehicle: None,
                     },
                     B::Vacate { occupant, structure } => Block::Vacate { occupant: e(*occupant), from: pick(&structures, *structure).unwrap_or_else(|| "s-none".into()) },
                     B::CreateEntity { kind, bind, position } => {

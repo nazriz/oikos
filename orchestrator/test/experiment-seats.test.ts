@@ -9,7 +9,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AnthropicAdapter, CreditExhausted, SpendingLimitReached, UsageLimitReached, type LlmAdapter } from "@oikos/participants/llm";
 import { atMost, callRecorder, forkLimits, budgetProblems, modelProblems } from "../src/experiment-seats";
-import { waitingAdapter } from "../src/seat-host";
+import { toldOf, waitingAdapter } from "../src/seat-host";
+import { Cast } from "../src/fork-cast";
 import { loadSpec, runExperiment, validate, type ExperimentSpec } from "../src/experiment";
 
 const root = join(import.meta.dir, "../..");
@@ -107,6 +108,38 @@ test("a provider's calls in flight in one process are held to the most allowed, 
   expect(order).toEqual([1, 2, 3, 4, 5]);
 });
 
+test("a fork's seat knows the cast as it stands, not as the config began it, and is told what a pilot's seat is told (MT-22)", () => {
+  const cfg = { participants: [{ id: "ann-self", kind: "person", person: "ann" }, { id: "desk-system", kind: "system", owner: "council" }], positions: [{ id: "desk", entity: "council", title: "Help desk", holder: "desk-system" }],
+    world: { entities: [{ id: "ann", name: "Ann Lee" }, { id: "council", name: "The Council" }] }, templates: [{ id: "clerk", title: "Clerk" }] };
+  const cast = Cast.of(cfg);
+  const ev = (body: object, t = 0) => ({ kind: "event", t, body });
+  for (const e of [ev({ event: "entity_created", entity: "club", kind: "group", name: "Walking Club" }), ev({ event: "participant_created", participant: "bob-self", kind: "person", person: "bob", template: "clerk" }),
+    ev({ event: "position_created", position: "sec", entity: "club", by: "ann-self", title: "Secretary" }), ev({ event: "participant_created", participant: "club-system", kind: "system", owner: "club", template: "clerk" }),
+    ev({ event: "appointed", position: "sec", holder: "club-system" })]) cast.see(e);
+  // (Kept at the fork and taken up again: the same cast.)
+  const again = Cast.restore(cfg, JSON.parse(JSON.stringify(cast.save())));
+  for (const c of [cast, again]) {
+    expect(c.whoIs("club-system")).toEqual({ id: "sec", name: "Secretary", of: "club" });
+    expect(c.whoIs("club")).toEqual({ id: "club", name: "Walking Club" });
+    expect(c.whoIs("desk-system")).toEqual({ id: "desk", name: "Help desk", of: "council" });
+    expect(c.systems().has("club-system")).toBe(true);
+  }
+  expect(Cast.of(cfg).whoIs("club-system")).toBeUndefined();
+  cast.see(ev({ event: "participant_ended", participant: "club-system", reason: "retired" }));
+  expect(cast.systems().has("club-system")).toBe(false);
+  // What the engine would not take as written, a call it could not read, and when an act will be done: told in words, never ids of the platform's.
+  const note = (data: object) => ({ kind: "annotation", body: { annotation: "note", subject: "s", data } });
+  const last = { thinking: 0, letter: false };
+  expect(toldOf(note({ rejected_action: JSON.stringify([{ block: "transfer" }]), why: "bad" }), "s", 5, last)).toEqual([{ t: 5, text: "What you did could not be carried out as it was written, and nothing was done." }]);
+  expect(toldOf(note({ rejected_action: JSON.stringify([{ block: "message", to: ["ann"], text: "Hi" }]) }), "s", 5, last)[0]!.text).toMatch(/^Your letter to ann \("Hi"\) was not sent/);
+  expect(toldOf(note({ rejected_action: "[{\"block\":\"mess" }), "s", 5, last)[0]!.text).toMatch(/could not be carried out/);
+  expect(toldOf(note({ call_unresolved: "x()", questions: ["Which case?", "Which day?"] }), "s", 5, last).map((x) => x.text)).toEqual(["Which case?", "Which day?"]);
+  expect(toldOf(note({ rejected_action: "[]" }), "other", 5, last)).toEqual([]);
+  const started = { kind: "event", t: 3_600, body: { event: "action_started", participant: "s", action: "a1", starts: 3_600 + 600, done: 3_600 + 4_200 } };
+  expect(toldOf(started, "s", 0, { thinking: 600, letter: true })).toEqual([{ t: 3_600, text: "Your letter will be written and sent at 02:10." }]);
+  expect(toldOf(started, "s", 0, { thinking: 0, letter: false })[0]!.text).toBe("What you did will be done at 02:10. It begins at 01:10: you have other work before it.");
+});
+
 // ---- on the engine, every model played by the mock
 
 const have = existsSync(join(root, "kernel/target/release/oikos-kernel")) && !!Bun.spawnSync(["sh", "-c", `ls ${join(root, "kernel/target/release")}/liboikos_napi.* 2>/dev/null`]).stdout.toString().trim();
@@ -195,5 +228,49 @@ test.skipIf(!have)("a model steward in a fork, played by the mock: drafts confir
   expect(lines.some((e) => e.kind === "command" && e.body?.provenance?.via === "translator")).toBe(true);
   expect(lines.some((e) => e.body?.annotation === "observation")).toBe(true);
   expect(Bun.spawnSync([kernel, "verify", jsonl]).exitCode).toBe(0);
+  rmSync(out, { recursive: true, force: true });
+}, 600_000);
+
+test.skipIf(!have)("in a fork, a model seat's thinking takes world time where the world says so, and a world's composer goes on from the base, its exit accounts at each fork's end (MT-22)", async () => {
+  const { spec: weather } = await loadSpec(join(root, "experiments/weather-stewards.ts"));
+  const prepare = weather.world.prepare!;
+  const small: ExperimentSpec = {
+    ...weather, name: "seats-mt22", seeds: [1], untilDay: 25,
+    world: { ...weather.world, prepare: (c: any, seed: number) => {
+      const x = prepare(c, seed);
+      x.orchestration = { ...x.orchestration, thinking_time: "costs_world_time", thinking: { model_seconds_per_output_token: 2 } };
+      x.dials = { ...x.dials, composer: { pieces_per_month: 4, mix: [{ model: "mock", share_bps: 10_000 }], accounts: 3 } };
+      return x;
+    } },
+    arms: [{ name: "code", steward: { kind: "code" } }, { name: "sonnet", steward: { kind: "model", model: "claude-code/claude-sonnet-5-5" } }],
+    seats: { mock_models: true, budget: { arm_usd: { sonnet: 50 } } }, measures: ["acts"],
+  };
+  const out = join(root, "runs", "test-experiment-mt22");
+  rmSync(out, { recursive: true, force: true });
+  const r = await runExperiment(small, { out, parallel: 0 });
+  expect(r.results.filter((x) => x.error)).toEqual([]);
+  // (The base keeps who is who and the composer's state at the fork, for each fork to go on from.)
+  for (const f of ["cast.json", "composer.json"]) expect(existsSync(join(out, "seed-1", f))).toBe(true);
+  const kernel = join(root, "kernel/target/release/oikos-kernel");
+  const linesOf = (arm: string) => {
+    const jsonl = join(out, "seed-1", `${arm}.jsonl`);
+    expect(Bun.spawnSync([kernel, "export", join(out, "seed-1", `${arm}.oklog`), "--out", jsonl]).exitCode).toBe(0);
+    return readFileSync(jsonl, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  };
+  const forkT = small.forkDay * 86_400;
+  const seat = (lines: any[]) => lines.find((e) => e.body?.data?.steward)?.body.data.steward.seat;
+  const sonnet = linesOf("sonnet"), code = linesOf("code");
+  const who = seat(sonnet);
+  const late = (lines: any[]) => lines.filter((e) => e.t >= forkT && e.kind === "command" && e.body?.command === "act" && e.body.participant === who).map((e) => e.body.thinking ?? 0);
+  // The model seat's acts each come after its thinking, by its tokens; the code twin's do not (code thinks `code_seconds`, here none).
+  expect(late(sonnet).length).toBeGreaterThan(0);
+  expect(late(sonnet).every((x) => x > 0)).toBe(true);
+  expect(late(code).every((x) => x === 0)).toBe(true);
+  // Every fork ends with its exit accounts, the composer's counts beside them; the seat's debrief knows a composer was on.
+  for (const lines of [sonnet, code]) {
+    expect(lines.some((e) => e.body?.data?.account_pieces?.wanted === 3)).toBe(true);
+    expect(lines.some((e) => e.body?.data?.composer_pieces)).toBe(true);
+  }
+  expect(r.results.find((x) => x.arm === "sonnet")!.accounts).toBeDefined();
   rmSync(out, { recursive: true, force: true });
 }, 600_000);
