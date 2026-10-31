@@ -872,22 +872,10 @@ impl World {
         // (Going somewhere takes the trip: the longest of the act's moves, from where each body is to the building it is
         // going to, each body on its way from when the act starts until it is done (law 9, S3). Literal ids only: a body or
         // space made in the act itself is going nowhere yet.)
-        let trips: Vec<(Id, Id, Option<Id>, i64)> = blocks
-            .iter()
-            .filter_map(|b| match b {
-                Block::Occupy { space, who, vehicle } if !space.starts_with('$') && !who.as_deref().is_some_and(|w| w.starts_with('$')) => {
-                    let body = who.clone().or_else(|| p.person.map(|x| x.to_string()))?;
-                    let (to, _) = crate::config::split_space(space)?;
-                    let from = self.state.structures_of(&body).into_iter().next()?;
-                    // (Driven, if the vehicle named is one the body may drive and it stands where they set out; else on foot.)
-                    let speed = vehicle.as_deref().and_then(|v| crate::exec::driven_speed(&self.s, &self.state, v, &body, &from).ok());
-                    let secs = crate::travel::seconds(&self.s, &self.state, &from, to, speed);
-                    (from != to && secs > 0).then(|| (Id::new(&body), Id::new(to), vehicle.as_deref().filter(|_| speed.is_some()).map(Id::new), secs))
-                }
-                _ => None,
-            })
-            .collect();
-        let trip = trips.iter().map(|x| x.3).max().unwrap_or(0);
+        // (Each body the act takes somewhere: into a building, by where goods are and go, to a building worked on; law 9,
+        // S3 and S4. The act takes as long as its longest trip.)
+        let journeys = crate::travel::journeys(&self.s, &self.state, p.person, blocks);
+        let trip = journeys.iter().map(|j| j.seconds).max().unwrap_or(0);
         // (A system's own rows first, from its template; then the world's table for its kind; then a default the world
         // states. Nobody's: the act is refused, `unpriced`.)
         let template_of = |state: &State, w: &str| state.participants.get(w).filter(|x| x.kind == ParticipantKind::System).and_then(|x| x.template);
@@ -1018,9 +1006,15 @@ impl World {
         let order_from = if only_orders && own == 0 { actor_free } else { start };
         let own_done = place(&mut self.state, &key, own_lanes, order_from, actor_seconds + own, own);
         done = done.max(own_done);
+        // (A performer's trip to where the work is, and back, is their time too; and a carrier's, who is no performer.)
+        let trip_of = |p: &Id| journeys.iter().find(|j| j.body == *p).map_or(0, |j| j.seconds);
         for (p, share) in shares.iter().filter(|(p, _)| **p != key) {
             let l = lanes_of(self, p);
-            done = done.max(place(&mut self.state, p, l, start, *share, *share));
+            let secs = share + trip_of(p);
+            done = done.max(place(&mut self.state, p, l, start, secs, secs));
+        }
+        for j in journeys.iter().filter(|j| j.body != key && !shares.contains_key(&j.body) && !by_shares.iter().any(|(w, _)| *w == j.body)) {
+            done = done.max(place(&mut self.state, &j.body, (1, None), start, j.seconds, j.seconds));
         }
         let starts = start;
         let free = (own_done < done).then_some(own_done);
@@ -1029,11 +1023,11 @@ impl World {
         // (Those it takes somewhere set out when it starts, and are on their way until it is done: law 9, S3. Before the
         // start's checks, so that an act refused when it starts brings them back.)
         let mut set_out = vec![];
-        for (body, to, vehicle, _) in trips {
+        for j in journeys {
             if start <= t {
-                set_out.extend(crate::exec::depart(&self.s, &mut self.state, &body, &to, done, vehicle.as_deref(), Some(&action), participant));
+                set_out.extend(crate::exec::depart(&self.s, &mut self.state, &j.body, &j.to, &j.via, done, j.vehicle.as_deref(), Some(&action), participant));
             } else {
-                self.state.schedule(start, crate::state::Sched::Depart { body, to, arrives: done, vehicle, act: Some(action.clone().into()), by: participant.into() });
+                self.state.schedule(start, crate::state::Sched::Depart { body: j.body, to: j.to, via: j.via, arrives: done, vehicle: j.vehicle, act: Some(action.clone().into()), by: participant.into() });
             }
         }
         if !checks.is_empty() {
@@ -1122,6 +1116,8 @@ impl World {
                 };
                 let mut events = vec![Timed::new(t, EventBody::ActionApplied { action: action.clone(), participant: participant.into(), position: pos.clone().map(Into::into), by: applied_by, created: created.clone() })];
                 events.extend(res.events);
+                // (Those the act took by places and not into one are back where they set out: law 9, S4.)
+                events.extend(crate::exec::turn_back(&self.s, &mut self.state, &action, participant));
                 (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None, surveyed: res.surveyed, investigated: res.investigated, seen: res.seen })
             }
             Err(r) => (

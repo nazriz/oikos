@@ -2667,6 +2667,20 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       water: { structure: "water-works", cell: at("water-works"), holder: "water-corp" }, power: { structure: "substation", cell: at("substation"), holder: "energy-co" }, sewer: { structure: "water-works", cell: at("water-works"), holder: "water-corp" }, f: NETF! });
     return { ...net, users };
   })() : undefined;
+  // The way out of the town (law 9, foundations-2 S4): a road from the street end nearest the ground's west edge to where the
+  // outside's goods come from and go to, the profile's `round.outside` distance at its speed, and each edge's node there, so
+  // that what an edge sells and takes is carried by its freight in the time that takes.
+  const OUTF = RDS ? V.round?.outside : undefined;
+  const OUT = OUTF && roadLots.size ? (() => {
+    const mid = Math.floor(spec.grid.h / 2);
+    const gate = [...roadLots].map((id) => parcels.find((p) => p.id === id)!).sort((a, b) => a.x - b.x || Math.abs(a.y - mid) - Math.abs(b.y - mid) || a.y - b.y)[0]!;
+    const edges: string[] = ["outside", ...(AUTO?.offers.length ? ["vendors"] : []), ...WHOLESALERS.map((w) => w.entity)];
+    const link = (id: string, from: string, to: string, length_m: number) => ({ id, from, to, mode: "road", length_m, capacity: RDS!.capacity_per_hour, speed_kmh: OUTF.speed_kmh });
+    return {
+      nodes: [{ id: "n-gate", cell: gate.cell }, { id: "n-far" }, ...edges.map((e) => ({ id: `n-edge-${e}`, edge: e }))],
+      links: [link("road-out", "n-gate", "n-far", OUTF.km * 1000), ...edges.map((e) => link(`edge-${e}`, "n-far", `n-edge-${e}`, 0))],
+    };
+  })() : undefined;
   // The utilities (world-expansion 6.1): the water corporation draws the town's water from the river and bills owners;
   // the energy retailer buys from the grid, supplies its customers and bills them. Each starts with three months'
   // takings in hand (a placeholder).
@@ -3871,7 +3885,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       holdings: [{ kind: "materials", holder: "builder", at: "builder-yard", quantity: String(kg(120)) }, ...factoryStock, ...ownStock,
         // (The works' store full, and a fortnight of the town's electricity at the substation, as the town opens.)
         ...(NET ? [{ kind: "water", holder: "water-corp", at: "water-works", quantity: String(NET.storage) }, { kind: "energy", holder: "energy-co", at: "substation", quantity: String(NET.users.reduce((a, u) => a + u.energy_kwh_day, 0) * 14) }] : [])],
-      ...(NET ? { network: NET.network, connections: NET.connections } : {}) },
+      ...(NET || OUT ? { network: { ...(NET?.network ?? { nodes: [] }), nodes: [...(NET?.network.nodes ?? []), ...(OUT?.nodes ?? [])], links: [...(NET?.network.links ?? []), ...(OUT?.links ?? [])] } } : {}),
+      ...(NET ? { connections: NET.connections } : {}) },
     participants,
     positions,
     templates,

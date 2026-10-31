@@ -97,12 +97,12 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
 /// that is dead, gone, already on its way or in no building does not set out; nor one whose vehicle is not there to take
 /// (its act is refused when due).
 #[allow(clippy::too_many_arguments)]
-pub fn depart(s: &Statics, st: &mut State, body: &str, to: &str, arrives: i64, vehicle: Option<&str>, act: Option<&str>, by: &str) -> Vec<Timed> {
+pub fn depart(s: &Statics, st: &mut State, body: &str, to: &str, via: &[Id], arrives: i64, vehicle: Option<&str>, act: Option<&str>, by: &str) -> Vec<Timed> {
     if !st.body(body).is_some_and(|b| b.alive && b.present) || st.transit.contains_key(body) {
         return vec![];
     }
     let Some(from) = st.structures_of(body).into_iter().next() else { return vec![] };
-    if act.is_some() && from == to {
+    if act.is_some() && from == to && via.is_empty() {
         return vec![];
     }
     let Some(space) = st.occupancy.get(&from).and_then(|m| m.iter().find(|(_, b)| b.contains(body)).map(|(sp, _)| *sp)) else { return vec![] };
@@ -117,7 +117,7 @@ pub fn depart(s: &Statics, st: &mut State, body: &str, to: &str, arrives: i64, v
         st.vehicles.get_mut(v).unwrap().at = Id::new(body);
     }
     let t = st.t;
-    st.transit.insert(Id::new(body), crate::state::Transit { from, space, to: Id::new(to), departed: t, arrives, vehicle: vehicle.map(Id::new), act: act.map(Id::new) });
+    st.transit.insert(Id::new(body), crate::state::Transit { from, space, to: Id::new(to), via: via.to_vec(), departed: t, arrives, vehicle: vehicle.map(Id::new), act: act.map(Id::new) });
     events
 }
 
@@ -949,7 +949,14 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             out.extend(crate::sites::end(s, st, &participant, position.as_deref(), &channel, places, &cells, names));
             out
         }
-        Sched::Depart { body, to, arrives, vehicle, act, by } => depart(s, st, &body, &to, arrives, vehicle.as_deref(), act.as_deref(), &by),
+        Sched::Depart { body, to, via, arrives, vehicle, act, by } => depart(s, st, &body, &to, &via, arrives, vehicle.as_deref(), act.as_deref(), &by),
+        Sched::Arrival { kind, quantity, holder, at } => {
+            let key = crate::state::holding_key(&holder, &at, &kind);
+            let q = st.holdings.get(&key).map_or(0, |h| h.quantity).saturating_add(quantity).clamp(-MAX_MONEY, MAX_MONEY);
+            let c = st.stamp();
+            st.holdings.insert(key, crate::state::Holding { kind, holder, at, quantity: q, changed: c });
+            vec![]
+        }
         Sched::BirthDue { parents, name, template } => {
             let Some(b) = st.body(&parents[0]) else { return vec![] };
             if !b.alive {
@@ -1843,7 +1850,7 @@ impl<'a> Exec<'a> {
                 self.emit(EventBody::Taken { by: me, from, kind: *kind, quantity: *quantity, at });
                 Ok(())
             }
-            Block::MoveGoods { kind, quantity, from_at, to, to_at } => {
+            Block::MoveGoods { kind, quantity, from_at, to, to_at, carried, carrier, vehicle: _ } => {
                 let (from_at, to, to_at) = (self.r(from_at)?, self.r(to)?, self.r(to_at)?);
                 if !self.s.config.catalogue.resources.iter().any(|r| &r.id == kind) {
                     return Err(refuse(RefusalCode::UnknownResource, format!("the world has no resource {kind}")));
@@ -1887,12 +1894,47 @@ impl<'a> Exec<'a> {
                 if !(me == to && from_at == to_at) && there.checked_add(*quantity).is_none_or(|x| x > MAX_MONEY) {
                     return Err(refuse(RefusalCode::Overflow, "the holding would exceed the range of a quantity"));
                 }
+                // Law 9 (foundations-2 S4): in a world one travels, goods between two places are carried. To or from an edge's
+                // outside, by the outside's freight, from the edge's node (in its time, if the world has the node); between
+                // buildings, by a body the act took by both (the acting person's own, or one the actor may direct).
+                let (mut carrier_was, mut arrives) = (None, None);
+                if self.s.config.catalogue.travel.is_some() && from_at != to_at {
+                    let outside = (edge && from_at == me).then_some((me, to_at)).or_else(|| (self.s.is_boundary(&to) && to_at == to).then_some((to, from_at)));
+                    if let Some((e, there)) = outside {
+                        carrier_was = Some(e);
+                        arrives = crate::travel::freight_seconds(self.s, self.st, &e, &there).filter(|x| *x > 0).map(|x| self.now() + x);
+                    } else {
+                        let body = match carrier {
+                            Some(c) => self.r(c)?,
+                            None if *carried => self.own_body()?,
+                            None => return Err(refuse(RefusalCode::NotCarried, format!("{kind} from {from_at} to {to_at} needs a carrier: someone to take it there"))),
+                        };
+                        if self.own_body().ok() != Some(body) && !may_direct(self.st, &me, &body) {
+                            return Err(refuse(RefusalCode::NotTheirs, format!("{me} may not send {body} with its goods")));
+                        }
+                        self.living_present(&body)?;
+                        // (When the act is done, the carrier has been by both: it went where the goods were and where they go.)
+                        if self.started {
+                            let went = self.st.transit.get(body.as_str()).is_some_and(|t| (t.from == from_at || t.via.contains(&from_at)) && (t.to == to_at || t.via.contains(&to_at)));
+                            if !went {
+                                return Err(refuse(RefusalCode::NotPresent, format!("{body} has not been by {from_at} and {to_at}")));
+                            }
+                        }
+                        carrier_was = Some(body);
+                    }
+                }
                 if !(me == to && from_at == to_at) {
                     let c = self.st.stamp();
                     self.add_holding(&me, &from_at, kind, -*quantity, c)?;
-                    self.add_holding(&to, &to_at, kind, *quantity, c)?;
+                    match arrives {
+                        // (On their way by the outside's freight: theirs when they arrive.)
+                        Some(at) => {
+                            self.st.schedule(at, crate::state::Sched::Arrival { kind: *kind, quantity: *quantity, holder: to, at: to_at });
+                        }
+                        None => self.add_holding(&to, &to_at, kind, *quantity, c)?,
+                    }
                 }
-                self.emit(EventBody::GoodsMoved { kind: *kind, quantity: *quantity, from: me, from_at, to, to_at, by: self.participant.into() });
+                self.emit(EventBody::GoodsMoved { kind: *kind, quantity: *quantity, from: me, from_at, to, to_at, by: self.participant.into(), carrier: carrier_was, arrives });
                 Ok(())
             }
 

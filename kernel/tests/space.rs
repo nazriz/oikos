@@ -202,3 +202,77 @@ fn a_trip_refused_on_arrival_brings_the_body_back_where_it_set_out() {
     assert_eq!(st.structures_of("alice"), vec![oikos_kernel::blocks::Id::new("s-house")], "back home");
     assert!(st.transit.is_empty());
 }
+
+// ----------------------------------------------------------------------------------------------------------------- S4: carried
+
+fn act_now(run: &mut Run<Vec<u8>>, who: &str, pos: Option<&str>, blocks: Value) -> (i64, i64, Vec<EventBody>) {
+    let cmd = direct(who, pos, serde_json::from_value(blocks).unwrap()).unwrap();
+    let r = run.command(&cmd).unwrap();
+    let Some((s, d)) = r.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { starts, done, .. } => Some((*starts, *done)), _ => None }) else {
+        return (0, 0, r.events.into_iter().map(|e| e.body).collect());
+    };
+    (s, d, r.events.into_iter().map(|e| e.body).collect())
+}
+
+fn refused(events: &[EventBody]) -> Option<RefusalCode> {
+    events.iter().find_map(|e| match e {
+        EventBody::ActionRefused { code, .. } => Some(*code),
+        _ => None,
+    })
+}
+
+#[test]
+fn goods_between_two_buildings_go_only_with_someone_who_carries_them_there_and_back() {
+    // Nobody takes them: refused, and nothing moves.
+    let mut run = Run::start(road_world(), "space-carry", Vec::new(), None).unwrap();
+    let (_, done, ev) = act_now(&mut run, "alice-self", None, json!([{"block": "move_goods", "kind": "goods", "quantity": "3", "from_at": "s-house", "to": "alice", "to_at": "s-shop"}]));
+    let out = run.command(&Command::Advance { to: done + 1 }).unwrap();
+    let all: Vec<EventBody> = ev.into_iter().chain(out.events.into_iter().map(|e| e.body)).collect();
+    assert_eq!(refused(&all), Some(RefusalCode::NotCarried));
+    assert_eq!(run.kernel().state().holding("alice", "s-house", "goods"), 10);
+    // She carries them: she goes to the shop and back (twice the way), is in no building meanwhile, and they are there.
+    let mut run = Run::start(road_world(), "space-carry2", Vec::new(), None).unwrap();
+    let (starts, done, _) = act_now(&mut run, "alice-self", None, json!([{"block": "move_goods", "kind": "goods", "quantity": "3", "from_at": "s-house", "to": "alice", "to_at": "s-shop", "carried": true}]));
+    let mut walk = Run::start(road_world(), "space-carry-walk", Vec::new(), None).unwrap();
+    let (s0, d0, _) = act_now(&mut walk, "alice-self", None, json!([{"block": "occupy", "space": "s-shop/dwelling.1"}]));
+    assert!((done - starts) >= 2 * (d0 - s0) - 10, "there and back: {} against one way {}", done - starts, d0 - s0);
+    assert!(run.kernel().state().structures_of("alice").is_empty());
+    let out = run.command(&Command::Advance { to: done + 1 }).unwrap();
+    assert_eq!(refused(&out.events.iter().map(|e| e.body.clone()).collect::<Vec<_>>()), None);
+    let st = run.kernel().state();
+    assert_eq!((st.holding("alice", "s-house", "goods"), st.holding("alice", "s-shop", "goods")), (7, 3));
+    assert_eq!(st.structures_of("alice"), vec![oikos_kernel::blocks::Id::new("s-house")], "home again");
+    assert!(out.events.iter().any(|e| matches!(&e.body, EventBody::GoodsMoved { carrier: Some(c), .. } if c == "alice")));
+}
+
+#[test]
+fn a_crew_goes_to_the_building_it_works_on_and_is_away_from_its_depot_meanwhile() {
+    let mut run = Run::start(road_world(), "space-crew", Vec::new(), None).unwrap();
+    let (_, done, _) = act_now(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "mend", "units": 1, "at": "s-shop", "on": "s-house", "performers": ["carol"]}]));
+    assert!(run.kernel().state().structures_of("carol").is_empty(), "carol has gone to the house");
+    assert!(run.kernel().state().transit["carol"].via.iter().any(|x| x == "s-house"));
+    let out = run.command(&Command::Advance { to: done + 1 }).unwrap();
+    assert_eq!(refused(&out.events.iter().map(|e| e.body.clone()).collect::<Vec<_>>()), None);
+    assert_eq!(run.kernel().state().structures_of("carol"), vec![oikos_kernel::blocks::Id::new("s-shop")], "back at the shop");
+}
+
+#[test]
+fn the_outsides_freight_takes_its_time_from_the_edges_node_and_goods_on_their_way_are_still_counted() {
+    let mut w = road_world();
+    // A road out of the town from the street's west end to the outside, 90 km at 90 km/h: an hour.
+    w["world"]["network"] = json!({"nodes": [{"id": "n-gate", "cell": "cell.2.1"}, {"id": "n-out", "edge": "outside"}],
+        "links": [{"id": "road-out", "from": "n-gate", "to": "n-out", "mode": "road", "length_m": 90_000, "capacity": 600, "speed_kmh": 90}]});
+    let mut run = Run::start(w, "space-freight", Vec::new(), None).unwrap();
+    let before = run.kernel().state().total_goods();
+    let (_, done, ev) = act_now(&mut run, "outside-system", Some("outside-trade"), json!([{"block": "move_goods", "kind": "goods", "quantity": "40", "from_at": "outside", "to": "devco", "to_at": "s-shop"}]));
+    if done == 0 {
+        panic!("{ev:?}");
+    }
+    let out = run.command(&Command::Advance { to: done + 1 }).unwrap();
+    let arrives = out.events.iter().find_map(|e| match &e.body { EventBody::GoodsMoved { arrives, .. } => *arrives, _ => None }).expect("on its way");
+    assert!(arrives >= done + 3_600, "an hour on the road out, and more through the town");
+    assert_eq!(run.kernel().state().holding("devco", "s-shop", "goods"), 200, "not there yet");
+    assert_eq!(run.kernel().state().total_goods(), before, "on their way, still counted");
+    run.command(&Command::Advance { to: arrives + 1 }).unwrap();
+    assert_eq!(run.kernel().state().holding("devco", "s-shop", "goods"), 240);
+}

@@ -96,6 +96,8 @@ pub enum RefusalCode {
     /// the world's table for their kind, and no `default` the world states): nobody said what it takes, so it is not done
     /// (law 10, foundations-2 P2; before, it took a second).
     Unpriced,
+    /// Law 9 (S4): goods between two places with nobody to carry them.
+    NotCarried,
     /// An edge asked to sell more of a scarce kind than it has left this period (foundations-2 C6).
     BeyondSupply,
 }
@@ -251,6 +253,11 @@ pub enum EventBody {
         to: Id,
         to_at: Id,
         by: Id,
+        /// Who carried them (law 9: a body, or the edge whose freight it was), and when they arrive, if later than now.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        carrier: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        arrives: Option<i64>,
     },
     AccountOpened {
         account: Id,

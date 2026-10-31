@@ -888,7 +888,7 @@ impl<B: Body> Factory<B> {
                 if q > 0 && abroad_ok {
                     let unit = d.i("unit_price").unwrap_or(0);
                     self.room.shipped(q);
-                    let ship = call("goods", vec![("kind", Some(arg(&self.p.output))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&self.p.market))), ("at", Some(arg(&self.p.market))), ("from_at", Some(arg(&self.p.works)))]);
+                    let ship = call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.output))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&self.p.market))), ("at", Some(arg(&self.p.market))), ("from_at", Some(arg(&self.p.works)))]);
                     let invoice = say(
                         "invoice",
                         &format!("Invoice: {q} {} at {} each, {}.", self.p.output, money(unit), money(q * unit)),

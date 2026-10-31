@@ -2,7 +2,9 @@
 //! over the cells between, each cell costing what its cover says (a road quicker, water slower) or the world's default.
 //! Physics only: where anyone goes, and why, is theirs.
 
+use crate::blocks::{Block, Id};
 use crate::state::{CellCosts, State};
+use std::collections::BTreeMap;
 use crate::statics::Statics;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -86,8 +88,116 @@ fn trip_cells(s: &Statics, st: &State, travel: &oikos_contracts::config::TravelC
     let w = crate::ways::ways(s, st);
     let (Some(e), Some(x)) = (w.nearest(a), w.nearest(b)) else { return walk };
     let Some(net) = crate::ways::tree_cached(s, st, &w, e, speed)[x as usize] else { return walk };
-    let total = path_cells(s, st, travel, a, w.nodes[e as usize]).saturating_add(net).saturating_add(path_cells(s, st, travel, w.nodes[x as usize], b));
+    let (Some(ea), Some(xb)) = (w.nodes[e as usize], w.nodes[x as usize]) else { return walk };
+    let total = path_cells(s, st, travel, a, ea).saturating_add(net).saturating_add(path_cells(s, st, travel, xb, b));
     walk.min(total)
+}
+
+/// How long the outside's freight takes between an edge and a structure (law 9, S4): along the ways from the edge's node to
+/// the node nearest the structure, at the links' own speeds, and on to its door. None: the world has no node for the edge
+/// (its goods arrive at once: the backstop's `edgesWithoutNode` names it), or no way joins them.
+pub fn freight_seconds(s: &Statics, st: &State, edge: &str, structure: &str) -> Option<i64> {
+    let travel = s.config.catalogue.travel.as_ref()?;
+    let w = crate::ways::ways(s, st);
+    let e = *w.edges.get(edge)?;
+    let to = st.structures.get(structure).and_then(|x| crate::config::cell_xy(&x.at))?;
+    let x = w.nearest(to)?;
+    let net = crate::ways::tree_cached(s, st, &w, e, Some(i64::from(u16::MAX)))[x as usize]?;
+    Some(net.saturating_add(path_cells(s, st, travel, w.nodes[x as usize]?, to)))
+}
+
+/// A body an act takes somewhere (law 9, S3 and S4): where it sets out from, the buildings it goes by in order (where goods
+/// are picked up and put down, a building worked on), where it ends (a building it goes into, or back where it set out),
+/// the vehicle it drives, and the trip's seconds, leg by leg.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Journey {
+    pub body: Id,
+    pub from: Id,
+    pub via: Vec<Id>,
+    pub to: Id,
+    pub vehicle: Option<Id>,
+    pub seconds: i64,
+}
+
+/// The journeys an act's blocks make (literal ids only: a body or a place made in the act itself is going nowhere yet). An
+/// `occupy` takes its body into a building; a `move_goods` between two buildings takes its carrier by where the goods are
+/// and where they go; a `work` on a building other than where it is done takes each performer there. A body goes by its
+/// stops in the blocks' order and ends in the building it goes into, or back where it set out.
+pub fn journeys(s: &Statics, st: &State, actor_body: Option<Id>, blocks: &[Block]) -> Vec<Journey> {
+    let lit = |x: &str| !x.starts_with('$');
+    let mut order: Vec<Id> = vec![];
+    let mut legs: BTreeMap<Id, (Vec<Id>, Option<Id>, Option<Id>)> = BTreeMap::new();
+    let mut touch = |order: &mut Vec<Id>, b: Id| {
+        if !order.contains(&b) {
+            order.push(b);
+        }
+    };
+    for b in blocks {
+        match b {
+            Block::Occupy { space, who, vehicle } if lit(space) && !who.as_deref().is_some_and(|w| w.starts_with('$')) => {
+                let Some(body) = who.as_deref().map(Id::new).or(actor_body) else { continue };
+                let Some((to, _)) = crate::config::split_space(space) else { continue };
+                touch(&mut order, body);
+                let e = legs.entry(body).or_default();
+                e.1 = Some(Id::new(to));
+                if let Some(v) = vehicle.as_deref().filter(|v| lit(v)) {
+                    e.2 = Some(Id::new(v));
+                }
+            }
+            Block::MoveGoods { from_at, to_at, carried, carrier, vehicle, .. } if lit(from_at) && lit(to_at) && from_at != to_at => {
+                let body = match carrier.as_deref() {
+                    Some(c) if lit(c) => Some(Id::new(c)),
+                    Some(_) => None,
+                    None if *carried => actor_body,
+                    None => None,
+                };
+                let Some(body) = body.filter(|b| st.body(b).is_some()) else { continue };
+                if !st.structures.contains_key(from_at.as_str()) || !st.structures.contains_key(to_at.as_str()) {
+                    continue;
+                }
+                touch(&mut order, body);
+                let e = legs.entry(body).or_default();
+                e.0.extend([Id::new(from_at), Id::new(to_at)]);
+                if let Some(v) = vehicle.as_deref().filter(|v| lit(v)) {
+                    e.2 = Some(Id::new(v));
+                }
+            }
+            Block::Work { at, on: Some(on), performers, .. } if lit(at) && lit(on) && on != at && st.structures.contains_key(on.as_str()) && !on.starts_with(&format!("{at}/")) => {
+                for p in performers.iter().filter(|p| lit(p)) {
+                    let p = Id::new(p);
+                    if st.body(&p).is_none() {
+                        continue;
+                    }
+                    touch(&mut order, p);
+                    legs.entry(p).or_default().0.push(Id::new(on));
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut out = vec![];
+    for body in order {
+        let (stops, into, vehicle) = legs.remove(&body).unwrap_or_default();
+        let Some(from) = st.structures_of(&body).into_iter().next() else { continue };
+        let to = into.unwrap_or(from);
+        let mut route = vec![from];
+        for x in stops.iter().chain(std::iter::once(&to)) {
+            if route.last() != Some(x) {
+                route.push(*x);
+            }
+        }
+        if route.len() < 2 {
+            continue;
+        }
+        let speed = vehicle.and_then(|v| crate::exec::driven_speed(s, st, &v, &body, &from).ok());
+        let seconds = route.windows(2).map(|p| seconds(s, st, &p[0], &p[1], speed)).fold(0i64, |a, b| a.saturating_add(b));
+        if seconds <= 0 {
+            continue;
+        }
+        let via: Vec<Id> = route[1..route.len() - 1].to_vec();
+        out.push(Journey { body, from, via, to, vehicle: vehicle.filter(|_| speed.is_some()), seconds });
+    }
+    out
 }
 
 /// The quickest path's time between two cells.

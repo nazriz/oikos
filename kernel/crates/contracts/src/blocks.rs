@@ -49,6 +49,15 @@ pub enum Block {
         to: IdOrRef,
         /// Where they go (a structure, or for an edge, itself).
         to_at: IdOrRef,
+        /// Law 9 (foundations-2 S4): between two buildings goods are carried, by the acting person (`carried`) or by a body
+        /// the actor may direct (`carrier`), who goes by where they are and where they go (driving `vehicle`, if named); to
+        /// or from an edge's outside, by the outside's freight, which takes its time from the edge's node.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        carried: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        carrier: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        vehicle: Option<IdOrRef>,
     },
     /// Taking goods another holds at a structure where the taker is, without their consent (world-expansion 7.3).
     Take {

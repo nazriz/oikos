@@ -1130,6 +1130,18 @@
         "to_at": {
           "description": "Where they go: a structure, or for an edge, itself.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "carried": {
+          "description": "Law 9 (foundations-2 S4): the acting person carries them. In a world one travels, goods between two buildings go only with a carrier, who goes by where they are and where they go, and back where it set out unless the act takes it into a building (its trip is the act's time and its own); to or from an edge's outside they go by the outside's freight, which takes its time from the edge's node. Refused `not_carried` with no carrier.",
+          "type": "boolean"
+        },
+        "carrier": {
+          "description": "Law 9 (S4): someone else who carries them, whom the actor may direct.",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "vehicle": {
+          "description": "Law 9 (S4): the vehicle the carrier drives (one it may drive, standing where it sets out).",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
         }
       }
     },

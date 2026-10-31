@@ -160,6 +160,9 @@ pub struct Transit {
     pub from: Id,
     pub space: Id,
     pub to: Id,
+    /// The buildings it goes by on the way (where goods are picked up and put down, a building worked on: S4).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub via: Vec<Id>,
     pub departed: i64,
     pub arrives: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -837,9 +840,19 @@ pub enum Sched {
     },
     /// A body sets out (law 9, foundations-2 S3): it leaves the space it is in for `to` (its own building again, for a visit
     /// there and back), and is on its way until `arrives`, driving `vehicle` if it named one. `act`: the act that takes it.
+    /// Goods on their way by the outside's freight (law 9, S4): they reach `holder`'s holding at `at` now.
+    Arrival {
+        kind: Id,
+        #[serde(with = "crate::money::amount")]
+        quantity: crate::money::Money,
+        holder: Id,
+        at: Id,
+    },
     Depart {
         body: Id,
         to: Id,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        via: Vec<Id>,
         arrives: i64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         vehicle: Option<Id>,
@@ -1008,6 +1021,12 @@ impl State {
         let mut t = std::collections::BTreeMap::new();
         for s in self.holdings.values() {
             *t.entry(s.kind).or_insert(0) += s.quantity;
+        }
+        // (Goods on their way by the outside's freight are the world's still: law 9, S4.)
+        for x in self.schedule.iter() {
+            if let Sched::Arrival { kind, quantity, .. } = &x.what {
+                *t.entry(*kind).or_insert(0) += *quantity;
+            }
         }
         t
     }

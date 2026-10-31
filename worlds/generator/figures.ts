@@ -373,6 +373,9 @@ export const FIGURE_BASIS: Basis[] = [
   ].flatMap((r) => ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params"].map((at) => ({ ...r, family: `any module: ${r.at}`, at: `${at}.${r.at}` }))),
   // The network for what flows (foundations-2 C4, law 8; worlds/generator/network.ts): its engineering figures are the
   // profile's (`utilities.network`, stand-ins until sourced); capacities and lengths are made from them and the layout.
+  { ...prof("world.network.links.*.length_m", "round.outside"), id: "road-out", family: "world.network.links (the road out)" },
+  { ...prof("world.network.links.*.speed_kmh", "round.outside"), family: "world.network.links (roads out)" },
+  { ...prof("world.network.links.*.capacity", "round.roads"), id: "road-out", family: "world.network.links (the road out's capacity)" },
   derived("world.network.links.*.capacity", "a pipe's or a wire's capacity: what its users ask at the start, times the profile's peak (pipes) or margin over the peak hour (wires): utilities.network"),
   derived("world.network.links.*.length_m", "the distance on the ground between its nodes, by the generator's layout of districts"),
   prof("world.network.links.*.loss_m", "utilities.network"),

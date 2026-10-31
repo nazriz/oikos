@@ -355,9 +355,9 @@ pub fn begin(s: &Statics, st: &mut State, participant: &str, key: &str, path: &s
         let home = st.structures_of(&b).into_iter().next();
         if let Some(h) = home {
             if starts <= t {
-                set_out = crate::exec::depart(s, st, &b, &h, done, None, None, participant);
+                set_out = crate::exec::depart(s, st, &b, &h, &[], done, None, None, participant);
             } else {
-                st.schedule(starts, Sched::Depart { body: b, to: h, arrives: done, vehicle: None, act: None, by: Id::new(participant) });
+                st.schedule(starts, Sched::Depart { body: b, to: h, via: vec![], arrives: done, vehicle: None, act: None, by: Id::new(participant) });
             }
         }
     }

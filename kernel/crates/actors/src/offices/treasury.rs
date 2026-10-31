@@ -2443,7 +2443,7 @@ impl Plan for WorksPlan {
             let q = self.at_depot;
             if q > 0 {
                 let docket = DisposalDocket { kind: p.kind.clone(), quantity: q };
-                let goods = call("goods", vec![("kind", Some(arg(&p.kind))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&p.landfill))), ("at", Some(arg(&p.landfill))), ("from_at", Some(arg(&p.depot)))]);
+                let goods = call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&p.kind))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&p.landfill))), ("at", Some(arg(&p.landfill))), ("from_at", Some(arg(&p.depot)))]);
                 let mut s = because(
                     format!("Taking the week's {} ({q}) to the landfill, with a docket.", p.kind),
                     vec![goods, say("disposal_docket", &format!("Delivered: {q} of {}.", p.kind), Say { to: Some(vec![p.landfill.clone()]), visible: Some(Visible::Only(vec![me.clone(), p.landfill.clone()])), data: Some(paper_data(&docket)), ..Default::default() })],

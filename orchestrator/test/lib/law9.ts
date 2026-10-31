@@ -59,11 +59,13 @@ export function uncarried(dirs = ACTOR_SOURCES, base = root): string[] {
     if (!existsSync(dir)) continue;
     for (const f of [...new Glob("**/*.rs").scanSync(dir)].sort()) {
       const text = readFileSync(join(dir, f), "utf8");
-      // (Its tests write moves to check what a module does with them: only the module's own code is read.)
-      const code = text.split(/\n#\[cfg\(test\)\]/)[0]!;
-      for (const line of code.split("\n")) {
-        const c = line.replace(/\/\/.*$/, "");
-        if (/call\("goods"/.test(c) && !/"carrier"|"within"/.test(c)) out.add(`${d}/${f}: goods moved with no carrier`);
+      // (Its tests write moves to check what a module does with them: only the module's own code is read, its comments left out.)
+      const code = text.split(/\n#\[cfg\(test\)\]/)[0]!.split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
+      // (A move is the call and its arguments, which may run over several lines: to the end of its `vec![...]`.)
+      for (const m of code.matchAll(/call\(\s*"goods",\s*vec!\[/g)) {
+        const rest = code.slice(m.index!, m.index! + 2000);
+        const call = rest.slice(0, rest.indexOf("])") + 2);
+        if (!/"carrier"|"carried"/.test(call)) out.add(`${d}/${f}: goods moved with no carrier`);
       }
     }
   }

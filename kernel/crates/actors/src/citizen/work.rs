@@ -1114,7 +1114,7 @@ impl Person {
             format!("We can't make ends meet ({}, less than a month's essentials): taking {} {} from {}'s stock at work, and home with them.", Self::wk_usd(w, balance), crime.quantity, self.p.goods, job.employer),
             vec![
                 call("take", vec![("kind", Some(arg(&self.p.goods))), ("quantity", Some(text(q.clone()))), ("from", Some(arg(&job.employer))), ("at", Some(arg(&at)))]),
-                call("goods", vec![("kind", Some(arg(&self.p.goods))), ("quantity", Some(text(q))), ("to", Some(arg(&me))), ("at", Some(arg(&home_at))), ("from_at", Some(arg(&at)))]),
+                call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.goods))), ("quantity", Some(text(q))), ("to", Some(arg(&me))), ("at", Some(arg(&home_at))), ("from_at", Some(arg(&at)))]),
             ],
         ));
     }

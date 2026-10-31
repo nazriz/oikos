@@ -1858,6 +1858,12 @@
                     "minimum": 0,
                     "maximum": 100000,
                     "description": "A pipe's head lost at capacity, in metres (the loss is this times the flow over the capacity)."
+                  },
+                  "speed_kmh": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "description": "Law 9 (S4): a link bodies and vehicles travel (a road out of the town to an edge's node; between towns), at this speed for vehicles; its capacity is then vehicles an hour each way."
                   }
                 }
               }

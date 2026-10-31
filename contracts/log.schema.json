@@ -710,6 +710,14 @@
             "by": {
               "description": "The participant that physically executed it.",
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "carrier": {
+              "description": "Law 9 (S4): who carried them: a body, or the edge whose freight it was.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "arrives": {
+              "description": "Law 9 (S4): when they reach `to_at`, if later (on the outside's freight): until then they are on their way.",
+              "type": "integer"
             }
           }
         },
@@ -2075,6 +2083,7 @@
         "coming_down",
         "offer_withdrawn",
         "unpriced",
+        "not_carried",
         "beyond_supply"
       ]
     },
