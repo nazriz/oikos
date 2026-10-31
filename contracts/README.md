@@ -758,3 +758,14 @@ Additive; no hard rule touched; nothing changes for a world that has no provider
   carried out at a fork's moment in a named participant's name and post, each noted (`note`, data `intervened`). A
   researcher's intervention, as `withhold` is; nothing in the world is told of it.
 - No block was added: `set_channels`, in the design's first draft, is not built (decisions, "Delegation D1 to D3").
+
+## Skills by use (2026-10-31; docs/design/foundations-2.md 7.4, step E4; docs/behaviour/skills.md; docs/decisions.md, "Skills by use"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing changes for a world that names no practised skill.
+
+- **A body variable takes `practice`** (`gain_bps_per_hour`, `half_life_days`, `floor`): a skill that grows with use and
+  fades toward its floor without it, settled when read or used. Not with `per_day`.
+- **A task takes `skill`** (`variable`, `novice_bps`, `expert_bps`): its labour scales with the performers' mean of a
+  practised variable (the stated labour at its `initial`), and their time is practice.
+- **The catalogue takes `act_skills`** (`act`, keyed as the table of work is; `variable`, `novice_bps`, `expert_bps`):
+  a person's time for such an act scales the same way, and doing it is practice.

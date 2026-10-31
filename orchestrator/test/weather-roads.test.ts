@@ -45,7 +45,9 @@ test("streets are laid, the bureau warns ahead, heat makes illness likelier, and
   const roads = config.world.structures.filter((s: any) => s.type === "road");
   expect(roads.length).toBeGreaterThan(20);
   expect(config.catalogue.structure_types.find((t: any) => t.id === "road").cover).toBe("road");
-  expect(config.catalogue.travel.by_cover.road).toBeLessThan(config.catalogue.travel.seconds_per_cell);
+  // (A road is a way, law 9: quicker to drive along, no quicker underfoot.)
+  expect(config.catalogue.structure_types.find((t: any) => t.id === "road").way).toMatchObject({ mode: "road" });
+  expect(config.catalogue.travel.by_cover.road).toBeUndefined();
   // A heatwave from day 20 to day 40, hot enough that its illness shows in a small town (a test's, not the climate's).
   const heat = config.catalogue.fields.find((f: any) => f.id === "heat");
   heat.source_by_day = [{ from_day: 0, bps: 0 }, { from_day: 20, bps: 10_000 }, { from_day: 40, bps: 0 }];

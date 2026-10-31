@@ -115,8 +115,8 @@ pub struct State {
     /// (`caps.entity_record_bytes`), so it never grows. The kernel reads none of it: its sections are opaque.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub entity_records: Map<Id, Arc<EntityRecord>>,
-    /// Vehicles (reserved shapes for travel, docs/design/travel.md): each its type, its owner and where it stands, as
-    /// the config declares them. Things their owners own; nothing moves them yet.
+    /// Vehicles (law 9, foundations-2 S2): each its type, its owner, where it stands and who may drive it. Things their
+    /// owners own; a vehicle goes where whoever drives it goes.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub vehicles: Map<Id, Vehicle>,
     /// Bodies on their way between places (reserved: nothing puts anyone in transit yet; a visit is still the time it
@@ -132,7 +132,8 @@ pub struct State {
     pub scarce_sold: Map<String, (i64, crate::money::Money)>,
 }
 
-/// A vehicle as the world keeps it (reserved shapes for travel).
+/// A vehicle as the world keeps it (law 9, foundations-2 S2): its type, its owner, where it stands, and who besides its owner
+/// may drive it. It goes where it is driven.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Vehicle {
     #[serde(rename = "type")]
@@ -140,6 +141,15 @@ pub struct Vehicle {
     pub owner: Id,
     /// A cell, or a structure.
     pub at: Id,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drivers: Vec<Id>,
+}
+
+impl Vehicle {
+    /// Whether a body may drive it: its owner, or one its owner lets.
+    pub fn may_drive(&self, who: &str) -> bool {
+        self.owner == who || self.drivers.iter().any(|d| d == who)
+    }
 }
 
 /// A body on its way (reserved shapes for travel): from where, to where, when it set out and when it arrives, and by
@@ -297,12 +307,24 @@ pub fn body_variables(cat: &crate::config::Catalogue, given: Option<&BTreeMap<Id
 
 /// A body variable's value at `t`, settled: its drift a whole day at a time since it was last set; and the time it's
 /// settled to (whole days on, so no part of a day's drift is lost when it's written back).
+/// A practised skill (foundations-2 E4) fades instead, by its half-life, toward its floor.
 pub fn body_variable_at(cfg: &crate::config::BodyVariableCfg, (v, at): (i64, i64), t: i64) -> (i64, i64) {
-    if cfg.per_day == 0 || t <= at {
+    if (cfg.per_day == 0 && cfg.practice.is_none()) || t <= at {
         return (v, at);
     }
     let days = (t - at) / 86_400;
+    if let Some(p) = &cfg.practice {
+        return (p.faded(v, days).clamp(cfg.min, cfg.max), at + days * 86_400);
+    }
     (v.saturating_add(cfg.per_day.saturating_mul(days)).clamp(cfg.min, cfg.max), at + days * 86_400)
+}
+
+/// A practised skill used for `seconds` at `t` (foundations-2 E4): settled to `t` (its fading), then the practice added.
+/// The time it is set from is `t` itself, so that a skill in use does not fade. Nothing for a variable that is no skill.
+pub fn practise(cfg: &crate::config::BodyVariableCfg, cur: (i64, i64), t: i64, seconds: i64) -> Option<(i64, i64)> {
+    let p = cfg.practice.as_ref()?;
+    let (v, _) = body_variable_at(cfg, cur, t);
+    Some((p.practised(cfg, v, seconds), t))
 }
 
 /// Someone leaving a space: who, why (they left, were removed, died, ...), and when.
@@ -1146,9 +1168,13 @@ impl State {
 #[derive(Default)]
 pub struct GroundCache {
     pub epoch: u64,
-    pub trips: std::sync::Mutex<Map<(Id, Id), (u64, i64)>>,
+    /// (From, to, the vehicle's speed or nought on foot) -> seconds, as of an epoch.
+    pub trips: std::sync::Mutex<Map<(Id, Id, i64), (u64, i64)>>,
     /// What entering each cell costs, as of an epoch (travel.rs): the same for every trip until the ground changes.
     pub costs: std::sync::Mutex<Option<(u64, Arc<CellCosts>)>>,
+    /// The ways of the ground as it stands, as of an epoch (ways.rs), and the quickest times from a node, by speed.
+    pub ways: std::sync::Mutex<Option<(u64, Arc<crate::ways::Ways>)>>,
+    pub trees: std::sync::Mutex<Map<(u32, i64), (u64, Arc<Vec<Option<i64>>>)>>,
 }
 
 /// What entering each cell of the ground costs a traveller (seconds), over the rectangle the cells lie in: none where
@@ -1176,13 +1202,13 @@ impl GroundCache {
     pub fn changed(&mut self) {
         self.epoch += 1;
     }
-    pub fn get(&self, from: &str, to: &str) -> Option<i64> {
+    pub fn get(&self, from: &str, to: &str, speed: i64) -> Option<i64> {
         let trips = self.trips.lock().ok()?;
-        trips.get(&(Id::new(from), Id::new(to))).filter(|(e, _)| *e == self.epoch).map(|(_, s)| *s)
+        trips.get(&(Id::new(from), Id::new(to), speed)).filter(|(e, _)| *e == self.epoch).map(|(_, s)| *s)
     }
-    pub fn put(&self, from: &str, to: &str, seconds: i64) {
+    pub fn put(&self, from: &str, to: &str, speed: i64, seconds: i64) {
         if let Ok(mut trips) = self.trips.lock() {
-            trips.insert((from.to_string().into(), to.to_string().into()), (self.epoch, seconds));
+            trips.insert((Id::new(from), Id::new(to), speed), (self.epoch, seconds));
         }
     }
 }
@@ -1192,6 +1218,8 @@ impl Clone for GroundCache {
             epoch: self.epoch,
             trips: std::sync::Mutex::new(self.trips.lock().map(|t| t.clone()).unwrap_or_default()),
             costs: std::sync::Mutex::new(self.costs.lock().map(|c| c.clone()).unwrap_or_default()),
+            ways: std::sync::Mutex::new(self.ways.lock().map(|c| c.clone()).unwrap_or_default()),
+            trees: std::sync::Mutex::new(self.trees.lock().map(|c| c.clone()).unwrap_or_default()),
         }
     }
 }
