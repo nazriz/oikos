@@ -113,7 +113,11 @@ docs/decisions.md). When one is hit, or about monthly, prune as on 2026-10-24 (d
    bugs that still apply (`--only`; a mutation whose `find` no longer matches its file is not planted). For the before side, `--source` a `git archive` of main with `node_modules` and `kernel/target` cloned in (`cp -c -R`), and a fresh `--out`: an archive alone runs no test, and a reused results file keeps its baseline, so a baseline where every file "did not run" counts every bug missed. A cut must not
    leave a bug that was caught caught by nothing, above all on the hard rules (money, the dead, the absent, work's time,
    sight, twins).
-5. **Record.** One decisions entry: each file or test cut or replaced, what covers it instead, and what would bring it
+5. **Spans.** A run is as long as the last thing its checks need, measured from its own log, with the days said beside
+   it: a town run 200 days whose readings all come in the first three weeks runs 30 (2026-10-31, "The slow tier's
+   budget"). Shorten only where the checks still see what they count; a negative check ("nobody comes") keeps the span
+   that gives its rule its chances.
+6. **Record.** One decisions entry: each file or test cut or replaced, what covers it instead, and what would bring it
    back; the suite's file count, test count and the two tiers' times before and after.
 
 ## The gaps
