@@ -2221,6 +2221,16 @@ impl<'a> Exec<'a> {
                 if let Some(r) = tpl.released.filter(|r| *r > self.now()) {
                     return Err(refuse(RefusalCode::UnknownTemplate, format!("{template} is not made until {r}: nobody can deliver one yet")));
                 }
+                // (A system that runs on hardware in the world is delivered only where there is hardware for its lanes beside
+                // the systems already there: foundations-2 P4.)
+                if let Some(ro) = &tpl.runs_on {
+                    let on_it = |p: &Participant| p.status != ParticipantStatus::Ended && p.template.as_deref().and_then(|t| self.s.templates.get(t)).and_then(|t| t.runs_on.as_ref()).is_some_and(|r| r.holder == ro.holder && r.at == ro.at && r.hardware == ro.hardware);
+                    let used: i64 = self.st.participants.values().filter(|p| on_it(p)).map(|p| p.def.lanes.unwrap_or(1) as i64 * ro.per_lane).sum();
+                    let held = self.st.holding(&ro.holder, &ro.at, &ro.hardware);
+                    if held < (used + ro.per_lane) as Money {
+                        return Err(refuse(RefusalCode::InsufficientQuantity, format!("{} holds {held} {} at {}, and the systems there take {used}: no room to run another {template}", ro.holder, ro.hardware, ro.at)));
+                    }
+                }
                 let client = match to {
                     Some(t) => self.r(t)?,
                     None => org,

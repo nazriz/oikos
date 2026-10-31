@@ -321,6 +321,7 @@ impl World {
             transit: Default::default(),
             network: None,
             scarce_sold: Default::default(),
+            metered: Default::default(),
         };
         for p in &c.positions {
             let position = Position { entity: p.entity, title: p.title.clone(), role: p.role.clone(), channels: Arc::new(p.channels.clone()), role_module: p.role_module.clone(), holder: p.holder, changed: 0 };
@@ -1040,7 +1041,10 @@ impl World {
             Err(Refusal { block: i, ..refuse(RefusalCode::NoTimeLeft, d) })
         } else {
             let mut scratch = self.state.clone();
-            let done = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), !placed.late).map(|res| (scratch, res));
+            // (A hosted system's work draws on its host's holding as its seconds add up: none there, and it is refused.)
+            let done = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), !placed.late)
+                .and_then(|res| draw_hosted(&self.s, &mut scratch, participant, by, blocks, &res.events).map(|()| res))
+                .map(|res| (scratch, res));
             match done {
                 // (Work the dry run could not place when the act began is placed now: the hours are counted on the day, and
                 // are the performers' from now. Nobody does more than a day's work for having been asked in a way that
@@ -1481,6 +1485,66 @@ fn act_program(s: &Statics, st: &State, actor: oikos_time::Actor, template: Opti
         });
     }
     Ok(sum.max(1))
+}
+
+/// What hosted systems' work draws (foundations-2 P4): for each system that did the act (its actor, those it names `by`,
+/// the performers of its work) whose template runs on hardware in the world, its seconds added to what it has not yet
+/// drawn, and each whole hour of them its template's `hour` recipe at the host: inputs from the host's holding there
+/// (refused if they are not all there), outputs into it, emissions to the world's counters.
+fn draw_hosted(s: &Statics, st: &mut State, participant: &str, by: &[Id], blocks: &[Block], events: &[Timed]) -> Result<(), Refusal> {
+    let hosted = |st: &State, w: &str| -> Option<(Id, crate::config::RunsOn)> {
+        let p = st.participants.get(w).filter(|x| x.kind == ParticipantKind::System)?;
+        let ro = s.templates.get(p.template.as_deref()?)?.runs_on.clone()?;
+        Some((Id::new(w), ro))
+    };
+    let mut secs: BTreeMap<Id, i64> = BTreeMap::new();
+    for (w, share) in work_shares(events) {
+        if hosted(st, &w).is_some() {
+            *secs.entry(w).or_insert(0) += share;
+        }
+    }
+    let doers: Vec<&str> = if by.is_empty() { vec![participant] } else { by.iter().map(|w| w.as_str()).collect() };
+    for w in &doers {
+        if let Some((id, _)) = hosted(st, w) {
+            let tpl = st.participants.get(*w).and_then(|p| p.template);
+            let own = s.act_times.program(oikos_time::Actor::System, tpl.as_deref(), blocks.iter().map(|b| (b.name(), b.makes()))).unwrap_or(0);
+            *secs.entry(id).or_insert(0) += (own + doers.len() as i64 - 1) / doers.len() as i64;
+        }
+    }
+    let stamp = st.stamp();
+    for (w, n) in secs {
+        let Some((_, ro)) = hosted(st, &w) else { continue };
+        let Some(task) = s.config.catalogue.tasks.iter().find(|x| x.id == ro.hour) else { continue };
+        let total = st.metered.get(&w).copied().unwrap_or(0).saturating_add(n.max(0));
+        let hours = total / 3_600;
+        st.metered.insert(w, total % 3_600);
+        if hours == 0 {
+            continue;
+        }
+        for (k, per) in task.consumes.iter().filter(|(_, p)| **p != 0) {
+            let q = per.saturating_mul(hours as crate::money::Money);
+            let have = st.holding(&ro.holder, &ro.at, k);
+            if have < q {
+                return Err(refuse(RefusalCode::InsufficientQuantity, format!("{w} runs at {}, where {} holds {have} {k}: an hour of its work needs {per}", ro.at, ro.holder)));
+            }
+            add_holding(st, &ro.holder, &ro.at, k, -q, stamp);
+        }
+        for (k, per) in task.produces.iter().filter(|(_, p)| **p != 0) {
+            add_holding(st, &ro.holder, &ro.at, k, per.saturating_mul(hours as crate::money::Money), stamp);
+        }
+        for (k, per) in &task.emits {
+            if let Some(v) = st.totals.get_mut(k) {
+                *v = v.saturating_add(per.saturating_mul(hours));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn add_holding(st: &mut State, holder: &str, at: &str, kind: &str, by: crate::money::Money, stamp: u64) {
+    let key = crate::state::holding_key(holder, at, kind);
+    let q = st.holdings.get(&key).map_or(0, |h| h.quantity).saturating_add(by);
+    st.holdings.insert(key, crate::state::Holding { kind: kind.into(), holder: holder.into(), at: at.into(), quantity: q, changed: stamp });
 }
 
 /// An act done is practice at each of its steps' skills, for the people who did it, each their share of the time.

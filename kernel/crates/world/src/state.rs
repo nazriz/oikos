@@ -130,6 +130,9 @@ pub struct State {
     /// What each edge has sold of a scarce kind this period (`edge|kind` -> (the period, how much)): foundations-2 C6.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub scarce_sold: Map<String, (i64, crate::money::Money)>,
+    /// A hosted system's seconds of work not yet drawn as a whole hour of its `runs_on` recipe (foundations-2 P4): by system.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub metered: Map<Id, i64>,
 }
 
 /// A vehicle as the world keeps it (reserved shapes for travel).

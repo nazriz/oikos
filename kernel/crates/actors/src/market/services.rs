@@ -95,6 +95,7 @@ impl Kind for Provider {
                 "account": p(json!({ "type": "string", "description": "the account it is paid into (the world must say)" }), Some(json!("")), None, "the account it is paid into (the world must say)"),
                 "offers": p(json!({ "type": "array" }), Some(json!([])), None, "the world gives it (the profile's, with their sources)"),
                 "releases": p(json!({ "type": "object" }), Some(json!({})), None, "the world gives it: the outside world's later releases of what an offer sells (none: the offers as made)"),
+                "hosting": p(json!({ "type": "object" }), None, None, "the world gives it (no default): where its systems run in the town, the host's account and fee a month"),
                 "grace_days": p(int("a service unpaid this long (two months' fees and a fortnight) lets the provider switch its systems off"), Some(json!(75)), Some("days"), "placeholder"),
                 "sign_days": p(int("a service whose agreement its client has not signed this long is switched off"), Some(json!(30)), Some("days"), "placeholder"),
                 "unpaid_days": p(int("an order unpaid this long is declined"), Some(json!(7)), Some("days"), "placeholder"),
@@ -116,6 +117,7 @@ impl Kind for Provider {
             grace_days: ctx.param("grace_days", 75)?,
             desk: ctx.param("desk", None)?,
             releases: ctx.param("releases", BTreeMap::new())?,
+            hosting: ctx.param("hosting", None)?,
         };
         Ok(Box::new(Stepper::new(Providing {
             orders: OrderBook::new(&ctx.entity, Some(p.unpaid_days), None),
@@ -125,6 +127,7 @@ impl Kind for Provider {
             listed: BTreeMap::new(),
             services: vec![],
             clients: BTreeMap::new(),
+            hosted_month: None,
         })))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
@@ -146,6 +149,16 @@ struct Params {
     /// Later releases of what an offer sells, by offer (foundations-2 E2): the scenario's. None: the offers as made.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     releases: BTreeMap<String, Vec<crate::market::automation::Release>>,
+    /// Where its systems run in the town, and what it pays a month for it (foundations-2 E5: a local host). None: abroad.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hosting: Option<HostingFee>,
+}
+
+/// A hosting firm's fee, paid each month into its account.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct HostingFee {
+    account: String,
+    fee_month: i64,
 }
 
 /// A service the provider has set up.
@@ -183,6 +196,9 @@ struct Providing {
     services: Vec<Served>,
     /// Offer -> its clients (its references).
     clients: BTreeMap<String, BTreeSet<String>>,
+    /// The last month its host's fee was paid for (where it has a host in the town).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hosted_month: Option<i64>,
 }
 
 impl Providing {
@@ -307,6 +323,14 @@ impl Plan for Providing {
     fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<Then>> {
         let t = pic.t;
         let mut steps: Vec<Step<Then>> = vec![];
+        // Its host's fee, once a month, where its systems run in the town.
+        if let Some(h) = self.p.hosting.clone().filter(|h| h.fee_month > 0 && self.hosted_month != Some(t / MONTH)) {
+            self.hosted_month = Some(t / MONTH);
+            steps.push(because(
+                "Our systems run at a host in the town: its fee for the month.",
+                vec![pay(&h.account, h.fee_month, Pay { from: Some(self.p.account.clone()), for_: Some("Hosting, a month.".into()), ..Default::default() }, cx)],
+            ));
+        }
         // What it sells: published again when its prices or its clients change.
         for o in self.p.offers.clone() {
             let x = self.now_offer(&o, t);

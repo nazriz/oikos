@@ -3193,6 +3193,19 @@
           "description": "For a system (foundations F4): the organisation that supplies systems from this template. Only it delivers one (`deploy`, naming the client), and it may switch one off (`retire`) as the client may. Absent: nobody supplies it, so none is delivered. Never on a person's.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
         },
+        "runs_on": {
+          "description": "For a system (foundations-2 P4, law 10): per_lane units of the hardware kind for each lane, held by holder at the structure at; an hour of a lane's work is the task hour there (its consumes, produces and emits, a unit an hour), drawn as its seconds add up. A system from it is delivered only where there is hardware for its lanes; with its host short of what an hour draws, its act is refused (insufficient_quantity). Absent: it runs on nothing in the world.",
+          "type": "object",
+          "required": ["hardware", "per_lane", "holder", "at", "hour"],
+          "additionalProperties": false,
+          "properties": {
+            "hardware": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+            "per_lane": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+            "holder": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "at": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "hour": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" }
+          }
+        },
         "released": {
           "description": "For a system (foundations-2 E2): the moment, in seconds from the start, the kind first exists (a technology the outside world releases during the run). Before it nobody can deliver one (deploy is refused, unknown_template). Absent: from the start.",
           "type": "integer",

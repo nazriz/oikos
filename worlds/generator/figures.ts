@@ -181,6 +181,13 @@ export const FIGURE_BASIS: Basis[] = [
   placeholder("catalogue.act_skills", "a novice's and a master's time at a person's papers as shares of an ordinary hand's: the run's, or SKILL_DEFAULTS (not fitted)"),
   derived("catalogue.body_variables.*.max", "the profile's education.max_years of schooling, as skill (a year is 10,000)"),
   conv("catalogue.body_variables", "skill counted from none: nobody is born schooled"),
+  // A host in the town (worlds/generator/hosting.ts; docs/behaviour/hosting.md), where a town asks for one.
+  ...task("compute", [prof("consumes", "hosting"), derived("produces", "the cooling water an hour, out to the sewer (values.hosting)"), derived("emits", "the grid's emissions a kWh (utilities.energy) times the hour's kWh")]),
+  ...task("plant-energy", [conv("consumes", "a kWh a unit"), prof("emits", "utilities.energy")]),
+  ...task("plant-water", [conv("consumes", "a litre a unit"), conv("produces", "a litre out for a litre in")]),
+  conv("templates.*.runs_on.per_lane", "a server a lane: a system's lane is the work of one server"),
+  ...of("firm.provider", [derived("hosting", "the host's fee a month: its power and water at full work at the profile's tariffs, with its margin (values.hosting), shared among the providers")]),
+  ...of("firm.host", [derived("plant", "what the building keeps in hand for its clients' work: a day of its draw at full work (values.hosting)")]),
   ...task("collect", [prof("labour", "services.collect_seconds_per_10kg"), conv("produces", "10 kg of waste a unit collected")]),
   ...task("maintain", [conv("labour", "an hour: the unit upkeep is counted in"), derived("changes", "the wear an hour of upkeep undoes: from services.asset_life_years and services.upkeep_hours_per_week_per_asset")]),
   ...task("repair", [conv("labour", "an hour: the unit a repair is counted in"), derived("changes", "the disrepair an hour puts right: the level of fault over frictions.repair_hours")]),
@@ -365,6 +372,26 @@ export const FIGURE_BASIS: Basis[] = [
     prof("open_from", "round.work_start_hour"),
     prof("open_until", "round.work_end_hour"),
   ].flatMap((r) => ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params"].map((at) => ({ ...r, family: `any module: ${r.at}${r.given ? ` (${r.given})` : ""}`, at: `${at}.${r.at}` }))),
+  // Delegation (docs/behaviour/assistants.md): what a principal weighs, and what a provider sells, where a town has
+  // assistants on offer (`assistants: true`).
+  ...[
+    prof("delegation.finds_bps", "assistants.principals"),
+    prof("delegation.horizon_months", "assistants.principals"),
+    prof("delegation.hurdle_bps", "assistants.principals"),
+    prof("delegation.prior_matters", "assistants.principals"),
+    prof("delegation.review_days", "assistants.principals"),
+    derived("delegation.hour_value", "an hour of the principal's own time at the profile's public-service wage (public_service.wage_per_pay_period) over its ordinary hours"),
+    prof("delegation.kinds.*.error_cost", "assistants.principals"),
+    derived("delegation.kinds.*.own_seconds", "the principal's own time for the paper: the person table's row (work_time)"),
+    placeholder("delegation.seconds", "the times of the papers of delegation (a referral, a go-ahead, a sign-off): the generator's placeholders (ME-22)"),
+    prof("offers.*.claim_slip_bps", "assistants.providers"),
+    prof("offers.*.exit", "assistants.providers"),
+    prof("offers.*.fee_month", "assistants.providers"),
+    prof("offers.*.notice_days", "assistants.providers"),
+    prof("offers.*.setup", "assistants.providers"),
+    prof("offers.*.term_days", "assistants.providers"),
+    derived("offers.*.seconds", "what a provider claims a matter takes its system: a person's time for the paper at the offer's speed (assistants.providers)"),
+  ].flatMap((r) => ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params"].map((at) => ({ ...r, family: `delegation: ${r.at}`, at: `${at}.${r.at}` }))),
   // Parameters several modules take, from the same sections of the profile.
   ...[
     derived("households.adult_age_bands", "the adults' ages by band, drawn to fit the profile's age structure and households (households.age_bands_bps and the households' kinds)"),
