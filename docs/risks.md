@@ -582,6 +582,18 @@ The mechanism:
 - **Notice by:** The cost of taking work back moving with a placeholder rate changed alone.
 - **Fix when:** before a study reads the size of what taking work back costs, rather than whether it rises with time unused.
 
+### ME-24 · A host in the town: its size and draw are placeholders, and it is there from the start
+- **Gap:** With `hosting: "local"`, the data centre's servers, each server's draw, the building's overhead, its cooling
+  water a kWh, its margin and its opening money are placeholders or unopened sources (au-vic only); it exists from the
+  start rather than entering by expected profit; its hourly draw has the households' shape; its cooling water goes to
+  the sewer rather than the air; it has no staff and its servers never wear out.
+- **Where:** `worlds/profiles/au-vic-2026.json` `values.hosting`; `worlds/generator/hosting.ts`; `docs/behaviour/hosting.md`.
+- **Effect:** How much of the town's power and water goes to compute, and how a shortage falls between the data centre and
+  homes, rest on these figures and on the shape; a study of what the town gives to AI reads them directly.
+- **L / I:** high / high for any finding about what compute takes of a town · **Status:** open (2026-11-01)
+- **Notice by:** The data centre's share of the town's energy and water moving with a placeholder changed alone.
+- **Fix when:** before a study reads the size of compute's share, rather than whether a shortage reaches it.
+
 ## Public bodies and law
 
 ### PB-1 · A tribunal's time is often the wrong quantity

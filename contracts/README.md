@@ -768,3 +768,11 @@ Additive; no hard rule touched; nothing changes for a world whose templates stat
   (`unknown_template`). Absent: from the start.
 - **`meta` takes `study_tags`** (tag to template ids): what a study counts as one technology, for measurement only. No
   code of the world reads it (`orchestrator/test/generality.test.ts`), and no participant is shown `meta`.
+
+## What a system runs on (2026-11-01; docs/design/foundations-2.md 4.1, P4, and 7.3, step E5; docs/behaviour/hosting.md; docs/decisions.md, "Compute in the town"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing changes for a world whose templates say nothing of what they run on.
+
+- **A template takes `runs_on`** (`hardware`, `per_lane`, `holder`, `at`, `hour`): a system from it is delivered only
+  where the hardware held covers its lanes beside those already there, and each whole hour of its work is the task
+  `hour` at its host (inputs from the holder's holding, refused if short: `insufficient_quantity`).

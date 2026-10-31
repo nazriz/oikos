@@ -77,8 +77,8 @@ test("every profile's town is counted, and the unbased places are only those lis
   const found = new Set<string>();
   const used = new Set<number>();
   // (Each profile's plain town, and two living ones, with founding, for the parameters only a living town is given; and one
-  // with skills by use and the outside's releases, for their figures.)
-  const towns = [...ids.map((id) => ({ id, extra: {} })), ...LIVING.map((id) => ({ id, extra: { living: { founding: true } } })), { id: LIVING[0]!, extra: { skills: true, capability: { tag: "ai", of: ["case-handling-system"], every_days: 182, time_bps: 8000, slip_bps: 8000, price_bps: 10_000 } } }];
+  // with skills by use, assistants hosted in the town and the outside's releases, for their figures.)
+  const towns = [...ids.map((id) => ({ id, extra: {} })), ...LIVING.map((id) => ({ id, extra: { living: { founding: true } } })), { id: LIVING[0]!, extra: { skills: true, assistants: true, hosting: "local", capability: { tag: "ai", of: ["case-handling-system"], every_days: 182, time_bps: 8000, slip_bps: 8000, price_bps: 10_000 } } }];
   for (const { id, extra } of towns) {
     const config = generate({ ...spec, ...extra, citizens: 60, profile: id });
     const r = figuresFor(config, { profile: id });

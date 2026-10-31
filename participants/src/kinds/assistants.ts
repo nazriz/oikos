@@ -70,3 +70,18 @@ export const assistant: BehaviourModule = {
   firstWake: () => 0,
   create: inEngine("assistant"),
 };
+
+/**
+ * A hosting firm (docs/behaviour/hosting.md): it runs the building where its clients' systems run (their servers, on the
+ * town's network), its plant uses what the work does not, and it pays its bills. Where a town asks for its assistants'
+ * systems to run in the town.
+ */
+export const host: BehaviourModule = {
+  name: "firm.host",
+  answers: { office: "a hosting firm", acts: "It runs the building where its clients' systems run, and pays its bills. It takes no requests." },
+  version: "0.1.0",
+  doc: "docs/behaviour/hosting.md",
+  cadence: () => DAY,
+  firstWake: () => 23 * 3600,
+  create: inEngine("firm.host"),
+};
