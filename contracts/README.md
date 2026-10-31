@@ -748,3 +748,31 @@ Additive; no hard rule touched; nothing changes for a world that has no provider
   carried out at a fork's moment in a named participant's name and post, each noted (`note`, data `intervened`). A
   researcher's intervention, as `withhold` is; nothing in the world is told of it.
 - No block was added: `set_channels`, in the design's first draft, is not built (decisions, "Delegation D1 to D3").
+
+## Skills by use (2026-10-31; docs/design/foundations-2.md 7.4, step E4; docs/behaviour/skills.md; docs/decisions.md, "Skills by use"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing changes for a world that names no practised skill.
+
+- **A body variable takes `practice`** (`gain_bps_per_hour`, `half_life_days`, `floor`): a skill that grows with use and
+  fades toward its floor without it, settled when read or used. Not with `per_day`.
+- **A task takes `skill`** (`variable`, `novice_bps`, `expert_bps`): its labour scales with the performers' mean of a
+  practised variable (the stated labour at its `initial`), and their time is practice.
+- **The catalogue takes `act_skills`** (`act`, keyed as the table of work is; `variable`, `novice_bps`, `expert_bps`):
+  a person's time for such an act scales the same way, and doing it is practice.
+
+## Technologies released during a run (2026-11-01; docs/design/foundations-2.md 7.2, step E2; docs/scenarios.md, "capability"; docs/decisions.md, "The outside's capability over time"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing changes for a world whose templates state no release.
+
+- **A template takes `released`** (seconds from the start): the kind first exists then; `deploy` before it is refused
+  (`unknown_template`). Absent: from the start.
+- **`meta` takes `study_tags`** (tag to template ids): what a study counts as one technology, for measurement only. No
+  code of the world reads it (`orchestrator/test/generality.test.ts`), and no participant is shown `meta`.
+
+## What a system runs on (2026-11-01; docs/design/foundations-2.md 4.1, P4, and 7.3, step E5; docs/behaviour/hosting.md; docs/decisions.md, "Compute in the town"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing changes for a world whose templates say nothing of what they run on.
+
+- **A template takes `runs_on`** (`hardware`, `per_lane`, `holder`, `at`, `hour`): a system from it is delivered only
+  where the hardware held covers its lanes beside those already there, and each whole hour of its work is the task
+  `hour` at its host (inputs from the holder's holding, refused if short: `insufficient_quantity`).

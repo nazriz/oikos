@@ -27,10 +27,11 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 
 ## Now
 
-- [~] **Years at the study's size** (code only): 10,000 people for 3 years and 50,000 for 2 or more; what breaks over
+- [x] **Years at the study's size** (code only): 10,000 people for 3 years and 50,000 for 2 or more; what breaks over
   time fixed with its law, what emerges recorded (docs/design/performance.md, "Years at 10,000 and 50,000"; decisions
   2026-10-31 "Years at 10,000"). First faults fixed: the hall's room, owners homeless while the register answers, the
-  works office's inspections in one moment, the energy retailer's bills read once a connection.
+  works office's inspections in one moment, the energy retailer's bills read once a connection, the rates office's
+  notices indexed. 10,000 for 3 years ran (11.8 h, 27 GB); 50,000 for 2 does not fit in 64 GB (about 105 MB a day: SC-6).
 - [~] **Memory per person.** A 10,000-person month peaked at about 500 KB a person; target about 50 KB, enforced by a
   test like the time budgets, results byte-identical (docs/design/performance.md, risk SC-1).
   - [x] Measure bytes per person at peak by component, at 1,000, 10,000 and 50,000 people (`mem-budget`, 8c28f399).
@@ -55,8 +56,8 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] D3. Learning from what the principal itself observed, from the provider's claims; inputs cited, tested.
   - [x] D4. Providers' records by contract; replacement and taking work back, with open matters handed over.
   - [x] D5. Forks that intervene at a checkpoint (grant, change, withdraw, redirect, constrain, replace, take back).
-  - [~] D6. Model seats as assistants to households, firms and government, through the translator; mock first (the
-    mock seats and the hosts done; forms for a real model in an assistant seat next).
+  - [x] D6. Model seats as assistants to households, firms and government, through the translator; mock first (a
+    seated assistant's stationery: its papers in words, and the principal's papers and drafts of them on its forms).
   - [x] D7. Persons as principals: the provider's desk writing in their name, and the offices that take it.
 
 ## Next, in order
@@ -64,11 +65,23 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [x] **Foundations-2, phase 2: conservation** (law 8; landed 2026-10-26, its hard-rule line in CLAUDE.md; the before/after measurement and a 10,000-person month next week). Water, energy, materials and waste as stocks with flows;
   metered homes; recipes say their energy and water; shortages follow from network, contracts and operators, with no
   allocation rule (docs/design/foundations-2.md §2).
-- [~] **Foundations-2, phase 3: space** (law 9; branch `f2-phase3`: S1, the backstop and its inventory). Roads, pipes, wires and data lines with capacity and energy; people in
+- [~] **Foundations-2, phase 3: space** (law 9; branch `f2-phase3`: S1, the backstop and its inventory; S2, roads as ways and household vehicles). Roads, pipes, wires and data lines with capacity and energy; people in
   transit; goods need a carrier; several towns as an option (§3). Transport and many towns come from this.
-- [?] **Foundations-2, phase 4: the general economy** (§7). Services anyone can buy (E1: now part of the delegation
-  capabilities, step D1, above); technologies as goods with an outside capability scenario; firms enter any industry;
-  skills by use.
+- [~] **Foundations-2, phase 4: the general economy** (§7; every roadmap item to be done, owner 2026-10-31; branch
+  `f2-economy`). Serves the north star's reversibility: what taking work back costs, and what AI takes of a finite town.
+  - [x] E1. Services anyone can buy (the delegation capabilities' D1, above).
+  - [x] E4. Skills that grow with use and fade without it, for people and staff; off, or on at a run's own rates, a
+    factor of a study (docs/behaviour/skills.md). Slips by skill wait for a source.
+  - [x] E2a. The outside's capability over time: releases of what it sells from a scenario (`capability`; the first,
+    `rising-capability`), each a kind of system released on its day, sold newest first; tagged `ai` in
+    `meta.study_tags` for measurement only, with a backstop that no world code reads it.
+  - [ ] E2b. Technologies that are goods (machines, hardware a firm holds, `runs_on`'s energy and water), with E5.
+  - [ ] E3. Firms enter any industry by expected profit, capital-heavy ones included.
+  - [x] E5. Compute competing for energy, water and land: what a system runs on, in the kernel (P4: hardware held
+    somewhere, each hour of work drawing its recipe there, refused without power), and a host in the town where a study
+    asks (`hosting: "local"`), on the feeders and the main with the homes (docs/behaviour/hosting.md; risk ME-24).
+  - [ ] WM-15. Every other workplace on the network, with its energy and water by industry (risk WM-15).
+  - [ ] E6. The measures M7 (what the town gives to AI) and M8 (who can still do the work); the tag's backstop.
 - [ ] **Foundations-2, phase 5:** strict modes on, old exception lists empty, each law's line in CLAUDE.md as its
   enforcement lands.
 - [ ] **Market power in prices** (ME-16), after phase 4.
@@ -92,12 +105,13 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - Systems keep the same hours every day (no weekends).
 - [x] A seat cannot yet be a non-resident agency officer (WM-14): a seat in the support office shares the body of an officer who lives outside the town (`gap-wm14`).
 - [x] A taxpayer account to reclaim an overpayment from (PB-23): the tax collector keeps it (`taxpayer-accounts`, d3eb2bf3, cedc1903); its figures are still placeholders, so PB-23 stays open as mitigated.
-- Candidacy: a field of 19 for about 118 votes (PB-10).
-- One day's crew paperwork ran in series, cause untraced (MT-23).
+- [x] Candidacy: a field of 19 for about 118 votes (PB-10): traced (`gap-pb10`): the test's own 10% chance of standing, five times the profile's; the fault left is that the field grows with the electorate (a mechanism to the owner: decisions "Candidacy: the field of 19 traced").
+- [x] One day's crew paperwork ran in series (MT-23): the seat held until each order began, fixed by foundations-2 P1; the seat-diary measure now reads the work's own times.
+- [x] A model steward in a fork is a pilot's seat (MT-22): told what was not taken, the cast followed, thinking in world time, composer and exit accounts; resuming a fork part-way left open.
 - Three tests still pinned to one seed (production, entry, own-venture); two near-duplicate twin cases kept.
 - Haiku against Sonnet welfare: a matched pair (same town, same offices) before more Haiku seats.
 - The unbased-figures list (orchestrator/test/figures.test.ts) to shrink as figures are sourced.
-- Borrowing to start a business (ME-1).
+- [x] Borrowing to start a business (ME-1): a founder short of the capital applies to the bank, whose lending office decides by its rules (`gap-me1`); lending against a home and borrowing for premises left.
 - [x] Dev machine: Linux with a hosted nightly, and one Rust test program (PL-4 (2) and (3); branch `linux`, rebased on main 2026-10-31).
 - Dev machine: elastic slots, and a trial of sharding the slow tier on hosted runners (PL-4).
 - The explorer's next steps (PL-2).

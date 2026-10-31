@@ -10,9 +10,14 @@
   recorded as leaving them (`vacated`, left). A world's config may put each body in one space only. Before, a worker
   was at home and at work at once, and never came home.
 - **Going somewhere takes the trip.** An act that moves a body (`occupy`) from one structure to another takes, on top
-  of the act itself, the time of the quickest path over the cells between (Dijkstra, within eight cells around the two
-  ends). Each cell costs what its cover says (`travel.by_cover`), else `travel.seconds_per_cell`. The body arrives
-  when the act is done: until then it's where it was. From nowhere (arriving, newborn) there's no trip.
+  of the act itself, the time of the quickest trip (docs/design/travel.md): on foot over the cells (Dijkstra, within
+  eight cells around the two ends; each cell costs what its cover says, `travel.by_cover`, else
+  `travel.seconds_per_cell`), or on foot to the nearest road, along the roads (driven at the lower of the vehicle's
+  speed and the road's, or walked), and on foot from the road to the door, whichever is quicker (law 9,
+  foundations-2 S2). The body arrives when the act is done: until then it's where it was. From nowhere (arriving,
+  newborn) there's no trip.
+- **Vehicles.** A vehicle is driven by its owner or someone its owner lets, from where it stands, and stands where it
+  was driven to.
 - **Where a body is** is in its own view (`body.in`).
 
 ## Citizens (citizen 0.30.0)
@@ -40,10 +45,18 @@ after the working day starts; the school's lessons begin half an hour after scho
 
 ## Roads
 
-A road is a building type whose ground is the cover `road` (no contract change: a type's cover is the ground under it,
-and travel goes by cover). The generator lays streets across the town every 6 rows and 8 columns, before anything else
-is built; the town owns them. On foot, a cell takes about 18 seconds; on a road, about 2. So the quickest way anywhere
-is to the nearest street and along it.
+A road is a building type that is a way (law 9, foundations-2 S2: `way`, mode `road`, the profile's
+`round.roads.speed_kmh` and `capacity_per_hour`); its ground is the cover `road`, for nature. The generator lays
+streets across the town every 6 rows and 8 columns, before anything else is built; the town owns them. On foot, a cell
+takes about 18 seconds, on a road as off it; driven along a road at 45 km/h (30 in some places), about 2. So whoever has
+a car at hand drives to the nearest street and along it, and whoever has none walks.
+
+## Vehicles (foundations-2 S2)
+
+Of the households housed at the start, the profile's share has a vehicle (`round.vehicles.households`: a car, or in
+some places a motorcycle; at most one a household), owned by the leaseholder or owner, standing at home, and the
+household's other adults may drive it. A citizen going where they belong takes a vehicle of theirs that stands where
+they are; if the world says it was not there to take (another of the household took it first), they walk.
 
 - **Wear:** roads wear out over their life like the parks and the hall, and the works crew keeps them up.
 - **The town builds roads** (city.mayor_code 0.8.0): within a roads budget (about $300 a resident a year), a road
@@ -73,7 +86,7 @@ Working hours 9 to 5, Monday to Friday, for everyone (shops included: a liberty;
 
 ## Leaves out (for now)
 
-- Traffic, congestion, vehicles, public transport, parking. Worn roads aren't slower. Who walks and who drives: all drive on roads and walk off them.
+- Traffic, congestion, fuel, public transport, parking. Worn roads aren't slower. A household has one vehicle at most, and it is bought by nobody: the ones the town opens with are all there are.
 - Rosters: everyone works the same hours, five days.
 - **Being in transit:** a body is where it was until it arrives.
 - Nights out, errands, visiting: people are at work, school, the clinic, a gathering, or home.

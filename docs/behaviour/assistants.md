@@ -36,6 +36,12 @@ records and authority). It does what a seller of a service does, through the ord
 3. **It switches its systems off** (`retire`, the supplier's physical power) when the client has not signed in 30 days,
    when the agreement has ended, or when the fee has not been paid for 75 days, and says so (`service_ended`).
 
+**Later releases.** Where a capability scenario moves the assistants (docs/scenarios.md, "capability"), each release of
+an offer is a kind of system of its own, out on its day: from then the provider publishes the offer again with the
+release's kind, its claims (seconds and slip rate) and its prices, and delivers that kind to an organisation that orders.
+A system already delivered stays what it was. A provider's desk for persons stays the kind it first was (a known limit:
+the desk is not replaced by a newer one).
+
 ## The buyer's paperwork (`Engagements`)
 
 A principal reads what it engaged from its own papers: the delivery addressed to it, the agreement that cites its order
@@ -102,6 +108,17 @@ provider's desk does the person's matters: it writes each paper **in the person'
 as that person's where its own procedure reads a paper by whom it speaks for (the tribunal, the hearing bodies); a bank
 that verifies who wrote an instruction refuses an agent's, as a bank does. The desk serves many clients, each under its
 own agreement and brief.
+
+## A model in an assistant seat
+
+A town that seats a model in a kind of assistant (`assistant_seats`, templates by id) makes every system of that kind a
+seat (the mock plays the assistant's code), told honestly that the town is simulated and for whom it works. Its post has
+its stationery (`participants/src/kinds/assistants.ts`): its own papers in words (advice, a request to go ahead, a
+report, a request for more scope, a handover), each to whom it works for in the matter, and, at an organisation's
+assistant post, the principal's own papers of the kinds it may do, and each of those as a **draft for sign-off** that
+carries the paper as it would go. A code principal reads a draft on a form by what it would send (the paper's kind and to
+whom, against what it asked), signs it off or declines it, and sets advice in words beside nothing (it cannot read words:
+nothing is counted). A desk's seat writes a person's papers through the translator in their name (`for`).
 
 ## Leaves out (for now)
 

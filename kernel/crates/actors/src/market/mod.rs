@@ -10,6 +10,7 @@ use crate::Kind;
 
 pub mod automation;
 pub mod body;
+pub mod hosting;
 pub mod lengnick;
 pub mod prices;
 pub mod producer;
@@ -23,4 +24,4 @@ pub mod trade;
 pub mod testkit;
 
 /// Every kind of this lane, in name order.
-pub static KINDS: &[&dyn Kind] = &[&producer::FirmProducer, &rent_portal::RentPortal, &retailer::FirmRetailer, &services::Provider, &automation::Vendor];
+pub static KINDS: &[&dyn Kind] = &[&hosting::Host, &producer::FirmProducer, &rent_portal::RentPortal, &retailer::FirmRetailer, &services::Provider, &automation::Vendor];

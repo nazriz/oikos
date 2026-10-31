@@ -1,0 +1,28 @@
+{
+  "answers": {
+    "acts": "It runs the building where its clients' systems run, and pays its bills. It takes no requests.",
+    "office": "a hosting firm"
+  },
+  "doc": "docs/behaviour/hosting.md",
+  "name": "firm.host",
+  "params": {
+    "at": {
+      "default": "",
+      "schema": {
+        "description": "its building (the world must say)",
+        "type": "string"
+      },
+      "source": "the world gives it (its building)"
+    },
+    "plant": {
+      "default": [],
+      "schema": {
+        "type": "array"
+      },
+      "source": "the world gives it: what its plant draws beyond the work, by kind, and what it keeps in hand for the work"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.1.0"
+}

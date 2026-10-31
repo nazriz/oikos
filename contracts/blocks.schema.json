@@ -283,7 +283,7 @@
       }
     },
     "occupy": {
-      "description": "PHYSICAL. A body goes into a space: the acting person, or someone they bring ('who'), who must be alive and in the world. Refused only if the structure is incomplete or the space is full (its physical capacity: how many bodies could fit at all, not how many should).",
+      "description": "PHYSICAL. A body goes into a space: the acting person, or someone they bring ('who'), who must be alive and in the world, on foot or by a vehicle ('vehicle'). Refused only if the structure is incomplete or the space is full (its physical capacity: how many bodies could fit at all, not how many should).",
       "type": "object",
       "required": [
         "block",
@@ -305,6 +305,10 @@
           ]
         },
         "who": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "vehicle": {
+          "description": "Law 9 (foundations-2 S2): the vehicle it goes by, driven: one the body may drive (its owner's, or one its owner lets), standing where it sets out. It takes the trip at the vehicle's speed along the world's ways, and stands where the body arrives. Refused if it is not there, or not theirs to drive. None: on foot.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
         }
       }

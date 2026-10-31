@@ -27,7 +27,7 @@ export interface Basis {
    * for something. */
   family?: string;
   /** Only for a number under this id (a key of the name, or an element with this `id`): which task, field or kind,
-   * where the pattern's `*` covers several made from different figures. */
+   * where the pattern's `*` covers several made from different figures. Ending in `*`: any id that begins so. */
   id?: string;
   /** Only where the config has this dotted path (a town with frictions has `dials.friction_bps`). */
   given?: string;
@@ -143,6 +143,7 @@ export const FIGURE_BASIS: Basis[] = [
   derived("world.records.*.data.members.*.born_at", "drawn from the profile's age structure"),
   placeholder("world.accounts.*.balance", "opening balances: the profile's wealth and savings by age where it has them, the generator's opening months elsewhere (ME-11)"),
   derived("world.records", "a record's terms: the profile's wages, rents, periods and laws, as the generator writes them"),
+  prof("world.ground.cell", "nature.cell_m"),
   derived("world.ground", "the ground's layout, drawn by the generator from the spec's grid"),
   derived("world.places", "the places on the ground, drawn by the generator from the spec's grid"),
   placeholder("world.holdings", "opening stocks: the generator's days of trade"),
@@ -170,10 +171,26 @@ export const FIGURE_BASIS: Basis[] = [
   // The catalogue: what the town's work takes, makes and changes (generate.ts, `catalogue`).
   derived("catalogue.working_day", "the profile's ordinary_hours_per_week over the round's working days (five without a round)"),
   prof("catalogue.travel.seconds_per_cell", "round.travel_seconds_per_cell"),
-  { ...prof("catalogue.travel.by_cover.*", "round.roads.seconds_per_cell"), id: "road", family: "catalogue.travel.by_cover (road)" },
+  prof("catalogue.structure_types.*.way.speed_kmh", "round.roads"),
+  prof("catalogue.structure_types.*.way.capacity", "round.roads"),
+  prof("travel.vehicle_types", "round"),
   prof("catalogue.travel.by_cover.*", "round.travel_by_cover"),
+  // Skills by use (worlds/generator/skills.ts; docs/behaviour/skills.md), where a town asks for them: the study's rates.
+  { ...conv("catalogue.body_variables.*.max", "a skill's scale: mastery is 10,000"), id: "skill-*", family: "skills: scale" },
+  { ...conv("catalogue.body_variables.*.min", "a skill's scale: none is nought"), id: "skill-*", family: "skills: scale" },
+  { ...derived("catalogue.body_variables.*.initial", "an ordinary hand's level (the table of work's times are theirs): where a full-time worker settles at the run's rates of practice and fading, over the profile's working week"), id: "skill-*" },
+  { ...placeholder("catalogue.body_variables.*.practice", "the run's rates of practice and fading, or SKILL_DEFAULTS: shapes from the literature (Heathcote, Brown and Mewhort 2000; Arthur et al. 1998; to confirm), sizes not fitted"), id: "skill-*" },
+  placeholder("catalogue.tasks.*.skill", "a novice's and a master's time as shares of an ordinary hand's: the run's, or SKILL_DEFAULTS (not fitted)"),
+  placeholder("catalogue.act_skills", "a novice's and a master's time at a person's papers as shares of an ordinary hand's: the run's, or SKILL_DEFAULTS (not fitted)"),
   derived("catalogue.body_variables.*.max", "the profile's education.max_years of schooling, as skill (a year is 10,000)"),
   conv("catalogue.body_variables", "skill counted from none: nobody is born schooled"),
+  // A host in the town (worlds/generator/hosting.ts; docs/behaviour/hosting.md), where a town asks for one.
+  ...task("compute", [prof("consumes", "hosting"), derived("produces", "the cooling water an hour, out to the sewer (values.hosting)"), derived("emits", "the grid's emissions a kWh (utilities.energy) times the hour's kWh")]),
+  ...task("plant-energy", [conv("consumes", "a kWh a unit"), prof("emits", "utilities.energy")]),
+  ...task("plant-water", [conv("consumes", "a litre a unit"), conv("produces", "a litre out for a litre in")]),
+  conv("templates.*.runs_on.per_lane", "a server a lane: a system's lane is the work of one server"),
+  ...of("firm.provider", [derived("hosting", "the host's fee a month: its power and water at full work at the profile's tariffs, with its margin (values.hosting), shared among the providers")]),
+  ...of("firm.host", [derived("plant", "what the building keeps in hand for its clients' work: a day of its draw at full work (values.hosting)")]),
   ...task("collect", [prof("labour", "services.collect_seconds_per_10kg"), conv("produces", "10 kg of waste a unit collected")]),
   ...task("maintain", [conv("labour", "an hour: the unit upkeep is counted in"), derived("changes", "the wear an hour of upkeep undoes: from services.asset_life_years and services.upkeep_hours_per_week_per_asset")]),
   ...task("repair", [conv("labour", "an hour: the unit a repair is counted in"), derived("changes", "the disrepair an hour puts right: the level of fault over frictions.repair_hours")]),
@@ -358,6 +375,26 @@ export const FIGURE_BASIS: Basis[] = [
     prof("open_from", "round.work_start_hour"),
     prof("open_until", "round.work_end_hour"),
   ].flatMap((r) => ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params"].map((at) => ({ ...r, family: `any module: ${r.at}${r.given ? ` (${r.given})` : ""}`, at: `${at}.${r.at}` }))),
+  // Delegation (docs/behaviour/assistants.md): what a principal weighs, and what a provider sells, where a town has
+  // assistants on offer (`assistants: true`).
+  ...[
+    prof("delegation.finds_bps", "assistants.principals"),
+    prof("delegation.horizon_months", "assistants.principals"),
+    prof("delegation.hurdle_bps", "assistants.principals"),
+    prof("delegation.prior_matters", "assistants.principals"),
+    prof("delegation.review_days", "assistants.principals"),
+    derived("delegation.hour_value", "an hour of the principal's own time at the profile's public-service wage (public_service.wage_per_pay_period) over its ordinary hours"),
+    prof("delegation.kinds.*.error_cost", "assistants.principals"),
+    derived("delegation.kinds.*.own_seconds", "the principal's own time for the paper: the person table's row (work_time)"),
+    placeholder("delegation.seconds", "the times of the papers of delegation (a referral, a go-ahead, a sign-off): the generator's placeholders (ME-22)"),
+    prof("offers.*.claim_slip_bps", "assistants.providers"),
+    prof("offers.*.exit", "assistants.providers"),
+    prof("offers.*.fee_month", "assistants.providers"),
+    prof("offers.*.notice_days", "assistants.providers"),
+    prof("offers.*.setup", "assistants.providers"),
+    prof("offers.*.term_days", "assistants.providers"),
+    derived("offers.*.seconds", "what a provider claims a matter takes its system: a person's time for the paper at the offer's speed (assistants.providers)"),
+  ].flatMap((r) => ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params"].map((at) => ({ ...r, family: `delegation: ${r.at}`, at: `${at}.${r.at}` }))),
   // Parameters several modules take, from the same sections of the profile.
   ...[
     derived("households.adult_age_bands", "the adults' ages by band, drawn to fit the profile's age structure and households (households.age_bands_bps and the households' kinds)"),
@@ -390,8 +427,12 @@ export const FIGURE_BASIS: Basis[] = [
   ...of("utility.water", [derived("storage", "the works' store: the town's use at the start times the profile's storage_days (utilities.network)")]),
   ...of(CITIZEN, [prof("utilities.water_l_a_head", "utilities.water.litres_per_person_per_day"), prof("utilities.energy_kwh_a_day", "utilities.energy.kwh_per_household_per_day")]),
   derived("templates.*.does.*.seconds", "a system's seconds for an act: a person's time for it at an offer's speed, or an officer's (the person table's row); act_time.sources template.<id>.<row>"),
+  derived("templates.*.released", "a release's day: the capability scenario's every_days times its number (worlds/generator/capability.ts)"),
+  ...["participants.*.controller.params", "positions.*.role_module.params"].map((at) => derived(`${at}.releases`, "an offer's later releases: their days, and their speed, claims and prices from the offer's by the capability scenario's shares a release")).map((r) => ({ ...r, family: "capability: releases" })),
   derived("templates.*.hours.from", "when a system's day begins: a machine's midnight (all day), or an officer's working day from the profile's round.work_start_hour"),
   derived("templates.*.hours.seconds", "how long a system's day is: a machine's whole day, or an officer's working day (ordinary_hours_per_week) times the town's share of officers; act_time.sources template.<id>.hours"),
   prof("participants.*.lanes", "public_service.support_officers_per_1000_claims"),
+  prof("participants.*.controller.params.start_loan_months", "credit.max_months"),
+  prof("templates.*.controller.params.start_loan_months", "credit.max_months"),
 ];
 export { conv, derived, placeholder, prof };

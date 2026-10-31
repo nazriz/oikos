@@ -309,9 +309,9 @@ The mechanism:
 - **Where:** `docs/behaviour/entry.md` ("Starting a business of one", "Employing start-ups wait on leased premises"); `docs/behaviour/leasing.md` (premises, the law on their leases, its remedies).
 - **Effect:** Job creation cannot emerge from entry. Any experiment where a steward's policy should create or destroy
   jobs is biased towards stasis or displacement; the number of births is fixed by the profile whatever the steward does.
-- **L / I:** high / medium · **Status:** to fix (births by expected profit, decisions 2026-10-24, "Market realism"; employing start-ups through leased premises, decisions 2026-10-25, "Commercial leasing"; the remedies of a commercial lease, decisions 2026-10-25, "Lease remedies"; left: borrowing to start)
+- **L / I:** high / medium · **Status:** to fix (births by expected profit, decisions 2026-10-24, "Market realism"; employing start-ups through leased premises, decisions 2026-10-25, "Commercial leasing"; the remedies of a commercial lease, decisions 2026-10-25, "Lease remedies"; borrowing to start, decisions 2026-10-31; left: lending against a home, borrowing for premises)
 - **Port note:** Rust port, lane C1 (2026-10-17) wrote `rules::entry`; nothing called it until 2026-10-24.
-- **Now (2026-10-24, citizen 0.59.0, generator 0.65.0):** no rate of births anywhere. A person weighs each venture monthly by its expected profit from what they know (prices read, their own purchases, the homes in view, the sellers they know, the going wage) against what they have, the choice the mind's (docs/behaviour/entry.md, "Entry by expected profit"). A shop in bought premises is weighed the same way and employs from its first day. Births in a year of the 1,000-person town: au-vic 26 to 37% (16.4% the ABS rate; 13 to 16% before), gb-eng and ke-nakuru in the decisions entry. 2026-10-25: founders look through what sellers advertise, newest first, before weighing; a business of one pays its running costs (the profile's); an owner weighs keeping it each month against the best job known (decisions 2026-10-25, "Market realism: who else sells it"). Rates are an observation, not a target (Naz). 2026-10-25: shop premises to let, on the profile's commercial terms (placeholders mostly): a business of one that turns custom away takes a unit on a lease and employs there (docs/behaviour/leasing.md; decisions 2026-10-25, "Commercial leasing"). 2026-10-25: the remedies of a lease of premises, as law data (`law-premises-leases`, from the profile's `commercial.law`, sources marked): the landlord asks for rent owed, ends the lease for it once the law's days have run, sets the deposit against what is owed and claims the rest before the tribunal; rent reviews to the market as often as the law lets (up only where it says); a business leaves early by its own notice where the law gives one, else by a surrender it pays the landlord's price for; and it sees its unit, serving only with those there (docs/behaviour/leasing.md; decisions 2026-10-25, "Lease remedies"). Most of the law's figures are recalled or placeholders. Still: nobody borrows to start; a lease holds nothing of the owner's beyond the business's money; no mediation, valuer or tenant's challenge.
+- **Now (2026-10-24, citizen 0.59.0, generator 0.65.0):** no rate of births anywhere. A person weighs each venture monthly by its expected profit from what they know (prices read, their own purchases, the homes in view, the sellers they know, the going wage) against what they have, the choice the mind's (docs/behaviour/entry.md, "Entry by expected profit"). A shop in bought premises is weighed the same way and employs from its first day. Births in a year of the 1,000-person town: au-vic 26 to 37% (16.4% the ABS rate; 13 to 16% before), gb-eng and ke-nakuru in the decisions entry. 2026-10-25: founders look through what sellers advertise, newest first, before weighing; a business of one pays its running costs (the profile's); an owner weighs keeping it each month against the best job known (decisions 2026-10-25, "Market realism: who else sells it"). Rates are an observation, not a target (Naz). 2026-10-25: shop premises to let, on the profile's commercial terms (placeholders mostly): a business of one that turns custom away takes a unit on a lease and employs there (docs/behaviour/leasing.md; decisions 2026-10-25, "Commercial leasing"). 2026-10-25: the remedies of a lease of premises, as law data (`law-premises-leases`, from the profile's `commercial.law`, sources marked): the landlord asks for rent owed, ends the lease for it once the law's days have run, sets the deposit against what is owed and claims the rest before the tribunal; rent reviews to the market as often as the law lets (up only where it says); a business leaves early by its own notice where the law gives one, else by a surrender it pays the landlord's price for; and it sees its unit, serving only with those there (docs/behaviour/leasing.md; decisions 2026-10-25, "Lease remedies"). Most of the law's figures are recalled or placeholders. 2026-10-31: a founder of a business of one short only of the money applies to the bank for it, the lending office deciding by its rules, and takes the loan only if the business still pays beside it (docs/behaviour/entry.md, "Borrowing to start"; decisions "Borrowing to start a business"). Still: no lending against a home or for premises; a lease holds nothing of the owner's beyond the business's money; no mediation, valuer or tenant's challenge.
 - **Notice by:** `economy/businesses`: births far from the profile's rate; no business of one with staff.
 - **Fix when:** before any employment-effect or gradual-disempowerment experiment.
 
@@ -569,6 +569,31 @@ The mechanism:
 - **Notice by:** Engagement and levels moving with a placeholder changed alone.
 - **Fix when:** before a study reads how much is delegated rather than what follows when it is.
 
+### ME-23 · Skills by use: every rate a placeholder, everyone an ordinary hand on day one
+- **Gap:** With `skills` on, how fast a skill is learnt and lost, its floor, and how slow a novice and how quick a master
+  are, are placeholders (the shapes from the literature, to confirm; none fitted); every person opens at an ordinary
+  hand's level in every skill, whatever they did before the run; one skill serves all of a person's papers; slips do
+  not move with skill; code minds plan by the table's stated times, not their staff's skill.
+- **Where:** `worlds/generator/skills.ts` (`SKILL_DEFAULTS`); `docs/behaviour/skills.md`; decisions 2026-10-31 "Skills by use".
+- **Effect:** How much slower taking work back is, and how long relearning takes, rest on these rates; with skills on, a
+  household's papers drift slower than the table's time where papers are done rarely; an office that plans a day by the
+  stated time is refused for time more often.
+- **L / I:** high / high for any finding about what taking work back costs · **Status:** open (2026-10-31)
+- **Notice by:** The cost of taking work back moving with a placeholder rate changed alone.
+- **Fix when:** before a study reads the size of what taking work back costs, rather than whether it rises with time unused.
+
+### ME-24 · A host in the town: its size and draw are placeholders, and it is there from the start
+- **Gap:** With `hosting: "local"`, the data centre's servers, each server's draw, the building's overhead, its cooling
+  water a kWh, its margin and its opening money are placeholders or unopened sources (au-vic only); it exists from the
+  start rather than entering by expected profit; its hourly draw has the households' shape; its cooling water goes to
+  the sewer rather than the air; it has no staff and its servers never wear out.
+- **Where:** `worlds/profiles/au-vic-2026.json` `values.hosting`; `worlds/generator/hosting.ts`; `docs/behaviour/hosting.md`.
+- **Effect:** How much of the town's power and water goes to compute, and how a shortage falls between the data centre and
+  homes, rest on these figures and on the shape; a study of what the town gives to AI reads them directly.
+- **L / I:** high / high for any finding about what compute takes of a town · **Status:** open (2026-11-01)
+- **Notice by:** The data centre's share of the town's energy and water moving with a placeholder changed alone.
+- **Fix when:** before a study reads the size of compute's share, rather than whether a shortage reaches it.
+
 ## Public bodies and law
 
 ### PB-1 · A tribunal's time is often the wrong quantity
@@ -667,16 +692,20 @@ The mechanism:
   candidate's top two values; voting weights placeholders. A mayor who runs the town well was re-elected in the seeds first
   tried; with the mix of shops on, the generated town's well-run mayor lost the count (2026-10-24).
 - **Gap (candidacy):** Whether a person stands is a rate (`stand_bps`), not a decision with a cost, a party, a sponsor or a
-  reason. In the test town it gives a field of 19 candidates for about 118 formal votes, each on 6 to 9% of first
-  preferences, so the count is decided by how the votes split; real local elections have a handful of candidates, often
-  one or two, from a few organised sources. The incumbent's ranking in the voters' lists follows how the town is run
-  (`elections.test.ts` holds that, on three seeds); who wins the count in a field this wide does not. A real mechanism for
-  candidacy is needed (who stands, why, with what backing and at what cost in time); not built here.
+  reason. **Traced 2026-10-31 (decisions "Candidacy: the field of 19 traced"):** the field of 19 for about 118 formal votes is the
+  test's own setting, not the town's: `elections.test.ts` sets `stand_bps` to 1,000 (10%) to force a contest, five times the
+  profile's placeholder (200), on the test town's 166 electors; at the profile's figure the same town fields about three or four,
+  a handful as real local elections do. The mechanism fault is elsewhere: each elector stands with the same chance whatever the
+  field, so **the field grows in proportion to the electorate** (about 16 to 19 in the 1,000-person town's 795 electors, some 800
+  in a town of 50,000), where real fields per vacancy stay a handful at any size. A real mechanism for candidacy is needed (who
+  stands, why, with what backing and at what cost in time, weighing the field already nominated); not built. The incumbent's
+  ranking in the voters' lists follows how the town is run (`elections.test.ts` holds that, on three seeds); who wins a wide
+  field does not.
 - **Where:** `docs/behaviour/elections.md`, `news.md`.
 - **Effect:** Accountability results carry little information; re-election is near certain.
-- **L / I:** medium / medium · **Status:** accepted
-- **Notice by:** Turnout and the winner against a place's municipal elections.
-- **Fix when:** an accountability experiment.
+- **L / I:** medium / medium (high in a town of tens of thousands) · **Status:** accepted; the candidacy fault to fix (traced 2026-10-31)
+- **Notice by:** Turnout and the winner against a place's municipal elections; candidates per vacancy against the place's (the VEC publishes them for Victoria).
+- **Fix when:** an accountability experiment, and before any election in a town much larger than a thousand.
 
 ### PB-11 · The code mayor's building programme has faults
 - **Gap:** After a builder declines a park, the code mayor never offers again; for roads it commissions the same site again and again.
@@ -1413,25 +1442,35 @@ The mechanism:
   Australian claimant does (a complaint to the Commonwealth Ombudsman, asking again) and give it to them as law data.
 
 ### MT-22 · A model steward in a fork is a pilot's seat, less a few things
-- **Gap:** The experiment harness's model seat (`orchestrator/src/seat-host.ts`) is the pilot's seat (the same
-  configuration, loop, translator arrangement, drafts, debrief) in the light host, except: who is who is the fork's
-  config, not the cast as it changes; thinking takes no world time; an act the engine will not take as written is noted
-  by the engine (`rejected_action`) and not told to the seat; no exit accounts or composer. An interrupted experiment is taken up again
-  (`--resume`, 2026-10-24) fork by fork from the seeds' snapshots, not from where a fork stopped.
-- **Where:** `orchestrator/src/seat-host.ts`, `experiment.ts`, `experiment-seats.ts`; docs/experiments.md, "Real models".
-- **Effect:** A seat whose rejected act goes untold may try again or wait where a pilot's would be told; small. A
-  fork interrupted part-way is run again whole: its spending so far is lost (it comes off its limit, so the total holds).
-- **L / I:** low / medium · **Status:** open; the dry run of the TARA spec at full size is the check that the path runs.
-- **Notice by:** `rejected_action` notes in a model fork; an experiment's log that stops without "done".
-- **Fix when:** Before the TARA run if a model fork's log shows `rejected_action`s from its seat.
+- **Gap:** Mitigated 2026-10-31 (docs/decisions.md, "A model steward in a fork is a pilot's seat"): the seat is told what
+  the engine would not take, follows the cast through base and fork, thinks in world time where the world says so, and
+  forks have the composer and exit accounts. Left: an interrupted experiment is taken up again (`--resume`) fork by fork
+  from the seeds' snapshots, not from where a fork stopped; a fork answers no `consult`, `reading` or `words` question
+  (a pilot answers them where it has the service).
+- **Where:** `orchestrator/src/seat-host.ts`, `fork-cast.ts`, `fork-composer.ts`, `experiment.ts`; docs/experiments.md, "Real models".
+- **Effect:** A fork interrupted part-way is run again whole: its spending so far is lost (it comes off its limit, so
+  the total holds), and it is a new sample. A world with the sparse mind or reading run as an experiment would differ
+  from its pilot in those answers.
+- **L / I:** low / low · **Status:** mitigated; the dry run of the TARA spec at full size is the check that the path runs.
+- **Notice by:** an experiment's log that stops without "done"; a spec whose world sets reading or the sparse mind.
+- **Fix when:** a long model fork is interrupted often enough that rerunning it whole costs real money or window time.
 
 ### MT-23 · A crew's day of delegated work took three times as long on one day, cause untraced
 - **Gap:** In `orchestrator/test/seat-diary.test.ts` (a works seat naming its crew to write forty notices a working day, 600 citizens, seed 1) the crew's paperwork takes 106 to 121 minutes from the first act of the day to the last on 18 of the 19 working days of days 1 to 28, and 310 minutes on day 21 (found 2026-10-24, after the run's seed began to draw who the people are). On the ordinary days the four crew members who are at work apply their acts side by side; on day 21 they applied one after another, the first four 30 minutes apart (555, 585, 615, 645 minutes into the day), and the day's later acts bunched in fours as well. **Not traced:** whether a crew member was busy with a gathering, a trip or another job that morning, whether the kernel serialised acts through one performer's time, or whether the seat's own sitting was late.
 - **Where:** the works crew's time (the kernel's charge of an act to its performers, `docs/all-work-takes-time.md`); `orchestrator/test/seat-diary.test.ts` (its bound is held to the middle working day since then).
 - **Effect:** A study that measures how fast delegated work gets done could read a one-day outlier as a delegation effect. If the cause is a fault, a crew's day is slower than its hours allow on some days.
-- **L / I:** low / medium · **Status:** open; untraced
-- **Notice by:** a day's span in the seat-diary run well above the others (`spanOf`), or a crew member's acts in the log not overlapping on a day when more than one is at work.
-- **Fix when:** a study reads delegated work's speed, or the day shows again at another seed.
+- **L / I:** low / medium · **Status:** closed (2026-10-31, branch `mt23-crew`): a mechanism fault, already fixed. Until
+  foundations-2 P1 (`fc5eabd`, 2026-10-25, the day after this was found) an actor who only orders an act was held on its
+  own time until the work began (docs/decisions.md, 2026-10-25, "Someone who only orders an act was held until it
+  began"), so a seat's orders queued behind whichever member of its crew was busy: the 30-minute steps and the bunching
+  in fours are that queue. On current main the crew's work is 105 minutes on every working day of days 1 to 22 in the
+  600-person town, day 21 included, and 31 minutes (two in post) on every working day of 30 in the town of the usual
+  size. Not re-run at `0e39e83` itself (a cold build of the old kernel): the trace is from the code and the dates. The
+  test's `spanOf` read the log time of `action_started`, which since P1 is when the seat gave the order (16 minutes a
+  day), not the crew's work; it now reads the work's own `starts` and `done`, and every working day is held to the
+  bound, not the middle one.
+- **Notice by:** a day's span in the seat-diary run (`spanOf`, now the work's own times) over three hours.
+- **Fix when:** (closed) a day over the bound again.
 
 ### MT-24 · The citizen capture keeps each decision as the mind recorded it, not yet everything the citizen model will read
 - **Gap:** The capture (docs/citizen-data.md, step 1 of docs/design/citizen-model.md) writes every recorded decision
@@ -1572,6 +1611,24 @@ The mechanism:
   (docs/design/tiered-storage.md). 10,000 people for a month: 1.67 GB against main's 2.48 on the same machine.
 - **Notice by:** The memory budget's test failing; a run past 50,000 near the 40 GB guard.
 - **Fix when:** Before a study at 100,000 for longer than a week.
+
+### SC-6 · A run's memory grows with its length faster than the town: 50,000 for two years does not fit
+- **Gap:** After the faults of 2026-10-31 were fixed, a 10,000-person town grows about 25 MB a simulated day (2.5 KB
+  a person a day; 1 KB at 1,000 people) and a 50,000-person town about 105 MB: three years at 10,000 peaked at 27 GB
+  (run 2026-11-01, 11.8 hours), two years at 50,000 would need about 86 GB on a 64 GB machine. What grows: the world's records (54%), the resolver's
+  knowledge of every addressed statement each participant has seen, the twins' per-matter draw counts (every
+  gathering's every date, for every person, for the run), minds, offices' files. Each is kept by design; none is a copy.
+  Also seen only at size: one hall of 200 for gatherings in a town of 10,000 is full (2,000 to 4,000 refusals a month),
+  and the water works sometimes finds no water in its field to draw (`field_exhausted`) at 10,000.
+- **Where:** `docs/design/performance.md` ("Years at 10,000 and 50,000"); `docs/design/tiered-storage.md` (proposed);
+  `kernel/crates/actors/src/draws.rs` (`matter_occurrences`); `kernel/crates/resolver/src/knowledge.rs` (`addressed`);
+  runs `runs/long-10000-3y-b`, `runs/long-50000-2y`.
+- **Effect:** A study of 50,000 people is limited to about a year on this machine; a 10,000-person study of three years
+  fits. The hall and the water at 10,000 are the spec's and the network's, so outcomes there are the town's, not faults.
+- **L / I:** high / medium · **Status:** open: tiered storage waits on the owner; the draw counts need a matter that
+  says when it ends (reliability's design); the hall and water are recorded, not tuned
+- **Notice by:** `progress.tsv` of a long run; the run's memory guard stopping it.
+- **Fix when:** Before a study at 50,000 for longer than a year.
 
 ### SC-2 · Resume replays from the start
 - **Gap:** No mid-run checkpoint; resume replays the whole log; resume against a real model is untested.
