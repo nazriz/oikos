@@ -35,7 +35,7 @@ use crate::firms::tax::{income_tax_law, withholding};
 use super::auditor::{Answerer, Audited, InBank, InBooks, Statement};
 use crate::common::work::ReportOf;
 use crate::common::{
-    addressed_to, approval_of, bases_of, bill_settled, cents, data, filed_before, is_kind, message,
+    addressed_to, approval_of, bases_of, cents, data, filed_before, is_kind, message,
     money_words, out_of_time, own_account, record, team, variable_today, visited, when_words,
     CounterWork, Directions, Fields, Letters, Part, StandingWork, DAY, MONTH, YEAR,
 };
@@ -1273,6 +1273,9 @@ struct RatesPlan {
     interest_cache: BTreeMap<String, i64>,
     /// The systems it may take up to write its notices (docs/behaviour/automation.md): none unless the world gives it.
     desk: OfficeDesk,
+    /// The file's rates notices by whom and what (an index of the book, made again from it after a restore).
+    #[serde(skip)]
+    notices: crate::common::money::RatesNotices,
 }
 
 impl RatesPlan {
@@ -1299,10 +1302,11 @@ impl RatesPlan {
             retry: BTreeSet::new(),
             interest_cache: BTreeMap::new(),
             desk: OfficeDesk::new(&ctx.entity, DeskParams::read(ctx)?),
+            notices: Default::default(),
         })
     }
     fn paid(&self, c: &Record) -> bool {
-        bill_settled(&self.book, c, &self.settled)
+        self.notices.settled(&self.book, c, &self.settled)
     }
     /// The rates claims we hold, in the order made.
     fn rates_claims(&self) -> Vec<Arc<Record>> {
@@ -1314,6 +1318,7 @@ impl Plan for RatesPlan {
     type Then = RatesThen;
     fn absorb(&mut self, pic: &Picture, _: &mut Cx) {
         self.book.absorb(pic);
+        self.notices.update(&self.book);
         self.desk.absorb(&self.book);
         self.letters.take(pic, &self.book);
         if let Some(acc) = own_account(pic) {
