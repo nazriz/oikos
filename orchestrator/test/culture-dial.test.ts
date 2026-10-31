@@ -105,7 +105,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
 // f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "d39dcf8e61f0da9f", "gb-eng-2026": "1cdcabae97f9e29d", "ke-nakuru-2026": "3514c46466a2cbab" }
+  ? { "au-vic-2026": "c6ccb21188fd3f79", "gb-eng-2026": "4ab575b82652687a", "ke-nakuru-2026": "6c856c4d47017630" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -146,15 +146,19 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // both: a road is a way of the network, the ground says a cell's metres, housed households have a vehicle and drive it where
 // they belong (generator 0.72.0), and a child's parents know of its birth at once; ce5432bd..., becc4b5a..., a33d92aa... for the
 // configs and e2f908c0..., 66d41a64..., 29ee83f1... for the states, until then.)
-// (Re-taken on 2026-11-01 at foundations-2 E3, config hashes and Rust states both: every town where there are factories offers
-// a factory as a venture, in a closed factory's works for sale (docs/behaviour/entry.md, "Founding a factory"). With that
-// venture taken out of the config the three towns give exactly the pins before it (checked on the branch), so the
-// rest of the change (the founding steps moved from the retailer to market/founding.rs) moves nothing; b69b5e45...,
-// 1c0ed42c..., bee66230... for the configs and 001f22ed..., 1a754a5d..., caa00714... for the states, until then.)
+// (Re-taken on 2026-11-01 at working calendars (gap-weekends), on the tree merged with main at f56d2dbc (delegation, the long-run
+// fixes, business loans, foundations-2 S2), config hashes and Rust states both: the support agency's and the tax collector's desks of officers keep
+// the place's days of rest and public holidays (`hours.closed`), an officer's day on each working day (generator 0.73.0); main's
+// b69b5e45..., 1c0ed42c..., bee66230... for the configs and 001f22ed..., 1a754a5d..., caa00714... for the states, until then.)
+// (Re-taken on 2026-11-01 at foundations-2 E3, on the tree merged with main, config hashes and Rust states both: every town where
+// there are factories offers a factory as a venture, in a closed factory's works for sale (docs/behaviour/entry.md, "Founding a
+// factory"). On the branch, with that venture taken out of the config the three towns gave exactly the pins before it, so the rest
+// of the change (the founding steps moved from the retailer to market/founding.rs) moves nothing; c899c8ff..., 9b0a54d6...,
+// a2f60218... for the configs and af012071..., fab20a4d..., e3093814... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "4c48e86728e4ddd701a82728bdded24632155df6e894c64daec383a256320456",
-  "gb-eng-2026": "234f76bd5c093cd736e0f8610189a55cda1b76de03e3dc16511f5e3449d773f3",
-  "ke-nakuru-2026": "692129a9a246a3024053029419e26f42c217538358cf6361a2da37e969f32b11",
+  "au-vic-2026": "5688698d9b46a0b56d425c592bae829b235fe5b13d11809ab56cba17f05e3ec1",
+  "gb-eng-2026": "edfee2e18088d645cfcc3b6b6ce80641f0c8fb8f466de8fabf537a0e6fb4da30",
+  "ke-nakuru-2026": "717229a9f5821b5d3ed9f74eb34d2f54d7a58190686934b04e51c91edbbac15d",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

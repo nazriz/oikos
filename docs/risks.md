@@ -293,8 +293,8 @@ The mechanism:
   non-resident officer as the seat's body, is not built, because a person with a body who is not a resident reaches the
   census, life events, elections and every module that counts persons (not contained); (2) the officers' ratio is a
   placeholder everywhere, and the minutes are sourced for us-oh only (gb-eng's and the others' are the generator's
-  placeholders); (3) the law's own waits (Universal Credit's assessment period) are not data yet; (4) a system's hours
-  are every day's (no weekends), so the officers' week is spread evenly over seven days; (5) a generic `publish` row on a
+  placeholders); (3) the law's own waits (Universal Credit's assessment period) are not data yet; (4) fixed 2026-10-31 (decisions "Working calendars"): the desks' hours
+  are closed on the place's days of rest and public holidays; (5) a generic `publish` row on a
   machine's template still covers a decision kind at the world's second if a module publishes one without naming the
   desk: the backstop sees only rows that name a decision kind.
 
