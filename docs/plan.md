@@ -6,6 +6,25 @@ coordinating session keeps the rest current. Each item names where its detail li
 
 Status words: `[x]` landed on main, `[~]` in progress, `[ ]` not started, `[?]` waiting on the owner.
 
+## North star
+
+The owner's TARA proposal (`docs/north-star.md`, submitted 2026-10-28): a town of tens of thousands over years, live
+models from more than one provider as assistants to households, firms and government; forks at checkpoints that
+withdraw, redirect, constrain, replace or take back the AI, or withhold a citizen's act; debriefs compared with measured
+effects. Not rigid, but every item below should say how it serves it. Where the platform stands against it (2026-10-31):
+
+| The proposal needs | Today |
+|---|---|
+| Tens of thousands of people, over years | 50,000 for a month measured (14.7 GB, 604 s); no multi-year run at that size yet |
+| Real-world friction | Laws of time and capacity (phase 1) and conservation (phase 2) landed; space (phase 3) not started |
+| Models act only in plain language | Seats write English, the translator turns it into acts; our translator parked at about 85%, Sonnet behind it |
+| Live models from more than one provider | Anthropic (API, Claude Code) and OpenAI (Codex CLI, which puts its own instructions under ours) |
+| Models as assistants to households, firms and government | **Missing.** Models hold office posts as stewards; nobody can hire an AI assistant (delegation capabilities, phase 4's services) |
+| Forks that withdraw, redirect, constrain, replace or take back the AI | **Partly.** Forks and withholding a citizen's act exist; the AI interventions need the delegation capabilities |
+| Requests for more scope or resources recorded | **Missing** (part of the delegation capabilities) |
+| Debriefs compared with measured effects | Debriefs and fork attribution exist; the comparison itself is analysis still to write |
+| A measure of "less able to shape their society" | Leverage measures designed (docs/design/gradual-disempowerment.md §6); the definition is the owner's to settle |
+
 ## Now
 
 - [~] **Memory per person.** A 10,000-person month peaked at about 500 KB a person; target about 50 KB, enforced by a
