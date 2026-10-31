@@ -10109,6 +10109,13 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Change:** the test holds what it means: no application for work while the business trades, from 14 days after its
   founding until its giving up (the wake that takes its price list down, the closure minutes later), and a closure, if
   any, is a giving up. Same seed, same horizon; nothing loosened beyond the rule.
+- **And the next test, on main at c46643eb** (E2a's releases and working calendars merged after d0105172): "a business
+  of one that does not pay its owner a living is given up" asked for a job application after the closure. The owner gave
+  up on day 44, then searched the jobs board 65 times (never once while trading), and all four postings in the 105 days
+  went up and were filled between two of their searches (the longest stood three days, while they did not wake): the
+  occasion is the town's, as the test's own comment already said. It now holds the rule: no search of the board (its
+  postings by pay) while the business trades, searches once it is given up, and an application whenever a posting stood
+  at one of them. Seed, horizon and set-up unchanged.
 - **Found, not fixed:** the owner founded the same business again two minutes after giving it up (day 134.54, $24,200 of
   capital): entry by expected profit reads the profile's venture, not what the person just lived through. A behaviour
   question (does a failed founder try again at once, and how soon?), to settle with a source, not a test.
