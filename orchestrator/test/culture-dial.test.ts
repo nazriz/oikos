@@ -105,7 +105,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
 // f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "c899c8ff16f761b6", "gb-eng-2026": "9b0a54d61900fdd7", "ke-nakuru-2026": "a2f60218588c0078" }
+  ? { "au-vic-2026": "a0a8a23343beec47", "gb-eng-2026": "a911615ec4c6568b", "ke-nakuru-2026": "a2f60218588c0078" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -150,14 +150,14 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // fixes, business loans, foundations-2 S2), config hashes and Rust states both: the support agency's and the tax collector's desks of officers keep
 // the place's days of rest and public holidays (`hours.closed`), an officer's day on each working day (generator 0.73.0); main's
 // b69b5e45..., 1c0ed42c..., bee66230... for the configs and 001f22ed..., 1a754a5d..., caa00714... for the states, until then.)
-// (Re-taken on 2026-11-01 at mt21-recourse (MT-21), merged with main at d0105172, au-vic and gb-eng only, config hashes and Rust
+// (Re-taken on 2026-11-01 at mt21-recourse (MT-21), merged with main at c46643eb (after gap-weekends), au-vic and gb-eng only, config hashes and Rust
 // states both: their law on benefit decisions states the days after which an unanswered review may be complained of to a body
 // that recommends (`review.complaint_after_days`), so the published law's words and data move, and a claimant left unanswered
-// may now go to the ombudsman desk; ke-nakuru's law has no such route and did not move. b69b5e45... and 1c0ed42c... for the
-// configs, 001f22ed... and 1a754a5d... for the states, until then.)
+// may now go to the ombudsman desk; ke-nakuru's law has no such route and did not move. c899c8ff... and 9b0a54d6... for the
+// configs, af012071... and fab20a4d... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "af012071ce20d4e56064b3a261295840bdecd6f82b3616be7f7444842ac9bb15",
-  "gb-eng-2026": "fab20a4d041378d243f93793a5842ad1a8603927f18ca8cc2df401287d168fe3",
+  "au-vic-2026": "ce297a1b5b6f09294b6fc1b6db37330be7044d78c287bac6a043d3a1fb0fc4dd",
+  "gb-eng-2026": "4c0f82610a38835b79de8648313d1f4525434610341a8f48bdb437dd6eb1be24",
   "ke-nakuru-2026": "e309381464fd3555eff4d3152ab7d0f3abd3e7d2bc5f019eb6f687b71df75e4f",
 };
 

@@ -9890,9 +9890,9 @@ say it. Contract: an additive field on `law` `data.decisions[].review`, **propos
   the review be decided. The first is a stronger push on the agency than the real one; noted, not built.
 - **Left:** asking again and judicial review / mandamus are not built; the 14 and 21 days read a wait for a complaint as
   the wait after a request for review; us-oh's 30 days is a placeholder.
-- **Pins re-taken (2026-11-01, merged with main at d0105172).** The new route moves au-vic, gb-eng and us-oh towns and
+- **Pins re-taken (2026-11-01, merged with main at c46643eb, after gap-weekends).** The new route moves au-vic, gb-eng and us-oh towns and
   not ke-nakuru's (its law has no such route): culture-dial's config hashes and Rust states for au-vic and gb-eng
-  (f5df4970..., 813b4e3c... and 00e05f9779..., 8122cbbd...; were b69b5e45..., 1c0ed42c... and 001f22ed..., 1a754a5d...),
+  (a0a8a233..., a911615e... and ce297a1b..., 4c0f8261...; were main's c899c8ff..., 9b0a54d6... and af012071..., fab20a4d...),
   and all six towns of `scripts/fixtures/representation-results.json` (au-vic, gb-eng, us-oh at 200 and 1,000 people).
   Cause is the one this entry names, not a fault: the gate's failure showed only the first pin, the rest were taken by
   running the towns on a freshly built kernel. (A first reading of the config hash on a stale `kernel/target` wasm gave a
