@@ -180,7 +180,13 @@ impl World {
             // (A system template's own rows and hours, made into one table at load: law 10, foundations-2 P1.)
             act_times: c.templates.iter().filter(|t| t.kind == ParticipantKind::System).fold(oikos_time::ActTimes::from_orchestration(&c.orchestration), |a, t| {
                 let rows = t.does.iter().flatten().filter(|r| r.block != "work").filter_map(|r| r.seconds.map(|s| (r.key(), s))).collect();
-                a.with_template(&t.id, oikos_time::TemplateTimes { rows, hours: t.hours.and_then(|h| oikos_time::Hours::new(h.from, h.seconds)) })
+                a.with_template(&t.id, oikos_time::TemplateTimes { rows, hours: t.hours.as_ref().and_then(|h| {
+                    let w = oikos_time::Hours::new(h.from, h.seconds)?;
+                    Some(match &h.closed {
+                        Some(c) => w.closed_on(oikos_time::Closed::new(&c.weekdays, &c.days)?),
+                        None => w,
+                    })
+                }) })
             }),
             performers_in: c.orchestration["performers_in"].as_str().map(String::from),
             randomness: Randomness::new(c.seed),
@@ -947,7 +953,7 @@ impl World {
             oikos_time::place_within(&mut lanes_now, lanes, ready, 0, hours).0
         };
         let own_lanes = (lanes, self.lane_hours(&key));
-        let actor_free = free_from(self.state.timelines.get(&key), own_lanes);
+        let actor_free = free_from(self.state.timelines.get(&key), own_lanes.clone());
         let mut start = actor_free;
         // (A system that does another's work takes it on as many lanes as it has.)
         let lanes_of = |me: &Self, p: &str| (me.state.participants.get(p).filter(|x| x.kind == ParticipantKind::System).map_or(1, |x| x.def.lanes.unwrap_or(1) as usize), me.lane_hours(p));

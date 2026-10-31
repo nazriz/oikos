@@ -912,18 +912,31 @@ pub struct Template {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supplier: Option<Id>,
     /// A system's: the daily window its lanes work in (law 10, foundations-2 P1): from `from` seconds after midnight, for
-    /// `seconds`. An act not finished by the window's end goes on in the next day's (a queue, not a refusal). Every day is
-    /// a working day. Absent: any time of day.
+    /// `seconds`. An act not finished by the window's end goes on in the next working day's (a queue, not a refusal); its
+    /// `closed` days (a working calendar) have no window. Absent: any time of day.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hours: Option<TemplateHours>,
 }
 
 /// A template's working hours (law 10).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TemplateHours {
     pub from: i64,
     pub seconds: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub closed: Option<ClosedDays>,
+}
+
+/// The days a template's hours do not open (a working calendar, from a profile's days of rest and holidays): days of the
+/// world's week (day `d` of the run is the week's day `d mod 7`) and days of the run, counted from its first (0).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ClosedDays {
+    #[serde(default)]
+    pub weekdays: Vec<i64>,
+    #[serde(default)]
+    pub days: Vec<i64>,
 }
 
 /// One thing a system from a template can do (foundations F4).
@@ -2841,9 +2854,16 @@ pub fn validate(c: &Config) -> Result<(), String> {
         if t.kind == ParticipantKind::Person && (t.does.is_some() || t.supplier.is_some() || t.hours.is_some()) {
             return Err(format!("template {}: a person's has no `does`, supplier or hours (only a system is supplied; a person's day is their own)", t.id));
         }
-        if let Some(h) = t.hours {
+        if let Some(h) = &t.hours {
             if !(0..86_400).contains(&h.from) || !(1..=86_400).contains(&h.seconds) {
                 return Err(format!("template {}: `hours` opens within the day (0 to 86399 s after midnight) and lasts 1 to 86400 s", t.id));
+            }
+            // (A working calendar leaves a working day in the week, or no work could ever be done.)
+            if let Some(c) = &h.closed {
+                let week: BTreeSet<i64> = c.weekdays.iter().copied().collect();
+                if week.iter().any(|w| !(0..7).contains(w)) || week.len() == 7 || c.days.iter().any(|d| *d < 0) {
+                    return Err(format!("template {}: `hours.closed` names days of the week 0 to 6, leaving one open, and days of the run from 0", t.id));
+                }
             }
         }
         if let Some(s) = &t.supplier {

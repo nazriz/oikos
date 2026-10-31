@@ -392,6 +392,8 @@ export const FIGURE_BASIS: Basis[] = [
   derived("templates.*.does.*.seconds", "a system's seconds for an act: a person's time for it at an offer's speed, or an officer's (the person table's row); act_time.sources template.<id>.<row>"),
   derived("templates.*.hours.from", "when a system's day begins: a machine's midnight (all day), or an officer's working day from the profile's round.work_start_hour"),
   derived("templates.*.hours.seconds", "how long a system's day is: a machine's whole day, or an officer's working day (ordinary_hours_per_week) times the town's share of officers; act_time.sources template.<id>.hours"),
+  derived("templates.*.hours.closed.weekdays.*", "the profile's calendar.weekend: the place's days of rest, when a desk of officers does not work (with the run's dates, the real week from the start date; without, its last days)"),
+  derived("templates.*.hours.closed.days.*", "the profile's calendar.holidays: the place's public holidays in the run's years, as days of the run from the start date"),
   prof("participants.*.lanes", "public_service.support_officers_per_1000_claims"),
 ];
 export { conv, derived, placeholder, prof };

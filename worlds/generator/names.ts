@@ -331,6 +331,25 @@ export function calendarConfig(C: CalendarSection, startDate: string | undefined
   };
 }
 
+/** A working calendar for a run (law 10: the days a desk of people works), from the profile's days of rest and public
+ * holidays: the days of the world's week it is closed (day d of the run is the week's day d mod 7) and the holidays as days
+ * of the run. With the run's dates (`dated`), the week is the real one from the start date; without, a run has no dates,
+ * and its week is the one its people keep (their working days first, its days of rest the week's last), the holidays
+ * still those of the profile's year from its start date. */
+export function workingCalendar(C: CalendarSection, startDate: string | undefined, years: number, dated: boolean): { weekdays: number[]; days: number[] } {
+  const start = startDate ?? C.start_date;
+  const d = parseIso(start);
+  if (!d) throw new Error(`start date ${start} is not a date (YYYY-MM-DD)`);
+  const day0 = daysFromCivil(d);
+  const first = (((day0 + 3) % 7) + 7) % 7; // (1970-01-01 was a Thursday, Monday 0)
+  const weekdays = dated
+    ? [0, 1, 2, 3, 4, 5, 6].filter((p) => C.weekend.includes((first + p) % 7))
+    : C.weekend.map((_, i) => 6 - i).sort((a, b) => a - b);
+  const days = expandHolidays(C.holidays, d.year, d.year + Math.ceil(years) + 1, C.weekend)
+    .map((h) => daysFromCivil(parseIso(h)!) - day0).filter((n) => n >= 0 && !weekdays.includes(n % 7));
+  return { weekdays, days };
+}
+
 if (import.meta.main) {
   let bad = 0;
   for (const id of process.argv.slice(2)) {
