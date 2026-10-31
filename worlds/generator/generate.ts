@@ -3510,6 +3510,19 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   for (const id of seats) {
     const pos = positions.find((x) => x.id === id);
     if (!pos || !pos.holder) throw new Error(`model_seats: no office "${id}" (offices: ${positions.map((x) => x.id).join(", ")})`);
+    // (A post of the outside world's held by its case system: a model seated there is given a person's body, an officer of the
+    // agency who lives outside the town (WM-14). Their body is not in the world (`present: false`): no census, roll, home or life
+    // events of the town's reach them, and they hold the post from outside it (`holds_abroad`), acting by letter as an owner abroad
+    // does. The seat shares that body, so it works at a person's speed in a person's working day, as every other seat. The case
+    // system that held the post is not delivered: the post's papers are the officer's.)
+    if (participants.find((x) => x.id === pos.holder)!.kind === "system" && entities.find((e) => e.id === pos.entity)?.kind === "boundary") {
+      const officer = `${pos.id}-officer`;
+      const age = 25 + rng(`nonresident-${pos.id}`).below(36);
+      entities.push({ id: officer, kind: "person", name: `An officer of ${entities.find((e) => e.id === pos.entity)?.name ?? pos.entity} (${pos.title})`, born_at: -(age * YEAR + 100 * DAY), sex: rng(`nonresident-${pos.id}-sex`).below(2) ? "female" : "male", present: false });
+      participants.splice(participants.findIndex((q) => q.id === pos.holder), 1, { id: `${officer}-self`, kind: "person", person: officer, channels: [], controller: code("world.nonresident"), framing: unstated });
+      pos.holder = `${officer}-self`;
+      pos.holds_abroad = true;
+    }
     const part = participants.find((x) => x.id === pos.holder)!.kind === "person" ? seatFor(pos) : participants.find((x) => x.id === pos.holder)!;
     if (part.controller.type !== "code") continue; // (a model's already: the mayor)
     // (A person in the post runs the post's own module; a system, the one it was delivered to run.)

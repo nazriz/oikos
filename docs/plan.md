@@ -91,7 +91,8 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 ## Gaps in the register, to pick up when they matter (each names its entry in docs/risks.md where it has one)
 
 - Commercial leases: no remedy for unpaid rent, no early exit, no rent reviews (docs/behaviour/leasing.md).
-- Systems keep the same hours every day (no weekends). A seat cannot yet be a non-resident agency officer (WM-14).
+- Systems keep the same hours every day (no weekends).
+- [x] A seat cannot yet be a non-resident agency officer (WM-14): a seat in the support office shares the body of an officer who lives outside the town (`gap-wm14`).
 - [x] A taxpayer account to reclaim an overpayment from (PB-23): the tax collector keeps it (`taxpayer-accounts`, d3eb2bf3, cedc1903); its figures are still placeholders, so PB-23 stays open as mitigated.
 - Candidacy: a field of 19 for about 118 votes (PB-10).
 - One day's crew paperwork ran in series, cause untraced (MT-23).

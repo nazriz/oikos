@@ -9654,3 +9654,28 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   The budget's ceiling is unchanged (270 KB): the measure did not move.
 - **Revisit if** a heap profile shows another part of the state copied whole within an act (any field of `State` that
   is not a persistent map, vector or set, or behind an `Arc`, is copied by every act).
+## 2026-10-31 · A seat in the support office is a non-resident officer, not the case system (branch `gap-wm14`; generator; new kind `world.nonresident`; risk WM-14 item 1; no contract change; no model called)
+
+- **What:** where a model is seated in a post of the outside world held by a system (the support office, `outside-support`),
+  the generator gives the seat a person's body: an officer of the agency who lives outside the town, a person entity with
+  `present: false`, their own participant a new kind that does nothing in the world (`world.nonresident`: their life is the
+  boundary's), holding the post with `holds_abroad`. The seat shares that body (`shares_body`), keeping its old id
+  (`outside-support-system`). The case system's participant that held the post is not delivered in that town. Docs:
+  `docs/behaviour/staffing.md`, "A seat in an office of the outside world".
+- **Why it is contained:** the risk entry held this back because a person with a body who is not a resident reaches the
+  census, life events, elections and every module that counts persons. The kernel already has persons outside the world:
+  everyone who leaves it (`leave`) keeps a body with `present: false`, and their participant lives on for their affairs
+  abroad; posts held from abroad exist (a firm owner's, `holds_abroad`). An absent body is not counted by the census (it
+  counts from the generator's population and the registers' events), has no enrolment, home or job, is not exposed to injury
+  or illness (the kernel skips absent bodies), and cannot do physical work (`not_present`). It can still die of other causes,
+  as people abroad do; the post then falls vacant.
+- **Effect:** the support seat works at a person's speed in a person's day, like every other seat (WM-14's "a seat's speed
+  there is not a person's, unlike every other seat"). The code twin is unchanged (the case system holds the post): a town
+  with the seat differs from its twin in the post's holder and one body outside the world.
+- **Test:** `office-books.test.ts` (the support seat): the seat is a person sharing a body not in the world, the post is
+  held from abroad (`holds_abroad`), so the kernel times the seat's acts as a person's (the mock seat makes none in 45 days: its staff do the routine).
+- **Left:** the officer's age is a placeholder draw (25 to 60); no other outside post is seated yet (the rule applies to any
+  post held by a system of an entity of kind boundary); the case system's machine work (payments, notices) is the officer's
+  in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
+- **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
+  agency's officers are simulated as people, when the seat should be one of them.
