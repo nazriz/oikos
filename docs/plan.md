@@ -27,6 +27,10 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 
 ## Now
 
+- [~] **Years at the study's size** (code only): 10,000 people for 3 years and 50,000 for 2 or more; what breaks over
+  time fixed with its law, what emerges recorded (docs/design/performance.md, "Years at 10,000 and 50,000"; decisions
+  2026-10-31 "Years at 10,000"). First faults fixed: the hall's room, owners homeless while the register answers, the
+  works office's inspections in one moment, the energy retailer's bills read once a connection.
 - [~] **Memory per person.** A 10,000-person month peaked at about 500 KB a person; target about 50 KB, enforced by a
   test like the time budgets, results byte-identical (docs/design/performance.md, risk SC-1).
   - [x] Measure bytes per person at peak by component, at 1,000, 10,000 and 50,000 people (`mem-budget`, 8c28f399).
