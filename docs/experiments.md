@@ -256,10 +256,13 @@ fork's end it is debriefed (the fixed interview) and its words go to `seed-N/<ar
   decision changed afterwards (1/0). With the act withheld in a twin arm, its difference in differences says whether
   the request still bites under each steward (MT-21: a town-wide count is swamped).
 
-What a pilot's host does that this one does not, yet: the cast as it changes during a fork (who is who is the fork's
-config); thinking time in world seconds; an act the engine will not take as written is noted by the engine and not
-told to the seat in words; exit accounts and the composer. A fork is taken up again from its seed's snapshot, not
-from where it stopped (a model fork run again is a new sample). A real model's answers are not reproducible: each (seed, arm)
+As a pilot's (MT-22): the seat is told, in the world's words, what the engine would not take as written, the
+questions of a call it could not read, and when what it did will be done; who is who follows the cast through the
+base and the fork (`seed-N/cast.json`); its thinking takes world time where the world's `thinking_time` says so (by
+its tokens, sent with its act); where the world has a composer, its pieces are composed (by the mock) in the base and
+every fork, and a fork ends with exit accounts (`seed-N/composer.json` carries both across the fork). Not yet: a fork
+is taken up again from its seed's snapshot, not from where it stopped (a model fork run again is a new sample); a
+fork answers no `consult` or `reading` question. A real model's answers are not reproducible: each (seed, arm)
 with a model is one sample.
 
 `experiments/tara-draft/` is the draft for the owner's TARA project (README there).

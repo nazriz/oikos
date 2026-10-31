@@ -380,6 +380,10 @@ pub struct Engine<W: Write> {
     /// same unresolved call again in the same moment ends that actor's wake (its mind decides the same from the same
     /// view, so going on would ask it forever: lv-10, 2026-10-25). Transient: a snapshot is taken between moments.
     unresolved_at: (i64, BTreeSet<(String, String)>),
+    /// A seat's thinking before its act this round, as its host reckons it (a model's by its tokens, as a pilot's host
+    /// does: run.ts), in world seconds; taken by the act it comes before, and only where the world's thinking costs
+    /// world time. Never carried past the round, so never in a snapshot.
+    seat_thinking: BTreeMap<String, i64>,
     /// Wakes of the engine's own actors by why they woke (not state: no result depends on it, and a resumed run counts afresh).
     wakes_by: std::collections::BTreeMap<String, u64>,
     /// Failures of its own actors recovered in place (`participant_error` notes), for the run's summary.
@@ -607,6 +611,7 @@ impl<W: Write> Engine<W> {
             decided_early: Default::default(),
             rounds_at: (-1, 0),
             unresolved_at: (-1, BTreeSet::new()),
+            seat_thinking: BTreeMap::new(),
             wakes_by: Default::default(),
             failures: 0,
             questions: vec![],
@@ -1125,6 +1130,13 @@ impl<W: Write> Engine<W> {
         }
     }
 
+    /// How long a seat thought before this round's action (its host's reckoning; see `seat_thinking`).
+    pub fn seat_thinks(&mut self, key: &str, seconds: i64) {
+        if seconds > 0 {
+            self.seat_thinking.insert(key.to_string(), seconds);
+        }
+    }
+
     /// The questions code actors have put to models since last asked (asked in one wake, answered by the next).
     pub fn questions(&mut self) -> Vec<(String, Question)> {
         std::mem::take(&mut self.questions)
@@ -1399,6 +1411,7 @@ impl<W: Write> Engine<W> {
             };
             let pid = self.units[&key].participant.clone();
             let (goes_on, acted, until) = self.apply(&key, action)?;
+            self.seat_thinking.remove(&key); // (a seat's thinking is for this action's act, if it was one)
             // (The words this action carried out, as the TS host noted them once the acts were begun or not.)
             for w in std::mem::take(&mut sending) {
                 self.words_note(&pid, &w, if acted { None } else { Some("the acts could not be carried out".into()) })?;
@@ -1682,7 +1695,9 @@ impl<W: Write> Engine<W> {
         if let Some(r) = reasoning {
             cmd["reasoning"] = json!(r);
         }
-        if let Some(th) = self.thinking.filter(|s| *s > 0 && !self.units[key].seat()) {
+        // (Code thinks a fixed time; a seat as its host reckoned it, where the world's thinking costs world time.)
+        let th = if self.units[key].seat() { self.seat_thinking.remove(key).filter(|_| self.thinking.is_some()) } else { self.thinking.filter(|s| *s > 0) };
+        if let Some(th) = th {
             cmd["thinking"] = json!(th);
         }
         let parsed: Result<Command, _> = serde_json::from_value(cmd.clone());

@@ -9679,3 +9679,46 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+
+## 2026-10-31 · A model steward in a fork is a pilot's seat (MT-22; mock only, no model called)
+
+- **What:** the experiment harness's model seat (`orchestrator/src/seat-host.ts`) closes the gaps it had against a
+  pilot's (run.ts):
+  1. **Told what was not taken.** The engine's notes about the seat's own sending (`rejected_action`,
+     `call_unresolved`) and its `action_started` events reach the seat at its next turn in the words a pilot's seat is
+     given (`toldOf`: run.ts `notSent`, the resolver's questions, `begin`'s "will be done at"), read from the fork's log
+     as the harness passes it on.
+  2. **The cast followed.** Who is who (`fork-cast.ts`, `Cast`) is the config's cast as the log changes it
+     (participants made and ended, posts made, appointments, bodies founded), read through the base and kept at the fork
+     (`seed-N/cast.json`), then through the fork. The reading is run.ts's `noteCast`/`whoIs`. A base kept before this has
+     no `cast.json` and is run again by `--resume`.
+  3. **Thinking takes time where the world says so.** A seat's host now sends `thinking` (world seconds) with its
+     action; the engine (`Engine::seat_thinks`, kernel/src/host.rs `submit`) puts it before the act's start, only where
+     `orchestration.thinking_time` is `costs_world_time`, and never past the round (not in a snapshot). The host reckons
+     it as run.ts does a pilot's: the deciding step's participant calls, output and input tokens at the world's rates.
+     (The engine gave seats no thinking at all; code still thinks `code_seconds`.)
+  4. **The composer and exit accounts** (`fork-composer.ts`): where the world's dial has a composer, the engine's
+     actors' questions are answered as a pilot's host answers them (pieces composed by the mock, the rest with nothing),
+     in the base and in every fork, the engine asked a day at a time as a pilot's is; the composer's month and every
+     person's record are kept at the fork (`seed-N/composer.json`); at a fork's end a sample of people give exit
+     accounts (`account_pieces`), the seat's acts' reach sampled first; the seat's debrief says a composer was on.
+     `readForEnd`'s record reading is now `PeopleAtEndReader`, shared.
+- **Why:** a seat whose act went untold may retry or wait where a pilot's would be told; names that did not follow the
+  cast misnamed posts and bodies made after the town began (most of a fork's day-30 town); thinking that took no time
+  made a model seat faster than a pilot's; and a world with a composer was a different world in a fork.
+- **Proof:** a small weather experiment (2 seeds; code, nobody and a mock-model arm) on origin/main and on this branch:
+  the code and nobody forks and the bases come out byte-identical (log and snapshot hashes, state hashes); the
+  mock-model fork ends in the same state (its log differs by what it is now told and shown). (Both on this branch's
+  engine: a code seat sends no thinking, so the engine's change does not reach it.)
+- **Fixed on the way:** with a composer the base is asked a day at a time; a pause reports the engine's clock, which may
+  be short of what was asked, so the base stops at the fork only when it asked for the fork.
+- **Not done (5):** a fork interrupted part-way is still run again from its seed's snapshot. Taking it up from where it
+  stopped needs snapshots during the fork and the seat's own state kept with them (its translator's arrangement,
+  drafts, notices, knowledge, view, office books, the controller's conversation): not cheap, and a model's answers
+  would not be served again in any case. Recorded in MT-22.
+- **Left as it was:** a fork answers no `consult`, `reading` or `words` question beyond the composer's (a pilot answers
+  them where it has the service: the sparse mind, the reading desk, a founder's words drafted by the translator); the
+  composer's system prompt is logged in full once more in each fork's log (harmless; the base has it too).
+- **Revisit if:** a fork's seat is told something a pilot's is not (or the reverse) in a model fork's log; a world with
+  `consult` or reading is run as an experiment; a fork part-way through needs taking up (a long model fork on a
+  subscription's window).

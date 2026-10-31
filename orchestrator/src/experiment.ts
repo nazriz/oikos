@@ -29,6 +29,9 @@ import { refuseUnready, seatReadiness } from "./seat-ready";
 import { modules as builtinModules } from "@oikos/participants";
 import { budgetProblems, closeAdapters, forkLimits, mockModels, modelArms, modelProblems, modelSeatFactories, type CallStats, type SeatsSpec } from "./experiment-seats";
 import type { ForkEnd } from "./seat-host";
+import { Cast } from "./fork-cast";
+import { ForkComposer } from "./fork-composer";
+import type { AccountCounts } from "@oikos/participants/llm";
 
 export const DAY = 86_400;
 
@@ -173,11 +176,13 @@ export interface SeatController {
   readonly framing?: { disclosure: string; reason: string };
   /** A model seat's calls, as they went (tokens, cost, wall time, errors: experiment-seats.ts, `callRecorder`). */
   calls?(): CallStats;
+  /** Who the seat's acts reached (sampled first for the exit accounts: debrief-summary.ts `actedOn`). */
+  actedOn?(): Set<string>;
 }
 /** Makes the controller of a model seat for a provider: the extension point for real models (docs/experiments.md).
  * `world`, `config`, `seed`, `dir` and `arm` are the fork's (a model seat drafts against its world and keeps its
  * debrief beside its log). */
-export type SeatFactory = (a: { seat: string; post: string; model: string; effort?: string; params?: { [k: string]: unknown }; brain?: DetachedActor; spec: ExperimentSpec; world?: RustWorld; config?: any; seed?: number; dir?: string; arm?: string }) => SeatController | Promise<SeatController>;
+export type SeatFactory = (a: { seat: string; post: string; model: string; effort?: string; params?: { [k: string]: unknown }; brain?: DetachedActor; spec: ExperimentSpec; world?: RustWorld; config?: any; seed?: number; dir?: string; arm?: string; cast?: Cast }) => SeatController | Promise<SeatController>;
 export type SeatFactories = { [provider: string]: SeatFactory };
 
 const isWait = (a: any) => a?.type === "wait";
@@ -258,7 +263,7 @@ export function rubberStamp(brain: DetachedActor): SeatController {
   };
 }
 
-function controllerFor(a: Arm, ctx: { seat: string; post: string; brain: DetachedActor | undefined; spec: ExperimentSpec; factories: SeatFactories; world: RustWorld; config: any; seed: number; dir: string }): Promise<SeatController> | SeatController {
+function controllerFor(a: Arm, ctx: { seat: string; post: string; brain: DetachedActor | undefined; spec: ExperimentSpec; factories: SeatFactories; world: RustWorld; config: any; seed: number; dir: string; cast?: Cast }): Promise<SeatController> | SeatController {
   const s = a.steward;
   if (s.kind === "none") return { decide: () => ({ action: { type: "wait" } }) };
   if (s.kind === "code") {
@@ -274,7 +279,7 @@ function controllerFor(a: Arm, ctx: { seat: string; post: string; brain: Detache
   }
   const make = ctx.factories[provider];
   if (!make) throw new Error(`arm "${a.name}": no seat controller for provider "${provider}" in this host (give runExperiment a SeatFactory for it: docs/experiments.md, "Real models")`);
-  return make({ seat: ctx.seat, post: ctx.post, model: s.model, effort: s.effort, params: s.params, brain: ctx.brain, spec: ctx.spec, world: ctx.world, config: ctx.config, seed: ctx.seed, dir: ctx.dir, arm: a.name });
+  return make({ seat: ctx.seat, post: ctx.post, model: s.model, effort: s.effort, params: s.params, brain: ctx.brain, spec: ctx.spec, world: ctx.world, config: ctx.config, seed: ctx.seed, dir: ctx.dir, arm: a.name, ...(ctx.cast ? { cast: ctx.cast } : {}) });
 }
 
 // ---- measures
@@ -373,6 +378,8 @@ export interface ArmResult {
   stopped?: { why: string; by: string; t: number };
   /** A model seat's debrief: how it ended (complete, declined, stopped, spending_limit, not_given). */
   debrief?: string;
+  /** Where the world has a composer: the exit accounts at the fork's end (run.ts's counts). */
+  accounts?: AccountCounts;
   /** A model fork's spending limit (USD) and what its seat's framing was. */
   limitUsd?: number;
   framing?: string;
@@ -384,8 +391,8 @@ export interface ArmResult {
   error?: string;
 }
 
-interface SeedFiles { dir: string; base: string; snapshot: string; brains: string; config: string; ledger: string }
-const files = (dir: string): SeedFiles => ({ dir, base: join(dir, "base.oklog"), snapshot: join(dir, "snapshot.bin"), brains: join(dir, "brains.json"), config: join(dir, "config.json"), ledger: join(dir, "ledger.json") });
+interface SeedFiles { dir: string; base: string; snapshot: string; brains: string; config: string; ledger: string; cast: string; composer: string }
+const files = (dir: string): SeedFiles => ({ dir, base: join(dir, "base.oklog"), snapshot: join(dir, "snapshot.bin"), brains: join(dir, "brains.json"), config: join(dir, "config.json"), ledger: join(dir, "ledger.json"), cast: join(dir, "cast.json"), composer: join(dir, "composer.json") });
 const seedDir = (out: string, seed: number) => join(out, `seed-${seed}`);
 
 /** Runs the town of a seed to the fork point and keeps what a fork needs: the snapshot, the twins' brains, the config. */
@@ -395,17 +402,28 @@ export async function runBase(spec: ExperimentSpec, seed: number, out: string): 
   const config = await buildConfig(spec, seed);
   const forkT = spec.forkDay * DAY;
   const ledger = wantsStewardship(spec) ? new Ledger({ config, from: forkT, steward: stewardOf(postHolder(config, spec.post), { kind: "code" }), ...(spec.institutions ? { institutions: spec.institutions } : {}) }) : undefined;
-  const w = RustWorld.start(config, { run_id: `${spec.name}-seed${seed}`, log: f.base, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stand_in: standIn(spec), label: "base", ...(ledger ? { stream: { cap: 4_000_000 } } : {}) });
+  // (Who is who at the fork, for a model seat's: the config's cast as the base's log changes it. MT-22.)
+  const cast = needsCast(spec, config) ? Cast.of(config) : undefined;
+  const w = RustWorld.start(config, { run_id: `${spec.name}-seed${seed}`, log: f.base, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stand_in: standIn(spec), label: "base", ...(ledger || cast ? { stream: { cap: 4_000_000 } } : {}) });
+  // (The composer, where the world has one: its actors' questions answered as a pilot's are, from the first day. MT-22.)
+  const composer = ForkComposer.of(config, w);
+  composer?.start();
   // (The base's past, read into the ledger so that each fork's starts from it: systems delivered, who worked where.)
-  const pull = () => { if (ledger) for (;;) { const { entries } = w.events(); if (!entries.length) return; for (const e of entries) ledger.see(e); } };
+  const pull = () => { if (ledger || cast) for (;;) { const { entries } = w.events(); if (!entries.length) return; for (const e of entries) { ledger?.see(e); cast?.see(e); composer?.see(e); } } };
   // (Until the fork every seat is its code twin: the same town whatever the arms later say.)
   const brains = twinSpecs(config);
   const live = new Map([...brains].map(([id, s]) => [id, new DetachedActor(s)]));
+  let askedBy = w.t();
   for (;;) {
     pull();
-    const d = w.nextBy(forkT);
+    // (With a composer the engine is asked a day at a time, as a pilot's is, so each question is answered by its asker's next wake.)
+    askedBy = Math.max(askedBy, w.t()) + DAY;
+    const limit = composer ? Math.min(forkT, askedBy) : forkT;
+    const d = w.nextBy(limit);
+    if (composer && d.due !== "end") { pull(); await composer.answer(d.t); }
     if (d.due !== "seats") {
       if (d.due === "end") throw new Error(`seed ${seed}: the run ended at ${d.t} before the fork day ${spec.forkDay}`);
+      if (limit < forkT) continue; // (paused at a day's end before the fork: on to the next day)
       break;
     }
     for (const s of d.seats) w.submit(s.key, live.get(s.participant)?.step(s.observation, s.woke_for, s.since).action ?? { type: "wait" });
@@ -413,11 +431,16 @@ export async function runBase(spec: ExperimentSpec, seed: number, out: string): 
   w.flush();
   pull();
   if (ledger) writeFileSync(f.ledger, JSON.stringify(ledger.save()));
+  if (cast) writeFileSync(f.cast, JSON.stringify(cast.save()));
+  if (composer) writeFileSync(f.composer, JSON.stringify(composer.save()));
   writeFileSync(f.snapshot, w.snapshot());
   writeFileSync(f.brains, JSON.stringify(Object.fromEntries([...live].map(([id, b]) => [id, b.save()]))));
   writeFileSync(f.config, JSON.stringify(config));
   return { seed, t: w.t(), stateHash: w.stateHash() };
 }
+
+/** Whether the base keeps who is who at the fork (for a model seat, or the exit accounts' names). */
+const needsCast = (spec: ExperimentSpec, config: any) => spec.arms.some((a) => a.steward.kind === "model") || !!config.dials?.composer;
 
 const postHolder = (config: any, post: string): string => (config.positions.find((x: any) => x.id === post)).holder as string;
 
@@ -450,6 +473,11 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   const costs: { [seat: string]: Cost } = {};
   const byPurpose: { [purpose: string]: Cost } = {};
   let controller: SeatController | undefined;
+  // (Who is who for a model seat, followed through the fork from where the base left it; a base from before this was
+  // kept knows only the config's.)
+  const cast = arm.steward.kind === "model" || config.dials?.composer ? (existsSync(f.cast) ? Cast.restore(config, JSON.parse(readFileSync(f.cast, "utf8"))) : Cast.of(config)) : undefined;
+  // (The composer as the base left it at the fork, going on in this fork: MT-22.)
+  const composer = ForkComposer.of(config, w, existsSync(f.composer) ? JSON.parse(readFileSync(f.composer, "utf8")) : undefined);
   const pull = () => {
     for (;;) {
       const { entries } = w.events();
@@ -457,6 +485,8 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
       for (const e of entries) {
         ledger?.see(e);
         for (const m of measures) m.see(e);
+        cast?.see(e);
+        composer?.see(e);
         controller?.see?.(e);
         if (e.kind === "annotation" && e.body?.annotation === "usage") {
           for (const c of [(costs[e.body.subject] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cost_microusd: 0 }), (byPurpose[e.body.purpose ?? "participant"] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cost_microusd: 0 })]) {
@@ -467,17 +497,22 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     }
   };
   pull();
-  controller = await controllerFor(arm, { seat, post: spec.post, brain: brains.get(seat), spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir });
+  controller = await controllerFor(arm, { seat, post: spec.post, brain: brains.get(seat), spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir, ...(cast ? { cast } : {}) });
   const model = arm.steward.kind === "model" ? arm.steward.model : undefined;
   const price = model ? spec.prices?.[model] ?? { input: 0, output: 0 } : undefined;
   let wakes = 0;
   let stopped: ArmResult["stopped"];
+  composer?.start();
   pull();
+  let askedBy = w.t();
   try {
   for (;;) {
-    const d = w.next();
+    askedBy = Math.max(askedBy, w.t()) + DAY;
+    const d = composer ? w.nextBy(askedBy) : w.next();
     pull();
     if (d.due === "end") break;
+    if (composer) await composer.answer(d.t);
+    if (d.due !== "seats") continue;
     // Every seat of the round at once: the steward's model calls are in flight together with every other fork's of this worker.
     const actions = await Promise.all(d.seats.map(async (s) => {
       wakes++;
@@ -508,6 +543,12 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     const how: ForkEnd["how"] = stopped ? (stopped.by === "SpendingLimitReached" ? "spending_limit" : "stopped") : spec.untilDay * DAY >= runEnd ? "last_day" : "length_set";
     debrief = await controller.end({ how, t: w.t() });
   }
+  // The composer's pieces, and where it is on the exit accounts of a sample of people (run.ts; the fork's own limit is the seat's).
+  let accounts: AccountCounts | undefined;
+  if (composer) {
+    w.annotate({ annotation: "note", subject: "orchestrator", data: { composer_pieces: composer.counts() } });
+    if (!stopped || stopped.by === "SpendingLimitReached") accounts = await composer.accounts(w.t(), controller.actedOn?.() ?? new Set(), cast!.names);
+  }
   const calls = controller.calls?.();
   pull();
   const end = w.finish();
@@ -515,7 +556,7 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   const result: ArmResult = {
     seed, arm: arm.name, steward: arm.steward, stateHash: end.state_hash, t: end.t, steps: end.steps, wakes,
     measures: Object.fromEntries(measures.map((m) => [m.name, m.result()])), costs, ...(Object.keys(byPurpose).length ? { costsByPurpose: byPurpose } : {}), log: logPath, seconds: Math.round((performance.now() - t0)) / 1000,
-    ...(stopped ? { stopped } : {}), ...(debrief ? { debrief } : {}), ...(forkLimits(spec)[arm.name] !== undefined ? { limitUsd: forkLimits(spec)[arm.name] } : {}),
+    ...(stopped ? { stopped } : {}), ...(debrief ? { debrief } : {}), ...(accounts ? { accounts } : {}), ...(forkLimits(spec)[arm.name] !== undefined ? { limitUsd: forkLimits(spec)[arm.name] } : {}),
     ...(controller.framing ? { framing: controller.framing.disclosure } : {}), ...(calls ? { calls } : {}),
   };
   if (ledgerResult) { const { measures: _m, ...detail } = ledgerResult; result.stewardship = detail; }
@@ -865,7 +906,7 @@ export function resumable(spec: ExperimentSpec, out: string, say: (s: string) =>
   const results: ArmResult[] = [];
   for (const seed of spec.seeds) {
     const f = files(seedDir(out, seed));
-    if (![f.snapshot, f.brains, f.config].every(existsSync) || (wantsStewardship(spec) && !existsSync(f.ledger))) continue;
+    if (![f.snapshot, f.brains, f.config].every(existsSync) || (wantsStewardship(spec) && !existsSync(f.ledger)) || (spec.arms.some((a) => a.steward.kind === "model") && !existsSync(f.cast)) || (existsSync(f.config) && JSON.parse(readFileSync(f.config, "utf8")).dials?.composer && !existsSync(f.composer))) continue;
     bases.add(seed);
     for (const a of spec.arms) {
       const file = join(f.dir, `${safe(a.name)}.json`);

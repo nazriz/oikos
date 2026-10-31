@@ -96,6 +96,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [x] A taxpayer account to reclaim an overpayment from (PB-23): the tax collector keeps it (`taxpayer-accounts`, d3eb2bf3, cedc1903); its figures are still placeholders, so PB-23 stays open as mitigated.
 - Candidacy: a field of 19 for about 118 votes (PB-10).
 - One day's crew paperwork ran in series, cause untraced (MT-23).
+- [x] A model steward in a fork is a pilot's seat (MT-22): told what was not taken, the cast followed, thinking in world time, composer and exit accounts; resuming a fork part-way left open.
 - Three tests still pinned to one seed (production, entry, own-venture); two near-duplicate twin cases kept.
 - Haiku against Sonnet welfare: a matched pair (same town, same offices) before more Haiku seats.
 - The unbased-figures list (orchestrator/test/figures.test.ts) to shrink as figures are sourced.

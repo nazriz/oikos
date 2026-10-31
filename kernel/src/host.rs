@@ -254,7 +254,13 @@ impl Host {
     }
 
     pub fn submit(&mut self, key: &str, action: &Value) -> Result<(), String> {
-        self.e.submit(key, Action::from_json(action)?)
+        let a = Action::from_json(action)?;
+        self.e.submit(key, a)?;
+        // (How long the seat thought first, as its host reckons it: world seconds, for the act it sends, if any.)
+        if let Some(th) = action.get("thinking").and_then(Value::as_i64) {
+            self.e.seat_thinks(key, th);
+        }
+        Ok(())
     }
 
     /// The host's own record into the log (usage and cost per seat, transcripts, debriefs): checked by the contract.
