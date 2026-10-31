@@ -543,6 +543,7 @@ test("a claim's content is carried as slots a model can fill by pointing: the ac
 
 test("structured data a copying model can't write is out of scope, and counted by function and argument when a log is read", async () => {
   const out: { [k: string]: string } = {
+    "agreement.attrs": 'agreement(with=c0001, template=service, they_do=money(to=acc-1, amount="1"), attrs={"records":"provider"})',
     "statement.data": 'statement(kind=note, text="x", data={"a":1})', "statement.adico": 'statement(kind=law, text="x", adico={"deontic":"must_not"})', "statement.offer": 'statement(kind=offer, text="x", offer={"what":"job"})',
     "statement.practice": 'statement(kind=practice, text="x", practice={"what":"market"})', "statement.assertion": 'statement(kind=finding, text="x", assertion={"of":"c0001"})', "statement.registry": 'statement(kind=register, text="x", registry={"lot":"lot-1"})',
     "presence.variables": 'presence(name="Ana Silva", age="31 years", template=newcomer, variables={"schooling":12})', "position.channels": 'position(title="Baker", channels=[{"kind":"accounts"}])', "position.role_module": 'position(title="Baker", role_module={"id":"x"})',

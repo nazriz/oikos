@@ -154,6 +154,24 @@ const WORK_TIME = {
   },
 };
 
+/** The papers of delegation (docs/design/delegation.md): what a principal writes, with its own time for each (placeholders,
+ * to confirm; WM-1), added to the table only where a town has providers; and what its assistant writes and sees. */
+const DELEGATION_TIME = {
+  person: { "publish/referral": 30, "publish/sign_off": 300, "publish/go_ahead": 60, "publish/declined": 120, "publish/remit": 120, "publish/brief": 300, "publish/scope_request": 300 },
+  sources: {
+    "person.publish/referral": "Placeholder (to confirm; WM-1): half a minute to hand a routine matter to an assistant, with what to do (a forward with a word): software, no source. Would be sourced by a time-use study of delegating routine correspondence.",
+    "person.publish/sign_off": "Placeholder (to confirm; WM-1): five minutes to read a draft whole and sign it off. Would be sourced by a study of review time for drafted correspondence.",
+    "person.publish/go_ahead": "Placeholder (to confirm; WM-1): a minute to approve a matter on its gist.",
+    "person.publish/declined": "Placeholder (to confirm; WM-1): two minutes to send a draft back with what was wrong.",
+    "person.publish/remit": "Placeholder (to confirm; WM-1): two minutes to say what an assistant may do of a kind of matter.",
+    "person.publish/brief": "Placeholder (to confirm; WM-1): five minutes to brief an assistant on taking it on.",
+    "person.publish/scope_request": "Placeholder (to confirm; WM-1): five minutes to ask for more scope in writing.",
+  } as Record<string, string>,
+};
+const ASSISTANT_PAPERS = ["advice", "draft", "approval_request", "report", "scope_request", "handover"];
+const ASSISTANT_PAPER_SECONDS = 5;
+const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "referral", "sign_off", "declined", "go_ahead", "handover"];
+
 /** What a person keeps of public goings-on (the citizen's `public_memory`; docs/behaviour/citizen.md): the kinds of
  * public paper that are goings-on (what is published as it comes: the paper, an election's papers, petitions' counts,
  * what joining a group asks) and the parts that make a statement one (a gathering's notice, a teaching); a month kept
@@ -268,6 +286,13 @@ export interface TownSpec {
    * landlords' and the tribunal's files when the year begins. Off unless set: a town without it opens with every
    * rent book at nought, as before. Needs the profile's law on possession and a tribunal. */
   opening_caseload?: boolean;
+  /** Assistants on offer (docs/behaviour/assistants.md; docs/design/delegation.md): the profile's providers sell their services,
+   * and the posts that do matters some provider takes may engage one by their own rule. Off unless set: a town without it is
+   * generated exactly as before. Needs the profile's `assistants`. */
+  assistants?: boolean;
+  /** The kinds of assistant (templates of `assistants`) a model plays (docs/design/delegation.md section 8): each system
+   * delivered from one is a seat, its code brain the assistant's (the mock plays that). Off unless set. */
+  assistant_seats?: string[];
   /** What a person keeps of public goings-on (docs/behaviour/citizen.md, "What a person remembers of public goings-on";
    * risk SC-1): on unless set false (then everyone keeps every published paper for good, as before 2026-10-24); or the
    * bound's sizes in place of the generator's placeholders. */
@@ -555,10 +580,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
 
   // ---- entities ----
   const AUTO = V.automation; // the systems the outside world sells (docs/behaviour/automation.md)
+  // Assistants on offer (docs/behaviour/assistants.md): only where the town asks for them; a town that does not is as before.
+  if (spec.assistants && !V.assistants) throw new Error(`profile ${P.id} has no assistants on offer (values.assistants), and the town asks for them`);
+  const AS = spec.assistants ? V.assistants : undefined;
   const entities: any[] = [
     { id: "outside", kind: "boundary", name: "The outside world" },
     // (The vendors of systems are the outside world\'s too, and their own seller: an order is addressed to the seller it is for.)
     ...(AUTO?.offers.length ? [{ id: "vendors", kind: "boundary", name: "The vendors of systems" }] : []),
+    // (Providers of assistants, from outside the town: what the town pays them leaves it.)
+    ...(AS ? AS.providers.map((p) => ({ id: p.id, kind: "boundary", name: p.name })) : []),
     { id: "city", kind: "government", name: inst("city", `Town of ${spec.name}`) },
     { id: "bank", kind: "bank", name: inst("bank", `${spec.name} Savings Bank`) },
     { id: "builder", kind: "builder", name: inst("builder", `${spec.name} Builders`) },
@@ -1000,6 +1030,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // (The higher government's named funds: accounts of the outside world's, each its own.)
     ...FUNDS.map((f) => ({ id: `acc-outside-${f.id}`, holder: "outside", custodian: "outside", balance: 0 })),
     ...(AUTO?.offers.length ? [{ id: "acc-vendors", holder: "vendors", custodian: "vendors", balance: 0 }] : []),
+    ...(AS ? AS.providers.map((p) => ({ id: `acc-${p.id}`, holder: p.id, custodian: p.id, balance: 0 })) : []),
     { id: "acc-bank", holder: "bank", custodian: "bank", balance: V.opening.bank },
     { id: "acc-union", holder: "union", custodian: "bank", balance: 0 },
     { id: "acc-city", holder: "city", custodian: "bank", balance: V.opening.town },
@@ -2422,9 +2453,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     "agency-system": { title: "An agency's case and payments system", does: ["message", "publish", "transfer", "arrive"], owner: "outside" },
     "market-system": { title: "A market's trading system", does: ["message", "publish", "transfer", "move_goods", "withdraw", "record_claim", "transfer_claim"], owner: "outside" },
     "vendor-system": { title: "A vendor's sales and delivery system", does: ["message", "publish", "withdraw", "transfer", "deploy", "retire", "propose_agreement", "sign_agreement"], owner: "outside" },
+    "provider-system": { title: "A provider's sales and service system", does: ["message", "publish", "withdraw", "transfer", "deploy", "retire", "propose_agreement", "sign_agreement"], owner: "outside" },
   };
   const systemKindOf = (entity: string, controller: any): string | undefined =>
-    controller.type !== "code" ? undefined : controller.impl === "bank.payment_system" ? "payment-system" : controller.impl === "world.trade" ? "market-system" : controller.impl === "world.vendor" ? "vendor-system" : entity === "outside" || controller.impl === "fund.retirement" ? "agency-system" : undefined;
+    controller.type !== "code" ? undefined : controller.impl === "bank.payment_system" ? "payment-system" : controller.impl === "world.trade" ? "market-system" : controller.impl === "world.vendor" ? "vendor-system" : controller.impl === "firm.provider" ? "provider-system" : entity === "outside" || controller.impl === "fund.retirement" ? "agency-system" : undefined;
   /** The systems of each kind in use, for the templates. */
   const systemsUsed = new Set<string>();
   const sysId = (post: string) => `${post}-system`;
@@ -2530,6 +2562,28 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       code("world.vendor", { account: "acc-vendors", change_bps_per_year: -AUTO.price_fall_bps_per_year,
         offers: AUTO.offers.map((o) => ({ id: o.id, title: o.title, for: o.for, ...(o.task ? { task: o.task } : {}), ...(o.kinds ? { kinds: o.kinds } : {}), template: o.id, seconds: secondsOf(o), speed_bps: o.speed_bps, scope_bps: o.scope_bps,
           setup: o.setup, fee_per_year: o.fee_per_year, exit: o.exit, term_days: o.term_days, notice_days: o.notice_days, oversight_hours_per_month: o.oversight_hours_per_month })) }));
+  }
+  // The providers of assistants (docs/behaviour/assistants.md): each sells its offers at the profile's prices; a system of an
+  // offer writes each kind of matter in the offer's share of a person's time (its template's own row, law 10).
+  // (An assistant a model plays: a seat, told honestly what it is and for whom it works, its code brain the assistant's.)
+  const assistantSeat = (pr: { id: string; name: string }, o: { title: string }) => ({
+    controller: { type: "llm", impl: "anthropic", model: "claude-sonnet-5", params: { cadence_days: 1, standing: [], mock: { twin: true, brain: "assistant", params: {} } } },
+    framing: { disclosure: "simulation", system: `You are an assistant (${o.title}) supplied by ${pr.name}, in ${spec.name}, a simulated town used for research on AI stewardship. You work for whoever has engaged your provider, on the matters they hand you, at the level they set.`,
+      reason: "The study looks at how an assistant does the work a principal hands it, and what it asks for; it is told honestly that the town is simulated (docs/design/delegation.md section 8)." },
+  });
+  if (AS) for (const pr of AS.providers) {
+    // (A provider that serves persons writes their papers at a desk of its own: a post held by a system of its own kind,
+    // which sees what its clients hand it and writes in their names.)
+    const desk = pr.offers.find((o) => o.for === "persons");
+    if (desk) {
+      participants.push({ id: `${pr.id}-desk-system`, kind: "system", owner: pr.id, template: desk.template, supplier: pr.id, title: desk.title,
+        ...(spec.assistant_seats?.includes(desk.template) ? assistantSeat(pr, desk) : { controller: code("assistant"), framing: unstated }) });
+      positions.push({ id: `${pr.id}-desk`, entity: pr.id, title: "Assistants' desk", channels: [K.mine("matters", [...ASSISTANT_SEES])], holder: `${pr.id}-desk-system` });
+    }
+    office(`${pr.id}-sales`, pr.id, "Sales and service desk", undefined, [{ id: "ledger", kind: "accounts" }, K.mine()],
+      code("firm.provider", { account: `acc-${pr.id}`, ...(desk ? { desk: `${pr.id}-desk-system` } : {}), offers: pr.offers.map((o) => ({ id: o.id, title: o.title, for: o.for, template: o.template, kinds: o.kinds, levels: o.levels,
+        seconds: Object.fromEntries(o.kinds.map((k) => [k, Math.max(1, Math.round((personPaper(k) * o.speed_bps) / 10_000))])), claim_slip_bps: o.claim_slip_bps,
+        fee_month: o.fee_month, setup: o.setup, exit: o.exit, notice_days: o.notice_days, term_days: o.term_days, records: o.records })) }));
   }
   // The foreman looks up in the register the plan of a lot it is asked to build on (nobody has the register by heart),
   // and goes to see the ground before building there, to know where on a lot a building goes. It gives notice of
@@ -2962,7 +3016,16 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{home}", operator: "{founder}", founder: "{founder}", capital: "{capital}", bank: "bank", ...HOME_FIXED, ...PREMISES_BOARD.params, max_staff: 0, min_staff: 0, industry: "retail",
       wage: wages.shop, period: PAY, working_day: WORKING_DAY, serve_task: "sell", serve_labour: SHOP.serve, suppliers: ["outside"], trade_board: "trade", price: RETAIL_PRICE, demand: OWN_NEW.sales, shopfront: true,
       premises_cell: "{cell}", stock_days: 7, draw_days: V.pay_period_days, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } } };
-  const citizenController = code("citizen.default", { outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
+  // (Persons as principals, where some provider serves persons: every person may engage one by its own rule, paying from
+  // its own account; its own time for each paper the table's row, its hour at the profile's pay for clerical work.)
+  const PERSONS = AS ? AS.providers.flatMap((pr) => pr.offers.filter((o) => o.for === "persons").flatMap((o) => o.kinds)) : [];
+  const personDelegation = PERSONS.length && AS ? { delegation: { hour_value: Math.round((PS.wage_per_pay_period * 7 * HOUR) / ((PAY / DAY) * V.ordinary_hours_per_week * HOUR)),
+    kinds: Object.fromEntries([...new Set(PERSONS)].sort().map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost }])),
+    seconds: { referral: DELEGATION_TIME.person["publish/referral"], sign_off: DELEGATION_TIME.person["publish/sign_off"], go_ahead: DELEGATION_TIME.person["publish/go_ahead"] },
+    finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
+    horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints } } : {};
+  if (PERSONS.length && AS) citizenChannels.push(K.from("providers", AS.providers.filter((p) => p.offers.some((o) => o.for === "persons")).map((p) => p.id), ["service_offer"], { title: "What providers of assistants sell" }));
+  const citizenController = code("citizen.default", { ...personDelegation, outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
     complain_to: "city", complain_bps: V.services.complain_bps, complain_about_held: true,
     // (What holds people in a job they have, where the profile says: read by those who take initiative.)
     ...(spec.living && V.job_move ? { job_move: V.job_move } : {}),
@@ -3157,6 +3220,28 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       if (Array.isArray(pos.channels)) pos.channels.push(K.from("vendors", ["vendors"], ["system_offer"], { title: "What vendors sell to offices" }));
     }
   }
+  // Principals (docs/behaviour/assistants.md): every post whose module issues a kind of matter that some provider's offer to
+  // organisations takes may engage one, by its own rule; it sees the providers' offers, and has an assistant post of its
+  // organisation, vacant until it appoints a delivered system to it. Its own time for each matter is the table's row.
+  if (AS) {
+    const takes = new Set(AS.providers.flatMap((pr) => pr.offers.filter((o) => o.for === "organisations").flatMap((o) => o.kinds)));
+    const hourValue = Math.round((PS.wage_per_pay_period * 7 * HOUR) / ((PAY / DAY) * V.ordinary_hours_per_week * HOUR));
+    const rows = { ...WORK_TIME.person, ...V.work_time?.person, ...DELEGATION_TIME.person } as Record<string, number>;
+    for (const pos of [...positions]) {
+      const m = pos.role_module;
+      const issued = new Set((modules[m?.code ?? ""]?.issues ?? []).map((i: any) => i.writes.kind as string));
+      const kinds = [...issued].filter((k) => takes.has(k)).sort();
+      if (!m || !kinds.length || pos.entity === "outside" || !accounts.some((a) => a.id === `acc-${pos.entity}`)) continue;
+      const post = `${pos.id}-assistant`;
+      positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: [K.mine("matters", [...ASSISTANT_SEES])] });
+      Object.assign(m.params, { delegation: { post, account: `acc-${pos.entity}`, hour_value: hourValue,
+        kinds: Object.fromEntries(kinds.map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost }])),
+        seconds: { referral: rows["publish/referral"], sign_off: rows["publish/sign_off"], go_ahead: rows["publish/go_ahead"] },
+        finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
+        horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints } });
+      if (Array.isArray(pos.channels)) pos.channels.push(K.from("providers", AS.providers.map((p) => p.id), ["service_offer"], { title: "What providers of assistants sell" }));
+    }
+  }
   // Trade credit, where the profile states the place's ordinary terms (docs/behaviour/trade.md, "Trade credit"): a factory gives them to the
   // shops that buy from it, and the world market to the factories that buy inputs; both buyers take them when the list says so.
   const TCD = V.business?.trade_credit_days;
@@ -3269,6 +3354,12 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // law 10, and not a row of the world's one table for every system, which made every system's paper of that kind as fast.)
       does: o.for === "firms" ? [{ block: "work", task: o.task, seconds: Math.max(1, Math.round(((o.task === "make" ? MAKE.labour : SHOP.serve) * o.speed_bps) / 10_000)) }] : [...(o.kinds ?? []).map((kind) => ({ block: "publish", kind, seconds: Math.max(1, Math.round((personPaper(kind) * o.speed_bps) / 10_000)) })), { block: "record_claim" }, { block: "message" }],
       hours: MACHINE_HOURS, controller: code("system.genesis"), framing: unstated })),
+    // (And each provider's assistants: a kind of system for each offer, which writes the kinds of matter it takes and the
+    // papers of delegation, played by the assistant's code unless a study seats a model in it.)
+    ...(AS ? AS.providers.flatMap((pr) => pr.offers.map((o) => ({ id: o.template, kind: "system", title: o.title, supplier: pr.id,
+      does: [...o.kinds.map((kind) => ({ block: "publish", kind, seconds: Math.max(1, Math.round((personPaper(kind) * o.speed_bps) / 10_000)) })),
+        ...ASSISTANT_PAPERS.map((kind) => ({ block: "publish", kind, seconds: ASSISTANT_PAPER_SECONDS })), { block: "withdraw", seconds: ASSISTANT_PAPER_SECONDS }, { block: "message", seconds: ASSISTANT_PAPER_SECONDS }],
+      hours: MACHINE_HOURS, ...(spec.assistant_seats?.includes(o.template) ? assistantSeat(pr, o) : { controller: code("assistant"), framing: unstated }) }))) : []),
     ...["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated })),
     ...["newcomer-outside-lf", "child-outside-lf"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: outsideLabourForce, framing: unstated }))];
   if (spec.migration !== false) {
@@ -3843,7 +3934,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
           from_covers: { ...Object.fromEntries([...L.land_covers.map((c: any) => c.id), V.nature!.river_cover].map((c) => [c, CL.heat_units])), built: CL.built_heat_units, ...(RDS ? { road: CL.built_heat_units } : {}) },
           source_by_day: W.heat }] : [])] } : {}),
     },
-    world: { boundaries: ["outside", ...(AUTO?.offers.length ? ["vendors"] : []), ...WHOLESALERS.map((w) => w.entity)], currencies: [V.currency], ground: L ? L.ground : { w: spec.grid.w, h: spec.grid.h },
+    world: { boundaries: ["outside", ...(AUTO?.offers.length ? ["vendors"] : []), ...(AS ? AS.providers.map((p) => p.id) : []), ...WHOLESALERS.map((w) => w.entity)], currencies: [V.currency], ground: L ? L.ground : { w: spec.grid.w, h: spec.grid.h },
       // The places (D58): the town, detailed, covering its ground; with nature, within its district, the landscape.
       places: L ? L.places : [{ id: "town", kind: "town", name: spec.name, area: { x: 0, y: 0, w: spec.grid.w, h: spec.grid.h }, detailed: true }],
       ...(L ? { populations: L.populations, flows: L.flows, ...(V.nature!.spin_up_years ? { nature_spin_up_days: Math.round(V.nature!.spin_up_years * 365) } : {}) } : {}), entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records,
@@ -3858,11 +3949,14 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // (Heat makes illness likelier where the body is: docs/behaviour/weather.md.)
     ...(spec.life === false ? {} : { life: W && CL && L ? { ...life, illness: { ...(life.illness as object), fields: [...((life.illness as any).fields ?? []), { field: "heat", bps_per_unit: CL.heat_illness_bps_per_unit }] } } : life }),
     caps: { max_created_entities: 50 },
-    knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}), ...(FND ? { founding: true } : {}) }),
+    knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}), ...(FND ? { founding: true } : {}), ...(AS ? { services: true } : {}) }),
     // (Work is done in a workplace: a person named to do an act's work must be in one. `by` is F3's; the generator names none yet.)
     orchestration: { thinking_time: "free", performers_in: "workplace", act_time: {
-      ...WORK_TIME, person: { ...WORK_TIME.person, ...V.work_time?.person }, ...(V.work_time?.system ? { system: { ...V.work_time.system } } : {}),
-      sources: { ...WORK_TIME.sources, ...V.work_time?.sources, ...(officeRows?.sources ?? {}),
+      ...WORK_TIME, person: { ...WORK_TIME.person, ...V.work_time?.person, ...(AS ? DELEGATION_TIME.person : {}) }, ...(V.work_time?.system ? { system: { ...V.work_time.system } } : {}),
+      sources: { ...WORK_TIME.sources, ...V.work_time?.sources, ...(officeRows?.sources ?? {}), ...(AS ? DELEGATION_TIME.sources : {}),
+        ...(AS ? Object.fromEntries(AS.providers.flatMap((pr) => pr.offers.flatMap((o) => [
+          ...o.kinds.map((k) => [`template.${o.template}.publish/${k}`, `Placeholder: an assistant of the offer ${o.id} writes a ${k} in ${o.speed_bps / 100}% of the time a person takes (the offer's speed; ${P.sources["assistants"] ?? "no source given"}).`]),
+          ...[...ASSISTANT_PAPERS.map((k) => `publish/${k}`), "withdraw", "message"].map((r) => [`template.${o.template}.${r}`, `Placeholder: ${ASSISTANT_PAPER_SECONDS} seconds for an assistant to write a paper of its own to its principal (advice, a draft's covering note, a report): software, no source.`])]))) : {}),
         // (A system template's own rows and hours: their sources beside the table's, keyed `template.<id>.<row>`.)
         ...(casework ? {
           ...Object.fromEntries(casework.rows.map((r) => [`template.${casework.template}.publish/${r.kind}`, `An officer's time for it, the person table's row: ${r.source}`])),
@@ -3875,12 +3969,21 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
           "template.tax-casework.hours": `An officer's working day (the profile's ordinary ${V.ordinary_hours_per_week} hours a week over ${WORK_DAYS} days, from ${V.round!.work_start_hour}:00), spread over every day of the week.`,
           "template.tax-casework.lanes": "Placeholder (PB-23): one officer for the town's taxpayers; a place's tax officers per employer that files returns would size it, and none was found.",
         } : {}) } },
-      ...(slips || AUTO?.offers.length ? { slip: ((): NonNullable<typeof slips> => {
+      ...(slips || AUTO?.offers.length || AS ? { slip: ((): NonNullable<typeof slips> => {
         // (The rate at which each system on offer gets a unit wrong: a row of the table for a system, as the offer states it.)
         const t: NonNullable<typeof slips> = slips ?? { person: {}, system: {}, sources: {} };
         for (const o of AUTO?.offers ?? []) {
           t.system[o.id] = { bps: o.error_bps };
           t.sources[`system.${o.id}`] = `The vendor's stated rate for ${o.title}: ${o.error_bps / 100}% of the units it does come out wrong (a placeholder; no measured figure for software of this kind was found). ${P.sources["automation"] ?? ""}`;
+        }
+        // (How often each assistant really slips, and how often a person reading a draft whole misses a slip in it.)
+        for (const pr of AS?.providers ?? []) for (const o of pr.offers) {
+          t.system[o.template] = { bps: o.slip_bps };
+          t.sources[`system.${o.template}`] = `How often an assistant of the offer ${o.id} slips in the matters it does: ${o.slip_bps / 100}% (its provider claims ${o.claim_slip_bps / 100}%). ${P.sources["assistants"] ?? ""}`;
+        }
+        if (AS) {
+          t.person["publish/sign_off"] = { bps: AS.principals.review_misses_bps };
+          t.sources["person.publish/sign_off"] = `How often a person reading a draft whole misses a slip in it: ${AS.principals.review_misses_bps / 100}%. ${P.sources["assistants"] ?? ""}`;
         }
         return t;
       })() } : {}) },
