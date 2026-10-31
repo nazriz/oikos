@@ -134,10 +134,14 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // the law on leases of shop premises (law-premises-leases), the landlords their surrender price and tribunal, a business of one
 // the ground of premises it holds by agreement (generator 0.70.0); the genesis records are in the state. 4c714b3d..., a6a15d31...
 // and dd840c8e... for the configs, and e6916c32..., 47582857... and f94c4358... for the states, until then.)
+// (Re-taken on 2026-10-31 at years at 10,000, the states only (the config hashes do not move: a hall's room changes only
+// in towns over 3,333 people): an owner waiting on the register for its lot's plan is not homeless meanwhile and stops
+// no supply, and the works office sends its inspector one visit at a time; ffab69c8..., c5619171... and e5d66985...
+// until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "ffab69c84b6008517844f2a4a76b0a4cad02b3a12c4ccde3fc92e407849e07ba",
-  "gb-eng-2026": "c5619171a49013887eb5cb032ac0a475f7ccd9c2fc29aa356871156277749c7e",
-  "ke-nakuru-2026": "e5d66985773db518c6182e2b7ed7183eda37e5f6a12051e5e22bb133edc55033",
+  "au-vic-2026": "553de625f6f007559f7dc1ca1723cbe84bf3ec1c11bf410ec1ef6e316c3e7334",
+  "gb-eng-2026": "3aa5f1812f4aedd22a58d29e9badecc92dc68bc269fda2c145b1d52d2ad76206",
+  "ke-nakuru-2026": "aa994113c733f0fd2e72f32a8667dc883bf4e95676b524efefea103599d38e62",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
