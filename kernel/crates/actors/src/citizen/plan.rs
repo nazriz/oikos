@@ -56,7 +56,7 @@ impl Person {
         self.unpaid_wages(w);
         self.job_end(w);
         self.switch_start(w);
-        if self.s.home.is_none() && self.s.homeless_since.is_none() && self.s.living_at.is_none() {
+        if self.s.home.is_none() && self.s.homeless_since.is_none() && self.s.living_at.is_none() && !self.own_plan_pending() {
             self.s.homeless_since = Some(t);
         }
         self.offers(w);

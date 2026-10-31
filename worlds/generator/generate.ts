@@ -1038,7 +1038,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // (A town may be described as starting with fewer of them in work, or none: a works office that has still to take
   // its crew on. What its budget pays for is the same.)
   const crewAtStart = Math.max(0, Math.min(townCrew, Math.floor(spec.works_crew_at_start ?? townCrew)));
-  workplaces.unshift({ employer: "city", structure: "town-hall", space: "town-hall/workplace.1", wage: wages.construction, capacity: 20, start: crewAtStart, industry: "public_administration" });
+  // (Its room at the hall: 20 places, or the crew the town's size calls for where that is more: a hall built for 20
+  // in a town of 10,000 with a crew of 60 left the offices' staff at the hall locked out of work.)
+  const crewRoom = Math.max(20, townCrew);
+  workplaces.unshift({ employer: "city", structure: "town-hall", space: "town-hall/workplace.1", wage: wages.construction, capacity: crewRoom, start: crewAtStart, industry: "public_administration" });
   // ---- who staffs the town's own bodies (foundations F5; docs/behaviour/staffing.md) ----
   // Every post is held by a person of the town, hired through the same jobs as anyone's: the rates are the profile's (full-time
   // equivalents per 1,000 residents, at least one for a body), the pay is the profile's, and each body pays from what it has: the
@@ -1069,7 +1072,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // (Property managers run the letting offices of several landlords; each is employed by one of them.)
   const managers = landlords.length ? Math.min(landlords.length, heads(SR.property_management)) : 0;
   const managerEmployers = Array.from({ length: managers }, (_, j) => landlords[Math.floor((j * landlords.length) / managers)]!);
-  const hallRoom = 20 + bodies.filter((b) => b.where === "hall").reduce((x, b) => x + b.n, 0) + (V.nature ? V.nature.survey_staff : 0);
+  const hallRoom = crewRoom + bodies.filter((b) => b.where === "hall").reduce((x, b) => x + b.n, 0) + (V.nature ? V.nature.survey_staff : 0);
   const officesRoom = Math.max(1, bodies.filter((b) => b.where === "offices").reduce((x, b) => x + b.n, 0) + managers);
   /** How many a body keeps for its posts (the heads of the clinic, the school and the police are paid in their grants). */
   const headsOf = (entity: string) => bodies.filter((b) => b.entity === entity).reduce((x, b) => x + b.n, 0);

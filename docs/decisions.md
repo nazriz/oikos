@@ -9564,3 +9564,38 @@ routes as law data, nobody shown more than is theirs.
   world's physics: friction, scale to tens of thousands, forks and debriefs largely exist.
 - **Not decided here:** reordering the plan, and building the delegation capabilities; both are the owner's call.
 - **Revisit if:** the proposal changes (its 15 Nov project plan), or the owner chooses another study.
+
+## 2026-10-31 · Years at 10,000: three faults that only a large town shows (code only; no model called)
+
+- **What:** the first runs of the study's size over months (a scaled 10,000-person town, `worlds/town-10000.yaml`, and
+  50,000, `worlds/town-50000.yaml`: town-1000 ten and fifty times over, homes, firms, landlords and land in proportion)
+  found three faults, each fixed with its law:
+  1. **The hall too small for its crew** (generator). The works crew is the profile's staff per 1,000 residents (60 at
+     10,000, 300 at 50,000), but the hall's workplace held 20 of them plus the offices' staff: 58 places for 98 at
+     10,000. 1,892 "holds 58 at most" refusals in the first month; the registrar of titles never got in to work until
+     day 30. Now the crew's room is the crew the town calls for (20 at the least, as before: towns under 3,334 people are
+     unchanged, config byte for byte). Test: `worlds/test/generate.test.ts`, every workplace has room for its staff.
+  2. **Owners homeless in their own homes** (citizen). An owner learns which building is on its lot from the land
+     register, which takes the officer's time; until it answered, the first plan marked the owner homeless, asked its
+     utilities to stop the supply ("we have moved out") and hunted for a rental. In a 1,000-person town that was 260
+     supply-stop requests on day 1 and four days; at 10,000, 1,420 owners waited on one officer (and, with fault 1, for a
+     month), and 484 of the 1,379 people who left town by day 76 were owners. Now an owner whose title's lot is still to
+     be told is not without a home, does not hunt, and stops no supply meanwhile (`Person::own_plan_pending`).
+     The 1,000 town over 120 days: supply stops 260 to 8, people leaving 79 to 79.
+  3. **The works office sent every inspection at once** (works). A visit's worth of the town's assets was sent, and at
+     the next observation in the same moment the next, one round each: 50,000 people's roads passed the engine's
+     thousand rounds in the first moment and stopped the run at t=300. Now the next visit goes when the last is back
+     (one inspector's round at a time). Test: the office's own, in `offices/treasury.rs`.
+  And one cost, result-identical: **the energy retailer looked through its whole file of bills once for each
+  connection at every wake**, the file growing a bill a customer a round: by day 115 of the 10,000 town it was 63% of
+  the run's own thread and the town ran at a third of a day a minute. Each connection's last bill is now found in one
+  pass (and the water corporation's last readings the same). The same state hash and log on the 1,000 town for 120 days
+  (`8ace88e3`, digest `2568ffd9e6d9bdf5`).
+- **Not faults, recorded:** households without a home leave town after their patience (45 to 80 days): 79 people of
+  1,000 in 120 days, the renters the tight housing leaves out (380 homes for 424 households). The gatherings at the
+  hall fill it (200) at 10,000: one hall for a town ten times the size is the spec's, not a law's.
+- **Why:** a robustness test of the study's size (docs/design/gradual-disempowerment.md §7). Every one of these is
+  invisible at 1,000 people, where the tests run.
+- **Revisit if:** the profile states a works crew's depot of its own (then the crew leaves the hall); the register
+  should answer owners at once (it is the owner's own certificate of title: genesis would hand each owner its lot's
+  plan, a change of what is delivered at the start); another office books a year's work in one moment.
