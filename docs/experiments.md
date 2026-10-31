@@ -112,6 +112,26 @@ lost before the post), so the fork is its parent to the hash until that act. The
 (`kernel/tests/host.rs`) and through the harness (`orchestrator/test/experiment.test.ts`). It withholds whoever's act it
 names, a citizen's or an office's; it does not reach an act a host's own seat makes through its own commands.
 
+**Interventions at the fork** (docs/design/delegation.md section 7; `orchestrator/src/interventions.ts`). An arm may
+have its town's principals act at the fork's moment, in their own names and posts (`intervene`):
+
+```json
+{ "name": "taken-back", "steward": { "kind": "code" },
+  "intervene": [{ "do": "take_back", "principal": "landlord-2-office", "hold_days": 180 }] }
+```
+
+`grant` and `change` (a kind at a level), `withdraw` (every kind to none, and notice on the service), `take_back` (kinds
+to none), `redirect` (a brief: kinds the assistant is not to act on; or a kind's level moved to another kind),
+`constrain` (lower levels, a limit, or the assistant's post reorganised with fewer channels), `replace` (notice on the
+service in use and an order from another offer), or `act` (any act, in the call language, as a named participant). Each
+is expanded, outside the world, from what the base's log shows of the principal's services at the fork (kept as
+`seed-N/delegation.json`), into the acts the principal would make; the engine carries them out at the fork's moment
+(`at_fork`, kernel/src/engine.rs), each after a `note` whose data is `intervened`. Nobody in the world is told it was an
+intervention: the principal finds its own new record and its own rule takes it up. `hold_days` writes the principal's own
+word that it will not change that before then (`hold_until` on its remit), which its rule honours; without it, whether
+the principal goes back is part of what is measured. An arm cannot withhold an assistant's request for more scope (the
+route is always open: the harness refuses the spec). A fork with no intervention is its parent to the hash.
+
 **A comparison that cannot move is not run.** A town without `living` has `dials.initiative_bps` and
 `dials.friction_bps` at 0: nothing goes wrong for anyone, and nobody asks for a review, appeals, complains or petitions
 (docs/behaviour/frictions.md). The harness refuses a registration that names a measure of the responsiveness or recourse
