@@ -9784,3 +9784,17 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+
+## 2026-10-31 · Main red after years at 10,000: two slow tests, one a test fault, one held to one seed
+
+- **What:** the first merge of years at 10,000 (a521b7ec) left two slow-tier files red in CI, neither run by its gate.
+  `word-of-mouth.test.ts`: its reading of "what the teller could see when it decided" walked back over wakes that carry
+  on a plan by `woke_for === "done"`, which the Rust world's logged observations never say; a tip planned at the hall and
+  sent on the way home, one act after another, read as a tip about a building not in sight. A wake that brings the
+  outcome of one's own act now counts as carrying on. `own-venture.test.ts` ("someone who meant a business starts one"):
+  held to one seed and moved seven times before; after the owners' fix the one person of seed 1 who meant a business
+  already ran one. It now holds the rule over seeds 1 to 3 (the first three, not chosen: 1 has no occasion, 2 and 3
+  have), counting only those who meant one while running none.
+- **Why:** the owner's standing permission for test fixes; the plan's gap list had own-venture among the tests pinned to
+  one seed. Not a seed hop: the occasion is the draws', the rule is every run's.
+- **Revisit if:** the three seeds all lose the occasion (then the test needs a town that makes one, not more seeds).
