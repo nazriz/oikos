@@ -297,12 +297,24 @@ pub fn body_variables(cat: &crate::config::Catalogue, given: Option<&BTreeMap<Id
 
 /// A body variable's value at `t`, settled: its drift a whole day at a time since it was last set; and the time it's
 /// settled to (whole days on, so no part of a day's drift is lost when it's written back).
+/// A practised skill (foundations-2 E4) fades instead, by its half-life, toward its floor.
 pub fn body_variable_at(cfg: &crate::config::BodyVariableCfg, (v, at): (i64, i64), t: i64) -> (i64, i64) {
-    if cfg.per_day == 0 || t <= at {
+    if (cfg.per_day == 0 && cfg.practice.is_none()) || t <= at {
         return (v, at);
     }
     let days = (t - at) / 86_400;
+    if let Some(p) = &cfg.practice {
+        return (p.faded(v, days).clamp(cfg.min, cfg.max), at + days * 86_400);
+    }
     (v.saturating_add(cfg.per_day.saturating_mul(days)).clamp(cfg.min, cfg.max), at + days * 86_400)
+}
+
+/// A practised skill used for `seconds` at `t` (foundations-2 E4): settled to `t` (its fading), then the practice added.
+/// The time it is set from is `t` itself, so that a skill in use does not fade. Nothing for a variable that is no skill.
+pub fn practise(cfg: &crate::config::BodyVariableCfg, cur: (i64, i64), t: i64, seconds: i64) -> Option<(i64, i64)> {
+    let p = cfg.practice.as_ref()?;
+    let (v, _) = body_variable_at(cfg, cur, t);
+    Some((p.practised(cfg, v, seconds), t))
 }
 
 /// Someone leaving a space: who, why (they left, were removed, died, ...), and when.

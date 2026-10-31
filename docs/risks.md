@@ -569,6 +569,19 @@ The mechanism:
 - **Notice by:** Engagement and levels moving with a placeholder changed alone.
 - **Fix when:** before a study reads how much is delegated rather than what follows when it is.
 
+### ME-23 · Skills by use: every rate a placeholder, everyone an ordinary hand on day one
+- **Gap:** With `skills` on, how fast a skill is learnt and lost, its floor, and how slow a novice and how quick a master
+  are, are placeholders (the shapes from the literature, to confirm; none fitted); every person opens at an ordinary
+  hand's level in every skill, whatever they did before the run; one skill serves all of a person's papers; slips do
+  not move with skill; code minds plan by the table's stated times, not their staff's skill.
+- **Where:** `worlds/generator/skills.ts` (`SKILL_DEFAULTS`); `docs/behaviour/skills.md`; decisions 2026-10-31 "Skills by use".
+- **Effect:** How much slower taking work back is, and how long relearning takes, rest on these rates; with skills on, a
+  household's papers drift slower than the table's time where papers are done rarely; an office that plans a day by the
+  stated time is refused for time more often.
+- **L / I:** high / high for any finding about what taking work back costs · **Status:** open (2026-10-31)
+- **Notice by:** The cost of taking work back moving with a placeholder rate changed alone.
+- **Fix when:** before a study reads the size of what taking work back costs, rather than whether it rises with time unused.
+
 ## Public bodies and law
 
 ### PB-1 · A tribunal's time is often the wrong quantity

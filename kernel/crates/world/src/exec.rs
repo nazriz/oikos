@@ -1125,6 +1125,17 @@ impl<'a> Exec<'a> {
                 total = ((total as i128 * factor + 9_999) / 10_000).max(1) as i64;
             }
         }
+        // A practised skill (foundations-2 E4): the labour scales with the people's mean of it too, as it stands now.
+        if let Some(sk) = spec.as_ref().and_then(|x| x.skill.as_ref()).filter(|_| n_systems < who.len() && total > 0) {
+            if let Some(cfg) = self.s.config.catalogue.body_variables.iter().find(|v| v.id == sk.variable) {
+                let now = self.now();
+                let people: Vec<&Id> = who.iter().filter(|p| self.st.body(p).is_some()).collect();
+                if !people.is_empty() {
+                    let sum: i128 = people.iter().map(|p| self.st.body(p).and_then(|b| b.variables.get(&cfg.id)).map_or(cfg.initial, |x| crate::state::body_variable_at(cfg, *x, now).0) as i128).sum();
+                    total = sk.scale(cfg, (sum / people.len() as i128) as i64, total);
+                }
+            }
+        }
         // (How much of a performer's working day is left is read where the work is placed: on their timeline, when the act
         // begins. Here a work is refused only if it is longer than a day, or the world has no day.)
         let share = if who.is_empty() { 0 } else { (total + who.len() as i64 - 1) / who.len() as i64 };
@@ -1294,6 +1305,13 @@ impl<'a> Exec<'a> {
             }
         }
         let someone_there = !who.is_empty();
+        // Each person's share of the time is practice at the task's skill (foundations-2 E4).
+        if let Some(cfg) = spec.as_ref().and_then(|x| x.skill.as_ref()).and_then(|sk| self.s.config.catalogue.body_variables.iter().find(|v| v.id == sk.variable)) {
+            if total > 0 && !who.is_empty() {
+                let share = (total + who.len() as i64 - 1) / who.len() as i64;
+                self.practise(&who, cfg, share);
+            }
+        }
         self.emit(EventBody::Worked { task: task.into(), units, at, on, performers: who, labour: total, by: self.participant.into() });
         if let (Some(bodies), Some(ob)) = (&bodies, &on_body) {
             for b in bodies {
@@ -1350,6 +1368,18 @@ impl<'a> Exec<'a> {
             }
         }
         Ok(())
+    }
+
+    /// Time spent at a practised skill (foundations-2 E4): each person's skill settled to now and the practice added.
+    fn practise(&mut self, who: &[Id], cfg: &crate::config::BodyVariableCfg, seconds: i64) {
+        let now = self.now();
+        for p in who {
+            let Some(b) = self.st.entities.get_mut(p).and_then(|e| e.body.as_mut()) else { continue };
+            let cur = b.variables.get(&cfg.id).copied().unwrap_or((cfg.initial, now));
+            if let Some(new) = crate::state::practise(cfg, cur, now, seconds) {
+                b.variables.insert(cfg.id, new);
+            }
+        }
     }
 
     /// Work done to a body (services): its variables changed, and care given for its conditions (each once).

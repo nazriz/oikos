@@ -9765,3 +9765,43 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+## 2026-10-31 · Skills by use: practice and fading for every kind of work, a factor a run switches (foundations-2 E4; branch `f2-economy`; contract additions; a town without `skills` is as before, to the byte; no model called)
+
+- **What:** a body variable may be a **practised skill** (`practice`: `gain_bps_per_hour`, `half_life_days`, `floor`).
+  Its use is practice (each hour closes that share of the gap to the maximum: diminishing returns); unused, its part
+  above the floor halves every half-life, worked out when it is read or used (the lazy settling body variables already
+  had, so nothing is written a day). A task names one (`skill`: `variable`, `novice_bps`, `expert_bps`): its labour is
+  the stated labour at the variable's `initial`, in a straight line to `novice_bps` of it at the minimum and
+  `expert_bps` at the maximum, by the crew's mean (multiplying schooling's `labour_by`), and each person's share of the
+  time is practice. An act names one through the catalogue's `act_skills`, keyed as the table of work is (`publish/<kind>`,
+  else the block): a person's time for it scales the same way (`kernel.rs` `act_program`), and the doers practise it when
+  it is done. The contract refuses a skill on a variable that is not practised, and a practised variable that also drifts.
+  The generator's `skills` (off unless set; `true`, or a study's rates; `only` to make some skills live and not others)
+  gives each kind of work in the town a skill (each task that takes time, by the stem of its id) and a person's papers
+  one (`publish`, any kind), with the opening level derived: where a full-time worker settles at the run's rates over
+  the profile's working week, so the table's times stay an ordinary hand's.
+- **Why this way:** the owner's study treats skill decay as an experimental factor, so it is a switch with rates, not a
+  law always on; its shapes are the literature's (a law of practice with diminishing returns, fading by time unused) and
+  every size a placeholder, counted by law 11. Grouping by the stem keeps the generator free of a hand list of trades.
+  An ordinary hand's opening level keeps a town with skills on as quick as one without on its first day, so what differs
+  later is practice and fading, not a start of novices.
+- **Not built, and why:** slips by skill (no source for how a person's slip rate moves with practice: foundations-2 7.4
+  says "where a source gives one"); per-kind skills for papers (the kernel takes them; the generator groups all papers
+  in one, a choice to revisit if a study needs it); the code minds' plans and the delegation rule still use the table's
+  stated times, not their own skill (the kernel refuses work that does not fit the day, as it does for schooling); the
+  measure of who can still do the work (M8, step E6).
+- **Known limits:** everyone opens at the ordinary level in every skill (the generator does not know who did what before
+  the run); a person who does a kind of work part time drifts below the table's time, and someone who files a paper a
+  month drifts toward the floor, so with skills on a household's papers take longer than the table says after a year or
+  two. That is the mechanism at placeholder rates; a study sets its own.
+- **Found on the way:** 90 days of the 300-person town with skills on against off: the same work, a little slower where a
+  skill is used part time (a survey 4% longer, the food factory's making longer), and 116 refusals for time against 20.
+  Nearly all are the environment office asking its crew, every look, for a day's fieldwork sized by the task's stated
+  time when the crew's own is longer: it records the time left but not the crew's pace, so it asks again. The same
+  fault shows off (18 of the 20); fixing it moves every town's hash, so it is left for its own change (the shared
+  `common::Pace`, which learns a crew's pace from such refusals, is the fix).
+- **Off, as before:** absent or `false`, the generator returns the config untouched (`worlds/test/generate.test.ts`
+  holds it to the byte, and holds the town with skills on to the plain town but for the skills); the kernel's new paths
+  run only where a world names a practised skill.
+- **Revisit if:** a source gives slip rates by practice, or skill half-lives by kind of work; a study needs papers'
+  skills by kind; the opening level's assumption (everyone an ordinary hand) shows in results.
