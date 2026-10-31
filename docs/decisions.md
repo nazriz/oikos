@@ -9679,3 +9679,19 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+
+## 2026-10-31 · A crew's day three times as long, traced: the seat held until each order began (MT-23) (branch `mt23-crew`; no model called)
+
+**What.** On 2026-10-24 the seat-diary run's day 21 showed a works crew's forty notices taking 310 minutes where every
+other working day took 106 to 121, the crew's acts one after another. Traced to a mechanism fault already fixed:
+until foundations-2 P1 (`fc5eabd`, 2026-10-25) an actor who only orders an act was held on its own time until the work
+began, so a seat's orders queued behind whichever member of its crew was busy; P1 places the order when the actor is
+free and lets it go on. On current main every working day is alike (105 minutes of crew work a day in the 600-person
+town, days 1 to 22; 31 minutes in the town of the usual size, days 1 to 30). Not re-run on the old kernel (a cold
+build); the trace is from the code, the decision of 2026-10-25 and the dates, and is recorded as such.
+- **The measure was wrong too.** The test's `spanOf` read the log time of `action_started`, which since P1 is when the
+  seat gave the order (16 minutes a day), so its bound held whatever the crew did. It now reads the work's own `starts`
+  and `done`, and every working day is held under three hours, not the middle day (the median was a stand-in while the
+  outlier was untraced). No pinned hash moves: a test-side change only.
+- **Revisit if:** a day over the bound again (then look at who in the crew was busy, and with what, from the log's
+  timelines).
