@@ -38,7 +38,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [~] Compact minds and memories (a cloud agent, branch `mem-minds`).
   - [x] A state hash worked out as it goes, without the cache of encoded copies (`mem-state-hash`, a60f9ae3).
   - [x] What people have seen, held compactly (any bound on what they remember is a law: to the owner first) (`mem-seen`, 7f81ceb3: held once for all who see it the same; no bound). Records delivered (`mem-delivered`) and buildings' facts (`mem-facts`) the same way.
-  - [ ] No whole-world copies during a step.
+  - [x] No whole-world copies during a step (`mem-no-copies`: what an act's copy of the state still copied whole, nature's fields, the network's lists, takings, floods and scarce sales, now shared; byte-identical, no change at the peak).
   - [x] 50,000 people for a month and 100,000 for a week, measured (with `mem-minds`: 14.7 GB and 604 s; 31.0 GB and 320 s; docs/design/performance.md).
 - [x] **Foundations-2, phase 1: capacity** (law 10). Every act has a time, every system its hours and lanes; casework
   done by officers' minutes (WM-14). Landed at 0824efb6; tag `pre-foundations-2` is main at 8570d699, before it.
