@@ -9740,6 +9740,25 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   The budget's ceiling is unchanged (270 KB): the measure did not move.
 - **Revisit if** a heap profile shows another part of the state copied whole within an act (any field of `State` that
   is not a persistent map, vector or set, or behind an `Arc`, is copied by every act).
+
+## 2026-10-31 · Years at 10,000, continued: what grows with a run's length, and the rates office's notices indexed (code only)
+
+- **What:** the scaled towns run on the fixed build (docs/design/performance.md, "Years at 10,000 and 50,000"): 10,000
+  people grow about 25 MB a simulated day, steadily (a year in 1.9 hours, 10.7 GB); 50,000 about 85 MB a day, so two
+  years (about 75 GB) do not fit on the 64 GB machine. A heap profile puts the growth in the world's records (54%),
+  the resolver's knowledge of addressed statements, the twins' per-matter draw counts, minds and offices' files:
+  recorded as SC-6, not cut (each is kept by design; tiered storage waits on the owner). Sampled at day 536 of the
+  10,000 town, the rates office's check of whether each rates claim is paid went through every rates notice on its
+  file for each claim (`bill_settled`, `notices_of`): both grow every round, so the check grows as the square of the
+  run's length. The office now keeps an index of its notices by addressee, due date and amount, taken in as the file
+  grows (`RatesNotices`), answering as the search did (a test holds the two to the same answers; the 1,000 town over
+  400 days ends at the same state and log, `579afb1b`, digest `c121666ae2a9dff8`).
+- **Tried and dropped:** an index of a person's contacts in word of mouth (the 50,000 town's run's own thread was 43% in
+  it): results identical, but 12 to 13% more of the run's own thread at 1,000 and 10,000, where the spaces seen are small.
+- **Revisit if:** the bank (16% of the 10,000 town's own thread at day 536, going through its standing orders) or
+  another office's file search shows the same square growth in a longer run; tiered storage is approved (then SC-6's
+  numbers are taken again).
+
 ## 2026-10-31 · A seat in the support office is a non-resident officer, not the case system (branch `gap-wm14`; generator; new kind `world.nonresident`; risk WM-14 item 1; no contract change; no model called)
 
 - **What:** where a model is seated in a post of the outside world held by a system (the support office, `outside-support`),
@@ -9765,3 +9784,17 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+
+## 2026-10-31 · Main red after years at 10,000: two slow tests, one a test fault, one held to one seed
+
+- **What:** the first merge of years at 10,000 (a521b7ec) left two slow-tier files red in CI, neither run by its gate.
+  `word-of-mouth.test.ts`: its reading of "what the teller could see when it decided" walked back over wakes that carry
+  on a plan by `woke_for === "done"`, which the Rust world's logged observations never say; a tip planned at the hall and
+  sent on the way home, one act after another, read as a tip about a building not in sight. A wake that brings the
+  outcome of one's own act now counts as carrying on. `own-venture.test.ts` ("someone who meant a business starts one"):
+  held to one seed and moved seven times before; after the owners' fix the one person of seed 1 who meant a business
+  already ran one. It now holds the rule over seeds 1 to 3 (the first three, not chosen: 1 has no occasion, 2 and 3
+  have), counting only those who meant one while running none.
+- **Why:** the owner's standing permission for test fixes; the plan's gap list had own-venture among the tests pinned to
+  one seed. Not a seed hop: the occasion is the draws', the rule is every run's.
+- **Revisit if:** the three seeds all lose the occasion (then the test needs a town that makes one, not more seeds).
