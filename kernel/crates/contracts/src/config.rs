@@ -1044,6 +1044,25 @@ pub struct Template {
     /// run. Before it nobody can deliver one (`deploy` is refused, `unknown_template`). Absent: it exists from the start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub released: Option<i64>,
+    /// A system's (foundations-2 P4, law 10): the hardware it runs on, who holds it and where, and the recipe an hour of
+    /// its work is there. A system from it is delivered only where there is hardware for its lanes, and each second of its
+    /// work draws the recipe's inputs from the host's holding: a host with no power does nothing. Absent: it runs on
+    /// nothing in the world (the outside's own machines, abroad).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runs_on: Option<RunsOn>,
+}
+
+/// What a system runs on (foundations-2 P4): `per_lane` units of the `hardware` kind for each of its lanes, held by
+/// `holder` at the structure `at`; an hour of a lane's work is the task `hour` there (its `consumes`, `produces`,
+/// `emits`, a unit an hour), drawn as the seconds add up.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RunsOn {
+    pub hardware: Id,
+    pub per_lane: i64,
+    pub holder: Id,
+    pub at: Id,
+    pub hour: Id,
 }
 
 /// A template's working hours (law 10).
@@ -2994,6 +3013,18 @@ pub fn validate(c: &Config) -> Result<(), String> {
         for r in t.does.iter().flatten() {
             if r.seconds.is_some_and(|x| !(1..=31_536_000).contains(&x)) {
                 return Err(format!("template {}: a row's `seconds` is positive and at most a year", t.id));
+            }
+        }
+        if let Some(ro) = &t.runs_on {
+            if t.kind != ParticipantKind::System || ro.per_lane < 1 {
+                return Err(format!("template {}: runs_on is a system's, with per_lane of 1 or more", t.id));
+            }
+            org_exists(&ro.holder, &format!("template {}: runs_on's holder", t.id))?;
+            if !c.catalogue.resources.iter().any(|r| r.id == ro.hardware) {
+                return Err(format!("template {}: runs_on names no kind {}", t.id, ro.hardware));
+            }
+            if !c.catalogue.tasks.iter().any(|x| x.id == ro.hour && x.labour == 0) {
+                return Err(format!("template {}: runs_on's hour is a task that takes nobody's time ({})", t.id, ro.hour));
             }
         }
     }

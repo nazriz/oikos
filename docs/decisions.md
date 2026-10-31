@@ -10037,3 +10037,29 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   town with capability to the plain town but for its releases and its tag).
 - **Revisit if:** a study needs capability as a continuous path rather than releases; a scenario's sizes find sources;
   buyers should replace delivered systems as releases come out (that is a buyer's rule, with a real basis, not this).
+## 2026-11-01 · Compute in the town: what a system runs on, and a host on the town's network (foundations-2 P4 and E5; branch `f2-economy`; contract addition; new kind `firm.host`; a town without `hosting` is as before, to the byte; no model called)
+
+- **What:** the kernel's `runs_on` (foundations-2 4.1, P4): a system's template says the hardware it runs on (a kind, so
+  many units a lane), who holds it and where, and the recipe an hour of its work is there. A `deploy` is refused when the
+  hardware held does not cover the lanes of the systems there and the new one's; a hosted system's seconds of work (its
+  own acts, the acts it is named on, its share of a work) add up, and each whole hour is the recipe at the host, its
+  inputs taken from the holding there (refused, `insufficient_quantity`, when they are not there: a host with no power
+  does nothing). The generator's `hosting: "local"` (with `assistants`, the network and the profile's `values.hosting`)
+  puts the providers' systems at a hosting firm in the town: a building on a lot of its own (the last taken), its servers,
+  an electricity, a water and a sewer connection sized by a day at full work, held there rather than used as it comes, and
+  the feeders and mains sized with it; an hour of a server's work (`compute`) is its draw times the building's PUE, with the
+  grid's emissions, and its cooling water out to the sewer. `firm.host` uses each day what came in beyond a day's full work
+  kept in hand (the plant: idle servers, cooling), and pays the bills addressed to it; each provider pays it a fee a month
+  (`hosting` on `firm.provider`), its power and water at the tariffs with a margin. Figures in au-vic, with sources to
+  confirm or marked placeholders (risk ME-24).
+- **Why this way:** foundations-2 asks that compute compete for energy, water and land through laws 8 and 9 with nothing
+  built for AI: a data centre is a building and a firm like any other, on the same network, and the systems on it draw
+  through the same holdings and recipes as any work. The per-act draw with a remainder carried keeps law 8 exact (no part
+  of an hour lost or invented); a delivery refused without hardware keeps a system from running on nothing.
+- **Not built, and why:** the host entering by expected profit (step E3); the households' hourly shape on its connection
+  (the kind's, one shape for every connection: a known limit of C3); evaporation (no recipe carries water to the air yet);
+  its staff and its servers' wear; every other workplace on the network (WM-15, its own item).
+- **Off, as before:** absent `hosting`, the generator emits nothing new (the network's users are the homes as before);
+  the kernel's new paths run only for a template that says what it runs on, and the provider's state carries nothing new.
+- **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
+  connection's rate; the placeholders find sources (ME-24).
