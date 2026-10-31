@@ -823,9 +823,16 @@ impl Person {
             let (owe, every) = commitment_of(r, &me);
             let Some(m) = owe.and_then(|o| o.money) else { continue };
             b.granted_at = Some(t);
-            signs.push((r.id, m.to, m.amount, every.unwrap_or(MONTH)));
+            // (A loan for a business we asked to borrow for: weighed again, at its repayment, before we sign.)
+            let for_business = crate::common::bases_of(r).iter().filter_map(|a| self.book.get(a)).any(|a| a.speaks_for.as_deref() == Some(me.as_str()) && data(a).s("purpose") == Some("a business"));
+            signs.push((r.id, m.to, m.amount, every.unwrap_or(MONTH), for_business));
         }
-        for (id, to, amount, every) in signs {
+        for (id, to, amount, every, for_business) in signs {
+            if for_business && !self.take_start_loan(w, amount) {
+                // (Not taken: the business would not pay us enough beside its repayment. The offer stands unsigned.)
+                self.money.borrowing.granted_at = None;
+                continue;
+            }
             let words = money_words(amount, &w.cx.ctx.world);
             let p = pay(&to, amount, Pay { from: Some(account.clone()), every: Some(every), first: Some(every), basis: Some(id.to_string()), for_: Some("Loan repayment.".into()), ..Default::default() }, w.cx);
             w.push(because(format!("The loan we applied for is offered: signing, and asking our bank to pay the {words} a month."), vec![sign(&id), p]));

@@ -400,5 +400,7 @@ export const FIGURE_BASIS: Basis[] = [
   derived("templates.*.hours.from", "when a system's day begins: a machine's midnight (all day), or an officer's working day from the profile's round.work_start_hour"),
   derived("templates.*.hours.seconds", "how long a system's day is: a machine's whole day, or an officer's working day (ordinary_hours_per_week) times the town's share of officers; act_time.sources template.<id>.hours"),
   prof("participants.*.lanes", "public_service.support_officers_per_1000_claims"),
+  prof("participants.*.controller.params.start_loan_months", "credit.max_months"),
+  prof("templates.*.controller.params.start_loan_months", "credit.max_months"),
 ];
 export { conv, derived, placeholder, prof };
