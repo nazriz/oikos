@@ -97,11 +97,12 @@ pub struct State {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub totals: BTreeMap<Id, i64>,
     /// Buildings under water now (world-expansion 7.3).
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub flooded: BTreeSet<Id>,
+    #[serde(default, skip_serializing_if = "imbl::OrdSet::is_empty")]
+    pub flooded: imbl::OrdSet<Id>,
     /// Goods taken without consent (world-expansion 7.3): the truth, which investigation can find.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub takings: Vec<Taking>,
+    /// (A persistent vector, like the maps: it grows with the run, and an act's copy of the state shares it.)
+    #[serde(default, skip_serializing_if = "imbl::Vector::is_empty")]
+    pub takings: imbl::Vector<Taking>,
     /// Questions put to a register's keeper that nobody was there to answer (no one of its posts present and on duty), in
     /// the order asked: taken up, one after another, when someone is (checked each hour while any are held).
     ///
@@ -127,8 +128,8 @@ pub struct State {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub network: Option<Arc<crate::network::NetState>>,
     /// What each edge has sold of a scarce kind this period (`edge|kind` -> (the period, how much)): foundations-2 C6.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub scarce_sold: BTreeMap<String, (i64, crate::money::Money)>,
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub scarce_sold: Map<String, (i64, crate::money::Money)>,
 }
 
 /// A vehicle as the world keeps it (reserved shapes for travel).
