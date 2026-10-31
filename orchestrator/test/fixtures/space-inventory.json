@@ -1,0 +1,91 @@
+{
+  "about": "Law 9, everything physical is somewhere and moves only along a network (docs/design/foundations-2.md section 3): today's violations, found by orchestrator/test/everything-is-somewhere.test.ts in every profile's town and the modules' sources, and by everything-is-somewhere-runs.test.ts in a month of each town's log. `found` lists each audit's findings as it names them; `entries` are the special cases the plan deletes, each a literal string `find` in `file` and the step that deletes it. The inventory only shrinks: a finding not listed fails the backstop, and so does a listed finding or entry no longer found, so the change that ends a case removes it here, with a line in docs/decisions.md. A step that has landed is in `done`: its entries stay, as guards.",
+  "done": [
+    "S1"
+  ],
+  "found": {
+    "unlocated": [
+      "agency-casework: a system with no place (the hardware it runs on held nowhere)",
+      "agency-system: a system with no place (the hardware it runs on held nowhere)",
+      "bodies in no space at the start, so nowhere (the unhoused)",
+      "market-system: a system with no place (the hardware it runs on held nowhere)",
+      "payment-system: a system with no place (the hardware it runs on held nowhere)",
+      "tax-casework: a system with no place (the hardware it runs on held nowhere)",
+      "vendor-system: a system with no place (the hardware it runs on held nowhere)"
+    ],
+    "edgesWithoutNode": [
+      "outside: an edge with no node, so what it sells and takes arrives nowhere",
+      "vendors: an edge with no node, so what it sells and takes arrives nowhere",
+      "wholesale-eating_out: an edge with no node, so what it sells and takes arrives nowhere",
+      "wholesale-food: an edge with no node, so what it sells and takes arrives nowhere",
+      "wholesale-personal_services: an edge with no node, so what it sells and takes arrives nowhere",
+      "wholesale-recreation: an edge with no node, so what it sells and takes arrives nowhere",
+      "wholesale-transport: an edge with no node, so what it sells and takes arrives nowhere"
+    ],
+    "waysOffNetwork": [
+      "road: ground crossed quicker than on foot, a way that is no link of the network"
+    ],
+    "uncarried": [
+      "kernel/crates/actors/src/boundary/trade.rs: goods moved with no carrier",
+      "kernel/crates/actors/src/citizen/money.rs: goods moved with no carrier",
+      "kernel/crates/actors/src/citizen/work.rs: goods moved with no carrier",
+      "kernel/crates/actors/src/market/producer.rs: goods moved with no carrier",
+      "kernel/crates/actors/src/market/retailer.rs: goods moved with no carrier",
+      "kernel/crates/actors/src/offices/treasury.rs: goods moved with no carrier"
+    ],
+    "uncarriedMoves": [
+      "citizen.default: goods moved from one place to another with no carrier",
+      "city.works: goods moved from one place to another with no carrier",
+      "firm.producer: goods moved from one place to another with no carrier",
+      "firm.retailer: goods moved from one place to another with no carrier",
+      "world.trade: goods moved from one place to another with no carrier"
+    ],
+    "workElsewhere": [
+      "city.works: collect done on a building elsewhere, its crew where they were",
+      "city.works: maintain done on a building elsewhere, its crew where they were",
+      "firm.builder: build done on a building elsewhere, its crew where they were"
+    ]
+  },
+  "entries": [
+    {
+      "id": "road-by-cover",
+      "law": 9,
+      "step": "S2",
+      "kind": "delete",
+      "file": "worlds/generator/generate.ts",
+      "find": "...(RDS ? { road: RDS.seconds_per_cell } : {})",
+      "what": "a road as a cheap cover of the ground (a car's speed baked into the cell), not links of the network with a speed and a capacity (foundations-2 3.1)",
+      "plan": "3.4 S2"
+    },
+    {
+      "id": "trip-where-one-set-out",
+      "law": 9,
+      "step": "S3",
+      "kind": "delete",
+      "file": "kernel/crates/world/src/kernel.rs",
+      "find": "// (Going somewhere takes the trip: the longest of the act's moves, from where each body is to the building it's",
+      "what": "a trip's time spent where one set out: the body stays where it was until it arrives, and is in no transit (foundations-2 3.1, bodies travel)",
+      "plan": "3.4 S3"
+    },
+    {
+      "id": "goods-move-anywhere",
+      "law": 9,
+      "step": "S4",
+      "kind": "delete",
+      "file": "kernel/crates/world/src/exec.rs",
+      "find": "Block::MoveGoods { kind, quantity, from_at, to, to_at } => {",
+      "what": "goods moved between any two places at once, with no carrier (foundations-2 3.1, goods are carried)",
+      "plan": "3.4 S4"
+    },
+    {
+      "id": "crews-from-the-depot",
+      "law": 9,
+      "step": "S4",
+      "kind": "delete",
+      "file": "kernel/crates/world/src/exec.rs",
+      "find": "// What's worked on: bodies (a person there, or everyone in a space of the place), or a structure.",
+      "what": "work on a building done from wherever the crew is (a depot), with no way there (foundations-2 3.3; phase-b-production 7)",
+      "plan": "3.4 S4"
+    }
+  ]
+}

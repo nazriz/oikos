@@ -17,6 +17,7 @@
   "orchestrator/test/elections.test.ts": "several seeds or towns (86 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/entity-records.test.ts": "towns run a year or more (190 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/entry.test.ts": "towns run a year or more; several seeds or towns (71 s on 2026-10-24, the whole suite at once)",
+  "orchestrator/test/everything-is-somewhere-runs.test.ts": "nine towns run for a month each: about 32 s alone on 2026-10-31 (law 9's backstop read from logs: goods moved uncarried, work on a building from afar; foundations-2 S1)",
   "orchestrator/test/figures.test.ts": "every profile's town generated and counted, two of them living (115 s in the merge gate of 2026-10-25, over the gate's 90 s file limit; the other files of that gate ran at their recorded times)",
   "orchestrator/test/founding.test.ts": "several seeds or towns (106 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/hazards.test.ts": "several towns run for months (55 s on 2026-10-24, the whole suite at once)",
