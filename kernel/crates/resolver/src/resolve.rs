@@ -1190,6 +1190,7 @@ impl Resolver<'_> {
             ("then", then.map(Json::from)),
             ("termination", (!termination.is_empty()).then(|| json!(termination))),
             ("text", text.map(Json::from)),
+            ("attrs", Self::json_(c, "attrs")?.filter(|a| a.is_object())),
         ]);
         Ok(vec![
             obj(vec![("block", some("propose_agreement")), ("ref", some(r.clone())), ("speaks_for", some(me.clone())), ("basis", basis), ("visible_to", vis), ("terms", some(terms))]),
