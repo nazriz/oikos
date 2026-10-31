@@ -14,8 +14,11 @@
   eight cells around the two ends; each cell costs what its cover says, `travel.by_cover`, else
   `travel.seconds_per_cell`), or on foot to the nearest road, along the roads (driven at the lower of the vehicle's
   speed and the road's, or walked), and on foot from the road to the door, whichever is quicker (law 9,
-  foundations-2 S2). The body arrives when the act is done: until then it's where it was. From nowhere (arriving,
-  newborn) there's no trip.
+  foundations-2 S2). The body sets out when the act starts and is on its way until the act is done (S3): out of
+  the space it left and in no building, so nothing is done to it or by it at any place on the way, and anyone looking
+  sees it in neither. A move refused when it arrives (the space filled meanwhile) brings it back where it set out (the
+  way there and back is the known limit). A person's visit to go and look is a trip there and back: away from where
+  they were for its whole time. From nowhere (arriving, newborn) there's no trip.
 - **Vehicles.** A vehicle is driven by its owner or someone its owner lets, from where it stands, and stands where it
   was driven to.
 - **Where a body is** is in its own view (`body.in`).
@@ -88,5 +91,4 @@ Working hours 9 to 5, Monday to Friday, for everyone (shops included: a liberty;
 
 - Traffic, congestion, fuel, public transport, parking. Worn roads aren't slower. A household has one vehicle at most, and it is bought by nobody: the ones the town opens with are all there are.
 - Rosters: everyone works the same hours, five days.
-- **Being in transit:** a body is where it was until it arrives.
 - Nights out, errands, visiting: people are at work, school, the clinic, a gathering, or home.

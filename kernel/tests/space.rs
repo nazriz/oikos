@@ -5,6 +5,8 @@
 //!   in two. (Going somewhere takes the trip: `services.rs`, `a_body_is_in_one_place_and_going_somewhere_takes_the_trip`.)
 //! - **S2:** roads are ways: a trip goes along them at the vehicle's speed (or on foot), a road with a gap is no way
 //!   through, a vehicle is driven only by whoever may and only from where it stands, and stands where it went.
+//! - **S3:** a body on its way is in no building from when it sets out until it arrives (the property, and a trip by car),
+//!   its vehicle with it; a trip refused on arrival brings it back where it set out.
 
 mod common;
 
@@ -25,6 +27,11 @@ fn check_run(config: Value, ops: &[Op]) -> Result<usize, TestCaseError> {
         let Some(resp) = step(&mut run, &cmd) else { continue };
         went += resp.events.iter().filter(|e| matches!(e.body, EventBody::Occupied { .. })).count();
         let st = run.kernel().state();
+        // (S3: a body on its way is in no building, and arrives no sooner than it set out.)
+        for (body, tr) in st.transit.iter() {
+            prop_assert!(st.structures_of(body).is_empty(), "{} is on its way and in {:?}", body, st.structures_of(body));
+            prop_assert!(tr.arrives >= tr.departed);
+        }
         let mut seen = std::collections::BTreeMap::<&str, &str>::new();
         for (structure, spaces) in st.occupancy.iter() {
             for body in spaces.values().flatten() {
@@ -143,4 +150,55 @@ fn a_road_with_a_gap_is_no_way_through_and_a_world_with_a_way_says_how_big_a_cel
     let mut w = road_world();
     w["travel"]["vehicle_types"][0].as_object_mut().unwrap().remove("speed_kmh");
     assert!(Run::start(w, "space-speed", Vec::new(), None).is_err());
+}
+
+// ----------------------------------------------------------------------------------------------------------------- S3: on the way
+
+fn start_go(run: &mut Run<Vec<u8>>, who: &str, space: &str, vehicle: Option<&str>) -> (i64, i64, Vec<EventBody>) {
+    let mut b = json!({"block": "occupy", "space": space});
+    if let Some(v) = vehicle {
+        b["vehicle"] = json!(v);
+    }
+    let cmd = direct(who, None, serde_json::from_value(json!([b])).unwrap()).unwrap();
+    // (Begun, not carried through: the act is under way.)
+    let r = run.command(&cmd).unwrap();
+    let (s, d) = r.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { starts, done, .. } => Some((*starts, *done)), _ => None }).unwrap();
+    (s, d, r.events.into_iter().map(|e| e.body).collect())
+}
+
+#[test]
+fn a_body_on_its_way_is_in_no_building_until_it_arrives_and_its_car_goes_with_it() {
+    let mut run = Run::start(road_world(), "space-transit", Vec::new(), None).unwrap();
+    let (starts, done, events) = start_go(&mut run, "alice-self", "s-shop/dwelling.1", Some("car-1"));
+    // She sets out at once: out of her home, on her way, the car with her.
+    assert!(events.iter().any(|e| matches!(e, EventBody::Vacated { occupant, .. } if occupant == "alice")));
+    assert!(starts < done);
+    let st = run.kernel().state();
+    assert!(st.structures_of("alice").is_empty(), "on her way, she is in no building");
+    assert_eq!(st.transit["alice"].to, "s-shop");
+    assert_eq!(st.vehicles["car-1"].at, "alice", "the car is on the road with her");
+    // Bob cannot take the car she is driving; she knows where she is going and when she gets there.
+    assert_eq!(go(&mut run, "bob-self", "s-house/dwelling.1", Some("car-1")), Err(RefusalCode::NotPresent));
+    let o = run.command(&Command::Observe { participant: "alice-self".into(), only: None }).unwrap().observation.unwrap();
+    assert_eq!(serde_json::to_value(&o).unwrap()["body"]["on_way"], json!({"to": "s-shop", "arrives": done}));
+    // She arrives when the trip is done, and the car is there.
+    run.command(&Command::Advance { to: done + 1 }).unwrap();
+    let st = run.kernel().state();
+    assert_eq!(st.structures_of("alice"), vec![oikos_kernel::blocks::Id::new("s-shop")]);
+    assert!(st.transit.is_empty());
+    assert_eq!(st.vehicles["car-1"].at, "s-shop");
+}
+
+#[test]
+fn a_trip_refused_on_arrival_brings_the_body_back_where_it_set_out() {
+    let mut run = Run::start(road_world(), "space-back", Vec::new(), None).unwrap();
+    let (_, done, _) = start_go(&mut run, "alice-self", "s-shop/dwelling.1", None);
+    // While she walks, carol takes the shop's one bed.
+    let (_, carol_done, _) = start_go(&mut run, "carol-self", "s-shop/dwelling.1", None);
+    assert!(carol_done < done);
+    let out = run.command(&Command::Advance { to: done + 1 }).unwrap();
+    assert!(out.events.iter().any(|e| matches!(e.body, EventBody::ActionRefused { code: RefusalCode::CapacityExceeded, .. })));
+    let st = run.kernel().state();
+    assert_eq!(st.structures_of("alice"), vec![oikos_kernel::blocks::Id::new("s-house")], "back home");
+    assert!(st.transit.is_empty());
 }

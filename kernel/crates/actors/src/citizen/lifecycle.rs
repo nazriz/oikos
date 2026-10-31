@@ -623,6 +623,10 @@ impl Person {
         if pic.body.as_ref().and_then(|b| b.in_space.as_deref()) == Some(to.as_str()) {
             return None;
         }
+        // (On our way somewhere: not again until we are there.)
+        if pic.body.as_ref().is_some_and(|b| b.on_way.is_some()) {
+            return None;
+        }
         if self.lifecycle.refused_go.as_ref().is_some_and(|(r, until)| *r == to && pic.t < *until) {
             return None;
         }

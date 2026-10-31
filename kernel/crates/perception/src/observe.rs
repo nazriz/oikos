@@ -84,6 +84,16 @@ pub struct BodyView {
     /// The vehicles it may drive (its own, and those their owners let it), each where it stands (law 9: its own things).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub vehicles: Vec<VehicleView>,
+    /// On its way (law 9, S3): where to, and when it arrives.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_way: Option<OnWayView>,
+}
+
+/// A body's trip, as it knows it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OnWayView {
+    pub to: Id,
+    pub arrives: i64,
 }
 
 /// A vehicle as one who may drive it knows it: what it is and where it stands.
@@ -1261,6 +1271,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             .collect(),
         in_space: st.structures_of(person).into_iter().find_map(|sid| st.occupancy.get(&sid)?.iter().find(|(_, bodies)| bodies.contains(person)).map(|(sp, _)| *sp)),
         vehicles: s.drivers_of.get(person).into_iter().flatten().filter_map(|v| st.vehicles.get(v).map(|x| VehicleView { vehicle: *v, type_: x.type_, at: x.at })).collect(),
+        on_way: st.transit.get(person).map(|x| OnWayView { to: x.to, arrives: x.arrives }),
     });
     let positions = st
         .held_by(participant)

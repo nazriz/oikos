@@ -869,9 +869,10 @@ impl World {
             ParticipantKind::Person => (oikos_time::Actor::Person, p.person.unwrap_or_else(|| participant.into()), 1),
             ParticipantKind::System => (oikos_time::Actor::System, Id::new(participant), p.def.lanes.unwrap_or(1) as usize),
         };
-        // (Going somewhere takes the trip: the longest of the act's moves, from where each body is to the building it's
-        // going to. Literal ids only: a body or space made in the act itself is going nowhere yet.)
-        let trip = blocks
+        // (Going somewhere takes the trip: the longest of the act's moves, from where each body is to the building it is
+        // going to, each body on its way from when the act starts until it is done (law 9, S3). Literal ids only: a body or
+        // space made in the act itself is going nowhere yet.)
+        let trips: Vec<(Id, Id, Option<Id>, i64)> = blocks
             .iter()
             .filter_map(|b| match b {
                 Block::Occupy { space, who, vehicle } if !space.starts_with('$') && !who.as_deref().is_some_and(|w| w.starts_with('$')) => {
@@ -880,12 +881,13 @@ impl World {
                     let from = self.state.structures_of(&body).into_iter().next()?;
                     // (Driven, if the vehicle named is one the body may drive and it stands where they set out; else on foot.)
                     let speed = vehicle.as_deref().and_then(|v| crate::exec::driven_speed(&self.s, &self.state, v, &body, &from).ok());
-                    Some(crate::travel::seconds(&self.s, &self.state, &from, to, speed))
+                    let secs = crate::travel::seconds(&self.s, &self.state, &from, to, speed);
+                    (from != to && secs > 0).then(|| (Id::new(&body), Id::new(to), vehicle.as_deref().filter(|_| speed.is_some()).map(Id::new), secs))
                 }
                 _ => None,
             })
-            .max()
-            .unwrap_or(0);
+            .collect();
+        let trip = trips.iter().map(|x| x.3).max().unwrap_or(0);
         // (A system's own rows first, from its template; then the world's table for its kind; then a default the world
         // states. Nobody's: the act is refused, `unpriced`.)
         let template_of = |state: &State, w: &str| state.participants.get(w).filter(|x| x.kind == ParticipantKind::System).and_then(|x| x.template);
@@ -1024,10 +1026,22 @@ impl World {
         let free = (own_done < done).then_some(own_done);
         let pos = position.map(String::from);
         let seq = self.state.schedule(done, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone().map(Into::into), blocks: blocks.to_vec(), by: by.to_vec(), placed: placed.clone() });
+        // (Those it takes somewhere set out when it starts, and are on their way until it is done: law 9, S3. Before the
+        // start's checks, so that an act refused when it starts brings them back.)
+        let mut set_out = vec![];
+        for (body, to, vehicle, _) in trips {
+            if start <= t {
+                set_out.extend(crate::exec::depart(&self.s, &mut self.state, &body, &to, done, vehicle.as_deref(), Some(&action), participant));
+            } else {
+                self.state.schedule(start, crate::state::Sched::Depart { body, to, arrives: done, vehicle, act: Some(action.clone().into()), by: participant.into() });
+            }
+        }
         if !checks.is_empty() {
             self.state.schedule(start, crate::state::Sched::Start { action: action.clone(), participant: participant.into(), position: pos.clone().map(Into::into), done, seq, checks, placed });
         }
-        Output { events: vec![Timed::new(t, EventBody::ActionStarted { action, participant: participant.into(), position: pos.map(Into::into), starts, done, free })] }
+        let mut events = vec![Timed::new(t, EventBody::ActionStarted { action, participant: participant.into(), position: pos.map(Into::into), starts, done, free })];
+        events.extend(set_out);
+        Output { events }
     }
 
     /// An act done: applied now, as a whole (or refused), and its outcome delivered at the actor's next observation.
@@ -1111,10 +1125,12 @@ impl World {
                 (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None, surveyed: res.surveyed, investigated: res.investigated, seen: res.seen })
             }
             Err(r) => (
-                vec![Timed::new(
+                std::iter::once(Timed::new(
                     t,
                     EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone().map(Into::into), block: r.block, code: r.code, detail: r.detail.clone() },
-                )],
+                ))
+                .chain(crate::exec::turn_back(&self.s, &mut self.state, &action, participant))
+                .collect(),
                 Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None, seen: vec![] },
             ),
         };
@@ -1156,9 +1172,10 @@ impl World {
         }
         let pos = position.map(String::from);
         let ev = Timed::new(t, EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone().map(Into::into), block: None, code: r.code, detail: r.detail.clone() });
+        let back = crate::exec::turn_back(&self.s, &mut self.state, &action, participant);
         let out = Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None, seen: vec![] };
         Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(pos.unwrap_or_else(|| SELF.into())).or_default().outcomes.push(out);
-        Output { events: vec![ev] }
+        Output { events: std::iter::once(ev).chain(back).collect() }
     }
 
     fn advance(&mut self, to: i64, stop_at_body_news: bool) -> Output {

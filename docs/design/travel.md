@@ -18,7 +18,12 @@ docs/design/foundations-2.md section 3), step by step. What stands today:
   (`vehicle`, the call's `by`): refused unless the body may drive it and it stands where the body sets out; the vehicle
   then stands where the body arrived. Who goes by what is theirs: a citizen takes a vehicle of theirs that stands where
   they are, and walks if another of the household took it.
-- **Positions in transit** (`State.transit`, keyed by body): reserved until S3, which puts bodies on the way.
+- **On the way** (S3, 2026-10-31; `State.transit`, keyed by body). An act that takes a body to another building puts it
+  on its way when the act starts (it leaves its space then) until the act is done (it enters the new one then), with
+  its vehicle, which stands with the body (no one else can take it). A body on its way is in no building: the presence
+  checks refuse whatever would be done to it or by it at a place. A move refused when it is done brings the body back
+  where it set out, into the space it left if there is room. A person's visit is a trip there and back. A person knows
+  where they are going and when they get there (`body.on_way`).
 
-Still to come (foundations-2 3.4): bodies in transit (S3), goods carried (S4), link flows, congestion and a vehicle's
+Still to come (foundations-2 3.4): goods carried (S4), link flows, congestion and a vehicle's
 energy from its holding (S5), several towns (S6).

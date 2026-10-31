@@ -349,9 +349,23 @@ pub fn begin(s: &Statics, st: &mut State, participant: &str, key: &str, path: &s
     let mut timeline = st.timelines.get(&timeline_key).cloned().unwrap_or_default();
     let (starts, done) = oikos_time::place_within(&mut timeline.lanes, lanes, t, seconds, crate::kernel::lane_hours(s, st, &timeline_key));
     st.timelines.insert(timeline_key, timeline);
+    // (A person goes there and back, law 9 S3: out of where they are from the start until it ends.)
+    let mut set_out = vec![];
+    if let Some(b) = person.filter(|_| !places.is_empty() && seconds > 0) {
+        let home = st.structures_of(&b).into_iter().next();
+        if let Some(h) = home {
+            if starts <= t {
+                set_out = crate::exec::depart(s, st, &b, &h, done, None, None, participant);
+            } else {
+                st.schedule(starts, Sched::Depart { body: b, to: h, arrives: done, vehicle: None, act: None, by: Id::new(participant) });
+            }
+        }
+    }
     let position = (key != crate::config::SELF).then(|| key.to_string());
     st.schedule(done, Sched::Visit { participant: participant.into(), position: position.clone().map(Into::into), channel: path.into(), places: places.to_vec(), cells: cells.into_iter().flatten().collect(), names });
-    vec![Timed::new(t, EventBody::VisitStarted { participant: participant.into(), position: position.map(Into::into), channel: path.into(), places: places.to_vec(), starts, done, })]
+    let mut out = vec![Timed::new(t, EventBody::VisitStarted { participant: participant.into(), position: position.map(Into::into), channel: path.into(), places: places.to_vec(), starts, done })];
+    out.extend(set_out);
+    out
 }
 
 /// A visit ended: what is at the cells gone to, now, kept for the looker's next observation.

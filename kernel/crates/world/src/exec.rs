@@ -92,6 +92,63 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
 /// A person who is to do work: alive and in the world; and, if `at` is given, in that structure (in a space of the
 /// given kind, if given); else in a space of the kind the world says work is done in (`orchestration.performers_in`),
 /// if it says. The one rule for a `work`'s performers and for an action's `by` (foundations F3).
+/// A body sets out (law 9, foundations-2 S3): out of the space it is in, on its way to `to` until `arrives` (its own building
+/// again, for a visit there and back), driving `vehicle` (which goes with it) if it named one it may drive from here. A body
+/// that is dead, gone, already on its way or in no building does not set out; nor one whose vehicle is not there to take
+/// (its act is refused when due).
+#[allow(clippy::too_many_arguments)]
+pub fn depart(s: &Statics, st: &mut State, body: &str, to: &str, arrives: i64, vehicle: Option<&str>, act: Option<&str>, by: &str) -> Vec<Timed> {
+    if !st.body(body).is_some_and(|b| b.alive && b.present) || st.transit.contains_key(body) {
+        return vec![];
+    }
+    let Some(from) = st.structures_of(body).into_iter().next() else { return vec![] };
+    if act.is_some() && from == to {
+        return vec![];
+    }
+    let Some(space) = st.occupancy.get(&from).and_then(|m| m.iter().find(|(_, b)| b.contains(body)).map(|(sp, _)| *sp)) else { return vec![] };
+    if vehicle.is_some_and(|v| driven_speed(s, st, v, body, &from).is_err()) {
+        return vec![];
+    }
+    let mut events = vec![];
+    leave_spaces(s, st, &from, Some(body), None, VacateReason::Left, Some(by), &mut events);
+    st.touch_structure(&from);
+    st.moved(body);
+    if let Some(v) = vehicle {
+        st.vehicles.get_mut(v).unwrap().at = Id::new(body);
+    }
+    let t = st.t;
+    st.transit.insert(Id::new(body), crate::state::Transit { from, space, to: Id::new(to), departed: t, arrives, vehicle: vehicle.map(Id::new), act: act.map(Id::new) });
+    events
+}
+
+/// A body on its way for an act that was refused, or back from a visit: it is where it set out from, in the space it left
+/// (if there is still room), and its vehicle with it. (A refused trip's way there and back is the known limit: the time
+/// was spent, the body is home.) Dead or gone on the way: only off the road.
+pub fn come_back(s: &Statics, st: &mut State, body: &str, by: &str) -> Vec<Timed> {
+    let Some(tr) = st.transit.remove(body) else { return vec![] };
+    if let Some(v) = tr.vehicle.and_then(|v| st.vehicles.get_mut(&v)) {
+        v.at = tr.from;
+    }
+    if !st.body(body).is_some_and(|b| b.alive && b.present) {
+        return vec![];
+    }
+    let room = st.structures.get(&tr.from).is_some_and(|x| x.complete) && crate::config::split_space(&tr.space).and_then(|(sid, local)| st.structures.get(sid).and_then(|x| s.space(&x.structure_type, local))).is_some_and(|spec| st.occupancy.get(&tr.from).and_then(|m| m.get(&tr.space)).map_or(0, |b| b.len()) < spec.capacity as usize);
+    if !room {
+        return vec![];
+    }
+    settle(s, st, &tr.from);
+    st.enter(&tr.from, &tr.space, body);
+    st.touch_structure(&tr.from);
+    st.moved(body);
+    vec![Timed::new(st.t, EventBody::Occupied { occupant: Id::new(body), space: tr.space, by: Id::new(by), vehicle: tr.vehicle })]
+}
+
+/// The bodies an act was taking somewhere, back where they set out, the act refused.
+pub fn turn_back(s: &Statics, st: &mut State, act: &str, by: &str) -> Vec<Timed> {
+    let bodies: Vec<Id> = st.transit.iter().filter(|(_, t)| t.act.as_deref() == Some(act)).map(|(b, _)| *b).collect();
+    bodies.iter().flat_map(|b| come_back(s, st, b, by)).collect()
+}
+
 /// The speed a body drives a vehicle at (law 9, foundations-2 S2): one it may drive (its owner's, or one its owner lets),
 /// standing where the body sets out from; refused otherwise.
 pub fn driven_speed(s: &Statics, st: &State, vehicle: &str, body: &str, from: &str) -> R<i64> {
@@ -886,7 +943,13 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             pending.asks.push(look);
             vec![Timed::new(t, EventBody::AskAnswered { participant, position, channel })]
         }
-        Sched::Visit { participant, position, channel, places, cells, names } => crate::sites::end(s, st, &participant, position.as_deref(), &channel, places, &cells, names),
+        Sched::Visit { participant, position, channel, places, cells, names } => {
+            let person = st.participants.get(participant.as_str()).filter(|_| position.is_none()).and_then(|p| p.person);
+            let mut out = person.map(|b| come_back(s, st, &b, &participant)).unwrap_or_default();
+            out.extend(crate::sites::end(s, st, &participant, position.as_deref(), &channel, places, &cells, names));
+            out
+        }
+        Sched::Depart { body, to, arrives, vehicle, act, by } => depart(s, st, &body, &to, arrives, vehicle.as_deref(), act.as_deref(), &by),
         Sched::BirthDue { parents, name, template } => {
             let Some(b) = st.body(&parents[0]) else { return vec![] };
             if !b.alive {
@@ -1980,6 +2043,8 @@ impl<'a> Exec<'a> {
                     Some(v) => Some(self.r(v)?),
                     None => None,
                 };
+                // (On its way here, S3: it arrives; its vehicle is with it.)
+                let on_way = self.st.transit.contains_key(who.as_str());
                 let (sid, local) = split_space(&space).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{space} isn't a space")))?;
                 let x = self.st.structures.get(sid).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {sid}")))?;
                 let spec = self.s.space(&x.structure_type, local).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{sid} has no space {local}")))?;
@@ -2003,8 +2068,11 @@ impl<'a> Exec<'a> {
                 let sid = sid.to_string();
                 // (Driven here: the vehicle must be one the body may drive, standing where it set out; it stands here now.)
                 if let Some(v) = &vehicle {
-                    let from = self.st.structures_of(&who).into_iter().next().ok_or_else(|| refuse(RefusalCode::NotPresent, format!("{who} is nowhere to drive {v} from")))?;
+                    let from = if on_way { Id::new(&who) } else { self.st.structures_of(&who).into_iter().next().ok_or_else(|| refuse(RefusalCode::NotPresent, format!("{who} is nowhere to drive {v} from")))? };
                     driven_speed(self.s, self.st, v, &who, &from)?;
+                }
+                if on_way {
+                    self.st.transit.remove(who.as_str());
                 }
                 // A body is in one place at a time: coming here, it leaves wherever else it was.
                 for other in self.st.structures_of(&who) {
