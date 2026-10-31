@@ -193,3 +193,22 @@ fn its_manifest_is_the_ts_one_with_the_ports_additions() {
     }
     assert!(manifest()["params"]["export_probe_bps"].is_object());
 }
+
+/// A factory founded in the run (foundations-2 E3; market/founding.rs, as a shop founded is): an account, its founder's
+/// capital, its shareholders, the works bought from the listing it was founded on; nothing made until then.
+#[test]
+fn a_factory_just_founded_sets_itself_up_and_buys_its_works_before_it_makes_anything() {
+    let mut h = harness(json!({ "founder": "ann", "capital": 7_000_000, "bank": "bank", "listing": "rec.fs" }));
+    let listing = statement("rec.fs", 0, "factory-1", "property_for_sale", &[], json!({ "structure": "works-1", "type": "factory", "price": 5_000_000, "account": "acc-factory-1" }));
+    let out = all(&h.wake(DAY, channels(vec![records("mine", vec![listing.clone()]), holdings(&[])])));
+    assert!(out.contains("account(") && out.contains("at=bank") && !out.contains("work("), "{out}");
+    let out = all(&h.wake(DAY + H, channels(vec![money(F, 0, json!([])), records("mine", vec![listing.clone()]), holdings(&[])])));
+    assert!(out.contains("capital_call") && out.contains("ann"), "{out}");
+    let txs = json!([tx("acc-ann", "acc-works", 7_000_000, DAY + H, "Capital")]);
+    let out = all(&h.wake(DAY + 2 * H, channels(vec![money(F, 7_000_000, txs), records("mine", vec![listing.clone()]), holdings(&[])])));
+    assert!(out.contains("shareholders") && out.contains("property_purchase") && out.contains("acc-factory-1"), "{out}");
+    // Sold to us: open for trade from the next wake.
+    let sold = statement("rec.sold", DAY + 3 * H, "factory-1", "property_sold", &[], json!({ "structure": "works-1", "buyer": F }));
+    let out = all(&h.wake(DAY + 4 * H, channels(vec![money(F, 2_000_000, json!([])), records("mine", vec![listing, sold]), holdings(&[])])));
+    assert!(!out.contains("property_purchase") && !out.contains("capital_call"), "set up: nothing more of it is asked {out}");
+}

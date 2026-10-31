@@ -77,6 +77,10 @@ pub struct Params {
     pub automation: Option<AdoptionParams>,
     pub lengnick: Lengnick,
     pub figures: PriceFigures,
+    /// A factory founded in the run (entry.md; foundations-2 E3): its founder, capital, the listing of its works, its bank.
+    /// None founded: a factory the town began with.
+    #[serde(default)]
+    pub founding: super::founding::Founding,
 }
 
 impl Params {
@@ -113,7 +117,16 @@ impl Params {
             automation: params_from(&ctx.params.get("automation").map(Frozen::to_value).unwrap_or(Value::Null))?,
             lengnick: Lengnick::read(ctx)?,
             figures: PriceFigures::read(ctx)?,
+            founding: super::founding::Founding {
+                founder: ctx.param("founder", None)?,
+                capital: ctx.param("capital", 0)?,
+                listing: ctx.param("listing", None)?,
+                bank: ctx.param("bank", String::new())?,
+            },
         };
+        if p.founding.founder.is_some() && p.founding.bank.is_empty() {
+            return Err("firm.producer: a factory founded in the run names its bank (`bank`)".into());
+        }
         Ok(p)
     }
     fn work_day(&self, t: i64) -> bool {
@@ -220,6 +233,9 @@ pub struct Factory<B: Body> {
     /// What making a unit costs us now (inputs and hours): the regular price a clearance states.
     #[serde(default)]
     cost_now: i64,
+    /// Setting up, for a factory founded in the run (market/founding.rs): until it is ready it does nothing else.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    setup: Option<super::founding::Setup>,
 }
 
 impl<B: Body> Factory<B> {
@@ -264,6 +280,7 @@ impl<B: Body> Factory<B> {
             sys_used: BTreeMap::new(),
             stock_meter: StockMeter::default(),
             cost_now: 0,
+            setup: p.founding.founder.is_some().then(|| super::founding::Setup { asked: -1, ..Default::default() }),
             body,
             book: Book::new(),
             p,
@@ -319,6 +336,9 @@ impl<B: Body> Plan for Factory<B> {
         }
         let acct = own_account(pic);
         let account = acct.as_ref().map(|a| a.account.as_str());
+        if let Some(su) = self.setup.as_mut() {
+            su.absorb(pic, account, "", "");
+        }
         self.orders.take(pic, account);
         self.committed.take(pic, account);
         self.payables.take(&self.book);
@@ -487,6 +507,16 @@ impl<B: Body> Factory<B> {
             let worth = where_.as_ref().and_then(|w| published_price(&self.book, &self.p.builder, &w.1, "prices"));
             let w = Wind { pic, book: &self.book, acct: a, stage: Stage::Closed, premises: where_, sale_price: worth.map(|w| w * self.p.premises_sale_bps / 10_000), paid_suppliers: 0, staying: false, };
             return lift(self.body.wind_up(&w, cx), Then::Body);
+        }
+        // (A factory founded in the run sets itself up first: its account, its founder's capital, its works bought.)
+        if let Some(mut su) = self.setup.take().filter(|s| !s.ready) {
+            let firm = super::founding::Firm { me: &self.me, what: "factory", founding: &self.p.founding, from_home: false, sale_board: "", premises: &self.p.works };
+            let (set, close) = su.setting_up::<Then>(&firm, &self.book, pic, acct.as_ref(), cx);
+            if close {
+                self.body.close();
+            }
+            self.setup = Some(su);
+            return set;
         }
         let Some(acct) = acct else { return steps };
         if self.body.winding_due(t) {
@@ -955,6 +985,11 @@ pub fn manifest() -> Value {
     add("clearance_floor_bps", 8000, "bps", "the lowest a clearance sale takes a price, as a share of marginal cost");
     add("rival_days", 60, "days", "how old a rival's price list may be and still count");
     add("export_probe_bps", 1000, "bps", "how far an exporter probes its room upward when the outside sent nothing back (docs/behaviour/boundary.md, Exports)");
+    // (A factory founded in the run: docs/behaviour/entry.md, "Founding a factory".)
+    for (k, what) in [("founder", "who founded it, where it was founded in the run (none: the town began with it)"), ("listing", "the listing of the works it was founded to buy"), ("bank", "the bank it opens its account at, where founded in the run")] {
+        params.insert(k.into(), json!({ "schema": { "type": ["string", "null"], "description": what }, "source": "the world gives it (no default)" }));
+    }
+    params.insert("capital".into(), json!({ "schema": { "type": "integer", "description": "the capital its founder puts in, where founded in the run" }, "unit": "cents", "default": 0, "source": "the world gives it: the founder's (the price of the works and the venture's capital)" }));
     m
 }
 

@@ -598,6 +598,16 @@
       "schema": {},
       "source": "placeholder"
     },
+    "bank": {
+      "schema": {
+        "description": "the bank it opens its account at, where founded in the run",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "source": "the world gives it (no default)"
+    },
     "borrow_again_days": {
       "default": 30,
       "schema": {
@@ -613,6 +623,15 @@
         "type": "string"
       },
       "source": "placeholder"
+    },
+    "capital": {
+      "default": 0,
+      "schema": {
+        "description": "the capital its founder puts in, where founded in the run",
+        "type": "integer"
+      },
+      "source": "the world gives it: the founder's (the price of the works and the venture's capital)",
+      "unit": "cents"
     },
     "casual_bps": {
       "default": 0,
@@ -679,6 +698,16 @@
       "source": "placeholder",
       "unit": "bps"
     },
+    "founder": {
+      "schema": {
+        "description": "who founded it, where it was founded in the run (none: the town began with it)",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "source": "the world gives it (no default)"
+    },
     "gamma_months": {
       "default": 24,
       "schema": {
@@ -724,6 +753,16 @@
         "type": "string"
       },
       "source": "placeholder"
+    },
+    "listing": {
+      "schema": {
+        "description": "the listing of the works it was founded to buy",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "source": "the world gives it (no default)"
     },
     "look_at": {
       "schema": {},

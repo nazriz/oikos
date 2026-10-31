@@ -76,7 +76,9 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
     `rising-capability`), each a kind of system released on its day, sold newest first; tagged `ai` in
     `meta.study_tags` for measurement only, with a backstop that no world code reads it.
   - [ ] E2b. Technologies that are goods (machines, hardware a firm holds, `runs_on`'s energy and water), with E5.
-  - [ ] E3. Firms enter any industry by expected profit, capital-heavy ones included.
+  - [~] E3. Firms enter any industry by expected profit: a factory now founded in works for sale, as a shop is
+    (docs/behaviour/entry.md, "Founding a factory"); building new premises through planning (the capital-heavy route,
+    a hosting firm among them) and borrowing for a venture in premises still to do (ME-1).
   - [x] E5. Compute competing for energy, water and land: what a system runs on, in the kernel (P4: hardware held
     somewhere, each hour of work drawing its recipe there, refused without power), and a host in the town where a study
     asks (`hosting: "local"`), on the feeders and the main with the homes (docs/behaviour/hosting.md; risk ME-24).

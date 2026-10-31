@@ -3053,6 +3053,26 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         ...(spec.living ? { keeps_record: true } : {}) },
     };
   });
+  // A factory, in works for sale (foundations-2 E3; docs/behaviour/entry.md, "Founding a factory"): a founder with the
+  // means buys a closed factory's works and makes the town's goods there, weighing it as a shop is weighed (expected
+  // profit), its custom the world market's appetite for goods as it publishes it, shared among the town's factories of
+  // goods and itself. Beyond the works: three months' wages for the staff that share needs, and a month's inputs for it.
+  const factoryVenture = factories.length ? (() => {
+    const PR = GOODS_PRODUCT;
+    const demand = exportsOf.get(PR.kind)?.units ?? 0;
+    const sellers = factories.filter((f) => productOf(f).kind === PR.kind).length;
+    const share = Math.ceil(demand / (sellers + 1));
+    const perWorker = Math.max(1, Math.floor((WORKING_DAY * WORK_DAYS * 30) / 7 / PR.labour));
+    const staff = Math.max(1, Math.ceil(share / perWorker));
+    return {
+      kind: "factory", name: "Factory", unit_cost: PR.inputs * PR.inputPrice, demand_per_month: demand, sellers,
+      capital: 3 * staff * Math.floor((wages.factory * MONTH) / PAY) + share * PR.inputs * PR.inputPrice,
+      channels: [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder"), lawBook, { id: "stock", kind: "holdings" }, K.premises("works", ["{cell}"]),
+        K.published("property", ["property_for_sale", "property_sold"])],
+      role_module: { code: "firm.producer", params: { works: "{structure}", workplace: "{structure}/workplace.1", max_staff: 40, wage: wages.factory, period: PAY, working_day: WORKING_DAY, industry: "manufacturing", lender: "bank", builder: "builder", work_days: WORK_DAYS,
+        per_unit: { [PR.input]: PR.inputs }, labour_per_unit: PR.labour, price: PR.price, supplier: "outside", market: "outside", founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank", ...look } },
+    };
+  })() : undefined;
   // "population" is who could sign a petition: the adults.
   // (With the clinic: treatable deaths come through illness, and care cuts them; docs/behaviour/life.md.)
   const severeKept = HE?.treats.find((x) => x.kind === "illness" && x.severity === V.life.treatable?.band)?.fatal_kept_bps;
@@ -3130,7 +3150,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     buffer_months: SAVINGS_KEPT_MONTHS, saving_bps: V.spending.saving_bps, wealth_effect_bps_per_year: V.spending.wealth_effect_bps_per_year, essentials: V.spending.essentials_per_month,
     retirement_age: V.retirement_age, ...(CURVE ? { stop_work_curve: CURVE } : {}),
     // Starting businesses: the ventures a person may weigh, each by its expected profit (docs/behaviour/entry.md).
-    ventures: [...shopVentures, ownVenture],
+    ventures: [...shopVentures, ...(factoryVenture ? [factoryVenture] : []), ownVenture],
     // (Borrowing to start one, risk ME-1: asked of the bank over the longest term it lends for, which its published terms say.)
     start_loan_months: Cr.max_months,
     // Founding (docs/behaviour/founding.md), where the town has it on: the profile's fitted chance and sizes; the

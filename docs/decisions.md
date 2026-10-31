@@ -10063,3 +10063,24 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   the kernel's new paths run only for a template that says what it runs on, and the provider's state carries nothing new.
 - **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
   connection's rate; the placeholders find sources (ME-24).
+## 2026-11-01 · Entry into the town's other industry: a factory founded in works for sale (foundations-2 E3, its first part; branch `f2-economy`; citizen, firm.producer, generator; no contract change; no model called)
+
+- **What:** the town's ventures gain a factory (`kind: factory`, the works' type): when a closed factory's works are for
+  sale, someone with the means for them and the venture's capital weighs founding a factory there by expected profit
+  (`rules::entry::expected`, as for a shop): its price and its inputs' cost a unit, its custom the world market's
+  appetite for goods as it publishes it (`demand_per_month`) shared among the town's factories of goods (`sellers`) and
+  itself, a hand's month at the time a unit takes, hands while the margin pays their wage. Founded, `firm.producer` sets
+  itself up first (account, the founder's capital, shareholders, the works bought), by the setting up the retailer had,
+  moved to `market/founding.rs` unchanged (the retailer's words and order kept, so a shop's founding is as before).
+- **Why this way:** entry was already by expected profit (2026-10-24, ME-1) and premises already came up for sale by
+  type; widening the venture list to the factory is the general law (any industry whose premises can be had), and the
+  world market already buys from every seller (ME-15), so a new factory has a market as a real entrant would.
+- **Not built, and why:** new premises built through planning, the route for an industry with no premises standing (a
+  hosting firm's): it needs a founder to buy land, apply for a permit and pay the builder, a chain the town has for
+  landlords' homes but not for firms; borrowing for a venture in premises (ME-1 says so); products other than goods.
+- **Results:** every town's ventures list has the factory where it has factories, so its config moves and so does its
+  state hash (a person's parameters are part of what is kept); with the venture taken out of the config, the culture
+  dial's three pinned towns give exactly their pins before the change, so the moved founding steps change nothing.
+  The pins are re-taken (orchestrator/test/culture-dial.test.ts).
+- **Revisit if:** factories close often enough that founding matters, and entrants never pay (the likely cause is what a
+  founder counts of the market); a study needs capital-heavy entry (then the planning route, above).
