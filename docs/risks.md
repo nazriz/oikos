@@ -1593,8 +1593,8 @@ The mechanism:
 
 ### SC-6 · A run's memory grows with its length faster than the town: 50,000 for two years does not fit
 - **Gap:** After the faults of 2026-10-31 were fixed, a 10,000-person town grows about 25 MB a simulated day (2.5 KB
-  a person a day; 1 KB at 1,000 people) and a 50,000-person town about 85 MB: three years at 10,000 ends near 30 GB,
-  two years at 50,000 would need about 75 GB on a 64 GB machine. What grows: the world's records (54%), the resolver's
+  a person a day; 1 KB at 1,000 people) and a 50,000-person town about 105 MB: three years at 10,000 peaked at 27 GB
+  (run 2026-11-01, 11.8 hours), two years at 50,000 would need about 86 GB on a 64 GB machine. What grows: the world's records (54%), the resolver's
   knowledge of every addressed statement each participant has seen, the twins' per-matter draw counts (every
   gathering's every date, for every person, for the run), minds, offices' files. Each is kept by design; none is a copy.
   Also seen only at size: one hall of 200 for gatherings in a town of 10,000 is full (2,000 to 4,000 refusals a month),
