@@ -373,6 +373,14 @@ impl Scheduler {
                     }
                 }
                 EventBody::ConditionBegan { person, .. } | EventBody::ConditionEnded { person, .. } | EventBody::ConditionTreated { person, .. } => self.news(st, News::Body(person), t),
+                // A child born: its parents know at once (the one who bore it brings it home and puts it on the household's
+                // record; until 2026-10-31 that waited for her next week's plan, and a child born in a run's last week was of
+                // no household at its end).
+                EventBody::PersonCreated { parents, .. } => {
+                    for p in parents {
+                        self.news(st, News::Body(p), t);
+                    }
+                }
                 EventBody::Recorded { record } => {
                     if st.is_some() {
                         let record = serde_json::to_value(&**record).expect("records serialize");

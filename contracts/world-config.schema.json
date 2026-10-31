@@ -1280,6 +1280,17 @@
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId",
           "description": "Nature: the land cover its cells count as while it stands (a park is grassland); absent, the reserved cover `built`."
         },
+        "way": {
+          "description": "Law 9 (foundations-2 S2): a way (a road, a path). Standing and complete, each of its cells is a node of the world's ways, joined to the next cell's node of the same mode by a link a cell long (the ground's `cell` metres; a world with a way must say it). A trip goes on foot over the cells to the nearest node, along the links (driven at the lower of the vehicle's speed and the link's, or on foot), and on foot from the node nearest where it is going, or on foot all the way, whichever is quicker.",
+          "type": "object",
+          "required": ["mode", "capacity"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "description": "The world's vocabulary (road, path): cells of one mode are joined, not of two.", "type": "string", "minLength": 1, "maxLength": 64 },
+            "capacity": { "description": "What a link of it carries an hour each way, at most (vehicles).", "type": "integer", "minimum": 1, "maximum": 1000000 },
+            "speed_kmh": { "description": "Its speed for vehicles; absent: on foot only.", "type": "integer", "minimum": 1, "maximum": 1000 }
+          }
+        },
         "floods": {
           "description": "Floods (world-expansion 7.3): when this field passes `above` on any of its cells, its occupants are moved out, no one can come in while it lasts, and its wear rises by wear_per_day.",
           "type": "object",
@@ -1477,6 +1488,7 @@
               "maximum": 2147483647
             },
             "cell": {
+              "description": "How many metres a cell is across (a world with a way must say it: its links are a cell long).",
               "type": "integer",
               "minimum": 1,
               "maximum": 1000000
@@ -3626,37 +3638,21 @@
       }
     },
     "Travel": {
-      "description": "Reserved shapes for travel (lane F, 2026-10-17; docs/design/travel.md): roads with a capacity, vehicles as things someone owns, and (in the state) bodies in transit between places. Shapes only: nothing moves along a road, fills one or drives a vehicle yet. A world may declare them; they are checked when it is loaded, and the vehicles are kept in the state (and hashed with it) as their owners' things.",
+      "description": "Travel's things (docs/design/travel.md; law 9, foundations-2 S2): kinds of vehicle and the vehicles entities own, kept in the state (and hashed with it) as their owners' things, each where it stands and who besides its owner may drive it. A vehicle goes where whoever drives it goes (an occupy's 'vehicle'). The ways they go on are structures whose type is a way ('way').",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "roads": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "cells", "capacity_per_hour"],
-            "properties": {
-              "id": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
-              "name": { "type": "string" },
-              "cells": { "description": "The cells it runs through, in order.", "type": "array", "minItems": 2, "items": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/CellId" } },
-              "capacity_per_hour": { "description": "How many vehicles it carries an hour each way, at most.", "type": "integer", "minimum": 1 },
-              "lanes": { "type": "integer", "minimum": 1 },
-              "seconds_per_cell": { "description": "How long crossing one of its cells takes at its usual speed.", "type": "integer", "minimum": 1 }
-            }
-          }
-        },
         "vehicle_types": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "seats"],
+            "required": ["id", "seats", "speed_kmh"],
             "properties": {
               "id": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
               "seats": { "type": "integer", "minimum": 0 },
               "load_kg": { "type": "integer", "minimum": 0 },
-              "seconds_per_cell": { "type": "integer", "minimum": 1 }
+              "speed_kmh": { "description": "The most it goes, km/h; a way's own speed may be less.", "type": "integer", "minimum": 1, "maximum": 1000 }
             }
           }
         },
@@ -3670,7 +3666,8 @@
               "id": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
               "type": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
               "owner": { "description": "The entity that owns it.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
-              "at": { "description": "Where it stands: a cell, or a structure.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" }
+              "at": { "description": "Where it stands: a cell, or a structure.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+              "drivers": { "description": "Who besides its owner may drive it (a household's adults).", "type": "array", "items": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" } }
             }
           }
         }
