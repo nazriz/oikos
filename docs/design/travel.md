@@ -1,18 +1,24 @@
-# Travel: the reserved shapes
+# Travel: ways, vehicles and trips
 
-Written 2026-10-17 (lane F of the Rust port). **Shapes only: no traffic.** The world can now say what travel will be
-built on, so that worlds, profiles and tools can name roads and vehicles before anything moves along them.
+Written 2026-10-17 (lane F of the Rust port) as reserved shapes; made physics by foundations-2 phase 3 (law 9,
+docs/design/foundations-2.md section 3), step by step. What stands today:
 
-- **Roads** (`travel.roads` in the world config): an id, the cells it runs through in order (each next to the one
-  before), how many vehicles it carries an hour each way at most (`capacity_per_hour`), and optionally its lanes and
-  how long one of its cells takes to cross. Checked when the world is loaded.
-- **Vehicle types** (`travel.vehicle_types`): seats, load, speed.
-- **Vehicles** (`travel.vehicles`): owned things. Each is of a declared type, owned by an entity of the world, and
-  stands at a cell or in a structure; the state keeps them (`State.vehicles`, hashed with the state).
-- **Positions in transit** (`State.transit`, keyed by body): from, to, when it set out, when it arrives, by which road
-  and vehicle. Nothing puts anyone in transit yet: a visit is still the time it takes, spent where one set out.
+- **Ways** (S2, 2026-10-31). A structure type may be a way (`way`: its mode, what a link of it carries an hour each way,
+  its speed for vehicles). Standing and complete, each of its cells is a node, joined to the next cell's node of the same
+  mode by a link a cell long (the ground's `cell` metres). The ways are worked out from the standing structures once for
+  the ground as it is, again when a way is finished or comes down (`kernel/crates/world/src/ways.rs`). A road the town
+  builds joins the ways when it is finished.
+- **A trip** goes on foot over the cells to the node nearest where it sets out, along the links (driven at the lower of
+  the vehicle's speed and the link's, or at walking pace), and on foot from the node nearest where it is going; or on
+  foot over the cells all the way, whichever is quicker (`travel.rs`). Off the ways a cell costs what its cover says, as
+  before; no cover is quicker than walking any more (a road is a way, not a cheap cell).
+- **Vehicle types** (`travel.vehicle_types`): seats, load, top speed.
+- **Vehicles** (`travel.vehicles`): owned things, each of a declared type, owned by an entity, standing at a cell or in a
+  structure, with who besides its owner may drive it (`drivers`). An `occupy` names the vehicle it goes by
+  (`vehicle`, the call's `by`): refused unless the body may drive it and it stands where the body sets out; the vehicle
+  then stands where the body arrived. Who goes by what is theirs: a citizen takes a vehicle of theirs that stands where
+  they are, and walks if another of the household took it.
+- **Positions in transit** (`State.transit`, keyed by body): reserved until S3, which puts bodies on the way.
 
-What is not here, on purpose: congestion, routing, fuel, anyone driving. When traffic is built, it is physics in the
-kernel (a road's capacity fills; a trip takes the time the road gives it), and who drives, owns and pays for vehicles
-is institutions' work, as everything else is (docs/all-work-takes-time.md). A world without a `travel` section is the
-world it was, to the hash.
+Still to come (foundations-2 3.4): bodies in transit (S3), goods carried (S4), link flows, congestion and a vehicle's
+energy from its holding (S5), several towns (S6).

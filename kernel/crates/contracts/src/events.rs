@@ -293,6 +293,9 @@ pub enum EventBody {
         occupant: Id,
         space: Id,
         by: Id,
+        /// The vehicle it came by, which now stands there too (law 9).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        vehicle: Option<Id>,
     },
     Vacated {
         occupant: Id,

@@ -105,7 +105,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
 // f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "d2b818e7cb097436", "gb-eng-2026": "75b3813664d9672f", "ke-nakuru-2026": "43665a61892edd2b" }
+  ? { "au-vic-2026": "b69b5e45f11f6372", "gb-eng-2026": "1c0ed42c71f90f2c", "ke-nakuru-2026": "bee66230724c9cbd" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -138,15 +138,18 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // in towns over 3,333 people): an owner waiting on the register for its lot's plan is not homeless meanwhile and stops
 // no supply, and the works office sends its inspector one visit at a time; ffab69c8..., c5619171... and e5d66985...
 // until then.)
-// (Re-taken on 2026-10-31 at mt21-recourse (MT-21), au-vic and gb-eng only, config hashes and Rust states both: their law on
-// benefit decisions states the days after which an unanswered review may be complained of to a body that recommends
-// (`review.complaint_after_days`), so the published law's words and data move, and a claimant left unanswered may now
-// go to the ombudsman desk; ke-nakuru's law has no such route and did not move. 38412f4e... and fb039153... for the
-// configs, and 553de625... and 3aa5f181... for the states, until then.)
+// (Re-taken on 2026-10-31 at borrowing to start (gap-me1, ME-1), on main at 60c7ab07, config hashes and Rust states both: a person
+// short only of the money for a business of one asks the bank for it over its longest term (`start_loan_months`, from the profile's
+// credit.max_months); 38412f4e..., fb039153..., 43665a61... for the configs and 553de625..., 3aa5f181..., aa994113... for the states,
+// until then.)
+// (Re-taken on 2026-10-31 at foundations-2 S2 (law 9), on the tree merged with main at 28c38600, config hashes and Rust states
+// both: a road is a way of the network, the ground says a cell's metres, housed households have a vehicle and drive it where
+// they belong (generator 0.72.0), and a child's parents know of its birth at once; ce5432bd..., becc4b5a..., a33d92aa... for the
+// configs and e2f908c0..., 66d41a64..., 29ee83f1... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "906ad1f1c369a7d659c7764057f4b639c81e693740f4a836653854095026b67b",
-  "gb-eng-2026": "fa10ba91ede5d678f5ba5c7fa5c3edf8d7302714dcbd343397bacad6683e01c7",
-  "ke-nakuru-2026": "aa994113c733f0fd2e72f32a8667dc883bf4e95676b524efefea103599d38e62",
+  "au-vic-2026": "001f22ede7b41c0bbe711ad365f8678d6be4f40d9e70252a0128ceb48fe26549",
+  "gb-eng-2026": "1a754a5d3c32ddfeafc09a28a84b5b458e86ad21cb122b635954a94e009d3951",
+  "ke-nakuru-2026": "caa00714a0728e19a2fb84f82a7429bdb67037996862e81dc5540b363924758f",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
