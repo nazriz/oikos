@@ -1734,9 +1734,10 @@ set the status to `fixed (commit abc1234)` (or the decisions entry), and let a r
   (`tests/main.rs`): a one-line change to the kernel's library rebuilds its tests in 34 s against 48 s, one to
   `oikos-actors` in 153 s against 170 s, one to the tests' `common` in 3.5 s against 14 to 45 s, and the tests run in
   230 s against 353 s (gate profile, 4 cores, Linux).
-- **Status:** planned (left: (1), and the sharding trial) · **Do when:** The kernel gate grows past about 4 minutes or
-  agents wait on the cap, for (1); the slow tier's time on the Mini holds up merges and the nightly Linux job has a few
-  green nights to read times from, for the sharding trial.
+- **Done (2026-10-31, in another form; decisions "Elastic slots"):** (1) the pool follows the machine (load, free memory,
+  each class's measured use), the cap kept for builds and runs, which cannot give tokens back soon.
+- **Status:** planned (left: the sharding trial) · **Do when:** the slow tier's time on the Mini holds up merges and the
+  nightly Linux job has a few green nights to read times from.
 
 ---
 

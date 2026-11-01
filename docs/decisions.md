@@ -10242,6 +10242,37 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   run only where a world names a practised skill.
 - **Revisit if:** a source gives slip rates by practice, or skill half-lives by kind of work; a study needs papers'
   skills by kind; the opening level's assumption (everyone an ordinary hand) shows in results.
+
+
+## 2026-10-31 · Elastic slots: the pool fits the machine as it is (branch `elastic-slots`; `scripts/slots.ts`; risk PL-4 (1); no result changes; no model called)
+- **What:** with `OIKOS_SLOTS` unset the pool is the core count (it was the cores less two, fixed), and a job that is not
+  the merge's starts only when the machine has room for it now (`fits` in `scripts/slots.ts`, a pure function of the
+  readings): `load average + expected cores of holders younger than a minute + job's expected cores <= cores`, and `free memory - expected
+  memory of holders younger than a minute - job's expected memory >= max(1 GiB, a tenth of the machine's)`. Free memory
+  is what can be had without swapping: Linux `MemAvailable`, macOS `vm_stat` free + inactive + speculative + purgeable.
+  Expected use is per token and per class (test, build, run, other): declared (a core; 1 GiB, a test file's 0.5 GiB) until
+  measured, then a moving average (0.7 old, 0.3 new) of cpu time over wall time and peak memory of the jobs of that
+  class that ended under the wrapper (`bun scripts/slots.ts -- ...`, cargo there is a build) or the test runner (its test
+  files and the kernel's cargo tests), kept in `usage.json` beside the tokens; a job under 2 s teaches nothing.
+- **Why so:** load 32 on 12 slots (2026-10-30) came from tokens that cost more than a core (builds, runs) and work
+  outside the slots, which a fixed count cannot see; a machine left at the cores less two sat idle when jobs were light.
+  The load average sees real use, outside the slots too, but lags by a minute; the expected use of the holders just
+  started covers that minute, so a burst of starts cannot pile up before the load shows it. (First written as the larger
+  of the load and every holder's expected use: on the first gate run a build's measured average, 3.3 cores a token, held
+  the test files back while the build's last rustc used one core. A long job's average is not its use now; the load is.) Memory gets the same two-part
+  reading (free now, less what the young holders will still take).
+- **What stays:** a job never stops another: one that does not fit waits. The head of the queue waits for room and
+  nobody passes it, so a big job is not starved by small ones. A job alone in the pool always starts. The merge's
+  (priority high) is not held by the machine's readings at all, only by the pool and the queue, as before. The cap per
+  checkout stays: a run or a build holds its tokens for minutes to hours and cannot give them back at a file boundary, so
+  lifting the cap for a lone agent (PL-4's first sketch) would leave the next agent waiting that long; only the test
+  runner's short tokens borrow past it, as before. `OIKOS_SLOTS=N` fixes the pool at N with no reading (the tests do).
+- **Not measured:** runs started by `oikos run` are in-process, so their use stays declared (a core a token, the engine
+  given as many threads as tokens). Peak memory is the largest single process a job waited for, not its tree's sum: a
+  cargo build's is one rustc's, an underestimate the memory reserve covers.
+- **Revisit if:** the load still runs well past the cores (then the measure misses the use: sample the holders' process
+  trees instead), the machine sits idle with jobs waiting (the reserve or the declared figures too high), or a big job
+  waits long at the head while small ones could run.
 ## 2026-11-01 · The outside's capability over time: releases of what it sells, from a scenario, tagged for measurement only (foundations-2 E2, its first part; branch `f2-economy`; contract additions; a town under no capability scenario is as before, to the byte; no model called)
 
 - **What:** a scenario may give `capability` (`tag`, `of`, `every_days`, `time_bps`, `slip_bps`, `price_bps`, with its
