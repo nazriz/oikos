@@ -10651,8 +10651,8 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **And:** the participants' world words gained `not_carried` (the kernel's words had it; `render.test.ts` holds that every
   refusal has world words). With the fix in, the representation towns' pins moved (a taking in the month where a
   carried theft had been refused) and were re-taken; culture-dial's did not move.
-- **Revisit if:** an act's trip should be tied to that act alone (f2-s5 adds `Exec.act`: then `tr.act` is the check), or
-  takings come to be acts of their own before the trip home.
+- **Then, in the f2-s5 landing:** with `Exec.act` (S5's), the trip counted is the taker's own for this act (`tr.act`).
+- **Revisit if:** takings come to be acts of their own before the trip home.
 
 ## 2026-11-02 · Law 9 is a hard rule in CLAUDE.md (landing `f2-s5`; project rules; no model called)
 
