@@ -10413,6 +10413,61 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   capital): entry by expected profit reads the profile's venture, not what the person just lived through. A behaviour
   question (does a failed founder try again at once, and how soon?), to settle with a source, not a test.
 - **Revisit if:** a founder's own failure is to weigh in their next venture (ME-1).
+## 2026-11-01 · Entry into the town's other industry: a factory founded in works for sale (foundations-2 E3, its first part; branch `f2-economy`; citizen, firm.producer, generator; no contract change; no model called)
+
+- **What:** the town's ventures gain a factory (`kind: factory`, the works' type): when a closed factory's works are for
+  sale, someone with the means for them and the venture's capital weighs founding a factory there by expected profit
+  (`rules::entry::expected`, as for a shop): its price and its inputs' cost a unit, its custom the world market's
+  appetite for goods as it publishes it (`demand_per_month`) shared among the town's factories of goods (`sellers`) and
+  itself, a hand's month at the time a unit takes, hands while the margin pays their wage. Founded, `firm.producer` sets
+  itself up first (account, the founder's capital, shareholders, the works bought), by the setting up the retailer had,
+  moved to `market/founding.rs` unchanged (the retailer's words and order kept, so a shop's founding is as before).
+- **Why this way:** entry was already by expected profit (2026-10-24, ME-1) and premises already came up for sale by
+  type; widening the venture list to the factory is the general law (any industry whose premises can be had), and the
+  world market already buys from every seller (ME-15), so a new factory has a market as a real entrant would.
+- **Not built, and why:** new premises built through planning, the route for an industry with no premises standing (a
+  hosting firm's): it needs a founder to buy land, apply for a permit and pay the builder, a chain the town has for
+  landlords' homes but not for firms; borrowing for a venture in premises (ME-1 says so); products other than goods.
+- **Results:** every town's ventures list has the factory where it has factories, so its config moves and so does its
+  state hash (a person's parameters are part of what is kept); with the venture taken out of the config, the culture
+  dial's three pinned towns give exactly their pins before the change, so the moved founding steps change nothing.
+  The pins are re-taken (orchestrator/test/culture-dial.test.ts).
+- **Revisit if:** factories close often enough that founding matters, and entrants never pay (the likely cause is what a
+  founder counts of the market); a study needs capital-heavy entry (then the planning route, above).
+## 2026-11-01 · Tools: technologies that are goods, weighed as any technology is (foundations-2 E2, its second part; branch `f2-economy`; contract addition; firm.producer; au-vic's profile; no model called)
+
+- **What:** a task may name a `tool` (a kind, so many a person, the share of the time the work then takes): with enough
+  held by the actor where the work is done for the people doing it, the work takes that share; the tool is not used up.
+  A profile's `automation.tools` puts tools on sale by the outside world (its price list) and on their task; a factory
+  (`firm.producer` `tool`) buys one for each of its staff when the time it saves them a month, at their wage, beats its
+  price over the payback it asks by the hurdle, the comparison it already makes of a system (`automation.firms`). au-vic
+  offers production machinery for `make` (80% of the time, AUD 20,000 each: placeholders, risk ME-25).
+- **Why this way:** foundations-2 7.2 asks that adoption be widened from systems to any technology, "a forklift, a
+  self-service till and a casework system weighed the same way"; a tool as a held good keeps law 8 (it is somewhere,
+  bought and held, never made from nothing) and leaves the decision to the firm's own numbers.
+- **Not built, and why:** tools wear and are replaced (no source for a life, and a durable good is not used up by a
+  task); shops and offices weighing tools (only the producer's comparison was widened; the retailer's and the offices' are
+  systems-only); tools in other profiles.
+- **Off unless asked** (`tools: true`): at au-vic's placeholder figures every factory of the 1,000-person town buys one
+  for each worker on its first day (AUD 800,000 a factory: a fifth of a factory wage a month saved, against AUD 833 a
+  month of the price over two years, by the 20% hurdle), a large unsourced effect on every run; so the tools are a
+  town's choice until sourced, and off the town is as before (the seller, the kind, the task and the weighing absent).
+  Each tool has a seller of its own (`sellers-<kind>`, a boundary selling by the unit), so a firm's least order of one
+  is kept; the world market's least order of a hundred would have refused every order.
+- **Revisit if:** a source gives a tool's saving and price, or its life; shops should weigh tools too.
+## 2026-11-01 · Who could still do the work: a monthly census of practised skills (foundations-2 M8, E6's first part; branch `f2-economy`; log addition; a world with no practised skill writes nothing new; no model called)
+
+- **What:** where a world has practised skills, the kernel censuses them monthly (`skill_census`): for each, how many
+  living people stand in each tenth of its range, read as it stands that day (fading included). `measure/queries/town/skills.sql`
+  lists it (`oikos measure DIR town/skills`): by run, day and skill, the ten counts, the people, the upper half.
+- **Why this way:** M8 asks, for each kind of work, who could still do it and how well, month by month; a person's skill
+  lives in the state, not the log, and a census in the log is what a measure can read (as the counters' is). Ten bands
+  are a count, not a threshold: what a study calls "could still do it" is its own choice, made before an experiment.
+- **Not built:** M7 (what the town gives to AI: the share of its energy, water, land, capital and hours that goes to
+  study-tagged systems and their hosts): it needs the hosts' metered draw read against the town's, and its definition is
+  among the owner's measures (docs/design/gradual-disempowerment.md section 6); "who" by kind of work is by skill, not
+  yet by the kinds of work study-tagged systems do.
+- **Revisit if:** a study needs per-person levels (then the census grows, or a measure reads checkpoints).
 
 ## 2026-11-02 · The slow tier's budget raised to 1,500 s (branch `slow-tier-budget`; tests; no model called)
 

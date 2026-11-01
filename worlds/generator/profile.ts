@@ -466,6 +466,8 @@ export interface Profile {
       firms: { payback_months: { small: number; large: number }; large_from: number; hurdle_bps: number; reference_bps: number; on_cost_bps: number; most?: number };
       /** The law on public buying: a contract worth more than the threshold (in the world\'s smallest unit) is put out to tender, and bids are open this long. */
       procurement?: { threshold: number; bid_days: number };
+      /** Tools the outside world sells (worlds/generator/tools.ts): goods a firm holds, with which a task takes a share of its time. */
+      tools?: import("./tools").ToolOffer[];
     };
     /** Assistants on offer (docs/behaviour/assistants.md; docs/design/delegation.md): the outside world's providers of services
      * and what each sells, at today's prices; read only where a town asks for them (`assistants: true`). `claim_slip_bps` is

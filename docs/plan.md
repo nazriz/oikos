@@ -75,13 +75,18 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] E2a. The outside's capability over time: releases of what it sells from a scenario (`capability`; the first,
     `rising-capability`), each a kind of system released on its day, sold newest first; tagged `ai` in
     `meta.study_tags` for measurement only, with a backstop that no world code reads it.
-  - [ ] E2b. Technologies that are goods (machines, hardware a firm holds, `runs_on`'s energy and water), with E5.
-  - [ ] E3. Firms enter any industry by expected profit, capital-heavy ones included.
+  - [x] E2b. Technologies that are goods: a tool a firm holds, with which a task takes a share of its time (the kernel's
+    `tool`), sold by the outside and weighed by a factory as any technology is; off unless a town asks, `tools: true`
+    (docs/behaviour/automation.md, "Tools"; risk ME-25); hardware as goods is E5's `runs_on`.
+  - [~] E3. Firms enter any industry by expected profit: a factory now founded in works for sale, as a shop is
+    (docs/behaviour/entry.md, "Founding a factory"); building new premises through planning (the capital-heavy route,
+    a hosting firm among them) and borrowing for a venture in premises still to do (ME-1).
   - [x] E5. Compute competing for energy, water and land: what a system runs on, in the kernel (P4: hardware held
     somewhere, each hour of work drawing its recipe there, refused without power), and a host in the town where a study
     asks (`hosting: "local"`), on the feeders and the main with the homes (docs/behaviour/hosting.md; risk ME-24).
   - [ ] WM-15. Every other workplace on the network, with its energy and water by industry (risk WM-15).
-  - [ ] E6. The measures M7 (what the town gives to AI) and M8 (who can still do the work); the tag's backstop.
+  - [~] E6. The measures: M8's census of who can still do the work (`skill_census`, `town/skills`) and the tag's
+    backstop are built; M7 (what the town gives to AI: its share of energy, water, land and hours) is still to write.
 - [ ] **Foundations-2, phase 5:** strict modes on, old exception lists empty, each law's line in CLAUDE.md as its
   enforcement lands.
 - [ ] **Market power in prices** (ME-16), after phase 4.
