@@ -8,7 +8,7 @@
 //!      events logged so far: no money moves without a transfer event;
 //!   4. every payment was executed by someone acting for the paying account's custodian.
 
-mod common;
+use crate::common;
 
 use common::*;
 use proptest::prelude::*;

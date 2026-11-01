@@ -9863,6 +9863,84 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   the reason (the desks' `hours.closed` is in the config; the desks' days move the towns). Main's values are in the
   comment beside them.
 
+## 2026-10-26 · Linux, and one Rust test program (PL-4 (2) and (3); branch `linux`; no result changes; no model called)
+
+**Asked (Naz):** PL-4's parts (2) and (3): Oikos and its gate build and pass on Linux x86_64, with a nightly hosted job
+and no secrets, any difference of a pinned hash between the Mac and Linux being a fault to find, not to skip; and the
+~50 programs of `kernel/tests/` made one, measured before and after.
+
+**Linux (2).** Built and run on a Linux x86_64 machine (4 cores, 15 GB; Rust 1.97, Bun 1.4.4), from a fresh clone.
+- *The hashes.* `orchestrator/test/culture-dial.test.ts` passes unchanged: the generated configs of three profiles and
+  the Rust state hashes of their towns are the Mac's to the byte. Nothing else was needed, as the design predicts (no
+  floats in the kernel or the contracts, D1, held by `kernel/tests/determinism_lint.rs`; one seeded PRNG; sorted maps;
+  SHA-256 the same with or without the ARM instructions, `sha2`'s `asm` feature on aarch64 only). The merge gate
+  (`bun run test:changed`; a kernel change, so the whole gate tier, 246 files, the kernel's tests and the canaries
+  culture-dial and invariants) passed here but for the two below, neither a hash. No difference of a pinned hash or a
+  log's bytes was found, so none was fixed; the slow tier's other pins were not run here (four cores; about two hours),
+  and the nightly job (below) runs them all.
+- *What was Mac-only, and what was done.* `scripts/disk-tidy.ts` asked `ps -E` for each command's environment, which
+  Linux's `ps` refuses: the listing came back empty and every build folder and worktree read as unused by any process,
+  so `--apply` could have removed a folder a running build was in. It now uses `ps e` off macOS, asks by uid (a user's
+  name may not resolve in a container: `lsof -u unknown` fails), and treats a failed listing as everything in use.
+  Its temp root is `/tmp` off macOS (`/private/tmp` on it) and its disk line reads the repo's own volume.
+  `scripts/status.ts` asks `lsof` by uid too. Already portable and left alone: caffeinate is used only on darwin
+  (`scripts/pilot-wave.ts`), notifications only on darwin (`orchestrator/src/pilot-alerts.ts`), the engine module is
+  found as `.dylib` or `.so`, the slots read `ps -A -o pid=,ppid=` (the same on both), the tests' temp folders come
+  from `os.tmpdir()`. launchd appears only in `docs/ci-runner.md` (the runner's service on the Mini); `scripts/mini` is a
+  tool for reaching the Mini from elsewhere, and its test runs against a local folder, so it runs on Linux as it is.
+- *Two failures in the first gate, and what they were.* `orchestrator/test/risks.test.ts`: this entry's own first edit
+  of PL-4 (its status and "Do when" must share a line). `orchestrator/test/mini.test.ts`, which then failed on every
+  Linux container: the run's model call (a `sleep`), ended by `scripts/mini stop` after its seed had gone, still
+  answered `kill -0` 300 ms later. Its parent gone, it is the first process's to reap, and this container's first
+  process (`process_api`, not launchd or systemd) reaps orphans only every second or two: until then the call is a
+  zombie. `stop` sent it TERM and said "stopped" at once, before it had left the process table. The fault was the
+  script's: `stop` now waits for what it ended to be gone (up to its wait, polled every 0.2 s), and names any that is
+  still there and not a zombie ("what it left did not end"). The test is main's, unchanged (a first fix had the test
+  count a zombie as ended; dropped for this). On the Mac it changes nothing (launchd reaps at once).
+- *The nightly job.* `.github/workflows/linux.yml`: `ubuntu-latest`, nightly at 04:30 UTC and by hand, `permissions:
+  contents: read`, no secrets; Bun pinned to 1.4.4, Rust stable with the wasm target, cargo-nextest; then the same
+  steps as ci.yml (installs, `bun run kernel`, typecheck, the gate tier, the slow tier), the cargo build cached from
+  the night before (`Swatinem/rust-cache`). A night with no commit on main in the last 25 hours is skipped by a small
+  first job (the code passed the night before), so a quiet repository costs nothing; a run by hand always goes. Hosted
+  runners are free for a public repository; no paid or larger runner. It does not record a result
+  for `merge.ts`: main's state stays the Mini's CI. `scripts/tiers.test.ts` now holds that no workflow on the
+  self-hosted runner has a `pull_request` trigger and that the Linux job is hosted, scheduled, secret-free and runs both
+  tiers. (`docs/ci-runner.md` still said ci.yml ran on every pull request; corrected.)
+
+**One Rust test program (3).** `kernel/Cargo.toml` has `autotests = false` and one `[[test]]`, `tests/main.rs`, which
+names each file in `kernel/tests/` as a module and `common` once (each file's `mod common;` became `use crate::common;`;
+no test was changed). The same 284 tests are listed before and after (each program's `--list` against the one's), and
+a new test in `main.rs` fails if a file in `tests/` is named by no `mod` line, since with `autotests = false` it would
+otherwise never run. A file is run alone with `cargo test --test main <file>::`; the comments and port guide that named
+`--test <file>` now say so. The proptest regression files are found by source path, so they still apply.
+
+*Measured* (this Linux machine, 4 cores, the `gate` profile the merge gate builds, warm, `cargo test -p oikos-kernel
+--tests --no-run` after a real one-line change: a public function appended whose body differs each time, then removed):
+
+| change in | 56 programs | one program |
+|---|---|---|
+| `kernel/tests/common` | 45 s, 14 s | 3.4 s, 3.6 s |
+| the kernel's library (`kernel/src/lib.rs`) | 48 s, 48 s | 34 s, 33 s |
+| `oikos-actors` (rebuilds actors, the kernel, its tests) | 169 s, 172 s | 153 s, 153 s |
+| running every test (`cargo test` runs programs in turn) | 353 s | 230 s |
+
+The saving is the link and the per-program build of `common` and the kernel's metadata: 14 s of the kernel's 48, 17 s of
+actors' 170 (where most is the crate itself), and nearly all of a change to the tests. Under nextest the programs ran
+side by side already, so the run time saves less there than under `cargo test`. On the Mini the counts differ (12 cores,
+sccache, more programs linked at once); not measured there.
+
+**Brought to main (2026-10-31).** Rebased onto main after the representation rewrite (an interned `oikos_core::Id`)
+and foundations-2 phase 3: both commits applied with one conflict (this file's end). One test file had joined
+`kernel/tests/` since, `space.rs`, and is now a module of `main.rs` (the guard test above names such a file). The gate
+on Linux (4 cores; the checkout's slots, 2 at a time): 1581 tests in 248 files and the kernel's cargo tests, all passing,
+the culture-dial pins still the Mac's to the byte; `mini.test.ts` passed three runs in three on main's test.
+
+**Leaves out.** PL-4 (1), the elastic slots, and the trial of sharding the slow tier on hosted runners (setup cold and
+warm, each file's time against the Mini's) — for after the nightly job has a few green nights to read times from.
+
+**Revisit if** the nightly Linux job finds a pinned hash that differs (a reproducibility fault: find the cause, never a
+pin per platform); a crate's own `tests/` grows to many files (the same change there); one test program's single link
+becomes the long pole of a kernel gate (split it in two by what a change reaches).
 ## 2026-10-31 · A crew's day three times as long, traced: the seat held until each order began (MT-23) (branch `mt23-crew`; no model called)
 
 **What.** On 2026-10-24 the seat-diary run's day 21 showed a works crew's forty notices taking 310 minutes where every
@@ -10094,6 +10172,40 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   the kernel's new paths run only for a template that says what it runs on, and the provider's state carries nothing new.
 - **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
   connection's rate; the placeholders find sources (ME-24).
+
+## 2026-11-01 · Main red after foundations-2 S2: own-venture held the owner of a failing business to 150 days
+
+- **What:** CI went red at d0105172 on `own-venture.test.ts`, "someone out of work ... starts a business of one": its
+  owner applied for a job more than 14 days after founding it. Bisected on main: green at 9f30b45e, red from f56d2dbc
+  (the merge of f2-s2: roads as ways of the network, vehicles, trips driven or walked). Main went green again at c46643eb
+  by chance (working calendars moved the draws), so the test was fixed, not left.
+- **Why:** not a broken rule. The business's sales were thin from its third month at both commits (it paid its owner
+  nothing in months three and four at 9f30b45e, and nothing in month three at f56d2dbc); with S2's roads its owner gave it
+  up on day 134 rather than after day 150, by the rule the file's third test holds (a business of one that does not pay
+  its owner a living is given up), and then looked for work, as that rule says. The test asserted no application in the whole 150 days, an
+  outcome of how well the business did.
+- **Change:** the test holds what it means: no application for work while the business trades, from 14 days after its
+  founding until its giving up (the wake that takes its price list down, the closure minutes later), and a closure, if
+  any, is a giving up. Same seed, same horizon; nothing loosened beyond the rule.
+- **And the next test, on main at c46643eb** (E2a's releases and working calendars merged after d0105172): "a business
+  of one that does not pay its owner a living is given up" asked for a job application after the closure. The owner gave
+  up on day 44, then searched the jobs board 65 times (never once while trading), and all four postings in the 105 days
+  went up and were filled between two of their searches (the longest stood three days, while they did not wake): the
+  occasion is the town's, as the test's own comment already said. It now holds the rule: no search of the board (its
+  postings by pay) while the business trades, searches once it is given up, and an application whenever a posting stood
+  at one of them. Seed, horizon and set-up unchanged.
+- **Two more red at c46643eb, from working calendars (gap-weekends; both green at b9601b0b, just before it):**
+  `representation.test.ts`'s six 30-day towns moved, as every town with a support office or tax collector does: pins
+  re-taken (`scripts/fixtures/representation-results.json`, its own commit), the 200-person gb-eng state the same as
+  culture-dial's. `production.test.ts` (Lengnick) held a wind-up's redundancy notices to within an hour of the manager's
+  command to wind up; factory-2's two landed 61 minutes after it, the notices being acts in the manager's time. It now
+  holds what it meant, exactly: each such notice is for an agreement that command gave notice on, and comes after it.
+  These two were missed by gap-weekends' gate: the change reached 65 slow-tier files, so the gate ran the canaries and
+  left the rest to CI, as designed.
+- **Found, not fixed:** the owner founded the same business again two minutes after giving it up (day 134.54, $24,200 of
+  capital): entry by expected profit reads the profile's venture, not what the person just lived through. A behaviour
+  question (does a failed founder try again at once, and how soon?), to settle with a source, not a test.
+- **Revisit if:** a founder's own failure is to weigh in their next venture (ME-1).
 
 ## 2026-11-01 · Weighing the commute: the rule specified, not yet built (branch `commute-choice`; risk WM-4; no model called)
 
