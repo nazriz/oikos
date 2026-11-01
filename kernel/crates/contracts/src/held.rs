@@ -259,8 +259,8 @@ impl Block {
 /// How many bytes of decompressed blocks are kept for reading again.
 const CACHED_BYTES: usize = 8 << 20;
 /// How many records go in a block at most, and how many bytes (before compression).
-const BLOCK_RECORDS: usize = 256;
-const BLOCK_BYTES: usize = 128 << 10;
+const BLOCK_RECORDS: usize = 64;
+const BLOCK_BYTES: usize = 32 << 10;
 /// The compression level (zstd's output is the same for the same input and level; it decides nothing here).
 const LEVEL: i32 = 3;
 

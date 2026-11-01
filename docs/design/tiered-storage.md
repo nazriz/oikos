@@ -26,7 +26,7 @@ disk are the record's canonical bytes (`canon::canonical`), read back by the sam
 - **The tier** (`Tier`, the kernel's: `Kernel::tier_records`, on by default in `oikos-kernel world` and in a host given a
   log; `OIKOS_COLD=off` keeps everything in memory). Once a simulated day it is told of the records filed since, and
   goes through those that may be in memory: one filed at least `after_days` ago (30) and not read for `idle_days` (14)
-  is written to disk if it is not there yet, in blocks of up to 256 records or 128 KB, each compressed (zstd level 3),
+  is written to disk if it is not there yet, in blocks of up to 64 records or 32 KB, each compressed (zstd level 3),
   and let go of in memory. `OIKOS_COLD_AFTER_DAYS` and `OIKOS_COLD_IDLE_DAYS` change the policy (a test moves every
   record out after a day); the results never depend on it.
 - **The cold file** is `<out>/<run>.cold` (the world command) or `<log>.cold` (a host), made anew at the start and
