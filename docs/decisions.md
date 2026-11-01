@@ -10094,3 +10094,31 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   the kernel's new paths run only for a template that says what it runs on, and the provider's state carries nothing new.
 - **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
   connection's rate; the placeholders find sources (ME-24).
+## 2026-11-01 · The environment office learns its crew's pace from a refusal, and stops asking again for fieldwork it was told will not fit (`city.environment` 0.5.3; branch `env-office-fieldwork`; the pinned towns do not move; no model called)
+
+- **The fault (a mechanism bug, not behaviour).** The office sized each day's fieldwork by the survey's stated time a cell
+  and counted its staff's hours itself. When the world refused a batch for time ("w has N s left; this needs M"), it
+  recorded the time left but kept planning at the stated time, so at its next look (five minutes on) it asked for the
+  same number of cells, and was refused again, all afternoon. Any gap between the stated time and the crew's real one
+  does it: with skills on (E4) a scientist is slower than the table's ordinary hand. 100 days of the 300-person town
+  with skills on: 43 refusals of the office's fieldwork, all the same ask (left 13,357 s, needs 13,769 s, every look
+  from 12:35 on one day). It also never gave a refused batch's hours back to the crew's other members, so they looked
+  busier than they were.
+- **Skills off.** The note in "Skills by use" (2026-10-31) counted 18 such refusals in 90 days with skills off, on the
+  branch as it then stood. On today's main, 100 days of the 300-person town with skills off has none: there the stated
+  time is the world's, so the loop needs some other gap to start. The fault is the same either way (the office never
+  learnt from what it was told), and the fix covers both.
+- **The fix.** The office plans with `common::Pace`, as the factories and shops already do: the stated time at first;
+  after a refusal for time, each of the crew as slow as the batch turned out to need; after a batch that went through,
+  a little quicker once a week (so a crew that gets quicker with practice is asked for more). A refused batch's hours
+  go back to the whole crew; the named worker's day is the world's count, as before. After it, the same skills-on town
+  has no refusals of the office's fieldwork in 100 days, and more of the round's fieldwork done (6 batches against 4).
+- **Hashes.** Expected to move every town's; they did not. The pinned towns (`culture-dial`'s three profiles, the
+  default town) pass unchanged: the office's planning differs only after a refusal for time, which those towns never
+  give it (the state hash is the world's, not the actor's saved notes). So no pin was re-taken. A town where the office
+  is refused (skills on, or a crew short of time) runs differently from before, as it should.
+- **Guarded by:** `told_a_days_fieldwork_will_not_fit_it_asks_for_what_the_crews_own_pace_allows_not_the_same_again`
+  (the environment office's tests): refused four cells that need 9 hours against 8 left, it asks for three, never the
+  four again.
+- **Revisit if:** the weekly probe toward a quicker pace shows as a refusal a week in a study of the office (it is the
+  shared manager's behaviour; the factories and shops do the same), or the office comes to do work other than fieldwork.
