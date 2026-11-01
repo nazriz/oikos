@@ -7,7 +7,7 @@
 //! tail. The witness anchors (written outside the log) catch both; these tests
 //! pin down exactly that division of labour.
 
-mod common;
+use crate::common;
 
 use common::*;
 use proptest::prelude::*;

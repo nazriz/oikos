@@ -5,6 +5,9 @@ edition = "2021"
 license = "Apache-2.0"
 description = "Oikos world kernel: physics and records, clock, hash-chained log, replay"
 rust-version = "1.85"
+# The integration tests are one program, tests/main.rs, each file in tests/ a module of it: one build and one link
+# where there were ~50 (risk PL-4 (3), docs/decisions.md). A new file there is a `mod` line in main.rs.
+autotests = false
 
 [lib]
 name = "oikos_kernel"
@@ -13,6 +16,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "oikos-kernel"
 path = "src/main.rs"
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
 
 [dependencies]
 oikos-core = { path = "crates/core" }
