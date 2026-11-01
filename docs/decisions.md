@@ -10330,3 +10330,18 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   capital): entry by expected profit reads the profile's venture, not what the person just lived through. A behaviour
   question (does a failed founder try again at once, and how soon?), to settle with a source, not a test.
 - **Revisit if:** a founder's own failure is to weigh in their next venture (ME-1).
+
+## 2026-11-02 · The slow tier's budget raised to 1,500 s (branch `slow-tier-budget`; tests; no model called)
+
+- **Why:** after the trims above the slow tier still takes about 1,220 s on the Mini against its 1,000 s budget, and what
+  is left is runs a law needs whole: the year-long towns (twins of a year, the year of invariants, credit's second loans
+  and arrears from day 361, births from day 279). Shortening those further would stop them guarding long runs, which is
+  what they are for. Naz approved raising the budget on 2026-11-02 so the year-long tests keep guarding long runs.
+- **Change:** `scripts/test-budgets.json` `slow.wall_seconds` 1,000 → 1,500 (25 minutes), about the tier's time today and
+  a quarter more. The gate's budget is unchanged. No test loosened.
+- **Also in this landing:** merged with main, `deemed-refusal-town.test.ts` keeps main's third town (au-vic, 200 days,
+  the ombudsman, from `mt21-recourse`) with this branch's 180 days for de-ni and gb-eng (measured on the merged tree: de-ni
+  a venue open in 3 weighings, none before 91 days; gb-eng's ombudsman open in 2; all assertions pass). The stray
+  scratch script `orchestrator/p-tmp.ts` the branch carried is removed.
+- **Revisit if:** the slow tier passes 1,500 s on the Mini, or merges wait on it; then the twin files and the elections'
+  towns first, as the entry above says, before any raise.
