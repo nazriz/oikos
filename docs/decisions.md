@@ -10208,6 +10208,11 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **What it does:** a unit of the transport kind is about 100 km of a car's driving, so fuel is a small draw in a town
   (on a 300-person town, 152 fills in 60 days); local roads at 900 vehicles an hour are almost never full, so congestion
   bites only where the profile or a study gives a road little capacity.
+- **Measured (the stop rule, 3.5):** a 10,000-person year (town-1000 at 10,000, lean log, 4 threads), main at c46643eb
+  (S2 and the representation work, without S3 to S6) against this branch (S3, S4, the deaths on the way, S5, S6's kernel
+  fix): 554 s wall and 504 s on the main thread, against 586 s and 531 s (+6% and +5%); peak memory 4.11 and 4.06 GB; log
+  5.77 and 5.76 GB. Well within 1.3 times. (The two partly overlapped on a loaded machine; the main thread's time is the
+  steadier figure.)
 - **Not as designed:** no load limit in mass (no kind has a mass yet: a carrier takes any quantity); no re-routing round a
   full road; flows have no day's history kept for whoever looks.
 - **Revisit if:** a study needs congestion (then the town's roads need sourced capacities, and re-routing); a kind gets a
