@@ -105,7 +105,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
 // f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "fd3b3e052a1eff31", "gb-eng-2026": "b9922d026dd25a2f", "ke-nakuru-2026": "9764f24d17235ffd" }
+  ? { "au-vic-2026": "c23cb0737b40d320", "gb-eng-2026": "889a4d5b65fcee3b", "ke-nakuru-2026": "144db8fb6f860117" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -155,9 +155,9 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // the way found by whoever comes by (generator 0.74.0); c899c8ff..., 9b0a54d6..., a2f60218... for the configs and af012071..., fab20a4d...,
 // e3093814... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "8f562cf953fcde0bd0080e51e733791686de924a6b9a7dd585e96c43071a0768",
-  "gb-eng-2026": "2a59777c66905e173698207130bef342bcf39c570df6f2f15fead9e650587bf8",
-  "ke-nakuru-2026": "ff1a5d7a85a28c7edc2cbdbf0b6cfa9a376df4ba5059f6d7b99bc62381da5494",
+  "au-vic-2026": "7035e68b62332f7662c989a71de538e20feaa02c0c4373b2e328560e292bef10",
+  "gb-eng-2026": "e945ee417cb610a5546045308c9ee30df8b05280a2076093f0d2a5371dbbf190",
+  "ke-nakuru-2026": "310e012f2c9c0768a5fdf09b2a9efcd148346f76897b6956eaf1e5b19a96f1ec",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

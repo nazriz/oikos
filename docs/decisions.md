@@ -10183,3 +10183,64 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   found by nobody (WM-6 stays open, narrower).
 - **Revisit if** a body lies unfound for long in a busy town (then the straight line is too far from the way people take:
   draw the way cell by cell); deaths on the road show in a result (then an undertaker's or coroner's work, and the time).
+
+## 2026-11-01 · Foundations-2 phase 3, S5: a road carries so many an hour, a full one slows and holds, and a vehicle runs on what is in its tank (branch `f2-s5`; contract additions; results move; no model called)
+
+- **Contract (world config, log; blanket approval).** `catalogue.travel.congestion` (`alpha_bps`, `beta`): the volume-delay
+  function a road's time follows; a vehicle type's `fuel` (the kind it runs on), `fuel_per_100km` and `tank`; a holding may
+  be at a vehicle (its tank, or its load); a new event, `fuel_used` (the vehicle, the kind, how much, the metres driven).
+- **Kernel.** Each way link counts the vehicles that set out on it in the hour, each way (`State.flows`, only the current
+  hour kept). A driven leg's time is each link's free time times 1 + alpha (on it / its capacity)^beta, the Bureau of
+  Public Roads' form in integers; a link already at its capacity this hour takes the vehicle only in the next (it waits the
+  hour out). Routes are the free-flow quickest (no re-routing: the known limit, 3.6). A trip by a vehicle that runs on
+  something draws it from its owner's holding at the vehicle as it sets out, by the metres driven, in whole units as the
+  millionths add up (`Vehicle.fuel_owed`), so a short trip is never charged a unit it did not use; a tank with too little
+  for the trip leaves the vehicle where it stands and the trip is walked. Goods go into a vehicle where it stands, or by
+  driving it to where they are.
+- **Generator, profiles, actors.** Each kind of vehicle runs on the fuel the town's service stations sell (the shop mix's
+  transport kind), at the profile's `round.vehicles.types[].fuel_cost_per_100km` over the kind's price, with a tank of its
+  `range_km`, half full at the start (generator 0.75.0); roads have the profile's `round.roads.congestion` (alpha 0.15,
+  beta 4, the BPR defaults; Traffic Assignment Manual 1964, to confirm; in all nine profiles). A citizen who owns a vehicle
+  puts the transport they bought into its tank, as far as it holds, driving there and back (`use_up_kind`).
+- **Backstop.** `movesForNothing` (a vehicle type that uses no energy, a way with no capacity): the inventory lists the six
+  profiles whose shop mix has no transport kind (their cars and motorcycles, which run on nothing until those profiles
+  say what fuel is sold there). The log audit treats goods into a vehicle as at the place it stands (`farActs`).
+- **What it does:** a unit of the transport kind is about 100 km of a car's driving, so fuel is a small draw in a town
+  (on a 300-person town, 152 fills in 60 days); local roads at 900 vehicles an hour are almost never full, so congestion
+  bites only where the profile or a study gives a road little capacity.
+- **Not as designed:** no load limit in mass (no kind has a mass yet: a carrier takes any quantity); no re-routing round a
+  full road; flows have no day's history kept for whoever looks.
+- **Revisit if:** a study needs congestion (then the town's roads need sourced capacities, and re-routing); a kind gets a
+  mass (then a body's and a vehicle's load); the other profiles' shop mixes name their fuel.
+
+## 2026-11-01 · Foundations-2 phase 3, S6: several towns in one world, joined by road, sharing the outside (branch `f2-s5`; generator option, off by default; results of one town move only by a kernel fix below; no model called)
+
+- **What:** a spec's `towns: N` (`worlds/generator/towns.ts`). Each town is generated whole from the spec, at its own seed
+  (the first at `seed`, then the next), all under the first's weather (`weather_seed`, the stream the first town's weather
+  is drawn from), and composed: laid side by side on one ground, each east of the one before, within one root place,
+  `region`. The first town keeps its ids; every id another town defines is prefixed (`t2-`, `t3-`) wherever it is written,
+  but for the world's vocabulary (a kind, a type, a role, a channel's own name: the police are an entity and a kind, a
+  mayor a post and a role). Shared, once: the outside world (its entities, its accounts, the network's nodes off the
+  ground: the far end of every town's road out and the edges there, so the outside's freight reaches every town), and what
+  of the outside's is alike in every town and names nothing of a town's (the weather bureau, an agency's template). A
+  road joins each town's gate to the next town's, its length the distance between them.
+- **Why this way:** the generator draws one town from the profile; a world of several is several such towns, each as a
+  one-town world would have it, so every rule and figure that holds for one holds for each. The alternative, a generator
+  that draws several towns at once, would touch every one of its four thousand lines.
+- **What it does:** what is published reaches everyone, so a job or a home in another town is seen as one's own town's:
+  in a world of three 60-person towns run a year, 52 of the 84 hires were across towns, and 91 people went into another
+  town's buildings (gatherings at its hall, its shops, a home). Every invariant held, and law 9's log audits found
+  nothing.
+- **Not as designed, and the parity notes:** the world has one design of each building, as big as the town that needs most
+  of it (a school's classrooms, a shop's places of work); one wear rate a day and one rate of pay come short, the first
+  town's (the generator derives each from its town's people; the towns are of one spec, so theirs are near one another).
+  People choose a job without weighing the trip to it (the citizen's choice has no commuting cost yet: hires across towns
+  are as likely as within one, 3 km apart); recorded, not chased.
+- **Kernel fix found by the three-town year (results move in every town).** A crew member's time is theirs again when
+  their part of a round is done, but they are on its way until the act is (the manager's part can be longer); their own
+  trip meanwhile was applied, so they were at a gathering while the round they were on was done. A body on its way for
+  one act is now not there to be sent anywhere by another (`not_present` when due; `Exec.act`), and the citizen tries
+  again later. A single town showed it too (a year of 60 people). Known limit: they come back when the act is done, not
+  when their part is.
+- **Revisit if:** a study needs commuting weighed (then the trip's time and cost in the citizen's choice of job and home,
+  with a real basis); towns of different profiles or sizes in one world (then the composer takes specs, not one).

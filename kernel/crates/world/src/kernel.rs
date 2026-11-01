@@ -1062,7 +1062,7 @@ impl World {
         // hours are placed and it takes effect when they are over. (law 2: "the act is done when they are")
         if placed.late && placed.over.is_none() && can_act(&self.state.participants[participant]) {
             let mut scratch = self.state.clone();
-            if let Ok(res) = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), false) {
+            if let Ok(res) = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), false, Some(&action)) {
                 if !work_shares(&res.events).is_empty() || !by.is_empty() {
                     return self.begin(participant, position, blocks, by, 0, Some(action));
                 }
@@ -1079,7 +1079,7 @@ impl World {
         } else {
             let mut scratch = self.state.clone();
             // (A hosted system's work draws on its host's holding as its seconds add up: none there, and it is refused.)
-            let done = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), !placed.late)
+            let done = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), !placed.late, Some(&action))
                 .and_then(|res| draw_hosted(&self.s, &mut scratch, participant, by, blocks, &res.events).map(|()| res))
                 .map(|res| (scratch, res));
             match done {

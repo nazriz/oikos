@@ -254,6 +254,16 @@ fn a_crew_goes_to_the_building_it_works_on_and_is_away_from_its_depot_meanwhile(
     let out = run.command(&Command::Advance { to: done + 1 }).unwrap();
     assert_eq!(refused(&out.events.iter().map(|e| e.body.clone()).collect::<Vec<_>>()), None);
     assert_eq!(run.kernel().state().structures_of("carol"), vec![oikos_kernel::blocks::Id::new("s-shop")], "back at the shop");
+    // The developer's own part of the order takes two hours, so carol's time is hers again before the act is done; but she
+    // is out on its round until then, and a trip of her own meanwhile is refused when due (she is not there to go from).
+    let mut w = road_world();
+    w["orchestration"]["act_time"]["system"] = json!({"work": 7_200});
+    let mut run = Run::start(w, "space-crew-out", Vec::new(), None).unwrap();
+    let (_, done, _) = act_now(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "mend", "units": 1, "at": "s-shop", "on": "s-house", "performers": ["carol"]}]));
+    let (_, hers, _) = act_now(&mut run, "carol-self", None, json!([{"block": "occupy", "space": "s-house/dwelling.1"}]));
+    assert!(hers < done, "hers {hers}, the round's {done}");
+    let out = run.command(&Command::Advance { to: hers + 1 }).unwrap();
+    assert_eq!(refused(&out.events.iter().map(|e| e.body.clone()).collect::<Vec<_>>()), Some(RefusalCode::NotPresent));
 }
 
 #[test]

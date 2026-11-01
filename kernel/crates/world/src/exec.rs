@@ -63,6 +63,9 @@ pub struct Exec<'a> {
     /// Who the action named to do its work, and whether their being at work was looked at when it began (F3).
     pub by: &'a [Id],
     pub started: bool,
+    /// The act being applied, when it is one begun before (law 9: a body on its way for it arrives; one on its way for
+    /// another act is not here to be moved).
+    pub act: Option<&'a str>,
 }
 
 pub struct ExecResult {
@@ -86,7 +89,7 @@ pub fn can_act(p: &Participant) -> bool {
 /// Apply `blocks` for `participant` (in `position`, or as itself) to `st`. On error, `st` is left
 /// partly modified and must be discarded.
 pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id]) -> R<ExecResult> {
-    exec_action_seen(s, st, participant, position, blocks, by, None, false)
+    exec_action_seen(s, st, participant, position, blocks, by, None, false, None)
 }
 
 /// A person who is to do work: alive and in the world; and, if `at` is given, in that structure (in a space of the
@@ -351,7 +354,7 @@ pub fn inactive_refusal(st: &State, participant: &str, position: Option<&str>) -
 /// What `exec_action` takes besides the blocks, for an act whose work was ordered earlier: `seen` says who was where
 /// when it was; `by` is who the action named; `started` that the performers' being there was looked at when the work
 /// began (so it is not looked at again when it ends).
-pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], seen: Option<&BTreeMap<Id, Vec<Id>>>, started: bool) -> R<ExecResult> {
+pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], seen: Option<&BTreeMap<Id, Vec<Id>>>, started: bool, act: Option<&str>) -> R<ExecResult> {
     let p = st.participants.get(participant).ok_or_else(|| refuse(RefusalCode::UnknownParticipant, format!("no participant {participant}")))?;
     if !can_act(p) {
         return Err(inactive_refusal(st, participant, position));
@@ -393,7 +396,7 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
             }
         }
     }
-    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, seen, worked_on: vec![], collected: BTreeSet::new(), by, started };
+    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, seen, worked_on: vec![], collected: BTreeSet::new(), by, started, act };
     for (i, b) in blocks.iter().enumerate() {
         ex.block(b, i).map_err(|mut r| {
             r.block.get_or_insert(i);
@@ -2222,6 +2225,12 @@ impl<'a> Exec<'a> {
                 // (On its way here, S3: it arrives, with the vehicle it went by, if it found the one it named where it set out;
                 // if not, it walked: the vehicle it named is not looked for again.)
                 let on_way = self.st.transit.contains_key(who.as_str());
+                // (On its way for another act, a body is not here to be sent anywhere: it is out on that, until it is done.)
+                if let Some(tr) = self.st.transit.get(who.as_str()) {
+                    if tr.act.is_some() && tr.act.as_deref() != self.act {
+                        return Err(refuse(RefusalCode::NotPresent, format!("{who} is out on the way to {}", tr.to)));
+                    }
+                }
                 let vehicle = if on_way { self.st.transit.get(who.as_str()).and_then(|t| t.vehicle) } else { vehicle };
                 let (sid, local) = split_space(&space).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{space} isn't a space")))?;
                 let x = self.st.structures.get(sid).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {sid}")))?;

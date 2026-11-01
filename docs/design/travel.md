@@ -50,4 +50,15 @@ docs/design/foundations-2.md section 3), step by step. What stands today:
   where they are: a citizen who owns a vehicle puts what the service station sold them into its tank, as far as it holds,
   driving there and back.
 
-Still to come (foundations-2 3.4): several towns (S6).
+- **Several towns** (S6, 2026-11-01; `worlds/generator/towns.ts`). A spec's `towns: N` makes N towns in one world: each
+  generated whole from the spec at its own seed (the first at `seed`, then the next), all under the first's weather
+  (`weather_seed`), laid side by side on one ground (each town's ground east of the one before) within one root place,
+  `region`. The first town keeps its ids; another's are prefixed (`t2-`, `t3-`), wherever written, but for the world's
+  vocabulary (kinds, types, roles, channels' own names). Shared, once: the outside world (its entities, accounts and the
+  network's nodes off the ground: the far end of every town's road out, and the edges there), and an office of the
+  outside's that is alike in every town and names nothing of a town's (the weather bureau, the agencies' templates).
+  Each town's road out runs to the one far end, and a road joins each town's gate to the next town's (`road-between-*`,
+  its length the distance between them). What is published reaches everyone, so a job or a home in another town is seen
+  as one in your own, and taken the same way: commuting and moving between towns are the citizens' ordinary acts.
+  The world has one design of each building, as big as the town that needs most of it, and one wear rate and one rate of
+  pay come short (each the first town's: the towns are of one spec, so theirs are near one another). Off by default.
