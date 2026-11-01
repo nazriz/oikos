@@ -16,7 +16,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 | The proposal needs | Today |
 |---|---|
 | Tens of thousands of people, over years | 50,000 for a month measured (14.7 GB, 604 s); no multi-year run at that size yet |
-| Real-world friction | Laws of time and capacity (phase 1) and conservation (phase 2) landed; space (phase 3) not started |
+| Real-world friction | Laws of time and capacity (phase 1), conservation (phase 2) and space (phase 3, law 9) landed |
 | Models act only in plain language | Seats write English, the translator turns it into acts; our translator parked at about 85%, Sonnet behind it |
 | Live models from more than one provider | Anthropic (API, Claude Code) and OpenAI (Codex CLI, which puts its own instructions under ours) |
 | Models as assistants to households, firms and government | **Mostly built** (delegation capabilities, in "Now"): providers sell assistants to organisations and persons; mock seats play them; a real model's forms are next |

@@ -10653,3 +10653,15 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   carried theft had been refused) and were re-taken; culture-dial's did not move.
 - **Revisit if:** an act's trip should be tied to that act alone (f2-s5 adds `Exec.act`: then `tr.act` is the check), or
   takings come to be acts of their own before the trip home.
+
+## 2026-11-02 · Law 9 is a hard rule in CLAUDE.md (landing `f2-s5`; project rules; no model called)
+
+- **What:** CLAUDE.md's "Hard rules" gain law 9 after "All work takes time": everything physical is somewhere, and moves
+  only along a way (a body, holding, vehicle or machine is in a space, at a node or on its way; a move takes the mover's
+  time, the way's capacity and the vehicle's fuel; goods between places only with a carrier; the outside's goods by
+  freight from the edge's node), with `orchestrator/test/everything-is-somewhere.test.ts` as its backstop.
+- **Why:** foundations-2 phase 3 (S1 to S6 and WM-6, branches `f2-phase3`, `f2-s4`, `f2-s5`) makes it a law of the world
+  like the other four; a hard rule is what keeps later work from reintroducing goods or bodies that move by themselves.
+- **Approval:** Naz approved adding the line on 2026-11-02 (hard rules go to him first).
+- **Also:** docs/plan.md's summary line now says phase 3 has landed.
+- **Revisit if:** the law's wording drifts from docs/design/travel.md, or the backstop is renamed.
