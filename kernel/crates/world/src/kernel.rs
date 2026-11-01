@@ -410,6 +410,10 @@ impl World {
         if !c.catalogue.counters.is_empty() {
             st.schedule(30 * 86_400, crate::state::Sched::CounterCensus);
         }
+        // (And the practised skills, where there are any: who could do each kind of work, foundations-2 M8.)
+        if c.catalogue.body_variables.iter().any(|v| v.practice.is_some()) {
+            st.schedule(30 * 86_400, crate::state::Sched::SkillCensus);
+        }
         // Bodies age from the start.
         let people: Vec<(Id, i64)> = st.entities.iter().filter_map(|(id, e)| e.body.as_ref().map(|b| (*id, b.born_at))).collect();
         for (id, born) in people {

@@ -15,6 +15,8 @@
 //! - `citizen`: citizen.ts's deciding half, composing the rest behind the seam (`plan`: the week's mind half;
 //!   `voice`: events, talk, civic life, petitions, word of mouth and the record; `talk`: the citizen's phrasing).
 //! - `math`: deterministic `exp`/`ln` and JavaScript's rounding.
+//! - `model`: the citizen model, a small network of our own giving the odds of a want's ways (off unless a world's
+//!   `dials.citizen_model` names one: docs/citizen-data.md, "The citizen model").
 //! - `packed`: a JSON value kept as its text (what a person last wrote to their record).
 //!
 //! Conventions (all parts): state kept in integers (basis points; fixed point where TS kept a fraction that matters),
@@ -27,6 +29,7 @@ pub mod founded;
 pub mod founding;
 pub mod inner;
 pub mod math;
+pub mod model;
 pub mod packed;
 pub mod person;
 pub mod plan;

@@ -31,6 +31,9 @@ const check = (ref: string, row: unknown) => {
   if (!v(row)) throw new Error(`${ref}: ${JSON.stringify(v.errors).slice(0, 800)} in ${JSON.stringify(row).slice(0, 600)}`);
 };
 const rows = (path: string) => readFileSync(path, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+// How long the founding towns run: 150 days, 205 until 2026-10-31 (the slow tier's budget). Measured that day over 205, the
+// first thing is founded on day 120 in the code town and in the composed one, seven or eight by day 205.
+const FOUNDED_BY = 150;
 const lean = (config: any) => ({ ...config, seed: 1, log: { ...config.log, detail: "lean" } });
 const TOWN = join(root, "worlds/town.yaml");
 /** The single-goods town: these tests hold founding's mechanisms in it (docs/risks.md ME-19). */
@@ -149,7 +152,7 @@ test("founding in code: with the composer off no model is called; a founded thin
     // 9, 10 and 15, 2 and 9 have two who share the want behind the first thing founded, 15 has one. Which seed has two is a matter of draws.)
     // (On the Rust world, seed 1 from 2026-10-23, the held cases settled: a person is drawn from the run's seed, so the people of each seed differ from before; of seeds 1 to 16 the first, 1, has
     // five who share the want behind the first thing founded (four things are founded). Which seed has two or more is a matter of draws, not of the rule.)
-    const s = await runWorld({ config: { ...config, seed: onRust ? 1 : 39 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
+    const s = await runWorld({ config: { ...config, seed: onRust ? 1 : 39 }, runId: "code", outDir: out, until: FOUNDED_BY * DAY, recordObservations: "none" });
     expect(s.composer).toBeUndefined();
     const log = readFileSync(s.logPath, "utf8");
     // No model anywhere: not a usage entry, not a transcript.
@@ -232,10 +235,10 @@ test("words: a composed piece is asked for and logged; its parts go through the 
     const config = await world();
     expect(config.dials.composer).toEqual({ pieces_per_month: 8, mix: [{ model: "claude-code/claude-sonnet-5-5", share_bps: 5_000 }, { model: "codex/gpt-6.1-sol", share_bps: 5_000 }], fallback: "claude-code/claude-sonnet-5-5", follow_up_bps: 2_500 });
     const asked: string[] = [];
-    const a = await runWorld({ config, runId: "a", outDir: out, until: 205 * DAY, recordObservations: "none", translatorAdapter: scriptedTranslator(asked), adapter: new MockAdapter("mock", mockPolicies(new Map())) });
+    const a = await runWorld({ config, runId: "a", outDir: out, until: FOUNDED_BY * DAY, recordObservations: "none", translatorAdapter: scriptedTranslator(asked), adapter: new MockAdapter("mock", mockPolicies(new Map())) });
     expect(a.composer!.asked).toBeGreaterThan(0);
     expect(a.composer!.composed + a.composer!.declined).toBe(a.composer!.asked);
-    const b = await runWorld({ config: await world(), runId: "b", outDir: out, until: 205 * DAY, recordObservations: "none", translatorAdapter: scriptedTranslator([]), adapter: new MockAdapter("mock", mockPolicies(new Map())) });
+    const b = await runWorld({ config: await world(), runId: "b", outDir: out, until: FOUNDED_BY * DAY, recordObservations: "none", translatorAdapter: scriptedTranslator([]), adapter: new MockAdapter("mock", mockPolicies(new Map())) });
     expect(b.stateHash).toBe(a.stateHash);
     const dir = join(out, "ds");
     const m: any = await exportDataset(a.logPath, dir);
@@ -294,7 +297,7 @@ test("the composer is never asked more often than its dial allows: at nothing a 
   try {
     const config = { ...(await loadWorld(TOWN, [NOMIX, LIVING, "living.founding=true", SURE, ONE, WRONGS, "living.composer.pieces_per_month=0"])).config, seed: 1 };
     expect(config.dials.composer.pieces_per_month).toBe(0);
-    const s = await runWorld({ config: lean(config), runId: "capped", outDir: out, until: 205 * DAY, recordObservations: "none" });
+    const s = await runWorld({ config: lean(config), runId: "capped", outDir: out, until: FOUNDED_BY * DAY, recordObservations: "none" });
     expect(s.composer).toMatchObject({ asked: 0, composed: 0 });
     expect(s.composer!.capped).toBeGreaterThan(0);
     const log = readFileSync(s.logPath, "utf8");

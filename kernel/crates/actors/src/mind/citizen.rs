@@ -228,6 +228,8 @@ pub struct Common {
     pub consult: bool,
     pub compose: bool,
     pub tick: i64,
+    /// The citizen model, where the world has one (`WorldInfo::citizen_model`): it gives the odds of a want's ways.
+    pub citizen_model: Option<std::sync::Arc<super::model::CitizenModel>>,
 }
 
 fn s(v: &Json, k: &str) -> Option<String> {
@@ -377,6 +379,7 @@ impl Common {
             // `compose`, so a Rust world never asked for a piece.)
             compose: dials.get("composer").map_or(false, |x| !x.is_null() && x != &Json::Bool(false)) || ctx.params.get("compose").and_then(|x| x.as_bool()) == Some(true),
             tick: ctx.world.tick.max(1),
+            citizen_model: ctx.world.citizen_model.clone(),
         }
     }
 }

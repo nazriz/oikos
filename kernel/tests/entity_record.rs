@@ -2,7 +2,7 @@
 //! shown to nobody but the entity, and set only by the platform's bookkeeping for that entity, named in the world's
 //! config (never by anything a model can reach).
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::canon;

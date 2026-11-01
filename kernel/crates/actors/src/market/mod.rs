@@ -10,6 +10,7 @@ use crate::Kind;
 
 pub mod automation;
 pub mod body;
+pub mod founding;
 pub mod hosting;
 pub mod lengnick;
 pub mod prices;

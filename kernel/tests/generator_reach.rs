@@ -5,7 +5,7 @@
 //! illness, injury, harm, death, appointments, every kind of record, refusals
 //! of every physical kind), not just pile up refusals.
 
-mod common;
+use crate::common;
 
 use common::*;
 use proptest::strategy::{Strategy, ValueTree};

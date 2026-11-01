@@ -2,7 +2,7 @@
 //! working hours in a day; inputs are used up and outputs made; state variables (wear) change with time, occupancy
 //! and work, exactly; a building completes only with its materials, its labour and its time; demolition takes labour.
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};

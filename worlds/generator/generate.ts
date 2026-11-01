@@ -6,6 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
+import { readFileSync } from "node:fs";
 import { townNetwork } from "./network";
 import { ASSISTANT_ISSUES, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
@@ -22,6 +23,7 @@ import * as K from "./knowing";
 import { withSkills, type SkillsSpec } from "./skills";
 import { withCapability, type CapabilitySpec } from "./capability";
 import { hostingOf } from "./hosting";
+import { withTools } from "./tools";
 
 /** The body that keeps the register of land, and the one that keeps the electoral roll: each its own (never the
  * town's: docs/behaviour/knowing.md, section 1). */
@@ -322,7 +324,11 @@ export interface TownSpec {
     /** Culture (docs/behaviour/culture.md): people hold a picture of what those around them do and approve of. Off unless set;
      * `true`, or which conducts are live and the sizes (`sway_milli`, `step`). The profile's `culture` figures go with the dial; people are
      * given an origin group only where the profile has `culture.origin` (drawn on a stream of its own). */
-    culture?: boolean | { conducts?: string[]; sway_milli?: number; step?: object } };
+    culture?: boolean | { conducts?: string[]; sway_milli?: number; step?: object };
+    /** The citizen model (docs/citizen-data.md, "The citizen model"): a trained model file of our own that gives the odds of a
+     * want's ways, its odds taking `share_bps` of the way from the code mind's (10,000: its own). Off unless set; carried into the
+     * config's `dials.citizen_model` with the file's SHA-256 (read here when not given; the engine checks it). */
+    citizen_model?: { weights: string; sha256?: string; share_bps?: number } };
   /** Skills that grow with use and fade without it (docs/behaviour/skills.md; foundations-2 E4): off unless set; `true`, at
    * the placeholder rates, or the rates a study sets (a factor of the study, not an assumption). Off: the town as before. */
   skills?: boolean | SkillsSpec;
@@ -333,6 +339,9 @@ export interface TownSpec {
    * before); `local`, at a hosting firm in the town, on its feeders and its main (needs `assistants` and the profile's
    * `values.hosting`). */
   hosting?: "local";
+  /** Tools the outside sells (docs/behaviour/automation.md, "Tools"; foundations-2 E2): off unless set, while the profile's
+   * figures are placeholders (ME-25). Needs the profile's `automation.tools`. */
+  tools?: boolean;
   /** How hard a seat's model reasons, where its way in takes that (docs/real-models.md, "A seat's settings"): one word
    * for every seat ("low"), or by office id ({ finance: "low" }). Not given: the model's own default. */
   seat_effort?: string | { [seat: string]: string };
@@ -517,6 +526,14 @@ function attachmentMeans(O: NonNullable<Profile["values"]["outlook"]>): { place_
   };
   const out = { ...(O.residence ? { place_bps: mean(O.residence, 5)! } : {}), ...(O.job_tenure ? { trade_bps: mean(O.job_tenure, 3)! } : {}) };
   return Object.keys(out).length ? out : undefined;
+}
+
+/** `dials.citizen_model` from a spec's `living.citizen_model`: the file's path as given, its SHA-256 (read from the file when the
+ * spec does not give it), and the share (10,000 unless given). The engine reads the file again and refuses a hash that differs. */
+function citizenModelDial(cm: { weights: string; sha256?: string; share_bps?: number }): { weights: string; sha256: string; share_bps: number } {
+  if (!cm.weights) throw new Error("living.citizen_model: no weights (the model file's path)");
+  const sha256 = cm.sha256 ?? new Bun.CryptoHasher("sha256").update(readFileSync(cm.weights)).digest("hex");
+  return { weights: cm.weights, sha256, share_bps: cm.share_bps ?? 10_000 };
 }
 
 export function generate(described: TownSpec): any {
@@ -723,8 +740,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // Whom a kind of shop buys from: the wholesalers of its kind, a trader of its own in the outside world (as a food shop's
   // wholesaler is not a clothing shop's); `goods` is the world market's, as the factories' goods are.
   const wholesaler = (kind: string) => (!MIX || kind === "goods" ? "outside" : `wholesale-${kind}`);
-  const WHOLESALERS = (MIX ?? []).filter((k) => k.kind !== "goods").map((k) => ({ kind: k.kind, entity: wholesaler(k.kind), wholesale: k.wholesale }));
-  for (const w of WHOLESALERS) entities.push({ id: w.entity, kind: "boundary", name: `The wholesalers of ${w.kind.replace(/_/g, " ")}` });
+  const toolSeller = (kind: string) => `sellers-${kind}`;
+  // (Tools the outside sells, where the town asks for them, `tools: true`: the profile's, while their figures are placeholders, ME-25.)
+  if (spec.tools && !V.automation?.tools?.length) throw new Error(`profile ${P.id} lists no tools (values.automation.tools), and the town asks for them`);
+  const TOOLS = spec.tools ? V.automation!.tools! : [];
+  // (And a seller for each tool the outside sells, by the unit: docs/behaviour/automation.md, "Tools".)
+  const WHOLESALERS: { kind: string; entity: string; wholesale: number; least?: number }[] = [...(MIX ?? []).filter((k) => k.kind !== "goods").map((k) => ({ kind: k.kind, entity: wholesaler(k.kind), wholesale: k.wholesale })),
+    ...TOOLS.map((t) => ({ kind: t.kind, entity: toolSeller(t.kind), wholesale: t.price, least: 1 }))];
+  const TOOL_SELLERS = TOOLS.map((t) => toolSeller(t.kind));
+  for (const w of WHOLESALERS) entities.push({ id: w.entity, kind: "boundary", name: w.least ? `The sellers of ${w.kind.replace(/_/g, " ")}` : `The wholesalers of ${w.kind.replace(/_/g, " ")}` });
   /** The yearly rate at which what is bought of a kind is found faulty: the profile's rate for goods, shared among the kinds by the shares of problems each has (the town's total is the profile's; with no shares, all of it is goods'). */
   const COMPLAINT_BPS = (kind: string): number => {
     const FRP = V.frictions;
@@ -828,6 +852,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     ...(CO_SPEC.accounts !== undefined ? { accounts: Number(CO_SPEC.accounts) } : {}) } : undefined;
   const READING = spec.living?.reading ? { ...spec.living.reading } : undefined;
   const CU_SPEC = spec.living?.culture === true ? {} : spec.living?.culture || undefined;
+  const CITIZEN_MODEL = spec.living?.citizen_model ? citizenModelDial(spec.living.citizen_model) : undefined;
   const CU = CU_SPEC ? V.culture : undefined;
   const CULTURE = CU_SPEC ? { ...(CU_SPEC.conducts ? { conducts: CU_SPEC.conducts } : {}), ...(CU_SPEC.sway_milli !== undefined ? { sway_milli: CU_SPEC.sway_milli } : {}), ...(CU_SPEC.step ? { step: CU_SPEC.step } : {}),
     profile: { ...(CU?.conducts ? { conducts: CU.conducts } : {}), ...(CU?.origin?.by_group ? { by_origin: CU.origin.by_group } : {}), ...(CU?.origin ? { homophily_bps: CU.origin.homophily_bps, origin_shares: CU.origin.groups.map((g) => ({ id: g.id, share_bps: g.share_bps })) } : {}) } } : undefined;
@@ -2586,7 +2611,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       buys: Object.fromEntries(PRODUCTS.map((PR) => [PR.kind, { unit_price: PR.price, per_month: exportsOf.get(PR.kind)!.units, from: exportsOf.get(PR.kind)!.shares }])) }));
   // Each kind of shop's wholesalers: a trader of its own, selling that kind at the world's price, on the terms the world market gives.
   for (const w of WHOLESALERS) office(`${w.entity}-trade`, w.entity, "Wholesale desk", undefined, [{ id: "ledger", kind: "accounts" }, K.mine("orders", ["order", "invoice", "invoice_declined", "delivery_note", "buying_offer"]), { id: "stock", kind: "holdings" }],
-    code("world.trade", { account: `acc-${w.entity}`, ...(V.business?.trade_credit_days ? { terms_days: V.business.trade_credit_days } : {}), sells: { [w.kind]: w.wholesale },
+    code("world.trade", { account: `acc-${w.entity}`, ...(V.business?.trade_credit_days ? { terms_days: V.business.trade_credit_days } : {}), sells: { [w.kind]: w.wholesale }, ...(w.least ? { min_order: w.least } : {}),
       price_process: Object.fromEntries(Object.entries(V.world_price_process ?? {}).filter(([k]) => k === w.kind)), shocks: (spec.shocks ?? []).filter((x: any) => x.kind === w.kind) }));
   // A person\'s seconds for a paper of a kind (the table\'s row for what is made, else for the block), and what a system of an office offer takes
   // for it: the offer\'s speed against that. The offer\'s template carries the row (law 10), with its source beside the table\'s.
@@ -2991,7 +3016,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     if (w.role) continue; // (a body's staff, hired above: their posts are the body's own)
     if (w.employer.startsWith("factory")) {
       const cell = structures.find((x) => x.id === w.structure)!.at;
-      office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder"), lawBook, { id: "stock", kind: "holdings" }, K.premises("works", [cell])],
+      office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder", ...TOOL_SELLERS), lawBook, { id: "stock", kind: "holdings" }, K.premises("works", [cell])],
         code("firm.producer", { works: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: PAY, working_day: WORKING_DAY, industry: w.industry, lender: "bank", builder: "builder", work_days: WORK_DAYS,
           per_unit: { [productOf(w.employer).input]: productOf(w.employer).inputs }, labour_per_unit: productOf(w.employer).labour, price: productOf(w.employer).price, supplier: "outside", market: "outside", ...(productOf(w.employer) === GOODS_PRODUCT ? {} : { task: productOf(w.employer).task, output: productOf(w.employer).kind }), ...look, ...informalOf(w) }));
       continue;
@@ -3068,6 +3093,26 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         ...(spec.living ? { keeps_record: true } : {}) },
     };
   });
+  // A factory, in works for sale (foundations-2 E3; docs/behaviour/entry.md, "Founding a factory"): a founder with the
+  // means buys a closed factory's works and makes the town's goods there, weighing it as a shop is weighed (expected
+  // profit), its custom the world market's appetite for goods as it publishes it, shared among the town's factories of
+  // goods and itself. Beyond the works: three months' wages for the staff that share needs, and a month's inputs for it.
+  const factoryVenture = factories.length ? (() => {
+    const PR = GOODS_PRODUCT;
+    const demand = exportsOf.get(PR.kind)?.units ?? 0;
+    const sellers = factories.filter((f) => productOf(f).kind === PR.kind).length;
+    const share = Math.ceil(demand / (sellers + 1));
+    const perWorker = Math.max(1, Math.floor((WORKING_DAY * WORK_DAYS * 30) / 7 / PR.labour));
+    const staff = Math.max(1, Math.ceil(share / perWorker));
+    return {
+      kind: "factory", name: "Factory", unit_cost: PR.inputs * PR.inputPrice, demand_per_month: demand, sellers,
+      capital: 3 * staff * Math.floor((wages.factory * MONTH) / PAY) + share * PR.inputs * PR.inputPrice,
+      channels: [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder", ...TOOL_SELLERS), lawBook, { id: "stock", kind: "holdings" }, K.premises("works", ["{cell}"]),
+        K.published("property", ["property_for_sale", "property_sold"])],
+      role_module: { code: "firm.producer", params: { works: "{structure}", workplace: "{structure}/workplace.1", max_staff: 40, wage: wages.factory, period: PAY, working_day: WORKING_DAY, industry: "manufacturing", lender: "bank", builder: "builder", work_days: WORK_DAYS,
+        per_unit: { [PR.input]: PR.inputs }, labour_per_unit: PR.labour, price: PR.price, supplier: "outside", market: "outside", founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank", ...look } },
+    };
+  })() : undefined;
   // "population" is who could sign a petition: the adults.
   // (With the clinic: treatable deaths come through illness, and care cuts them; docs/behaviour/life.md.)
   const severeKept = HE?.treats.find((x) => x.kind === "illness" && x.severity === V.life.treatable?.band)?.fatal_kept_bps;
@@ -3145,7 +3190,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     buffer_months: SAVINGS_KEPT_MONTHS, saving_bps: V.spending.saving_bps, wealth_effect_bps_per_year: V.spending.wealth_effect_bps_per_year, essentials: V.spending.essentials_per_month,
     retirement_age: V.retirement_age, ...(CURVE ? { stop_work_curve: CURVE } : {}),
     // Starting businesses: the ventures a person may weigh, each by its expected profit (docs/behaviour/entry.md).
-    ventures: [...shopVentures, ownVenture],
+    ventures: [...shopVentures, ...(factoryVenture ? [factoryVenture] : []), ownVenture],
     // (Borrowing to start one, risk ME-1: asked of the bank over the longest term it lends for, which its published terms say.)
     start_loan_months: Cr.max_months,
     // Founding (docs/behaviour/founding.md), where the town has it on: the profile's fitted chance and sizes; the
@@ -3932,15 +3977,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   retellTexts();
   // (Skills by use, where the town asks for them: docs/behaviour/skills.md; and the outside's releases, where a scenario gives
   // them: docs/scenarios.md, "Capability". Neither asked: the config as it is.)
-  return withCapability(withSkills({
+  return withCapability(withSkills(withTools({
     contracts: "0.8",
     meta: { name: spec.name, description: `Generated town (generator ${GENERATOR_VERSION}, seed ${spec.seed}): ${everyone.length} people in ${households.length} households, ${homes.length} homes, ${jobSlots.length} jobs.${RS ? ` As the year begins: ${[...inForce.values()].reduce((x, y) => x + y.length, 0)} payments in force; ${start.taken_in} households with nothing coming in live with kin, ${start.on_savings} rent on their savings, ${start.without} households are without a home.` : ""}${OA ? ` ${ownBusinesses.length} people working for themselves, in the kinds the town holds (${OA_HELD.map((k) => k.name).join(", ") || "none"}); of the profile's own-account workers, ${(10_000 - OA_HELD.reduce((x, k) => x + k.share_bps, 0)) / 100}% are in kinds it cannot hold yet and are drawn in jobs.` : ""}${under.applied.length ? ` Starting conditions: ${under.applied.join(", ")}.` : ""}${NM ? ` People and bodies are named from the profile's frequency lists (${everyone.length - 0} people; ${(() => { const seen = new Map<string, number>(); for (const m of everyone) seen.set(nm(m.id), (seen.get(nm(m.id)) ?? 0) + 1); return [...seen.values()].reduce((x, n) => x + (n > 1 ? n * (n - 1) / 2 : 0), 0); })()} pairs share a full name; ${["names.given", "names.family"].filter((k) => P.sources[k]?.startsWith("PLACEHOLDER")).length ? "some lists are placeholders" : "no list is a placeholder"}). The names are drawn, not records of anyone.` : ""}`, canary: CANARY },
     ...(CAL_START ? { calendar: calendarConfig(CAL!, CAL_START, spec.years) } : {}),
     // (A named town says so: the resolver answers a name a seat knows more than one by `ambiguous`. Not said otherwise.)
     ...(NM ? { names: true } : {}),
     seed: spec.seed,
-    ...(spec.living?.initiative_bps !== undefined || FR || FND || READING || CULTURE ? { dials: { ...(spec.living?.initiative_bps !== undefined ? { initiative_bps: spec.living.initiative_bps } : {}), ...(FR ? { friction_bps: FRICTION_BPS } : {}),
-      ...(FND ? { founding: { shapes: FO_SHAPES, scale_bps: FO_SPEC!.scale_bps ?? 10_000 } } : {}), ...(COMPOSER ? { composer: COMPOSER } : {}), ...(READING ? { reading: READING } : {}), ...(CULTURE ? { culture: CULTURE } : {}) } } : {}),
+    ...(spec.living?.initiative_bps !== undefined || FR || FND || READING || CULTURE || CITIZEN_MODEL ? { dials: { ...(spec.living?.initiative_bps !== undefined ? { initiative_bps: spec.living.initiative_bps } : {}), ...(FR ? { friction_bps: FRICTION_BPS } : {}),
+      ...(FND ? { founding: { shapes: FO_SHAPES, scale_bps: FO_SPEC!.scale_bps ?? 10_000 } } : {}), ...(COMPOSER ? { composer: COMPOSER } : {}), ...(READING ? { reading: READING } : {}), ...(CULTURE ? { culture: CULTURE } : {}), ...(CITIZEN_MODEL ? { citizen_model: CITIZEN_MODEL } : {}) } } : {}),
     clock: { tick_seconds: 3600, run_seconds: spec.years * 365 * DAY },
     log: { checkpoint_every: MONTH, anchor_every_entries: 1000 },
     // Amounts and quantities on the wire are decimal strings (D58); the generator counts in numbers.
@@ -4090,5 +4135,5 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         }
         return t;
       })() } : {}) },
-  }, spec.skills, (WORKING_DAY * WORK_DAYS) / 7 / HOUR), spec.capability, spec.years * 365);
+  }, TOOLS, AUTO?.firms, toolSeller), spec.skills, (WORKING_DAY * WORK_DAYS) / 7 / HOUR), spec.capability, spec.years * 365);
 }

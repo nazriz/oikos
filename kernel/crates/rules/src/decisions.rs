@@ -66,12 +66,23 @@ pub struct ReviewRoute {
     /// refused (a deemed refusal), and the appeal's days run from then. None: silence is only silence.
     #[serde(default, deserialize_with = "opt_whole", skip_serializing_if = "Option::is_none")]
     pub deemed_refused_days: Option<i64>,
+    /// Where the law has no deemed refusal but a body that recommends (an ombudsman, a complaints examiner, a
+    /// representative's caseworker) takes up an agency's delay: a review asked for and not answered within so many
+    /// days of the asking may be complained of there. It opens no appeal; it is a complaint, heard by that body at its
+    /// own cost and time, and what it recommends binds nobody (MT-21).
+    #[serde(default, deserialize_with = "opt_whole", skip_serializing_if = "Option::is_none")]
+    pub complaint_after_days: Option<i64>,
 }
 
 impl ReviewRoute {
     /// When a review asked for at `asked` and not answered is taken as refused, if the law has a deemed refusal.
     pub fn deemed_refused_at(&self, asked: i64) -> Option<i64> {
         self.deemed_refused_days.map(|d| asked + d * DAY)
+    }
+
+    /// From when a review asked for at `asked` and not answered may be complained of to a body that recommends.
+    pub fn complaint_from(&self, asked: i64) -> Option<i64> {
+        self.complaint_after_days.map(|d| asked + d * DAY)
     }
 }
 
@@ -221,6 +232,10 @@ pub fn decisions_in_words(rules: &[DecisionLaw], written: impl Fn(i64) -> String
                     let last = parts.pop().unwrap_or_default();
                     parts.push(format!("{last}; a review not answered within {d} days of being asked for is taken as refused"));
                 }
+                if let Some(d) = v.complaint_after_days {
+                    let last = parts.pop().unwrap_or_default();
+                    parts.push(format!("{last}; a review not answered within {d} days of being asked for may be complained of to a body that hears such complaints, which may recommend but not order"));
+                }
             }
             if let Some(a) = &r.appeal {
                 let after = match &r.review {
@@ -353,6 +368,12 @@ it may be appealed to a body that hears claim refused and can set it aside, with
         assert_eq!(review.deemed_refused_at(5 * DAY), Some(96 * DAY));
         let none = rules_of(&oikos_core::Frozen::from(json!({ "decisions": [{ "kind": "k", "name": "S", "review": { "within_days": 30, "grounds": "any", "required": true } }] })));
         assert_eq!(none[0].review.as_ref().unwrap().deemed_refused_at(0), None, "no deemed refusal unless the law says so");
+        assert_eq!(none[0].review.as_ref().unwrap().complaint_from(0), None, "no complaint of delay unless the law says so");
+        // Where the law has a complaint of delay instead (MT-21): said in the words, dated from the asking, opening no appeal.
+        let c = rules_of(&oikos_core::Frozen::from(json!({ "decisions": [{ "kind": "k", "name": "S", "review": { "within_days": 30, "grounds": "any", "required": true, "complaint_after_days": 21 } }] })));
+        assert_eq!(c[0].review.as_ref().unwrap().complaint_from(5 * DAY), Some(26 * DAY));
+        assert_eq!(c[0].review.as_ref().unwrap().deemed_refused_at(5 * DAY), None);
+        assert!(decisions_in_words(&c, |n| format!("{n}")).contains("not answered within 21 days of being asked for may be complained of to a body that hears such complaints, which may recommend but not order"));
     }
 
     #[test]
