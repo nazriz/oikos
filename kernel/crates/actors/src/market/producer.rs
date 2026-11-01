@@ -143,7 +143,7 @@ impl Params {
             },
         };
         if p.founding.founder.is_some() && p.founding.bank.is_empty() {
-            return Err("firm.producer: a factory founded in the run names its bank (`bank`)".into());
+            return Err("firm.producer: a factory someone founds names its bank (`bank`)".into());
         }
         Ok(p)
     }
@@ -1036,11 +1036,11 @@ pub fn manifest() -> Value {
     add("rival_days", 60, "days", "how old a rival's price list may be and still count");
     add("export_probe_bps", 1000, "bps", "how far an exporter probes its room upward when the outside sent nothing back (docs/behaviour/boundary.md, Exports)");
     // (A factory founded in the run: docs/behaviour/entry.md, "Founding a factory".)
-    for (k, what) in [("founder", "who founded it, where it was founded in the run (none: the town began with it)"), ("listing", "the listing of the works it was founded to buy"), ("bank", "the bank it opens its account at, where founded in the run")] {
+    for (k, what) in [("founder", "who founded it, where someone founded it (none: the town began with it)"), ("listing", "the listing of the works it was founded to buy"), ("bank", "the bank it opens its account at, where someone founded it")] {
         params.insert(k.into(), json!({ "schema": { "type": ["string", "null"], "description": what }, "source": "the world gives it (no default)" }));
     }
     params.insert("tool".into(), json!({ "schema": { "type": ["object", "null"], "description": "a tool its work may be done with, as its supplier sells it, and how it weighs buying one (kind, labour_bps, payback_months, hurdle_bps)" }, "source": "the world gives it (no default): the technology on offer" }));
-    params.insert("capital".into(), json!({ "schema": { "type": "integer", "description": "the capital its founder puts in, where founded in the run" }, "unit": "cents", "default": 0, "source": "the world gives it: the founder's (the price of the works and the venture's capital)" }));
+    params.insert("capital".into(), json!({ "schema": { "type": "integer", "description": "the capital its founder puts in, where someone founded it, in the smallest unit of the world's money" }, "default": 0, "source": "the world gives it: the founder's (the price of the works and the venture's capital)" }));
     m
 }
 

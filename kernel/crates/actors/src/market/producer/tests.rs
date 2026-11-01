@@ -218,9 +218,9 @@ fn a_factory_just_founded_sets_itself_up_and_buys_its_works_before_it_makes_anyt
 /// saved is about 21,428, against a tenth of a million over 24 months, 4,166, by a fifth: it pays; at ten million, no.)
 #[test]
 fn a_tool_is_bought_for_each_of_the_staff_when_what_it_saves_beats_its_price_over_the_payback() {
-    let tool = json!({ "tool": { "kind": "press", "seller": "farm", "labour_bps": 5000, "payback_months": 24, "hurdle_bps": 2000 } });
-    let sells = |press: i64| statement("rec.1", 0, "farm", "price_list", &[], json!({ "goods": { "grain": 100, "press": press }, "account": "acc-farm", "min_order": 10 }));
-    let o = |press: i64| vec![sells(press), offer("rec.2", 0, 450, 200, Some((F, 150)))];
+    let tool = json!({ "tool": { "kind": "press", "seller": "presses", "labour_bps": 5000, "payback_months": 24, "hurdle_bps": 2000 } });
+    let sells = |press: i64| statement("rec.3", 0, "presses", "price_list", &[], json!({ "goods": { "press": press }, "account": "acc-presses", "min_order": 1 }));
+    let o = |press: i64| vec![farm("rec.1", 100), sells(press), offer("rec.2", 0, 450, 200, Some((F, 150)))];
     let mut h = harness(tool.clone());
     let t = all(&h.wake(DAY + 9 * H, world(&["w1", "w2"], o(100_000), 0, 0, 10_000_000, json!([]))));
     assert!(t.contains("kind=order") && t.contains("\"kind\":\"press\",\"quantity\":2"), "{t}");

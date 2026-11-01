@@ -600,7 +600,7 @@
     },
     "bank": {
       "schema": {
-        "description": "the bank it opens its account at, where founded in the run",
+        "description": "the bank it opens its account at, where someone founded it",
         "type": [
           "string",
           "null"
@@ -627,11 +627,10 @@
     "capital": {
       "default": 0,
       "schema": {
-        "description": "the capital its founder puts in, where founded in the run",
+        "description": "the capital its founder puts in, where someone founded it, in the smallest unit of the world's money",
         "type": "integer"
       },
-      "source": "the world gives it: the founder's (the price of the works and the venture's capital)",
-      "unit": "cents"
+      "source": "the world gives it: the founder's (the price of the works and the venture's capital)"
     },
     "casual_bps": {
       "default": 0,
@@ -700,7 +699,7 @@
     },
     "founder": {
       "schema": {
-        "description": "who founded it, where it was founded in the run (none: the town began with it)",
+        "description": "who founded it, where someone founded it (none: the town began with it)",
         "type": [
           "string",
           "null"
