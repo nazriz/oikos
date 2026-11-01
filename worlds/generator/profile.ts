@@ -316,13 +316,13 @@ export interface Profile {
      * `needs`: what the decision waits for before it is made (papers from the claimant, a confirmation from their last employer), within so many days,
      * and `else` what comes of it when they do not come (`refuse`, or `decide` on what is on hand). `review`: the office looks at its own decision again
      * if asked within so many days, on what grounds, whether an appeal lies only after it (`required`), and, where the law takes silence as a
-     * refusal, after how many days of asking an unanswered review counts as refused (`deemed_refused_days`; the appeal's days run from then). `appeal`: the matter a venue that can set the
+     * refusal, after how many days of asking an unanswered review counts as refused (`deemed_refused_days`; the appeal's days run from then), or, where it has none, after how many days a body that only recommends takes up the delay (`complaint_after_days`: an ombudsman's or a complaints examiner's; no appeal follows). `appeal`: the matter a venue that can set the
      * decision aside hears (`claim_refused`), within so many days, on what grounds, and its fee in hours of ordinary pay (0: none). `refused_by`: where the
      * office is a head and staff, whether the head alone may refuse. Each with its source (`sources["decisions.<kind>.<payment or all>"]`), or marked
      * "PLACEHOLDER" or "(to confirm)". A route a place's law lacks is left out (no `review`: no internal reconsideration). */
     decisions?: { kind: string; name: string; payments?: string[]; refused_by?: "office-holder" | "staff";
       needs?: { id: string; from: "claimant" | "employer"; what: string; within_days: number; else: "refuse" | "decide" }[];
-      review?: { within_days: number; grounds: string; required?: boolean; deemed_refused_days?: number };
+      review?: { within_days: number; grounds: string; required?: boolean; deemed_refused_days?: number; complaint_after_days?: number };
       appeal?: { matter: string; within_days: number; grounds: string; fee_hours_of_pay: number } }[];
     /** Founding (docs/behaviour/founding.md), read only for a living town that turns it on: how often new associations
      * are registered here (`registered_per_100000_per_year`, with its source; code never reads it) and how many more
@@ -473,6 +473,9 @@ export interface Profile {
      * `principals`: what a principal weighs that no market gives (what an error costs it, the share of slips it finds in a draft
      * it reads, how much a claim counts against what it has seen, its hurdle); `review_misses_bps` how often a reading misses a
      * slip (a person's row in the table of slips). No figure here sets how much anyone delegates. */
+    /** A hosting firm in the town (docs/behaviour/hosting.md): read only where a town asks for its assistants' systems to run
+     * in the town (`hosting: "local"`). worlds/generator/hosting.ts says what each figure is. */
+    hosting?: import("./hosting").HostingFigures;
     assistants?: {
       providers: { id: string; name: string; offers: { id: string; title: string; for: "organisations" | "persons"; template: string; kinds: string[]; levels: ("advice" | "draft" | "approve" | "alone")[];
         speed_bps: number; claim_slip_bps: number; slip_bps: number; fee_month: number; setup: number; exit: number; notice_days: number; term_days: number; records: "principal" | "provider" | "on_request" }[] }[];

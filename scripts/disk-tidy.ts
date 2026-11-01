@@ -15,7 +15,7 @@
 //     *.jsonl.zst of 50 MB or more outside a *.dataset; anchors, summaries, measure/, STATUS, cost files, datasets
 //     stay), since the log can be regenerated from git, the world and the seed.
 // A run with a live process (a pid file whose process is alive) or written to within --days is left alone.
-// The system temp root (/private/tmp) is swept too: oikos-*, forms-trained* and sz-* folders (what tests and tools leave)
+// The system temp root (/private/tmp on macOS, /tmp elsewhere) is swept too: oikos-*, forms-trained* and sz-* folders (what tests and tools leave)
 // older than a day (--tmp-hours), and a finished test run's own oikos-test-<pid>-*. The home caches are not touched.
 // Worktrees under .claude/worktrees/ go by scripts/worktree-clean.ts's rules (merged into origin/main, clean, no runs
 // inside, nothing working in it, not a wave copy, not the one this runs in), plus: never a protected name (merge-main
@@ -28,7 +28,7 @@
 // (none has a file open in it or its working folder there, none names it in its command line or environment). They hold
 // only what cargo builds again.
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, userInfo } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { scan, type Tree } from "./worktree-clean";
 
@@ -193,8 +193,15 @@ export function classifyTargets(claudeDir: string, inUse: (path: string) => bool
 /** Whether any running process of this user uses a folder: a file open in it (or mapped), its working folder there, or its
  * command line or environment naming it. One look at all processes, asked again for each folder. */
 export function processUses(): (path: string) => boolean {
-  const open = Bun.spawnSync(["lsof", "-u", process.env.USER ?? "", "-Fn"], { stdout: "pipe", stderr: "pipe" }).stdout.toString().split("\n").filter((l) => l.startsWith("n")).map((l) => l.slice(1));
-  const cmds = Bun.spawnSync(["ps", "-E", "-ww", "-u", process.env.USER ?? "", "-o", "pid=,command="], { stdout: "pipe", stderr: "pipe" }).stdout.toString().split("\n").filter((l) => Number(l.trim().split(/\s+/)[0]) !== process.pid);
+  // (Each command with its environment: `ps -E` on macOS, `ps e` on Linux, where `-E` is refused. Where either listing
+  // can't be had, everything counts as in use: a folder is never removed on a blind look.)
+  const user = String(process.getuid?.() ?? (process.env.USER || userInfo().username)); // (the uid: a name may not resolve in a container)
+  const run = (cmd: string[]) => { try { const r = Bun.spawnSync(cmd, { stdout: "pipe", stderr: "pipe" }); return r.exitCode === 0 ? r.stdout.toString() : undefined; } catch { return undefined; } };
+  const lsof = run(["lsof", "-u", user, "-Fn"]);
+  const ps = run(process.platform === "darwin" ? ["ps", "-E", "-ww", "-u", user, "-o", "pid=,command="] : ["ps", "eww", "-u", user, "-o", "pid=,args="]);
+  if (lsof === undefined || ps === undefined) return () => true;
+  const open = lsof.split("\n").filter((l) => l.startsWith("n")).map((l) => l.slice(1));
+  const cmds = ps.split("\n").filter((l) => Number(l.trim().split(/\s+/)[0]) !== process.pid);
   return (path: string) => open.some((f) => f === path || f.startsWith(path + "/")) || cmds.some((c) => c.includes(path));
 }
 
@@ -306,13 +313,13 @@ if (import.meta.main) {
     return judgeWorktree(t, locks.get(t.path), { protect, ...(unlockPid ? { unlockPid } : {}), birthMs: birth });
   });
 
-  const df = Bun.spawnSync(["df", "-h", "/System/Volumes/Data"]).stdout.toString().split("\n")[1]?.split(/\s+/) ?? [];
+  const df = Bun.spawnSync(["df", "-h", process.platform === "darwin" ? "/System/Volumes/Data" : sc.repo]).stdout.toString().split("\n")[1]?.split(/\s+/) ?? [];
   const free = df[3] ?? "unknown";
   const inv = opt("--inventory");
   if (inv) { mkdirSync(dirname(resolve(inv)), { recursive: true }); writeFileSync(resolve(inv), inventoryMarkdown(new Date().toISOString().slice(0, 10), free, runs, trees)); console.log(`inventory written to ${inv}`); }
 
   let freeKb = 0;
-  const tmpRoot = resolve(opt("--tmp") ?? "/private/tmp");
+  const tmpRoot = resolve(opt("--tmp") ?? (process.platform === "darwin" ? "/private/tmp" : "/tmp"));
   const tmps = classifyTmp(tmpRoot, { hours: Number(opt("--tmp-hours") ?? 24) });
   for (const t of tmps) {
     if (t.action === "keep") continue;

@@ -218,3 +218,48 @@ test("skills: off is the town as before; on, every kind of work and a person's p
   expect(only.catalogue.tasks.some((t: any) => t.skill)).toBe(false);
   expect(() => generate({ ...spec, skills: { only: ["juggling"] } })).toThrow(/no skill of this town/);
 });
+
+// The outside world's capability over time (docs/scenarios.md, "Capability"): each release a kind of system of its own,
+// released on its day, quicker and slipping less; the seller sells the newest out; the study's tag lists them all.
+test("capability: releases are kinds of system released on their days, sold newest first, and tagged for measurement only", () => {
+  const cap = { tag: "ai", of: ["case-handling-system"], every_days: 182, time_bps: 8000, slip_bps: 8000, price_bps: 10_000 };
+  const plain = generate(spec) as any;
+  const on = generate({ ...spec, capability: cap }) as any;
+  const base = plain.templates.find((t: any) => t.id === "case-handling-system");
+  const r2 = on.templates.find((t: any) => t.id === "case-handling-system-r2");
+  expect(r2.released).toBe(2 * 182 * 86_400);
+  expect(r2.does.find((d: any) => d.kind === "permit_decision").seconds).toBe(Math.round(base.does.find((d: any) => d.kind === "permit_decision").seconds * 0.64));
+  expect(on.orchestration.slip.system["case-handling-system-r2"].bps).toBe(Math.round(plain.orchestration.slip.system["case-handling-system"].bps * 0.64));
+  const vendor = on.participants.find((p: any) => p.controller?.impl === "world.vendor").controller.params;
+  expect(vendor.releases["case-handling-system"].map((r: any) => r.template)).toEqual(["case-handling-system-r1", "case-handling-system-r2", "case-handling-system-r3", "case-handling-system-r4"]);
+  expect(on.meta.study_tags.ai).toContain("case-handling-system-r4");
+  // Nothing else moves: the town is the plain town but for the releases and the tag.
+  const strip = (c: any) => JSON.stringify({ ...c, templates: c.templates.filter((t: any) => t.released === undefined) },
+    (k, v) => (k === "releases" || k === "study_tags" || /-r\d+(\.|$)/.test(k) ? undefined : v));
+  expect(strip(on)).toBe(strip(plain));
+  expect(() => generate({ ...spec, capability: { ...cap, of: ["a-machine-nobody-sells"] } })).toThrow(/no offer/);
+});
+
+// A host in the town (docs/behaviour/hosting.md): the assistants' systems run on its servers, in its building on the
+// town's network; what comes in is held there for the work, and the providers pay its fee. Absent: abroad, as before.
+test("hosting: the assistants' systems run at a host on the town's network, which the providers pay", () => {
+  const on = generate({ ...spec, assistants: true, hosting: "local" }) as any;
+  const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });
+  for (const f of ["common", "blocks", "records", "world-config", "participant-api", "log"]) ajv.addSchema(JSON.parse(readFileSync(join(root, `contracts/${f}.schema.json`), "utf8")));
+  expect(ajv.getSchema("urn:oikos:contracts:0.8:world-config")!(on)).toBe(true);
+  const conns = on.world.connections.filter((c: any) => c.holder === "host");
+  expect(conns.map((c: any) => c.kind).sort()).toEqual(["energy", "wastewater", "water"]);
+  expect(conns.every((c: any) => c.uses === undefined && c.at === "data-centre")).toBe(true);
+  // Every provider's kind of system runs there, and the systems there at the start fit its servers.
+  const hosted = on.templates.filter((t: any) => t.runs_on);
+  expect(hosted.length).toBe(on.templates.filter((t: any) => t.supplier?.startsWith("provider-")).length);
+  const servers = Number(on.world.holdings.find((h: any) => h.holder === "host" && h.kind === "hardware").quantity);
+  expect(on.participants.filter((p: any) => hosted.some((t: any) => t.id === p.template)).length).toBeLessThanOrEqual(servers);
+  const fees = on.positions.filter((p: any) => p.role_module?.code === "firm.provider").map((p: any) => p.role_module.params.hosting);
+  expect(fees.length).toBeGreaterThan(0);
+  expect(fees.every((f: any) => f.account === "acc-host" && f.fee_month > 0)).toBe(true);
+  // Absent, abroad: nothing of it.
+  const abroad = JSON.stringify(generate({ ...spec, assistants: true }));
+  expect(/data-centre|runs_on|"firm\.host"/.test(abroad)).toBe(false);
+  expect(() => generate({ ...spec, hosting: "local" })).toThrow(/assistants/);
+});

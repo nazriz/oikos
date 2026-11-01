@@ -293,8 +293,8 @@ The mechanism:
   non-resident officer as the seat's body, is not built, because a person with a body who is not a resident reaches the
   census, life events, elections and every module that counts persons (not contained); (2) the officers' ratio is a
   placeholder everywhere, and the minutes are sourced for us-oh only (gb-eng's and the others' are the generator's
-  placeholders); (3) the law's own waits (Universal Credit's assessment period) are not data yet; (4) a system's hours
-  are every day's (no weekends), so the officers' week is spread evenly over seven days; (5) a generic `publish` row on a
+  placeholders); (3) the law's own waits (Universal Credit's assessment period) are not data yet; (4) fixed 2026-10-31 (decisions "Working calendars"): the desks' hours
+  are closed on the place's days of rest and public holidays; (5) a generic `publish` row on a
   machine's template still covers a decision kind at the world's second if a module publishes one without naming the
   desk: the backstop sees only rows that name a decision kind.
 
@@ -557,17 +557,24 @@ The mechanism:
 
 ---
 
-### ME-22 · Delegation's figures are placeholders, and a code assistant decides nothing
-- **Gap:** The assistants on offer (prices, speed, a provider's claimed and true slip rates, the records term) and what a
-  principal weighs (what an error costs it, the share of slips its reading finds, how much a claim counts, its hurdle,
-  its review day, its horizon) are placeholders in au-vic only; the times of the papers of delegation are placeholders.
-  A code assistant carries out what its principal decided; only a model in the seat decides otherwise.
-- **Where:** `worlds/profiles/au-vic-2026.json` `values.assistants`; `docs/behaviour/assistants.md`; `docs/design/delegation.md`.
-- **Effect:** How much code principals delegate, at which levels, and how fast hidden slips build trust, rest on these
-  figures; a run with code assistants shows the machinery, not how much real principals would hand over.
-- **L / I:** high / high for any finding about how much is delegated · **Status:** open (2026-10-31)
+### ME-22 · Delegation's speed, slips and principals' figures are placeholders, and a code assistant decides nothing
+- **Gap:** The assistants' prices now rest on published 2026 prices of real assistant products (au-vic, gb-eng, us-oh;
+  2026-10-31, `assistant-prices`), most from secondary pages (to confirm). Still placeholders: an assistant's speed (no
+  provider publishes a time per paper; the one controlled study measures a person with an assistant), a provider's
+  claimed and true slip rates (no published error rate for drafting papers; hallucination benchmarks measure
+  summaries), the records term, and all a principal weighs (what an error costs it, the share of slips its reading
+  finds, how much a claim counts, its hurdle, its review day, its horizon); the times of the papers of delegation; and
+  which real product stands for provider A or B (a convention). A code assistant carries out what its principal
+  decided; only a model in the seat decides otherwise. Other profiles have no assistants.
+- **Where:** `worlds/profiles/{au-vic,gb-eng,us-oh}-2026.json` `values.assistants`; `docs/behaviour/assistants.md`; `docs/design/delegation.md`.
+- **Effect:** How much code principals delegate, at which levels, and how fast hidden slips build trust, rest above all
+  on the speed and slip placeholders and the principals' figures (prices are now real but list prices of general
+  assistants, not of a service that does tenancy papers alone); a run with code assistants shows the machinery, not how
+  much real principals would hand over.
+- **L / I:** high / high for any finding about how much is delegated · **Status:** open (2026-10-31; prices sourced 2026-10-31)
 - **Notice by:** Engagement and levels moving with a placeholder changed alone.
-- **Fix when:** before a study reads how much is delegated rather than what follows when it is.
+- **Fix when:** before a study reads how much is delegated rather than what follows when it is: a measured time and
+  error rate for an assistant doing such papers alone, and a source for what an error costs a landlord or a person.
 
 ### ME-23 · Skills by use: every rate a placeholder, everyone an ordinary hand on day one
 - **Gap:** With `skills` on, how fast a skill is learnt and lost, its floor, and how slow a novice and how quick a master
@@ -581,6 +588,18 @@ The mechanism:
 - **L / I:** high / high for any finding about what taking work back costs · **Status:** open (2026-10-31)
 - **Notice by:** The cost of taking work back moving with a placeholder rate changed alone.
 - **Fix when:** before a study reads the size of what taking work back costs, rather than whether it rises with time unused.
+
+### ME-24 · A host in the town: its size and draw are placeholders, and it is there from the start
+- **Gap:** With `hosting: "local"`, the data centre's servers, each server's draw, the building's overhead, its cooling
+  water a kWh, its margin and its opening money are placeholders or unopened sources (au-vic only); it exists from the
+  start rather than entering by expected profit; its hourly draw has the households' shape; its cooling water goes to
+  the sewer rather than the air; it has no staff and its servers never wear out.
+- **Where:** `worlds/profiles/au-vic-2026.json` `values.hosting`; `worlds/generator/hosting.ts`; `docs/behaviour/hosting.md`.
+- **Effect:** How much of the town's power and water goes to compute, and how a shortage falls between the data centre and
+  homes, rest on these figures and on the shape; a study of what the town gives to AI reads them directly.
+- **L / I:** high / high for any finding about what compute takes of a town · **Status:** open (2026-11-01)
+- **Notice by:** The data centre's share of the town's energy and water moving with a placeholder changed alone.
+- **Fix when:** before a study reads the size of compute's share, rather than whether a shortage reaches it.
 
 ## Public bodies and law
 
@@ -1421,13 +1440,19 @@ The mechanism:
 - **L / I:** medium / high · **Status:** mitigated (2026-10-24, branch `fix-memory-appeal`). A deemed refusal is law
   data (`review.deemed_refused_days`): where a place's law has one, a review unanswered that long is taken as refused
   and the claimant's appeal runs from then (de-ni: 91 days, SGG s 88(2), to confirm; held at citizen level and in a
-  living town whose office's answers are withheld). Still open where the law has none: au-vic (the TARA town), gb-eng,
-  us-oh's pension recall none (to confirm); what their claimants do instead (ask again, the ombudsman, judicial review)
-  is not built.
+  living town whose office's answers are withheld). Where the law has none (au-vic, the TARA town; gb-eng; us-oh's
+  pension; none recalled, to confirm), since 2026-10-31 (branch `mt21-recourse`) what their claimants do instead is
+  law data too (`review.complaint_after_days`): after 14, 21 and 30 days (the last a placeholder) unanswered, the delay
+  may be complained of to the town's ombudsman desk, standing for the Commonwealth Ombudsman, the DWP complaints route
+  to the Independent Case Examiner, and a congressional caseworker; it does the work at its own cost and only
+  recommends; the appeal still runs from an answer (held at citizen level and in living au-vic and gb-eng towns whose
+  office's answers are withheld: 5 of 14 au-vic claimants complained). Left: asking again, judicial review or
+  mandamus; the desk's recommendation is to set the decision aside, where a real ombudsman on delay asks first that the
+  review be decided; the figures are mostly to confirm.
 - **Notice by:** `withheld` arms whose claimant never acts again in a town whose law has no deemed refusal; a model
   steward that leaves requests unanswered there.
-- **Fix when:** Before a TARA arm in au-vic in which the steward may leave requests unanswered: source what an
-  Australian claimant does (a complaint to the Commonwealth Ombudsman, asking again) and give it to them as law data.
+- **Fix when:** the profiles' figures are confirmed; or a TARA arm reads how far claimants escalate (then asking again,
+  and England's three tiers, may matter).
 
 ### MT-22 · A model steward in a fork is a pilot's seat, less a few things
 - **Gap:** Mitigated 2026-10-31 (docs/decisions.md, "A model steward in a fork is a pilot's seat"): the seat is told what
@@ -1447,9 +1472,18 @@ The mechanism:
 - **Gap:** In `orchestrator/test/seat-diary.test.ts` (a works seat naming its crew to write forty notices a working day, 600 citizens, seed 1) the crew's paperwork takes 106 to 121 minutes from the first act of the day to the last on 18 of the 19 working days of days 1 to 28, and 310 minutes on day 21 (found 2026-10-24, after the run's seed began to draw who the people are). On the ordinary days the four crew members who are at work apply their acts side by side; on day 21 they applied one after another, the first four 30 minutes apart (555, 585, 615, 645 minutes into the day), and the day's later acts bunched in fours as well. **Not traced:** whether a crew member was busy with a gathering, a trip or another job that morning, whether the kernel serialised acts through one performer's time, or whether the seat's own sitting was late.
 - **Where:** the works crew's time (the kernel's charge of an act to its performers, `docs/all-work-takes-time.md`); `orchestrator/test/seat-diary.test.ts` (its bound is held to the middle working day since then).
 - **Effect:** A study that measures how fast delegated work gets done could read a one-day outlier as a delegation effect. If the cause is a fault, a crew's day is slower than its hours allow on some days.
-- **L / I:** low / medium · **Status:** open; untraced
-- **Notice by:** a day's span in the seat-diary run well above the others (`spanOf`), or a crew member's acts in the log not overlapping on a day when more than one is at work.
-- **Fix when:** a study reads delegated work's speed, or the day shows again at another seed.
+- **L / I:** low / medium · **Status:** closed (2026-10-31, branch `mt23-crew`): a mechanism fault, already fixed. Until
+  foundations-2 P1 (`fc5eabd`, 2026-10-25, the day after this was found) an actor who only orders an act was held on its
+  own time until the work began (docs/decisions.md, 2026-10-25, "Someone who only orders an act was held until it
+  began"), so a seat's orders queued behind whichever member of its crew was busy: the 30-minute steps and the bunching
+  in fours are that queue. On current main the crew's work is 105 minutes on every working day of days 1 to 22 in the
+  600-person town, day 21 included, and 31 minutes (two in post) on every working day of 30 in the town of the usual
+  size. Not re-run at `0e39e83` itself (a cold build of the old kernel): the trace is from the code and the dates. The
+  test's `spanOf` read the log time of `action_started`, which since P1 is when the seat gave the order (16 minutes a
+  day), not the crew's work; it now reads the work's own `starts` and `done`, and every working day is held to the
+  bound, not the middle one.
+- **Notice by:** a day's span in the seat-diary run (`spanOf`, now the work's own times) over three hours.
+- **Fix when:** (closed) a day over the bound again.
 
 ### MT-24 · The citizen capture keeps each decision as the mind recorded it, not yet everything the citizen model will read
 - **Gap:** The capture (docs/citizen-data.md, step 1 of docs/design/citizen-model.md) writes every recorded decision
@@ -1593,8 +1627,8 @@ The mechanism:
 
 ### SC-6 · A run's memory grows with its length faster than the town: 50,000 for two years does not fit
 - **Gap:** After the faults of 2026-10-31 were fixed, a 10,000-person town grows about 25 MB a simulated day (2.5 KB
-  a person a day; 1 KB at 1,000 people) and a 50,000-person town about 85 MB: three years at 10,000 ends near 30 GB,
-  two years at 50,000 would need about 75 GB on a 64 GB machine. What grows: the world's records (54%), the resolver's
+  a person a day; 1 KB at 1,000 people) and a 50,000-person town about 105 MB: three years at 10,000 peaked at 27 GB
+  (run 2026-11-01, 11.8 hours), two years at 50,000 would need about 86 GB on a 64 GB machine. What grows: the world's records (54%), the resolver's
   knowledge of every addressed statement each participant has seen, the twins' per-matter draw counts (every
   gathering's every date, for every person, for the run), minds, offices' files. Each is kept by design; none is a copy.
   Also seen only at size: one hall of 200 for gatherings in a town of 10,000 is full (2,000 to 4,000 refusals a month),
@@ -1689,8 +1723,20 @@ set the status to `fixed (commit abc1234)` (or the decisions entry), and let a r
   the part (3) would cut. A documents-only gate is 15 s, TypeScript only 85-100 s, the slow tier 660 s on 12 slots. A lone
   agent's gate is held to 3 slots for builds and runs today, which (1) would lift. The code has run only on macOS arm64,
   so nothing yet says its logs are the same elsewhere, which (2) would.
-- **Status:** planned (after feature work resumes) · **Do when:** The kernel gate grows past about 4 minutes or agents
-  wait on the cap for (1) and (3); before any result is claimed to reproduce on another machine, for (2).
+- **Done (2026-10-26, brought to main 2026-10-31; decisions "Linux, and one Rust test program"):** (2) the build and the gate run on Linux x86_64,
+  and the culture-dial pins (config hashes and the Rust state hashes of three profiles) are the Mac's to the byte; the
+  Mac-only pieces are skipped where absent, and `disk-tidy` no longer reads every folder as unused on Linux (its `ps -E`
+  is macOS's), and `scripts/mini stop` waits for what it ended to leave the process table (a Linux container's first
+  process reaps orphans a second or two late: the cause of `mini.test.ts` failing there every time).
+  `.github/workflows/linux.yml` runs both tiers nightly on a free `ubuntu-latest` runner with no secrets, cached, and
+  skips a night with no new commit on main; no workflow on
+  the self-hosted runner takes a pull request (`scripts/tiers.test.ts`). (3) `kernel/tests/` is one program
+  (`tests/main.rs`): a one-line change to the kernel's library rebuilds its tests in 34 s against 48 s, one to
+  `oikos-actors` in 153 s against 170 s, one to the tests' `common` in 3.5 s against 14 to 45 s, and the tests run in
+  230 s against 353 s (gate profile, 4 cores, Linux).
+- **Status:** planned (left: (1), and the sharding trial) · **Do when:** The kernel gate grows past about 4 minutes or
+  agents wait on the cap, for (1); the slow tier's time on the Mini holds up merges and the nightly Linux job has a few
+  green nights to read times from, for the sharding trial.
 
 ---
 

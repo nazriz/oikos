@@ -36,6 +36,12 @@ records and authority). It does what a seller of a service does, through the ord
 3. **It switches its systems off** (`retire`, the supplier's physical power) when the client has not signed in 30 days,
    when the agreement has ended, or when the fee has not been paid for 75 days, and says so (`service_ended`).
 
+**Later releases.** Where a capability scenario moves the assistants (docs/scenarios.md, "capability"), each release of
+an offer is a kind of system of its own, out on its day: from then the provider publishes the offer again with the
+release's kind, its claims (seconds and slip rate) and its prices, and delivers that kind to an organisation that orders.
+A system already delivered stays what it was. A provider's desk for persons stays the kind it first was (a known limit:
+the desk is not replaced by a newer one).
+
 ## The buyer's paperwork (`Engagements`)
 
 A principal reads what it engaged from its own papers: the delivery addressed to it, the agreement that cites its order
@@ -91,6 +97,9 @@ work and software services (docs/behaviour/automation.md for the licence it foll
 person's name on a mandate is how a bank acts on one, and how a payment-initiation service acts under the EU's second
 Payment Services Directive (Directive (EU) 2015/2366; to confirm). Who keeps the records an outsourced service makes, and
 whether they pass on at the end, is a term of the contract in practice (to confirm: a source on data-return clauses).
+
+Prices: the published 2026 prices of real general AI assistants (business seats and the consumer tier), in au-vic,
+gb-eng and us-oh, with their sources in each profile; speed, slip rates and principals' figures are placeholders (ME-22).
 
 ## A person as principal (the desk)
 

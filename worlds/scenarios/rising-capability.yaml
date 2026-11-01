@@ -1,0 +1,20 @@
+# Rising capability: the outside world's systems that read and write papers (case-handling systems, and assistants where a
+# town has them) are released anew every six months from the first day, each quicker and slipping less than the one
+# before, at the same prices. What anyone does about it, and whether any takes one, is their own.
+id: rising-capability
+about: The outside world's case-handling systems and assistants come out in a new release every six months, each a fifth quicker and slipping a fifth less, at the same prices.
+bears_on: [vendor, provider, rates, planning, support, finance]
+capability:
+  tag: ai
+  of: [case-handling-system, assistants]
+  every_days: 182
+  time_bps: 8000
+  slip_bps: 8000
+  price_bps: 10000
+  basis: >-
+    Placeholders for the pace, chosen well short of what is measured of the language models such systems are built on:
+    the length of task frontier models complete has doubled about every seven months since 2019 (METR, "Measuring AI
+    Ability to Complete Long Tasks", 2025; to confirm), and the price of a given level of performance has fallen between
+    9 and 900 times a year (Epoch AI, 2025; read in a summary only, to confirm). A release twice a year is about the pace
+    of major model releases from the large providers (to confirm). The time and slips a fifth less a release are not
+    fitted; prices are held here (falling-system-prices moves them). A rate from the first day, not an event.

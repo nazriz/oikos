@@ -9831,6 +9831,196 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
 - **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
   agency's officers are simulated as people, when the seat should be one of them.
+## 2026-10-31 · Working calendars: a desk of officers keeps the place's week (branch `gap-weekends`; generator 0.73.0; risk WM-14 item 4; contract addition: a template's `hours.closed`; no model called)
+
+- **What:** a system template's `hours` may say the days its window does not open (`closed`: days of the world's week,
+  day d of the run being the week's day d mod 7, and days of the run, its holidays); the kernel's placing of work
+  (`oikos_time::Hours`, `place_within`) skips them, so work not done by a Friday's closing goes on at Monday's opening and
+  a holiday's work waits. Generic in the kernel (a list of closed days, no civil calendar); the law is data. The
+  generator gives both desks of officers (the support agency's casework, `agency-casework`, and the tax collector's,
+  `tax-casework`) the place's working calendar from its profile: `calendar.weekend` and `calendar.holidays` (all nine
+  profiles have them, sourced there), as days of the run from its start date. Each desk now works an officer's day on
+  each working day, where before the week's hours were spread evenly over seven days. A town with dates (`calendar` in
+  the spec) uses the real week from its start date; a town without dates keeps the week its people keep (their working
+  days first: `day % 7 < work_days`, as the actors count), with the profile's holidays from its start date.
+- **The law's backstop:** `all-work-takes-time.test.ts` fails, naming the template, on a desk of people (a system that
+  writes a decision with its own seconds in a day shorter than the whole day) whose hours are open every day of the
+  week. A machine's hours (the whole day) are not held to it: software runs when asked (the case-handling system).
+- **Why only the desks:** they are the only systems that stand for people's work. A machine's lanes run all day, as a
+  payment platform or case system does. People who staff the town's own bodies are persons, whose routines already keep
+  a working week (`work_days`); they do not yet keep public holidays (left, below).
+- **Effect:** the desks' yearly capacity falls by the holidays (eight in gb-eng), and decisions wait over weekends, as a
+  claim made on a Friday evening does. Every town's state hash with a support office or a tax collector moves.
+- **Left:** offices staffed by persons do not keep public holidays (each actor's `work_days` routine would need the
+  calendar's days; `common::next_working` already reads it where a town has dates); a town without dates numbers its
+  week from its people's first working day, not from a weekday (it has no weekdays); banks' settlement days (payments
+  on weekends) are not modelled.
+- **Revisit if:** a profile's officers work another pattern (shifts, a six-day week), which would be a `closed` of its
+  own; or an office of persons is held to the calendar, when the desks and the persons should read the one list.
+- **Pins re-taken on the merge with main (2026-11-01, main at 28c38600 and again at f56d2dbc: delegation, the long-run fixes,
+  business loans, then foundations-2 S2, which took generator 0.72.0, so working calendars are 0.73.0):**
+  `culture-dial.test.ts`'s three config hashes and three Rust states, taken on the merged tree, the working calendars as
+  the reason (the desks' `hours.closed` is in the config; the desks' days move the towns). Main's values are in the
+  comment beside them.
+
+## 2026-10-26 · Linux, and one Rust test program (PL-4 (2) and (3); branch `linux`; no result changes; no model called)
+
+**Asked (Naz):** PL-4's parts (2) and (3): Oikos and its gate build and pass on Linux x86_64, with a nightly hosted job
+and no secrets, any difference of a pinned hash between the Mac and Linux being a fault to find, not to skip; and the
+~50 programs of `kernel/tests/` made one, measured before and after.
+
+**Linux (2).** Built and run on a Linux x86_64 machine (4 cores, 15 GB; Rust 1.97, Bun 1.4.4), from a fresh clone.
+- *The hashes.* `orchestrator/test/culture-dial.test.ts` passes unchanged: the generated configs of three profiles and
+  the Rust state hashes of their towns are the Mac's to the byte. Nothing else was needed, as the design predicts (no
+  floats in the kernel or the contracts, D1, held by `kernel/tests/determinism_lint.rs`; one seeded PRNG; sorted maps;
+  SHA-256 the same with or without the ARM instructions, `sha2`'s `asm` feature on aarch64 only). The merge gate
+  (`bun run test:changed`; a kernel change, so the whole gate tier, 246 files, the kernel's tests and the canaries
+  culture-dial and invariants) passed here but for the two below, neither a hash. No difference of a pinned hash or a
+  log's bytes was found, so none was fixed; the slow tier's other pins were not run here (four cores; about two hours),
+  and the nightly job (below) runs them all.
+- *What was Mac-only, and what was done.* `scripts/disk-tidy.ts` asked `ps -E` for each command's environment, which
+  Linux's `ps` refuses: the listing came back empty and every build folder and worktree read as unused by any process,
+  so `--apply` could have removed a folder a running build was in. It now uses `ps e` off macOS, asks by uid (a user's
+  name may not resolve in a container: `lsof -u unknown` fails), and treats a failed listing as everything in use.
+  Its temp root is `/tmp` off macOS (`/private/tmp` on it) and its disk line reads the repo's own volume.
+  `scripts/status.ts` asks `lsof` by uid too. Already portable and left alone: caffeinate is used only on darwin
+  (`scripts/pilot-wave.ts`), notifications only on darwin (`orchestrator/src/pilot-alerts.ts`), the engine module is
+  found as `.dylib` or `.so`, the slots read `ps -A -o pid=,ppid=` (the same on both), the tests' temp folders come
+  from `os.tmpdir()`. launchd appears only in `docs/ci-runner.md` (the runner's service on the Mini); `scripts/mini` is a
+  tool for reaching the Mini from elsewhere, and its test runs against a local folder, so it runs on Linux as it is.
+- *Two failures in the first gate, and what they were.* `orchestrator/test/risks.test.ts`: this entry's own first edit
+  of PL-4 (its status and "Do when" must share a line). `orchestrator/test/mini.test.ts`, which then failed on every
+  Linux container: the run's model call (a `sleep`), ended by `scripts/mini stop` after its seed had gone, still
+  answered `kill -0` 300 ms later. Its parent gone, it is the first process's to reap, and this container's first
+  process (`process_api`, not launchd or systemd) reaps orphans only every second or two: until then the call is a
+  zombie. `stop` sent it TERM and said "stopped" at once, before it had left the process table. The fault was the
+  script's: `stop` now waits for what it ended to be gone (up to its wait, polled every 0.2 s), and names any that is
+  still there and not a zombie ("what it left did not end"). The test is main's, unchanged (a first fix had the test
+  count a zombie as ended; dropped for this). On the Mac it changes nothing (launchd reaps at once).
+- *The nightly job.* `.github/workflows/linux.yml`: `ubuntu-latest`, nightly at 04:30 UTC and by hand, `permissions:
+  contents: read`, no secrets; Bun pinned to 1.4.4, Rust stable with the wasm target, cargo-nextest; then the same
+  steps as ci.yml (installs, `bun run kernel`, typecheck, the gate tier, the slow tier), the cargo build cached from
+  the night before (`Swatinem/rust-cache`). A night with no commit on main in the last 25 hours is skipped by a small
+  first job (the code passed the night before), so a quiet repository costs nothing; a run by hand always goes. Hosted
+  runners are free for a public repository; no paid or larger runner. It does not record a result
+  for `merge.ts`: main's state stays the Mini's CI. `scripts/tiers.test.ts` now holds that no workflow on the
+  self-hosted runner has a `pull_request` trigger and that the Linux job is hosted, scheduled, secret-free and runs both
+  tiers. (`docs/ci-runner.md` still said ci.yml ran on every pull request; corrected.)
+
+**One Rust test program (3).** `kernel/Cargo.toml` has `autotests = false` and one `[[test]]`, `tests/main.rs`, which
+names each file in `kernel/tests/` as a module and `common` once (each file's `mod common;` became `use crate::common;`;
+no test was changed). The same 284 tests are listed before and after (each program's `--list` against the one's), and
+a new test in `main.rs` fails if a file in `tests/` is named by no `mod` line, since with `autotests = false` it would
+otherwise never run. A file is run alone with `cargo test --test main <file>::`; the comments and port guide that named
+`--test <file>` now say so. The proptest regression files are found by source path, so they still apply.
+
+*Measured* (this Linux machine, 4 cores, the `gate` profile the merge gate builds, warm, `cargo test -p oikos-kernel
+--tests --no-run` after a real one-line change: a public function appended whose body differs each time, then removed):
+
+| change in | 56 programs | one program |
+|---|---|---|
+| `kernel/tests/common` | 45 s, 14 s | 3.4 s, 3.6 s |
+| the kernel's library (`kernel/src/lib.rs`) | 48 s, 48 s | 34 s, 33 s |
+| `oikos-actors` (rebuilds actors, the kernel, its tests) | 169 s, 172 s | 153 s, 153 s |
+| running every test (`cargo test` runs programs in turn) | 353 s | 230 s |
+
+The saving is the link and the per-program build of `common` and the kernel's metadata: 14 s of the kernel's 48, 17 s of
+actors' 170 (where most is the crate itself), and nearly all of a change to the tests. Under nextest the programs ran
+side by side already, so the run time saves less there than under `cargo test`. On the Mini the counts differ (12 cores,
+sccache, more programs linked at once); not measured there.
+
+**Brought to main (2026-10-31).** Rebased onto main after the representation rewrite (an interned `oikos_core::Id`)
+and foundations-2 phase 3: both commits applied with one conflict (this file's end). One test file had joined
+`kernel/tests/` since, `space.rs`, and is now a module of `main.rs` (the guard test above names such a file). The gate
+on Linux (4 cores; the checkout's slots, 2 at a time): 1581 tests in 248 files and the kernel's cargo tests, all passing,
+the culture-dial pins still the Mac's to the byte; `mini.test.ts` passed three runs in three on main's test.
+
+**Leaves out.** PL-4 (1), the elastic slots, and the trial of sharding the slow tier on hosted runners (setup cold and
+warm, each file's time against the Mini's) — for after the nightly job has a few green nights to read times from.
+
+**Revisit if** the nightly Linux job finds a pinned hash that differs (a reproducibility fault: find the cause, never a
+pin per platform); a crate's own `tests/` grows to many files (the same change there); one test program's single link
+becomes the long pole of a kernel gate (split it in two by what a change reaches).
+## 2026-10-31 · A review never answered where the law has no deemed refusal: a complaint of the delay (MT-21) (branch `mt21-recourse`; no model called)
+
+**What.** Where a place's law requires a review before an appeal and has no deemed refusal (au-vic, gb-eng, us-oh's
+pension), a claimant whose review was never answered had nowhere to go: the citizen's `may_apply` shut every body that
+hears a refused claim, the town's ombudsman desk included, though the desk opens no appeal. What a real claimant does
+instead is complain of the delay to a body that takes it up and can only recommend: in Australia the Commonwealth
+Ombudsman (it asks that the agency be given 10 business days first, then investigates, free, and may recommend but not
+direct Services Australia); in England a complaint to the DWP office, a senior manager, then the Independent Case
+Examiner (there is no time limit on a mandatory reconsideration); in the US the member of Congress's caseworker, whose
+inquiry SSA answers. That is now law data: the review route's `complaint_after_days` (14, 21, and 30 a placeholder),
+with sources in each profile (most "to confirm"; docs/behaviour/decisions.md has the table). After that many days
+unanswered, a body that hears the matter and does not order (`can` without `order`) is among the claimant's ways; the
+tribunal never is, and the appeal still runs only from an answer. The work is the existing desk's: an officer's hours
+from the table of work, its slips, its asking the agency and its recommendation, which binds nobody. The law's words
+say it. Contract: an additive field on `law` `data.decisions[].review`, **proposed for Naz's sign-off**
+(contracts/README.md).
+- **Guarded:** at citizen level (`recourse.rs`: the ombudsman from day 31 for a review asked on day 10 and 21 days'
+  law, never the tribunal, which opens once an answer comes; the deemed-refusal test sees both bodies, as it should);
+  in the words (`rules/decisions.rs`); and in living towns whose office's answers are withheld
+  (`deemed-refusal-town.test.ts`, au-vic added: the ombudsman open only after the law's days, never the tribunal, and
+  any complaint heard).
+- **Choices.** The three real tiers in England and the US caseworker are one desk in the town (the generator's
+  ombudsman desk), as the town has one body that recommends on a refused claim. The desk's recommendation on a refused
+  claim is its generic one (set the decision aside, the agency not answering); a real ombudsman on delay asks first that
+  the review be decided. The first is a stronger push on the agency than the real one; noted, not built.
+- **Left:** asking again and judicial review / mandamus are not built; the 14 and 21 days read a wait for a complaint as
+  the wait after a request for review; us-oh's 30 days is a placeholder.
+- **Pins re-taken (2026-11-01, merged with main at c46643eb, after gap-weekends).** The new route moves au-vic, gb-eng and us-oh towns and
+  not ke-nakuru's (its law has no such route): culture-dial's config hashes and Rust states for au-vic and gb-eng
+  (a0a8a233..., a911615e... and ce297a1b..., 4c0f8261...; were main's c899c8ff..., 9b0a54d6... and af012071..., fab20a4d...),
+  and all six towns of `scripts/fixtures/representation-results.json` (au-vic, gb-eng, us-oh at 200 and 1,000 people).
+  Cause is the one this entry names, not a fault: the gate's failure showed only the first pin, the rest were taken by
+  running the towns on a freshly built kernel. (A first reading of the config hash on a stale `kernel/target` wasm gave a
+  wrong value, f4424f29...: the generated config carries words from the law crate, so take hashes only on a current build.)
+- **Revisit if:** a profile's figure is confirmed otherwise; a study reads how often claimants escalate (then the three
+  tiers in England may matter); or a steward is found to answer the ombudsman and still not the claimant.
+
+## 2026-10-31 · A crew's day three times as long, traced: the seat held until each order began (MT-23) (branch `mt23-crew`; no model called)
+
+**What.** On 2026-10-24 the seat-diary run's day 21 showed a works crew's forty notices taking 310 minutes where every
+other working day took 106 to 121, the crew's acts one after another. Traced to a mechanism fault already fixed:
+until foundations-2 P1 (`fc5eabd`, 2026-10-25) an actor who only orders an act was held on its own time until the work
+began, so a seat's orders queued behind whichever member of its crew was busy; P1 places the order when the actor is
+free and lets it go on. On current main every working day is alike (105 minutes of crew work a day in the 600-person
+town, days 1 to 22; 31 minutes in the town of the usual size, days 1 to 30). Not re-run on the old kernel (a cold
+build); the trace is from the code, the decision of 2026-10-25 and the dates, and is recorded as such.
+- **The measure was wrong too.** The test's `spanOf` read the log time of `action_started`, which since P1 is when the
+  seat gave the order (16 minutes a day), so its bound held whatever the crew did. It now reads the work's own `starts`
+  and `done`, and every working day is held under three hours, not the middle day (the median was a stand-in while the
+  outlier was untraced). No pinned hash moves: a test-side change only.
+- **Revisit if:** a day over the bound again (then look at who in the crew was busy, and with what, from the log's
+  timelines).
+
+## 2026-10-31 · The assistants' prices from real products; gb-eng and us-oh get assistants (branch `assistant-prices`; profiles only; a town without `assistants` is unchanged; no model called)
+
+- **What.** Each offer's fee, set-up and exit in au-vic now rest on 2026 published prices of real general AI
+  assistants, and gb-eng and us-oh get the same two providers in their own currencies (sources in each profile's
+  `sources.assistants`; citations in docs/research/references.md). Businesses: A at a ChatGPT Business seat's annual
+  price (US$20; A$31.00 and £15.60 converted at the profiles' rates, no local price found), B at Microsoft 365 Copilot's
+  (A$44.90, £24.70, US$30). Persons: the consumer tier at about US$20, A at the cheaper and B at the dearer local price
+  found (A$29.99 / 32.99; £18.99 / 19.99; US$19.99 / 20.00). Set-up and exit 0 for a business (none listed for these
+  self-serve subscriptions; B's US$200 set-up and US$100 exit had no source), a person's set-up a month's fee (paid a
+  month ahead: a convention). Per use: none (flat subscriptions; an offer has no per-use field). For comparison, not
+  read by any code: what a bookkeeper or clerk costs in each place.
+- **Not changed, and why.** Speed (a tenth of a person's time), the claimed and true slip rates, the records terms and
+  every principal's figure stay placeholders, labelled: no honest source measures an assistant doing such papers alone
+  (Noy and Zhang 2023 measure a person with one; hallucination leaderboards measure summaries, at rates from under 1% to
+  over 10% by dataset), and picking a number out of such a range would be choosing the outcome. gb-eng's and us-oh's
+  error cost is au-vic's placeholder converted. Nothing was tuned: every price is moved to its source whichever way it
+  moves engagement; prices all fell (business fees by a third to a half, set-ups to nothing), so expect more engagement
+  at au-vic's prices than before, recorded, not targeted.
+- **Results.** Towns without `assistants: true` are generated and run as before (no pinned hash moved); towns with it
+  change in the providers' offers only.
+- **Which product stands for A or B** is a convention (the cheaper for A); the world names neither. B's dearer price
+  goes with its records returned to the client and its lower true slip rate, both placeholders, so a principal's choice
+  between them is a choice between placeholders as much as prices.
+- **Revisit if** a provider publishes an error rate or time per document for agent work of this kind, a study measures
+  an assistant working alone on administrative papers, a product sold to landlords or for persons' claims (rather than a
+  general assistant) is priced, or the primary price pages can be opened (most figures are from secondary pages: to
+  confirm).
 
 ## 2026-10-31 · Main red after years at 10,000: two slow tests, one a test fault, one held to one seed
 
@@ -10052,3 +10242,91 @@ energy; people in transit; goods need a carrier; several towns as an option), Na
   run only where a world names a practised skill.
 - **Revisit if:** a source gives slip rates by practice, or skill half-lives by kind of work; a study needs papers'
   skills by kind; the opening level's assumption (everyone an ordinary hand) shows in results.
+## 2026-11-01 · The outside's capability over time: releases of what it sells, from a scenario, tagged for measurement only (foundations-2 E2, its first part; branch `f2-economy`; contract additions; a town under no capability scenario is as before, to the byte; no model called)
+
+- **What:** a scenario may give `capability` (`tag`, `of`, `every_days`, `time_bps`, `slip_bps`, `price_bps`, with its
+  basis): the outside world's technology released anew every so many days from the first, each release's time, slips
+  and prices a share of the one before. The generator (`worlds/generator/capability.ts`) makes each release a kind of
+  system of its own (`<kind>-r<n>`, its rows quicker, its row of the table of slips lower, `released` on its day) and
+  gives its sellers the schedule (`releases` in `world.vendor`'s and `firm.provider`'s parameters); a seller sells the
+  newest out, publishing the offer again when one comes out (a provider's claims move with it), and fills an order
+  from that kind. The kernel refuses to deliver a kind before its release (`unknown_template`: nothing from nothing).
+  The tag lists every kind the capability moves, and its releases, in `meta.study_tags`, for measurement; a backstop
+  (`orchestrator/test/generality.test.ts`) fails on any world code that reads it. The first scenario is
+  `rising-capability`: case-handling systems and assistants, a release every six months, each a fifth quicker and
+  slipping a fifth less, prices held (placeholders, well short of what is measured of language models: METR 2025,
+  Epoch AI 2025, both to confirm).
+- **Why this way:** the owner ruled that AI's capabilities and costs come from an outside scenario for now, and that
+  nothing in the world knows which systems are AI (foundations-2 7.2, 7.5). Discrete releases, each a template, keep the
+  kernel's systems what they are (a template's rows are fixed; a system is what it was delivered as), make upgrading an
+  ordinary purchase, and let the kernel refuse a kind before it exists. The schedule is the seller's parameter, never
+  published: nobody in the world knows of a release before it is out.
+- **Not built, and why:** technologies that are goods (a machine or hardware a firm holds, with `runs_on`'s energy and
+  water) wait for E5, where hardware has to be somewhere on the network (plan, "E2b"); a provider's desk for persons is
+  not replaced by a newer release (the desk's clients keep the first kind); buyers do not trade a delivered system in
+  for a newer one by any rule of their own beyond the comparison they already make; the scenario's sizes are not fitted.
+- **Off, as before:** with no capability the generator returns the config untouched; the vendor's and the provider's
+  saved state carry no `releases` and their published offers' keys are as before (`worlds/test/generate.test.ts` holds a
+  town with capability to the plain town but for its releases and its tag).
+- **Revisit if:** a study needs capability as a continuous path rather than releases; a scenario's sizes find sources;
+  buyers should replace delivered systems as releases come out (that is a buyer's rule, with a real basis, not this).
+## 2026-11-01 · Compute in the town: what a system runs on, and a host on the town's network (foundations-2 P4 and E5; branch `f2-economy`; contract addition; new kind `firm.host`; a town without `hosting` is as before, to the byte; no model called)
+
+- **What:** the kernel's `runs_on` (foundations-2 4.1, P4): a system's template says the hardware it runs on (a kind, so
+  many units a lane), who holds it and where, and the recipe an hour of its work is there. A `deploy` is refused when the
+  hardware held does not cover the lanes of the systems there and the new one's; a hosted system's seconds of work (its
+  own acts, the acts it is named on, its share of a work) add up, and each whole hour is the recipe at the host, its
+  inputs taken from the holding there (refused, `insufficient_quantity`, when they are not there: a host with no power
+  does nothing). The generator's `hosting: "local"` (with `assistants`, the network and the profile's `values.hosting`)
+  puts the providers' systems at a hosting firm in the town: a building on a lot of its own (the last taken), its servers,
+  an electricity, a water and a sewer connection sized by a day at full work, held there rather than used as it comes, and
+  the feeders and mains sized with it; an hour of a server's work (`compute`) is its draw times the building's PUE, with the
+  grid's emissions, and its cooling water out to the sewer. `firm.host` uses each day what came in beyond a day's full work
+  kept in hand (the plant: idle servers, cooling), and pays the bills addressed to it; each provider pays it a fee a month
+  (`hosting` on `firm.provider`), its power and water at the tariffs with a margin. Figures in au-vic, with sources to
+  confirm or marked placeholders (risk ME-24).
+- **Why this way:** foundations-2 asks that compute compete for energy, water and land through laws 8 and 9 with nothing
+  built for AI: a data centre is a building and a firm like any other, on the same network, and the systems on it draw
+  through the same holdings and recipes as any work. The per-act draw with a remainder carried keeps law 8 exact (no part
+  of an hour lost or invented); a delivery refused without hardware keeps a system from running on nothing.
+- **Not built, and why:** the host entering by expected profit (step E3); the households' hourly shape on its connection
+  (the kind's, one shape for every connection: a known limit of C3); evaporation (no recipe carries water to the air yet);
+  its staff and its servers' wear; every other workplace on the network (WM-15, its own item).
+- **Off, as before:** absent `hosting`, the generator emits nothing new (the network's users are the homes as before);
+  the kernel's new paths run only for a template that says what it runs on, and the provider's state carries nothing new.
+- **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
+  connection's rate; the placeholders find sources (ME-24).
+
+## 2026-11-01 · Main red after foundations-2 S2: own-venture held the owner of a failing business to 150 days
+
+- **What:** CI went red at d0105172 on `own-venture.test.ts`, "someone out of work ... starts a business of one": its
+  owner applied for a job more than 14 days after founding it. Bisected on main: green at 9f30b45e, red from f56d2dbc
+  (the merge of f2-s2: roads as ways of the network, vehicles, trips driven or walked). Main went green again at c46643eb
+  by chance (working calendars moved the draws), so the test was fixed, not left.
+- **Why:** not a broken rule. The business's sales were thin from its third month at both commits (it paid its owner
+  nothing in months three and four at 9f30b45e, and nothing in month three at f56d2dbc); with S2's roads its owner gave it
+  up on day 134 rather than after day 150, by the rule the file's third test holds (a business of one that does not pay
+  its owner a living is given up), and then looked for work, as that rule says. The test asserted no application in the whole 150 days, an
+  outcome of how well the business did.
+- **Change:** the test holds what it means: no application for work while the business trades, from 14 days after its
+  founding until its giving up (the wake that takes its price list down, the closure minutes later), and a closure, if
+  any, is a giving up. Same seed, same horizon; nothing loosened beyond the rule.
+- **And the next test, on main at c46643eb** (E2a's releases and working calendars merged after d0105172): "a business
+  of one that does not pay its owner a living is given up" asked for a job application after the closure. The owner gave
+  up on day 44, then searched the jobs board 65 times (never once while trading), and all four postings in the 105 days
+  went up and were filled between two of their searches (the longest stood three days, while they did not wake): the
+  occasion is the town's, as the test's own comment already said. It now holds the rule: no search of the board (its
+  postings by pay) while the business trades, searches once it is given up, and an application whenever a posting stood
+  at one of them. Seed, horizon and set-up unchanged.
+- **Two more red at c46643eb, from working calendars (gap-weekends; both green at b9601b0b, just before it):**
+  `representation.test.ts`'s six 30-day towns moved, as every town with a support office or tax collector does: pins
+  re-taken (`scripts/fixtures/representation-results.json`, its own commit), the 200-person gb-eng state the same as
+  culture-dial's. `production.test.ts` (Lengnick) held a wind-up's redundancy notices to within an hour of the manager's
+  command to wind up; factory-2's two landed 61 minutes after it, the notices being acts in the manager's time. It now
+  holds what it meant, exactly: each such notice is for an agreement that command gave notice on, and comes after it.
+  These two were missed by gap-weekends' gate: the change reached 65 slow-tier files, so the gate ran the canaries and
+  left the rest to CI, as designed.
+- **Found, not fixed:** the owner founded the same business again two minutes after giving it up (day 134.54, $24,200 of
+  capital): entry by expected profit reads the profile's venture, not what the person just lived through. A behaviour
+  question (does a failed founder try again at once, and how soon?), to settle with a source, not a test.
+- **Revisit if:** a founder's own failure is to weigh in their next venture (ME-1).
