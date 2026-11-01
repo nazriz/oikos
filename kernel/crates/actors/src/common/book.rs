@@ -608,6 +608,11 @@ impl Book {
     pub fn records(&self) -> impl DoubleEndedIterator<Item = &Arc<Record>> + ExactSizeIterator {
         Every(self.seen.iter())
     }
+    /// Every record made at `at` or after (its `at`), in the order seen: `records().filter(|r| r.at >= at)`, without
+    /// reading the others.
+    pub fn records_since(&self, at: i64) -> impl Iterator<Item = &Arc<Record>> {
+        self.seen.iter().filter(move |e| e.rec.at() >= at).map(Entry::get)
+    }
     /// How many records of each statement kind (and of each other record type) it holds: for whoever measures memory.
     pub fn counts(&self) -> BTreeMap<String, u64> {
         let mut out: BTreeMap<String, u64> = self.kinds.iter().map(|(k, v)| (k.to_string(), v.0.len() as u64)).collect();

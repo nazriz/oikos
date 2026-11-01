@@ -93,7 +93,7 @@ impl CitizenMind {
         let t = cx.t;
         let mut out = Planned::default();
         self.refresh_teachings(book);
-        let fresh: Vec<_> = book.records().filter(|r| r.at >= self.s.last_planned_from).cloned().collect();
+        let fresh: Vec<_> = book.records_since(self.s.last_planned_from).cloned().collect();
         let first_plan = !self.s.planned_once;
         // Culture: someone made in the run holds the picture lightly; a newcomer with no parents here is of a group
         // drawn from the profile's shares (citizen.ts 1733-1740).

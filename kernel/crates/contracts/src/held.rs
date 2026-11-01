@@ -31,6 +31,8 @@ struct Slot {
     cold: OnceLock<ColdAt>,
     /// Read since the tier last looked (`Tier::pass`).
     touched: AtomicBool,
+    /// When it was made (the record's `at`): what a reader that goes by time asks, without reading the record.
+    at: i64,
 }
 
 struct ColdAt {
@@ -53,7 +55,8 @@ impl Rec {
 
     /// A record already shared (the config's, at the start): the same one is held, not a copy.
     pub fn from_arc(r: Arc<Record>) -> Rec {
-        Rec(Arc::new(Slot { hot: RwLock::new(Some(r)), cold: OnceLock::new(), touched: AtomicBool::new(false) }))
+        let at = r.at;
+        Rec(Arc::new(Slot { hot: RwLock::new(Some(r)), cold: OnceLock::new(), touched: AtomicBool::new(false), at }))
     }
 
     /// The record, read: from memory, or back from disk (and then held in memory again, until its tier finds it cold
@@ -88,6 +91,11 @@ impl Rec {
         }
         let at = self.0.cold.get().expect("a record neither in memory nor on disk");
         Arc::new(at.file.record(at.block, at.index))
+    }
+
+    /// When it was made (its `at`), without reading it.
+    pub fn at(&self) -> i64 {
+        self.0.at
     }
 
     /// Its id (read without marking it read).

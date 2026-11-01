@@ -1942,6 +1942,9 @@ impl<W: Write> Engine<W> {
         }
         let st = self.run.kernel().state();
         add("state.records", st.records.len());
+        add("state.ledgers", st.ledgers.len());
+        add("state.ledgers.transactions", st.ledgers.values().map(|l| l.len()).sum());
+        add("state.participants.new_transactions", st.participants.values().map(|p| p.new_transactions.values().map(|q| q.len()).sum::<usize>()).sum());
         if std::env::var_os("OIKOS_KEPT_RC").is_some() {
             // (Who holds the world's records: each one's count of holders, and its JSON size, by that count.)
             for s in st.records.values() {
