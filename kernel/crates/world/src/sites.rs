@@ -25,6 +25,9 @@ pub struct SiteCell {
     /// Nature: conspicuous species anyone there would notice (never how many).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub seen: Vec<Id>,
+    /// Someone who died on their way and lies here (law 9): anyone there sees who.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub remains: Vec<Id>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -132,6 +135,7 @@ pub fn site_cell(s: &Statics, st: &State, id: &Id, c: &crate::state::Cell, me: &
         seen: st.nature.as_deref().map_or(vec![], |n| {
             s.config.catalogue.species.iter().filter(|sp| sp.conspicuous && n.populations.get(&sp.id).is_some_and(|m| m.get(id).is_some_and(|x| *x > 0))).map(|sp| sp.id).collect()
         }),
+        remains: st.remains.iter().filter(|(_, at)| *at == id).map(|(b, _)| *b).collect(),
         structure: c.structure.as_ref().map(|sid| {
             if let Some((_, structure)) = shown.iter().rev().find(|(shown, _)| shown == sid) {
                 return structure.clone();

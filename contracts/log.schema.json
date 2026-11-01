@@ -1361,6 +1361,10 @@
                 "injury",
                 "other"
               ]
+            },
+            "lies_at": {
+              "description": "Law 9: where the body lies, a cell of the road, if the person died on their way between buildings.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
             }
           }
         },

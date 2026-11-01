@@ -123,6 +123,10 @@ pub struct State {
     /// space of any building, so that nothing is done to them or by them at any place on the way. Keyed by the body.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub transit: Map<Id, Transit>,
+    /// The dead who died on their way, each where it lay (a cell of the ground: law 9, S3): seen by whoever is there
+    /// (`SiteCell.remains`), until the death is registered.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub remains: Map<Id, Id>,
     /// The network for what flows (foundations-2 C3, law 8): each link's state, each connection with its meter. Behind
     /// an `Arc`, as nature is: settled hourly, and an action's copy of the state shares it.
     #[serde(default, skip_serializing_if = "Option::is_none")]

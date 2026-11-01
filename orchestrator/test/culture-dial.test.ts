@@ -151,13 +151,13 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // the place's days of rest and public holidays (`hours.closed`), an officer's day on each working day (generator 0.73.0); main's
 // b69b5e45..., 1c0ed42c..., bee66230... for the configs and 001f22ed..., 1a754a5d..., caa00714... for the states, until then.)
 // (Re-taken on 2026-11-01 at foundations-2 S3 and S4 (law 9), config hashes and Rust states both: bodies on their way between
-// buildings, goods carried, crews to the building they work on, the outside's freight from the edge's node by the road out
-// (generator 0.74.0); c899c8ff..., 9b0a54d6..., a2f60218... for the configs and af012071..., fab20a4d...,
+// buildings, goods carried, crews to the building they work on, the outside's freight from the edge's node by the road out, the dead on
+// the way found by whoever comes by (generator 0.74.0); c899c8ff..., 9b0a54d6..., a2f60218... for the configs and af012071..., fab20a4d...,
 // e3093814... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "a8cdbaa38df2d939c16923ec22fa5e14ca46c0739015989d66cdbb7249fb8a7e",
-  "gb-eng-2026": "f73f7cb69ac6271f619b22ad894f1e45129f29e9f5448a7ae4edda3f50cbe935",
-  "ke-nakuru-2026": "20780438db079950f21cd8e83c993b0585483a082a5f8483b23c7b34d0c9e304",
+  "au-vic-2026": "8f562cf953fcde0bd0080e51e733791686de924a6b9a7dd585e96c43071a0768",
+  "gb-eng-2026": "2a59777c66905e173698207130bef342bcf39c570df6f2f15fead9e650587bf8",
+  "ke-nakuru-2026": "ff1a5d7a85a28c7edc2cbdbf0b6cfa9a376df4ba5059f6d7b99bc62381da5494",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

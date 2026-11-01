@@ -10157,3 +10157,29 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   the kernel's new paths run only for a template that says what it runs on, and the provider's state carries nothing new.
 - **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
   connection's rate; the placeholders find sources (ME-24).
+
+## 2026-11-01 · Deaths on the way: whoever comes by finds them, a household reports one who has not come home (WM-6; with S3 and S4; results move; no model called)
+
+- **What we saw:** the invariants canary (ke-nakuru seed 2, a year) failed on S3 and S4: a severely ill worker set out
+  from the builder's yard for the clinic and died six minutes into the walk. A body on its way is in no building (S3), so
+  nobody was in the room; the death was never reported and the employer's standing order paid wages for 58 days. Before
+  S3 the worker would have died at the yard, with coworkers present. The gap is WM-6's ("a death outdoors leaves no
+  trace"), made reachable by law 9. The coordinator's direction: real behaviour, the "they are there" way of knowing, no
+  invented find-rates, not a loosened invariant.
+- **Kernel.** A body that dies on its way lies on the road where it had come to (`State.remains`: the cell that far along
+  the straight line between the buildings it goes by, the known limit), its vehicle with it. Whoever comes by within a cell
+  and a half of it on their own way (at the end of their trip) sees who lies there: a look at that cell, delivered to
+  their first channel of what is at places (`SiteCell.remains`, shown to anyone there).
+- **Citizen.** Someone who has seen a body lying where they went by asks the police to come (`welfare_check_request`
+  naming the cell), once for each of the dead. An adult at home who sees that one of the household left home more than a
+  day ago and has not come back (the home's departures) reports them missing (`missing` on the request), once for each
+  going. A day is the round's own rhythm, as for a home that stands empty (deaths.md).
+- **Police.** Called to a place on the road, an officer goes (a visit, as to a home) and reports whoever lies there to the
+  registry as found there, once, and does not go to that place again; called about one who has not come home, they look
+  at the home and the street outside it (each cell next to its ground). The registry, the bank and the employer then learn
+  of the death the normal way (deaths.md, "Who is told").
+- **Not done:** the body is not taken away (nobody does an undertaker's work): others who come by still see it, and the
+  police, who found it, do not go again. A body lying where nobody passes, of someone with no household at home, is still
+  found by nobody (WM-6 stays open, narrower).
+- **Revisit if** a body lies unfound for long in a busy town (then the straight line is too far from the way people take:
+  draw the way cell by cell); deaths on the road show in a result (then an undertaker's or coroner's work, and the time).

@@ -337,6 +337,9 @@ pub enum EventBody {
     PersonDied {
         person: Id,
         died_of: DeathCause,
+        /// Where the body lies, if the person died on their way between buildings (law 9: a cell of the road).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        lies_at: Option<Id>,
     },
     BirthStarted {
         parents: Vec<Id>,

@@ -276,3 +276,32 @@ fn the_outsides_freight_takes_its_time_from_the_edges_node_and_goods_on_their_wa
     run.command(&Command::Advance { to: arrives + 1 }).unwrap();
     assert_eq!(run.kernel().state().holding("devco", "s-shop", "goods"), 240);
 }
+
+// ----------------------------------------------------------------------------------------------------------------- dead on the way
+
+#[test]
+fn someone_who_dies_on_the_way_lies_where_they_had_come_to_and_whoever_comes_by_sees_them() {
+    let mut run = Run::start(road_world(), "space-remains", Vec::new(), None).unwrap();
+    let (starts, done, _) = start_go(&mut run, "alice-self", "s-shop/dwelling.1", None);
+    let mut st = run.kernel().state().clone();
+    let s = run.kernel().statics().clone();
+    let tr = st.transit["alice"].clone();
+    // Halfway along the way from her house (1,1) to the shop (39,2): about cell 20 of the straight line.
+    let mid = oikos_kernel::exec::where_on_the_way(&st, &tr, starts + (done - starts) / 2).expect("a cell of the road");
+    let (x, _) = oikos_kernel::config::cell_xy(&mid).unwrap();
+    assert!((18..=22).contains(&x), "{mid}");
+    st.remains.insert("alice".into(), mid);
+    // Bob comes by the same way (from the house to the shop): he sees her there, as a look at that cell would show it.
+    let mut by = tr.clone();
+    by.from = "s-house".into();
+    oikos_kernel::exec::seen_on_the_way(&s, &mut st, "bob", &by);
+    let pending = &st.participants["bob-self"].pending;
+    let seen = pending.values().flat_map(|p| p.visits.iter()).flat_map(|v| v.cells.iter()).find(|c| c.cell == mid).expect("bob saw the cell");
+    assert_eq!(seen.remains, vec![oikos_kernel::blocks::Id::new("alice")]);
+    // Carol, who went nowhere near (a trip from the shop to itself), sees nothing.
+    let mut away = tr.clone();
+    away.from = "s-shop".into();
+    away.to = "s-shop".into();
+    oikos_kernel::exec::seen_on_the_way(&s, &mut st, "carol", &away);
+    assert!(st.participants["carol-self"].pending.values().all(|p| p.visits.is_empty()));
+}

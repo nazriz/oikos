@@ -337,6 +337,7 @@ impl World {
                 .map(|v| (v.id, crate::state::Vehicle { type_: v.type_, owner: v.owner, at: v.at, drivers: v.drivers.clone() }))
                 .collect(),
             transit: Default::default(),
+            remains: Default::default(),
             network: None,
             scarce_sold: Default::default(),
             metered: Default::default(),

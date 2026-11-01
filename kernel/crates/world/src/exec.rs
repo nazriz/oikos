@@ -121,6 +121,71 @@ pub fn depart(s: &Statics, st: &mut State, body: &str, to: &str, via: &[Id], arr
     events
 }
 
+/// Where a body on its way has come to at `t` (law 9): the cell that far along the trip, by the straight line between the
+/// buildings it goes by (the known limit: the way is not drawn cell by cell).
+pub fn where_on_the_way(st: &State, tr: &crate::state::Transit, t: i64) -> Option<Id> {
+    let cell_of = |sid: &Id| st.structures.get(sid).and_then(|x| crate::config::cell_xy(&x.at));
+    let mut pts: Vec<(i64, i64)> = std::iter::once(&tr.from).chain(tr.via.iter()).chain(std::iter::once(&tr.to)).filter_map(cell_of).collect();
+    if tr.to == tr.from && tr.via.is_empty() {
+        // (A visit there and back: half the way out, half back; its places are not kept, so the body lies at home's door.)
+        pts.truncate(1);
+    }
+    let first = *pts.first()?;
+    let lens: Vec<i64> = pts.windows(2).map(|p| (p[1].0 - p[0].0).abs() + (p[1].1 - p[0].1).abs()).collect();
+    let total: i64 = lens.iter().sum();
+    let span = (tr.arrives - tr.departed).max(1);
+    let mut d = (total as i128 * (t - tr.departed).clamp(0, span) as i128 / span as i128) as i64;
+    let mut at = first;
+    for (i, l) in lens.iter().enumerate() {
+        if d <= *l {
+            let (a, b) = (pts[i], pts[i + 1]);
+            at = (a.0 + (b.0 - a.0) * d / (*l).max(1), a.1 + (b.1 - a.1) * d / (*l).max(1));
+            break;
+        }
+        d -= l;
+        at = pts[i + 1];
+    }
+    let id = Id::new(&crate::config::cell_id(at.0, at.1));
+    st.cells.contains_key(&id).then_some(id)
+}
+
+/// Whoever comes by the dead lying on the road sees them (law 9: they are there): at the end of a trip, each of the remains
+/// within a cell and a half of the way it went (the straight line between the buildings it went by) is seen, as a look at
+/// that cell would show it, through the channel of what one saw on one's way (`config::ON_THE_WAY`).
+pub fn seen_on_the_way(s: &Statics, st: &mut State, body: &str, tr: &crate::state::Transit) {
+    if st.remains.is_empty() {
+        return;
+    }
+    let cell_of = |sid: &Id| st.structures.get(sid).and_then(|x| crate::config::cell_xy(&x.at));
+    let pts: Vec<(i64, i64)> = std::iter::once(&tr.from).chain(tr.via.iter()).chain(std::iter::once(&tr.to)).filter_map(cell_of).collect();
+    let near = |r: (i64, i64)| {
+        pts.windows(2).any(|p| {
+            let ((ax, ay), (bx, by)) = (p[0], p[1]);
+            let (dx, dy, rx, ry) = ((bx - ax) as i128, (by - ay) as i128, (r.0 - ax) as i128, (r.1 - ay) as i128);
+            let len2 = dx * dx + dy * dy;
+            if len2 == 0 {
+                return rx * rx + ry * ry <= 2;
+            }
+            let dot = rx * dx + ry * dy;
+            let cross = rx * dy - ry * dx;
+            (0..=len2).contains(&dot) && cross * cross <= 2 * len2
+        }) || pts.iter().any(|p| (p.0 - r.0).pow(2) + (p.1 - r.1).pow(2) <= 2)
+    };
+    let mut cells: Vec<Id> = st.remains.iter().filter(|(dead, _)| dead.as_str() != body).map(|(_, c)| *c).filter(|c| crate::config::cell_xy(c).is_some_and(near)).collect();
+    cells.sort();
+    cells.dedup();
+    if cells.is_empty() {
+        return;
+    }
+    let Some(participant) = st.body(body).and_then(|b| b.participant).filter(|p| st.participants.contains_key(p.as_str())) else { return };
+    // (Shown as a look at that cell, through a channel of its own: what one saw on one's way, `ON_THE_WAY`.)
+    let channel = Id::new(crate::config::ON_THE_WAY);
+    let mut shown = vec![];
+    let seen: Vec<crate::sites::SiteCell> = cells.iter().filter_map(|c| st.cells.get(c).map(|x| crate::sites::site_cell(s, st, c, x, body, false, &mut shown))).collect();
+    let t = st.t;
+    Arc::make_mut(st.participants.get_mut(participant.as_str()).unwrap()).pending.entry(crate::config::SELF.to_string()).or_default().visits.push(crate::sites::Visited { channel, as_of: t, cells: seen });
+}
+
 /// A body on its way for an act that was refused, or back from a visit: it is where it set out from, in the space it left
 /// (if there is still room), and its vehicle with it. (A refused trip's way there and back is the known limit: the time
 /// was spent, the body is home.) Dead or gone on the way: only off the road.
@@ -129,6 +194,7 @@ pub fn come_back(s: &Statics, st: &mut State, body: &str, by: &str) -> Vec<Timed
     if let Some(v) = tr.vehicle.and_then(|v| st.vehicles.get_mut(&v)) {
         v.at = tr.from;
     }
+    seen_on_the_way(s, st, body, &tr);
     if !st.body(body).is_some_and(|b| b.alive && b.present) {
         return vec![];
     }
@@ -515,11 +581,22 @@ fn die(s: &Statics, st: &mut State, person: &str, cause: DeathCause) -> Vec<Time
     let participant = b.participant;
     let seats = seats_of(st, person, participant.as_deref());
     let mut events = vacate_all(s, st, person, VacateReason::Died, None);
+    // (Dead on the way, law 9: the body lies where it had come to on the road, and its vehicle with it.)
+    let mut lies_at = None;
+    if let Some(tr) = st.transit.remove(person) {
+        if let Some(cell) = where_on_the_way(st, &tr, t) {
+            if let Some(v) = tr.vehicle.and_then(|v| st.vehicles.get_mut(&v)) {
+                v.at = cell;
+            }
+            st.remains.insert(Id::new(person), cell);
+            lies_at = Some(cell);
+        }
+    }
     if let Some(b) = st.entities.get_mut(person).and_then(|e| e.body.as_mut()) {
         b.alive = false;
         b.conditions.clear();
     }
-    events.push(Timed::new(t, EventBody::PersonDied { person: person.into(), died_of: cause }));
+    events.push(Timed::new(t, EventBody::PersonDied { person: person.into(), died_of: cause, lies_at }));
     if let Some(p) = participant {
         events.extend(end_participant(st, &p, EndReason::Died));
     }
@@ -2147,7 +2224,9 @@ impl<'a> Exec<'a> {
                     driven_speed(self.s, self.st, v, &who, &from)?;
                 }
                 if on_way {
-                    self.st.transit.remove(who.as_str());
+                    if let Some(tr) = self.st.transit.remove(who.as_str()) {
+                        seen_on_the_way(self.s, self.st, &who, &tr);
+                    }
                 }
                 // A body is in one place at a time: coming here, it leaves wherever else it was.
                 for other in self.st.structures_of(&who) {
