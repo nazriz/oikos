@@ -65,6 +65,35 @@ machine. 50,000 for 2 years at about 105 MB a day (some 86 GB) does not fit on t
 waiting on the owner) and the twins' per-matter draw counts let go when a matter is over (a design question for
 reliability's owners: a matter would have to say when it ends).
 
+**Tiered storage (2026-11-02, docs/design/tiered-storage.md).** The world's records nobody reads are held on the run's
+cold file and read back when read; readers that read what they no longer needed were fixed; the resolver's addressed
+statements held small; matters that say they are over let their draw counts go; the offices' files of payments tiered;
+the travel caches bounded. Results byte-identical (state hash and log digest: six pinned towns for a month with every
+record sent to disk from its second day; 10,000 people for 60 days, `1f1d00af`, digest `a63f364b`; 1,000 for 180 days,
+`0a5c244d`). Measured on the Mini (shared, load 10 to 30), main at 7bd29aaf against the branch, the release kernel, 2
+engine threads, the footprint (`footprint`) by simulated day:
+
+| 10,000 people | day 30 | day 60 | day 120 | day 150 | day 180 | MB a day, the last two months |
+|---|---|---|---|---|---|---|
+| main 7bd29aaf | 2,449 | 3,145 | 4,677 | 5,433 | 6,188 | 25.2 |
+| tiered (39d7f612) | 2,433 | 2,983 | 4,001 | 4,478 | 4,991 | 16.5 |
+
+(Both end at the same state, `a97f429f`, and log digest, `f16f16e0`; peak resident 6.59 GB against 5.34; the run's
+own thread 1,699 s against 1,741, +2.5%, within the shared machine's noise.)
+
+At 1,000 people for 180 days (4 threads, the peak resident): 670 MB on main, 573 to 587 MB tiered (the tier off: 639,
+the readers' and the other growers' fixes alone); the run's own thread 78.5 s on main and 79.5 s tiered (72.6 s tiered
+with the tier off): no cost found beyond the machine's noise. At day 120 of the 10,000 town, 711,000 of 1,171,000 records
+were in memory and the rest on disk (51 MB, about 110 bytes a record compressed), 32,000 read back since the start.
+
+**What is left of the growth** (a heap profile of the 10,000 town under the tier, day 71 to day 120, 16 MB a day): the
+world's records still 8 MB a day: those read in the last fortnight (in force: a bank's standing orders, people's
+agreements and households, open claims, the property roll), those of the last 30 days (`after_days`), and for every
+record ever made what stays when it is cold (its slot, its place in the state's map and in perception's index, its
+entries in the books that saw it: some 300 to 400 bytes a record, about 3 MB a day here); the engine 2.7 MB a day (the
+units' views and knowledge); offices and firms 2 MB; citizens 1.7 MB; minds 0.7 MB. The memory budget gained a growth
+budget (`scripts/memory-budget.json`, `growth_bytes_per_person_day`: the 1,000-person town's half-year past its month).
+
 **Costs that grow with the town, not the run** (sampled on the 50,000 town at day 49, the run's own thread): a person's
 word of mouth (`CitizenMind::word_of_mouth`) 43%, taking in everyone it sees in every space around it into its list of
 contacts by a search of the list for each, before cutting the list back to its 15: quadratic in how crowded the

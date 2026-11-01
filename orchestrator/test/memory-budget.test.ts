@@ -35,11 +35,26 @@ export async function peakOf(spec: string, days: number, threads: number, sets: 
   }
 }
 
+/** The town's month, run once for both tests. */
+let monthRun: Promise<{ people: number; peak: number }> | undefined;
+const month = () => (monthRun ??= peakOf(budget.town, budget.days, budget.threads));
+
 test("a 1,000-person month keeps to the memory budget for each person", async () => {
-  const { people, peak } = await peakOf(budget.town, budget.days, budget.threads);
+  const { people, peak } = await month();
   const per = Math.round((peak - budget.overhead_bytes) / people);
   console.log(`memory: ${people} people, peak ${(peak / 1e6).toFixed(0)} MB, ${(per / 1000).toFixed(1)} KB a person beside ${(budget.overhead_bytes / 1e6).toFixed(0)} MB (budget ${(budget.bytes_per_person / 1000).toFixed(1)} KB, target ${(budget.target_bytes_per_person / 1000).toFixed(1)} KB)`);
   expect(people).toBeGreaterThan(900);
   expect(budget.bytes_per_person).toBeGreaterThanOrEqual(budget.target_bytes_per_person);
   expect(per).toBeLessThanOrEqual(budget.bytes_per_person);
 }, 600_000);
+
+// What a run's length adds (risk SC-6; docs/design/tiered-storage.md): the same town for half a year, its peak past the
+// month's, for each person and each day between, within the growth budget. A change that holds more of the history in
+// memory (a reader that keeps what it no longer reads, a cache that grows with the run) fails here.
+test("a 1,000-person half-year grows within the memory budget for each person and day", async () => {
+  const first = await month();
+  const half = await peakOf(budget.town, budget.growth_days, budget.threads);
+  const perDay = Math.round((half.peak - first.peak) / half.people / (budget.growth_days - budget.days));
+  console.log(`memory growth: day ${budget.days} ${(first.peak / 1e6).toFixed(0)} MB, day ${budget.growth_days} ${(half.peak / 1e6).toFixed(0)} MB, ${perDay} bytes a person a day (budget ${budget.growth_bytes_per_person_day})`);
+  expect(perDay).toBeLessThanOrEqual(budget.growth_bytes_per_person_day);
+}, 900_000);

@@ -10376,3 +10376,41 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   scratch script `orchestrator/p-tmp.ts` the branch carried is removed.
 - **Revisit if:** the slow tier passes 1,500 s on the Mini, or merges wait on it; then the twin files and the elections'
   towns first, as the entry above says, before any raise.
+
+## 2026-11-02 · Tiered storage: the world's records nobody reads held on disk, and what else grew with a run (SC-1, SC-6; branch `tiered-storage`; no result changes; no model called)
+
+- **What was asked:** Naz approved the proposal (docs/design/tiered-storage.md, then a proposal) on 2026-11-02 ("Yes to
+  all"): records out of memory once cold, read back on demand, the actors' books holding records through the shared
+  store rather than direct pointers; then the other growers fixed where they are a mechanism's fault; results
+  byte-identical; 50,000 people for two years or more within about 40 GB the goal.
+- **Built** (docs/design/tiered-storage.md says how): every holder of a record holds a `Rec`, a handle to its one slot;
+  the kernel's `Tier` moves records filed 30 days ago and unread for 14 to the run's cold file (`<out>/<run>.cold`,
+  removed at the end) in compressed blocks of 64, and a read brings one back; the state hash streams a cold record's
+  bytes as they are; books keep handles and let what they read go at their next day; the delivered cache is keyed by
+  slot and drops entries a week unshown; the offices' files of payments put what is past 30 days on the same file.
+- **Readers fixed** (found with `OIKOS_COLD_WHO`, which counts who reads old records): lists collected whole to skip what
+  was read (trade desk, producer, electoral office); a person's weekly going-through of public goings-on and weekly
+  plan reading every record of their book. Each also cost the run's own thread time growing with the run.
+- **Other growers fixed:** the resolver's addressed statements (a map from every addressed statement each participant
+  saw to its addressees) held by number with each list of addressees once; the twins' per-matter draw counts let go when
+  a matter says it is over (`Cx::rng_until`, `rng_once`: a gathering once it begins, a delivered order's faultiness once
+  drawn; no draw is named differently: a matter is never drawn for once it says it is over); the travel caches (quickest-time trees, 152 MB at
+  10,000 people by day 71, and trips) bounded.
+- **Results, shown:** the six pinned towns for a month, every record sent to disk from its second day whenever unread that
+  day, at main's state and log, with and without; 10,000 people for 60 and for 180 days and 1,000 for 180 at main's state
+  hash and log digest; `kernel/tests/a1_citizen.rs` holds a tiered town to one held in memory, byte for byte.
+- **Measured** (docs/design/performance.md, "Tiered storage"): 10,000 people grow 16.5 MB a simulated day against 25.2
+  (-35%), 4.99 GB against 6.19 at day 180; 1,000 people for 180 days 573 to 587 MB against 670; the run's own thread
+  within noise. Still growing: records read in force, the last 30 days' records, and what stays of every record when it
+  is cold (slot, map entries, book entries: some 300 to 400 bytes a record), the units' views and knowledge, the actors'
+  own state.
+- **The budget:** the month's ceiling lowered from 270 to 235 KB a person (main and the branch both measure about 218 on
+  the Mini today); a growth budget added (the same town's half-year past its month, 1,900 bytes a person a day; main
+  about 2,300, the branch 1,640 to 1,770), `orchestrator/test/memory-budget.test.ts`, slow tier (+90 s).
+- **Decided here, not in the proposal:** records leave memory one by one by when last read, not a month's segment at a
+  time; the cold file is the run's scratch, removed at its end (a snapshot carries every record whole, so nothing that
+  needs it outlives the run; kept, it would be gigabytes a run at 50,000); OIKOS_COLD=off keeps the old way.
+- **Revisit if:** a run's reads back from disk climb (a reader that goes through old records daily: then that reader is
+  the fault, as these were); a study's run needs to resume from a snapshot without the records whole in it; the cold
+  file's disk passes what the run server has to spare; 50,000 for two years does not fit (then the per-record cost that
+  stays when cold, the books' entries, and the units' views are next).
