@@ -2,7 +2,7 @@
 //! run inside the engine with every other code participant standing idle and a member's papers scripted. Same result on
 //! one thread and on fourteen.
 
-mod common;
+use crate::common;
 
 use oikos_kernel::engine::{run_code_world, EngineOptions};
 use serde_json::{json, Value};

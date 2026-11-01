@@ -105,7 +105,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
 // f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "ce5432bd10cc3768", "gb-eng-2026": "becc4b5a840d5679", "ke-nakuru-2026": "a33d92aa11cb0e6d" }
+  ? { "au-vic-2026": "a0a8a23343beec47", "gb-eng-2026": "a911615ec4c6568b", "ke-nakuru-2026": "a2f60218588c0078" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -142,10 +142,23 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // short only of the money for a business of one asks the bank for it over its longest term (`start_loan_months`, from the profile's
 // credit.max_months); 38412f4e..., fb039153..., 43665a61... for the configs and 553de625..., 3aa5f181..., aa994113... for the states,
 // until then.)
+// (Re-taken on 2026-10-31 at foundations-2 S2 (law 9), on the tree merged with main at 28c38600, config hashes and Rust states
+// both: a road is a way of the network, the ground says a cell's metres, housed households have a vehicle and drive it where
+// they belong (generator 0.72.0), and a child's parents know of its birth at once; ce5432bd..., becc4b5a..., a33d92aa... for the
+// configs and e2f908c0..., 66d41a64..., 29ee83f1... for the states, until then.)
+// (Re-taken on 2026-11-01 at working calendars (gap-weekends), on the tree merged with main at f56d2dbc (delegation, the long-run
+// fixes, business loans, foundations-2 S2), config hashes and Rust states both: the support agency's and the tax collector's desks of officers keep
+// the place's days of rest and public holidays (`hours.closed`), an officer's day on each working day (generator 0.73.0); main's
+// b69b5e45..., 1c0ed42c..., bee66230... for the configs and 001f22ed..., 1a754a5d..., caa00714... for the states, until then.)
+// (Re-taken on 2026-11-01 at mt21-recourse (MT-21), merged with main at c46643eb (after gap-weekends), au-vic and gb-eng only, config hashes and Rust
+// states both: their law on benefit decisions states the days after which an unanswered review may be complained of to a body
+// that recommends (`review.complaint_after_days`), so the published law's words and data move, and a claimant left unanswered
+// may now go to the ombudsman desk; ke-nakuru's law has no such route and did not move. c899c8ff... and 9b0a54d6... for the
+// configs, af012071... and fab20a4d... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "e2f908c06fba526f9b89ea05f074f6702df7cbd801dadd235c3f5f81c3481bee",
-  "gb-eng-2026": "66d41a640ac7b59a9b4a3f21231961f05620f1f91c047365a648e441fda38e34",
-  "ke-nakuru-2026": "29ee83f1ccdd2f60579e95e1e678b322f838ad4196bf61f533b4683c6e8526e9",
+  "au-vic-2026": "ce297a1b5b6f09294b6fc1b6db37330be7044d78c287bac6a043d3a1fb0fc4dd",
+  "gb-eng-2026": "4c0f82610a38835b79de8648313d1f4525434610341a8f48bdb437dd6eb1be24",
+  "ke-nakuru-2026": "e309381464fd3555eff4d3152ab7d0f3abd3e7d2bc5f019eb6f687b71df75e4f",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

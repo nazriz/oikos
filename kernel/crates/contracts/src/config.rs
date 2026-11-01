@@ -75,6 +75,10 @@ pub struct Meta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub canary: String,
+    /// What a study counts as one technology (foundations-2 7.5: `ai`, say): template ids, by tag. For measurement only:
+    /// nothing in the world reads it (`orchestrator/test/generality.test.ts`), and no participant is shown `meta`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub study_tags: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -608,6 +612,21 @@ pub struct StructureType {
     /// Floods (world-expansion 7.3): above what level of which field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub floods: Option<FloodsCfg>,
+    /// Law 9 (foundations-2 S2): a way (a road, a path). Standing, each of its cells is a node of the world's ways, joined to
+    /// the next cell's node of the same mode by a link a cell long.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub way: Option<WayCfg>,
+}
+
+/// What a way is: its mode (the world's vocabulary: road, path), what it carries an hour each way (vehicles), and its speed
+/// for vehicles (none: on foot only).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WayCfg {
+    pub mode: String,
+    pub capacity: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speed_kmh: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1017,18 +1036,54 @@ pub struct Template {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supplier: Option<Id>,
     /// A system's: the daily window its lanes work in (law 10, foundations-2 P1): from `from` seconds after midnight, for
-    /// `seconds`. An act not finished by the window's end goes on in the next day's (a queue, not a refusal). Every day is
-    /// a working day. Absent: any time of day.
+    /// `seconds`. An act not finished by the window's end goes on in the next working day's (a queue, not a refusal); its
+    /// `closed` days (a working calendar) have no window. Absent: any time of day.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hours: Option<TemplateHours>,
+    /// A system's (foundations-2 E2): the moment the kind first exists, a technology the outside world releases during the
+    /// run. Before it nobody can deliver one (`deploy` is refused, `unknown_template`). Absent: it exists from the start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub released: Option<i64>,
+    /// A system's (foundations-2 P4, law 10): the hardware it runs on, who holds it and where, and the recipe an hour of
+    /// its work is there. A system from it is delivered only where there is hardware for its lanes, and each second of its
+    /// work draws the recipe's inputs from the host's holding: a host with no power does nothing. Absent: it runs on
+    /// nothing in the world (the outside's own machines, abroad).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runs_on: Option<RunsOn>,
+}
+
+/// What a system runs on (foundations-2 P4): `per_lane` units of the `hardware` kind for each of its lanes, held by
+/// `holder` at the structure `at`; an hour of a lane's work is the task `hour` there (its `consumes`, `produces`,
+/// `emits`, a unit an hour), drawn as the seconds add up.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RunsOn {
+    pub hardware: Id,
+    pub per_lane: i64,
+    pub holder: Id,
+    pub at: Id,
+    pub hour: Id,
 }
 
 /// A template's working hours (law 10).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TemplateHours {
     pub from: i64,
     pub seconds: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub closed: Option<ClosedDays>,
+}
+
+/// The days a template's hours do not open (a working calendar, from a profile's days of rest and holidays): days of the
+/// world's week (day `d` of the run is the week's day `d mod 7`) and days of the run, counted from its first (0).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ClosedDays {
+    #[serde(default)]
+    pub weekdays: Vec<i64>,
+    #[serde(default)]
+    pub days: Vec<i64>,
 }
 
 /// One thing a system from a template can do (foundations F4).
@@ -2373,33 +2428,15 @@ fn check_nature(c: &Config) -> Result<(), String> {
     Ok(())
 }
 
-/// Reserved shapes for travel (lane F, 2026-10-17; docs/design/travel.md): what traffic will be built on. Nothing moves
-/// along a road or drives a vehicle yet; they are checked, and vehicles are kept in the state as their owners' things.
+/// Travel's things (docs/design/travel.md; law 9, foundations-2 S2): kinds of vehicle and the vehicles entities own, kept in
+/// the state as their owners' things, each where it stands. The ways they go on are structures that are ways (`way`).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Travel {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub roads: Vec<Road>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub vehicle_types: Vec<VehicleType>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub vehicles: Vec<VehicleCfg>,
-}
-
-/// A road: the cells it runs through in order, and how much it carries.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Road {
-    pub id: Id,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    pub cells: Vec<Id>,
-    /// Vehicles an hour each way, at most.
-    pub capacity_per_hour: i64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub lanes: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub seconds_per_cell: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -2409,11 +2446,11 @@ pub struct VehicleType {
     pub seats: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub load_kg: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub seconds_per_cell: Option<i64>,
+    /// The most it goes, km/h (a way's own speed may be less).
+    pub speed_kmh: i64,
 }
 
-/// A vehicle: a thing its owner owns, standing at a cell or in a structure.
+/// A vehicle: a thing its owner owns, standing at a cell or in a structure, and who besides its owner may drive it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VehicleCfg {
@@ -2422,6 +2459,8 @@ pub struct VehicleCfg {
     pub type_: Id,
     pub owner: Id,
     pub at: Id,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drivers: Vec<Id>,
 }
 
 /// The travel section checked against the world: each road runs through cells of the ground, a cell next to the one
@@ -2434,27 +2473,9 @@ fn validate_travel(t: &Travel, w: &World) -> Result<(), String> {
         (it.next().is_none() && (0..w.ground.w).contains(&x) && (0..w.ground.h).contains(&y)).then_some((x, y))
     };
     let mut ids = std::collections::BTreeSet::new();
-    for r in &t.roads {
-        if !ids.insert(r.id) {
-            return Err(format!("travel: {} is declared twice", r.id));
-        }
-        if r.cells.len() < 2 || r.capacity_per_hour < 1 || r.lanes.is_some_and(|l| l < 1) || r.seconds_per_cell.is_some_and(|s| s < 1) {
-            return Err(format!("travel: road {} needs two cells or more and a positive capacity", r.id));
-        }
-        let mut last: Option<(i64, i64)> = None;
-        for c in &r.cells {
-            let at = cell(c).ok_or_else(|| format!("travel: road {} runs through {c}, which is no cell of the ground", r.id))?;
-            if let Some(l) = last {
-                if (l.0 - at.0).abs() + (l.1 - at.1).abs() != 1 {
-                    return Err(format!("travel: road {} jumps from one cell to {c}, which is not next to it", r.id));
-                }
-            }
-            last = Some(at);
-        }
-    }
     for v in &t.vehicle_types {
-        if !ids.insert(v.id) || v.seats < 0 {
-            return Err(format!("travel: vehicle type {} is declared twice, or has fewer than no seats", v.id));
+        if !ids.insert(v.id) || v.seats < 0 || !(1..=1_000).contains(&v.speed_kmh) {
+            return Err(format!("travel: vehicle type {} is declared twice, has fewer than no seats or no speed", v.id));
         }
     }
     let structures: std::collections::BTreeSet<&str> = w.structures.iter().map(|s| s.id.as_str()).collect();
@@ -2472,6 +2493,9 @@ fn validate_travel(t: &Travel, w: &World) -> Result<(), String> {
         if cell(&v.at).is_none() && !structures.contains(v.at.as_str()) {
             return Err(format!("travel: vehicle {} stands at {}, which is no cell or structure", v.id, v.at));
         }
+        if let Some(d) = v.drivers.iter().find(|d| !entities.contains(d.as_str())) {
+            return Err(format!("travel: vehicle {} may be driven by {d}, who is no entity of the world", v.id));
+        }
     }
     Ok(())
 }
@@ -2481,6 +2505,16 @@ pub fn validate(c: &Config) -> Result<(), String> {
         validate_travel(t, &c.world)?;
     }
     crate::network::validate(c)?;
+    // (A way is so many metres a cell long: the ground says how big a cell is.)
+    for t in &c.catalogue.structure_types {
+        let Some(w) = &t.way else { continue };
+        if w.mode.is_empty() || !(1..=1_000_000).contains(&w.capacity) || w.speed_kmh.is_some_and(|v| !(1..=1_000).contains(&v)) {
+            return Err(format!("structure type {}: a way needs a mode, a capacity of 1 to a million an hour and a speed of 1 to 1,000 km/h", t.id));
+        }
+        if c.world.ground.cell.is_none() {
+            return Err(format!("structure type {} is a way, and the ground does not say how many metres a cell is (world.ground.cell)", t.id));
+        }
+    }
     for x in &c.world.scarce {
         if !c.world.boundaries.contains(&x.edge) || !c.catalogue.resources.iter().any(|r| r.id == x.kind) || x.quantity < 0 || !(1..=31_622_400 * 100).contains(&x.every) {
             return Err(format!("scarce: {} of {} is no edge's kind the world declares, or its quantity or period is out of range", x.kind, x.edge));
@@ -2977,9 +3011,16 @@ pub fn validate(c: &Config) -> Result<(), String> {
         if t.kind == ParticipantKind::Person && (t.does.is_some() || t.supplier.is_some() || t.hours.is_some()) {
             return Err(format!("template {}: a person's has no `does`, supplier or hours (only a system is supplied; a person's day is their own)", t.id));
         }
-        if let Some(h) = t.hours {
+        if let Some(h) = &t.hours {
             if !(0..86_400).contains(&h.from) || !(1..=86_400).contains(&h.seconds) {
                 return Err(format!("template {}: `hours` opens within the day (0 to 86399 s after midnight) and lasts 1 to 86400 s", t.id));
+            }
+            // (A working calendar leaves a working day in the week, or no work could ever be done.)
+            if let Some(c) = &h.closed {
+                let week: BTreeSet<i64> = c.weekdays.iter().copied().collect();
+                if week.iter().any(|w| !(0..7).contains(w)) || week.len() == 7 || c.days.iter().any(|d| *d < 0) {
+                    return Err(format!("template {}: `hours.closed` names days of the week 0 to 6, leaving one open, and days of the run from 0", t.id));
+                }
             }
         }
         if let Some(s) = &t.supplier {
@@ -2992,6 +3033,18 @@ pub fn validate(c: &Config) -> Result<(), String> {
         for r in t.does.iter().flatten() {
             if r.seconds.is_some_and(|x| !(1..=31_536_000).contains(&x)) {
                 return Err(format!("template {}: a row's `seconds` is positive and at most a year", t.id));
+            }
+        }
+        if let Some(ro) = &t.runs_on {
+            if t.kind != ParticipantKind::System || ro.per_lane < 1 {
+                return Err(format!("template {}: runs_on is a system's, with per_lane of 1 or more", t.id));
+            }
+            org_exists(&ro.holder, &format!("template {}: runs_on's holder", t.id))?;
+            if !c.catalogue.resources.iter().any(|r| r.id == ro.hardware) {
+                return Err(format!("template {}: runs_on names no kind {}", t.id, ro.hardware));
+            }
+            if !c.catalogue.tasks.iter().any(|x| x.id == ro.hour && x.labour == 0) {
+                return Err(format!("template {}: runs_on's hour is a task that takes nobody's time ({})", t.id, ro.hour));
             }
         }
     }

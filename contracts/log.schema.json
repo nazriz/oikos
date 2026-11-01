@@ -1031,6 +1031,10 @@
             },
             "by": {
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "vehicle": {
+              "description": "The vehicle it came by, which now stands there too (law 9).",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
             }
           }
         },

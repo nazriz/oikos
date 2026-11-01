@@ -4,13 +4,13 @@
 //! are `#[ignore = "F<n>: ..."]`: written against the INTENDED interface (the plan's section 2: `by` on any act, a
 //! work table keyed by record kind, a template's `does` and `supplier`, `deploy.to`), never red in the suite, and
 //! switched on by the step that builds the thing (remove the `ignore`, adjust the names the step settles on).
-//! `cargo test --test foundations -- --ignored` runs the pending ones, which must all fail today (F0 checked this).
+//! `cargo test --test main foundations:: -- --ignored` runs the pending ones, which must all fail today (F0 checked this).
 //!
 //! Law 6 (who may do what is data) and law 7 (information with its keeper) are kept already and have their own tests:
 //! `statements_have_no_power.rs`, `knowing.rs` and `orchestrator/test/no-god-view.test.ts`. Law 1's money and goods are
 //! `money_conservation.rs` and `conservation.rs`; what is added here is time.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::EventBody;
@@ -362,6 +362,55 @@ fn law3_only_the_templates_supplier_delivers_a_system() {
     // The supplier delivers, to the city; the system belongs to the city.
     let bot = deliver(&mut run);
     assert_eq!(run.kernel().state().participants[bot.as_str()].owner.as_deref(), Some("city"));
+    // A kind of system released later in the run (foundations-2 E2) is delivered to nobody before it exists.
+    let mut run = with_template(|t| {
+        t["supplier"] = json!("outside");
+        t["released"] = json!(86_400);
+    });
+    let early = cmd("outside-system", Some("outside-trade"), json!([{"block": "deploy", "template": "clerk-bot", "to": "city"}]));
+    assert_eq!(outcome(&mut run, &early).as_deref(), Some("unknown_template"));
+    run.command(&Command::Advance { to: 86_400 }).unwrap();
+    deliver(&mut run);
+}
+
+/// What a system runs on (foundations-2 P4): the clerk-bot needs 400 kg of the developer's materials at the shop a lane
+/// (there are 1,000: room for two), and an hour of its work there is the recipe `eat` (a unit of goods used up). A
+/// message takes it half an hour.
+fn hosted(goods: &str) -> R {
+    let mut c = world(&default_params());
+    for h in c["world"]["holdings"].as_array_mut().unwrap() {
+        if h["holder"] == "devco" && h["kind"] == "goods" {
+            h["quantity"] = json!(goods);
+        }
+    }
+    let t = c["templates"].as_array_mut().unwrap().iter_mut().find(|t| t["id"] == "clerk-bot").unwrap();
+    t["supplier"] = json!("outside");
+    t["does"] = json!([{"block": "message", "seconds": 1800}]);
+    t["runs_on"] = json!({"hardware": "materials", "per_lane": 400, "holder": "devco", "at": "s-shop", "hour": "eat"});
+    start(c)
+}
+
+#[test]
+fn p4_a_system_runs_on_hardware_held_somewhere_and_its_work_draws_there() {
+    let goods = |run: &R| run.kernel().state().holding("devco", "s-shop", "goods");
+    let mut run = hosted("200");
+    let bot = deliver(&mut run);
+    deliver(&mut run);
+    let third = cmd("outside-system", Some("outside-trade"), json!([{"block": "deploy", "template": "clerk-bot", "to": "city"}]));
+    assert_eq!(outcome(&mut run, &third).as_deref(), Some("insufficient_quantity"), "no hardware left for a third");
+    applied(&mut run, &cmd("mayor-system", Some("mayor"), json!([{"block": "appoint", "position": "clerk", "participant": bot}])));
+    let say = cmd(&bot, Some("clerk"), json!([{"block": "message", "to": ["bob-self"], "text": "ok"}]));
+    assert_eq!(outcome(&mut run, &say), None);
+    assert_eq!(goods(&run), 200, "half an hour: nothing drawn yet");
+    assert_eq!(outcome(&mut run, &say), None);
+    assert_eq!(goods(&run), 199, "an hour of its work: the recipe's unit, at its host");
+    // A host with nothing to run it on: the hour's work is refused.
+    let mut run = hosted("0");
+    let bot = deliver(&mut run);
+    applied(&mut run, &cmd("mayor-system", Some("mayor"), json!([{"block": "appoint", "position": "clerk", "participant": bot}])));
+    let say = cmd(&bot, Some("clerk"), json!([{"block": "message", "to": ["bob-self"], "text": "ok"}]));
+    assert_eq!(outcome(&mut run, &say), None);
+    assert_eq!(outcome(&mut run, &say).as_deref(), Some("insufficient_quantity"));
 }
 
 #[test]

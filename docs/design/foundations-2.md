@@ -302,7 +302,10 @@ shopping, gatherings and seats' own sittings. It gets its own before and after.
 **Built (branch `f2-phase3`; decisions "Foundations-2 phase 3"):** S1 (2026-10-31): the backstop
 (`everything-is-somewhere.test.ts`, its log half `everything-is-somewhere-runs.test.ts` in the slow tier, audits in
 `test/lib/law9.ts`), the inventory (`fixtures/space-inventory.json`) and `kernel/tests/space.rs`. Added to the design's
-list: systems' places and the unhoused, who are in no space.
+list: systems' places and the unhoused, who are in no space. S2 (2026-10-31): a structure type may be a way (roads), its
+cells joined into links a cell long; trips along the ways at the vehicle's speed or on foot; vehicles driven by whoever may,
+standing where they went; households' vehicles from the profiles. Not as designed: roads are structures that are ways, not
+links declared in `world.network` (so a road the town builds joins the network); declared travel links come with S6.
 
 ### 3.5 Performance
 

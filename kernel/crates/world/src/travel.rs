@@ -11,21 +11,23 @@ use std::sync::Arc;
 /// How far around the two ends a path may wander (cells).
 const MARGIN: i64 = 8;
 
-/// Seconds to go from one structure to another (none if the world has no travel, or it's the same place).
-pub fn seconds(s: &Statics, st: &State, from: &str, to: &str) -> i64 {
+/// Seconds to go from one structure to another (none if the world has no travel, or it's the same place): on foot, or by
+/// a vehicle at `speed` km/h (law 9: along the world's ways, foundations-2 S2).
+pub fn seconds(s: &Statics, st: &State, from: &str, to: &str, speed: Option<i64>) -> i64 {
     let Some(travel) = s.config.catalogue.travel.as_ref() else { return 0 };
     if from == to {
         return 0;
     }
     // (The same trip over unchanged ground takes the same time: worked out once. OIKOS_CHECK_TRAVEL checks it.)
-    if let Some(secs) = st.ground.get(from, to) {
+    let key = speed.unwrap_or(0);
+    if let Some(secs) = st.ground.get(from, to, key) {
         if std::env::var_os("OIKOS_CHECK_TRAVEL").is_some() {
-            assert_eq!(secs, path(s, st, travel, from, to), "travel cache stale for {from} -> {to}");
+            assert_eq!(secs, path(s, st, travel, from, to, speed), "travel cache stale for {from} -> {to}");
         }
         return secs;
     }
-    let secs = path(s, st, travel, from, to);
-    st.ground.put(from, to, secs);
+    let secs = path(s, st, travel, from, to, speed);
+    st.ground.put(from, to, key, secs);
     secs
 }
 
@@ -60,21 +62,32 @@ fn costs(s: &Statics, st: &State, travel: &oikos_contracts::config::TravelCfg) -
     costs
 }
 
-/// Seconds to go from one cell to another (none if the world has no travel, or it's the same cell): the way to a
+/// Seconds to go from one cell to another on foot (none if the world has no travel, or it's the same cell): the way to a
 /// place that may have no building on it (going to look at a lot). Worked out each time: such trips are few.
 pub fn between(s: &Statics, st: &State, from: (i64, i64), to: (i64, i64)) -> i64 {
     let Some(travel) = s.config.catalogue.travel.as_ref() else { return 0 };
     if from == to {
         return 0;
     }
-    path_cells(s, st, travel, from, to)
+    trip_cells(s, st, travel, from, to, None)
 }
 
-/// The quickest path's time, worked out.
-fn path(s: &Statics, st: &State, travel: &oikos_contracts::config::TravelCfg, from: &str, to: &str) -> i64 {
+/// The quickest trip's time, worked out.
+fn path(s: &Statics, st: &State, travel: &oikos_contracts::config::TravelCfg, from: &str, to: &str, speed: Option<i64>) -> i64 {
     let (Some(a), Some(b)) = (st.structures.get(from), st.structures.get(to)) else { return 0 };
     let (Some(a), Some(b)) = (crate::config::cell_xy(&a.at), crate::config::cell_xy(&b.at)) else { return 0 };
-    path_cells(s, st, travel, a, b)
+    trip_cells(s, st, travel, a, b, speed)
+}
+
+/// The quickest trip between two cells: on foot over the cells all the way, or on foot to the nearest node of the world's
+/// ways, along them (driven at `speed`, or on foot), and on foot from the node nearest where it is going (law 9).
+fn trip_cells(s: &Statics, st: &State, travel: &oikos_contracts::config::TravelCfg, a: (i64, i64), b: (i64, i64), speed: Option<i64>) -> i64 {
+    let walk = path_cells(s, st, travel, a, b);
+    let w = crate::ways::ways(s, st);
+    let (Some(e), Some(x)) = (w.nearest(a), w.nearest(b)) else { return walk };
+    let Some(net) = crate::ways::tree_cached(s, st, &w, e, speed)[x as usize] else { return walk };
+    let total = path_cells(s, st, travel, a, w.nodes[e as usize]).saturating_add(net).saturating_add(path_cells(s, st, travel, w.nodes[x as usize], b));
+    walk.min(total)
 }
 
 /// The quickest path's time between two cells.

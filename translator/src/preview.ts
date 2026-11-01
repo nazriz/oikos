@@ -553,7 +553,7 @@ export class Preview {
         return one(`You will ${verb[b.op] ?? b.op} ${b.link}.`, said);
       }
       case "occupy":
-        return one(b.who ? `You will bring ${this.who(b.who)} into ${b.space}.` : `You will move into ${b.space}.`, ["who", "space"]);
+        return one((b.who ? `You will bring ${this.who(b.who)} into ${b.space}` : `You will move into ${b.space}`) + (b.vehicle ? `, driving ${b.vehicle}.` : "."), ["who", "space", "vehicle"]);
       case "vacate":
         return one(this.k.entityOf(b.occupant) === this.k.entity ? `You will leave ${b.from}.` : `You will remove ${this.who(b.occupant)} from ${b.from}.`, ["occupant", "from"]);
       case "create_entity": {
