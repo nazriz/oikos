@@ -97,7 +97,7 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
 /// that is dead, gone, already on its way or in no building does not set out; nor one whose vehicle is not there to take
 /// (its act is refused when due).
 #[allow(clippy::too_many_arguments)]
-pub fn depart(s: &Statics, st: &mut State, body: &str, to: &str, via: &[Id], arrives: i64, vehicle: Option<&str>, act: Option<&str>, by: &str) -> Vec<Timed> {
+pub fn depart(s: &Statics, st: &mut State, body: &str, to: &str, via: &[Id], fuel: Option<(Id, Money, i64)>, arrives: i64, vehicle: Option<&str>, act: Option<&str>, by: &str) -> Vec<Timed> {
     if !st.body(body).is_some_and(|b| b.alive && b.present) || st.transit.contains_key(body) {
         return vec![];
     }
@@ -110,6 +110,24 @@ pub fn depart(s: &Statics, st: &mut State, body: &str, to: &str, via: &[Id], arr
         return vec![];
     }
     let mut events = vec![];
+    // (Its fuel, S5: drawn from its owner's holding at the vehicle as it sets out; too little now, it does not set out.)
+    if let (Some(v), Some((kind, _, metres))) = (vehicle, fuel) {
+        let x = st.vehicles[v].clone();
+        let per = s.config.travel.as_ref().and_then(|t| t.vehicle_types.iter().find(|t| t.id == x.type_)).and_then(|t| t.fuel_per_100km).unwrap_or(0);
+        let owed = x.fuel_owed as i128 + metres as i128 * per as i128 * 10;
+        let q = (owed / 1_000_000) as Money;
+        let key = crate::state::holding_key(&x.owner, v, &kind);
+        let have = st.holdings.get(&key).map_or(0, |h| h.quantity);
+        if have < q {
+            return vec![];
+        }
+        st.vehicles.get_mut(v).unwrap().fuel_owed = (owed % 1_000_000) as i64;
+        if q > 0 {
+            let c = st.stamp();
+            st.holdings.insert(key, crate::state::Holding { kind, holder: x.owner, at: Id::new(v), quantity: have - q, changed: c });
+            events.push(Timed::new(st.t, EventBody::FuelUsed { vehicle: Id::new(v), kind, quantity: q, metres, by: Id::new(by) }));
+        }
+    }
     leave_spaces(s, st, &from, Some(body), None, VacateReason::Left, Some(by), &mut events);
     st.touch_structure(&from);
     st.moved(body);
@@ -1026,7 +1044,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             out.extend(crate::sites::end(s, st, &participant, position.as_deref(), &channel, places, &cells, names));
             out
         }
-        Sched::Depart { body, to, via, arrives, vehicle, act, by } => depart(s, st, &body, &to, &via, arrives, vehicle.as_deref(), act.as_deref(), &by),
+        Sched::Depart { body, to, via, fuel, arrives, vehicle, act, by } => depart(s, st, &body, &to, &via, fuel, arrives, vehicle.as_deref(), act.as_deref(), &by),
         Sched::Arrival { kind, quantity, holder, at } => {
             let key = crate::state::holding_key(&holder, &at, &kind);
             let q = st.holdings.get(&key).map_or(0, |h| h.quantity).saturating_add(quantity).clamp(-MAX_MONEY, MAX_MONEY);
@@ -1967,8 +1985,8 @@ impl<'a> Exec<'a> {
                     return Err(refuse(RefusalCode::Overflow, "quantity out of range"));
                 }
                 self.entity_exists(&to)?;
-                // Where goods can be: a structure (standing or begun), or an edge's own outside.
-                let place_ok = |who: &str, at: &str| self.st.structures.contains_key(at) || (self.s.is_boundary(who) && at == who);
+                // Where goods can be: a structure (standing or begun), a vehicle (its tank, its load: S5), or an edge's own outside.
+                let place_ok = |who: &str, at: &str| self.st.structures.contains_key(at) || self.st.vehicles.contains_key(at) || (self.s.is_boundary(who) && at == who);
                 if !place_ok(&to, &to_at) {
                     return Err(refuse(RefusalCode::UnknownPlace, format!("{to_at} isn't somewhere {to} can hold goods")));
                 }
@@ -2006,7 +2024,10 @@ impl<'a> Exec<'a> {
                 // outside, by the outside's freight, from the edge's node (in its time, if the world has the node); between
                 // buildings, by a body the act took by both (the acting person's own, or one the actor may direct).
                 let (mut carrier_was, mut arrives) = (None, None);
-                if self.s.config.catalogue.travel.is_some() && from_at != to_at {
+                // (A vehicle is where it stands: goods between it and the building it stands at are within one place.)
+                let place_of = |x: &Id| self.st.vehicles.get(x.as_str()).map_or(*x, |v| v.at);
+                let one_place = place_of(&from_at) == place_of(&to_at);
+                if self.s.config.catalogue.travel.is_some() && from_at != to_at && !one_place {
                     let outside = (edge && from_at == me).then_some((me, to_at)).or_else(|| (self.s.is_boundary(&to) && to_at == to).then_some((to, from_at)));
                     if let Some((e, there)) = outside {
                         carrier_was = Some(e);
@@ -2023,7 +2044,12 @@ impl<'a> Exec<'a> {
                         self.living_present(&body)?;
                         // (When the act is done, the carrier has been by both: it went where the goods were and where they go.)
                         if self.started {
-                            let went = self.st.transit.get(body.as_str()).is_some_and(|t| (t.from == from_at || t.via.contains(&from_at)) && (t.to == to_at || t.via.contains(&to_at)));
+                            // (A vehicle the goods go into is where it stands, or with the carrier who drives it.)
+                            let by = |t: &crate::state::Transit, x: &Id| {
+                                let at = place_of(x);
+                                t.from == at || t.via.contains(&at) || t.to == at || t.vehicle == Some(*x) || at.as_str() == body.as_str()
+                            };
+                            let went = self.st.transit.get(body.as_str()).is_some_and(|t| by(t, &from_at) && by(t, &to_at));
                             if !went {
                                 return Err(refuse(RefusalCode::NotPresent, format!("{body} has not been by {from_at} and {to_at}")));
                             }
@@ -2222,6 +2248,10 @@ impl<'a> Exec<'a> {
                 if let Some(v) = &vehicle {
                     let from = if on_way { Id::new(&who) } else { self.st.structures_of(&who).into_iter().next().ok_or_else(|| refuse(RefusalCode::NotPresent, format!("{who} is nowhere to drive {v} from")))? };
                     driven_speed(self.s, self.st, v, &who, &from)?;
+                    // (Named for a trip and not gone on it: it was not there to take as the body set out, so it never did.)
+                    if self.started && !on_way && self.s.config.catalogue.travel.is_some() && from != sid.as_str() {
+                        return Err(refuse(RefusalCode::NotPresent, format!("{who} never set out with {v}")));
+                    }
                 }
                 if on_way {
                     if let Some(tr) = self.st.transit.remove(who.as_str()) {

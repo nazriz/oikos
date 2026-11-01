@@ -146,7 +146,7 @@ export const FIGURE_BASIS: Basis[] = [
   prof("world.ground.cell", "nature.cell_m"),
   derived("world.ground", "the ground's layout, drawn by the generator from the spec's grid"),
   derived("world.places", "the places on the ground, drawn by the generator from the spec's grid"),
-  placeholder("world.holdings", "opening stocks: the generator's days of trade"),
+  placeholder("world.holdings", "opening stocks: the generator's days of trade; a vehicle's tank half full, the average between fills"),
   prof("life.illness", "life.illness"),
   prof("life.injury", "life.injury"),
   prof("life.birth.gestation", "life.birth.gestation_days"),
@@ -173,6 +173,9 @@ export const FIGURE_BASIS: Basis[] = [
   prof("catalogue.travel.seconds_per_cell", "round.travel_seconds_per_cell"),
   prof("catalogue.structure_types.*.way.speed_kmh", "round.roads"),
   prof("catalogue.structure_types.*.way.capacity", "round.roads"),
+  derived("travel.vehicle_types.*.fuel_per_100km", "the profile's round.vehicles fuel_cost_per_100km over the price of a unit of the service stations' kind"),
+  derived("travel.vehicle_types.*.tank", "fuel_per_100km times the profile's round.vehicles range_km"),
+  prof("catalogue.travel.congestion", "round.roads"),
   prof("travel.vehicle_types", "round"),
   prof("catalogue.travel.by_cover.*", "round.travel_by_cover"),
   // Skills by use (worlds/generator/skills.ts; docs/behaviour/skills.md), where a town asks for them: the study's rates.

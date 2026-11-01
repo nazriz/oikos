@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { casesStanding, inventory, root, specialCasesLeft } from "./lib/law8";
-import { CONFIG_AUDITS, edgesWithoutNode, farActs, SPACE_INVENTORY, uncarried, unlocated, waysOffNetwork } from "./lib/law9";
+import { CONFIG_AUDITS, edgesWithoutNode, farActs, movesForNothing, SPACE_INVENTORY, uncarried, unlocated, waysOffNetwork } from "./lib/law9";
 
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 const profiles = readdirSync(join(root, "worlds/profiles")).filter((f) => f.endsWith(".json")).map((f) => f.replace(/\.json$/, ""));
@@ -77,6 +77,13 @@ test("it fails, naming the cover, on ground crossed quicker than on foot", () =>
   const c = structuredClone(town("au-vic-2026"));
   c.catalogue.travel = { seconds_per_cell: 18, by_cover: { water: 120, motorway: 1 } };
   expect(waysOffNetwork(c)).toEqual(["motorway: ground crossed quicker than on foot, a way that is no link of the network"]);
+});
+
+test("it fails, naming it, on a vehicle that uses no energy and a way with no capacity", () => {
+  const c = structuredClone(town("au-vic-2026"));
+  c.travel.vehicle_types.push({ id: "glider", seats: 1, speed_kmh: 30 });
+  c.catalogue.structure_types.push({ id: "lane", category: "transport", build_time: 1, footprint: { w: 1, h: 1 }, spaces: [], way: { mode: "road", capacity: 0 } });
+  expect(movesForNothing(c)).toEqual(["glider: a vehicle that uses no energy", "lane: a way with no capacity"]);
 });
 
 test("it fails, naming the file, on a module that moves goods with no carrier, and is quiet on one that names it", () => {

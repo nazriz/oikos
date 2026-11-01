@@ -38,5 +38,16 @@ docs/design/foundations-2.md section 3), step by step. What stands today:
 - **The way out.** The generator joins the street end nearest the town's west edge to a node off the ground by the road
   out (the profile's `round.outside` distance and speed), and every edge's node to it.
 
-Still to come (foundations-2 3.4): , link flows, congestion and a vehicle's
-energy from its holding (S5), several towns (S6).
+- **Flows and congestion** (S5, 2026-11-01). Each way link counts the vehicles that set out on it in the hour, each way
+  (`State.flows`: only the current hour is kept). A driven leg's time is its links' free times raised by what is on them
+  against their capacity (`catalogue.travel.congestion`: the free time times 1 + alpha (on / capacity)^beta, the Bureau
+  of Public Roads' form, in integers), and a link already at capacity this hour takes the vehicle only in the next (it
+  waits the rest of the hour). Routes are the free-flow quickest ones (no re-routing).
+- **Fuel** (S5). A vehicle type may say what it runs on (`fuel`, `fuel_per_100km`, `tank`); its owner's holding of the
+  kind at the vehicle is the tank (a vehicle is a place goods can be). A trip draws its fuel as it sets out, by the metres
+  driven, whole units as the millionths add up (`fuel_owed`), and a tank with too little for the trip leaves the vehicle
+  where it stands and the trip walked (`fuel_used` in the log). Goods go into a vehicle where it stands, or by driving it to
+  where they are: a citizen who owns a vehicle puts what the service station sold them into its tank, as far as it holds,
+  driving there and back.
+
+Still to come (foundations-2 3.4): several towns (S6).

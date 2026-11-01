@@ -1855,6 +1855,19 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     }
   }
 
+  // What a vehicle runs on (law 9, S5): where the town's service stations sell a kind for it (the shops' `transport`), each
+  // kind of vehicle runs on it, a hundred kilometres taking the profile's cost of them at the pump over a unit's price, its
+  // tank the profile's range; each tank half full at the start (the average between fills). Without it, vehicles use nothing
+  // (the backstop names them).
+  const FUEL = (MIX ?? []).find((k) => k.kind === "transport");
+  const vehicleTypes = (VEH?.types ?? []).map((t) => (FUEL && t.fuel_cost_per_100km && t.range_km
+    ? { id: t.id, seats: t.seats, speed_kmh: t.speed_kmh, fuel: FUEL.kind, fuel_per_100km: Math.max(1, Math.round(t.fuel_cost_per_100km / FUEL.price)), tank: Math.max(1, Math.round((Math.max(1, Math.round(t.fuel_cost_per_100km / FUEL.price)) * t.range_km) / 100)) }
+    : { id: t.id, seats: t.seats, speed_kmh: t.speed_kmh }));
+  const tanks = vehicles.flatMap((v) => {
+    const t = vehicleTypes.find((x) => x.id === v.type) as any;
+    return t?.fuel ? [{ kind: t.fuel, holder: v.owner, at: v.id, quantity: String(Math.floor(t.tank / 2)) }] : [];
+  });
+
   // ---- an ordinary day's caseload (docs/behaviour/generator.md; docs/decisions.md, "What the fourth living pilot
   // found"). A town generated with every rent book at nought has no tenancy before its tribunal for months: rent must
   // be owed for the landlord's patience, then the law's notice, then the tribunal's time to answer, before anything
@@ -4015,7 +4028,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         ] : []),
       ]),
       ...(UT ? { counters: [{ id: "greenhouse_gas" }] } : {}),
-      ...(RD ? { travel: { seconds_per_cell: RD.travel_seconds_per_cell, by_cover: { ...RD.travel_by_cover } } } : {}),
+      ...(RD ? { travel: { seconds_per_cell: RD.travel_seconds_per_cell, by_cover: { ...RD.travel_by_cover }, ...(RDS?.congestion ? { congestion: RDS.congestion } : {}) } } : {}),
       ...(HE && ED ? { body_variables: [{ id: "skill", min: 0, max: ED.max_years * SKILL_PER_YEAR, initial: 0 }] } : {}),
       working_day: WORKING_DAY,
       // (The river carries water where there are utilities: fed along its course, flowing downstream, lost along the way.)
@@ -4040,7 +4053,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       places: L ? L.places : [{ id: "town", kind: "town", name: spec.name, area: { x: 0, y: 0, w: spec.grid.w, h: spec.grid.h }, detailed: true }],
       ...(L ? { populations: L.populations, flows: L.flows, ...(V.nature!.spin_up_years ? { nature_spin_up_days: Math.round(V.nature!.spin_up_years * 365) } : {}) } : {}), entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records,
       // The builder's stock at its yard: a house's worth of materials.
-      holdings: [{ kind: "materials", holder: "builder", at: "builder-yard", quantity: String(kg(120)) }, ...factoryStock, ...ownStock, ...(HOST ? HOST.holdings : []),
+      holdings: [{ kind: "materials", holder: "builder", at: "builder-yard", quantity: String(kg(120)) }, ...factoryStock, ...ownStock, ...tanks, ...(HOST ? HOST.holdings : []),
         // (The works' store full, and a fortnight of the town's electricity at the substation, as the town opens.)
         ...(NET ? [{ kind: "water", holder: "water-corp", at: "water-works", quantity: String(NET.storage) }, { kind: "energy", holder: "energy-co", at: "substation", quantity: String(NET.users.reduce((a, u) => a + u.energy_kwh_day, 0) * 14) }] : [])],
       ...(NET || OUT ? { network: { ...(NET?.network ?? { nodes: [] }), nodes: [...(NET?.network.nodes ?? []), ...(OUT?.nodes ?? [])], links: [...(NET?.network.links ?? []), ...(OUT?.links ?? [])] } } : {}),
@@ -4048,7 +4061,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     participants,
     positions,
     templates,
-    ...(VEH && vehicles.length ? { travel: { vehicle_types: VEH.types, vehicles } } : {}),
+    ...(VEH && vehicles.length ? { travel: { vehicle_types: vehicleTypes, vehicles } } : {}),
     // (Heat makes illness likelier where the body is: docs/behaviour/weather.md.)
     ...(spec.life === false ? {} : { life: W && CL && L ? { ...life, illness: { ...(life.illness as object), fields: [...((life.illness as any).fields ?? []), { field: "heat", bps_per_unit: CL.heat_illness_bps_per_unit }] } } : life }),
     caps: { max_created_entities: 50 },

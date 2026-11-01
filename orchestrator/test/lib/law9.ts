@@ -24,7 +24,9 @@ export function unlocated(c: any): string[] {
   }
   const structures = new Set<string>((c.world.structures ?? []).map((s: any) => s.id));
   const edges = new Set<string>(c.world.boundaries ?? []);
-  const placed = (at: unknown) => typeof at === "string" && (structures.has(at) || edges.has(at));
+  // (A vehicle is a place too: its tank, its load, law 9 S5.)
+  const vehicles = new Set<string>((c.travel?.vehicles ?? []).map((v: any) => v.id));
+  const placed = (at: unknown) => typeof at === "string" && (structures.has(at) || edges.has(at) || vehicles.has(at));
   for (const h of c.world.holdings ?? []) if (!placed(h.at)) out.add(`${h.kind} held at ${h.at}, which is no structure or edge`);
   for (const p of c.participants ?? []) if (p.kind === "system" && !placed(p.at)) out.add(`${p.template ?? p.id}: a system with no place (the hardware it runs on held nowhere)`);
   return [...out].sort();
@@ -46,7 +48,16 @@ export function waysOffNetwork(c: any): string[] {
   return Object.entries(t.by_cover ?? {}).filter(([, s]) => (s as number) < t.seconds_per_cell).map(([cover]) => `${cover}: ground crossed quicker than on foot, a way that is no link of the network`).sort();
 }
 
-export const CONFIG_AUDITS: Record<string, (c: any) => string[]> = { unlocated, edgesWithoutNode, waysOffNetwork };
+/** Every kind of vehicle runs on something it holds (law 9, S5: a vehicle's trip draws its energy from its own holding), and
+ * every way says what it carries an hour. Names the vehicle type or the way. */
+export function movesForNothing(c: any): string[] {
+  const out: string[] = [];
+  for (const t of c.travel?.vehicle_types ?? []) if (!t.fuel || !t.fuel_per_100km) out.push(`${t.id}: a vehicle that uses no energy`);
+  for (const t of c.catalogue?.structure_types ?? []) if (t.way && !(t.way.capacity > 0)) out.push(`${t.id}: a way with no capacity`);
+  return out.sort();
+}
+
+export const CONFIG_AUDITS: Record<string, (c: any) => string[]> = { unlocated, edgesWithoutNode, waysOffNetwork, movesForNothing };
 
 // ----------------------------------------------------------------------------------------------------------------- in the modules' sources
 

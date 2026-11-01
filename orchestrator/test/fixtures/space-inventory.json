@@ -4,7 +4,8 @@
     "S1",
     "S2",
     "S3",
-    "S4"
+    "S4",
+    "S5"
   ],
   "found": {
     "unlocated": [
@@ -20,7 +21,11 @@
     "waysOffNetwork": [],
     "uncarried": [],
     "uncarriedMoves": [],
-    "workElsewhere": []
+    "workElsewhere": [],
+    "movesForNothing": [
+      "car: a vehicle that uses no energy",
+      "motorcycle: a vehicle that uses no energy"
+    ]
   },
   "entries": [
     {
