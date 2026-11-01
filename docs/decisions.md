@@ -10094,3 +10094,17 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   the kernel's new paths run only for a template that says what it runs on, and the provider's state carries nothing new.
 - **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
   connection's rate; the placeholders find sources (ME-24).
+
+## 2026-11-01 · Weighing the commute: the rule specified, not yet built (branch `commute-choice`; risk WM-4; no model called)
+
+- **What:** docs/design/commute-choice.md: job and home choices carry the commute's hours (into the mind's
+  `time_hours_per_month`, worth a profile's share of the person's wage) and its money (a vehicle's running cost), with
+  sources; a trip's time is known only from the person's own trips and from going to look (a visit, over the roads).
+- **Why not built:** on `main` the kernel charges a trip's time and tells nobody how long it took, and bodies are not
+  yet in transit (foundations-2 S3, on `f2-s5`). Building the person's knowledge now means a participant-API addition
+  (`Outcome.trip`, seen only by the traveller) that S3 may make unnecessary and would collide with; a contract change is
+  Naz's to sign off. Building the choice without it would be inert, or need a straight-line stand-in, which the brief rules out.
+- **Asked of Naz:** which source of a person's trip time to build on (the outcome's `trip`, or S3's departure and
+  arrival), and the profile figures (`commute_time_bps`, a vehicle's cost a kilometre) per place.
+- **Revisit if:** `f2-s5` lands (then build the rule against what it shows a traveller), or a multi-town run is needed
+  before that.
