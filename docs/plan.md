@@ -93,9 +93,13 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [ ] **Translator rebuild,** once forms settle: about the current size, writing an act constrained by the form's
   grammar; Sonnet only as the safety net, its share reported in every run. Retrain plan: the 2026-10-25 "Translator v3"
   entry in docs/decisions.md.
-- [ ] **Citizen model,** trained from the captured citizen decisions (docs/design/citizen-model.md, docs/citizen-data.md).
+- [x] **Citizen model,** trained from the captured citizen decisions (docs/design/citizen-model.md, docs/citizen-data.md).
   Caveat: trained on code minds' decisions, it inherits their assumptions; it is faster, not an independent check of how
-  people delegate or respond to AI.
+  people delegate or respond to AI. Round 1 landed 2026-11-01: the act head for a want's way (`want-way-r1`, 1.3 points
+  from the code mind's odds on two profiles never seen, every spread and edit check passed, 23 microseconds a
+  decision), an optional citizen mind (`living.citizen_model`, off by default), one command
+  (`bun scripts/citizen-model.ts`). Not yet: the content heads and teachers (design steps 2, 6, 7), which need the
+  renderer and the owner's budget. (It is not faster than the code mind's arithmetic for this decision.)
 
 ## Waiting on the owner
 

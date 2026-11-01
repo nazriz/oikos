@@ -10301,6 +10301,58 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   town with capability to the plain town but for its releases and its tag).
 - **Revisit if:** a study needs capability as a continuous path rather than releases; a scenario's sizes find sources;
   buyers should replace delivered systems as releases come out (that is a buyer's rule, with a real basis, not this).
+## 2026-11-01 · The citizen model, step 1: a model of our own as an optional citizen mind, and its pipeline (docs/design/citizen-model.md steps 2, 3, 5; contract addition `dials.citizen_model`; a world without it is as before, to the byte; no model called)
+
+- **What:** `kernel/crates/actors/src/mind/model.rs`: the input builder (reads the `situation` the mind records with a
+  want decision, less the code mind's own scoring) and the forward pass of a small network that gives each of a want's
+  ways a score; `dials.citizen_model` (`weights`, `sha256`, `share_bps`), read and hash-checked by the engine
+  (`engine.rs` `citizen_model`), carried to every citizen through `WorldInfo`; in `pursue`, the way is drawn from the
+  code mind's exponents blended in log-odds with the model's (`model::blend`), both odds recorded. The trainer
+  (`kernel/crates/citizen-train`) and the pipeline (`scripts/citizen-model.ts`, one command; `towns` makes the code
+  towns of `worlds/citizen-model.yaml`). `Attractions::choose` now draws through `exponents` and `pick`, the same
+  arithmetic in the same order.
+- **Why this way:**
+  - *The want's way first:* it is the design's round 1 (whether to contest, and where), it is the one decision whose
+    situation the capture types fully, and the code mind's odds are recorded with it as targets.
+  - *An MLP over each option, not attention over items:* with the act head only, the options are a handful of kinds,
+    and a scorer applied to each alone keeps order out by construction. Attention over fact and paper items is for the
+    content heads (grounds, evidence), which need step 2's renderer and the teachers first.
+  - *Floats in a fixed order, weights in 1/65,536ths, not int8:* the code mind already computes its logit with IEEE
+    arithmetic and `mind::math::exp`, which is the same on any machine; whole-number weights make the file exactly
+    what runs, and an int8 forward buys speed this decision does not need (a few thousand calls a day in a town of
+    10,000). Revisit if a head runs on every decision.
+  - *Training in Rust, not PyTorch:* the network is small; one thread, a fixed order and `mind::math` make the same
+    data and seed give the same weights anywhere, and the trainer measures the very forward pass a run computes, so
+    no Python reference or bit-identity test is needed. `crates/citizen-train` is outside the determinism lint (as the
+    explorer is): it is not in the world, and a run reads only the file it writes, by its hash.
+  - *The weights by path and hash, read by the engine:* the actors crate may not touch files; inlining the weights in
+    the config would make every person's parameter key carry them. The hash in the config (and so in the log) says
+    which weights ran; a file that differs refuses to run.
+- **Not built:** the content heads (seeks, amount, grounds, evidence, register: step 2's renderer and teachers); the
+  teachers (paid API, the owner's go-ahead); scrambled-record and edit checks against the code mind's own response
+  (the code mind's odds are recorded, not recomputable from a row: the edits are checked for the direction of the code
+  mind's own sways instead); the content and patterns-not-told checks; twins over two years.
+- **Revisit if:** the model's odds are used past round 1 (a head per domain needs its own situation typed); a head runs
+  on every decision (then int8 and batching); the code mind's want weighing changes (retrain: the model learns the
+  code mind as it was when captured, which the data manifest records by source hash).
+## 2026-11-01 · The citizen model, round 1 trained and measured: `want-way-r1` (docs/citizen-data.md, "Round 1"; no model called)
+
+- **What:** 25 code towns made for it (`worlds/citizen-model.yaml`, nine profiles, a year each, captured: runs/citizen-model/towns/)
+  and the pilots' training split; 33,692 want decisions kept (the three held-out test pilots refused whole, decisions
+  with only waiting open left out); five seeds trained; seed 2 chosen. On two profiles never trained on: 1.3 points
+  from the code mind's odds (median), acting at all 67.30% against 67.32%, the spread between people kept (0.98), every
+  edit the code mind's way in every case, 23 microseconds a decision. Retrained, the same file byte for byte. Twins
+  in a town of 1,000: no difference in run time beyond the load's noise; waiting 53.0% against 54.0%.
+- **Why the splits so:** whole towns and whole profiles held out, as 11e asks, so the test says whether it learned the
+  citizen or one town's settings; the held-out pilot says whether seats' towns differ (they do not, here).
+- **What it shows, honestly:** a small net of our own reproduces the code mind's want weighing closely, fast, keeping
+  who people are, and the mechanism is in place for a round that adds teachers or content heads. It shows nothing about
+  real people: it inherits the code mind's placeholder sways (plan caveat). Nor is it faster than the code mind for
+  this decision; its use is as the base the later heads build on.
+- **Revisit if:** the code mind's want weighing changes (retrain from new captures; the manifest records each source's
+  hash); a profile whose parameters differ from all nine shows a larger distance (the model reads no profile parameter
+  directly, e.g. the mind's lambda); the scrambled-record figure (13.8 here) is to be compared with the code mind's own,
+  which needs the code mind run on edited records (a harness of its own).
 ## 2026-11-01 · Compute in the town: what a system runs on, and a host on the town's network (foundations-2 P4 and E5; branch `f2-economy`; contract addition; new kind `firm.host`; a town without `hosting` is as before, to the byte; no model called)
 
 - **What:** the kernel's `runs_on` (foundations-2 4.1, P4): a system's template says the hardware it runs on (a kind, so

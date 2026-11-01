@@ -990,6 +990,17 @@
             }
           }
         },
+        "citizen_model": {
+          "description": "The citizen model (docs/citizen-data.md, \"The citizen model\"): a trained model file of our own giving the odds of each way of going after a want, blended with the code mind's in log-odds (`share_bps` of the way; 10000: its own). The engine reads the file and refuses it unless its SHA-256 is `sha256`. Absent: every citizen decides as the code mind, and the world is as before.",
+          "type": "object",
+          "properties": {
+            "weights": { "description": "The model file's path (as the engine's process sees it).", "type": "string", "minLength": 1 },
+            "sha256": { "description": "The file's SHA-256, lowercase hex.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "share_bps": { "type": "integer", "minimum": 0, "maximum": 10000 }
+          },
+          "required": ["weights", "sha256"],
+          "additionalProperties": false
+        },
         "composer": {
           "description": "The composing model (docs/design/ai-citizens.md 10e; VISION 15, point 7): the words of a founded thing are written by a model asked as an author shown the founder's own record, who may decline. Absent: no model is asked, and every statement of purpose is the plain one code writes. A run plays the composer on the mock unless it is started with the composer for real; either way the mix here is on record.",
           "type": "object",

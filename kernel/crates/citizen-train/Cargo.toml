@@ -1,0 +1,17 @@
+[package]
+name = "oikos-citizen-train"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Trains and evaluates the citizen model (docs/citizen-data.md, \"The citizen model\") from captured citizen decisions. Outside the world: a run reads only the model file it writes, by its hash."
+rust-version = "1.85"
+
+[[bin]]
+name = "oikos-citizen-train"
+path = "src/main.rs"
+
+[dependencies]
+# The model's input builder, forward pass and deterministic arithmetic are the actors crate's own (mind/model.rs,
+# mind/math.rs): training and serving read one thing.
+oikos-actors = { path = "../actors" }
+serde_json = { workspace = true }

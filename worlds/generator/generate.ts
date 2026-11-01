@@ -6,6 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
+import { readFileSync } from "node:fs";
 import { townNetwork } from "./network";
 import { ASSISTANT_ISSUES, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
@@ -323,7 +324,11 @@ export interface TownSpec {
     /** Culture (docs/behaviour/culture.md): people hold a picture of what those around them do and approve of. Off unless set;
      * `true`, or which conducts are live and the sizes (`sway_milli`, `step`). The profile's `culture` figures go with the dial; people are
      * given an origin group only where the profile has `culture.origin` (drawn on a stream of its own). */
-    culture?: boolean | { conducts?: string[]; sway_milli?: number; step?: object } };
+    culture?: boolean | { conducts?: string[]; sway_milli?: number; step?: object };
+    /** The citizen model (docs/citizen-data.md, "The citizen model"): a trained model file of our own that gives the odds of a
+     * want's ways, its odds taking `share_bps` of the way from the code mind's (10,000: its own). Off unless set; carried into the
+     * config's `dials.citizen_model` with the file's SHA-256 (read here when not given; the engine checks it). */
+    citizen_model?: { weights: string; sha256?: string; share_bps?: number } };
   /** Skills that grow with use and fade without it (docs/behaviour/skills.md; foundations-2 E4): off unless set; `true`, at
    * the placeholder rates, or the rates a study sets (a factor of the study, not an assumption). Off: the town as before. */
   skills?: boolean | SkillsSpec;
@@ -521,6 +526,14 @@ function attachmentMeans(O: NonNullable<Profile["values"]["outlook"]>): { place_
   };
   const out = { ...(O.residence ? { place_bps: mean(O.residence, 5)! } : {}), ...(O.job_tenure ? { trade_bps: mean(O.job_tenure, 3)! } : {}) };
   return Object.keys(out).length ? out : undefined;
+}
+
+/** `dials.citizen_model` from a spec's `living.citizen_model`: the file's path as given, its SHA-256 (read from the file when the
+ * spec does not give it), and the share (10,000 unless given). The engine reads the file again and refuses a hash that differs. */
+function citizenModelDial(cm: { weights: string; sha256?: string; share_bps?: number }): { weights: string; sha256: string; share_bps: number } {
+  if (!cm.weights) throw new Error("living.citizen_model: no weights (the model file's path)");
+  const sha256 = cm.sha256 ?? new Bun.CryptoHasher("sha256").update(readFileSync(cm.weights)).digest("hex");
+  return { weights: cm.weights, sha256, share_bps: cm.share_bps ?? 10_000 };
 }
 
 export function generate(described: TownSpec): any {
@@ -839,6 +852,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     ...(CO_SPEC.accounts !== undefined ? { accounts: Number(CO_SPEC.accounts) } : {}) } : undefined;
   const READING = spec.living?.reading ? { ...spec.living.reading } : undefined;
   const CU_SPEC = spec.living?.culture === true ? {} : spec.living?.culture || undefined;
+  const CITIZEN_MODEL = spec.living?.citizen_model ? citizenModelDial(spec.living.citizen_model) : undefined;
   const CU = CU_SPEC ? V.culture : undefined;
   const CULTURE = CU_SPEC ? { ...(CU_SPEC.conducts ? { conducts: CU_SPEC.conducts } : {}), ...(CU_SPEC.sway_milli !== undefined ? { sway_milli: CU_SPEC.sway_milli } : {}), ...(CU_SPEC.step ? { step: CU_SPEC.step } : {}),
     profile: { ...(CU?.conducts ? { conducts: CU.conducts } : {}), ...(CU?.origin?.by_group ? { by_origin: CU.origin.by_group } : {}), ...(CU?.origin ? { homophily_bps: CU.origin.homophily_bps, origin_shares: CU.origin.groups.map((g) => ({ id: g.id, share_bps: g.share_bps })) } : {}) } } : undefined;
@@ -3955,8 +3969,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // (A named town says so: the resolver answers a name a seat knows more than one by `ambiguous`. Not said otherwise.)
     ...(NM ? { names: true } : {}),
     seed: spec.seed,
-    ...(spec.living?.initiative_bps !== undefined || FR || FND || READING || CULTURE ? { dials: { ...(spec.living?.initiative_bps !== undefined ? { initiative_bps: spec.living.initiative_bps } : {}), ...(FR ? { friction_bps: FRICTION_BPS } : {}),
-      ...(FND ? { founding: { shapes: FO_SHAPES, scale_bps: FO_SPEC!.scale_bps ?? 10_000 } } : {}), ...(COMPOSER ? { composer: COMPOSER } : {}), ...(READING ? { reading: READING } : {}), ...(CULTURE ? { culture: CULTURE } : {}) } } : {}),
+    ...(spec.living?.initiative_bps !== undefined || FR || FND || READING || CULTURE || CITIZEN_MODEL ? { dials: { ...(spec.living?.initiative_bps !== undefined ? { initiative_bps: spec.living.initiative_bps } : {}), ...(FR ? { friction_bps: FRICTION_BPS } : {}),
+      ...(FND ? { founding: { shapes: FO_SHAPES, scale_bps: FO_SPEC!.scale_bps ?? 10_000 } } : {}), ...(COMPOSER ? { composer: COMPOSER } : {}), ...(READING ? { reading: READING } : {}), ...(CULTURE ? { culture: CULTURE } : {}), ...(CITIZEN_MODEL ? { citizen_model: CITIZEN_MODEL } : {}) } } : {}),
     clock: { tick_seconds: 3600, run_seconds: spec.years * 365 * DAY },
     log: { checkpoint_every: MONTH, anchor_every_entries: 1000 },
     // Amounts and quantities on the wire are decimal strings (D58); the generator counts in numbers.
