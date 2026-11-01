@@ -10136,3 +10136,16 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   Each tool has a seller of its own (`sellers-<kind>`, a boundary selling by the unit), so a firm's least order of one
   is kept; the world market's least order of a hundred would have refused every order.
 - **Revisit if:** a source gives a tool's saving and price, or its life; shops should weigh tools too.
+## 2026-11-01 · Who could still do the work: a monthly census of practised skills (foundations-2 M8, E6's first part; branch `f2-economy`; log addition; a world with no practised skill writes nothing new; no model called)
+
+- **What:** where a world has practised skills, the kernel censuses them monthly (`skill_census`): for each, how many
+  living people stand in each tenth of its range, read as it stands that day (fading included). `measure/queries/town/skills.sql`
+  lists it (`oikos measure DIR town/skills`): by run, day and skill, the ten counts, the people, the upper half.
+- **Why this way:** M8 asks, for each kind of work, who could still do it and how well, month by month; a person's skill
+  lives in the state, not the log, and a census in the log is what a measure can read (as the counters' is). Ten bands
+  are a count, not a threshold: what a study calls "could still do it" is its own choice, made before an experiment.
+- **Not built:** M7 (what the town gives to AI: the share of its energy, water, land, capital and hours that goes to
+  study-tagged systems and their hosts): it needs the hosts' metered draw read against the town's, and its definition is
+  among the owner's measures (docs/design/gradual-disempowerment.md section 6); "who" by kind of work is by skill, not
+  yet by the kinds of work study-tagged systems do.
+- **Revisit if:** a study needs per-person levels (then the census grows, or a measure reads checkpoints).

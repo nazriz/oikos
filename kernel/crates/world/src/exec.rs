@@ -777,6 +777,20 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             st.schedule(t + 30 * 86_400, Sched::CounterCensus);
             vec![Timed::new(t, EventBody::CounterCensus { counters: st.totals.clone() })]
         }
+        Sched::SkillCensus => {
+            st.schedule(t + 30 * 86_400, Sched::SkillCensus);
+            let mut skills: BTreeMap<Id, Vec<i64>> = BTreeMap::new();
+            for cfg in s.config.catalogue.body_variables.iter().filter(|v| v.practice.is_some() && v.max > v.min) {
+                let mut bands = vec![0i64; 10];
+                for b in st.entities.values().filter_map(|e| e.body.as_ref()).filter(|b| b.alive) {
+                    let v = b.variables.get(&cfg.id).map_or(cfg.initial, |x| crate::state::body_variable_at(cfg, *x, t).0);
+                    let band = ((v - cfg.min) as i128 * 10 / (cfg.max - cfg.min) as i128).clamp(0, 9) as usize;
+                    bands[band] += 1;
+                }
+                skills.insert(cfg.id, bands);
+            }
+            vec![Timed::new(t, EventBody::SkillCensus { skills })]
+        }
         Sched::StructureComplete { structure } => match st.structures.get_mut(&structure) {
             Some(x) if !x.complete && x.completes_at == Some(item.at) => {
                 // Its time is up; it's complete if its building work is done too (phase B), or else as soon as it is.

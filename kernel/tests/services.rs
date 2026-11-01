@@ -404,3 +404,18 @@ fn a_tool_held_for_each_person_at_the_work_makes_it_quicker_and_is_not_used_up()
     assert_eq!(made("1", &["carol"]), (1800, 1), "one machine for carol: half the time, and it is still there");
     assert_eq!(made("0", &["carol"]), (3600, 0));
 }
+
+/// Who could do each kind of work (foundations-2 M8): a monthly census of each practised skill, how many living people in
+/// each tenth of its range; none in a world with no practised skill.
+#[test]
+fn the_practised_skills_are_censused_monthly_and_a_world_without_them_has_no_census() {
+    let mut run = start(&practised_world());
+    let ev = advance(&mut run, 31 * DAY);
+    let census = ev.iter().find_map(|e| match e { EventBody::SkillCensus { skills } => Some(skills.clone()), _ => None }).expect("a census at the month");
+    let craft = &census[&oikos_kernel::blocks::Id::new("craft")];
+    assert_eq!(craft.len(), 10);
+    // (Everyone at the ordinary 5,000, faded a month toward the floor: in the band from 4,000.)
+    assert_eq!(craft[4], craft.iter().sum::<i64>());
+    let mut plain = start(&services_world());
+    assert!(!advance(&mut plain, 31 * DAY).iter().any(|e| matches!(e, EventBody::SkillCensus { .. })));
+}
