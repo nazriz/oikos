@@ -10094,3 +10094,37 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   the kernel's new paths run only for a template that says what it runs on, and the provider's state carries nothing new.
 - **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
   connection's rate; the placeholders find sources (ME-24).
+
+## 2026-11-01 · Main red after foundations-2 S2: own-venture held the owner of a failing business to 150 days
+
+- **What:** CI went red at d0105172 on `own-venture.test.ts`, "someone out of work ... starts a business of one": its
+  owner applied for a job more than 14 days after founding it. Bisected on main: green at 9f30b45e, red from f56d2dbc
+  (the merge of f2-s2: roads as ways of the network, vehicles, trips driven or walked). Main went green again at c46643eb
+  by chance (working calendars moved the draws), so the test was fixed, not left.
+- **Why:** not a broken rule. The business's sales were thin from its third month at both commits (it paid its owner
+  nothing in months three and four at 9f30b45e, and nothing in month three at f56d2dbc); with S2's roads its owner gave it
+  up on day 134 rather than after day 150, by the rule the file's third test holds (a business of one that does not pay
+  its owner a living is given up), and then looked for work, as that rule says. The test asserted no application in the whole 150 days, an
+  outcome of how well the business did.
+- **Change:** the test holds what it means: no application for work while the business trades, from 14 days after its
+  founding until its giving up (the wake that takes its price list down, the closure minutes later), and a closure, if
+  any, is a giving up. Same seed, same horizon; nothing loosened beyond the rule.
+- **And the next test, on main at c46643eb** (E2a's releases and working calendars merged after d0105172): "a business
+  of one that does not pay its owner a living is given up" asked for a job application after the closure. The owner gave
+  up on day 44, then searched the jobs board 65 times (never once while trading), and all four postings in the 105 days
+  went up and were filled between two of their searches (the longest stood three days, while they did not wake): the
+  occasion is the town's, as the test's own comment already said. It now holds the rule: no search of the board (its
+  postings by pay) while the business trades, searches once it is given up, and an application whenever a posting stood
+  at one of them. Seed, horizon and set-up unchanged.
+- **Two more red at c46643eb, from working calendars (gap-weekends; both green at b9601b0b, just before it):**
+  `representation.test.ts`'s six 30-day towns moved, as every town with a support office or tax collector does: pins
+  re-taken (`scripts/fixtures/representation-results.json`, its own commit), the 200-person gb-eng state the same as
+  culture-dial's. `production.test.ts` (Lengnick) held a wind-up's redundancy notices to within an hour of the manager's
+  command to wind up; factory-2's two landed 61 minutes after it, the notices being acts in the manager's time. It now
+  holds what it meant, exactly: each such notice is for an agreement that command gave notice on, and comes after it.
+  These two were missed by gap-weekends' gate: the change reached 65 slow-tier files, so the gate ran the canaries and
+  left the rest to CI, as designed.
+- **Found, not fixed:** the owner founded the same business again two minutes after giving it up (day 134.54, $24,200 of
+  capital): entry by expected profit reads the profile's venture, not what the person just lived through. A behaviour
+  question (does a failed founder try again at once, and how soon?), to settle with a source, not a test.
+- **Revisit if:** a founder's own failure is to weigh in their next venture (ME-1).
