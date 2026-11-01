@@ -225,3 +225,28 @@ test("insideSlot: the engine runs as many threads as the slot's weight, unless t
   expect(insideSlot(3, { OIKOS_SLOT_HELD: undefined }).OIKOS_ENGINE_THREADS).toBe("3");
   expect(insideSlot(1, { OIKOS_SLOT_HELD: undefined, OIKOS_ENGINE_THREADS: "14" }).OIKOS_ENGINE_THREADS).toBe("14");
 });
+
+test("fits, the elastic rule: the load plus young holders' expected use, and memory, both leave room; the merge's and a lone job always start", async () => {
+  const { fits, foldUse, DECLARED } = await import("./slots");
+  const G = 2 ** 30, now = 1_000_000;
+  const r = { cores: 14, load: 4, freeMem: 32 * G, totalMem: 64 * G, now };
+  const held = (n: number, cls?: "build" | "run", since = now - 10_000) => Array.from({ length: n }, () => ({ cls, since }));
+  expect(fits({ weight: 6 }, held(4), r)).toBe(true); // load 4 + 4 just started + 6 <= 14
+  expect(fits({ weight: 7 }, held(4), r)).toBe(false);
+  expect(fits({ weight: 7 }, held(4, undefined, 0), r)).toBe(true); // holders older than a minute are in the load already
+  expect(fits({ weight: 3 }, held(2), { ...r, load: 12 })).toBe(false); // work outside the slots counts, by the load
+  expect(fits({ weight: 3, priority: 1 }, held(14), { ...r, load: 32 })).toBe(true); // the merge keeps its priority
+  expect(fits({ weight: 8 }, [], { ...r, load: 40, freeMem: 0 })).toBe(true); // alone: something always runs
+  // Measured use replaces the declared: builds found to use 2 cores a token leave room for fewer.
+  expect(fits({ weight: 2, cls: "build" }, held(4, "build"), r, { build: { cores: 2, mem: G } })).toBe(false); // 4 + 8 + 4 > 14
+  expect(fits({ weight: 2, cls: "build" }, held(4, "build"), r)).toBe(true); // declared, 1 a token: 4 + 4 + 2
+  // Memory: free less a tenth kept back (6.4 GiB) less what holders younger than a minute are still to grow into.
+  expect(fits({ weight: 1 }, held(2, "run", now - 10_000), { ...r, freeMem: 10 * G })).toBe(true); // 10 - 2 - 1 = 7
+  expect(fits({ weight: 2 }, held(2, "run", now - 10_000), { ...r, freeMem: 10 * G })).toBe(false); // 6 < 6.4
+  expect(fits({ weight: 2 }, held(2, "run", now - 120_000), { ...r, freeMem: 10 * G })).toBe(true); // grown: in the free figure already
+  // The average: the first measure stands, later ones move it by 0.3; a job too short teaches nothing.
+  const a = foldUse(undefined, { cpuMs: 8000, wallMs: 2000, rssBytes: 4 * G }, 2)!;
+  expect(a).toEqual({ cores: 2, mem: 2 * G });
+  expect(foldUse(a, { cpuMs: 0, wallMs: 3000, rssBytes: 0 }, 1)!.cores).toBeCloseTo(1.4);
+  expect(foldUse(DECLARED.run, { cpuMs: 1, wallMs: 1000, rssBytes: 1 }, 1)).toBe(DECLARED.run); // too short to measure
+});

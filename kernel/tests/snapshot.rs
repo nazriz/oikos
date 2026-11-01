@@ -2,7 +2,7 @@
 //! would have (the same log entries byte for byte, the same state hash), on any number of threads, from memory or from
 //! its bytes; forks of one moment are apart from each other from then on, and alike when given the same.
 
-mod common;
+use crate::common;
 
 use oikos_actors::sight::Action;
 use oikos_kernel::engine::{Due, Engine, EngineOptions, Snapshot};

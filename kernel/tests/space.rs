@@ -6,7 +6,7 @@
 //! - **S2:** roads are ways: a trip goes along them at the vehicle's speed (or on foot), a road with a gap is no way
 //!   through, a vehicle is driven only by whoever may and only from where it stands, and stands where it went.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::{EventBody, RefusalCode};

@@ -117,7 +117,9 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - Haiku against Sonnet welfare: a matched pair (same town, same offices) before more Haiku seats.
 - The unbased-figures list (orchestrator/test/figures.test.ts) to shrink as figures are sourced.
 - [x] Borrowing to start a business (ME-1): a founder short of the capital applies to the bank, whose lending office decides by its rules (`gap-me1`); lending against a home and borrowing for premises left.
-- Dev machine: elastic slots, Linux with a hosted nightly, one Rust test program (PL-4).
+- [x] Dev machine: elastic slots, the pool fitting the machine's load, memory and each job class's measured use (PL-4 (1), `elastic-slots`).
+- [x] Dev machine: Linux with a hosted nightly, and one Rust test program (PL-4 (2) and (3); branch `linux`, rebased on main 2026-10-31).
+- Dev machine: a trial of sharding the slow tier on hosted runners (PL-4).
 - The explorer's next steps (PL-2).
 
 ## Done (2026-10-24 to 2026-10-25)
@@ -130,6 +132,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [x] Disk: each worktree's test scratch tidied by the same rule as the runs.
 - [x] Stand-ins removed (debt-generic-2), the run's seed draws who people are (debt-behaviour), guardianship (debt-risks).
 - [x] Deemed refusal of an unanswered review where the law says so (MT-21); bounded public memory (SC-1).
+- [x] Where the law has no deemed refusal (au-vic, gb-eng, us-oh), a complaint of the delay to a body that recommends (MT-21, `complaint_after_days`).
 - [x] Citizen decisions captured in every model run, for the citizen model.
 - [x] Six pilots on the Rust world ($31.86), their faults fixed (lending office's looks, a work site that is not a
   place, names a seat could not use), a returning holder's view shown whole.

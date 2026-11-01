@@ -3,7 +3,7 @@
 //! everything else idle. Each world is the same on one thread and on fourteen, and a shop short of the staff it wants posts a
 //! job through the ordinary staff routine (the stand-in body the lane tested with posts none).
 
-mod common;
+use crate::common;
 
 use oikos_kernel::engine::{run_code_world, EngineOptions};
 use serde_json::{json, Value};
