@@ -190,11 +190,19 @@ pub mod who {
         }
     }
 
+    /// The day the tier last looked (records read that were filed a fortnight before it are counted apart, as old).
+    static TODAY: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+    pub(super) fn set_day(day: i64) {
+        TODAY.store(day, std::sync::atomic::Ordering::Relaxed);
+    }
+
     pub(super) fn count(r: &Record) {
         let kind = match &r.body {
             RecordBody::Statement { kind, .. } => kind.text(),
             b => b.kind_name(),
         };
+        let old = TODAY.load(std::sync::atomic::Ordering::Relaxed) - r.at.div_euclid(86_400) >= 14;
+        let kind = if old { name(&format!("{kind} (old)")) } else { kind };
         let who = READER.with(Cell::get);
         *held(COUNTS.lock()).entry((who, kind)).or_default() += 1;
     }
@@ -443,6 +451,7 @@ impl Tier {
     pub fn pass(&mut self, day: i64) -> std::io::Result<Tally> {
         let Some(file) = self.file.clone() else { return Ok(self.tally) };
         let today = day as i32;
+        who::set_day(day);
         let mut hot = std::mem::take(&mut self.hot);
         hot.append(&mut *held(file.warmed.lock()));
         hot.sort_unstable();

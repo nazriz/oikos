@@ -1110,7 +1110,7 @@ impl Person {
                 if let Some(rate) = self.p.frictions.faulty_by_kind.get(&k).copied().filter(|r| *r > 0) {
                     let since = ((t - self.money.fault_seen) / DAY).min(self.p.shop_every_days).max(0);
                     let oid = order.clone().unwrap_or_default();
-                    if dial > 0 && delivered > 0 && (w.cx.rng(&format!("faulty-{k}-{oid}")).below(1_000_000) as i64) < chance_ppm(rate, since, dial) {
+                    if dial > 0 && delivered > 0 && (w.cx.rng_once(&format!("faulty-{k}-{oid}")).below(1_000_000) as i64) < chance_ppm(rate, since, dial) {
                         let bad = half_up(delivered * self.p.frictions.faulty_share_bps.unwrap_or(2_500), 10_000).max(1);
                         let price = shops(&self.book, &k).iter().find(|x| x.shop == seller).map_or(0, |s| s.price);
                         let facts: BTreeMap<String, Value> = [("delivered".to_string(), json!(delivered)), ("faulty".to_string(), json!(bad)), ("order".to_string(), json!(oid)), ("kind".to_string(), json!(k))].into();
@@ -1144,7 +1144,7 @@ impl Person {
             let since = ((t - self.money.fault_seen) / DAY).min(self.p.shop_every_days).max(0);
             self.money.fault_seen = t;
             let oid = order.clone().unwrap_or_default();
-            if dial > 0 && delivered > 0 && (w.cx.rng(&format!("faulty-{oid}")).below(1_000_000) as i64) < chance_ppm(self.p.frictions.faulty_bps_per_year.unwrap_or(0), since, dial) {
+            if dial > 0 && delivered > 0 && (w.cx.rng_once(&format!("faulty-{oid}")).below(1_000_000) as i64) < chance_ppm(self.p.frictions.faulty_bps_per_year.unwrap_or(0), since, dial) {
                 let bad = half_up(delivered * self.p.frictions.faulty_share_bps.unwrap_or(2_500), 10_000).max(1);
                 let price = price_at(&seller).map_or(0, |s| s.price);
                 self.money.spoiled += bad;

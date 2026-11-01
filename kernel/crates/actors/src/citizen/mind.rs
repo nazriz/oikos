@@ -181,6 +181,8 @@ pub struct Decide {
     pub doubt: Option<i64>,
     /// The stream it draws on (TS `ctx.rng("home")`, `"job"`, `"shop"`...): none, the domain's name.
     pub purpose: Option<String>,
+    /// When the matter the purpose names is over (drawn for only before then: `Cx::rng_until`).
+    pub purpose_ends: Option<i64>,
     /// Bedrooms the household needs, for a home (the decision's circumstances).
     pub bedrooms_needed: Option<u32>,
     /// The decision this one follows up (the citizen's own count, `DecisionRecord.n`).

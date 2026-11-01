@@ -94,6 +94,8 @@ pub struct EngineOptions {
     /// Hold the world's records that nobody reads on disk, in this file (docs/design/tiered-storage.md; the policy from
     /// `OIKOS_COLD_AFTER_DAYS` and `OIKOS_COLD_IDLE_DAYS`). Nothing anyone sees, logs or hashes changes with it.
     pub cold: Option<std::path::PathBuf>,
+    /// When a record is cold, if not as the environment says (`Policy::from_env`): a test moves records out after a day.
+    pub cold_policy: Option<crate::held::Policy>,
 }
 
 /// One act withheld (docs/experiments.md, "Counterfactual forks"; risk MT-19): of the acts carried out from the start of
@@ -204,6 +206,7 @@ impl Default for EngineOptions {
             at_fork: vec![],
             capture_citizens: None,
             cold: None,
+            cold_policy: None,
         }
     }
 }
@@ -623,7 +626,7 @@ impl<W: Write> Engine<W> {
         }
         // (A cold file that can't be made leaves every record in memory, as before: the same results.)
         if let Some(path) = &opts.cold {
-            if let Err(e) = run.tier_records(path, crate::held::Policy::from_env()) {
+            if let Err(e) = run.tier_records(path, opts.cold_policy.unwrap_or_else(crate::held::Policy::from_env)) {
                 eprintln!("the world's records stay in memory: {}: {e}", path.display());
             }
         }

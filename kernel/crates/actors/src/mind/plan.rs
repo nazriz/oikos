@@ -1720,6 +1720,8 @@ impl CitizenMind {
                     satisfied_here: trying.then_some(0),
                     doubt: trying.then_some(10_000),
                     purpose: Some(format!("practice-{}-{start}", r.id)),
+                    // (Decided on only before it begins: at `start` this gathering's matter is over.)
+                    purpose_ends: Some(start),
                     ..Default::default()
                 };
                 let levels = self.need_levels(life, t);

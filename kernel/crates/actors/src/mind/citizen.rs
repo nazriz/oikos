@@ -1339,7 +1339,11 @@ impl CitizenMind {
         let doubt = d.doubt.unwrap_or_else(|| if MONEY_MATTERS.contains(&d.domain.as_str()) { round(self.s.feelings.level(Emotion::Fear, "money", t) as f64 / 2.0) } else { 0 });
         let circ = self.circumstances(life, d.bedrooms_needed);
         let options: Vec<person::Choice> = d.options.iter().map(|c| person::Choice { key: c.key.clone(), facts: c.facts.as_ref().map(facts_in), others: c.others, meaning: c.meaning }).collect();
-        let mut rng = cx.rng(d.purpose.as_deref().unwrap_or(&d.domain));
+        let purpose = d.purpose.as_deref().unwrap_or(&d.domain);
+        let mut rng = match d.purpose_ends {
+            Some(ends) => cx.rng_until(purpose, ends),
+            None => cx.rng(purpose),
+        };
         let ask = person::Ask { options, current: d.current.clone(), levels, circ: circ.clone(), satisfied_here: d.satisfied_here, doubt: Some(doubt) };
         let got = self.s.mind.decide(&d.domain, &mut rng, &ask);
         cx.drew(&rng);
