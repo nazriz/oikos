@@ -1963,7 +1963,11 @@ impl<'a> Exec<'a> {
                 if !(1..=MAX_MONEY).contains(quantity) {
                     return Err(refuse(RefusalCode::Overflow, "quantity out of range"));
                 }
-                if !self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(&me))) {
+                // (Law 9: an act that takes the taker somewhere, as taking goods home does, set them out when it began; when it is
+                // done they were there if their way set out from it or went by it, as a carrier's is read for `move_goods`.)
+                let here = self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(&me)));
+                let went = self.started && self.st.transit.get(me.as_str()).is_some_and(|t| t.from == at || t.via.contains(&at));
+                if !here && !went {
                     return Err(refuse(RefusalCode::NotPresent, format!("{me} isn't at {at}")));
                 }
                 let have = self.st.holding(&from, &at, kind);

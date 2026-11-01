@@ -10570,3 +10570,20 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   scratch script `orchestrator/p-tmp.ts` the branch carried is removed.
 - **Revisit if:** the slow tier passes 1,500 s on the Mini, or merges wait on it; then the twin files and the elections'
   towns first, as the entry above says, before any raise.
+
+## 2026-11-02 · Taking from work under law 9: the taker was there if their way set out from it (landing `f2-s4`; kernel fix; no model called)
+
+- **Found:** at the landing of `f2-s4`, `orchestrator/test/hazards.test.ts` ("taking from work, found at a stocktake, ...")
+  had no takings at all (0 against more than 5), on the branch alone as on the tree merged with main. The citizen's theft is
+  one act: `take` at work, then the goods carried home (`move_goods`, `carried`). Law 9 (S4) sets the carrier out on its
+  way when the act begins and applies the act's blocks when it is done; `move_goods` reads the carrier's trip (it went by
+  both places), but `take` still asked that the taker be in the building at the end, where by then they were on the road.
+  Every such act was refused `not_present`.
+- **Change:** `Block::Take` (kernel/crates/world/src/exec.rs) counts the taker present at the act's end if their way set out
+  from the building or went by it (`started`, and their transit's `from` or `via`), as `move_goods` reads a carrier. A
+  take with no trip is checked as before. Not loosened: someone who was never there still cannot take.
+- **And:** the participants' world words gained `not_carried` (the kernel's words had it; `render.test.ts` holds that every
+  refusal has world words). With the fix in, the representation towns' pins moved (a taking in the month where a
+  carried theft had been refused) and were re-taken; culture-dial's did not move.
+- **Revisit if:** an act's trip should be tied to that act alone (f2-s5 adds `Exec.act`: then `tr.act` is the check), or
+  takings come to be acts of their own before the trip home.
