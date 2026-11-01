@@ -1,9 +1,9 @@
 // The two tiers of the suite (scripts/test-tiers.json, docs/dev-machine.md): every test file is in exactly one; the
 // slow tier is named file by file with why; the backstops are in the gate; the gate's files stay short; and CI runs
-// both tiers on every push to main and nightly, so every assertion still runs somewhere.
+// both tiers on every push to main and nightly, so every assertion still runs somewhere (and nightly on Linux too).
 
 import { expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const repo = join(import.meta.dir, "..");
@@ -65,4 +65,20 @@ test("CI runs both tiers on every push to main and nightly", () => {
   expect(ci).toMatch(/schedule:/);
   expect(ci).toMatch(/bun scripts\/test\.ts --tier gate/);
   expect(ci).toMatch(/bun scripts\/test\.ts --tier slow/);
+});
+
+// The repository is public: a workflow on the self-hosted runner (the run server) never runs on a pull request, whose
+// code may be a stranger's. The nightly Linux job (PL-4) runs both tiers on a hosted machine with no secrets.
+test("the self-hosted runner takes no pull request; the hosted Linux job runs both tiers and holds no secrets", () => {
+  const dir = join(repo, ".github/workflows");
+  for (const f of readdirSync(dir).filter((f) => /\.ya?ml$/.test(f))) {
+    const w = readFileSync(join(dir, f), "utf8");
+    if (/runs-on:.*self-hosted/.test(w)) expect({ f, pr: /^\s*pull_request(_target)?\s*:/m.test(w) }).toEqual({ f, pr: false });
+  }
+  const linux = readFileSync(join(dir, "linux.yml"), "utf8");
+  expect(linux).toMatch(/runs-on: ubuntu-latest/);
+  expect(linux).toMatch(/schedule:/);
+  expect(linux).not.toMatch(/secrets\.|pull_request/);
+  expect(linux).toMatch(/bun scripts\/test\.ts --tier gate/);
+  expect(linux).toMatch(/bun scripts\/test\.ts --tier slow/);
 });

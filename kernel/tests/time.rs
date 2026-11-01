@@ -2,7 +2,7 @@
 //! thinking; a person does one thing at a time, in whatever capacity; a system as many at once as it has lanes; and an
 //! act takes effect when it's done, not when it's begun.
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};

@@ -2,7 +2,7 @@
 //! exported back byte for byte; snapshots among them that a fork carries on from, its own log naming its parent; the
 //! stream handing on every entry as it is written.
 
-mod common;
+use crate::common;
 
 use oikos_actors::sight::Action;
 use oikos_kernel::blog::{self, About, BinLog};
