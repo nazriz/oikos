@@ -1285,6 +1285,9 @@ impl CellCosts {
         self.seconds[(dy * self.w + dx) as usize]
     }
 }
+/// How many trips worked out are kept at most (`GroundCache::put`).
+const TRIPS_KEPT: usize = 1 << 20;
+
 impl GroundCache {
     /// The ground has changed: every trip is worked out afresh.
     pub fn changed(&mut self) {
@@ -1296,6 +1299,17 @@ impl GroundCache {
     }
     pub fn put(&self, from: &str, to: &str, speed: i64, seconds: i64) {
         if let Ok(mut trips) = self.trips.lock() {
+            // (Bounded: the pairs of places a long run's people go between grow with it, SC-6. Past the bound the
+            // trips of an earlier ground go, then all: they are worked out again when wanted, the same.)
+            if trips.len() >= TRIPS_KEPT {
+                let stale: Vec<(Id, Id, i64)> = trips.iter().filter(|(_, (e, _))| *e != self.epoch).map(|(k, _)| *k).collect();
+                for k in stale {
+                    trips.remove(&k);
+                }
+                if trips.len() >= TRIPS_KEPT {
+                    *trips = Default::default();
+                }
+            }
             trips.insert((Id::new(from), Id::new(to), speed), (self.epoch, seconds));
         }
     }
