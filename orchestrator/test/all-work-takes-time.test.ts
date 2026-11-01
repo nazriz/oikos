@@ -99,6 +99,15 @@ export function systemsWithoutHours(c: any): string[] {
   return (c.templates ?? []).filter((t: any) => t.kind === "system" && !(t.hours?.seconds > 0)).map((t: any) => `${t.id}: a system with no hours`);
 }
 
+/** Law 10: a desk of people (a system that decides, with its own seconds for it, in a working day shorter than the whole day: a
+ * machine's runs all day) works a working calendar, its hours closed on the place's days of rest, never every day of the week.
+ * Names the template. */
+export function desksWithoutCalendar(c: any): string[] {
+  const kinds = new Set(decisionKinds(c));
+  return (c.templates ?? []).filter((t: any) => t.kind === "system" && t.hours?.seconds < 86_400 && (t.does ?? []).some((r: any) => r.block === "publish" && kinds.has(r.kind) && r.seconds > 0))
+    .filter((t: any) => !(t.hours?.closed?.weekdays?.length > 0)).map((t: any) => `${t.id}: a desk that decides works every day of the week`);
+}
+
 /** Law 2: every kind of paper a form writes takes a person time: the row for what it makes, else the block's (never none). Names the form. */
 export function unpricedPapers(c: any): string[] {
   const table = c.orchestration?.act_time?.person ?? {};
@@ -168,6 +177,7 @@ test("every profile's town, as code and with every office a model's, has no free
     expect(dialsHanded(c), `${profile} (${how}): throughput, delay or error set directly`).toEqual([]);
     expect(decisionsAtTheSystemsSecond(c), `${profile} (${how}): decisions at a computer's second`).toEqual([]);
     expect(systemsWithoutHours(c), `${profile} (${how}): systems with no hours`).toEqual([]);
+    expect(desksWithoutCalendar(c), `${profile} (${how}): desks with no working calendar`).toEqual([]);
   }
 }, 600_000);
 
@@ -236,7 +246,7 @@ test("it fails, naming the row, on work with no time: a block nobody priced, a r
   expect(unpricedPapers(c).some((x) => x.startsWith(`${form.id}: the paper it writes (${form.data.writes.kind}) takes no time`))).toBe(true);
 });
 
-test("it fails, naming the template, on a system's capacity left unsaid: a decision at the system's second, a system with no hours, a row of its own with no source (law 10)", () => {
+test("it fails, naming the template, on a system's capacity left unsaid: a decision at the system's second, a system with no hours, a desk with no working calendar, a row of its own with no source (law 10)", () => {
   const base = living("au-vic-2026");
   expect(decisionKinds(base)).toContain("benefit_decision");
   // The support office's casework desk, its decision's own seconds taken away: it would decide at the world's second for systems.
@@ -249,6 +259,10 @@ test("it fails, naming the template, on a system's capacity left unsaid: a decis
   const machine = c.templates.find((t: any) => t.kind === "system" && t.id !== desk.id)!;
   delete machine.hours;
   expect(systemsWithoutHours(c)).toEqual([`${machine.id}: a system with no hours`]);
+  // A desk that decides with no working calendar: its officers would work every day of the week.
+  c = structuredClone(base);
+  delete c.templates.find((t: any) => t.id === desk.id).hours.closed;
+  expect(desksWithoutCalendar(c)).toEqual([`${desk.id}: a desk that decides works every day of the week`]);
   // A row of its own whose figure says nothing of where it is from.
   c = structuredClone(base);
   delete c.orchestration.act_time.sources[`template.${desk.id}.publish/benefit_decision`];

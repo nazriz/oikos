@@ -239,3 +239,27 @@ test("capability: releases are kinds of system released on their days, sold newe
   expect(strip(on)).toBe(strip(plain));
   expect(() => generate({ ...spec, capability: { ...cap, of: ["a-machine-nobody-sells"] } })).toThrow(/no offer/);
 });
+
+// A host in the town (docs/behaviour/hosting.md): the assistants' systems run on its servers, in its building on the
+// town's network; what comes in is held there for the work, and the providers pay its fee. Absent: abroad, as before.
+test("hosting: the assistants' systems run at a host on the town's network, which the providers pay", () => {
+  const on = generate({ ...spec, assistants: true, hosting: "local" }) as any;
+  const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });
+  for (const f of ["common", "blocks", "records", "world-config", "participant-api", "log"]) ajv.addSchema(JSON.parse(readFileSync(join(root, `contracts/${f}.schema.json`), "utf8")));
+  expect(ajv.getSchema("urn:oikos:contracts:0.8:world-config")!(on)).toBe(true);
+  const conns = on.world.connections.filter((c: any) => c.holder === "host");
+  expect(conns.map((c: any) => c.kind).sort()).toEqual(["energy", "wastewater", "water"]);
+  expect(conns.every((c: any) => c.uses === undefined && c.at === "data-centre")).toBe(true);
+  // Every provider's kind of system runs there, and the systems there at the start fit its servers.
+  const hosted = on.templates.filter((t: any) => t.runs_on);
+  expect(hosted.length).toBe(on.templates.filter((t: any) => t.supplier?.startsWith("provider-")).length);
+  const servers = Number(on.world.holdings.find((h: any) => h.holder === "host" && h.kind === "hardware").quantity);
+  expect(on.participants.filter((p: any) => hosted.some((t: any) => t.id === p.template)).length).toBeLessThanOrEqual(servers);
+  const fees = on.positions.filter((p: any) => p.role_module?.code === "firm.provider").map((p: any) => p.role_module.params.hosting);
+  expect(fees.length).toBeGreaterThan(0);
+  expect(fees.every((f: any) => f.account === "acc-host" && f.fee_month > 0)).toBe(true);
+  // Absent, abroad: nothing of it.
+  const abroad = JSON.stringify(generate({ ...spec, assistants: true }));
+  expect(/data-centre|runs_on|"firm\.host"/.test(abroad)).toBe(false);
+  expect(() => generate({ ...spec, hosting: "local" })).toThrow(/assistants/);
+});

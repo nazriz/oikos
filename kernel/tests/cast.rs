@@ -4,7 +4,7 @@
 //! and change hands, only by the organisation's own act. Nothing here is a
 //! game rule: no spawning, no automatic succession, no health meter.
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};

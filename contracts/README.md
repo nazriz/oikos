@@ -602,7 +602,7 @@ No schema changes: the kernel and the JSON Schemas are as they were. What change
 
 - **Breaking, statements (a kind renamed):** **`remedy_request` is now `review_request`**: the one request every grievance has (put this right, look at this again), whether it is about a bill, a repair, a short pay or a decision of an office. `remedy_answer` is unchanged. Logs made before this change hold `remedy_request`; they replay on a build of their version, and a measure query that reads the kind reads the new one (`measure/queries/town/frictions.sql`).
 - **Additive, statements:** `decision_review` (an office's record that it looked at one of its decisions again: `decision`, `kind`, `request`, `outcome` `changed` / `upheld` / `out_of_time`, `found`, `asked_by`, `decided_on`; who and when are the record's own author and time); `evidence_request` (an office to a claimant: `claim`, `need`, `what`, `by`) and `evidence` (the claimant's papers: `claim`, `need`, `request`); `confirmation_request` (an office to an employer: `claim`, `need`, `what`, `by`, `about` the worker) and `confirmation_answer` (`claim`, `need`, `request`, `subject`, `employed`, `known`, `ended_on`). A `benefit_decision` made on a second look carries `on_review` (the request) and `replaces` (the refusal); a `permit_decision` on a second look the same. A `remedy_answer` to a review carries `review` (the outcome) and `decision`.
-- **Additive, laws:** a `law` statement may carry **`data.decisions`**: a list of rules, each for a kind of decision (and, where it differs by payment, for named `payments`): `needs` (`id`, `from` `claimant` or `employer`, `what`, `within_days`, `else` `refuse` or `decide`), `review` (`within_days`, `grounds`, `required`, and since 2026-10-24 `deemed_refused_days`: a review asked for and not answered within so many days is taken as refused and the appeal runs from then, where the law says so; MT-21), `appeal` (`matter`, `within_days`, `grounds`, `fee` in the smallest unit), `refused_by` (`office-holder` or `staff`). The generator writes it as `law-decisions` from each profile's `values.decisions` (with sources). A procedure `proc-payments` carries **`data.approval`** (`by`: the post whose written approval a payment over `over` needs; `over` in cents); the law on possession's `data.enforced_by` (already there) is what the citizen reads for who carries out a removal. Participant parameters gone: `city.finance_officer`'s `approval_over` and `mayor_position`.
+- **Additive, laws:** a `law` statement may carry **`data.decisions`**: a list of rules, each for a kind of decision (and, where it differs by payment, for named `payments`): `needs` (`id`, `from` `claimant` or `employer`, `what`, `within_days`, `else` `refuse` or `decide`), `review` (`within_days`, `grounds`, `required`, and since 2026-10-24 `deemed_refused_days`: a review asked for and not answered within so many days is taken as refused and the appeal runs from then, where the law says so; MT-21; and since 2026-10-31 `complaint_after_days`, **proposed, for sign-off**: where the law has no deemed refusal, a review not answered within so many days may be complained of to a body that hears the matter and only recommends; no appeal follows), `appeal` (`matter`, `within_days`, `grounds`, `fee` in the smallest unit), `refused_by` (`office-holder` or `staff`). The generator writes it as `law-decisions` from each profile's `values.decisions` (with sources). A procedure `proc-payments` carries **`data.approval`** (`by`: the post whose written approval a payment over `over` needs; `over` in cents); the law on possession's `data.enforced_by` (already there) is what the citizen reads for who carries out a removal. Participant parameters gone: `city.finance_officer`'s `approval_over` and `mayor_position`.
 - **Additive, participant parameters (not contracts):** a body's `hears` entry may carry `fee` (what applying about that matter costs, where it differs from the body's): `office.desk` and `tribunal.member` publish one notice of what they hear for each fee.
 - **Breaking, replay:** the state hashes of every generated town move (the support office asks for papers before it decides; reviews are decisions; the appeal fee for a refused claim is the law's). Logs made before this change replay only on a build of their version.
 
@@ -735,6 +735,16 @@ Additive only; no schema file changed. A log made before is a valid log.
 - **Task `collects`** (`{kind, per_unit}`): a unit takes up to so much of a kind held at the structure worked on, never more than is there (C4: the works' round). **Variables' `per_occupant_per_day` is refused at load** (`stock_as_variable`), as is a variable with a kind's name (C4).
 - **World config: `world.scarce`** (`edge`, `kind`, `quantity`, `every`): a scarce kind at an edge; a `move_goods` from the edge's outside beyond it is refused **`beyond_supply`** (C6).
 
+## Working calendars (2026-10-31; plan gap "Systems keep the same hours every day"; docs/decisions.md, "Working calendars"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- **World config: a template's `hours.closed`** (`weekdays`: days of the world's week, day d of the run being the week's
+  day d mod 7, at least one left open; `days`: days of the run, holidays, from 0): the days its window does not open.
+  Work not done by a window's end goes on at the next open day's opening. Refused at load if every day of the week is
+  closed. Absent: every day is a working day, as before.
+- **Generator:** the support agency's casework desk (`agency-casework`) works the place's working week, closed on its
+  days of rest and its public holidays (the profile's `calendar.weekend` and `calendar.holidays`), so an officer's day is
+  a working day's and not a seventh of the week spread over seven.
+- **Breaking, replay:** the state hashes of every generated town with a support office move.
 ## Delegation: assistants as services (2026-10-31; docs/design/delegation.md; docs/decisions.md, "Delegation D1 to D3"; under the owner's blanket approval of contract changes, 2026-10-11, and his approval of the delegation capabilities, 2026-10-31)
 
 Additive; no hard rule touched; nothing changes for a world that has no providers.
@@ -768,3 +778,11 @@ Additive; no hard rule touched; nothing changes for a world whose templates stat
   (`unknown_template`). Absent: from the start.
 - **`meta` takes `study_tags`** (tag to template ids): what a study counts as one technology, for measurement only. No
   code of the world reads it (`orchestrator/test/generality.test.ts`), and no participant is shown `meta`.
+
+## What a system runs on (2026-11-01; docs/design/foundations-2.md 4.1, P4, and 7.3, step E5; docs/behaviour/hosting.md; docs/decisions.md, "Compute in the town"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing changes for a world whose templates say nothing of what they run on.
+
+- **A template takes `runs_on`** (`hardware`, `per_lane`, `holder`, `at`, `hour`): a system from it is delivered only
+  where the hardware held covers its lanes beside those already there, and each whole hour of its work is the task
+  `hour` at its host (inputs from the holder's holding, refused if short: `insufficient_quantity`).

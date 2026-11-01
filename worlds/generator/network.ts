@@ -32,6 +32,8 @@ export interface User {
   at: string;
   water_l_day: number;
   energy_kwh_day: number;
+  /** What is delivered is held there for its own processes to use (a works, a data centre), not used as it comes. */
+  store?: boolean;
 }
 
 export interface Site {
@@ -107,8 +109,8 @@ export function townNetwork(opts: { structures: { id: string; at: string }[]; ho
   const connections: any[] = [];
   users.forEach((u, i) => {
     const tag = `${u.holder}-${u.at}`.replace(/[^a-z0-9_-]/g, "-").slice(0, 50);
-    connections.push({ id: `w-${tag}`, kind: "water", node: `n-${u.at}`, holder: u.holder, at: u.at, rate: Math.round(u.water_l_day), uses: "use_water" });
-    connections.push({ id: `e-${tag}`, kind: "energy", node: `n-${u.at}`, holder: u.holder, at: u.at, rate: Math.round(u.energy_kwh_day), uses: "use_energy", meter: "remote" });
+    connections.push({ id: `w-${tag}`, kind: "water", node: `n-${u.at}`, holder: u.holder, at: u.at, rate: Math.round(u.water_l_day), ...(u.store ? {} : { uses: "use_water" }) });
+    connections.push({ id: `e-${tag}`, kind: "energy", node: `n-${u.at}`, holder: u.holder, at: u.at, rate: Math.round(u.energy_kwh_day), ...(u.store ? {} : { uses: "use_energy" }), meter: "remote" });
     connections.push({ id: `s-${tag}`, kind: "wastewater", node: `n-${u.at}`, holder: u.holder, at: u.at, rate: 1_000_000 });
     void i;
   });

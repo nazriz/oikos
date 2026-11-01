@@ -4,7 +4,7 @@
 //!   2. Everything the kernel emits (every log entry, every observation)
 //!      validates against the JSON Schemas in contracts/.
 
-mod common;
+use crate::common;
 
 use common::*;
 use proptest::prelude::*;

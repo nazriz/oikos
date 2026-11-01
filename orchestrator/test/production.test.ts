@@ -229,12 +229,14 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // the export slump). A count here would hold the town to an outcome; what is held is that someone goes, that every
   // redundancy the factories give is for one of the rule's two reasons, and that making stops at the band's top.)
   const given = e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && factoryJobs.has(e.record.agreement) && String(e.record.text).startsWith("Redundancy"));
-  // Every notice of redundancy a factory gives is for one of three reasons, and a notice of the third (the business wound up) follows a command
-  // of that factory's manager to wind up, at the same moment: never one without it.
+  // Every notice of redundancy a factory gives is for one of three reasons, and a notice of the third (the business wound up) is one its
+  // manager's command to wind up gave: never one without it. (Held by the notice's agreement in that command since 2026-11-01, "Main red
+  // after foundations-2 S2" in docs/decisions.md, where it was "within the hour after": the notices are acts in the manager's time and
+  // land when they are done; on main at c46643eb factory-2's two landed 61 minutes after the command.)
   const windUpNotices = given.filter((n) => n.record.text === "Redundancy: the business is being wound up.");
   expect(given.length - windUpNotices.length).toBe(letGo.length + cashLetGo.length);
   for (const n of given) expect(["Redundancy: we're making more than we sell.", "Redundancy: we can't cover the wage bill.", "Redundancy: the business is being wound up."]).toContain(n.record.text);
-  for (const n of windUpNotices) expect(windUp.some((c) => c.as === `${n.record.as}-manager` && c.t <= n.t && n.t - c.t <= 3_600)).toBe(true);
+  for (const n of windUpNotices) expect(windUp.some((c) => c.as === `${n.record.as}-manager` && c.t <= n.t && c.blocks?.some((b: any) => b.block === "give_notice" && b.agreement === n.record.agreement))).toBe(true);
   void quit;
   // The rule's own two reasons, held in a run where it lays off (seed 2: factory-2 cannot cover its wages and lets two go, then is wound up):
   // every notice of a factory is for one of the three, and those by the rule are as many as the manager's commands for them.

@@ -3,7 +3,7 @@
 //! here: no test that anything illegal is refused, because the kernel doesn't
 //! know the law (D19).
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};

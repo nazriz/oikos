@@ -5,7 +5,7 @@
 //! dead person's order and settles their estate. (The rules, case by case, are the unit tests in
 //! `crates/actors/src/finance/bank.rs`.)
 
-mod common;
+use crate::common;
 
 use oikos_actors::sight::Action;
 use oikos_kernel::engine::{run_code_world, Due, Engine, EngineOptions};

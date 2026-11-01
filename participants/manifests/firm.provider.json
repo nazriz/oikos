@@ -29,6 +29,12 @@
       "source": "placeholder",
       "unit": "days"
     },
+    "hosting": {
+      "schema": {
+        "type": "object"
+      },
+      "source": "the world gives it (no default): where its systems run in the town, the host's account and fee a month"
+    },
     "offers": {
       "default": [],
       "schema": {

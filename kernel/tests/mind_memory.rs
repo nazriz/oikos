@@ -6,7 +6,7 @@
 //! - Held always: in three profiles' generated towns, every person's shared readings are what that person would have
 //!   read of all their params alone (so leaving their own members out of what is shared, and sharing it, changed nothing
 //!   anyone reads), and people given the same params but their own share one reading.
-//! - The proof of the change, run by hand (`cargo test --test mind_memory -- --ignored`): a living town of each of the
+//! - The proof of the change, run by hand (`cargo test --test main mind_memory:: -- --ignored`): a living town of each of the
 //!   three profiles runs a month to the state hash and the log main did before the change (main at 2e3f6277). These are
 //!   pins, which catch any change to what a town does (docs/testing.md, "Change detectors"), so they are not run with
 //!   the others: culture-dial.test.ts is the one alarm kept. The 1,000- and 10,000-person towns were checked the same

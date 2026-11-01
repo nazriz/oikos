@@ -77,8 +77,10 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
     `meta.study_tags` for measurement only, with a backstop that no world code reads it.
   - [ ] E2b. Technologies that are goods (machines, hardware a firm holds, `runs_on`'s energy and water), with E5.
   - [ ] E3. Firms enter any industry by expected profit, capital-heavy ones included.
-  - [ ] E5. Compute competing for energy, water and land through laws 8 and 9 (a hosting industry's recipe); first,
-    workplaces on the network with their energy and water by industry (WM-15).
+  - [x] E5. Compute competing for energy, water and land: what a system runs on, in the kernel (P4: hardware held
+    somewhere, each hour of work drawing its recipe there, refused without power), and a host in the town where a study
+    asks (`hosting: "local"`), on the feeders and the main with the homes (docs/behaviour/hosting.md; risk ME-24).
+  - [ ] WM-15. Every other workplace on the network, with its energy and water by industry (risk WM-15).
   - [ ] E6. The measures M7 (what the town gives to AI) and M8 (who can still do the work); the tag's backstop.
 - [ ] **Foundations-2, phase 5:** strict modes on, old exception lists empty, each law's line in CLAUDE.md as its
   enforcement lands.
@@ -104,17 +106,19 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 ## Gaps in the register, to pick up when they matter (each names its entry in docs/risks.md where it has one)
 
 - Commercial leases: no remedy for unpaid rent, no early exit, no rent reviews (docs/behaviour/leasing.md).
-- Systems keep the same hours every day (no weekends).
+- [x] Systems keep the same hours every day (no weekends): desks of officers keep the place's working calendar, its days of rest and public holidays from the profile (`gap-weekends`).
 - [x] A seat cannot yet be a non-resident agency officer (WM-14): a seat in the support office shares the body of an officer who lives outside the town (`gap-wm14`).
 - [x] A taxpayer account to reclaim an overpayment from (PB-23): the tax collector keeps it (`taxpayer-accounts`, d3eb2bf3, cedc1903); its figures are still placeholders, so PB-23 stays open as mitigated.
 - [x] Candidacy: a field of 19 for about 118 votes (PB-10): traced (`gap-pb10`): the test's own 10% chance of standing, five times the profile's; the fault left is that the field grows with the electorate (a mechanism to the owner: decisions "Candidacy: the field of 19 traced").
-- One day's crew paperwork ran in series, cause untraced (MT-23).
+- [x] One day's crew paperwork ran in series (MT-23): the seat held until each order began, fixed by foundations-2 P1; the seat-diary measure now reads the work's own times.
 - [x] A model steward in a fork is a pilot's seat (MT-22): told what was not taken, the cast followed, thinking in world time, composer and exit accounts; resuming a fork part-way left open.
 - Three tests still pinned to one seed (production, entry, own-venture); two near-duplicate twin cases kept.
 - Haiku against Sonnet welfare: a matched pair (same town, same offices) before more Haiku seats.
 - The unbased-figures list (orchestrator/test/figures.test.ts) to shrink as figures are sourced.
 - [x] Borrowing to start a business (ME-1): a founder short of the capital applies to the bank, whose lending office decides by its rules (`gap-me1`); lending against a home and borrowing for premises left.
-- Dev machine: elastic slots, Linux with a hosted nightly, one Rust test program (PL-4).
+- [x] Dev machine: elastic slots, the pool fitting the machine's load, memory and each job class's measured use (PL-4 (1), `elastic-slots`).
+- [x] Dev machine: Linux with a hosted nightly, and one Rust test program (PL-4 (2) and (3); branch `linux`, rebased on main 2026-10-31).
+- Dev machine: a trial of sharding the slow tier on hosted runners (PL-4).
 - The explorer's next steps (PL-2).
 
 ## Done (2026-10-24 to 2026-10-25)
@@ -127,6 +131,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [x] Disk: each worktree's test scratch tidied by the same rule as the runs.
 - [x] Stand-ins removed (debt-generic-2), the run's seed draws who people are (debt-behaviour), guardianship (debt-risks).
 - [x] Deemed refusal of an unanswered review where the law says so (MT-21); bounded public memory (SC-1).
+- [x] Where the law has no deemed refusal (au-vic, gb-eng, us-oh), a complaint of the delay to a body that recommends (MT-21, `complaint_after_days`).
 - [x] Citizen decisions captured in every model run, for the citizen model.
 - [x] Six pilots on the Rust world ($31.86), their faults fixed (lending office's looks, a work site that is not a
   place, names a seat could not use), a returning holder's view shown whole.

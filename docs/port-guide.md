@@ -119,7 +119,7 @@ the test asserts the behaviour instead.
 
 ## 4. Testing a module alone
 
-- **Rust tests** (`kernel/tests/<lane>_*.rs`, `cargo test --test <file>`): start from a world config (a small
+- **Rust tests** (`kernel/tests/<lane>_*.rs`, each a module of `kernel/tests/main.rs`: `cargo test --test main <file>::`): start from a world config (a small
   hand-written one, `common::riverbend()`, or a generated town written to JSON by a TS helper), point the participants
   under test at your kind, and run `engine::run_code_world` with `EngineOptions { stand_in: Some("idle".into()), .. }`
   so every kind not yet ported stands idle. Read the log (`Engine::into_log`) and assert on records, events and acts.

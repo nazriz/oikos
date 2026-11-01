@@ -3,7 +3,9 @@
 // the appeal's days ran from the answer, and none came. Where the place's law takes a review left unanswered as
 // refused after so many days (Lower Saxony's: an objection not decided in three months may be taken to the social
 // court, SGG s 88(2)), the claimant may now appeal from then; where it has no such rule (England's mandatory
-// reconsideration), silence is still only silence. The office's answers are withheld for the whole run (the engine's
+// reconsideration, Victoria's authorised review), there is still no appeal, but the delay may be complained of to a
+// body that recommends (the Independent Case Examiner, the Commonwealth Ombudsman: the town's ombudsman desk) once the
+// law's days have run (`complaint_after_days`). The office's answers are withheld for the whole run (the engine's
 // `withhold`: it looks at each request and believes it answered, and decides afresh where it found the refusal wrong;
 // nothing of either reaches the claimant). No model is called.
 
@@ -54,11 +56,11 @@ async function town(profile: string, days: number) {
   return { asked, answered, appeals, rejected: rejected.filter((r) => appeals.some((a) => r.data?.application === a.id || r.basis === a.id)), weighed: weighed.filter(after) };
 }
 
-test.skipIf(!have)("a review never answered is taken as refused where the place's law says so, and the claimant may appeal from then; where the law has no such rule, nobody can", async () => {
-  const [de, gb] = await Promise.all([town("de-ni-2026", 330), town("gb-eng-2026", 330)]);
-  const open = (x: typeof de, early: boolean) => x.weighed.filter((v) => v.venue && (v.t - x.asked.get(v.who)! < 91 * DAY) === early);
-  console.log(`deemed refusal: de-ni ${de.asked.size} asked, ${de.answered.length} answered, ${de.weighed.length} weighings after asking, a venue open in ${open(de, false).length} (${open(de, true).length} before 91 days), ${de.appeals.length} appealed; gb-eng ${gb.asked.size} asked, a venue open in ${open(gb, false).length + open(gb, true).length}, ${gb.appeals.length} appealed`);
-  for (const x of [de, gb]) {
+test.skipIf(!have)("a review never answered is taken as refused where the place's law says so, and the claimant may appeal from then; where the law has no such rule, nobody may appeal, but the delay may be complained of to a body that recommends", async () => {
+  const [de, gb, au] = await Promise.all([town("de-ni-2026", 330), town("gb-eng-2026", 330), town("au-vic-2026", 200)]);
+  const open = (x: typeof de, early: boolean, days = 91) => x.weighed.filter((v) => v.venue && (v.t - x.asked.get(v.who)! < days * DAY) === early);
+  console.log(`deemed refusal: de-ni ${de.asked.size} asked, ${de.answered.length} answered, ${de.weighed.length} weighings after asking, a venue open in ${open(de, false).length} (${open(de, true).length} before 91 days), ${de.appeals.length} appealed; gb-eng ${gb.asked.size} asked, the ombudsman open in ${open(gb, false, 21).length}, ${gb.appeals.length} complained; au-vic ${au.asked.size} asked, the ombudsman open in ${open(au, false, 14).length}, ${au.appeals.length} complained`);
+  for (const x of [de, gb, au]) {
     expect(x.asked.size).toBeGreaterThan(0);
     expect(x.answered.length).toBe(0);
   }
@@ -72,8 +74,20 @@ test.skipIf(!have)("a review never answered is taken as refused where the place'
     expect(a.at - a.data.review_asked_on).toBeGreaterThanOrEqual(91 * DAY);
   }
   expect(de.rejected).toEqual([]);
-  // England: the law has no deemed refusal, so the route stays shut (what a real claimant does instead, a complaint or a
-  // judicial review, is not built: MT-21's remainder).
-  expect(open(gb, false).length + open(gb, true).length).toBe(0);
-  expect(gb.appeals.length).toBe(0);
+  // England and Victoria: no deemed refusal, so no appeal; once the law's days for a complaint of delay have run (21, 14),
+  // a body that hears it is open (never before), every application made goes to the ombudsman desk, which recommends, and
+  // never to the tribunal (which the citizen-level test in recourse.rs holds is not even offered), and none is turned away. (Whether a claimant takes it is theirs; in Victoria, the study's
+  // town, some do: 5 of 14 on 2026-10-31.)
+  for (const [x, days] of [[gb, 21], [au, 14]] as const) {
+    expect(open(x, true, days)).toEqual([]);
+    expect(open(x, false, days).length).toBeGreaterThan(0);
+    for (const a of x.appeals) {
+      // (Which body: the application is seen by the applicant, the body it is brought to and the office it is against.)
+      expect(JSON.stringify(a.visible_to)).toContain('"ombudsman"');
+      expect(JSON.stringify(a.visible_to)).not.toContain('"tribunal"');
+      expect(a.at - x.asked.get(a.speaks_for)!).toBeGreaterThanOrEqual(days * DAY);
+    }
+    expect(x.rejected).toEqual([]);
+  }
+  expect(au.appeals.length).toBeGreaterThan(0);
 }, 1_200_000);
