@@ -72,6 +72,9 @@ pub struct WorldInfo {
     /// The run captures its citizens' decisions for training (docs/citizen-data.md): each decision's draws are kept
     /// beside it (`Cx::rng` notes every stream it opens). Read by nothing that decides: a run is the same with it on.
     pub capture: bool,
+    /// The citizen model a world's `dials.citizen_model` names (docs/citizen-data.md, "The citizen model"), read and
+    /// checked against its hash by the engine before the run starts. Absent: every citizen decides as the code mind.
+    pub citizen_model: Option<std::sync::Arc<mind::model::CitizenModel>>,
 }
 
 /// Where an actor runs: which participant, acting for which entity, in which position (absent: as itself), and its

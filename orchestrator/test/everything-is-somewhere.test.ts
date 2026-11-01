@@ -97,6 +97,8 @@ test("it fails, naming the module, on goods moved between places with no carrier
     ev({ event: "action_applied", as: "crew-post", participant: "c1-self" }),
     ev({ event: "worked", task: "collect", at: "depot", on: "house-1", by: "c1-self" }),
     ev({ event: "worked", task: "serve", at: "depot", on: "depot/workplace.1", by: "c1-self" }),
+    ev({ event: "vacated", occupant: "c2", space: "depot/workplace.1" }),
+    ev({ event: "worked", task: "maintain", at: "depot", on: "house-1", performers: ["c2"], by: "c1-self" }),
     ev({ event: "action_applied", participant: "c1-self" }),
     ev({ event: "goods_moved", from_at: "shop", to_at: "house-1", by: "c1-self" }),
     ev({ event: "goods_moved", from_at: "shop", to_at: "shop", by: "c1-self" }),

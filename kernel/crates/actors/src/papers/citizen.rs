@@ -628,6 +628,10 @@ pub struct WelfareCheckRequest {
     pub at: String,
     /// When the home was last seen entered, seconds.
     pub since: i64,
+    /// One of the household who has not come home (a missing person, law 9): the police look at the home and the street
+    /// outside it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub missing: Option<String>,
 }
 impl Paper for WelfareCheckRequest {
     const KIND: &'static str = "welfare_check_request";

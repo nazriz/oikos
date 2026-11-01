@@ -629,7 +629,7 @@ fn fill_as<T>(o: &Order, quantity: i64, from_at: &str, pay_from: &str, why: &str
     if quantity > 0 {
         calls.push(call(
             "goods",
-            vec![("kind", Some(arg(&o.kind))), ("quantity", Some(text(quantity.to_string()))), ("to", Some(arg(&o.to))), ("at", Some(arg(&o.at))), ("from_at", Some(arg(from_at)))],
+            vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&o.kind))), ("quantity", Some(text(quantity.to_string()))), ("to", Some(arg(&o.to))), ("at", Some(arg(&o.at))), ("from_at", Some(arg(from_at)))],
         ));
     }
     if refund > 0 {

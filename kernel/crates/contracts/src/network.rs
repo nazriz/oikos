@@ -56,6 +56,10 @@ pub struct LinkCfg {
     /// the flow over the capacity).
     #[serde(default, skip_serializing_if = "is_zero")]
     pub loss_m: i64,
+    /// Law 9 (S4): a link bodies and vehicles travel (a road out of the town to an edge, or between towns), at this speed
+    /// for vehicles; its capacity is then vehicles an hour each way.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speed_kmh: Option<i64>,
 }
 
 /// How a supply's tree behaves.
@@ -168,7 +172,7 @@ pub fn validate(c: &crate::config::Config) -> Result<(), String> {
         if !nodes.contains(l.from.as_str()) || !nodes.contains(l.to.as_str()) || l.from == l.to {
             return Err(format!("network: link {} joins no two nodes of the network", l.id));
         }
-        if !(1..=MAX_FLOW).contains(&l.capacity) || !(0..=100_000).contains(&l.loss_m) || l.length_m.is_some_and(|x| !(0..=100_000_000).contains(&x)) {
+        if !(1..=MAX_FLOW).contains(&l.capacity) || !(0..=100_000).contains(&l.loss_m) || l.length_m.is_some_and(|x| !(0..=100_000_000).contains(&x)) || l.speed_kmh.is_some_and(|v| !(1..=1_000).contains(&v)) {
             return Err(format!("network: link {}'s capacity, loss or length is out of range", l.id));
         }
     }

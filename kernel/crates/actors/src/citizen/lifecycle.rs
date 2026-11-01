@@ -235,11 +235,72 @@ impl Person {
                 &format!("Nobody has been seen at {} for some days. Please call there.", x.space),
                 Say {
                     to: Some(vec![wf.police.clone()]),
-                    data: Some(crate::papers::data(&WelfareCheckRequest { space: x.space.clone(), structure: x.structure, at: x.at, since: x.since })),
+                    data: Some(crate::papers::data(&WelfareCheckRequest { space: x.space.clone(), structure: x.structure, at: x.at, since: x.since, missing: None })),
                     ..Default::default()
                 },
             )],
         ))
+    }
+
+    /// Someone lying dead where we went by (law 9: we were there and saw them): we ask the police to come, once for each
+    /// of them (docs/behaviour/deaths.md, "On the way"). Whoever reports a death on the road names no family: nobody there
+    /// can say who it is.
+    pub fn saw_dead_on_the_way(&mut self, w: &mut Week) -> Option<Step<()>> {
+        let wf = self.p.welfare.clone()?;
+        let t = w.t;
+        // (Seen as a look at the place, through what we saw on our way.)
+        let (cell, who) = crate::common::asking::visited(w.pic, oikos_contracts::config::ON_THE_WAY)
+            .into_iter()
+            .flat_map(|c| c.remains.iter().map(move |r| (c.cell.to_string(), r.to_string())))
+            .find(|(_, r)| !self.lifecycle.asked_about.contains(&format!("remains:{r}")) && *r != self.me)?;
+        self.lifecycle.asked_about.insert(format!("remains:{who}"));
+        Some(because(
+            format!("Someone is lying dead at {cell}, on our way: asking the police to come."),
+            vec![say(
+                "welfare_check_request",
+                &format!("Someone is lying dead at {cell}. Please come."),
+                Say { to: Some(vec![wf.police.clone()]), data: Some(crate::papers::data(&WelfareCheckRequest { space: cell.clone(), structure: cell.clone(), at: cell.clone(), since: t, missing: None })), ..Default::default() },
+            )],
+        ))
+    }
+
+    /// One of our household who has not come home (law 9: someone who died on their way lies where nobody may see them): an
+    /// adult at home who sees that a member of the household left home more than a day ago (the round's own rhythm: a
+    /// household that lives together is home every day) and has not come back reports them missing to the police, once for
+    /// each going (docs/behaviour/deaths.md, "On the way").
+    pub fn missed_at_home(&mut self, w: &mut Week) -> Option<Step<()>> {
+        let wf = self.p.welfare.clone()?;
+        let t = w.t;
+        if !self.adult_body(w.pic, t) {
+            return None;
+        }
+        let home = self.our_home()?;
+        let hh = self.s.household.clone()?;
+        let here: Vec<SiteSpace> = spaces(w.pic).filter(|sp| sp.space == home).cloned().collect();
+        let sp = here.first()?;
+        if !has(sp, &self.me) {
+            return None;
+        }
+        let in_now: BTreeSet<String> = sp.occupants.iter().flatten().map(|o| o.to_string()).collect();
+        let structure = structure_of(&home).to_string();
+        let at = cells(w.pic, wf.channel.as_str()).iter().find(|c| c.structure.as_ref().is_some_and(|s| s.structure == structure.as_str())).map(|c| c.cell.to_string()).unwrap_or_else(|| structure.clone());
+        for m in hh.members.iter().filter(|m| m.person != self.me && !in_now.contains(&m.person) && !self.s.mourned.contains(m.person.as_str())) {
+            let Some(l) = sp.left.iter().flatten().filter(|l| l.occupant == m.person.as_str()).max_by_key(|l| l.at) else { continue };
+            let key = format!("missing:{}@{}", m.person, l.at);
+            if died(l.reason) || l.reason != oikos_contracts::events::VacateReason::Left || t - l.at <= DAY || self.lifecycle.asked_about.contains(&key) {
+                continue;
+            }
+            self.lifecycle.asked_about.insert(key);
+            return Some(because(
+                format!("{} left home more than a day ago and has not come back: reporting them missing to the police.", m.person),
+                vec![say(
+                    "welfare_check_request",
+                    &format!("{} of our household has not come home since they left. Please look for them.", m.person),
+                    Say { to: Some(vec![wf.police.clone()]), data: Some(crate::papers::data(&WelfareCheckRequest { space: home.clone(), structure, at, since: l.at, missing: Some(m.person.clone()) })), ..Default::default() },
+                )],
+            ));
+        }
+        None
     }
 
     // ------------------------------------------------------------------ deaths (citizen.ts 1623-1728)
@@ -621,6 +682,10 @@ impl Person {
         self.s.last_dwelling = self.last_dwelling_now(pic);
         let to = self.belong(pic)?;
         if pic.body.as_ref().and_then(|b| b.in_space.as_deref()) == Some(to.as_str()) {
+            return None;
+        }
+        // (On our way somewhere: not again until we are there.)
+        if pic.body.as_ref().is_some_and(|b| b.on_way.is_some()) {
             return None;
         }
         if self.lifecycle.refused_go.as_ref().is_some_and(|(r, until)| *r == to && pic.t < *until) {
@@ -1138,6 +1203,23 @@ mod tests {
         let p = pic("ann", 9 * DAY, adult("female", None), vec![], vec![next(9 * DAY)]);
         let (s, _) = week(&mut ann, &c, &p, |a, w| a.wonder_next_door(w));
         assert!(s.is_none(), "once");
+    }
+
+    #[test]
+    fn someone_seen_lying_dead_on_the_way_is_reported_to_the_police_once() {
+        let c = ctx("ann", json!({ "welfare": { "police": "police", "channel": "next", "found_after": [{ "within_days": 3, "bps": 10_000 }] } }));
+        let mut ann = Person::new(&c).unwrap();
+        let road = |as_of: i64| {
+            let cell: SiteCell = serde_json::from_value(json!({ "cell": "cell.4.2", "x": 4, "y": 2, "remains": ["dan"] })).unwrap();
+            ("on_the_way", Seen::Sites { as_of, cells: Arc::new(vec![cell]), visit: Some(oikos_sight::Visit { seen_at: Default::default(), fresh: vec!["cell.4.2".into()] }) })
+        };
+        let p = pic("ann", DAY, adult("female", None), vec![], vec![road(DAY)]);
+        let (s, _) = week(&mut ann, &c, &p, |a, w| a.saw_dead_on_the_way(w));
+        let text = oikos_sight::calls::program_text(&s.expect("asked").program());
+        assert!(text.contains("welfare_check_request") && text.contains("police") && text.contains("cell.4.2"), "{text}");
+        let p = pic("ann", 2 * DAY, adult("female", None), vec![], vec![road(2 * DAY)]);
+        let (s, _) = week(&mut ann, &c, &p, |a, w| a.saw_dead_on_the_way(w));
+        assert!(s.is_none(), "once for each of them");
     }
 
     #[test]

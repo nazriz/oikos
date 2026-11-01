@@ -324,6 +324,24 @@ pub fn world_info(config: &Value) -> Result<WorldInfo, String> {
 }
 
 /// What the engine reads once from a world's config (the same at the start and when a snapshot is resumed).
+/// The citizen model a world's `dials.citizen_model` names (`{ weights, sha256, share_bps }`: docs/citizen-data.md, "The
+/// citizen model"): the file read, its SHA-256 checked against the config's (so the config says exactly which weights
+/// ran, and a replay cannot run other weights), and parsed. A world that names one it cannot read does not start.
+fn citizen_model(dial: Option<&Value>) -> Result<Option<Arc<oikos_actors::mind::model::CitizenModel>>, String> {
+    use sha2::{Digest, Sha256};
+    let Some(d) = dial.filter(|d| !d.is_null()) else { return Ok(None) };
+    let path = d["weights"].as_str().ok_or("dials.citizen_model: no weights (the model file's path)")?;
+    let want = d["sha256"].as_str().ok_or("dials.citizen_model: no sha256 (the model file's hash)")?;
+    let share = d.get("share_bps").map_or(Some(10_000), Value::as_i64).ok_or("dials.citizen_model.share_bps: not a whole number")?;
+    let bytes = std::fs::read(path).map_err(|e| format!("dials.citizen_model: {path}: {e}"))?;
+    let got = oikos_core::canon::to_hex(&Sha256::digest(&bytes));
+    if got != want {
+        return Err(format!("dials.citizen_model: {path} has SHA-256 {got}, the config names {want}"));
+    }
+    let v: Value = serde_json::from_slice(&bytes).map_err(|e| format!("dials.citizen_model: {path}: {e}"))?;
+    Ok(Some(Arc::new(oikos_actors::mind::model::CitizenModel::from_json(&v, &got, share)?)))
+}
+
 struct Base {
     types: BTreeMap<String, Value>,
     currency: Option<oikos_resolver::calls::Currency>,
@@ -370,6 +388,7 @@ impl Base {
             calendar: config.get("calendar").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| format!("calendar: {e}"))?,
             date_style: config.get("calendar").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| format!("calendar: {e}"))?,
             capture: false,
+            citizen_model: citizen_model(config.get("dials").and_then(|d| d.get("citizen_model")))?,
         });
         let dated = oikos_rules::calendar::Dated::from_config(config.get("calendar"));
         let templates =

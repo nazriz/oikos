@@ -327,6 +327,17 @@ impl Person {
         }
         let pm = v.role_module.get("params").cloned().unwrap_or(Value::Null);
         let g = |k: &str| pm.get(k).and_then(crate::papers::lenient::whole);
+        let opportunity = self.s.job.as_ref().map_or(0, |j| div_round(j.wage * MONTH, j.period.max(DAY)));
+        // (A factory, in works for sale (foundations-2 E3): its custom is the market for its kind, as the world market
+        // publishes what it takes a month, shared among the town's factories of that kind and itself; a hand makes what a
+        // working month at its time a unit allows; the going wage is its own, as a factory posts it.)
+        if v.role_module.get("code").and_then(|c| c.as_str()) == Some("firm.producer") {
+            let per = g("labour_per_unit").filter(|x| *x > 0)?;
+            let units_per_worker = g("working_day").unwrap_or(8 * 3_600) * g("work_days").unwrap_or(5) * 30 / 7 / per;
+            let period = g("period").unwrap_or(14 * DAY).max(DAY);
+            let wage = if hires { g("wage").map_or(0, |w| div_round(w * MONTH, period)) } else { 0 };
+            return Some(oikos_rules::entry::Prospect { price: g("price")?, unit_cost: v.unit_cost.unwrap_or(0), units_per_household: v.demand_per_month?, households_reached: 1, sellers_known: v.sellers.unwrap_or(0), units_per_worker, wage, fixed: v.fixed_per_month.unwrap_or(0).max(0), opportunity });
+        }
         let kind = pm.get("kind").and_then(|x| x.as_str()).unwrap_or(&self.p.goods).to_string();
         let mine: BTreeSet<String> = self.s.own_work.iter().map(|o| o.firm.clone()).collect();
         let known: Vec<super::money::Shop> = super::money::shops(&self.book, &kind).into_iter().filter(|s| !mine.contains(&s.shop)).collect();
@@ -361,7 +372,6 @@ impl Person {
             })
             .max();
         let wage = if hires { posted.or_else(|| g("wage").map(|w| div_round(w * MONTH, period))).unwrap_or(0) } else { 0 };
-        let opportunity = self.s.job.as_ref().map_or(0, |j| div_round(j.wage * MONTH, j.period.max(DAY)));
         Some(oikos_rules::entry::Prospect { price, unit_cost, units_per_household, households_reached: if v.own { homes.len() as i64 } else { self.p.population }, sellers_known: known.len() as i64, units_per_worker, wage, fixed: v.fixed_per_month.unwrap_or(0).max(0), opportunity })
     }
 
@@ -1183,7 +1193,7 @@ impl Person {
             format!("We can't make ends meet ({}, less than a month's essentials): taking {} {} from {}'s stock at work, and home with them.", Self::wk_usd(w, balance), crime.quantity, self.p.goods, job.employer),
             vec![
                 call("take", vec![("kind", Some(arg(&self.p.goods))), ("quantity", Some(text(q.clone()))), ("from", Some(arg(&job.employer))), ("at", Some(arg(&at)))]),
-                call("goods", vec![("kind", Some(arg(&self.p.goods))), ("quantity", Some(text(q))), ("to", Some(arg(&me))), ("at", Some(arg(&home_at))), ("from_at", Some(arg(&at)))]),
+                call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.goods))), ("quantity", Some(text(q))), ("to", Some(arg(&me))), ("at", Some(arg(&home_at))), ("from_at", Some(arg(&at)))]),
             ],
         ));
     }
@@ -1542,6 +1552,50 @@ mod tests {
         // The same crowded market draws someone with nothing coming in: a small share beats nothing.
         let e = oikos_rules::entry::expected(&bob.venture_prospect(&homes_around(DAY, None, 200), &bob.p.ventures[0].clone(), false).unwrap());
         assert!(e.profit > 0 && e.profit < 100_000 * MONTH / (14 * DAY), "{e:?}");
+    }
+
+    /// A factory's venture (foundations-2 E3): works for sale bought, the town's goods made there; its market the world
+    /// market's appetite (1,000 a month) shared with the one factory there is.
+    fn factory_venture() -> Value {
+        json!([{ "kind": "factory", "name": "Factory", "capital": 2_000_000, "unit_cost": 2_700, "demand_per_month": 1_000, "sellers": 1,
+            "channels": [], "role_module": { "code": "firm.producer", "params": { "works": "{structure}", "founder": "{founder}", "capital": "{capital}", "listing": "{listing}", "bank": "bank",
+                "price": 6_000, "labour_per_unit": 5_400, "wage": 150_000, "period": 14 * DAY, "working_day": 8 * 3_600, "work_days": 5, "max_staff": 40 } } }])
+    }
+
+    #[test]
+    fn a_closed_factorys_works_for_sale_are_bought_for_a_factory_where_its_market_pays_and_not_where_it_does_not() {
+        let listing = |price: i64| st("rec.fs", "property_for_sale", "factory-1", json!({ "structure": "factory-1-works", "type": "factory", "cell": "c.9", "price": price, "account": "acc.factory-1" }));
+        // Its market: half of 1,000 a month at a margin of 3,300 a unit, made by hands at 114 a month each: hands pay.
+        let c = ctx_with(json!({ "ventures": factory_venture() }));
+        let mut ann = Person::new(&c).unwrap();
+        at_home(&mut ann);
+        ann.book.take_all(&[listing(5_000_000)]);
+        let p = ann.venture_prospect(&pic(DAY, None, false), &ann.p.ventures[0].clone(), true).unwrap();
+        assert_eq!((p.price, p.unit_cost, p.units_per_household, p.households_reached, p.sellers_known, p.units_per_worker), (6_000, 2_700, 1_000, 1, 1, 114));
+        // Short of the works and the capital: nothing; with the means, it is weighed and started within the year.
+        ann.work.next_venture = 0;
+        assert!(run(&mut ann, &c, &pic(DAY, None, false), 1_000_000, |a, w| a.ventures(w)).is_empty());
+        let mut out = vec![];
+        for m in 1..=12 {
+            ann.work.next_venture = 0;
+            out = run(&mut ann, &c, &pic(m * MONTH, None, false), 9_000_000, |a, w| a.ventures(w));
+            if !out.is_empty() {
+                break;
+            }
+        }
+        assert!(out.len() == 1 && out[0].contains("firm.producer") && out[0].contains("\"works\":\"factory-1-works\"") && out[0].contains("\"listing\":\"rec.fs\""), "{out:?}");
+        assert_eq!(ann.absorbed.pending_firm, Some(7_000_000));
+        // No margin (goods sell for what their inputs cost): never, however long it is weighed.
+        let mut v = factory_venture();
+        v[0]["unit_cost"] = json!(6_000);
+        let c = ctx_with(json!({ "ventures": v }));
+        let mut bob = Person::new(&c).unwrap();
+        at_home(&mut bob);
+        bob.book.take_all(&[listing(5_000_000)]);
+        for m in 1..=24 {
+            bob.work.next_venture = 0;
+            assert!(run(&mut bob, &c, &pic(m * MONTH, None, false), 9_000_000, |a, w| a.ventures(w)).is_empty(), "month {m}");
+        }
     }
 
     #[test]

@@ -161,9 +161,12 @@ The mechanism:
 - **Fix when:** a pilot shows hundreds of asks in a day, or a seat is given a wide remit.
 
 ### WM-6 · Deaths that nobody reports
-- **Gap:** A death outdoors leaves no trace and is never registered; someone alone at work is found by nobody (an
-  employer who misses a worker calls nobody); the finder's delay for a person living alone is Japan's figure from a press summary.
-- **Where:** `docs/behaviour/deaths.md` ("Leaves out"); decisions 2026-10-17 "The seated twin on fix-housing, and deaths at work".
+- **Gap:** Someone alone at work is found by nobody (an employer who misses a worker calls nobody); the finder's delay
+  for a person living alone is Japan's figure from a press summary. A death on the way (law 9, 2026-11-01: a body on its
+  way is in no building) is found by whoever comes by where it lies, or by the police called to the home and the street
+  outside it by a household whose member has not come home; a body lying where nobody passes, of someone with no
+  household at home, is still found by nobody, and the body is not taken away (no undertaker).
+- **Where:** `docs/behaviour/deaths.md` ("Leaves out", "On the way"); decisions 2026-10-17 "The seated twin on fix-housing, and deaths at work"; 2026-11-01 "Deaths on the way".
 - **Effect:** Small but systematic: estates, vacancies and population counts lag. gb-eng went from 5 to 3 unregistered of 14 in a year after the last fix.
 - **L / I:** medium / low · **Status:** accepted
 - **Notice by:** Deaths at work in the log against a place's recorded workplace deaths; a body found by nobody.
@@ -600,6 +603,17 @@ The mechanism:
 - **L / I:** high / high for any finding about what compute takes of a town · **Status:** open (2026-11-01)
 - **Notice by:** The data centre's share of the town's energy and water moving with a placeholder changed alone.
 - **Fix when:** before a study reads the size of compute's share, rather than whether a shortage reaches it.
+
+### ME-25 · Tools as goods: what a tool saves and costs is a placeholder
+- **Gap:** The one tool on offer (au-vic's production machinery: 80% of the time to make a unit, AUD 20,000 each) has no
+  source for either figure; a tool is never used up and does not wear; only a factory weighs a tool, by its own staff's
+  wage, and only for the task the profile names.
+- **Where:** `worlds/profiles/au-vic-2026.json` `values.automation.tools`; `worlds/generator/tools.ts`;
+  `kernel/crates/actors/src/market/producer.rs` (`ToolParams`).
+- **Effect:** Whether factories take tools up, and what that does to their staffing, rests on these two figures.
+- **L / I:** medium / medium · **Status:** open (2026-11-01)
+- **Notice by:** Uptake of tools moving with the placeholder price alone.
+- **Fix when:** before a study reads how firms take up technologies that are goods.
 
 ## Public bodies and law
 

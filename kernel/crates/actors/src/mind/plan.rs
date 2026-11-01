@@ -742,7 +742,23 @@ impl CitizenMind {
         let purpose = format!("want-{}-{}", w.about, w.against.as_ref().map(|a| a.record.clone()).or_else(|| w.whom.clone()).unwrap_or_default());
         let mut rng = cx.rng(&purpose);
         let open = self.s.mind.person.temperament.openness;
-        let (key, weights) = self.s.mind.learned("way").choose(&mut rng, &options, open);
+        // The citizen model, where the world has one: its odds blended with the code mind's (docs/citizen-data.md, "The
+        // citizen model"), drawn on the same stream in the same way. Without one, the code mind's alone, as ever.
+        let mut model_odds: Option<(Vec<i64>, i64, String)> = None;
+        let (key, weights) = match self.p.citizen_model.clone() {
+            None => self.s.mind.learned("way").choose(&mut rng, &options, open),
+            Some(m) => {
+                let code = self.s.mind.learned("way").exponents(&options, open);
+                let code_w: Vec<i64> = code.iter().map(|x| round(super::math::exp(*x) * 1_000_000.0)).collect();
+                let s = self.situation(life, ways, w, &found, vec![], t, Json::Null);
+                let keys: Vec<(String, Option<i64>)> =
+                    options.iter().map(|(kk, _)| (kk.clone(), self.s.mind.learned_known("way", kk).then(|| self.s.mind.learned_get("way", kk)))).collect();
+                let blended = super::model::blend(&code, &m.scores(&s, &keys), m.share_bps);
+                let i = super::person::pick(&mut rng, &blended);
+                model_odds = Some((super::model::ppm(&blended), m.share_bps, m.sha256.clone()));
+                (options[i].0.clone(), code_w)
+            }
+        };
         cx.drew(&rng);
         let total: i64 = weights.iter().sum::<i64>().max(1);
         let mut d = Map::new();
@@ -766,7 +782,11 @@ impl CitizenMind {
             ),
         );
         let odds: Vec<Json> = options.iter().zip(&weights).map(|((kk, _), wt)| json!({ "key": kk, "ppm": round((*wt as f64 * 1_000_000.0) / total as f64) })).collect();
-        d.insert("situation".into(), self.situation(life, ways, w, &found, odds, t, Json::Null));
+        // (With the model, the code mind's odds are still recorded as `code`, and the odds drawn on beside them.)
+        let more = model_odds.map_or(Json::Null, |(p, share, sha)| {
+            json!({ "model": { "odds": options.iter().zip(&p).map(|((kk, _), x)| json!({ "key": kk, "ppm": x })).collect::<Vec<_>>(), "share_bps": share, "sha256": sha } })
+        });
+        d.insert("situation".into(), self.situation(life, ways, w, &found, odds, t, more));
         self.decision(cx, d, &[]);
         let Some(way) = best.get(&key).cloned() else {
             self.s.wants.tried(w, "wait", t, None);

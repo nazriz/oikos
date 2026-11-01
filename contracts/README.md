@@ -786,3 +786,17 @@ Additive; no hard rule touched; nothing changes for a world whose templates say 
 - **A template takes `runs_on`** (`hardware`, `per_lane`, `holder`, `at`, `hour`): a system from it is delivered only
   where the hardware held covers its lanes beside those already there, and each whole hour of its work is the task
   `hour` at its host (inputs from the holder's holding, refused if short: `insufficient_quantity`).
+
+## Tools: technologies that are goods (2026-11-01; docs/design/foundations-2.md 7.2, step E2; docs/behaviour/automation.md, "Tools"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing changes for a world whose tasks name no tool.
+
+- **A task takes `tool`** (`kind`, `per_performer`, `labour_bps`): with that many of the kind held by the actor where the
+  work is done, for each person doing it, the work takes `labour_bps` of its time; the tool is not used up.
+
+## A census of practised skills (2026-11-01; docs/behaviour/skills.md, "the census"; foundations-2 M8; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing is written for a world with no practised skill.
+
+- **The log takes `skill_census`** (monthly, where a world has practised skills): for each skill, how many living people
+  stand in each tenth of its range. For measurement only.

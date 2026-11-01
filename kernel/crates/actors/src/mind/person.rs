@@ -430,20 +430,32 @@ impl Attractions {
         if options.is_empty() {
             return (String::new(), vec![]);
         }
+        let weights: Vec<i64> = self.exponents(options, openness_bps).iter().map(|x| math::round(math::exp(*x) * 1_000_000.0)).collect();
+        let i = pick(rng, &weights);
+        (options[i].0.clone(), weights)
+    }
+
+    /// The logit's exponents `choose` draws on, each lam * (score - the largest score): the largest is 0. (The citizen
+    /// model's odds are blended with these: mind/model.rs `blend`.)
+    pub fn exponents(&self, options: &[(String, i64)], openness_bps: i64) -> Vec<f64> {
         let lam = self.e.lambda_milli as f64 / 1000.0 * (1.0 - openness_bps as f64 / 20_000.0);
         let scores: Vec<f64> = options.iter().map(|(k, v)| (self.get_f(k) + *v as f64) / 10_000.0).collect();
         let max = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        let weights: Vec<i64> = scores.iter().map(|s| math::round(math::exp(lam * (s - max)) * 1_000_000.0)).collect();
-        let total: i64 = weights.iter().sum();
-        let mut r = rng.below(total.max(1) as u64) as i64;
-        for (i, w) in weights.iter().enumerate() {
-            r -= w;
-            if r < 0 {
-                return (options[i].0.clone(), weights);
-            }
-        }
-        (options[options.len() - 1].0.clone(), weights)
+        scores.iter().map(|s| lam * (s - max)).collect()
     }
+}
+
+/// Which of the weights a draw falls on (one value of the stream: `below` their total), the last if none.
+pub fn pick(rng: &mut Rng, weights: &[i64]) -> usize {
+    let total: i64 = weights.iter().sum();
+    let mut r = rng.below(total.max(1) as u64) as i64;
+    for (i, w) in weights.iter().enumerate() {
+        r -= w;
+        if r < 0 {
+            return i;
+        }
+    }
+    weights.len().saturating_sub(1)
 }
 
 // ---------------------------------------------------------------- how to decide (CONSUMAT)

@@ -303,6 +303,24 @@ fn a_home_nobody_asked_about_is_never_gone_to_and_a_death_someone_outlived_is_no
 }
 
 #[test]
+fn asked_to_come_to_someone_lying_dead_on_the_road_an_officer_goes_and_reports_them_found_there_once() {
+    // (Law 9: someone who died on their way lies on the road, and whoever came by asked the police to come.)
+    let ask = st("rec.70", 5 * DAY, "welfare_check_request", "passer-1", &[ME], json!({ "space": "cell.4.2", "structure": "cell.4.2", "at": "cell.4.2", "since": 5 * DAY }));
+    let ask2 = st("rec.71", 6 * DAY, "welfare_check_request", "passer-2", &[ME], json!({ "space": "cell.4.2", "structure": "cell.4.2", "at": "cell.4.2", "since": 6 * DAY }));
+    let mut s = station();
+    let w = s.wake(5 * DAY + 10 * 3600, [staff_records(), vec![ask]].concat(), vec![("premises", premises(&["officer-1"]))], &|_| false);
+    assert_eq!(w.looks.len(), 1, "{:?}", w.looks);
+    assert!(w.looks[0].to_string().contains("cell.4.2"));
+    let road: oikos_sight::SiteCell = serde_json::from_value(json!({ "cell": "cell.4.2", "x": 4, "y": 2, "remains": ["ann"] })).unwrap();
+    let back = Seen::Sites { as_of: 5 * DAY + 13 * 3600, cells: Arc::new(vec![road]), visit: Some(Visit { seen_at: Default::default(), fresh: vec!["cell.4.2".into()] }) };
+    let w = s.wake(6 * DAY + 10 * 3600, vec![ask2], vec![("premises", premises(&["officer-1"])), ("calls", back)], &|_| false);
+    let found = w.of("death_notification");
+    assert_eq!(found.len(), 1, "{:?}", w.calls);
+    assert!(found[0].to_string().contains("ann") && found[0].to_string().contains("cell.4.2"));
+    assert!(w.looks.is_empty(), "found there once: asked again about the place, they do not go again");
+}
+
+#[test]
 fn a_saved_station_steps_as_the_original() {
     let mut s = station();
     s.wake(10 * 3600, [staff_records(), vec![warrant("rec.20", "t1", &["t1"], 1)]].concat(), vec![("premises", premises(&["officer-1"]))], &|_| false);
