@@ -277,8 +277,9 @@ impl ColdFile {
         })
     }
 
-    /// Writes a block of records' canonical bytes; returns its number.
-    fn append(&self, records: &[Vec<u8>]) -> std::io::Result<u32> {
+    /// Writes a block of records' canonical bytes (or of any other things' bytes, one after another: an office's file
+    /// of payments); returns its number.
+    pub fn append(&self, records: &[Vec<u8>]) -> std::io::Result<u32> {
         let mut raw = Vec::with_capacity(4 + records.len() * 4 + records.iter().map(Vec::len).sum::<usize>());
         raw.extend_from_slice(&(records.len() as u32).to_le_bytes());
         let mut end = 0u32;
@@ -327,6 +328,12 @@ impl ColdFile {
             }
         }
         b
+    }
+
+    /// Every item of a block, as written (`append`), in order.
+    pub fn items(&self, block: u32) -> Vec<Vec<u8>> {
+        let b = self.block(block);
+        (0..b.ends.len() as u32).map(|i| b.get(i).to_vec()).collect()
     }
 
     fn with_bytes<T>(&self, block: u32, index: u32, f: impl FnOnce(&[u8]) -> T) -> T {
@@ -424,6 +431,11 @@ impl Tier {
     fn with_policy(mut self, policy: Policy) -> Tier {
         self.policy = policy;
         self
+    }
+
+    /// The run's cold file, if the tier is on (for an office's file of payments held there too).
+    pub fn file(&self) -> Option<Arc<ColdFile>> {
+        self.file.clone()
     }
 
     pub fn is_on(&self) -> bool {

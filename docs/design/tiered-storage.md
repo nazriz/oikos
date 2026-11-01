@@ -1,76 +1,93 @@
-# Tiered storage: a proposal (SC-1)
+# Tiered storage (SC-1, SC-6)
 
-Status: **proposed, for Naz's review; nothing built.** Measured on branch `representation` (2026-10-27), on a 4-core,
-15 GB Linux machine.
+Status: **built** (branch `tiered-storage`, 2026-11-02; Naz approved the proposal 2026-11-02, "Yes to all"). The
+proposal as it was reviewed is in git history (this file before that date); what was built differs from it where
+"Where it differs" says. Numbers: docs/design/performance.md ("Years at 10,000 and 50,000"); the decision and what
+would make us revisit it: docs/decisions.md 2026-11-02, "Tiered storage".
 
-## Why now
+## Why
 
-A run's length, not its size, is what limits a long study now. 1,000 people (au-vic, all code, 4 threads):
+A run's length, not its size, limits a long study. After the faults of 2026-10-31 were fixed, a 10,000-person town grew
+about 25 MB a simulated day and a 50,000-person town about 105 MB, so 50,000 people outgrew the 64 GB machine near day
+290. A heap profile put the growth in the world's records (54%: every record ever made, held whole by every holder of
+it), the resolver's knowledge of every addressed statement each participant saw, the twins' per-matter draw counts,
+citizens' minds, and the offices' files of payments.
 
-| run | peak resident | live heap | of it, the world's history |
-|---|---|---|---|
-| 30 days | 305 MB | about 200 MB | small |
-| 180 days | 634 MB | | |
-| 365 days | 1,081 MB | 895 MB | about 550 MB |
+## What a record is held as
 
-(With every cut on the branch; before the last, the delivered records' cache, a year peaked at 1,500 MB.) It grows
-about 1 MB a day at 1,000 people, linearly: ten years at 10,000 would want some 30 to 40 GB, most of it history.
+Every holder of a record (the world's store, perception's index, the delivered-records cache, every actor's book, a
+host that keeps what it is handed) holds a `Rec` (`kernel/crates/contracts/src/held.rs`): a handle to the record's one
+slot, shared by all of them. The slot holds the record in memory (hot), or knows where its canonical bytes are in the
+run's cold file (cold), or both, and when the record was made. `Rec::load` reads it, from memory or back from disk (and
+then holds it in memory again); it marks the slot read. Nothing anyone reads differs by where it was held: the bytes on
+disk are the record's canonical bytes (`canon::canonical`), read back by the same deserialiser to the same record
+(checked as each is written in a debug build).
 
-What a year's heap holds (`scripts/heapprof.ts --components`, the run's end): the world's records 441 MB (each
-record and its JSON content); the offices' files of payments 38 MB; one entry per record in the delivered cache 25 MB;
-what readers have learned from records 50 MB; the actors' state 61, citizens 57, their minds 44, the rest small.
+- **The tier** (`Tier`, the kernel's: `Kernel::tier_records`, on by default in `oikos-kernel world` and in a host given a
+  log; `OIKOS_COLD=off` keeps everything in memory). Once a simulated day it is told of the records filed since, and
+  goes through those that may be in memory: one filed at least `after_days` ago (30) and not read for `idle_days` (14)
+  is written to disk if it is not there yet, in blocks of up to 256 records or 128 KB, each compressed (zstd level 3),
+  and let go of in memory. `OIKOS_COLD_AFTER_DAYS` and `OIKOS_COLD_IDLE_DAYS` change the policy (a test moves every
+  record out after a day); the results never depend on it.
+- **The cold file** is `<out>/<run>.cold` (the world command) or `<log>.cold` (a host), made anew at the start and
+  removed when the run ends (when nothing holds a slot of it any more). It holds only what the run's memory held: a
+  snapshot carries every record whole, as before, so nothing outlives the run that needs it, and a resumed run tiers
+  again from its snapshot. (Decided here, not in the proposal: see "Where it differs".)
+- **Reading back** decompresses the record's block, kept in a small cache of blocks (8 MB), and deserialises the record.
+- **The state hash** streams every record in id order, as before; a cold record's bytes are written as they are on disk,
+  never made into a record again (`Rec::write_canonical`), so a checkpoint does not bring the history back into memory.
+- **Books** (`kernel/crates/actors/src/common/book.rs`) keep each record's `Rec`, and the record itself only while
+  they read it: what a book has read is let go at its next day (`Book::set_moment`) and read again when it is next
+  asked for. Its lists read lazily: what a reader skips (`skip`, `nth`), counts or passes over is not read, so a reader
+  that keeps its place in a list reads only what is new to it.
+- **The delivered-records cache** is keyed by the record's slot, not by where the record is in memory (a record read
+  back from disk is a new copy), and an entry not shown for a week goes whole; a host that keeps what it is handed keeps
+  the slots of what it holds itself.
+- **The offices' files of payments** (`State::ledgers`, derived, never hashed) keep their last weeks in memory: what is
+  older than `after_days` goes to the same cold file in blocks of at least 256 payments, and the file reads back whole
+  and in order when a post changes hands (`Ledger::all`), the only time it is read.
 
-## What is cold
+## Readers that read what they no longer needed
 
-A record is immutable once filed and, after its first days, seldom read: it is read again when someone asks its keeper
-for it by name, when a register that lists it is shown, when a law or an agreement it carries is in force, and at a
-checkpoint (the state hash streams every record). A payment on an office's file is read when a new holder takes the
-post and is handed the file. Most of the history is read at a checkpoint and nowhere else.
+A record stays in memory while someone reads it. Measured on the 10,000 town (`OIKOS_COLD_WHO`, which counts the first
+read of each record each day by the kind of actor reading it), most of the old records still read each day were read
+by code that went through more than it needed: every one a mechanism fault that also cost the run's own thread time
+growing with the run. Fixed, each result-identical:
 
-## The proposal
+- a list collected whole to skip what was read before (the trade desk's delivery notes and orders, the producer's
+  declined invoices, the electoral office's votes): the list read lazily from where it was left;
+- a person's weekly going-through of public goings-on (citizen/memory.rs) read every record of their book; it reads
+  only public statements and withdrawals, the only papers it can let go (`Book::public`, `forget_public`);
+- a person's weekly plan read every record to find those made since the last plan (`Book::records_since`: the slot
+  knows when its record was made).
 
-**Records (and offices' files) past a few weeks old move to disk, and come back when read.** Nothing anyone sees,
-nothing in the log and nothing in the state hash changes: disk is where the kernel keeps what it already keeps.
+What is still read every day is what is in force (a bank's standing orders, agreements, a register's entries, open
+claims): held in memory, as the proposal said it would be.
 
-- **Segments.** Records leave memory in filing order, a segment at a time (say a month's): written once, canonical
-  bytes, zstd-compressed (the kernel already uses it for snapshots and the binary log), to the run's own directory
-  (`runs/<run>/cold/`), never edited. In memory each moved record leaves its id and where its bytes are (16 bytes or
-  so, against some 400 now).
-- **Reading.** A read of a moved record decodes it from its segment and keeps it in a small cache of the recently
-  read (bounded by bytes). Every place that reads records goes through one accessor; today 14 places read the map.
-- **What stays in memory.** Anything a rule reads every day: records whose laws or agreements are in force, the
-  registers' current entries, what an office's file holds of the last weeks. The derived indexes (`marks`,
-  `agreements_of`) stay as they are.
-- **The state hash, unchanged.** At a checkpoint the hash streams every record in id order, as now, cold ones read
-  from their segments in turn (some 440 MB a year at 1,000 people: about a second of reading per checkpoint).
-  Changing the hash's definition (a tree of segment hashes, so cold segments are not read again) would be faster
-  but is a change to the contract: not proposed.
-- **Snapshots and resume.** A snapshot names the segments it relies on (they never change); resume maps them back.
-- **The delivered cache.** It is keyed by where a record is in memory (so that what a host was handed is never
-  mistaken for another record); a record read back from disk is a new copy, so the cache would be keyed by the
-  record's id instead (one more small change, the same results).
+## The other growers
+
+- **The resolver's addressed statements** (`Knowledge::addressed`, what a hold on a paper is addressed to): one entry
+  for every addressed statement each participant has seen, kept for the run. Held small: by the record's number, its
+  list of addressees held once for all (`Addressed`); written out (a snapshot) as the map it stands for.
+- **The twins' per-matter draw counts** (`Draws::matter_occurrences`): a matter may say when it is over
+  (`Cx::rng_until`, `Cx::rng_once`), and its count goes then. A gathering's matter ends when it begins (it is decided on
+  only before); a delivered order's faultiness is drawn once, when its note is read. Results identical: a matter is
+  never drawn for after it says it is over (a test holds the count running on before its end).
+
+## Where it differs from the proposal
+
+- **Slots, not segments of a month.** Records leave memory one by one by when they were last read, not a month at a time:
+  what a rule still reads stays, whatever its age, and what nobody reads goes after `idle_days`.
+- **The cold file is the run's scratch, not kept.** The proposal's question 2 (keep it with the run, or let it go) is
+  answered "let it go": it is rebuilt from the run, a snapshot carries what it holds, and a model run's log (never
+  deleted) is untouched. Kept, it would add some 2 to 10 GB a run at 50,000 people.
+- **The state hash unchanged** (question 3): as proposed.
+- **What people remember** (question 4) is untouched: a person's mind and its knowledge stay in memory.
 
 ## What must hold
 
-Every result byte-identical to keeping all in memory, proved by `orchestrator/test/representation.test.ts` and by a
-year-long town ending at the same state hash with and without the cold tier, forced on early (a test setting that
-moves records to disk after a day). No participant learns anything differently: the cold tier is the kernel's, and
-records still reach a participant only through its channels (docs/no-god-view.md). Disk I/O never decides anything.
-
-## Expected effect
-
-At a year at 1,000 people, about 450 to 500 MB of the 895 MB live goes to disk (records and payments past a month),
-the peak falling to perhaps 550 to 650 MB, and growth to a fraction of 1 MB a day (what stays is the indexes and the
-in-force records). CPU: a few percent at checkpoints and on reads of old records; to be paired, as every step.
-
-## For Naz to decide
-
-1. **Go ahead with the design?** It is the largest change on the branch (world state, the kernel's record accessor,
-   snapshots, the delivered cache): some days, in steps, each byte-identical.
-2. **Where cold data lives and what it may cost in disk.** Proposed: beside the run's log in `runs/<run>/cold/`; a
-   year at 1,000 people is some 100 to 150 MB compressed. Kept with the run (model runs are never deleted) or let go
-   when the run ends (it can be rebuilt from the log)?
-3. **The state hash.** Keep it as it is (proposed), at the cost of reading cold history at each checkpoint, or
-   consider a hash over segments later, which is a contract change.
-4. **What people remember** is not touched: a person's own knowledge stays in memory. If it is the next to grow, it
-   is yours to bound or to tier.
+Every result byte-identical to keeping everything in memory: `kernel/tests/a1_citizen.rs` runs a town tiered from the
+second day (every record not read that day goes to disk) against one held in memory, state hash and log byte for byte;
+`orchestrator/test/representation.test.ts` holds six towns to their pins with the tier on; the 10,000 town over 60 days
+ends at main's state hash and log digest with and without it (docs/decisions.md). Disk decides nothing: a cold file that
+cannot be made leaves the records in memory; one that cannot be read back stops the run.

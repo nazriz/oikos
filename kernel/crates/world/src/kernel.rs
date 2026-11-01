@@ -472,6 +472,20 @@ impl World {
         &self.state
     }
 
+    /// The offices' files of payments: what is older than `before` written to the run's cold file and let go of in
+    /// memory, for every file with at least `most` such (docs/design/tiered-storage.md). They are derived, never part of
+    /// the state's hash; a file reads back the same (`Ledger::all`). How many payments went.
+    pub fn cool_ledgers(&mut self, file: &std::sync::Arc<crate::held::ColdFile>, before: i64, most: usize) -> std::io::Result<usize> {
+        let keys: Vec<String> = self.state.ledgers.iter().filter(|(_, l)| l.old(before) >= most).map(|(k, _)| k.clone()).collect();
+        let mut n = 0;
+        for k in keys {
+            if let Some(l) = self.state.ledgers.get_mut(&k) {
+                n += l.cool(file, before)?;
+            }
+        }
+        Ok(n)
+    }
+
     pub fn statics(&self) -> &Statics {
         &self.s
     }

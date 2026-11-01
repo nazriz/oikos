@@ -485,6 +485,9 @@ const LOOK_AHEAD: usize = 64;
 /// Fewer than this aren't worth the starting of threads.
 const WORTH_SHARING: usize = 16;
 
+/// How many of an office's old payments go to disk together (fewer wait for more).
+const LEDGER_BLOCK: usize = 256;
+
 /// `f` of each item, in the items' order, worked out on up to `threads` threads. Each thread takes the next item not
 /// yet taken; every result is put where its item stands, so the list is the same however the work fell out.
 fn each<T: Sync, R: Send>(items: &[T], threads: usize, f: impl Fn(&T) -> R + Sync) -> Vec<R> {
@@ -570,6 +573,13 @@ impl Kernel {
             }
         }
         self.tiered = st.record_order.len();
+        // (The offices' files of payments: what is older than the tier keeps records filed, in blocks of a few hundred.)
+        if let Some(file) = self.tier.file() {
+            let before = (day - self.tier.policy().after_days) * 86_400;
+            if let Err(e) = self.world.cool_ledgers(&file, before, LEDGER_BLOCK) {
+                panic!("the offices' files could not be written: {e}");
+            }
+        }
         match self.tier.pass(day) {
             Ok(t) => {
                 if std::env::var_os("OIKOS_COLD_TRACE").is_some() {
