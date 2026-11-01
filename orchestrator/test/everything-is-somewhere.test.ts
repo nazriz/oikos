@@ -66,7 +66,7 @@ test("a world of three towns (S6): the audits find what one town's find, each to
   expect(w.entities.filter((e: any) => e.kind === "boundary").map((e: any) => e.id)).toEqual(w.boundaries);
   expect(c.participants.filter((p: any) => p.controller?.impl === "world.weather").length).toBe(1);
   const cell = (n: string) => w.network.nodes.find((x: any) => x.id === n).cell;
-  for (const [a, b] of [["n-gate", "t2-n-gate"], ["t2-n-gate", "t3-n-gate"]]) expect(w.network.links.some((l: any) => l.from === a && l.to === b && l.mode === "road" && l.length_m > 0 && cell(a) !== cell(b)), `${a} to ${b}`).toBe(true);
+  for (const [a, b] of [["n-gate", "t2-n-gate"], ["t2-n-gate", "t3-n-gate"]] as const) expect(w.network.links.some((l: any) => l.from === a && l.to === b && l.mode === "road" && l.length_m > 0 && cell(a) !== cell(b)), `${a} to ${b}`).toBe(true);
 });
 
 test("the special cases the landed steps deleted are gone, and stay gone", () => {
