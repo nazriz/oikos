@@ -137,8 +137,7 @@ pub mod rig {
                 asking: vec![],
                 readings: BTreeMap::new(),
                 woke_for: woke_for.into(),
-                since: 0,
-            }
+                since: 0, held: Default::default() }
         }
 
         /// One wake: the actor steps until it waits, each act it makes counted as done. Returns every action it took.

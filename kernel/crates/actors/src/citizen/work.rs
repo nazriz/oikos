@@ -1254,8 +1254,7 @@ mod tests {
             asking: vec![],
             readings: Default::default(),
             woke_for: "cadence".into(),
-            since: 0,
-        }
+            since: 0, held: Default::default() }
     }
     fn acc(balance: i64) -> Option<crate::common::OwnAccount> {
         Some(crate::common::OwnAccount { account: "acc.ann".into(), balance, custodian: "bank".into(), currency: "XTS".into() })

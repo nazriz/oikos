@@ -329,15 +329,16 @@ impl<B: Body> Plan for Factory<B> {
             }
         }
         // What the outside sent back unpaid is what we learn our room from.
-        let notes: Vec<_> = self.book.all("invoice_declined").cloned().collect();
-        for n in notes.iter().skip(self.invoices_read) {
+        let declined = self.book.all("invoice_declined").len();
+        let notes: Vec<_> = self.book.all("invoice_declined").skip(self.invoices_read).cloned().collect();
+        for n in notes.iter() {
             if crate::common::addressed_to(n).iter().any(|a| *a == self.me) {
                 if let Some(back) = data(n).i("returned") {
                     self.room.sent_back(back);
                 }
             }
         }
-        self.invoices_read = notes.len();
+        self.invoices_read = declined;
     }
 
     fn until(&self, pic: &Picture) -> Option<i64> {

@@ -978,8 +978,7 @@ mod tests {
             asking: vec![],
             readings: Default::default(),
             woke_for: "cadence".into(),
-            since: 0,
-        }
+            since: 0, held: Default::default() }
     }
     fn adult(sex: &str, at: Option<&str>) -> Value {
         json!({ "born_at": -40 * YEAR, "sex": sex, "present": true, "alive": true, "in": at })

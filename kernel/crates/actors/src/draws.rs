@@ -61,6 +61,16 @@ fn names_matter(p: &str) -> bool {
 }
 
 impl Draws {
+    /// What it keeps, for whoever measures memory: entries counted by what, and a few of its matters' purposes.
+    pub fn kept(&self) -> (Vec<(&'static str, usize)>, Vec<&str>) {
+        let papers: usize = self.drawn_on.values().map(BTreeMap::len).sum();
+        let chance: usize = self.chance_drawn_on.values().map(BTreeMap::len).sum();
+        (
+            vec![("draws.day", self.day_occurrences.len()), ("draws.matter", self.matter_occurrences.len()), ("draws.papers", papers), ("draws.purposes", self.drawn_on.len()), ("draws.chance_papers", chance)],
+            self.matter_occurrences.keys().take(3).map(|k| &**k).collect(),
+        )
+    }
+
     pub fn new(participant: &str, capacity: &str) -> Self {
         Draws { participant: participant.into(), capacity: capacity.into(), day: -1, ..Default::default() }
     }

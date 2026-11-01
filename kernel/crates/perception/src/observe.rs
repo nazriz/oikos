@@ -145,7 +145,7 @@ pub enum ChannelData {
     },
     Records {
         /// (The state's own records, shared: a record is immutable once made, and one is shown to many.)
-        records: Vec<Arc<Record>>,
+        records: Vec<crate::held::Rec>,
         /// Set when these are a search's results (what matches now), not what's new since the last look.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         search: Option<bool>,
@@ -302,8 +302,8 @@ pub struct PositionItem {
 pub fn held_structures(st: &State, entity: &str) -> Vec<Id> {
     let mut out: BTreeSet<Id> = BTreeSet::new();
     for id in st.agreements_of.get(entity).into_iter().flatten() {
-        let Some(stored) = st.records.get(id) else { continue };
-        let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { continue };
+        let Some(r) = st.records.get(id).map(|x| x.record()) else { continue };
+        let crate::blocks::RecordBody::Agreement { terms } = &r.body else { continue };
         if !st.reading(id).is_some_and(|r| r.status == "in_force" || r.status == "ending") {
             continue;
         }
@@ -328,11 +328,11 @@ pub fn can_see(st: &State, rec: &Record, entity: &str) -> bool {
 
 /// Where a record physically is: the cell a statement was put up on, and the same place for
 /// taking it down (a withdrawal of a placed statement).
-pub fn place_of<'a>(st: &'a State, rec: &'a Record) -> Option<&'a Id> {
+pub fn place_of(st: &State, rec: &Record) -> Option<Id> {
     match &rec.body {
-        crate::blocks::RecordBody::Statement { place, .. } => place.as_ref(),
-        crate::blocks::RecordBody::Withdrawal { withdraws, .. } => match &st.records.get(withdraws)?.record.body {
-            crate::blocks::RecordBody::Statement { place, .. } => place.as_ref(),
+        crate::blocks::RecordBody::Statement { place, .. } => *place,
+        crate::blocks::RecordBody::Withdrawal { withdraws, .. } => match &st.records.get(withdraws)?.record().body {
+            crate::blocks::RecordBody::Statement { place, .. } => *place,
             _ => None,
         },
         _ => None,
@@ -345,7 +345,7 @@ fn placed_ok(st: &State, rec: &Record, me: &str, area: Option<&Scope>) -> bool {
     match (place_of(st, rec), area) {
         (None, None) => true,
         (None, Some(_)) => false,
-        (Some(p), Some(scope)) => scope.covers(p),
+        (Some(p), Some(scope)) => scope.covers(&p),
         (Some(_), None) => st.author_entity(rec).as_deref() == Some(me) || rec.speaks_for.as_deref() == Some(me),
     }
 }
@@ -372,9 +372,9 @@ impl Scope {
 fn involved(st: &State, rec: &Record) -> Vec<Id> {
     let mut v: Vec<Id> = rec.entities_named().into_iter().map(Id::new).chain(st.author_entity(rec)).collect();
     for other in rec.body.records_referenced() {
-        if let Some(o) = st.records.get(other) {
-            v.extend(o.record.entities_named().into_iter().map(Id::new));
-            v.extend(st.author_entity(&o.record));
+        if let Some(o) = st.records.get(other).map(|x| x.record()) {
+            v.extend(o.entities_named().into_iter().map(Id::new));
+            v.extend(st.author_entity(&o));
         }
     }
     v
@@ -382,12 +382,13 @@ fn involved(st: &State, rec: &Record) -> Vec<Id> {
 
 /// The record a withdrawal takes down: the one it names, if whoever withdraws it is its own author's entity or
 /// whoever it speaks for (anyone may record that they "withdraw" anything; only its owner ends its standing).
-fn taken_down<'a>(st: &'a State, rec: &Record) -> Option<&'a crate::state::Stored> {
+fn taken_down(st: &State, rec: &Record) -> Option<(u64, Arc<Record>)> {
     let crate::blocks::RecordBody::Withdrawal { withdraws, .. } = &rec.body else { return None };
-    let target = st.records.get(withdraws)?;
+    let stored = st.records.get(withdraws)?;
+    let target = stored.record();
     let owner = |r: &Record| -> Vec<Id> { r.speaks_for.iter().cloned().chain(st.author_entity(r)).collect() };
     let by = owner(rec);
-    owner(&target.record).iter().any(|o| by.contains(o)).then_some(target)
+    owner(&target).iter().any(|o| by.contains(o)).then_some((stored.seq, target))
 }
 
 /// Does a channel's filter show this record? `news`: what a look delivers, where a statement being taken down is
@@ -399,7 +400,8 @@ fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&Want>, news
     }
     // (What the filter's `statement_kinds` and `has` are asked of: the record, or the statement it takes down.)
     let rec_itself = rec;
-    let rec = if news && (f.statement_kinds.is_some() || f.has.is_some()) { taken_down(st, rec).map_or(rec, |t| &*t.record) } else { rec };
+    let target = if news && (f.statement_kinds.is_some() || f.has.is_some()) { taken_down(st, rec) } else { None };
+    let rec = target.as_ref().map_or(rec, |(_, t)| &**t);
     if let Some(kinds) = &f.statement_kinds {
         match &rec.body {
             crate::blocks::RecordBody::Statement { kind, .. } if kinds.iter().any(|k| k == kind) => {}
@@ -467,7 +469,7 @@ impl<'a> Want<'a> {
 pub struct RecordIndex {
     indexed: usize,
     /// The records in the order they were made (record with seq q is `by_seq[q - 1]`): the state's own, shared.
-    by_seq: Vec<Arc<Record>>,
+    by_seq: Vec<crate::held::Rec>,
     by_record: BTreeMap<&'static str, Vec<u64>>,
     by_kind: BTreeMap<Id, Vec<u64>>,
     by_entity: BTreeMap<Id, Vec<u64>>,
@@ -597,7 +599,8 @@ impl RecordIndex {
         assert!(self.indexed <= st.record_order.len(), "the record index is ahead of the state it's asked about");
         for i in self.indexed..st.record_order.len() {
             let stored = &st.records[&st.record_order[i]];
-            let (seq, rec) = (stored.seq, &*stored.record);
+            let record = stored.record();
+            let (seq, rec) = (stored.seq, &*record);
             self.by_seq.push(stored.record.clone());
             self.by_record.entry(rec.body.kind_name()).or_default().push(seq);
             if let crate::blocks::RecordBody::Statement { kind, offer, practice, assertion, registry, adico, formal, .. } = &rec.body {
@@ -612,7 +615,7 @@ impl RecordIndex {
                 self.by_entity.entry(e).or_default().push(seq);
             }
             if let Some(p) = place_of(st, rec) {
-                self.by_place.entry(*p).or_default().push(seq);
+                self.by_place.entry(p).or_default().push(seq);
                 self.placed_last = self.placed_last.max(seq);
             }
             // Everything stands when made, except a withdrawal: it takes something down.
@@ -625,14 +628,14 @@ impl RecordIndex {
             // A withdrawal by the record's own author (or whoever it speaks for) ends its standing, and is news
             // wherever statements like the one it takes down are shown (`matches`): found by that statement's
             // kind and by the fields it carries.
-            if let Some(target) = taken_down(st, rec) {
-                let t = &*target.record;
+            if let Some((target_seq, target)) = taken_down(st, rec) {
+                let t = &*target;
                 if let Some(set) = self.standing_record.get_mut(t.body.kind_name()) {
-                    set.remove(&target.seq);
+                    set.remove(&target_seq);
                 }
                 if let crate::blocks::RecordBody::Statement { kind, offer, practice, assertion, registry, adico, formal, .. } = &t.body {
                     if let Some(set) = self.standing_kind.get_mut(kind) {
-                        set.remove(&target.seq);
+                        set.remove(&target_seq);
                     }
                     self.by_kind.entry(kind.clone()).or_default().push(seq);
                     let carries = [("offer", offer.is_some()), ("practice", practice.is_some()), ("assertion", assertion.is_some()), ("registry", registry.is_some()), ("adico", adico.is_some()), ("formal", formal.is_some()), ("hears", offer.as_ref().is_some_and(|o| o.get("hears").is_some()))];
@@ -1034,7 +1037,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             if let (false, ChannelKind::Records { way, filter, from, of, by, .. }) = (searches.is_empty(), &ch.kind) {
                 let scope = area.map(|a| index.scope(s, st, a, &me));
                 let want = Want::of(*way, from.as_ref(), &me);
-                let mut found: Vec<Arc<Record>> = vec![];
+                let mut found: Vec<crate::held::Rec> = vec![];
                 for q in searches {
                     // How many one answer gives is the keeper's to say, and a board's how many one reading takes in.
                     let most = match way {
@@ -1046,7 +1049,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         _ => None,
                     };
                     for r in search(st, index, &me, filter, want.as_ref(), scope.as_ref(), q, most) {
-                        if !found.iter().any(|x| x.id == r.id) {
+                        if !found.iter().any(|x| x.same(&r)) {
                             found.push(r);
                         }
                     }
@@ -1160,7 +1163,10 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         records: seqs
                             .into_iter()
                             .map(|q| &by_seq[(q - 1) as usize])
-                            .filter(|r| can_see(st, r, &me) && placed_ok(st, r, &me, scope.as_ref()) && matches(st, r, filter, want.as_ref(), true))
+                            .filter(|h| {
+                                let r = h.load();
+                                can_see(st, &r, &me) && placed_ok(st, &r, &me, scope.as_ref()) && matches(st, &r, filter, want.as_ref(), true)
+                            })
                             .cloned()
                             .collect(),
                         search: None,
@@ -1273,15 +1279,16 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
     for ch in channels.values() {
         if let ChannelData::Records { records, .. } = ch {
             for r in records {
+                let r = r.load();
                 let agreement = match &r.body {
-                    crate::blocks::RecordBody::Agreement { .. } => Some(&r.id),
-                    crate::blocks::RecordBody::Signature { agreement, .. } | crate::blocks::RecordBody::Notice { agreement, .. } => Some(agreement),
+                    crate::blocks::RecordBody::Agreement { .. } => Some(r.id),
+                    crate::blocks::RecordBody::Signature { agreement, .. } | crate::blocks::RecordBody::Notice { agreement, .. } => Some(*agreement),
                     _ => None,
                 };
                 if let Some(a) = agreement {
-                    if !readings.contains_key(a) {
-                        if let Some(x) = st.reading(a) {
-                            readings.insert(*a, x);
+                    if !readings.contains_key(&a) {
+                        if let Some(x) = st.reading(&a) {
+                            readings.insert(a, x);
                         }
                     }
                 }
@@ -1365,7 +1372,7 @@ fn looked_up_one(st: &State, who: &Who) -> ChannelData {
 /// and the query, now. Standing records only if asked; ordered as asked (newest first by default);
 /// at most `limit` (default 20).
 #[allow(clippy::too_many_arguments)]
-fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want: Option<&Want>, area: Option<&Scope>, q: &Query, most: Option<u32>) -> Vec<Arc<Record>> {
+fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want: Option<&Want>, area: Option<&Scope>, q: &Query, most: Option<u32>) -> Vec<crate::held::Rec> {
     let at_seq = |seq: u64| &index.by_seq[(seq - 1) as usize];
     // A search for one record by its id reads that record, not the register it is in (the same answer: every other
     // condition is still asked of it below).
@@ -1380,12 +1387,12 @@ fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want
             None => one,
         }
         .into_iter()
-        .filter(|&seq| q.standing != Some(true) || index.is_standing(at_seq(seq), seq))
+        .filter(|&seq| q.standing != Some(true) || index.is_standing(&at_seq(seq).load(), seq))
         .collect()
     } else if let Some(sc) = area {
         let mut v = index.placed(sc, 0);
         if q.standing == Some(true) {
-            v.retain(|&seq| index.is_standing(at_seq(seq), seq));
+            v.retain(|&seq| index.is_standing(&at_seq(seq).load(), seq));
         }
         v.reverse();
         v
@@ -1397,14 +1404,14 @@ fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want
         v
     };
     let conditions = q.conditions.as_deref().unwrap_or(&[]);
-    let mut hits: Vec<(u64, &Arc<Record>)> = seqs
+    let mut hits: Vec<(u64, &crate::held::Rec, Arc<Record>)> = seqs
         .into_iter()
-        .map(|seq| (seq, at_seq(seq)))
-        .filter(|(_, r)| can_see(st, r, me) && placed_ok(st, r, me, area) && matches(st, r, filter, want, false) && conditions.iter().all(|c| holds(r, c)))
+        .map(|seq| (seq, at_seq(seq), at_seq(seq).load()))
+        .filter(|(_, _, r)| can_see(st, r, me) && placed_ok(st, r, me, area) && matches(st, r, filter, want, false) && conditions.iter().all(|c| holds(r, c)))
         .collect();
     if let Some(o) = &q.order {
         // Records without the field sort last; ties keep newest first.
-        hits.sort_by(|(sa, a), (sb, b)| match (field(a, &o.field), field(b, &o.field)) {
+        hits.sort_by(|(sa, _, a), (sb, _, b)| match (field(a, &o.field), field(b, &o.field)) {
             (Some(x), Some(y)) => {
                 let c = compare(scalar(&x), scalar(&y)).unwrap_or(std::cmp::Ordering::Equal);
                 (if o.desc { c.reverse() } else { c }).then(sb.cmp(sa))
@@ -1415,5 +1422,5 @@ fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want
         });
     }
     let limit = q.limit.unwrap_or(20).min(most.unwrap_or(u32::MAX));
-    hits.into_iter().take(limit as usize).map(|(_, r)| r.clone()).collect()
+    hits.into_iter().take(limit as usize).map(|(_, h, _)| h.clone()).collect()
 }

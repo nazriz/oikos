@@ -602,7 +602,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 let ags: Vec<(oikos_kernel::blocks::Id, String)> = st
                     .records
                     .iter()
-                    .filter_map(|(id, x)| match &x.record.body {
+                    .filter_map(|(id, x)| match &x.record().body {
                         oikos_kernel::blocks::RecordBody::Agreement { terms } => Some(terms.parties.iter().map(|p| (*id, p.clone())).collect::<Vec<_>>()),
                         _ => None,
                     })

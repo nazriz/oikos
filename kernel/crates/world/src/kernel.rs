@@ -149,6 +149,39 @@ fn write_map<K: AsRef<str> + Ord + Clone, V: serde::Serialize + Clone>(m: &crate
     Ok(())
 }
 
+/// The world's records as `write_map` writes them (each `{"record":...,"seq":n}`, by id), each record's bytes from where
+/// it is held (`Rec::write_canonical`).
+fn write_records(m: &crate::state::Map<Id, crate::state::Stored>, sink: &mut dyn FnMut(&[u8])) -> Result<(), canon::CanonError> {
+    let mut keys: Vec<&Id> = m.keys().collect();
+    if !keys.iter().all(|k| k.is_ascii()) {
+        keys.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
+    }
+    let mut buf = Vec::new();
+    sink(b"{");
+    for (i, k) in keys.into_iter().enumerate() {
+        buf.clear();
+        if i > 0 {
+            buf.push(b',');
+        }
+        canon::write_string(k, &mut buf);
+        buf.extend_from_slice(b":{\"record\":");
+        let stored = &m[k];
+        stored.record.write_canonical(&mut buf)?;
+        buf.extend_from_slice(format!(",\"seq\":{}}}", stored.seq).as_bytes());
+        #[cfg(debug_assertions)]
+        {
+            let mut whole = Vec::new();
+            canon::write_string(k, &mut whole);
+            whole.push(b':');
+            whole.extend_from_slice(&canon::canonical(stored)?);
+            debug_assert_eq!(&buf[usize::from(i > 0)..], &whole[..], "a stored record written from its bytes isn't its canonical JSON");
+        }
+        sink(&buf);
+    }
+    sink(b"}");
+    Ok(())
+}
+
 fn refusal_info(r: &Refusal) -> RefusalInfo {
     RefusalInfo { code: r.code, block: r.block, detail: r.detail.clone() }
 }
@@ -481,7 +514,13 @@ impl World {
                 }
             )*};
         }
-        stream!(entities, accounts, holdings, closed_accounts, cells, structures, occupancy, departures, entered, records, participants, positions, timelines);
+        stream!(entities, accounts, holdings, closed_accounts, cells, structures, occupancy, departures, entered, participants, positions, timelines);
+        // (The records, each written as `canon::canonical` of it would be, a cold one's bytes as they are on disk: the
+        // record is not made again to be hashed, nor held in memory again.)
+        rest.records = Default::default();
+        if !s.records.is_empty() {
+            streamed.push(("records", Box::new(move |sink: &mut dyn FnMut(&[u8])| write_records(&s.records, sink))));
+        }
         rest.record_order = imbl::Vector::new();
         if !s.record_order.is_empty() {
             streamed.push(("record_order", Box::new(move |sink: &mut dyn FnMut(&[u8])| {

@@ -1492,8 +1492,7 @@ mod tests {
             asking: vec![],
             readings: BTreeMap::new(),
             woke_for: "cadence".into(),
-            since: 0,
-        }
+            since: 0, held: Default::default() }
     }
 
     fn rec(v: Value) -> Arc<Record> {

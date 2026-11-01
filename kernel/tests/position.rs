@@ -102,7 +102,7 @@ fn sites(o: &Observation, ch: &str) -> (Vec<SiteCell>, bool) {
 
 fn ids(o: &Observation, ch: &str) -> Vec<String> {
     match &o.channels[ch] {
-        ChannelData::Records { records, .. } => records.iter().map(|r| r.id).map(|x| x.to_string()).collect(),
+        ChannelData::Records { records, .. } => records.iter().map(|r| r.id()).map(|x| x.to_string()).collect(),
         ChannelData::Sites { cells, .. } => cells.iter().map(|p| p.cell).map(|x| x.to_string()).collect(),
         other => panic!("{other:?}"),
     }
