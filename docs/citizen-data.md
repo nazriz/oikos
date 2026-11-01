@@ -141,7 +141,7 @@ points, acting -0.23 to +0.22 points, spread kept 0.97 to 1.00.
   54.0% of want decisions waited with the model off and 53.0% on; the odds drawn on put 54.4% on waiting where the code
   mind's own put 54.2%.
 - **What this is and is not:** a faithful, fast copy of the code mind's want weighing (the caveat on the plan holds: it
-  inherits the code mind's assumptions, placeholder sways and all, and is no independent evidence of how people act).
+  inherits the code mind's assumptions, placeholder sways (PC-5) and all, and is no independent evidence of how people act).
   It is not faster than the code mind's own arithmetic for this decision (a few dozen operations); it is the shape,
   speed, determinism and spread the design asked step 5 to prove before any teacher, and the mechanism a round with
   teachers or content heads plugs into.
