@@ -1,29 +1,29 @@
 {
- "//": "The 30-day results of each town (worlds/town.yaml, worlds/town-1000.yaml; profiles au-vic-2026, gb-eng-2026, us-oh-2026) at 4 engine threads, taken at 8a1866a7 by `bun scripts/same-results.ts --pin scripts/fixtures/representation-results.json`. orchestrator/test/representation.test.ts holds every build to them: a change of representation leaves them byte-identical. A change meant to change results re-takes them, in its own commit, with the reason.",
+ "//": "The 30-day results of each town (worlds/town.yaml, worlds/town-1000.yaml; profiles au-vic-2026, gb-eng-2026, us-oh-2026) at 4 engine threads, taken at 7d3f07c6 by `bun scripts/same-results.ts --pin scripts/fixtures/representation-results.json`. orchestrator/test/representation.test.ts holds every build to them: a change of representation leaves them byte-identical. A change meant to change results re-takes them, in its own commit, with the reason.",
  "towns": {
   "200-au-vic-2026": {
-   "state_hash": "4d7ae3377f1fa49bc712c1079babb158d1b9610acf1839c2d0a39815b02a0603",
-   "log_sha256": "db59eded6bbdc5b8459b9b2118a86f5c29c09aa21c38dcacf07dc2f0474c9f4a"
+   "state_hash": "847eb30f235d1cc4963e42b3e9bd54e4e31eb11490e1184dfa938699251c611d",
+   "log_sha256": "312115748bf710ecba253feb711b90806c9d6cf1c462b37f804b1d0dc410e71d"
   },
   "200-gb-eng-2026": {
-   "state_hash": "4c0f82610a38835b79de8648313d1f4525434610341a8f48bdb437dd6eb1be24",
-   "log_sha256": "a00533460bef234df7d5d64b87ac41fb1f6c2cd49a19471989ca31950b52b252"
+   "state_hash": "c6c36e29a6050c97839a61f4ab802bbb133beae87c9d8a692406ad4c3be97605",
+   "log_sha256": "f9970cd3ae0af3662e1250293349b9a70dbc0644ac0fe8891a3ba01a88bdae50"
   },
   "200-us-oh-2026": {
-   "state_hash": "685f2dd003ab97826a7e79069a7f012c66d7adc7dfb2ab0a9204e89d7e00659d",
-   "log_sha256": "dcbe2b5b7bfdc863b0b786845f89b864db8eea6a11e03319c3438d50ff8b912a"
+   "state_hash": "b32180550391b8d85d16d6fdcbccf9ca967d9e700e664fe2a2886b68b815bea1",
+   "log_sha256": "96e093cb4c9745656257b26fba2365302e5d62d919b5a46bcdc0b6341e9f19b3"
   },
   "1000-au-vic-2026": {
-   "state_hash": "888768dedecacb384ff3857c8d6063aaaa3393801cb562ff5be564e9ac3c194d",
-   "log_sha256": "0855cfba679d42fd4d1d616cd5a91bc800032b0000fab571f8bce4c6ecefc040"
+   "state_hash": "c223825391dd27a73e188c6e3f6aea02b3c06c2817a64a4691dabac2f734d06c",
+   "log_sha256": "444d3334d77387e774bcc3f3b460764a3a3baa6585724a429f8e617af163d55d"
   },
   "1000-gb-eng-2026": {
-   "state_hash": "50d6e5039d6f3c2c40c0f6647f062a5c8beba5635310f5f401573548e9400c26",
-   "log_sha256": "d126a872fe954d4c1d0d69f53cff06d638f729b6f1b9766dd037d148afa07d0d"
+   "state_hash": "eb1c0603bbd3d084389049b581ec86e72f093502982c28ea63ba70eaf99fd823",
+   "log_sha256": "c4eacce823778d06addd6b19947d2ede193f52317f90058808c89027105329ac"
   },
   "1000-us-oh-2026": {
-   "state_hash": "f8586363ec35d3ff239b1f97f74d1c8d415e2e6d756a25068e1e3520a46adc18",
-   "log_sha256": "4e3728e90388e2a23c98ad1fa422bad1bec855c7c510653ad4712e246d95d16e"
+   "state_hash": "fb1419b27cd010f84d64dd738cf7af4f6c15067e58ee4a044632d1899bef25d7",
+   "log_sha256": "83570087fcc95b3ed53bc8a71cc10ae0b5380bf1fddee6562197bfc76d4b7110"
   }
  }
 }
