@@ -217,6 +217,16 @@ pub struct SkillUse {
     pub expert_bps: u32,
 }
 
+/// A tool a piece of work may be done with (foundations-2 E2): a good, so many for each person at the work, and the share
+/// of the time the work then takes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ToolUse {
+    pub kind: Id,
+    pub per_performer: i64,
+    pub labour_bps: u32,
+}
+
 /// An act's skill (foundations-2 E4): `act` as the table of work keys it (`publish/<kind>`, or a block).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -449,6 +459,10 @@ pub struct TaskCfg {
     /// task is practice.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill: Option<SkillUse>,
+    /// A technology that is a good (foundations-2 E2): with `per_performer` of the `kind` held by the actor where the work
+    /// is done, for each person doing it, the work takes `labour_bps` of its time. The tool is not used up. Absent: none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<ToolUse>,
     /// Per unit: taken from a field, at the cell (the structure's, or the four around them) that has the most of it
     /// (water from the river).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2242,6 +2256,11 @@ fn check_bodies(c: &Config) -> Result<(), String> {
         }
         if let Some(sk) = &t.skill {
             check_skill_use(&vars, &format!("task {}", t.id), &sk.variable, sk.novice_bps, sk.expert_bps)?;
+        }
+        if let Some(tl) = &t.tool {
+            if !cat.resources.iter().any(|r| r.id == tl.kind) || tl.per_performer < 1 || tl.labour_bps > 10_000 {
+                return Err(format!("task {}: a tool is a kind the world holds, one or more for each person, its time at most all of it", t.id));
+            }
         }
     }
     let mut acts: BTreeSet<&str> = BTreeSet::new();

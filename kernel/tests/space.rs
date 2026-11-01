@@ -8,7 +8,7 @@
 //! - **S3:** a body on its way is in no building from when it sets out until it arrives (the property, and a trip by car),
 //!   its vehicle with it; a trip refused on arrival brings it back where it set out.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::{EventBody, RefusalCode};

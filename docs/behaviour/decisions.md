@@ -78,14 +78,24 @@ review asked for and not answered within so many days of the asking is taken as 
 then, as from an answer. The claimant's appeal opens on that day (`citizen/recourse.rs`, `Ways::for_want`), its
 application says when the review was asked (`review_asked_on`), and the venue counts the days from the deemed refusal
 (`offices/hearing.rs`); before then it turns the appeal away as wanting the review, as before. The law's words say it.
-An answer that comes later is an answer like any other. A place whose law has no such rule leaves the route shut, as
-the real one does: what its claimants do instead (ask again, complain to an ombudsman, seek judicial review) is not
-built (MT-21's remainder).
+An answer that comes later is an answer like any other. A place whose law has no such rule leaves the appeal shut, as
+the real one does. What its claimants do instead is complain of the delay to a body that takes it up and can only
+recommend: the review route's `complaint_after_days` (since 2026-10-31). A review asked for and not answered that long
+may be brought to any body that hears the matter and does not order (the town's ombudsman desk: `can: recommend`),
+never to the tribunal; the desk does the work at its own cost and time (an officer's hours, its slips), asks the
+agency, and recommends; nothing binds the agency. An answer ends it: the appeal then runs from the answer. Asking again
+and judicial review (or mandamus) are not built (MT-21).
 
 | Profile | Deemed refusal | Source |
 |---|---|---|
 | de-ni | 91 days (three months) after the objection, then the month to go to the social court | SGG s 88(2), the action for failure to act (*Untätigkeitsklage*), recalled, **to confirm**; the real action has no month's limit after the three months: ours is the stricter reading (MT-21) |
 | au-vic, gb-eng, us-oh (pension) | none | no deemed refusal recalled for the internal review of a benefit decision, **to confirm** (Australia's FOI Act has one, s 15AC, for access requests, not here; MT-21) |
+
+| Profile | Complaint of delay (`complaint_after_days`) | Who does it, really | Source |
+|---|---|---|---|
+| au-vic | 14 days after the request for review (MT-21) | the Commonwealth Ombudsman (free; may recommend, cannot direct Services Australia) | Ombudsman Act 1976 (Cth) s 5, recalled, **to confirm**; the Ombudsman's Services Australia page (give the agency 10 business days first) and its case study on ARO review delays, opened 2026-10-31 |
+| gb-eng | 21 days (MT-21) | a complaint to the DWP office, a senior manager, then the Independent Case Examiner (free; recommends): one desk in the town | no time limit on a mandatory reconsideration (JUSTICE/AJC 2021 p 81; Citizens Advice; DWP FOI 343/2013), seen as search summaries, **to confirm**; the 15 working days, recalled, **to confirm** |
+| us-oh (pension) | 30 days, a PLACEHOLDER (MT-21) | a congressional inquiry by the member of Congress's caseworker (SSA answers; it decides nothing); the desk stands in | CRS, *Casework in a Congressional Office* (98-878), seen as a search summary, **to confirm**; 20 CFR 404.920 sets no time, recalled, **to confirm** |
 | mx-jal | not stated | the review is optional, so the appeal runs from the decision anyway; Mexican administrative law's *negativa ficta* (to confirm) would matter only if it were required (MT-21) |
 
 ## The places' routes

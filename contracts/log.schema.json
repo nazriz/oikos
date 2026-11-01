@@ -1725,6 +1725,21 @@
           }
         },
         {
+          "description": "Who could do each kind of work, and how well (foundations-2 M8), monthly, for measurement: for each practised skill, how many living people stand in each tenth of its range.",
+          "type": "object",
+          "required": ["event", "cause", "skills"],
+          "additionalProperties": false,
+          "properties": {
+            "event": { "const": "skill_census" },
+            "cause": { "description": "seq of the command entry that caused this event.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count" },
+            "skills": {
+              "type": "object",
+              "propertyNames": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+              "additionalProperties": { "type": "array", "minItems": 10, "maxItems": 10, "items": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 } }
+            }
+          }
+        },
+        {
           "description": "The world's totals (tier 2: greenhouse gas), monthly, for measurement.",
           "type": "object",
           "required": [
@@ -2033,6 +2048,7 @@
         "position_created",
         "appointed",
         "counter_census",
+        "skill_census",
         "taken",
         "flooded",
         "flood_receded",

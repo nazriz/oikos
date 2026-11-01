@@ -1,7 +1,7 @@
 //! firm.builder in the Rust world (docs/port-guide.md, section 4): the kind in Riverbend in place of the city's finance
 //! officer, every other code actor idle, a supplier's prices scripted. The same world on 1 and 14 threads.
 
-mod common;
+use crate::common;
 
 use oikos_kernel::engine::{run_code_world, EngineOptions};
 use serde_json::{json, Value};

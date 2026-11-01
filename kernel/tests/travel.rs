@@ -2,7 +2,7 @@
 //! are checked when it is loaded, and the vehicles are kept in the state as their owners' things (driving them:
 //! `space.rs`). A world without them is the world it was, to the hash.
 
-mod common;
+use crate::common;
 
 use oikos_kernel::run::Run;
 use serde_json::{json, Value};

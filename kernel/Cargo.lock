@@ -846,6 +846,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "oikos-citizen-train"
+version = "0.1.0"
+dependencies = [
+ "oikos-actors",
+ "serde_json",
+]
+
+[[package]]
 name = "oikos-contracts"
 version = "0.7.0"
 dependencies = [

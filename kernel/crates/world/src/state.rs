@@ -819,6 +819,8 @@ pub enum Sched {
     NatureDay { day: i64 },
     /// The world's totals, censused (monthly).
     CounterCensus,
+    /// The practised skills, censused (monthly: foundations-2 M8).
+    SkillCensus,
     /// A year of age: draws for the coming year (illness, injury, other causes).
     Birthday { person: Id },
     /// A drawn chance of injury, taken now against the danger of where the body is (thinning).

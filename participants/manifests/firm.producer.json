@@ -598,6 +598,16 @@
       "schema": {},
       "source": "placeholder"
     },
+    "bank": {
+      "schema": {
+        "description": "the bank it opens its account at, where someone founded it",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "source": "the world gives it (no default)"
+    },
     "borrow_again_days": {
       "default": 30,
       "schema": {
@@ -613,6 +623,14 @@
         "type": "string"
       },
       "source": "placeholder"
+    },
+    "capital": {
+      "default": 0,
+      "schema": {
+        "description": "the capital its founder puts in, where someone founded it, in the smallest unit of the world's money",
+        "type": "integer"
+      },
+      "source": "the world gives it: the founder's (the price of the works and the venture's capital)"
     },
     "casual_bps": {
       "default": 0,
@@ -679,6 +697,16 @@
       "source": "placeholder",
       "unit": "bps"
     },
+    "founder": {
+      "schema": {
+        "description": "who founded it, where someone founded it (none: the town began with it)",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "source": "the world gives it (no default)"
+    },
     "gamma_months": {
       "default": 24,
       "schema": {
@@ -724,6 +752,16 @@
         "type": "string"
       },
       "source": "placeholder"
+    },
+    "listing": {
+      "schema": {
+        "description": "the listing of the works it was founded to buy",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "source": "the world gives it (no default)"
     },
     "look_at": {
       "schema": {},
@@ -978,6 +1016,16 @@
       },
       "source": "placeholder",
       "unit": "bps"
+    },
+    "tool": {
+      "schema": {
+        "description": "a tool its work may be done with, as its supplier sells it, and how it weighs buying one (kind, labour_bps, payback_months, hurdle_bps)",
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "source": "the world gives it (no default): the technology on offer"
     },
     "values": {
       "default": {},

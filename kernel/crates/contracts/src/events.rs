@@ -397,6 +397,11 @@ pub enum EventBody {
     CounterCensus {
         counters: BTreeMap<Id, i64>,
     },
+    /// Who could do each kind of work, and how well (foundations-2 M8), monthly, for measurement: for each practised skill,
+    /// how many living people stand in each tenth of its range, as it stands (fading read to the day).
+    SkillCensus {
+        skills: BTreeMap<Id, Vec<i64>>,
+    },
     /// Work changed a body variable (services: teaching raises skill): its value now.
     BodyChanged {
         person: Id,
@@ -554,6 +559,7 @@ impl EventBody {
             EventBody::ConditionTreated { .. } => "condition_treated",
             EventBody::BodyChanged { .. } => "body_changed",
             EventBody::CounterCensus { .. } => "counter_census",
+            EventBody::SkillCensus { .. } => "skill_census",
             EventBody::Flooded { .. } => "flooded",
             EventBody::Taken { .. } => "taken",
             EventBody::FloodReceded { .. } => "flood_receded",

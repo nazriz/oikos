@@ -932,6 +932,20 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             st.schedule(t + 30 * 86_400, Sched::CounterCensus);
             vec![Timed::new(t, EventBody::CounterCensus { counters: st.totals.clone() })]
         }
+        Sched::SkillCensus => {
+            st.schedule(t + 30 * 86_400, Sched::SkillCensus);
+            let mut skills: BTreeMap<Id, Vec<i64>> = BTreeMap::new();
+            for cfg in s.config.catalogue.body_variables.iter().filter(|v| v.practice.is_some() && v.max > v.min) {
+                let mut bands = vec![0i64; 10];
+                for b in st.entities.values().filter_map(|e| e.body.as_ref()).filter(|b| b.alive) {
+                    let v = b.variables.get(&cfg.id).map_or(cfg.initial, |x| crate::state::body_variable_at(cfg, *x, t).0);
+                    let band = ((v - cfg.min) as i128 * 10 / (cfg.max - cfg.min) as i128).clamp(0, 9) as usize;
+                    bands[band] += 1;
+                }
+                skills.insert(cfg.id, bands);
+            }
+            vec![Timed::new(t, EventBody::SkillCensus { skills })]
+        }
         Sched::StructureComplete { structure } => match st.structures.get_mut(&structure) {
             Some(x) if !x.complete && x.completes_at == Some(item.at) => {
                 // Its time is up; it's complete if its building work is done too (phase B), or else as soon as it is.
@@ -1309,6 +1323,13 @@ impl<'a> Exec<'a> {
                 let off = (10_000 - lb.at_max_bps.min(10_000) as i128) * (mean - cfg.min as i128) / (cfg.max - cfg.min) as i128;
                 let factor = 10_000 - off;
                 total = ((total as i128 * factor + 9_999) / 10_000).max(1) as i64;
+            }
+        }
+        // A tool (foundations-2 E2): held where the work is done, enough for each person at it, the work takes its share of the time.
+        if let Some(tl) = spec.as_ref().and_then(|x| x.tool.as_ref()).filter(|_| n_systems < who.len() && total > 0) {
+            let people = (who.len() - n_systems) as i64;
+            if self.st.holding(&self.entity, &at, &tl.kind) >= tl.per_performer.saturating_mul(people) as Money {
+                total = ((total as i128 * tl.labour_bps as i128 + 9_999) / 10_000).max(1) as i64;
             }
         }
         // A practised skill (foundations-2 E4): the labour scales with the people's mean of it too, as it stands now.
@@ -1963,7 +1984,11 @@ impl<'a> Exec<'a> {
                 if !(1..=MAX_MONEY).contains(quantity) {
                     return Err(refuse(RefusalCode::Overflow, "quantity out of range"));
                 }
-                if !self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(&me))) {
+                // (Law 9: an act that takes the taker somewhere, as taking goods home does, set them out when it began; when it is
+                // done they were there if their way set out from it or went by it, as a carrier's is read for `move_goods`.)
+                let here = self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(&me)));
+                let went = self.started && self.st.transit.get(me.as_str()).is_some_and(|t| t.from == at || t.via.contains(&at));
+                if !here && !went {
                     return Err(refuse(RefusalCode::NotPresent, format!("{me} isn't at {at}")));
                 }
                 let have = self.st.holding(&from, &at, kind);

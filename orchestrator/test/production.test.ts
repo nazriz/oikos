@@ -28,12 +28,21 @@ async function run(name: string, config: any, until: number) {
   return { ev, cmds, recs: ev.filter((e) => e.event === "recorded").map((e) => e.record) };
 }
 
+/** The town with the outside paying a fifth more for its goods than the profile's price: its factories make a profit. */
+function profitable(config: any) {
+  const goods = officeAt(config, "outside-trade").params.buys.goods;
+  goods.unit_price = Math.round(goods.unit_price * 1.2);
+  return config;
+}
+/** How long the dividend towns run: four months, the first dividends due at the first month's end. */
+const END = 120 * DAY;
+
 test("goods are made from inputs by workers' hours, exported within each factory's share, and profits paid to shareholders", async () => {
-  // (Seed 5 of the town: a factory paying a dividend in 300 days is a rare draw of a 200-person town, a margin of a few per cent of its buffer.
-  // Counted over run seeds 1 to 6 of the town, 300 days, a dividend is paid in 2 (seeds 1 and 5) on the code before review of the foundations'
-  // finding 4 (an answer needs a performer at work: registry answers now wait for the clerk's hours, which moves the day's draws) and in 1 (seed 5)
-  // after it. Seed 1, the town's own, had its first dividend on day 30 before. Chance, not a mechanism: the same 420 days of seed 1 hold none.)
-  const config = generate({ ...base, seed: 5 });
+  // (A dividend by construction since 2026-10-31, the slow tier's budget: the outside pays a fifth more for the town's goods
+  // (`profitable`), so a factory earns more in a month than it pays out and holds more than its buffer. It was seed 5 and
+  // 300 days until then, a rare draw: of run seeds 1 to 6 a dividend in 300 days was paid in one or two. Measured that day,
+  // the town's own seed pays one on day 30 at today's price and at a fifth more, monthly after.)
+  const config = profitable(generate(base));
   const trader = officeAt(config, "outside-trade").params;
   const share = trader.buys.goods.from as { [f: string]: number };
   const task = config.catalogue.tasks.find((t: any) => t.id === "make");
@@ -41,7 +50,7 @@ test("goods are made from inputs by workers' hours, exported within each factory
   // its buffer. People now know the shops near them, not every shop; less of what a shop cannot serve is bought
   // elsewhere, shops order a little less, and a factory's first month over its buffer comes later. What is checked of a
   // dividend is the same.)
-  const { ev, recs } = await run("town", config, 300 * DAY);
+  const { ev, recs } = await run("town", config, END);
   // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
   // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own), and households moving into homes still being left.
   // (And a person who has moved by the time an act reaches the one it is for, "X isn't near Y", since foundations F5 (2026-10-16): people hold the offices now and are busier, so more acts wait; the same class as not_present, and as in clinic-school and deaths.)
@@ -103,8 +112,8 @@ test("goods are made from inputs by workers' hours, exported within each factory
     // or, wages first, later, when the world records the sum as a debt against the factory. Those orders are held to that.)
     // (An order the world did not fill, as at a price it had moved from, is delivered nothing and invoiced nothing.)
     const onTerms = o.data.pay_in_days > 0 && (recs.some((r) => r.kind === "delivery_note" && r.data.order === o.id && r.data.delivered === 0) || ev.some((e) => e.event === "transfer" && e.to === "acc-outside" && e.from === `acc-${o.speaks_for}` && String(e.memo ?? "").startsWith(`Invoice ${o.id}:`))
-      || recs.some((r) => r.record === "claim" && r.basis === o.id) || o.at + (o.data.pay_in_days + 40) * DAY > 300 * DAY);
-    expect(paid || declined || onTerms || o.at > 290 * DAY).toBe(true);
+      || recs.some((r) => r.record === "claim" && r.basis === o.id) || o.at + (o.data.pay_in_days + 40) * DAY > END);
+    expect(paid || declined || onTerms || o.at > END - 10 * DAY).toBe(true);
   }
   // Exports: paid for at the month's offer price (world prices move), never beyond that month's demand. (Changed
   // 2026-10-18, integration: exports follow what the outside will buy, not a share fixed for each factory (risks ME-15,
@@ -147,14 +156,14 @@ test("goods are made from inputs by workers' hours, exported within each factory
   const paid = register.map((h) => ({ shares: h.shares, got: Number(first.find((m) => m.to === h.account)?.amount ?? 0) }));
   expect(first.length).toBe(paid.filter((p) => p.got > 0).length);
   for (const a of paid) for (const b of paid) expect(Math.abs(a.got * b.shares - b.got * a.shares)).toBeLessThan(Math.max(a.shares, b.shares));
-  for (const r of asked.filter((x) => x.at < 170 * DAY)) expect(ev.filter((e) => e.event === "transfer" && e.per_instruction === r.id).length).toBe(r.data.payments.length);
+  for (const r of asked.filter((x) => x.at < END - 30 * DAY)) expect(ev.filter((e) => e.event === "transfer" && e.per_instruction === r.id).length).toBe(r.data.payments.length);
 }, 300_000);
 
 // The retirement fund is off unless a town asks for it (docs/behaviour/firm-ownership.md); this town does.
 test("a town that asks for a retirement fund: the factories pay it as any holder, and it pays its costs and its retired members", async () => {
-  // (Seed 5, as the test above, for the same reason: a dividend in 300 days is a rare draw, and seed 1 has none on this code.)
-  const config = generate({ ...base, seed: 5, retirement_fund: true });
-  const { ev, recs } = await run("fund", config, 300 * DAY);
+  // (Profitable, as the test above, so that the factories pay out to their holders, the fund among them.)
+  const config = profitable(generate({ ...base, retirement_fund: true }));
+  const { ev, recs } = await run("fund", config, END);
   const asked = recs.filter((r) => r.kind === "request" && r.speaks_for?.startsWith("factory-") && Array.isArray(r.data?.payments) && r.data.payments[0]?.for === "Dividend.");
   expect(asked.length).toBeGreaterThan(0);
   const register = config.world.records.find((r: any) => r.id === `shareholders-${asked[0].speaks_for}`).data.holders as { account: string; shares: number }[];
@@ -171,7 +180,7 @@ test("a town that asks for a retirement fund: the factories pay it as any holder
       expect(born.has(p.to)).toBe(true);
       if (p.for === "Pension.") expect(Math.floor((r.at - born.get(p.to)!) / (365 * DAY))).toBeGreaterThanOrEqual(retirementAge);
     }
-    if (r.at < 170 * DAY) expect(ev.filter((e) => e.event === "transfer" && e.per_instruction === r.id).length).toBe(r.data.payments.length);
+    if (r.at < END - 30 * DAY) expect(ev.filter((e) => e.event === "transfer" && e.per_instruction === r.id).length).toBe(r.data.payments.length);
   }
   const costs = recs.filter((r) => r.kind === "request" && r.speaks_for === "fund" && r.data?.outcome?.money?.to === "acc-outside");
   expect(costs.length).toBeGreaterThan(0);
@@ -229,12 +238,14 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // the export slump). A count here would hold the town to an outcome; what is held is that someone goes, that every
   // redundancy the factories give is for one of the rule's two reasons, and that making stops at the band's top.)
   const given = e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && factoryJobs.has(e.record.agreement) && String(e.record.text).startsWith("Redundancy"));
-  // Every notice of redundancy a factory gives is for one of three reasons, and a notice of the third (the business wound up) follows a command
-  // of that factory's manager to wind up, at the same moment: never one without it.
+  // Every notice of redundancy a factory gives is for one of three reasons, and a notice of the third (the business wound up) is one its
+  // manager's command to wind up gave: never one without it. (Held by the notice's agreement in that command since 2026-11-01, "Main red
+  // after foundations-2 S2" in docs/decisions.md, where it was "within the hour after": the notices are acts in the manager's time and
+  // land when they are done; on main at c46643eb factory-2's two landed 61 minutes after the command.)
   const windUpNotices = given.filter((n) => n.record.text === "Redundancy: the business is being wound up.");
   expect(given.length - windUpNotices.length).toBe(letGo.length + cashLetGo.length);
   for (const n of given) expect(["Redundancy: we're making more than we sell.", "Redundancy: we can't cover the wage bill.", "Redundancy: the business is being wound up."]).toContain(n.record.text);
-  for (const n of windUpNotices) expect(windUp.some((c) => c.as === `${n.record.as}-manager` && c.t <= n.t && n.t - c.t <= 3_600)).toBe(true);
+  for (const n of windUpNotices) expect(windUp.some((c) => c.as === `${n.record.as}-manager` && c.t <= n.t && c.blocks?.some((b: any) => b.block === "give_notice" && b.agreement === n.record.agreement))).toBe(true);
   void quit;
   // The rule's own two reasons, held in a run where it lays off (seed 2: factory-2 cannot cover its wages and lets two go, then is wound up):
   // every notice of a factory is for one of the three, and those by the rule are as many as the manager's commands for them.

@@ -316,13 +316,13 @@ export interface Profile {
      * `needs`: what the decision waits for before it is made (papers from the claimant, a confirmation from their last employer), within so many days,
      * and `else` what comes of it when they do not come (`refuse`, or `decide` on what is on hand). `review`: the office looks at its own decision again
      * if asked within so many days, on what grounds, whether an appeal lies only after it (`required`), and, where the law takes silence as a
-     * refusal, after how many days of asking an unanswered review counts as refused (`deemed_refused_days`; the appeal's days run from then). `appeal`: the matter a venue that can set the
+     * refusal, after how many days of asking an unanswered review counts as refused (`deemed_refused_days`; the appeal's days run from then), or, where it has none, after how many days a body that only recommends takes up the delay (`complaint_after_days`: an ombudsman's or a complaints examiner's; no appeal follows). `appeal`: the matter a venue that can set the
      * decision aside hears (`claim_refused`), within so many days, on what grounds, and its fee in hours of ordinary pay (0: none). `refused_by`: where the
      * office is a head and staff, whether the head alone may refuse. Each with its source (`sources["decisions.<kind>.<payment or all>"]`), or marked
      * "PLACEHOLDER" or "(to confirm)". A route a place's law lacks is left out (no `review`: no internal reconsideration). */
     decisions?: { kind: string; name: string; payments?: string[]; refused_by?: "office-holder" | "staff";
       needs?: { id: string; from: "claimant" | "employer"; what: string; within_days: number; else: "refuse" | "decide" }[];
-      review?: { within_days: number; grounds: string; required?: boolean; deemed_refused_days?: number };
+      review?: { within_days: number; grounds: string; required?: boolean; deemed_refused_days?: number; complaint_after_days?: number };
       appeal?: { matter: string; within_days: number; grounds: string; fee_hours_of_pay: number } }[];
     /** Founding (docs/behaviour/founding.md), read only for a living town that turns it on: how often new associations
      * are registered here (`registered_per_100000_per_year`, with its source; code never reads it) and how many more
@@ -466,6 +466,8 @@ export interface Profile {
       firms: { payback_months: { small: number; large: number }; large_from: number; hurdle_bps: number; reference_bps: number; on_cost_bps: number; most?: number };
       /** The law on public buying: a contract worth more than the threshold (in the world\'s smallest unit) is put out to tender, and bids are open this long. */
       procurement?: { threshold: number; bid_days: number };
+      /** Tools the outside world sells (worlds/generator/tools.ts): goods a firm holds, with which a task takes a share of its time. */
+      tools?: import("./tools").ToolOffer[];
     };
     /** Assistants on offer (docs/behaviour/assistants.md; docs/design/delegation.md): the outside world's providers of services
      * and what each sells, at today's prices; read only where a town asks for them (`assistants: true`). `claim_slip_bps` is
