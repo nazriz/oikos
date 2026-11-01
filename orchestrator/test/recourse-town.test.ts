@@ -51,14 +51,16 @@ const total = (c: { [k: string]: number }, prefix: string) => Object.entries(c).
 
 test.skipIf(!have)("in a living town people take what went wrong to whoever did it, and a refused claim is looked at again; without `living`, nobody asks", async () => {
   // (Frictions at three times the rates as sourced, as the culture batches and foundations F8 ran them, so that a
-  // 300-person town over 150 days has enough to see.)
-  const living = await papers(["living.initiative_bps=10000", "living.friction_bps=30000"], 300);
+  // 300-person town over 150 days has enough to see. 150 it is, 300 until 2026-10-31, the slow tier's budget: measured that
+  // day over 300, the first review asked and answered on day 3, the first other matter asked on day 37, the first
+  // application on day 44.)
+  const living = await papers(["living.initiative_bps=10000", "living.friction_bps=30000"], 150);
   expect(living.dials).toMatchObject({ initiative_bps: 10_000, friction_bps: 30_000 });
   expect(living.count["asked:claim_refused"] ?? 0).toBeGreaterThan(0);
   expect(total(living.count, "reviewed:")).toBeGreaterThan(0);
   expect(total(living.count, "asked:")).toBeGreaterThan(living.count["asked:claim_refused"] ?? 0);
   expect(total(living.count, "applied:")).toBeGreaterThan(0);
-  const plain = await papers([], 300);
+  const plain = await papers([], 150);
   // (A debt owed to us is still pursued at the tribunal: that is life's, not a friction's. What frictions raise is not.)
   expect(total(plain.count, "asked:")).toBe(0);
   for (const m of ["claim_refused", "bill", "goods", "underpaid", "disrepair"]) expect(plain.count[`applied:${m}`] ?? 0, m).toBe(0);

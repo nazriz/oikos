@@ -9941,6 +9941,43 @@ warm, each file's time against the Mini's) — for after the nightly job has a f
 **Revisit if** the nightly Linux job finds a pinned hash that differs (a reproducibility fault: find the cause, never a
 pin per platform); a crate's own `tests/` grows to many files (the same change there); one test program's single link
 becomes the long pole of a kernel gate (split it in two by what a change reaches).
+## 2026-10-31 · A review never answered where the law has no deemed refusal: a complaint of the delay (MT-21) (branch `mt21-recourse`; no model called)
+
+**What.** Where a place's law requires a review before an appeal and has no deemed refusal (au-vic, gb-eng, us-oh's
+pension), a claimant whose review was never answered had nowhere to go: the citizen's `may_apply` shut every body that
+hears a refused claim, the town's ombudsman desk included, though the desk opens no appeal. What a real claimant does
+instead is complain of the delay to a body that takes it up and can only recommend: in Australia the Commonwealth
+Ombudsman (it asks that the agency be given 10 business days first, then investigates, free, and may recommend but not
+direct Services Australia); in England a complaint to the DWP office, a senior manager, then the Independent Case
+Examiner (there is no time limit on a mandatory reconsideration); in the US the member of Congress's caseworker, whose
+inquiry SSA answers. That is now law data: the review route's `complaint_after_days` (14, 21, and 30 a placeholder),
+with sources in each profile (most "to confirm"; docs/behaviour/decisions.md has the table). After that many days
+unanswered, a body that hears the matter and does not order (`can` without `order`) is among the claimant's ways; the
+tribunal never is, and the appeal still runs only from an answer. The work is the existing desk's: an officer's hours
+from the table of work, its slips, its asking the agency and its recommendation, which binds nobody. The law's words
+say it. Contract: an additive field on `law` `data.decisions[].review`, **proposed for Naz's sign-off**
+(contracts/README.md).
+- **Guarded:** at citizen level (`recourse.rs`: the ombudsman from day 31 for a review asked on day 10 and 21 days'
+  law, never the tribunal, which opens once an answer comes; the deemed-refusal test sees both bodies, as it should);
+  in the words (`rules/decisions.rs`); and in living towns whose office's answers are withheld
+  (`deemed-refusal-town.test.ts`, au-vic added: the ombudsman open only after the law's days, never the tribunal, and
+  any complaint heard).
+- **Choices.** The three real tiers in England and the US caseworker are one desk in the town (the generator's
+  ombudsman desk), as the town has one body that recommends on a refused claim. The desk's recommendation on a refused
+  claim is its generic one (set the decision aside, the agency not answering); a real ombudsman on delay asks first that
+  the review be decided. The first is a stronger push on the agency than the real one; noted, not built.
+- **Left:** asking again and judicial review / mandamus are not built; the 14 and 21 days read a wait for a complaint as
+  the wait after a request for review; us-oh's 30 days is a placeholder.
+- **Pins re-taken (2026-11-01, merged with main at c46643eb, after gap-weekends).** The new route moves au-vic, gb-eng and us-oh towns and
+  not ke-nakuru's (its law has no such route): culture-dial's config hashes and Rust states for au-vic and gb-eng
+  (a0a8a233..., a911615e... and ce297a1b..., 4c0f8261...; were main's c899c8ff..., 9b0a54d6... and af012071..., fab20a4d...),
+  and all six towns of `scripts/fixtures/representation-results.json` (au-vic, gb-eng, us-oh at 200 and 1,000 people).
+  Cause is the one this entry names, not a fault: the gate's failure showed only the first pin, the rest were taken by
+  running the towns on a freshly built kernel. (A first reading of the config hash on a stale `kernel/target` wasm gave a
+  wrong value, f4424f29...: the generated config carries words from the law crate, so take hashes only on a current build.)
+- **Revisit if:** a profile's figure is confirmed otherwise; a study reads how often claimants escalate (then the three
+  tiers in England may matter); or a steward is found to answer the ombudsman and still not the claimant.
+
 ## 2026-10-31 · A crew's day three times as long, traced: the seat held until each order began (MT-23) (branch `mt23-crew`; no model called)
 
 **What.** On 2026-10-24 the seat-diary run's day 21 showed a works crew's forty notices taking 310 minutes where every
@@ -9956,6 +9993,34 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   outlier was untraced). No pinned hash moves: a test-side change only.
 - **Revisit if:** a day over the bound again (then look at who in the crew was busy, and with what, from the log's
   timelines).
+
+## 2026-10-31 · The assistants' prices from real products; gb-eng and us-oh get assistants (branch `assistant-prices`; profiles only; a town without `assistants` is unchanged; no model called)
+
+- **What.** Each offer's fee, set-up and exit in au-vic now rest on 2026 published prices of real general AI
+  assistants, and gb-eng and us-oh get the same two providers in their own currencies (sources in each profile's
+  `sources.assistants`; citations in docs/research/references.md). Businesses: A at a ChatGPT Business seat's annual
+  price (US$20; A$31.00 and £15.60 converted at the profiles' rates, no local price found), B at Microsoft 365 Copilot's
+  (A$44.90, £24.70, US$30). Persons: the consumer tier at about US$20, A at the cheaper and B at the dearer local price
+  found (A$29.99 / 32.99; £18.99 / 19.99; US$19.99 / 20.00). Set-up and exit 0 for a business (none listed for these
+  self-serve subscriptions; B's US$200 set-up and US$100 exit had no source), a person's set-up a month's fee (paid a
+  month ahead: a convention). Per use: none (flat subscriptions; an offer has no per-use field). For comparison, not
+  read by any code: what a bookkeeper or clerk costs in each place.
+- **Not changed, and why.** Speed (a tenth of a person's time), the claimed and true slip rates, the records terms and
+  every principal's figure stay placeholders, labelled: no honest source measures an assistant doing such papers alone
+  (Noy and Zhang 2023 measure a person with one; hallucination leaderboards measure summaries, at rates from under 1% to
+  over 10% by dataset), and picking a number out of such a range would be choosing the outcome. gb-eng's and us-oh's
+  error cost is au-vic's placeholder converted. Nothing was tuned: every price is moved to its source whichever way it
+  moves engagement; prices all fell (business fees by a third to a half, set-ups to nothing), so expect more engagement
+  at au-vic's prices than before, recorded, not targeted.
+- **Results.** Towns without `assistants: true` are generated and run as before (no pinned hash moved); towns with it
+  change in the providers' offers only.
+- **Which product stands for A or B** is a convention (the cheaper for A); the world names neither. B's dearer price
+  goes with its records returned to the client and its lower true slip rate, both placeholders, so a principal's choice
+  between them is a choice between placeholders as much as prices.
+- **Revisit if** a provider publishes an error rate or time per document for agent work of this kind, a study measures
+  an assistant working alone on administrative papers, a product sold to landlords or for persons' claims (rather than a
+  general assistant) is priced, or the primary price pages can be opened (most figures are from secondary pages: to
+  confirm).
 
 ## 2026-10-31 · Main red after years at 10,000: two slow tests, one a test fault, one held to one seed
 
@@ -9984,6 +10049,65 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   as with the assistant's code (the state hashes differ, as the seated town carries the stationery and the seats' channels).
 - **Revisit if:** a real model's drafts are declined for addressing alone where the matter was right (then the principal
   needs a reading of more of the paper), or a seat cannot find its forms.
+
+## 2026-10-31 · The slow tier's budget: one computation made cheap, ten towns run only the span their laws need (branch `slow-tier-budget`; tests; no model called)
+
+- **Why:** the slow tier took about 1,526 s on the Mini against its 1,000 s budget (`scripts/test-budgets.json`).
+  Pruned as docs/testing.md, "Pruning", says: first the per-run trace (`OIKOS_RUN_TRACE`) for towns run twice (none
+  but the deliberate twins: nothing to share), then the slowest files' runs against when what they check happens.
+- **What:** no assertion loosened, no seed moved. Each shortened run states beside it the days it was measured to need,
+  read from the long run's own log that day.
+  - `orchestrator/src/figures.ts`: `matches` compiled a regular expression on every call (20,000 numbers a town times the
+    generator's table) and tested every prefix of the shape; now one expression per pattern, covering the shape and
+    anything under it. Same answer on all 1,064,124 pattern-and-shape pairs of two profiles' towns, old against new.
+  - `reading-dial.test.ts`: 200 → 30 days (worded decisions read from day 0, about forty in three weeks).
+  - `migration.test.ts`: 365 → 120 days where people come (first arrivals day 0, housed by 12, at work by 30, the next
+    wave days 63 to 93); "nobody comes" keeps its year.
+  - `scenarios.test.ts`: 60 → 35 days, the election's scenario 60 (its timetable fills two months).
+  - `recourse-town.test.ts`: 300 → 150 days (the span its own comment gave; first review day 3, application day 44).
+  - `deemed-refusal-town.test.ts`: 330 → 180 days (de-ni weighs an open venue on days 126, 154, 162).
+  - `justice.test.ts`: 300 → 250 and 200 days (rent reviews on day 181, orders on 238).
+  - `automation-run.test.ts`: 200 → 90 days (systems delivered and serving from day 31).
+  - `founding.test.ts`: 205 → 150 days (the first founding on day 120, code town and composed).
+  - `entry.test.ts`: 450 → 240 and 300 → 120 days (premises sold day 106, the buyer serving day 120, and day 165 after
+    main's change to citizens' work the same day: 160 days failed then, so the margin is wide; the living shop's record
+    begun day 85).
+- **Tried and kept:** `elections.test.ts` with polling at day 120 fails its paper's four editions (the paper is thin
+  until the notice); the twins' 120 days at 60 give 3 answers where the test asks more than 8; `credit` (second loans
+  and arrears from day 361), `unions` (a claim cycle a year after the closure), `prices`, `tenancy`, `households`
+  (births from day 279) need their spans.
+- **Measured** (a 4-core cloud container, three files at a time, `bun scripts/test.ts --tier slow`; before on main
+  c285778, after on the branch merged with main 1ae2561): 65 files, 9,730 → 8,042 file-seconds, 4,872 → 4,025 s wall,
+  all passing after (own-venture and word-of-mouth were red before, as on main). Per file, before → after:
+  reading-dial 547 → 59, scenarios 487 → 297, figures 184 → 8, recourse-town 295 → 123, migration 262 → 107,
+  deemed-refusal-town 286 → 134, automation-run 242 → 99, entry 211 → 68 (at 160 days; at 240 about 90), founding 230 → 171, justice 168 → 120; every
+  other file within the load's noise but `own-venture` 197 → 476, main's own change that day (three seeds where it
+  held one). Without that, the cut is 20%: on the Mini about 1,526 → 1,220 s, still over the budget.
+- **Mutations:** not run (limited credit; a cloud container, no copy-on-write clone). No planted bug is in `figures.ts`.
+  Three name a shortened file: `kernel-absent-may-work` (migration), `rs-appeal-window-off-by-one` and
+  `rs-grievance-ignored-in-seconds` (recourse-town). Owed: `scripts/mutate.ts --only` with those three, before and
+  after, on the Mini; if one is caught before and not after, the run it needs goes back to its old span.
+- **Not done, and what is left:** the rest of the slow tier is runs a law needs whole (twins of a year, three years
+  of records, the year of invariants) or held to one seed for a rare draw (production's dividend, the station's
+  warrants), each a case to be made by construction, as docs/testing.md says. The next payoffs: those cases built,
+  `elections.test.ts` (seven towns of 205 days; a paper fuller before the notice would let the election come sooner),
+  and the twin files (about 1,000 file-seconds between them). Or the budget raised, with its entry here.
+- **Then, on the coordinator's word (don't raise the budget; build rare cases, shorten the twins where the law allows),**
+  each file alone on the same container: `production.test.ts`'s dividend by construction, the outside paying a fifth
+  more for the town's goods (`profitable`) on the town's own seed, 120 days, where it was seed 5 and 300 days hunting a
+  rare draw (the "every line paid" checks now cover instructions a month before the end, where they were day 170 of
+  300): 246 → 134 s. `police-station-seat.test.ts`: 330 → 120 days (the opening case's warrant is in month two; the
+  rest is held only as both towns agreeing): 203 → 80 s. `twin-draws-seat.test.ts`, the prices twin: a year → 240 days
+  (the fault moved prices from the second month; 8 lists, 8 distinct): about −90 s. Kept: `twin-draws-year`'s mayor
+  floor (0.37 of decisions alike) is set against a year, where the fault it guards gave 35%; at 120 days the town gave
+  72% alike, so a shorter run would not catch it. `twin-seat-year` needs a seated resident's death and its floors are a
+  year's. The elections paper: not cheap (who files what before the notice), not done. With these, about 8,042 → 7,750
+  file-seconds here, 20% under the start (23% leaving own-venture's growth out): on the Mini about 1,526 → 1,200 s,
+  still over the budget. What is left is the twins of a year and the elections, each a law's whole span, or the
+  budget.
+- **Revisit if:** a shortened run's event moves past its end (the test fails on the count, not silently: each asks
+  for at least one of what it checks), or a scenario starts acting after its first month.
+
 ## 2026-10-31 · Borrowing to start a business: the founder asks the bank, the lending office decides (branch `gap-me1`; citizen, generator; risk ME-1; no contract change; no model called)
 
 - **What:** a person who would start a business of one by what they expect it to pay them, with a home to trade from,
@@ -10118,6 +10242,37 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   run only where a world names a practised skill.
 - **Revisit if:** a source gives slip rates by practice, or skill half-lives by kind of work; a study needs papers'
   skills by kind; the opening level's assumption (everyone an ordinary hand) shows in results.
+
+
+## 2026-10-31 · Elastic slots: the pool fits the machine as it is (branch `elastic-slots`; `scripts/slots.ts`; risk PL-4 (1); no result changes; no model called)
+- **What:** with `OIKOS_SLOTS` unset the pool is the core count (it was the cores less two, fixed), and a job that is not
+  the merge's starts only when the machine has room for it now (`fits` in `scripts/slots.ts`, a pure function of the
+  readings): `load average + expected cores of holders younger than a minute + job's expected cores <= cores`, and `free memory - expected
+  memory of holders younger than a minute - job's expected memory >= max(1 GiB, a tenth of the machine's)`. Free memory
+  is what can be had without swapping: Linux `MemAvailable`, macOS `vm_stat` free + inactive + speculative + purgeable.
+  Expected use is per token and per class (test, build, run, other): declared (a core; 1 GiB, a test file's 0.5 GiB) until
+  measured, then a moving average (0.7 old, 0.3 new) of cpu time over wall time and peak memory of the jobs of that
+  class that ended under the wrapper (`bun scripts/slots.ts -- ...`, cargo there is a build) or the test runner (its test
+  files and the kernel's cargo tests), kept in `usage.json` beside the tokens; a job under 2 s teaches nothing.
+- **Why so:** load 32 on 12 slots (2026-10-30) came from tokens that cost more than a core (builds, runs) and work
+  outside the slots, which a fixed count cannot see; a machine left at the cores less two sat idle when jobs were light.
+  The load average sees real use, outside the slots too, but lags by a minute; the expected use of the holders just
+  started covers that minute, so a burst of starts cannot pile up before the load shows it. (First written as the larger
+  of the load and every holder's expected use: on the first gate run a build's measured average, 3.3 cores a token, held
+  the test files back while the build's last rustc used one core. A long job's average is not its use now; the load is.) Memory gets the same two-part
+  reading (free now, less what the young holders will still take).
+- **What stays:** a job never stops another: one that does not fit waits. The head of the queue waits for room and
+  nobody passes it, so a big job is not starved by small ones. A job alone in the pool always starts. The merge's
+  (priority high) is not held by the machine's readings at all, only by the pool and the queue, as before. The cap per
+  checkout stays: a run or a build holds its tokens for minutes to hours and cannot give them back at a file boundary, so
+  lifting the cap for a lone agent (PL-4's first sketch) would leave the next agent waiting that long; only the test
+  runner's short tokens borrow past it, as before. `OIKOS_SLOTS=N` fixes the pool at N with no reading (the tests do).
+- **Not measured:** runs started by `oikos run` are in-process, so their use stays declared (a core a token, the engine
+  given as many threads as tokens). Peak memory is the largest single process a job waited for, not its tree's sum: a
+  cargo build's is one rustc's, an underestimate the memory reserve covers.
+- **Revisit if:** the load still runs well past the cores (then the measure misses the use: sample the holders' process
+  trees instead), the machine sits idle with jobs waiting (the reserve or the declared figures too high), or a big job
+  waits long at the head while small ones could run.
 ## 2026-11-01 · The outside's capability over time: releases of what it sells, from a scenario, tagged for measurement only (foundations-2 E2, its first part; branch `f2-economy`; contract additions; a town under no capability scenario is as before, to the byte; no model called)
 
 - **What:** a scenario may give `capability` (`tag`, `of`, `every_days`, `time_bps`, `slip_bps`, `price_bps`, with its
@@ -10146,6 +10301,58 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   town with capability to the plain town but for its releases and its tag).
 - **Revisit if:** a study needs capability as a continuous path rather than releases; a scenario's sizes find sources;
   buyers should replace delivered systems as releases come out (that is a buyer's rule, with a real basis, not this).
+## 2026-11-01 · The citizen model, step 1: a model of our own as an optional citizen mind, and its pipeline (docs/design/citizen-model.md steps 2, 3, 5; contract addition `dials.citizen_model`; a world without it is as before, to the byte; no model called)
+
+- **What:** `kernel/crates/actors/src/mind/model.rs`: the input builder (reads the `situation` the mind records with a
+  want decision, less the code mind's own scoring) and the forward pass of a small network that gives each of a want's
+  ways a score; `dials.citizen_model` (`weights`, `sha256`, `share_bps`), read and hash-checked by the engine
+  (`engine.rs` `citizen_model`), carried to every citizen through `WorldInfo`; in `pursue`, the way is drawn from the
+  code mind's exponents blended in log-odds with the model's (`model::blend`), both odds recorded. The trainer
+  (`kernel/crates/citizen-train`) and the pipeline (`scripts/citizen-model.ts`, one command; `towns` makes the code
+  towns of `worlds/citizen-model.yaml`). `Attractions::choose` now draws through `exponents` and `pick`, the same
+  arithmetic in the same order.
+- **Why this way:**
+  - *The want's way first:* it is the design's round 1 (whether to contest, and where), it is the one decision whose
+    situation the capture types fully, and the code mind's odds are recorded with it as targets.
+  - *An MLP over each option, not attention over items:* with the act head only, the options are a handful of kinds,
+    and a scorer applied to each alone keeps order out by construction. Attention over fact and paper items is for the
+    content heads (grounds, evidence), which need step 2's renderer and the teachers first.
+  - *Floats in a fixed order, weights in 1/65,536ths, not int8:* the code mind already computes its logit with IEEE
+    arithmetic and `mind::math::exp`, which is the same on any machine; whole-number weights make the file exactly
+    what runs, and an int8 forward buys speed this decision does not need (a few thousand calls a day in a town of
+    10,000). Revisit if a head runs on every decision.
+  - *Training in Rust, not PyTorch:* the network is small; one thread, a fixed order and `mind::math` make the same
+    data and seed give the same weights anywhere, and the trainer measures the very forward pass a run computes, so
+    no Python reference or bit-identity test is needed. `crates/citizen-train` is outside the determinism lint (as the
+    explorer is): it is not in the world, and a run reads only the file it writes, by its hash.
+  - *The weights by path and hash, read by the engine:* the actors crate may not touch files; inlining the weights in
+    the config would make every person's parameter key carry them. The hash in the config (and so in the log) says
+    which weights ran; a file that differs refuses to run.
+- **Not built:** the content heads (seeks, amount, grounds, evidence, register: step 2's renderer and teachers); the
+  teachers (paid API, the owner's go-ahead); scrambled-record and edit checks against the code mind's own response
+  (the code mind's odds are recorded, not recomputable from a row: the edits are checked for the direction of the code
+  mind's own sways instead); the content and patterns-not-told checks; twins over two years.
+- **Revisit if:** the model's odds are used past round 1 (a head per domain needs its own situation typed); a head runs
+  on every decision (then int8 and batching); the code mind's want weighing changes (retrain: the model learns the
+  code mind as it was when captured, which the data manifest records by source hash).
+## 2026-11-01 · The citizen model, round 1 trained and measured: `want-way-r1` (docs/citizen-data.md, "Round 1"; no model called)
+
+- **What:** 25 code towns made for it (`worlds/citizen-model.yaml`, nine profiles, a year each, captured: runs/citizen-model/towns/)
+  and the pilots' training split; 33,692 want decisions kept (the three held-out test pilots refused whole, decisions
+  with only waiting open left out); five seeds trained; seed 2 chosen. On two profiles never trained on: 1.3 points
+  from the code mind's odds (median), acting at all 67.30% against 67.32%, the spread between people kept (0.98), every
+  edit the code mind's way in every case, 23 microseconds a decision. Retrained, the same file byte for byte. Twins
+  in a town of 1,000: no difference in run time beyond the load's noise; waiting 53.0% against 54.0%.
+- **Why the splits so:** whole towns and whole profiles held out, as 11e asks, so the test says whether it learned the
+  citizen or one town's settings; the held-out pilot says whether seats' towns differ (they do not, here).
+- **What it shows, honestly:** a small net of our own reproduces the code mind's want weighing closely, fast, keeping
+  who people are, and the mechanism is in place for a round that adds teachers or content heads. It shows nothing about
+  real people: it inherits the code mind's placeholder sways (plan caveat). Nor is it faster than the code mind for
+  this decision; its use is as the base the later heads build on.
+- **Revisit if:** the code mind's want weighing changes (retrain from new captures; the manifest records each source's
+  hash); a profile whose parameters differ from all nine shows a larger distance (the model reads no profile parameter
+  directly, e.g. the mind's lambda); the scrambled-record figure (13.8 here) is to be compared with the code mind's own,
+  which needs the code mind run on edited records (a harness of its own).
 ## 2026-11-01 · Compute in the town: what a system runs on, and a host on the town's network (foundations-2 P4 and E5; branch `f2-economy`; contract addition; new kind `firm.host`; a town without `hosting` is as before, to the byte; no model called)
 
 - **What:** the kernel's `runs_on` (foundations-2 4.1, P4): a system's template says the hardware it runs on (a kind, so
@@ -10206,6 +10413,77 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   capital): entry by expected profit reads the profile's venture, not what the person just lived through. A behaviour
   question (does a failed founder try again at once, and how soon?), to settle with a source, not a test.
 - **Revisit if:** a founder's own failure is to weigh in their next venture (ME-1).
+## 2026-11-01 · Entry into the town's other industry: a factory founded in works for sale (foundations-2 E3, its first part; branch `f2-economy`; citizen, firm.producer, generator; no contract change; no model called)
+
+- **What:** the town's ventures gain a factory (`kind: factory`, the works' type): when a closed factory's works are for
+  sale, someone with the means for them and the venture's capital weighs founding a factory there by expected profit
+  (`rules::entry::expected`, as for a shop): its price and its inputs' cost a unit, its custom the world market's
+  appetite for goods as it publishes it (`demand_per_month`) shared among the town's factories of goods (`sellers`) and
+  itself, a hand's month at the time a unit takes, hands while the margin pays their wage. Founded, `firm.producer` sets
+  itself up first (account, the founder's capital, shareholders, the works bought), by the setting up the retailer had,
+  moved to `market/founding.rs` unchanged (the retailer's words and order kept, so a shop's founding is as before).
+- **Why this way:** entry was already by expected profit (2026-10-24, ME-1) and premises already came up for sale by
+  type; widening the venture list to the factory is the general law (any industry whose premises can be had), and the
+  world market already buys from every seller (ME-15), so a new factory has a market as a real entrant would.
+- **Not built, and why:** new premises built through planning, the route for an industry with no premises standing (a
+  hosting firm's): it needs a founder to buy land, apply for a permit and pay the builder, a chain the town has for
+  landlords' homes but not for firms; borrowing for a venture in premises (ME-1 says so); products other than goods.
+- **Results:** every town's ventures list has the factory where it has factories, so its config moves and so does its
+  state hash (a person's parameters are part of what is kept); with the venture taken out of the config, the culture
+  dial's three pinned towns give exactly their pins before the change, so the moved founding steps change nothing.
+  The pins are re-taken (orchestrator/test/culture-dial.test.ts).
+- **Revisit if:** factories close often enough that founding matters, and entrants never pay (the likely cause is what a
+  founder counts of the market); a study needs capital-heavy entry (then the planning route, above).
+## 2026-11-01 · Tools: technologies that are goods, weighed as any technology is (foundations-2 E2, its second part; branch `f2-economy`; contract addition; firm.producer; au-vic's profile; no model called)
+
+- **What:** a task may name a `tool` (a kind, so many a person, the share of the time the work then takes): with enough
+  held by the actor where the work is done for the people doing it, the work takes that share; the tool is not used up.
+  A profile's `automation.tools` puts tools on sale by the outside world (its price list) and on their task; a factory
+  (`firm.producer` `tool`) buys one for each of its staff when the time it saves them a month, at their wage, beats its
+  price over the payback it asks by the hurdle, the comparison it already makes of a system (`automation.firms`). au-vic
+  offers production machinery for `make` (80% of the time, AUD 20,000 each: placeholders, risk ME-25).
+- **Why this way:** foundations-2 7.2 asks that adoption be widened from systems to any technology, "a forklift, a
+  self-service till and a casework system weighed the same way"; a tool as a held good keeps law 8 (it is somewhere,
+  bought and held, never made from nothing) and leaves the decision to the firm's own numbers.
+- **Not built, and why:** tools wear and are replaced (no source for a life, and a durable good is not used up by a
+  task); shops and offices weighing tools (only the producer's comparison was widened; the retailer's and the offices' are
+  systems-only); tools in other profiles.
+- **Off unless asked** (`tools: true`): at au-vic's placeholder figures every factory of the 1,000-person town buys one
+  for each worker on its first day (AUD 800,000 a factory: a fifth of a factory wage a month saved, against AUD 833 a
+  month of the price over two years, by the 20% hurdle), a large unsourced effect on every run; so the tools are a
+  town's choice until sourced, and off the town is as before (the seller, the kind, the task and the weighing absent).
+  Each tool has a seller of its own (`sellers-<kind>`, a boundary selling by the unit), so a firm's least order of one
+  is kept; the world market's least order of a hundred would have refused every order.
+- **Revisit if:** a source gives a tool's saving and price, or its life; shops should weigh tools too.
+## 2026-11-01 · Who could still do the work: a monthly census of practised skills (foundations-2 M8, E6's first part; branch `f2-economy`; log addition; a world with no practised skill writes nothing new; no model called)
+
+- **What:** where a world has practised skills, the kernel censuses them monthly (`skill_census`): for each, how many
+  living people stand in each tenth of its range, read as it stands that day (fading included). `measure/queries/town/skills.sql`
+  lists it (`oikos measure DIR town/skills`): by run, day and skill, the ten counts, the people, the upper half.
+- **Why this way:** M8 asks, for each kind of work, who could still do it and how well, month by month; a person's skill
+  lives in the state, not the log, and a census in the log is what a measure can read (as the counters' is). Ten bands
+  are a count, not a threshold: what a study calls "could still do it" is its own choice, made before an experiment.
+- **Not built:** M7 (what the town gives to AI: the share of its energy, water, land, capital and hours that goes to
+  study-tagged systems and their hosts): it needs the hosts' metered draw read against the town's, and its definition is
+  among the owner's measures (docs/design/gradual-disempowerment.md section 6); "who" by kind of work is by skill, not
+  yet by the kinds of work study-tagged systems do.
+- **Revisit if:** a study needs per-person levels (then the census grows, or a measure reads checkpoints).
+
+## 2026-11-02 · The slow tier's budget raised to 1,500 s (branch `slow-tier-budget`; tests; no model called)
+
+- **Why:** after the trims above the slow tier still takes about 1,220 s on the Mini against its 1,000 s budget, and what
+  is left is runs a law needs whole: the year-long towns (twins of a year, the year of invariants, credit's second loans
+  and arrears from day 361, births from day 279). Shortening those further would stop them guarding long runs, which is
+  what they are for. Naz approved raising the budget on 2026-11-02 so the year-long tests keep guarding long runs.
+- **Change:** `scripts/test-budgets.json` `slow.wall_seconds` 1,000 → 1,500 (25 minutes), about the tier's time today and
+  a quarter more. The gate's budget is unchanged. No test loosened.
+- **Also in this landing:** merged with main, `deemed-refusal-town.test.ts` keeps main's third town (au-vic, 200 days,
+  the ombudsman, from `mt21-recourse`) with this branch's 180 days for de-ni and gb-eng (measured on the merged tree: de-ni
+  a venue open in 3 weighings, none before 91 days; gb-eng's ombudsman open in 2; all assertions pass). The stray
+  scratch script `orchestrator/p-tmp.ts` the branch carried is removed.
+- **Revisit if:** the slow tier passes 1,500 s on the Mini, or merges wait on it; then the twin files and the elections'
+  towns first, as the entry above says, before any raise.
+
 
 ## 2026-11-01 · Weighing the commute: the rule specified, not yet built (branch `commute-choice`; risk WM-4; no model called)
 

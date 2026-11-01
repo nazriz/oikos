@@ -105,7 +105,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
 // f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "c899c8ff16f761b6", "gb-eng-2026": "9b0a54d61900fdd7", "ke-nakuru-2026": "a2f60218588c0078" }
+  ? { "au-vic-2026": "a99a286022700340", "gb-eng-2026": "2d6735b7556f4cfa", "ke-nakuru-2026": "6c856c4d47017630" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -150,10 +150,24 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // fixes, business loans, foundations-2 S2), config hashes and Rust states both: the support agency's and the tax collector's desks of officers keep
 // the place's days of rest and public holidays (`hours.closed`), an officer's day on each working day (generator 0.73.0); main's
 // b69b5e45..., 1c0ed42c..., bee66230... for the configs and 001f22ed..., 1a754a5d..., caa00714... for the states, until then.)
+// (Re-taken on 2026-11-01 at mt21-recourse (MT-21), merged with main at c46643eb (after gap-weekends), au-vic and gb-eng only, config hashes and Rust
+// states both: their law on benefit decisions states the days after which an unanswered review may be complained of to a body
+// that recommends (`review.complaint_after_days`), so the published law's words and data move, and a claimant left unanswered
+// may now go to the ombudsman desk; ke-nakuru's law has no such route and did not move. c899c8ff... and 9b0a54d6... for the
+// configs, af012071... and fab20a4d... for the states, until then.)
+// (Re-taken on 2026-11-01 at foundations-2 E3, on the tree merged with main, and again on 2026-11-02 on the tree merged with main
+// after mt21-recourse (whose pins are just above), config hashes and Rust states both: every town where
+// there are factories offers a factory as a venture, in a closed factory's works for sale (docs/behaviour/entry.md, "Founding a
+// factory"). On the branch, with that venture taken out of the config the three towns gave exactly the pins before it, so the rest
+// of the change (the founding steps moved from the retailer to market/founding.rs) moves nothing; c899c8ff..., 9b0a54d6...,
+// a2f60218... for the configs and af012071..., fab20a4d..., e3093814... for the states, until then. On the tree merged with
+// main after mt21-recourse, both changes at once: ke-nakuru is this branch's own pin (recourse did not move it), au-vic and
+// gb-eng have the ombudsman and the factory venture both; mt21's a0a8a233..., a911615e..., a2f60218... and ce297a1b...,
+// 4c0f8261..., e3093814..., until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "af012071ce20d4e56064b3a261295840bdecd6f82b3616be7f7444842ac9bb15",
-  "gb-eng-2026": "fab20a4d041378d243f93793a5842ad1a8603927f18ca8cc2df401287d168fe3",
-  "ke-nakuru-2026": "e309381464fd3555eff4d3152ab7d0f3abd3e7d2bc5f019eb6f687b71df75e4f",
+  "au-vic-2026": "b51631ea85621e6eac2d3379adc467f3aa04ce4dc9bdcd1f6be93cbf1eff69c3",
+  "gb-eng-2026": "c6c36e29a6050c97839a61f4ab802bbb133beae87c9d8a692406ad4c3be97605",
+  "ke-nakuru-2026": "717229a9f5821b5d3ed9f74eb34d2f54d7a58190686934b04e51c91edbbac15d",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

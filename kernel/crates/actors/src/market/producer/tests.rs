@@ -193,3 +193,38 @@ fn its_manifest_is_the_ts_one_with_the_ports_additions() {
     }
     assert!(manifest()["params"]["export_probe_bps"].is_object());
 }
+
+/// A factory founded in the run (foundations-2 E3; market/founding.rs, as a shop founded is): an account, its founder's
+/// capital, its shareholders, the works bought from the listing it was founded on; nothing made until then.
+#[test]
+fn a_factory_just_founded_sets_itself_up_and_buys_its_works_before_it_makes_anything() {
+    let mut h = harness(json!({ "founder": "ann", "capital": 7_000_000, "bank": "bank", "listing": "rec.fs" }));
+    let listing = statement("rec.fs", 0, "factory-1", "property_for_sale", &[], json!({ "structure": "works-1", "type": "factory", "price": 5_000_000, "account": "acc-factory-1" }));
+    let out = all(&h.wake(DAY, channels(vec![records("mine", vec![listing.clone()]), holdings(&[])])));
+    assert!(out.contains("account(") && out.contains("at=bank") && !out.contains("work("), "{out}");
+    let out = all(&h.wake(DAY + H, channels(vec![money(F, 0, json!([])), records("mine", vec![listing.clone()]), holdings(&[])])));
+    assert!(out.contains("capital_call") && out.contains("ann"), "{out}");
+    let txs = json!([tx("acc-ann", "acc-works", 7_000_000, DAY + H, "Capital")]);
+    let out = all(&h.wake(DAY + 2 * H, channels(vec![money(F, 7_000_000, txs), records("mine", vec![listing.clone()]), holdings(&[])])));
+    assert!(out.contains("shareholders") && out.contains("property_purchase") && out.contains("acc-factory-1"), "{out}");
+    // Sold to us: open for trade from the next wake.
+    let sold = statement("rec.sold", DAY + 3 * H, "factory-1", "property_sold", &[], json!({ "structure": "works-1", "buyer": F }));
+    let out = all(&h.wake(DAY + 4 * H, channels(vec![money(F, 2_000_000, json!([])), records("mine", vec![listing, sold]), holdings(&[])])));
+    assert!(!out.contains("property_purchase") && !out.contains("capital_call"), "set up: nothing more of it is asked {out}");
+}
+
+/// A tool (foundations-2 E2): bought, one for each of the staff, where the time it saves them at their wage beats its
+/// price over the payback asked, by the hurdle; not where it does not. (A worker's month here is about 42,857; half of it
+/// saved is about 21,428, against a tenth of a million over 24 months, 4,166, by a fifth: it pays; at ten million, no.)
+#[test]
+fn a_tool_is_bought_for_each_of_the_staff_when_what_it_saves_beats_its_price_over_the_payback() {
+    let tool = json!({ "tool": { "kind": "press", "seller": "presses", "labour_bps": 5000, "payback_months": 24, "hurdle_bps": 2000 } });
+    let sells = |press: i64| statement("rec.3", 0, "presses", "price_list", &[], json!({ "goods": { "press": press }, "account": "acc-presses", "min_order": 1 }));
+    let o = |press: i64| vec![farm("rec.1", 100), sells(press), offer("rec.2", 0, 450, 200, Some((F, 150)))];
+    let mut h = harness(tool.clone());
+    let t = all(&h.wake(DAY + 9 * H, world(&["w1", "w2"], o(100_000), 0, 0, 10_000_000, json!([]))));
+    assert!(t.contains("kind=order") && t.contains("\"kind\":\"press\",\"quantity\":2"), "{t}");
+    let mut dear = harness(tool);
+    let t = all(&dear.wake(DAY + 9 * H, world(&["w1", "w2"], o(10_000_000), 0, 0, 100_000_000, json!([]))));
+    assert!(!t.contains("press"), "a tool that does not pay is not bought: {t}");
+}

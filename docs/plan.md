@@ -75,22 +75,31 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] E2a. The outside's capability over time: releases of what it sells from a scenario (`capability`; the first,
     `rising-capability`), each a kind of system released on its day, sold newest first; tagged `ai` in
     `meta.study_tags` for measurement only, with a backstop that no world code reads it.
-  - [ ] E2b. Technologies that are goods (machines, hardware a firm holds, `runs_on`'s energy and water), with E5.
-  - [ ] E3. Firms enter any industry by expected profit, capital-heavy ones included.
+  - [x] E2b. Technologies that are goods: a tool a firm holds, with which a task takes a share of its time (the kernel's
+    `tool`), sold by the outside and weighed by a factory as any technology is; off unless a town asks, `tools: true`
+    (docs/behaviour/automation.md, "Tools"; risk ME-25); hardware as goods is E5's `runs_on`.
+  - [~] E3. Firms enter any industry by expected profit: a factory now founded in works for sale, as a shop is
+    (docs/behaviour/entry.md, "Founding a factory"); building new premises through planning (the capital-heavy route,
+    a hosting firm among them) and borrowing for a venture in premises still to do (ME-1).
   - [x] E5. Compute competing for energy, water and land: what a system runs on, in the kernel (P4: hardware held
     somewhere, each hour of work drawing its recipe there, refused without power), and a host in the town where a study
     asks (`hosting: "local"`), on the feeders and the main with the homes (docs/behaviour/hosting.md; risk ME-24).
   - [ ] WM-15. Every other workplace on the network, with its energy and water by industry (risk WM-15).
-  - [ ] E6. The measures M7 (what the town gives to AI) and M8 (who can still do the work); the tag's backstop.
+  - [~] E6. The measures: M8's census of who can still do the work (`skill_census`, `town/skills`) and the tag's
+    backstop are built; M7 (what the town gives to AI: its share of energy, water, land and hours) is still to write.
 - [ ] **Foundations-2, phase 5:** strict modes on, old exception lists empty, each law's line in CLAUDE.md as its
   enforcement lands.
 - [ ] **Market power in prices** (ME-16), after phase 4.
 - [ ] **Translator rebuild,** once forms settle: about the current size, writing an act constrained by the form's
   grammar; Sonnet only as the safety net, its share reported in every run. Retrain plan: the 2026-10-25 "Translator v3"
   entry in docs/decisions.md.
-- [ ] **Citizen model,** trained from the captured citizen decisions (docs/design/citizen-model.md, docs/citizen-data.md).
+- [x] **Citizen model,** trained from the captured citizen decisions (docs/design/citizen-model.md, docs/citizen-data.md).
   Caveat: trained on code minds' decisions, it inherits their assumptions; it is faster, not an independent check of how
-  people delegate or respond to AI.
+  people delegate or respond to AI. Round 1 landed 2026-11-01: the act head for a want's way (`want-way-r1`, 1.3 points
+  from the code mind's odds on two profiles never seen, every spread and edit check passed, 23 microseconds a
+  decision), an optional citizen mind (`living.citizen_model`, off by default), one command
+  (`bun scripts/citizen-model.ts`). Not yet: the content heads and teachers (design steps 2, 6, 7), which need the
+  renderer and the owner's budget. (It is not faster than the code mind's arithmetic for this decision.)
 
 ## Waiting on the owner
 
@@ -112,8 +121,9 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - Haiku against Sonnet welfare: a matched pair (same town, same offices) before more Haiku seats.
 - The unbased-figures list (orchestrator/test/figures.test.ts) to shrink as figures are sourced.
 - [x] Borrowing to start a business (ME-1): a founder short of the capital applies to the bank, whose lending office decides by its rules (`gap-me1`); lending against a home and borrowing for premises left.
+- [x] Dev machine: elastic slots, the pool fitting the machine's load, memory and each job class's measured use (PL-4 (1), `elastic-slots`).
 - [x] Dev machine: Linux with a hosted nightly, and one Rust test program (PL-4 (2) and (3); branch `linux`, rebased on main 2026-10-31).
-- Dev machine: elastic slots, and a trial of sharding the slow tier on hosted runners (PL-4).
+- Dev machine: a trial of sharding the slow tier on hosted runners (PL-4).
 - The explorer's next steps (PL-2).
 
 ## Done (2026-10-24 to 2026-10-25)
@@ -126,6 +136,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [x] Disk: each worktree's test scratch tidied by the same rule as the runs.
 - [x] Stand-ins removed (debt-generic-2), the run's seed draws who people are (debt-behaviour), guardianship (debt-risks).
 - [x] Deemed refusal of an unanswered review where the law says so (MT-21); bounded public memory (SC-1).
+- [x] Where the law has no deemed refusal (au-vic, gb-eng, us-oh), a complaint of the delay to a body that recommends (MT-21, `complaint_after_days`).
 - [x] Citizen decisions captured in every model run, for the citizen model.
 - [x] Six pilots on the Rust world ($31.86), their faults fixed (lending office's looks, a work site that is not a
   place, names a seat could not use), a returning holder's view shown whole.
