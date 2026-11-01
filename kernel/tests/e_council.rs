@@ -3,7 +3,7 @@
 //! to a ballot, the councillors vote on their own causes (the mayor's proposal is deferred to), the clerk counts and
 //! declares the result, and only then publishes the budget. The same world on 1 and 14 threads is the same world.
 
-mod common;
+use crate::common;
 
 use oikos_kernel::engine::{run_code_world, EngineOptions};
 use serde_json::{json, Value};

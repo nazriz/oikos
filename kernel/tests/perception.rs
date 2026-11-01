@@ -6,7 +6,7 @@
 //! exactly the full picture the channel covers. Over random worlds and random
 //! command sequences, for every channel delivered in every observation.
 
-mod common;
+use crate::common;
 
 use common::*;
 use proptest::prelude::*;

@@ -28,7 +28,9 @@ test("unlawful rent increases are taken to the tribunal, found invalid, and with
   for (const t of config.templates) challenging(t.controller);
   const out = join(root, "runs", "test-justice");
   rmSync(out, { recursive: true, force: true });
-  const s = await runWorld({ config, runId: "justice", outDir: out, until: 300 * DAY });
+  // (250 days, 300 until 2026-10-31, the slow tier's budget: the landlords' six-monthly reviews give their notices on days 181
+  // and 182, each taken to the tribunal that day, and its orders and the withdrawals come on days 238 and 239.)
+  const s = await runWorld({ config, runId: "justice", outDir: out, until: 250 * DAY });
   expect(s.participantErrors).toBe(0);
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
@@ -72,7 +74,8 @@ test("a law repealed by the town that made it stops binding those who followed i
   rmSync(out, { recursive: true, force: true });
   let repealedAt: number | undefined;
   const told = new Map<string, number>(); // participant -> times its book of laws showed it the repeal
-  const s = await runWorld({ config, runId: "repeal", outDir: out, until: 300 * DAY,
+  // (200 days, 300 until 2026-10-31: the landlords' six-monthly reviews after the repeal raise rents on day 182.)
+  const s = await runWorld({ config, runId: "repeal", outDir: out, until: 200 * DAY,
     // (What each was shown is read from the log, where the run records these participants' observations in full: the Rust
     // world's engine runs the offices itself, so a test cannot be handed their observations as they are made.)
     recordObservations: [...new Set(["landlord-1-office", "landlord-2-office", "tribunal-member", "union-organiser"].map((post) => officeAt(config, post).holder.id as string))],

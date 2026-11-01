@@ -1,7 +1,7 @@
 //! The planning officer in a small world (docs/port-guide.md, section 4): the developer's application scripted, every
 //! other actor idle; with and without a planning procedure stated by the town; the same world on 1 and 14 threads.
 
-mod common;
+use crate::common;
 
 use oikos_kernel::engine::{run_code_world, EngineOptions};
 use serde_json::{json, Value};

@@ -2,7 +2,7 @@
 //! a look through a records channel can be a search. Mechanical throughout: the
 //! kernel compares named fields and never learns what they mean.
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::json;
