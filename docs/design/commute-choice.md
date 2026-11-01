@@ -1,8 +1,8 @@
 # Weighing the commute in job and home choices (risk WM-4)
 
 2026-11-01, branch `commute-choice`. A design note written before the code, as market-realism.md was. **Status: the rule
-is specified here; the code is not built on this branch** (WM-4), because what a person can know of a trip's time is not yet
-something the world tells them on `main` (below, "What it needs"). docs/decisions.md, "Weighing the commute".
+is specified here; the code is not built on this branch** (WM-4); how a person knows a trip's time is settled (below),
+and it is built on foundations-2 S3 (`f2-s5`). docs/decisions.md, "Weighing the commute".
 
 ## The fault
 
@@ -31,30 +31,42 @@ the person's own terms, and the mind weighs it as it weighs anything else (no ru
    on job and residential moves as joint search over commuting: all to confirm). The mind's weighing of time against
    money gives that trade; nothing here sets how far anyone goes.
 
-## What a person knows of a trip (no god's view)
+## What a person knows of a trip (no god's view; settled 2026-11-01 by the coordinating session)
 
-Never a straight line, never the world's path-finder read for them. A trip's time is known in two of the four ways:
+Never a straight line, never the network's whole timetable, and **no participant-API addition**. On `f2-s5`
+(foundations-2 S3 to S6, landing on main) a person on the way sees it in their own body: `BodyView.on_way {to, arrives}`
+(`kernel/crates/perception/src/observe.rs`), and the citizen already waits on it (`person.rs`, `lifecycle.rs`). So:
 
-- **They made it** (their own trips): each trip a person makes, the time it took over the roads as they went (the
-  kernel's `travel::seconds`, by the mode they went by), kept in a bounded memory of their own, by where they went.
-  The commute of a job they hold is what their own trips to it take.
-- **They went to look** (a visit, docs/design/knowing.md): someone weighing a posting or a home at a place they have
-  never been to goes to see it, which takes the real trip there and back (`sites::visit_seconds`, over the roads), and
-  learns its time by having made it. A visit costs their time, so it is made for the options that are worth it (the
-  best-paid few, as the search shows them: `search_limit`), and a place not visited is weighed as unknown, with the
-  mind's ordinary caution about what it has not seen.
+- **Their own trips.** When a person sets out (the act that moves them, from the structure they are in), they note
+  where from and when; when they see themselves on the way they read `to` and `arrives`, and keep the trip's seconds
+  (`arrives` less when they set out) in a bounded memory of their own, by the pair of structures, either way round, the
+  latest time kept. The commute of a job they hold, or of a home and work they have travelled between, is that.
+- **What they are told or can see published:** a posted timetable, where the world publishes one (a public service's
+  timetable is published, as any statement is); none exists yet, so this is the hook, not a source today.
+- **Otherwise they do not know it**, and the option carries no commute term (never a guess). A first hire across towns
+  can therefore still happen; the commute then counts from the first trips, in the monthly job search (a job nearer, at
+  pay net of the commute) and in the home search (a home nearer the work).
 
-## What it needs (why it is not built here; WM-4)
+## Figures, per place (to source in the profiles, each with its source; WM-4)
 
-1. **A traveller's own trip time on their act's outcome** (contract addition, participant API `Outcome`: an optional
-   `trip: {to, seconds}`, seen only by the one whose body went, as `investigated` and `surveyed` are). Today the kernel
-   charges the trip in `begin` (`kernel.rs`) and tells nobody how long it took. This is a contract change, for Naz's
-   sign-off; with foundations-2 S3 (bodies in transit, on `f2-s5`) a person may instead see their own departure and
-   arrival, and the addition may be unnecessary. Settle which once `f2-s5` lands, so the two do not collide.
-2. **A visit to a posting's place**: the posting must say where the work is (a structure), which a producer's posting
-   does through its `workplace`; a shop's and an office's need checking.
-3. The profile figures above (`commute_time_bps`, a vehicle's running cost a kilometre), each with its source, in
-   `worlds/profiles/`, never as module defaults.
+| Profile | Value of commuting time | Vehicle cost a kilometre |
+|---|---|---|
+| au-vic (WM-4) | ATAP (Australian Transport Assessment and Planning) guidelines, PV2 (to confirm) | ATAP PV2 vehicle operating costs (to confirm) |
+| gb-eng (WM-4) | DfT TAG data book, table A1.3.1 (to confirm) | DfT TAG data book, A1.3.13-14 (to confirm) |
+| us-oh (WM-4) | USDOT, revised value of travel time guidance (2016) (to confirm) | AAA, "Your Driving Costs" (to confirm) |
+| others (WM-4) | PLACEHOLDER, labelled | PLACEHOLDER, labelled |
+
+## What is left to build (WM-4)
+
+1. On `f2-s5` or main once it lands: the citizen's trip memory, filled from its own departures and `on_way`, bounded,
+   in the person's saved state.
+2. The commute term in `look_for_work` (each employer's posting by its place of work: a producer's `workplace`; a
+   shop's and an office's to check) and in the home choice (`housing.rs`, the `home` decision), as `time_hours_per_month`
+   and a negative `money_per_month`.
+3. The two figures as profile fields, through the generator to the citizen's params (with the manifest), no module
+   default.
+4. Behaviour doc (citizen.md or a new `docs/behaviour/commuting.md`), references, decision entry; state hashes re-taken
+   with the reason if they move.
 
 ## Tests that will guard it (lean)
 

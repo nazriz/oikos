@@ -10220,3 +10220,7 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   arrival), and the profile figures (`commute_time_bps`, a vehicle's cost a kilometre) per place.
 - **Revisit if:** `f2-s5` lands (then build the rule against what it shows a traveller), or a multi-town run is needed
   before that.
+- **Settled later the same day (the coordinating session):** a person's trip time is what they saw on their own trips,
+  the S3 way (`BodyView.on_way`), or what is published (a timetable); no participant-API addition; otherwise they do not
+  know it. Figures per place from ATAP (au-vic), the DfT TAG data book (gb-eng), USDOT guidance and AAA costs (us-oh),
+  placeholders elsewhere. Building waits on `f2-s5` landing (docs/design/commute-choice.md, "What is left to build").
