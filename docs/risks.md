@@ -557,17 +557,24 @@ The mechanism:
 
 ---
 
-### ME-22 · Delegation's figures are placeholders, and a code assistant decides nothing
-- **Gap:** The assistants on offer (prices, speed, a provider's claimed and true slip rates, the records term) and what a
-  principal weighs (what an error costs it, the share of slips its reading finds, how much a claim counts, its hurdle,
-  its review day, its horizon) are placeholders in au-vic only; the times of the papers of delegation are placeholders.
-  A code assistant carries out what its principal decided; only a model in the seat decides otherwise.
-- **Where:** `worlds/profiles/au-vic-2026.json` `values.assistants`; `docs/behaviour/assistants.md`; `docs/design/delegation.md`.
-- **Effect:** How much code principals delegate, at which levels, and how fast hidden slips build trust, rest on these
-  figures; a run with code assistants shows the machinery, not how much real principals would hand over.
-- **L / I:** high / high for any finding about how much is delegated · **Status:** open (2026-10-31)
+### ME-22 · Delegation's speed, slips and principals' figures are placeholders, and a code assistant decides nothing
+- **Gap:** The assistants' prices now rest on published 2026 prices of real assistant products (au-vic, gb-eng, us-oh;
+  2026-10-31, `assistant-prices`), most from secondary pages (to confirm). Still placeholders: an assistant's speed (no
+  provider publishes a time per paper; the one controlled study measures a person with an assistant), a provider's
+  claimed and true slip rates (no published error rate for drafting papers; hallucination benchmarks measure
+  summaries), the records term, and all a principal weighs (what an error costs it, the share of slips its reading
+  finds, how much a claim counts, its hurdle, its review day, its horizon); the times of the papers of delegation; and
+  which real product stands for provider A or B (a convention). A code assistant carries out what its principal
+  decided; only a model in the seat decides otherwise. Other profiles have no assistants.
+- **Where:** `worlds/profiles/{au-vic,gb-eng,us-oh}-2026.json` `values.assistants`; `docs/behaviour/assistants.md`; `docs/design/delegation.md`.
+- **Effect:** How much code principals delegate, at which levels, and how fast hidden slips build trust, rest above all
+  on the speed and slip placeholders and the principals' figures (prices are now real but list prices of general
+  assistants, not of a service that does tenancy papers alone); a run with code assistants shows the machinery, not how
+  much real principals would hand over.
+- **L / I:** high / high for any finding about how much is delegated · **Status:** open (2026-10-31; prices sourced 2026-10-31)
 - **Notice by:** Engagement and levels moving with a placeholder changed alone.
-- **Fix when:** before a study reads how much is delegated rather than what follows when it is.
+- **Fix when:** before a study reads how much is delegated rather than what follows when it is: a measured time and
+  error rate for an assistant doing such papers alone, and a source for what an error costs a landlord or a person.
 
 ### ME-23 · Skills by use: every rate a placeholder, everyone an ordinary hand on day one
 - **Gap:** With `skills` on, how fast a skill is learnt and lost, its floor, and how slow a novice and how quick a master
@@ -1433,13 +1440,19 @@ The mechanism:
 - **L / I:** medium / high · **Status:** mitigated (2026-10-24, branch `fix-memory-appeal`). A deemed refusal is law
   data (`review.deemed_refused_days`): where a place's law has one, a review unanswered that long is taken as refused
   and the claimant's appeal runs from then (de-ni: 91 days, SGG s 88(2), to confirm; held at citizen level and in a
-  living town whose office's answers are withheld). Still open where the law has none: au-vic (the TARA town), gb-eng,
-  us-oh's pension recall none (to confirm); what their claimants do instead (ask again, the ombudsman, judicial review)
-  is not built.
+  living town whose office's answers are withheld). Where the law has none (au-vic, the TARA town; gb-eng; us-oh's
+  pension; none recalled, to confirm), since 2026-10-31 (branch `mt21-recourse`) what their claimants do instead is
+  law data too (`review.complaint_after_days`): after 14, 21 and 30 days (the last a placeholder) unanswered, the delay
+  may be complained of to the town's ombudsman desk, standing for the Commonwealth Ombudsman, the DWP complaints route
+  to the Independent Case Examiner, and a congressional caseworker; it does the work at its own cost and only
+  recommends; the appeal still runs from an answer (held at citizen level and in living au-vic and gb-eng towns whose
+  office's answers are withheld: 5 of 14 au-vic claimants complained). Left: asking again, judicial review or
+  mandamus; the desk's recommendation is to set the decision aside, where a real ombudsman on delay asks first that the
+  review be decided; the figures are mostly to confirm.
 - **Notice by:** `withheld` arms whose claimant never acts again in a town whose law has no deemed refusal; a model
   steward that leaves requests unanswered there.
-- **Fix when:** Before a TARA arm in au-vic in which the steward may leave requests unanswered: source what an
-  Australian claimant does (a complaint to the Commonwealth Ombudsman, asking again) and give it to them as law data.
+- **Fix when:** the profiles' figures are confirmed; or a TARA arm reads how far claimants escalate (then asking again,
+  and England's three tiers, may matter).
 
 ### MT-22 · A model steward in a fork is a pilot's seat, less a few things
 - **Gap:** Mitigated 2026-10-31 (docs/decisions.md, "A model steward in a fork is a pilot's seat"): the seat is told what
@@ -1710,8 +1723,21 @@ set the status to `fixed (commit abc1234)` (or the decisions entry), and let a r
   the part (3) would cut. A documents-only gate is 15 s, TypeScript only 85-100 s, the slow tier 660 s on 12 slots. A lone
   agent's gate is held to 3 slots for builds and runs today, which (1) would lift. The code has run only on macOS arm64,
   so nothing yet says its logs are the same elsewhere, which (2) would.
-- **Status:** planned (after feature work resumes) · **Do when:** The kernel gate grows past about 4 minutes or agents
-  wait on the cap for (1) and (3); before any result is claimed to reproduce on another machine, for (2).
+- **Done (2026-10-26, brought to main 2026-10-31; decisions "Linux, and one Rust test program"):** (2) the build and the gate run on Linux x86_64,
+  and the culture-dial pins (config hashes and the Rust state hashes of three profiles) are the Mac's to the byte; the
+  Mac-only pieces are skipped where absent, and `disk-tidy` no longer reads every folder as unused on Linux (its `ps -E`
+  is macOS's), and `scripts/mini stop` waits for what it ended to leave the process table (a Linux container's first
+  process reaps orphans a second or two late: the cause of `mini.test.ts` failing there every time).
+  `.github/workflows/linux.yml` runs both tiers nightly on a free `ubuntu-latest` runner with no secrets, cached, and
+  skips a night with no new commit on main; no workflow on
+  the self-hosted runner takes a pull request (`scripts/tiers.test.ts`). (3) `kernel/tests/` is one program
+  (`tests/main.rs`): a one-line change to the kernel's library rebuilds its tests in 34 s against 48 s, one to
+  `oikos-actors` in 153 s against 170 s, one to the tests' `common` in 3.5 s against 14 to 45 s, and the tests run in
+  230 s against 353 s (gate profile, 4 cores, Linux).
+- **Done (2026-10-31, in another form; decisions "Elastic slots"):** (1) the pool follows the machine (load, free memory,
+  each class's measured use), the cap kept for builds and runs, which cannot give tokens back soon.
+- **Status:** planned (left: the sharding trial) · **Do when:** the slow tier's time on the Mini holds up merges and the
+  nightly Linux job has a few green nights to read times from.
 
 ---
 

@@ -28,7 +28,10 @@ const notes = (path: string) => readFileSync(path, "utf8").trim().split("\n").fi
 const PLAIN: R.Reading = { respect: 0, reason: 0, answers: null, recourse: 0, threat: 0, appeals: { openness: 0, conservation: 0, enhancement: 0, transcendence: 0 } };
 const TABLE: ReadingTable = { version: "test", reader: "test", rows: Object.fromEntries(["remedy_answer", "variation_answer", "venue_decision", "tribunal_order", "fund_decision", "loan_decision", "benefit_decision"].flatMap((k) => ["granted", "refused", "decided", "approved"].map((o) => [`${k}:${o}`, PLAIN]))) };
 const seam = { bySeat: () => true, words: (s: { text: string }) => s.text };
-async function town(reader: any, days = 200, dial = true) {
+// (Thirty days, 200 until 2026-10-31, the slow tier's budget: the town's worded decisions are read from its first day, about
+// forty of them in the first three weeks, the model asked on seven of those days and the cache answering the rest; the
+// months after add more of the same, sparser. Everything held below happens in the first fortnight.)
+async function town(reader: any, days = 30, dial = true) {
   const d = out();
   const config = dial ? withDial(generate({ ...base, living: { initiative_bps: 10_000 } }) as any) : (generate({ ...base, living: { initiative_bps: 10_000 } }) as any);
   const run = await runWorld({ config: { ...config, seed: 1, log: { ...config.log, detail: "full" } }, runId: "r", outDir: d, until: days * DAY, recordObservations: "none", reader, readingTable: TABLE, readingSeam: seam });
@@ -80,7 +83,7 @@ test("a worded decision is read once and filed as an event; kinder and curter re
     expect(curt.run.stateHash).not.toBe(neutral.run.stateHash);
     expect(curt.run.stateHash).not.toBe(kind.run.stateHash);
     // The reader that reads every paper as the plain one shifts nothing: the world with the dial off, to the state hash.
-    const off = await town(neutralReader(), 200, false);
+    const off = await town(neutralReader(), 30, false);
     try { expect(neutral.run.stateHash).toBe(off.run.stateHash); } finally { rmSync(off.d, { recursive: true, force: true }); }
   } finally { for (const x of [kind, curt, kind2]) rmSync(x.d, { recursive: true, force: true }); }
 }, 900_000);

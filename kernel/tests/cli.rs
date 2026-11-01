@@ -1,7 +1,7 @@
 //! End to end through the real binary: drive a run over the stdio protocol,
 //! then `verify` and `replay` the log it wrote, then tamper with it.
 
-mod common;
+use crate::common;
 
 use serde_json::{json, Value};
 use std::io::Write;
