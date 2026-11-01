@@ -65,7 +65,7 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [x] **Foundations-2, phase 2: conservation** (law 8; landed 2026-10-26, its hard-rule line in CLAUDE.md; the before/after measurement and a 10,000-person month next week). Water, energy, materials and waste as stocks with flows;
   metered homes; recipes say their energy and water; shortages follow from network, contracts and operators, with no
   allocation rule (docs/design/foundations-2.md §2).
-- [~] **Foundations-2, phase 3: space** (law 9; branch `f2-phase3`: S1, the backstop and its inventory; S2, roads as ways and household vehicles). Roads, pipes, wires and data lines with capacity and energy; people in
+- [~] **Foundations-2, phase 3: space** (law 9; branch `f2-phase3`: S1, the backstop and its inventory; S2, roads as ways and household vehicles; S3, bodies on their way; S4, goods carried, crews to the site, freight from the edges). Roads, pipes, wires and data lines with capacity and energy; people in
   transit; goods need a carrier; several towns as an option (§3). Transport and many towns come from this.
 - [~] **Foundations-2, phase 4: the general economy** (§7; every roadmap item to be done, owner 2026-10-31; branch
   `f2-economy`). Serves the north star's reversibility: what taking work back costs, and what AI takes of a finite town.
@@ -75,22 +75,31 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] E2a. The outside's capability over time: releases of what it sells from a scenario (`capability`; the first,
     `rising-capability`), each a kind of system released on its day, sold newest first; tagged `ai` in
     `meta.study_tags` for measurement only, with a backstop that no world code reads it.
-  - [ ] E2b. Technologies that are goods (machines, hardware a firm holds, `runs_on`'s energy and water), with E5.
-  - [ ] E3. Firms enter any industry by expected profit, capital-heavy ones included.
+  - [x] E2b. Technologies that are goods: a tool a firm holds, with which a task takes a share of its time (the kernel's
+    `tool`), sold by the outside and weighed by a factory as any technology is; off unless a town asks, `tools: true`
+    (docs/behaviour/automation.md, "Tools"; risk ME-25); hardware as goods is E5's `runs_on`.
+  - [~] E3. Firms enter any industry by expected profit: a factory now founded in works for sale, as a shop is
+    (docs/behaviour/entry.md, "Founding a factory"); building new premises through planning (the capital-heavy route,
+    a hosting firm among them) and borrowing for a venture in premises still to do (ME-1).
   - [x] E5. Compute competing for energy, water and land: what a system runs on, in the kernel (P4: hardware held
     somewhere, each hour of work drawing its recipe there, refused without power), and a host in the town where a study
     asks (`hosting: "local"`), on the feeders and the main with the homes (docs/behaviour/hosting.md; risk ME-24).
   - [ ] WM-15. Every other workplace on the network, with its energy and water by industry (risk WM-15).
-  - [ ] E6. The measures M7 (what the town gives to AI) and M8 (who can still do the work); the tag's backstop.
+  - [~] E6. The measures: M8's census of who can still do the work (`skill_census`, `town/skills`) and the tag's
+    backstop are built; M7 (what the town gives to AI: its share of energy, water, land and hours) is still to write.
 - [ ] **Foundations-2, phase 5:** strict modes on, old exception lists empty, each law's line in CLAUDE.md as its
   enforcement lands.
 - [ ] **Market power in prices** (ME-16), after phase 4.
 - [ ] **Translator rebuild,** once forms settle: about the current size, writing an act constrained by the form's
   grammar; Sonnet only as the safety net, its share reported in every run. Retrain plan: the 2026-10-25 "Translator v3"
   entry in docs/decisions.md.
-- [ ] **Citizen model,** trained from the captured citizen decisions (docs/design/citizen-model.md, docs/citizen-data.md).
+- [x] **Citizen model,** trained from the captured citizen decisions (docs/design/citizen-model.md, docs/citizen-data.md).
   Caveat: trained on code minds' decisions, it inherits their assumptions; it is faster, not an independent check of how
-  people delegate or respond to AI.
+  people delegate or respond to AI. Round 1 landed 2026-11-01: the act head for a want's way (`want-way-r1`, 1.3 points
+  from the code mind's odds on two profiles never seen, every spread and edit check passed, 23 microseconds a
+  decision), an optional citizen mind (`living.citizen_model`, off by default), one command
+  (`bun scripts/citizen-model.ts`). Not yet: the content heads and teachers (design steps 2, 6, 7), which need the
+  renderer and the owner's budget. (It is not faster than the code mind's arithmetic for this decision.)
 
 ## Waiting on the owner
 

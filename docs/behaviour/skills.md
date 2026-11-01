@@ -51,6 +51,14 @@ off, or on at the rates it chooses, and says so (ME-23). Off, the config is the 
 None of these is a place's figure: they are of people, not of a town, and live in the generator's `SKILL_DEFAULTS` as
 placeholders (law 11 counts them so; risk ME-23).
 
+## Who could still do the work: the census (foundations-2 M8)
+
+Where a world has practised skills, the kernel censuses them each month (`skill_census` in the log): for each skill,
+how many living people stand in each tenth of its range, as it stands that day. It is a count, for measurement only;
+nothing in the world reads it. `oikos measure DIR town/skills` lists it by run, day and skill (`measure/queries/town/skills.sql`):
+the ten counts, the people, and how many are in the upper half. What a study reads as "could still do it" is its choice
+of band.
+
 ## What it does not do yet (risk ME-23)
 
 - **Slips by skill.** How often a person's work goes wrong is still the table of slips' rate, the same at any skill: no
@@ -61,4 +69,3 @@ placeholders (law 11 counts them so; risk ME-23).
   own time at the table's rate, not its own skill.
 - **One skill for all papers.** A person's papers of every kind share one skill. The kernel takes one per kind
   (`act_skills` is keyed as the table of work is); the generator groups them.
-- **Who can still do the work** (foundations-2 M8) is a measure still to write (E6); it will read these variables.

@@ -63,6 +63,7 @@ pub fn refusal_text(code: Option<&str>) -> &'static str {
         "offer_withdrawn" => "the offer has been taken back by whoever made it, so there is nothing to sign",
         "unpriced" => "nobody here knows what doing that takes, so it can't be done",
         "beyond_supply" => "there is no more of that to be had from outside this time: what is offered of it has all been taken",
+        "not_carried" => "nobody is taking it there: goods go from one place to another only with someone who carries them",
         _ => "it isn't possible",
     }
 }

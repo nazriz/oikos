@@ -9994,6 +9994,33 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Revisit if:** a day over the bound again (then look at who in the crew was busy, and with what, from the log's
   timelines).
 
+## 2026-10-31 · Foundations-2 phase 3, S3: bodies on their way (branch `f2-phase3`; results move; no model called)
+
+- **Kernel.** An act that takes a body to another building puts it on its way when the act starts (it leaves its space
+  then, `vacated`) until the act is done (it enters the new one then, `occupied`), in `State.transit` (the reserved shape,
+  now with the space it left and the act that takes it). A body on its way is in no building, so the presence checks that
+  already exist refuse whatever would be done to it or by it at a place, and nobody sees it in either; its vehicle stands
+  with it (`at` the body: nobody else can take it). An act that starts later (its actor busy) sets them out at its start
+  (`Sched::Depart`, before the start's checks). A move refused when it is done (the space filled meanwhile; the act
+  refused when it starts) brings the body back where it set out, into the space it left if there is room (the way there
+  and back is the known limit); dead or gone on the way, it is only taken off the road. A person's visit to go and look
+  is a trip there and back: away from where they were for its whole time. A person knows where they are going and when
+  they arrive (`body.on_way`), and a citizen on their way sets out for nowhere else.
+- **Standing journeys not built** (3.1 has them, to keep the log from growing by a commute's acts): putting bodies on the
+  way adds no event (the `vacated` comes at the start instead of the end, the `occupied` as before), so the log does not
+  grow, and the daily round's wakes already happen at the round's hours. Revisit if a commute's acts show in a profile of
+  a long run or the log.
+- **Kernel tests** (`space.rs`): the property holds that a body on its way is in no building and arrives no sooner than
+  it set out; a trip by car (in no building until it arrives, the car with her, bob cannot take it, she knows where she
+  is going and when); a trip refused on arrival brings her home.
+- **Measured** (10,000 people, 30 days, as S2's; on the tree merged with main at 60c7ab07, so main's years-at-10,000
+  fixes are in it too): 3,337,279 log lines against main's 3,332,887 (+0.13%, within the plan's 5%); wall 99 s, the run's
+  own thread 74.7 s; peak 1.68 GB. 30,376 moves into a space, 6,772 driven; refusals for want of room fell from 1,486 to
+  11 and `no_time_left` from 499 to 139 (a body on its way holds no space: the house is not full of people who have gone
+  out), `not_present` 1,719 (a household's second driver finding the car gone).
+- **Inventory.** S3 done: the trip spent where one set out is gone (the entry a guard).
+- **Revisit if** a refused arrival's way back matters to a result (then the body stands at the door, a place of its own);
+  a body on its way should be met or seen on the road (then a link it is on, S5's flows).
 ## 2026-10-31 · The assistants' prices from real products; gb-eng and us-oh get assistants (branch `assistant-prices`; profiles only; a town without `assistants` is unchanged; no model called)
 
 - **What.** Each offer's fee, set-up and exit in au-vic now rest on 2026 published prices of real general AI
@@ -10243,6 +10270,41 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Revisit if:** a source gives slip rates by practice, or skill half-lives by kind of work; a study needs papers'
   skills by kind; the opening level's assumption (everyone an ordinary hand) shows in results.
 
+## 2026-11-01 · Foundations-2 phase 3, S4: goods are carried, crews go to the site, the outside's freight takes its time (branch `f2-phase3`; results move; no model called)
+
+- **Contract (blocks, log, world config; blanket approval).** `move_goods` gains `carried` (the acting person carries
+  them), `carrier` (someone the actor may direct does) and `vehicle` (driven by the carrier); `goods_moved` names the
+  `carrier` and, for the outside's freight, when the goods `arrives`; a network link may carry travel (`speed_kmh`: a road
+  out of the town to an edge's node; between towns, S6). A new refusal, `not_carried`. The calls' `carried`, `carrier` and
+  `by` are code's own until the translator is taught them (the resolver's `CODE_ONLY_ARGS`), as S2's `by` is.
+- **Kernel.** In a world one travels (it has `catalogue.travel`; every world in phase 5's strict mode), goods between two
+  buildings go only with a carrier, and an act's journeys (`travel::journeys`) take each body it moves by the buildings
+  its blocks reach, in order: an `occupy`'s body into its building; a `move_goods`'s carrier by where the goods are and
+  where they go; a `work` on a building other than where it is done each performer to it. A body ends in the building it
+  goes into, or back where it set out (`turn_back` when the act is applied). Its trip is leg by leg; the act takes its
+  longest trip; each performer's and carrier's trip is placed on their own timeline. When the act is done the carrier must
+  have been by both places (`Transit.via`), else `not_present`. To or from an edge's outside, goods go by the outside's
+  freight (no town person's time): from the edge's node along the ways to the door, at the links' speeds, on their way
+  meanwhile (`Sched::Arrival`, counted by `State::total_goods`, so the conservation property holds over goods on the
+  road); at once where the world has no node for the edge (the backstop's `edgesWithoutNode` would name it). A vehicle
+  named that the body may not drive, or that is not where it sets out, means the body does not set out and the act is
+  refused when due (it looked, and the car was gone); on arrival the vehicle that went is the one that arrives.
+- **Generator, profiles.** The road out (`round.outside`: how far by road the outside's goods come from, and its freight's
+  speed, placeholders in all nine profiles, with what each would be sourced from), from the street end nearest the
+  town's west edge to a node off the ground, and every edge's node at its end.
+- **Actors.** Every move of goods an actor writes says it is carried (`uncarried` is empty). A citizen's order is collected
+  at the shop (it says where it serves from) and carried home at the weekly use, there and back; a seller delivering to
+  another business, and a shop moving its stock, carry it themselves. The crews (the builder's, the works', the
+  collectors') go to the buildings they work on with no change of their own: the kernel's journeys take them.
+- **Inventory.** S4 done: `edgesWithoutNode`, `uncarried`, `uncarriedMoves` and `workElsewhere` empty in every profile's
+  town and a month of each one's log; the special cases `goods-move-anywhere` and `crews-from-the-depot` gone (guards).
+  Left: the unhoused in no space, and the systems with no place.
+- **Not as designed:** carriage has no load yet (a body's or a vehicle's limit in mass: S5 with link capacity, which needs a
+  mass for each kind); a carrier's goods land when it is back, not when it passes their place (a trip's length late at
+  most); the freight's price is the edge's offer's as before (a freight charge by distance is the outside's behaviour, to
+  come with its sourced rate).
+- **Revisit if** a delivery round's order of stops matters (then the route is ordered by the carrier, not the blocks); the
+  outside's freight should take town people's time (then a carrier firm of the town's, its staff and vans).
 
 ## 2026-10-31 · Elastic slots: the pool fits the machine as it is (branch `elastic-slots`; `scripts/slots.ts`; risk PL-4 (1); no result changes; no model called)
 - **What:** with `OIKOS_SLOTS` unset the pool is the core count (it was the cores less two, fixed), and a job that is not
@@ -10301,6 +10363,58 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   town with capability to the plain town but for its releases and its tag).
 - **Revisit if:** a study needs capability as a continuous path rather than releases; a scenario's sizes find sources;
   buyers should replace delivered systems as releases come out (that is a buyer's rule, with a real basis, not this).
+## 2026-11-01 · The citizen model, step 1: a model of our own as an optional citizen mind, and its pipeline (docs/design/citizen-model.md steps 2, 3, 5; contract addition `dials.citizen_model`; a world without it is as before, to the byte; no model called)
+
+- **What:** `kernel/crates/actors/src/mind/model.rs`: the input builder (reads the `situation` the mind records with a
+  want decision, less the code mind's own scoring) and the forward pass of a small network that gives each of a want's
+  ways a score; `dials.citizen_model` (`weights`, `sha256`, `share_bps`), read and hash-checked by the engine
+  (`engine.rs` `citizen_model`), carried to every citizen through `WorldInfo`; in `pursue`, the way is drawn from the
+  code mind's exponents blended in log-odds with the model's (`model::blend`), both odds recorded. The trainer
+  (`kernel/crates/citizen-train`) and the pipeline (`scripts/citizen-model.ts`, one command; `towns` makes the code
+  towns of `worlds/citizen-model.yaml`). `Attractions::choose` now draws through `exponents` and `pick`, the same
+  arithmetic in the same order.
+- **Why this way:**
+  - *The want's way first:* it is the design's round 1 (whether to contest, and where), it is the one decision whose
+    situation the capture types fully, and the code mind's odds are recorded with it as targets.
+  - *An MLP over each option, not attention over items:* with the act head only, the options are a handful of kinds,
+    and a scorer applied to each alone keeps order out by construction. Attention over fact and paper items is for the
+    content heads (grounds, evidence), which need step 2's renderer and the teachers first.
+  - *Floats in a fixed order, weights in 1/65,536ths, not int8:* the code mind already computes its logit with IEEE
+    arithmetic and `mind::math::exp`, which is the same on any machine; whole-number weights make the file exactly
+    what runs, and an int8 forward buys speed this decision does not need (a few thousand calls a day in a town of
+    10,000). Revisit if a head runs on every decision.
+  - *Training in Rust, not PyTorch:* the network is small; one thread, a fixed order and `mind::math` make the same
+    data and seed give the same weights anywhere, and the trainer measures the very forward pass a run computes, so
+    no Python reference or bit-identity test is needed. `crates/citizen-train` is outside the determinism lint (as the
+    explorer is): it is not in the world, and a run reads only the file it writes, by its hash.
+  - *The weights by path and hash, read by the engine:* the actors crate may not touch files; inlining the weights in
+    the config would make every person's parameter key carry them. The hash in the config (and so in the log) says
+    which weights ran; a file that differs refuses to run.
+- **Not built:** the content heads (seeks, amount, grounds, evidence, register: step 2's renderer and teachers); the
+  teachers (paid API, the owner's go-ahead); scrambled-record and edit checks against the code mind's own response
+  (the code mind's odds are recorded, not recomputable from a row: the edits are checked for the direction of the code
+  mind's own sways instead); the content and patterns-not-told checks; twins over two years.
+- **Revisit if:** the model's odds are used past round 1 (a head per domain needs its own situation typed); a head runs
+  on every decision (then int8 and batching); the code mind's want weighing changes (retrain: the model learns the
+  code mind as it was when captured, which the data manifest records by source hash).
+## 2026-11-01 · The citizen model, round 1 trained and measured: `want-way-r1` (docs/citizen-data.md, "Round 1"; no model called)
+
+- **What:** 25 code towns made for it (`worlds/citizen-model.yaml`, nine profiles, a year each, captured: runs/citizen-model/towns/)
+  and the pilots' training split; 33,692 want decisions kept (the three held-out test pilots refused whole, decisions
+  with only waiting open left out); five seeds trained; seed 2 chosen. On two profiles never trained on: 1.3 points
+  from the code mind's odds (median), acting at all 67.30% against 67.32%, the spread between people kept (0.98), every
+  edit the code mind's way in every case, 23 microseconds a decision. Retrained, the same file byte for byte. Twins
+  in a town of 1,000: no difference in run time beyond the load's noise; waiting 53.0% against 54.0%.
+- **Why the splits so:** whole towns and whole profiles held out, as 11e asks, so the test says whether it learned the
+  citizen or one town's settings; the held-out pilot says whether seats' towns differ (they do not, here).
+- **What it shows, honestly:** a small net of our own reproduces the code mind's want weighing closely, fast, keeping
+  who people are, and the mechanism is in place for a round that adds teachers or content heads. It shows nothing about
+  real people: it inherits the code mind's placeholder sways (plan caveat). Nor is it faster than the code mind for
+  this decision; its use is as the base the later heads build on.
+- **Revisit if:** the code mind's want weighing changes (retrain from new captures; the manifest records each source's
+  hash); a profile whose parameters differ from all nine shows a larger distance (the model reads no profile parameter
+  directly, e.g. the mind's lambda); the scrambled-record figure (13.8 here) is to be compared with the code mind's own,
+  which needs the code mind run on edited records (a harness of its own).
 ## 2026-11-01 · Compute in the town: what a system runs on, and a host on the town's network (foundations-2 P4 and E5; branch `f2-economy`; contract addition; new kind `firm.host`; a town without `hosting` is as before, to the byte; no model called)
 
 - **What:** the kernel's `runs_on` (foundations-2 4.1, P4): a system's template says the hardware it runs on (a kind, so
@@ -10328,6 +10442,31 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
   connection's rate; the placeholders find sources (ME-24).
 
+## 2026-11-01 · Deaths on the way: whoever comes by finds them, a household reports one who has not come home (WM-6; with S3 and S4; results move; no model called)
+
+- **What we saw:** the invariants canary (ke-nakuru seed 2, a year) failed on S3 and S4: a severely ill worker set out
+  from the builder's yard for the clinic and died six minutes into the walk. A body on its way is in no building (S3), so
+  nobody was in the room; the death was never reported and the employer's standing order paid wages for 58 days. Before
+  S3 the worker would have died at the yard, with coworkers present. The gap is WM-6's ("a death outdoors leaves no
+  trace"), made reachable by law 9. The coordinator's direction: real behaviour, the "they are there" way of knowing, no
+  invented find-rates, not a loosened invariant.
+- **Kernel.** A body that dies on its way lies on the road where it had come to (`State.remains`: the cell that far along
+  the straight line between the buildings it goes by, the known limit), its vehicle with it. Whoever comes by within a cell
+  and a half of it on their own way (at the end of their trip) sees who lies there: a look at that cell, delivered to
+  their first channel of what is at places (`SiteCell.remains`, shown to anyone there).
+- **Citizen.** Someone who has seen a body lying where they went by asks the police to come (`welfare_check_request`
+  naming the cell), once for each of the dead. An adult at home who sees that one of the household left home more than a
+  day ago and has not come back (the home's departures) reports them missing (`missing` on the request), once for each
+  going. A day is the round's own rhythm, as for a home that stands empty (deaths.md).
+- **Police.** Called to a place on the road, an officer goes (a visit, as to a home) and reports whoever lies there to the
+  registry as found there, once, and does not go to that place again; called about one who has not come home, they look
+  at the home and the street outside it (each cell next to its ground). The registry, the bank and the employer then learn
+  of the death the normal way (deaths.md, "Who is told").
+- **Not done:** the body is not taken away (nobody does an undertaker's work): others who come by still see it, and the
+  police, who found it, do not go again. A body lying where nobody passes, of someone with no household at home, is still
+  found by nobody (WM-6 stays open, narrower).
+- **Revisit if** a body lies unfound for long in a busy town (then the straight line is too far from the way people take:
+  draw the way cell by cell); deaths on the road show in a result (then an undertaker's or coroner's work, and the time).
 ## 2026-11-01 · Main red after foundations-2 S2: own-venture held the owner of a failing business to 150 days
 
 - **What:** CI went red at d0105172 on `own-venture.test.ts`, "someone out of work ... starts a business of one": its
@@ -10361,6 +10500,61 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   capital): entry by expected profit reads the profile's venture, not what the person just lived through. A behaviour
   question (does a failed founder try again at once, and how soon?), to settle with a source, not a test.
 - **Revisit if:** a founder's own failure is to weigh in their next venture (ME-1).
+## 2026-11-01 · Entry into the town's other industry: a factory founded in works for sale (foundations-2 E3, its first part; branch `f2-economy`; citizen, firm.producer, generator; no contract change; no model called)
+
+- **What:** the town's ventures gain a factory (`kind: factory`, the works' type): when a closed factory's works are for
+  sale, someone with the means for them and the venture's capital weighs founding a factory there by expected profit
+  (`rules::entry::expected`, as for a shop): its price and its inputs' cost a unit, its custom the world market's
+  appetite for goods as it publishes it (`demand_per_month`) shared among the town's factories of goods (`sellers`) and
+  itself, a hand's month at the time a unit takes, hands while the margin pays their wage. Founded, `firm.producer` sets
+  itself up first (account, the founder's capital, shareholders, the works bought), by the setting up the retailer had,
+  moved to `market/founding.rs` unchanged (the retailer's words and order kept, so a shop's founding is as before).
+- **Why this way:** entry was already by expected profit (2026-10-24, ME-1) and premises already came up for sale by
+  type; widening the venture list to the factory is the general law (any industry whose premises can be had), and the
+  world market already buys from every seller (ME-15), so a new factory has a market as a real entrant would.
+- **Not built, and why:** new premises built through planning, the route for an industry with no premises standing (a
+  hosting firm's): it needs a founder to buy land, apply for a permit and pay the builder, a chain the town has for
+  landlords' homes but not for firms; borrowing for a venture in premises (ME-1 says so); products other than goods.
+- **Results:** every town's ventures list has the factory where it has factories, so its config moves and so does its
+  state hash (a person's parameters are part of what is kept); with the venture taken out of the config, the culture
+  dial's three pinned towns give exactly their pins before the change, so the moved founding steps change nothing.
+  The pins are re-taken (orchestrator/test/culture-dial.test.ts).
+- **Revisit if:** factories close often enough that founding matters, and entrants never pay (the likely cause is what a
+  founder counts of the market); a study needs capital-heavy entry (then the planning route, above).
+## 2026-11-01 · Tools: technologies that are goods, weighed as any technology is (foundations-2 E2, its second part; branch `f2-economy`; contract addition; firm.producer; au-vic's profile; no model called)
+
+- **What:** a task may name a `tool` (a kind, so many a person, the share of the time the work then takes): with enough
+  held by the actor where the work is done for the people doing it, the work takes that share; the tool is not used up.
+  A profile's `automation.tools` puts tools on sale by the outside world (its price list) and on their task; a factory
+  (`firm.producer` `tool`) buys one for each of its staff when the time it saves them a month, at their wage, beats its
+  price over the payback it asks by the hurdle, the comparison it already makes of a system (`automation.firms`). au-vic
+  offers production machinery for `make` (80% of the time, AUD 20,000 each: placeholders, risk ME-25).
+- **Why this way:** foundations-2 7.2 asks that adoption be widened from systems to any technology, "a forklift, a
+  self-service till and a casework system weighed the same way"; a tool as a held good keeps law 8 (it is somewhere,
+  bought and held, never made from nothing) and leaves the decision to the firm's own numbers.
+- **Not built, and why:** tools wear and are replaced (no source for a life, and a durable good is not used up by a
+  task); shops and offices weighing tools (only the producer's comparison was widened; the retailer's and the offices' are
+  systems-only); tools in other profiles.
+- **Off unless asked** (`tools: true`): at au-vic's placeholder figures every factory of the 1,000-person town buys one
+  for each worker on its first day (AUD 800,000 a factory: a fifth of a factory wage a month saved, against AUD 833 a
+  month of the price over two years, by the 20% hurdle), a large unsourced effect on every run; so the tools are a
+  town's choice until sourced, and off the town is as before (the seller, the kind, the task and the weighing absent).
+  Each tool has a seller of its own (`sellers-<kind>`, a boundary selling by the unit), so a firm's least order of one
+  is kept; the world market's least order of a hundred would have refused every order.
+- **Revisit if:** a source gives a tool's saving and price, or its life; shops should weigh tools too.
+## 2026-11-01 · Who could still do the work: a monthly census of practised skills (foundations-2 M8, E6's first part; branch `f2-economy`; log addition; a world with no practised skill writes nothing new; no model called)
+
+- **What:** where a world has practised skills, the kernel censuses them monthly (`skill_census`): for each, how many
+  living people stand in each tenth of its range, read as it stands that day (fading included). `measure/queries/town/skills.sql`
+  lists it (`oikos measure DIR town/skills`): by run, day and skill, the ten counts, the people, the upper half.
+- **Why this way:** M8 asks, for each kind of work, who could still do it and how well, month by month; a person's skill
+  lives in the state, not the log, and a census in the log is what a measure can read (as the counters' is). Ten bands
+  are a count, not a threshold: what a study calls "could still do it" is its own choice, made before an experiment.
+- **Not built:** M7 (what the town gives to AI: the share of its energy, water, land, capital and hours that goes to
+  study-tagged systems and their hosts): it needs the hosts' metered draw read against the town's, and its definition is
+  among the owner's measures (docs/design/gradual-disempowerment.md section 6); "who" by kind of work is by skill, not
+  yet by the kinds of work study-tagged systems do.
+- **Revisit if:** a study needs per-person levels (then the census grows, or a measure reads checkpoints).
 
 ## 2026-11-02 · The slow tier's budget raised to 1,500 s (branch `slow-tier-budget`; tests; no model called)
 
@@ -10404,3 +10598,20 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   four again.
 - **Revisit if:** the weekly probe toward a quicker pace shows as a refusal a week in a study of the office (it is the
   shared manager's behaviour; the factories and shops do the same), or the office comes to do work other than fieldwork.
+
+## 2026-11-02 · Taking from work under law 9: the taker was there if their way set out from it (landing `f2-s4`; kernel fix; no model called)
+
+- **Found:** at the landing of `f2-s4`, `orchestrator/test/hazards.test.ts` ("taking from work, found at a stocktake, ...")
+  had no takings at all (0 against more than 5), on the branch alone as on the tree merged with main. The citizen's theft is
+  one act: `take` at work, then the goods carried home (`move_goods`, `carried`). Law 9 (S4) sets the carrier out on its
+  way when the act begins and applies the act's blocks when it is done; `move_goods` reads the carrier's trip (it went by
+  both places), but `take` still asked that the taker be in the building at the end, where by then they were on the road.
+  Every such act was refused `not_present`.
+- **Change:** `Block::Take` (kernel/crates/world/src/exec.rs) counts the taker present at the act's end if their way set out
+  from the building or went by it (`started`, and their transit's `from` or `via`), as `move_goods` reads a carrier. A
+  take with no trip is checked as before. Not loosened: someone who was never there still cannot take.
+- **And:** the participants' world words gained `not_carried` (the kernel's words had it; `render.test.ts` holds that every
+  refusal has world words). With the fix in, the representation towns' pins moved (a taking in the month where a
+  carried theft had been refused) and were re-taken; culture-dial's did not move.
+- **Revisit if:** an act's trip should be tied to that act alone (f2-s5 adds `Exec.act`: then `tr.act` is the check), or
+  takings come to be acts of their own before the trip home.

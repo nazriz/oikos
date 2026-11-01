@@ -29,7 +29,6 @@ use super::sourcing::{self, Candidate, SourcingFigures};
 use super::trade::{self, decline, goods_prices, held, order, price_list, send_back, Deliveries, Order, OrderBook, Ordering, Payables, TradeThen, UNDELIVERABLE};
 use crate::common::asking::{ask, Asked};
 use crate::common::{data, money_words, out_of_time, own_account, published_price, team, withdraw, Book, Fields, Pace, DAY, MONTH};
-use crate::papers::{self, market::CapitalCall};
 use crate::steps::{arg, because, call, json, pay, say, text, Done, Pay, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
 use oikos_rules::bargaining::Takings;
@@ -62,14 +61,7 @@ pub struct Adjust {
     pub hours_step_bps: Option<i64>,
 }
 
-/// A shop just founded (entry.md): who founded it, the capital, the listing it buys its premises from, its bank.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Founding {
-    pub founder: Option<String>,
-    pub capital: i64,
-    pub listing: Option<String>,
-    pub bank: String,
-}
+pub use super::founding::Founding;
 
 /// The shop's parameters (names unchanged from retailer.ts; defaults the TS's).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -295,20 +287,7 @@ struct Lease {
     must_leave: bool,
 }
 
-/// A shop just founded, setting up.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct Setup {
-    account_asked: bool,
-    capital_called: bool,
-    founder_account: Option<String>,
-    registered: bool,
-    purchased: bool,
-    ready: bool,
-    asked: i64,
-    listings: Option<Vec<String>>,
-    sold: Option<Vec<String>>,
-    gone_since: Option<i64>,
-}
+use super::founding::Setup;
 
 /// A business of one: where it trades from now (its owner tells it when they move home), whether it has anywhere to,
 /// and whether its owner has gone from the town (it then closes: what it holds is its owner's).
@@ -646,7 +625,7 @@ impl<B: Body> Shop<B> {
         }
         calls.push(pay(&rent_to, lt.rent, Pay { from: Some(account.to_string()), every: Some(MONTH), first: Some(0), basis: Some(a.id.to_string()), for_: Some(format!("Rent for {space}, monthly in advance.")), ..Default::default() }, cx));
         if stock > 0 && structure != self.at.premises {
-            calls.push(call("goods", vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&structure))), ("from_at", Some(arg(&self.at.premises)))]));
+            calls.push(call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&structure))), ("from_at", Some(arg(&self.at.premises)))]));
         }
         // (Until when it binds us: its term, from now, as its terms say.)
         let term = match &a.body {
@@ -743,7 +722,7 @@ impl<B: Body> Shop<B> {
             let mut calls: Vec<Call> = orders.iter().map(|o| withdraw(o, Some("Lease ended; stop this standing order."))).collect();
             let (back, back_space, back_cell) = l.from.clone();
             if stock > 0 && !back.is_empty() && back != l.structure {
-                calls.push(call("goods", vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&back))), ("from_at", Some(arg(&l.structure)))]));
+                calls.push(call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&back))), ("from_at", Some(arg(&l.structure)))]));
             }
             if let Some(op) = self.p.operator.clone() {
                 calls.push(say(
@@ -865,145 +844,14 @@ impl<B: Body> Shop<B> {
         }
     }
 
-    /// Setting up a shop just founded: an account at the bank; the founder's capital; our shareholders (the founder);
-    /// the premises bought from the property listing. If someone else buys them first, the capital goes back and we close.
+    /// Setting up a shop just founded (market/founding.rs): an account at the bank; the founder's capital; our
+    /// shareholders (the founder); the premises bought from the property listing. If someone else buys them first, the
+    /// capital goes back and we close.
     fn setting_up(&mut self, pic: &Picture, acct: Option<&crate::common::OwnAccount>, cx: &Cx) -> Vec<Step<Then>> {
-        let money = |n| money_words(n, &cx.ctx.world);
-        let me = self.me.clone();
-        let founder = self.p.founding.founder.clone().unwrap_or_default();
-        let Some(acc) = acct else {
-            if self.setup.account_asked {
-                return vec![];
-            }
-            self.setup.account_asked = true;
-            return vec![because(
-                "A new shop: opening our account at the bank.",
-                vec![call("account", vec![("holder", Some(arg(&me))), ("at", Some(arg(&self.p.founding.bank)))])],
-            )];
-        };
-        if !self.setup.capital_called {
-            self.setup.capital_called = true;
-            let cap = self.p.founding.capital;
-            return vec![because(
-                format!("A new shop: asking our founder for the {} of capital they're putting in.", money(cap)),
-                vec![say(
-                    "capital_call",
-                    &format!("Please pay the {} of capital into {}.", money(cap), acc.account),
-                    Say {
-                        to: Some(vec![founder.clone()]),
-                        visible: Some(Visible::Only(vec![me.clone(), founder.clone()])),
-                        data: Some(papers::data(&CapitalCall { account: acc.account.clone(), amount: cap })),
-                        ..Default::default()
-                    },
-                )],
-            )];
-        }
-        let mut steps: Vec<Step<Then>> = vec![];
-        if self.setup.founder_account.is_some() && !self.setup.registered {
-            self.setup.registered = true;
-            steps.push(because(
-                "Our shareholders: our founder, who put in the capital.",
-                vec![say(
-                    "shareholders",
-                    &format!("The shareholders of {me}, and their shares."),
-                    Say {
-                        to: Some(vec![founder.clone()]),
-                        visible: Some(Visible::Only(vec![me.clone(), founder.clone()])),
-                        data: Some(json!({ "holders": [{ "holder": founder, "account": self.setup.founder_account, "shares": 10_000 }] })),
-                        ..Default::default()
-                    },
-                )],
-            ));
-        }
-        // (A business of one, founded to trade from its owner's home: no premises to buy. Once the capital is in, it trades.)
-        if self.p.operator.is_some() && self.p.founding.listing.is_none() {
-            if self.setup.founder_account.is_some() {
-                self.setup.ready = true;
-            }
-            return if self.setup.ready { [steps, vec![because("Our owner's capital is in: opening for trade, from their home.", vec![])]].concat() } else { steps };
-        }
-        let looked = !self.p.sale_board.is_empty();
-        if looked && self.setup.listings.is_none() {
-            return steps;
-        }
-        let first = self.p.founding.listing.as_deref().and_then(|l| self.book.get(l)).cloned();
-        let structure: Option<String> = if looked {
-            Some(self.p.premises.clone())
-        } else {
-            first.as_ref().and_then(|f| data(f).s("structure").map(str::to_string))
-        };
-        let standing: Vec<std::sync::Arc<oikos_sight::Record>> = if looked {
-            self.setup.listings.iter().flatten().filter_map(|id| self.book.get(id).cloned()).collect()
-        } else {
-            self.book.open("property_for_sale").cloned().collect()
-        };
-        let mut relisted: Vec<_> = standing.into_iter().filter(|r| data(r).s("structure") == structure.as_deref()).collect();
-        relisted.sort_by(|a, b| b.at.cmp(&a.at));
-        let listing = relisted.first().cloned().or(if looked { None } else { first.clone() });
-        let sold_rec = {
-            let pool: Vec<std::sync::Arc<oikos_sight::Record>> = if looked {
-                self.setup.sold.iter().flatten().filter_map(|id| self.book.get(id).cloned()).collect()
-            } else {
-                self.book.all("property_sold").cloned().collect()
-            };
-            pool.into_iter().find(|r| structure.is_some() && data(r).s("structure") == structure.as_deref())
-        };
-        if looked && sold_rec.is_none() {
-            if listing.is_some() {
-                self.setup.gone_since = None;
-            } else if *self.setup.gone_since.get_or_insert(pic.t) > pic.t - DAY {
-                return steps;
-            }
-        }
-        if let Some(s) = sold_rec.as_ref().filter(|s| data(s).s("buyer") == Some(me.as_str())) {
-            self.setup.ready = true;
-            steps.push(because(format!("Our premises ({}) are ours: opening for trade.", data(s).s("structure").unwrap_or_default()), vec![]));
-            return steps;
-        }
-        let taken_by_other = sold_rec.is_some()
-            || if looked { listing.is_none() } else { listing.as_ref().is_some_and(|l| self.book.withdrawn(&l.id)) };
-        if taken_by_other {
-            // Someone else bought them: the capital goes back, and we close.
-            let mut calls = vec![];
-            if let (Some(fa), true) = (&self.setup.founder_account, acc.balance > 0) {
-                calls.push(pay(fa, acc.balance, Pay { from: Some(acc.account.clone()), for_: Some("Capital returned: the venture didn't go ahead.".into()), ..Default::default() }, cx));
-            }
-            calls.push(say(
-                "closure",
-                &format!("{me} didn't open: its premises were sold to someone else."),
-                Say { visible: Some(Visible::Public), data: Some(json!({ "firm": me, "to_creditors": 0, "to_shareholders": acc.balance })), ..Default::default() },
-            ));
-            steps.push(because("The premises we meant to buy were sold to someone else: returning the capital, and closing.", calls));
-            self.setup.ready = true; // (the shop never trades: the body, told it is closed, does nothing more)
-            self.setup.purchased = true;
+        let firm = super::founding::Firm { me: &self.me, what: "shop", founding: &self.p.founding, from_home: self.p.operator.is_some(), sale_board: &self.p.sale_board, premises: &self.p.premises };
+        let (steps, close) = self.setup.setting_up(&firm, &self.book, pic, acct, cx);
+        if close {
             self.body.close();
-            return steps;
-        }
-        if let Some(l) = &listing {
-            let d = data(l);
-            if let (Some(price), false) = (d.i("price"), self.setup.purchased) {
-                if acc.balance >= price {
-                    self.setup.purchased = true;
-                    let structure = d.s("structure").unwrap_or_default().to_string();
-                    steps.push(because(
-                        format!("Buying our premises ({structure}) at the {} asked: publishing our purchase, and paying with it.", money(price)),
-                        vec![
-                            say(
-                                "property_purchase",
-                                &format!("Purchase of {structure}, as listed."),
-                                Say {
-                                    to: l.speaks_for.map(|s| vec![s.to_string()]),
-                                    visible: l.speaks_for.map(|s| Visible::Only(vec![me.clone(), s.to_string()])),
-                                    basis: Some(l.id.to_string()),
-                                    data: Some(json!({ "listing": l.id, "account": acc.account })),
-                                    ..Default::default()
-                                },
-                            ),
-                            pay(d.s("account").unwrap_or_default(), price, Pay { from: Some(acc.account.clone()), for_: Some(format!("Premises: {structure}.")), ..Default::default() }, cx),
-                        ],
-                    ));
-                }
-            }
         }
         steps
     }
@@ -1037,25 +885,8 @@ impl<B: Body> Plan for Shop<B> {
                 }
             }
         }
-        if self.setup.asked == pic.t {
-            if let Some(l) = self.found(pic, &self.p.sale_board) {
-                self.setup.listings = Some(l);
-            }
-            if let Some(l) = self.found(pic, &self.p.sold_board) {
-                self.setup.sold = Some(l);
-            }
-        }
-        // Setting up: the founder's capital, as it arrives (the account it comes from is theirs).
-        if !self.setup.ready && self.setup.capital_called && self.setup.founder_account.is_none() {
-            if let Some(mine) = account {
-                for tx in pic.transactions() {
-                    if tx.to == mine && tx.from != mine {
-                        self.setup.founder_account = Some(tx.from.to_string());
-                        break;
-                    }
-                }
-            }
-        }
+        // Setting up: our premises' listings and sale, as our looks find them; the founder's capital, as it arrives.
+        self.setup.absorb(pic, account, &self.p.sale_board, &self.p.sold_board);
         self.orders.take(pic, account);
         self.payables.take(&self.book);
         for d in self.deliveries.take(&self.book, &self.me) {
@@ -1275,7 +1106,7 @@ impl<B: Body> Shop<B> {
             }
             calls.push(call(
                 "goods",
-                vec![("kind", Some(arg(&o.kind))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&o.to))), ("at", Some(arg(&o.at))), ("from_at", Some(arg(&self.at.premises)))],
+                vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&o.kind))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&o.to))), ("at", Some(arg(&o.at))), ("from_at", Some(arg(&self.at.premises)))],
             ));
         }
         if total >= 0 {
@@ -1397,7 +1228,7 @@ impl<B: Body> Shop<B> {
                     format!("Our owner lives at {} now: taking our stock there.", d.s("space").unwrap_or_default()),
                     vec![call(
                         "goods",
-                        vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(had.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&to))), ("from_at", Some(arg(&self.at.premises)))],
+                        vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(had.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&to))), ("from_at", Some(arg(&self.at.premises)))],
                     )],
                 ));
             }

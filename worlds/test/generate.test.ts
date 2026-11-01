@@ -263,3 +263,17 @@ test("hosting: the assistants' systems run at a host on the town's network, whic
   expect(/data-centre|runs_on|"firm\.host"/.test(abroad)).toBe(false);
   expect(() => generate({ ...spec, hosting: "local" })).toThrow(/assistants/);
 });
+
+// Tools (docs/behaviour/automation.md, "Tools"): a town that asks has the profile's tools sold by the unit by a seller of
+// their own, used at their task, and weighed by the factories that do it; a town that does not ask is as before.
+test("tools: sold by the unit, used at their task, weighed by the factories; off, nothing of them", () => {
+  const on = generate({ ...spec, tools: true }) as any;
+  const T = JSON.parse(readFileSync(join(root, `worlds/profiles/${spec.profile}.json`), "utf8")).values.automation.tools[0];
+  expect(on.catalogue.tasks.find((t: any) => t.id === T.task).tool).toEqual({ kind: T.kind, per_performer: 1, labour_bps: T.labour_bps });
+  const seller = on.positions.find((p: any) => p.role_module?.code === "world.trade" && p.role_module.params.sells?.[T.kind]);
+  expect(seller.role_module.params).toMatchObject({ min_order: 1, sells: { [T.kind]: T.price } });
+  const weighing = on.positions.filter((p: any) => p.role_module?.code === "firm.producer" && (p.role_module.params.task ?? "make") === T.task);
+  expect(weighing.length).toBeGreaterThan(0);
+  expect(weighing.every((p: any) => p.role_module.params.tool?.seller === seller.entity && p.channels.some((c: any) => c.id === "market" && JSON.stringify(c).includes(seller.entity)))).toBe(true);
+  expect(JSON.stringify(generate(spec)).includes(`"${T.kind}"`)).toBe(false);
+});

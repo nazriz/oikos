@@ -1,13 +1,16 @@
 //! Ways (law 9, foundations-2 S2; docs/design/foundations-2.md section 3.1): the links bodies and vehicles travel on.
 //! A structure whose type is a way (a road, a path) is a node on each of its cells, joined to the next cell's node of the
-//! same mode by a link a cell long, with the type's capacity an hour and its speed for vehicles. A trip is on foot over
-//! the cells to the nearest node, along the links, and on foot from the nearest node to where it is going, or on foot
-//! over the cells all the way, whichever is quicker. Physics only: who goes, and by what, is theirs.
+//! same mode by a link a cell long, with the type's capacity an hour and its speed for vehicles. The world's network may
+//! add links for travel (a link with a speed: a road out of the town to an edge, S4; between towns, S6), from a node on a
+//! cell (joined to that cell's way node) or at an edge, off the ground. A trip is on foot over the cells to the nearest
+//! node, along the links, and on foot from the nearest node to where it is going, or on foot over the cells all the way,
+//! whichever is quicker. Physics only: who goes, and by what, is theirs.
 //!
-//! Derived from the standing structures, as the cells' costs are: worked out once for the ground as it is, again when a
-//! way is finished or comes down. Integers only; nodes in the order of their cells, so the answer is the same however
-//! the structures were made.
+//! Derived from the standing structures and the config, as the cells' costs are: worked out once for the ground as it is,
+//! again when a way is finished or comes down. Integers only; nodes in the order of their cells (then the config's edge
+//! nodes, in its order), so the answer is the same however the structures were made.
 
+use crate::blocks::Id;
 use crate::state::State;
 use crate::statics::Statics;
 use std::cmp::Reverse;
@@ -29,15 +32,17 @@ pub struct WayLink {
 /// The ways of the ground as it stands.
 #[derive(Debug, Default)]
 pub struct Ways {
-    /// Each node's cell, in order (by row, then column).
-    pub nodes: Vec<(i64, i64)>,
+    /// Each node's cell, in order (by row, then column); none for a node off the ground (at an edge).
+    pub nodes: Vec<Option<(i64, i64)>>,
     pub links: Vec<WayLink>,
     /// Each node's links: (the node at the other end, the link).
     pub adj: Vec<Vec<(u32, u32)>>,
+    /// The node each edge of the world is reached at (S4: where the outside's goods arrive from and leave for).
+    pub edges: BTreeMap<Id, u32>,
 }
 
 impl Ways {
-    /// The ways of the standing structures.
+    /// The ways of the standing structures, and the network's links for travel.
     pub fn of(s: &Statics, st: &State) -> Ways {
         let mut cells: BTreeMap<(i64, i64), (&str, i64, Option<i64>)> = BTreeMap::new();
         for x in st.structures.values().filter(|x| x.complete) {
@@ -48,9 +53,30 @@ impl Ways {
                 }
             }
         }
+        // (The network's travel links: their nodes on cells become the ways' nodes there, those at an edge come after.)
+        let net = s.config.world.network.as_ref();
+        let travel_links: Vec<&oikos_contracts::network::LinkCfg> = net.map(|n| n.links.iter().filter(|l| l.speed_kmh.is_some()).collect()).unwrap_or_default();
+        let node_cfg = |id: &Id| net.and_then(|n| n.nodes.iter().find(|x| x.id == *id));
+        let mut extra_cells: Vec<(i64, i64)> = vec![];
+        let mut edge_nodes: Vec<Id> = vec![];
+        for l in &travel_links {
+            for end in [&l.from, &l.to] {
+                let Some(n) = node_cfg(end) else { continue };
+                match n.cell.as_deref().and_then(crate::config::cell_xy) {
+                    Some((x, y)) if !cells.contains_key(&(y, x)) && !extra_cells.contains(&(y, x)) => extra_cells.push((y, x)),
+                    Some(_) => {}
+                    None if !edge_nodes.contains(&n.id) => edge_nodes.push(n.id),
+                    None => {}
+                }
+            }
+        }
         let cell_m = s.config.world.ground.cell.unwrap_or(1).max(1);
-        let index: BTreeMap<(i64, i64), u32> = cells.keys().enumerate().map(|(i, k)| (*k, i as u32)).collect();
-        let mut w = Ways { nodes: cells.keys().map(|(y, x)| (*x, *y)).collect(), links: vec![], adj: vec![vec![]; cells.len()] };
+        let mut keys: Vec<(i64, i64)> = cells.keys().copied().chain(extra_cells.iter().copied()).collect();
+        keys.sort();
+        keys.dedup();
+        let index: BTreeMap<(i64, i64), u32> = keys.iter().enumerate().map(|(i, k)| (*k, i as u32)).collect();
+        let n_nodes = keys.len() + edge_nodes.len();
+        let mut w = Ways { nodes: keys.iter().map(|(y, x)| Some((*x, *y))).chain(edge_nodes.iter().map(|_| None)).collect(), links: vec![], adj: vec![vec![]; n_nodes], edges: BTreeMap::new() };
         for ((y, x), (mode, cap, speed)) in &cells {
             let a = index[&(*y, *x)];
             for (ny, nx) in [(*y, x + 1), (y + 1, *x)] {
@@ -63,18 +89,40 @@ impl Ways {
                     (Some(p), Some(q)) => Some(*p.min(q)),
                     _ => None,
                 };
-                let l = w.links.len() as u32;
-                w.links.push(WayLink { a, b, length_m: cell_m, capacity: *cap.min(cap2), speed_kmh: speed });
-                w.adj[a as usize].push((b, l));
-                w.adj[b as usize].push((a, l));
+                w.join(a, b, WayLink { a, b, length_m: cell_m, capacity: *cap.min(cap2), speed_kmh: speed });
+            }
+        }
+        let node_ix = |w: &Ways, id: &Id| -> Option<u32> {
+            let n = node_cfg(id)?;
+            match n.cell.as_deref().and_then(crate::config::cell_xy) {
+                Some((x, y)) => index.get(&(y, x)).copied(),
+                None => edge_nodes.iter().position(|e| e == id).map(|i| (keys.len() + i) as u32).filter(|i| (*i as usize) < w.nodes.len()),
+            }
+        };
+        for l in &travel_links {
+            let (Some(a), Some(b)) = (node_ix(&w, &l.from), node_ix(&w, &l.to)) else { continue };
+            if a != b {
+                w.join(a, b, WayLink { a, b, length_m: l.length_m.unwrap_or(cell_m), capacity: l.capacity, speed_kmh: l.speed_kmh });
+            }
+        }
+        for (i, id) in edge_nodes.iter().enumerate() {
+            if let Some(e) = node_cfg(id).and_then(|n| n.edge) {
+                w.edges.entry(e).or_insert((keys.len() + i) as u32);
             }
         }
         w
     }
 
-    /// The node nearest a cell (by cells across and down; the first in order of those as near).
+    fn join(&mut self, a: u32, b: u32, link: WayLink) {
+        let l = self.links.len() as u32;
+        self.links.push(link);
+        self.adj[a as usize].push((b, l));
+        self.adj[b as usize].push((a, l));
+    }
+
+    /// The node on the ground nearest a cell (by cells across and down; the first in order of those as near).
     pub fn nearest(&self, (x, y): (i64, i64)) -> Option<u32> {
-        self.nodes.iter().enumerate().min_by_key(|(_, (nx, ny))| (nx - x).abs() + (ny - y).abs()).map(|(i, _)| i as u32)
+        self.nodes.iter().enumerate().filter_map(|(i, c)| c.map(|c| (i, c))).min_by_key(|(_, (nx, ny))| (nx - x).abs() + (ny - y).abs()).map(|(i, _)| i as u32)
     }
 }
 

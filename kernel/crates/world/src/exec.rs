@@ -92,6 +92,129 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
 /// A person who is to do work: alive and in the world; and, if `at` is given, in that structure (in a space of the
 /// given kind, if given); else in a space of the kind the world says work is done in (`orchestration.performers_in`),
 /// if it says. The one rule for a `work`'s performers and for an action's `by` (foundations F3).
+/// A body sets out (law 9, foundations-2 S3): out of the space it is in, on its way to `to` until `arrives` (its own building
+/// again, for a visit there and back), driving `vehicle` (which goes with it) if it named one it may drive from here. A body
+/// that is dead, gone, already on its way or in no building does not set out; nor one whose vehicle is not there to take
+/// (its act is refused when due).
+#[allow(clippy::too_many_arguments)]
+pub fn depart(s: &Statics, st: &mut State, body: &str, to: &str, via: &[Id], arrives: i64, vehicle: Option<&str>, act: Option<&str>, by: &str) -> Vec<Timed> {
+    if !st.body(body).is_some_and(|b| b.alive && b.present) || st.transit.contains_key(body) {
+        return vec![];
+    }
+    let Some(from) = st.structures_of(body).into_iter().next() else { return vec![] };
+    if act.is_some() && from == to && via.is_empty() {
+        return vec![];
+    }
+    let Some(space) = st.occupancy.get(&from).and_then(|m| m.iter().find(|(_, b)| b.contains(body)).map(|(sp, _)| *sp)) else { return vec![] };
+    if vehicle.is_some_and(|v| driven_speed(s, st, v, body, &from).is_err()) {
+        return vec![];
+    }
+    let mut events = vec![];
+    leave_spaces(s, st, &from, Some(body), None, VacateReason::Left, Some(by), &mut events);
+    st.touch_structure(&from);
+    st.moved(body);
+    if let Some(v) = vehicle {
+        st.vehicles.get_mut(v).unwrap().at = Id::new(body);
+    }
+    let t = st.t;
+    st.transit.insert(Id::new(body), crate::state::Transit { from, space, to: Id::new(to), via: via.to_vec(), departed: t, arrives, vehicle: vehicle.map(Id::new), act: act.map(Id::new) });
+    events
+}
+
+/// Where a body on its way has come to at `t` (law 9): the cell that far along the trip, by the straight line between the
+/// buildings it goes by (the known limit: the way is not drawn cell by cell).
+pub fn where_on_the_way(st: &State, tr: &crate::state::Transit, t: i64) -> Option<Id> {
+    let cell_of = |sid: &Id| st.structures.get(sid).and_then(|x| crate::config::cell_xy(&x.at));
+    let mut pts: Vec<(i64, i64)> = std::iter::once(&tr.from).chain(tr.via.iter()).chain(std::iter::once(&tr.to)).filter_map(cell_of).collect();
+    if tr.to == tr.from && tr.via.is_empty() {
+        // (A visit there and back: half the way out, half back; its places are not kept, so the body lies at home's door.)
+        pts.truncate(1);
+    }
+    let first = *pts.first()?;
+    let lens: Vec<i64> = pts.windows(2).map(|p| (p[1].0 - p[0].0).abs() + (p[1].1 - p[0].1).abs()).collect();
+    let total: i64 = lens.iter().sum();
+    let span = (tr.arrives - tr.departed).max(1);
+    let mut d = (total as i128 * (t - tr.departed).clamp(0, span) as i128 / span as i128) as i64;
+    let mut at = first;
+    for (i, l) in lens.iter().enumerate() {
+        if d <= *l {
+            let (a, b) = (pts[i], pts[i + 1]);
+            at = (a.0 + (b.0 - a.0) * d / (*l).max(1), a.1 + (b.1 - a.1) * d / (*l).max(1));
+            break;
+        }
+        d -= l;
+        at = pts[i + 1];
+    }
+    let id = Id::new(&crate::config::cell_id(at.0, at.1));
+    st.cells.contains_key(&id).then_some(id)
+}
+
+/// Whoever comes by the dead lying on the road sees them (law 9: they are there): at the end of a trip, each of the remains
+/// within a cell and a half of the way it went (the straight line between the buildings it went by) is seen, as a look at
+/// that cell would show it, through the channel of what one saw on one's way (`config::ON_THE_WAY`).
+pub fn seen_on_the_way(s: &Statics, st: &mut State, body: &str, tr: &crate::state::Transit) {
+    if st.remains.is_empty() {
+        return;
+    }
+    let cell_of = |sid: &Id| st.structures.get(sid).and_then(|x| crate::config::cell_xy(&x.at));
+    let pts: Vec<(i64, i64)> = std::iter::once(&tr.from).chain(tr.via.iter()).chain(std::iter::once(&tr.to)).filter_map(cell_of).collect();
+    let near = |r: (i64, i64)| {
+        pts.windows(2).any(|p| {
+            let ((ax, ay), (bx, by)) = (p[0], p[1]);
+            let (dx, dy, rx, ry) = ((bx - ax) as i128, (by - ay) as i128, (r.0 - ax) as i128, (r.1 - ay) as i128);
+            let len2 = dx * dx + dy * dy;
+            if len2 == 0 {
+                return rx * rx + ry * ry <= 2;
+            }
+            let dot = rx * dx + ry * dy;
+            let cross = rx * dy - ry * dx;
+            (0..=len2).contains(&dot) && cross * cross <= 2 * len2
+        }) || pts.iter().any(|p| (p.0 - r.0).pow(2) + (p.1 - r.1).pow(2) <= 2)
+    };
+    let mut cells: Vec<Id> = st.remains.iter().filter(|(dead, _)| dead.as_str() != body).map(|(_, c)| *c).filter(|c| crate::config::cell_xy(c).is_some_and(near)).collect();
+    cells.sort();
+    cells.dedup();
+    if cells.is_empty() {
+        return;
+    }
+    let Some(participant) = st.body(body).and_then(|b| b.participant).filter(|p| st.participants.contains_key(p.as_str())) else { return };
+    // (Shown as a look at that cell, through a channel of its own: what one saw on one's way, `ON_THE_WAY`.)
+    let channel = Id::new(crate::config::ON_THE_WAY);
+    let mut shown = vec![];
+    let seen: Vec<crate::sites::SiteCell> = cells.iter().filter_map(|c| st.cells.get(c).map(|x| crate::sites::site_cell(s, st, c, x, body, false, &mut shown))).collect();
+    let t = st.t;
+    Arc::make_mut(st.participants.get_mut(participant.as_str()).unwrap()).pending.entry(crate::config::SELF.to_string()).or_default().visits.push(crate::sites::Visited { channel, as_of: t, cells: seen });
+}
+
+/// A body on its way for an act that was refused, or back from a visit: it is where it set out from, in the space it left
+/// (if there is still room), and its vehicle with it. (A refused trip's way there and back is the known limit: the time
+/// was spent, the body is home.) Dead or gone on the way: only off the road.
+pub fn come_back(s: &Statics, st: &mut State, body: &str, by: &str) -> Vec<Timed> {
+    let Some(tr) = st.transit.remove(body) else { return vec![] };
+    if let Some(v) = tr.vehicle.and_then(|v| st.vehicles.get_mut(&v)) {
+        v.at = tr.from;
+    }
+    seen_on_the_way(s, st, body, &tr);
+    if !st.body(body).is_some_and(|b| b.alive && b.present) {
+        return vec![];
+    }
+    let room = st.structures.get(&tr.from).is_some_and(|x| x.complete) && crate::config::split_space(&tr.space).and_then(|(sid, local)| st.structures.get(sid).and_then(|x| s.space(&x.structure_type, local))).is_some_and(|spec| st.occupancy.get(&tr.from).and_then(|m| m.get(&tr.space)).map_or(0, |b| b.len()) < spec.capacity as usize);
+    if !room {
+        return vec![];
+    }
+    settle(s, st, &tr.from);
+    st.enter(&tr.from, &tr.space, body);
+    st.touch_structure(&tr.from);
+    st.moved(body);
+    vec![Timed::new(st.t, EventBody::Occupied { occupant: Id::new(body), space: tr.space, by: Id::new(by), vehicle: tr.vehicle })]
+}
+
+/// The bodies an act was taking somewhere, back where they set out, the act refused.
+pub fn turn_back(s: &Statics, st: &mut State, act: &str, by: &str) -> Vec<Timed> {
+    let bodies: Vec<Id> = st.transit.iter().filter(|(_, t)| t.act.as_deref() == Some(act)).map(|(b, _)| *b).collect();
+    bodies.iter().flat_map(|b| come_back(s, st, b, by)).collect()
+}
+
 /// The speed a body drives a vehicle at (law 9, foundations-2 S2): one it may drive (its owner's, or one its owner lets),
 /// standing where the body sets out from; refused otherwise.
 pub fn driven_speed(s: &Statics, st: &State, vehicle: &str, body: &str, from: &str) -> R<i64> {
@@ -458,11 +581,22 @@ fn die(s: &Statics, st: &mut State, person: &str, cause: DeathCause) -> Vec<Time
     let participant = b.participant;
     let seats = seats_of(st, person, participant.as_deref());
     let mut events = vacate_all(s, st, person, VacateReason::Died, None);
+    // (Dead on the way, law 9: the body lies where it had come to on the road, and its vehicle with it.)
+    let mut lies_at = None;
+    if let Some(tr) = st.transit.remove(person) {
+        if let Some(cell) = where_on_the_way(st, &tr, t) {
+            if let Some(v) = tr.vehicle.and_then(|v| st.vehicles.get_mut(&v)) {
+                v.at = cell;
+            }
+            st.remains.insert(Id::new(person), cell);
+            lies_at = Some(cell);
+        }
+    }
     if let Some(b) = st.entities.get_mut(person).and_then(|e| e.body.as_mut()) {
         b.alive = false;
         b.conditions.clear();
     }
-    events.push(Timed::new(t, EventBody::PersonDied { person: person.into(), died_of: cause }));
+    events.push(Timed::new(t, EventBody::PersonDied { person: person.into(), died_of: cause, lies_at }));
     if let Some(p) = participant {
         events.extend(end_participant(st, &p, EndReason::Died));
     }
@@ -777,6 +911,20 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             st.schedule(t + 30 * 86_400, Sched::CounterCensus);
             vec![Timed::new(t, EventBody::CounterCensus { counters: st.totals.clone() })]
         }
+        Sched::SkillCensus => {
+            st.schedule(t + 30 * 86_400, Sched::SkillCensus);
+            let mut skills: BTreeMap<Id, Vec<i64>> = BTreeMap::new();
+            for cfg in s.config.catalogue.body_variables.iter().filter(|v| v.practice.is_some() && v.max > v.min) {
+                let mut bands = vec![0i64; 10];
+                for b in st.entities.values().filter_map(|e| e.body.as_ref()).filter(|b| b.alive) {
+                    let v = b.variables.get(&cfg.id).map_or(cfg.initial, |x| crate::state::body_variable_at(cfg, *x, t).0);
+                    let band = ((v - cfg.min) as i128 * 10 / (cfg.max - cfg.min) as i128).clamp(0, 9) as usize;
+                    bands[band] += 1;
+                }
+                skills.insert(cfg.id, bands);
+            }
+            vec![Timed::new(t, EventBody::SkillCensus { skills })]
+        }
         Sched::StructureComplete { structure } => match st.structures.get_mut(&structure) {
             Some(x) if !x.complete && x.completes_at == Some(item.at) => {
                 // Its time is up; it's complete if its building work is done too (phase B), or else as soon as it is.
@@ -886,7 +1034,20 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             pending.asks.push(look);
             vec![Timed::new(t, EventBody::AskAnswered { participant, position, channel })]
         }
-        Sched::Visit { participant, position, channel, places, cells, names } => crate::sites::end(s, st, &participant, position.as_deref(), &channel, places, &cells, names),
+        Sched::Visit { participant, position, channel, places, cells, names } => {
+            let person = st.participants.get(participant.as_str()).filter(|_| position.is_none()).and_then(|p| p.person);
+            let mut out = person.map(|b| come_back(s, st, &b, &participant)).unwrap_or_default();
+            out.extend(crate::sites::end(s, st, &participant, position.as_deref(), &channel, places, &cells, names));
+            out
+        }
+        Sched::Depart { body, to, via, arrives, vehicle, act, by } => depart(s, st, &body, &to, &via, arrives, vehicle.as_deref(), act.as_deref(), &by),
+        Sched::Arrival { kind, quantity, holder, at } => {
+            let key = crate::state::holding_key(&holder, &at, &kind);
+            let q = st.holdings.get(&key).map_or(0, |h| h.quantity).saturating_add(quantity).clamp(-MAX_MONEY, MAX_MONEY);
+            let c = st.stamp();
+            st.holdings.insert(key, crate::state::Holding { kind, holder, at, quantity: q, changed: c });
+            vec![]
+        }
         Sched::BirthDue { parents, name, template } => {
             let Some(b) = st.body(&parents[0]) else { return vec![] };
             if !b.alive {
@@ -1143,6 +1304,13 @@ impl<'a> Exec<'a> {
                 total = ((total as i128 * factor + 9_999) / 10_000).max(1) as i64;
             }
         }
+        // A tool (foundations-2 E2): held where the work is done, enough for each person at it, the work takes its share of the time.
+        if let Some(tl) = spec.as_ref().and_then(|x| x.tool.as_ref()).filter(|_| n_systems < who.len() && total > 0) {
+            let people = (who.len() - n_systems) as i64;
+            if self.st.holding(&self.entity, &at, &tl.kind) >= tl.per_performer.saturating_mul(people) as Money {
+                total = ((total as i128 * tl.labour_bps as i128 + 9_999) / 10_000).max(1) as i64;
+            }
+        }
         // A practised skill (foundations-2 E4): the labour scales with the people's mean of it too, as it stands now.
         if let Some(sk) = spec.as_ref().and_then(|x| x.skill.as_ref()).filter(|_| n_systems < who.len() && total > 0) {
             if let Some(cfg) = self.s.config.catalogue.body_variables.iter().find(|v| v.id == sk.variable) {
@@ -1207,7 +1375,8 @@ impl<'a> Exec<'a> {
                 Some((d.field, best, value(&best) - need))
             }
         };
-        // What's worked on: bodies (a person there, or everyone in a space of the place), or a structure.
+        // What's worked on: bodies (a person there, or everyone in a space of the place), or a structure (where the act took its
+        // crew, law 9 S4: `travel::journeys`).
         let bodies: Option<Vec<Id>> = match &on {
             Some(o) if self.st.body(o).is_some() => {
                 self.living_present(o)?;
@@ -1794,7 +1963,11 @@ impl<'a> Exec<'a> {
                 if !(1..=MAX_MONEY).contains(quantity) {
                     return Err(refuse(RefusalCode::Overflow, "quantity out of range"));
                 }
-                if !self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(&me))) {
+                // (Law 9: an act that takes the taker somewhere, as taking goods home does, set them out when it began; when it is
+                // done they were there if their way set out from it or went by it, as a carrier's is read for `move_goods`.)
+                let here = self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(&me)));
+                let went = self.started && self.st.transit.get(me.as_str()).is_some_and(|t| t.from == at || t.via.contains(&at));
+                if !here && !went {
                     return Err(refuse(RefusalCode::NotPresent, format!("{me} isn't at {at}")));
                 }
                 let have = self.st.holding(&from, &at, kind);
@@ -1810,7 +1983,7 @@ impl<'a> Exec<'a> {
                 self.emit(EventBody::Taken { by: me, from, kind: *kind, quantity: *quantity, at });
                 Ok(())
             }
-            Block::MoveGoods { kind, quantity, from_at, to, to_at } => {
+            Block::MoveGoods { kind, quantity, from_at, to, to_at, carried, carrier, vehicle: _ } => {
                 let (from_at, to, to_at) = (self.r(from_at)?, self.r(to)?, self.r(to_at)?);
                 if !self.s.config.catalogue.resources.iter().any(|r| &r.id == kind) {
                     return Err(refuse(RefusalCode::UnknownResource, format!("the world has no resource {kind}")));
@@ -1854,12 +2027,47 @@ impl<'a> Exec<'a> {
                 if !(me == to && from_at == to_at) && there.checked_add(*quantity).is_none_or(|x| x > MAX_MONEY) {
                     return Err(refuse(RefusalCode::Overflow, "the holding would exceed the range of a quantity"));
                 }
+                // Law 9 (foundations-2 S4): in a world one travels, goods between two places are carried. To or from an edge's
+                // outside, by the outside's freight, from the edge's node (in its time, if the world has the node); between
+                // buildings, by a body the act took by both (the acting person's own, or one the actor may direct).
+                let (mut carrier_was, mut arrives) = (None, None);
+                if self.s.config.catalogue.travel.is_some() && from_at != to_at {
+                    let outside = (edge && from_at == me).then_some((me, to_at)).or_else(|| (self.s.is_boundary(&to) && to_at == to).then_some((to, from_at)));
+                    if let Some((e, there)) = outside {
+                        carrier_was = Some(e);
+                        arrives = crate::travel::freight_seconds(self.s, self.st, &e, &there).filter(|x| *x > 0).map(|x| self.now() + x);
+                    } else {
+                        let body = match carrier {
+                            Some(c) => self.r(c)?,
+                            None if *carried => self.own_body()?,
+                            None => return Err(refuse(RefusalCode::NotCarried, format!("{kind} from {from_at} to {to_at} needs a carrier: someone to take it there"))),
+                        };
+                        if self.own_body().ok() != Some(body) && !may_direct(self.st, &me, &body) {
+                            return Err(refuse(RefusalCode::NotTheirs, format!("{me} may not send {body} with its goods")));
+                        }
+                        self.living_present(&body)?;
+                        // (When the act is done, the carrier has been by both: it went where the goods were and where they go.)
+                        if self.started {
+                            let went = self.st.transit.get(body.as_str()).is_some_and(|t| (t.from == from_at || t.via.contains(&from_at)) && (t.to == to_at || t.via.contains(&to_at)));
+                            if !went {
+                                return Err(refuse(RefusalCode::NotPresent, format!("{body} has not been by {from_at} and {to_at}")));
+                            }
+                        }
+                        carrier_was = Some(body);
+                    }
+                }
                 if !(me == to && from_at == to_at) {
                     let c = self.st.stamp();
                     self.add_holding(&me, &from_at, kind, -*quantity, c)?;
-                    self.add_holding(&to, &to_at, kind, *quantity, c)?;
+                    match arrives {
+                        // (On their way by the outside's freight: theirs when they arrive.)
+                        Some(at) => {
+                            self.st.schedule(at, crate::state::Sched::Arrival { kind: *kind, quantity: *quantity, holder: to, at: to_at });
+                        }
+                        None => self.add_holding(&to, &to_at, kind, *quantity, c)?,
+                    }
                 }
-                self.emit(EventBody::GoodsMoved { kind: *kind, quantity: *quantity, from: me, from_at, to, to_at, by: self.participant.into() });
+                self.emit(EventBody::GoodsMoved { kind: *kind, quantity: *quantity, from: me, from_at, to, to_at, by: self.participant.into(), carrier: carrier_was, arrives });
                 Ok(())
             }
 
@@ -2010,6 +2218,10 @@ impl<'a> Exec<'a> {
                     Some(v) => Some(self.r(v)?),
                     None => None,
                 };
+                // (On its way here, S3: it arrives, with the vehicle it went by, if it found the one it named where it set out;
+                // if not, it walked: the vehicle it named is not looked for again.)
+                let on_way = self.st.transit.contains_key(who.as_str());
+                let vehicle = if on_way { self.st.transit.get(who.as_str()).and_then(|t| t.vehicle) } else { vehicle };
                 let (sid, local) = split_space(&space).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{space} isn't a space")))?;
                 let x = self.st.structures.get(sid).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {sid}")))?;
                 let spec = self.s.space(&x.structure_type, local).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{sid} has no space {local}")))?;
@@ -2033,8 +2245,13 @@ impl<'a> Exec<'a> {
                 let sid = sid.to_string();
                 // (Driven here: the vehicle must be one the body may drive, standing where it set out; it stands here now.)
                 if let Some(v) = &vehicle {
-                    let from = self.st.structures_of(&who).into_iter().next().ok_or_else(|| refuse(RefusalCode::NotPresent, format!("{who} is nowhere to drive {v} from")))?;
+                    let from = if on_way { Id::new(&who) } else { self.st.structures_of(&who).into_iter().next().ok_or_else(|| refuse(RefusalCode::NotPresent, format!("{who} is nowhere to drive {v} from")))? };
                     driven_speed(self.s, self.st, v, &who, &from)?;
+                }
+                if on_way {
+                    if let Some(tr) = self.st.transit.remove(who.as_str()) {
+                        seen_on_the_way(self.s, self.st, &who, &tr);
+                    }
                 }
                 // A body is in one place at a time: coming here, it leaves wherever else it was.
                 for other in self.st.structures_of(&who) {

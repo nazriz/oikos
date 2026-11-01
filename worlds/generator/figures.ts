@@ -184,6 +184,11 @@ export const FIGURE_BASIS: Basis[] = [
   placeholder("catalogue.act_skills", "a novice's and a master's time at a person's papers as shares of an ordinary hand's: the run's, or SKILL_DEFAULTS (not fitted)"),
   derived("catalogue.body_variables.*.max", "the profile's education.max_years of schooling, as skill (a year is 10,000)"),
   conv("catalogue.body_variables", "skill counted from none: nobody is born schooled"),
+  // Tools the outside sells (worlds/generator/tools.ts), where the profile's automation lists any.
+  { ...prof("catalogue.tasks.*.tool.labour_bps", "automation.tools"), family: "tools: a task's" },
+  { ...conv("catalogue.tasks.*.tool.per_performer", "a tool for each person at the work"), family: "tools: a task's" },
+  ...of("firm.producer", [prof("tool.labour_bps", "automation.tools"), prof("tool.payback_months", "automation.firms"), prof("tool.hurdle_bps", "automation.firms")]),
+  ...of("world.trade", [conv("min_order", "a tool is sold by the unit: one is the least order")]),
   // A host in the town (worlds/generator/hosting.ts; docs/behaviour/hosting.md), where a town asks for one.
   ...task("compute", [prof("consumes", "hosting"), derived("produces", "the cooling water an hour, out to the sewer (values.hosting)"), derived("emits", "the grid's emissions a kWh (utilities.energy) times the hour's kWh")]),
   ...task("plant-energy", [conv("consumes", "a kWh a unit"), prof("emits", "utilities.energy")]),
@@ -407,6 +412,9 @@ export const FIGURE_BASIS: Basis[] = [
   ].flatMap((r) => ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params"].map((at) => ({ ...r, family: `any module: ${r.at}`, at: `${at}.${r.at}` }))),
   // The network for what flows (foundations-2 C4, law 8; worlds/generator/network.ts): its engineering figures are the
   // profile's (`utilities.network`, stand-ins until sourced); capacities and lengths are made from them and the layout.
+  { ...prof("world.network.links.*.length_m", "round.outside"), id: "road-out", family: "world.network.links (the road out)" },
+  { ...prof("world.network.links.*.speed_kmh", "round.outside"), family: "world.network.links (roads out)" },
+  { ...prof("world.network.links.*.capacity", "round.roads"), id: "road-out", family: "world.network.links (the road out's capacity)" },
   derived("world.network.links.*.capacity", "a pipe's or a wire's capacity: what its users ask at the start, times the profile's peak (pipes) or margin over the peak hour (wires): utilities.network"),
   derived("world.network.links.*.length_m", "the distance on the ground between its nodes, by the generator's layout of districts"),
   prof("world.network.links.*.loss_m", "utilities.network"),

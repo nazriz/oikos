@@ -119,10 +119,14 @@ pub struct State {
     /// owners own; a vehicle goes where whoever drives it goes.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub vehicles: Map<Id, Vehicle>,
-    /// Bodies on their way between places (reserved: nothing puts anyone in transit yet; a visit is still the time it
-    /// takes, spent where one set out). Keyed by the body.
+    /// Bodies on their way between places (law 9, foundations-2 S3): from when they set out until they arrive, in no
+    /// space of any building, so that nothing is done to them or by them at any place on the way. Keyed by the body.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub transit: Map<Id, Transit>,
+    /// The dead who died on their way, each where it lay (a cell of the ground: law 9, S3): seen by whoever is there
+    /// (`SiteCell.remains`), until the death is registered.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub remains: Map<Id, Id>,
     /// The network for what flows (foundations-2 C3, law 8): each link's state, each connection with its meter. Behind
     /// an `Arc`, as nature is: settled hourly, and an action's copy of the state shares it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -155,18 +159,23 @@ impl Vehicle {
     }
 }
 
-/// A body on its way (reserved shapes for travel): from where, to where, when it set out and when it arrives, and by
-/// which road and vehicle, where it goes by one.
+/// A body on its way (law 9, foundations-2 S3): the building and space it left, where it is going (the same building, for a
+/// visit there and back), when it set out and arrives, the vehicle it is driving, and the act that takes it there (none for
+/// a visit).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Transit {
     pub from: Id,
+    pub space: Id,
     pub to: Id,
+    /// The buildings it goes by on the way (where goods are picked up and put down, a building worked on: S4).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub via: Vec<Id>,
     pub departed: i64,
     pub arrives: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub road: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vehicle: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub act: Option<Id>,
 }
 
 /// An entity's own record: its sections (opaque, whole numbers only), how many times it has been set (`n`), when
@@ -802,6 +811,8 @@ pub enum Sched {
     NatureDay { day: i64 },
     /// The world's totals, censused (monthly).
     CounterCensus,
+    /// The practised skills, censused (monthly: foundations-2 M8).
+    SkillCensus,
     /// A year of age: draws for the coming year (illness, injury, other causes).
     Birthday { person: Id },
     /// A drawn chance of injury, taken now against the danger of where the body is (thinning).
@@ -847,6 +858,28 @@ pub enum Sched {
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
         look: crate::config::LookRequest,
+    },
+    /// A body sets out (law 9, foundations-2 S3): it leaves the space it is in for `to` (its own building again, for a visit
+    /// there and back), and is on its way until `arrives`, driving `vehicle` if it named one. `act`: the act that takes it.
+    /// Goods on their way by the outside's freight (law 9, S4): they reach `holder`'s holding at `at` now.
+    Arrival {
+        kind: Id,
+        #[serde(with = "crate::money::amount")]
+        quantity: crate::money::Money,
+        holder: Id,
+        at: Id,
+    },
+    Depart {
+        body: Id,
+        to: Id,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        via: Vec<Id>,
+        arrives: i64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        vehicle: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        act: Option<Id>,
+        by: Id,
     },
     /// A visit in progress (docs/design/knowing.md): when it ends its looker sees what is at these cells.
     Visit {
@@ -1009,6 +1042,12 @@ impl State {
         let mut t = std::collections::BTreeMap::new();
         for s in self.holdings.values() {
             *t.entry(s.kind).or_insert(0) += s.quantity;
+        }
+        // (Goods on their way by the outside's freight are the world's still: law 9, S4.)
+        for x in self.schedule.iter() {
+            if let Sched::Arrival { kind, quantity, .. } = &x.what {
+                *t.entry(*kind).or_insert(0) += *quantity;
+            }
         }
         t
     }
