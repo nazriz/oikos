@@ -13,10 +13,14 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
-async function run(name: string, config: any) {
+// (How long a town runs: a year where nobody should come, so every month the outside world looks is one that brings
+// nobody; four months where people come, 365 days until 2026-10-31 (the slow tier's budget). Measured that day: in the
+// towns with jobs the first two come on day 0, find a home by day 12 and work by day 30, and the next wave comes on days
+// 63 to 93; with no jobseekers ten of the year's fifteen have come in four months, with 400 none in the year.)
+async function run(name: string, config: any, days = 120) {
   const out = join(root, "runs", `test-migration-${name}`);
   rmSync(out, { recursive: true, force: true });
-  const s = await runWorld({ config, runId: name, outDir: out, until: 365 * DAY });
+  const s = await runWorld({ config, runId: name, outDir: out, until: days * DAY });
   return readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
 }
 
@@ -82,7 +86,7 @@ test("the town's own jobseekers make coming less worth it (Harris & Todaro: the 
 test("with no jobs going, nobody comes", async () => {
   // One shop and one factory, whose export customers want less than it makes (so it isn't hiring); and elsewhere pays
   // more than the town does, so any posting there is isn't worth coming for.
-  const ev = await run("none", generate({ ...spec, citizens: 120, shops: 1, factories: 1, exports_per_month: 4_000_000, migration: { outside_monthly_income: 1_000_000, response_bps: 3000 } }));
+  const ev = await run("none", generate({ ...spec, citizens: 120, shops: 1, factories: 1, exports_per_month: 4_000_000, migration: { outside_monthly_income: 1_000_000, response_bps: 3000 } }), 365);
   // Postings may appear and be filled at once; with none standing when the outside world looks, or a gap below zero, no one comes.
   expect(ev.filter((e) => e.event === "person_arrived").length).toBeLessThanOrEqual(2);
 }, 300_000);
