@@ -625,7 +625,7 @@ impl<B: Body> Shop<B> {
         }
         calls.push(pay(&rent_to, lt.rent, Pay { from: Some(account.to_string()), every: Some(MONTH), first: Some(0), basis: Some(a.id.to_string()), for_: Some(format!("Rent for {space}, monthly in advance.")), ..Default::default() }, cx));
         if stock > 0 && structure != self.at.premises {
-            calls.push(call("goods", vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&structure))), ("from_at", Some(arg(&self.at.premises)))]));
+            calls.push(call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&structure))), ("from_at", Some(arg(&self.at.premises)))]));
         }
         // (Until when it binds us: its term, from now, as its terms say.)
         let term = match &a.body {
@@ -722,7 +722,7 @@ impl<B: Body> Shop<B> {
             let mut calls: Vec<Call> = orders.iter().map(|o| withdraw(o, Some("Lease ended; stop this standing order."))).collect();
             let (back, back_space, back_cell) = l.from.clone();
             if stock > 0 && !back.is_empty() && back != l.structure {
-                calls.push(call("goods", vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&back))), ("from_at", Some(arg(&l.structure)))]));
+                calls.push(call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&back))), ("from_at", Some(arg(&l.structure)))]));
             }
             if let Some(op) = self.p.operator.clone() {
                 calls.push(say(
@@ -1106,7 +1106,7 @@ impl<B: Body> Shop<B> {
             }
             calls.push(call(
                 "goods",
-                vec![("kind", Some(arg(&o.kind))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&o.to))), ("at", Some(arg(&o.at))), ("from_at", Some(arg(&self.at.premises)))],
+                vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&o.kind))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&o.to))), ("at", Some(arg(&o.at))), ("from_at", Some(arg(&self.at.premises)))],
             ));
         }
         if total >= 0 {
@@ -1228,7 +1228,7 @@ impl<B: Body> Shop<B> {
                     format!("Our owner lives at {} now: taking our stock there.", d.s("space").unwrap_or_default()),
                     vec![call(
                         "goods",
-                        vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(had.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&to))), ("from_at", Some(arg(&self.at.premises)))],
+                        vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(had.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&to))), ("from_at", Some(arg(&self.at.premises)))],
                     )],
                 ));
             }

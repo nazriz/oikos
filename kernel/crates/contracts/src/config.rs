@@ -28,6 +28,9 @@ pub const BOUNDARY: &str = "boundary";
 
 /// The capacity name for a participant acting, or looking, as itself (its own person).
 pub const SELF: &str = "self";
+/// The channel what a body saw on its way comes through (law 9: someone lying dead where it went by), as a look at the
+/// place would show it. No world declares it: every person has it.
+pub const ON_THE_WAY: &str = "on_the_way";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

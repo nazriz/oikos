@@ -534,7 +534,7 @@ export class Preview {
       case "work":
         return one(`${(b.performers ?? []).length ? `${(b.performers as string[]).map((p) => this.who(p)).join(" and ")} will do` : "You will do"} ${b.units} of ${b.task} at ${b.at}${b.on ? `, on ${b.on}` : ""}.`, ["performers", "units", "task", "at", "on"]);
       case "move_goods":
-        return one(`You will move ${b.quantity} ${b.kind} from ${b.from_at} to ${b.to === this.me ? "yourself" : this.who(b.to)} at ${b.to_at}.`, ["quantity", "kind", "from_at", "to", "to_at"]);
+        return one(`You will move ${b.quantity} ${b.kind} from ${b.from_at} to ${b.to === this.me ? "yourself" : this.who(b.to)} at ${b.to_at}${b.carried ? ", carrying them yourself" : b.carrier ? `, ${this.who(b.carrier)} carrying them` : ""}${b.vehicle ? ` in ${b.vehicle}` : ""}.`, ["quantity", "kind", "from_at", "to", "to_at", "carried", "carrier", "vehicle"]);
       case "take":
         return one(`You will take ${b.quantity} ${b.kind} from ${this.who(b.from)} at ${b.at}, without their agreement.`, ["quantity", "kind", "from", "at"]);
       case "connection": {

@@ -336,7 +336,7 @@ impl Plan for Market {
                 calls.push(pay(&owed_to, amount, Pay { from: Some(self.p.account.clone()), for_: Some(format!("{take} {kind} bought.")), settles: Some(inv.id.to_string()), ..Default::default() }, cx));
             }
             if back > 0 && !return_to.is_empty() {
-                calls.push(call("goods", vec![("kind", Some(crate::steps::arg(&kind))), ("quantity", Some(text(back.to_string()))), ("to", Some(crate::steps::arg(&from))), ("at", Some(crate::steps::arg(&return_to))), ("from_at", Some(crate::steps::arg(&me)))]));
+                calls.push(call("goods", vec![("carried", Some(crate::steps::arg("yes"))), ("kind", Some(crate::steps::arg(&kind))), ("quantity", Some(text(back.to_string()))), ("to", Some(crate::steps::arg(&from))), ("at", Some(crate::steps::arg(&return_to))), ("from_at", Some(crate::steps::arg(&me)))]));
             }
             if back > 0 {
                 calls.push(say(

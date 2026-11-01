@@ -592,9 +592,9 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 let q = 1 + (*b as i128 % 50);
                 if *flag {
                     let (who, pos, edge) = if a % 2 == 0 { ("outside-system", "outside-trade", "outside") } else { ("upriver-system", "upriver-trade", "upriver") };
-                    direct(who, Some(pos), vec![Block::MoveGoods { kind: "goods".into(), quantity: q, from_at: edge.into(), to: "devco".into(), to_at: "s-shop".into() }])
+                    direct(who, Some(pos), vec![Block::MoveGoods { kind: "goods".into(), quantity: q, from_at: edge.into(), to: "devco".into(), to_at: "s-shop".into(), carried: false, carrier: None, vehicle: None }])
                 } else {
-                    direct("developer-system", Some("developer"), vec![Block::MoveGoods { kind: "goods".into(), quantity: q, from_at: "s-shop".into(), to: "alice".into(), to_at: "s-house".into() }])
+                    direct("developer-system", Some("developer"), vec![Block::MoveGoods { kind: "goods".into(), quantity: q, from_at: "s-shop".into(), to: "alice".into(), to_at: "s-house".into(), carried: false, carrier: None, vehicle: None }])
                 }
             }
             _ => {
@@ -626,7 +626,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         let kinds = ["goods", "materials", "gold"];
                         let mut places = structures.clone();
                         places.push(me.to_string());
-                        Block::MoveGoods { kind: kinds[*kind as usize % 3].into(), quantity: *quantity, from_at: pick(&places, *from_at).unwrap(), to: e(*to), to_at: pick(&places, *to_at).unwrap() }
+                        Block::MoveGoods { kind: kinds[*kind as usize % 3].into(), quantity: *quantity, from_at: pick(&places, *from_at).unwrap(), to: e(*to), to_at: pick(&places, *to_at).unwrap(), carried: false, carrier: None, vehicle: None }
                     }
                     B::Transfer { from, to, amount } => Block::Transfer { from: my(*from), to: pick(&accounts, *to).unwrap(), amount: *amount, settles: None, per_instruction: None, memo: None, line: None },
                     B::OpenAccount { holder, to_new } => Block::OpenAccount { holder: if *to_new && bound { "$new".into() } else { e(*holder) }, currency: None, bind: None },

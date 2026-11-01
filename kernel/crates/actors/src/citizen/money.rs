@@ -1038,9 +1038,10 @@ impl Person {
         self.buy_kind(w, &goods, s, q, why, retry_of)
     }
 
-    /// `buy`, of a kind we name.
+    /// `buy`, of a kind we name. (Collected at the shop, where it says it serves from, and carried home when we use them, law
+    /// 9 S4; delivered home only by a seller that names nowhere.)
     fn buy_kind(&mut self, w: &mut Week, goods: &str, s: &Shop, q: i64, why: String, retry_of: Option<String>) -> bool {
-        let Some(place) = self.home_at(w.pic).or(s.at.clone()) else { return false };
+        let Some(place) = s.at.clone().or_else(|| self.home_at(w.pic)) else { return false };
         if q < 1 {
             return false;
         }
@@ -1382,7 +1383,7 @@ impl Person {
         if let Some(home) = &home_at {
             for (at, q) in had.iter().filter(|h| &h.0 != home) {
                 fetched = true;
-                lines.push(call("goods", vec![("kind", Some(arg(&goods))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&self.me))), ("at", Some(arg(home))), ("from_at", Some(arg(at)))]));
+                lines.push(call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&goods))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&self.me))), ("at", Some(arg(home))), ("from_at", Some(arg(at)))]));
             }
             // (What was faulty is thrown out with what is used: it is gone, and the week is shorter for it.)
             let out = total.min(each + self.money.spoiled);

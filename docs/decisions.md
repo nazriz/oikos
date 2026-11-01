@@ -9994,6 +9994,33 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Revisit if:** a day over the bound again (then look at who in the crew was busy, and with what, from the log's
   timelines).
 
+## 2026-10-31 · Foundations-2 phase 3, S3: bodies on their way (branch `f2-phase3`; results move; no model called)
+
+- **Kernel.** An act that takes a body to another building puts it on its way when the act starts (it leaves its space
+  then, `vacated`) until the act is done (it enters the new one then, `occupied`), in `State.transit` (the reserved shape,
+  now with the space it left and the act that takes it). A body on its way is in no building, so the presence checks that
+  already exist refuse whatever would be done to it or by it at a place, and nobody sees it in either; its vehicle stands
+  with it (`at` the body: nobody else can take it). An act that starts later (its actor busy) sets them out at its start
+  (`Sched::Depart`, before the start's checks). A move refused when it is done (the space filled meanwhile; the act
+  refused when it starts) brings the body back where it set out, into the space it left if there is room (the way there
+  and back is the known limit); dead or gone on the way, it is only taken off the road. A person's visit to go and look
+  is a trip there and back: away from where they were for its whole time. A person knows where they are going and when
+  they arrive (`body.on_way`), and a citizen on their way sets out for nowhere else.
+- **Standing journeys not built** (3.1 has them, to keep the log from growing by a commute's acts): putting bodies on the
+  way adds no event (the `vacated` comes at the start instead of the end, the `occupied` as before), so the log does not
+  grow, and the daily round's wakes already happen at the round's hours. Revisit if a commute's acts show in a profile of
+  a long run or the log.
+- **Kernel tests** (`space.rs`): the property holds that a body on its way is in no building and arrives no sooner than
+  it set out; a trip by car (in no building until it arrives, the car with her, bob cannot take it, she knows where she
+  is going and when); a trip refused on arrival brings her home.
+- **Measured** (10,000 people, 30 days, as S2's; on the tree merged with main at 60c7ab07, so main's years-at-10,000
+  fixes are in it too): 3,337,279 log lines against main's 3,332,887 (+0.13%, within the plan's 5%); wall 99 s, the run's
+  own thread 74.7 s; peak 1.68 GB. 30,376 moves into a space, 6,772 driven; refusals for want of room fell from 1,486 to
+  11 and `no_time_left` from 499 to 139 (a body on its way holds no space: the house is not full of people who have gone
+  out), `not_present` 1,719 (a household's second driver finding the car gone).
+- **Inventory.** S3 done: the trip spent where one set out is gone (the entry a guard).
+- **Revisit if** a refused arrival's way back matters to a result (then the body stands at the door, a place of its own);
+  a body on its way should be met or seen on the road (then a link it is on, S5's flows).
 ## 2026-10-31 · The assistants' prices from real products; gb-eng and us-oh get assistants (branch `assistant-prices`; profiles only; a town without `assistants` is unchanged; no model called)
 
 - **What.** Each offer's fee, set-up and exit in au-vic now rest on 2026 published prices of real general AI
@@ -10243,6 +10270,41 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Revisit if:** a source gives slip rates by practice, or skill half-lives by kind of work; a study needs papers'
   skills by kind; the opening level's assumption (everyone an ordinary hand) shows in results.
 
+## 2026-11-01 · Foundations-2 phase 3, S4: goods are carried, crews go to the site, the outside's freight takes its time (branch `f2-phase3`; results move; no model called)
+
+- **Contract (blocks, log, world config; blanket approval).** `move_goods` gains `carried` (the acting person carries
+  them), `carrier` (someone the actor may direct does) and `vehicle` (driven by the carrier); `goods_moved` names the
+  `carrier` and, for the outside's freight, when the goods `arrives`; a network link may carry travel (`speed_kmh`: a road
+  out of the town to an edge's node; between towns, S6). A new refusal, `not_carried`. The calls' `carried`, `carrier` and
+  `by` are code's own until the translator is taught them (the resolver's `CODE_ONLY_ARGS`), as S2's `by` is.
+- **Kernel.** In a world one travels (it has `catalogue.travel`; every world in phase 5's strict mode), goods between two
+  buildings go only with a carrier, and an act's journeys (`travel::journeys`) take each body it moves by the buildings
+  its blocks reach, in order: an `occupy`'s body into its building; a `move_goods`'s carrier by where the goods are and
+  where they go; a `work` on a building other than where it is done each performer to it. A body ends in the building it
+  goes into, or back where it set out (`turn_back` when the act is applied). Its trip is leg by leg; the act takes its
+  longest trip; each performer's and carrier's trip is placed on their own timeline. When the act is done the carrier must
+  have been by both places (`Transit.via`), else `not_present`. To or from an edge's outside, goods go by the outside's
+  freight (no town person's time): from the edge's node along the ways to the door, at the links' speeds, on their way
+  meanwhile (`Sched::Arrival`, counted by `State::total_goods`, so the conservation property holds over goods on the
+  road); at once where the world has no node for the edge (the backstop's `edgesWithoutNode` would name it). A vehicle
+  named that the body may not drive, or that is not where it sets out, means the body does not set out and the act is
+  refused when due (it looked, and the car was gone); on arrival the vehicle that went is the one that arrives.
+- **Generator, profiles.** The road out (`round.outside`: how far by road the outside's goods come from, and its freight's
+  speed, placeholders in all nine profiles, with what each would be sourced from), from the street end nearest the
+  town's west edge to a node off the ground, and every edge's node at its end.
+- **Actors.** Every move of goods an actor writes says it is carried (`uncarried` is empty). A citizen's order is collected
+  at the shop (it says where it serves from) and carried home at the weekly use, there and back; a seller delivering to
+  another business, and a shop moving its stock, carry it themselves. The crews (the builder's, the works', the
+  collectors') go to the buildings they work on with no change of their own: the kernel's journeys take them.
+- **Inventory.** S4 done: `edgesWithoutNode`, `uncarried`, `uncarriedMoves` and `workElsewhere` empty in every profile's
+  town and a month of each one's log; the special cases `goods-move-anywhere` and `crews-from-the-depot` gone (guards).
+  Left: the unhoused in no space, and the systems with no place.
+- **Not as designed:** carriage has no load yet (a body's or a vehicle's limit in mass: S5 with link capacity, which needs a
+  mass for each kind); a carrier's goods land when it is back, not when it passes their place (a trip's length late at
+  most); the freight's price is the edge's offer's as before (a freight charge by distance is the outside's behaviour, to
+  come with its sourced rate).
+- **Revisit if** a delivery round's order of stops matters (then the route is ordered by the carrier, not the blocks); the
+  outside's freight should take town people's time (then a carrier firm of the town's, its staff and vans).
 
 ## 2026-10-31 · Elastic slots: the pool fits the machine as it is (branch `elastic-slots`; `scripts/slots.ts`; risk PL-4 (1); no result changes; no model called)
 - **What:** with `OIKOS_SLOTS` unset the pool is the core count (it was the cores less two, fixed), and a job that is not
@@ -10380,6 +10442,31 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
   connection's rate; the placeholders find sources (ME-24).
 
+## 2026-11-01 · Deaths on the way: whoever comes by finds them, a household reports one who has not come home (WM-6; with S3 and S4; results move; no model called)
+
+- **What we saw:** the invariants canary (ke-nakuru seed 2, a year) failed on S3 and S4: a severely ill worker set out
+  from the builder's yard for the clinic and died six minutes into the walk. A body on its way is in no building (S3), so
+  nobody was in the room; the death was never reported and the employer's standing order paid wages for 58 days. Before
+  S3 the worker would have died at the yard, with coworkers present. The gap is WM-6's ("a death outdoors leaves no
+  trace"), made reachable by law 9. The coordinator's direction: real behaviour, the "they are there" way of knowing, no
+  invented find-rates, not a loosened invariant.
+- **Kernel.** A body that dies on its way lies on the road where it had come to (`State.remains`: the cell that far along
+  the straight line between the buildings it goes by, the known limit), its vehicle with it. Whoever comes by within a cell
+  and a half of it on their own way (at the end of their trip) sees who lies there: a look at that cell, delivered to
+  their first channel of what is at places (`SiteCell.remains`, shown to anyone there).
+- **Citizen.** Someone who has seen a body lying where they went by asks the police to come (`welfare_check_request`
+  naming the cell), once for each of the dead. An adult at home who sees that one of the household left home more than a
+  day ago and has not come back (the home's departures) reports them missing (`missing` on the request), once for each
+  going. A day is the round's own rhythm, as for a home that stands empty (deaths.md).
+- **Police.** Called to a place on the road, an officer goes (a visit, as to a home) and reports whoever lies there to the
+  registry as found there, once, and does not go to that place again; called about one who has not come home, they look
+  at the home and the street outside it (each cell next to its ground). The registry, the bank and the employer then learn
+  of the death the normal way (deaths.md, "Who is told").
+- **Not done:** the body is not taken away (nobody does an undertaker's work): others who come by still see it, and the
+  police, who found it, do not go again. A body lying where nobody passes, of someone with no household at home, is still
+  found by nobody (WM-6 stays open, narrower).
+- **Revisit if** a body lies unfound for long in a busy town (then the straight line is too far from the way people take:
+  draw the way cell by cell); deaths on the road show in a result (then an undertaker's or coroner's work, and the time).
 ## 2026-11-01 · Main red after foundations-2 S2: own-venture held the owner of a failing business to 150 days
 
 - **What:** CI went red at d0105172 on `own-venture.test.ts`, "someone out of work ... starts a business of one": its
@@ -10483,3 +10570,20 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   scratch script `orchestrator/p-tmp.ts` the branch carried is removed.
 - **Revisit if:** the slow tier passes 1,500 s on the Mini, or merges wait on it; then the twin files and the elections'
   towns first, as the entry above says, before any raise.
+
+## 2026-11-02 · Taking from work under law 9: the taker was there if their way set out from it (landing `f2-s4`; kernel fix; no model called)
+
+- **Found:** at the landing of `f2-s4`, `orchestrator/test/hazards.test.ts` ("taking from work, found at a stocktake, ...")
+  had no takings at all (0 against more than 5), on the branch alone as on the tree merged with main. The citizen's theft is
+  one act: `take` at work, then the goods carried home (`move_goods`, `carried`). Law 9 (S4) sets the carrier out on its
+  way when the act begins and applies the act's blocks when it is done; `move_goods` reads the carrier's trip (it went by
+  both places), but `take` still asked that the taker be in the building at the end, where by then they were on the road.
+  Every such act was refused `not_present`.
+- **Change:** `Block::Take` (kernel/crates/world/src/exec.rs) counts the taker present at the act's end if their way set out
+  from the building or went by it (`started`, and their transit's `from` or `via`), as `move_goods` reads a carrier. A
+  take with no trip is checked as before. Not loosened: someone who was never there still cannot take.
+- **And:** the participants' world words gained `not_carried` (the kernel's words had it; `render.test.ts` holds that every
+  refusal has world words). With the fix in, the representation towns' pins moved (a taking in the month where a
+  carried theft had been refused) and were re-taken; culture-dial's did not move.
+- **Revisit if:** an act's trip should be tied to that act alone (f2-s5 adds `Exec.act`: then `tr.act` is the check), or
+  takings come to be acts of their own before the trip home.
