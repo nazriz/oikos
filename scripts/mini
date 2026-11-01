@@ -133,9 +133,19 @@ case "$cmd" in
                     sleep 1; i=$((i + 1))
                   done
                   # What the run started and left (a model call still out, say): its own, checked to be the same processes.
-                  printf "%s" "$others" | while read -r p when; do
-                    if [ -n "$when" ] && [ "$(began "$p")" = "$when" ]; then kill -TERM "$p" 2>/dev/null && echo "ended what it left: pid $p"; fi
+                  ended=""
+                  while read -r p when; do
+                    if [ -n "$when" ] && [ "$(began "$p")" = "$when" ] && kill -TERM "$p" 2>/dev/null; then echo "ended what it left: pid $p"; ended="$ended $p"; fi
+                  done <<< "$others"
+                  # And waited for, until gone from the process table: an orphan is reaped by the first process, at once
+                  # under launchd, a second or two later in some Linux containers (a zombie until then, still found).
+                  i=0
+                  while [ "$i" -lt "$((wait_s * 5))" ]; do
+                    left=""; for p in $ended; do if kill -0 "$p" 2>/dev/null; then left="$left $p"; fi; done
+                    [ -z "$left" ] && break
+                    sleep 0.2; i=$((i + 1))
                   done
+                  for p in $left; do case "$(ps -o stat= -p "$p" 2>/dev/null)" in Z*) ;; *) echo "what it left did not end: pid $p" ;; esac; done
                   left=""; for p in $runs; do if kill -0 "$p" 2>/dev/null; then left="$left $p"; fi; done
                   if [ -n "$left" ]; then echo "still going after $wait_s s (pid$left): finishing up (measuring), or stuck. Look again: scripts/mini status $name"
                   else echo "stopped runs/$name; resume it with: scripts/mini resume $name"; fi' ;;

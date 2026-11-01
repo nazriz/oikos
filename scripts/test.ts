@@ -32,7 +32,7 @@ import { cpus, homedir, loadavg } from "node:os";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { realpathSync } from "node:fs";
-import { buildJobs, defaultPriority, insideSlot, poolSize, take } from "./slots";
+import { buildJobs, defaultPriority, insideSlot, poolSize, take, usedBy, type Used } from "./slots";
 
 const repo = join(import.meta.dir, "..");
 const args = process.argv.slice(2);
@@ -307,7 +307,7 @@ function kernelCrates(changedFiles: string[]): string[] | undefined {
 async function kernelCargoTests(crates?: string[]) {
   // (The `gate` profile: release's optimisation and overflow checks, without its whole-program link: the same tests, built in
   // a fraction of the time. 2026-10-24: `cargo test --release` built each of ~50 test programs with a fat LTO link.)
-  const slot = await take(4, `the kernel's tests (cargo test${crates ? ` -p ${crates.join(" -p ")}` : ""})`, { borrow: true });
+  const slot = await take(4, `the kernel's tests (cargo test${crates ? ` -p ${crates.join(" -p ")}` : ""})`, { borrow: true, cls: "build" });
   const which = crates ? crates.flatMap((c) => ["-p", c]) : ["--workspace"];
   if (crates) console.log(`kernel tests (cargo test): ${crates.join(", ")}`);
   // (cargo-nextest where it is installed: every test its own process, the test programs side by side, where `cargo test`
@@ -320,12 +320,13 @@ async function kernelCargoTests(crates?: string[]) {
   const cmd = nextest
     ? `cargo nextest run --cargo-profile gate ${m.join(" ")} --test-threads ${jobs} --no-fail-fast --status-level fail --final-status-level fail --hide-progress-bar && cargo test --profile gate ${m.join(" ")} --doc -q`
     : `cargo test --profile gate ${m.join(" ")} -q`;
+  const tk = Date.now();
   const k = Bun.spawn(["sh", "-c", cmd], { cwd: repo, stdout: "pipe", stderr: "pipe", env: { ...insideSlot(4), CARGO_BUILD_JOBS: jobs } });
   children.add(k);
   const out = (await Promise.all([new Response(k.stdout).text(), new Response(k.stderr).text()])).join("");
   const ok = (await k.exited) === 0;
   children.delete(k);
-  slot?.release();
+  slot?.release(usedBy(k, tk));
   console.log(`${ok ? "ok  " : "FAIL"} kernel (cargo test) ${((performance.now() - t0) / 1000).toFixed(0)}s`);
   if (!ok) { failed++; console.log(out.split("\n").filter((l) => /FAILED|FAIL \[|panicked|error/.test(l)).slice(0, 40).join("\n")); }
 }
@@ -338,9 +339,9 @@ const record: Record<string, { secs: number; ok: boolean; tests: number }> = {};
 const bad: string[] = [];
 const lateTimeouts: string[] = [];
 
-type Result ={ code: number; text: string; secs: number; npass: number; nfail: number; onlyTimeouts: boolean };
+type Result ={ code: number; text: string; secs: number; npass: number; nfail: number; onlyTimeouts: boolean; used?: Used };
 async function runFile(f: string): Promise<Result> {
-  const s = performance.now();
+  const s = performance.now(), t0 = Date.now();
   const p = Bun.spawn(["bun", "test", f], { cwd: root, stdout: "pipe", stderr: "pipe", env: insideSlot(1, { ...process.env, NODE_ENV: "test" }) });
   children.add(p);
   const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
@@ -353,7 +354,7 @@ async function runFile(f: string): Promise<Result> {
   const timedOut = (text.match(/timed out after \d+\s*ms/g) ?? []).length;
   const otherErrors = text.split("\n").filter((l) => /^\s*(error|Error|TypeError|ReferenceError|SyntaxError)\b|Unhandled|Cannot find module|panicked/.test(l) && !/timed out after/.test(l));
   const onlyTimeouts = code !== 0 && timedOut > 0 && timedOut >= nfail && !otherErrors.length;
-  return { code, text, secs: (performance.now() - s) / 1000, npass: Number(/^\s*(\d+) pass/m.exec(text)?.[1] ?? 0), nfail, onlyTimeouts };
+  return { code, text, secs: (performance.now() - s) / 1000, npass: Number(/^\s*(\d+) pass/m.exec(text)?.[1] ?? 0), nfail, onlyTimeouts, used: usedBy(p, t0) };
 }
 const tail = (f: string, text: string) => `\n== ${f}\n${text.split("\n").filter((l) => !/^\s*$/.test(l)).slice(-60).join("\n")}`;
 
@@ -372,7 +373,8 @@ async function worker() {
     const f = files[next++];
     if (!slot || !f) { slot?.release(); return; }
     running++;
-    const r = await runFile(f).finally(() => slot.release());
+    let r: Result | undefined;
+    try { r = await runFile(f); } finally { slot.release(r?.used); }
     running--;
     times[f] = Math.round(r.secs * 10) / 10;
     record[f] = { secs: times[f]!, ok: r.code === 0, tests: r.npass + r.nfail };

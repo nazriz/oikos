@@ -2,7 +2,7 @@
 //! office, every other kind stood in for by `idle`; the same state hash on one thread and on fourteen; the manifest the
 //! TS module's in every key that file has (the Rust adds the review's optional parameters and its version).
 
-mod common;
+use crate::common;
 
 use oikos_kernel::engine::{run_code_world, EngineOptions};
 use serde_json::{json, Value};

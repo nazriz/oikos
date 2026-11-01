@@ -2,7 +2,7 @@
 //! system replaced by an employer, everything else idle; the world is the same on one thread and on fourteen, and the
 //! employer posts jobs for the staff it opens with (no trade on record yet).
 
-mod common;
+use crate::common;
 
 use oikos_kernel::engine::{run_code_world, EngineOptions};
 use serde_json::{json, Value};
