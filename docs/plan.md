@@ -75,7 +75,9 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] E2a. The outside's capability over time: releases of what it sells from a scenario (`capability`; the first,
     `rising-capability`), each a kind of system released on its day, sold newest first; tagged `ai` in
     `meta.study_tags` for measurement only, with a backstop that no world code reads it.
-  - [ ] E2b. Technologies that are goods (machines, hardware a firm holds, `runs_on`'s energy and water), with E5.
+  - [x] E2b. Technologies that are goods: a tool a firm holds, with which a task takes a share of its time (the kernel's
+    `tool`), sold by the outside and weighed by a factory as any technology is; off unless a town asks, `tools: true`
+    (docs/behaviour/automation.md, "Tools"; risk ME-25); hardware as goods is E5's `runs_on`.
   - [~] E3. Firms enter any industry by expected profit: a factory now founded in works for sale, as a shop is
     (docs/behaviour/entry.md, "Founding a factory"); building new premises through planning (the capital-heavy route,
     a hosting firm among them) and borrowing for a venture in premises still to do (ME-1).

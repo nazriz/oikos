@@ -81,6 +81,23 @@ pub struct Params {
     /// None founded: a factory the town began with.
     #[serde(default)]
     pub founding: super::founding::Founding,
+    /// A tool its work may be done with (foundations-2 E2: a technology that is a good), as its supplier sells it, and how it
+    /// weighs buying one. None: it looks at none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<ToolParams>,
+}
+
+/// A tool for the work (foundations-2 E2): the kind, the share of the time the work takes with it, and the comparison by the
+/// numbers a firm makes of any technology (`automation.rs`): what it saves of its staff's time a month against its price
+/// spread over the payback a firm asks, by the hurdle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolParams {
+    pub kind: String,
+    /// Who sells it (its price list, read as the supplier's is).
+    pub seller: String,
+    pub labour_bps: i64,
+    pub payback_months: i64,
+    pub hurdle_bps: i64,
 }
 
 impl Params {
@@ -117,6 +134,7 @@ impl Params {
             automation: params_from(&ctx.params.get("automation").map(Frozen::to_value).unwrap_or(Value::Null))?,
             lengnick: Lengnick::read(ctx)?,
             figures: PriceFigures::read(ctx)?,
+            tool: ctx.param("tool", None)?,
             founding: super::founding::Founding {
                 founder: ctx.param("founder", None)?,
                 capital: ctx.param("capital", 0)?,
@@ -777,6 +795,38 @@ impl<B: Body> Factory<B> {
             st.then = Some(Then::Bought { kind: kind.clone(), quantity: q, seller_account: sacct, cost: q * unit, terms: terms > 0 });
             steps.push(st);
         }
+        // A tool for each of our staff, where our supplier sells one and it pays by the numbers: the time it saves them, at
+        // their wage, against its price over the payback we ask, by the hurdle (the comparison any technology is weighed by).
+        if let (Some(tp), true) = (self.p.tool.clone(), trading) {
+            let have = held(pic, &self.p.works, &tp.kind) + self.on_order.get(&tp.kind).copied().unwrap_or(0);
+            let staff = nw.max(self.headcount);
+            let sold = goods_prices(&self.book, &tp.seller);
+            if let (Some(unit), Some(sacct), true) = (sold.prices.get(&tp.kind).copied(), sold.account.clone(), have < staff) {
+                let saves = self.wage * MONTH / self.p.period.max(1) * (10_000 - tp.labour_bps).max(0) / 10_000;
+                let costs = unit / tp.payback_months.max(1);
+                let q = (staff - have).min(spare.div_euclid(unit.max(1)));
+                // (Its seller's least order is kept, as for inputs: a smaller want is not ordered.)
+                if q > 0 && q >= sold.min_order.unwrap_or(1) && saves * 10_000 >= costs * (10_000 + tp.hurdle_bps) {
+                    spare -= q * unit;
+                    self.committed.add(&sacct, q * unit, t);
+                    *self.on_order.entry(tp.kind.clone()).or_insert(0) += q;
+                    let why = format!(
+                        "A {} saves each of our staff {}% of their time, worth {} a month at their wage, against {} a month of its price over {} months: ordering {q}.",
+                        tp.kind,
+                        (10_000 - tp.labour_bps) / 100,
+                        money(saves),
+                        money(costs),
+                        tp.payback_months
+                    );
+                    let mut st = order::<Then>(
+                        &Ordering { me: me.clone(), seller: tp.seller.clone(), seller_account: sacct.clone(), kind: tp.kind.clone(), quantity: q, unit_price: unit, to: None, at: self.p.works.clone(), from: acct.account.clone(), why, retry_of: None, for_days: None, terms: None },
+                        cx,
+                    );
+                    st.then = Some(Then::Bought { kind: tp.kind.clone(), quantity: q, seller_account: sacct, cost: q * unit, terms: false });
+                    steps.push(st);
+                }
+            }
+        }
         if losing && trading && t >= self.next_losing_note {
             self.next_losing_note = t + MONTH;
             steps.push(because(format!("A {} fetches {} on the trade we have, and its inputs cost {}: buying none, and making only from what we hold.", self.p.output, money(fetches), money(input_cost)), vec![]));
@@ -989,6 +1039,7 @@ pub fn manifest() -> Value {
     for (k, what) in [("founder", "who founded it, where it was founded in the run (none: the town began with it)"), ("listing", "the listing of the works it was founded to buy"), ("bank", "the bank it opens its account at, where founded in the run")] {
         params.insert(k.into(), json!({ "schema": { "type": ["string", "null"], "description": what }, "source": "the world gives it (no default)" }));
     }
+    params.insert("tool".into(), json!({ "schema": { "type": ["object", "null"], "description": "a tool its work may be done with, as its supplier sells it, and how it weighs buying one (kind, labour_bps, payback_months, hurdle_bps)" }, "source": "the world gives it (no default): the technology on offer" }));
     params.insert("capital".into(), json!({ "schema": { "type": "integer", "description": "the capital its founder puts in, where founded in the run" }, "unit": "cents", "default": 0, "source": "the world gives it: the founder's (the price of the works and the venture's capital)" }));
     m
 }

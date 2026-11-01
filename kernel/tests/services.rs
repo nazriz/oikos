@@ -380,3 +380,27 @@ fn a_skill_is_named_only_on_a_practised_variable() {
     w["catalogue"]["body_variables"][1]["per_day"] = json!(1);
     assert!(Run::start(w, "services", Vec::new(), None).is_err(), "a skill fades by its half-life, not a drift as well");
 }
+
+/// A technology that is a good (foundations-2 E2): a machine the developer holds at the shop, one for each person making,
+/// halves the work; one for two people does nothing; it is not used up.
+#[test]
+fn a_tool_held_for_each_person_at_the_work_makes_it_quicker_and_is_not_used_up() {
+    let made = |machines: &str, performers: &[&str]| {
+        let mut w = services_world();
+        w["catalogue"]["resources"].as_array_mut().unwrap().push(json!({"id": "machine", "unit": "item"}));
+        for t in w["catalogue"]["tasks"].as_array_mut().unwrap() {
+            if t["id"] == "make" {
+                t.as_object_mut().unwrap().remove("labour_by");
+                t["tool"] = json!({"kind": "machine", "per_performer": 1, "labour_bps": 5000});
+            }
+        }
+        if machines != "0" {
+            w["world"]["holdings"].as_array_mut().unwrap().push(json!({"kind": "machine", "holder": "devco", "at": "s-shop", "quantity": machines}));
+        }
+        let mut run = start(&w);
+        let ev = act(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "make", "units": 2, "at": "s-shop", "performers": performers}])).unwrap();
+        (labour_of(&ev), run.kernel().state().holding("devco", "s-shop", "machine"))
+    };
+    assert_eq!(made("1", &["carol"]), (1800, 1), "one machine for carol: half the time, and it is still there");
+    assert_eq!(made("0", &["carol"]), (3600, 0));
+}

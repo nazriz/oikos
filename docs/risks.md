@@ -594,6 +594,17 @@ The mechanism:
 - **Notice by:** The data centre's share of the town's energy and water moving with a placeholder changed alone.
 - **Fix when:** before a study reads the size of compute's share, rather than whether a shortage reaches it.
 
+### ME-25 · Tools as goods: what a tool saves and costs is a placeholder
+- **Gap:** The one tool on offer (au-vic's production machinery: 80% of the time to make a unit, AUD 20,000 each) has no
+  source for either figure; a tool is never used up and does not wear; only a factory weighs a tool, by its own staff's
+  wage, and only for the task the profile names.
+- **Where:** `worlds/profiles/au-vic-2026.json` `values.automation.tools`; `worlds/generator/tools.ts`;
+  `kernel/crates/actors/src/market/producer.rs` (`ToolParams`).
+- **Effect:** Whether factories take tools up, and what that does to their staffing, rests on these two figures.
+- **L / I:** medium / medium · **Status:** open (2026-11-01)
+- **Notice by:** Uptake of tools moving with the placeholder price alone.
+- **Fix when:** before a study reads how firms take up technologies that are goods.
+
 ## Public bodies and law
 
 ### PB-1 · A tribunal's time is often the wrong quantity

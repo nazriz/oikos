@@ -10115,3 +10115,24 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   The pins are re-taken (orchestrator/test/culture-dial.test.ts).
 - **Revisit if:** factories close often enough that founding matters, and entrants never pay (the likely cause is what a
   founder counts of the market); a study needs capital-heavy entry (then the planning route, above).
+## 2026-11-01 · Tools: technologies that are goods, weighed as any technology is (foundations-2 E2, its second part; branch `f2-economy`; contract addition; firm.producer; au-vic's profile; no model called)
+
+- **What:** a task may name a `tool` (a kind, so many a person, the share of the time the work then takes): with enough
+  held by the actor where the work is done for the people doing it, the work takes that share; the tool is not used up.
+  A profile's `automation.tools` puts tools on sale by the outside world (its price list) and on their task; a factory
+  (`firm.producer` `tool`) buys one for each of its staff when the time it saves them a month, at their wage, beats its
+  price over the payback it asks by the hurdle, the comparison it already makes of a system (`automation.firms`). au-vic
+  offers production machinery for `make` (80% of the time, AUD 20,000 each: placeholders, risk ME-25).
+- **Why this way:** foundations-2 7.2 asks that adoption be widened from systems to any technology, "a forklift, a
+  self-service till and a casework system weighed the same way"; a tool as a held good keeps law 8 (it is somewhere,
+  bought and held, never made from nothing) and leaves the decision to the firm's own numbers.
+- **Not built, and why:** tools wear and are replaced (no source for a life, and a durable good is not used up by a
+  task); shops and offices weighing tools (only the producer's comparison was widened; the retailer's and the offices' are
+  systems-only); tools in other profiles.
+- **Off unless asked** (`tools: true`): at au-vic's placeholder figures every factory of the 1,000-person town buys one
+  for each worker on its first day (AUD 800,000 a factory: a fifth of a factory wage a month saved, against AUD 833 a
+  month of the price over two years, by the 20% hurdle), a large unsourced effect on every run; so the tools are a
+  town's choice until sourced, and off the town is as before (the seller, the kind, the task and the weighing absent).
+  Each tool has a seller of its own (`sellers-<kind>`, a boundary selling by the unit), so a firm's least order of one
+  is kept; the world market's least order of a hundred would have refused every order.
+- **Revisit if:** a source gives a tool's saving and price, or its life; shops should weigh tools too.

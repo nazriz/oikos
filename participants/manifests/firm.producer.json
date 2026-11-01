@@ -1018,6 +1018,16 @@
       "source": "placeholder",
       "unit": "bps"
     },
+    "tool": {
+      "schema": {
+        "description": "a tool its work may be done with, as its supplier sells it, and how it weighs buying one (kind, labour_bps, payback_months, hurdle_bps)",
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "source": "the world gives it (no default): the technology on offer"
+    },
     "values": {
       "default": {},
       "schema": {

@@ -1143,6 +1143,13 @@ impl<'a> Exec<'a> {
                 total = ((total as i128 * factor + 9_999) / 10_000).max(1) as i64;
             }
         }
+        // A tool (foundations-2 E2): held where the work is done, enough for each person at it, the work takes its share of the time.
+        if let Some(tl) = spec.as_ref().and_then(|x| x.tool.as_ref()).filter(|_| n_systems < who.len() && total > 0) {
+            let people = (who.len() - n_systems) as i64;
+            if self.st.holding(&self.entity, &at, &tl.kind) >= tl.per_performer.saturating_mul(people) as Money {
+                total = ((total as i128 * tl.labour_bps as i128 + 9_999) / 10_000).max(1) as i64;
+            }
+        }
         // A practised skill (foundations-2 E4): the labour scales with the people's mean of it too, as it stands now.
         if let Some(sk) = spec.as_ref().and_then(|x| x.skill.as_ref()).filter(|_| n_systems < who.len() && total > 0) {
             if let Some(cfg) = self.s.config.catalogue.body_variables.iter().find(|v| v.id == sk.variable) {

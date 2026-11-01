@@ -304,6 +304,17 @@
                   }
                 }
               },
+              "tool": {
+                "description": "A technology that is a good (foundations-2 E2): with per_performer of the kind held by the actor where the work is done, for each person doing it, the work takes labour_bps of its time. Not used up.",
+                "type": "object",
+                "required": ["kind", "per_performer", "labour_bps"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+                  "per_performer": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+                  "labour_bps": { "type": "integer", "minimum": 0, "maximum": 10000 }
+                }
+              },
               "skill": {
                 "description": "A practised skill (foundations-2 E4): the labour per unit scales with the performers' mean of a practised body variable as well (the stated labour at its initial, novice_bps of it at its minimum, expert_bps at its maximum), and each performer's share of the time is practice.",
                 "type": "object",
