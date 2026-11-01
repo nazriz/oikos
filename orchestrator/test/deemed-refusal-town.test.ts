@@ -57,7 +57,10 @@ async function town(profile: string, days: number) {
 }
 
 test.skipIf(!have)("a review never answered is taken as refused where the place's law says so, and the claimant may appeal from then; where the law has no such rule, nobody may appeal, but the delay may be complained of to a body that recommends", async () => {
-  const [de, gb, au] = await Promise.all([town("de-ni-2026", 330), town("gb-eng-2026", 330), town("au-vic-2026", 200)]);
+  // (180 days for de-ni and gb-eng, 330 until 2026-10-31, the slow tier's budget: measured that day over 330, de-ni's
+  // residents ask on days 15 and 16 and weigh a venue open to them on days 126, 154 and 162; gb-eng's ask on days 25 to
+  // 65, and its ombudsman opens 21 days after. au-vic 200, as recourse set it.)
+  const [de, gb, au] = await Promise.all([town("de-ni-2026", 180), town("gb-eng-2026", 180), town("au-vic-2026", 200)]);
   const open = (x: typeof de, early: boolean, days = 91) => x.weighed.filter((v) => v.venue && (v.t - x.asked.get(v.who)! < days * DAY) === early);
   console.log(`deemed refusal: de-ni ${de.asked.size} asked, ${de.answered.length} answered, ${de.weighed.length} weighings after asking, a venue open in ${open(de, false).length} (${open(de, true).length} before 91 days), ${de.appeals.length} appealed; gb-eng ${gb.asked.size} asked, the ombudsman open in ${open(gb, false, 21).length}, ${gb.appeals.length} complained; au-vic ${au.asked.size} asked, the ombudsman open in ${open(au, false, 14).length}, ${au.appeals.length} complained`);
   for (const x of [de, gb, au]) {

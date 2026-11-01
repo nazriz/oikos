@@ -10049,6 +10049,65 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   as with the assistant's code (the state hashes differ, as the seated town carries the stationery and the seats' channels).
 - **Revisit if:** a real model's drafts are declined for addressing alone where the matter was right (then the principal
   needs a reading of more of the paper), or a seat cannot find its forms.
+
+## 2026-10-31 · The slow tier's budget: one computation made cheap, ten towns run only the span their laws need (branch `slow-tier-budget`; tests; no model called)
+
+- **Why:** the slow tier took about 1,526 s on the Mini against its 1,000 s budget (`scripts/test-budgets.json`).
+  Pruned as docs/testing.md, "Pruning", says: first the per-run trace (`OIKOS_RUN_TRACE`) for towns run twice (none
+  but the deliberate twins: nothing to share), then the slowest files' runs against when what they check happens.
+- **What:** no assertion loosened, no seed moved. Each shortened run states beside it the days it was measured to need,
+  read from the long run's own log that day.
+  - `orchestrator/src/figures.ts`: `matches` compiled a regular expression on every call (20,000 numbers a town times the
+    generator's table) and tested every prefix of the shape; now one expression per pattern, covering the shape and
+    anything under it. Same answer on all 1,064,124 pattern-and-shape pairs of two profiles' towns, old against new.
+  - `reading-dial.test.ts`: 200 → 30 days (worded decisions read from day 0, about forty in three weeks).
+  - `migration.test.ts`: 365 → 120 days where people come (first arrivals day 0, housed by 12, at work by 30, the next
+    wave days 63 to 93); "nobody comes" keeps its year.
+  - `scenarios.test.ts`: 60 → 35 days, the election's scenario 60 (its timetable fills two months).
+  - `recourse-town.test.ts`: 300 → 150 days (the span its own comment gave; first review day 3, application day 44).
+  - `deemed-refusal-town.test.ts`: 330 → 180 days (de-ni weighs an open venue on days 126, 154, 162).
+  - `justice.test.ts`: 300 → 250 and 200 days (rent reviews on day 181, orders on 238).
+  - `automation-run.test.ts`: 200 → 90 days (systems delivered and serving from day 31).
+  - `founding.test.ts`: 205 → 150 days (the first founding on day 120, code town and composed).
+  - `entry.test.ts`: 450 → 240 and 300 → 120 days (premises sold day 106, the buyer serving day 120, and day 165 after
+    main's change to citizens' work the same day: 160 days failed then, so the margin is wide; the living shop's record
+    begun day 85).
+- **Tried and kept:** `elections.test.ts` with polling at day 120 fails its paper's four editions (the paper is thin
+  until the notice); the twins' 120 days at 60 give 3 answers where the test asks more than 8; `credit` (second loans
+  and arrears from day 361), `unions` (a claim cycle a year after the closure), `prices`, `tenancy`, `households`
+  (births from day 279) need their spans.
+- **Measured** (a 4-core cloud container, three files at a time, `bun scripts/test.ts --tier slow`; before on main
+  c285778, after on the branch merged with main 1ae2561): 65 files, 9,730 → 8,042 file-seconds, 4,872 → 4,025 s wall,
+  all passing after (own-venture and word-of-mouth were red before, as on main). Per file, before → after:
+  reading-dial 547 → 59, scenarios 487 → 297, figures 184 → 8, recourse-town 295 → 123, migration 262 → 107,
+  deemed-refusal-town 286 → 134, automation-run 242 → 99, entry 211 → 68 (at 160 days; at 240 about 90), founding 230 → 171, justice 168 → 120; every
+  other file within the load's noise but `own-venture` 197 → 476, main's own change that day (three seeds where it
+  held one). Without that, the cut is 20%: on the Mini about 1,526 → 1,220 s, still over the budget.
+- **Mutations:** not run (limited credit; a cloud container, no copy-on-write clone). No planted bug is in `figures.ts`.
+  Three name a shortened file: `kernel-absent-may-work` (migration), `rs-appeal-window-off-by-one` and
+  `rs-grievance-ignored-in-seconds` (recourse-town). Owed: `scripts/mutate.ts --only` with those three, before and
+  after, on the Mini; if one is caught before and not after, the run it needs goes back to its old span.
+- **Not done, and what is left:** the rest of the slow tier is runs a law needs whole (twins of a year, three years
+  of records, the year of invariants) or held to one seed for a rare draw (production's dividend, the station's
+  warrants), each a case to be made by construction, as docs/testing.md says. The next payoffs: those cases built,
+  `elections.test.ts` (seven towns of 205 days; a paper fuller before the notice would let the election come sooner),
+  and the twin files (about 1,000 file-seconds between them). Or the budget raised, with its entry here.
+- **Then, on the coordinator's word (don't raise the budget; build rare cases, shorten the twins where the law allows),**
+  each file alone on the same container: `production.test.ts`'s dividend by construction, the outside paying a fifth
+  more for the town's goods (`profitable`) on the town's own seed, 120 days, where it was seed 5 and 300 days hunting a
+  rare draw (the "every line paid" checks now cover instructions a month before the end, where they were day 170 of
+  300): 246 → 134 s. `police-station-seat.test.ts`: 330 → 120 days (the opening case's warrant is in month two; the
+  rest is held only as both towns agreeing): 203 → 80 s. `twin-draws-seat.test.ts`, the prices twin: a year → 240 days
+  (the fault moved prices from the second month; 8 lists, 8 distinct): about −90 s. Kept: `twin-draws-year`'s mayor
+  floor (0.37 of decisions alike) is set against a year, where the fault it guards gave 35%; at 120 days the town gave
+  72% alike, so a shorter run would not catch it. `twin-seat-year` needs a seated resident's death and its floors are a
+  year's. The elections paper: not cheap (who files what before the notice), not done. With these, about 8,042 → 7,750
+  file-seconds here, 20% under the start (23% leaving own-venture's growth out): on the Mini about 1,526 → 1,200 s,
+  still over the budget. What is left is the twins of a year and the elections, each a law's whole span, or the
+  budget.
+- **Revisit if:** a shortened run's event moves past its end (the test fails on the count, not silently: each asks
+  for at least one of what it checks), or a scenario starts acting after its first month.
+
 ## 2026-10-31 · Borrowing to start a business: the founder asks the bank, the lending office decides (branch `gap-me1`; citizen, generator; risk ME-1; no contract change; no model called)
 
 - **What:** a person who would start a business of one by what they expect it to pay them, with a home to trade from,
@@ -10302,3 +10361,18 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   capital): entry by expected profit reads the profile's venture, not what the person just lived through. A behaviour
   question (does a failed founder try again at once, and how soon?), to settle with a source, not a test.
 - **Revisit if:** a founder's own failure is to weigh in their next venture (ME-1).
+
+## 2026-11-02 · The slow tier's budget raised to 1,500 s (branch `slow-tier-budget`; tests; no model called)
+
+- **Why:** after the trims above the slow tier still takes about 1,220 s on the Mini against its 1,000 s budget, and what
+  is left is runs a law needs whole: the year-long towns (twins of a year, the year of invariants, credit's second loans
+  and arrears from day 361, births from day 279). Shortening those further would stop them guarding long runs, which is
+  what they are for. Naz approved raising the budget on 2026-11-02 so the year-long tests keep guarding long runs.
+- **Change:** `scripts/test-budgets.json` `slow.wall_seconds` 1,000 → 1,500 (25 minutes), about the tier's time today and
+  a quarter more. The gate's budget is unchanged. No test loosened.
+- **Also in this landing:** merged with main, `deemed-refusal-town.test.ts` keeps main's third town (au-vic, 200 days,
+  the ombudsman, from `mt21-recourse`) with this branch's 180 days for de-ni and gb-eng (measured on the merged tree: de-ni
+  a venue open in 3 weighings, none before 91 days; gb-eng's ombudsman open in 2; all assertions pass). The stray
+  scratch script `orchestrator/p-tmp.ts` the branch carried is removed.
+- **Revisit if:** the slow tier passes 1,500 s on the Mini, or merges wait on it; then the twin files and the elections'
+  towns first, as the entry above says, before any raise.
