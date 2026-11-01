@@ -19,21 +19,21 @@ const SEEDS = Number(process.env.OIKOS_INVARIANT_SEEDS ?? 2);
 const CITIZENS = Number(process.env.OIKOS_INVARIANT_CITIZENS ?? 60);
 const AT_ONCE = 3;
 
-async function town(profile: string, seed: number, days: number, name: string, recordObservations: "none" | "all" = "none") {
+async function town(profile: string, seed: number, days: number, name: string, recordObservations: "none" | "all" = "none", towns?: number) {
   const { generate } = await import("@oikos/worlds/generator/generate");
   const out = join(root, "runs", `test-invariants-${name}`);
   rmSync(out, { recursive: true, force: true });
-  const s = await runWorld({ config: generate({ ...spec, citizens: CITIZENS, profile, seed }), runId: name, outDir: out, until: days * DAY, recordObservations });
+  const s = await runWorld({ config: generate({ ...spec, citizens: CITIZENS, profile, seed, ...(towns ? { towns } : {}) }), runId: name, outDir: out, until: days * DAY, recordObservations });
   return { out, log: s.logPath, stateHash: s.stateHash };
 }
 
 /** Run each, check its log, and delete it: a year's log is a few hundred megabytes. */
-async function checked(jobs: { profile: string; seed: number; days: number; name: string; observations?: boolean }[]) {
+async function checked(jobs: { profile: string; seed: number; days: number; name: string; observations?: boolean; towns?: number }[]) {
   const reports: { name: string; report: InvariantReport }[] = [];
   const queue = [...jobs];
   await Promise.all(Array.from({ length: AT_ONCE }, async () => {
     for (let j = queue.shift(); j; j = queue.shift()) {
-      const r = await town(j.profile, j.seed, j.days, j.name, j.observations ? "all" : "none");
+      const r = await town(j.profile, j.seed, j.days, j.name, j.observations ? "all" : "none", j.towns);
       try {
         reports.push({ name: j.name, report: await checkLog(r.log) });
       } finally {
@@ -48,8 +48,12 @@ const violations = (reports: { name: string; report: InvariantReport }[]) =>
   reports.flatMap((r) => r.report.violations.slice(0, 20).map((v) => `${r.name}: ${v.invariant} at seq ${v.seq} (day ${Math.floor(v.t / DAY)}): ${v.what}`));
 const total = (reports: { report: InvariantReport }[], what: string) => reports.reduce((a, r) => a + (r.report.seen[what] ?? 0), 0);
 
-test("a year in towns of three profiles, on several seeds: every invariant holds", async () => {
-  const jobs = PROFILES.flatMap((profile) => Array.from({ length: SEEDS }, (_, i) => ({ profile, seed: i + 1, days: 365, name: `${profile}-${i + 1}` })));
+test("a year in towns of three profiles, on several seeds, and in a world of three towns: every invariant holds", async () => {
+  const jobs = [
+    ...PROFILES.flatMap((profile) => Array.from({ length: SEEDS }, (_, i) => ({ profile, seed: i + 1, days: 365, name: `${profile}-${i + 1}` }))),
+    // (Several towns in one world, law 9 S6: each its own, joined by road, sharing the outside.)
+    { profile: PROFILES[0]!, seed: 1, days: 365, name: "three-towns", towns: 3 },
+  ];
   const reports = await checked(jobs);
   expect(violations(reports)).toEqual([]);
   // (An invariant that saw nothing proves nothing: the towns must have done each thing it is about.)

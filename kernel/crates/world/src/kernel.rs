@@ -334,10 +334,11 @@ impl World {
                 .travel
                 .iter()
                 .flat_map(|t| t.vehicles.iter())
-                .map(|v| (v.id, crate::state::Vehicle { type_: v.type_, owner: v.owner, at: v.at, drivers: v.drivers.clone() }))
+                .map(|v| (v.id, crate::state::Vehicle { type_: v.type_, owner: v.owner, at: v.at, drivers: v.drivers.clone(), fuel_owed: 0 }))
                 .collect(),
             transit: Default::default(),
             remains: Default::default(),
+            flows: Default::default(),
             network: None,
             scarce_sold: Default::default(),
             metered: Default::default(),
@@ -1035,11 +1036,18 @@ impl World {
         // (Those it takes somewhere set out when it starts, and are on their way until it is done: law 9, S3. Before the
         // start's checks, so that an act refused when it starts brings them back.)
         let mut set_out = vec![];
+        let hour = start.div_euclid(3_600);
         for j in journeys {
+            // (Each link it goes along carries one more vehicle in the hour it sets out: S5.)
+            for k in &j.links {
+                let n = self.state.flows.get(k).filter(|(h, _)| *h == hour).map_or(0, |(_, n)| *n);
+                self.state.flows.insert(*k, (hour, n + 1));
+            }
+            let fuel = j.fuel.map(|(k, q)| (k, q, j.metres));
             if start <= t {
-                set_out.extend(crate::exec::depart(&self.s, &mut self.state, &j.body, &j.to, &j.via, done, j.vehicle.as_deref(), Some(&action), participant));
+                set_out.extend(crate::exec::depart(&self.s, &mut self.state, &j.body, &j.to, &j.via, fuel, done, j.vehicle.as_deref(), Some(&action), participant));
             } else {
-                self.state.schedule(start, crate::state::Sched::Depart { body: j.body, to: j.to, via: j.via, arrives: done, vehicle: j.vehicle, act: Some(action.clone().into()), by: participant.into() });
+                self.state.schedule(start, crate::state::Sched::Depart { body: j.body, to: j.to, via: j.via, fuel, arrives: done, vehicle: j.vehicle, act: Some(action.clone().into()), by: participant.into() });
             }
         }
         if !checks.is_empty() {
@@ -1058,7 +1066,7 @@ impl World {
         // hours are placed and it takes effect when they are over. (law 2: "the act is done when they are")
         if placed.late && placed.over.is_none() && can_act(&self.state.participants[participant]) {
             let mut scratch = self.state.clone();
-            if let Ok(res) = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), false) {
+            if let Ok(res) = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), false, Some(&action)) {
                 if !work_shares(&res.events).is_empty() || !by.is_empty() {
                     return self.begin(participant, position, blocks, by, 0, Some(action));
                 }
@@ -1075,7 +1083,7 @@ impl World {
         } else {
             let mut scratch = self.state.clone();
             // (A hosted system's work draws on its host's holding as its seconds add up: none there, and it is refused.)
-            let done = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), !placed.late)
+            let done = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), !placed.late, Some(&action))
                 .and_then(|res| draw_hosted(&self.s, &mut scratch, participant, by, blocks, &res.events).map(|()| res))
                 .map(|res| (scratch, res));
             match done {

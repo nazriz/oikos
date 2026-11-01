@@ -24,7 +24,9 @@ export function unlocated(c: any): string[] {
   }
   const structures = new Set<string>((c.world.structures ?? []).map((s: any) => s.id));
   const edges = new Set<string>(c.world.boundaries ?? []);
-  const placed = (at: unknown) => typeof at === "string" && (structures.has(at) || edges.has(at));
+  // (A vehicle is a place too: its tank, its load, law 9 S5.)
+  const vehicles = new Set<string>((c.travel?.vehicles ?? []).map((v: any) => v.id));
+  const placed = (at: unknown) => typeof at === "string" && (structures.has(at) || edges.has(at) || vehicles.has(at));
   for (const h of c.world.holdings ?? []) if (!placed(h.at)) out.add(`${h.kind} held at ${h.at}, which is no structure or edge`);
   for (const p of c.participants ?? []) if (p.kind === "system" && !placed(p.at)) out.add(`${p.template ?? p.id}: a system with no place (the hardware it runs on held nowhere)`);
   return [...out].sort();
@@ -46,7 +48,16 @@ export function waysOffNetwork(c: any): string[] {
   return Object.entries(t.by_cover ?? {}).filter(([, s]) => (s as number) < t.seconds_per_cell).map(([cover]) => `${cover}: ground crossed quicker than on foot, a way that is no link of the network`).sort();
 }
 
-export const CONFIG_AUDITS: Record<string, (c: any) => string[]> = { unlocated, edgesWithoutNode, waysOffNetwork };
+/** Every kind of vehicle runs on something it holds (law 9, S5: a vehicle's trip draws its energy from its own holding), and
+ * every way says what it carries an hour. Names the vehicle type or the way. */
+export function movesForNothing(c: any): string[] {
+  const out: string[] = [];
+  for (const t of c.travel?.vehicle_types ?? []) if (!t.fuel || !t.fuel_per_100km) out.push(`${t.id}: a vehicle that uses no energy`);
+  for (const t of c.catalogue?.structure_types ?? []) if (t.way && !(t.way.capacity > 0)) out.push(`${t.id}: a way with no capacity`);
+  return out.sort();
+}
+
+export const CONFIG_AUDITS: Record<string, (c: any) => string[]> = { unlocated, edgesWithoutNode, waysOffNetwork, movesForNothing };
 
 // ----------------------------------------------------------------------------------------------------------------- in the modules' sources
 
@@ -92,6 +103,9 @@ export function farActs(lines: string[], c: any): { uncarriedMoves: string[]; wo
   let post: string | undefined;
   // (Who is away from every building: their last move was out of one. A crew that went to the building it works on is.)
   const away = new Set<string>();
+  // (A vehicle is where it stands, as the last trip it was driven on left it: goods into it there are within one place.)
+  const vehicleAt = new Map<string, string>((c.travel?.vehicles ?? []).map((v: any) => [v.id, v.at]));
+  const placeOf = (x: string) => vehicleAt.get(x) ?? x;
   for (const l of lines) {
     const applied = l.includes('"action_applied"');
     if (!applied && !l.includes('"goods_moved"') && !l.includes('"worked"') && !l.includes('"occupied"') && !l.includes('"vacated"')) continue;
@@ -99,10 +113,10 @@ export function farActs(lines: string[], c: any): { uncarriedMoves: string[]; wo
     if (e.kind !== "event") continue;
     const b = e.body;
     if (b.event === "action_applied") { post = b.as; continue; }
-    if (b.event === "occupied") { away.delete(b.occupant); continue; }
+    if (b.event === "occupied") { away.delete(b.occupant); if (b.vehicle) vehicleAt.set(b.vehicle, b.space.split("/")[0]); continue; }
     if (b.event === "vacated") { away.add(b.occupant); continue; }
     if (b.event === "worked" && (b.performers ?? []).length && b.performers.every((p: string) => away.has(p))) continue;
-    if (b.event === "goods_moved" && b.from_at !== b.to_at && !b.carrier) moves.add(`${mod(b.by, post)}: goods moved from one place to another with no carrier`);
+    if (b.event === "goods_moved" && placeOf(b.from_at) !== placeOf(b.to_at) && !b.carrier) moves.add(`${mod(b.by, post)}: goods moved from one place to another with no carrier`);
     if (b.event === "worked" && b.on && b.on !== b.at && (structures.has(b.on) || /^str\./.test(b.on)) && !b.on.startsWith(`${b.at}/`)) far.add(`${mod(b.by, post)}: ${b.task} done on a building elsewhere, its crew where they were`);
   }
   return { uncarriedMoves: [...moves].sort(), workElsewhere: [...far].sort() };

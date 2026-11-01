@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { casesStanding, inventory, root, specialCasesLeft } from "./lib/law8";
-import { CONFIG_AUDITS, edgesWithoutNode, farActs, SPACE_INVENTORY, uncarried, unlocated, waysOffNetwork } from "./lib/law9";
+import { CONFIG_AUDITS, edgesWithoutNode, farActs, movesForNothing, SPACE_INVENTORY, uncarried, unlocated, waysOffNetwork } from "./lib/law9";
 
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 const profiles = readdirSync(join(root, "worlds/profiles")).filter((f) => f.endsWith(".json")).map((f) => f.replace(/\.json$/, ""));
@@ -46,6 +46,28 @@ test("every profile's town has nothing nowhere, no edge off the network and no w
   const standing = new Set(casesStanding(inv));
   expect(inv.entries.filter((e) => !inv.done.includes(e.step) && !standing.has(e.id)).map((e) => e.id), "special cases listed as standing and no longer found (move their step to done, or remove them)").toEqual([]);
 }, 120_000);
+
+test("a world of three towns (S6): the audits find what one town's find, each town's own are its own, and a road joins each to the next", () => {
+  const inv = inventory(SPACE_INVENTORY);
+  const c = generate({ ...spec, citizens: 120, profile: "au-vic-2026", factories: 3, living: spec.living ?? {}, towns: 3 });
+  // (A finding in another town is the first town's, its prefix taken off.)
+  for (const [name, audit] of Object.entries(CONFIG_AUDITS)) expect(audit(c).map((f) => f.replace(/^t\d+-/, "")).filter((f) => !(inv.found[name] ?? []).includes(f)), name).toEqual([]);
+  // (Nothing a town defines is defined twice; each town has its people, its council and its posts.)
+  const w = c.world;
+  for (const xs of [w.entities, w.accounts, w.structures, w.records, w.places, w.connections, w.network.nodes, w.network.links, c.travel.vehicles, c.participants, c.positions, c.templates]) {
+    const ids = xs.map((x: any) => x.id);
+    expect(ids.filter((id: string, i: number) => ids.indexOf(id) !== i)).toEqual([]);
+  }
+  for (const t of ["", "t2-", "t3-"]) {
+    expect(w.entities.some((e: any) => e.id === `${t}city`) && c.positions.some((p: any) => p.id === `${t}mayor` && p.entity === `${t}city`), t).toBe(true);
+    expect(c.participants.filter((p: any) => p.kind === "person" && p.person?.startsWith(`${t}c0`)).length, t).toBeGreaterThan(50);
+  }
+  // (One outside, its edges once; one weather.)
+  expect(w.entities.filter((e: any) => e.kind === "boundary").map((e: any) => e.id)).toEqual(w.boundaries);
+  expect(c.participants.filter((p: any) => p.controller?.impl === "world.weather").length).toBe(1);
+  const cell = (n: string) => w.network.nodes.find((x: any) => x.id === n).cell;
+  for (const [a, b] of [["n-gate", "t2-n-gate"], ["t2-n-gate", "t3-n-gate"]] as const) expect(w.network.links.some((l: any) => l.from === a && l.to === b && l.mode === "road" && l.length_m > 0 && cell(a) !== cell(b)), `${a} to ${b}`).toBe(true);
+});
 
 test("the special cases the landed steps deleted are gone, and stay gone", () => {
   expect(specialCasesLeft(SPACE_INVENTORY), "special cases law 9's steps deleted, standing again").toEqual([]);
@@ -79,6 +101,13 @@ test("it fails, naming the cover, on ground crossed quicker than on foot", () =>
   expect(waysOffNetwork(c)).toEqual(["motorway: ground crossed quicker than on foot, a way that is no link of the network"]);
 });
 
+test("it fails, naming it, on a vehicle that uses no energy and a way with no capacity", () => {
+  const c = structuredClone(town("au-vic-2026"));
+  c.travel.vehicle_types.push({ id: "glider", seats: 1, speed_kmh: 30 });
+  c.catalogue.structure_types.push({ id: "lane", category: "transport", build_time: 1, footprint: { w: 1, h: 1 }, spaces: [], way: { mode: "road", capacity: 0 } });
+  expect(movesForNothing(c)).toEqual(["glider: a vehicle that uses no energy", "lane: a way with no capacity"]);
+});
+
 test("it fails, naming the file, on a module that moves goods with no carrier, and is quiet on one that names it", () => {
   const dir = mkdtempSync(join(tmpdir(), "oikos-somewhere-"));
   try {
@@ -103,6 +132,9 @@ test("it fails, naming the module, on goods moved between places with no carrier
     ev({ event: "goods_moved", from_at: "shop", to_at: "house-1", by: "c1-self" }),
     ev({ event: "goods_moved", from_at: "shop", to_at: "shop", by: "c1-self" }),
     ev({ event: "goods_moved", from_at: "shop", to_at: "house-1", by: "c1-self", carrier: "c1" }),
+    // (Into a car where it stands, driven there: one place.)
+    ev({ event: "occupied", occupant: "c1", space: "shop/workplace.1", vehicle: "car-1" }),
+    ev({ event: "goods_moved", from_at: "shop", to_at: "car-1", by: "c1-self" }),
   ];
   expect(farActs(lines, c)).toEqual({ uncarriedMoves: ["citizen.default: goods moved from one place to another with no carrier"], workElsewhere: ["city.works: collect done on a building elsewhere, its crew where they were"] });
 });

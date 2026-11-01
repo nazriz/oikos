@@ -213,6 +213,16 @@ pub enum EventBody {
         structure: Id,
         by: Id,
     },
+    /// A vehicle driven on a trip used fuel from its tank (law 9, S5): its owner's holding of the kind at the vehicle, used
+    /// up (a kind that dissipates).
+    FuelUsed {
+        vehicle: Id,
+        kind: Id,
+        #[serde(with = "oikos_core::money::amount")]
+        quantity: oikos_core::money::Money,
+        metres: i64,
+        by: Id,
+    },
     /// An act on a connection (foundations-2 C3): opened, set, closed, interrupted, restored. Its settlements are not
     /// events: the meter is state.
     ConnectionChanged {
@@ -525,6 +535,7 @@ impl EventBody {
             EventBody::ActionRefused { .. } => "action_refused",
             EventBody::Transfer { .. } => "transfer",
             EventBody::GoodsMoved { .. } => "goods_moved",
+            EventBody::FuelUsed { .. } => "fuel_used",
             EventBody::ConnectionChanged { .. } => "connection_changed",
             EventBody::LinkChanged { .. } => "link_changed",
             EventBody::Worked { .. } => "worked",
@@ -577,6 +588,7 @@ impl EventBody {
             self,
             EventBody::Transfer { .. }
                 | EventBody::GoodsMoved { .. }
+                | EventBody::FuelUsed { .. }
                 | EventBody::ConnectionChanged { .. }
                 | EventBody::LinkChanged { .. }
                 | EventBody::Worked { .. }

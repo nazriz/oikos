@@ -127,6 +127,10 @@ pub struct State {
     /// (`SiteCell.remains`), until the death is registered.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub remains: Map<Id, Id>,
+    /// What each way link carries this hour (law 9, S5): link -> (the hour, vehicles that set out on it in it). Only the
+    /// current hour's count is kept; an hour past is counted afresh.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub flows: Map<Id, (i64, u32)>,
     /// The network for what flows (foundations-2 C3, law 8): each link's state, each connection with its meter. Behind
     /// an `Arc`, as nature is: settled hourly, and an action's copy of the state shares it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -150,6 +154,10 @@ pub struct Vehicle {
     pub at: Id,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub drivers: Vec<Id>,
+    /// Fuel its driving has used and its tank not yet given, in millionths of a unit (law 9, S5): a trip takes whole units
+    /// as the millionths add up to them, so a short trip is not charged a unit it did not use.
+    #[serde(default, skip_serializing_if = "is_zero_i64")]
+    pub fuel_owed: i64,
 }
 
 impl Vehicle {
@@ -874,6 +882,9 @@ pub enum Sched {
         to: Id,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         via: Vec<Id>,
+        /// The fuel its vehicle's trip takes, and the metres driven (S5).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fuel: Option<(Id, crate::money::Money, i64)>,
         arrives: i64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         vehicle: Option<Id>,
@@ -1216,7 +1227,7 @@ pub struct GroundCache {
     pub costs: std::sync::Mutex<Option<(u64, Arc<CellCosts>)>>,
     /// The ways of the ground as it stands, as of an epoch (ways.rs), and the quickest times from a node, by speed.
     pub ways: std::sync::Mutex<Option<(u64, Arc<crate::ways::Ways>)>>,
-    pub trees: std::sync::Mutex<Map<(u32, i64), (u64, Arc<Vec<Option<i64>>>)>>,
+    pub trees: std::sync::Mutex<Map<(u32, i64), (u64, Arc<crate::ways::Tree>)>>,
 }
 
 /// What entering each cell of the ground costs a traveller (seconds), over the rectangle the cells lie in: none where

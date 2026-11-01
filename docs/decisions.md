@@ -10467,6 +10467,72 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   found by nobody (WM-6 stays open, narrower).
 - **Revisit if** a body lies unfound for long in a busy town (then the straight line is too far from the way people take:
   draw the way cell by cell); deaths on the road show in a result (then an undertaker's or coroner's work, and the time).
+
+## 2026-11-01 · Foundations-2 phase 3, S5: a road carries so many an hour, a full one slows and holds, and a vehicle runs on what is in its tank (branch `f2-s5`; contract additions; results move; no model called)
+
+- **Contract (world config, log; blanket approval).** `catalogue.travel.congestion` (`alpha_bps`, `beta`): the volume-delay
+  function a road's time follows; a vehicle type's `fuel` (the kind it runs on), `fuel_per_100km` and `tank`; a holding may
+  be at a vehicle (its tank, or its load); a new event, `fuel_used` (the vehicle, the kind, how much, the metres driven).
+- **Kernel.** Each way link counts the vehicles that set out on it in the hour, each way (`State.flows`, only the current
+  hour kept). A driven leg's time is each link's free time times 1 + alpha (on it / its capacity)^beta, the Bureau of
+  Public Roads' form in integers; a link already at its capacity this hour takes the vehicle only in the next (it waits the
+  hour out). Routes are the free-flow quickest (no re-routing: the known limit, 3.6). A trip by a vehicle that runs on
+  something draws it from its owner's holding at the vehicle as it sets out, by the metres driven, in whole units as the
+  millionths add up (`Vehicle.fuel_owed`), so a short trip is never charged a unit it did not use; a tank with too little
+  for the trip leaves the vehicle where it stands and the trip is walked. Goods go into a vehicle where it stands, or by
+  driving it to where they are.
+- **Generator, profiles, actors.** Each kind of vehicle runs on the fuel the town's service stations sell (the shop mix's
+  transport kind), at the profile's `round.vehicles.types[].fuel_cost_per_100km` over the kind's price, with a tank of its
+  `range_km`, half full at the start (generator 0.75.0); roads have the profile's `round.roads.congestion` (alpha 0.15,
+  beta 4, the BPR defaults; Traffic Assignment Manual 1964, to confirm; in all nine profiles). A citizen who owns a vehicle
+  puts the transport they bought into its tank, as far as it holds, driving there and back (`use_up_kind`).
+- **Backstop.** `movesForNothing` (a vehicle type that uses no energy, a way with no capacity): the inventory lists the six
+  profiles whose shop mix has no transport kind (their cars and motorcycles, which run on nothing until those profiles
+  say what fuel is sold there). The log audit treats goods into a vehicle as at the place it stands (`farActs`).
+- **What it does:** a unit of the transport kind is about 100 km of a car's driving, so fuel is a small draw in a town
+  (on a 300-person town, 152 fills in 60 days); local roads at 900 vehicles an hour are almost never full, so congestion
+  bites only where the profile or a study gives a road little capacity.
+- **Measured (the stop rule, 3.5):** a 10,000-person year (town-1000 at 10,000, lean log, 4 threads), main at c46643eb
+  (S2 and the representation work, without S3 to S6) against this branch (S3, S4, the deaths on the way, S5, S6's kernel
+  fix): 554 s wall and 504 s on the main thread, against 586 s and 531 s (+6% and +5%); peak memory 4.11 and 4.06 GB; log
+  5.77 and 5.76 GB. Well within 1.3 times. (The two partly overlapped on a loaded machine; the main thread's time is the
+  steadier figure.)
+- **Not as designed:** no load limit in mass (no kind has a mass yet: a carrier takes any quantity); no re-routing round a
+  full road; flows have no day's history kept for whoever looks.
+- **Revisit if:** a study needs congestion (then the town's roads need sourced capacities, and re-routing); a kind gets a
+  mass (then a body's and a vehicle's load); the other profiles' shop mixes name their fuel.
+
+## 2026-11-01 · Foundations-2 phase 3, S6: several towns in one world, joined by road, sharing the outside (branch `f2-s5`; generator option, off by default; results of one town move only by a kernel fix below; no model called)
+
+- **What:** a spec's `towns: N` (`worlds/generator/towns.ts`). Each town is generated whole from the spec, at its own seed
+  (the first at `seed`, then the next), all under the first's weather (`weather_seed`, the stream the first town's weather
+  is drawn from), and composed: laid side by side on one ground, each east of the one before, within one root place,
+  `region`. The first town keeps its ids; every id another town defines is prefixed (`t2-`, `t3-`) wherever it is written,
+  but for the world's vocabulary (a kind, a type, a role, a channel's own name: the police are an entity and a kind, a
+  mayor a post and a role). Shared, once: the outside world (its entities, its accounts, the network's nodes off the
+  ground: the far end of every town's road out and the edges there, so the outside's freight reaches every town), and what
+  of the outside's is alike in every town and names nothing of a town's (the weather bureau, an agency's template). A
+  road joins each town's gate to the next town's, its length the distance between them.
+- **Why this way:** the generator draws one town from the profile; a world of several is several such towns, each as a
+  one-town world would have it, so every rule and figure that holds for one holds for each. The alternative, a generator
+  that draws several towns at once, would touch every one of its four thousand lines.
+- **What it does:** what is published reaches everyone, so a job or a home in another town is seen as one's own town's:
+  in a world of three 60-person towns run a year, 52 of the 84 hires were across towns, and 91 people went into another
+  town's buildings (gatherings at its hall, its shops, a home). Every invariant held, and law 9's log audits found
+  nothing.
+- **Not as designed, and the parity notes:** the world has one design of each building, as big as the town that needs most
+  of it (a school's classrooms, a shop's places of work); one wear rate a day and one rate of pay come short, the first
+  town's (the generator derives each from its town's people; the towns are of one spec, so theirs are near one another).
+  People choose a job without weighing the trip to it (the citizen's choice has no commuting cost yet: hires across towns
+  are as likely as within one, 3 km apart); recorded, not chased.
+- **Kernel fix found by the three-town year (results move in every town).** A crew member's time is theirs again when
+  their part of a round is done, but they are on its way until the act is (the manager's part can be longer); their own
+  trip meanwhile was applied, so they were at a gathering while the round they were on was done. A body on its way for
+  one act is now not there to be sent anywhere by another (`not_present` when due; `Exec.act`), and the citizen tries
+  again later. A single town showed it too (a year of 60 people). Known limit: they come back when the act is done, not
+  when their part is.
+- **Revisit if:** a study needs commuting weighed (then the trip's time and cost in the citizen's choice of job and home,
+  with a real basis); towns of different profiles or sizes in one world (then the composer takes specs, not one).
 ## 2026-11-01 · Main red after foundations-2 S2: own-venture held the owner of a failing business to 150 days
 
 - **What:** CI went red at d0105172 on `own-venture.test.ts`, "someone out of work ... starts a business of one": its
@@ -10585,5 +10651,17 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **And:** the participants' world words gained `not_carried` (the kernel's words had it; `render.test.ts` holds that every
   refusal has world words). With the fix in, the representation towns' pins moved (a taking in the month where a
   carried theft had been refused) and were re-taken; culture-dial's did not move.
-- **Revisit if:** an act's trip should be tied to that act alone (f2-s5 adds `Exec.act`: then `tr.act` is the check), or
-  takings come to be acts of their own before the trip home.
+- **Then, in the f2-s5 landing:** with `Exec.act` (S5's), the trip counted is the taker's own for this act (`tr.act`).
+- **Revisit if:** takings come to be acts of their own before the trip home.
+
+## 2026-11-02 · Law 9 is a hard rule in CLAUDE.md (landing `f2-s5`; project rules; no model called)
+
+- **What:** CLAUDE.md's "Hard rules" gain law 9 after "All work takes time": everything physical is somewhere, and moves
+  only along a way (a body, holding, vehicle or machine is in a space, at a node or on its way; a move takes the mover's
+  time, the way's capacity and the vehicle's fuel; goods between places only with a carrier; the outside's goods by
+  freight from the edge's node), with `orchestrator/test/everything-is-somewhere.test.ts` as its backstop.
+- **Why:** foundations-2 phase 3 (S1 to S6 and WM-6, branches `f2-phase3`, `f2-s4`, `f2-s5`) makes it a law of the world
+  like the other four; a hard rule is what keeps later work from reintroducing goods or bodies that move by themselves.
+- **Approval:** Naz approved adding the line on 2026-11-02 (hard rules go to him first).
+- **Also:** docs/plan.md's summary line now says phase 3 has landed.
+- **Revisit if:** the law's wording drifts from docs/design/travel.md, or the backstop is renamed.

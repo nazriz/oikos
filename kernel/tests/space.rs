@@ -121,7 +121,7 @@ fn a_trip_by_car_goes_along_the_road_at_its_speed_and_the_car_stands_where_it_we
     assert_eq!(on_foot.kernel().state().vehicles["car-1"].at, "s-house", "on foot, the car stays at home");
     // Hers to know: the car, where it stands.
     let o = by_car.command(&Command::Observe { participant: "alice-self".into(), only: None }).unwrap().observation.unwrap();
-    assert_eq!(serde_json::to_value(&o).unwrap()["body"]["vehicles"], json!([{"vehicle": "car-1", "type": "car", "at": "s-shop"}]));
+    assert_eq!(serde_json::to_value(&o).unwrap()["body"]["vehicles"], json!([{"vehicle": "car-1", "type": "car", "at": "s-shop", "owner": "alice"}]));
 }
 
 #[test]
@@ -254,6 +254,16 @@ fn a_crew_goes_to_the_building_it_works_on_and_is_away_from_its_depot_meanwhile(
     let out = run.command(&Command::Advance { to: done + 1 }).unwrap();
     assert_eq!(refused(&out.events.iter().map(|e| e.body.clone()).collect::<Vec<_>>()), None);
     assert_eq!(run.kernel().state().structures_of("carol"), vec![oikos_kernel::blocks::Id::new("s-shop")], "back at the shop");
+    // The developer's own part of the order takes two hours, so carol's time is hers again before the act is done; but she
+    // is out on its round until then, and a trip of her own meanwhile is refused when due (she is not there to go from).
+    let mut w = road_world();
+    w["orchestration"]["act_time"]["system"] = json!({"work": 7_200});
+    let mut run = Run::start(w, "space-crew-out", Vec::new(), None).unwrap();
+    let (_, done, _) = act_now(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "mend", "units": 1, "at": "s-shop", "on": "s-house", "performers": ["carol"]}]));
+    let (_, hers, _) = act_now(&mut run, "carol-self", None, json!([{"block": "occupy", "space": "s-house/dwelling.1"}]));
+    assert!(hers < done, "hers {hers}, the round's {done}");
+    let out = run.command(&Command::Advance { to: hers + 1 }).unwrap();
+    assert_eq!(refused(&out.events.iter().map(|e| e.body.clone()).collect::<Vec<_>>()), Some(RefusalCode::NotPresent));
 }
 
 #[test]
@@ -304,4 +314,81 @@ fn someone_who_dies_on_the_way_lies_where_they_had_come_to_and_whoever_comes_by_
     away.to = "s-shop".into();
     oikos_kernel::exec::seen_on_the_way(&s, &mut st, "carol", &away);
     assert!(st.participants["carol-self"].pending.values().all(|p| p.visits.is_empty()));
+}
+
+// ----------------------------------------------------------------------------------------------------------------- S5: flows and fuel
+
+/// The long town with congestion (the Bureau of Public Roads' form), a road that takes two vehicles an hour each way, and
+/// three cars that run on goods (ten units a kilometre, a tank of 40), each half full.
+fn busy_world() -> Value {
+    let mut w = road_world();
+    w["catalogue"]["travel"]["congestion"] = json!({"alpha_bps": 1500, "beta": 4});
+    for t in w["catalogue"]["structure_types"].as_array_mut().unwrap() {
+        if t["id"] == "road" {
+            t["way"]["capacity"] = json!(2);
+        }
+    }
+    w["travel"] = json!({"vehicle_types": [{"id": "car", "seats": 5, "speed_kmh": 100, "fuel": "goods", "fuel_per_100km": 1000, "tank": 40}],
+        "vehicles": [{"id": "car-1", "type": "car", "owner": "alice", "at": "s-house"}, {"id": "car-2", "type": "car", "owner": "bob", "at": "s-flats"}, {"id": "car-3", "type": "car", "owner": "carol", "at": "s-shop"}]});
+    for (who, car) in [("alice", "car-1"), ("bob", "car-2"), ("carol", "car-3")] {
+        w["world"]["holdings"].as_array_mut().unwrap().push(json!({"kind": "goods", "holder": who, "at": car, "quantity": "20"}));
+    }
+    w
+}
+
+#[test]
+fn a_trip_by_car_draws_its_fuel_and_an_empty_tank_leaves_the_car_and_the_trip_walked() {
+    let mut run = Run::start(busy_world(), "space-fuel", Vec::new(), None).unwrap();
+    // 37 links of 25 m: 925 m driven at ten units a km: 9 whole units now, a quarter of one owed to the next trip.
+    let (_, done, ev) = start_go(&mut run, "alice-self", "s-shop/dwelling.1", Some("car-1"));
+    assert!(ev.iter().any(|e| matches!(e, EventBody::FuelUsed { vehicle, quantity: 9, metres: 925, .. } if vehicle == "car-1")), "{ev:?}");
+    assert_eq!(run.kernel().state().holding("alice", "car-1", "goods"), 11);
+    assert_eq!(run.kernel().state().vehicles["car-1"].fuel_owed, 250_000);
+    run.command(&Command::Advance { to: done + 1 }).unwrap();
+    assert_eq!(run.kernel().state().vehicles["car-1"].at, "s-shop");
+    // An empty tank: the car is left where it stands, and the trip is walked.
+    let mut w = busy_world();
+    w["world"]["holdings"].as_array_mut().unwrap().retain(|h| h["at"] != "car-1");
+    let mut run = Run::start(w, "space-empty", Vec::new(), None).unwrap();
+    let (s, d, _) = start_go(&mut run, "alice-self", "s-shop/dwelling.1", Some("car-1"));
+    run.command(&Command::Advance { to: d + 1 }).unwrap();
+    let st = run.kernel().state();
+    assert_eq!(st.structures_of("alice"), vec![oikos_kernel::blocks::Id::new("s-shop")], "she walked");
+    assert_eq!(st.vehicles["car-1"].at, "s-house", "the car stayed");
+    assert!(d - s >= 39 * 18, "walked: {}", d - s);
+}
+
+#[test]
+fn a_road_at_its_capacity_this_hour_takes_one_more_car_only_in_the_next() {
+    let mut run = Run::start(busy_world(), "space-busy", Vec::new(), None).unwrap();
+    // Alice and bob drive east along the road in the same hour: it is full. Carol, going west, is on the other way and
+    // is not held; a fourth eastbound trip (alice back, after the hour) would be.
+    let (s1, d1, _) = start_go(&mut run, "alice-self", "s-shop/dwelling.1", Some("car-1"));
+    let (s2, d2, _) = start_go(&mut run, "bob-self", "s-shop/dwelling.1", Some("car-2"));
+    let (s3, d3, _) = start_go(&mut run, "carol-self", "s-house/dwelling.1", Some("car-3"));
+    let (t1, t2, t3) = (d1 - s1, d2 - s2, d3 - s3);
+    assert!(t2 > t1, "the second car on a road of two an hour is slowed: {t1} then {t2}");
+    assert!(t3 < 3_000, "the other way is not full: {t3}");
+    let flows = &run.kernel().state().flows;
+    assert!(flows.values().any(|(_, n)| *n == 2), "two on the eastbound links this hour: {flows:?}");
+}
+
+#[test]
+fn a_car_is_filled_by_driving_it_to_where_the_fuel_is_and_back() {
+    let mut run = Run::start(busy_world(), "space-fill", Vec::new(), None).unwrap();
+    // Devco keeps goods at the shop; alice has bought some there (her holding at the shop), and fills her car with it.
+    let mut w = busy_world();
+    w["world"]["holdings"].as_array_mut().unwrap().push(json!({"kind": "goods", "holder": "alice", "at": "s-shop", "quantity": "6"}));
+    run = Run::start(w, "space-fill", Vec::new(), None).unwrap();
+    let cmd = direct("alice-self", None, serde_json::from_value(json!([{"block": "move_goods", "kind": "goods", "quantity": "5", "from_at": "s-shop", "to": "alice", "to_at": "car-1", "carried": true, "vehicle": "car-1"}])).unwrap()).unwrap();
+    let r = run.command(&cmd).unwrap();
+    let done = r.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { done, .. } => Some(*done), _ => None }).unwrap();
+    assert_eq!(run.kernel().state().vehicles["car-1"].at, "alice", "she drives it there");
+    let out = run.command(&Command::Advance { to: done + 1 }).unwrap();
+    assert!(!out.events.iter().any(|e| matches!(e.body, EventBody::ActionRefused { .. })), "{:?}", out.events);
+    let st = run.kernel().state();
+    // 1,850 m there and back at ten units a km: 18 used (a half owed), five put in.
+    assert_eq!(st.holding("alice", "car-1", "goods"), 20 - 18 + 5);
+    assert_eq!(st.holding("alice", "s-shop", "goods"), 1);
+    assert_eq!(st.vehicles["car-1"].at, "s-house", "and back home");
 }
