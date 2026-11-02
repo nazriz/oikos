@@ -10665,6 +10665,22 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Revisit if:** the weekly probe toward a quicker pace shows as a refusal a week in a study of the office (it is the
   shared manager's behaviour; the factories and shops do the same), or the office comes to do work other than fieldwork.
 
+## 2026-11-01 · Founding again after giving a business up: the owner's own record (branch `refound-after-failure`; risk ME-1; no model called)
+
+- **What:** an owner who gives a business of one up keeps their record of it (months, what it paid them, what its market
+  said such a business pays), and weighs starting one again on the market's figure moved by that record, weighted by its
+  months against `venture_prior_months` (3, a placeholder, in `citizen.default` 0.61.0); the next weighing is a month on.
+  The record is used wherever a business of one is weighed (starting, borrowing to start, taking the loan) and in the
+  pay it is expected to bring. docs/behaviour/entry.md, "Founding again after giving one up".
+- **Why this way:** founding was weighed on the market's figure alone, so the evidence that had just closed the business
+  counted for nothing, and the weighing was overdue (it does not run while one owns a business), so it came at once. The
+  learning is Jovanovic's (an owner learns from what the venture pays them); the shrinkage toward the market's figure
+  rather than a bar keeps restarts possible, as they are in the literature on renascent and serial entrepreneurs. Behaviour,
+  not a count: nothing here is tuned to how often people refound.
+- **Not built:** the record does not carry to a shop in premises, and nobody hears of others' failures (a founder learns
+  of their own only). Someone with nothing coming in still weighs any positive figure against nothing.
+- **Revisit if:** a source gives how strongly founders weigh their own past venture against their view of the market
+  (`venture_prior_months`), or runs show owners cycling through the same failing business month after month.
 ## 2026-11-02 · Taking from work under law 9: the taker was there if their way set out from it (landing `f2-s4`; kernel fix; no model called)
 
 - **Found:** at the landing of `f2-s4`, `orchestrator/test/hazards.test.ts` ("taking from work, found at a stocktake, ...")
@@ -10716,8 +10732,9 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   years at 50,000 are not measured yet: projected some 45 to 50 GB. Still growing: what stays of every record when it is
   cold (slot, map entries, book entries: some 250 to 350 bytes a record), the units' views and knowledge, the actors' own
   state.
-- **The budget:** the month's ceiling lowered from 270 to 235 KB a person (main and the branch both measure about 218 on
-  the Mini today); a growth budget added (the same town's half-year past its month, 1,700 bytes a person a day; main
+- **The budget:** the month's ceiling held at 270 KB a person: a month holds no record past the tier's 30 days, so its
+  measure did not move (main and the branch alike, about 218 KB on the release kernel, up to 250 on the gate's build the
+  merge measures with); a growth budget added (the same town's half-year past its month, 1,700 bytes a person a day; main
   f2a3568a about 2,450, the branch 1,410 to 1,570), `orchestrator/test/memory-budget.test.ts`, slow tier (+90 s).
 - **Decided here, not in the proposal:** records leave memory one by one by when last read, not a month's segment at a
   time; the cold file is the run's scratch, removed at its end (a snapshot carries every record whole, so nothing that
@@ -10768,6 +10785,20 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   day's trip is then known). An act still too long for the day is refused and done the next day, not split.
 - **Revisit if:** a planner other than these sends people elsewhere (then it keeps `Trips` too); a seller with its own
   carrier (a town's haulier) sells on delivery (then it says `arrives` from its own trips).
+
+## 2026-11-02: stale incremental folders are pruned, incremental stays on
+
+- **Why.** `[profile.gate] incremental = true` is deliberate, but cargo keeps every `incremental/<crate>-<hash>/` whose hash
+  changed; one agent worktree's `kernel/target/gate` reached 72 GB (62 GB incremental) and the run server fell to 18 GB free.
+- **What.** `scripts/disk-tidy.ts --prune-incremental` keeps, per crate, the newest unit folder and those within 6 hours of it,
+  and never one written in the last 30 minutes. It runs before `bun run kernel`, before the gate's kernel build, at the start
+  of `merge.ts`'s check, and in the full tidy for every idle worktree. Test: the keep/remove rule (`disk-tidy.test.ts`).
+- **Measured** (agent worktree, `gate`): one-file edit 58 s unpruned, 69 s after an extreme prune, ~130 s non-incremental;
+  the pruned build tested fine. Removing a unit folder can only cost that unit a full compile, never correctness. The
+  `CARGO_INCREMENTAL=0` fallback was not needed.
+- **Revisit if:** gate builds get slower after merges (then widen the 6-hour window or keep the newest N per crate), or
+  worktrees still balloon (then the cause is something other than old hashes: look at `deps/` and `.fingerprint/`).
+
 - **Addendum, 2026-11-02 (retail.test.ts red on main after this landed).** An act refused for want of room in its
   people's day still sent them on their way and put the trip on their day (S4's journeys were placed whatever the day
   said, and now that the day counts the trip, the refusals came): a builder with no record of the trip yet planned the
@@ -10775,3 +10806,20 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   in the retail town's year). Now an act refused that way sends nobody anywhere and charges no one, and its outcome says
   how long the trips would have been (`Outcome.trips`), so the planner's next act fits. The whole slow tier was run on
   the fix before it landed.
+
+## 2026-11-02 · A household moving back in does not bring a child who is already there (main red after refound-after-failure; citizen fix; no model called)
+
+- **Found:** CI on main after `refound-after-failure` failed `households.test.ts` (2 households split at the year's end,
+  at most 1 allowed). One household (leaseholder c0014, town.yaml, seed as the test has it): its tenancy ended on day 347
+  while the youngest was out, so the leaseholder's "leave" for the child was refused (`not_present`), and the child came home
+  to the dwelling afterwards. The household re-let the same home on day 351, and each day after the leaseholder's move-in
+  (one act: the leaseholder in, and each child brought) was refused whole, `already_present`, for the child already in it.
+  Five of six were out of any home for the last 18 days. Refounding only moved the draws that made this happen; the fault
+  was older: the move-in had no answer to a child who was already there.
+- **Change:** the citizen reads the refusal: if its move-in was refused `already_present` at the block that brought a
+  child, that child is not brought again into that home (`housing.already_in`, `absorbed.already_in_block`). The world
+  told them so: they knew it from their own act's refusal, not by looking. No test changed; the representation towns'
+  pins moved (one of them had such a move-in) and were re-taken; culture-dial's did not.
+- **Not changed:** a child coming home to a dwelling whose tenancy has ended (the leave refused while they were out) is
+  left as found; it is a behaviour question (who tells a child the home is gone?), not this fault.
+- **Revisit if:** households move with other members than children (the adults are told and come themselves).

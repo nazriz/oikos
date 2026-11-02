@@ -23,6 +23,8 @@
 // ("claude agent ... pid N") is lifted only for the pid given with --unlock-pid, and only if the tree meets the rest.
 // Removal is `git worktree remove` then `git worktree prune`, never rm -rf on a worktree. A worktree that stays loses its
 // `kernel/target` at once when its branch is merged into origin/main and nothing is running in it (`judgeTarget`).
+// Stale incremental folders (cargo's `<crate>-<hash>/` units whose hash changed) are pruned from each idle worktree's
+// kernel/target, keeping each crate's newest build (`classifyIncremental`); `--prune-incremental [DIR]` does only that.
 // Build folders `.claude/target-*` (a CARGO_TARGET_DIR an agent was given) go whole when nothing has been built in them for
 // a day (--target-hours: the folder, its first two levels of folders, none written since) and no running process uses one
 // (none has a file open in it or its working folder there, none names it in its command line or environment). They hold
@@ -205,6 +207,52 @@ export function processUses(): (path: string) => boolean {
   return (path: string) => open.some((f) => f === path || f.startsWith(path + "/")) || cmds.some((c) => c.includes(path));
 }
 
+export interface IncrementalVerdict { path: string; crate: string; action: "remove" | "keep"; reason: string }
+/**
+ * Stale incremental-compilation folders in one profile's `incremental/` (`kernel/target/<profile>/incremental`). Cargo names
+ * each unit `<crate>-<hash>/` and never deletes a unit whose hash changed (a new flag, dependency or toolchain), so they pile
+ * up (62 GB in one agent worktree, 2026-11-02). Per crate, the newest unit folder and any written within `windowHours` (6)
+ * of it stay (one build writes a crate's lib and test units together); the rest go. A folder written to in the last
+ * `idleMinutes` (30) is never removed (a build may be using it). Removing a unit only costs that unit one non-incremental
+ * compile: rustc treats a missing folder as a first build, so it is never a correctness risk.
+ */
+export function classifyIncremental(dir: string, o: { windowHours?: number; idleMinutes?: number; now?: number } = {}): IncrementalVerdict[] {
+  const now = o.now ?? Date.now(), win = (o.windowHours ?? 6) * 3600_000, idle = (o.idleMinutes ?? 30) * 60_000;
+  const byCrate = new Map<string, { path: string; t: number }[]>();
+  for (const name of existsSync(dir) ? readdirSync(dir) : []) {
+    const m = name.match(/^(.+)-[0-9a-z]{13}$/);
+    if (!m) continue;
+    const path = join(dir, name);
+    let t = 0;
+    try { const st = lstatSync(path); if (!st.isDirectory()) continue; t = st.mtimeMs; for (const e of readdirSync(path)) t = Math.max(t, lstatSync(join(path, e)).mtimeMs); } catch { continue; }
+    const list = byCrate.get(m[1]!) ?? [];
+    list.push({ path, t });
+    byCrate.set(m[1]!, list);
+  }
+  const out: IncrementalVerdict[] = [];
+  for (const [crate, us] of byCrate) {
+    const newest = Math.max(...us.map((u) => u.t));
+    for (const u of us.sort((a, b) => b.t - a.t)) {
+      if (u.t >= newest - win) out.push({ path: u.path, crate, action: "keep", reason: "the newest build of this crate" });
+      else if (now - u.t < idle) out.push({ path: u.path, crate, action: "keep", reason: "written to in the last half hour" });
+      else out.push({ path: u.path, crate, action: "remove", reason: `${((newest - u.t) / 3600_000).toFixed(1)} h older than the crate's newest build` });
+    }
+  }
+  return out;
+}
+/** Prunes every `<target>/<profile>/incremental` under a `kernel/target`; returns the kilobytes removed (or that would be). */
+export function pruneIncremental(target: string, apply: boolean, o: { windowHours?: number; idleMinutes?: number } = {}): number {
+  let kb = 0;
+  for (const prof of existsSync(target) ? readdirSync(target) : []) {
+    for (const v of classifyIncremental(join(target, prof, "incremental"), o)) {
+      if (v.action !== "remove") continue;
+      kb += Number(Bun.spawnSync(["du", "-sk", v.path], { stdout: "pipe" }).stdout.toString().split(/\s/)[0]) || 0;
+      if (apply) rmSync(v.path, { recursive: true, force: true });
+    }
+  }
+  return kb;
+}
+
 const gb = (kb: number) => (kb / 1048576).toFixed(2) + " GB";
 
 function readTree(dir: string, ext: RegExp, cap = 60e6): string {
@@ -301,6 +349,16 @@ if (import.meta.main) {
   const unlockPid = opt("--unlock-pid") ? Number(opt("--unlock-pid")) : undefined;
   const protect = (opt("--protect") ?? "").split(",").filter(Boolean);
 
+  // `--prune-incremental [DIR]`: only the stale incremental folders of one kernel/target (default this repo's), cheap enough
+  // to run before every build (scripts/merge.ts, `bun run kernel`). The full tidy below does it for every worktree too.
+  if (a.includes("--prune-incremental")) {
+    const next = opt("--prune-incremental");
+    const target = resolve(next && !next.startsWith("--") ? next : (process.env.CARGO_TARGET_DIR ?? join(repo, "kernel/target")));
+    const kb = pruneIncremental(target, apply);
+    if (kb) console.log(`${apply ? "pruned" : "would prune"} stale incremental folders in ${target} (${gb(kb)})`);
+    process.exit(0);
+  }
+
   const docsText = readTree(join(repo, "docs"), /\.md$/);
   const entries = readdirSync(runsDir);
   const statusText = (skip: string) => entries.filter((e) => e !== skip && existsSync(join(runsDir, e, "STATUS"))).map((e) => readFileSync(join(runsDir, e, "STATUS"), "utf8")).join("\n");
@@ -340,6 +398,14 @@ if (import.meta.main) {
     freeKb += w.tree.targetKb;
     console.log(`${apply ? "REMOVING" : "would remove"} ${w.tree.name}/kernel/target (${gb(w.tree.targetKb)}) -- ${j.reason}`);
     if (apply) rmSync(join(w.tree.path, "kernel/target"), { recursive: true, force: true });
+  }
+  // Stale incremental folders in every worktree's kernel/target that nothing is running in (the target stays, so builds stay incremental).
+  for (const t of sc.trees) {
+    if (!existsSync(join(t.path, "kernel/target")) || uses(t.path)) continue;
+    const kb = pruneIncremental(join(t.path, "kernel/target"), apply);
+    if (!kb) continue;
+    freeKb += kb;
+    console.log(`${apply ? "PRUNED" : "would prune"} ${t.name}/kernel/target stale incremental folders (${gb(kb)})`);
   }
   for (const t of targets) {
     if (t.action === "keep") continue;

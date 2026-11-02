@@ -64,6 +64,19 @@ pub struct Work {
     pub start_loan: Option<i64>,
     #[serde(default)]
     pub start_repayment: Option<i64>,
+    /// Our own record of a business of one we ran and gave up (docs/behaviour/entry.md, "Founding again after giving one
+    /// up"): what it paid us and what its market, as we saw it, said it would, over the months we judged it by.
+    #[serde(default)]
+    pub ran_own: Option<RanOwn>,
+}
+
+/// What a business of one we gave up paid us, against what its market (as we saw it then) said it would, summed over the
+/// months we judged it by: our own evidence of what such a business does in our hands (Jovanovic 1982).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RanOwn {
+    pub months: i64,
+    pub paid: i64,
+    pub expected: i64,
 }
 
 impl Work {
@@ -373,6 +386,24 @@ impl Person {
             .max();
         let wage = if hires { posted.or_else(|| g("wage").map(|w| div_round(w * MONTH, period))).unwrap_or(0) } else { 0 };
         Some(oikos_rules::entry::Prospect { price, unit_cost, units_per_household, households_reached: if v.own { homes.len() as i64 } else { self.p.population }, sellers_known: known.len() as i64, units_per_worker, wage, fixed: v.fixed_per_month.unwrap_or(0).max(0), opportunity })
+    }
+
+    /// What a business of one would leave us, as we judge it: its market's figure (`venture_prospect`), weighed with our
+    /// own record of running one, where we have one (docs/behaviour/entry.md, "Founding again after giving one up"). The
+    /// record moves the market's figure by what ours paid against what its market said it would, as evidence of what such a
+    /// business does in our hands (Jovanovic 1982: one learns one's own aptitude from what the venture pays), counted as
+    /// its months against the market figure's weight (`venture_prior_months`, a placeholder): a short record moves it a
+    /// little, a long one nearly wholly. The market's figure itself is read now, so a market that has changed since counts.
+    pub fn own_expected(&self, pic: &Picture, v: &super::params::Venture, hires: bool) -> Option<oikos_rules::entry::Expected> {
+        let mut e = oikos_rules::entry::expected(&self.venture_prospect(pic, v, hires)?);
+        if let Some(r) = self.work.ran_own.as_ref().filter(|r| v.own && r.months > 0 && e.profit > 0) {
+            let k = self.p.venture_prior_months.max(0);
+            // (In basis points of the market's figure: the record's ratio, paid over expected; none expected, none learned.)
+            let ratio = if r.expected > 0 { (r.paid.max(0) * 10_000 / r.expected).min(10_000 * 10) } else { 10_000 };
+            let bps = div_round(k * 10_000 + r.months * ratio, (k + r.months).max(1));
+            e.profit = div_round(e.profit * bps, 10_000);
+        }
+        Some(e)
     }
 
     /// Whether to start it (docs/behaviour/entry.md, "Entry by expected profit"): the mind's decision between the
@@ -879,7 +910,7 @@ impl Person {
             && (venturing || wanted || {
                 // (Hands only where the business can take them on: its room for staff.)
                 let hires = v.role_module.get("params").and_then(|p| p.get("max_staff")).and_then(crate::papers::lenient::whole).unwrap_or(0) > 0;
-                let e = self.venture_prospect(w.pic, &v, hires).map(|p| oikos_rules::entry::expected(&p));
+                let e = self.own_expected(w.pic, &v, hires);
                 // (Less what we repay a month on a loan we took to start it.)
                 let owed = self.work.start_repayment.unwrap_or(0);
                 e.is_some_and(|e| e.units > 0 && self.weigh_venture(w, e.profit - owed, false))
@@ -930,7 +961,7 @@ impl Person {
         .collect();
         // (What we expect it to pay us a month, by what we know of its market, until it has a record of its own; the
         // venture's figure where we know no price.)
-        let expect = self.venture_prospect(w.pic, &v, false).map(|p| oikos_rules::entry::expected(&p).profit).filter(|x| *x > 0).or(v.expect_per_month).unwrap_or(0);
+        let expect = self.own_expected(w.pic, &v, false).map(|e| e.profit).filter(|x| *x > 0).or(v.expect_per_month).unwrap_or(0);
         self.work.founded = Some(Founded { firm: None, capital: v.capital, paid: false, own: Some((dwelling.clone(), expect)) });
         self.work.start_loan = None;
         let entity = call(
@@ -967,7 +998,7 @@ impl Person {
             return;
         }
         let worth = wanted || {
-            let e = self.venture_prospect(w.pic, v, false).map(|p| oikos_rules::entry::expected(&p));
+            let e = self.own_expected(w.pic, v, false);
             e.is_some_and(|e| e.units > 0 && self.weigh_venture(w, e.profit, false))
         };
         if !worth {
@@ -997,7 +1028,7 @@ impl Person {
         let wanted = w.t < self.s.venture_wanted;
         let Some(v) = self.p.ventures.iter().find(|v| v.own).cloned() else { return false };
         let takes = wanted || {
-            let e = self.venture_prospect(w.pic, &v, false).map(|p| oikos_rules::entry::expected(&p));
+            let e = self.own_expected(w.pic, &v, false);
             e.is_some_and(|e| e.units > 0 && self.weigh_venture(w, e.profit - repayment, false))
         };
         self.work.start_loan = None;
@@ -1060,6 +1091,14 @@ impl Person {
             format!("Our business has paid us {} a month over {} months: not worth keeping against {alt}. Closing it, and looking for work.", Self::wk_usd(w, pays), window),
             vec![say("trading_from", "Closing: the business is given up.", Say { to: Some(vec![own.firm.clone()]), visible: only(&self.me, &own.firm), data: Some(dd), ..Default::default() })],
         ));
+        // (Our record of it, beside any earlier one: what it paid us against what its market, as we see it now, says such
+        // a business pays; and the next weighing of starting one a month on, as for anyone, not at once.)
+        let market = self.p.ventures.iter().find(|v| v.own).cloned().and_then(|v| self.venture_prospect(w.pic, &v, false)).map(|p| oikos_rules::entry::expected(&p).profit).filter(|x| *x > 0).unwrap_or(own.expect_per_month);
+        let r = self.work.ran_own.get_or_insert_with(Default::default);
+        r.months += window;
+        r.paid += pays * window;
+        r.expected += market.max(0) * window;
+        self.work.next_own_venture = t + MONTH;
         self.s.own_work = None;
         self.work.trading_from = None;
         self.work.own_since = -1;
@@ -1651,6 +1690,32 @@ mod tests {
             assert!(run(&mut bob, &c, &pic(m * MONTH + 2 * DAY, None, false), 0, |a, w| a.ventures(w)).is_empty(), "month {m}");
         }
         assert!(bob.s.own_work.is_some());
+    }
+
+    #[test]
+    fn an_owner_who_gives_a_business_of_one_up_keeps_its_record_and_weighs_founding_again_by_it_a_month_on() {
+        // (ME-1: refounded the same business at once, on the market's figure alone.)
+        let c = ctx_with(json!({ "ventures": own_venture(), "own_work": { "firm": "stall-1", "account": "acc.stall", "home": "b1/dwelling.1", "expect_per_month": 100_000 } }));
+        let mut ann = Person::new(&c).unwrap();
+        at_home(&mut ann);
+        ann.book.take_all(&known_shops(2, 1_200));
+        let market = ann.own_expected(&homes_around(DAY, None, 200), &ann.p.ventures[0].clone(), false).unwrap().profit;
+        // Three months that paid nothing: given up, and its record kept against the market's figure.
+        ann.work.next_own_review = 0;
+        ann.work.next_own_venture = 0;
+        let t = 3 * MONTH + DAY;
+        let out = run(&mut ann, &c, &homes_around(t, None, 200), 500_000, |a, w| a.ventures(w));
+        assert!(out.len() == 1 && out[0].contains("\"closed\":true"), "{out:?}");
+        assert_eq!(ann.work.ran_own, Some(RanOwn { months: 3, paid: 0, expected: market * 3 }));
+        // Not weighed again until a month on.
+        assert_eq!(ann.work.next_own_venture, t + MONTH);
+        assert!(run(&mut ann, &c, &homes_around(t + DAY, None, 200), 500_000, |a, w| a.ventures(w)).is_empty());
+        // What it would pay is the market's figure moved by the record: three months of nothing against the figure's
+        // weight of three, half of it; a record that paid what the market said leaves the figure as it is.
+        let half = ann.own_expected(&homes_around(t, None, 200), &ann.p.ventures[0].clone(), false).unwrap().profit;
+        assert_eq!(half, div_round(market, 2));
+        ann.work.ran_own = Some(RanOwn { months: 3, paid: market * 3, expected: market * 3 });
+        assert_eq!(ann.own_expected(&homes_around(t, None, 200), &ann.p.ventures[0].clone(), false).unwrap().profit, market);
     }
 
     #[test]
