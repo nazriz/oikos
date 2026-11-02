@@ -10695,8 +10695,54 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **And:** the participants' world words gained `not_carried` (the kernel's words had it; `render.test.ts` holds that every
   refusal has world words). With the fix in, the representation towns' pins moved (a taking in the month where a
   carried theft had been refused) and were re-taken; culture-dial's did not move.
+- **Revisit if:** an act's trip should be tied to that act alone (f2-s5 adds `Exec.act`: then `tr.act` is the check), or
+  takings come to be acts of their own before the trip home.
 - **Then, in the f2-s5 landing:** with `Exec.act` (S5's), the trip counted is the taker's own for this act (`tr.act`).
 - **Revisit if:** takings come to be acts of their own before the trip home.
+
+## 2026-11-02 · Tiered storage: the world's records nobody reads held on disk, and what else grew with a run (SC-1, SC-6; branch `tiered-storage`; no result changes; no model called)
+
+- **What was asked:** Naz approved the proposal (docs/design/tiered-storage.md, then a proposal) on 2026-11-02 ("Yes to
+  all"): records out of memory once cold, read back on demand, the actors' books holding records through the shared
+  store rather than direct pointers; then the other growers fixed where they are a mechanism's fault; results
+  byte-identical; 50,000 people for two years or more within about 40 GB the goal.
+- **Built** (docs/design/tiered-storage.md says how): every holder of a record holds a `Rec`, a handle to its one slot;
+  the kernel's `Tier` moves records filed 30 days ago and unread for 14 to the run's cold file (`<out>/<run>.cold`,
+  removed at the end) in compressed blocks of 64, and a read brings one back; the state hash streams a cold record's
+  bytes as they are; books keep handles and let what they read go at their next day; the delivered cache is keyed by
+  slot and drops entries a week unshown; the offices' files of payments put what is past 30 days on the same file.
+- **Readers fixed** (found with `OIKOS_COLD_WHO`, which counts who reads old records): lists collected whole to skip what
+  was read (trade desk, producer, electoral office); a person's weekly going-through of public goings-on and weekly
+  plan reading every record of their book; a payroll going through every request on its book at every wake for its own
+  wage orders (at the bank's staff payroll, every payment anyone made: 450,000 of 1.17 million records held for it at
+  day 120 of the 10,000 town; `OIKOS_COLD_WHO_STACK` names where a reader reads). Each also cost the run's own thread
+  time growing with the run.
+- **Other growers fixed:** the resolver's addressed statements (a map from every addressed statement each participant
+  saw to its addressees) held by number with each list of addressees once; the twins' per-matter draw counts let go when
+  a matter says it is over (`Cx::rng_until`, `rng_once`: a gathering once it begins, a delivered order's faultiness once
+  drawn; no draw is named differently: a matter is never drawn for once it says it is over); the travel caches (quickest-time trees, 152 MB at
+  10,000 people by day 71, and trips) bounded.
+- **Results, shown:** the six pinned towns for a month, every record sent to disk from its second day whenever unread that
+  day, at main's state and log, with and without; 10,000 people for 60 and for 180 days and 1,000 for 180 at main's state
+  hash and log digest; `kernel/tests/a1_citizen.rs` holds a tiered town to one held in memory, byte for byte.
+- **Measured** (docs/design/performance.md, "Tiered storage"), on main f2a3568a: 10,000 people grow 8.8 MB a simulated
+  day against 24.3 (-64%), a footprint of 4.18 GB against 6.22 at day 180, the same state and log; 1,000 people for 180
+  days 533 to 557 MB against 691 to 695; the run's own thread within noise. 50,000 people (an earlier build, before the
+  payroll's fix) 17.4 GB against 23.6 at day 89, both stopped there by a fault of main's (the police post's wakes), so two
+  years at 50,000 are not measured yet: projected some 45 to 50 GB. Still growing: what stays of every record when it is
+  cold (slot, map entries, book entries: some 250 to 350 bytes a record), the units' views and knowledge, the actors' own
+  state.
+- **The budget:** the month's ceiling held at 270 KB a person: a month holds no record past the tier's 30 days, so its
+  measure did not move (main and the branch alike, about 218 KB on the release kernel, up to 250 on the gate's build the
+  merge measures with); a growth budget added (the same town's half-year past its month, 1,700 bytes a person a day; main
+  f2a3568a about 2,450, the branch 1,410 to 1,570), `orchestrator/test/memory-budget.test.ts`, slow tier (+90 s).
+- **Decided here, not in the proposal:** records leave memory one by one by when last read, not a month's segment at a
+  time; the cold file is the run's scratch, removed at its end (a snapshot carries every record whole, so nothing that
+  needs it outlives the run; kept, it would be gigabytes a run at 50,000); OIKOS_COLD=off keeps the old way.
+- **Revisit if:** a run's reads back from disk climb (a reader that goes through old records daily: then that reader is
+  the fault, as these were); a study's run needs to resume from a snapshot without the records whole in it; the cold
+  file's disk passes what the run server has to spare; 50,000 for two years does not fit (then the per-record cost that
+  stays when cold, the books' entries, and the units' views are next).
 
 ## 2026-11-02 · Law 9 is a hard rule in CLAUDE.md (landing `f2-s5`; project rules; no model called)
 

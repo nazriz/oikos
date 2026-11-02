@@ -259,9 +259,11 @@ pub struct Deliveries {
 
 impl Deliveries {
     pub fn take(&mut self, book: &Book, me: &str) -> Vec<Delivered> {
-        let notes: Vec<_> = book.all("delivery_note").collect();
+        // (Only the new ones are read: those before the cursor stay where they are held.)
+        let notes = book.all("delivery_note");
+        let len = notes.len();
         let mut out = vec![];
-        for n in notes.iter().skip(self.cursor) {
+        for n in notes.skip(self.cursor) {
             if !crate::common::addressed_to(n).iter().any(|a| a == me) {
                 continue;
             }
@@ -277,7 +279,7 @@ impl Deliveries {
                 arrives: d.i("arrives"),
             });
         }
-        self.cursor = notes.len();
+        self.cursor = len;
         out
     }
 }
@@ -473,8 +475,9 @@ impl OrderBook {
 
     /// Open orders to us, oldest first.
     fn open(&mut self, book: &Book) -> Vec<Order> {
-        let orders: Vec<_> = book.all("order").collect();
-        for r in orders.iter().skip(self.cursor) {
+        let orders = book.all("order");
+        let len = orders.len();
+        for r in orders.skip(self.cursor) {
             if !crate::common::addressed_to(r).iter().any(|a| *a == self.me) || self.settled.contains(r.id.as_str()) {
                 continue;
             }
@@ -498,7 +501,7 @@ impl OrderBook {
                 },
             );
         }
-        self.cursor = orders.len();
+        self.cursor = len;
         let gone: Vec<String> = self.waiting.keys().filter(|id| self.settled.contains(*id) || book.withdrawn(id)).cloned().collect();
         for id in gone {
             self.waiting.remove(&id);
@@ -752,8 +755,9 @@ impl Payables {
     /// Invoices on the delivery notes addressed to us (only new ones are read); debts recorded against us for an order
     /// of ours are paid as debts.
     pub fn take(&mut self, book: &Book) {
-        let notes: Vec<_> = book.all("delivery_note").collect();
-        for n in notes.iter().skip(self.cursor) {
+        let notes = book.all("delivery_note");
+        let len = notes.len();
+        for n in notes.skip(self.cursor) {
             if !crate::common::addressed_to(n).iter().any(|a| *a == self.me) {
                 continue;
             }
@@ -775,7 +779,7 @@ impl Payables {
                 due: n.at + days * DAY,
             });
         }
-        self.cursor = notes.len();
+        self.cursor = len;
         if !self.open.is_empty() {
             let claimed: BTreeSet<String> = book
                 .of_type("claim")

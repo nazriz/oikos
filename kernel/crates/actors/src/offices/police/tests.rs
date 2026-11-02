@@ -106,8 +106,7 @@ impl Driver {
                 asking: vec![],
                 readings: BTreeMap::new(),
                 woke_for: if first { "cadence".into() } else { "done".into() },
-                since: DAY,
-            };
+                since: DAY, held: Default::default() };
             first = false;
             let mut cx = Cx::new(t, &self.ctx, &mut self.draws, 7, vec![]);
             match self.actor.step(&pic, &mut cx) {
@@ -238,7 +237,7 @@ fn an_investigation_that_finds_the_taker_is_charged_and_one_that_does_not_is_clo
         channels.insert("mine".into(), Seen::Records { records, search: false });
         channels.insert("premises".into(), premises(&["officer-1"]));
         Picture { participant: "police-oic-system".into(), t, status: oikos_sight::ParticipantStatus::Active, entity: ME.into(), as_position: Some("police-oic".into()), body: None, positions: vec![],
-            outcomes: outcomes.into_iter().map(|o| serde_json::from_value(o).unwrap()).collect(), inbox: vec![], channels, asking: vec![], readings: BTreeMap::new(), woke_for: "done".into(), since: DAY }
+            outcomes: outcomes.into_iter().map(|o| serde_json::from_value(o).unwrap()).collect(), inbox: vec![], channels, asking: vec![], readings: BTreeMap::new(), woke_for: "done".into(), since: DAY, held: Default::default() }
     };
     let t = DAY + 10 * 3600;
     let mut draws = Draws::new("police-oic-system", "police-oic");

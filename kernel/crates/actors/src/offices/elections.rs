@@ -444,8 +444,10 @@ impl Plan for ElectionPlan {
                 Some((b.to_string(), data(self.book.get(b)?).i("closes_at")?))
             })
             .collect();
-        let votes: Vec<Arc<Record>> = self.book.of_type("vote").cloned().collect();
-        for v in votes.iter().skip(self.votes_read) {
+        // (Only the votes not read before are read: those before stay where they are held.)
+        let votes_seen = self.book.of_type("vote").len();
+        let votes: Vec<Arc<Record>> = self.book.of_type("vote").skip(self.votes_read).cloned().collect();
+        for v in votes.iter() {
             let oikos_sight::RecordBody::Vote { ballot, .. } = &v.body else { continue };
             let Some(closed_at) = closed.get(ballot.as_str()) else { continue };
             if v.at < *closed_at || v.author == "genesis" || v.at < first - DAY {
@@ -456,7 +458,7 @@ impl Plan for ElectionPlan {
                 vec![message(std::slice::from_ref(&v.author.to_string()), &format!("From the electoral office: your vote on {ballot} is not counted. The poll closed on {} and the result is declared.", when(*closed_at)), Some(&v.id))],
             ));
         }
-        self.votes_read = votes.len();
+        self.votes_read = votes_seen;
         steps
     }
     fn then(&mut self, tok: &Then, done: Done, _cx: &mut Cx) -> Vec<Step<Then>> {

@@ -32,7 +32,7 @@ fn notice(run: &mut Run<Vec<u8>>, rent: i64, private: bool) -> String {
 
 fn board(o: &Observation) -> Option<(Vec<String>, bool)> {
     match o.channels.get("board")? {
-        ChannelData::Records { records, search, .. } => { Some((records.iter().map(|r| r.id).map(|x| x.to_string()).collect(), search.is_some()))}
+        ChannelData::Records { records, search, .. } => { Some((records.iter().map(|r| r.id()).map(|x| x.to_string()).collect(), search.is_some()))}
         _ => None,
     }
 }
@@ -92,7 +92,7 @@ fn a_statement_taken_down_is_news_wherever_statements_like_it_are_shown() {
     let seen = |run: &mut Run<Vec<u8>>, channel: &str| -> Vec<String> {
         let o = run.command(&Command::Observe { participant: "bob-self".into(), only: None }).unwrap().observation.unwrap();
         match o.channels.get(channel) {
-            Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id).map(|x| x.to_string()).collect(),
+            Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id()).map(|x| x.to_string()).collect(),
             other => panic!("{other:?}"),
         }
     };
@@ -109,7 +109,7 @@ fn a_statement_taken_down_is_news_wherever_statements_like_it_are_shown() {
     let o = run.command(&Command::Observe { participant: "bob-self".into(), only: None }).unwrap().observation.unwrap();
     for channel in ["book", "rules"] {
         match o.channels.get(channel) {
-            Some(ChannelData::Records { records, .. }) => { assert_eq!(records.iter().map(|r| r.id).collect::<Vec<_>>(), vec![gone.clone()], "{channel}")}
+            Some(ChannelData::Records { records, .. }) => { assert_eq!(records.iter().map(|r| r.id()).collect::<Vec<_>>(), vec![gone.clone()], "{channel}")}
             other => panic!("{other:?}"),
         }
     }
@@ -122,7 +122,7 @@ fn a_statement_taken_down_is_news_wherever_statements_like_it_are_shown() {
     // The whole picture the channel covers has it too (what a view built from looks must equal).
     let full = run.full_view("bob-self").unwrap();
     match full.channels.get("book") {
-        Some(ChannelData::Records { records, .. }) => { assert_eq!(records.iter().map(|r| r.id).collect::<Vec<_>>(), vec![rule, gone])}
+        Some(ChannelData::Records { records, .. }) => { assert_eq!(records.iter().map(|r| r.id()).collect::<Vec<_>>(), vec![rule, gone])}
         other => panic!("{other:?}"),
     }
 }
@@ -150,7 +150,7 @@ fn a_channel_can_show_whatever_is_offered_whatever_it_is_called() {
     let plain = post(&mut run, "mayor", json!([{"block": "publish", "kind": "festival_fund", "speaks_for": "city", "text": "The fund raised $1,000.", "ref": "p"}]));
     let o = run.command(&Command::Observe { participant: "bob-self".into(), only: None }).unwrap().observation.unwrap();
     let seen: Vec<String> = match o.channels.get("offers") {
-        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id).map(|x| x.to_string()).collect(),
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id()).map(|x| x.to_string()).collect(),
         other => panic!("{other:?}"),
     };
     assert_eq!(seen, vec![offered]);
@@ -177,7 +177,7 @@ fn a_register_is_searched_for_a_named_record_and_for_what_became_of_a_title() {
         for ch in ["lots", "titles", "dealings"] {
             if let Some(ChannelData::Records { records, search, .. }) = o.channels.get(ch) {
                 assert!(search.is_some());
-                got.insert(ch.to_string(), records.iter().map(|r| r.id).map(|x| x.to_string()).collect());
+                got.insert(ch.to_string(), records.iter().map(|r| r.id()).map(|x| x.to_string()).collect());
             }
         }
         got

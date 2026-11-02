@@ -42,7 +42,7 @@ fn notice(run: &mut Run<Vec<u8>>, basis: Value) -> Response {
 }
 
 fn stored(run: &Run<Vec<u8>>, id: &str) -> Value {
-    serde_json::to_value(&*run.kernel().state().records[id].record).unwrap()
+    serde_json::to_value(&*run.kernel().state().records[id].record()).unwrap()
 }
 
 #[test]
@@ -157,7 +157,7 @@ fn a_search_by_basis_finds_a_record_that_cites_it_among_several() {
         let looks = serde_json::from_value(json!([{"channel": "board", "query": q}])).unwrap();
         let o = run.command(&Command::Look { participant: "bob-self".into(), only: None, looks }).unwrap().observation.unwrap();
         match o.channels.get("board").unwrap() {
-            ChannelData::Records { records, .. } => records.iter().map(|r| r.id).map(|x| x.to_string()).collect(),
+            ChannelData::Records { records, .. } => records.iter().map(|r| r.id()).map(|x| x.to_string()).collect(),
             _ => panic!(),
         }
     };

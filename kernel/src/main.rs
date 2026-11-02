@@ -140,6 +140,11 @@ fn world(args: &[String]) -> Result<(), String> {
     }
     opts.until = flag("--until").map(|u| u.parse::<i64>()).transpose().map_err(|_| "--until S")?;
     opts.stand_in = flag("--stand-in");
+    // (The world's records nobody reads are held on disk beside the log, and the file is removed at the end:
+    // docs/design/tiered-storage.md. OIKOS_COLD=off keeps them all in memory; the results are the same.)
+    if std::env::var("OIKOS_COLD").map_or(true, |v| v != "off") {
+        opts.cold = Some(std::path::PathBuf::from(format!("{out}/{run_id}.cold")));
+    }
     if args.iter().any(|a| a == "--binary") {
         let mut o = serde_json::json!({ "run_id": run_id, "log": format!("{out}/{run_id}.oklog"), "threads": opts.threads, "until": opts.until, "stand_in": opts.stand_in });
         if let Some(d) = flag("--snapshot-every") {
@@ -169,6 +174,15 @@ fn world(args: &[String]) -> Result<(), String> {
         eprintln!("kept {}", serde_json::to_string(&e.kept()).unwrap_or_default());
         let (n, b) = oikos_core::id::interned();
         eprintln!("ids interned {n} ({b} bytes of text)");
+    }
+    // (For whoever measures: where the world's records were held at the end.)
+    if let Some(t) = e.tier_tally() {
+        eprintln!("records {} ({} in memory), {} read back from disk, {} bytes on disk", t.records, t.hot, t.reads, t.disk_bytes);
+    }
+    if oikos_kernel::held::who::on() {
+        for (who, kind, n) in oikos_kernel::held::who::counts().into_iter().take(60) {
+            eprintln!("read by {who}: {kind} {n}");
+        }
     }
     // (For whoever measures: the run's own thread's CPU time, the critical path when the machine is shared.)
     if let Some(ms) = thread_cpu_ms() {

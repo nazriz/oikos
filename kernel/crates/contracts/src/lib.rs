@@ -9,5 +9,6 @@ pub mod config;
 pub mod contracts;
 pub mod controller;
 pub mod events;
+pub mod held;
 pub mod network;
 pub mod vocab;

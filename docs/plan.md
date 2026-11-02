@@ -41,6 +41,12 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] What people have seen, held compactly (any bound on what they remember is a law: to the owner first) (`mem-seen`, 7f81ceb3: held once for all who see it the same; no bound). Records delivered (`mem-delivered`) and buildings' facts (`mem-facts`) the same way.
   - [x] No whole-world copies during a step (`mem-no-copies`: what an act's copy of the state still copied whole, nature's fields, the network's lists, takings, floods and scarce sales, now shared; byte-identical, no change at the peak).
   - [x] 50,000 people for a month and 100,000 for a week, measured (with `mem-minds`: 14.7 GB and 604 s; 31.0 GB and 320 s; docs/design/performance.md).
+  - [~] **Tiered storage** (approved 2026-11-02; docs/design/tiered-storage.md; SC-6): records nobody reads on disk,
+    books holding them by handle, readers that read what they no longer needed fixed, addressed statements and matters'
+    draw counts held small or let go, offices' files tiered, travel caches bounded; a growth budget. Landed: the 10,000
+    town grows 8.8 MB a day, from 24.3, byte-identical (4.18 GB at day 180 against 6.22). Next: 50,000 for two years
+    measured against the 40 GB goal (projected 45 to 50 GB; blocked by main's day-89 police stop), and what each cold
+    record keeps in memory.
 - [x] **Foundations-2, phase 1: capacity** (law 10). Every act has a time, every system its hours and lanes; casework
   done by officers' minutes (WM-14). Landed at 0824efb6; tag `pre-foundations-2` is main at 8570d699, before it.
 - [~] **Test strength.** Dead TypeScript removed; the planted-bug catalogue rebuilt against the code that runs; tests

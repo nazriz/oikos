@@ -74,8 +74,9 @@ impl PublicMemory {
         None
     }
 
-    /// What of the book is kept at `t`, by `me` (an entity; `participant`: its own author id), given the ids the
-    /// mind holds to: true for every record kept.
+    /// What of the book's statements and withdrawals is kept at `t`, by `me` (an entity; `participant`: its own author
+    /// id), given the ids the mind holds to. (Nothing else is ever let go, `Book::forget`, so nothing else is read: a
+    /// record the person does not read can leave memory, docs/design/tiered-storage.md.)
     pub fn keeps(&self, book: &Book, me: &str, participant: &str, held: &BTreeSet<String>, t: i64) -> BTreeSet<String> {
         let horizon = t - self.days * DAY;
         // Whom we have dealings with: the other parties to agreements of ours in force (an employer, a landlord, a
@@ -90,10 +91,12 @@ impl PublicMemory {
             .filter(|p| *p != me)
             .collect();
         let ours = |r: &Record| r.speaks_for.as_deref() == Some(me) || r.author == participant;
-        let mine: BTreeSet<&str> = book.records().filter(|r| ours(r)).map(|r| r.id.as_str()).collect();
+        // (A paper of mine that a statement answers: the paper it cites, read where it is in the book.)
+        let mine = |id: &str| book.get(id).is_some_and(|r| ours(r));
         let mut keep: BTreeSet<String> = BTreeSet::new();
         let mut older: BTreeMap<String, Vec<(i64, u64, &str)>> = BTreeMap::new();
-        for r in book.records() {
+        // (Only a public statement is of a class: any other statement is kept, as it is, unread.)
+        for r in book.public().chain(book.of_type("withdrawal")) {
             let Some(class) = self.class_of(r) else {
                 if !matches!(r.body, RecordBody::Withdrawal { .. }) || r.at >= horizon {
                     keep.insert(r.id.to_string());
@@ -104,7 +107,7 @@ impl PublicMemory {
                 || addressed_to(r).iter().any(|a| a == me)
                 || held.contains(r.id.as_str())
                 || r.speaks_for.as_deref().is_some_and(|s| dealings.contains(s))
-                || bases_of(r).iter().any(|b| mine.contains(b.as_str()));
+                || bases_of(r).iter().any(|b| mine(b.as_str()));
             if touches {
                 keep.insert(r.id.to_string());
             } else if r.at >= horizon || !book.withdrawn(&r.id) {
@@ -142,10 +145,10 @@ impl Person {
         self.s.memory_at = Some(t);
         let held: BTreeSet<String> = self.mind.holds_to().into_iter().collect();
         let keep = m.keeps(&self.book, &self.me, participant, &held, t);
-        if keep.len() == self.book.len() {
+        if keep.len() == self.book.public().len() + self.book.of_type("withdrawal").len() {
             return;
         }
-        let remap = self.book.forget(|r| keep.contains(r.id.as_str()));
+        let remap = self.book.forget_public(|r| keep.contains(r.id.as_str()));
         // (Whoever keeps a place in the book: the housing part's last full plan.)
         let moved = |at: usize| remap.iter().take(at).filter(|x| x.is_some()).count();
         self.housing.fresh_from = moved(self.housing.fresh_from.min(remap.len()));

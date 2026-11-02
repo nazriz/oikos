@@ -332,7 +332,8 @@ pub fn may_direct(st: &State, entity: &str, person: &str) -> bool {
     });
     holds
         || st.agreements_of.get(person).into_iter().flatten().any(|id| {
-            let Some(RecordBody::Agreement { terms }) = st.records.get(id).map(|r| &r.record.body) else { return false };
+            let Some(r) = st.records.get(id).map(|r| r.record()) else { return false };
+            let RecordBody::Agreement { terms } = &r.body else { return false };
             terms.parties.iter().any(|p| p == entity) && {
                 let m = st.marks.get(id).cloned().unwrap_or_default();
                 matches!(oikos_terms::read(terms, &m.signatures, &m.notices, st.t).status, "in_force" | "ending")
@@ -1695,8 +1696,8 @@ impl<'a> Exec<'a> {
         self.st.accounts.get(id).map(|a| &**a).ok_or_else(|| refuse(RefusalCode::UnknownAccount, format!("no account {id}")))
     }
 
-    fn record_of_kind(&self, id: &str, kind: &str) -> R<&Record> {
-        let r = &*self.st.records.get(id).ok_or_else(|| refuse(RefusalCode::UnknownRecord, format!("no record {id}")))?.record;
+    fn record_of_kind(&self, id: &str, kind: &str) -> R<Arc<Record>> {
+        let r = self.st.records.get(id).ok_or_else(|| refuse(RefusalCode::UnknownRecord, format!("no record {id}")))?.record();
         if kind != "any" && r.body.kind_name() != kind {
             return Err(refuse(RefusalCode::WrongRecordKind, format!("{id} is a {}, not a {kind}", r.body.kind_name())));
         }
@@ -1892,7 +1893,7 @@ impl<'a> Exec<'a> {
             RecordBody::Vote { ballot, .. } => {
                 // A vote is seen by the voter and whoever runs the ballot, not by everyone.
                 let b = self.record_of_kind(ballot, "statement")?;
-                let counter = self.st.author_entity(b).or(b.speaks_for);
+                let counter = self.st.author_entity(&b).or(b.speaks_for);
                 Visibility::only(base.into_iter().chain(counter))
             }
         })
@@ -2621,7 +2622,7 @@ impl<'a> Exec<'a> {
                 // took first decides it: a withdrawal not yet stored does not stop a signature.
                 if let Some(m) = self.st.marks.get(&agreement) {
                     if let (Some(at), Some(stored)) = (m.withdrawn_at, self.st.records.get(&agreement)) {
-                        if let RecordBody::Agreement { terms } = &stored.record.body {
+                        if let RecordBody::Agreement { terms } = &stored.record().body {
                             if !terms.parties.iter().all(|p| m.signatures.iter().any(|s| &s.party == p)) {
                                 return Err(refuse(RefusalCode::OfferWithdrawn, format!("{agreement} was withdrawn by its maker at {at}; it can no longer be signed")));
                             }

@@ -91,6 +91,11 @@ pub struct EngineOptions {
     /// Capture the citizens' decisions to this file (docs/citizen-data.md: `<run>.citizens.jsonl.zst`, beside the log),
     /// for training. Nothing in the world or the log changes with it.
     pub capture_citizens: Option<String>,
+    /// Hold the world's records that nobody reads on disk, in this file (docs/design/tiered-storage.md; the policy from
+    /// `OIKOS_COLD_AFTER_DAYS` and `OIKOS_COLD_IDLE_DAYS`). Nothing anyone sees, logs or hashes changes with it.
+    pub cold: Option<std::path::PathBuf>,
+    /// When a record is cold, if not as the environment says (`Policy::from_env`): a test moves records out after a day.
+    pub cold_policy: Option<crate::held::Policy>,
 }
 
 /// One act withheld (docs/experiments.md, "Counterfactual forks"; risk MT-19): of the acts carried out from the start of
@@ -200,6 +205,8 @@ impl Default for EngineOptions {
             withhold: vec![],
             at_fork: vec![],
             capture_citizens: None,
+            cold: None,
+            cold_policy: None,
         }
     }
 }
@@ -635,6 +642,12 @@ impl<W: Write> Engine<W> {
         // Nothing depends on it (`Kernel::plan`).
         if std::env::var_os("OIKOS_KERNEL_THREADS").is_none() {
             run.share(opts.threads, Some(opts.share_at));
+        }
+        // (A cold file that can't be made leaves every record in memory, as before: the same results.)
+        if let Some(path) = &opts.cold {
+            if let Err(e) = run.tier_records(path, opts.cold_policy.unwrap_or_else(crate::held::Policy::from_env)) {
+                eprintln!("the world's records stay in memory: {}: {e}", path.display());
+            }
         }
         let until = opts.until.map_or(base.run_end, |u| u.min(base.run_end));
         Engine {
@@ -1339,6 +1352,7 @@ impl<W: Write> Engine<W> {
         let strip = true;
         let results = each_mut(&mut stepping, self.opts.threads, self.opts.share_at, |(u, obs, only)| {
             let obs = obs.take().expect("each unit is stepped once");
+            let _reading = crate::held::who::reading_as(&u.kind);
             let pic = u.view.apply(obs, only.as_deref(), &u.entity, &u.woke_for, u.since);
             let pic = &pic;
             let answers = std::mem::take(&mut u.answers);
@@ -1826,7 +1840,8 @@ impl<W: Write> Engine<W> {
         let st = self.run.kernel().state();
         let read = |id: &str| -> Option<(String, Vec<String>, bool)> {
             let stored = st.records.get(id)?;
-            let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { return None };
+            let record = stored.record();
+            let crate::blocks::RecordBody::Agreement { terms } = &record.body else { return None };
             let status = st
                 .reading(id)
                 .map(|r| serde_json::to_value(&r).ok().and_then(|v| v["status"].as_str().map(String::from)).unwrap_or_default())
@@ -1913,6 +1928,11 @@ impl<W: Write> Engine<W> {
 /// Runs a world with no seats to its end (or `until`), and returns its final state hash. For the gate, the port's
 /// own tests and `oikos-kernel world`.
 impl<W: Write> Engine<W> {
+    /// Where the world's records are held, if they are tiered (for whoever measures).
+    pub fn tier_tally(&self) -> Option<crate::held::Tally> {
+        self.run.kernel().tier_tally()
+    }
+
     /// What its code actors keep, summed by what (`Actor::kept`), for whoever measures memory.
     pub fn kept(&self) -> BTreeMap<String, u64> {
         let mut out = BTreeMap::new();
@@ -1941,9 +1961,43 @@ impl<W: Write> Engine<W> {
         }
         let st = self.run.kernel().state();
         add("state.records", st.records.len());
+        add("state.ledgers", st.ledgers.len());
+        add("state.ledgers.transactions", st.ledgers.values().map(|l| l.len()).sum());
+        add("state.participants.new_transactions", st.participants.values().map(|p| p.new_transactions.values().map(|q| q.len()).sum::<usize>()).sum());
+        if std::env::var_os("OIKOS_KEPT_RC").is_some() {
+            // (Who holds the world's records: each one's count of holders, and its JSON size, by that count.)
+            for s in st.records.values() {
+                let rc = if s.record.is_hot() { 1 } else { 0 };
+                let r = s.record.peek();
+                let kind = match &r.body {
+                    crate::blocks::RecordBody::Statement { kind, .. } => format!("statement:{kind}"),
+                    b => b.kind_name().to_string(),
+                };
+                let n = serde_json::to_vec(&*r).map(|v| v.len()).unwrap_or(0);
+                add(&format!("rc.{rc}"), 1);
+                add(&format!("rc.{rc}.bytes"), n);
+                add(&format!("kind.{kind}"), 1);
+                add(&format!("kind.{kind}.bytes"), n);
+                add(&format!("kind.{kind}.rc{rc}"), 1);
+            }
+        }
         add("state.entities", st.entities.len());
         add("state.entity_records", st.entity_records.len());
         add("state.cells", st.cells.len());
+        let mut samples: BTreeMap<String, u64> = BTreeMap::new();
+        for u in self.units.values() {
+            let (sizes, some) = u.draws.kept();
+            for (what, n) in sizes {
+                add(what, n);
+            }
+            for k in some {
+                // (The shape of a matter's purpose, its digits taken out: what kinds of matter are kept.)
+                let shape: String = k.chars().map(|c| if c.is_ascii_digit() { '9' } else { c }).collect();
+                *samples.entry(format!("engine.draws.matter_shape {shape}")).or_default() += 1;
+            }
+        }
+        out.extend(samples);
+        let mut add = |what: &str, n: usize| *out.entry(format!("engine.{what}")).or_default() += n as u64;
         for u in self.units.values() {
             add("units", 1);
             add("units.answers", u.answers.len());

@@ -1634,8 +1634,9 @@ The mechanism:
   R4's first part, the actors' indexes keyed by interned ids: 290 KB; the allocator without huge
   pages: 253 KB on Linux, nothing on macOS; the config's schemas let go once it is read: 217 KB; the delivered records' cache trimmed: 195 KB).
   **A run's length is the larger part now:** a year at 1,000 peaks at 1.1 GB, about 1 MB a day, mostly the world's
-  records (docs/decisions.md 2026-10-27, "What grows with a run's length"); tiered storage is proposed for it
-  (docs/design/tiered-storage.md). 10,000 people for a month: 1.67 GB against main's 2.48 on the same machine.
+  records (docs/decisions.md 2026-10-27, "What grows with a run's length"); tiered storage holds the cold ones on disk
+  (docs/design/tiered-storage.md, built 2026-11-02; SC-6). 10,000 people for a month: 1.67 GB against main's 2.48 on the
+  same machine.
 - **Notice by:** The memory budget's test failing; a run past 50,000 near the 40 GB guard.
 - **Fix when:** Before a study at 100,000 for longer than a week.
 
@@ -1645,15 +1646,22 @@ The mechanism:
   (run 2026-11-01, 11.8 hours), two years at 50,000 would need about 86 GB on a 64 GB machine. What grows: the world's records (54%), the resolver's
   knowledge of every addressed statement each participant has seen, the twins' per-matter draw counts (every
   gathering's every date, for every person, for the run), minds, offices' files. Each is kept by design; none is a copy.
-  Also seen only at size: one hall of 200 for gatherings in a town of 10,000 is full (2,000 to 4,000 refusals a month),
+  **Tiered storage (2026-11-02)** cut the 10,000 town's growth to 8.8 MB a day (from 24.3 on main f2a3568a: records
+  nobody reads on disk, readers that read what they no longer needed fixed, a payroll's every-request scan the largest,
+  addressed statements and perception's index held small, a matter's draw count let go when it is over, offices' files
+  tiered, travel caches bounded; results byte-identical). At 50,000, 17.4 GB at day 89 against main's 23.6 (a build
+  before the payroll's fix); two years there are not measured yet, both stopped at day 89 by a fault of main's (the
+  police post's wakes, t=7754574), and projected at some 45 to 50 GB. What still grows: what each record keeps in memory
+  when cold (250 to 350 bytes), the units' views and knowledge, the actors' own state. Also seen only at size: one hall of 200 for gatherings in a town of 10,000 is full (2,000 to 4,000 refusals a month),
   and the water works sometimes finds no water in its field to draw (`field_exhausted`) at 10,000.
-- **Where:** `docs/design/performance.md` ("Years at 10,000 and 50,000"); `docs/design/tiered-storage.md` (proposed);
+- **Where:** `docs/design/performance.md` ("Years at 10,000 and 50,000", "Tiered storage"); `docs/design/tiered-storage.md`;
   `kernel/crates/actors/src/draws.rs` (`matter_occurrences`); `kernel/crates/resolver/src/knowledge.rs` (`addressed`);
-  runs `runs/long-10000-3y-b`, `runs/long-50000-2y`.
+  runs `runs/long-10000-3y-b`, `runs/long-50000-2y`, `runs/tier-10000-main180` and `runs/tier-10000-t3-180` (before
+  and after); the growth budget in `scripts/memory-budget.json`.
 - **Effect:** A study of 50,000 people is limited to about a year on this machine; a 10,000-person study of three years
   fits. The hall and the water at 10,000 are the spec's and the network's, so outcomes there are the town's, not faults.
-- **L / I:** high / medium · **Status:** open: tiered storage waits on the owner; the draw counts need a matter that
-  says when it ends (reliability's design); the hall and water are recorded, not tuned
+- **L / I:** high / medium · **Status:** partly fixed: tiered storage built (two thirds of the 10,000 town's growth
+  gone); 50,000 for two years waits on the day-89 stop; the hall and water are recorded, not tuned
 - **Notice by:** `progress.tsv` of a long run; the run's memory guard stopping it.
 - **Fix when:** Before a study at 50,000 for longer than a year.
 

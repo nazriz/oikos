@@ -1507,8 +1507,7 @@ mod tests {
             asking: vec![],
             readings: BTreeMap::new(),
             woke_for: "cadence".into(),
-            since: 0,
-        }
+            since: 0, held: Default::default() }
     }
     fn acc() -> Option<OwnAccount> {
         Some(OwnAccount { account: "acc-c1".into(), balance: 5_000_000, custodian: "bank".into(), currency: "XTS".into() })

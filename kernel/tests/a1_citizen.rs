@@ -61,9 +61,16 @@ fn lines(log: &[u8]) -> Vec<Value> {
 fn a_town_of_citizens_runs_in_the_engine_the_same_on_one_thread_and_on_fourteen() {
     let until = 21 * DAY;
     let (h1, e1) = run_code_world(plain_town(), "a1", Vec::new(), opts(1, until)).unwrap();
-    let (h14, e14) = run_code_world(plain_town(), "a1", Vec::new(), opts(14, until)).unwrap();
+    // (And with the world's records held on disk from their second day whenever they were not read that day, read
+    // back as they are: the same world, docs/design/tiered-storage.md.)
+    let cold = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("a1-{}.cold", std::process::id()));
+    let tiered = EngineOptions { cold: Some(cold.clone()), cold_policy: Some(oikos_kernel::held::Policy { after_days: 1, idle_days: 0 }), ..opts(14, until) };
+    let (h14, e14) = run_code_world(plain_town(), "a1", Vec::new(), tiered).unwrap();
+    let tally = e14.tier_tally().expect("tiered");
+    assert!(tally.reads > 0 && tally.hot < tally.records, "records went to disk and were read back: {tally:?}");
     assert_eq!(h1, h14);
     let (l1, l14) = (e1.into_log(), e14.into_log());
+    assert!(!cold.exists(), "the cold file goes with the run");
     assert!(l1 == l14, "the logs are byte for byte the same");
     let log = lines(&l1);
     let acts = log.iter().filter(|l| l["kind"] == "command" && l["body"]["command"] == "act" && l["body"]["participant"].as_str().is_some_and(|p| p.starts_with('c'))).count();

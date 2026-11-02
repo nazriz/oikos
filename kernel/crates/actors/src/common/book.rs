@@ -12,13 +12,108 @@
 //!   object, and lots by the cells they cover. Every list is in the order seen.
 //! - **Snapshots** (`Book::save`, `Book::restore`): the records in the order seen, and what came beside them
 //!   (readings, the directory, laws that could not be read); the rest is rebuilt by taking the records in again.
+//! - **Records held as the world holds them** (docs/design/tiered-storage.md): a book keeps each record's handle
+//!   (`Rec`), and the record itself only while it reads it: what it has read is let go at its next day, and read
+//!   again (from memory, or back from disk) when it is next asked for. A record nobody reads can then leave memory.
+//!   What the book answers is the same: the record is the same record.
 
 use oikos_core::{Frozen, Id};
 use oikos_sight::{Picture, Record, RecordBody, Seen};
+use oikos_sight::Rec;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use std::cell::OnceCell;
 use std::sync::Arc;
+
+/// A record the book has seen: as the world holds it, and, while the book reads it, the record (let go at the book's
+/// next day: `Book::set_moment`).
+#[derive(Debug)]
+struct Entry {
+    rec: Rec,
+    read: OnceCell<Arc<Record>>,
+}
+
+impl Entry {
+    fn get(&self) -> &Arc<Record> {
+        self.read.get_or_init(|| self.rec.load())
+    }
+}
+
+/// Records of the book by their places, read as they are reached: what is skipped (`skip`, `nth`), counted or passed
+/// over to the last is not read, so a reader that keeps its place in a list reads only what is new to it.
+struct Listed<'a> {
+    seen: &'a [Entry],
+    at: std::slice::Iter<'a, u32>,
+}
+
+impl<'a> Iterator for Listed<'a> {
+    type Item = &'a Arc<Record>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.at.next().map(|i| self.seen[*i as usize].get())
+    }
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.at.nth(n).map(|i| self.seen[*i as usize].get())
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.at.size_hint()
+    }
+    fn count(self) -> usize {
+        self.at.len()
+    }
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+}
+
+impl DoubleEndedIterator for Listed<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.at.next_back().map(|i| self.seen[*i as usize].get())
+    }
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        self.at.nth_back(n).map(|i| self.seen[*i as usize].get())
+    }
+}
+
+impl ExactSizeIterator for Listed<'_> {}
+
+/// Every record of the book, in the order seen, read as reached (as `Listed`).
+struct Every<'a>(std::slice::Iter<'a, Entry>);
+
+impl<'a> Iterator for Every<'a> {
+    type Item = &'a Arc<Record>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(Entry::get)
+    }
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.0.nth(n).map(Entry::get)
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+    fn count(self) -> usize {
+        self.0.len()
+    }
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+}
+
+impl DoubleEndedIterator for Every<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back().map(Entry::get)
+    }
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        self.0.nth_back(n).map(Entry::get)
+    }
+}
+
+impl ExactSizeIterator for Every<'_> {}
+
+/// The day of a moment.
+fn day_of(t: i64) -> i64 {
+    t.div_euclid(86_400)
+}
 
 /// A record's id as a key: the number of a minted id (`rec.<n>`), else the id itself. Ordered as the records were
 /// filed where both are minted (`filed_before`); no answer depends on the order of the map itself.
@@ -127,7 +222,7 @@ pub struct NoticeSeen<'a> {
 /// Everything a participant has perceived so far, indexed.
 #[derive(Debug, Default)]
 pub struct Book {
-    seen: Vec<Arc<Record>>,
+    seen: Vec<Entry>,
     place: Place,
     types: BTreeMap<&'static str, Vec<u32>>,
     /// Statements of each kind: all seen, and those not withdrawn, in the order seen (one map of both: SC-1).
@@ -149,6 +244,9 @@ pub struct Book {
     with_practice: Vec<u32>,
     with_assertion: Vec<u32>,
     with_hears: Vec<u32>,
+    /// Statements seen that are public (visible to all), in the order seen: what a person's bounded memory of public
+    /// goings-on goes through (citizen/memory.rs), without reading the rest.
+    public: Vec<u32>,
     readings: BTreeMap<String, Reading>,
     /// participant -> the person it acts as (from a directory).
     participant_person: BTreeMap<String, String>,
@@ -209,7 +307,7 @@ impl Book {
         self.set_moment(pic);
         let mut fresh = vec![];
         for r in pic.all_records() {
-            self.take(r, &mut fresh);
+            self.take(r, || pic.held_of(r), &mut fresh);
         }
         for ch in pic.channels.values() {
             if let Seen::Directory { entities, positions } = ch {
@@ -236,6 +334,12 @@ impl Book {
     /// The moment, and the agreements' readings, as an observation gives them (`absorb` takes these with its records;
     /// a reader that takes only some records takes these first).
     pub fn set_moment(&mut self, pic: &Picture) {
+        // (A new day: what was read is let go, and read again when it is next asked for.)
+        if day_of(pic.t) != day_of(self.now) {
+            for e in &mut self.seen {
+                e.read.take();
+            }
+        }
         self.now = pic.t;
         for (id, r) in &pic.readings {
             self.readings.insert(id.to_string(), Reading { status: r.status.to_string(), ends_at: r.ends_at });
@@ -246,19 +350,19 @@ impl Book {
     pub fn take_all<'a>(&mut self, records: impl IntoIterator<Item = &'a Arc<Record>>) -> Vec<Arc<Record>> {
         let mut fresh = vec![];
         for r in records {
-            self.take(r, &mut fresh);
+            self.take(r, || Rec::from_arc(r.clone()), &mut fresh);
         }
         fresh
     }
 
-    fn take(&mut self, r: &Arc<Record>, fresh: &mut Vec<Arc<Record>>) {
+    fn take(&mut self, r: &Arc<Record>, held: impl FnOnce() -> Rec, fresh: &mut Vec<Arc<Record>>) {
         let k = key(&r.id);
         if self.place.contains_key(&k) {
             return;
         }
         let i = self.seen.len() as u32;
         self.place.insert(k, i);
-        self.seen.push(r.clone());
+        self.seen.push(Entry { rec: held(), read: OnceCell::from(r.clone()) });
         self.types.entry(r.body.kind_name()).or_default().push(i);
         match &r.body {
             RecordBody::Claim { holder, counterparty, about, .. } => {
@@ -271,6 +375,9 @@ impl Book {
                 }
             }
             RecordBody::Statement { kind, data, .. } => {
+                if matches!(r.visible_to, oikos_contracts::blocks::Visibility::Public(_)) {
+                    self.public.push(i);
+                }
                 let withdrawn = self.withdrawn.contains(r.id.as_str());
                 let (all, standing) = self.kinds.entry(Id::new(kind)).or_default();
                 all.push(i);
@@ -301,7 +408,7 @@ impl Book {
 
     /// What a record does to the book on being taken in, beyond being there.
     fn mark(&mut self, i: u32) {
-        let r = self.seen[i as usize].clone();
+        let r = self.seen[i as usize].get().clone();
         match &r.body {
             RecordBody::ClaimRelease { claim } => {
                 self.released.insert(Id::new(claim));
@@ -347,7 +454,7 @@ impl Book {
     fn take_down(&mut self, id: &String, at: i64) {
         if self.withdrawn.insert(Id::new(id)) {
             if let Some(&i) = self.place.get(&key(id)) {
-                if let RecordBody::Statement { kind, .. } = &self.seen[i as usize].body {
+                if let RecordBody::Statement { kind, .. } = &self.seen[i as usize].get().body {
                     if let Some((_, l)) = self.kinds.get_mut(kind.as_str()) {
                         l.retain(|x| *x != i);
                     }
@@ -361,7 +468,7 @@ impl Book {
     }
 
     fn list<'a>(&'a self, idx: Option<&'a Vec<u32>>) -> impl DoubleEndedIterator<Item = &'a Arc<Record>> + ExactSizeIterator + 'a {
-        idx.map(Vec::as_slice).unwrap_or(&[]).iter().map(move |i| &self.seen[*i as usize])
+        Listed { seen: &self.seen, at: idx.map(Vec::as_slice).unwrap_or(&[]).iter() }
     }
 
     // ---- letting go (a person's bounded memory of public goings-on: citizen/memory.rs)
@@ -372,14 +479,36 @@ impl Book {
     /// Returns, for each old place in the order seen, its new place (none: let go), for whoever keeps a place in the
     /// book (`records().skip(n)`). Deterministic: the order of what is kept is the order seen.
     pub fn forget(&mut self, keep: impl Fn(&Record) -> bool) -> Vec<Option<u32>> {
+        self.forget_of(&["statement", "withdrawal"], keep)
+    }
+
+    /// `forget`, asking `keep` only of public statements and withdrawals: every other record stays, unread.
+    pub fn forget_public(&mut self, keep: impl Fn(&Record) -> bool) -> Vec<Option<u32>> {
+        self.forget_of(&["public", "withdrawal"], keep)
+    }
+
+    /// Public statements seen, in the order seen.
+    pub fn public(&self) -> impl DoubleEndedIterator<Item = &Arc<Record>> + ExactSizeIterator {
+        self.list(Some(&self.public))
+    }
+
+    fn forget_of(&mut self, among: &[&str], keep: impl Fn(&Record) -> bool) -> Vec<Option<u32>> {
         // Only a statement, or a withdrawal, is ever let go: what else a book holds (an agreement, a signature, a claim)
         // is a party's own. And never a paper that made a kept one stand down (its withdrawal, what replaced it): a book
         // saved and restored takes its records in again, and must stand where it stood.
-        let mut keeps: Vec<bool> = self.seen.iter().map(|r| !matches!(r.body, RecordBody::Statement { .. } | RecordBody::Withdrawal { .. }) || keep(r)).collect();
-        for (i, r) in self.seen.iter().enumerate() {
+        // (Which are statements or withdrawals is the book's own index: nothing else is read to find them.)
+        let mut keeps: Vec<bool> = vec![true; self.seen.len()];
+        for kind in among {
+            let places = if *kind == "public" { Some(&self.public) } else { self.types.get(kind) };
+            for &i in places.into_iter().flatten() {
+                keeps[i as usize] = keep(self.seen[i as usize].get());
+            }
+        }
+        for i in 0..self.seen.len() {
             if keeps[i] {
                 continue;
             }
+            let r = self.seen[i].get();
             let names = match &r.body {
                 RecordBody::Withdrawal { withdraws, .. } => Some(withdraws.as_str()),
                 RecordBody::Statement { data, .. } => data.as_ref().and_then(|d| d.get("replaces")).and_then(|x| x.as_str()),
@@ -390,15 +519,15 @@ impl Book {
             }
         }
         let mut remap: Vec<Option<u32>> = Vec::with_capacity(self.seen.len());
-        let mut kept: Vec<Arc<Record>> = Vec::with_capacity(self.seen.len());
+        let mut kept: Vec<Entry> = Vec::with_capacity(self.seen.len());
         let mut gone: Vec<Arc<Record>> = vec![];
-        for (i, r) in std::mem::take(&mut self.seen).into_iter().enumerate() {
+        for (i, e) in std::mem::take(&mut self.seen).into_iter().enumerate() {
             if keeps[i] {
                 remap.push(Some(kept.len() as u32));
-                kept.push(r);
+                kept.push(e);
             } else {
                 remap.push(None);
-                gone.push(r);
+                gone.push(e.get().clone());
             }
         }
         if gone.is_empty() {
@@ -435,6 +564,7 @@ impl Book {
         map(&mut self.with_practice);
         map(&mut self.with_assertion);
         map(&mut self.with_hears);
+        map(&mut self.public);
         self.place.remove_all(gone.iter().map(|r| key(&r.id)));
         for i in self.place.values_mut() {
             *i = remap[*i as usize].unwrap_or_else(|| unreachable!("a place kept for a record let go"));
@@ -462,7 +592,7 @@ impl Book {
 
     /// The record of an id, as first seen.
     pub fn get(&self, id: &str) -> Option<&Arc<Record>> {
-        self.place.get(&key(id)).map(|i| &self.seen[*i as usize])
+        self.place.get(&key(id)).map(|i| self.seen[*i as usize].get())
     }
     pub fn has(&self, id: &str) -> bool {
         self.place.contains_key(&key(id))
@@ -475,8 +605,13 @@ impl Book {
         self.seen.is_empty()
     }
     /// Every record, in the order seen.
-    pub fn records(&self) -> impl DoubleEndedIterator<Item = &Arc<Record>> {
-        self.seen.iter()
+    pub fn records(&self) -> impl DoubleEndedIterator<Item = &Arc<Record>> + ExactSizeIterator {
+        Every(self.seen.iter())
+    }
+    /// Every record made at `at` or after (its `at`), in the order seen: `records().filter(|r| r.at >= at)`, without
+    /// reading the others.
+    pub fn records_since(&self, at: i64) -> impl Iterator<Item = &Arc<Record>> {
+        self.seen.iter().filter(move |e| e.rec.at() >= at).map(Entry::get)
     }
     /// How many records of each statement kind (and of each other record type) it holds: for whoever measures memory.
     pub fn counts(&self) -> BTreeMap<String, u64> {
@@ -701,7 +836,7 @@ impl Book {
     /// The book as a snapshot keeps it.
     pub fn save(&self) -> Value {
         let s = Saved {
-            records: self.seen.iter().map(|r| (**r).clone()).collect(),
+            records: self.seen.iter().map(|e| (*e.rec.peek()).clone()).collect(),
             readings: self.readings.clone(),
             participant_person: self.participant_person.clone(),
             positions: self.positions.clone(),

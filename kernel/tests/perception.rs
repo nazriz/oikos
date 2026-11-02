@@ -53,7 +53,7 @@ impl View {
                 if *whole == Some(true) {
                     self.records.clear();
                 }
-                self.records.extend(records.iter().map(|r| r.id.to_string()))
+                self.records.extend(records.iter().map(|r| r.id().to_string()))
             }
             ChannelData::Sites { cells, whole, .. } => {
                 if *whole == Some(true) {
@@ -230,7 +230,7 @@ fn a_returning_holder_is_told_the_file_is_whole() {
     let laws = |run: &mut Run<Vec<u8>>, who: &str| -> Option<(Option<bool>, Vec<String>)> {
         let obs = run.command(&Command::Observe { participant: who.into(), only: None }).unwrap().observation.unwrap();
         match obs.channels.get("finance/laws")? {
-            ChannelData::Records { records, whole, .. } => { Some((*whole, records.iter().map(|r| r.id).map(|x| x.to_string()).collect()))}
+            ChannelData::Records { records, whole, .. } => { Some((*whole, records.iter().map(|r| r.id()).map(|x| x.to_string()).collect()))}
             other => panic!("{other:?}"),
         }
     };

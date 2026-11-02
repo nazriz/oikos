@@ -233,6 +233,11 @@ impl<W: Write> Run<W> {
         self.kernel.share(threads, at_least);
     }
 
+    /// The world's records that nobody reads are held on disk: see `Kernel::tier_records`.
+    pub fn tier_records(&mut self, path: &std::path::Path, policy: crate::held::Policy) -> std::io::Result<()> {
+        self.kernel.tier_records(path, policy)
+    }
+
     /// The host keeps the records it's handed: see `Kernel::refer_to_records`.
     pub fn refer_to_records(&mut self) {
         self.kernel.refer_to_records();
