@@ -10665,3 +10665,33 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Approval:** Naz approved adding the line on 2026-11-02 (hard rules go to him first).
 - **Also:** docs/plan.md's summary line now says phase 3 has landed.
 - **Revisit if:** the law's wording drifts from docs/design/travel.md, or the backstop is renamed.
+
+## 2026-11-02 · A crew's trips are its working time, and planners size the day with them; goods on the road stay on order (law 9, after S4 and S5 landed; contract additions; results move; no model called)
+
+- **What we saw:** main went red after S4 and S5 landed: five slow files (services, production, unions, households,
+  own-venture). Read against main just before S4 (6770ecdc), where all five pass, two faults and one test:
+  - **The day planned without the trips.** S4 made a performer's trip to the site and back their time (it is placed on
+    their lane and counts against their working day), but the offices that size the day's work (the works office's
+    round and upkeep, the builder's projects and repairs) counted only the work. Their acts ran past the day and were
+    refused (the hall's upkeep never got done; the builder retried each day's work a trip too long).
+  - **Goods on the road counted nowhere.** The outside's freight takes its time (S4), but a buyer took its order off its
+    books when the delivery note came, before the goods arrived; until they did, they were neither on order nor held, and
+    it ordered again. A factory bought nearly three times its month's inputs in its second month, ran short, and paid no
+    dividend; at the strike town a striker's wages then came short, and they claimed for them.
+  - **A return counted as a move.** Someone the builder's act takes from home to a site comes back to the space they
+    left by that act; the households test read that as another adult moving them.
+- **Kernel and contract (participant API; blanket approval).** The working-day check counts each performer's trip with
+  their share (`over_the_day`). An outcome tells the one whose act it was how long each body it took somewhere was on
+  its way, there and back (`Outcome.trips`), and how long goods it sent by the outside's freight take to each place
+  (`Outcome.freight`): their own record of their trips, never the network's timetable.
+- **Actors.** A planner keeps its people's trips by site (`common::trips::Trips`: a round's trip shared among its sites; a
+  site never gone to is reckoned at the average of those known, or at nothing until the first trip is back) and sizes
+  the day's work with them: the works office's round and upkeep, the builder's projects and repairs. The outside's trade
+  desk keeps how long its freight takes to each place and says on the delivery note when the goods arrive (`arrives`);
+  a factory and a shop keep goods delivered and still on the road on order until then.
+- **Test.** households.test.ts: a body brought back by the act that took it, to the space it left, is no move.
+- **Not done:** the coordinator's design lets the works office, which keeps the road register, reckon a site it has
+  never been to from the roads' lengths and speeds; it uses the average of its own trips instead (simpler, and the first
+  day's trip is then known). An act still too long for the day is refused and done the next day, not split.
+- **Revisit if:** a planner other than these sends people elsewhere (then it keeps `Trips` too); a seller with its own
+  carrier (a town's haulier) sells on delivery (then it says `arrives` from its own trips).

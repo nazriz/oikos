@@ -247,6 +247,8 @@ pub struct Delivered {
     pub delivered: i64,
     pub refund: i64,
     pub seller: String,
+    /// When the goods are to arrive, where the note says (they go by a carrier and take their time: law 9).
+    pub arrives: Option<i64>,
 }
 
 /// Delivery notes addressed to us, not yet read (only new ones are read: no rescanning).
@@ -272,6 +274,7 @@ impl Deliveries {
                 delivered,
                 refund: d.i("refund").unwrap_or(0),
                 seller: n.speaks_for.unwrap_or_default().to_string(),
+                arrives: d.i("arrives"),
             });
         }
         self.cursor = notes.len();
@@ -592,7 +595,7 @@ pub fn then<T: From<TradeThen>>(tok: &TradeThen, done: Done, book: &mut OrderBoo
                     order.id,
                     o.refusal.as_ref().map(|r| r.detail.clone().unwrap_or_else(|| format!("{:?}", r.code))).unwrap_or_default()
                 );
-                vec![fill_as(order, 0, from_at, pay_from, &why, cx)]
+                vec![fill_as(order, 0, from_at, pay_from, &why, cx, None)]
             }
             _ => vec![],
         },
@@ -611,14 +614,21 @@ pub fn then<T: From<TradeThen>>(tok: &TradeThen, done: Done, book: &mut OrderBoo
 /// so in a delivery note. `pay_from` is our account; `from_at` where the goods are. If the delivery is refused (the
 /// place it was to go is gone, say), the whole order is refunded instead.
 pub fn fill<T: From<TradeThen>>(o: &Order, quantity: i64, from_at: &str, pay_from: &str, why: &str, cx: &Cx) -> Step<T> {
-    let mut s = fill_as(o, quantity, from_at, pay_from, why, cx);
+    fill_arriving(o, quantity, from_at, pay_from, why, cx, None)
+}
+
+/// As `fill`, for goods that go by a carrier and take their time (law 9: the outside's freight): the note says when they
+/// are to arrive (`arrives`, a time), as the seller's own carrier has taken to get there, so the buyer counts them as
+/// coming until then.
+pub fn fill_arriving<T: From<TradeThen>>(o: &Order, quantity: i64, from_at: &str, pay_from: &str, why: &str, cx: &Cx, arrives: Option<i64>) -> Step<T> {
+    let mut s = fill_as(o, quantity, from_at, pay_from, why, cx, arrives);
     if quantity > 0 {
         s.then = Some(TradeThen::DeliveryRefused { order: o.clone(), from_at: from_at.to_string(), pay_from: pay_from.to_string() }.into());
     }
     s
 }
 
-fn fill_as<T>(o: &Order, quantity: i64, from_at: &str, pay_from: &str, why: &str, cx: &Cx) -> Step<T> {
+fn fill_as<T>(o: &Order, quantity: i64, from_at: &str, pay_from: &str, why: &str, cx: &Cx, arrives: Option<i64>) -> Step<T> {
     let money = |n| money_words(n, &cx.ctx.world);
     // (On terms nothing was paid, so nothing is refunded: the invoice is for what was delivered.)
     let refund = if o.terms.is_some() { 0 } else { (o.quantity - quantity) * o.unit_price };
@@ -638,6 +648,9 @@ fn fill_as<T>(o: &Order, quantity: i64, from_at: &str, pay_from: &str, why: &str
         format!("Delivered {quantity} of the {} {} ordered{}.", o.quantity, o.kind, if refund > 0 { format!("; {} refunded", money(refund)) } else { String::new() })
     };
     let mut d = json!({ "order": o.id, "kind": o.kind, "ordered": o.quantity, "delivered": quantity, "refund": refund });
+    if let (Some(a), true) = (arrives, quantity > 0) {
+        d.as_object_mut().expect("object").insert("arrives".into(), json!(a));
+    }
     if let (Some(days), true) = (o.terms, quantity > 0) {
         words.push_str(&format!(" Invoice: {}, to be paid within {days} days, into {pay_from}, naming the order ({}).", money(quantity * o.unit_price), o.id));
         let dm = d.as_object_mut().expect("object");

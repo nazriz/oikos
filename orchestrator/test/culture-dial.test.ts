@@ -175,9 +175,9 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // in one world), on the tree merged with main after f2-s4 landed (the taker's trip for this act its own), config hashes and Rust
 // states both; main's 7b16c3db..., 2e42476d..., 58353057... and e39632a0..., 294d3077..., 3a55c1a5..., until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "9d932d3180cd8ab3e6ed06fd4f4704202e2801f0d67f16958c1ed5bd3a34ed34",
-  "gb-eng-2026": "861681fd4fdead748c83f543dbb64e817f80029ac06427ec4f5f69c651817f69",
-  "ke-nakuru-2026": "6be856aeb536f5aabd724a07f08f5308e7fb46e90e7df4170f33979e29ffb8ce",
+  "au-vic-2026": "b1dc744d93b55539e7d17222c36893ba2bfe8bc611d4910ca85c4627d100f5ae",
+  "gb-eng-2026": "b51955994f60e286974a65a7354f491768dd7e9800569e61bb98ba2082d1b147",
+  "ke-nakuru-2026": "4b97669f9d1925e1efc1abdc50490d3a76f35b9bcce378bbd2bc734d0dc388bc",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

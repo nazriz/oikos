@@ -1893,7 +1893,7 @@ mod tests {
                         next.woke_for = "done".into();
                         next.channels = Default::default();
                         next.inbox = vec![];
-                        next.outcomes = vec![oikos_sight::Outcome { action: format!("act.{i}"), t: p.t, status: oikos_sight::OutcomeStatus::Applied, created: None, refusal: None, investigated: None, surveyed: None, seen: vec![] }];
+                        next.outcomes = vec![oikos_sight::Outcome { action: format!("act.{i}"), t: p.t, status: oikos_sight::OutcomeStatus::Applied, created: None, refusal: None, investigated: None, surveyed: None, seen: vec![], trips: Default::default(), freight: Default::default() }];
                         return_more(self, &next, &mut out, i + 1);
                         break;
                     }
@@ -2055,7 +2055,7 @@ mod tests {
         assert!(matches!(a.step(&p, &mut cx), crate::Action::Call { .. }));
         a.sent("act.1");
         let mut p2 = pic(2 * DAYS, vec![], vec![]);
-        p2.outcomes = vec![oikos_sight::Outcome { action: "act.1".into(), t: 2 * DAYS, status: oikos_sight::OutcomeStatus::Refused, created: None, refusal: None, investigated: None, surveyed: None, seen: vec![] }];
+        p2.outcomes = vec![oikos_sight::Outcome { action: "act.1".into(), t: 2 * DAYS, status: oikos_sight::OutcomeStatus::Refused, created: None, refusal: None, investigated: None, surveyed: None, seen: vec![], trips: Default::default(), freight: Default::default() }];
         let mut cx = Cx::new(p2.t, &c, &mut draws, 1, vec![]);
         assert!(matches!(a.step(&p2, &mut cx), crate::Action::Call { .. }), "a refused vote is cast again");
     }

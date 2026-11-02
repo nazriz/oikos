@@ -63,6 +63,8 @@ pub struct Exec<'a> {
     /// Who the action named to do its work, and whether their being at work was looked at when it began (F3).
     pub by: &'a [Id],
     pub started: bool,
+    /// Goods sent by the outside's freight in this act: where to, and how long on the road.
+    pub freight: BTreeMap<Id, i64>,
     /// The act being applied, when it is one begun before (law 9: a body on its way for it arrives; one on its way for
     /// another act is not here to be moved).
     pub act: Option<&'a str>,
@@ -75,6 +77,8 @@ pub struct ExecResult {
     pub investigated: Option<Value>,
     /// The buildings worked on, each as those who worked on it left it (for the actor alone).
     pub seen: Vec<crate::sites::SiteStructure>,
+    /// Goods the act sent by the outside's freight: where to, and how long they take to get there (for the actor alone).
+    pub freight: BTreeMap<Id, i64>,
 }
 
 /// Can this participant act now? (Active, or opted out with a stand-in carrying on.)
@@ -396,7 +400,7 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
             }
         }
     }
-    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, seen, worked_on: vec![], collected: BTreeSet::new(), by, started, act };
+    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, seen, worked_on: vec![], collected: BTreeSet::new(), by, started, freight: BTreeMap::new(), act };
     for (i, b) in blocks.iter().enumerate() {
         ex.block(b, i).map_err(|mut r| {
             r.block.get_or_insert(i);
@@ -419,7 +423,7 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
             x
         })
         .collect();
-    Ok(ExecResult { events: ex.events, created: ex.refs, surveyed: ex.surveyed, investigated: ex.investigated, seen })
+    Ok(ExecResult { events: ex.events, created: ex.refs, surveyed: ex.surveyed, investigated: ex.investigated, seen, freight: ex.freight })
 }
 
 // ---------------- life: shared by acts and scheduled effects ----------------
@@ -2060,6 +2064,9 @@ impl<'a> Exec<'a> {
                     if let Some((e, there)) = outside {
                         carrier_was = Some(e);
                         arrives = crate::travel::freight_seconds(self.s, self.st, &e, &there).filter(|x| *x > 0).map(|x| self.now() + x);
+                        if let (Some(a), true) = (arrives, to_at == there) {
+                            self.freight.insert(to_at, a - self.now());
+                        }
                     } else {
                         let body = match carrier {
                             Some(c) => self.r(c)?,
