@@ -37,7 +37,7 @@ impl Kind for Citizen {
     fn version(&self) -> &'static str {
         // (Held equal to the TS manifest until the cut-over, docs/port-guide.md section 2; the integration step bumps
         // it with the Rust's own changes, listed in the decisions entry.)
-        "0.60.0"
+        "0.61.0"
     }
     fn doc(&self) -> &'static str {
         "docs/behaviour/citizen.md"

@@ -179,9 +179,9 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // and weigh a known commute in job and home choices (docs/behaviour/commuting.md); b63b2c19..., a18cf6dd..., cfe34895... for the
 // configs and b1dc744d..., b5195599..., 4b97669f... for the states, until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "b87776c3275a7416da2157e07f235c33d46d60f8dc9566d1da6cd5420ab9f882",
-  "gb-eng-2026": "3bd990288ee8fb63e902707db2ad606d12b07aa8d0e1412ca43cd474bfc0170e",
-  "ke-nakuru-2026": "07fd629150eefa456443e3b90b117334ffafec8054643eb7d8308a2f13049c33",
+  "au-vic-2026": "d8300873a5c03da6d435069c7fe02c5b7e3c862730914970ffd57b0bd30b2790",
+  "gb-eng-2026": "e9564040f909ba83234cf899afe319fb813c973c3ba0c9191aec594bfd9de59a",
+  "ke-nakuru-2026": "7bf5ae46d53382f1530ad0dba3ed0087df4256c796ad28a94796ce9552b8d7fc",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

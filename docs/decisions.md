@@ -10636,6 +10636,7 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   scratch script `orchestrator/p-tmp.ts` the branch carried is removed.
 - **Revisit if:** the slow tier passes 1,500 s on the Mini, or merges wait on it; then the twin files and the elections'
   towns first, as the entry above says, before any raise.
+## 2026-11-01 · The environment office learns its crew's pace from a refusal, and stops asking again for fieldwork it was told will not fit (`city.environment` 0.5.3; branch `env-office-fieldwork`; the pinned towns do not move; no model called)
 
 
 ## 2026-11-01 · Weighing the commute: the rule specified, not yet built (branch `commute-choice`; risk WM-4; no model called)
@@ -10655,6 +10656,49 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   the S3 way (`BodyView.on_way`), or what is published (a timetable); no participant-API addition; otherwise they do not
   know it. Figures per place from ATAP (au-vic), the DfT TAG data book (gb-eng), USDOT guidance and AAA costs (us-oh),
   placeholders elsewhere. Building waits on `f2-s5` landing (docs/design/commute-choice.md, "What is left to build").
+- **The fault (a mechanism bug, not behaviour).** The office sized each day's fieldwork by the survey's stated time a cell
+  and counted its staff's hours itself. When the world refused a batch for time ("w has N s left; this needs M"), it
+  recorded the time left but kept planning at the stated time, so at its next look (five minutes on) it asked for the
+  same number of cells, and was refused again, all afternoon. Any gap between the stated time and the crew's real one
+  does it: with skills on (E4) a scientist is slower than the table's ordinary hand. 100 days of the 300-person town
+  with skills on: 43 refusals of the office's fieldwork, all the same ask (left 13,357 s, needs 13,769 s, every look
+  from 12:35 on one day). It also never gave a refused batch's hours back to the crew's other members, so they looked
+  busier than they were.
+- **Skills off.** The note in "Skills by use" (2026-10-31) counted 18 such refusals in 90 days with skills off, on the
+  branch as it then stood. On today's main, 100 days of the 300-person town with skills off has none: there the stated
+  time is the world's, so the loop needs some other gap to start. The fault is the same either way (the office never
+  learnt from what it was told), and the fix covers both.
+- **The fix.** The office plans with `common::Pace`, as the factories and shops already do: the stated time at first;
+  after a refusal for time, each of the crew as slow as the batch turned out to need; after a batch that went through,
+  a little quicker once a week (so a crew that gets quicker with practice is asked for more). A refused batch's hours
+  go back to the whole crew; the named worker's day is the world's count, as before. After it, the same skills-on town
+  has no refusals of the office's fieldwork in 100 days, and more of the round's fieldwork done (6 batches against 4).
+- **Hashes.** Expected to move every town's; they did not. The pinned towns (`culture-dial`'s three profiles, the
+  default town) pass unchanged: the office's planning differs only after a refusal for time, which those towns never
+  give it (the state hash is the world's, not the actor's saved notes). So no pin was re-taken. A town where the office
+  is refused (skills on, or a crew short of time) runs differently from before, as it should.
+- **Guarded by:** `told_a_days_fieldwork_will_not_fit_it_asks_for_what_the_crews_own_pace_allows_not_the_same_again`
+  (the environment office's tests): refused four cells that need 9 hours against 8 left, it asks for three, never the
+  four again.
+- **Revisit if:** the weekly probe toward a quicker pace shows as a refusal a week in a study of the office (it is the
+  shared manager's behaviour; the factories and shops do the same), or the office comes to do work other than fieldwork.
+
+## 2026-11-01 · Founding again after giving a business up: the owner's own record (branch `refound-after-failure`; risk ME-1; no model called)
+
+- **What:** an owner who gives a business of one up keeps their record of it (months, what it paid them, what its market
+  said such a business pays), and weighs starting one again on the market's figure moved by that record, weighted by its
+  months against `venture_prior_months` (3, a placeholder, in `citizen.default` 0.61.0); the next weighing is a month on.
+  The record is used wherever a business of one is weighed (starting, borrowing to start, taking the loan) and in the
+  pay it is expected to bring. docs/behaviour/entry.md, "Founding again after giving one up".
+- **Why this way:** founding was weighed on the market's figure alone, so the evidence that had just closed the business
+  counted for nothing, and the weighing was overdue (it does not run while one owns a business), so it came at once. The
+  learning is Jovanovic's (an owner learns from what the venture pays them); the shrinkage toward the market's figure
+  rather than a bar keeps restarts possible, as they are in the literature on renascent and serial entrepreneurs. Behaviour,
+  not a count: nothing here is tuned to how often people refound.
+- **Not built:** the record does not carry to a shop in premises, and nobody hears of others' failures (a founder learns
+  of their own only). Someone with nothing coming in still weighs any positive figure against nothing.
+- **Revisit if:** a source gives how strongly founders weigh their own past venture against their view of the market
+  (`venture_prior_months`), or runs show owners cycling through the same failing business month after month.
 ## 2026-11-02 · Taking from work under law 9: the taker was there if their way set out from it (landing `f2-s4`; kernel fix; no model called)
 
 - **Found:** at the landing of `f2-s4`, `orchestrator/test/hazards.test.ts` ("taking from work, found at a stocktake, ...")
@@ -10734,3 +10778,23 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Revisit if:** a timetable is published (then it is a second way to know a trip); vehicles' fuel from holdings gives
   a trip's real running cost; a run shows people never learning a trip (looks too sparse to see themselves on their
   way), in which case a trip arrived from should be kept as at most its elapsed time.
+## 2026-11-02: stale incremental folders are pruned, incremental stays on
+
+- **Why.** `[profile.gate] incremental = true` is deliberate, but cargo keeps every `incremental/<crate>-<hash>/` whose hash
+  changed; one agent worktree's `kernel/target/gate` reached 72 GB (62 GB incremental) and the run server fell to 18 GB free.
+- **What.** `scripts/disk-tidy.ts --prune-incremental` keeps, per crate, the newest unit folder and those within 6 hours of it,
+  and never one written in the last 30 minutes. It runs before `bun run kernel`, before the gate's kernel build, at the start
+  of `merge.ts`'s check, and in the full tidy for every idle worktree. Test: the keep/remove rule (`disk-tidy.test.ts`).
+- **Measured** (agent worktree, `gate`): one-file edit 58 s unpruned, 69 s after an extreme prune, ~130 s non-incremental;
+  the pruned build tested fine. Removing a unit folder can only cost that unit a full compile, never correctness. The
+  `CARGO_INCREMENTAL=0` fallback was not needed.
+- **Revisit if:** gate builds get slower after merges (then widen the 6-hour window or keep the newest N per crate), or
+  worktrees still balloon (then the cause is something other than old hashes: look at `deps/` and `.fingerprint/`).
+
+- **Addendum, 2026-11-02 (retail.test.ts red on main after this landed).** An act refused for want of room in its
+  people's day still sent them on their way and put the trip on their day (S4's journeys were placed whatever the day
+  said, and now that the day counts the trip, the refusals came): a builder with no record of the trip yet planned the
+  work to the end of the day, was refused, and lost the trip from the day each time, refused again and again (814 times
+  in the retail town's year). Now an act refused that way sends nobody anywhere and charges no one, and its outcome says
+  how long the trips would have been (`Outcome.trips`), so the planner's next act fits. The whole slow tier was run on
+  the fix before it landed.
