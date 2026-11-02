@@ -105,7 +105,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
 // f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "a99a286022700340", "gb-eng-2026": "2d6735b7556f4cfa", "ke-nakuru-2026": "6c856c4d47017630" }
+  ? { "au-vic-2026": "b63b2c19b3f1c2ff", "gb-eng-2026": "a18cf6dd689297f9", "ke-nakuru-2026": "cfe34895be14a485" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -164,10 +164,20 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // main after mt21-recourse, both changes at once: ke-nakuru is this branch's own pin (recourse did not move it), au-vic and
 // gb-eng have the ombudsman and the factory venture both; mt21's a0a8a233..., a911615e..., a2f60218... and ce297a1b...,
 // 4c0f8261..., e3093814..., until then.)
+// (Re-taken on 2026-11-01 at foundations-2 S3 and S4 (law 9), config hashes and Rust states both: bodies on their way between
+// buildings, goods carried, crews to the building they work on, the outside's freight from the edge's node by the road out, the dead on
+// the way found by whoever comes by (generator 0.74.0); c899c8ff..., 9b0a54d6..., a2f60218... for the configs and af012071..., fab20a4d...,
+// e3093814... for the states, until then. Again on 2026-11-02 on the tree merged with main after
+// mt21-recourse and f2-economy (their pins just above), law 9 on top of theirs: fd3b3e05..., b9922d02..., 9764f24d... and 8f562cf9...,
+// 2a59777c..., ff1a5d7a... on the branch alone; main's a99a2860..., 2d6735b7..., 6c856c4d... and b51631ea..., c6c36e29..., 717229a9...,
+// until then.)
+// (Re-taken on 2026-11-02 at foundations-2 S5 and S6 (law 9: a road's flows an hour, congestion, fuel from the tank; several towns
+// in one world), on the tree merged with main after f2-s4 landed (the taker's trip for this act its own), config hashes and Rust
+// states both; main's 7b16c3db..., 2e42476d..., 58353057... and e39632a0..., 294d3077..., 3a55c1a5..., until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "b51631ea85621e6eac2d3379adc467f3aa04ce4dc9bdcd1f6be93cbf1eff69c3",
-  "gb-eng-2026": "c6c36e29a6050c97839a61f4ab802bbb133beae87c9d8a692406ad4c3be97605",
-  "ke-nakuru-2026": "717229a9f5821b5d3ed9f74eb34d2f54d7a58190686934b04e51c91edbbac15d",
+  "au-vic-2026": "b1dc744d93b55539e7d17222c36893ba2bfe8bc611d4910ca85c4627d100f5ae",
+  "gb-eng-2026": "b51955994f60e286974a65a7354f491768dd7e9800569e61bb98ba2082d1b147",
+  "ke-nakuru-2026": "4b97669f9d1925e1efc1abdc50490d3a76f35b9bcce378bbd2bc734d0dc388bc",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

@@ -2,7 +2,10 @@
   "about": "Law 9, everything physical is somewhere and moves only along a network (docs/design/foundations-2.md section 3): today's violations, found by orchestrator/test/everything-is-somewhere.test.ts in every profile's town and the modules' sources, and by everything-is-somewhere-runs.test.ts in a month of each town's log. `found` lists each audit's findings as it names them; `entries` are the special cases the plan deletes, each a literal string `find` in `file` and the step that deletes it. The inventory only shrinks: a finding not listed fails the backstop, and so does a listed finding or entry no longer found, so the change that ends a case removes it here, with a line in docs/decisions.md. A step that has landed is in `done`: its entries stay, as guards.",
   "done": [
     "S1",
-    "S2"
+    "S2",
+    "S3",
+    "S4",
+    "S5"
   ],
   "found": {
     "unlocated": [
@@ -14,35 +17,14 @@
       "tax-casework: a system with no place (the hardware it runs on held nowhere)",
       "vendor-system: a system with no place (the hardware it runs on held nowhere)"
     ],
-    "edgesWithoutNode": [
-      "outside: an edge with no node, so what it sells and takes arrives nowhere",
-      "vendors: an edge with no node, so what it sells and takes arrives nowhere",
-      "wholesale-eating_out: an edge with no node, so what it sells and takes arrives nowhere",
-      "wholesale-food: an edge with no node, so what it sells and takes arrives nowhere",
-      "wholesale-personal_services: an edge with no node, so what it sells and takes arrives nowhere",
-      "wholesale-recreation: an edge with no node, so what it sells and takes arrives nowhere",
-      "wholesale-transport: an edge with no node, so what it sells and takes arrives nowhere"
-    ],
+    "edgesWithoutNode": [],
     "waysOffNetwork": [],
-    "uncarried": [
-      "kernel/crates/actors/src/boundary/trade.rs: goods moved with no carrier",
-      "kernel/crates/actors/src/citizen/money.rs: goods moved with no carrier",
-      "kernel/crates/actors/src/citizen/work.rs: goods moved with no carrier",
-      "kernel/crates/actors/src/market/producer.rs: goods moved with no carrier",
-      "kernel/crates/actors/src/market/retailer.rs: goods moved with no carrier",
-      "kernel/crates/actors/src/offices/treasury.rs: goods moved with no carrier"
-    ],
-    "uncarriedMoves": [
-      "citizen.default: goods moved from one place to another with no carrier",
-      "city.works: goods moved from one place to another with no carrier",
-      "firm.producer: goods moved from one place to another with no carrier",
-      "firm.retailer: goods moved from one place to another with no carrier",
-      "world.trade: goods moved from one place to another with no carrier"
-    ],
-    "workElsewhere": [
-      "city.works: collect done on a building elsewhere, its crew where they were",
-      "city.works: maintain done on a building elsewhere, its crew where they were",
-      "firm.builder: build done on a building elsewhere, its crew where they were"
+    "uncarried": [],
+    "uncarriedMoves": [],
+    "workElsewhere": [],
+    "movesForNothing": [
+      "car: a vehicle that uses no energy",
+      "motorcycle: a vehicle that uses no energy"
     ]
   },
   "entries": [

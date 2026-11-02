@@ -345,16 +345,35 @@ impl Plan for Police {
                 let space = as_text(d.get("space"));
                 let structure = d.get("at").or_else(|| d.get("structure")).map(|v| as_text(Some(v))).unwrap_or_default();
                 let silence = format!("{space}@{}", as_text(d.get("since")));
-                if space.is_empty() || structure.is_empty() || self.answered.contains(&silence) {
+                if space.is_empty() || structure.is_empty() || self.answered.contains(&silence) || self.answered.contains(&format!("{structure}@found")) {
                     continue;
                 }
                 self.answered.insert(silence);
+                // (One who has not come home: the home, and the street outside it, each cell next to its ground.)
+                if d.get("missing").is_some_and(|m| !m.is_null()) {
+                    if let Some((x, y)) = structure.strip_prefix("cell.").and_then(|r| r.split_once('.')).and_then(|(x, y)| Some((x.parse::<i64>().ok()?, y.parse::<i64>().ok()?))) {
+                        for (dx, dy) in [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)] {
+                            let c = format!("cell.{}.{}", x + dx, y + dy);
+                            self.calls.push(Call { space: c.clone(), structure: c });
+                        }
+                    }
+                }
                 self.calls.push(Call { space, structure });
             }
         }
         // What a call found: whoever died in the home we were asked about (having gone in, we see who left it and why).
         if !self.p.calls_channel.is_empty() {
             for c in visited(pic, &self.p.calls_channel) {
+                // (Asked to come to a place on the road where someone lies dead: whoever lies there is found there.)
+                if !c.remains.is_empty() && self.called.remove(c.cell.as_str()) {
+                    for r in &c.remains {
+                        if self.told.insert(r.to_string()) {
+                            self.found.push((r.to_string(), c.cell.to_string()));
+                        }
+                        // (Found here once: asked again about this place, we have reported whoever lies there.)
+                        self.answered.insert(format!("{}@found", c.cell));
+                    }
+                }
                 for sp in c.structure.iter().flat_map(|s| s.spaces.iter()) {
                     if !self.called.remove(sp.space.as_str()) {
                         continue;
@@ -639,6 +658,9 @@ impl Plan for Police {
     /// Going to the homes we are asked to call at (an officer's going: it takes the station's time; what is found comes
     /// when they are back).
     fn looks(&mut self, _pic: &Picture) -> Vec<LookRequest> {
+        // (A place on the road where we found whoever lay there is not gone to again.)
+        let answered = &self.answered;
+        self.calls.retain(|c| !answered.contains(&format!("{}@found", c.structure)));
         if self.p.calls_channel.is_empty() || self.calls.is_empty() || !self.calling_now {
             return vec![];
         }

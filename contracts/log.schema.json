@@ -668,6 +668,21 @@
           }
         },
         {
+          "description": "Law 9 (S5): a vehicle driven on a trip used fuel from its tank (its owner's holding of the kind at the vehicle, used up).",
+          "type": "object",
+          "required": ["event", "cause", "vehicle", "kind", "quantity", "metres", "by"],
+          "additionalProperties": false,
+          "properties": {
+            "event": { "const": "fuel_used" },
+            "cause": { "description": "seq of the command entry that caused this event.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count" },
+            "vehicle": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "kind": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "quantity": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Quantity" },
+            "metres": { "type": "integer", "minimum": 0 },
+            "by": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" }
+          }
+        },
+        {
           "type": "object",
           "required": [
             "event",
@@ -710,6 +725,14 @@
             "by": {
               "description": "The participant that physically executed it.",
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "carrier": {
+              "description": "Law 9 (S4): who carried them: a body, or the edge whose freight it was.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "arrives": {
+              "description": "Law 9 (S4): when they reach `to_at`, if later (on the outside's freight): until then they are on their way.",
+              "type": "integer"
             }
           }
         },
@@ -1353,6 +1376,10 @@
                 "injury",
                 "other"
               ]
+            },
+            "lies_at": {
+              "description": "Law 9: where the body lies, a cell of the road, if the person died on their way between buildings.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
             }
           }
         },
@@ -1998,6 +2025,7 @@
         "structure_demolished",
         "species_extinct",
         "nature_census",
+        "fuel_used",
         "occupied",
         "vacated",
         "recorded",
@@ -2091,6 +2119,7 @@
         "coming_down",
         "offer_withdrawn",
         "unpriced",
+        "not_carried",
         "beyond_supply"
       ]
     },

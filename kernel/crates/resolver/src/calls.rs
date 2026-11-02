@@ -252,7 +252,7 @@ pub const CODE_ONLY: [(&str, &[&str], &[&str]); 2] = [
 ];
 
 /// Arguments of a seat's call that are code's own until the translator is taught them: (the function, the arguments).
-pub const CODE_ONLY_ARGS: [(&str, &[&str]); 1] = [("occupancy", &["by"])];
+pub const CODE_ONLY_ARGS: [(&str, &[&str]); 2] = [("occupancy", &["by"]), ("goods", &["carried", "carrier", "by"])];
 
 /// Per function: the arguments it takes and the ones it needs, read from contracts/calls.schema.json.
 fn args_table() -> &'static BTreeMap<String, Args> {

@@ -25,6 +25,9 @@ pub struct SiteCell {
     /// Nature: conspicuous species anyone there would notice (never how many).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub seen: Vec<Id>,
+    /// Someone who died on their way and lies here (law 9): anyone there sees who.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub remains: Vec<Id>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -132,6 +135,7 @@ pub fn site_cell(s: &Statics, st: &State, id: &Id, c: &crate::state::Cell, me: &
         seen: st.nature.as_deref().map_or(vec![], |n| {
             s.config.catalogue.species.iter().filter(|sp| sp.conspicuous && n.populations.get(&sp.id).is_some_and(|m| m.get(id).is_some_and(|x| *x > 0))).map(|sp| sp.id).collect()
         }),
+        remains: st.remains.iter().filter(|(_, at)| *at == id).map(|(b, _)| *b).collect(),
         structure: c.structure.as_ref().map(|sid| {
             if let Some((_, structure)) = shown.iter().rev().find(|(shown, _)| shown == sid) {
                 return structure.clone();
@@ -349,9 +353,23 @@ pub fn begin(s: &Statics, st: &mut State, participant: &str, key: &str, path: &s
     let mut timeline = st.timelines.get(&timeline_key).cloned().unwrap_or_default();
     let (starts, done) = oikos_time::place_within(&mut timeline.lanes, lanes, t, seconds, crate::kernel::lane_hours(s, st, &timeline_key));
     st.timelines.insert(timeline_key, timeline);
+    // (A person goes there and back, law 9 S3: out of where they are from the start until it ends.)
+    let mut set_out = vec![];
+    if let Some(b) = person.filter(|_| !places.is_empty() && seconds > 0) {
+        let home = st.structures_of(&b).into_iter().next();
+        if let Some(h) = home {
+            if starts <= t {
+                set_out = crate::exec::depart(s, st, &b, &h, &[], None, done, None, None, participant);
+            } else {
+                st.schedule(starts, Sched::Depart { body: b, to: h, via: vec![], fuel: None, arrives: done, vehicle: None, act: None, by: Id::new(participant) });
+            }
+        }
+    }
     let position = (key != crate::config::SELF).then(|| key.to_string());
     st.schedule(done, Sched::Visit { participant: participant.into(), position: position.clone().map(Into::into), channel: path.into(), places: places.to_vec(), cells: cells.into_iter().flatten().collect(), names });
-    vec![Timed::new(t, EventBody::VisitStarted { participant: participant.into(), position: position.map(Into::into), channel: path.into(), places: places.to_vec(), starts, done, })]
+    let mut out = vec![Timed::new(t, EventBody::VisitStarted { participant: participant.into(), position: position.map(Into::into), channel: path.into(), places: places.to_vec(), starts, done })];
+    out.extend(set_out);
+    out
 }
 
 /// A visit ended: what is at the cells gone to, now, kept for the looker's next observation.

@@ -84,6 +84,16 @@ pub struct BodyView {
     /// The vehicles it may drive (its own, and those their owners let it), each where it stands (law 9: its own things).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub vehicles: Vec<VehicleView>,
+    /// On its way (law 9, S3): where to, and when it arrives.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_way: Option<OnWayView>,
+}
+
+/// A body's trip, as it knows it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OnWayView {
+    pub to: Id,
+    pub arrives: i64,
 }
 
 /// A vehicle as one who may drive it knows it: what it is and where it stands.
@@ -93,6 +103,14 @@ pub struct VehicleView {
     #[serde(rename = "type")]
     pub type_: Id,
     pub at: Id,
+    /// What it runs on, what its tank holds of it now (its owner's holding at the vehicle) and holds full (law 9, S5).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fuel: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::money::opt_amount")]
+    pub in_tank: Option<crate::money::Money>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tank: Option<i64>,
+    pub owner: Id,
 }
 
 /// A child, as their parent knows them.
@@ -1260,7 +1278,19 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             .filter_map(|cfg| b.variables.get(&cfg.id).map(|x| (cfg.id, crate::state::body_variable_at(cfg, *x, st.t).0)))
             .collect(),
         in_space: st.structures_of(person).into_iter().find_map(|sid| st.occupancy.get(&sid)?.iter().find(|(_, bodies)| bodies.contains(person)).map(|(sp, _)| *sp)),
-        vehicles: s.drivers_of.get(person).into_iter().flatten().filter_map(|v| st.vehicles.get(v).map(|x| VehicleView { vehicle: *v, type_: x.type_, at: x.at })).collect(),
+        vehicles: s
+            .drivers_of
+            .get(person)
+            .into_iter()
+            .flatten()
+            .filter_map(|v| {
+                let x = st.vehicles.get(v)?;
+                let t = s.config.travel.as_ref().and_then(|t| t.vehicle_types.iter().find(|t| t.id == x.type_));
+                let fuel = t.and_then(|t| t.fuel);
+                Some(VehicleView { vehicle: *v, type_: x.type_, at: x.at, fuel, in_tank: fuel.map(|k| st.holding(&x.owner, v, &k)), tank: t.and_then(|t| t.tank), owner: x.owner })
+            })
+            .collect(),
+        on_way: st.transit.get(person).map(|x| OnWayView { to: x.to, arrives: x.arrives }),
     });
     let positions = st
         .held_by(participant)

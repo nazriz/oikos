@@ -22,7 +22,7 @@
 
 use crate::common::book::Book;
 use crate::common::{cents, data, filed_before, money_words, withdraw, Fields, MONTH};
-use crate::market::trade::{self, decline, decline_on_terms, fill, held, price_list, send_back, Order, OrderBook, SellingTerms, TradeThen};
+use crate::market::trade::{self, decline, decline_on_terms, held, price_list, send_back, Order, OrderBook, SellingTerms, TradeThen};
 use crate::steps::{because, call, pay, say, text, Done, Pay, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture, DAY};
 use oikos_sight::OutcomeStatus;
@@ -101,6 +101,9 @@ struct Market {
     paid_for: BTreeMap<String, i64>,
     baseline: BTreeMap<String, i64>,
     answered: BTreeSet<String>,
+    /// How long our freight took to each place we sent goods to (law 9): what a note tells the buyer to expect.
+    #[serde(default)]
+    freight: BTreeMap<String, i64>,
 }
 
 impl Market {
@@ -161,6 +164,9 @@ impl Plan for Market {
             Then::Delivered { order, t } =>
                 match done {
                     Done::Outcome(o) if o.status == OutcomeStatus::Applied => {
+                        for (to, secs) in &o.freight {
+                            self.freight.insert(to.to_string(), *secs);
+                        }
                         *self.sent.entry(order.kind.clone()).or_insert(0) += order.quantity;
                         self.orders.bill(order, order.quantity, *t);
                         vec![]
@@ -247,7 +253,9 @@ impl Plan for Market {
                     }
                 )
             };
-            let mut st: Step<Then> = fill(o, if ok { o.quantity } else { 0 }, &me, &self.p.account, &why, cx);
+            // (When they will be there, as our freight to that place has taken: none known, the buyer learns it from the goods.)
+            let arrives = self.freight.get(&o.at).map(|x| t + x);
+            let mut st: Step<Then> = trade::fill_arriving(o, if ok { o.quantity } else { 0 }, &me, &self.p.account, &why, cx, arrives);
             if ok {
                 st.then = Some(Then::Delivered { order: o.clone(), t });
             }
@@ -336,7 +344,7 @@ impl Plan for Market {
                 calls.push(pay(&owed_to, amount, Pay { from: Some(self.p.account.clone()), for_: Some(format!("{take} {kind} bought.")), settles: Some(inv.id.to_string()), ..Default::default() }, cx));
             }
             if back > 0 && !return_to.is_empty() {
-                calls.push(call("goods", vec![("kind", Some(crate::steps::arg(&kind))), ("quantity", Some(text(back.to_string()))), ("to", Some(crate::steps::arg(&from))), ("at", Some(crate::steps::arg(&return_to))), ("from_at", Some(crate::steps::arg(&me)))]));
+                calls.push(call("goods", vec![("carried", Some(crate::steps::arg("yes"))), ("kind", Some(crate::steps::arg(&kind))), ("quantity", Some(text(back.to_string()))), ("to", Some(crate::steps::arg(&from))), ("at", Some(crate::steps::arg(&return_to))), ("from_at", Some(crate::steps::arg(&me)))]));
             }
             if back > 0 {
                 calls.push(say(
@@ -414,6 +422,7 @@ impl Kind for WorldTrade {
             month: -1,
             bought: BTreeMap::new(),
             sent: BTreeMap::new(),
+            freight: BTreeMap::new(),
             paid_for: BTreeMap::new(),
             baseline: BTreeMap::new(),
             answered: BTreeSet::new(),

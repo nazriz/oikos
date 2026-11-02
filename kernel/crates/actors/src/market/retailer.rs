@@ -326,6 +326,10 @@ pub struct Shop<B: Body> {
     asked: Asked,
     /// Goods ordered from suppliers, not yet delivered.
     on_order: i64,
+    /// Delivered and still on the road to us (law 9: the seller's note says when they arrive): (quantity, when). They
+    /// stay on order until then.
+    #[serde(default)]
+    coming: Vec<(i64, i64)>,
     /// Our order -> (seller, quantity).
     ours: BTreeMap<String, (String, i64)>,
     /// What we have learned of each supplier's deliveries (sourcing.rs).
@@ -409,6 +413,7 @@ impl<B: Body> Shop<B> {
             deliveries: Deliveries::default(),
             asked: Asked::default(),
             on_order: 0,
+            coming: vec![],
             ours: BTreeMap::new(),
             sources: sourcing::Record::default(),
             stock_meter: StockMeter::default(),
@@ -625,7 +630,7 @@ impl<B: Body> Shop<B> {
         }
         calls.push(pay(&rent_to, lt.rent, Pay { from: Some(account.to_string()), every: Some(MONTH), first: Some(0), basis: Some(a.id.to_string()), for_: Some(format!("Rent for {space}, monthly in advance.")), ..Default::default() }, cx));
         if stock > 0 && structure != self.at.premises {
-            calls.push(call("goods", vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&structure))), ("from_at", Some(arg(&self.at.premises)))]));
+            calls.push(call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&structure))), ("from_at", Some(arg(&self.at.premises)))]));
         }
         // (Until when it binds us: its term, from now, as its terms say.)
         let term = match &a.body {
@@ -722,7 +727,7 @@ impl<B: Body> Shop<B> {
             let mut calls: Vec<Call> = orders.iter().map(|o| withdraw(o, Some("Lease ended; stop this standing order."))).collect();
             let (back, back_space, back_cell) = l.from.clone();
             if stock > 0 && !back.is_empty() && back != l.structure {
-                calls.push(call("goods", vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&back))), ("from_at", Some(arg(&l.structure)))]));
+                calls.push(call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(stock.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&back))), ("from_at", Some(arg(&l.structure)))]));
             }
             if let Some(op) = self.p.operator.clone() {
                 calls.push(say(
@@ -889,12 +894,17 @@ impl<B: Body> Plan for Shop<B> {
         self.setup.absorb(pic, account, &self.p.sale_board, &self.p.sold_board);
         self.orders.take(pic, account);
         self.payables.take(&self.book);
+        let t = pic.t;
         for d in self.deliveries.take(&self.book, &self.me) {
             let Some((seller, quantity)) = self.ours.remove(&d.order) else { continue };
-            self.on_order = (self.on_order - quantity).max(0);
+            self.coming.push((quantity, d.arrives.unwrap_or(t)));
             self.sources.delivered(&self.p.sourcing, &seller, quantity, d.delivered);
             self.books.r#in += d.delivered;
         }
+        // (What has arrived is no longer on order: it is held.)
+        let arrived: i64 = self.coming.iter().filter(|x| x.1 <= t).map(|x| x.0).sum();
+        self.coming.retain(|x| x.1 > t);
+        self.on_order = (self.on_order - arrived).max(0);
     }
 
     fn looks(&mut self, pic: &Picture) -> Vec<LookRequest> {
@@ -1106,7 +1116,7 @@ impl<B: Body> Shop<B> {
             }
             calls.push(call(
                 "goods",
-                vec![("kind", Some(arg(&o.kind))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&o.to))), ("at", Some(arg(&o.at))), ("from_at", Some(arg(&self.at.premises)))],
+                vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&o.kind))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&o.to))), ("at", Some(arg(&o.at))), ("from_at", Some(arg(&self.at.premises)))],
             ));
         }
         if total >= 0 {
@@ -1228,7 +1238,7 @@ impl<B: Body> Shop<B> {
                     format!("Our owner lives at {} now: taking our stock there.", d.s("space").unwrap_or_default()),
                     vec![call(
                         "goods",
-                        vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(had.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&to))), ("from_at", Some(arg(&self.at.premises)))],
+                        vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(had.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&to))), ("from_at", Some(arg(&self.at.premises)))],
                     )],
                 ));
             }
