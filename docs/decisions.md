@@ -10839,3 +10839,22 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   people for 180 days at landed main's state hash and log digest (`8e91f08e`, `061b34ba`), peak resident 4.39 GB against
   4.58.
 - **Revisit if:** the police post's loop is fixed (then 50,000 for two years, measured); the projection's fall does not come.
+
+## 2026-11-02 · The police send one round of calls at a time, and a household reports one missing once until they are home (WM-6, after a 50,000-person run stopped; results move; no model called)
+
+- **What we saw:** main's 50,000-person town stopped at day 89 (t=7754574): "participants kept waking each other (1000
+  rounds in one moment)". Replayed with a line per wake from round 990, it was the police station: at each wake it sent
+  a round of calls (16 places) while the one before was still out, and each wake was the next in the same moment, so it
+  sent its whole list at once. The list held about four thousand missing-person calls of 729 people in 89 days (6 of them
+  dead): a household reported a member missing again for each of their goings, and one who lives elsewhere and drops by
+  was reported up to 86 times.
+- **Police:** a round of calls goes out, and the next when the officer is back (what they found comes in), as the works
+  office's inspector does; waited for until the next day at most (a round whose places were none to go to brings
+  nothing back). Law 9: a going takes the goer's time.
+- **Household:** a member is reported missing once, until they are seen home again (`missing:<person>`), not once for
+  each going.
+- **Test:** police/tests.rs, a round goes out one at a time and the next when the officer is back (fails without it).
+- **Not done:** the household still cannot tell a member who lives elsewhere from one who has not come home (it knows
+  their departures, not their other homes); such a member is reported once each time they drop by and go. Revisit if a
+  result counts missing-person reports (then the household asks the member first, by message, and reports only if no
+  answer comes).

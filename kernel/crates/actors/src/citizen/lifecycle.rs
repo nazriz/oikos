@@ -284,9 +284,14 @@ impl Person {
         let in_now: BTreeSet<String> = sp.occupants.iter().flatten().map(|o| o.to_string()).collect();
         let structure = structure_of(&home).to_string();
         let at = cells(w.pic, wf.channel.as_str()).iter().find(|c| c.structure.as_ref().is_some_and(|s| s.structure == structure.as_str())).map(|c| c.cell.to_string()).unwrap_or_else(|| structure.clone());
+        // (Reported once until they are home again: a household that has told the police does not tell them again each
+        // time it looks round, nor for each going of one who comes and goes and was never back while we were in.)
+        for m in hh.members.iter().filter(|m| in_now.contains(&m.person)) {
+            self.lifecycle.asked_about.remove(&format!("missing:{}", m.person));
+        }
         for m in hh.members.iter().filter(|m| m.person != self.me && !in_now.contains(&m.person) && !self.s.mourned.contains(m.person.as_str())) {
             let Some(l) = sp.left.iter().flatten().filter(|l| l.occupant == m.person.as_str()).max_by_key(|l| l.at) else { continue };
-            let key = format!("missing:{}@{}", m.person, l.at);
+            let key = format!("missing:{}", m.person);
             if died(l.reason) || l.reason != oikos_contracts::events::VacateReason::Left || t - l.at <= DAY || self.lifecycle.asked_about.contains(&key) {
                 continue;
             }

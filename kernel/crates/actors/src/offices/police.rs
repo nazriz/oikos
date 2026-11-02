@@ -232,6 +232,7 @@ impl Kind for Station {
             answered: BTreeSet::new(),
             found: vec![],
             told: BTreeSet::new(),
+            out_since: None,
         })))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
@@ -305,6 +306,11 @@ struct Police {
     found: Vec<(String, String)>,
     told: BTreeSet<String>,
     calling_now: bool,
+    /// An officer out on a round of calls, sent when: the next round goes when they are back (law 9: a going takes the
+    /// goer's time; a station that sent a round every time it woke sent its whole list in one moment). Waited for until
+    /// the next day at most (a round whose places were none to go to brings nothing back).
+    #[serde(default)]
+    out_since: Option<i64>,
 }
 
 impl Police {
@@ -363,7 +369,11 @@ impl Plan for Police {
         }
         // What a call found: whoever died in the home we were asked about (having gone in, we see who left it and why).
         if !self.p.calls_channel.is_empty() {
-            for c in visited(pic, &self.p.calls_channel) {
+            let back = visited(pic, &self.p.calls_channel);
+            if !back.is_empty() || self.out_since.is_some_and(|s| pic.t >= s + DAY) {
+                self.out_since = None;
+            }
+            for c in back {
                 // (Asked to come to a place on the road where someone lies dead: whoever lies there is found there.)
                 if !c.remains.is_empty() && self.called.remove(c.cell.as_str()) {
                     for r in &c.remains {
@@ -657,13 +667,14 @@ impl Plan for Police {
 
     /// Going to the homes we are asked to call at (an officer's going: it takes the station's time; what is found comes
     /// when they are back).
-    fn looks(&mut self, _pic: &Picture) -> Vec<LookRequest> {
+    fn looks(&mut self, pic: &Picture) -> Vec<LookRequest> {
         // (A place on the road where we found whoever lay there is not gone to again.)
         let answered = &self.answered;
         self.calls.retain(|c| !answered.contains(&format!("{}@found", c.structure)));
-        if self.p.calls_channel.is_empty() || self.calls.is_empty() || !self.calling_now {
+        if self.p.calls_channel.is_empty() || self.calls.is_empty() || !self.calling_now || self.out_since.is_some() {
             return vec![];
         }
+        self.out_since = Some(pic.t);
         let n = self.calls.len().min(VISIT_MAX);
         let go: Vec<Call> = self.calls.drain(..n).collect();
         let mut places: Vec<String> = vec![];
