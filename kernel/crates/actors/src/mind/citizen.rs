@@ -487,11 +487,13 @@ pub struct State {
     // talk
     /// (Each boxed: a map's node holds room for eleven, and a told item is some 250 bytes. SC-1.)
     pub told_us: BTreeMap<String, (Box<News>, i64)>,
-    pub talked: BTreeMap<String, i64>,
+    /// (Keyed by interned ids, ordered and written as the strings they are: a person comes to know some hundreds over
+    /// years, each a string apiece before: SC-6.)
+    pub talked: BTreeMap<oikos_core::Id, i64>,
     /// People we have come to know by talking with them, mourning with them or meeting them at a gathering (TS's
     /// `peopleWeKnow`, kept at the same places): those asked whether we may stay when we have no home.
     #[serde(default)]
-    pub people_known: BTreeSet<String>,
+    pub people_known: BTreeSet<oikos_core::Id>,
     /// The people we know from homes and workplaces shared, with when, in the order TS's Map kept them.
     pub contacts: Vec<(String, i64)>,
     pub asked_how: Vec<String>,

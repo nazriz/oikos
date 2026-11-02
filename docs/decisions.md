@@ -10823,3 +10823,19 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Not changed:** a child coming home to a dwelling whose tenancy has ended (the leave refused while they were out) is
   left as found; it is a behaviour question (who tells a child the home is gone?), not this fault.
 - **Revisit if:** households move with other members than children (the adults are told and come themselves).
+
+## 2026-11-02 · Tiered storage, a second step: 50,000 people measured to day 89, and what every record keeps made smaller (SC-6; branch `tiered-storage`; no result changes; no model called)
+
+- **50,000 people** (docs/design/performance.md, "Tiered storage"): resident 14.7 GB at day 80 against main's 21.8, growing
+  54 MB a simulated day against 110 (days 30 to 80). Main and both tiered builds stop at the same moment, t=7754574 on day
+  89, "participants kept waking each other (1000 rounds in one moment): c3090-self|police-oic among them": a fault of
+  main's (law 9's owners have it), so two years at 50,000 are not measured yet. Projected from the 10,000 town (whose
+  growth fell by a third once its first months were past): near 38 GB for two years, 50 GB if it does not fall.
+- **A snapshot of the 50,000 town does not fit:** at day 80 the footprint went from 22.5 to 82 GB while it was written (main
+  f2a3568a's binary host; `runs/tier-50000-police-snapshot`). Recorded under SC-2's resume, not fixed here: a snapshot would
+  have to be written as the state hash is, streamed.
+- **Smaller:** whom a person has talked with and come to know keyed by interned ids (the same order, the same words
+  written out); a book's places of minted ids in four bytes; the tier reads when a record was filed from its slot. 10,000
+  people for 180 days at landed main's state hash and log digest (`8e91f08e`, `061b34ba`), peak resident 4.39 GB against
+  4.58.
+- **Revisit if:** the police post's loop is fixed (then 50,000 for two years, measured); the projection's fall does not come.

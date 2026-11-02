@@ -131,22 +131,31 @@ fn key(id: &str) -> Key {
 }
 
 /// Where each record stands in the order seen, by id. Minted ids (`rec.<n>`) come mostly in the order they were filed,
-/// so they are kept in a list sorted by number, pushed at its end or put in near it (16 bytes a record, where a map's
-/// node held about 45: risk SC-1); one that would go further back than `NEAR` from the end, and every other id, goes
-/// in a map. Either way a record has one place, found by its id; nothing reads the order they are kept in.
+/// so they are kept in a list sorted by number, pushed at its end or put in near it (8 bytes a record, where a map's
+/// node held about 45: risks SC-1, SC-6); one that would go further back than `NEAR` from the end, one numbered past
+/// what four bytes hold, and every other id, goes in a map. Either way a record has one place, found by its id; nothing
+/// reads the order they are kept in.
 #[derive(Debug, Default)]
 struct Place {
-    minted: Vec<(u64, u32)>,
+    minted: Vec<(u32, u32)>,
     other: BTreeMap<Key, u32>,
 }
 
 /// How far back from its end a minted id is put into the list (a shift of at most so many entries).
 const NEAR: usize = 64;
 
+/// A minted id's number, where four bytes hold it.
+fn small(k: &Key) -> Option<u32> {
+    match k {
+        Key::N(n) => u32::try_from(*n).ok(),
+        Key::S(_) => None,
+    }
+}
+
 impl Place {
     fn get(&self, k: &Key) -> Option<&u32> {
-        if let Key::N(n) = k {
-            if let Ok(i) = self.minted.binary_search_by_key(n, |e| e.0) {
+        if let Some(n) = small(k) {
+            if let Ok(i) = self.minted.binary_search_by_key(&n, |e| e.0) {
                 return Some(&self.minted[i].1);
             }
         }
@@ -157,7 +166,7 @@ impl Place {
     }
     /// (Of an id not held: `Book::take` asks first.)
     fn insert(&mut self, k: Key, i: u32) {
-        if let Key::N(n) = k {
+        if let Some(n) = small(&k) {
             let at = self.minted.partition_point(|e| e.0 < n);
             if self.minted.len() - at <= NEAR {
                 self.minted.insert(at, (n, i));
@@ -168,11 +177,11 @@ impl Place {
     }
     /// Gives up the places of these ids.
     fn remove_all(&mut self, ks: impl Iterator<Item = Key>) {
-        let mut gone: Vec<u64> = vec![];
+        let mut gone: Vec<u32> = vec![];
         for k in ks {
-            match k {
-                Key::N(n) if self.other.remove(&k).is_none() => gone.push(n),
-                k => {
+            match small(&k) {
+                Some(n) if self.other.remove(&k).is_none() => gone.push(n),
+                _ => {
                     self.other.remove(&k);
                 }
             }

@@ -413,13 +413,12 @@ pub struct Tally {
     pub disk_bytes: u64,
 }
 
-/// The kernel's tier of records: every record of the world's store, in the order filed, with when each was filed and
-/// last read (in days), and the run's cold file. Off (no file): every record stays in memory, as before.
+/// The kernel's tier of records: every record of the world's store, in the order filed, with when each was last read (in
+/// days; when it was made its slot knows), and the run's cold file. Off (no file): every record stays in memory, as before.
 pub struct Tier {
     file: Option<Arc<ColdFile>>,
     policy: Policy,
     slots: Vec<Rec>,
-    born: Vec<i32>,
     last: Vec<i32>,
     /// Places of the records that may be in memory.
     hot: Vec<u32>,
@@ -434,7 +433,7 @@ impl Default for Tier {
 
 impl Tier {
     pub fn off() -> Tier {
-        Tier { file: None, policy: Policy::default(), slots: vec![], born: vec![], last: vec![], hot: vec![], tally: Tally::default() }
+        Tier { file: None, policy: Policy::default(), slots: vec![], last: vec![], hot: vec![], tally: Tally::default() }
     }
 
     /// A tier whose cold file is `path` (made anew; removed when the run is over).
@@ -476,7 +475,6 @@ impl Tier {
         let day = day as i32;
         self.hot.push(self.slots.len() as u32);
         self.slots.push(r.clone());
-        self.born.push(day);
         self.last.push(day);
     }
 
@@ -500,7 +498,9 @@ impl Tier {
             if held(slot.hot.read()).is_none() {
                 continue;
             }
-            let ready = i64::from(today - self.born[i as usize]) >= self.policy.after_days && i64::from(today - self.last[i as usize]) >= self.policy.idle_days;
+            // (Filed on the day its record was made: the slot knows when.)
+            let filed = slot.at.div_euclid(86_400);
+            let ready = i64::from(today) - filed >= self.policy.after_days && i64::from(today - self.last[i as usize]) >= self.policy.idle_days;
             if ready {
                 cool.push(i);
             } else {
@@ -567,7 +567,7 @@ mod tests {
     use super::*;
 
     fn rec(i: u64) -> Rec {
-        let v = serde_json::json!({ "id": format!("rec.{i}"), "author": "p1", "at": i as i64 * 86_400, "visible_to": "public", "record": "statement", "kind": "note", "text": format!("the {i}th: \"quoted\" é"), "data": { "n": i, "list": [1, 2, { "deep": "x" }] } });
+        let v = serde_json::json!({ "id": format!("rec.{i}"), "author": "p1", "at": (i / 100) as i64 * 86_400, "visible_to": "public", "record": "statement", "kind": "note", "text": format!("the {i}th: \"quoted\" é"), "data": { "n": i, "list": [1, 2, { "deep": "x" }] } });
         Rec::new(serde_json::from_value(v).expect("a record"))
     }
 

@@ -45,8 +45,8 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
     books holding them by handle, readers that read what they no longer needed fixed, addressed statements and matters'
     draw counts held small or let go, offices' files tiered, travel caches bounded; a growth budget. Landed: the 10,000
     town grows 8.8 MB a day, from 24.3, byte-identical (4.18 GB at day 180 against 6.22). Next: 50,000 for two years
-    measured against the 40 GB goal (projected 45 to 50 GB; blocked by main's day-89 police stop), and what each cold
-    record keeps in memory.
+    measured against the 40 GB goal (to day 80: 14.7 GB against main's 21.8, 54 MB a day against 110; projected near 38
+    GB; blocked by main's day-89 police stop), and what each cold record keeps in memory.
 - [x] **Foundations-2, phase 1: capacity** (law 10). Every act has a time, every system its hours and lanes; casework
   done by officers' minutes (WM-14). Landed at 0824efb6; tag `pre-foundations-2` is main at 8570d699, before it.
 - [~] **Test strength.** Dead TypeScript removed; the planted-bug catalogue rebuilt against the code that runs; tests
