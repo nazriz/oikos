@@ -83,6 +83,9 @@ pub struct Absorbed {
     pub told_dead: Vec<(String, String)>,
     /// A lease on a home we found under water (housing ends it).
     pub uninhabitable: Option<String>,
+    /// Our move into a home refused because one we were bringing was already in it: which block (housing drops them).
+    #[serde(default)]
+    pub already_in_block: Option<usize>,
     /// A rent standing order just set up for this lease: its id comes back in the outcome (housing sets it).
     pub pending_rent_order: Option<String>,
     /// Offers of a lease addressed to us that succeed a tenant who has died (their basis the old lease): housing signs
@@ -717,6 +720,9 @@ impl Person {
                     }
                 }
                 let code = last.refusal.as_ref().map(|r| refusal_code(r.code)).unwrap_or_default();
+                if code == "already_present" {
+                    self.absorbed.already_in_block = last.refusal.as_ref().and_then(|r| r.block);
+                }
                 if let Some(h) = self.s.home.clone().filter(|h| !h.owned) {
                     let (k, f) = if h.moved_in { ("moved_in", BTreeMap::new()) } else { ("not_in_yet", facts([("why", json!(code))])) };
                     self.tell(w, outcome("home", &h.space, k, Way::Mine, f, None));

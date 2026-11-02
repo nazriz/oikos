@@ -121,6 +121,12 @@ pub struct Housing {
     took_in: BTreeSet<String>,
     stay_asked: BTreeSet<String>,
     next_move_try: i64,
+    /// Who we last tried to bring into the home with us, in order (the blocks after our own), and those the world said
+    /// were in it already (`space|person`): they are not brought again.
+    #[serde(default)]
+    move_kids: Vec<String>,
+    #[serde(default)]
+    already_in: BTreeSet<String>,
     energy_for: Option<String>,
     /// What we have asked to be supplied with (`<lease>/<kind>`), and connections we have asked to stop (foundations-2 C4).
     #[serde(default)]
@@ -1634,7 +1640,14 @@ impl Person {
         if let Some(h) = self.s.home.clone().filter(|h| !h.moved_in) {
             if t >= self.housing.next_move_try {
                 self.housing.next_move_try = t + DAY;
-                let kids = self.children(t);
+                // (One we brought last time was in the home already, the world said: not brought again.)
+                if let Some(i) = self.absorbed.already_in_block.take().filter(|i| *i >= 1) {
+                    if let Some(k) = self.housing.move_kids.get(i - 1).cloned() {
+                        self.housing.already_in.insert(format!("{}|{k}", h.space));
+                    }
+                }
+                let kids: Vec<_> = self.children(t).into_iter().filter(|k| !self.housing.already_in.contains(&format!("{}|{}", h.space, k.person))).collect();
+                self.housing.move_kids = kids.iter().map(|k| k.person.clone()).collect();
                 let mut calls = vec![move_in(&h.space)];
                 calls.extend(kids.iter().map(|k| call("occupancy", vec![("in", Some(arg(&h.space))), ("who", Some(arg(&k.person)))])));
                 w.push_marked(because(format!("Moving into {}, which we hold a lease on{}.", h.space, if kids.is_empty() { "" } else { ", with the children" }), calls), Mark::Move);
