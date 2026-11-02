@@ -10870,3 +10870,24 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Also measured:** the 50,000-person two-year run on main (`runs/tier-50000-2y`) is past the day-89 stop (fixed on
   main); resident 18.4 GB at day 130, growing some 74 MB a day from day 30 to 90 and 47 from 100 to 130.
 - **Revisit if:** a reader of the log comes to need an id's earlier stamps (none does: `since` asks only for what came after one).
+
+## 2026-11-03 · Minted record ids held by their number (SC-6; amends R1, "Ids interned"; branch `tiered-storage`; no result changes; no model called)
+
+- **Found** (a heap profile of the 10,000-person town, days 98 to 240): of the 9.2 MB a simulated day that still grows,
+  some 1.3 MB was interned record ids. A record's id (`rec.<n>`) is minted once a record and is the most numerous id a
+  run holds (3.8 million of them in 10,000 people's 180 days); R1 kept each in the interner's sharded hash tables,
+  whose slots, at most half full and doubling, cost some 60 bytes an id besides its text.
+- **Change** (kernel/crates/core/src/id.rs): an id whose text is a minted record id in canonical form (`rec.` then a
+  number written without a leading zero, below 2^32) is found by its number, in chunks of 4,096, not in the tables.
+  R1's design otherwise stands: still one copy of each text for the process, an `Id` still a handle on it, ordered,
+  hashed and serialised as the text, so every map's order, every hash and the log are as before. Any other text,
+  `rec.007` included, is interned as before. (The simplest form asked for was a number with its text rendered on
+  demand; it is not taken because an `Id` is a `&'static str` everywhere, and making it an enum would touch every
+  reader for a further saving of about ten bytes an id.)
+- **Results:** the six pinned towns for a month at main's state hashes and log digests; 10,000 people for 180 days at
+  main's state hash and log digest (`1aa21c64`, `2c48bf87`). Peak resident, sampled each minute, 3.80 GB against 4.04
+  for the build before it.
+- **Revisit if:** record ids are minted in another form (then `minted` learns it, or they go back to the tables, which
+  still work); or a run passes 2^32 records (held in the tables beyond that, correct but without the saving); or the
+  texts themselves show in a profile (then the number held and the text written when read, which needs `Id` to change
+  from a `&'static str`).
