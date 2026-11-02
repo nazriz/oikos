@@ -10681,6 +10681,8 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   carried theft had been refused) and were re-taken; culture-dial's did not move.
 - **Revisit if:** an act's trip should be tied to that act alone (f2-s5 adds `Exec.act`: then `tr.act` is the check), or
   takings come to be acts of their own before the trip home.
+- **Then, in the f2-s5 landing:** with `Exec.act` (S5's), the trip counted is the taker's own for this act (`tr.act`).
+- **Revisit if:** takings come to be acts of their own before the trip home.
 
 ## 2026-11-02 · Tiered storage: the world's records nobody reads held on disk, and what else grew with a run (SC-1, SC-6; branch `tiered-storage`; no result changes; no model called)
 
@@ -10707,11 +10709,13 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Results, shown:** the six pinned towns for a month, every record sent to disk from its second day whenever unread that
   day, at main's state and log, with and without; 10,000 people for 60 and for 180 days and 1,000 for 180 at main's state
   hash and log digest; `kernel/tests/a1_citizen.rs` holds a tiered town to one held in memory, byte for byte.
-- **Measured** (docs/design/performance.md, "Tiered storage"): 10,000 people grow 16.5 MB a simulated day against 25.2
-  (-35%), 4.99 GB against 6.19 at day 180; 1,000 people for 180 days 573 to 587 MB against 670; the run's own thread
-  within noise. Still growing: records read in force, the last 30 days' records, and what stays of every record when it
-  is cold (slot, map entries, book entries: some 300 to 400 bytes a record), the units' views and knowledge, the actors'
-  own state.
+- **Measured** (docs/design/performance.md, "Tiered storage"), on main f2a3568a: 10,000 people grow 8.8 MB a simulated
+  day against 24.3 (-64%), a footprint of 4.18 GB against 6.22 at day 180, the same state and log; 1,000 people for 180
+  days 533 to 557 MB against 691 to 695; the run's own thread within noise. 50,000 people (an earlier build, before the
+  payroll's fix) 17.4 GB against 23.6 at day 89, both stopped there by a fault of main's (the police post's wakes), so two
+  years at 50,000 are not measured yet: projected some 45 to 50 GB. Still growing: what stays of every record when it is
+  cold (slot, map entries, book entries: some 250 to 350 bytes a record), the units' views and knowledge, the actors' own
+  state.
 - **The budget:** the month's ceiling lowered from 270 to 235 KB a person (main and the branch both measure about 218 on
   the Mini today); a growth budget added (the same town's half-year past its month, 1,700 bytes a person a day; main
   f2a3568a about 2,450, the branch 1,410 to 1,570), `orchestrator/test/memory-budget.test.ts`, slow tier (+90 s).
@@ -10722,9 +10726,6 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   the fault, as these were); a study's run needs to resume from a snapshot without the records whole in it; the cold
   file's disk passes what the run server has to spare; 50,000 for two years does not fit (then the per-record cost that
   stays when cold, the books' entries, and the units' views are next).
-
-- **Then, in the f2-s5 landing:** with `Exec.act` (S5's), the trip counted is the taker's own for this act (`tr.act`).
-- **Revisit if:** takings come to be acts of their own before the trip home.
 
 ## 2026-11-02 · Law 9 is a hard rule in CLAUDE.md (landing `f2-s5`; project rules; no model called)
 

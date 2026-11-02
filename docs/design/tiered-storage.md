@@ -73,6 +73,9 @@ claims): held in memory, as the proposal said it would be.
 - **The resolver's addressed statements** (`Knowledge::addressed`, what a hold on a paper is addressed to): one entry
   for every addressed statement each participant has seen, kept for the run. Held small: by the record's number, its
   list of addressees held once for all (`Addressed`); written out (a snapshot) as the map it stands for.
+- **Perception's index of records** (`RecordIndex`): what every record keeps there for the run, held in four bytes a
+  number, and what stands read from its lists less what was taken down (two sets that held every standing record).
+- **The travel caches** (quickest-time trees and trips): bounded; past the bound, an earlier ground's go, then all.
 - **The twins' per-matter draw counts** (`Draws::matter_occurrences`): a matter may say when it is over
   (`Cx::rng_until`, `Cx::rng_once`), and its count goes then. A gathering's matter ends when it begins (it is decided on
   only before); a delivered order's faultiness is drawn once, when its note is read. Results identical: a matter is
