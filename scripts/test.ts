@@ -133,7 +133,7 @@ function gateBuild() {
   // (The merge's build takes six: nothing of the gate can start before it, but asking the whole pool waited minutes for
   // the last tokens on a busy machine. The kernel's test programs are built
   // after, beside the test files: 2026-10-24, building them here first made a kernel change's gate 220 s, beside 170 s.)
-  const cmd = `cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace -q && cargo build --release --manifest-path kernel/Cargo.toml --target wasm32-unknown-unknown -p oikos-law -q`;
+  const cmd = `bun scripts/disk-tidy.ts --prune-incremental --apply && cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace -q && cargo build --release --manifest-path kernel/Cargo.toml --target wasm32-unknown-unknown -p oikos-law -q`;
   if (!run(["bun", join(import.meta.dir, "slots.ts"), "--weight", String(defaultPriority() ? 6 : 4), "--what", "kernel build (gate profile)", "--", "sh", "-c", cmd], repo)) stop("the gate build of the kernel failed: run `cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace` and read its errors");
   const lib = ["liboikos_napi.dylib", "liboikos_napi.so"].map((f) => join(target, "gate", f)).find((f) => existsSync(f));
   process.env.OIKOS_KERNEL = join(target, "gate", "oikos-kernel");
