@@ -582,6 +582,18 @@ impl<V: Clone + PartialEq> Changes<V> {
                     }
                 }
                 self.log[start..].sort_unstable();
+                // (Only an id's latest entry answers anything: "which ids have a stamp above this one" is the same
+                // with its earlier ones gone. Let go of once they outnumber the ids four to one: an account changes at
+                // every payment, and the log held every change of the run, SC-6.)
+                if self.log.len() > 4 * self.ids.len() + 4096 {
+                    let mut latest: Vec<u64> = vec![0; self.ids.len()];
+                    for &(c, n) in &self.log {
+                        latest[n as usize] = latest[n as usize].max(c);
+                    }
+                    self.log.retain(|&(c, n)| c == latest[n as usize]);
+                    self.log.dedup();
+                    self.log.shrink_to_fit();
+                }
             }
         }
         self.seen = Some(now.clone());
