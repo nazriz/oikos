@@ -1650,8 +1650,9 @@ The mechanism:
   nobody reads on disk, readers that read what they no longer needed fixed, a payroll's every-request scan the largest,
   addressed statements and perception's index held small, a matter's draw count let go when it is over, offices' files
   tiered, travel caches bounded; results byte-identical). At 50,000, 17.4 GB at day 89 against main's 23.6 (a build
-  before the payroll's fix); two years there are not measured yet, both stopped at day 89 by a fault of main's (the
-  police post's wakes, t=7754574), and projected at some 45 to 50 GB. What still grows: what each record keeps in memory
+  before the payroll's fix; 14.7 at day 80 with it, against 21.8); two years there are not measured yet, all stopped at
+  day 89 by a fault of main's (the police post's wakes, t=7754574), and projected at near 38 GB (50 if the growth does
+  not fall after the first months, as it did at 10,000). A snapshot at 50,000 does not fit in memory (82 GB at day 80). What still grows: what each record keeps in memory
   when cold (250 to 350 bytes), the units' views and knowledge, the actors' own state. Also seen only at size: one hall of 200 for gatherings in a town of 10,000 is full (2,000 to 4,000 refusals a month),
   and the water works sometimes finds no water in its field to draw (`field_exhausted`) at 10,000.
 - **Where:** `docs/design/performance.md` ("Years at 10,000 and 50,000", "Tiered storage"); `docs/design/tiered-storage.md`;

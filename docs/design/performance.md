@@ -85,19 +85,24 @@ At 1,000 people for 180 days (4 threads, the peak resident): 691 to 695 MB on ma
 thread 72.5 and 112.4 s on main against 70.1 and 115.3 tiered (two pairs, the machine's load moving between them): no
 cost found beyond its noise.
 
-At 50,000 people (`worlds/town-50000.yaml`, lean log, 3 engine threads; runs `tier-50000-before` and `tier-50000-after`),
-main f2a3568a and an earlier tiered build (9cbefc7b: before the payroll's fix, which at 10,000 halved what was left):
+At 50,000 people (`worlds/town-50000.yaml`, lean log, 3 engine threads; runs `tier-50000-before`, `tier-50000-after`
+and `tier-50000-after2`), resident GB (`ps`; the footprint, which `footprint` gives in whole GB here, runs about 0.5 GB
+under it on the tiered builds and 2 GB over it on main):
 
-| 50,000 people, footprint GB | day 15 | day 30 | day 45 | day 60 | day 75 | day 89 | GB a day, days 30 to 89 |
-|---|---|---|---|---|---|---|---|
-| main f2a3568a | 14.3 | 16.4 | 18.4 | 19.5 | 21.5 | 23.6 | 0.12 |
-| tiered (9cbefc7b) | 11.3 | 12.3 | 14.3 | 15.4 | 16.4 | 17.4 | 0.085 |
+| 50,000 people, resident GB | day 10 | day 30 | day 50 | day 70 | day 80 | MB a day, days 30 to 80 |
+|---|---|---|---|---|---|---|
+| main f2a3568a | 14.3 | 16.3 | 18.5 | 19.8 | 21.8 | 110 |
+| tiered, before the payroll's fix (9cbefc7b) | 11.4 | 12.8 | 14.6 | 15.8 | 15.6 | 56 |
+| tiered (1ee81be3) | 11.4 | 12.0 | 13.4 | 14.7 | 14.7 | 54 |
 
-Both stop at the same moment, t=7754574 on day 89: "participants kept waking each other (1000 rounds in one moment):
-c3090-self|police-oic among them", a fault of main's own (law 9's owners have it; a snapshot at day 80 to replay it from,
-`runs/tier-50000-police-snapshot`). Two years at 50,000 can't be measured until it is fixed. From these and the 10,000
-town's runs: about 12 GB at day 30, then some 45 to 55 MB a day with the payroll's fix if it scales with the town, so
-two years would come to some 45 to 50 GB, over the goal of 40: what each cold record keeps in memory is next.
+All three stop at the same moment, t=7754574 on day 89: "participants kept waking each other (1000 rounds in one
+moment): c3090-self|police-oic among them", a fault of main's own (law 9's owners have it). Two years at 50,000 can't be
+measured until it is fixed. At day 87, 1.86 of 3.95 million records were in memory (the last 30 days' are near half of
+a run that young). At 10,000 the tiered town's growth fell by a third once its first months were past (13.5 MB a day at
+days 45 to 75, 8.8 at days 135 to 180), as the records read in force stopped growing: if 50,000 does the same, two
+years come to about 12 GB at day 30, 54 MB a day to day 90 and some 35 after, near 38 GB; at 54 MB a day throughout,
+50 GB. (A snapshot of the 50,000 town at day 80 took the footprint from 22.5 to 82 GB: it does not fit in this machine
+as snapshots are written today, `runs/tier-50000-police-snapshot`.)
 
 **What is left of the growth**, at 8.8 MB a simulated day for 10,000 people (0.9 KB a person a day): what every record
 keeps in memory when it is cold (its slot, its place in the state's map and in perception's index, its entries in the
