@@ -10858,3 +10858,15 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   their departures, not their other homes); such a member is reported once each time they drop by and go. Revisit if a
   result counts missing-person reports (then the household asks the member first, by message, and reports only if no
   answer comes).
+
+## 2026-11-03 · Perception's log of what changed keeps each id's latest entry (SC-6; branch `tiered-storage-changes`; no result changes; no model called)
+
+- **Found** (a heap profile of the 10,000-person town, days 98 to 240): what still grows is spread thin, 9.2 MB a
+  simulated day in all. Of it, perception's log of which accounts changed (`Changes::log`) kept an entry for every change
+  of every account for the whole run (0.35 MB a day there). Only an id's latest entry answers "which ids changed after
+  this stamp", so the earlier ones are let go once the log holds four times as many entries as the ids it names.
+- **Results:** 10,000 people for 180 days at main 0736a870's state hash and log digest (`1aa21c64`, `2c48bf87`); peak
+  resident 4.38 GB against 4.45.
+- **Also measured:** the 50,000-person two-year run on main (`runs/tier-50000-2y`) is past the day-89 stop (fixed on
+  main); resident 18.4 GB at day 130, growing some 74 MB a day from day 30 to 90 and 47 from 100 to 130.
+- **Revisit if:** a reader of the log comes to need an id's earlier stamps (none does: `since` asks only for what came after one).
