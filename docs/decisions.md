@@ -10467,6 +10467,72 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   found by nobody (WM-6 stays open, narrower).
 - **Revisit if** a body lies unfound for long in a busy town (then the straight line is too far from the way people take:
   draw the way cell by cell); deaths on the road show in a result (then an undertaker's or coroner's work, and the time).
+
+## 2026-11-01 · Foundations-2 phase 3, S5: a road carries so many an hour, a full one slows and holds, and a vehicle runs on what is in its tank (branch `f2-s5`; contract additions; results move; no model called)
+
+- **Contract (world config, log; blanket approval).** `catalogue.travel.congestion` (`alpha_bps`, `beta`): the volume-delay
+  function a road's time follows; a vehicle type's `fuel` (the kind it runs on), `fuel_per_100km` and `tank`; a holding may
+  be at a vehicle (its tank, or its load); a new event, `fuel_used` (the vehicle, the kind, how much, the metres driven).
+- **Kernel.** Each way link counts the vehicles that set out on it in the hour, each way (`State.flows`, only the current
+  hour kept). A driven leg's time is each link's free time times 1 + alpha (on it / its capacity)^beta, the Bureau of
+  Public Roads' form in integers; a link already at its capacity this hour takes the vehicle only in the next (it waits the
+  hour out). Routes are the free-flow quickest (no re-routing: the known limit, 3.6). A trip by a vehicle that runs on
+  something draws it from its owner's holding at the vehicle as it sets out, by the metres driven, in whole units as the
+  millionths add up (`Vehicle.fuel_owed`), so a short trip is never charged a unit it did not use; a tank with too little
+  for the trip leaves the vehicle where it stands and the trip is walked. Goods go into a vehicle where it stands, or by
+  driving it to where they are.
+- **Generator, profiles, actors.** Each kind of vehicle runs on the fuel the town's service stations sell (the shop mix's
+  transport kind), at the profile's `round.vehicles.types[].fuel_cost_per_100km` over the kind's price, with a tank of its
+  `range_km`, half full at the start (generator 0.75.0); roads have the profile's `round.roads.congestion` (alpha 0.15,
+  beta 4, the BPR defaults; Traffic Assignment Manual 1964, to confirm; in all nine profiles). A citizen who owns a vehicle
+  puts the transport they bought into its tank, as far as it holds, driving there and back (`use_up_kind`).
+- **Backstop.** `movesForNothing` (a vehicle type that uses no energy, a way with no capacity): the inventory lists the six
+  profiles whose shop mix has no transport kind (their cars and motorcycles, which run on nothing until those profiles
+  say what fuel is sold there). The log audit treats goods into a vehicle as at the place it stands (`farActs`).
+- **What it does:** a unit of the transport kind is about 100 km of a car's driving, so fuel is a small draw in a town
+  (on a 300-person town, 152 fills in 60 days); local roads at 900 vehicles an hour are almost never full, so congestion
+  bites only where the profile or a study gives a road little capacity.
+- **Measured (the stop rule, 3.5):** a 10,000-person year (town-1000 at 10,000, lean log, 4 threads), main at c46643eb
+  (S2 and the representation work, without S3 to S6) against this branch (S3, S4, the deaths on the way, S5, S6's kernel
+  fix): 554 s wall and 504 s on the main thread, against 586 s and 531 s (+6% and +5%); peak memory 4.11 and 4.06 GB; log
+  5.77 and 5.76 GB. Well within 1.3 times. (The two partly overlapped on a loaded machine; the main thread's time is the
+  steadier figure.)
+- **Not as designed:** no load limit in mass (no kind has a mass yet: a carrier takes any quantity); no re-routing round a
+  full road; flows have no day's history kept for whoever looks.
+- **Revisit if:** a study needs congestion (then the town's roads need sourced capacities, and re-routing); a kind gets a
+  mass (then a body's and a vehicle's load); the other profiles' shop mixes name their fuel.
+
+## 2026-11-01 · Foundations-2 phase 3, S6: several towns in one world, joined by road, sharing the outside (branch `f2-s5`; generator option, off by default; results of one town move only by a kernel fix below; no model called)
+
+- **What:** a spec's `towns: N` (`worlds/generator/towns.ts`). Each town is generated whole from the spec, at its own seed
+  (the first at `seed`, then the next), all under the first's weather (`weather_seed`, the stream the first town's weather
+  is drawn from), and composed: laid side by side on one ground, each east of the one before, within one root place,
+  `region`. The first town keeps its ids; every id another town defines is prefixed (`t2-`, `t3-`) wherever it is written,
+  but for the world's vocabulary (a kind, a type, a role, a channel's own name: the police are an entity and a kind, a
+  mayor a post and a role). Shared, once: the outside world (its entities, its accounts, the network's nodes off the
+  ground: the far end of every town's road out and the edges there, so the outside's freight reaches every town), and what
+  of the outside's is alike in every town and names nothing of a town's (the weather bureau, an agency's template). A
+  road joins each town's gate to the next town's, its length the distance between them.
+- **Why this way:** the generator draws one town from the profile; a world of several is several such towns, each as a
+  one-town world would have it, so every rule and figure that holds for one holds for each. The alternative, a generator
+  that draws several towns at once, would touch every one of its four thousand lines.
+- **What it does:** what is published reaches everyone, so a job or a home in another town is seen as one's own town's:
+  in a world of three 60-person towns run a year, 52 of the 84 hires were across towns, and 91 people went into another
+  town's buildings (gatherings at its hall, its shops, a home). Every invariant held, and law 9's log audits found
+  nothing.
+- **Not as designed, and the parity notes:** the world has one design of each building, as big as the town that needs most
+  of it (a school's classrooms, a shop's places of work); one wear rate a day and one rate of pay come short, the first
+  town's (the generator derives each from its town's people; the towns are of one spec, so theirs are near one another).
+  People choose a job without weighing the trip to it (the citizen's choice has no commuting cost yet: hires across towns
+  are as likely as within one, 3 km apart); recorded, not chased.
+- **Kernel fix found by the three-town year (results move in every town).** A crew member's time is theirs again when
+  their part of a round is done, but they are on its way until the act is (the manager's part can be longer); their own
+  trip meanwhile was applied, so they were at a gathering while the round they were on was done. A body on its way for
+  one act is now not there to be sent anywhere by another (`not_present` when due; `Exec.act`), and the citizen tries
+  again later. A single town showed it too (a year of 60 people). Known limit: they come back when the act is done, not
+  when their part is.
+- **Revisit if:** a study needs commuting weighed (then the trip's time and cost in the citizen's choice of job and home,
+  with a real basis); towns of different profiles or sizes in one world (then the composer takes specs, not one).
 ## 2026-11-01 · Main red after foundations-2 S2: own-venture held the owner of a failing business to 150 days
 
 - **What:** CI went red at d0105172 on `own-venture.test.ts`, "someone out of work ... starts a business of one": its
@@ -10570,6 +10636,34 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   scratch script `orchestrator/p-tmp.ts` the branch carried is removed.
 - **Revisit if:** the slow tier passes 1,500 s on the Mini, or merges wait on it; then the twin files and the elections'
   towns first, as the entry above says, before any raise.
+## 2026-11-01 · The environment office learns its crew's pace from a refusal, and stops asking again for fieldwork it was told will not fit (`city.environment` 0.5.3; branch `env-office-fieldwork`; the pinned towns do not move; no model called)
+
+- **The fault (a mechanism bug, not behaviour).** The office sized each day's fieldwork by the survey's stated time a cell
+  and counted its staff's hours itself. When the world refused a batch for time ("w has N s left; this needs M"), it
+  recorded the time left but kept planning at the stated time, so at its next look (five minutes on) it asked for the
+  same number of cells, and was refused again, all afternoon. Any gap between the stated time and the crew's real one
+  does it: with skills on (E4) a scientist is slower than the table's ordinary hand. 100 days of the 300-person town
+  with skills on: 43 refusals of the office's fieldwork, all the same ask (left 13,357 s, needs 13,769 s, every look
+  from 12:35 on one day). It also never gave a refused batch's hours back to the crew's other members, so they looked
+  busier than they were.
+- **Skills off.** The note in "Skills by use" (2026-10-31) counted 18 such refusals in 90 days with skills off, on the
+  branch as it then stood. On today's main, 100 days of the 300-person town with skills off has none: there the stated
+  time is the world's, so the loop needs some other gap to start. The fault is the same either way (the office never
+  learnt from what it was told), and the fix covers both.
+- **The fix.** The office plans with `common::Pace`, as the factories and shops already do: the stated time at first;
+  after a refusal for time, each of the crew as slow as the batch turned out to need; after a batch that went through,
+  a little quicker once a week (so a crew that gets quicker with practice is asked for more). A refused batch's hours
+  go back to the whole crew; the named worker's day is the world's count, as before. After it, the same skills-on town
+  has no refusals of the office's fieldwork in 100 days, and more of the round's fieldwork done (6 batches against 4).
+- **Hashes.** Expected to move every town's; they did not. The pinned towns (`culture-dial`'s three profiles, the
+  default town) pass unchanged: the office's planning differs only after a refusal for time, which those towns never
+  give it (the state hash is the world's, not the actor's saved notes). So no pin was re-taken. A town where the office
+  is refused (skills on, or a crew short of time) runs differently from before, as it should.
+- **Guarded by:** `told_a_days_fieldwork_will_not_fit_it_asks_for_what_the_crews_own_pace_allows_not_the_same_again`
+  (the environment office's tests): refused four cells that need 9 hours against 8 left, it asks for three, never the
+  four again.
+- **Revisit if:** the weekly probe toward a quicker pace shows as a refusal a week in a study of the office (it is the
+  shared manager's behaviour; the factories and shops do the same), or the office comes to do work other than fieldwork.
 
 ## 2026-11-02 · Taking from work under law 9: the taker was there if their way set out from it (landing `f2-s4`; kernel fix; no model called)
 
@@ -10628,3 +10722,55 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   the fault, as these were); a study's run needs to resume from a snapshot without the records whole in it; the cold
   file's disk passes what the run server has to spare; 50,000 for two years does not fit (then the per-record cost that
   stays when cold, the books' entries, and the units' views are next).
+
+- **Then, in the f2-s5 landing:** with `Exec.act` (S5's), the trip counted is the taker's own for this act (`tr.act`).
+- **Revisit if:** takings come to be acts of their own before the trip home.
+
+## 2026-11-02 · Law 9 is a hard rule in CLAUDE.md (landing `f2-s5`; project rules; no model called)
+
+- **What:** CLAUDE.md's "Hard rules" gain law 9 after "All work takes time": everything physical is somewhere, and moves
+  only along a way (a body, holding, vehicle or machine is in a space, at a node or on its way; a move takes the mover's
+  time, the way's capacity and the vehicle's fuel; goods between places only with a carrier; the outside's goods by
+  freight from the edge's node), with `orchestrator/test/everything-is-somewhere.test.ts` as its backstop.
+- **Why:** foundations-2 phase 3 (S1 to S6 and WM-6, branches `f2-phase3`, `f2-s4`, `f2-s5`) makes it a law of the world
+  like the other four; a hard rule is what keeps later work from reintroducing goods or bodies that move by themselves.
+- **Approval:** Naz approved adding the line on 2026-11-02 (hard rules go to him first).
+- **Also:** docs/plan.md's summary line now says phase 3 has landed.
+- **Revisit if:** the law's wording drifts from docs/design/travel.md, or the backstop is renamed.
+
+## 2026-11-02 · A crew's trips are its working time, and planners size the day with them; goods on the road stay on order (law 9, after S4 and S5 landed; contract additions; results move; no model called)
+
+- **What we saw:** main went red after S4 and S5 landed: five slow files (services, production, unions, households,
+  own-venture). Read against main just before S4 (6770ecdc), where all five pass, two faults and one test:
+  - **The day planned without the trips.** S4 made a performer's trip to the site and back their time (it is placed on
+    their lane and counts against their working day), but the offices that size the day's work (the works office's
+    round and upkeep, the builder's projects and repairs) counted only the work. Their acts ran past the day and were
+    refused (the hall's upkeep never got done; the builder retried each day's work a trip too long).
+  - **Goods on the road counted nowhere.** The outside's freight takes its time (S4), but a buyer took its order off its
+    books when the delivery note came, before the goods arrived; until they did, they were neither on order nor held, and
+    it ordered again. A factory bought nearly three times its month's inputs in its second month, ran short, and paid no
+    dividend; at the strike town a striker's wages then came short, and they claimed for them.
+  - **A return counted as a move.** Someone the builder's act takes from home to a site comes back to the space they
+    left by that act; the households test read that as another adult moving them.
+- **Kernel and contract (participant API; blanket approval).** The working-day check counts each performer's trip with
+  their share (`over_the_day`). An outcome tells the one whose act it was how long each body it took somewhere was on
+  its way, there and back (`Outcome.trips`), and how long goods it sent by the outside's freight take to each place
+  (`Outcome.freight`): their own record of their trips, never the network's timetable.
+- **Actors.** A planner keeps its people's trips by site (`common::trips::Trips`: a round's trip shared among its sites; a
+  site never gone to is reckoned at the average of those known, or at nothing until the first trip is back) and sizes
+  the day's work with them: the works office's round and upkeep, the builder's projects and repairs. The outside's trade
+  desk keeps how long its freight takes to each place and says on the delivery note when the goods arrive (`arrives`);
+  a factory and a shop keep goods delivered and still on the road on order until then.
+- **Test.** households.test.ts: a body brought back by the act that took it, to the space it left, is no move.
+- **Not done:** the coordinator's design lets the works office, which keeps the road register, reckon a site it has
+  never been to from the roads' lengths and speeds; it uses the average of its own trips instead (simpler, and the first
+  day's trip is then known). An act still too long for the day is refused and done the next day, not split.
+- **Revisit if:** a planner other than these sends people elsewhere (then it keeps `Trips` too); a seller with its own
+  carrier (a town's haulier) sells on delivery (then it says `arrives` from its own trips).
+- **Addendum, 2026-11-02 (retail.test.ts red on main after this landed).** An act refused for want of room in its
+  people's day still sent them on their way and put the trip on their day (S4's journeys were placed whatever the day
+  said, and now that the day counts the trip, the refusals came): a builder with no record of the trip yet planned the
+  work to the end of the day, was refused, and lost the trip from the day each time, refused again and again (814 times
+  in the retail town's year). Now an act refused that way sends nobody anywhere and charges no one, and its outcome says
+  how long the trips would have been (`Outcome.trips`), so the planner's next act fits. The whole slow tier was run on
+  the fix before it landed.

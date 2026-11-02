@@ -326,6 +326,10 @@ pub struct Shop<B: Body> {
     asked: Asked,
     /// Goods ordered from suppliers, not yet delivered.
     on_order: i64,
+    /// Delivered and still on the road to us (law 9: the seller's note says when they arrive): (quantity, when). They
+    /// stay on order until then.
+    #[serde(default)]
+    coming: Vec<(i64, i64)>,
     /// Our order -> (seller, quantity).
     ours: BTreeMap<String, (String, i64)>,
     /// What we have learned of each supplier's deliveries (sourcing.rs).
@@ -409,6 +413,7 @@ impl<B: Body> Shop<B> {
             deliveries: Deliveries::default(),
             asked: Asked::default(),
             on_order: 0,
+            coming: vec![],
             ours: BTreeMap::new(),
             sources: sourcing::Record::default(),
             stock_meter: StockMeter::default(),
@@ -889,12 +894,17 @@ impl<B: Body> Plan for Shop<B> {
         self.setup.absorb(pic, account, &self.p.sale_board, &self.p.sold_board);
         self.orders.take(pic, account);
         self.payables.take(&self.book);
+        let t = pic.t;
         for d in self.deliveries.take(&self.book, &self.me) {
             let Some((seller, quantity)) = self.ours.remove(&d.order) else { continue };
-            self.on_order = (self.on_order - quantity).max(0);
+            self.coming.push((quantity, d.arrives.unwrap_or(t)));
             self.sources.delivered(&self.p.sourcing, &seller, quantity, d.delivered);
             self.books.r#in += d.delivered;
         }
+        // (What has arrived is no longer on order: it is held.)
+        let arrived: i64 = self.coming.iter().filter(|x| x.1 <= t).map(|x| x.0).sum();
+        self.coming.retain(|x| x.1 > t);
+        self.on_order = (self.on_order - arrived).max(0);
     }
 
     fn looks(&mut self, pic: &Picture) -> Vec<LookRequest> {

@@ -212,6 +212,7 @@ Each read 2026-10-08 unless marked.
 
 | Idea | Citation | Used in |
 |---|---|---|
+| A road's travel time rises with its volume over its capacity: t = t0 (1 + alpha (v/c)^beta), alpha 0.15, beta 4 | Bureau of Public Roads (1964), *Traffic Assignment Manual*, U.S. Department of Commerce **(to confirm)** | `travel::driven_leg` (law 9, S5); every profile's `round.roads.congestion` |
 | Comfortable walking speed, about 1.4 m/s | Bohannon, R. W. (1997), "Comfortable and maximum walking speed of adults aged 20–79 years", *Age and Ageing* 26(1), 15–19 **(to confirm)** | Travel off roads, 18 s a 25 m cell |
 | The urban heat island: built ground hotter than open land | Oke, T. R. (1982), "The energetic basis of the urban heat island", *Quarterly Journal of the Royal Meteorological Society* 108(455), 1–24 **(to confirm)** | More heat on built cells and roads |
 | Heatwaves raise illness and death, most among the old | Department of Human Services (2009), *January 2009 Heatwave in Victoria: an Assessment of Health Impacts* **(to confirm)** | Heat raises the chance of illness; the elderly die of it more (fatality by age) |

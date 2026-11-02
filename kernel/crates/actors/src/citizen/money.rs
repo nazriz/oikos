@@ -1440,6 +1440,25 @@ impl Person {
         let each = left;
         let task = format!("consume-{kind}");
         let mut lines = vec![];
+        // (What a vehicle of ours runs on, law 9 S5: into its tank, as far as it holds, driving it to where we have it.)
+        let me = self.me.clone();
+        if let Some(v) = w.pic.body.as_ref().and_then(|b| b.vehicles.iter().find(|v| v.owner == me.as_str() && v.fuel.is_some_and(|f| f == kind)).cloned()) {
+            let mut room = (v.tank.unwrap_or(0) as i128 - v.in_tank.unwrap_or(0)).max(0) as i64;
+            let mut filled = vec![];
+            for (at, q) in had.iter_mut().filter(|(at, _)| pickups.contains(at.as_str())) {
+                let u = room.min(*q);
+                if u <= 0 {
+                    continue;
+                }
+                filled.push(call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(kind))), ("quantity", Some(text(u.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&v.vehicle))), ("from_at", Some(arg(at))), ("by", Some(arg(&v.vehicle)))]));
+                *q -= u;
+                room -= u;
+            }
+            if !filled.is_empty() {
+                w.push(because(format!("Filling {} with {kind}: driving it to where we have it.", v.vehicle), filled));
+                return;
+            }
+        }
         for (at, q) in &had {
             let u = left.min(*q);
             if u <= 0 {

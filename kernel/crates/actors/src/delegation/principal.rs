@@ -361,6 +361,8 @@ impl State {
                     investigated: None,
                     surveyed: None,
                     seen: vec![],
+                    trips: Default::default(),
+                    freight: Default::default(),
                 });
                 self.matters.remove(&action);
                 self.by_referral.remove(&x.referral);

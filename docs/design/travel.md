@@ -38,5 +38,27 @@ docs/design/foundations-2.md section 3), step by step. What stands today:
 - **The way out.** The generator joins the street end nearest the town's west edge to a node off the ground by the road
   out (the profile's `round.outside` distance and speed), and every edge's node to it.
 
-Still to come (foundations-2 3.4): , link flows, congestion and a vehicle's
-energy from its holding (S5), several towns (S6).
+- **Flows and congestion** (S5, 2026-11-01). Each way link counts the vehicles that set out on it in the hour, each way
+  (`State.flows`: only the current hour is kept). A driven leg's time is its links' free times raised by what is on them
+  against their capacity (`catalogue.travel.congestion`: the free time times 1 + alpha (on / capacity)^beta, the Bureau
+  of Public Roads' form, in integers), and a link already at capacity this hour takes the vehicle only in the next (it
+  waits the rest of the hour). Routes are the free-flow quickest ones (no re-routing).
+- **Fuel** (S5). A vehicle type may say what it runs on (`fuel`, `fuel_per_100km`, `tank`); its owner's holding of the
+  kind at the vehicle is the tank (a vehicle is a place goods can be). A trip draws its fuel as it sets out, by the metres
+  driven, whole units as the millionths add up (`fuel_owed`), and a tank with too little for the trip leaves the vehicle
+  where it stands and the trip walked (`fuel_used` in the log). Goods go into a vehicle where it stands, or by driving it to
+  where they are: a citizen who owns a vehicle puts what the service station sold them into its tank, as far as it holds,
+  driving there and back.
+
+- **Several towns** (S6, 2026-11-01; `worlds/generator/towns.ts`). A spec's `towns: N` makes N towns in one world: each
+  generated whole from the spec at its own seed (the first at `seed`, then the next), all under the first's weather
+  (`weather_seed`), laid side by side on one ground (each town's ground east of the one before) within one root place,
+  `region`. The first town keeps its ids; another's are prefixed (`t2-`, `t3-`), wherever written, but for the world's
+  vocabulary (kinds, types, roles, channels' own names). Shared, once: the outside world (its entities, accounts and the
+  network's nodes off the ground: the far end of every town's road out, and the edges there), and an office of the
+  outside's that is alike in every town and names nothing of a town's (the weather bureau, the agencies' templates).
+  Each town's road out runs to the one far end, and a road joins each town's gate to the next town's (`road-between-*`,
+  its length the distance between them). What is published reaches everyone, so a job or a home in another town is seen
+  as one in your own, and taken the same way: commuting and moving between towns are the citizens' ordinary acts.
+  The world has one design of each building, as big as the town that needs most of it, and one wear rate and one rate of
+  pay come short (each the first town's: the towns are of one spec, so theirs are near one another). Off by default.

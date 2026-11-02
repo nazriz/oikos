@@ -498,10 +498,10 @@ export interface Profile {
     round?: { work_start_hour: number; work_end_hour: number; work_days: number; school_start_hour: number; school_end_hour: number; travel_seconds_per_cell: number; travel_by_cover: { [cover: string]: number };
       /** Roads (world-expansion 6.3): a road cell's travel time, how far from one a building may stand before the town builds
        * toward it, and what the town budgets for roads a year per resident (cents). */
-      roads?: { speed_kmh: number; capacity_per_hour: number; within_cells: number; budget_per_resident: number };
+      roads?: { speed_kmh: number; capacity_per_hour: number; within_cells: number; budget_per_resident: number; congestion?: { alpha_bps: number; beta: number } };
       /** Law 9 (foundations-2 S2): the kinds of vehicle (seats, top speed) and, of housed households, the share whose vehicle is
        * of each kind (at most one a household). */
-      vehicles?: { types: { id: string; seats: number; speed_kmh: number }[]; households: { type: string; bps: number }[] };
+      vehicles?: { types: { id: string; seats: number; speed_kmh: number; fuel_cost_per_100km?: number; range_km?: number }[]; households: { type: string; bps: number }[] };
       /** Law 9 (foundations-2 S4): how far by road the outside's goods come from (the nearest city or depot that supplies the
        * town, and takes its exports), and the speed its freight goes there. */
       outside?: { km: number; speed_kmh: number } };

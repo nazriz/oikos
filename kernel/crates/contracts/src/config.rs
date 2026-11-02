@@ -165,6 +165,18 @@ pub struct TravelCfg {
     pub seconds_per_cell: i64,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub by_cover: BTreeMap<Id, i64>,
+    /// Law 9 (S5): how a link's time rises with the vehicles on it in an hour against its capacity: the free time times
+    /// one and `alpha_bps` (basis points) of (vehicles over capacity) to the power `beta` (a volume-delay function, the
+    /// Bureau of Public Roads' form); a link at capacity takes one more vehicle only in the next hour. Absent: free flow.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub congestion: Option<CongestionCfg>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CongestionCfg {
+    pub alpha_bps: i64,
+    pub beta: u32,
 }
 
 /// A body variable: its bounds, its value for a body born here (or given none), and its drift a day.
@@ -2470,6 +2482,15 @@ pub struct VehicleType {
     pub load_kg: Option<i64>,
     /// The most it goes, km/h (a way's own speed may be less).
     pub speed_kmh: i64,
+    /// Law 9 (S5): the kind it runs on, how much of it a hundred kilometres driven takes (in the kind's unit), and how much
+    /// its tank holds. Its owner's holding of the kind at the vehicle is what is in the tank; a trip draws on it as it sets
+    /// out, and a vehicle with too little for the trip is not driven. Absent: it uses nothing (the backstop names it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fuel: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fuel_per_100km: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tank: Option<i64>,
 }
 
 /// A vehicle: a thing its owner owns, standing at a cell or in a structure, and who besides its owner may drive it.
@@ -2812,8 +2833,10 @@ pub fn validate(c: &Config) -> Result<(), String> {
         }
         entity(&st.holder)?;
         let edge = w.boundaries.contains(&st.holder);
-        if !(structures.contains_key(st.at.as_str()) || (edge && st.at == st.holder)) {
-            return Err(format!("{}'s holding of {} is at {}, which isn't a structure (or, for an edge, itself)", st.holder, st.kind, st.at));
+        // (A vehicle is a place too, law 9 S5: its tank, its load.)
+        let vehicle = c.travel.as_ref().is_some_and(|t| t.vehicles.iter().any(|v| v.id == st.at));
+        if !(structures.contains_key(st.at.as_str()) || vehicle || (edge && st.at == st.holder)) {
+            return Err(format!("{}'s holding of {} is at {}, which isn't a structure, a vehicle or (for an edge) itself", st.holder, st.kind, st.at));
         }
         if !(0..=oikos_core::money::MAX_MONEY).contains(&st.quantity) && !edge {
             return Err(format!("{}'s holding of {} is out of range", st.holder, st.kind));

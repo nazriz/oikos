@@ -367,10 +367,11 @@ impl World {
                 .travel
                 .iter()
                 .flat_map(|t| t.vehicles.iter())
-                .map(|v| (v.id, crate::state::Vehicle { type_: v.type_, owner: v.owner, at: v.at, drivers: v.drivers.clone() }))
+                .map(|v| (v.id, crate::state::Vehicle { type_: v.type_, owner: v.owner, at: v.at, drivers: v.drivers.clone(), fuel_owed: 0 }))
                 .collect(),
             transit: Default::default(),
             remains: Default::default(),
+            flows: Default::default(),
             network: None,
             scarce_sold: Default::default(),
             metered: Default::default(),
@@ -1026,7 +1027,10 @@ impl World {
         // A performer's working day: what is already placed on it, and this act's share, within the day's hours.
         let mut start = start;
         let mut day_idx = crate::exec::day_of(start);
-        let mut over = self.over_the_day(&shares, start).or(refused_to_place);
+        // (A performer's trip to where the work is, and back, is their working time too, law 9: it counts against their day.)
+        let trip_of = |p: &Id| journeys.iter().find(|j| j.body == *p).map_or(0, |j| j.seconds);
+        let with_trips: BTreeMap<Id, i64> = shares.iter().map(|(p, s)| (*p, s + if *p == key { 0 } else { trip_of(p) })).collect();
+        let mut over = self.over_the_day(&with_trips, start).or(refused_to_place);
         if over.is_some() {
             // (No room in their day: the act is refused, and its actor hears so now, not when the crew would have been free.)
             shares.clear();
@@ -1051,7 +1055,11 @@ impl World {
             v.extend(others.iter().map(|w| crate::state::WorkCheck { who: *w, at: None, space: None }));
             v
         };
-        let placed = crate::state::Placed { over, day: day_idx, from: start, hours: shares.clone(), seen: self.seen_at_order(blocks), late, unpriced: None };
+        // (An act with no room in its people's day is refused now and nobody sets out for it; its outcome still says how
+        // long each would have been on their way, so the one who ordered it can make the next one fit.)
+        let going = over.is_none();
+        let trips: BTreeMap<Id, i64> = journeys.iter().filter(|j| j.body != key && j.seconds > 0).map(|j| (j.body, j.seconds)).collect();
+        let placed = crate::state::Placed { over, day: day_idx, from: start, hours: shares.clone(), seen: self.seen_at_order(blocks), late, unpriced: None, trips };
         let mut done = start;
         let place = |state: &mut State, who: &Id, (lanes, hours): (usize, Option<oikos_time::Hours>), from: i64, secs: i64, work: i64| {
             let mut tl = state.timelines.get(who).cloned().unwrap_or_default();
@@ -1072,13 +1080,12 @@ impl World {
         let own_done = place(&mut self.state, &key, own_lanes, order_from, actor_seconds + own, own);
         done = done.max(own_done);
         // (A performer's trip to where the work is, and back, is their time too; and a carrier's, who is no performer.)
-        let trip_of = |p: &Id| journeys.iter().find(|j| j.body == *p).map_or(0, |j| j.seconds);
         for (p, share) in shares.iter().filter(|(p, _)| **p != key) {
             let l = lanes_of(self, p);
             let secs = share + trip_of(p);
             done = done.max(place(&mut self.state, p, l, start, secs, secs));
         }
-        for j in journeys.iter().filter(|j| j.body != key && !shares.contains_key(&j.body) && !by_shares.iter().any(|(w, _)| *w == j.body)) {
+        for j in journeys.iter().filter(|j| going && j.body != key && !shares.contains_key(&j.body) && !by_shares.iter().any(|(w, _)| *w == j.body)) {
             done = done.max(place(&mut self.state, &j.body, (1, None), start, j.seconds, j.seconds));
         }
         let starts = start;
@@ -1088,11 +1095,18 @@ impl World {
         // (Those it takes somewhere set out when it starts, and are on their way until it is done: law 9, S3. Before the
         // start's checks, so that an act refused when it starts brings them back.)
         let mut set_out = vec![];
-        for j in journeys {
+        let hour = start.div_euclid(3_600);
+        for j in journeys.into_iter().filter(|_| going) {
+            // (Each link it goes along carries one more vehicle in the hour it sets out: S5.)
+            for k in &j.links {
+                let n = self.state.flows.get(k).filter(|(h, _)| *h == hour).map_or(0, |(_, n)| *n);
+                self.state.flows.insert(*k, (hour, n + 1));
+            }
+            let fuel = j.fuel.map(|(k, q)| (k, q, j.metres));
             if start <= t {
-                set_out.extend(crate::exec::depart(&self.s, &mut self.state, &j.body, &j.to, &j.via, done, j.vehicle.as_deref(), Some(&action), participant));
+                set_out.extend(crate::exec::depart(&self.s, &mut self.state, &j.body, &j.to, &j.via, fuel, done, j.vehicle.as_deref(), Some(&action), participant));
             } else {
-                self.state.schedule(start, crate::state::Sched::Depart { body: j.body, to: j.to, via: j.via, arrives: done, vehicle: j.vehicle, act: Some(action.clone().into()), by: participant.into() });
+                self.state.schedule(start, crate::state::Sched::Depart { body: j.body, to: j.to, via: j.via, fuel, arrives: done, vehicle: j.vehicle, act: Some(action.clone().into()), by: participant.into() });
             }
         }
         if !checks.is_empty() {
@@ -1111,7 +1125,7 @@ impl World {
         // hours are placed and it takes effect when they are over. (law 2: "the act is done when they are")
         if placed.late && placed.over.is_none() && can_act(&self.state.participants[participant]) {
             let mut scratch = self.state.clone();
-            if let Ok(res) = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), false) {
+            if let Ok(res) = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), false, Some(&action)) {
                 if !work_shares(&res.events).is_empty() || !by.is_empty() {
                     return self.begin(participant, position, blocks, by, 0, Some(action));
                 }
@@ -1128,7 +1142,7 @@ impl World {
         } else {
             let mut scratch = self.state.clone();
             // (A hosted system's work draws on its host's holding as its seconds add up: none there, and it is refused.)
-            let done = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), !placed.late)
+            let done = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), !placed.late, Some(&action))
                 .and_then(|res| draw_hosted(&self.s, &mut scratch, participant, by, blocks, &res.events).map(|()| res))
                 .map(|res| (scratch, res));
             match done {
@@ -1151,6 +1165,7 @@ impl World {
         // (Work refused when it is done was begun, and its performers' lanes were held until now: the hours were spent, and count
         // against the day. Only work that never began gives its hours back: `start_check`.)
         let pos = position.map(String::from);
+        let trips = placed.trips.clone();
         let (events, outcome) = match result {
             Ok((scratch, res)) => {
                 self.state = scratch;
@@ -1192,7 +1207,7 @@ impl World {
                 events.extend(res.events);
                 // (Those the act took by places and not into one are back where they set out: law 9, S4.)
                 events.extend(crate::exec::turn_back(&self.s, &mut self.state, &action, participant));
-                (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None, surveyed: res.surveyed, investigated: res.investigated, seen: res.seen })
+                (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None, surveyed: res.surveyed, investigated: res.investigated, seen: res.seen, trips, freight: res.freight })
             }
             Err(r) => (
                 std::iter::once(Timed::new(
@@ -1201,7 +1216,7 @@ impl World {
                 ))
                 .chain(crate::exec::turn_back(&self.s, &mut self.state, &action, participant))
                 .collect(),
-                Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None, seen: vec![] },
+                Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None, seen: vec![], trips, freight: BTreeMap::new() },
             ),
         };
         let key = pos.unwrap_or_else(|| SELF.into());
@@ -1243,7 +1258,7 @@ impl World {
         let pos = position.map(String::from);
         let ev = Timed::new(t, EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone().map(Into::into), block: None, code: r.code, detail: r.detail.clone() });
         let back = crate::exec::turn_back(&self.s, &mut self.state, &action, participant);
-        let out = Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None, seen: vec![] };
+        let out = Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None, seen: vec![], trips: BTreeMap::new(), freight: BTreeMap::new() };
         Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(pos.unwrap_or_else(|| SELF.into())).or_default().outcomes.push(out);
         Output { events: std::iter::once(ev).chain(back).collect() }
     }
