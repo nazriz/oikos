@@ -40,6 +40,9 @@ pub struct Params {
     /// lend to start one, and nobody borrows to: risk ME-1).
     pub start_loan_months: i64,
     pub give_up_months: i64,
+    /// How many months of one's own trading the market's figure for a business of one counts as, beside one's own record of
+    /// running one (a placeholder; docs/behaviour/entry.md, "Founding again after giving one up").
+    pub venture_prior_months: i64,
     pub possession: Option<Possession>,
     pub shop_every_days: i64,
     pub beta: i64,
@@ -140,6 +143,7 @@ impl Default for Params {
             found_own_buffer_months: 1,
             start_loan_months: 0,
             give_up_months: 6,
+            venture_prior_months: 3,
             possession: None,
             shop_every_days: 14,
             beta: 5,
