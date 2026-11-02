@@ -721,7 +721,7 @@ impl CitizenMind {
                     })
                     .map(|(k, _)| k.clone())
                     .unwrap_or_else(|| pool.last().unwrap().clone());
-                self.s.talked.insert(who.clone(), t);
+                self.s.talked.insert(oikos_core::Id::new(&who), t);
                 out.steps.push(because("Catching up with someone we know.", vec![message(&[who], catching_up::ASK, None)]));
             }
         }
