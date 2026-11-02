@@ -10723,3 +10723,10 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   day's trip is then known). An act still too long for the day is refused and done the next day, not split.
 - **Revisit if:** a planner other than these sends people elsewhere (then it keeps `Trips` too); a seller with its own
   carrier (a town's haulier) sells on delivery (then it says `arrives` from its own trips).
+- **Addendum, 2026-11-02 (retail.test.ts red on main after this landed).** An act refused for want of room in its
+  people's day still sent them on their way and put the trip on their day (S4's journeys were placed whatever the day
+  said, and now that the day counts the trip, the refusals came): a builder with no record of the trip yet planned the
+  work to the end of the day, was refused, and lost the trip from the day each time, refused again and again (814 times
+  in the retail town's year). Now an act refused that way sends nobody anywhere and charges no one, and its outcome says
+  how long the trips would have been (`Outcome.trips`), so the planner's next act fits. The whole slow tier was run on
+  the fix before it landed.

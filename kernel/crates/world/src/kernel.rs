@@ -1002,7 +1002,10 @@ impl World {
             v.extend(others.iter().map(|w| crate::state::WorkCheck { who: *w, at: None, space: None }));
             v
         };
-        let trips: BTreeMap<Id, i64> = if over.is_some() { BTreeMap::new() } else { journeys.iter().filter(|j| j.body != key && j.seconds > 0).map(|j| (j.body, j.seconds)).collect() };
+        // (An act with no room in its people's day is refused now and nobody sets out for it; its outcome still says how
+        // long each would have been on their way, so the one who ordered it can make the next one fit.)
+        let going = over.is_none();
+        let trips: BTreeMap<Id, i64> = journeys.iter().filter(|j| j.body != key && j.seconds > 0).map(|j| (j.body, j.seconds)).collect();
         let placed = crate::state::Placed { over, day: day_idx, from: start, hours: shares.clone(), seen: self.seen_at_order(blocks), late, unpriced: None, trips };
         let mut done = start;
         let place = |state: &mut State, who: &Id, (lanes, hours): (usize, Option<oikos_time::Hours>), from: i64, secs: i64, work: i64| {
@@ -1029,7 +1032,7 @@ impl World {
             let secs = share + trip_of(p);
             done = done.max(place(&mut self.state, p, l, start, secs, secs));
         }
-        for j in journeys.iter().filter(|j| j.body != key && !shares.contains_key(&j.body) && !by_shares.iter().any(|(w, _)| *w == j.body)) {
+        for j in journeys.iter().filter(|j| going && j.body != key && !shares.contains_key(&j.body) && !by_shares.iter().any(|(w, _)| *w == j.body)) {
             done = done.max(place(&mut self.state, &j.body, (1, None), start, j.seconds, j.seconds));
         }
         let starts = start;
@@ -1040,7 +1043,7 @@ impl World {
         // start's checks, so that an act refused when it starts brings them back.)
         let mut set_out = vec![];
         let hour = start.div_euclid(3_600);
-        for j in journeys {
+        for j in journeys.into_iter().filter(|_| going) {
             // (Each link it goes along carries one more vehicle in the hour it sets out: S5.)
             for k in &j.links {
                 let n = self.state.flows.get(k).filter(|(h, _)| *h == hour).map_or(0, |(_, n)| *n);
