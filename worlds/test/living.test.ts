@@ -85,6 +85,12 @@ test("`living` with the starting attachment off gives no started; the initiative
   expect(JSON.stringify(c)).not.toContain('"started"');
   expect(params(c).every((p: any) => p.attach_mean !== undefined)).toBe(true);
   expect(c.dials).toEqual({ initiative_bps: 2500, friction_bps: 10_000 });
+  // The citizen model's dial (docs/citizen-data.md, "The citizen model"): carried with the file's hash, read when not given.
+  const file = join(root, "worlds/town.yaml");
+  const sha = new Bun.CryptoHasher("sha256").update(readFileSync(file)).digest("hex");
+  const m = generate({ ...small, living: { starting_attachment: false, initiative_bps: 2500, citizen_model: { weights: file } } }) as any;
+  expect(m.dials.citizen_model).toEqual({ weights: file, sha256: sha, share_bps: 10_000 });
+  expect({ ...m, dials: { ...m.dials, citizen_model: undefined } }).toEqual({ ...c, dials: { ...c.dials, citizen_model: undefined } });
 });
 
 test("a living town is deterministic and leaves every other draw as it was", () => {

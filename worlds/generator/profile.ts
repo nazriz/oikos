@@ -466,6 +466,8 @@ export interface Profile {
       firms: { payback_months: { small: number; large: number }; large_from: number; hurdle_bps: number; reference_bps: number; on_cost_bps: number; most?: number };
       /** The law on public buying: a contract worth more than the threshold (in the world\'s smallest unit) is put out to tender, and bids are open this long. */
       procurement?: { threshold: number; bid_days: number };
+      /** Tools the outside world sells (worlds/generator/tools.ts): goods a firm holds, with which a task takes a share of its time. */
+      tools?: import("./tools").ToolOffer[];
     };
     /** Assistants on offer (docs/behaviour/assistants.md; docs/design/delegation.md): the outside world's providers of services
      * and what each sells, at today's prices; read only where a town asks for them (`assistants: true`). `claim_slip_bps` is
@@ -496,10 +498,13 @@ export interface Profile {
     round?: { work_start_hour: number; work_end_hour: number; work_days: number; school_start_hour: number; school_end_hour: number; travel_seconds_per_cell: number; travel_by_cover: { [cover: string]: number };
       /** Roads (world-expansion 6.3): a road cell's travel time, how far from one a building may stand before the town builds
        * toward it, and what the town budgets for roads a year per resident (cents). */
-      roads?: { speed_kmh: number; capacity_per_hour: number; within_cells: number; budget_per_resident: number };
+      roads?: { speed_kmh: number; capacity_per_hour: number; within_cells: number; budget_per_resident: number; congestion?: { alpha_bps: number; beta: number } };
       /** Law 9 (foundations-2 S2): the kinds of vehicle (seats, top speed) and, of housed households, the share whose vehicle is
        * of each kind (at most one a household). */
-      vehicles?: { types: { id: string; seats: number; speed_kmh: number }[]; households: { type: string; bps: number }[] } };
+      vehicles?: { types: { id: string; seats: number; speed_kmh: number; fuel_cost_per_100km?: number; range_km?: number }[]; households: { type: string; bps: number }[] };
+      /** Law 9 (foundations-2 S4): how far by road the outside's goods come from (the nearest city or depot that supplies the
+       * town, and takes its exports), and the speed its freight goes there. */
+      outside?: { km: number; speed_kmh: number } };
     /** Home ownership (world-expansion 6.2): which houses their households own, with a mortgage or outright. */
     /** `owner_bps_by_age`: of households, the share who own their home, by the age of the household's head; read as
      * how much likelier one household is than another to be among the town's owners (their number is the houses'). */

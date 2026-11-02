@@ -2058,6 +2058,8 @@ enum WorksThen {
     Disposed(i64),
     /// A part of the day's round: what was planned and when, and who did it.
     Round { items: Vec<RoundItem>, t: i64, present: Vec<String> },
+    /// Upkeep of these assets: how long the crew's trips to them took is kept (law 9).
+    Upkeep(Vec<String>),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2093,6 +2095,9 @@ struct WorksPlan {
     handled: BTreeSet<String>,
     used: BTreeMap<String, i64>,
     used_day: i64,
+    /// How long the crew's trips to each address and asset took, from its own records (law 9): the day is planned with them.
+    #[serde(default)]
+    trips: crate::common::trips::Trips,
     next_dispose: i64,
     month: i64,
     collected_kg: i64,
@@ -2153,6 +2158,7 @@ impl WorksPlan {
             handled: BTreeSet::new(),
             used: BTreeMap::new(),
             used_day: -1,
+            trips: Default::default(),
             next_dispose: p.dispose_every_days * DAY,
             month: -1,
             collected_kg: 0,
@@ -2256,7 +2262,15 @@ impl Plan for WorksPlan {
                     self.next_dispose = 0;
                 }
             }
+            WorksThen::Upkeep(on) => {
+                if let Done::Outcome(o) = done {
+                    self.trips.record(on, o);
+                }
+            }
             WorksThen::Round { items, t, present } => {
+                if let Done::Outcome(o) = done {
+                    self.trips.record(&items.iter().map(|x| x.on.clone()).collect::<Vec<_>>(), o);
+                }
                 if let (true, Done::Outcome(out)) = (done.applied(), done) {
                     // What the crew found at each address: what they left, and so what had gathered since they were last there.
                     for x in items {
@@ -2448,7 +2462,7 @@ impl Plan for WorksPlan {
             let q = self.at_depot;
             if q > 0 {
                 let docket = DisposalDocket { kind: p.kind.clone(), quantity: q };
-                let goods = call("goods", vec![("kind", Some(arg(&p.kind))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&p.landfill))), ("at", Some(arg(&p.landfill))), ("from_at", Some(arg(&p.depot)))]);
+                let goods = call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&p.kind))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&p.landfill))), ("at", Some(arg(&p.landfill))), ("from_at", Some(arg(&p.depot)))]);
                 let mut s = because(
                     format!("Taking the week's {} ({q}) to the landfill, with a docket.", p.kind),
                     vec![goods, say("disposal_docket", &format!("Delivered: {q} of {}.", p.kind), Say { to: Some(vec![p.landfill.clone()]), visible: Some(Visible::Only(vec![me.clone(), p.landfill.clone()])), data: Some(paper_data(&docket)), ..Default::default() })],
@@ -2528,12 +2542,14 @@ impl Plan for WorksPlan {
                         let expected_milli = was.map_or(0, |w| w.0) * 1000 + self.fills_milli.get(s).copied().unwrap_or(0) * (t - was.map_or(t, |w| w.1)).max(0) / DAY;
                         // (At least a load's call at every address due: the crew goes, and sees.)
                         let units = if first { 1 } else { ((expected_milli + p.collect_per_unit * 1000 - 1) / (p.collect_per_unit * 1000)).max(1) };
-                        let fit = units.min(left(&used) / p.collect_labour);
+                        // (The crew's trip there and back is their time too, as their trips have taken: law 9.)
+                        let trip = if *s == p.depot { 0 } else { self.trips.of(s) * present.len() as i64 };
+                        let fit = units.min((left(&used) - trip).max(0) / p.collect_labour);
                         if fit <= 0 {
                             break;
                         }
                         let before = self.collected_at.get(s).copied();
-                        spend(&mut used, fit * p.collect_labour);
+                        spend(&mut used, fit * p.collect_labour + trip);
                         if fit == units && !first {
                             self.collected_at.insert(s.clone(), t);
                             self.complained.remove(s);
@@ -2577,11 +2593,12 @@ impl Plan for WorksPlan {
                 let mut upkeep: Vec<Call> = vec![];
                 let mut names: Vec<String> = vec![];
                 for (b, wear) in &worn {
-                    let units = ((wear - p.maintain_over + p.maintain_per_unit - 1) / p.maintain_per_unit).min(left(&used) / p.maintain_labour);
+                    let trip = if b.structure == p.depot { 0 } else { self.trips.of(&b.structure) * present.len() as i64 };
+                    let units = ((wear - p.maintain_over + p.maintain_per_unit - 1) / p.maintain_per_unit).min((left(&used) - trip).max(0) / p.maintain_labour);
                     if units <= 0 {
                         break;
                     }
-                    spend(&mut used, units * p.maintain_labour);
+                    spend(&mut used, units * p.maintain_labour + trip);
                     upkeep.push(job(&p.maintain_task, units, &b.structure));
                     names.push(b.structure.to_string());
                     if upkeep.len() <= 30 {
@@ -2593,7 +2610,10 @@ impl Plan for WorksPlan {
                 self.routines.note(&p.maintain_task, (left_over > 0).then(|| format!("{left_over} worn asset{} were left when the crew's hours ran out", if left_over > 1 { "s" } else { "" })));
                 if !upkeep.is_empty() {
                     upkeep.truncate(30);
-                    steps.push(because(format!("Upkeep of the most worn of the town's assets: {}.", names.join(", ")), upkeep));
+                    names.truncate(30);
+                    let mut s = because(format!("Upkeep of the most worn of the town's assets: {}.", names.join(", ")), upkeep);
+                    s.then = Some(WorksThen::Upkeep(names.clone()));
+                    steps.push(s);
                 }
             }
             self.used = used;

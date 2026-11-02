@@ -53,6 +53,25 @@ Unchanged: the means (the capital and a month's housing and essentials; for prem
 
 **Revisit if** a town's births are far from the profile's rate (the likely causes are what founders know, the means, or the prices; never a rate to add), or when commercial leasing arrives.
 
+## Founding a factory (2026-11-01; foundations-2 7.3, step E3; risk ME-1)
+
+A shop was the only firm anyone could found in premises. Entry now reaches the other industry a town has: **a factory, in
+works for sale.** When a factory closes its works are listed as any premises are (`property_for_sale`, by type). Someone
+with the means for the works and the venture's capital (three months' wages for the staff its share of the market needs,
+and a month's inputs for it), beside three months of their housing and essentials, weighs it by expected profit as a
+shop is weighed (`rules::entry::expected`): its custom the world market's appetite for the town's goods, as the market
+publishes it, shared among the town's factories of goods and itself; a hand makes what a working month at the time a unit
+takes allows; hands taken on while the margin on what they make pays their wage. The choice is the mind's (`venture`).
+Founded, the factory sets itself up as a founded shop does (`market/founding.rs`, the same steps, moved from the retailer
+unchanged): an account at the bank, its founder's capital, its shareholders, the works bought from the listing, or the
+capital back and closed if someone else buys them first. Then it trades as any factory: hiring, buying inputs, making,
+selling to the shops and the world market, which buys from every seller.
+
+**Left (E3's rest):** a factory makes the town's goods only (not the profile's other products); no works are built new
+(buying land and building through planning, the capital-heavy route: a hosting firm among them), so a factory is founded
+only where one has closed; no borrowing for a venture in premises (ME-1); the founder counts the town's factories of goods
+as its rivals, which they are known to be (a town has few).
+
 ## Starting a business of one (2026-10-11; citizen 0.48.0, firm.retailer 0.12.0)
 
 **The fault.** Nobody founded a business in a year of the 1,000-person town. The only venture was a shop in premises bought from a closed firm: about $365,000 for the premises and $91,000 of capital, where nobody of working age holds a tenth of that and no firm closes in the year. The monthly chance was never reached. Real business births are mostly not that: in Australia about 65% of businesses have no employees (ABS, Counts of Australian Businesses, June 2026), and most new ones start small, from home, on their owner's savings.

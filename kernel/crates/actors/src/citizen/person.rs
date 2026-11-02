@@ -768,9 +768,20 @@ impl Person {
         if self.s.mourned.len() > mourned_before {
             self.s.next_plan_at = self.s.next_plan_at.min(t);
         }
+        // (Someone seen lying dead where we went by: we call the police at once, whatever else we were doing; what we saw is
+        // shown with the observation that brings it, and only then.)
+        {
+            let mut w = Week { pic, cx: &mut *cx, t, acc: None, steps: vec![] };
+            if let Some(s) = self.saw_dead_on_the_way(&mut w) {
+                return self.send(s, cx);
+            }
+        }
         if self.todo.is_empty() {
             let mut w = Week { pic, cx: &mut *cx, t, acc: None, steps: vec![] };
             if let Some(s) = self.wonder_next_door(&mut w) {
+                return self.send(s, cx);
+            }
+            if let Some(s) = self.missed_at_home(&mut w) {
                 return self.send(s, cx);
             }
         }
@@ -790,7 +801,7 @@ impl Person {
             if let Some(go) = self.go_where_we_belong(pic, cx) {
                 return self.send_go(go, cx);
             }
-            return self.wait(self.next_change(t).min(self.s.next_plan_at).min(practice_wake.filter(|p| *p > t).unwrap_or(i64::MAX)));
+            return self.wait(self.next_change(t).min(self.s.next_plan_at).min(practice_wake.filter(|p| *p > t).unwrap_or(i64::MAX)).min(arrived(pic, t)));
         }
         // Planned when a wake begins; woken because an act of ours is done, we carry on with the plan.
         if self.s.planned_at != t && (pic.woke_for != "done" || self.todo.is_empty()) {
@@ -826,7 +837,7 @@ impl Person {
             self.s.last_was_move = false;
             let pw = self.s.mind_wake_at.filter(|p| *p > t);
             return match self.p.round {
-                Some(_) => self.wait(pw.unwrap_or(i64::MAX).min(self.s.next_plan_at).min(self.next_change(t))),
+                Some(_) => self.wait(pw.unwrap_or(i64::MAX).min(self.s.next_plan_at).min(self.next_change(t)).min(arrived(pic, t))),
                 None => match pw {
                     Some(p) => self.wait(p.min(t + 7 * DAY)),
                     None => Action::wait(),
@@ -1011,3 +1022,10 @@ fn ends_by_our_notice(r: &oikos_sight::Record, me: &str) -> bool {
         _ => false,
     }
 }
+
+/// On our way somewhere (law 9, S3): a look again just after we arrive, to go on where we belong (a crew taken to a site and
+/// back after the working day is over goes home then; until 2026-11-01 it waited for the next morning's round).
+fn arrived(pic: &oikos_sight::Picture, t: i64) -> i64 {
+    pic.body.as_ref().and_then(|b| b.on_way.as_ref()).map(|w| w.arrives + 1).filter(|a| *a > t).unwrap_or(i64::MAX)
+}
+

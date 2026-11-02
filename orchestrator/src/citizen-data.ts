@@ -47,6 +47,24 @@ export function captureOf(path: string): string {
   return path.replace(/\.jsonl(\.zst)?$/, ".citizens.jsonl.zst");
 }
 
+/**
+ * Every turn of the capture at `path` that stands (a part a run was taken up from replaces what earlier parts wrote from
+ * then on), in order, each with whether it is kept out of training by the test cases' rule (as `exportCitizenData`
+ * marks it). For a trainer that reads only the decision's own rows (the citizen model reads the `situation`, which holds
+ * the record as the mind had it); no record is folded and no outcome joined.
+ */
+export async function* standingTurns(path: string, o: { run?: string; tests?: TestRef[] } = {}): AsyncIterable<{ row: any; excluded: boolean }> {
+  const run = o.run ?? runName(path);
+  const testDays = new Set((o.tests ?? realTests()).filter((c) => c.run === run).map((c) => c.day));
+  const from: number[] = [];
+  for await (const x of rowsOf(path)) if (x.row.row === "segment") from[x.part] = x.row.from_t;
+  const until = from.map((_, i) => Math.min(Infinity, ...from.slice(i + 1)));
+  for await (const { row, part } of rowsOf(path)) {
+    if (row.row !== "turn" || !(row.t < until[part]!)) continue;
+    yield { row, excluded: testDays.has(Math.floor(row.t / DAY)) };
+  }
+}
+
 export interface CitizenDataSummary {
   run: string;
   turns: number;

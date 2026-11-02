@@ -10,6 +10,7 @@ pub mod calls;
 pub mod laws;
 pub mod letters;
 pub mod money;
+pub mod trips;
 pub mod work;
 
 pub use asking::{ask, go_see, look_up, owner_looks, visited, who_wrote, Asked, LOOKS_MAX, VISIT_MAX};

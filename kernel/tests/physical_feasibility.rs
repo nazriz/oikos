@@ -266,7 +266,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             }
             Ok(())
         }
-        Block::MoveGoods { kind, quantity, from_at, to, to_at } => {
+        Block::MoveGoods { kind, quantity, from_at, to, to_at, .. } => {
             // Possession (phase B): the actor moves its own holding; an edge's may go negative.
             let max = oikos_kernel::money::MAX_MONEY;
             if !s.config.catalogue.resources.iter().any(|r| &r.id == kind) {

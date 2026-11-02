@@ -1038,9 +1038,10 @@ impl Person {
         self.buy_kind(w, &goods, s, q, why, retry_of)
     }
 
-    /// `buy`, of a kind we name.
+    /// `buy`, of a kind we name. (Collected at the shop, where it says it serves from, and carried home when we use them, law
+    /// 9 S4; delivered home only by a seller that names nowhere.)
     fn buy_kind(&mut self, w: &mut Week, goods: &str, s: &Shop, q: i64, why: String, retry_of: Option<String>) -> bool {
-        let Some(place) = self.home_at(w.pic).or(s.at.clone()) else { return false };
+        let Some(place) = s.at.clone().or_else(|| self.home_at(w.pic)) else { return false };
         if q < 1 {
             return false;
         }
@@ -1382,7 +1383,7 @@ impl Person {
         if let Some(home) = &home_at {
             for (at, q) in had.iter().filter(|h| &h.0 != home) {
                 fetched = true;
-                lines.push(call("goods", vec![("kind", Some(arg(&goods))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&self.me))), ("at", Some(arg(home))), ("from_at", Some(arg(at)))]));
+                lines.push(call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&goods))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&self.me))), ("at", Some(arg(home))), ("from_at", Some(arg(at)))]));
             }
             // (What was faulty is thrown out with what is used: it is gone, and the week is shorter for it.)
             let out = total.min(each + self.money.spoiled);
@@ -1439,6 +1440,25 @@ impl Person {
         let each = left;
         let task = format!("consume-{kind}");
         let mut lines = vec![];
+        // (What a vehicle of ours runs on, law 9 S5: into its tank, as far as it holds, driving it to where we have it.)
+        let me = self.me.clone();
+        if let Some(v) = w.pic.body.as_ref().and_then(|b| b.vehicles.iter().find(|v| v.owner == me.as_str() && v.fuel.is_some_and(|f| f == kind)).cloned()) {
+            let mut room = (v.tank.unwrap_or(0) as i128 - v.in_tank.unwrap_or(0)).max(0) as i64;
+            let mut filled = vec![];
+            for (at, q) in had.iter_mut().filter(|(at, _)| pickups.contains(at.as_str())) {
+                let u = room.min(*q);
+                if u <= 0 {
+                    continue;
+                }
+                filled.push(call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(kind))), ("quantity", Some(text(u.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&v.vehicle))), ("from_at", Some(arg(at))), ("by", Some(arg(&v.vehicle)))]));
+                *q -= u;
+                room -= u;
+            }
+            if !filled.is_empty() {
+                w.push(because(format!("Filling {} with {kind}: driving it to where we have it.", v.vehicle), filled));
+                return;
+            }
+        }
         for (at, q) in &had {
             let u = left.min(*q);
             if u <= 0 {

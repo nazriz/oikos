@@ -20,6 +20,7 @@ mod c2_firms;
 mod c2_shop_mix;
 mod capacity;
 mod cast;
+mod citizen_model;
 mod cli;
 mod config_stream;
 mod conformance;

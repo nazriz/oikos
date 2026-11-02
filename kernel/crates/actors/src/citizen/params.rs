@@ -356,6 +356,12 @@ pub struct Venture {
     /// What running it costs a month beside its stock (registration, a licence and the like), as the place charges it.
     #[serde(default)]
     pub fixed_per_month: Option<i64>,
+    /// A factory's market (foundations-2 E3): what the world market publishes it takes of the kind a month, and how many
+    /// factories of the kind the town has (they are few, and known). None: a shop's, read from what the founder knows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub demand_per_month: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sellers: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

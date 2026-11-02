@@ -304,6 +304,17 @@
                   }
                 }
               },
+              "tool": {
+                "description": "A technology that is a good (foundations-2 E2): with per_performer of the kind held by the actor where the work is done, for each person doing it, the work takes labour_bps of its time. Not used up.",
+                "type": "object",
+                "required": ["kind", "per_performer", "labour_bps"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+                  "per_performer": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+                  "labour_bps": { "type": "integer", "minimum": 0, "maximum": 10000 }
+                }
+              },
               "skill": {
                 "description": "A practised skill (foundations-2 E4): the labour per unit scales with the performers' mean of a practised body variable as well (the stated labour at its initial, novice_bps of it at its minimum, expert_bps at its maximum), and each performer's share of the time is practice.",
                 "type": "object",
@@ -806,6 +817,16 @@
                 "maximum": 86400
               },
               "maxProperties": 50
+            },
+            "congestion": {
+              "description": "Law 9 (foundations-2 S5): how a way link's time rises with the vehicles that set out on it in the hour against its capacity: the free time times 1 + alpha_bps/10,000 x (vehicles / capacity)^beta (the Bureau of Public Roads' volume-delay form); a link at capacity takes one more vehicle only in the next hour. Absent: free flow.",
+              "type": "object",
+              "required": ["alpha_bps", "beta"],
+              "additionalProperties": false,
+              "properties": {
+                "alpha_bps": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+                "beta": { "type": "integer", "minimum": 1, "maximum": 8 }
+              }
             }
           }
         }
@@ -978,6 +999,17 @@
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
             }
           }
+        },
+        "citizen_model": {
+          "description": "The citizen model (docs/citizen-data.md, \"The citizen model\"): a trained model file of our own giving the odds of each way of going after a want, blended with the code mind's in log-odds (`share_bps` of the way; 10000: its own). The engine reads the file and refuses it unless its SHA-256 is `sha256`. Absent: every citizen decides as the code mind, and the world is as before.",
+          "type": "object",
+          "properties": {
+            "weights": { "description": "The model file's path (as the engine's process sees it).", "type": "string", "minLength": 1 },
+            "sha256": { "description": "The file's SHA-256, lowercase hex.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "share_bps": { "type": "integer", "minimum": 0, "maximum": 10000 }
+          },
+          "required": ["weights", "sha256"],
+          "additionalProperties": false
         },
         "composer": {
           "description": "The composing model (docs/design/ai-citizens.md 10e; VISION 15, point 7): the words of a founded thing are written by a model asked as an author shown the founder's own record, who may decline. Absent: no model is asked, and every statement of purpose is the plain one code writes. A run plays the composer on the mock unless it is started with the composer for real; either way the mix here is on record.",
@@ -1901,6 +1933,12 @@
                     "minimum": 0,
                     "maximum": 100000,
                     "description": "A pipe's head lost at capacity, in metres (the loss is this times the flow over the capacity)."
+                  },
+                  "speed_kmh": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "description": "Law 9 (S4): a link bodies and vehicles travel (a road out of the town to an edge's node; between towns), at this speed for vehicles; its capacity is then vehicles an hour each way."
                   }
                 }
               }
@@ -3661,7 +3699,10 @@
               "id": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
               "seats": { "type": "integer", "minimum": 0 },
               "load_kg": { "type": "integer", "minimum": 0 },
-              "speed_kmh": { "description": "The most it goes, km/h; a way's own speed may be less.", "type": "integer", "minimum": 1, "maximum": 1000 }
+              "speed_kmh": { "description": "The most it goes, km/h; a way's own speed may be less.", "type": "integer", "minimum": 1, "maximum": 1000 },
+              "fuel": { "description": "Law 9 (S5): the kind it runs on. Its owner's holding of it at the vehicle is what is in the tank; a trip draws on it as it sets out, and a vehicle with too little for the trip is left and the trip walked.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId" },
+              "fuel_per_100km": { "description": "How much of its fuel a hundred kilometres driven takes, in the kind's unit.", "type": "integer", "minimum": 0, "maximum": 1000000000 },
+              "tank": { "description": "How much of its fuel its tank holds.", "type": "integer", "minimum": 0, "maximum": 1000000000 }
             }
           }
         },

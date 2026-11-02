@@ -1,0 +1,28 @@
+# The code-only living towns the citizen model's training data is captured from (docs/citizen-data.md, "The citizen model"):
+# worlds/town-1000.yaml, living as the pilots of 2026-10-24 were (initiative, frictions and founding at the sourced
+# rates; opening in the middle of things), with no seat and no composer. Each batch sets its profile and seed:
+#   oikos run worlds/citizen-model.yaml --set profile=<p> --set seed=<s> --towns 3 --until 31536000 \
+#     --capture-citizens on --log lean --record-observations none --no-measure --out runs/citizen-model/towns/<p>
+generate: town
+name: Millbrook
+seed: 1
+citizens: 1000
+years: 2
+grid: { w: 40, h: 30 }
+apartment_blocks: 15
+houses: 200
+shops: 30
+factories: 10
+landlords: 20
+profile: au-vic-2026
+housed_bps: 9500
+employed_bps: 9500
+savings_months: [1, 6]
+landlord_compliance_bps: 5000
+opening_caseload_scale_bps: 10000
+opening_caseload: true
+mayor: code
+living:
+  initiative_bps: 10000
+  friction_bps: 10000
+  founding: { scale_bps: 10000 }

@@ -105,7 +105,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
 // f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "a0a8a23343beec47", "gb-eng-2026": "a911615ec4c6568b", "ke-nakuru-2026": "a2f60218588c0078" }
+  ? { "au-vic-2026": "b63b2c19b3f1c2ff", "gb-eng-2026": "a18cf6dd689297f9", "ke-nakuru-2026": "cfe34895be14a485" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -155,10 +155,29 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // that recommends (`review.complaint_after_days`), so the published law's words and data move, and a claimant left unanswered
 // may now go to the ombudsman desk; ke-nakuru's law has no such route and did not move. c899c8ff... and 9b0a54d6... for the
 // configs, af012071... and fab20a4d... for the states, until then.)
+// (Re-taken on 2026-11-01 at foundations-2 E3, on the tree merged with main, and again on 2026-11-02 on the tree merged with main
+// after mt21-recourse (whose pins are just above), config hashes and Rust states both: every town where
+// there are factories offers a factory as a venture, in a closed factory's works for sale (docs/behaviour/entry.md, "Founding a
+// factory"). On the branch, with that venture taken out of the config the three towns gave exactly the pins before it, so the rest
+// of the change (the founding steps moved from the retailer to market/founding.rs) moves nothing; c899c8ff..., 9b0a54d6...,
+// a2f60218... for the configs and af012071..., fab20a4d..., e3093814... for the states, until then. On the tree merged with
+// main after mt21-recourse, both changes at once: ke-nakuru is this branch's own pin (recourse did not move it), au-vic and
+// gb-eng have the ombudsman and the factory venture both; mt21's a0a8a233..., a911615e..., a2f60218... and ce297a1b...,
+// 4c0f8261..., e3093814..., until then.)
+// (Re-taken on 2026-11-01 at foundations-2 S3 and S4 (law 9), config hashes and Rust states both: bodies on their way between
+// buildings, goods carried, crews to the building they work on, the outside's freight from the edge's node by the road out, the dead on
+// the way found by whoever comes by (generator 0.74.0); c899c8ff..., 9b0a54d6..., a2f60218... for the configs and af012071..., fab20a4d...,
+// e3093814... for the states, until then. Again on 2026-11-02 on the tree merged with main after
+// mt21-recourse and f2-economy (their pins just above), law 9 on top of theirs: fd3b3e05..., b9922d02..., 9764f24d... and 8f562cf9...,
+// 2a59777c..., ff1a5d7a... on the branch alone; main's a99a2860..., 2d6735b7..., 6c856c4d... and b51631ea..., c6c36e29..., 717229a9...,
+// until then.)
+// (Re-taken on 2026-11-02 at foundations-2 S5 and S6 (law 9: a road's flows an hour, congestion, fuel from the tank; several towns
+// in one world), on the tree merged with main after f2-s4 landed (the taker's trip for this act its own), config hashes and Rust
+// states both; main's 7b16c3db..., 2e42476d..., 58353057... and e39632a0..., 294d3077..., 3a55c1a5..., until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "ce297a1b5b6f09294b6fc1b6db37330be7044d78c287bac6a043d3a1fb0fc4dd",
-  "gb-eng-2026": "4c0f82610a38835b79de8648313d1f4525434610341a8f48bdb437dd6eb1be24",
-  "ke-nakuru-2026": "e309381464fd3555eff4d3152ab7d0f3abd3e7d2bc5f019eb6f687b71df75e4f",
+  "au-vic-2026": "b1dc744d93b55539e7d17222c36893ba2bfe8bc611d4910ca85c4627d100f5ae",
+  "gb-eng-2026": "b51955994f60e286974a65a7354f491768dd7e9800569e61bb98ba2082d1b147",
+  "ke-nakuru-2026": "4b97669f9d1925e1efc1abdc50490d3a76f35b9bcce378bbd2bc734d0dc388bc",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

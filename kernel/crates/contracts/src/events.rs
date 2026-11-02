@@ -96,6 +96,8 @@ pub enum RefusalCode {
     /// the world's table for their kind, and no `default` the world states): nobody said what it takes, so it is not done
     /// (law 10, foundations-2 P2; before, it took a second).
     Unpriced,
+    /// Law 9 (S4): goods between two places with nobody to carry them.
+    NotCarried,
     /// An edge asked to sell more of a scarce kind than it has left this period (foundations-2 C6).
     BeyondSupply,
 }
@@ -211,6 +213,16 @@ pub enum EventBody {
         structure: Id,
         by: Id,
     },
+    /// A vehicle driven on a trip used fuel from its tank (law 9, S5): its owner's holding of the kind at the vehicle, used
+    /// up (a kind that dissipates).
+    FuelUsed {
+        vehicle: Id,
+        kind: Id,
+        #[serde(with = "oikos_core::money::amount")]
+        quantity: oikos_core::money::Money,
+        metres: i64,
+        by: Id,
+    },
     /// An act on a connection (foundations-2 C3): opened, set, closed, interrupted, restored. Its settlements are not
     /// events: the meter is state.
     ConnectionChanged {
@@ -251,6 +263,11 @@ pub enum EventBody {
         to: Id,
         to_at: Id,
         by: Id,
+        /// Who carried them (law 9: a body, or the edge whose freight it was), and when they arrive, if later than now.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        carrier: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        arrives: Option<i64>,
     },
     AccountOpened {
         account: Id,
@@ -330,6 +347,9 @@ pub enum EventBody {
     PersonDied {
         person: Id,
         died_of: DeathCause,
+        /// Where the body lies, if the person died on their way between buildings (law 9: a cell of the road).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        lies_at: Option<Id>,
     },
     BirthStarted {
         parents: Vec<Id>,
@@ -376,6 +396,11 @@ pub enum EventBody {
     /// The world's totals (tier 2: greenhouse gas), monthly, for measurement.
     CounterCensus {
         counters: BTreeMap<Id, i64>,
+    },
+    /// Who could do each kind of work, and how well (foundations-2 M8), monthly, for measurement: for each practised skill,
+    /// how many living people stand in each tenth of its range, as it stands (fading read to the day).
+    SkillCensus {
+        skills: BTreeMap<Id, Vec<i64>>,
     },
     /// Work changed a body variable (services: teaching raises skill): its value now.
     BodyChanged {
@@ -510,6 +535,7 @@ impl EventBody {
             EventBody::ActionRefused { .. } => "action_refused",
             EventBody::Transfer { .. } => "transfer",
             EventBody::GoodsMoved { .. } => "goods_moved",
+            EventBody::FuelUsed { .. } => "fuel_used",
             EventBody::ConnectionChanged { .. } => "connection_changed",
             EventBody::LinkChanged { .. } => "link_changed",
             EventBody::Worked { .. } => "worked",
@@ -533,6 +559,7 @@ impl EventBody {
             EventBody::ConditionTreated { .. } => "condition_treated",
             EventBody::BodyChanged { .. } => "body_changed",
             EventBody::CounterCensus { .. } => "counter_census",
+            EventBody::SkillCensus { .. } => "skill_census",
             EventBody::Flooded { .. } => "flooded",
             EventBody::Taken { .. } => "taken",
             EventBody::FloodReceded { .. } => "flood_receded",
@@ -561,6 +588,7 @@ impl EventBody {
             self,
             EventBody::Transfer { .. }
                 | EventBody::GoodsMoved { .. }
+                | EventBody::FuelUsed { .. }
                 | EventBody::ConnectionChanged { .. }
                 | EventBody::LinkChanged { .. }
                 | EventBody::Worked { .. }

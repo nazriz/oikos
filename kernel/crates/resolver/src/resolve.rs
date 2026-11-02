@@ -448,7 +448,21 @@ impl Resolver<'_> {
                 }
             }
         };
-        Ok(vec![json!({ "block": "move_goods", "kind": kind, "quantity": quantity, "from_at": from_at, "to": to, "to_at": to_at })])
+        // (Carried, law 9 S4: by us, by someone we send, by a vehicle; code's own for now.)
+        let carried = Self::yes(c, "carried")?;
+        let carrier = self.id(c, "carrier")?;
+        let by = Self::str_(c, "by")?.filter(|v| !v.is_empty());
+        let mut b = json!({ "block": "move_goods", "kind": kind, "quantity": quantity, "from_at": from_at, "to": to, "to_at": to_at });
+        if carried {
+            b["carried"] = json!(true);
+        }
+        if let Some(x) = carrier {
+            b["carrier"] = json!(x);
+        }
+        if let Some(v) = by {
+            b["vehicle"] = json!(v);
+        }
+        Ok(vec![b])
     }
 
     /// Work: units of a task at a place, by the people named.
