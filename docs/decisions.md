@@ -10695,3 +10695,17 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   day's trip is then known). An act still too long for the day is refused and done the next day, not split.
 - **Revisit if:** a planner other than these sends people elsewhere (then it keeps `Trips` too); a seller with its own
   carrier (a town's haulier) sells on delivery (then it says `arrives` from its own trips).
+
+## 2026-11-02: stale incremental folders are pruned, incremental stays on
+
+- **Why.** `[profile.gate] incremental = true` is deliberate, but cargo keeps every `incremental/<crate>-<hash>/` whose hash
+  changed; one agent worktree's `kernel/target/gate` reached 72 GB (62 GB incremental) and the run server fell to 18 GB free.
+- **What.** `scripts/disk-tidy.ts --prune-incremental` keeps, per crate, the newest unit folder and those within 6 hours of it,
+  and never one written in the last 30 minutes. It runs before `bun run kernel`, before the gate's kernel build, at the start
+  of `merge.ts`'s check, and in the full tidy for every idle worktree. Test: the keep/remove rule (`disk-tidy.test.ts`).
+- **Measured** (agent worktree, `gate`): one-file edit 58 s unpruned, 69 s after an extreme prune, ~130 s non-incremental;
+  the pruned build tested fine. Removing a unit folder can only cost that unit a full compile, never correctness. The
+  `CARGO_INCREMENTAL=0` fallback was not needed.
+- **Revisit if:** gate builds get slower after merges (then widen the 6-hour window or keep the newest N per crate), or
+  worktrees still balloon (then the cause is something other than old hashes: look at `deps/` and `.fingerprint/`).
+

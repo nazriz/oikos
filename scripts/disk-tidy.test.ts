@@ -4,7 +4,7 @@ import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { classifyRun, classifyTmp, judgeTarget } from "./disk-tidy";
+import { classifyIncremental, classifyRun, classifyTmp, judgeTarget } from "./disk-tidy";
 import type { Tree } from "./worktree-clean";
 
 const NOW = Date.UTC(2026, 9, 17), DAY = 86400000;
@@ -77,4 +77,16 @@ test("a merged worktree with nothing running in it loses its kernel/target at on
   expect(judgeTarget(tree({ name: "merge-main" }), false).action).toBe("keep");
   expect(judgeTarget(tree({ name: "wave-1", wave: true }), false).action).toBe("keep");
   expect(judgeTarget(tree({ targetKb: 0 }), false).action).toBe("keep");
+});
+
+test("stale incremental folders: each crate keeps its newest build; a recent write is never removed", () => {
+  const inc = mk(), H = 3600000, now = Date.now();
+  const unit = (name: string, hoursAgo: number) => { const p = join(inc, name); mkdirSync(p, { recursive: true }); const t = (now - hoursAgo * H) / 1000; utimesSync(p, t, t); };
+  unit("oikos_world-aaaaaaaaaaaaa", 100); unit("oikos_world-bbbbbbbbbbbbb", 30); // stale builds of one crate
+  unit("oikos_world-ccccccccccccc", 2); unit("oikos_world-ddddddddddddd", 1); // the newest build (lib and test units together)
+  unit("oikos_kernel-eeeeeeeeeeeee", 500); // a crate's only folder stays, however old
+  unit("a1_citizen-fffffffffffff", 0.1); unit("a1_citizen-ggggggggggggg", 0.1); // written just now
+  const v = Object.fromEntries(classifyIncremental(inc, { now }).map((x) => [x.path.split("/").pop()!.slice(-13), x.action]));
+  expect(v).toEqual({ aaaaaaaaaaaaa: "remove", bbbbbbbbbbbbb: "remove", ccccccccccccc: "keep", ddddddddddddd: "keep", eeeeeeeeeeeee: "keep", fffffffffffff: "keep", ggggggggggggg: "keep" });
+  rmSync(inc, { recursive: true, force: true });
 });
