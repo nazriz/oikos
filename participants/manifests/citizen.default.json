@@ -801,6 +801,14 @@
       },
       "source": "placeholder"
     },
+    "venture_prior_months": {
+      "default": 3,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "months"
+    },
     "ventures": {
       "default": [],
       "schema": {
@@ -844,5 +852,5 @@
   },
   "perceives": [],
   "state": "none",
-  "version": "0.60.0"
+  "version": "0.61.0"
 }

@@ -10665,6 +10665,22 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Revisit if:** the weekly probe toward a quicker pace shows as a refusal a week in a study of the office (it is the
   shared manager's behaviour; the factories and shops do the same), or the office comes to do work other than fieldwork.
 
+## 2026-11-01 · Founding again after giving a business up: the owner's own record (branch `refound-after-failure`; risk ME-1; no model called)
+
+- **What:** an owner who gives a business of one up keeps their record of it (months, what it paid them, what its market
+  said such a business pays), and weighs starting one again on the market's figure moved by that record, weighted by its
+  months against `venture_prior_months` (3, a placeholder, in `citizen.default` 0.61.0); the next weighing is a month on.
+  The record is used wherever a business of one is weighed (starting, borrowing to start, taking the loan) and in the
+  pay it is expected to bring. docs/behaviour/entry.md, "Founding again after giving one up".
+- **Why this way:** founding was weighed on the market's figure alone, so the evidence that had just closed the business
+  counted for nothing, and the weighing was overdue (it does not run while one owns a business), so it came at once. The
+  learning is Jovanovic's (an owner learns from what the venture pays them); the shrinkage toward the market's figure
+  rather than a bar keeps restarts possible, as they are in the literature on renascent and serial entrepreneurs. Behaviour,
+  not a count: nothing here is tuned to how often people refound.
+- **Not built:** the record does not carry to a shop in premises, and nobody hears of others' failures (a founder learns
+  of their own only). Someone with nothing coming in still weighs any positive figure against nothing.
+- **Revisit if:** a source gives how strongly founders weigh their own past venture against their view of the market
+  (`venture_prior_months`), or runs show owners cycling through the same failing business month after month.
 ## 2026-11-02 · Taking from work under law 9: the taker was there if their way set out from it (landing `f2-s4`; kernel fix; no model called)
 
 - **Found:** at the landing of `f2-s4`, `orchestrator/test/hazards.test.ts` ("taking from work, found at a stocktake, ...")
