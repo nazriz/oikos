@@ -41,6 +41,33 @@ struct Texts {
 /// The size of a block of texts.
 const BLOCK: usize = 4 * 1024;
 
+/// Minted record ids (`rec.<n>`, `n` written as it writes itself), the most numerous ids of a run (one a record): held
+/// by their number, in chunks of `MINTED_CHUNK`, rather than in the shards' tables, whose slots, at most half full and
+/// doubling, cost them some 60 bytes each besides their text (SC-6). The same one copy of each text: an id is the
+/// same id however it is reached.
+#[derive(Default)]
+struct Minted {
+    chunks: Vec<Box<[Option<&'static str>]>>,
+    texts: Texts,
+    len: usize,
+}
+
+const MINTED_CHUNK: usize = 4096;
+
+/// Beyond this a record's number is held in the shards' tables as any other id.
+const MINTED_MOST: usize = 1 << 32;
+
+static MINTED: LazyLock<RwLock<Minted>> = LazyLock::new(|| RwLock::new(Minted::default()));
+
+/// The number of a minted record id: `rec.` then the decimal digits of a number (no leading zero but the number 0).
+fn minted(s: &str) -> Option<usize> {
+    let d = s.strip_prefix("rec.")?;
+    if d.is_empty() || d.len() > 10 || !d.bytes().all(|b| b.is_ascii_digit()) || (d.len() > 1 && d.starts_with('0')) {
+        return None;
+    }
+    d.parse::<usize>().ok().filter(|n| *n < MINTED_MOST)
+}
+
 impl Texts {
     fn find(&self, s: &str, h: u64) -> Option<&'static str> {
         if self.slots.is_empty() {
@@ -102,6 +129,9 @@ impl Id {
         Id::interned(&s)
     }
     fn interned(s: &str) -> Id {
+        if let Some(n) = minted(s) {
+            return Id::minted_id(s, n);
+        }
         let h = fnv(s);
         let t = &TABLE[(h >> 58) as usize % SHARDS];
         if let Some(k) = t.read().unwrap_or_else(|e| e.into_inner()).find(s, h) {
@@ -115,6 +145,27 @@ impl Id {
         w.add(k, h);
         Id(k)
     }
+    /// A minted record id's one copy, found by its number in `MINTED` (made if it is new).
+    fn minted_id(s: &str, n: usize) -> Id {
+        let (chunk, at) = (n / MINTED_CHUNK, n % MINTED_CHUNK);
+        {
+            let m = MINTED.read().unwrap_or_else(|e| e.into_inner());
+            if let Some(k) = m.chunks.get(chunk).and_then(|c| c[at]) {
+                return Id(k);
+            }
+        }
+        let mut m = MINTED.write().unwrap_or_else(|e| e.into_inner());
+        while m.chunks.len() <= chunk {
+            m.chunks.push(vec![None; MINTED_CHUNK].into_boxed_slice());
+        }
+        if let Some(k) = m.chunks[chunk][at] {
+            return Id(k);
+        }
+        let k = m.texts.keep(s);
+        m.chunks[chunk][at] = Some(k);
+        m.len += 1;
+        Id(k)
+    }
     pub fn as_str(&self) -> &str {
         self.0
     }
@@ -126,10 +177,12 @@ impl Id {
 
 /// How many texts the process holds as ids, and their bytes (for whoever measures memory).
 pub fn interned() -> (usize, usize) {
-    TABLE.iter().fold((0, 0), |(n, b), t| {
+    let (n, b) = TABLE.iter().fold((0, 0), |(n, b), t| {
         let t = t.read().unwrap_or_else(|e| e.into_inner());
         (n + t.len, b + t.slots.iter().flatten().map(|k| k.len()).sum::<usize>())
-    })
+    });
+    let m = MINTED.read().unwrap_or_else(|e| e.into_inner());
+    (n + m.len, b + m.chunks.iter().flat_map(|c| c.iter().flatten()).map(|k| k.len()).sum::<usize>())
 }
 
 impl Default for Id {
@@ -303,5 +356,18 @@ mod tests {
             std::hash::Hasher::finish(&s)
         };
         assert_eq!(h(&|s| std::hash::Hash::hash(&a, s)), h(&|s| std::hash::Hash::hash("rec.10", s)));
+        // Minted ids held by their number, and the forms that are not one (a leading zero, too long, not digits) held as
+        // any other text: each its one copy, its own text.
+        for t in ["rec.0", "rec.5000", "rec.123456789", "rec.007", "rec.", "rec.12a", "rec.99999999999", "rec.4294967296"] {
+            let x = Id::new(t);
+            assert_eq!(x.as_str(), t);
+            assert!(std::ptr::eq(x.as_str(), Id::from_string(t.to_string()).as_str()), "one copy of {t}");
+        }
+        assert_ne!(Id::new("rec.007"), Id::new("rec.7"));
+        let mut m: Vec<Id> = (0..10_000).rev().map(|i| Id::from_string(format!("rec.{i}"))).collect();
+        m.sort();
+        let mut mt: Vec<String> = (0..10_000).map(|i| format!("rec.{i}")).collect();
+        mt.sort();
+        assert!(m.iter().zip(&mt).all(|(i, t)| i == t), "ordered as their texts are");
     }
 }
