@@ -267,6 +267,10 @@ fn a_crew_goes_to_the_building_it_works_on_and_is_away_from_its_depot_meanwhile(
     let out8 = run8.command(&Command::Advance { to: d8 + 1 }).unwrap();
     let all8: Vec<EventBody> = ev8.into_iter().chain(out8.events.into_iter().map(|e| e.body)).collect();
     assert_eq!(refused(&all8), Some(RefusalCode::NoTimeLeft), "the mend and the trip are more than her day: {all8:?}");
+    // (Refused so, she never set out, and her day is as it was; what is told is how long the trip would have been.)
+    assert!(!all8.iter().any(|e| matches!(e, EventBody::Vacated { occupant, .. } if occupant == "carol")), "{all8:?}");
+    let o8 = run8.command(&Command::Observe { participant: "developer-system".into(), only: None }).unwrap().observation.unwrap();
+    assert!(o8.outcomes.last().is_some_and(|x| x.trips.contains_key("carol")));
     // The developer's own part of the order takes two hours, so carol's time is hers again before the act is done; but she
     // is out on its round until then, and a trip of her own meanwhile is refused when due (she is not there to go from).
     let mut w = road_world();
