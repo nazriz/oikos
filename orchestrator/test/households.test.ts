@@ -58,8 +58,15 @@ test("households live, move and pay together", async () => {
   const brought = [...firstInto.values()].filter((e) => !config.world.occupancy.some((o: any) => o.occupant === e.occupant && o.space === e.space));
   for (const e of brought) expect([`${householdOf.get(e.occupant).leaseholder}-self`, `${e.occupant}-self`]).toContain(e.by);
   expect(brought.some((e) => e.by === `${householdOf.get(e.occupant).leaseholder}-self`)).toBe(true);
-  // Other adults move themselves.
-  const adultMoves = ev.filter((e) => e.event === "occupied" && e.space.includes("/dwelling.") && known(e.occupant) && adult(e.occupant, e.t) && householdOf.get(e.occupant).leaseholder !== e.occupant);
+  // Other adults move themselves. (Coming back is no move: someone an employer's act took from home to a site, there and
+  // back, is back in the space they left, by that act, law 9 S4.)
+  const lastLeft = new Map<string, any>();
+  const returned = new Set<any>();
+  for (const e of ev) {
+    if (e.event === "vacated") lastLeft.set(e.occupant, e);
+    if (e.event === "occupied" && lastLeft.get(e.occupant)?.space === e.space && lastLeft.get(e.occupant)?.by === e.by && e.by !== `${e.occupant}-self`) returned.add(e);
+  }
+  const adultMoves = ev.filter((e) => e.event === "occupied" && !returned.has(e) && e.space.includes("/dwelling.") && known(e.occupant) && adult(e.occupant, e.t) && householdOf.get(e.occupant).leaseholder !== e.occupant);
   expect(adultMoves.length).toBeGreaterThan(0);
   for (const e of adultMoves) expect(e.by).toBe(`${e.occupant}-self`);
   // Shares of the rent reach leaseholders.

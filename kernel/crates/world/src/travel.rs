@@ -87,7 +87,7 @@ fn trip_cells(s: &Statics, st: &State, travel: &oikos_contracts::config::TravelC
     let walk = path_cells(s, st, travel, a, b);
     let w = crate::ways::ways(s, st);
     let (Some(e), Some(x)) = (w.nearest(a), w.nearest(b)) else { return walk };
-    let Some(net) = crate::ways::tree_cached(s, st, &w, e, speed)[x as usize] else { return walk };
+    let Some(net) = crate::ways::tree_cached(s, st, &w, e, speed).best[x as usize] else { return walk };
     let (Some(ea), Some(xb)) = (w.nodes[e as usize], w.nodes[x as usize]) else { return walk };
     let total = path_cells(s, st, travel, a, ea).saturating_add(net).saturating_add(path_cells(s, st, travel, xb, b));
     walk.min(total)
@@ -102,7 +102,7 @@ pub fn freight_seconds(s: &Statics, st: &State, edge: &str, structure: &str) -> 
     let e = *w.edges.get(edge)?;
     let to = st.structures.get(structure).and_then(|x| crate::config::cell_xy(&x.at))?;
     let x = w.nearest(to)?;
-    let net = crate::ways::tree_cached(s, st, &w, e, Some(i64::from(u16::MAX)))[x as usize]?;
+    let net = crate::ways::tree_cached(s, st, &w, e, Some(i64::from(u16::MAX))).best[x as usize]?;
     Some(net.saturating_add(path_cells(s, st, travel, w.nodes[x as usize]?, to)))
 }
 
@@ -117,6 +117,64 @@ pub struct Journey {
     pub to: Id,
     pub vehicle: Option<Id>,
     pub seconds: i64,
+    /// Driven (S5): the way links it goes along (each carries one more vehicle this hour), the metres, and the fuel.
+    pub links: Vec<Id>,
+    pub metres: i64,
+    pub fuel: Option<(Id, crate::money::Money)>,
+}
+
+/// A driven leg between two buildings (S5): its seconds this hour (each link's free time raised by the vehicles on it
+/// against its capacity, and an hour's wait at a link already at capacity), the links it goes along and their metres; on
+/// foot all the way where that is quicker (then no links).
+pub fn driven_leg(s: &Statics, st: &State, from: &str, to: &str, speed: i64, extra: &BTreeMap<Id, u32>) -> (i64, Vec<Id>, i64) {
+    let Some(travel) = s.config.catalogue.travel.as_ref() else { return (0, vec![], 0) };
+    let (Some(a), Some(b)) = (st.structures.get(from).and_then(|x| crate::config::cell_xy(&x.at)), st.structures.get(to).and_then(|x| crate::config::cell_xy(&x.at))) else { return (0, vec![], 0) };
+    if a == b {
+        return (0, vec![], 0);
+    }
+    let walk = path_cells(s, st, travel, a, b);
+    let w = crate::ways::ways(s, st);
+    let (Some(e), Some(x)) = (w.nearest(a), w.nearest(b)) else { return (walk, vec![], 0) };
+    let tree = crate::ways::tree_cached(s, st, &w, e, Some(speed));
+    if tree[x as usize].is_none() {
+        return (walk, vec![], 0);
+    }
+    let (Some(ea), Some(xb)) = (w.nodes[e as usize], w.nodes[x as usize]) else { return (walk, vec![], 0) };
+    let route = tree.route(&w, x);
+    let hour = st.t.div_euclid(3_600);
+    let mut net: i64 = 0;
+    let mut waited = false;
+    // (Each link each way: its key and the way it is gone along, `>` from its first node, `<` back.)
+    let mut keys: Vec<Id> = vec![];
+    let mut node = e;
+    for l in &route {
+        let link = &w.links[*l as usize];
+        let (dir, next) = if link.a == node { ('>', link.b) } else { ('<', link.a) };
+        node = next;
+        let key = Id::new(&format!("{}{dir}", link.key));
+        keys.push(key);
+        let free = crate::ways::link_seconds(s, link, Some(speed)).unwrap_or(0);
+        let on = st.flows.get(&key).filter(|(h, _)| *h == hour).map_or(0, |(_, n)| *n) as i64 + *extra.get(&key).unwrap_or(&0) as i64;
+        let cap = link.capacity.max(1);
+        let mut secs = free;
+        if let Some(c) = travel.congestion {
+            // (Free time times 1 + alpha (on / capacity)^beta, in integers.)
+            let ratio_pow = (on as i128).pow(c.beta) * 1_000_000 / (cap as i128).pow(c.beta).max(1);
+            secs = free + ((free as i128) * (c.alpha_bps as i128) * ratio_pow / (10_000 * 1_000_000)) as i64;
+            if on >= cap && !waited {
+                // (Full this hour: the vehicle goes on it in the next.)
+                secs += 3_600 - st.t.rem_euclid(3_600);
+                waited = true;
+            }
+        }
+        net = net.saturating_add(secs);
+    }
+    let total = path_cells(s, st, travel, a, ea).saturating_add(net).saturating_add(path_cells(s, st, travel, xb, b));
+    if walk <= total {
+        return (walk, vec![], 0);
+    }
+    let metres = route.iter().map(|l| w.links[*l as usize].length_m).sum();
+    (total, keys, metres)
 }
 
 /// The journeys an act's blocks make (literal ids only: a body or a place made in the act itself is going nowhere yet). An
@@ -124,6 +182,8 @@ pub struct Journey {
 /// and where they go; a `work` on a building other than where it is done takes each performer there. A body goes by its
 /// stops in the blocks' order and ends in the building it goes into, or back where it set out.
 pub fn journeys(s: &Statics, st: &State, actor_body: Option<Id>, blocks: &[Block]) -> Vec<Journey> {
+    // (The vehicles this act's own journeys put on each link, counted as they are planned.)
+    let extra = &mut BTreeMap::<Id, u32>::new();
     let lit = |x: &str| !x.starts_with('$');
     let mut order: Vec<Id> = vec![];
     let mut legs: BTreeMap<Id, (Vec<Id>, Option<Id>, Option<Id>)> = BTreeMap::new();
@@ -152,6 +212,17 @@ pub fn journeys(s: &Statics, st: &State, actor_body: Option<Id>, blocks: &[Block
                     None => None,
                 };
                 let Some(body) = body.filter(|b| st.body(b).is_some()) else { continue };
+                // (Into a vehicle, S5: its driver takes it by where the goods are, unless it stands there.)
+                if let Some(v) = st.vehicles.get(to_at.as_str()) {
+                    if !st.structures.contains_key(from_at.as_str()) || v.at == from_at.as_str() {
+                        continue;
+                    }
+                    touch(&mut order, body);
+                    let e = legs.entry(body).or_default();
+                    e.0.push(Id::new(from_at));
+                    e.2 = Some(Id::new(to_at));
+                    continue;
+                }
                 if !st.structures.contains_key(from_at.as_str()) || !st.structures.contains_key(to_at.as_str()) {
                     continue;
                 }
@@ -198,12 +269,48 @@ pub fn journeys(s: &Statics, st: &State, actor_body: Option<Id>, blocks: &[Block
             },
             None => None,
         };
-        let seconds = route.windows(2).map(|p| seconds(s, st, &p[0], &p[1], speed)).fold(0i64, |a, b| a.saturating_add(b));
+        // (Driven, S5: along the links' route, slowed by what is on them this hour; on foot, as the ground and ways give.)
+        let (mut seconds, mut links, mut metres) = match speed {
+            Some(v) => {
+                let mut links: Vec<Id> = vec![];
+                let (mut secs, mut metres) = (0i64, 0i64);
+                for p in route.windows(2) {
+                    let (t, ls, m) = driven_leg(s, st, &p[0], &p[1], v, extra);
+                    links.extend(ls);
+                    secs = secs.saturating_add(t);
+                    metres += m;
+                }
+                (secs, links, metres)
+            }
+            None => (route.windows(2).map(|p| seconds(s, st, &p[0], &p[1], None)).fold(0i64, |a, b| a.saturating_add(b)), vec![], 0),
+        };
+        // (Its fuel, S5: what the metres driven take, from its owner's holding at the vehicle; too little for the trip, it
+        // is left where it stands and the trip is walked.)
+        let mut speed = speed;
+        let mut fuel = None;
+        if let Some((v, x)) = vehicle.filter(|_| speed.is_some()).and_then(|v| st.vehicles.get(&v).map(|x| (v, x.clone()))) {
+            if let Some((kind, per)) = s.config.travel.as_ref().and_then(|t| t.vehicle_types.iter().find(|t| t.id == x.type_)).and_then(|t| Some((t.fuel?, t.fuel_per_100km?))) {
+                // (Millionths of a unit a metre: per a hundred km is per x 10 millionths a metre.)
+                let owed = x.fuel_owed as i128 + metres as i128 * per as i128 * 10;
+                let need = (owed / 1_000_000) as crate::money::Money;
+                if st.holding(&x.owner, &v, &kind) < need {
+                    speed = None;
+                    seconds = route.windows(2).map(|p| self::seconds(s, st, &p[0], &p[1], None)).fold(0i64, |a, b| a.saturating_add(b));
+                    links.clear();
+                    metres = 0;
+                } else {
+                    fuel = Some((kind, need));
+                }
+            }
+        }
         if seconds <= 0 {
             continue;
         }
+        for k in &links {
+            *extra.entry(*k).or_insert(0) += 1;
+        }
         let via: Vec<Id> = route[1..route.len() - 1].to_vec();
-        out.push(Journey { body, from, via, to, vehicle: vehicle.filter(|_| speed.is_some()), seconds });
+        out.push(Journey { body, from, via, to, vehicle: vehicle.filter(|_| speed.is_some()), seconds, links, metres, fuel });
     }
     out
 }

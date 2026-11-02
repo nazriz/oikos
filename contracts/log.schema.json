@@ -668,6 +668,21 @@
           }
         },
         {
+          "description": "Law 9 (S5): a vehicle driven on a trip used fuel from its tank (its owner's holding of the kind at the vehicle, used up).",
+          "type": "object",
+          "required": ["event", "cause", "vehicle", "kind", "quantity", "metres", "by"],
+          "additionalProperties": false,
+          "properties": {
+            "event": { "const": "fuel_used" },
+            "cause": { "description": "seq of the command entry that caused this event.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count" },
+            "vehicle": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "kind": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "quantity": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Quantity" },
+            "metres": { "type": "integer", "minimum": 0 },
+            "by": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" }
+          }
+        },
+        {
           "type": "object",
           "required": [
             "event",
@@ -2010,6 +2025,7 @@
         "structure_demolished",
         "species_extinct",
         "nature_census",
+        "fuel_used",
         "occupied",
         "vacated",
         "recorded",

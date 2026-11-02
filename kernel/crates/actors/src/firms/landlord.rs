@@ -2934,7 +2934,7 @@ mod tests {
                         self.actor.sent(&name);
                         pic.t += 60;
                         pic.woke_for = "done".into();
-                        pic.outcomes = vec![oikos_sight::Outcome { action: name, t: pic.t, status: OutcomeStatus::Applied, created: Some(created), refusal: None, investigated: None, surveyed: None, seen: vec![] }];
+                        pic.outcomes = vec![oikos_sight::Outcome { action: name, t: pic.t, status: OutcomeStatus::Applied, created: Some(created), refusal: None, investigated: None, surveyed: None, seen: vec![], trips: Default::default(), freight: Default::default() }];
                         pic.channels.remove("sites").map(|_| ());
                         let cells: Vec<SiteCell> = self.cells.iter().map(|c| serde_json::from_value(c.clone()).unwrap()).collect();
                         pic.channels.insert("sites".into(), Seen::Sites { as_of: t, cells: Arc::new(cells), visit: None });

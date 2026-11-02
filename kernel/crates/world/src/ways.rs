@@ -20,6 +20,8 @@ use std::sync::Arc;
 /// A link between two nodes of a way.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WayLink {
+    /// Its name, the same whatever else is built: `<mode>:<x>.<y>-<x>.<y>` for one a way's cells make, else the network's.
+    pub key: Id,
     pub a: u32,
     pub b: u32,
     pub length_m: i64,
@@ -89,7 +91,8 @@ impl Ways {
                     (Some(p), Some(q)) => Some(*p.min(q)),
                     _ => None,
                 };
-                w.join(a, b, WayLink { a, b, length_m: cell_m, capacity: *cap.min(cap2), speed_kmh: speed });
+                let key = Id::new(&format!("{mode}:{x}.{y}-{nx}.{ny}"));
+                w.join(a, b, WayLink { key, a, b, length_m: cell_m, capacity: *cap.min(cap2), speed_kmh: speed });
             }
         }
         let node_ix = |w: &Ways, id: &Id| -> Option<u32> {
@@ -102,7 +105,7 @@ impl Ways {
         for l in &travel_links {
             let (Some(a), Some(b)) = (node_ix(&w, &l.from), node_ix(&w, &l.to)) else { continue };
             if a != b {
-                w.join(a, b, WayLink { a, b, length_m: l.length_m.unwrap_or(cell_m), capacity: l.capacity, speed_kmh: l.speed_kmh });
+                w.join(a, b, WayLink { key: l.id, a, b, length_m: l.length_m.unwrap_or(cell_m), capacity: l.capacity, speed_kmh: l.speed_kmh });
             }
         }
         for (i, id) in edge_nodes.iter().enumerate() {
@@ -142,9 +145,42 @@ pub fn link_seconds(s: &Statics, l: &WayLink, speed: Option<i64>) -> Option<i64>
     }
 }
 
+/// The quickest times from a node to every other, and for each node the link it is reached by (to walk a route back).
+#[derive(Debug, Default)]
+pub struct Tree {
+    pub best: Vec<Option<i64>>,
+    pub by: Vec<Option<u32>>,
+}
+
+impl std::ops::Index<usize> for Tree {
+    type Output = Option<i64>;
+    fn index(&self, i: usize) -> &Option<i64> {
+        &self.best[i]
+    }
+}
+
+impl Tree {
+    /// The links from the tree's node to `to`, in order (none: it is not reached, or it is the node itself).
+    pub fn route(&self, w: &Ways, to: u32) -> Vec<u32> {
+        let mut out = vec![];
+        let mut n = to;
+        while let Some(l) = self.by[n as usize] {
+            out.push(l);
+            let link = &w.links[l as usize];
+            n = if link.a == n { link.b } else { link.a };
+            if out.len() > w.links.len() {
+                break;
+            }
+        }
+        out.reverse();
+        out
+    }
+}
+
 /// The quickest time from one node to every other, by a vehicle at `speed` or on foot.
-pub fn tree(s: &Statics, w: &Ways, from: u32, speed: Option<i64>) -> Vec<Option<i64>> {
+pub fn tree(s: &Statics, w: &Ways, from: u32, speed: Option<i64>) -> Tree {
     let mut best: Vec<Option<i64>> = vec![None; w.nodes.len()];
+    let mut by: Vec<Option<u32>> = vec![None; w.nodes.len()];
     let mut heap = BinaryHeap::new();
     best[from as usize] = Some(0);
     heap.push(Reverse((0i64, from)));
@@ -157,11 +193,12 @@ pub fn tree(s: &Statics, w: &Ways, from: u32, speed: Option<i64>) -> Vec<Option<
             let nd = d.saturating_add(c);
             if best[*m as usize].is_none_or(|b| nd < b) {
                 best[*m as usize] = Some(nd);
+                by[*m as usize] = Some(*l);
                 heap.push(Reverse((nd, *m)));
             }
         }
     }
-    best
+    Tree { best, by }
 }
 
 /// The ways of the ground as it is now (worked out once an epoch).
@@ -179,7 +216,7 @@ pub fn ways(s: &Statics, st: &State) -> Arc<Ways> {
 }
 
 /// The quickest times from a node, by a vehicle at `speed` or on foot, worked out once an epoch.
-pub fn tree_cached(s: &Statics, st: &State, w: &Ways, from: u32, speed: Option<i64>) -> Arc<Vec<Option<i64>>> {
+pub fn tree_cached(s: &Statics, st: &State, w: &Ways, from: u32, speed: Option<i64>) -> Arc<Tree> {
     let key = (from, speed.unwrap_or(0));
     if let Ok(kept) = st.ground.trees.lock() {
         if let Some((_, t)) = kept.get(&key).filter(|(e, _)| *e == st.ground.epoch) {
