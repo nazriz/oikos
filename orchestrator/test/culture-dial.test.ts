@@ -177,11 +177,13 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // (Re-taken on 2026-11-02 at commute-choice (WM-4), on the tree merged with main at fb4168c, config hashes and Rust states both:
 // a citizen's round carries the place's value of travel time and driving cost (generator 0.76.0), people keep their own trips
 // and weigh a known commute in job and home choices (docs/behaviour/commuting.md); b63b2c19..., a18cf6dd..., cfe34895... for the
-// configs and b1dc744d..., b5195599..., 4b97669f... for the states, until then.)
+// configs and b1dc744d..., b5195599..., 4b97669f... for the states, until then. The states re-taken again on the tree merged
+// with main at 3fc51b7d (main's trips, retail, environment office and refounding fixes under it; the configs did not move);
+// main's d8300873..., e9564040..., 7bf5ae46..., until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "d8300873a5c03da6d435069c7fe02c5b7e3c862730914970ffd57b0bd30b2790",
-  "gb-eng-2026": "e9564040f909ba83234cf899afe319fb813c973c3ba0c9191aec594bfd9de59a",
-  "ke-nakuru-2026": "7bf5ae46d53382f1530ad0dba3ed0087df4256c796ad28a94796ce9552b8d7fc",
+  "au-vic-2026": "2ee01f8cdce8e6f74911c3a1ff820261d0050085f42f168c77eafb501f1aca41",
+  "gb-eng-2026": "7abe89a675509eecf7145d184f3c5e689093a8b28e27a2dccea96e777030ddb3",
+  "ke-nakuru-2026": "4be8a863712a0d67f0c692657024b7a4e282674d39431d0db3199c5e9a8b7dd2",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
