@@ -214,6 +214,10 @@ pub struct Factory<B: Body> {
     /// Makings ordered whose outcome has not come back yet: (units, when planned).
     making: Vec<(i64, i64)>,
     on_order: BTreeMap<String, i64>,
+    /// Delivered and still on the road to us (law 9: the seller's note says when they arrive): (kind, quantity, when).
+    /// They stay on order until then.
+    #[serde(default)]
+    coming: Vec<(String, i64, i64)>,
     order_qty: BTreeMap<String, (String, i64)>,
     used: BTreeMap<String, i64>,
     used_day: i64,
@@ -270,6 +274,7 @@ impl<B: Body> Factory<B> {
             invoices_read: 0,
             making: vec![],
             on_order: BTreeMap::new(),
+            coming: vec![],
             order_qty: BTreeMap::new(),
             used: BTreeMap::new(),
             used_day: -1,
@@ -362,9 +367,16 @@ impl<B: Body> Plan for Factory<B> {
         self.payables.take(&self.book);
         for d in self.deliveries.take(&self.book, &self.me) {
             if let Some((kind, q)) = self.order_qty.remove(&d.order) {
-                let e = self.on_order.entry(kind).or_insert(0);
-                *e = (*e - q).max(0);
+                self.coming.push((kind, q, d.arrives.unwrap_or(pic.t)));
             }
+        }
+        // (What has arrived is no longer on order: it is held.)
+        let t = pic.t;
+        let (here, still): (Vec<_>, Vec<_>) = std::mem::take(&mut self.coming).into_iter().partition(|x| x.2 <= t);
+        self.coming = still;
+        for (kind, q, _) in here {
+            let e = self.on_order.entry(kind).or_insert(0);
+            *e = (*e - q).max(0);
         }
         // What the outside sent back unpaid is what we learn our room from.
         let notes: Vec<_> = self.book.all("invoice_declined").cloned().collect();

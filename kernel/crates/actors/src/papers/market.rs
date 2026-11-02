@@ -138,6 +138,9 @@ pub struct DeliveryNote {
     pub pay_in_days: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pay_to: Option<String>,
+    /// When the goods are to arrive (law 9: they go by the seller's carrier, and take their time).
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int")]
+    pub arrives: Option<i64>,
 }
 impl Paper for DeliveryNote {
     const KIND: &'static str = "delivery_note";

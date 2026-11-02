@@ -177,7 +177,8 @@ test("everything that comes back from an act is told: what it made, what a surve
     surveyed: { of: "river_trout", cells: { "cell.1.2": 14, "cell.1.3": 0 } },
     investigated: { from: "shop-1", at: "shop-1/store.1", kind: "goods", taken: true, taker: "c0042" },
     seen: [{ structure: "house-3", type: "house", at: "cell.2.2", w: 1, h: 1, complete: true, variables: { wear: { value: 12, per_day: 1, as_of_day: 0, min: 0, max: 100 } },
-      spaces: [{ space: "house-3/dwelling.1", kind: "dwelling", capacity: 4, count: 2 }] }] };
+      spaces: [{ space: "house-3/dwelling.1", kind: "dwelling", capacity: 4, count: 2 }] }],
+    trips: { c0007: 1500 }, freight: { "shop-1": 7260 } };
   const refused = { action: "act.10", t: 0, status: "refused", refusal: { code: "insufficient_funds", block: 2, detail: "block 2: acc-city holds 100 cents" } };
   // (Between them they carry every part the participant API lets an outcome have: a part added there is added here.)
   expect(new Set([...Object.keys(done), ...Object.keys(refused)])).toEqual(new Set(Object.keys(api.$defs.Outcome.properties)));
@@ -190,6 +191,8 @@ test("everything that comes back from an act is told: what it made, what a surve
   expect(text).toContain("What the investigation into goods taken from shop-1 at shop-1/store.1 found: it was taken, by c0042.");
   // Work on a building: how the crew left it (how many are in it, never who, at someone else's building).
   expect(text).toContain("As those who did the work left it:");
+  expect(text).toContain("On their way, there and back: c0007 25 min.");
+  expect(text).toContain("By the outside's freight: to shop-1, 2 h 1 min on the road.");
   expect(text).toContain("house house-3, at cell.2.2: wear 12, rising 1 a day");
   expect(text).toContain("house-3/dwelling.1, a dwelling: 2 people (room for 4)");
   const no = renderObservation(obs({}, { outcomes: [refused] }), { lastAction: "What you confirmed" });

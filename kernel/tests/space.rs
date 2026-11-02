@@ -254,6 +254,19 @@ fn a_crew_goes_to_the_building_it_works_on_and_is_away_from_its_depot_meanwhile(
     let out = run.command(&Command::Advance { to: done + 1 }).unwrap();
     assert_eq!(refused(&out.events.iter().map(|e| e.body.clone()).collect::<Vec<_>>()), None);
     assert_eq!(run.kernel().state().structures_of("carol"), vec![oikos_kernel::blocks::Id::new("s-shop")], "back at the shop");
+    // Whose work it was hears how long her trip took (their own record of it, to plan the next day by), and the trip was
+    // her working time: a day's work on top of it is more than her day.
+    let o = run.command(&Command::Observe { participant: "developer-system".into(), only: None }).unwrap().observation.unwrap();
+    let trip = o.outcomes.last().and_then(|x| x.trips.get("carol").copied()).expect("her trip told");
+    assert!(trip >= 2 * 39 * 18 - 40, "there and back on foot: {trip}");
+    // (A quarter of an hour's mend in a half-hour day: it fits, but not with the walk there and back.)
+    let mut w8 = road_world();
+    w8["catalogue"]["working_day"] = json!(1_800);
+    let mut run8 = Run::start(w8, "space-crew-day", Vec::new(), None).unwrap();
+    let (_, d8, ev8) = act_now(&mut run8, "developer-system", Some("developer"), json!([{"block": "work", "task": "mend", "units": 1, "at": "s-shop", "on": "s-house", "performers": ["carol"]}]));
+    let out8 = run8.command(&Command::Advance { to: d8 + 1 }).unwrap();
+    let all8: Vec<EventBody> = ev8.into_iter().chain(out8.events.into_iter().map(|e| e.body)).collect();
+    assert_eq!(refused(&all8), Some(RefusalCode::NoTimeLeft), "the mend and the trip are more than her day: {all8:?}");
     // The developer's own part of the order takes two hours, so carol's time is hers again before the act is done; but she
     // is out on its round until then, and a trip of her own meanwhile is refused when due (she is not there to go from).
     let mut w = road_world();
@@ -283,6 +296,9 @@ fn the_outsides_freight_takes_its_time_from_the_edges_node_and_goods_on_their_wa
     assert!(arrives >= done + 3_600, "an hour on the road out, and more through the town");
     assert_eq!(run.kernel().state().holding("devco", "s-shop", "goods"), 200, "not there yet");
     assert_eq!(run.kernel().state().total_goods(), before, "on their way, still counted");
+    // (The seller's carrier tells it how long the goods take to get there: what it tells its buyer to expect.)
+    let o = run.command(&Command::Observe { participant: "outside-system".into(), only: None }).unwrap().observation.unwrap();
+    assert_eq!(o.outcomes.last().and_then(|x| x.freight.get("s-shop").copied()), Some(arrives - done));
     run.command(&Command::Advance { to: arrives + 1 }).unwrap();
     assert_eq!(run.kernel().state().holding("devco", "s-shop", "goods"), 240);
 }

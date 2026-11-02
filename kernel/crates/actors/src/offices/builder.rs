@@ -275,6 +275,9 @@ struct Firm {
   spoken_for: BTreeMap<String, i64>,
   used: BTreeMap<String, i64>,
   used_day: i64,
+  /// How long the crew's trips to each site took, from its own records (law 9): a day's work is sized with them.
+  #[serde(default)]
+  trips: crate::common::trips::Trips,
 }
 
 fn ceil_div(a: i128, b: i128) -> i128 {
@@ -309,7 +312,7 @@ impl Firm {
             p, book: Book::new(), staff, dues: WindingUp::new(me, WindingParams { short_days: 0, wind_up_days: 0, idle_days: 0, reprice_days: 0, reprice_bps: 0 }), takings: Takings::default(), bargaining: Bargaining::new(me), letters: Letters::default(), asked: Asked::default(), plans_out: BTreeSet::new(), no_plan: BTreeSet::new(),
             in_flight: BTreeSet::new(), ordering: vec![], publishing: None, begun: BTreeSet::new(), paying: BTreeSet::new(),
             projects: vec![], over: BTreeSet::new(), finished: BTreeSet::new(), seen_type: BTreeMap::new(), repairs: vec![], dealt: BTreeSet::new(),
-            paid_in: BTreeMap::new(), spoken_for: BTreeMap::new(), used: BTreeMap::new(), used_day: -1,
+            paid_in: BTreeMap::new(), spoken_for: BTreeMap::new(), used: BTreeMap::new(), used_day: -1, trips: Default::default(),
         }
     }
 
@@ -920,6 +923,9 @@ impl Plan for Firm {
                 vec![]
             }
             Then::Work { structure, build, units, share, crew } => {
+                if let Some(o) = out {
+                    self.trips.record(std::slice::from_ref(structure), o);
+                }
                 let (wd, i) = (self.p.working_day, self.projects.iter().position(|p| p.structure == *structure && p.build == *build));
                 if let Some(i) = i {
                     let pr = &mut self.projects[i];
@@ -945,6 +951,9 @@ impl Plan for Firm {
             Then::Mend { order, units, share, crew } => {
                 let wd = self.p.working_day;
                 let Some(i) = self.repairs.iter().position(|r| r.id == *order) else { return vec![] };
+                if let Some(o) = out {
+                    self.trips.record(&[self.repairs[i].structure.clone()], o);
+                }
                 self.repairs[i].flying = (self.repairs[i].flying - units).max(0);
                 if applied {
                     self.repairs[i].left -= units;
@@ -1016,12 +1025,14 @@ impl Firm {
             if r.left - r.flying <= 0 {
                 continue;
             }
-            let avail = crew.iter().map(|w| wd - self.used.get(w).copied().unwrap_or(0)).min().unwrap_or(0);
+            // (Each of the crew goes there and back: their trip is their day's time too, as their trips have taken, law 9.)
+            let trip = if r.structure == self.p.yard { 0 } else { self.trips.of(&r.structure) };
+            let avail = crew.iter().map(|w| wd - self.used.get(w).copied().unwrap_or(0)).min().unwrap_or(0) - trip;
             let units = (r.left - r.flying).min((avail.max(0) * crew.len() as i64).div_euclid(self.p.repair_labour));
             if units <= 0 {
                 break;
             }
-            let share = ceil_div(units as i128 * self.p.repair_labour as i128, crew.len() as i128) as i64;
+            let share = ceil_div(units as i128 * self.p.repair_labour as i128, crew.len() as i128) as i64 + trip;
             for w in crew {
                 *self.used.entry(w.clone()).or_insert(0) += share;
             }
@@ -1044,15 +1055,17 @@ impl Firm {
                 continue;
             }
             i += 1;
+            let trip = if pr.structure == self.p.yard { 0 } else { self.trips.of(&pr.structure) };
             let avail = crew.iter().map(|w| wd - self.used.get(w).copied().unwrap_or(0)).min().unwrap_or(0);
             if avail <= 0 {
                 break;
             }
-            let units = (pr.left - pr.flying).min(avail * crew.len() as i64);
+            // (Each of the crew goes there and back: their trip is their day's time too, as their trips have taken, law 9.)
+            let units = (pr.left - pr.flying).min((avail - trip).max(0) * crew.len() as i64);
             if units <= 0 {
                 continue;
             }
-            let share = ceil_div(units as i128, crew.len() as i128) as i64;
+            let share = ceil_div(units as i128, crew.len() as i128) as i64 + trip;
             for w in crew {
                 *self.used.entry(w.clone()).or_insert(0) += share;
             }

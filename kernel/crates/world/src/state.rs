@@ -648,6 +648,14 @@ pub struct Outcome {
     /// building worked on, as they left it, seen only by the one whose work it was.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub seen: Vec<crate::sites::SiteStructure>,
+    /// How long each body the act took somewhere was on its way, there and back (law 9): those doing the work went, so
+    /// the one whose work it was knows how long it took them. A planner sizes its next acts from these.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub trips: BTreeMap<Id, i64>,
+    /// Goods the act sent by the outside's freight (law 9, S4): where to, and how long they were to take on the road, for
+    /// the one who sent them (a seller's carrier tells it).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub freight: BTreeMap<Id, i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -733,6 +741,10 @@ pub struct Placed {
     /// (`unpriced`) when due, with this reason.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unpriced: Option<String>,
+    /// How long each body the act took somewhere is on its way, there and back (law 9): their time, told to the one whose
+    /// act it was when it is done, as a crew's own record of its trips.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub trips: BTreeMap<Id, i64>,
 }
 
 /// A person who is to be at work when an act's work begins: alive, in the world, and, if `at` is given, in that
