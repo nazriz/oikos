@@ -54,8 +54,13 @@ test("children are taught, the ill stay home and are seen at the clinic", async 
   // set when it starts; the engine writes it down when it ends, `labour` later). A teacher who walks in after that, kept
   // from leaving home by something else that morning (a councillor's vote, on the Rust world's day 294), is not unwell
   // but was not there: the school did not have them to teach. It is the same rule as the TS school's.
+  // (When the school sets them: its morning, `starts`, not when a lesson begins, which is later when the principal's own
+  // time is taken first: on day 290 since 2026-11-02 (law 9's trips), a teacher in at 10:02 and the lessons,
+  // set at the morning's look for the two then there, begun at 10:45.)
+  const school = config.positions.find((p: any) => p.role_module?.code === "school.principal");
+  const starts = Number(school?.role_module?.params?.starts ?? 30_600);
   const lessonsSetAt = new Map<number, number>();
-  for (const e of lessons) lessonsSetAt.set(dayOf(e), Math.min(lessonsSetAt.get(dayOf(e)) ?? Infinity, e.t - e.labour));
+  for (const e of lessons) lessonsSetAt.set(dayOf(e), Math.min(lessonsSetAt.get(dayOf(e)) ?? Infinity, e.t - e.labour, dayOf(e) * DAY + starts));
   const arrivals = ev.filter((e) => e.event === "occupied" && /\/workplace\./.test(e.space) && teachers.includes(e.occupant));
   const arrivedAfterLessonsSet = (who: string, day: number) => arrivals.some((a) => a.occupant === who && dayOf(a) === day && a.t > lessonsSetAt.get(day)!);
   for (const who of teachers) {
