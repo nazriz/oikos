@@ -10760,3 +10760,20 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   in the retail town's year). Now an act refused that way sends nobody anywhere and charges no one, and its outcome says
   how long the trips would have been (`Outcome.trips`), so the planner's next act fits. The whole slow tier was run on
   the fix before it landed.
+
+## 2026-11-02 · A household moving back in does not bring a child who is already there (main red after refound-after-failure; citizen fix; no model called)
+
+- **Found:** CI on main after `refound-after-failure` failed `households.test.ts` (2 households split at the year's end,
+  at most 1 allowed). One household (leaseholder c0014, town.yaml, seed as the test has it): its tenancy ended on day 347
+  while the youngest was out, so the leaseholder's "leave" for the child was refused (`not_present`), and the child came home
+  to the dwelling afterwards. The household re-let the same home on day 351, and each day after the leaseholder's move-in
+  (one act: the leaseholder in, and each child brought) was refused whole, `already_present`, for the child already in it.
+  Five of six were out of any home for the last 18 days. Refounding only moved the draws that made this happen; the fault
+  was older: the move-in had no answer to a child who was already there.
+- **Change:** the citizen reads the refusal: if its move-in was refused `already_present` at the block that brought a
+  child, that child is not brought again into that home (`housing.already_in`, `absorbed.already_in_block`). The world
+  told them so: they knew it from their own act's refusal, not by looking. No test changed; the representation towns'
+  pins moved (one of them had such a move-in) and were re-taken; culture-dial's did not.
+- **Not changed:** a child coming home to a dwelling whose tenancy has ended (the leave refused while they were out) is
+  left as found; it is a behaviour question (who tells a child the home is gone?), not this fault.
+- **Revisit if:** households move with other members than children (the adults are told and come themselves).
