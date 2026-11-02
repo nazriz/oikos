@@ -16,8 +16,9 @@ pub struct Trips {
 }
 
 impl Trips {
-    /// An act that took its people to `sites` came back: the longest of their trips is the act's, shared evenly among the
-    /// sites (a round goes by each). Done with nobody going anywhere: those sites are where the work is done from.
+    /// An act that took its people to `sites` came back (or was refused for want of time, saying how long their trips
+    /// would have been): the longest of their trips is the act's, shared evenly among the sites (a round goes by each).
+    /// Done with nobody going anywhere: those sites are where the work is done from.
     pub fn record(&mut self, sites: &[String], o: &oikos_sight::Outcome) {
         if sites.is_empty() {
             return;
