@@ -207,6 +207,9 @@ struct Bank {
     /// Accounts to open, as asked: the holder.
     opens: Vec<String>,
     replies: VecDeque<Kept>,
+    /// How its plans went, for whoever measures (`kept`): never saved, read by nothing it does.
+    #[serde(skip)]
+    counted: BTreeMap<&'static str, u64>,
 }
 
 impl Bank {
@@ -241,6 +244,7 @@ impl Bank {
             refusals: vec![],
             opens: vec![],
             replies: VecDeque::new(),
+            counted: BTreeMap::new(),
         }
     }
 
@@ -306,6 +310,16 @@ impl Bank {
             who_is_who: if self.p.who.is_some() { 0 } else { self.book.positions().len() },
         };
         let changed = self.p.review_all || self.read.as_ref() != Some(&now_read);
+        *self.counted.entry("plans").or_default() += 1;
+        if let Some(was) = &self.read {
+            *self.counted.entry(if was.accounts != now_read.accounts { "changed.accounts" } else { "same.accounts" }).or_default() += 1;
+            *self.counted.entry(if was.signatories != now_read.signatories { "changed.signatories" } else { "same.signatories" }).or_default() += 1;
+            *self.counted.entry(if was.who_is_who != now_read.who_is_who { "changed.who_is_who" } else { "same.who_is_who" }).or_default() += 1;
+        }
+        if changed {
+            *self.counted.entry("changed").or_default() += 1;
+            *self.counted.entry("changed.standing_gone_through").or_default() += self.standing.len() as u64;
+        }
         if changed {
             self.read = Some(now_read);
         }
@@ -860,6 +874,14 @@ impl Bank {
 impl Actor for Bank {
     fn save(&self) -> Result<Value, String> {
         Ok(json!({ "bank": serde_json::to_value(self).map_err(|e| e.to_string())?, "book": self.book.save() }))
+    }
+
+    fn kept(&self) -> Option<BTreeMap<String, u64>> {
+        let mut out: BTreeMap<String, u64> = self.counted.iter().map(|(k, v)| (format!("bank.{k}"), *v)).collect();
+        for (k, n) in [("standing", self.standing.len()), ("undated", self.undated.len()), ("by_due", self.by_due.len()), ("next_due", self.next_due.len()), ("ended", self.ended.len()), ("done", self.done.len()), ("book", self.book.len())] {
+            out.insert(format!("bank.{k}"), n as u64);
+        }
+        Some(out)
     }
 
     fn step(&mut self, pic: &Picture, cx: &mut Cx) -> Action {

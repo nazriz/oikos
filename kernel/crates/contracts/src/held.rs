@@ -213,6 +213,20 @@ pub mod who {
         let kind = if old { name(&format!("{kind} (old)")) } else { kind };
         let who = READER.with(Cell::get);
         *held(COUNTS.lock()).entry((who, kind)).or_default() += 1;
+        // (And where in the code, for one reader named by OIKOS_COLD_WHO_STACK: the actors' frames that read it.)
+        static STACK_OF: OnceLock<Option<String>> = OnceLock::new();
+        if old && STACK_OF.get_or_init(|| std::env::var("OIKOS_COLD_WHO_STACK").ok()).as_deref().is_some_and(|l| l.split(',').any(|w| w == who)) {
+            let bt = std::backtrace::Backtrace::force_capture().to_string();
+            let frames: Vec<&str> = bt
+                .lines()
+                .map(str::trim)
+                .filter(|l| (l.contains("oikos_actors::") || l.contains("oikos_sight::") || l.contains("oikos_kernel::")) && !l.contains("held::"))
+                .map(|l| l.split_once(": ").map_or(l, |(_, f)| f))
+                .take(5)
+                .collect();
+            let at = name(&format!("{kind} @ {}", frames.join(" < ")));
+            *held(COUNTS.lock()).entry((who, at)).or_default() += 1;
+        }
     }
 
     /// The counts so far, the largest first.

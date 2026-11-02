@@ -388,6 +388,9 @@ impl Actor for StaffClerk {
     fn save(&self) -> Result<Value, String> {
         Ok(json!({ "inner": self.inner.save()?, "keeping": serde_json::to_value(&self.keeping).map_err(|e| e.to_string())?, "books": self.books.save()? }))
     }
+    fn kept(&self) -> Option<std::collections::BTreeMap<String, u64>> {
+        self.inner.kept()
+    }
 }
 
 /// The staff post that keeps an office's books (`office.clerk`): does nothing else of the office's business.
