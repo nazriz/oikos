@@ -504,7 +504,10 @@ export interface Profile {
       vehicles?: { types: { id: string; seats: number; speed_kmh: number; fuel_cost_per_100km?: number; range_km?: number }[]; households: { type: string; bps: number }[] };
       /** Law 9 (foundations-2 S4): how far by road the outside's goods come from (the nearest city or depot that supplies the
        * town, and takes its exports), and the speed its freight goes there. */
-      outside?: { km: number; speed_kmh: number } };
+      outside?: { km: number; speed_kmh: number };
+      /** Weighing the commute (docs/behaviour/commuting.md): the value of travel time as basis points of the traveller's
+       * hourly pay, and a vehicle's running cost a kilometre (fuel, tyres, repairs; not ownership), each with its source. */
+      commute?: { time_bps: number; vehicle_cost_per_km: number } };
     /** Home ownership (world-expansion 6.2): which houses their households own, with a mortgage or outright. */
     /** `owner_bps_by_age`: of households, the share who own their home, by the age of the household's head; read as
      * how much likelier one household is than another to be among the town's owners (their number is the houses'). */

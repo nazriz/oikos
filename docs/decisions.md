@@ -10713,3 +10713,24 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   day's trip is then known). An act still too long for the day is refused and done the next day, not split.
 - **Revisit if:** a planner other than these sends people elsewhere (then it keeps `Trips` too); a seller with its own
   carrier (a town's haulier) sells on delivery (then it says `arrives` from its own trips).
+
+## 2026-11-02 · Weighing the commute, built (branch `commute-choice`; risk WM-4; profiles and generator 0.76.0; no model called)
+
+- **What:** job and home choices weigh the trip between home and work (docs/behaviour/commuting.md;
+  `citizen/commute.rs`). A person keeps their own trips, seen on their way (`BodyView.on_way`, set out from where and
+  when), bounded at 16 by pair of buildings; a posting's pay less its commute and a listing's rent plus the commute to
+  the job held go into the mind's `money_per_month`. A trip never made is not known: no commute term (no straight line,
+  no network timetable). No participant-API or contract change.
+- **Departure from the design note:** the commute's hours are not also put into `time_hours_per_month`. That term's
+  weight in the mind is an unsourced placeholder (40 bp an hour), and the place's value of travel time already turns the
+  hours into money; counting both would weigh the same hours twice, once without a source.
+- **Figures:** profile `round.commute` (`time_bps`, `vehicle_cost_per_km`) with `sources["round.commute"]`: au-vic from
+  ATAP PV2, gb-eng from the DfT TAG data book, us-oh from USDOT's 2016 guidance and AAA's driving costs, all recalled and
+  marked "to confirm"; the other six are labelled placeholders. The generator passes `drive_per_hour`, the running cost
+  a km at the town's road speed, since a person knows a trip's time and not its length (a simplification, in the
+  behaviour doc's "Leaves out").
+- **Not tuned:** no hire or move count was looked at or aimed for; the rule is the literature's and the figures the
+  places'.
+- **Revisit if:** a timetable is published (then it is a second way to know a trip); vehicles' fuel from holdings gives
+  a trip's real running cost; a run shows people never learning a trip (looks too sparse to see themselves on their
+  way), in which case a trip arrived from should be kept as at most its elapsed time.

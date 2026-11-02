@@ -966,7 +966,7 @@ impl Person {
             self.mind.record(w.cx, &life);
         }
         if let Some(go) = self.go_where_we_belong(w.pic, w.cx) {
-            return self.send_go(go, w.cx);
+            return self.send_go(go, w.pic, w.cx);
         }
         let round = if self.p.round.is_some() { self.next_change(t) } else { i64::MAX };
         oikos_sight::Action::Wait { until: Some((t + MONTH).min(self.world_end + DAY).min(round)) }
@@ -1321,6 +1321,39 @@ mod tests {
         p.outcomes = vec![serde_json::from_value(json!({ "action": "a1", "t": 0, "status": "refused", "refusal": { "code": "flooded" } })).unwrap()];
         bea.heard_go(&p);
         assert_eq!(bea.belong(&p).as_deref(), Some("hall/main"));
+    }
+
+    #[test]
+    fn a_trip_is_known_only_from_our_own_way_and_a_known_commute_costs_its_time_and_running() {
+        // (docs/behaviour/commuting.md; law 9 and no god's view: never a straight line, never the network's timetable.)
+        let round = json!({ "work_start": 9 * 3_600, "work_end": 17 * 3_600, "work_days": 5, "school_start": 9 * 3_600, "school_end": 15 * 3_600, "commute": { "time_bps": 5_000, "drive_per_hour": 900 } });
+        let c = ctx("ann", json!({ "round": round }));
+        let mut ann = Person::new(&c).unwrap();
+        let at = |t: i64, here: Option<&str>, to: Option<(&str, i64)>| {
+            let mut p = pic("ann", t, adult("female", here), vec![], vec![]);
+            if let (Some(b), Some((to, arrives))) = (p.body.as_mut(), to) {
+                b.on_way = Some(serde_json::from_value(json!({ "to": to, "arrives": arrives })).unwrap());
+            }
+            p
+        };
+        assert_eq!(ann.commute_cost("b1/dwelling.1", "shop/floor", 2_000), None, "never travelled: not known");
+        assert_eq!(ann.commute_cost("shop/floor", "shop/office", 2_000), Some(0), "within one building: no trip");
+        // Set out and arrived before we looked: not known.
+        ann.setting_out(&at(10 * 3_600, Some("b1/dwelling.1"), None), "shop/floor");
+        ann.noted_trip(&at(11 * 3_600, Some("shop/floor"), None));
+        assert_eq!(ann.known_trip("b1/dwelling.1", "shop/floor"), None);
+        // Driving, seen on our way: ten minutes, known either way round.
+        ann.lifecycle.drove = Some("car.1".into());
+        ann.setting_out(&at(DAY + 8 * 3_600, Some("b1/dwelling.1"), None), "shop/floor");
+        ann.noted_trip(&at(DAY + 8 * 3_600, None, Some(("shop", DAY + 8 * 3_600 + 600))));
+        assert_eq!(ann.known_trip("shop/floor", "b1/dwelling.4"), Some((600, true)));
+        // A month's round trips on the working days: their time at half our hourly pay, and an hour's driving's running.
+        let secs = 2 * 600 * 5 * 52;
+        assert_eq!(ann.commute_cost("b1/dwelling.1", "shop/floor", 2_000), Some(secs * 2_000 * 5_000 / (12 * 3_600 * 10_000) + secs * 900 / (12 * 3_600)));
+        // A place that does not say how a commute is weighed: not weighed.
+        let mut bea = Person::new(&ctx("bea", json!({}))).unwrap();
+        bea.s.trips = ann.s.trips.clone();
+        assert_eq!(bea.commute_cost("b1/dwelling.1", "shop/floor", 2_000), None);
     }
 
     #[test]

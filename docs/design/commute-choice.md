@@ -1,7 +1,7 @@
 # Weighing the commute in job and home choices (risk WM-4)
 
-2026-11-01, branch `commute-choice`. A design note written before the code, as market-realism.md was. **Status: the rule
-is specified here; the code is not built on this branch** (WM-4); how a person knows a trip's time is settled (below),
+2026-11-01, branch `commute-choice`. A design note written before the code, as market-realism.md was. **Status (2026-11-02): built**, as
+docs/behaviour/commuting.md describes (one departure: the hours go into money only, docs/decisions.md 2026-11-02) (WM-4); how a person knows a trip's time is settled (below),
 and it is built on foundations-2 S3 (`f2-s5`). docs/decisions.md, "Weighing the commute".
 
 ## The fault
