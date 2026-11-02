@@ -480,17 +480,18 @@ pub struct RecordIndex {
     indexed: usize,
     /// The records in the order they were made (record with seq q is `by_seq[q - 1]`): the state's own, shared.
     by_seq: Vec<crate::held::Rec>,
-    by_record: BTreeMap<&'static str, Vec<u64>>,
-    by_kind: BTreeMap<Id, Vec<u64>>,
-    by_entity: BTreeMap<Id, Vec<u64>>,
+    /// (Sequence numbers held as `u32`, in order: a run's records number fewer than four billion. Each list is a
+    /// record's few bytes for as long as the run lasts, so they are kept small: SC-6.)
+    by_record: BTreeMap<&'static str, Vec<u32>>,
+    by_kind: BTreeMap<Id, Vec<u32>>,
+    by_entity: BTreeMap<Id, Vec<u32>>,
     /// Statements by the structured fields they carry (what a channel's `has` asks for): a practice, an offer...
-    by_has: BTreeMap<&'static str, Vec<u64>>,
-    /// Records still standing (not withdrawn by their own author or whoever they speak for), by
-    /// statement kind and by record kind: what a search for standing records scans.
-    standing_kind: BTreeMap<Id, BTreeSet<u64>>,
-    standing_record: BTreeMap<&'static str, BTreeSet<u64>>,
+    by_has: BTreeMap<&'static str, Vec<u32>>,
+    /// Records taken down (withdrawn by their own author or whoever they speak for). Everything else stands but a
+    /// withdrawal itself: what a search for standing records reads, from the lists above, less these.
+    taken: BTreeSet<u32>,
     /// cell -> records placed there (and withdrawals of them).
-    by_place: BTreeMap<Id, Vec<u64>>,
+    by_place: BTreeMap<Id, Vec<u32>>,
     /// The latest record placed anywhere (0: none).
     placed_last: u64,
     accounts: Option<AccountsByEntity>,
@@ -610,7 +611,8 @@ impl RecordIndex {
         for i in self.indexed..st.record_order.len() {
             let stored = &st.records[&st.record_order[i]];
             let record = stored.record();
-            let (seq, rec) = (stored.seq, &*record);
+            let rec = &*record;
+            let seq = u32::try_from(stored.seq).expect("fewer than four billion records");
             self.by_seq.push(stored.record.clone());
             self.by_record.entry(rec.body.kind_name()).or_default().push(seq);
             if let crate::blocks::RecordBody::Statement { kind, offer, practice, assertion, registry, adico, formal, .. } = &rec.body {
@@ -626,27 +628,16 @@ impl RecordIndex {
             }
             if let Some(p) = place_of(st, rec) {
                 self.by_place.entry(p).or_default().push(seq);
-                self.placed_last = self.placed_last.max(seq);
+                self.placed_last = self.placed_last.max(u64::from(seq));
             }
             // Everything stands when made, except a withdrawal: it takes something down.
-            if !matches!(rec.body, crate::blocks::RecordBody::Withdrawal { .. }) {
-                self.standing_record.entry(rec.body.kind_name()).or_default().insert(seq);
-            }
-            if let crate::blocks::RecordBody::Statement { kind, .. } = &rec.body {
-                self.standing_kind.entry(kind.clone()).or_default().insert(seq);
-            }
             // A withdrawal by the record's own author (or whoever it speaks for) ends its standing, and is news
             // wherever statements like the one it takes down are shown (`matches`): found by that statement's
             // kind and by the fields it carries.
             if let Some((target_seq, target)) = taken_down(st, rec) {
                 let t = &*target;
-                if let Some(set) = self.standing_record.get_mut(t.body.kind_name()) {
-                    set.remove(&target_seq);
-                }
+                self.taken.insert(u32::try_from(target_seq).expect("fewer than four billion records"));
                 if let crate::blocks::RecordBody::Statement { kind, offer, practice, assertion, registry, adico, formal, .. } = &t.body {
-                    if let Some(set) = self.standing_kind.get_mut(kind) {
-                        set.remove(&target_seq);
-                    }
                     self.by_kind.entry(kind.clone()).or_default().push(seq);
                     let carries = [("offer", offer.is_some()), ("practice", practice.is_some()), ("assertion", assertion.is_some()), ("registry", registry.is_some()), ("adico", adico.is_some()), ("formal", formal.is_some()), ("hears", offer.as_ref().is_some_and(|o| o.get("hears").is_some()))];
                     for (field, _) in carries.into_iter().filter(|(_, x)| *x) {
@@ -660,10 +651,10 @@ impl RecordIndex {
 
     /// Sequence numbers above `after` that might match the filter, in order.
     fn candidates(&self, f: &RecordFilter, want: Option<&Want>, after: u64) -> Option<Vec<u64>> {
-        fn tail(v: &[u64], after: u64) -> &[u64] {
-            &v[v.partition_point(|&q| q <= after)..]
+        fn tail(v: &[u32], after: u64) -> &[u32] {
+            &v[v.partition_point(|&q| u64::from(q) <= after)..]
         }
-        let mut options: Vec<Vec<&[u64]>> = vec![];
+        let mut options: Vec<Vec<&[u32]>> = vec![];
         if let Some(k) = &f.records {
             options.push(k.iter().filter_map(|x| self.by_record.get(x.as_str())).map(|v| tail(v, after)).collect());
         }
@@ -678,20 +669,31 @@ impl RecordIndex {
             options.push(self.by_has.get(h.as_str()).map(|v| tail(v, after)).into_iter().collect());
         }
         let best = options.into_iter().min_by_key(|lists| lists.iter().map(|l| l.len()).sum::<usize>())?;
-        let mut seqs: Vec<u64> = best.into_iter().flatten().copied().collect();
+        let mut seqs: Vec<u64> = best.into_iter().flatten().map(|&q| u64::from(q)).collect();
         seqs.sort_unstable();
         seqs.dedup();
         Some(seqs)
     }
 
+    /// Whether the record numbered `seq` is a withdrawal.
+    fn is_withdrawal(&self, seq: u32) -> bool {
+        self.by_record.get("withdrawal").is_some_and(|w| w.binary_search(&seq).is_ok())
+    }
+
+    /// Whether the record numbered `seq` stands: not a withdrawal, and not taken down.
+    fn stands(&self, seq: u32) -> bool {
+        !self.taken.contains(&seq) && !self.is_withdrawal(seq)
+    }
+
     /// Standing records that might match the filter, newest first.
     fn standing(&self, f: &RecordFilter) -> Vec<u64> {
+        // (A statement kind's list holds the withdrawals of its statements too, and a withdrawal never stands.)
         let mut seqs: Vec<u64> = if let Some(kinds) = &f.statement_kinds {
-            kinds.iter().filter_map(|k| self.standing_kind.get(k.as_str())).flatten().copied().collect()
+            kinds.iter().filter_map(|k| self.by_kind.get(k.as_str())).flatten().filter(|&&q| self.stands(q)).map(|&q| u64::from(q)).collect()
         } else if let Some(kinds) = &f.records {
-            kinds.iter().filter_map(|k| self.standing_record.get(k.as_str())).flatten().copied().collect()
+            kinds.iter().filter(|k| k.as_str() != "withdrawal").filter_map(|k| self.by_record.get(k.as_str())).flatten().filter(|&&q| !self.taken.contains(&q)).map(|&q| u64::from(q)).collect()
         } else {
-            self.standing_record.values().flatten().copied().collect()
+            self.by_record.iter().filter(|(k, _)| **k != "withdrawal").flat_map(|(_, v)| v).filter(|&&q| !self.taken.contains(&q)).map(|&q| u64::from(q)).collect()
         };
         seqs.sort_unstable_by(|a, b| b.cmp(a));
         seqs.dedup();
@@ -700,7 +702,7 @@ impl RecordIndex {
 
     /// Is this record still standing?
     fn is_standing(&self, rec: &Record, seq: u64) -> bool {
-        self.standing_record.get(rec.body.kind_name()).is_some_and(|x| x.contains(&seq))
+        !matches!(rec.body, crate::blocks::RecordBody::Withdrawal { .. }) && u32::try_from(seq).is_ok_and(|q| !self.taken.contains(&q))
     }
 
     /// Records placed within the scope, above `after`, in order.
@@ -710,9 +712,9 @@ impl RecordIndex {
             return vec![];
         }
         let mut seqs: Vec<u64> = vec![];
-        let mut tail = |v: &Vec<u64>| {
-            if v.last().is_some_and(|&q| q > after) {
-                seqs.extend_from_slice(&v[v.partition_point(|&q| q <= after)..]);
+        let mut tail = |v: &Vec<u32>| {
+            if v.last().is_some_and(|&q| u64::from(q) > after) {
+                seqs.extend(v[v.partition_point(|&q| u64::from(q) <= after)..].iter().map(|&q| u64::from(q)));
             }
         };
         match scope {
@@ -724,7 +726,7 @@ impl RecordIndex {
         seqs.sort_unstable();
         #[cfg(debug_assertions)]
         {
-            let plain = |v: &Vec<u64>| v[v.partition_point(|&q| q <= after)..].to_vec();
+            let plain = |v: &Vec<u32>| v[v.partition_point(|&q| u64::from(q) <= after)..].iter().map(|&q| u64::from(q)).collect::<Vec<u64>>();
             let mut all: Vec<u64> = match scope {
                 Scope::Everywhere => self.by_place.values().flat_map(plain).collect(),
                 Scope::Cells(ps) => ps.iter().filter_map(|p| self.by_place.get(p)).flat_map(plain).collect(),
