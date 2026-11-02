@@ -10716,8 +10716,9 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   years at 50,000 are not measured yet: projected some 45 to 50 GB. Still growing: what stays of every record when it is
   cold (slot, map entries, book entries: some 250 to 350 bytes a record), the units' views and knowledge, the actors' own
   state.
-- **The budget:** the month's ceiling lowered from 270 to 235 KB a person (main and the branch both measure about 218 on
-  the Mini today); a growth budget added (the same town's half-year past its month, 1,700 bytes a person a day; main
+- **The budget:** the month's ceiling held at 270 KB a person: a month holds no record past the tier's 30 days, so its
+  measure did not move (main and the branch alike, about 218 KB on the release kernel, up to 250 on the gate's build the
+  merge measures with); a growth budget added (the same town's half-year past its month, 1,700 bytes a person a day; main
   f2a3568a about 2,450, the branch 1,410 to 1,570), `orchestrator/test/memory-budget.test.ts`, slow tier (+90 s).
 - **Decided here, not in the proposal:** records leave memory one by one by when last read, not a month's segment at a
   time; the cold file is the run's scratch, removed at its end (a snapshot carries every record whole, so nothing that
