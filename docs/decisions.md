@@ -10601,7 +10601,10 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   slot and drops entries a week unshown; the offices' files of payments put what is past 30 days on the same file.
 - **Readers fixed** (found with `OIKOS_COLD_WHO`, which counts who reads old records): lists collected whole to skip what
   was read (trade desk, producer, electoral office); a person's weekly going-through of public goings-on and weekly
-  plan reading every record of their book. Each also cost the run's own thread time growing with the run.
+  plan reading every record of their book; a payroll going through every request on its book at every wake for its own
+  wage orders (at the bank's staff payroll, every payment anyone made: 450,000 of 1.17 million records held for it at
+  day 120 of the 10,000 town; `OIKOS_COLD_WHO_STACK` names where a reader reads). Each also cost the run's own thread
+  time growing with the run.
 - **Other growers fixed:** the resolver's addressed statements (a map from every addressed statement each participant
   saw to its addressees) held by number with each list of addressees once; the twins' per-matter draw counts let go when
   a matter says it is over (`Cx::rng_until`, `rng_once`: a gathering once it begins, a delivered order's faultiness once
@@ -10616,8 +10619,8 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   is cold (slot, map entries, book entries: some 300 to 400 bytes a record), the units' views and knowledge, the actors'
   own state.
 - **The budget:** the month's ceiling lowered from 270 to 235 KB a person (main and the branch both measure about 218 on
-  the Mini today); a growth budget added (the same town's half-year past its month, 1,900 bytes a person a day; main
-  about 2,300, the branch 1,640 to 1,770), `orchestrator/test/memory-budget.test.ts`, slow tier (+90 s).
+  the Mini today); a growth budget added (the same town's half-year past its month, 1,700 bytes a person a day; main
+  f2a3568a about 2,450, the branch 1,410 to 1,570), `orchestrator/test/memory-budget.test.ts`, slow tier (+90 s).
 - **Decided here, not in the proposal:** records leave memory one by one by when last read, not a month's segment at a
   time; the cold file is the run's scratch, removed at its end (a snapshot carries every record whole, so nothing that
   needs it outlives the run; kept, it would be gigabytes a run at 50,000); OIKOS_COLD=off keeps the old way.

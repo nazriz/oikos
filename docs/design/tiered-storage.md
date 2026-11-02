@@ -59,7 +59,11 @@ growing with the run. Fixed, each result-identical:
 - a person's weekly going-through of public goings-on (citizen/memory.rs) read every record of their book; it reads
   only public statements and withdrawals, the only papers it can let go (`Book::public`, `forget_public`);
 - a person's weekly plan read every record to find those made since the last plan (`Book::records_since`: the slot
-  knows when its record was made).
+  knows when its record was made);
+- a payroll (firms', and the bank's own staff) went through every request on its book at every wake to find its own
+  wage orders: at the bank, every payment anyone instructed, so every request ever made stayed in memory (450,000 of
+  the 10,000 town's 1.17 million records at day 120). It now reads the new ones from where it left off
+  (`Staffing::adopt_orders`), and its own standing ones by their ids.
 
 What is still read every day is what is in force (a bank's standing orders, agreements, a register's entries, open
 claims): held in memory, as the proposal said it would be.
