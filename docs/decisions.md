@@ -10897,7 +10897,7 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Found:** the 50,000-person two-year run on main 0736a870 (`runs/tier-50000-2y`) was stopped by its 44 GB guard at
   day 707 of 730. Its footprint did not climb evenly: it stepped by some 8 GB over days 305 to 309 (25.1 to 33.8 GB
   resident) and grew about 30 MB a day before and after. A 10,000-person town on main steps too, by 0.4 GB on days 306
-  to 308. Its full log (`runs/tier-10000-log312`) shows why. Days 303 to 311 hold the first election's nominations, 400
+  to 308. Its full log (`runs/tier-10000-log312`) shows why. Days 303 to 311 hold the first election's nominations, about 200
   public statements, nearly all of them citizens standing, each carrying its platform as an assertion. Every person's
   book keeps each public assertion for a month (`public_memory`), and each citizen's mind rebuilt, at every wake, a
   private copy of the ids of all of them as text (`teachings`, host -> ids). Candidates grow with the town and so do
