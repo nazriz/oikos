@@ -10891,3 +10891,27 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   still work); or a run passes 2^32 records (held in the tables beyond that, correct but without the saving); or the
   texts themselves show in a profile (then the number held and the text written when read, which needs `Id` to change
   from a `&'static str`).
+
+## 2026-11-04 · Citizens hold the book's teachings as ids (SC-6; branch `tiered-storage-teachings`; no result changes; no model called)
+
+- **Found:** the 50,000-person two-year run on main 0736a870 (`runs/tier-50000-2y`) was stopped by its 44 GB guard at
+  day 707 of 730. Its footprint did not climb evenly: it stepped by some 8 GB over days 305 to 309 (25.1 to 33.8 GB
+  resident) and grew about 30 MB a day before and after. A 10,000-person town on main steps too, by 0.4 GB on days 306
+  to 308. Its full log (`runs/tier-10000-log312`) shows why. Days 303 to 311 hold the first election's nominations, 400
+  public statements, nearly all of them citizens standing, each carrying its platform as an assertion. Every person's
+  book keeps each public assertion for a month (`public_memory`), and each citizen's mind rebuilt, at every wake, a
+  private copy of the ids of all of them as text (`teachings`, host -> ids). Candidates grow with the town and so do
+  the people who read them, so the copies grew as the town squared: 0.25 GB of a heap profile's growth across the
+  10,000 town's step (`runs/tier-10000-hp340`, dumps 52 and 53). Freed a month later, the memory stayed with the
+  allocator and was reused, so the 50,000-person run's resident size held near 34 GB for the next 250 days.
+- **Change** (kernel/crates/actors/src/mind/citizen.rs, voice.rs): `teachings` holds `Id`s (8 bytes each, the one copy
+  of the text) in place of `String`s. It is still built from the same book at the same moments, ordered by the
+  host's text, and saved as the same text.
+- **Results:** the six pinned towns for a month at main's state hashes and log digests. 10,000 people for 340 days at
+  main's state hash and log digest (`88077fb9`, `d3377966`). The 10,000 town's step was 0.2 GB in place of 0.4; its
+  resident size was 5.2 GB at day 310 against 5.6, with a peak of 5.45 GB against 5.62 for main (`runs/tier-10000-log312`, to day 312).
+- **Not changed:** each person's book still holds every public assertion of the last month, and that is what they
+  know. Whether some 2% of the people standing for council is plausible is a question about the citizens' rules, not
+  memory; it is noted here, not acted on.
+- **Revisit if:** the 50,000-person two-year run on this build still steps at its elections (then what a mind keeps
+  of its book's assertions is read from the book when asked, not copied).
