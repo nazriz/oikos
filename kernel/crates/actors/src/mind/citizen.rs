@@ -565,7 +565,9 @@ pub struct State {
     pub readings: BTreeMap<String, Option<PaperRead>>,
     /// What the last `treated` with a paper's words moved, to go on the outcome that follows it.
     pub last_read: Option<(String, Json)>,
-    pub teachings: BTreeMap<String, Vec<String>>,
+    /// The assertions in the book, by who teaches them, as of the last refresh (ids, not copies of their text: each
+    /// person's book holds every public assertion of the last month, so a copy each grew as the town squared, SC-6).
+    pub teachings: BTreeMap<oikos_core::Id, Vec<oikos_core::Id>>,
     /// Practices in the book, by id, and who holds them.
     pub practice_hosts: BTreeMap<String, String>,
     // the record
@@ -865,23 +867,24 @@ impl CitizenMind {
     }
     /// The teachings in the book, by who teaches them (refreshed when the mind is given the book).
     pub fn refresh_teachings(&mut self, book: &Book) {
-        let mut m: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut m: BTreeMap<oikos_core::Id, Vec<oikos_core::Id>> = BTreeMap::new();
         for r in book.assertions() {
-            m.entry((r.speaks_for.unwrap_or_else(|| r.author.clone().into())).to_string()).or_default().push(r.id.to_string());
+            m.entry(r.speaks_for.unwrap_or_else(|| r.author.clone().into())).or_default().push(r.id);
         }
+        m.values_mut().for_each(Vec::shrink_to_fit);
         self.s.teachings = m;
         self.s.practice_hosts = book.practices().map(|r| (r.id.to_string(), r.speaks_for.map_or_else(|| r.author.to_string(), |x| x.to_string()))).collect();
     }
     /// How strongly we hold what a host teaches (the most of its teachings: citizen.ts `holdTo`).
     pub fn hold_to(&self, host: &str) -> i64 {
-        self.s.teachings.get(host).map_or(0, |ids| ids.iter().map(|id| *self.s.beliefs.get(id).unwrap_or(&0)).max().unwrap_or(0)).max(0)
+        self.s.teachings.get(host).map_or(0, |ids| ids.iter().map(|id| *self.s.beliefs.get(id.as_str()).unwrap_or(&0)).max().unwrap_or(0)).max(0)
     }
     /// Nearer certainty, by a share of the way (citizen.ts `strengthen`), and the record of it.
     pub fn strengthened(&mut self, host: &str, bps: i64) -> Json {
         let before = self.hold_to(host);
         for id in self.s.teachings.get(host).cloned().unwrap_or_default() {
-            let b = *self.s.beliefs.get(&id).unwrap_or(&0);
-            self.s.beliefs.insert(id, b + round(((10_000 - b) * bps) as f64 / 10_000.0));
+            let b = *self.s.beliefs.get(id.as_str()).unwrap_or(&0);
+            self.s.beliefs.insert(id.to_string(), b + round(((10_000 - b) * bps) as f64 / 10_000.0));
         }
         json!({ "host": host, "before": before, "after": self.hold_to(host) })
     }
