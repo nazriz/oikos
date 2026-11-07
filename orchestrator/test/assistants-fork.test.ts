@@ -65,7 +65,10 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
   rmSync(out, { recursive: true, force: true });
   const P = structuredClone(loadProfile(base.profile)) as any;
   for (const pr of P.values.assistants.providers) for (const o of pr.offers) { o.fee_month = Math.round(o.fee_month / 20); o.setup = Math.round(o.setup / 20); }
-  const config = generateFrom({ ...base, assistants: true, assistant_seats: ["assistant-a", "assistant-a-personal"] }, P);
+  const config = generateFrom({ ...base, assistants: true, assistant_seats: ["assistant-a", "assistant-a-personal"] }, P) as any;
+  // (One office has decided by hand to take provider A's assistant on day 1, so that an organisation's system is a seat by the fork.)
+  const office = config.positions.find((p: any) => p.role_module?.params?.delegation && p.role_module.code === "firm.landlord");
+  office.role_module.params = { ...office.role_module.params, delegation: { ...office.role_module.params.delegation, commit: { offer: "letting-assistant-a", levels: { notice_to_vacate: "draft", rent_increase: "draft", repair_order: "draft", rental_listing: "draft" }, levels_until: 200 * DAY, keep_until: 200 * DAY, why: "test" } } };
   const limit = 0.4;
   const spec: ExperimentSpec = { name: "assistants-seats", world: { config }, post: "template:assistant-a,assistant-a-personal", seeds: [1], forkDay: 60, untilDay: 120,
     arms: [{ name: "seats", steward: { kind: "model", model: "anthropic/claude-sonnet-5-5" } }], measures: ["acts"],
