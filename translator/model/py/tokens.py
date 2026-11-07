@@ -38,6 +38,19 @@ class Tokens:
         return {"tokens": torch.tensor(self.ids, dtype=torch.long), "line": torch.tensor(self.line, dtype=torch.long)}
 
 
+def piece_aligned(tokenizer):
+    """A byte-level BPE tokenizer (ettin, ModernBERT) made to never join two marks into one token: its pre-tokenizer
+    joins a run of punctuation (`."`, `),`, `'s`), so a span that ends at the full stop inside a closing quotation mark is
+    no run of tokens, and 6.4% of v4's training rows would be left out (translator v4, 2026-11-07). Each mark, with the
+    space before it, is split off first. Saved with the model (`save_pretrained`), so answering reads the same tokens.
+    A tokenizer of another kind (deberta-v3's, which splits marks already) is left as it is."""
+    from tokenizers import Regex, pre_tokenizers
+    pt = tokenizer.backend_tokenizer.pre_tokenizer
+    if isinstance(pt, pre_tokenizers.ByteLevel):
+        tokenizer.backend_tokenizer.pre_tokenizer = pre_tokenizers.Sequence([pre_tokenizers.Split(Regex(r" ?[^\s\p{L}\p{N}]"), behavior="isolated"), pt])
+    return tokenizer
+
+
 def tokenize(tokenizer, text: str, max_lines: int) -> Tokens:
     """Never cut short: a caller that has a limit looks at the length and decides."""
     e = tokenizer(text, return_offsets_mapping=True, add_special_tokens=True, truncation=False, verbose=False)
@@ -101,7 +114,7 @@ def check(data: str, encoder: str) -> dict:
     import json
     from pathlib import Path
     from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(encoder)
+    tokenizer = piece_aligned(AutoTokenizer.from_pretrained(encoder))
     report: dict = {"encoder": encoder}
     for side in ("train", "validation"):
         lengths, n_spans, inexact, not_back, examples_inexact, why = [], 0, 0, 0, 0, {}

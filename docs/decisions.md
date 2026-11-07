@@ -11072,6 +11072,45 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
   name-and-office word rule turns out to leave real near-distractors out of form rows too often (it is strict on
   purpose).
 
+## 2026-11-07 · Translator v4, steps 2 and 3 in part: the assistants' papers taught, the reader and the writer built (no paid call; plan usage)
+
+- **The assistants' papers, written and keyed by subagents on the owner's plan** (the owner's change: the API credit
+  is the pilot's). `translator/train/v4-assistants/`: 240 assistant situations by code (invented posts at rates,
+  housing, licensing, benefits and works, providers' desks; never the scope set's two posts), 8 briefs each (4 scope
+  requests of every shape: kind, level, access, hours, budget, combined; unprompted, prompted, in passing, a list, a
+  question, hedged, demanding; 4 look-alikes: advice incl. "spend more" and "widen your office", a request to go ahead,
+  reports done, not done and "could not finish without access", a handover, letters, a draft, nothing to file, the
+  client's own application), ten styles dealt evenly. Writers Haiku, Sonnet and Opus 5.5 (subagents, a third each);
+  readers blind, Sonnet and Opus 5.5 (Haiku as a subagent left three in four of a batch of 100 as placeholders, and
+  one Haiku writer wrote 16 of 160 by script: both set aside, kept as files). Both readers filed `scope_request` for
+  97 to 100% of the scope briefs in every style. Kept: agreement by meaning, a form's text fields not compared (as
+  letters' are, ruling A), each paper's free text taken as the request's own words most like the reader's (F1 of words
+  at least 0.6), the form's name, office and options implied by its card (as v3's `withImplied`), the writer's brief
+  met, two passes (`cardRows`), each request on one line as the adapter shows it (a list's "- " lines had been read as
+  forms: 20% of the rows had failed the slot rule). Dropped by code: 238 that share five words running with the scope
+  test set, 3 with the held-out cases. **1,451 rows** (669 scope requests, 782 look-alikes; 148 to validation by whole
+  situations), in training three times. A brief-writing slip (`300undefined00` for an amount in 45 briefs) was fixed and
+  those requests left out.
+- **The reader swap** (`ettin-encoder-150m`, run A) needs one change: its byte-level tokenizer joins marks (`."`, `),`,
+  `'s`), so 6.4% of rows had a span that is no run of tokens. `tokens.py` `piece_aligned` splits each mark first (saved
+  with the model, so answering reads the same tokens); 0 inexact after. A trains at 2,048 tokens, D at its own 1,024.
+- **The text writer** (run C): `py/text_model.py` (Gemma 3 270M, full fine-tune on the program as text, loss on its
+  tokens only) and `py/text_grammar.py`, the constraint at every token: the call language in canonical order, the
+  contract's functions, arguments and required ones, the forms shown (a field only that form's, `to` its office), a
+  quoted value a run of the input or a constant of the closed set, a bare one a run of whole pieces (or as one word),
+  field types (`fits_type`). Every label of the v4 data passes it (one in 7,321 sampled does not: a constant). Greedy,
+  deterministic; 19 ms a token on this CPU under load. Its rows (`text-export.ts`) are the encoders' labels made one
+  way, joined back from the two passes, so all three runs learn one key.
+- **Scoring** (`v4-score.ts`, `v4-scope.ts`): whole requests by meaning (meaning.ts, the shared id-or-words table),
+  free text's edges as fair.py; right served at the 1% mark, by point and by a one-sided 95% bound; asking back
+  (`none(unclear)`) is never served; by writer; latency. Today's first (`pod-small-v3-s2`) on validation-real: **540 of
+  615 right (87.8%), but only 216 (35.1%) served at the 1% mark**: several wrong answers are at sureness 1.0. Scope set:
+  20 of 67, as translator-fix found.
+- **Pods:** community pods with a public address were all taken; `OIKOS_POD_CLOUD=ALL` takes the secure cloud too
+  (more cards listed). The RunPod balance is 6.14 USD; C waits for the owner's top-up.
+- **Revisit if:** the readers' agreement on the scope papers' optional fields matters to the study (kind and access
+  are kept from the first reader where they differ); the scope set's five-word leak rule turns out to drop most of a
+  style (it took 238); Haiku is needed as a reader again (it must then be given batches far smaller than 100).
 ## 2026-11-07 · The paper's research plan, drafted, with a literature review (docs only; no model called)
 
 - **What:** docs/research/paper-plan.md, a draft for the owner covering:

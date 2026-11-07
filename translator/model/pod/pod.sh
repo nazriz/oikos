@@ -106,11 +106,11 @@ watchdog() {
 start() {
   local PK=$(cat ~/.ssh/oikos_runpod.pub) ID="" G R price max=${OIKOS_POD_MAX_PER_HOUR:-1}
   say "balance before: $(balance)"
-  for G in "NVIDIA GeForce RTX 4090" "NVIDIA GeForce RTX 5080" "NVIDIA RTX A6000" "NVIDIA GeForce RTX 3090" "NVIDIA RTX A5000" "NVIDIA GeForce RTX 5090"; do
+  for G in "NVIDIA GeForce RTX 4090" "NVIDIA GeForce RTX 5080" "NVIDIA RTX A6000" "NVIDIA GeForce RTX 3090" "NVIDIA RTX A5000" "NVIDIA GeForce RTX 5090" "NVIDIA L40S" "NVIDIA A40" "NVIDIA RTX 4000 Ada Generation" "NVIDIA L4"; do
     # (supportPublicIp: without it a pod can come with no SSH port that can be reached from here.)
-    R=$(api "{\"query\":\"mutation { podFindAndDeployOnDemand(input:{cloudType:COMMUNITY, supportPublicIp:true, gpuCount:1, volumeInGb:0, containerDiskInGb:40, minVcpuCount:4, minMemoryInGb:16, gpuTypeId:\\\"$G\\\", name:\\\"$NAME\\\", imageName:\\\"runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04\\\", ports:\\\"22/tcp\\\", env:[{key:\\\"PUBLIC_KEY\\\", value:\\\"$PK\\\"}]}) { id costPerHr } }\"}")
+    R=$(api "{\"query\":\"mutation { podFindAndDeployOnDemand(input:{cloudType:${OIKOS_POD_CLOUD:-COMMUNITY}, supportPublicIp:true, gpuCount:1, volumeInGb:0, containerDiskInGb:40, minVcpuCount:4, minMemoryInGb:${OIKOS_POD_RAM_GB:-16}, gpuTypeId:\\\"$G\\\", name:\\\"$NAME\\\", imageName:\\\"runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04\\\", ports:\\\"22/tcp\\\", env:[{key:\\\"PUBLIC_KEY\\\", value:\\\"$PK\\\"}]}) { id costPerHr } }\"}")
     ID=$(print -r -- "$R" | sed -n 's/.*"id":"\([a-z0-9]*\)".*/\1/p')
-    [ -n "$ID" ] || continue
+    [ -n "$ID" ] || { say "$G: not had ($(print -r -- "$R" | sed -n "s/.*\"message\":\"\([^\"]*\)\".*/\1/p" | head -c 160))"; continue; }
     # From here the pod is billed: its id on file, its time limit, and the watchdog, before anything else.
     echo $ID > $S/pod-id; echo $(( $(date +%s) + ${SECONDS_LIMIT:-21600} )) > $S/deadline; date +%s > $S/started
     (nohup zsh $SELF watchdog $ID $$ > /dev/null 2>&1 < /dev/null &)
@@ -137,7 +137,11 @@ N=$1; E=$2; S=$3; D=$4; shift 4
 . /work/.venv/bin/activate; cd /work/py; mkdir -p /work/runs/$N
 TB=""; [ "$(cat /work/gpu-mb)" -lt 20000 ] && TB="--token-budget 4096"
 for try in 1 2 3; do
-  python train.py /work/data/$D /work/runs/$N --encoder $E --seed $S --epochs 4 --validate-every 2 --renumber 0.8 --forms 0.7 --device cuda --resume $TB "$@" >> /work/runs/$N/train.log 2>&1 && break
+  # (A reader named text=BASE is the text writer of translator v4 (text_model.py), a decoder that writes the program as text.)
+  case "$E" in
+    text=*) python text_model.py train /work/data/$D /work/runs/$N --base ${E#text=} --seed $S --device cuda --resume "$@" >> /work/runs/$N/train.log 2>&1 && break ;;
+    *) python train.py /work/data/$D /work/runs/$N --encoder $E --seed $S --epochs 4 --validate-every 2 --renumber 0.8 --forms 0.7 --device cuda --resume $TB "$@" >> /work/runs/$N/train.log 2>&1 && break ;;
+  esac
   echo "try $try was cut short" >> /work/runs/$N/train.log
 done
 X
@@ -149,7 +153,7 @@ chmod +x /work/run.sh' < /dev/null || return 1
 queue() {
   local DATA=$1; shift
   local SSH=$(ssh_opts) H=$(host) spec q=$S/queue.sh
-  rsync -az -e "$SSH" $W/translator/model/py/model.py $W/translator/model/py/train.py $W/translator/model/py/tokens.py $W/translator/model/py/predict.py $W/translator/model/py/slots.py $W/translator/model/py/limits.py $W/translator/model/py/fair.py root@$H:/work/py/ || return 1
+  rsync -az -e "$SSH" $W/translator/model/py/model.py $W/translator/model/py/train.py $W/translator/model/py/tokens.py $W/translator/model/py/predict.py $W/translator/model/py/slots.py $W/translator/model/py/limits.py $W/translator/model/py/fair.py $W/translator/model/py/text_model.py $W/translator/model/py/text_grammar.py root@$H:/work/py/ || return 1
   rsync -az -e "$SSH" ${DATA:A} root@$H:/work/data/ || return 1
   { echo "#!/bin/sh"; for spec in "$@"; do
       local f=("${(@s/:/)spec}")
@@ -222,6 +226,8 @@ work() {
   for spec in "$@"; do
     n=${spec%%:*}
     [ -f $M/$n/report.json ] || { code=1; continue; }
+    # (A text writer is scored by its own answers, text_model.py `answer`, not as a decide/ model.)
+    [ -f $M/$n/text-config.json ] && continue
     [ -f $M/$n/eval.json ] || score $n || code=1
   done
   return $code
