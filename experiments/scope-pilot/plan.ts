@@ -58,3 +58,12 @@ export const BUDGET: { pilot: Limits; rare: Limits; neutral: Limits; sol: Limits
     sol: { experiment_usd: 4, arm_usd: { sol: 4 } },
     scopeSet: 2,
   };
+
+/** Round 3's limits (2026-11-08). The credit's spend by the runs' own records: round 1 $56.85 (main 45.57, the cells 4.31
+ * and 5.33, sol 0.38, the scope set 1.27), round 2 $79.31 (main 64.69, the cells 7.79 and 6.82): $136.16 of $190.20, so
+ * $54.04 left; $4 kept as a margin, $49.50 the hard cap. Opus a seed $15.50 (round 2's seed spent $15.15: a seed that
+ * calls more stops cleanly at its limit and is debriefed), Haiku a seed $1.50 (round 2's, $0.90). */
+export const ROUND3: { seeds23: Limits; seed4: Limits } = {
+  seeds23: { experiment_usd: 34, arm_usd: { opus: 31, haiku: 3 } },
+  seed4: { experiment_usd: 15.5, arm_usd: { opus: 15.5 } },
+};
