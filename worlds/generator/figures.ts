@@ -310,7 +310,8 @@ export const FIGURE_BASIS: Basis[] = [
   ]),
   ...of("body.payroll", [prof("wage", "public_service.wage_per_pay_period")]),
   ...of("police.station", [derived("officers", "the profile's crime.police_per_1000 of the town, at least one"), prof("wage", "crime.officer_wage_per_pay_period")]),
-  ...of("city.electoral_office", [derived("term_days", "the profile's elections.term_years, in days")]),
+  ...of("city.electoral_office", [derived("term_days", "the profile's elections.term_years, in days"),
+    conv("first_poll_day", "when the sitting term happens to end: a year in, or the spec's first_election_days (a scenario's, with its basis: worlds/scenarios/election-due.yaml)")]),
   ...of("tribunal.member", [
     { ...prof("hearing_after_days", "frictions.venues.tribunal_days"), given: "dials.friction_bps" },
     prof("hearing_after_days", "justice.hearing_after_days"),
@@ -403,6 +404,10 @@ export const FIGURE_BASIS: Basis[] = [
     { ...prof("work_days", "round.work_days"), given: "catalogue.travel" },
     prof("open_from", "round.work_start_hour"),
     prof("open_until", "round.work_end_hour"),
+    // (A scenario's scripted shocks to the world market, and its prices of systems falling: each change with its basis in
+    // the scenario, worlds/scenarios.)
+    derived("shocks.**", "a scenario's scripted shock to the world market: the spec's `shocks`, each with its basis in its scenario (worlds/scenarios)"),
+    prof("change_bps_per_year", "automation.price_fall_bps_per_year"),
   ].flatMap((r) => PARAMS_AT.map((at) => ({ ...r, family: `any module: ${r.at}${r.given ? ` (${r.given})` : ""}`, at: `${at}.${r.at}` }))),
   // Delegation (docs/behaviour/assistants.md): what a principal weighs, and what a provider sells, where a town has
   // assistants on offer (`assistants: true`).
