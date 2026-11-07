@@ -31,6 +31,7 @@
 //   oikos figures <world> [--json]: what the world's numbers rest on (law 11, counting only).
 //   oikos health <DIR> [--profile NAME]: the batch's measures against its profile's calibration targets (and over how
 //     many runs of how many towns)
+//   oikos flags <DIR> [--json]: law 12's flags (docs/flags.md), states no world should be in, each with what it rests on
 //   oikos cost <DIR> [--translator-model provider/model]
 //   oikos run ... [--no-compress]: logs are compressed once measured (<run>.jsonl.zst, about a seventh the size,
 //     checked to read back whole before the plain log goes); --no-compress keeps them plain.
@@ -236,7 +237,7 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | figures <world> [--json] [--most N] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR> [--out file.html] [--twin DIR | --no-twin] | experiment run <spec.json|yaml|ts> --out DIR [--parallel P] [--no-slots] [--mock-models] [--resume] | experiment report <DIR> [--rebuild] | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | view <log.jsonl[.zst]> <seq> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
+const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | flags <DIR> [--json] | figures <world> [--json] [--most N] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR> [--out file.html] [--twin DIR | --no-twin] | experiment run <spec.json|yaml|ts> --out DIR [--parallel P] [--no-slots] [--mock-models] [--resume] | experiment report <DIR> [--rebuild] | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | view <log.jsonl[.zst]> <seq> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -356,6 +357,12 @@ try {
     const { config, spec } = await loadWorld(positional()[0]!, sets());
     const r = figuresFor(config, spec);
     console.log(has("json") ? JSON.stringify(r, null, 2) : figuresText(r, Number(flag("most", "15"))));
+  } else if (cmd === "flags" && positional()[0]) {
+    // Law 12's flags (docs/flags.md): states no world should be in, each with what it rests on; a finding for the risk
+    // register, never a target or a gate. A batch folder, or a measurement folder. --json: the same as data.
+    const { flags, flagsText } = await import("@oikos/measure");
+    const fs = await flags(await measureDir(positional()[0]!));
+    console.log(has("json") ? JSON.stringify(fs, null, 2) : flagsText(fs));
   } else if (cmd === "health" && positional()[0]) {
     // The health report (docs/design/rebuild.md 8.4): the batch's measures against its profile's targets.
     const { drawn, health, healthText } = await import("@oikos/measure");

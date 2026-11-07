@@ -15,7 +15,7 @@ fn with_travel(t: Value) -> Value {
 
 fn good() -> Value {
     json!({
-        "vehicle_types": [{ "id": "van", "seats": 2, "load_kg": 1200, "speed_kmh": 90 }],
+        "vehicle_types": [{ "id": "van", "seats": 2, "load_kg": 1200, "speed_kmh": 90, "fuel": "materials", "fuel_per_100km": 10, "tank": 80 }],
         "vehicles": [{ "id": "van-1", "type": "van", "owner": "buildco", "at": "cell.0.0", "drivers": ["alice"] }]
     })
 }
@@ -40,4 +40,10 @@ fn a_vehicle_of_no_type_owner_or_speed_or_driven_by_nobody_is_refused() {
     assert!(bad(&|t| t["vehicles"][0]["owner"] = json!("nobody")).contains("no entity"));
     assert!(bad(&|t| t["vehicles"][0]["drivers"] = json!(["nobody"])).contains("no entity"));
     assert!(bad(&|t| t["vehicle_types"][0]["speed_kmh"] = json!(0)).contains("invalid config"));
+    // (Law 9: a kind of vehicle that runs on nothing (the contract requires its fuel), or on no kind of the world's, is refused.)
+    assert!(bad(&|t| {
+        t["vehicle_types"][0].as_object_mut().unwrap().remove("fuel");
+    })
+    .contains("invalid config"));
+    assert!(bad(&|t| t["vehicle_types"][0]["fuel"] = json!("moonbeams")).contains("moves_for_nothing"));
 }

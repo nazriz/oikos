@@ -9,23 +9,14 @@
   ],
   "found": {
     "unlocated": [
-      "agency-casework: a system with no place (the hardware it runs on held nowhere)",
-      "agency-system: a system with no place (the hardware it runs on held nowhere)",
-      "bodies in no space at the start, so nowhere (the unhoused)",
-      "market-system: a system with no place (the hardware it runs on held nowhere)",
-      "payment-system: a system with no place (the hardware it runs on held nowhere)",
-      "tax-casework: a system with no place (the hardware it runs on held nowhere)",
-      "vendor-system: a system with no place (the hardware it runs on held nowhere)"
+      "bodies in no space at the start, so nowhere (the unhoused)"
     ],
     "edgesWithoutNode": [],
     "waysOffNetwork": [],
     "uncarried": [],
     "uncarriedMoves": [],
     "workElsewhere": [],
-    "movesForNothing": [
-      "car: a vehicle that uses no energy",
-      "motorcycle: a vehicle that uses no energy"
-    ]
+    "movesForNothing": []
   },
   "entries": [
     {

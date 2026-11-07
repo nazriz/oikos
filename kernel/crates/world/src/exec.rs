@@ -2580,6 +2580,10 @@ impl<'a> Exec<'a> {
                 }
                 // (A system that runs on hardware in the world is delivered only where there is hardware for its lanes beside
                 // the systems already there: foundations-2 P4.)
+                // (Law 9: one that names no hardware runs on its supplier's own machines, abroad: only an edge supplies it.)
+                if tpl.runs_on.is_none() && !self.s.is_boundary(&org) {
+                    return Err(refuse(RefusalCode::UnknownPlace, format!("{template} runs on nothing held anywhere: it names no hardware, and {org} is no edge whose own machines it could run on")));
+                }
                 if let Some(ro) = &tpl.runs_on {
                     let on_it = |p: &Participant| p.status != ParticipantStatus::Ended && p.template.as_deref().and_then(|t| self.s.templates.get(t)).and_then(|t| t.runs_on.as_ref()).is_some_and(|r| r.holder == ro.holder && r.at == ro.at && r.hardware == ro.hardware);
                     let used: i64 = self.st.participants.values().filter(|p| on_it(p)).map(|p| p.def.lanes.unwrap_or(1) as i64 * ro.per_lane).sum();

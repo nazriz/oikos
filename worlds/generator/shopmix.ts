@@ -54,15 +54,19 @@ export function hasShopTable(V: Profile["values"]): boolean {
  * what its shops pay for it. Shops are divided by the kinds' shares of businesses where every kind has one, by their
  * shares of spending otherwise; `goods` keeps at least one shop.
  */
-export function shopMix(V: Profile["values"], shops: number, goods: { price: number; wholesale: number }, unit_serve_cost: number): ShopKind[] {
+export function shopMix(V: Profile["values"], shops: number, goods: { price: number; wholesale: number }, unit_serve_cost: number, keep: string[] = []): ShopKind[] {
   const sold = (V.spending.demand?.kinds ?? []).filter((k) => k.kind === "goods" || k.seller);
   const byBusiness = sold.every((k) => k.seller?.business_share_bps !== undefined);
   const counts = apportion(sold.map((k) => (byBusiness ? k.seller!.business_share_bps! : k.share_bps)), shops);
-  const goodsAt = sold.findIndex((k) => k.kind === "goods");
-  if (shops > 0 && counts[goodsAt] === 0) {
+  // (`goods` keeps a shop, and so does each kind in `keep`: what the town's vehicles run on, law 9, where its households
+  // drive. Each from the kind with the most shops that has more than one, while there is one.)
+  for (const kind of ["goods", ...keep]) {
+    const at = sold.findIndex((k) => k.kind === kind);
+    if (at < 0 || counts[at]! > 0) continue;
     const most = counts.reduce((m, c, i) => (c > counts[m]! ? i : m), 0);
+    if (!(counts[most]! > (kind === "goods" ? 0 : 1))) continue;
     counts[most]!--;
-    counts[goodsAt] = 1;
+    counts[at] = 1;
   }
   const out: ShopKind[] = [];
   sold.forEach((k, i) => {

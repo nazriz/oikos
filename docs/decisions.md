@@ -11268,3 +11268,65 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
   it and the table's), a model's answers come back unread often enough in `text` to try `json` or `tools` for it, or a
   host's credit or rate-limit errors use words `COMPAT_CREDIT`/`COMPAT_LIMITED` don't match (Fireworks' and Together's
   wording is unverified).
+
+## 2026-11-08 · Foundations-2 phase 5: law 9's last findings, and its strict mode (branch `f2-phase5`; generator 0.78.0; no model called)
+
+- **Systems somewhere.** Law 9's inventory listed six system templates "with no place". The audit read a participant's
+  `at`, which the contract does not have: a system is where the hardware it runs on is held (P4, `runs_on`). The
+  outside's own systems (its agencies, traders, the payment and vendors' systems) name no hardware and run abroad on
+  their supplier's machines, which the owner's ruling allows (AI and other suppliers abroad or local, 2026-10-25;
+  hosting.md: "the outside's own machines, abroad"). The law is now said and refused in the kernel, not read from an
+  absent field: a system participant names `runs_on`, or its supplier is an edge (`unlocated` at load); a template's
+  hardware is at a structure, or at its holder's own outside for an edge; a `deploy` of a template with no hardware by
+  anyone but an edge is refused (`unknown_place`). Every generated town already met it; the audit reads the same rule.
+  The bank's payment system (the bank's, supplied by the outside) runs abroad by this reading: a bank's core systems
+  are its own data centre's or a provider's, not the branch's.
+- **Vehicles that run on something.** Six profiles (us-oh, jp-akita, br-mg, de-ni, in-tn, mx-jal) have no shop table,
+  so their towns sold no fuel and their cars ran on nothing (S5's backstop listed them). A gap in the profiles, not the
+  law (ME-19's fix): each now has a table of two kinds, `goods` and `transport`, the transport share recalled from the
+  place's household survey (to confirm, marked) and the seller's figures carried over from au-vic (placeholders); a
+  service station is kept where households drive (as a shop of `goods` always is), since a town with cars has somewhere
+  to fill them; and a town that sells nothing a vehicle runs on (`shop_mix: false`, the test stand-ins) has no
+  household vehicles. The kernel refuses a kind of vehicle without `fuel` (a kind of the catalogue), `fuel_per_100km`
+  and `tank` (`moves_for_nothing`; the contract requires them).
+- **The inventory now holds one finding, waiting on the owner: the unhoused.** A body in no building is in no place, and
+  travels in no time (the kernel's journeys start from a body's building). Where a person with no home is, and how they
+  come back there, is a law the world does not have: a new kind of place for a body (outdoors at a cell or a node) or
+  an institution (a shelter). Not guessed; risk WM-16.
+- **Also:** a stale liberty taken off the first foundations' list of liberties that must stand ("goods move instantly",
+  ended by S4); `docs/everything-is-somewhere.md`, law 9's rule page, as nothing-from-nothing.md is law 8's.
+- **What it does to a town:** the six profiles' towns now have service stations and shoppers who buy fuel, and every
+  household with a car fills it; their shop mix and their households' spending move. Not measured against a baseline
+  beyond the pins: us-oh's 30-day states moved (representation pins re-taken, in a commit of their own); au-vic, gb-eng
+  and ke-nakuru moved only by the generator's version (culture-dial's config hashes re-taken; with 0.77.0 written in,
+  each is the hash it was). A code-only year of us-oh (300 people) raises no stampede, freeze or broken physics (the
+  flags, below). The single-goods towns of the tests (`shop_mix: false`) lose their cars: own-venture's three seeds then
+  had no occasion for its rule (who meant a business already ran one, or meant it too late), so it reads the first five
+  (seeds 4 and 5 each have one, started within a fortnight).
+- **Revisit if:** a profile's full shop table is written (then its two-kind table goes); a system is found that is
+  neither the outside's nor hosted (then it names its hardware); the owner decides where the unhoused are.
+
+## 2026-11-08 · Foundations-2 phase 5: law 12's flags (L1 to L3; branch `f2-phase5`; measure 0.7.0; no model called)
+
+- **What:** `oikos flags <batch>` (`measure/src/flags.ts`), written beside every batch as `flags.txt` and `flags.json`, and
+  printed nightly for a code-only year of three towns (`scripts/nightly-flags.ts`, ci.yml on the schedule, never
+  failing the night). Four kinds, each with the run, the moment and `rests_on`: a stampede (half of the town leaving, or
+  signing a new agreement of one kind, in a month), a freeze (a kind of agreement the town opened with that nobody made
+  again in a year), a dead law (a law no paper of a year cites, a form never filled in, an office that did nothing), and
+  a stock that breaks physics (an account outside the edges below nought; an organisation's balance, or the town's money,
+  growing month after month without levelling). Thresholds are the run's own, stated once with their reasons.
+- **Not as designed:** the physics flags read money only. Holdings and flows are state, not acts, so the log does not
+  carry them; a holding below nought outside an edge is the kernel's own refusal (law 8). Reading them would take a
+  replay with a state dump (a kernel subcommand); not built, said in docs/flags.md. Routes nobody uses are not read
+  (link flows are not logged). A law is "dead" when no paper cites it: the log cannot show a condition applying.
+- **The backstop** (`orchestrator/test/flags-only-flag.test.ts`, fast): nothing that runs a world reads the flags; a
+  planted log of each broken state is flagged, each flag with what it rests on; a trend that levels is no flag. The
+  slow tier flags a month of every profile's plain town (`everything-is-somewhere-runs.test.ts`): none raised.
+- **What three plain years raise** (300 people, code only, seed 1): au-vic 41, gb-eng 55, us-oh 45 flags, all dead laws:
+  offices that did nothing (19, 27, 20: owners' posts held abroad, deputies, the weather bureau's and the tax
+  collector's own posts beside their desks, child protection, the land registrar), forms never filled in (8, 13, 12:
+  the seats' directions, a review request, the tax account forms) and laws no paper cites (14, 15, 13). No stampede, no
+  freeze, no broken physics. The uncited laws are mostly laws in use whose papers do not name them (risk WM-17).
+- **Revisit if:** a flag fires on most towns (then the next missing laws are behaviour: a checkpoint with the owner, not
+  a chase); papers cite their laws (WM-17: the dead-law flags then mean what they say); holdings are wanted (the replay
+  dump).

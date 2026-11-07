@@ -108,7 +108,9 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
   // (Re-taken on 2026-11-07 at WM-15: workplaces on the network, each recipe at one drawing its industry's hour from its
   // operator's connections kept up to what it used, bills paid, effluent put back in the river; 11d0adcb..., 164ec86f...,
   // d8227b34... until then.)
-  ? { "au-vic-2026": "6123ac0b95baa1f0", "gb-eng-2026": "e310a1272074024a", "ke-nakuru-2026": "fd53b87fa06eb55e" }
+  // (Re-taken on 2026-11-08 at foundations-2 phase 5 (law 9 strict), the config hashes only: the generator's version
+  // alone; with 0.77.0 written in, each is the hash it was. 6123ac0b..., e310a127..., fd53b87f... until then.)
+  ? { "au-vic-2026": "42ca70580dc08491", "gb-eng-2026": "50c1e33a981f5dc5", "ke-nakuru-2026": "4c849e00c4b04140" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its

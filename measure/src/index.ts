@@ -14,7 +14,7 @@ import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, rmS
 import zlib from "node:zlib";
 import { basename, join } from "node:path";
 
-export const MEASURE_VERSION = "0.6.0";
+export const MEASURE_VERSION = "0.7.0"; // 0.7.0: accounts carry their opening balance (`opening_balance`), for law 12's flags
 
 const QUERY_DIR = join(import.meta.dir, "../queries");
 
@@ -106,10 +106,10 @@ const TABLES: { [name: string]: string } = {
   // Accounts and who holds them: the world config's, and those opened during the run (a newcomer's, a newborn's).
   accounts: `
     select $run as run_id, 0::BIGINT as opened_t, json_extract_string(a, '$.id') as account, json_extract_string(a, '$.holder') as holder, json_extract_string(a, '$.custodian') as custodian,
-      json_extract_string(a, '$.currency') as currency
+      json_extract_string(a, '$.currency') as currency, coalesce((json_extract_string(a, '$.balance'))::HUGEINT, 0) as opening_balance
     from (select unnest(from_json(json_extract(body, '$.config.world.accounts'), '["JSON"]')) as a from raw where kind = 'header')
     union all
-    select $run, t, json_extract_string(body, '$.account'), json_extract_string(body, '$.holder'), json_extract_string(body, '$.custodian'), json_extract_string(body, '$.currency')
+    select $run, t, json_extract_string(body, '$.account'), json_extract_string(body, '$.holder'), json_extract_string(body, '$.custodian'), json_extract_string(body, '$.currency'), 0::HUGEINT
     from raw where kind = 'event' and json_extract_string(body, '$.event') = 'account_opened'`,
   // Goods moved (phase B): a quantity of a kind, from a holder at a place to a holder at a place.
   goods: `
@@ -315,3 +315,4 @@ export function table(rows: Record<string, unknown>[]): string {
 
 export { diff, diffText, drawn, drawnText, DIFF_QUERIES, type DiffRow, type Drawn } from "./diff";
 export { health, healthText, TARGET_MEASURES, type HealthRow, type Target } from "./health";
+export { flags, flagsOf, flagsText, grows, type Flag, type FlagKind } from "./flags";

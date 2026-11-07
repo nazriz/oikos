@@ -29,11 +29,6 @@
       "find": "faulty-{oid}"
     },
     {
-      "what": "goods move instantly (a documented liberty; revisited after F10)",
-      "file": "kernel/crates/world/src/exec.rs",
-      "find": "Block::MoveGoods"
-    },
-    {
       "what": "per-ask `most` (one answer is one thing); daily caps become time at F11",
       "file": "docs/design/knowing.md",
       "find": "most"

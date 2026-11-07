@@ -411,6 +411,17 @@ fn p4_a_system_runs_on_hardware_held_somewhere_and_its_work_draws_there() {
     let say = cmd(&bot, Some("clerk"), json!([{"block": "message", "to": ["bob-self"], "text": "ok"}]));
     assert_eq!(outcome(&mut run, &say), None);
     assert_eq!(outcome(&mut run, &say).as_deref(), Some("insufficient_quantity"));
+    // Law 9: a system that names no hardware runs on its supplier's own machines abroad, so only an edge supplies one. A firm of
+    // the town supplying it delivers a system that is nowhere: refused when delivered, and a world that starts with one does
+    // not load.
+    let mut run = with_template(|t| t["supplier"] = json!("devco"));
+    let nowhere = cmd("developer-system", Some("developer"), json!([{"block": "deploy", "template": "clerk-bot", "to": "city"}]));
+    assert_eq!(outcome(&mut run, &nowhere).as_deref(), Some("unknown_place"));
+    let mut c = world(&default_params());
+    let p = c["participants"].as_array_mut().unwrap().iter_mut().find(|p| p["kind"] == "system").unwrap();
+    p["supplier"] = json!("devco");
+    let err = Run::start(c, "nowhere", Vec::new(), None).err().expect("a system that is nowhere does not load");
+    assert!(format!("{err:?}").contains("unlocated"), "{err:?}");
 }
 
 #[test]

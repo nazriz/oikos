@@ -83,9 +83,11 @@ test("it fails, naming what is nowhere: a body in no space, a holding at no plac
   const c = structuredClone(town("au-vic-2026"));
   c.world.occupancy = [];
   c.world.holdings.push({ kind: "goods", holder: "builder", at: "nowhere-yard", quantity: "1" });
-  c.participants = c.participants.map((p: any) => (p.kind === "system" ? { ...p, at: c.world.structures[0].id } : p));
-  c.participants.push({ id: "planted-system", kind: "system", template: "planted-template", owner: "outside", supplier: "outside" });
-  expect(unlocated(c)).toEqual(["bodies in no space at the start, so nowhere (the unhoused)", "goods held at nowhere-yard, which is no structure or edge", "planted-template: a system with no place (the hardware it runs on held nowhere)"]);
+  // (A system that names no hardware runs on its supplier's machines abroad: supplied by a firm of the town, it is nowhere; so is
+  // one whose hardware is held at no structure. One at a structure, or supplied by an edge, is somewhere.)
+  c.templates.push({ id: "planted-template", kind: "system", does: [] }, { id: "hosted-template", kind: "system", does: [], runs_on: { hardware: "goods", per_lane: 1, holder: "builder", at: "nowhere-yard", hour: "x" } }, { id: "placed-template", kind: "system", does: [], runs_on: { hardware: "goods", per_lane: 1, holder: "builder", at: c.world.structures[0].id, hour: "x" } });
+  c.participants.push({ id: "planted-system", kind: "system", template: "planted-template", owner: "builder", supplier: "builder" }, { id: "hosted-system", kind: "system", template: "hosted-template", owner: "builder", supplier: "builder" }, { id: "placed-system", kind: "system", template: "placed-template", owner: "builder", supplier: "builder" }, { id: "abroad-system", kind: "system", template: "planted-template", owner: "builder", supplier: "outside" });
+  expect(unlocated(c)).toEqual(["bodies in no space at the start, so nowhere (the unhoused)", "goods held at nowhere-yard, which is no structure or edge", "hosted-template: a system with no place (the hardware it runs on held nowhere)", "planted-template: a system with no place (the hardware it runs on held nowhere)"]);
 });
 
 test("it fails, naming the edge, on an edge that is no node of a world's network, and is quiet on one that is", () => {
