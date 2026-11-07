@@ -1,8 +1,8 @@
-// What a world's numbers rest on (docs/design/foundations-2.md, law 11; step N1 and N2, counting only). Every profile's
-// town is counted: each number is sourced, to confirm, derived, fitted, a placeholder, a convention, or unbased. The
-// places that are still unbased are listed in fixtures/figures-unbased.json, which may only shrink: a new unbased place
-// fails (give it a row in worlds/generator/figures.ts, true of the code that makes it), and so does a listed place that
-// no town has any more (take it off the list). Counting changes no world: it is never in a config or a log.
+// What a world's numbers rest on (docs/design/foundations-2.md, law 11; steps N1 and N2, and N3, strict). Every profile's
+// town is counted: each number is sourced, to confirm, derived, fitted, a placeholder, a convention, or unbased, and none
+// may be unbased (give it a row in worlds/generator/figures.ts, true of the code that makes it). The list of places
+// still unbased (fixtures/figures-unbased.json) was emptied on 2026-10-25 and is gone: a run of a generated world with
+// an unbased number does not start (`refuseUnbased`). Counting is never in a config or a log.
 
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
@@ -10,10 +10,9 @@ import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { FIGURE_BASIS } from "@oikos/worlds/generator/figures";
 import { PROFILE_DIR, loadProfile } from "@oikos/worlds/generator/profile";
-import { basisOf, classify, figuresFor, figuresReport, figuresText, leaves, matches, shape } from "../src/figures";
+import { basisOf, classify, figuresFor, figuresReport, figuresText, leaves, matches, refuseUnbased, shape } from "../src/figures";
 
 const root = join(import.meta.dir, "../..");
-const FIXTURE = join(import.meta.dir, "fixtures/figures-unbased.json");
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 /** Profiles whose town is also counted living (the rest share its parameters' shape). */
 const LIVING = ["au-vic-2026", "gb-eng-2026"];
@@ -72,13 +71,12 @@ test("a row's profile path reads the note of the same part below it, and a row m
   expect(basisOf({ ...c, dials: {} }, { path: ["t", "days"], value: 0 }, profile, table).class).toBe("unbased");
 });
 
-test("every profile's town is counted, and the unbased places are only those listed (the list only shrinks)", () => {
-  const listed: string[] = JSON.parse(readFileSync(FIXTURE, "utf8")).unbased;
+test("every profile's town is counted, and no number in any is unbased", () => {
   const found = new Set<string>();
   const used = new Set<number>();
   // (Each profile's plain town, and two living ones, with founding, for the parameters only a living town is given; and one
   // with skills by use, assistants hosted in the town and the outside's releases, for their figures.)
-  const towns = [...ids.map((id) => ({ id, extra: {} })), ...LIVING.map((id) => ({ id, extra: { living: { founding: true } } })), { id: LIVING[0]!, extra: { skills: true, tools: true, assistants: true, hosting: "local", capability: { tag: "ai", of: ["case-handling-system"], every_days: 182, time_bps: 8000, slip_bps: 8000, price_bps: 10_000 } } }];
+  const towns = [...ids.map((id) => ({ id, extra: {} })), ...LIVING.map((id) => ({ id, extra: { living: { founding: true } } })), { id: LIVING[0]!, extra: { skills: true, tools: true, assistants: true, assistant_seats: ["assistant-a", "assistant-a-personal"], hosting: "local", capability: { tag: "ai", of: ["case-handling-system"], every_days: 182, time_bps: 8000, slip_bps: 8000, price_bps: 10_000 } } }];
   for (const { id, extra } of towns) {
     const config = generate({ ...spec, ...extra, citizens: 60, profile: id });
     const r = figuresFor(config, { profile: id });
@@ -91,13 +89,27 @@ test("every profile's town is counted, and the unbased places are only those lis
       if (row !== undefined) used.add(row);
     }
   }
-  const fresh = [...found].filter((x) => !listed.includes(x)).sort();
-  const gone = listed.filter((x) => !found.has(x));
-  expect({ new_unbased_places: fresh }).toEqual({ new_unbased_places: [] });
-  expect({ listed_but_gone: gone }).toEqual({ listed_but_gone: [] });
+  // (And a town with every office a model's: its seats' cadence and hours, the mocks of their code twins, the clerks'.)
+  const code = generate({ ...spec, citizens: 60, profile: LIVING[1]! });
+  const seats = code.positions.filter((p: any) => !/-(staff|payroll|deputy)$/.test(p.id) && code.participants.find((x: any) => x.id === p.holder)?.kind === "person").map((p: any) => p.id);
+  const seated = generate({ ...spec, citizens: 60, profile: LIVING[1]!, model_seats: seats });
+  for (const u of figuresFor(seated, { profile: LIVING[1] }).unbased) found.add(`(seated) ${u.at}`);
+  const sp = loadProfile(LIVING[1]!) as any;
+  for (const leaf of leaves(seated)) { const row = basisOf(seated, leaf, { values: sp.values, sources: sp.sources }).row; if (row !== undefined) used.add(row); }
+  expect({ unbased_places: [...found].sort() }).toEqual({ unbased_places: [] });
   // (A row that speaks for nothing in any town is a statement about code that no longer makes it.)
   const family = (i: number) => FIGURE_BASIS[i]!.family ?? FIGURE_BASIS[i]!.at;
   const live = new Set([...used].map(family));
   const dead = [...new Set(FIGURE_BASIS.map((_, i) => family(i)))].filter((f) => !live.has(f));
   expect({ rows_that_match_nothing: dead }).toEqual({ rows_that_match_nothing: [] });
 }, 240_000); // (eleven towns to generate)
+
+test("a generated world with a number nothing speaks for does not run; a hand-written one is counted and runs", () => {
+  const config = generate({ ...spec, citizens: 60, profile: "au-vic-2026" });
+  expect(() => refuseUnbased(config)).not.toThrow();
+  const planted = structuredClone(config);
+  planted.catalogue.made_up = { figure: 7 };
+  expect(() => refuseUnbased(planted)).toThrow(/^unbased_figure: .*catalogue\.made_up\.figure \(1\)/);
+  // (A test's own world, written by hand, is not the generator's: its numbers are its own, and it runs.)
+  expect(() => refuseUnbased({ ...planted, meta: { name: "fixture" } })).not.toThrow();
+});
