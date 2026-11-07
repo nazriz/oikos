@@ -370,6 +370,9 @@ pub enum Block {
         uses: Option<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         meter: Option<crate::network::MeterKind>,
+        /// Opened (or set again) for what is held where it is delivered: the most its user keeps there (`ConnectionCfg::up_to`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        up_to: Option<i64>,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
         bind: Option<String>,
     },

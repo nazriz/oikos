@@ -6,12 +6,12 @@
 //! it, from the fees its clients pay. It sets no price and decides no client's use: it is the building's operator.
 
 use super::trade;
-use crate::common::{addressed_to, data, own_account, Book, DAY};
-use crate::steps::{arg, because, call, pay, text, Pay, Plan, Step, Stepper};
+use crate::common::supply::Supply;
+use crate::common::{own_account, Book, DAY};
+use crate::steps::{arg, because, call, text, Plan, Step, Stepper};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::BTreeSet;
 
 /// What the plant draws of a kind beyond the work: its recipe (`task`, a unit of the kind used up) and what it keeps in
 /// hand for its clients' work (`keep`).
@@ -61,7 +61,7 @@ impl Kind for Host {
     }
     fn create(&self, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
         let p = Params { at: ctx.need("at", "firm.host")?, plant: ctx.param("plant", vec![])? };
-        Ok(Box::new(Stepper::new(Hosting { me: ctx.entity.clone(), p, book: Book::new(), answered: BTreeSet::new() })))
+        Ok(Box::new(Stepper::new(Hosting { me: ctx.entity.clone(), p, book: Book::new(), supply: Supply::default() })))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
         Ok(Box::new(Stepper::<Hosting>::restore(saved)?))
@@ -73,8 +73,9 @@ struct Hosting {
     me: String,
     p: Params,
     book: Book,
-    /// Invoices paid (or with nothing to pay by).
-    answered: BTreeSet<String>,
+    /// Its bills paid (common::supply).
+    #[serde(default)]
+    supply: Supply,
 }
 
 impl Plan for Hosting {
@@ -96,34 +97,10 @@ impl Plan for Hosting {
                 ));
             }
         }
-        // Bills addressed to us: each paid when the account covers it, oldest first.
+        // Bills addressed to us: each paid when the account covers it, oldest first (common::supply, as every workplace's).
         let Some(acct) = own_account(pic) else { return steps };
         let mut in_hand = acct.balance;
-        let open: Vec<_> = self.book.open("invoice").cloned().collect();
-        for inv in open {
-            if self.answered.contains(inv.id.as_str()) || !addressed_to(&inv).iter().any(|x| *x == self.me) {
-                continue;
-            }
-            let Some(money) = data(&inv).get("outcome").and_then(|o| o.get("money")).cloned() else {
-                self.answered.insert(inv.id.to_string());
-                continue;
-            };
-            let amount = money.get("amount").and_then(crate::papers::lenient::whole).unwrap_or(0);
-            let to = money.get("to").and_then(|x| x.as_str()).unwrap_or("").to_string();
-            if amount <= 0 || to.is_empty() {
-                self.answered.insert(inv.id.to_string());
-                continue;
-            }
-            if in_hand < amount {
-                continue;
-            }
-            in_hand -= amount;
-            self.answered.insert(inv.id.to_string());
-            steps.push(because(
-                "Paying a bill addressed to us.",
-                vec![pay(&to, amount, Pay { from: Some(acct.account.clone()), for_: Some("Paying an invoice.".into()), settles: Some(inv.id.to_string()), ..Default::default() }, cx)],
-            ));
-        }
+        steps.extend(self.supply.pay(&self.book, &self.me, &acct.account, &mut in_hand, cx));
         steps
     }
 }

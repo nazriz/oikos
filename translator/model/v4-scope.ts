@@ -6,7 +6,7 @@
 //   bun translator/model/v4-scope.ts --model decide/<name> --model text:<answers.jsonl> [--cut decide/x=0.9] --out <file.json>
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { formsFiled, SITUATIONS } from "../eval/scope-run";
+import { formsFiled, SITUATIONS } from "../eval/scope-situations";
 import { DecideAdapter } from "./adapter";
 
 const args = process.argv.slice(2);

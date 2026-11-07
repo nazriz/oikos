@@ -80,6 +80,11 @@ test("it fails, naming the recipe, on a recipe at a workplace that does not say 
   expect(silentRecipes(c).filter((x) => !x.includes("no such kind"))).toEqual([]);
   c.catalogue.tasks.push({ id: "weld", labour: 600, in: "workplace", consumes: { inputs: "2", water: "0" }, produces: { goods: "1" } });
   expect(silentRecipes(c).filter((x) => x.startsWith("weld"))).toEqual(["weld: states no energy"]);
+  // (WM-15) Its workplaces on the network, a recipe there that draws nothing, a unit or by the hour, is named; one that
+  // draws by its industry's hour is not.
+  c.catalogue.tasks.push({ id: "solder", labour: 600, in: "workplace", consumes: { inputs: "2", energy: "0", water: "0" }, produces: { goods: "1" } });
+  c.catalogue.tasks.push({ id: "braze", labour: 600, in: "workplace", hour: "hour-manufacturing", consumes: { inputs: "2", energy: "0", water: "0" }, produces: { goods: "1" } });
+  expect(silentRecipes(c).filter((x) => x.startsWith("solder") || x.startsWith("braze"))).toEqual(["solder: draws no energy and no water, a unit or by the hour, though the world's workplaces are on its network"]);
 });
 
 test("it fails, naming the module, on a bill for an assumed use", () => {

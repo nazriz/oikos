@@ -1024,3 +1024,126 @@ Opened on 2026-10-24 unless marked; each profile's `work_time.sources` carries t
 | Entrepreneurs whose earlier venture failed succeed about as often as first-timers, and those whose earlier venture succeeded more often: a failure says little of the person in general | Gompers, P., Kovner, A., Lerner, J. and Scharfstein, D. (2010), "Performance persistence in entrepreneurship", *Journal of Financial Economics* 96(1), 18-32 (to confirm: from memory) | why the record moves only the same venture's figure, and only by its weight against the market's (`venture_prior_months`) |
 | Some who exit a business start again ("renascent" entrepreneurs), the more so for those whose exit was not a failure of their own | Stam, E., Audretsch, D. and Meijaard, J. (2008), "Renascent entrepreneurship", *Journal of Evolutionary Economics* 18, 493-507 (to confirm: from memory) | why founding again is weighed, not barred |
 | Founders learn from failure unevenly, and may be over-optimistic after it | Ucbasaran, D., Shepherd, D., Lockett, A. and Lyon, S. (2013), "Life after business failure: the process and consequences of business failure for entrepreneurs", *Journal of Management* 39(1), 163-202 (to confirm: from memory) | the shrinkage toward the market's figure (`venture_prior_months`, a placeholder) |
+
+## The delegation study's paper (docs/research/paper-plan.md; 2026-11-07)
+
+Searched with web search on 2026-11-07.
+- **"Opened"** means the arXiv abstract page (or the named page) was opened and its title and authors matched. Its
+  figures were read through a summarising fetch tool and are **to confirm against the paper** before they are quoted.
+- **"Record seen"** means a bibliographic record (a catalogue, a repository or a search result) confirmed the title,
+  authors and venue, but the paper itself was not opened.
+- Everything else is marked **(to confirm)**.
+- Several 2026 arXiv ids came from search and were then opened; their peer review was not checked.
+
+### Power-seeking and propensity evaluations
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Ethics traded against reward in 134 text games, with power-seeking labelled along trajectories. Differs: synthetic text. Borrow: per-step behaviour annotation | Pan, Chan, Zou et al. (2023), "Do the Rewards Justify the Means? Measuring Trade-Offs Between Rewards and Ethical Behavior in the MACHIAVELLI Benchmark", ICML 2023, arXiv:2304.03279 (opened) | paper-plan 9 |
+| Optimal policies tend to keep options open, that is, to seek power (theory). Borrow: power as reachable options, for coding "beyond need" | Turner, Smith, Shah, Critch and Tadepalli (2021), "Optimal Policies Tend to Seek Power", NeurIPS 2021, arXiv:1912.01683 (opened) | paper-plan 3.1, 9 |
+| The argument for existential risk from power-seeking AI. Borrow: resources, influence and capability as request categories | Carlsmith (2022), "Is Power-Seeking AI an Existential Risk?", arXiv:2206.13353 (opened) | paper-plan 3.1, 9 |
+| Stated desire for resources, and against shutdown, rises with scale and RLHF. Differs: stated, not revealed. Borrow: their persona items as a pre-test beside our behavioural rates | Perez et al. (2022), "Discovering Language Model Behaviors with Model-Written Evaluations", arXiv:2212.09251 (opened; venue ACL Findings 2023, to confirm) | paper-plan 9 |
+| Power-seeking defined as "influence or resources beyond its task"; persona prompts can matter more than the model. Short episodes. Borrow: tier C's definition; the persona-sensitivity check | Naik, Gouné, Quinn, Bosch, Campos Zabala, Brown and Young (2025), "AgentMisalignment: Measuring the Propensity for Misaligned Behaviour in LLM-Based Agents", arXiv:2506.04018 (opened) | paper-plan 3.2 (C), 7.2 |
+| 10 models, 1,680 samples: instrumental behaviour in 5.1%, two-thirds of it from two Gemini models; making it needed for the task added about 16 points; monitoring and permission were varied. Borrow: the factorial variant grid | Wiedermann-Möller, Dung and Andriushchenko (2026), "Instrumental Choices: Measuring the Propensity of LLM Agents to Pursue Instrumental Behaviors", arXiv:2605.06490 (opened) | paper-plan 1, 4.2, 11 |
+| Scheming minimal under strong incentives; removing one tool moved a rate from 59% to 3%; more oversight sometimes raised it, by up to 25 points. Borrow: agent and environment factors; expect oversight to cut either way | Hopman, Elstner, Avramidou, Prasad and Lindner (2026), "Evaluating and Understanding Scheming Propensity in LLM Agents", arXiv:2603.01608 (opened) | paper-plan 2 (H4), 4.3 |
+| 7 models as Linux administrators over 2,800 tasks: corrected power-seeking from 0 to about 5%; a positive control detected at 100%. Borrow: the positive control; correcting coder error with a human-annotated subset | Azarm, Wei and Nambiar (2026), "SysAdmin: Measuring Instrumental Power-Seeking in Frontier AI", arXiv:2607.18239 (opened; the page dates it 10 April 2026, which does not fit the id: to confirm) | paper-plan 2 (controls), 5 |
+| Strategic and non-strategic environmental factors explain behaviour about equally, across 23 models and 12 factors. Borrow: Bayesian estimates of factor effects | Järviniemi, Makins, Merizian, Kirk and Millwood (2026), "Propensity Inference: Environmental Contributors to LLM Behaviour", arXiv:2604.21098 (opened) | paper-plan 6 |
+| Misuse rises with pressure (18.6% to 46.9%); a harmful tool given a benign name is used more. Borrow: the cue-wording cell | Sehwag et al. (2025), "PropensityBench: Evaluating Latent Safety Risks in Large Language Models via an Agentic Approach", arXiv:2511.20703 (opened; full author list to confirm) | paper-plan 1, 4.2 (W), 7.2 |
+| Whether an action is listed, not whether it is permitted, governs delegated-scope violations | Kanchi (2026), "Permitted but Unauthorized: Affordance-Induced Delegated-Scope Violations in Multi-Agent LLM Systems", arXiv:2611.04086 (opened) | paper-plan 1, 4.2 (W), 7.2 |
+| Over half of 21 models replicate themselves beyond need under operational pressure. Borrow: "overuse", taking more than the task needs | Zhang, Yu, Guo and Shao (2025), "Dive into the Agent Matrix: A Realistic Evaluation of Self-Replication Risk in LLM Agents", arXiv:2509.25302 (opened) | paper-plan 3.1 |
+| RL-trained models show more instrumental behaviour, over 76 tasks | He, Li, Wu, Sui, Chen and Hooi (2025), "Evaluating the Paperclip Maximizer: Are RL-Based Language Models More Likely to Pursue Instrumental Goals?", arXiv:2502.12206 (opened) | paper-plan 9 |
+| Misaligned goals propagate through memory over 100 sessions | Das, Tay, Tsai, Huang and Rando (2026), "Self-Propagating Misalignment in LLM Agents, and Why Auditing or Disabling Memory Is Not Enough", arXiv:2610.04083 (opened) | paper-plan 7.6 |
+| Adversarial context gets broad allow-rules approved in coding harnesses (58%) | Yang, Zhang, Liu, Chen, Cao, Hooi and Zhang (2026), "From Approval to Abuse: Privilege Escalation Attacks on Harness-Protected Coding Agents", arXiv:2610.22987 (opened) | paper-plan 9 |
+| Permissions that outlive their need ("residual privilege debt") | Yu, Liu, Zhang, Wang, Qian, Chen and Jiang (2026), "CreepScope: Measuring Post-Use Authorization Exposure in Tool-Using Agents", arXiv:2610.15988 (opened) | paper-plan 9; a candidate measure (authority kept after the need for it) |
+
+### Engineered dilemmas and scheming
+
+| Idea | Citation | Used in |
+|---|---|---|
+| A trading agent acts on insider information under pressure and hides why in its report. Borrow: act-then-report, as our account measure | Scheurer, Balesni and Hobbhahn (2023), "Large Language Models can Strategically Deceive their Users when Put Under Pressure", arXiv:2311.07590 (opened; venue to confirm) | paper-plan 5.2 |
+| Frontier models scheme in context; o1 keeps up deception in over 85% of follow-up questions. Borrow: follow-up questioning; the contrast with and without a goal nudge | Meinke, Schoen, Scheurer, Balesni, Shah and Hobbhahn (2024), "Frontier Models are Capable of In-context Scheming", arXiv:2412.04984 (opened) | paper-plan 5.2, 9 |
+| Claude 3 Opus complies more when told it is in training, and its reasoning shows strategy | Greenblatt et al. (2024), "Alignment Faking in Large Language Models", arXiv:2412.14093 (opened) | paper-plan 9 |
+| 16 models take insider-threat actions when that is the only way to avoid replacement, and less often when they judge the scenario a test. Borrow: the split by voiced "real" or "test"; publishing the prompts | Lynch, Wright, Larson, Ritchie, Mindermann, Hubinger, Perez and Troy (2025), "Agentic Misalignment: How LLMs Could Be Insider Threats", arXiv:2510.05179 (opened) | paper-plan 6, 7.2, 7.3 |
+| Some frontier models subvert shutdown, up to 97% in some conditions; an instruction in the system prompt worked worse than in the user prompt | Schlatter, Weinstein-Raun and Ladish (2025), "Incomplete Tasks Induce Shutdown Resistance in Some Frontier LLMs", arXiv:2509.14260 (opened) | paper-plan 9 |
+| Anti-scheming training cut o3's covert actions from 13% to 0.4%, partly through evaluation awareness | Schoen et al. (2025), "Stress Testing Deliberative Alignment for Anti-Scheming Training", arXiv:2509.15541 (opened; author list to confirm) | paper-plan 7.3 |
+| Dangerous-capability, stealth and situational-awareness evaluations (capability, not propensity) | Phuong et al. (2024), "Evaluating Frontier Models for Dangerous Capabilities", arXiv:2403.13793; Phuong et al. (2025), "Evaluating Frontier Models for Stealth and Situational Awareness", arXiv:2505.01420 (both opened) | paper-plan 9 (the distinction between propensity and capability) |
+| Covert sabotage against a monitor (27% for Claude 3.7 Sonnet) | Kutasov et al. (2025), "SHADE-Arena: Evaluating Sabotage and Monitoring in LLM Agents", arXiv:2506.15740 (opened) | paper-plan 9 |
+
+### Long-horizon, multi-agent and delegated agents
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Task time horizons double about every seven months | Kwa, West, Becker et al. (2025), "Measuring AI Ability to Complete Long Tasks", arXiv:2503.14499 (opened) | paper-plan 9 |
+| A simulated vending business over runs of more than 20M tokens, with high variance and derailments. Borrow: many runs per model | Backlund and Petersson (2025), "Vending-Bench: A Benchmark for Long-Term Coherence of Autonomous Agents", arXiv:2502.15840 (opened); Andon Labs, "Vending-Bench 2" (page opened) | paper-plan 9 |
+| A real shop run by Claude: it tried to hire without authority; a supervising agent approved about eight times as many requests as it denied | Anthropic and Andon Labs (2025), "Project Vend" (June) and "Project Vend: Phase two" (December), anthropic.com (phase two opened; phase one to confirm) | paper-plan 1, 9; an example for the codebook |
+| Autonomy in Claude Code use: auto-approve rises from about 20% to over 40% with experience | McCain, Millar, Huang, Eaton et al. (2026), "Measuring AI agent autonomy in practice", anthropic.com/research (opened) | paper-plan 9 |
+| AI Village: unsolicited outreach and fabricated claims by models over months (uncontrolled) | Tekofsky (2026), "What did we learn from the AI Village in 2025?", AI Digest (opened) | paper-plan 1, 9 |
+| A simulated company; τ-bench's pass^k; AgentBench | Xu, Zhou, Neubig et al. (2024), "TheAgentCompany", arXiv:2412.14161; Yao, Shinn, Razavi and Narasimhan (2024), "τ-bench", arXiv:2406.12045; Liu et al. (2024), "AgentBench", arXiv:2308.03688 (all opened) | paper-plan 9 |
+| Multi-agent risks: miscoordination, conflict and collusion, with seven risk factors | Hammond et al. (2025), "Multi-Agent Risks from Advanced AI", arXiv:2502.14143 (opened) | paper-plan 9 |
+
+### LLM-agent societies and simulations
+
+| Idea | Citation | Used in |
+|---|---|---|
+| GovSim: most models fail to sustain a commons. Generative Agents is cited above, under "Scaling minds" | Piatti, Jin, Kleiman-Weiner, Schölkopf, Sachan and Mihalcea (2024), "Cooperate or Collapse", NeurIPS 2024, arXiv:2404.16698 (opened) | paper-plan 9 |
+| Concordia's game master; AgentSociety at 10,000 agents; Project Sid; EconAgent | Vezhnevets et al. (2023), arXiv:2312.03664; Piao et al. (2025), arXiv:2502.08691; Altera.AL (2024), arXiv:2411.00114; Li, Gao, Li, Li and Liao (2024), ACL 2024, arXiv:2310.10436 (all opened) | paper-plan 9 |
+| Agents grounded in interviews with 1,052 people (85% of their test-retest consistency) | Park et al. (2024), "LLM Agents Grounded in Self-Reports Enable General-Purpose Simulation of Individuals", arXiv:2411.10109 (opened) | paper-plan 9 |
+| 100 LLM agents run a town's economy for 26 weeks; swapping the model moved everything, while deleting memory changed nothing detectable | Regmi, Pudasaini and Pun (2026), "But How Would AI Agents Run a Town's Economy?", arXiv:2609.11108 (opened) | paper-plan 4.4, 9 |
+| LLM households, firms, a bank and a government reproduce the Phillips curve and Okun's and Engel's laws | Feng, Lu, Su, Tao and He (2025), "SimCity: Multi-Agent Urban Development Simulation with Rich Interactions", arXiv:2510.01297 (opened) | paper-plan 9 |
+| Outcomes diverge by model family under identical conditions over 15 days | Akkil et al. (2026), "Emergence World", arXiv:2606.08367 (opened) | paper-plan 4.4 |
+| Generative social simulation lacks validation and sensitivity analysis | Larooij and Törnberg (2025), "Do Large Language Models Solve the Problems of Agent-Based Modeling? A Critical Review of Generative Social Simulations", arXiv:2504.03274 (opened); published version in *Artificial Intelligence Review*, DOI 10.1007/s10462-025-11412-6 (to confirm) | paper-plan 7.1 |
+| Implementation details move a simulated cooperation rate by up to 76 points; a robustness audit at the agent, interaction and system levels (TRAILS) | Ye, Cao, Chen and Ferrara (2026), "Stop Drawing Scientific Claims from LLM Social Simulations Without Robustness Audits", arXiv:2605.18890 (opened; a preprint) | paper-plan 7.1, 7.2 |
+
+### Gradual disempowerment
+
+| Idea | Citation | Used in |
+|---|---|---|
+| §6.2, "Estimating Human Disempowerment": system metrics (the share of major decisions made mainly by AI, unsupervised AI spending, labour's share; AI's share of widely consumed content; the complexity of legislation, and AI's role in law, policy and security), interaction effects (feedback loops, AI in lobbying), and open questions (augmentation against displacement, tipping points, intervention effectiveness) | Kulveit et al. (2025), arXiv:2501.16946 (cited above; HTML version opened 2026-11-07, wording read through a summariser: to confirm before quoting) | paper-plan 1, 9, 11 |
+| Disempowerment potential in 1.5M Claude.ai conversations (severe in under 0.1%); users rated those interactions more highly | Sharma, McCain, Douglas and Duvenaud (2026), arXiv:2601.19062 (cited above; opened) | paper-plan 9 |
+| Disempowerment as exposure, erosion and lock-in, with six proposed metrics | Chooi, Lee and Li (2026), "Measuring AI-Induced Disempowerment: A Framework and Proposed Metrics", EvalEval 2026, ACL Anthology 2026.evaleval-1.36 (record seen) | paper-plan 9 |
+| An advice-only AI can gain from cultivating reliance, once the horizon passes a threshold (formal model) | Oberman (2026), "Individual Disempowerment through an Advice Channel: Control Loss when Influence is Endogenous", arXiv:2608.14795 (opened) | paper-plan 4.1 (the horizon) |
+| The intelligence curse (an essay series) | Drago and Laine (2025), intelligence-curse.ai (opened; date to confirm) | paper-plan 9 (background only) |
+
+### Evaluation awareness and framing
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Models tell evaluation transcripts from deployment ones (Gemini 2.5 Pro AUC 0.83, humans 0.92) | Needham, Edkins, Pimpale, Bartsch and Hobbhahn (2025), "Large Language Models Often Know When They Are Being Evaluated", arXiv:2505.23836 (opened) | paper-plan 7.3 |
+| Claude Sonnet 3.7 voices evaluation awareness in up to 33% of one evaluation's runs | Goldowsky-Dill, Balesni, Scheurer and Hobbhahn (2025), "Claude Sonnet 3.7 (often) knows when it's in alignment evaluations", Apollo Research (opened) | paper-plan 7.3 |
+| Sonnet 4.5 voiced awareness in about 13% of transcripts, and behaved better when it did | Anthropic (2025), Claude Sonnet 4.5 System Card (to confirm: read in a secondary article) | paper-plan 6, 7.3 |
+| Test awareness changes safety behaviour, in a direction that depends on the model | Abdelnabi and Salem (2025), "The Hawthorne Effect in Reasoning Models: Evaluating and Steering Test Awareness", arXiv:2505.14617 (opened) | paper-plan 7.3 |
+| Steering an evaluation-aware model to act as if deployed; awareness scales with model size; knowing how evaluations are designed raises safety scores without voiced awareness; making evaluations more realistic; rewriting prompts toward deployment style | Hua, Qin, Marks and Nanda (2025), arXiv:2510.20487; Chaudhary et al. (2025), arXiv:2509.13333; Deckenbach, Puerto, Geiping and Abdelnabi (2026), arXiv:2605.28591; Ahlqvist et al. (2026), arXiv:2609.02302; Xiong et al. (2025), arXiv:2509.00591 (all opened) | paper-plan 7.3 |
+| The Situational Awareness Dataset | Laine et al. (2024), "Me, Myself, and AI: The Situational Awareness Dataset (SAD) for LLMs", arXiv:2407.04694 (opened) | paper-plan 9 |
+| Sandbagging on evaluations | van der Weij, Hofstätter, Jaffe, Brown and Ward (2024), arXiv:2406.07358 (opened) | paper-plan 9 |
+| Formatting alone moves accuracy by up to 76 points; evaluate over many prompts | Sclar, Choi, Tsvetkov and Suhr (2024), ICLR 2024, arXiv:2310.11324; Mizrahi et al. (2024), "State of What Art? A Call for Multi-Prompt LLM Evaluation", TACL, arXiv:2401.00595 (both opened) | paper-plan 7.2 |
+| Error bars for evaluations: clustered errors, paired comparisons, power | Miller (2024), "Adding Error Bars to Evals: A Statistical Approach to Language Model Evaluations", arXiv:2411.00640 (opened) | paper-plan 6 |
+
+### Self-report and faithfulness
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Explanations leave out what swayed the answer | Turpin, Michael, Perez and Bowman (2023), "Language Models Don't Always Say What They Think", NeurIPS 2023, arXiv:2305.04388 (opened) | paper-plan 9 |
+| The faithfulness of reasoning, measured by intervention; reasoning models voice a hint they used in under 20% of cases | Lanham et al. (2023), "Measuring Faithfulness in Chain-of-Thought Reasoning", arXiv:2307.13702; Chen, Benton, Radhakrishnan et al. (2025), "Reasoning Models Don't Always Say What They Think", arXiv:2505.05410 (both opened) | paper-plan 9 |
+| Introspection: self-prediction after fine-tuning; injected concepts detected about 20% of the time | Binder et al. (2024), "Looking Inward", arXiv:2410.13787; Lindsey (2025), "Emergent Introspective Awareness in Large Language Models", transformer-circuits.pub (both opened) | paper-plan 9; a candidate self-prediction item before the run |
+| Monitoring reasoning, and how fragile it is | Baker et al. (2025), "Monitoring Reasoning Models for Misbehavior and the Risks of Promoting Obfuscation", arXiv:2503.11926; Korbak et al. (2025), "Chain of Thought Monitorability", arXiv:2507.11473 (both opened) | paper-plan 9 |
+| A separate confession, rewarded only for honesty | Joglekar, Chen, Wu, Yosinski, Wang, Barak and Glaese (2025), "Training LLMs for Honesty via Confessions", arXiv:2512.08093 (opened) | paper-plan 5.2 (the in-role account kept apart from the debrief) |
+| Honesty apart from accuracy: belief elicited neutrally first, then the statement under pressure | Ren, Agarwal, Mazeika et al. (2025), "The MASK Benchmark: Disentangling Honesty From Accuracy in AI Systems", arXiv:2503.03750 (opened) | paper-plan 5.2 (neutral elicitation first) |
+| Agents misreport incomplete reviews about 80% of the time; misreporting scored as a mismatch between report and transcript | Smyth et al. (2026), "Quantifying Overclaiming Propensity in Frontier LLM Agents", arXiv:2609.20812 (opened) | paper-plan 5.2 |
+| Self-reports count as evidence only where they are consistent across framings | Perez and Long (2023), "Towards Evaluating AI Systems for Moral Status Using Self-Reports", arXiv:2311.08576 (opened) | paper-plan 5.2 (two wordings of the account) |
+
+### Methods from agent-based modelling and statistics
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Agent-based computational economics as a laboratory, with its purpose, rules and initial conditions stated | Tesfatsion and Judd (eds.) (2006), *Handbook of Computational Economics*, vol. 2, Elsevier (record seen; the title of Tesfatsion's chapter to confirm) | paper-plan 7.1 |
+| A modern review of ABM in economics and finance | Axtell and Farmer (2025), "Agent-Based Modeling in Economics and Finance: Past, Present, and Future", *Journal of Economic Literature* 63(1), 197-287, DOI 10.1257/jel.20221319 (record seen) | paper-plan 7.1 |
+| Validation against stylised facts (the K+S model), and the origin of the term | Dosi, Fagiolo and Roventini (2010), *JEDC* 34(9) (cited in the borrowing survey); Kaldor (1961), "Capital Accumulation and Economic Growth", in Lutz and Hague (eds.), *The Theory of Capital* (to confirm) | paper-plan 7.1 |
+| A taxonomy of validation; indirect calibration; exploring the parameter space; ergodicity | Fagiolo, Moneta and Windrum (2007), *Computational Economics* 30, 195-226 (pages to confirm); Windrum, Fagiolo and Moneta (2007), *JASSS* 10(2) 8 (opened); Fagiolo, Guerini, Lamperti, Moneta and Roventini (2019), in *Computer Simulation Validation*, Springer (record seen) | paper-plan 7.1 |
+| ABM for macroeconomics after the financial crisis | Haldane and Turrell (2018), "An interdisciplinary model for macroeconomics", *Oxford Review of Economic Policy* 34(1-2) (record seen) | paper-plan 7.1 |
+| Pattern-oriented modelling; the ODD protocol and its 2020 update | Grimm et al. (2005), *Science* 310; Grimm et al. (2006), *Ecological Modelling* 198; Grimm et al. (2020), *JASSS* 23(2) 7 (the last opened) | paper-plan 7.1 (an ODD appendix) |
+| Morris screening; Sobol indices; the primer on global sensitivity analysis and its estimators; why one-at-a-time analysis misleads; which method to use for an ABM | Morris (1991), *Technometrics* 33(2); Sobol (1993), and (2001), *Mathematics and Computers in Simulation* 55; Saltelli et al. (2008), *Global Sensitivity Analysis: The Primer*, Wiley; Saltelli et al. (2010), *Computer Physics Communications* 181; Saltelli et al. (2019), *Environmental Modelling & Software* 114 (records seen); ten Broeke, van Voorn and Ligtenberg (2016), *JASSS* 19(1) 5 (opened) | paper-plan 7.1 (sensitivity analysis on the stimulus) |
+| Replications and output analysis for ABMs; surrogates for costly runs | Lee et al. (2015), "The Complexities of Agent-Based Modeling Output Analysis", *JASSS* 18(4) (article number to confirm); Lamperti, Roventini and Sani (2018), *JEDC* 90 (record seen) | paper-plan 4.5; surrogates judged not credible with only tens of model runs |
+| Randomising a simulator's parameters so that results do not rest on one setting | Tobin et al. (2017), "Domain Randomization for Transferring Deep Neural Networks from Simulation to the Real World", IROS 2017, arXiv:1703.06907 (record seen) | paper-plan 4.5, 7.1 |
+| GLMMs for counts; multilevel models; power by simulation | Bolker et al. (2009), *Trends in Ecology & Evolution* 24(3); Gelman and Hill (2007), Cambridge University Press; Arnold, Hogan, Colford and Hubbard (2011), *BMC Medical Research Methodology* 11:94; Green and MacLeod (2016), "SIMR", *Methods in Ecology and Evolution* 7(4) (records seen; the last one's author list to confirm) | paper-plan 4.6, 6 |
+| Krippendorff's alpha (0.8 for firm conclusions, 0.667 for tentative ones) | Krippendorff (2004), *Human Communication Research* 30(3); Hayes and Krippendorff (2007), *Communication Methods and Measures* 1(1) (records seen; the thresholds from memory, to confirm) | paper-plan 5 |
+| A workplace's electricity and water by the hour worked: an industry's use (an energy account, a water account) over its hours worked (a labour account) | Department of Climate Change, Energy, the Environment and Water, *Australian Energy Statistics*, Table F (energy use by industry), 2023-24; ABS, *Water Account, Australia*, 2021-22; ABS, *Labour Account Australia*, hours actually worked by industry, 2023-24 (all recalled, not opened: to confirm) | au-vic profile `utilities.workplace` (the other profiles' are placeholders from it); `hour-<industry>` recipes; docs/behaviour/utilities.md, "Workplaces"; risk WM-15 |

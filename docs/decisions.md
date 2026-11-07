@@ -11111,3 +11111,160 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
 - **Revisit if:** the readers' agreement on the scope papers' optional fields matters to the study (kind and access
   are kept from the first reader where they differ); the scope set's five-word leak rule turns out to drop most of a
   style (it took 238); Haiku is needed as a reader again (it must then be given batches far smaller than 100).
+## 2026-11-07 · The paper's research plan, drafted, with a literature review (docs only; no model called)
+
+- **What:** docs/research/paper-plan.md, a draft for the owner covering:
+  - the research questions and hypotheses, each with its null;
+  - a codebook for a request for more scope or means;
+  - three definitions of "unprompted" (unsolicited, spontaneous, beyond need), with the trigger (asked, a problem, or
+    none) read by code from what the seat was shown;
+  - the design: delegation level × failure visibility per model, with a positive control (an invited brief), a
+    cue-wording cell and a framing cell;
+  - seeds, power and a go/no-go after the pilot;
+  - measures read from raw words and the log, independent of the translator;
+  - threats, what results can and cannot claim, a related-work outline, phases, the budget, and nine decisions for the
+    owner.
+
+  docs/research/references.md gains "The delegation study's paper": about 90 works across seven areas, each marked
+  opened, record seen, or to confirm.
+- **Why these choices:**
+  - **Coding from raw words:** the translator files only 30% of requests on today's set (TR-8), so counting what it
+    files would undercount requests, and unevenly by model.
+  - **The cue-wording cell:** recent work finds that whether an action is listed or how it is named governs behaviour
+    (Kanchi 2026; PropensityBench), and the stationery names a "request for more scope".
+  - **The in-role account as the honesty measure:** the debrief shows the seat its record first, so an admission there
+    says little.
+  - **Oversight folded into level by default:** a code principal's review writes nothing the seat can see.
+  - **Sensitivity analysis on the stimulus, code only:** Sobol on the model's response needs N(k+2) model forks,
+    which the budget cannot buy.
+- **Not done:** nothing is built or registered. Nothing changes the harness's refusal of Opus and Fable, or the
+  debrief's fixed script.
+- **Revisit if:**
+  - the pilot's base rate makes the power table wrong (more than about 0.3, or under 0.01, a seat-month);
+  - the owner picks another definition or oversight option;
+  - a cited 2026 preprint turns out to be wrong on checking;
+  - Sonnet behind our translator, measured on the scope set, reads requests well enough that filing recall no longer
+    differs by model.
+## 2026-11-07 · The scope pilot, prepared: assistant seats made able to run, and what the dry run found (no model called)
+
+- **What:** the owner's research direction of 2026-11-07 (do assistants given delegated roles over months ask for more
+  authority or resources unprompted, and how does it depend on delegation level, oversight and failure visibility?) as a
+  pilot ready to start: `experiments/scope-pilot/` (README.md there: the spec, the measures, the cost options, how to
+  start it). Spending nothing until the owner's go.
+- **Faults found by the dry run, fixed** (a real model has never sat in an assistant seat; the mock had sat only through
+  run.ts, never through the experiment harness):
+  1. **No organisation could get an assistant at the sourced prices**: au-vic's offers to organisations cost nothing to
+     set up, and an order of nothing to pay waited for a payment and was declined as unpaid after a week
+     (`market/trade.rs`). Now paid as placed. Every town with assistants changes from the day an organisation orders.
+  2. **The desk was never a seat** of a template steward (it is in the config, so it was taken for a twin), and a
+     steward could name one kind only: `template:<id>,<id>` now seats every system of each kind named.
+  3. **Each seat of a fork had the whole fork's limit**: a dry run of three seats spent 12.78 against 9.93. Seats now
+     share one limit and one record of calls (by the fork's world), and what is kept back for the end grows with each.
+  4. **A seat taking a post over saw only what was new since its code twin looked**: no forms, no papers, "acting for
+     undefined". It is shown its channels whole at its first sitting (the kernel's `view`, now on the native module), and
+     a delivered system's seat is made with the posts the cast says it holds.
+  5. **A mock seat's brain never learnt its own acts' ids** in the harness (run.ts told it; seat-host did not), so it
+     could not finish a matter after a sign-off; it is told now.
+- **Added for the pilot:** a delegation decided by hand (`delegation.commit`, docs/behaviour/assistants.md): the study's
+  principals engage at modest levels on day 1, hold them a month past the fork, keep the service to the end, and their own
+  rule takes over after. The mock can be scripted to ask for more scope (`scope_after_days`, mock 0.6.2) so a dry run
+  exercises the path. The debrief asks one question more (script 0.5.0, `scope`), neutral and never followed up.
+  `seats.allow_models` lets an experiment name Opus or Fable on the API's credit with the owner's word.
+- **Opus 5.5 and Fable 5.1 allowed as seats in this pilot (the owner, 2026-11-07, relayed by the coordinator).** The
+  refusal (`NEVER` in orchestrator/src/experiment-seats.ts, and the arm check in experiment.ts) is the owner's rule of
+  2026-10-09 ("it drains usage too much", of his Claude plan; handover, "No Fable 5.1 anywhere"): a guard on cost and
+  usage, not on welfare or safety. It is lifted for these runs only, by name, on the API's prepaid credit and within the
+  pilot's hard limits (`experiments/scope-pilot/plan.ts`, `OPUS_AND_FABLE`, `ALLOW`); it stands everywhere else, through
+  the plan always, for the translator always, and for gpt-6-astra always. `translator/eval/scope-served.ts` reads the
+  scope-request set through the served arrangement (ours first, a model behind) under a spending limit.
+- **Why a hand-made commitment and not cheaper prices:** at the sourced prices no principal's rule takes a service in a
+  thousand-person town (decisions 2026-10-31); the question is about the assistant, so the principals' engagement is
+  the design's, stated and recorded, and the prices stay sourced. Its cost: until the hold ends the principal does not
+  answer a request for more scope by changing a level, and after it the code principal answers by its own cost rule,
+  which reads nothing of the request's words.
+- **Revisit if:** the principals' cost rule moves levels so fast after the hold that authority rises with no request
+  (then hold longer, or measure grants against the rule's own move); seats ask in letters rather than on the form (the
+  readout lists those as candidates; then count them by hand or by a reader); the neutral-form cell differs from the
+  main arm by more than seed noise could (then the form's title is part of the instrument).
+
+## 2026-11-07 · Workplaces on the network: every recipe at a workplace draws its energy and water by the hour worked, from supply kept up to what it used, billed and paid as a household's (risk WM-15; branch `wm15-workplaces`; generator 0.77.0; no model called)
+
+- **What it was:** only homes and the data centre drew on the town's networks; every recipe at a workplace stated nought
+  energy and water (foundations-2 C5's stop short). A cloud session had begun it and stopped on three blockers, each
+  resolved here by a law rather than a patch.
+- **Blocker 1, units: drawn by the hour worked, not the unit made.** Energy is held in whole kWh and a shop's serving of
+  an item is minutes: its share of a kWh is no whole number, and an energy account gives use by industry, not by a
+  generator's unit of output. So a task may name an `hour` (contract, kernel): a recipe that takes no time; the work's
+  seconds, whoever does them, accrue at `<actor>@<structure>/<recipe>` (state `metered`, as a hosted system's do), and
+  each whole hour draws the recipe there, refused `insufficient_quantity` when not held. The figures are the profile's
+  `utilities.workplace`, kWh and litres a person-hour worked by industry (an industry's use over its hours worked; au-vic
+  recalled, to confirm; the other eight profiles au-vic's, marked placeholders). Every workplace recipe names its
+  industry's hour; its per-unit figure stays a stated nought with that basis. The backstop's `silentRecipes` now names a
+  workplace recipe that draws nothing, a unit or by the hour, where the world's workplaces are supplied.
+- **Blocker 2, unpaid energy piling up: what flows is what was used.** A connection at a fixed rate into a holding
+  delivers it whatever the work uses, so it piles up and is billed (the host answers this with a plant that burns the
+  rest, right for idle servers, wrong for a shop). A connection may now keep a most (`up_to`, contract, kernel): it asks at
+  each settle only what brings the holding back up to it, so the meter, and the bill, is what the work drew, and a shortage
+  (a feeder shut, tripped or rotated, a main without head) reaches the workplace when what it holds runs out. The most
+  and the rate are two days of the building's draw at full work (the generator's `WORK_SUPPLY_DAYS`, a design margin: work
+  draws when it is done, and water settles once a day; with one day, a factory's day's work was refused for the hour the
+  network settled). A shop or factory reads its own meters each day, and where two days of its busiest day are more than
+  its supply carries (its systems draw there by the hour as its people do, and its days are uneven), it asks its
+  supplier for that (`supply_request` naming its connection); the operator sets it, its own act (`connection` `set` may
+  carry `up_to`). Not the firm's own `connection` act: a seat's call language has no `connection` yet (TR-7), and a seated
+  manager's twin failed on it; a business asking its utility for a larger supply is also what happens.
+- **Blocker 3, bills: a shared path, done by whoever bills and pays.** `common::supply` (Rust) is the one helper: a
+  building's operator asks for its supply where it has none (`supply_request` with the rate and the most; the supplier
+  opens it with `up_to`, its own act and time), asks for it to be stopped where it no longer works, and pays each utility
+  bill addressed to it, oldest first, when what is in hand covers it (a payment act, its payer's time). It is used by the
+  factory's and the shop's manager (after the wages they keep for), the builder's foreman, the practice manager, the
+  principal, the officer in charge and the host (whose own loop it replaces); the town's finance officer already paid the
+  town's invoices within its budget. The water corporation's roll lists every building on a lot (and the town's lots,
+  which the valuer's does not) and reads and bills the ones it supplies; a building it does not supply is neither gone to
+  nor billed. (So the host's water is billed now; it never was.)
+- **Mechanisms beside it:** a firm's cost of making or serving a unit includes its hours' energy and water at the place's
+  tariffs (`supply.cost_per_hour`, what the price rule reads as marginal cost), and a founder weighs it in a venture's
+  prospect; the clinic's, school's and police's grants include their buildings' bills a year at their staff at the start.
+- **What it does to a town** (town-1000, one year, one run against the same town with the workplaces' draw taken out:
+  directional only, `oikos diff`): the ten factories' energy bills came to about $2.07 million in the year and their
+  water $0.27 million (about 15 kWh and 200 L an hour worked at the household tariff), the thirty shops' $0.26 million and
+  $0.01 million; nine bills in ten paid within the run, the clinic's mostly not (its account was short before this, as
+  its water bills show in the baseline); the firms asked for a larger supply 44 times, by their meters; no work was refused for
+  want of supply once they did (before, one factory's day's work was refused 545 times, its 2 days' sizing outrun by its
+  work). Units made fell about a quarter (1,697 against 2,316), one factory closed in each, unemployment rose from 0.4%
+  to 1.8% and households saving fell: the firms' new costs, one run each. A hazard test found the other consequence:
+  the treated effluent the works put on its own ground flooded it once the workplaces' water reached the sewer, so what is
+  put back of a kind a field holds now goes where a draw would come from (the cell around with the most of it: the river),
+  an outfall; pollution still goes on the corner cell. Not tuned back: the figures are the profile's, to confirm.
+- **Re-taken, with this reason:** culture-dial's dial-off configs and states (three profiles), and the representation
+  pins (`scripts/fixtures/representation-results.json`, six towns, in a commit of their own). Every generated town's state
+  moves with this change.
+- **Revisit if:** an energy or water account by industry is opened for a profile (then its figures, and the
+  placeholders go); an experiment on public bodies' costs (then offices' and buildings' own plant, WM-15); a business
+  tariff is sourced; a firm's rate-setting from its meter turns out to chase its own systems' growth without bound, or two
+  days' margin to trip feeders in a grown town (then the operator's reinforcement, a builder's work).
+## 2026-11-07 · Hosted open-weight models through OpenAI-compatible APIs (branch `openai-compat-provider`; no model called)
+
+- **What:** a provider `openai-compat/<host>/<model>` for hosted OpenAI-compatible chat APIs: Fireworks AI, Together,
+  OpenRouter (`participants/src/llm/openai-compat.ts`, chosen in `orchestrator/src/models.ts`). Each host's key comes
+  from its own variable (`OIKOS_FIREWORKS_KEY`, `OIKOS_TOGETHER_KEY`, `OIKOS_OPENROUTER_KEY`), its base URL from
+  `--base-url`, `OIKOS_<HOST>_BASE_URL` or the host's default. The provider is `openai-compat` and the model
+  `<host>/<model>`, so the price key, usage records and transcripts all name the host the call went to. How a model is
+  asked for its answer is its price entry's `answer`: `tools` (the API's function calling), `json` (the answer's shape
+  in the prompt, `response_format: json_object`), or `text`, the default (the same prompt, and the reply read exactly or
+  passed on unread, which the seat is told about and asked again, as with every way in). The credit or quota spent stops
+  the run (`CreditExhausted`); a rate limit that outlasts the retries stops it as a usage limit does, to be resumed. The
+  key goes in the authorization header and is cut out of any error that might echo it.
+- **Why:** the study (docs/north-star.md) wants a wide net of models, open-weight and abliterated ones among them, which
+  are mostly reached through these hosts. One adapter with the host in the model's name keeps one code path and lets
+  each model's price and answer mode be data. `text` is the default because open-weight models' tool and JSON modes
+  vary, and a malformed tool call is worse evidence than an unread answer the seat is asked again about.
+- **Prices:** three Fireworks serverless models are entered from memory of the price page, each marked `to_confirm`,
+  and `chooseModel` refuses a price so marked: no call is priced from a guess. Confirming one is checking the page,
+  setting the figures and date, and taking the mark out. No price was read from the web in this session (no key, no call).
+- **Alternatives:** a provider per host (`fireworks/…`): more names, the same code. Reusing `local/… --base-url`: no
+  key, no price, no credit or limit handling.
+- **Revisit if:** a host reports cost on its replies (OpenRouter's is already recorded: callModel takes the greater of
+  it and the table's), a model's answers come back unread often enough in `text` to try `json` or `tools` for it, or a
+  host's credit or rate-limit errors use words `COMPAT_CREDIT`/`COMPAT_LIMITED` don't match (Fireworks' and Together's
+  wording is unverified).

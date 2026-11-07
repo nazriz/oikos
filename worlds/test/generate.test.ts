@@ -264,6 +264,32 @@ test("hosting: the assistants' systems run at a host on the town's network, whic
   expect(() => generate({ ...spec, hosting: "local" })).toThrow(/assistants/);
 });
 
+// Workplaces on the network (WM-15; docs/behaviour/utilities.md, "Workplaces"): every recipe done at a workplace draws
+// its industry's hour there, and every building where one is done has its operator's water, electricity and sewer,
+// held there and kept up to what it holds at the start; the shops and factories that may move or be founded ask for it.
+test("workplaces: every recipe done at one draws its industry's hour, from its operator's connections there", () => {
+  const c = generate(spec) as any;
+  const tasks = new Map(c.catalogue.tasks.map((t: any) => [t.id, t]));
+  for (const t of c.catalogue.tasks.filter((x: any) => x.in === "workplace")) {
+    const h: any = tasks.get(t.hour);
+    expect(Number(h?.consumes?.energy) > 0 && Number(h?.consumes?.water) > 0 && h.produces.wastewater === h.consumes.water, `${t.id}: ${t.hour}`).toBe(true);
+  }
+  const ops = [...c.positions.filter((p: any) => ["firm.producer", "firm.retailer"].includes(p.role_module?.code) && !p.role_module.params.operator)];
+  expect(ops.length).toBeGreaterThan(5);
+  for (const p of ops) {
+    const at = p.role_module.params.works ?? p.role_module.params.premises;
+    const mine = c.world.connections.filter((x: any) => x.holder === p.entity && x.at === at);
+    const kinds: string[] = mine.map((x: any) => String(x.kind)).sort();
+    expect(kinds, p.entity).toEqual(["energy", "wastewater", "water"]);
+    for (const x of mine.filter((x: any) => x.kind !== "wastewater")) {
+      expect(x.uses === undefined && x.up_to === x.rate && x.rate === p.role_module.params.supply[x.kind === "energy" ? "energy_kwh" : "water_l"]).toBe(true);
+      expect(Number(c.world.holdings.find((h: any) => h.holder === p.entity && h.at === at && h.kind === x.kind)?.quantity)).toBe(x.up_to);
+    }
+  }
+  for (const [holder, at] of [["city", "town-hall"], ["clinic", "clinic-centre"], ["school", "school-building"], ["police", "police-station"], ["builder", "builder-yard"]])
+    expect(c.world.connections.some((x: any) => x.holder === holder && x.at === at && x.kind === "energy" && x.up_to > 0), holder).toBe(true);
+});
+
 // Tools (docs/behaviour/automation.md, "Tools"): a town that asks has the profile's tools sold by the unit by a seller of
 // their own, used at their task, and weighed by the factories that do it; a town that does not ask is as before.
 test("tools: sold by the unit, used at their task, weighed by the factories; off, nothing of them", () => {

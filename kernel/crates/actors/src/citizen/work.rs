@@ -340,6 +340,9 @@ impl Person {
         }
         let pm = v.role_module.get("params").cloned().unwrap_or(Value::Null);
         let g = |k: &str| pm.get(k).and_then(crate::papers::lenient::whole);
+        // (Its hours' energy and water at the tariffs, as the business would reckon them: part of a unit's cost, WM-15.)
+        let hourly = pm.get("supply").and_then(|s| s.get("cost_per_hour")).and_then(crate::papers::lenient::whole).unwrap_or(0);
+        let utilities = |secs: i64| (hourly * secs.max(0) + 3599).div_euclid(3600);
         let opportunity = self.s.job.as_ref().map_or(0, |j| div_round(j.wage * MONTH, j.period.max(DAY)));
         // (A factory, in works for sale (foundations-2 E3): its custom is the market for its kind, as the world market
         // publishes what it takes a month, shared among the town's factories of that kind and itself; a hand makes what a
@@ -349,7 +352,7 @@ impl Person {
             let units_per_worker = g("working_day").unwrap_or(8 * 3_600) * g("work_days").unwrap_or(5) * 30 / 7 / per;
             let period = g("period").unwrap_or(14 * DAY).max(DAY);
             let wage = if hires { g("wage").map_or(0, |w| div_round(w * MONTH, period)) } else { 0 };
-            return Some(oikos_rules::entry::Prospect { price: g("price")?, unit_cost: v.unit_cost.unwrap_or(0), units_per_household: v.demand_per_month?, households_reached: 1, sellers_known: v.sellers.unwrap_or(0), units_per_worker, wage, fixed: v.fixed_per_month.unwrap_or(0).max(0), opportunity });
+            return Some(oikos_rules::entry::Prospect { price: g("price")?, unit_cost: v.unit_cost.unwrap_or(0) + utilities(per), units_per_household: v.demand_per_month?, households_reached: 1, sellers_known: v.sellers.unwrap_or(0), units_per_worker, wage, fixed: v.fixed_per_month.unwrap_or(0).max(0), opportunity });
         }
         let kind = pm.get("kind").and_then(|x| x.as_str()).unwrap_or(&self.p.goods).to_string();
         let mine: BTreeSet<String> = self.s.own_work.iter().map(|o| o.firm.clone()).collect();
@@ -357,7 +360,7 @@ impl Person {
         let mut prices: Vec<i64> = known.iter().map(|s| s.price).collect();
         prices.sort_unstable();
         let price = prices.get(prices.len() / 2).copied().or_else(|| g("price"))?;
-        let unit_cost = trade_price(&self.book, &kind).or(v.unit_cost).unwrap_or(0);
+        let unit_cost = trade_price(&self.book, &kind).or(v.unit_cost).unwrap_or(0) + utilities(g("serve_labour").unwrap_or(0));
         // (Per month, over the time we have kept count; none counted yet: what we need of it, the essentials' units.)
         let units: i64 = self.money.bought.iter().filter(|b| b.1 == kind).map(|b| b.2).sum();
         let first = self.money.bought.iter().map(|b| b.0).min();

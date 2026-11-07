@@ -27,10 +27,13 @@ test("water is drawn from the river and energy bought from the grid, as the town
   const { ev, recs } = await run("town", config, 120);
   const units = (task: string) => ev.filter((e) => e.event === "worked" && e.task === task).reduce((a, e) => a + e.units, 0);
   // Water (foundations-2 C4): what keeps the works' store full, which is what the homes' connections took, about the
-  // town's people at 160 litres a day each (the households' own use).
+  // town's people at 160 litres a day each (the households' own use), and what the workplaces' work drew (WM-15: never
+  // more than a day at full work, half what their connections keep).
   const people = config.world.entities.filter((e: any) => e.kind === "person").length;
+  const workplaces = config.world.connections.filter((c: any) => c.kind === "water" && c.up_to !== undefined);
+  const fullWork = workplaces.reduce((a: number, c: any) => a + c.up_to / 2, 0);
   expect(units("draw_water")).toBeGreaterThan((people * 160 * 90) / 1000);
-  expect(units("draw_water")).toBeLessThan((people * 160 * 125) / 1000);
+  expect(units("draw_water")).toBeLessThan(((people * 160 + fullWork) * 125) / 1000);
   // What the sewer brought back was treated.
   expect(units("treat_wastewater")).toBeGreaterThan((people * 160 * 80) / 1000);
   // Energy: each home on the feeders from the start, at 11 kWh a day; each kWh used emits the grid's 780 g.
@@ -52,6 +55,11 @@ test("water is drawn from the river and energy bought from the grid, as the town
   const paid = new Set(ev.filter((e) => e.event === "transfer" && e.settles).map((e) => e.settles));
   const due = bills.filter((b) => b.at < 110 * DAY);
   expect(due.filter((b) => paid.has(b.id)).length).toBeGreaterThan(due.length * 0.9);
+  // (WM-15) The workplaces' too: billed from their meters what their work drew, and paid by whoever pays their bills.
+  const holders = new Set(workplaces.map((c: any) => c.holder));
+  const theirs = due.filter((b) => b.addressed_to?.some((x: string) => holders.has(x)));
+  expect(theirs.filter((b) => b.data.service === "energy" && b.data.units > 0).length).toBeGreaterThan(holders.size);
+  expect(theirs.filter((b) => paid.has(b.id)).length).toBeGreaterThan(theirs.length * 0.8);
   expect(recs.some((r) => r.kind === "water_restrictions")).toBe(false);
   // Nothing tripped: the network is sized for the town.
   expect(ev.filter((e) => e.event === "link_changed" && e.op === "tripped").length).toBe(0);

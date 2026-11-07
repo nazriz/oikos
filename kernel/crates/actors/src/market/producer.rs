@@ -85,6 +85,9 @@ pub struct Params {
     /// weighs buying one. None: it looks at none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool: Option<ToolParams>,
+    /// Its works' supply (WM-15): whom it asks for water and energy, and what the works draw a day at full work.
+    #[serde(default)]
+    pub supply: crate::common::supply::SupplyParams,
 }
 
 /// A tool for the work (foundations-2 E2): the kind, the share of the time the work takes with it, and the comparison by the
@@ -135,6 +138,7 @@ impl Params {
             lengnick: Lengnick::read(ctx)?,
             figures: PriceFigures::read(ctx)?,
             tool: ctx.param("tool", None)?,
+            supply: ctx.param("supply", Default::default())?,
             founding: super::founding::Founding {
                 founder: ctx.param("founder", None)?,
                 capital: ctx.param("capital", 0)?,
@@ -258,6 +262,9 @@ pub struct Factory<B: Body> {
     /// Setting up, for a factory founded in the run (market/founding.rs): until it is ready it does nothing else.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     setup: Option<super::founding::Setup>,
+    /// Its works' supply asked for, and its utility bills paid (common::supply; WM-15).
+    #[serde(default)]
+    supplied: crate::common::supply::Supply,
 }
 
 impl<B: Body> Factory<B> {
@@ -304,6 +311,7 @@ impl<B: Body> Factory<B> {
             stock_meter: StockMeter::default(),
             cost_now: 0,
             setup: p.founding.founder.is_some().then(|| super::founding::Setup { asked: -1, ..Default::default() }),
+            supplied: Default::default(),
             body,
             book: Book::new(),
             p,
@@ -581,7 +589,8 @@ impl<B: Body> Factory<B> {
         let supply = goods_prices(&self.book, &self.p.supplier);
         let input_cost: i64 = self.p.per_unit.iter().map(|(k, q)| q * supply.prices.get(k).copied().unwrap_or(0)).sum();
         // (What making a unit costs: its inputs and its hours at the wage, and where systems make some, their fees spread over the units they make.)
-        let labour_cost = (self.p.hourly(self.wage) * self.p.labour_per_unit + 3599).div_euclid(3600);
+        // (And its hours' energy and water, at the tariffs: WM-15.)
+        let labour_cost = (self.p.hourly(self.wage) * self.p.labour_per_unit + 3599).div_euclid(3600) + self.p.supply.cost_of(self.p.labour_per_unit);
         let by_us = self.system_units(self.last_demand.max(0));
         let marginal_cost = input_cost
             + if by_us > 0 && self.last_demand > 0 { ((self.last_demand - by_us) * labour_cost + self.fleet.fees(&self.p.task) + self.last_demand - 1).div_euclid(self.last_demand) } else { labour_cost };
@@ -760,11 +769,18 @@ impl<B: Body> Factory<B> {
         let top_of_band = (self.p.lengnick.phi_high_bps * expected_units + 9999).div_euclid(10_000);
         let sys_capacity = if self.p.automation.is_some() { self.fleet.capacity(&self.p.task, UTILISATION) } else { 0 };
         let plan = if losing { 0 } else { (self.p.monthly_units(nw) + sys_capacity).min(expected_units + (top_of_band - stock).max(0)) };
+        let mut bills_paid = 0;
         if was_trading {
             let keep = nw.max(self.headcount) * self.wage;
             steps.extend(self.payables.pay::<Then>(t, &acct.account, acct.balance - self.committed.owed(), keep, Some(&mut self.committed), false, cx));
+            // (Its works' supply, and its utility bills, as any creditor's: after the wages it must keep for.)
+            steps.extend(self.supplied.ask::<Then>(pic, &me, Some(&self.p.workplace), &acct.account, &self.p.supply));
+            let before = acct.balance - self.committed.owed() - self.payables.pending(t) - keep;
+            let mut in_hand = before;
+            steps.extend(self.supplied.pay::<Then>(&self.book, &me, &acct.account, &mut in_hand, cx));
+            bills_paid = before - in_hand;
         }
-        let mut spare = acct.balance - self.committed.owed() - self.payables.pending(t) - nw.max(self.headcount) * self.wage;
+        let mut spare = acct.balance - self.committed.owed() - self.payables.pending(t) - nw.max(self.headcount) * self.wage - bills_paid;
         let mut on_terms = 0_i64; // ordered on terms this wake (not yet in what we owe)
         let kinds: Vec<(String, i64)> = self.p.per_unit.iter().map(|(k, q)| (k.clone(), *q)).collect();
         for (kind, per) in kinds {

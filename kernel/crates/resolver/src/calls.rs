@@ -247,7 +247,7 @@ struct Args {
 
 /// Functions only code writes (foundations-2 C3): each with the arguments it takes and needs.
 pub const CODE_ONLY: [(&str, &[&str], &[&str]); 2] = [
-    ("connection", &["op", "connection", "kind", "node", "to", "at", "rate", "uses", "meter"], &[]),
+    ("connection", &["op", "connection", "kind", "node", "to", "at", "rate", "uses", "meter", "up_to"], &[]),
     ("link", &["link", "op", "every", "from", "off"], &["link", "op"]),
 ];
 

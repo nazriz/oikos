@@ -233,6 +233,7 @@ impl Kind for Station {
             found: vec![],
             told: BTreeSet::new(),
             out_since: None,
+            supplied: Default::default(),
         })))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
@@ -311,6 +312,9 @@ struct Police {
     /// the next day at most (a round whose places were none to go to brings nothing back).
     #[serde(default)]
     out_since: Option<i64>,
+    /// Its utility bills paid (common::supply; WM-15).
+    #[serde(default)]
+    supplied: crate::common::supply::Supply,
 }
 
 impl Police {
@@ -432,6 +436,11 @@ impl Plan for Police {
                 ..Default::default()
             };
             steps.extend(self.staff.routine(pic, &self.book, cx, &self.p.account, &want));
+            // (The station's utility bills, after the officers' wages it must keep for.)
+            if let Some(a) = crate::common::own_account(pic) {
+                let mut in_hand = a.balance - workers.len() as i64 * self.p.wage;
+                steps.extend(self.supplied.pay::<Then>(&self.book, &me, &a.account, &mut in_hand, cx));
+            }
         }
 
         // What is on our file: the reports we have charged or closed, the warrants we have done, the deaths we have reported.
