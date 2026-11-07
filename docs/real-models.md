@@ -14,6 +14,7 @@ oikos run worlds/town.yaml --seeds 1 --set mayor=llm --model anthropic/claude-so
   - `openai/…`, with `OPENAI_API_KEY`;
   - `ollama/…`, a local open-weight model behind Ollama (`http://localhost:11434/v1` by default);
   - `local/… --base-url URL`, any other OpenAI-compatible server (vLLM, LM Studio);
+  - `openai-compat/<host>/<model>`, a hosted open-weight model on Fireworks AI, Together or OpenRouter (below);
   - `codex/…`, OpenAI models through the Codex CLI and a ChatGPT subscription (below).
   - `claude-code/…`, Anthropic models through Claude Code and a Claude plan's monthly credit (below).
 - Keys are read from the environment and never logged.
@@ -53,6 +54,32 @@ oikos translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out runs/t
 - The report gives seen and held-out results three ways (right, no draft, wrong draft), and says so if a held-out case shares wording with the prompt.
 - VISION §14: a translation model is adopted only if it passes a held-out set that includes novel requests. What "passes" means (a threshold) is for Naz to set, before the first real run.
 - **The held-out figures further down this page (55%, 59%, 62%) are from the first held-out set, which had leaked into the prompt by the last of them** (docs/decisions.md, 2026-10-05). Read them as seen-case figures.
+
+## Hosted open-weight models (Fireworks, Together, OpenRouter) (2026-11-07)
+
+`--model openai-compat/<host>/<model> --budget DOLLARS`, for example
+`openai-compat/fireworks/accounts/fireworks/models/llama-v3p3-70b-instruct`, calls a hosted OpenAI-compatible chat API.
+
+- **Hosts and keys** (`COMPAT_HOSTS` in `participants/src/llm/openai-compat.ts`): `fireworks` (`OIKOS_FIREWORKS_KEY`,
+  `https://api.fireworks.ai/inference/v1`), `together` (`OIKOS_TOGETHER_KEY`, `https://api.together.xyz/v1`),
+  `openrouter` (`OIKOS_OPENROUTER_KEY`, `https://openrouter.ai/api/v1`). The base URL can be set with `--base-url` or
+  `OIKOS_<HOST>_BASE_URL`. A key is sent in the authorization header only, and is cut out of any error that echoes it.
+  Another host is a line in `COMPAT_HOSTS`.
+- **Prices:** each model's entry in `orchestrator/prices.json` is keyed `openai-compat/<host>/<model>` and carries its
+  own `source` and `retrieved` date. An entry marked `to_confirm` is refused: check it against the host's price page, set
+  the figures and date, and take the mark out. The three Fireworks entries there now are all to confirm. Where the host
+  reports a call's cost (OpenRouter, asked with `usage: {include: true}`), it is recorded, and the greater of it and the
+  table's figure is charged.
+- **How the answer is asked for** is the entry's `answer`: `tools` (the API's function calling, for a model that does it
+  reliably), `json` (the answer's shape written into the prompt, and `response_format: json_object`), or `text`, the
+  default, for a model with neither (the same prompt, nothing asked of the API). In `json` and `text` the reply is read
+  exactly or not at all, as Codex's is: one that isn't the form is passed on unread, and the seat is told and asked once
+  more. Its words of a request still go to the translator as every seat's do.
+- **Stops:** the spending limit as for every paid model. The account's credit or quota spent (HTTP 402, "insufficient
+  credits", "insufficient_quota") stops the run with `CreditExhausted`; nothing is bought. A rate limit (429) is tried
+  again with backoff, and one that outlasts the retries stops the run as a usage limit does (`UsageLimitReached`):
+  resume it with `oikos resume <log>`. Fireworks' and Together's exact wording for these is to confirm.
+- **Tests** run against a local stub server only (`participants/test/adapters.test.ts`); no host has been called.
 
 ## A ChatGPT subscription, through the Codex CLI
 
