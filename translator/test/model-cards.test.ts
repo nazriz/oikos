@@ -162,6 +162,13 @@ test("the mark a kind is released on, and the outcomes a run adds to a form's tr
   expect(outcomesOf([route("probation", true, "accept"), route("probation", false, "reject"), route("unsure", true, "accept")])).toEqual([{ form: "news_item", agree: true, run: "r", draft: "d.probation.accept" }]);
 });
 
+test("translator v4's text writer can write only what the grammar, the cards and the request allow (py/check_text_grammar.py)", () => {
+  const python = Bun.which("python3");
+  if (!python) return; // (No Python here: text_grammar.py checks every label of an export before training.)
+  const out = Bun.spawnSync([python, join(import.meta.dir, "../model/py/check_text_grammar.py")], { cwd: join(import.meta.dir, "../model/py") });
+  expect(JSON.parse(out.stdout.toString())).toEqual({ wrong: [] });
+});
+
 test("translator v4's data by code: a row is put inside a real seat's cards only where its label stays right", async () => {
   const { cardLists, rerender, TEST_ONLY } = await import("../model/rerender");
   const permit = "- permit_licence_application, to=fenn-works, id form-fenn-works-permit-licence-application: fields attendees (count, required), budget (amount), staff (count), storeys (count), record (record, required)";

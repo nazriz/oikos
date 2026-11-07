@@ -71,7 +71,7 @@ test("every sentence the platform's own code can write to a seat: scanned in the
   const files = ["participants/src/llm/participant.ts", "participants/src/llm/render.ts", "participants/src/llm/counter.ts", "participants/src/llm/words.ts",
     "translator/src/preview.ts", "translator/src/resolver.ts", "translator/src/arrangement.ts", "translator/src/knowledge.ts",
     // (and the ways in to a model, which add how to answer to what a seat is sent)
-    "participants/src/llm/claude-code.ts", "participants/src/llm/codex.ts", "participants/src/llm/answer.ts", "participants/src/llm/anthropic.ts", "participants/src/llm/openai.ts",
+    "participants/src/llm/claude-code.ts", "participants/src/llm/codex.ts", "participants/src/llm/answer.ts", "participants/src/llm/anthropic.ts", "participants/src/llm/openai.ts", "participants/src/llm/openai-compat.ts",
     // (what is still read of the kinds the engine runs, whose TypeScript actors were deleted at the cut-over: their
     // declarations, and the helpers and readers the generator and the host use)
     ...SEAT_SIDE_DIRS.flatMap((d) => readdirSync(join(root, d)).filter((f) => f.endsWith(".ts")).map((f) => `${d}/${f}`)), "participants/src/engine-kinds.ts"];
@@ -88,6 +88,7 @@ test("every sentence the platform's own code can write to a seat: scanned in the
     { file: "kernel/crates/actors/src/mind/founding.rs", has: "The translator did not answer.", why: "the reason recorded when a code founder's draft could not be had, kept in the log; nobody is sent it" },
     { file: "participants/src/llm/claude-code.ts", has: "the Claude plan's limit for claude -p was reached", why: "an error to whoever runs the pilot, which stops the run; no model is sent it" },
     { file: "participants/src/llm/codex.ts", has: "the Codex subscription's usage limit was reached", why: "the same" },
+    { file: "participants/src/llm/openai-compat.ts", has: "rate limit was reached and outlasted the retries", why: "the same" },
   ];
   const used = new Set<number>();
   let scanned = 0, scannedRust = 0;

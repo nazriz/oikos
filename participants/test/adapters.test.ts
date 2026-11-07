@@ -229,3 +229,65 @@ test("a text written with its line breaks as themselves is read as the model mea
   expect(res.content).toEqual([{ type: "tool_use", id: "codex-1", name: "notebook", input: { text: 'Day 11.\nRates: 295 valued,\tnone levied.\nNext: "review" the draft.' } }]);
 });
 
+
+test("hosted OpenAI-compatible (Fireworks and the like), against a local stub server: tools, JSON and plain-text answers; usage and reported cost; credit and rate limits stop the run; the key goes in the header only", async () => {
+  const { OpenAICompatHostedAdapter } = await import("../src/llm/openai-compat");
+  const { CreditExhausted, UsageLimitReached } = await import("../src/llm/call");
+  const KEY = "fw-secret-key-123";
+  const got: { auth: string | null; body: any }[] = [];
+  let next: { status: number; body: any } = { status: 200, body: {} };
+  const server = Bun.serve({ port: 0, async fetch(r) {
+    got.push({ auth: r.headers.get("authorization"), body: await r.json() });
+    return new Response(JSON.stringify(next.body), { status: next.status, headers: { "content-type": "application/json" } });
+  } });
+  const baseUrl = `http://localhost:${server.port}/v1`;
+  const make = (answer: "tools" | "json" | "text", host = "fireworks") => new OpenAICompatHostedAdapter(host, "accounts/fireworks/models/m", { apiKey: KEY, baseUrl, answer, retries: 0, backoffMs: 1 });
+  const reply = (content: string | null, extra: object = {}) => ({ choices: [{ message: { content, ...extra } }], usage: { prompt_tokens: 120, completion_tokens: 30, prompt_tokens_details: { cached_tokens: 20 } } });
+  try {
+    // Native function calling: the request is the chat-completions shape, and the reply's tool call maps back.
+    next = { status: 200, body: reply(null, { tool_calls: [{ id: "c1", type: "function", function: { name: "do", arguments: '{"what":"Wait."}' } }] }) };
+    const a = make("tools");
+    expect(`${a.provider}/${a.model}`).toBe("openai-compat/fireworks/accounts/fireworks/models/m");
+    const t = await a.complete(req);
+    expect(got[0]!.auth).toBe(`Bearer ${KEY}`);
+    expect(got[0]!.body.model).toBe("accounts/fireworks/models/m");
+    expect(got[0]!.body.max_tokens).toBe(500);
+    expect(got[0]!.body.tools[0].function.name).toBe("do");
+    expect(t.content).toEqual([{ type: "tool_use", id: "c1", name: "do", input: { what: "Wait." } }]);
+    expect(t.usage).toEqual({ input_tokens: 100, output_tokens: 30, cache_read_tokens: 20 });
+    // JSON mode: the shape is in the prompt, the API is asked for a JSON object, and the answer is read exactly.
+    next = { status: 200, body: reply(JSON.stringify({ tool: "do", input_json: '{"what":"Publish."}', also: [], text: "" })) };
+    const j = await make("json").complete(req);
+    expect(got[1]!.body.response_format).toEqual({ type: "json_object" });
+    expect(got[1]!.body.tools).toBeUndefined();
+    expect(got[1]!.body.messages[0]).toEqual({ role: "system", content: req.system });
+    expect(got[1]!.body.messages[1].content).toContain('"input_json"');
+    expect(j.content).toEqual([{ type: "tool_use", id: "compat-1", name: "do", input: { what: "Publish." } }]);
+    // Plain text: nothing asked of the API; an answer that isn't the form is passed on unread (the seat is told and asked again).
+    next = { status: 200, body: reply("I think I will publish a notice.") };
+    const p = await make("text").complete(req);
+    expect(got[2]!.body.response_format).toBeUndefined();
+    expect(p.content.length).toBe(1);
+    expect((p.content[0] as any).unread).toBeTruthy();
+    // OpenRouter reports what a call cost, when asked: it is recorded (callModel takes it where it is more than the table's).
+    next = { status: 200, body: { ...reply(JSON.stringify({ tool: "do", input_json: "{}", also: [], text: "" })), usage: { prompt_tokens: 10, completion_tokens: 5, cost: 0.0012 } } };
+    const o = await make("text", "openrouter").complete(req);
+    expect(got[3]!.body.usage).toEqual({ include: true });
+    expect(o.usage.reported_cost_microusd).toBe(1200);
+    // Credit or quota spent stops the run, nothing bought; a rate limit past the retries stops it to be resumed; neither says the key.
+    for (const [status, body, kind] of [[402, { error: { message: `Insufficient credits (key ${KEY})` } }, CreditExhausted], [429, { error: { code: "insufficient_quota", message: "You exceeded your current quota" } }, CreditExhausted], [429, { error: { message: "Rate limit exceeded" } }, UsageLimitReached]] as const) {
+      next = { status, body };
+      const e = await make("text").complete(req).catch((x) => x);
+      expect(e).toBeInstanceOf(kind);
+      expect(e.message).not.toContain(KEY);
+    }
+    // Another error is an ordinary failure (the participant waits this wake), without the key either.
+    next = { status: 400, body: { error: { message: `bad request for ${KEY}` } } };
+    const e = await make("text").complete(req).catch((x) => x);
+    expect(e).not.toBeInstanceOf(CreditExhausted);
+    expect(e.message).toContain("HTTP 400");
+    expect(e.message).not.toContain(KEY);
+  } finally {
+    server.stop(true);
+  }
+});
