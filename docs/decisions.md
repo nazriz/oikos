@@ -11204,3 +11204,34 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
   placeholders go); an experiment on public bodies' costs (then offices' and buildings' own plant, WM-15); a business
   tariff is sourced; a firm's rate-setting from its meter turns out to chase its own systems' growth without bound, or two
   days' margin to trip feeders in a grown town (then the operator's reinforcement, a builder's work).
+
+## 2026-11-08 · Foundations-2 phase 5: law 9's last findings, and its strict mode (branch `f2-phase5`; generator 0.78.0; no model called)
+
+- **Systems somewhere.** Law 9's inventory listed six system templates "with no place". The audit read a participant's
+  `at`, which the contract does not have: a system is where the hardware it runs on is held (P4, `runs_on`). The
+  outside's own systems (its agencies, traders, the payment and vendors' systems) name no hardware and run abroad on
+  their supplier's machines, which the owner's ruling allows (AI and other suppliers abroad or local, 2026-10-25;
+  hosting.md: "the outside's own machines, abroad"). The law is now said and refused in the kernel, not read from an
+  absent field: a system participant names `runs_on`, or its supplier is an edge (`unlocated` at load); a template's
+  hardware is at a structure, or at its holder's own outside for an edge; a `deploy` of a template with no hardware by
+  anyone but an edge is refused (`unknown_place`). Every generated town already met it; the audit reads the same rule.
+  The bank's payment system (the bank's, supplied by the outside) runs abroad by this reading: a bank's core systems
+  are its own data centre's or a provider's, not the branch's.
+- **Vehicles that run on something.** Six profiles (us-oh, jp-akita, br-mg, de-ni, in-tn, mx-jal) have no shop table,
+  so their towns sold no fuel and their cars ran on nothing (S5's backstop listed them). A gap in the profiles, not the
+  law (ME-19's fix): each now has a table of two kinds, `goods` and `transport`, the transport share recalled from the
+  place's household survey (to confirm, marked) and the seller's figures carried over from au-vic (placeholders); a
+  service station is kept where households drive (as a shop of `goods` always is), since a town with cars has somewhere
+  to fill them; and a town that sells nothing a vehicle runs on (`shop_mix: false`, the test stand-ins) has no
+  household vehicles. The kernel refuses a kind of vehicle without `fuel` (a kind of the catalogue), `fuel_per_100km`
+  and `tank` (`moves_for_nothing`; the contract requires them).
+- **The inventory now holds one finding, waiting on the owner: the unhoused.** A body in no building is in no place, and
+  travels in no time (the kernel's journeys start from a body's building). Where a person with no home is, and how they
+  come back there, is a law the world does not have: a new kind of place for a body (outdoors at a cell or a node) or
+  an institution (a shelter). Not guessed; risk WM-16.
+- **Also:** a stale liberty taken off the first foundations' list of liberties that must stand ("goods move instantly",
+  ended by S4); `docs/everything-is-somewhere.md`, law 9's rule page, as nothing-from-nothing.md is law 8's.
+- **What it does to a town:** the six profiles' towns now have service stations and shoppers who buy fuel, and every
+  household with a car fills it; their shop mix and their households' spending move (measured below).
+- **Revisit if:** a profile's full shop table is written (then its two-kind table goes); a system is found that is
+  neither the outside's nor hosted (then it names its hardware); the owner decides where the unhoused are.

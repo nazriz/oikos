@@ -28,7 +28,16 @@ export function unlocated(c: any): string[] {
   const vehicles = new Set<string>((c.travel?.vehicles ?? []).map((v: any) => v.id));
   const placed = (at: unknown) => typeof at === "string" && (structures.has(at) || edges.has(at) || vehicles.has(at));
   for (const h of c.world.holdings ?? []) if (!placed(h.at)) out.add(`${h.kind} held at ${h.at}, which is no structure or edge`);
-  for (const p of c.participants ?? []) if (p.kind === "system" && !placed(p.at)) out.add(`${p.template ?? p.id}: a system with no place (the hardware it runs on held nowhere)`);
+  // (A system is where the hardware it runs on is held, its template's `runs_on`: at a structure, or an edge's own outside.
+  // One that names none runs on its supplier's own machines, abroad, so only an edge supplies it: the kernel refuses
+  // anything else at load, `unlocated`.)
+  const tpl = new Map<string, any>((c.templates ?? []).map((t: any) => [t.id, t]));
+  for (const p of c.participants ?? []) {
+    if (p.kind !== "system") continue;
+    const ro = tpl.get(p.template)?.runs_on;
+    const at = ro ? (structures.has(ro.at) || (edges.has(ro.holder) && ro.at === ro.holder)) : edges.has(p.supplier);
+    if (!at) out.add(`${p.template ?? p.id}: a system with no place (the hardware it runs on held nowhere)`);
+  }
   return [...out].sort();
 }
 

@@ -83,7 +83,8 @@ fn road_world() -> Value {
     for x in 2..40 {
         structures.push(json!({"id": format!("road-{x}"), "at": format!("cell.{x}.1"), "type": "road", "built_by": "buildco"}));
     }
-    w["travel"] = json!({"vehicle_types": [{"id": "car", "seats": 5, "speed_kmh": 100}], "vehicles": [{"id": "car-1", "type": "car", "owner": "alice", "at": "s-house", "drivers": ["bob"]}]});
+    w["travel"] = json!({"vehicle_types": [{"id": "car", "seats": 5, "speed_kmh": 100, "fuel": "goods", "fuel_per_100km": 1, "tank": 40}], "vehicles": [{"id": "car-1", "type": "car", "owner": "alice", "at": "s-house", "drivers": ["bob"]}]});
+    w["world"]["holdings"].as_array_mut().unwrap().push(json!({"kind": "goods", "holder": "alice", "at": "car-1", "quantity": "40"}));
     w
 }
 
@@ -121,7 +122,7 @@ fn a_trip_by_car_goes_along_the_road_at_its_speed_and_the_car_stands_where_it_we
     assert_eq!(on_foot.kernel().state().vehicles["car-1"].at, "s-house", "on foot, the car stays at home");
     // Hers to know: the car, where it stands.
     let o = by_car.command(&Command::Observe { participant: "alice-self".into(), only: None }).unwrap().observation.unwrap();
-    assert_eq!(serde_json::to_value(&o).unwrap()["body"]["vehicles"], json!([{"vehicle": "car-1", "type": "car", "at": "s-shop", "owner": "alice"}]));
+    assert_eq!(serde_json::to_value(&o).unwrap()["body"]["vehicles"], json!([{"vehicle": "car-1", "type": "car", "at": "s-shop", "owner": "alice", "fuel": "goods", "in_tank": "40", "tank": 40}]));
 }
 
 #[test]
@@ -350,6 +351,7 @@ fn busy_world() -> Value {
     }
     w["travel"] = json!({"vehicle_types": [{"id": "car", "seats": 5, "speed_kmh": 100, "fuel": "goods", "fuel_per_100km": 1000, "tank": 40}],
         "vehicles": [{"id": "car-1", "type": "car", "owner": "alice", "at": "s-house"}, {"id": "car-2", "type": "car", "owner": "bob", "at": "s-flats"}, {"id": "car-3", "type": "car", "owner": "carol", "at": "s-shop"}]});
+    w["world"]["holdings"].as_array_mut().unwrap().retain(|h| h["at"] != "car-1");
     for (who, car) in [("alice", "car-1"), ("bob", "car-2"), ("carol", "car-3")] {
         w["world"]["holdings"].as_array_mut().unwrap().push(json!({"kind": "goods", "holder": who, "at": car, "quantity": "20"}));
     }

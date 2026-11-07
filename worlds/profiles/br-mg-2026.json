@@ -523,7 +523,7 @@
    "wealth_effect_bps_per_year": 300,
    "essentials_per_month": 36376,
    "shops_known": 7,
-   "shop_search_bps_per_month": 2500
+   "shop_search_bps_per_month": 2500, "demand": {"frisch_bps": -20000, "kinds": [{"kind": "goods", "share_bps": 8200, "income_elasticity_bps": 11000, "seller": {"occupation": "sales assistant", "wage_vs_shop_bps": 10000}}, {"kind": "transport", "class": "dissipates", "share_bps": 1800, "income_elasticity_bps": 11000, "seller": {"wholesale_bps": 8000, "labour_bps": 1200, "occupation": "service station attendant (frentista)", "wage_vs_shop_bps": 11000}}]}
   },
   "savings_by_age": [
    {
@@ -1587,6 +1587,7 @@
   "spending.wealth_effect_bps_per_year": "Placeholder: carried over from the reference profile (a modelling rule).",
   "spending.essentials_per_month": "IBGE, POF 2017-18, SIDRA tables 6715 and 6977, Minas Gerais: food spending R$688.51 a family a month (15.7% of total), average family size 2.93, so R$235 a person in 2017-18; times the IPCA 1.548 to August 2026 (Banco Central SGS 433) = R$364 a person (opened 2026-10-08).",
   "spending.shops_known": "Placeholder: carried over from the reference profile.",
+  "spending.demand": "Two kinds only, so that a vehicle runs on something the town sells (law 9, S5: a car's fuel is the kind `transport`, bought at the town's service stations; risk ME-19, the other six profiles given a table): transporte 18% of consumption expenditure (IBGE, Pesquisa de Orcamentos Familiares 2017-2018; recalled, to confirm for Minas Gerais); everything else the household buys stays the kind `goods` (the rest of spending). PLACEHOLDERS carried over from au-vic-2026 and gb-eng-2026: the income elasticities (11,000 for both, Lluch, Powell and Williams 1977, to confirm), the seller's wholesale_bps 8,000 and labour_bps 1,200 (ABS Australian Industry, to source for this place) and its wage at 110% of the shop wage; Frisch's money flexibility -2 (Frisch 1959; to confirm). The transport share is all transport spending, as in au-vic-2026, not fuel alone (the town sells no vehicles). Added 2026-11-08 (foundations-2 phase 5).",
   "spending.shop_search_bps_per_month": "Placeholder: carried over from the reference profile.",
   "savings_by_age": "Placeholder: the reference profile's distribution scaled by 0.2 (the ratio of Brazilian to Australian household financial wealth and income is much lower; no Brazilian survey of savings by age retrieved). To replace from IBGE POF 2017-18 or Banco Central do Brasil, Relatorio de Cidadania Financeira.",
   "retirement_age": "Placeholder / closest fit: 65. Under Emenda Constitucional 103/2019 the permanent old-age retirement age is 65 for men and 62 for women (urban workers, INSS); rural workers 60 and 55 (Lei 8.213/1991, art. 48 par. 1); the low-income old-age benefit (BPC/LOAS, Lei 8.742/1993) starts at 65. The profile holds one age; see the report on structural gaps. Since 2026-10-08 people here stop work at ages of their own, drawn from labour_force_share_by_age; this age is still the one the profile's other figures turn on (the retired's savings, the end of the payments for those out of work, a retirement fund's access) and the top of the working ages the measures use. The pension's age is the payment's own (support.payments).",

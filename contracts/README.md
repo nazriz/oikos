@@ -814,3 +814,14 @@ connections keep no most.
   `uses`), the most its user keeps there; it asks at each settle only what brings the holding up to it, within its rate.
   So what flows, and what its meter shows, is what the user's processes used. Refused: `up_to` with a `uses`, or on any
   act but `open`.
+
+## Law 9 made strict: systems and vehicles somewhere (2026-11-08; docs/design/foundations-2.md phase 5; docs/decisions.md, "Foundations-2 phase 5: law 9's last findings"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Restrictive; no hard rule touched (it serves law 9's). Every generated town already met it.
+
+- **A system is where its hardware is** (`unlocated` at load): a system participant's template names `runs_on`, or its
+  supplier is an edge (a system that names no hardware runs on its supplier's own machines, abroad). A template's
+  `runs_on.at` is a structure, or its holder's own outside where an edge holds it. A `deploy` of a template that names
+  no hardware by anyone but an edge is refused (`unknown_place`).
+- **A kind of vehicle runs on something** (`moves_for_nothing` at load): `fuel` (a kind of the catalogue),
+  `fuel_per_100km` and `tank` (each at least 1) are required.

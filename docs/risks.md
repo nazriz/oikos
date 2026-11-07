@@ -222,6 +222,23 @@ The mechanism:
 - **Notice by:** an experiment on energy prices or on public bodies' budgets; a profile's energy account opened.
 - **Fix when:** before an experiment on utilities prices, the public bodies' costs, or a place's industrial mix.
 
+### WM-16 · A person with no home is nowhere, and travels in no time
+- **Gap:** (law 9's last finding, 2026-11-08) a body in no building is in no place: the households a town cannot house at
+  the start, and anyone who leaves every building with nowhere to go, have no location, and the kernel's journeys start
+  from a body's building, so their trips take no time (`kernel/crates/world/src/travel.rs`, `journeys`). Where a person
+  with no home is (sleeping rough in a public place, a shelter, a car, a friend's floor) and how they come back there each
+  night is a law the world does not have. It is the one finding left in law 9's inventory
+  (`orchestrator/test/fixtures/space-inventory.json`, `unlocated`), and needs the owner's decision (a new kind of place
+  for a body: outdoors at a cell or a node, or a shelter as an institution).
+- **Where:** `worlds/generator/generate.ts` (households with no home at the start); `kernel/crates/world/src/travel.rs`;
+  the citizen's housing search (`kernel/crates/actors/src/citizen`).
+- **Effect:** the unhoused (3 to 24 people in a town of 120, by profile) reach jobs, shops and offices at once, so their
+  search for a home and for work is easier than it should be, and nothing about having no home (exposure, sleep, being
+  seen) touches them.
+- **L / I:** high / medium · **Status:** open (needs a design decision)
+- **Notice by:** an experiment on housing or homelessness; the unhoused's days to a job or a home against the housed's.
+- **Fix when:** before any study reads outcomes for the unhoused, and before law 9's line joins the hard rules.
+
 ### WM-10 · Repeal does not reach those who read the law; new kinds of binding law cannot be made
 - **Gap:** A law repealed without a replacement is still taken as in force by landlords, tenants, the union and the
   tribunal (their books show laws, not withdrawals). A law of a new kind that binds (a rent cap, a winter ban on
@@ -509,6 +526,10 @@ The mechanism:
   ke-nakuru-2026. A unit of each kind is what the same staff time serves, so its size and price follow from the labour
   share; factories still make one kind (`goods`, standing for household goods and other goods) and the outside world
   sells every kind wholesale. Only these three profiles have the table: the other six keep the single `goods` town.
+  **Update 2026-11-08 (foundations-2 phase 5, law 9):** the other six now have a table of two kinds, `goods` and
+  `transport` (what their cars run on, bought at a service station the generator keeps where households drive), the
+  transport share recalled from each place's household survey (to confirm) and the seller's figures carried over from
+  au-vic-2026 (placeholders); their full tables are still to write.
   The flag is off by default, because the TS world's modules buy only `goods`.
 - **Where:** `worlds/profiles/{au-vic,gb-eng,ke-nakuru}-2026.json` (`spending.demand.kinds[].seller`);
   `worlds/generator/shopmix.ts`, `generate.ts`; docs/behaviour/demand.md ("A town's mix of shops").

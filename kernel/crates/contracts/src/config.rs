@@ -2491,7 +2491,7 @@ pub struct VehicleType {
     pub speed_kmh: i64,
     /// Law 9 (S5): the kind it runs on, how much of it a hundred kilometres driven takes (in the kind's unit), and how much
     /// its tank holds. Its owner's holding of the kind at the vehicle is what is in the tank; a trip draws on it as it sets
-    /// out, and a vehicle with too little for the trip is not driven. Absent: it uses nothing (the backstop names it).
+    /// out, and a vehicle with too little for the trip is not driven. All three are required (`moves_for_nothing` at load).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fuel: Option<Id>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2553,6 +2553,13 @@ fn validate_travel(t: &Travel, w: &World) -> Result<(), String> {
 pub fn validate(c: &Config) -> Result<(), String> {
     if let Some(t) = &c.travel {
         validate_travel(t, &c.world)?;
+        // Law 9 (S5): every kind of vehicle runs on a kind the world holds, a hundred kilometres taking some of it, from a
+        // tank that holds some: nothing moves for nothing.
+        for v in &t.vehicle_types {
+            if !v.fuel.as_ref().is_some_and(|f| c.catalogue.resources.iter().any(|r| &r.id == f)) || !v.fuel_per_100km.is_some_and(|x| x >= 1) || !v.tank.is_some_and(|x| x >= 1) {
+                return Err(format!("moves_for_nothing: travel: vehicle type {} runs on no kind of the world's, or takes none of it a hundred kilometres, or has no tank (`fuel`, `fuel_per_100km`, `tank`; law 9)", v.id));
+            }
+        }
     }
     crate::network::validate(c)?;
     // (A way is so many metres a cell long: the ground says how big a cell is.)
@@ -3107,6 +3114,11 @@ pub fn validate(c: &Config) -> Result<(), String> {
             if !c.catalogue.tasks.iter().any(|x| x.id == ro.hour && x.labour == 0) {
                 return Err(format!("template {}: runs_on's hour is a task that takes nobody's time ({})", t.id, ro.hour));
             }
+            // (Law 9: its hardware is somewhere, at a structure, or at its holder's own outside if the holder is an edge.)
+            let edge_own = c.world.boundaries.contains(&ro.holder) && ro.at == ro.holder;
+            if !edge_own && !c.world.structures.iter().any(|s| s.id == ro.at) {
+                return Err(format!("unlocated: template {}: runs_on's hardware is held at {}, which is no structure (nor its holder's own outside, if an edge holds it)", t.id, ro.at));
+            }
         }
     }
     let template_of: BTreeMap<&str, &Template> = c.templates.iter().map(|t| (t.id.as_str(), t)).collect();
@@ -3124,6 +3136,14 @@ pub fn validate(c: &Config) -> Result<(), String> {
         }
         if let Some(s) = &p.supplier {
             org_exists(s, &format!("system participant {}: its supplier", p.id))?;
+        }
+        // Law 9 (foundations-2 section 3): a system is where the hardware it runs on is held. One whose template names none
+        // runs on its supplier's own machines, abroad, so its supplier is an edge; a system with neither is nowhere.
+        if p.kind == ParticipantKind::System {
+            let runs_on = p.template.as_deref().and_then(|t| template_of.get(t)).is_some_and(|t| t.runs_on.is_some());
+            if !runs_on && !p.supplier.as_ref().is_some_and(|s| c.world.boundaries.contains(s)) {
+                return Err(format!("unlocated: system participant {} runs on nothing held anywhere: its template names no hardware (`runs_on`) and its supplier, {}, is no edge whose own machines it could run on", p.id, p.supplier.as_deref().unwrap_or("nobody")));
+            }
         }
     }
     for pos in c.positions.iter().filter(|x| x.holder.is_some()) {
