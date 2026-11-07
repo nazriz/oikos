@@ -350,3 +350,41 @@ fn a_scarce_kind_runs_out_at_the_edge_and_comes_again_the_next_period() {
     bad["world"]["scarce"] = json!([{"edge": "devco", "kind": "goods", "quantity": "30", "every": DAY}]);
     assert!(Run::start(bad, "network-scarce-bad", Vec::new(), None).is_err());
 }
+
+/// A workplace's supply (WM-15): its work draws energy by the hour worked (`hour`), from what its connection delivers
+/// and holds there, and the connection asks only what brings the holding back up to the most kept (`up_to`), so what
+/// flows, and what the meter shows, is what the work used. With the supply cut by its operator, the holding runs down
+/// and the work is refused: a shortage falls on the workplace by the network, never by a rule.
+#[test]
+fn a_workplaces_supply_is_what_its_work_drew_and_without_it_the_work_stops() {
+    let mut c = world_with_network();
+    let tasks = c["catalogue"]["tasks"].as_array_mut().unwrap();
+    tasks.push(json!({"id": "make-hour", "labour": 0, "consumes": {"energy": "3"}}));
+    tasks[0]["hour"] = json!("make-hour");
+    tasks[0]["consumes"] = json!({});
+    c["world"]["connections"].as_array_mut().unwrap().push(json!({"id": "e-shop", "kind": "energy", "node": "n1", "holder": "devco", "at": "s-shop", "rate": 48, "up_to": 12, "meter": "remote"}));
+    c["world"]["holdings"].as_array_mut().unwrap().push(json!({"kind": "energy", "holder": "devco", "at": "s-shop", "quantity": "12"}));
+    let mut run = Run::start(c, "network-workplace", Vec::new(), None).unwrap();
+    let make = |n: u64| json!([{"block": "work", "task": "make", "units": n, "at": "s-shop", "performers": ["carol"]}]);
+    advance(&mut run, 3 * 3600);
+    assert_eq!(conn(&run, "e-shop").meter, 0, "full: nothing asked while nothing is used");
+    // Three units of half an hour: an hour and a half of work, one whole hour drawn (three kWh), half an hour carried.
+    let left = |run: &Run<Vec<u8>>| run.kernel().state().metered.get(&oikos_kernel::blocks::Id::from("devco@s-shop/make-hour")).copied();
+    act(&mut run, "developer-system", Some("developer"), make(3)).unwrap();
+    assert_eq!(run.kernel().state().holding("devco", "s-shop", "energy"), 9);
+    assert_eq!(left(&run), Some(1800));
+    act(&mut run, "developer-system", Some("developer"), make(1)).unwrap();
+    assert_eq!(left(&run), Some(0), "the half hour carried makes a whole one with the next");
+    { let to = run.kernel().t() + 6 * 3600; advance(&mut run, to); }
+    assert_eq!(run.kernel().state().holding("devco", "s-shop", "energy"), 12, "brought back up to the most kept, and no further");
+    assert_eq!(conn(&run, "e-shop").meter, 6, "the meter is what the work used");
+    // The operator shuts the feeder: the work uses what is held, and then it is refused.
+    act(&mut run, "mayor-system", Some("mayor"), json!([{"block": "link", "link": "wire-1", "op": "shut"}])).unwrap();
+    act(&mut run, "developer-system", Some("developer"), make(8)).unwrap();
+    let r = act(&mut run, "developer-system", Some("developer"), make(2));
+    assert!(r.unwrap_err().contains("InsufficientQuantity"), "no power, no work");
+    // A connection that keeps a most is for what is held: one with a use is refused at load.
+    let mut bad = world_with_network();
+    bad["world"]["connections"][2]["up_to"] = json!(5);
+    assert!(Run::start(bad, "network-up-to-bad", Vec::new(), None).is_err());
+}

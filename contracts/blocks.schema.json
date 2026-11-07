@@ -1799,6 +1799,12 @@
             "remote"
           ]
         },
+        "up_to": {
+          "description": "Opened for what is held where it is delivered (no `uses`): the most its user keeps there; it asks only what brings the holding up to it.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000000
+        },
         "ref": {
           "type": "string",
           "minLength": 1,

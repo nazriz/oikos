@@ -115,6 +115,20 @@ fn connect_steps<T>(book: &Book, me: &str, kinds: &[(&str, Option<&str>, Option<
             continue;
         }
         let d = data(r);
+        // (A customer's own connection, asked to carry more: set, by its operator, once a request, WM-15.)
+        if let Some(cid) = d.s("connection") {
+            let theirs = conns.iter().find(|c| c.id == cid && c.holder == who && !c.closed);
+            if let (Some(c), Some(rate)) = (theirs, d.i("rate")) {
+                if kinds.iter().any(|k| k.0 == c.kind) && cache.insert(format!("set:{}", r.id)) && rate != c.rate {
+                    let mut args = vec![("op", Some(arg("set"))), ("connection", Some(arg(&c.id))), ("rate", Some(text(rate.max(0).to_string())))];
+                    if let Some(most) = d.i("up_to") {
+                        args.push(("up_to", Some(text(most.max(0).to_string()))));
+                    }
+                    out.push(because(format!("{who} asks for its {} supply at {} to carry {rate} a day: setting it.", c.kind, c.at), vec![call("connection", args)]));
+                }
+            }
+            continue;
+        }
         let Some(home) = d.s("home") else { continue };
         let structure = crate::common::structure_of(home).to_string();
         let Some(node) = node_of(links, &structure) else { continue };
@@ -131,8 +145,15 @@ fn connect_steps<T>(book: &Book, me: &str, kinds: &[(&str, Option<&str>, Option<
             cache.insert(key);
             let rate = fixed.unwrap_or_else(|| d.i("rate").unwrap_or(0).max(0));
             let mut args = vec![("op", Some(arg("open"))), ("kind", Some(arg(kind))), ("node", Some(arg(&node))), ("to", Some(arg(&who))), ("at", Some(arg(&structure))), ("rate", Some(text(rate.to_string())))];
-            if let Some(u) = uses {
-                args.push(("uses", Some(arg(u))));
+            // (A workplace's: what comes is held there for its work to draw, kept up to the most it asks for, WM-15; a
+            // home's is used as it comes.)
+            match (fixed, d.i("up_to")) {
+                (None, Some(most)) => args.push(("up_to", Some(text(most.max(0).to_string())))),
+                _ => {
+                    if let Some(u) = uses {
+                        args.push(("uses", Some(arg(u))));
+                    }
+                }
             }
             out.push(because(format!("{who} asks to be supplied at {structure}: connecting their {kind}."), vec![call("connection", args)]));
         }
@@ -323,11 +344,13 @@ struct WaterWorks {
 }
 
 /// The customer roll as the corporation's papers show it, in the order they were made: each lot, its owner, and the
-/// buildings on it that hold dwellings.
+/// buildings on it (those that hold dwellings marked: a workplace's is billed only when its meter was read in the round,
+/// WM-15).
 struct Roll {
     owner: BTreeMap<String, String>,
     buildings: BTreeMap<String, BTreeSet<String>>,
     lot_of: BTreeMap<String, String>,
+    homes: BTreeSet<String>,
 }
 
 impl WaterWorks {
@@ -348,7 +371,7 @@ impl WaterWorks {
             }
         }
         papers.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
-        let mut roll = Roll { owner: BTreeMap::new(), buildings: BTreeMap::new(), lot_of: BTreeMap::new() };
+        let mut roll = Roll { owner: BTreeMap::new(), buildings: BTreeMap::new(), lot_of: BTreeMap::new(), homes: BTreeSet::new() };
         for r in papers {
             let d = data(r);
             let kind = crate::common::kind(r).unwrap_or("");
@@ -363,10 +386,12 @@ impl WaterWorks {
                     if let Some(o) = d.s("owner") {
                         roll.owner.insert(lot.to_string(), o.to_string());
                     }
+                    // (Every building on the lot: a home's, and a workplace's on the network, WM-15.)
                     for b in d.get("buildings").and_then(|x| x.as_array()).into_iter().flatten() {
-                        if b.get("dwellings").is_some_and(crate::common::truthy) {
-                            if let Some(s) = b.s("structure") {
-                                add(&mut roll, lot, s);
+                        if let Some(s) = b.s("structure") {
+                            add(&mut roll, lot, s);
+                            if b.get("dwellings").is_some_and(crate::common::truthy) {
+                                roll.homes.insert(s.to_string());
                             }
                         }
                     }
@@ -386,6 +411,7 @@ impl WaterWorks {
                         }
                     } else if let (Some(lot), Some(s)) = (d.s("lot"), d.s("structure")) {
                         add(&mut roll, lot, s);
+                        roll.homes.insert(s.to_string());
                     }
                 }
             }
@@ -451,7 +477,8 @@ impl Plan for WaterWorks {
                     continue;
                 }
                 let water: Vec<&oikos_sight::MeterView> = st.meters.iter().filter(|m| m.kind == "water").collect();
-                if st.complete && !st.spaces.iter().any(|s| s.kind == "dwelling") {
+                // (A building with nothing on the network to read: no home, no workplace, no meter.)
+                if st.complete && !st.spaces.iter().any(|s| s.kind == "dwelling" || s.kind == "workplace") && water.is_empty() {
                     none.push(st.structure.to_string());
                     continue;
                 }
@@ -569,8 +596,10 @@ impl Plan for WaterWorks {
                     }
                 }
             }
+            // (A building that is no home is a customer where it is connected: one with no supply has no service to charge for.)
+            let connected: BTreeSet<&str> = conns.iter().filter(|c| c.kind == "water" && !c.closed).map(|c| c.at.as_str()).collect();
             for (key, home, payer) in payers {
-                if unmetered.contains(&home) || billed.contains(&key) || payer == me {
+                if unmetered.contains(&home) || billed.contains(&key) || payer == me || (!roll.homes.contains(&home) && !connected.contains(home.as_str())) {
                     continue;
                 }
                 let read = readings.get(&key);
@@ -637,8 +666,11 @@ impl Plan for WaterWorks {
             self.gone_to = (begins, BTreeSet::new());
         }
         let gone = &self.gone_to.1;
+        // (The homes on the roll, and the other buildings it supplies: WM-15.)
+        let (conns, _) = network(pic);
+        let connected: BTreeSet<&str> = conns.iter().filter(|c| c.kind == "water" && !c.closed).map(|c| c.at.as_str()).collect();
         let to_read: Vec<String> = {
-            let mut v: Vec<String> = roll.lot_of.keys().filter(|h| !unmetered.contains(*h) && !gone.contains(*h) && readings.get(*h).is_none_or(|(_, at)| *at < begins)).cloned().collect();
+            let mut v: Vec<String> = roll.lot_of.keys().filter(|h| (roll.homes.contains(*h) || connected.contains(h.as_str())) && !unmetered.contains(*h) && !gone.contains(*h) && readings.get(*h).is_none_or(|(_, at)| *at < begins)).cloned().collect();
             v.sort();
             v.truncate(VISIT_MAX);
             v

@@ -135,6 +135,34 @@ fn the_reader_goes_to_the_meters_and_the_owner_is_billed_what_they_moved() {
     assert!(w.of("invoice").is_empty(), "{:?}", w.calls);
 }
 
+/// A workplace's supply (WM-15): asked for with the most it keeps, it is opened for its work to draw on (held there, no
+/// use as it comes), the sewer with it; once connected, the building is on the reader's round with the homes and its
+/// owner is billed what its meter moved. A building on the roll with no supply is neither gone to nor billed.
+#[test]
+fn a_workplace_that_asks_is_connected_for_its_work_and_once_connected_is_read_and_billed() {
+    let ask = st("rec.5", DAY, "supply_request", "shop-1", &["police"], json!({ "account": "acc-shop", "home": "shed-1/workplace.1", "kind": "water", "rate": 900, "up_to": 900 }));
+    let mut s = Driver::new(&Water, ctx(water_params()));
+    let w = s.wake(DAY + 6 * 3600, vec![ask], vec![("stock", stock(&[("works", "water", 100_000)], vec![], vec![link("pipe-shed-1", "n-d00", "n-shed-1", false)]))], &|_| false);
+    let opens = w.of("connection");
+    assert_eq!(opens.len(), 2, "{opens:?}");
+    assert!(opens.iter().any(|c| c.contains("n-shed-1") && c.contains("up_to") && c.contains("900") && !c.contains("use_water")), "{opens:?}");
+    let t0 = 71 * DAY + 6 * 3600;
+    let held = || stock(&[("works", "water", 100_000)], vec![conn("conn.9", "water", "shed-1", "shop-1", None)], vec![]);
+    let mut s = Driver::new(&Water, ctx(water_params()));
+    let w = s.wake(t0, roll(), vec![("stock", held())], &|_| false);
+    assert!(w.looks[0].to_string().contains("shed-1"), "{:?}", w.looks);
+    let cell = |n: u32, name: &str, space: &str, litres: i64| -> oikos_sight::SiteCell {
+        serde_json::from_value(json!({ "cell": format!("c{n}"), "x": n, "y": 0, "structure": { "structure": name, "type": "house", "at": format!("c{n}"), "w": 1, "h": 1, "complete": true,
+            "meters": [{ "connection": format!("conn.{n}"), "kind": "water", "reading": litres.to_string() }], "spaces": [{ "space": format!("{name}/{space}.1"), "kind": space, "capacity": 4, "count": 2 }] } })).unwrap()
+    };
+    let back = Seen::Sites { as_of: t0 + 3600, cells: Arc::new(vec![cell(1, "home-1", "dwelling", 40_000), cell(2, "home-2", "dwelling", 25_000), cell(3, "shed-1", "workplace", 7_000)]), visit: Some(oikos_sight::Visit { seen_at: Default::default(), fresh: vec!["c1".into(), "c2".into(), "c3".into()] }) };
+    s.wake(t0 + DAY, vec![], vec![("meters", back), ("stock", held())], &|_| false);
+    let w = s.wake(92 * DAY + 6 * 3600, vec![], vec![("books", accounts(10_000_000)), ("stock", held())], &|_| false);
+    let bills = w.of("invoice");
+    assert_eq!(bills.len(), 3, "{bills:?}");
+    assert!(bills.iter().any(|b| b.contains("shed-1") && b.contains("owner-1") && b.contains("7 kL")), "{bills:?}");
+}
+
 #[test]
 fn where_the_occupant_pays_each_connection_is_billed_to_its_user() {
     let mut p = water_params();

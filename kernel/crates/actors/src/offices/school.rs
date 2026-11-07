@@ -179,6 +179,7 @@ impl Kind for Principal {
             taught_day: -1,
             report_day: -1,
             telling: false,
+            supplied: Default::default(),
         })))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
@@ -206,6 +207,9 @@ struct School {
     taught_day: i64,
     report_day: i64,
     telling: bool,
+    /// Its utility bills paid (common::supply; WM-15).
+    #[serde(default)]
+    supplied: crate::common::supply::Supply,
 }
 
 impl School {
@@ -252,6 +256,11 @@ impl Plan for School {
                 ..Default::default()
             };
             steps.extend(self.staff.routine(pic, &self.book, cx, &self.p.account, &want));
+            // (The school's utility bills, after the teachers' wages it must keep for.)
+            if let Some(a) = crate::common::own_account(pic) {
+                let mut in_hand = a.balance - workers.len() as i64 * self.p.wage;
+                steps.extend(self.supplied.pay::<Then>(&self.book, &me, &a.account, &mut in_hand, cx));
+            }
         }
 
         // ---- the roll, from the school's own file ----

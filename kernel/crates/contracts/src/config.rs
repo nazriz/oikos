@@ -475,6 +475,13 @@ pub struct TaskCfg {
     /// is not taken, and nothing is made. What is left is seen by those who did it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collects: Option<Collects>,
+    /// What an hour of this work draws where it is done (law 8; a workplace's energy and water by the hour worked): a
+    /// recipe that takes no time (its `consumes`, `produces`, `emits`). The work's seconds, whoever does them, are added to
+    /// what the actor has not yet drawn for that recipe at that structure, and each whole hour of them is the recipe there:
+    /// its inputs from the actor's holding (the work is refused, `insufficient_quantity`, when they are not all held), its
+    /// outputs into it, its emissions to the world's counters. Absent: the work draws nothing by the hour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hour: Option<Id>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -2809,6 +2816,15 @@ pub fn validate(c: &Config) -> Result<(), String> {
         for v in t.changes.keys() {
             if !var_ids.contains(v.as_str()) {
                 return Err(format!("task {} changes unknown variable {v}", t.id));
+            }
+        }
+        // (An hour's recipe is a process that takes no time and acts on nothing but holdings and counters.)
+        if let Some(h) = &t.hour {
+            let ok = c.catalogue.tasks.iter().find(|x| &x.id == h).is_some_and(|x| {
+                x.labour == 0 && x.in_space.is_none() && x.hour.is_none() && x.changes.is_empty() && x.on_body.is_none() && x.collects.is_none() && x.draws.is_none() && !x.surveys && !x.investigates
+            });
+            if !ok {
+                return Err(format!("task {}: its hour {h} is a task of the world's that takes no time and only uses, makes and emits", t.id));
             }
         }
     }

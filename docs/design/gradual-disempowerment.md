@@ -11,8 +11,7 @@
   for sale (E3, first part), compute on the town's network with a local host (P4, E5), and the census of who can still
   do the work (M8). Phase 3 (law 9: bodies, goods and vehicles move along ways, with time, capacity and fuel). An
   optional learned citizen mind, and years at 10,000 people with tiered storage.
-- **Not built:** M7, what the town gives to AI (its share of energy, water, land and hours); every other workplace on
-  the network (WM-15); new premises built for a venture (the rest of E3); adoption that learns from performance
+- **Not built:** M7, what the town gives to AI (its share of energy, water, land and hours); offices' and buildings' own draw beside their work (WM-15); new premises built for a venture (the rest of E3); adoption that learns from performance
   (buyers still read the vendor's figures); know-how or data held by systems; new work for displaced people.
 - **Not decided:** the experiment itself. The owner's TARA proposal (`docs/north-star.md`) is the plan's north star; a
   study's definition, measures and preregistration are his to approve before anything is run.

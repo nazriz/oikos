@@ -37,7 +37,9 @@ in the town:
 - **The firm** (`firm.host`) does what a building's operator does: each day its plant (idle servers, cooling, lighting)
   uses what came in beyond what it keeps in hand for its clients' work (a day of full work: `plant-energy`,
   `plant-water`), and it pays the bills addressed to it (the retailer's from its meter, the water corporation's as the
-  owner of its lot) when its account covers them. Its income is its clients' fee: each provider pays it a month
+  owner of its lot) when its account covers them, as every workplace's operator does (`common::supply`, WM-15). (Until
+  2026-11-07 the water corporation's roll listed only buildings with homes, so the host's water was never billed: its roll
+  now lists every building it supplies, docs/behaviour/utilities.md, "Workplaces".) Its income is its clients' fee: each provider pays it a month
   (`hosting` in the provider's parameters), its power and water at full work at the place's tariffs with a margin,
   shared among them.
 - **So compute competes with homes on the same network.** It is one more large user on a feeder and the main: in a

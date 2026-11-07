@@ -73,6 +73,7 @@ const SAMPLES: any[] = [
   { block: "take", kind: "gravel", quantity: "40", from: "greenco", at: "str.7" },
   { block: "connection", op: "open", kind: "water", node: "n-str-7", to: "greenco", at: "str.7", rate: 400, uses: "use_water", meter: "remote", ref: "c" },
   { block: "connection", op: "set", connection: "conn.4", rate: 250 },
+  { block: "connection", op: "open", kind: "energy", node: "n-str-9", to: "greenco", at: "str.9", rate: 900, up_to: 900 },
   { block: "link", link: "wire-d00", op: "rotate", every: 7200, from: 3600, off: 3600 },
   { block: "link", link: "pipe-d01", op: "shut" },
 ];

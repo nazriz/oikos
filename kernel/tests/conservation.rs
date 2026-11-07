@@ -12,6 +12,9 @@
 //!   nature's edge (what nature's days have added and taken, `nature.edge`) changes only by what processes make and
 //!   use; a draw moves what it takes into the drawer's holding, so nothing is drawn into nothing.
 //!
+//! - **An hour of work's recipe** (`hour`, WM-15: a workplace's energy by the hour worked): what each whole hour of the
+//!   work's seconds draws is accounted for as a process's inputs and outputs, and what is left of an hour is kept.
+//!
 //! This generalises `goods.rs` (phase B) to fields (foundations-2 C1) and to fields that hold a kind (C2).
 
 use crate::common;
@@ -44,6 +47,18 @@ fn world_with_a_kind() -> Value {
     let mut c = world_with_fields();
     c["catalogue"]["resources"].as_array_mut().unwrap().push(json!({"id": "water", "unit": "L"}));
     c["catalogue"]["fields"][0]["kind"] = json!("water");
+    c
+}
+
+/// The test world with the shop's making drawing energy by the hour (WM-15): two kWh an hour of it, from the
+/// developer's holding at the shop, enough for some hours and not all.
+fn world_with_hours() -> Value {
+    let mut c = world(&default_params());
+    c["catalogue"]["resources"].as_array_mut().unwrap().push(json!({"id": "energy", "unit": "kWh", "class": "dissipates"}));
+    let tasks = c["catalogue"]["tasks"].as_array_mut().unwrap();
+    tasks.push(json!({"id": "make-hour", "labour": 0, "consumes": {"energy": "2"}}));
+    tasks[0]["hour"] = json!("make-hour");
+    c["world"]["holdings"].as_array_mut().unwrap().push(json!({"kind": "energy", "holder": "devco", "at": "s-shop", "quantity": "9"}));
     c
 }
 
@@ -125,12 +140,15 @@ fn check_run(config: Value, ops: &[COp]) -> Result<(usize, usize), TestCaseError
             COp::Spill(u) => work_cmd("spill", *u),
         };
         let day = nature_day(&run);
+        let metered = run.kernel().state().metered.clone();
         let Some(resp) = step(&mut run, &cmd) else { continue };
         let acting = resp.events.iter().find_map(|e| match &e.body {
             EventBody::ActionApplied { participant, position, .. } => run.kernel().state().acting_entity(participant, position.as_deref()),
             _ => None,
         });
         let mut field_change: BTreeMap<oikos_kernel::blocks::Id, i128> = BTreeMap::new();
+        // (Seconds of work toward an hour's recipe, by actor, structure and recipe: the hours drawn are what they add up to.)
+        let mut hour_secs: BTreeMap<(String, String), i64> = BTreeMap::new();
         for e in &resp.events {
             match &e.body {
                 EventBody::GoodsMoved { from, quantity, .. } => {
@@ -140,7 +158,10 @@ fn check_run(config: Value, ops: &[COp]) -> Result<(usize, usize), TestCaseError
                 }
                 // What work and construction account for: inputs used up, outputs made, materials built in; and what
                 // work drew from a field or emitted to one.
-                EventBody::Worked { task, units, .. } => {
+                EventBody::Worked { task, units, at, labour, .. } => {
+                    if let (Some(h), Some(who)) = (tasks.iter().find(|x| &x.id == task).and_then(|t| t.hour), acting.as_ref()) {
+                        *hour_secs.entry((format!("{who}@{at}/{h}"), h.to_string())).or_insert(0) += *labour;
+                    }
                     if let Some(t) = tasks.iter().find(|x| &x.id == task) {
                         for (k, per) in &t.consumes {
                             *expected.entry(k.to_string().into()).or_insert(0) -= per * *units as i128;
@@ -177,6 +198,21 @@ fn check_run(config: Value, ops: &[COp]) -> Result<(usize, usize), TestCaseError
             }
         }
         let st = run.kernel().state();
+        for ((key, h), secs) in &hour_secs {
+            let id: oikos_kernel::blocks::Id = key.as_str().into();
+            let before = metered.get(&id).copied().unwrap_or(0);
+            let after = st.metered.get(&id).copied().unwrap_or(0);
+            prop_assert!((0..3_600).contains(&after), "what is left of an hour is under an hour");
+            prop_assert_eq!((before + secs - after) % 3_600, 0, "whole hours drawn");
+            let hours = ((before + secs - after) / 3_600) as i128;
+            let r = tasks.iter().find(|x| x.id == h.as_str()).unwrap();
+            for (k, per) in &r.consumes {
+                *expected.entry(*k).or_insert(0) -= per * hours;
+            }
+            for (k, per) in &r.produces {
+                *expected.entry(*k).or_insert(0) += per * hours;
+            }
+        }
         let mut have = kind_totals(&run);
         for k in expected.keys() {
             have.entry(*k).or_insert(0);
@@ -209,6 +245,11 @@ proptest! {
     #[test]
     fn fields_change_only_by_what_work_draws_and_emits_and_by_nature(ops in proptest::collection::vec(cop_strategy(), 1..120)) {
         check_run(world_with_fields(), &ops)?;
+    }
+
+    #[test]
+    fn an_hour_of_work_draws_its_recipe_and_nothing_else(ops in proptest::collection::vec(op_strategy().prop_map(COp::Common), 1..120)) {
+        check_run(world_with_hours(), &ops)?;
     }
 
     #[test]

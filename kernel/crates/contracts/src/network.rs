@@ -127,6 +127,11 @@ pub struct ConnectionCfg {
     pub uses: Option<Id>,
     #[serde(default, skip_serializing_if = "is_on_site")]
     pub meter: MeterKind,
+    /// For what is held where it is delivered (no `uses`): the most its user keeps there. A connection asks at each
+    /// settle only what brings the holding up to it (within its rate), so what flows is what the user's processes used
+    /// since: a workplace's supply, drawn by its work (WM-15). Absent: its rate, whatever is held.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub up_to: Option<i64>,
 }
 
 fn is_zero(x: &i64) -> bool {
@@ -211,6 +216,9 @@ pub fn validate(c: &crate::config::Config) -> Result<(), String> {
         }
         if !(0..=MAX_FLOW).contains(&x.rate) {
             return Err(format!("connection {}: its rate is out of range", x.id));
+        }
+        if x.up_to.is_some_and(|m| !(0..=MAX_FLOW).contains(&m)) || (x.up_to.is_some() && x.uses.is_some()) {
+            return Err(format!("connection {}: the most kept is for what is held where it is delivered (no use), in range", x.id));
         }
         if let Some(u) = &x.uses {
             check_use(&tasks, &c.catalogue.fields.iter().map(|f| f.id.as_str()).collect(), u, &x.kind).map_err(|e| format!("connection {}: {e}", x.id))?;

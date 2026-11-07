@@ -716,6 +716,10 @@ impl Resolver<'_> {
             }
             None => {}
         }
+        // (For what is held where it is delivered: the most its user keeps there.)
+        if let Some(r) = Self::str_(c, "up_to")?.filter(|r| !r.is_empty() && r.bytes().all(|x| x.is_ascii_digit())) {
+            b.insert("up_to".into(), json!(r.parse::<i64>().unwrap_or(0)));
+        }
         if op == "set" && !b.contains_key("rate") {
             return ask("Set it to what rate (a day)?");
         }

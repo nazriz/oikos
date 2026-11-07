@@ -105,7 +105,10 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
 // f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "11d0adcb2cc58805", "gb-eng-2026": "164ec86f450d00fd", "ke-nakuru-2026": "d8227b3453991a6d" }
+  // (Re-taken on 2026-11-07 at WM-15: workplaces on the network, each recipe at one drawing its industry's hour from its
+  // operator's connections kept up to what it used, bills paid, effluent put back in the river; 11d0adcb..., 164ec86f...,
+  // d8227b34... until then.)
+  ? { "au-vic-2026": "6123ac0b95baa1f0", "gb-eng-2026": "e310a1272074024a", "ke-nakuru-2026": "fd53b87fa06eb55e" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -180,10 +183,11 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // configs and b1dc744d..., b5195599..., 4b97669f... for the states, until then. The states re-taken again on the tree merged
 // with main at 3fc51b7d (main's trips, retail, environment office and refounding fixes under it; the configs did not move);
 // main's d8300873..., e9564040..., 7bf5ae46..., until then.)
+// (Re-taken on 2026-11-07 at WM-15, as the configs above; 2ee01f8c..., 7abe89a6..., 4be8a863... until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "2ee01f8cdce8e6f74911c3a1ff820261d0050085f42f168c77eafb501f1aca41",
-  "gb-eng-2026": "7abe89a675509eecf7145d184f3c5e689093a8b28e27a2dccea96e777030ddb3",
-  "ke-nakuru-2026": "4be8a863712a0d67f0c692657024b7a4e282674d39431d0db3199c5e9a8b7dd2",
+  "au-vic-2026": "1895f02c0fa9fc1c99621394b4b32edeba7309a1f93ff20424243cd8a1f6b20f",
+  "gb-eng-2026": "402f7523b185099564ea106cd303bc2862a8f4f6f767cacd3ed8c3bff5df9639",
+  "ke-nakuru-2026": "3a1ff10ca4df6eb93265bf430be66e695b15b9cf94dc01c353b1106f5aaa37a7",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

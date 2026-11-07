@@ -10,7 +10,7 @@ export const INVENTORY = join(import.meta.dir, "../fixtures/foundations-2-invent
 /** Where the engine's behaviour is written: the Rust world's actors, its rules and the world's physics, and what of the town's kinds is still read in TypeScript. */
 export const SOURCES = ["kernel/crates/actors/src", "kernel/crates/rules/src", "kernel/crates/world/src", "participants/src/kinds", "participants/src/shared", "participants/src/readers"];
 
-export type Task = { id: string; in?: string; labour?: number; consumes?: Record<string, string>; produces?: Record<string, string>; changes?: Record<string, number>; draws?: { field: string; per_unit: number }; emits?: Record<string, number>; on_body?: unknown; surveys?: boolean; investigates?: boolean };
+export type Task = { id: string; in?: string; hour?: string; labour?: number; consumes?: Record<string, string>; produces?: Record<string, string>; changes?: Record<string, number>; draws?: { field: string; per_unit: number }; emits?: Record<string, number>; on_body?: unknown; surveys?: boolean; investigates?: boolean };
 type Resource = { id: string; unit: string; class?: "stock" | "dissipates" | "service" };
 
 /** Every module's parameters in a world: each post's role module, and each participant's controller. */
@@ -76,15 +76,26 @@ export function orphanKinds(c: any): string[] {
   return out;
 }
 
-/** Every recipe at a workplace states its energy and water (nought is allowed, with its basis in the figure table; silence is not). Names the recipe. */
+/** Every recipe at a workplace states its energy and water (nought is allowed, with its basis in the figure table; silence is not);
+ * and where the world's workplaces are on its network (WM-15), each draws them, a unit or by the hour worked. Names the recipe. */
 export function silentRecipes(c: any): string[] {
   const kinds = new Set<string>((c.catalogue.resources ?? []).map((r: Resource) => r.id));
+  const supplied = (c.world?.connections ?? []).some((x: any) => x.up_to !== undefined);
   const out: string[] = [];
   for (const t of (c.catalogue.tasks ?? []) as Task[]) {
     if (t.in !== "workplace") continue;
     const says = (k: string) => Object.prototype.hasOwnProperty.call(t.consumes ?? {}, k);
     const missing = ["energy", "water"].filter((k) => !says(k));
     if (missing.length) out.push(`${t.id}: states no ${missing.join(" and no ")}${missing.some((k) => !kinds.has(k)) ? " (the world has no such kind)" : ""}`);
+    // (Where the world's workplaces are supplied over its network, WM-15, a recipe there draws what its work uses: a unit's
+    // own, or by the hour worked, `hour`; one that draws nothing at all is a recipe whose work costs nothing physical.)
+    if (!supplied || missing.length) continue;
+    const hour = t.hour === undefined ? undefined : (c.catalogue.tasks as Task[]).find((x) => x.id === t.hour);
+    if (t.hour !== undefined && !hour) { out.push(`${t.id}: its hour ${t.hour} is no recipe of the world's`); continue; }
+    const draws = (x?: Task) => ["energy", "water"].filter((k) => Number(x?.consumes?.[k] ?? 0) > 0);
+    const drawn = new Set([...draws(t), ...draws(hour)]);
+    const none = ["energy", "water"].filter((k) => !drawn.has(k));
+    if (none.length) out.push(`${t.id}: draws no ${none.join(" and no ")}, a unit or by the hour, though the world's workplaces are on its network`);
   }
   return out;
 }

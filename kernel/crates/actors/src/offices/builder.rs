@@ -278,6 +278,9 @@ struct Firm {
   /// How long the crew's trips to each site took, from its own records (law 9): a day's work is sized with them.
   #[serde(default)]
   trips: crate::common::trips::Trips,
+  /// Its yard's utility bills paid (common::supply; WM-15).
+  #[serde(default)]
+  supplied: crate::common::supply::Supply,
 }
 
 fn ceil_div(a: i128, b: i128) -> i128 {
@@ -312,7 +315,7 @@ impl Firm {
             p, book: Book::new(), staff, dues: WindingUp::new(me, WindingParams { short_days: 0, wind_up_days: 0, idle_days: 0, reprice_days: 0, reprice_bps: 0 }), takings: Takings::default(), bargaining: Bargaining::new(me), letters: Letters::default(), asked: Asked::default(), plans_out: BTreeSet::new(), no_plan: BTreeSet::new(),
             in_flight: BTreeSet::new(), ordering: vec![], publishing: None, begun: BTreeSet::new(), paying: BTreeSet::new(),
             projects: vec![], over: BTreeSet::new(), finished: BTreeSet::new(), seen_type: BTreeMap::new(), repairs: vec![], dealt: BTreeSet::new(),
-            paid_in: BTreeMap::new(), spoken_for: BTreeMap::new(), used: BTreeMap::new(), used_day: -1, trips: Default::default(),
+            paid_in: BTreeMap::new(), spoken_for: BTreeMap::new(), used: BTreeMap::new(), used_day: -1, trips: Default::default(), supplied: Default::default(),
         }
     }
 
@@ -510,6 +513,9 @@ impl Plan for Firm {
         let crew_now = self.staff.workers(&self.book, t);
         let keep = crew_now.len() as i64 * wage;
         steps.extend(self.pay_debts(&acc.account, acc.balance, keep, cx));
+        // (Its yard's utility bills, after the crew's wages it must keep for.)
+        let mut in_hand = acc.balance - keep;
+        steps.extend(self.supplied.pay::<Then>(&self.book, &me, &acc.account, &mut in_hand, cx));
 
         // What stands on the ground, as it is shown.
         let cells = sites_cells(pic);

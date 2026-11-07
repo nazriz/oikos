@@ -66,6 +66,7 @@ impl Kind for Practice {
             used: BTreeMap::new(),
             used_day: -1,
             report_day: -1,
+            supplied: Default::default(),
         })))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
@@ -155,6 +156,9 @@ struct Clinic {
     used: BTreeMap<String, i64>,
     used_day: i64,
     report_day: i64,
+    /// Its utility bills paid (common::supply; WM-15).
+    #[serde(default)]
+    supplied: crate::common::supply::Supply,
 }
 
 impl Clinic {
@@ -203,6 +207,14 @@ impl Plan for Clinic {
             &[Routine { task: &self.p.treat_task, at: &self.p.building, every: DAY, why: "Setting the doctors' work: those waiting are seen each working day, as a standing work order." }],
         );
         // Who has asked for care, in the order they asked.
+        // (The practice's utility bills, paid by its manager when its account covers them.)
+        if self.p.part != "staff" {
+            if let Some(a) = crate::common::own_account(pic) {
+                let mut in_hand = a.balance;
+                let me = self.me.clone();
+                steps.extend(self.supplied.pay::<Seen_>(&self.book, &me, &a.account, &mut in_hand, cx));
+            }
+        }
         let mut asked: Vec<Waiting> = self
             .book
             .open("care_request")
@@ -360,6 +372,7 @@ mod tests {
             used: BTreeMap::new(),
             used_day: -1,
             report_day: -1,
+            supplied: Default::default(),
         }
     }
 

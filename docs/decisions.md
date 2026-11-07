@@ -11071,3 +11071,60 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
   a model trained on it does worse on validation-real's 2-form rows than v3's (the draw may under-weight them); or the
   name-and-office word rule turns out to leave real near-distractors out of form rows too often (it is strict on
   purpose).
+
+## 2026-11-07 · Workplaces on the network: every recipe at a workplace draws its energy and water by the hour worked, from supply kept up to what it used, billed and paid as a household's (risk WM-15; branch `wm15-workplaces`; generator 0.77.0; no model called)
+
+- **What it was:** only homes and the data centre drew on the town's networks; every recipe at a workplace stated nought
+  energy and water (foundations-2 C5's stop short). A cloud session had begun it and stopped on three blockers, each
+  resolved here by a law rather than a patch.
+- **Blocker 1, units: drawn by the hour worked, not the unit made.** Energy is held in whole kWh and a shop's serving of
+  an item is minutes: its share of a kWh is no whole number, and an energy account gives use by industry, not by a
+  generator's unit of output. So a task may name an `hour` (contract, kernel): a recipe that takes no time; the work's
+  seconds, whoever does them, accrue at `<actor>@<structure>/<recipe>` (state `metered`, as a hosted system's do), and
+  each whole hour draws the recipe there, refused `insufficient_quantity` when not held. The figures are the profile's
+  `utilities.workplace`, kWh and litres a person-hour worked by industry (an industry's use over its hours worked; au-vic
+  recalled, to confirm; the other eight profiles au-vic's, marked placeholders). Every workplace recipe names its
+  industry's hour; its per-unit figure stays a stated nought with that basis. The backstop's `silentRecipes` now names a
+  workplace recipe that draws nothing, a unit or by the hour, where the world's workplaces are supplied.
+- **Blocker 2, unpaid energy piling up: what flows is what was used.** A connection at a fixed rate into a holding
+  delivers it whatever the work uses, so it piles up and is billed (the host answers this with a plant that burns the
+  rest, right for idle servers, wrong for a shop). A connection may now keep a most (`up_to`, contract, kernel): it asks at
+  each settle only what brings the holding back up to it, so the meter, and the bill, is what the work drew, and a shortage
+  (a feeder shut, tripped or rotated, a main without head) reaches the workplace when what it holds runs out. The most
+  and the rate are two days of the building's draw at full work (the generator's `WORK_SUPPLY_DAYS`, a design margin: work
+  draws when it is done, and water settles once a day; with one day, a factory's day's work was refused for the hour the
+  network settled). A shop or factory reads its own meters each day, and where two days of its busiest day are more than
+  its supply carries (its systems draw there by the hour as its people do, and its days are uneven), it asks its
+  supplier for that (`supply_request` naming its connection); the operator sets it, its own act (`connection` `set` may
+  carry `up_to`). Not the firm's own `connection` act: a seat's call language has no `connection` yet (TR-7), and a seated
+  manager's twin failed on it; a business asking its utility for a larger supply is also what happens.
+- **Blocker 3, bills: a shared path, done by whoever bills and pays.** `common::supply` (Rust) is the one helper: a
+  building's operator asks for its supply where it has none (`supply_request` with the rate and the most; the supplier
+  opens it with `up_to`, its own act and time), asks for it to be stopped where it no longer works, and pays each utility
+  bill addressed to it, oldest first, when what is in hand covers it (a payment act, its payer's time). It is used by the
+  factory's and the shop's manager (after the wages they keep for), the builder's foreman, the practice manager, the
+  principal, the officer in charge and the host (whose own loop it replaces); the town's finance officer already paid the
+  town's invoices within its budget. The water corporation's roll lists every building on a lot (and the town's lots,
+  which the valuer's does not) and reads and bills the ones it supplies; a building it does not supply is neither gone to
+  nor billed. (So the host's water is billed now; it never was.)
+- **Mechanisms beside it:** a firm's cost of making or serving a unit includes its hours' energy and water at the place's
+  tariffs (`supply.cost_per_hour`, what the price rule reads as marginal cost), and a founder weighs it in a venture's
+  prospect; the clinic's, school's and police's grants include their buildings' bills a year at their staff at the start.
+- **What it does to a town** (town-1000, one year, one run against the same town with the workplaces' draw taken out:
+  directional only, `oikos diff`): the ten factories' energy bills came to about $2.07 million in the year and their
+  water $0.27 million (about 15 kWh and 200 L an hour worked at the household tariff), the thirty shops' $0.26 million and
+  $0.01 million; nine bills in ten paid within the run, the clinic's mostly not (its account was short before this, as
+  its water bills show in the baseline); the firms asked for a larger supply 44 times, by their meters; no work was refused for
+  want of supply once they did (before, one factory's day's work was refused 545 times, its 2 days' sizing outrun by its
+  work). Units made fell about a quarter (1,697 against 2,316), one factory closed in each, unemployment rose from 0.4%
+  to 1.8% and households saving fell: the firms' new costs, one run each. A hazard test found the other consequence:
+  the treated effluent the works put on its own ground flooded it once the workplaces' water reached the sewer, so what is
+  put back of a kind a field holds now goes where a draw would come from (the cell around with the most of it: the river),
+  an outfall; pollution still goes on the corner cell. Not tuned back: the figures are the profile's, to confirm.
+- **Re-taken, with this reason:** culture-dial's dial-off configs and states (three profiles), and the representation
+  pins (`scripts/fixtures/representation-results.json`, six towns, in a commit of their own). Every generated town's state
+  moves with this change.
+- **Revisit if:** an energy or water account by industry is opened for a profile (then its figures, and the
+  placeholders go); an experiment on public bodies' costs (then offices' and buildings' own plant, WM-15); a business
+  tariff is sourced; a firm's rate-setting from its meter turns out to chase its own systems' growth without bound, or two
+  days' margin to trip feeders in a grown town (then the operator's reinforcement, a builder's work).
