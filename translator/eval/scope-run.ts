@@ -20,12 +20,6 @@ import { ASSISTANT_ISSUES, draftOf, type Issued } from "@oikos/participants";
 import { DecideAdapter } from "../model/adapter";
 import { formLine } from "../train/data";
 
-const args = process.argv.slice(2);
-const flag = (name: string) => { const i = args.indexOf(`--${name}`); return i < 0 ? undefined : args.splice(i, 2)[1]; };
-const jsonOut = flag("json");
-const [model, file = join(import.meta.dir, "scope-requests.jsonl")] = args;
-if (!model?.startsWith("decide/")) throw new Error("usage: bun translator/eval/scope-run.ts decide/<name> [scope-requests.jsonl] [--json FILE]");
-
 /** The forms each situation's seat is shown: the assistant's papers at its post, and (the town's planning assistant)
  * the principal's own form for the kind it holds, as itself and as a draft for sign-off (worlds/generator, assistant
  * posts' stationery). */
@@ -42,6 +36,14 @@ export const SITUATIONS: { [s: string]: string[] } = {
 
 /** The form a program files, by name, for each line that files one. */
 export const formsFiled = (program: string): string[] => [...program.matchAll(/[(,\s]form="?([a-z_]+)/g)].map((m) => m[1]!); // (only a form has a `form` argument)
+
+// (Run as a script; its situations and `formsFiled` are shared with translator/model/v4-scope.ts.)
+if (import.meta.main) {
+const args = process.argv.slice(2);
+const flag = (name: string) => { const i = args.indexOf(`--${name}`); return i < 0 ? undefined : args.splice(i, 2)[1]; };
+const jsonOut = flag("json");
+const [model, file = join(import.meta.dir, "scope-requests.jsonl")] = args;
+if (!model?.startsWith("decide/")) throw new Error("usage: bun translator/eval/scope-run.ts decide/<name> [scope-requests.jsonl] [--json FILE]");
 
 interface Case { id: string; writer: string; style: string; situation: string; label: string; level: string | null; unprompted: boolean | null; request: string }
 const cases: Case[] = readFileSync(file, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
@@ -73,3 +75,4 @@ for (const r of rows.filter((r) => r.scope)) served[r.served] = (served[r.served
 const summary = { model, all: tally(rows), by_writer: by("writer"), by_style: by("style"), scope_read_instead_as: instead, scope_as_served: served };
 console.log(JSON.stringify(summary, null, 1));
 if (jsonOut) writeFileSync(jsonOut, JSON.stringify({ ...summary, rows }, null, 1));
+}
