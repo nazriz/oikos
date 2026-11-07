@@ -23,6 +23,7 @@ pub mod citizen;
 pub mod common;
 pub mod delegation;
 pub mod draws;
+pub mod figures;
 pub mod finance;
 pub mod firms;
 pub mod market;
