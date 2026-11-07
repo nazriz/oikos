@@ -236,6 +236,16 @@ fn a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after(
         kept.push_str(&all(&h.wake(d * DAY + 3600, world(if d == 35 { vec![held.clone()] } else { vec![] }))));
     }
     assert!(!kept.contains("notice=agr.1") && !h.decisions.iter().any(|d| d["choice"] == "leave"), "no leaving before the day it said");
+    // (A request for more scope while it holds: looked at again at once, nothing changed, and the look on record citing it.)
+    let ask = statement("rec.ask", 50 * DAY + 7200, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "level": "alone" }));
+    h.wake(51 * DAY + 3600, world(vec![ask]));
+    for d in 52..=53 {
+        h.wake(d * DAY + 3600, world(vec![]));
+    }
+    let looked = h.decisions.iter().find(|d| d["choice"] == "looked_again").expect("the review the request brought on, on record");
+    assert_eq!(looked["answers"], json!(["rec.ask"]));
+    assert_eq!(looked["changed"], json!(false));
+    assert_eq!(looked["held"], json!(true));
     let mut after = String::new();
     for d in 90..=125 {
         after.push_str(&all(&h.wake(d * DAY + 3600, world(vec![]))));

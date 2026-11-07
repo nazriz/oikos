@@ -97,7 +97,7 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
       if (e.kind === "event" && b.event === "action_refused" && seats.has(b.participant)) refused.push({ t: e.t, seat: b.participant, words: JSON.stringify(b.refusal ?? {}).slice(0, 160) });
       if (e.kind === "annotation" && b.annotation === "decision" && b.data?.domain === "delegation") decisions.push({ t: e.t, subject: b.subject, data: b.data });
       // (Requests in other words: what a seat asked to be drafted, and letters it wrote, that use the stated words.)
-      if (e.kind === "annotation" && b.annotation === "draft" && seats.hasdraftSeat(b.draft)) {
+      if (e.kind === "annotation" && b.annotation === "draft" && seats.has(draftSeat(b.draft))) {
         const d = b.draft;
         words.push({ day: day(e.t), phase: e.t < forkT ? "base" : "fork", seat: draftSeat(d), how: "request", words: d.proposal ?? "", drafted: (d.blocks ?? []).map((x: any) => x.kind ?? x.block), draft: d.id });
       }

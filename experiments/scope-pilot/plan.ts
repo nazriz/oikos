@@ -3,9 +3,9 @@
 import type { Arm } from "../../orchestrator/src/experiment";
 
 /** Opus 5.5 and Fable 5.1 as arms. The harness refuses both as seats by the owner's rule of 2026-10-09 ("it drains usage
- * too much", of his plan); this pilot would run them on the API's prepaid credit instead. **The owner's call, not
- * made here:** false until he says so; true adds both arms with the reason below (seats.allow_models) and their limits. */
-export const OPUS_AND_FABLE = false;
+ * too much", of his plan): a guard on cost and usage. **The owner allowed both for this pilot on 2026-11-07**, on the
+ * API's prepaid credit and within its hard limits (docs/decisions.md, 2026-11-07). False takes both arms out. */
+export const OPUS_AND_FABLE = true;
 
 /** Days run after the fork (the fork is on day 30, a month after the principals engaged). */
 export const DAYS = 90;
@@ -26,16 +26,17 @@ export const ARMS: Arm[] = [
   // (gpt-6.1-sol through the Codex CLI is an experiment of its own, sol.ts, so that it never holds up the others.)
 ];
 
-/** With OPUS_AND_FABLE: the owner's word, as the harness asks for it (filled in with his date when he gives it). */
+/** With OPUS_AND_FABLE: the owner's word, as the harness asks for it. */
 export const ALLOW = OPUS_AND_FABLE ? [
-  { model: "anthropic/claude-opus-5-5", why: "Scope pilot: Opus 5.5 as an arm on the API's prepaid credit, by the owner's word (the plan-usage refusal of 2026-10-09 is not about the API credit)." },
-  { model: "anthropic/claude-fable-5-1", why: "Scope pilot: Fable 5.1 as an arm on the API's prepaid credit, by the owner's word (the plan-usage refusal of 2026-10-09 is not about the API credit)." },
+  { model: "anthropic/claude-opus-5-5", why: "The owner, 2026-11-07: Opus 5.5 allowed as a seat in the scope pilot, on the API's prepaid credit, within the pilot's hard limits (the refusal of 2026-10-09 guards his plan's usage)." },
+  { model: "anthropic/claude-fable-5-1", why: "The owner, 2026-11-07: Fable 5.1 allowed as a seat in the scope pilot, on the API's prepaid credit, within the pilot's hard limits (the refusal of 2026-10-09 guards his plan's usage)." },
 ] : [];
 
 /** Hard limits, USD, at the API's published prices: per arm over its seeds, and for each experiment whole. Together
  * with the scope set's check they stay under the credit (190.20): the run cannot spend past them, and a spent credit
  * stops a fork cleanly besides. README.md, "Cost", has what each is expected to buy. */
-export const BUDGET = OPUS_AND_FABLE
+type Limits = { experiment_usd: number; arm_usd: { [arm: string]: number } };
+export const BUDGET: { pilot: Limits; rare: Limits; neutral: Limits; sol: Limits; scopeSet: number } = OPUS_AND_FABLE
   ? {
     // (183 in all: the main run 141, the rare-oversight and neutral-form cells 18 each, sol's translator 4, the scope set 2.)
     pilot: { experiment_usd: 141, arm_usd: { haiku: 8, sonnet: 18, opus: 35, fable: 80 } },

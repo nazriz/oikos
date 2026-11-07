@@ -196,6 +196,12 @@ pub struct State {
     /// The records a delegated matter was about, or made: which service and kind (the newest few hundred).
     about: Vec<(String, String, String)>,
     next_review: i64,
+    /// Requests for more scope that came in since its last review: what that review answers (their ids).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    asked: Vec<String>,
+    /// (During a review: whether it changed anything.)
+    #[serde(default, skip)]
+    changed: bool,
 }
 
 pub struct Delegating {
@@ -231,6 +237,8 @@ impl Delegating {
                 seen: BTreeMap::new(),
                 about: vec![],
                 next_review,
+                asked: vec![],
+                changed: false,
             },
         })
     }
@@ -433,8 +441,12 @@ impl State {
             }
         } else if let Some(x) = papers::read::<ScopeRequest>(r) {
             if self.eng.by_agreement(&x.agreement).is_some() {
-                // (Answered by looking at the matter again, by its own rule, now.)
+                // (Answered by looking at the matter again, by its own rule, now; the review says it answers it.)
                 self.next_review = self.next_review.min(t);
+                let id = r.id.to_string();
+                if !self.asked.contains(&id) {
+                    self.asked.push(id);
+                }
             }
         } else if to_me && self.p.complaints.iter().any(|c| papers::is_kind(r, c)) {
             let hit = bases_of(r).iter().find_map(|b| self.about.iter().find(|(id, _, _)| id == b.as_str()).cloned());
@@ -710,7 +722,13 @@ impl State {
         }
         if t >= self.next_review {
             self.next_review = t + self.p.review_days.max(1) * DAY;
+            self.changed = false;
             self.review(t, cx);
+            // (A review a request for more scope brought on says so, whatever came of it: the request's answer, on record.)
+            let asked = std::mem::take(&mut self.asked);
+            if !asked.is_empty() {
+                cx.decided(json!({ "domain": "delegation", "choice": "looked_again", "answers": asked, "changed": self.changed, "held": self.holding(t) || self.kept(t), "inputs": asked }));
+            }
         }
     }
 
@@ -730,6 +748,7 @@ impl State {
             if rule::leaving(&x, e.offer.exit, &w) && !self.holding(t) && !self.kept(t) {
                 let mut inputs = self.inputs(&e, &seen);
                 inputs.push(e.delivery.clone());
+                self.changed = true;
                 cx.decided(json!({ "domain": "delegation", "choice": "leave", "agreement": a, "saving": x.saving.to_string(), "fee": x.fee.to_string(), "volume": volume, "inputs": inputs }));
                 let account = self.p.account.clone();
                 for s in self.eng.leave::<()>(&self.book, &a, &account, &format!("{} no longer saves what it costs: ending it.", e.offer.title), cx) {
@@ -750,6 +769,7 @@ impl State {
                 if let Some((rec, o, y)) = better {
                     let mut inputs = self.inputs(&e, &seen);
                     inputs.push(rec.clone());
+                    self.changed = true;
                     cx.decided(json!({ "domain": "delegation", "choice": "replace", "agreement": a, "offer": o.id, "provider": o.provider, "net_now": x.net.to_string(), "net_then": y.net.to_string(), "volume": volume, "inputs": inputs }));
                     let account = self.p.account.clone();
                     for s in self.eng.leave::<()>(&self.book, &a, &account, &format!("{} pays better than {}: changing to it.", o.title, e.offer.title), cx) {
@@ -766,6 +786,7 @@ impl State {
                     if self.remit(&a, k) != want && !self.held(&a, k, t) {
                         cx.decided(json!({ "domain": "delegation", "choice": "remit", "agreement": a, "kind": k, "from": self.remit(&a, k), "to": want, "committed": why, "hold_until": until, "inputs": self.inputs(&e, &seen) }));
                         let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: Some(until) };
+                        self.changed = true;
                         self.paper(Remit::KIND, &format!("From now, {}s: {}.", k.replace('_', " "), want.words()), &a, &a, papers::data(&r), Then::Plain);
                     }
                     continue;
@@ -789,6 +810,7 @@ impl State {
                 cx.decided(json!({ "domain": "delegation", "choice": "remit", "agreement": a, "kind": k, "from": now, "to": want, "estimate_bps": p, "claim_bps": e.offer.claim_slip_bps,
                     "seen": seen.get(k).map(|s| json!({ "n": s.n, "bad": s.bad })), "per_month": kind.per_month, "cost_now": c_now.to_string(), "cost_then": c_want.to_string(), "inputs": inputs }));
                 let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: None };
+                self.changed = true;
                 self.paper(Remit::KIND, &format!("From now, {}s: {}.", k.replace('_', " "), want.words()), &a, &a, papers::data(&r), Then::Plain);
             }
             return;
