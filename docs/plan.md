@@ -105,8 +105,9 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] Law 12: L1 to L3, `oikos flags`, the backstop, the nightly flags (docs/flags.md). Holdings left to a replay dump.
   - [x] Law 11, N3: a generated world with an unbased number is not run (at the loader, not the kernel: decisions,
     "Foundations-2 phase 5: law 11 strict"); the old list of unbased places gone.
-  - [ ] Law 11: N4 (the code's figures in registries, the lint's inventory to nought), N5 (reach tallies), N6 (`oikos
-    reliance`).
+  - [~] Law 11, N4: the lint and its inventory (1,623 literals in 97 files, shrinking), the registries made; to nought
+    still to do.
+  - [ ] Law 11: N5 (reach tallies), N6 (`oikos reliance`).
   - [ ] The hard-rule lines for laws 9, 11 and 12, to the owner first.
 - [ ] **Market power in prices** (ME-16), after phase 4.
 - [ ] **Translator rebuild,** once forms settle: about the current size, writing an act constrained by the form's

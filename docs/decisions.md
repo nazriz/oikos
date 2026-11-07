@@ -11386,3 +11386,23 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
 - **Revisit if:** a run is refused for a figure of a spec flag no test town covers (give it its row: the error names
   it); configs are handed to the kernel by anything but the loader (then the table goes into the config, as designed);
   N5's reach tallies need the class of each charged row in the kernel.
+
+## 2026-11-08 · Foundations-2 phase 5: law 11 in the code, the lint and its inventory (N4, first part; branch `f2-phase5-n4`)
+
+- **What:** `orchestrator/test/every-number-has-a-basis.test.ts` (fast) counts, by file, the literal numbers the engine's
+  actors and rules (`kernel/crates/actors`, `kernel/crates/rules`) and the generator compute with that are not
+  conventions (small counts, the units of time, basis points and percent, stated once in `test/lib/law11.ts` with their
+  reason); comments, strings, a template's text and tests are not read (a scanner, so a template's `${...}` is code). The
+  inventory (`fixtures/code-figures-inventory.json`) holds today's: 1,623 in 97 files, most of them the citizen's mind
+  (`mind/citizen.rs` 136, `inner.rs`, `plan.rs`, `founding.rs`, `voice.rs`, `culture.rs`, `person.rs`, `model.rs`, about
+  700 together) and the generator (`generate.ts` 213). A file with more fails (a new figure goes into a registry or a
+  parameter); a file with fewer fails until its count is lowered, so each move is said. The registries
+  (`kernel/crates/actors/src/figures.rs`, `worlds/generator/registry.ts`) are made, empty; a figure in them must say its
+  class first in its comment.
+- **Not done: the inventory to nought.** Each of the 1,623 needs its own reading (a convention, a parameter with its
+  manifest note, or a registered figure with its class and source), and most of the mind's are coefficients of the
+  decision law with no source but the design (placeholders by the owner's word, or fitted). That is days of reading, not
+  a mechanism, and it moves no result; it is left as the step-by-step work the design names, the counts saying where.
+- **Revisit if:** a literal the lint calls a figure is a convention it does not know (add it to the conventions with its
+  reason, never to pass); the counts stop shrinking (then it is a checkpoint with the owner on what the mind's
+  coefficients are).
