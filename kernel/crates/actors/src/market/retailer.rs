@@ -120,6 +120,9 @@ pub struct Params {
     /// looks at none (a world with no vendor).
     #[serde(default)]
     pub automation: Option<AdoptionParams>,
+    /// Its premises' supply (WM-15): whom it asks for water and energy, and what its premises draw a day at full work.
+    #[serde(default)]
+    pub supply: crate::common::supply::SupplyParams,
     pub lengnick: Lengnick,
     pub figures: PriceFigures,
     /// How its restocking is spread across its suppliers (sourcing.rs).
@@ -182,6 +185,7 @@ impl Params {
                 bank: ctx.param("bank", String::new())?,
             },
             automation: params_from(&ctx.params.get("automation").map(Frozen::to_value).unwrap_or(Value::Null))?,
+            supply: ctx.param("supply", Default::default())?,
             lengnick: Lengnick::read(ctx)?,
             figures: PriceFigures::read(ctx)?,
             sourcing: SourcingFigures::read(ctx)?,
@@ -400,6 +404,9 @@ pub struct Shop<B: Body> {
     /// says what was ordered, and the price we charged for what it bought.
     #[serde(default)]
     repriced: BTreeMap<String, i64>,
+    /// Its premises' supply asked for, and its utility bills paid (common::supply; WM-15).
+    #[serde(default)]
+    supplied: crate::common::supply::Supply,
 }
 
 impl<B: Body> Shop<B> {
@@ -460,6 +467,7 @@ impl<B: Body> Shop<B> {
             account_now: None,
             over_paid: BTreeMap::new(),
             repriced: BTreeMap::new(),
+            supplied: Default::default(),
             body,
             book: Book::new(),
             p,
@@ -1307,7 +1315,8 @@ impl<B: Body> Shop<B> {
             }
         }
         // (What serving costs a unit: its hours at the wage, and where systems do some, their fees spread over the units they do.)
-        let labour_cost = (self.p.hourly(self.wage) * self.p.serve_labour + 3599).div_euclid(3600);
+        // (And its hours' energy and water, at the tariffs: WM-15.)
+        let labour_cost = (self.p.hourly(self.wage) * self.p.serve_labour + 3599).div_euclid(3600) + self.p.supply.cost_of(self.p.serve_labour);
         let by_us = self.system_units(self.last_demand);
         let marginal_cost = self.unit_cost
             + if by_us > 0 && self.last_demand > 0 { ((self.last_demand - by_us) * labour_cost + self.fleet_fees() + self.last_demand - 1).div_euclid(self.last_demand) } else { labour_cost };
@@ -1553,6 +1562,12 @@ impl<B: Body> Shop<B> {
         if was_trading {
             let keep = (workers.len() as i64).max(self.headcount) * self.wage;
             steps.extend(self.payables.pay::<Then>(t, &acct.account, acct.balance, keep, None, false, cx));
+            // (The supply of the premises it serves in, where it serves in a workplace (a business of one at home sells from
+            // the household's own), and its utility bills, after the wages it must keep for.)
+            let serving = (!self.at.nowhere && !self.at.gone && !self.at.closed && self.at.workplace.contains("/workplace.")).then_some(self.at.workplace.as_str());
+            steps.extend(self.supplied.ask::<Then>(pic, &me, serving, &acct.account, &self.p.supply));
+            let mut in_hand = acct.balance - self.payables.pending(t) - keep;
+            steps.extend(self.supplied.pay::<Then>(&self.book, &me, &acct.account, &mut in_hand, cx));
         }
 
         // ---- restocking, weekly: below the middle of Lengnick's band of last month's sales, up to its top ----

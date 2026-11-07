@@ -205,20 +205,22 @@ The mechanism:
   from where it is held (`collects`: the crew takes what is there, never more, and sees what is left). A backlog is now
   waste held that no crew's hours reached. Not yet traced against pilot 7a's figures.
 
-### WM-15 · Workplaces use no energy or water
-- **Gap:** Every recipe at a workplace states its energy and water (law 8, foundations-2 C5), and every one states nought:
-  no workplace is on the network (homes are), no firm or office asks to be supplied, and no firm pays a utility bill. A
-  figure above nought would stop the work it is in. So a factory's output, a shop's service and an office's work cost
-  nothing in energy or water, the town's demand on the river and the grid is its households' alone, and a drought or a
-  dear grid reaches no employer.
-- **Where:** `worlds/generator/generate.ts` (`WORKPLACE_USE`), `worlds/generator/figures.ts` (the rows' basis); firm and
-  office modules (no supply request, no utility invoices paid).
-- **Effect:** A shortage or a price on energy and water falls on households only; a large user (a works, a data centre)
-  cannot be modelled; the AI economy's draw on energy and water (foundations-2 section 7) does not exist yet.
-- **L / I:** high / medium · **Status:** to fix (per-unit figures by industry, from an energy account or an input-output
-  table where the place has one; workplaces connected at the start and on founding; firms paying their bills)
-- **Notice by:** any recipe at a workplace with nought for energy or water (all of them today).
-- **Fix when:** before an experiment on utilities, prices of energy or water, or a large user.
+### WM-15 · Workplaces draw energy and water only where a recipe is done, at placeholder figures
+- **Gap:** (what is left, 2026-11-07) every recipe done at a workplace now draws its industry's hour of electricity and
+  water from its operator's connections there, kept up to what the work used, billed by meter and paid by whoever pays
+  the body's bills (docs/decisions.md, "Workplaces on the network"; docs/behaviour/utilities.md, "Workplaces"). Left:
+  offices where only papers are written (the town offices, the tribunal, the bank, the paper) draw nothing, and no
+  building has a plant (lighting, heating) apart from its work; a business of one draws nothing where it sells; the
+  figures a person-hour are recalled for Australia (to confirm) and copied as placeholders to the other eight profiles;
+  firms pay the household tariff (no business tariff sourced); a firm reckons an hour's cost at the opening tariff and does
+  not read it again; gas and vehicle fuel used at work are not modelled.
+- **Where:** `worlds/profiles/*.json` (`utilities.workplace`); `worlds/generator/generate.ts` (`HOUR_OF`, `workDraw`,
+  `WORKSITES`); `kernel/crates/actors/src/common/supply.rs`.
+- **Effect:** office-heavy bodies' running costs and their share of the town's demand are understated; places differ in
+  workplace energy only by their tariffs, not their use; a tariff change reaches firms' bills but not their prices.
+- **L / I:** medium / medium · **Status:** to source (the figures by place); to fix (offices' and buildings' own plant)
+- **Notice by:** an experiment on energy prices or on public bodies' budgets; a profile's energy account opened.
+- **Fix when:** before an experiment on utilities prices, the public bodies' costs, or a place's industrial mix.
 
 ### WM-10 · Repeal does not reach those who read the law; new kinds of binding law cannot be made
 - **Gap:** A law repealed without a replacement is still taken as in force by landlords, tenants, the union and the

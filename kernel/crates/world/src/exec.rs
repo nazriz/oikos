@@ -1372,6 +1372,27 @@ impl<'a> Exec<'a> {
                 need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an output"))?;
             }
         }
+        // What its hours draw where it is done (law 8, `hour`): the seconds added to what has not yet been drawn for the
+        // recipe here, each whole hour the recipe; what an hour takes must be held here, or the work is refused.
+        let hourly: Option<(Id, crate::config::TaskCfg, i64, u64)> = match spec.as_ref().and_then(|x| x.hour) {
+            None => None,
+            Some(h) => {
+                let rec = self.s.config.catalogue.tasks.iter().find(|x| x.id == h).cloned().ok_or_else(|| refuse(RefusalCode::UnknownTask, format!("no task {h}")))?;
+                let key = Id::from_string(format!("{me}@{at}/{h}"));
+                let sum = self.st.metered.get(&key).copied().unwrap_or(0).saturating_add(total.max(0));
+                let hours = (sum / 3_600) as u64;
+                for (k, per) in rec.consumes.iter().filter(|(_, p)| **p != 0) {
+                    let q = per.checked_mul(hours as i128).filter(|x| *x <= MAX_MONEY).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an hour's input"))?;
+                    // (Beside what its units take of the same kind.)
+                    let units_take = spec.as_ref().and_then(|x| x.consumes.get(k)).and_then(need).unwrap_or(0);
+                    let have = self.st.holding(&me, &at, k) - units_take;
+                    if have < q {
+                        return Err(refuse(RefusalCode::InsufficientQuantity, format!("{me} has {have} {k} at {at} beyond its units' use; {hours} hour(s) of {task} there need {q}")));
+                    }
+                }
+                Some((key, rec, sum % 3_600, hours))
+            }
+        };
         // What's drawn from a field (water from the river): from the cell, of the structure's or the four around them, with
         // the most of it, if it has enough.
         let drawn: Option<(Id, Id, i64)> = match spec.as_ref().and_then(|x| x.draws.clone()) {
@@ -1454,6 +1475,22 @@ impl<'a> Exec<'a> {
                 let q = need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an output"))?;
                 self.add_holding(&me, &at, k, q, c)?;
             }
+            // (Its hours' draw, checked above: inputs out, outputs in, emissions to the counters; what is left of an hour kept.)
+            if let Some((key, rec, left, hours)) = &hourly {
+                let h = *hours as Money;
+                for (k, per) in rec.consumes.iter().filter(|(_, p)| **p != 0) {
+                    self.add_holding(&me, &at, k, -per.saturating_mul(h), c)?;
+                }
+                for (k, per) in rec.produces.iter().filter(|(_, p)| **p != 0) {
+                    self.add_holding(&me, &at, k, per.saturating_mul(h), c)?;
+                }
+                for (k, per) in &rec.emits {
+                    if let Some(v) = self.st.totals.get_mut(k) {
+                        *v = v.saturating_add(per.saturating_mul(*hours as i64));
+                    }
+                }
+                self.st.metered.insert(*key, *left);
+            }
             // Collected from the structure worked on: what its holders hold there of the kind, up to what the units take, in
             // the holders' order; what is not there is not taken (law 8: nothing made, a bin emptied).
             if let (Some(cl), None) = (&x.collects, &bodies) {
@@ -1506,6 +1543,29 @@ impl<'a> Exec<'a> {
                 if let Some(v) = self.st.totals.get_mut(k) {
                     *v = v.saturating_add(by);
                 } else if let Some(f) = self.s.config.catalogue.fields.iter().find(|f| &f.id == k) {
+                    // (What is put back of a kind a field holds goes where a draw would come from, an outfall: the cell of the
+                    // structure, or of the four around them, that has the most of it (the river beside the works, not the
+                    // works' own ground, which flooded once the town's workplaces sent their water to the sewer, WM-15).
+                    // Pollution and the like go on the corner cell, as before.)
+                    let corner = if f.kind.is_some() {
+                        let nature = self.st.nature.as_deref();
+                        let value = |c: &Id| nature.and_then(|n| n.fields.get(k)).and_then(|m| m.get(c)).copied().unwrap_or(f.baseline);
+                        let mut cells: BTreeSet<Id> = BTreeSet::new();
+                        for c in &self.st.structures[&at].cells {
+                            cells.insert(*c);
+                            if let Some((x, y)) = crate::config::cell_xy(c) {
+                                for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                                    let nb = crate::config::cell_id(x + dx, y + dy);
+                                    if self.st.cells.contains_key(&nb) {
+                                        cells.insert(nb);
+                                    }
+                                }
+                            }
+                        }
+                        cells.iter().max_by(|a, b| value(a).cmp(&value(b)).then(b.cmp(a))).copied().unwrap_or(corner)
+                    } else {
+                        corner
+                    };
                     if let Some(n) = self.st.nature.as_mut().map(Arc::make_mut) {
                         let cur = n.fields.get(k).and_then(|m| m.get(&corner)).copied().unwrap_or(f.baseline);
                         // (A field that holds a kind is a stock: what is put on a cell beyond its bound is refused, not lost.)
@@ -2701,7 +2761,7 @@ impl<'a> Exec<'a> {
                 Ok(())
             }
 
-            Block::Connection { op, connection, kind, node, to, at, rate, uses, meter, bind } => self.connection(*op, connection, kind, node, to, at, *rate, uses, *meter, bind),
+            Block::Connection { op, connection, kind, node, to, at, rate, uses, meter, up_to, bind } => self.connection(*op, connection, kind, node, to, at, *rate, uses, *meter, *up_to, bind),
             Block::Link { link, op, every, from, off } => self.link(link, *op, *every, *from, *off),
         }
     }
@@ -2709,13 +2769,16 @@ impl<'a> Exec<'a> {
     /// An act on a connection (foundations-2 C3): its operator opens, closes, interrupts and restores it; its user or its
     /// operator sets its rate. Whose a connection is, is the network's: the holder of the supply whose tree its node is on.
     #[allow(clippy::too_many_arguments)]
-    fn connection(&mut self, op: crate::blocks::ConnOp, connection: &Option<String>, kind: &Option<Id>, node: &Option<Id>, to: &Option<String>, at: &Option<String>, rate: Option<i64>, uses: &Option<Id>, meter: Option<crate::config::MeterKind>, bind: &Option<String>) -> R<()> {
+    fn connection(&mut self, op: crate::blocks::ConnOp, connection: &Option<String>, kind: &Option<Id>, node: &Option<Id>, to: &Option<String>, at: &Option<String>, rate: Option<i64>, uses: &Option<Id>, meter: Option<crate::config::MeterKind>, up_to: Option<i64>, bind: &Option<String>) -> R<()> {
         use crate::blocks::ConnOp;
         let (Some(n), Some(net)) = (self.s.config.world.network.as_ref(), self.s.net.clone()) else {
             return Err(refuse(RefusalCode::NotModelled, "this world has no network for anything to flow on"));
         };
-        if rate.is_some_and(|r| !(0..=oikos_contracts::network::MAX_FLOW).contains(&r)) {
+        if rate.is_some_and(|r| !(0..=oikos_contracts::network::MAX_FLOW).contains(&r)) || up_to.is_some_and(|r| !(0..=oikos_contracts::network::MAX_FLOW).contains(&r)) {
             return Err(refuse(RefusalCode::Overflow, "a rate out of range"));
+        }
+        if up_to.is_some() && (uses.is_some() || !matches!(op, ConnOp::Open | ConnOp::Set)) {
+            return Err(refuse(RefusalCode::UnknownRef, "the most kept is said of a connection opened or set for what is held where it is delivered (no use)"));
         }
         let me = self.entity;
         let stamp = self.st.stamp();
@@ -2742,7 +2805,7 @@ impl<'a> Exec<'a> {
                 ns.opened += 1;
                 let id = Id::from_string(format!("conn.{}", ns.opened));
                 let r = rate.unwrap_or(0);
-                ns.add(crate::network::Connection { id, kind: *kind, node: *node, supply: supply as u32, holder: to, at, rate: r, meter: 0, uses: *uses, reading: meter.unwrap_or_default(), closed: false, interrupted: false, changed: stamp });
+                ns.add(crate::network::Connection { id, kind: *kind, node: *node, supply: supply as u32, holder: to, at, rate: r, meter: 0, uses: *uses, up_to, reading: meter.unwrap_or_default(), closed: false, interrupted: false, changed: stamp });
                 (id, EventBody::ConnectionChanged { connection: id, op: "open".into(), rate: Some(r), kind: Some(*kind), node: Some(*node), holder: Some(to), at: Some(at), by })
             }
             (op, connection) => {
@@ -2758,6 +2821,13 @@ impl<'a> Exec<'a> {
                             return Err(refuse(RefusalCode::NotTheirs, format!("{id} is neither {me}'s nor on a supply {me} operates")));
                         }
                         x.rate = rate.ok_or_else(|| refuse(RefusalCode::UnknownRef, "set it to what rate?"))?;
+                        // (A connection that keeps a most may have it set again; one used as it comes keeps none.)
+                        if let Some(m) = up_to {
+                            if x.up_to.is_none() {
+                                return Err(refuse(RefusalCode::UnknownRef, format!("{id} keeps nothing where it is delivered: no most to set")));
+                            }
+                            x.up_to = Some(m);
+                        }
                     }
                     _ if !operator => return Err(refuse(RefusalCode::NotTheirs, format!("only its operator may {} {id}", op.name()))),
                     ConnOp::Open => x.closed = false,

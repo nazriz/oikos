@@ -93,7 +93,9 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] E5. Compute competing for energy, water and land: what a system runs on, in the kernel (P4: hardware held
     somewhere, each hour of work drawing its recipe there, refused without power), and a host in the town where a study
     asks (`hosting: "local"`), on the feeders and the main with the homes (docs/behaviour/hosting.md; risk ME-24).
-  - [ ] WM-15. Every other workplace on the network, with its energy and water by industry (risk WM-15).
+  - [x] WM-15. Every other workplace on the network, with its energy and water by industry: each recipe at a workplace
+    draws its industry's hour (the kernel's `hour`), from connections kept up to what the work used (`up_to`), billed and
+    paid by whoever bills and pays (docs/behaviour/utilities.md, "Workplaces"; risk WM-15, its remainder).
   - [~] E6. The measures: M8's census of who can still do the work (`skill_census`, `town/skills`) and the tag's
     backstop are built; M7 (what the town gives to AI: its share of energy, water, land and hours) is still to write.
 - [ ] **Foundations-2, phase 5:** strict modes on, old exception lists empty, each law's line in CLAUDE.md as its

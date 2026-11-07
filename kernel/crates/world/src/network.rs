@@ -101,6 +101,9 @@ pub struct Connection {
     pub meter: Money,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uses: Option<Id>,
+    /// The most its user keeps where it is delivered: it asks only what brings the holding up to it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub up_to: Option<i64>,
     #[serde(default, skip_serializing_if = "is_on_site")]
     pub reading: MeterKind,
     /// Closed by its operator: it takes nothing until opened again (a disconnection).
@@ -186,7 +189,7 @@ pub fn initial(s: &Statics) -> Option<Arc<NetState>> {
     let mut ns = NetState { links: imbl::Vector::from(vec![LinkState::default(); n.links.len()]), ..Default::default() };
     for c in &w.connections {
         let supply = net.trees.supply_of(n, &c.kind, &c.node).expect("validated") as u32;
-        ns.add(Connection { id: c.id, kind: c.kind, node: c.node, supply, holder: c.holder, at: c.at, rate: c.rate, meter: 0, uses: c.uses, reading: c.meter, closed: false, interrupted: false, changed: 0 });
+        ns.add(Connection { id: c.id, kind: c.kind, node: c.node, supply, holder: c.holder, at: c.at, rate: c.rate, meter: 0, uses: c.uses, up_to: c.up_to, reading: c.meter, closed: false, interrupted: false, changed: 0 });
     }
     Some(Arc::new(ns))
 }
@@ -276,6 +279,10 @@ fn solve(s: &Statics, st: &State, ns: &NetState, k: usize, t: i64, hour: i64) ->
         let mut a = if *settle == Settle::Hour { in_hour(c.rate, hour, cum.as_ref()) } else { c.rate };
         if sup.physics == Physics::Drain {
             a = a.min(st.holding(&c.holder, &c.at, &c.kind).clamp(0, i64::MAX as i128) as i64);
+        }
+        // (Held where it is delivered, to a most kept: only what brings the holding up to it, which is what was used since.)
+        if let Some(most) = c.up_to {
+            a = a.min((most as i128 - st.holding(&c.holder, &c.at, &c.kind)).clamp(0, i64::MAX as i128) as i64);
         }
         if a > 0 {
             asked.push((ci, local, a));

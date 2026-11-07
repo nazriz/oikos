@@ -326,6 +326,10 @@
                   "expert_bps": { "type": "integer", "minimum": 0, "maximum": 10000 }
                 }
               },
+              "hour": {
+                "description": "What an hour of this work draws where it is done (law 8; a workplace's energy and water by the hour worked, WM-15): a task of the world's that takes no time and only uses, makes and emits. The work's seconds are added to what the actor has not yet drawn for it at that structure, and each whole hour is the recipe there: its inputs from the actor's holding (refused, insufficient_quantity, when not all held), its outputs into it, its emissions to the world's counters.",
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+              },
               "collects": {
                 "description": "Collection (law 8, foundations-2 C4: a round emptying the bins): per unit, up to `per_unit` of a kind held at the structure worked on (`on`) by anyone there is taken into the actor's holding at `at`, from the holders in turn (a different one first each day); what is not there is not taken and nothing is made. What is left is seen by those who did it.",
                 "type": "object",
@@ -2069,6 +2073,12 @@
                   "on_site",
                   "remote"
                 ]
+              },
+              "up_to": {
+                "description": "For what is held where it is delivered (no `uses`): the most its user keeps there. It asks at each settle only what brings the holding up to it, within its rate, so what flows is what the user's processes used since (a workplace's supply, WM-15).",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000000000
               }
             }
           }

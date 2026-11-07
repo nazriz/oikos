@@ -1125,7 +1125,7 @@
         "supply_per_day": 0,
         "grid_price_per_kwh": 100,
         "grid_emissions_g_per_kwh": 444
-      }
+      }, "workplace": {"manufacturing": {"kwh_per_hour": 15, "litres_per_hour": 200}, "retail": {"kwh_per_hour": 6, "litres_per_hour": 10}, "construction": {"kwh_per_hour": 1, "litres_per_hour": 20}, "public_administration": {"kwh_per_hour": 2, "litres_per_hour": 10}, "health_care": {"kwh_per_hour": 3, "litres_per_hour": 20}, "education": {"kwh_per_hour": 3, "litres_per_hour": 50}, "public_safety": {"kwh_per_hour": 3, "litres_per_hour": 15}}
     },
     "climate": {
       "rain_by_month_bps": [
@@ -1424,6 +1424,7 @@
   },
   "sources": {
     "utilities.network": "PLACEHOLDER (to confirm; WM-1, foundations-2 C4): the network's engineering figures are the generator's stand-ins, the same in every profile: a source head of 50 m, a service head of 20 m (a common minimum service pressure in supply codes, e.g. the Water Services Association of Australia's code: recalled, to confirm) and 5 m below which nothing comes; a store of two days' use; pipes sized for 2.5 times the average flow and wires for 1.5 times the peak hour's; a main losing 10 m and a service 5 m at capacity (linear stand-ins for friction); a household's day of electricity by hour, an evening peak (a typical residential load profile: recalled, to confirm). Would be sourced from a local water authority's and a distributor's design standards and published load profiles.",
+    "utilities.workplace": "PLACEHOLDER (risk WM-15): Australia's figures (au-vic-2026's `utilities.workplace`, themselves to confirm) until this place's energy account and water account by industry are read against its labour account's hours worked: electricity and water a person-hour worked differ by climate (heating and cooling), by the mix within an industry and by what is electrified.",
     "utilities.water.bill_to": "PLACEHOLDER (to confirm; WM-12): the water utility's account is the property's: not opened.",
     "public_service.support_officers_per_1000_claims": "PLACEHOLDER (to confirm; WM-14; approved by the owner as a marked national ratio on a small town, 2026-10-25): 4 of the support agency's officers per 1,000 claims in payment. Not this place's figure: an order of magnitude recalled for Great Britain (the Department for Work and Pensions' staff, roughly 90,000, over roughly 23 million benefit claims in payment, State Pension included, is about 4 per 1,000, of whom not all decide claims; not opened, to confirm), carried to every profile until each place's agency staffing and caseload are sourced. Would be sourced by the agency's annual report (staff handling claims, full-time equivalents) over its published caseload.",
     "names.customs": "Family_name_from 'both' and given-first order: the Mexican custom of two surnames, the father's then the mother's (Civil Code practice; Registro Civil acts record both). Titles 'Sr.'/'Sra.' are as Mexican paper writes them. wife_takes_husband_bps 1500 is a PLACEHOLDER: in Mexico a married woman keeps her own surnames in law and papers; the social 'de [husband's surname]' form is uncommon on official documents; no share was found. Not opened: any source for these customs (stated from general knowledge, to confirm).",

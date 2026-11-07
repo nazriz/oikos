@@ -157,7 +157,9 @@ ratings and drains, meters in state, the acts on connections and links, rotation
 kernel); the generated town's homes on water, electricity and sewer connections, use and waste as recipes, collection from
 where waste is held, bills from meters, who pays the water bill as law data, the two variables, the assumed use and the
 energy at the depot deleted, and the operators' reclosing and rotation (C4); every workplace recipe states its energy and
-water, each nought with its basis (C5, short of the design: no workplace is supplied yet, WM-15); scarce kinds at an edge,
+water, each nought with its basis (C5, short of the design until WM-15 landed on 2026-11-07: each recipe at a workplace
+now draws its industry's hour of energy and water, the profile's `utilities.workplace`, from its operator's connections
+there, kept up to what the work used; docs/behaviour/utilities.md, "Workplaces"); scarce kinds at an edge,
 refused `beyond_supply` (C6). **Not as designed:** the `connection` and `link` calls are code's own until the
 translator is taught them (TR-7); households do not yet read the tariff or a restriction (WM-12); the CLAUDE.md line is
 drafted in the decisions entry and added when C4 lands.

@@ -562,6 +562,12 @@ pub struct SupplyRequest {
     /// What the household will use a day (its connection's rate).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate: Option<i64>,
+    /// A workplace's (WM-15): what is delivered is held there for its work to draw, kept up to this.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub up_to: Option<i64>,
+    /// A connection of the asker's own, asked to carry `rate` (and keep `up_to`) from now (WM-15).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection: Option<String>,
 }
 impl Paper for SupplyRequest {
     const KIND: &'static str = "supply_request";

@@ -800,3 +800,17 @@ Additive; no hard rule touched; nothing is written for a world with no practised
 
 - **The log takes `skill_census`** (monthly, where a world has practised skills): for each skill, how many living people
   stand in each tenth of its range. For measurement only.
+
+## A workplace's energy and water (2026-11-07; risk WM-15; docs/behaviour/utilities.md, "Workplaces"; docs/decisions.md, "Workplaces on the network"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched (it serves law 8's); nothing changes for a world whose tasks name no hour and whose
+connections keep no most.
+
+- **A task takes `hour`**: a recipe that takes no time and only uses, makes and emits. The work's seconds are added to
+  what the actor has not yet drawn for it at that structure (state `metered`, keyed `<actor>@<structure>/<recipe>`), and
+  each whole hour is the recipe there: its inputs from the actor's holding (refused, `insufficient_quantity`, when not
+  all held), its outputs into it, its emissions to the world's counters. Refused at load: an hour that is no such recipe.
+- **A connection takes `up_to`** (at the start, and on `connection` `open`): for what is held where it is delivered (no
+  `uses`), the most its user keeps there; it asks at each settle only what brings the holding up to it, within its rate.
+  So what flows, and what its meter shows, is what the user's processes used. Refused: `up_to` with a `uses`, or on any
+  act but `open`.

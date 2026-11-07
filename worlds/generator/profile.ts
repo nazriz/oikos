@@ -522,6 +522,12 @@ export interface Profile {
       /** `bill_to`: whom the water bill goes to, the property's owner or its occupant, as the place's law has it (WM-12). */
       water: { litres_per_person_per_day: number; bill_to?: "owner" | "occupant"; price_per_kl: number; service_per_quarter: number; river_inflow_kl_per_cell_per_day: number; river_decay_bps_per_day: number; river_flow_bps_per_day: number };
       energy: { kwh_per_household_per_day: number; price_per_kwh: number; supply_per_day: number; grid_price_per_kwh: number; grid_emissions_g_per_kwh: number };
+      /** What an hour of work at a workplace draws, by industry (law 8; risk WM-15; docs/behaviour/utilities.md,
+       * "Workplaces"): electricity in kWh and water in litres a person-hour worked there (an energy account's and a water
+       * account's use by industry over the labour account's hours worked by industry, where the place has them). Keys are
+       * the generator's industries: manufacturing, retail, construction, public_administration, health_care, education,
+       * public_safety. A town whose profile has none draws nothing at its workplaces (their recipes state nought, WM-15). */
+      workplace?: { [industry: string]: { kwh_per_hour: number; litres_per_hour: number } };
     };
     /** Floods (world-expansion 7.3): the river's banks and spill, how deep before a building floods, wetland's soaking. */
     /** The climate (world-expansion 7.3), for weather drawn for a run: the river's inflow by calendar month (10,000 = the

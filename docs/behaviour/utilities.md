@@ -46,7 +46,55 @@ the older ones are kept for what they record of how the offices came to be.
   household, still to be sourced), the retailer's `units_per_customer_per_day` and the energy used up at the depot.
 - **Leaves out (new):** households do not yet read the tariff or a restriction, so neither changes the rate they set; a
   seat cannot act on connections or links (TR-7); the network is a tree (a meshed main's second path ignored) with linear
-  losses and ratings only (foundations-2 2.6); treated effluent is put on the works' own cell.
+  losses and ratings only (foundations-2 2.6). Treated effluent is put back where a draw would come from (the river
+  beside the works: since 2026-11-07; before, on the works' own ground, which flooded once workplaces sent their water to
+  the sewer).
+
+## Workplaces (2026-11-07; risk WM-15; generator 0.77.0)
+
+Every workplace where a recipe is done draws what its work uses over the same network, by the same physics, and pays for
+it as a household does. Nothing here shares anything out.
+
+- **What the work draws: by the hour worked.** Each recipe done at a workplace (making, serving, collecting, upkeep,
+  repair, care, teaching, investigation) names its industry's hour (`hour: hour-<industry>`, contract: a task's `hour`):
+  each whole hour of the work's seconds, whoever does them (a person or a system the firm took on), is that recipe at the
+  building, so many kWh and litres from what the operator holds there, its water out as wastewater to the sewer, the grid's
+  emissions for its kWh. The figures are the profile's `utilities.workplace`: electricity and water a person-hour worked,
+  by industry (an energy account's and a water account's use by industry over the labour account's hours worked; for
+  au-vic recalled, to confirm; for the other places au-vic's, marked placeholders: WM-15). A unit's own figure stays nought, with
+  that basis: a shop's serving of an item is minutes, and its share of a kWh is no whole number (the energy kind is held
+  in whole kWh). **What an hour needs must be held there, or the work is refused** (`insufficient_quantity`): a workplace
+  whose feeder is shut, tripped or on a rotation's hour off, or whose main has no head, stops working when what it holds
+  runs out. Who goes short is the network's physics, the supply in force and the operators' acts, as for a home.
+- **Its supply: held there, kept up to what it uses.** Each such building's operator (the factory, the shop, the builder,
+  the town at the town hall where its crews work, the clinic, the school, the police) holds a water, an electricity and a
+  sewer connection at the start, held there for its work (no use as it comes) and kept up to a most (`up_to`, contract):
+  each settle it asks only what brings its holding back up, so **what flows, and what its meter shows, is what its work
+  used**. The most, and the rate, are two days of the building's draw at full work (its workplace's room, a working day
+  each: the generator's `WORK_SUPPLY_DAYS`, a design margin), so that a day's work, drawn when it is done, is not refused
+  for the hour the network settles; it opens with that in hand. A shop or a factory whose building has no supply of its own
+  (one founded in the run, one that leases a unit) asks for it as a household does (`supply_request`, with the rate and the
+  most), and the operator opens it, an act of its own that takes its time; one that no longer works there asks for it to be
+  stopped (`supply_end`). A shop or a factory whose busiest day, by its own meters, would take more than half its supply
+  asks its supplier for two days of that (`supply_request` naming its connection), and the operator sets it. (`common::supply`.)
+- **Its bills: billed by whoever bills, paid by whoever pays its other bills.** The energy retailer bills each connection's
+  user for its days and its meter, as before; the water corporation reads the meters of the homes on its roll **and of the
+  other buildings it supplies** (its roll now lists every building on a lot, and the town's own lots, which the valuer's
+  does not), and bills the owner or the occupant as the place's law has it. A building it does not supply is neither gone
+  to nor billed. Each bill is paid, oldest first, when what is in hand covers it, by the post that pays the body's other
+  debts: a firm's manager after the wages it keeps for, the builder's foreman, the practice manager, the principal, the
+  officer in charge, the host's operations, the town's finance officer within its budget (as any invoice to the town). One
+  it cannot pay yet stays open. Each payment is a payment act and takes its payer's time (`transfer`).
+- **Costs and funding.** A firm's cost of making or serving a unit includes its hours' energy and water at the place's
+  tariffs (`supply.cost_per_hour`, its plant's draw at the published prices: what the price rule reads as marginal cost).
+  The clinic's, the school's and the police's funders' grants include their buildings' bills a year at their staff at the
+  start, as their wages are.
+- **Leaves out:** offices where only papers are written (the town offices, the tribunal, the bank, the paper...) draw
+  nothing: their acts are not recipes, and a building's own plant (lighting, heating) is not modelled apart from the work;
+  a business of one draws nothing where it sells from (its `sell` is done anywhere); a firm's tariff is the household
+  tariff (no business tariff is sourced); a firm's cost an hour is reckoned at the start's tariff and not read again; gas and
+  vehicle fuel at work are not modelled; a firm's systems draw at the building by the hour as its people do, but the supply
+  is sized on its people.
 
 ## The physics (kernel)
 

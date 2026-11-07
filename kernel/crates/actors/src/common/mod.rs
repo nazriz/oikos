@@ -10,6 +10,7 @@ pub mod calls;
 pub mod laws;
 pub mod letters;
 pub mod money;
+pub mod supply;
 pub mod trips;
 pub mod work;
 
