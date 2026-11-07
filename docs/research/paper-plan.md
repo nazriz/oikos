@@ -3,7 +3,7 @@
 **Status:** a draft for decision. Nothing here is registered, built or run. The study's definition, measures and arms
 are the owner's (docs/north-star.md); this page proposes them, gives alternatives, and says where the design is weak.
 Section 13 lists the decisions. The literature is in section 11 and in docs/research/references.md ("The delegation
-study's paper"). Entries there marked **(to confirm)** were not opened, and the figures quoted from abstract pages
+study's paper"). Entries there that are marked as unconfirmed were not opened, and the figures quoted from abstract pages
 should be checked against the papers before they go into a manuscript.
 
 ## 1. The question, and why it is worth a paper
@@ -428,7 +428,7 @@ delegation study's paper". What the design takes from them:
 ## 12. Budget
 
 - **API credit: only the model seats.** The present credit (about $185 for the pilot, expiring 11 November) covers the
-  pilot. The main runs draw on later months' credit, whose size is to confirm. Hard limits are set in the spec under
+  pilot. The main runs draw on later months' credit, whose size is not yet known. Hard limits are set in the spec under
   each balance, so nothing can be charged beyond it.
 - **Cost per seat-month: unknown until the pilot.** The support-office draft priced a Sonnet call at about $0.03 and
   about 210 calls in 180 days. An assistant seat with less work may sit less often. Planning figures: Sonnet $0.5 to
