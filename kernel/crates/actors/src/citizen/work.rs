@@ -101,7 +101,7 @@ impl Work {
 // ------------------------------------------------------------------ small rules
 
 /// n / d rounded half away from zero (TS `Math.round` of a ratio).
-fn div_round(n: i64, d: i64) -> i64 {
+pub(super) fn div_round(n: i64, d: i64) -> i64 {
     if d == 0 {
         return 0;
     }
@@ -768,13 +768,19 @@ impl Person {
         }
         // In work, only postings that pay better than ours, elsewhere (and, where the world says what holds people,
         // enough better).
+        // (Pay net of the commute, where we know the trip: docs/behaviour/commuting.md.)
         let held = self.wk_held_in(w, t, None);
+        let home = self.s.home.as_ref().map(|h| h.space.clone());
+        let commute = |p: &Person, wp: Option<&str>, pay_per_month: i64| -> i64 {
+            home.as_deref().zip(wp).and_then(|(h, wp)| p.commute_cost(h, wp, div_round(pay_per_month, 160))).unwrap_or(0)
+        };
         let better = |p: &Person, r: &Record| -> bool {
             let Some(j) = &job else { return true };
             let d = data(r);
             let (wage, period) = (d.i("wage").unwrap_or(0), d.i("period").unwrap_or(j.period));
+            let (theirs, ours) = (div_round(wage * MONTH, period.max(1)), div_round(j.wage * MONTH, j.period.max(1)));
             r.speaks_for.as_deref() != Some(j.employer.as_str())
-                && wage * j.period > j.wage * period
+                && theirs - commute(p, d.s("workplace"), theirs) > ours - commute(p, j.workplace.as_deref(), ours)
                 && (held == 0 || wage * j.period * 10_000 > j.wage * period * (10_000 + p.wk_held_in(w, t, d.s("industry"))))
         };
         let told: Vec<Arc<Record>> = if job.is_some() { vec![] } else { self.s.lead_jobs.iter().filter(|id| !self.work.applied.contains(*id)).filter_map(|id| self.wk_record(w.pic, id)).collect() };
@@ -801,11 +807,12 @@ impl Person {
             .map(|(e, r)| {
                 let offer = crate::common::part(r, crate::common::Piece::Offer);
                 let d = data(r);
-                let f = if offer.is_null() {
+                let mut f = if offer.is_null() {
                     Facts { money_per_month: div_round(d.i("wage").unwrap_or(0) * MONTH, d.i("period").unwrap_or(14 * DAY).max(1)), work_hours_per_month: Some(160), ..Default::default() }
                 } else {
                     facts_of(offer)
                 };
+                f.money_per_month -= commute(self, d.s("workplace"), f.money_per_month);
                 Choice { key: e.clone(), facts: Some(f), others: Some(i64::from(told_ids.contains(r.id.as_str()))), meaning: None }
             })
             .collect();

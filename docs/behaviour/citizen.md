@@ -413,7 +413,8 @@ Unless a source is named above, a figure is a placeholder, to calibrate.
 
 - Voice beyond petitions, complaints and elections: protest, contacting councillors, campaigning for a candidate.
 - Knowing which laws already exist (a citizen may petition for a law already passed).
-- Buying homes; commuting; housing quality beyond price and bedrooms; renegotiating rent.
+- Buying homes; housing quality beyond price and bedrooms; renegotiating rent.
+- The commute is weighed in job and home choices (docs/behaviour/commuting.md), only for a trip the person has made.
 - Moving house while housed: looking for somewhere cheaper or better while keeping the home, and giving notice once a new lease is signed. A household hunts only once it's without a home, so a rent it can't bear means notice first, then the hunt (the realistic order is the other way round).
 - The other social moves: help, snub, gossip, reputation.
 - Goals with sub-goals; learning which methods work.

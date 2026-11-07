@@ -3,6 +3,7 @@
 //! `housing`, `work`, `money`, `lifecycle` and `recourse`; what is taken in at every wake is `absorb`.
 
 pub mod absorb;
+pub mod commute;
 pub mod health;
 pub mod household;
 pub mod housing;

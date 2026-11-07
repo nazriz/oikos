@@ -22,6 +22,7 @@ use super::params::Params;
 #[allow(unused_imports)]
 use super::person::{bound, cells, inside, occupants, step_of_lines, Home, Mark, Missed, Person, Todo, Vacate, Week};
 use super::household::SAYING;
+use super::work::div_round;
 use crate::common::{
     addressed_to, ask, cites, data, first_due, is_kind, kind, letters::message, money_words, structure_of, when_words, Asked, ClaimKey, Fields, DAY, MONTH,
 };
@@ -1778,13 +1779,16 @@ impl Person {
             return;
         }
         let need = self.s.household.as_ref().map_or(1, |h| oikos_rules::household::bedrooms_needed(h, t, self.p.year, self.p.occupancy.as_ref()));
+        // (The commute from each home to our work, where we know the trip: docs/behaviour/commuting.md.)
+        let work = self.s.job.as_ref().map(|j| (j.workplace.clone(), div_round(j.wage * MONTH, j.period.max(1))));
         let options = listings
             .iter()
             .map(|l| {
                 let d = data(l);
+                let commute = work.as_ref().and_then(|(wp, pay)| self.commute_cost(d.s("space")?, wp.as_deref()?, div_round(*pay, 160))).unwrap_or(0);
                 Choice {
                     key: l.id.to_string(),
-                    facts: Some(Facts { money_per_month: -d.i("rent").unwrap_or(0), home: Some(HomeFacts { bedrooms: d.i("bedrooms") }), ..Default::default() }),
+                    facts: Some(Facts { money_per_month: -d.i("rent").unwrap_or(0) - commute, home: Some(HomeFacts { bedrooms: d.i("bedrooms") }), ..Default::default() }),
                     others: Some(i64::from(told.iter().any(|x| x.id == l.id))),
                     ..Default::default()
                 }

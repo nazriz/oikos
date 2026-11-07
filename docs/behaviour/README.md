@@ -49,6 +49,7 @@ Rules every module follows (so re-runs are reproducible):
 | `school.principal` | a school: keeps its teachers, gives places to children of school age, teaches each classroom on school days (raising pupils' skill), certifies those who finish | [education.md](education.md) |
 | `clinic.practice` | a clinic: keeps its doctors, sees patients who come in and ask, in turn, as their hours allow (care shortens a condition) | [health.md](health.md) |
 | (the daily round) | a body in one place at a time; travel takes time; citizens go to work and school and come home; employers look when their staff are in | [daily-round.md](daily-round.md) |
+| (the commute) | job and home choices weigh the trip between home and work, known only from the person's own trips, at the place's value of travel time and running cost | [commuting.md](commuting.md) |
 | (home ownership) | owner-occupiers at the start, mortgages the bank takes on, owners' rates, titles passed to heirs | [ownership.md](ownership.md) |
 | `utility.water` | a water corporation: draws the town's use from the river each day (restrictions when it can't), bills owners quarterly | [utilities.md](utilities.md) |
 | `utility.energy` | an energy retailer: buys from the grid, supplies its customers (emitting the grid's greenhouse gas), bills them monthly | [utilities.md](utilities.md) |

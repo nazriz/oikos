@@ -10638,6 +10638,24 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   towns first, as the entry above says, before any raise.
 ## 2026-11-01 · The environment office learns its crew's pace from a refusal, and stops asking again for fieldwork it was told will not fit (`city.environment` 0.5.3; branch `env-office-fieldwork`; the pinned towns do not move; no model called)
 
+
+## 2026-11-01 · Weighing the commute: the rule specified, not yet built (branch `commute-choice`; risk WM-4; no model called)
+
+- **What:** docs/design/commute-choice.md: job and home choices carry the commute's hours (into the mind's
+  `time_hours_per_month`, worth a profile's share of the person's wage) and its money (a vehicle's running cost), with
+  sources; a trip's time is known only from the person's own trips and from going to look (a visit, over the roads).
+- **Why not built:** on `main` the kernel charges a trip's time and tells nobody how long it took, and bodies are not
+  yet in transit (foundations-2 S3, on `f2-s5`). Building the person's knowledge now means a participant-API addition
+  (`Outcome.trip`, seen only by the traveller) that S3 may make unnecessary and would collide with; a contract change is
+  Naz's to sign off. Building the choice without it would be inert, or need a straight-line stand-in, which the brief rules out.
+- **Asked of Naz:** which source of a person's trip time to build on (the outcome's `trip`, or S3's departure and
+  arrival), and the profile figures (`commute_time_bps`, a vehicle's cost a kilometre) per place.
+- **Revisit if:** `f2-s5` lands (then build the rule against what it shows a traveller), or a multi-town run is needed
+  before that.
+- **Settled later the same day (the coordinating session):** a person's trip time is what they saw on their own trips,
+  the S3 way (`BodyView.on_way`), or what is published (a timetable); no participant-API addition; otherwise they do not
+  know it. Figures per place from ATAP (au-vic), the DfT TAG data book (gb-eng), USDOT guidance and AAA costs (us-oh),
+  placeholders elsewhere. Building waits on `f2-s5` landing (docs/design/commute-choice.md, "What is left to build").
 - **The fault (a mechanism bug, not behaviour).** The office sized each day's fieldwork by the survey's stated time a cell
   and counted its staff's hours itself. When the world refused a batch for time ("w has N s left; this needs M"), it
   recorded the time left but kept planning at the stated time, so at its next look (five minutes on) it asked for the
@@ -10786,6 +10804,26 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Revisit if:** a planner other than these sends people elsewhere (then it keeps `Trips` too); a seller with its own
   carrier (a town's haulier) sells on delivery (then it says `arrives` from its own trips).
 
+## 2026-11-02 · Weighing the commute, built (branch `commute-choice`; risk WM-4; profiles and generator 0.76.0; no model called)
+
+- **What:** job and home choices weigh the trip between home and work (docs/behaviour/commuting.md;
+  `citizen/commute.rs`). A person keeps their own trips, seen on their way (`BodyView.on_way`, set out from where and
+  when), bounded at 16 by pair of buildings; a posting's pay less its commute and a listing's rent plus the commute to
+  the job held go into the mind's `money_per_month`. A trip never made is not known: no commute term (no straight line,
+  no network timetable). No participant-API or contract change.
+- **Departure from the design note:** the commute's hours are not also put into `time_hours_per_month`. That term's
+  weight in the mind is an unsourced placeholder (40 bp an hour), and the place's value of travel time already turns the
+  hours into money; counting both would weigh the same hours twice, once without a source.
+- **Figures:** profile `round.commute` (`time_bps`, `vehicle_cost_per_km`) with `sources["round.commute"]`: au-vic from
+  ATAP PV2, gb-eng from the DfT TAG data book, us-oh from USDOT's 2016 guidance and AAA's driving costs, all recalled and
+  marked "to confirm"; the other six are labelled placeholders. The generator passes `drive_per_hour`, the running cost
+  a km at the town's road speed, since a person knows a trip's time and not its length (a simplification, in the
+  behaviour doc's "Leaves out").
+- **Not tuned:** no hire or move count was looked at or aimed for; the rule is the literature's and the figures the
+  places'.
+- **Revisit if:** a timetable is published (then it is a second way to know a trip); vehicles' fuel from holdings gives
+  a trip's real running cost; a run shows people never learning a trip (looks too sparse to see themselves on their
+  way), in which case a trip arrived from should be kept as at most its elapsed time.
 ## 2026-11-02: stale incremental folders are pruned, incremental stays on
 
 - **Why.** `[profile.gate] incremental = true` is deliberate, but cargo keeps every `incremental/<crate>-<hash>/` whose hash

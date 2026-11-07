@@ -482,6 +482,17 @@ pub struct Round {
     pub work_days: i64,
     pub school_start: i64,
     pub school_end: i64,
+    /// How a commute is weighed in job and home choices (docs/behaviour/commuting.md); absent: it is not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commute: Option<Commute>,
+}
+
+/// The place's value of travel time, as basis points of the traveller's hourly pay, and what an hour's driving costs
+/// to run (cents: the profile's running cost a kilometre at its roads' speed). Both from the profile, with sources.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Commute {
+    pub time_bps: i64,
+    pub drive_per_hour: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

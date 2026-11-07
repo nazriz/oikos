@@ -233,6 +233,14 @@ pub struct State {
     pub moving: bool,
     pub last_was_move: bool,
     pub pending_go: Option<String>,
+    /// Setting out (law 9; docs/behaviour/commuting.md): from which structure, to which, when, and whether driving;
+    /// until we see ourselves on our way.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub set_out: Option<(String, String, i64, bool)>,
+    /// Our own trips, as we saw them on our way: between two structures (either way round), the seconds the latest
+    /// took and whether we drove; bounded, the oldest dropped (docs/behaviour/commuting.md).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub trips: Vec<(String, String, i64, bool)>,
     pub leaving: bool,
     pub departed: bool,
     pub mourned: BTreeSet<String>,
@@ -750,6 +758,7 @@ impl Person {
         if pic.body.as_ref().is_some_and(|b| !b.present) {
             return self.wait(self.end());
         }
+        self.noted_trip(pic);
         self.heard_go(pic);
 
         // A child does nothing on their own until they're 18 (their parents house them): the child's wake.
@@ -799,7 +808,7 @@ impl Person {
             && !practice_wake.is_some_and(|p| t >= p)
         {
             if let Some(go) = self.go_where_we_belong(pic, cx) {
-                return self.send_go(go, cx);
+                return self.send_go(go, pic, cx);
             }
             return self.wait(self.next_change(t).min(self.s.next_plan_at).min(practice_wake.filter(|p| *p > t).unwrap_or(i64::MAX)).min(arrived(pic, t)));
         }
@@ -851,6 +860,7 @@ impl Person {
         }
         if let Mark::Go(to) = &next.mark {
             self.s.pending_go = Some(to.clone());
+            self.setting_out(pic, to);
         }
         self.send(next.step, cx)
     }
@@ -859,9 +869,10 @@ impl Person {
     pub fn send(&mut self, s: Step<()>, cx: &mut Cx) -> Action {
         noted(&mut self.book, s.action(cx))
     }
-    pub fn send_go(&mut self, go: Todo, cx: &mut Cx) -> Action {
+    pub fn send_go(&mut self, go: Todo, pic: &Picture, cx: &mut Cx) -> Action {
         if let Mark::Go(to) = &go.mark {
             self.s.pending_go = Some(to.clone());
+            self.setting_out(pic, to);
         }
         self.send(go.step, cx)
     }

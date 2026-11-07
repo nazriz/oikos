@@ -90,6 +90,7 @@ export const FIGURE_BASIS: Basis[] = [
     prof("crime.take_bps", "crime.take_bps_per_month_in_need"),
     prof("crime.caught_bps", "crime.caught_bps_reckoned"),
     prof("crime.quantity", "crime.take_quantity"),
+    derived("round.commute.drive_per_hour", "the profile's round.commute.vehicle_cost_per_km at its round.roads.speed_kmh (what a person knows of a trip is its time)"),
     prof("round.**", "round"),
     prof("tribunal.challenge_bps", "justice.challenge_bps"),
     prof("tribunal.apply_bps", "justice.apply_bps"),

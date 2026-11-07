@@ -148,7 +148,7 @@ The mechanism:
 - **Effect:** Siting, logistics, flood cuts and access to services have little effect; spatial policy is understated.
 - **L / I:** medium / medium · **Status:** accepted
 - **Notice by:** A transport or distance scenario shows no effect; a place's real commuting or delivery times differ widely from zero.
-- **Fix when:** an experiment on siting, roads or access to services.
+- **Fix when:** an experiment on siting, roads or access to services. Job and home choices ignore the commute (52 of 84 hires crossed towns on `f2-s5`): built 2026-11-02 (docs/behaviour/commuting.md): the commute a person knows from their own trips is weighed; its figures are recalled, to confirm.
 
 ### WM-5 · Asking a directory is free and at once
 - **Gap:** Who-is-this and directory look-ups (`bank.payment_system` `who`) are answered at once and for nothing;

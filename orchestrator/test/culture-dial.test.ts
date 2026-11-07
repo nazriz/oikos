@@ -105,7 +105,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
 // f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "b63b2c19b3f1c2ff", "gb-eng-2026": "a18cf6dd689297f9", "ke-nakuru-2026": "cfe34895be14a485" }
+  ? { "au-vic-2026": "11d0adcb2cc58805", "gb-eng-2026": "164ec86f450d00fd", "ke-nakuru-2026": "d8227b3453991a6d" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -174,10 +174,16 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // (Re-taken on 2026-11-02 at foundations-2 S5 and S6 (law 9: a road's flows an hour, congestion, fuel from the tank; several towns
 // in one world), on the tree merged with main after f2-s4 landed (the taker's trip for this act its own), config hashes and Rust
 // states both; main's 7b16c3db..., 2e42476d..., 58353057... and e39632a0..., 294d3077..., 3a55c1a5..., until then.)
+// (Re-taken on 2026-11-02 at commute-choice (WM-4), on the tree merged with main at fb4168c, config hashes and Rust states both:
+// a citizen's round carries the place's value of travel time and driving cost (generator 0.76.0), people keep their own trips
+// and weigh a known commute in job and home choices (docs/behaviour/commuting.md); b63b2c19..., a18cf6dd..., cfe34895... for the
+// configs and b1dc744d..., b5195599..., 4b97669f... for the states, until then. The states re-taken again on the tree merged
+// with main at 3fc51b7d (main's trips, retail, environment office and refounding fixes under it; the configs did not move);
+// main's d8300873..., e9564040..., 7bf5ae46..., until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "d8300873a5c03da6d435069c7fe02c5b7e3c862730914970ffd57b0bd30b2790",
-  "gb-eng-2026": "e9564040f909ba83234cf899afe319fb813c973c3ba0c9191aec594bfd9de59a",
-  "ke-nakuru-2026": "7bf5ae46d53382f1530ad0dba3ed0087df4256c796ad28a94796ce9552b8d7fc",
+  "au-vic-2026": "2ee01f8cdce8e6f74911c3a1ff820261d0050085f42f168c77eafb501f1aca41",
+  "gb-eng-2026": "7abe89a675509eecf7145d184f3c5e689093a8b28e27a2dccea96e777030ddb3",
+  "ke-nakuru-2026": "4be8a863712a0d67f0c692657024b7a4e282674d39431d0db3199c5e9a8b7dd2",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
