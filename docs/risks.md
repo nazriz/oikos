@@ -1332,16 +1332,17 @@ The mechanism:
 - **Notice by:** A replay of an old log that fails on a new build.
 - **Fix when:** When a study spans builds; pin the build per study.
 
-### MT-11 · Gradual-disempowerment: delegation and dependence are thin
-- **Gap:** The measures are built (`measure/src/stewardship.ts`: human in the decision, dependence, reversibility,
-  concentration, authorship), and so are adoption, exit and the auditor. What is missing (2026-10-25): delegation to a
-  live model mid-run; adoption that learns from performance (buyers read the vendor's figures, which are the true ones);
-  skills by use and fading; know-how held by systems; new work for displaced people, which leans results towards displacement.
-- **Where:** `docs/design/gradual-disempowerment.md` §2, §6, §8.
-- **Effect:** The platform's central experiment cannot be read off today's 57 measures; built as planned it would lean one way.
-- **L / I:** medium / high · **Status:** to fix (awaits the owner)
+### MT-11 · Gradual-disempowerment: what the town gives to AI is not measured, and displacement has no counterweight
+- **Gap:** Built (2026-11-07): the stewardship measures (`measure/src/stewardship.ts`), adoption, exit and the auditor,
+  delegation D0 to D7, skills by use (E4), capability releases (E2a), tools (E2b), compute on the network (E5) and the
+  census of who can still do the work (M8). Missing: M7 (the town's energy, water, land and hours that go to AI);
+  adoption that learns from performance (buyers read the vendor's figures, which are the true ones); know-how held by
+  systems; new work for displaced people, which leans results towards displacement.
+- **Where:** `docs/design/gradual-disempowerment.md` (status, §2, §6, §8); docs/plan.md, phase 4 (E6).
+- **Effect:** A study could measure dependence but not the resources AI takes, and would lean towards displacement.
+- **L / I:** medium / high · **Status:** to fix (phase 4's E6; the study awaits the owner)
 - **Notice by:** A gradual-disempowerment claim made without a measure.
-- **Fix when:** foundations-2 phase 4 (services for anyone, skills by use); before any delegation experiment.
+- **Fix when:** before any delegation experiment.
 
 ### MT-12 · The code twin is a set of unsourced rules, sometimes harsher than the law
 - **Gap:** The code offices a seat is compared with follow placeholder rules: the code mayor builds a park a year and

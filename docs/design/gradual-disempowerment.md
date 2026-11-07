@@ -1,10 +1,24 @@
 # Gradual disempowerment: what the town must carry (plan, 2026-10-15)
 
-**Status (2026-10-25, read against main at 72dbbed0):** partly built.
-- **Built:** adoption by the numbers for shops, factories and the rates and planning offices (`kernel/crates/actors/src/market/automation.rs`, `offices/systems.rs`); licence terms, exit fees and the vendor's off-switch; the measures of a human in the decision, dependence, reversibility, concentration and authorship (`measure/src/stewardship.ts`).
-- **Not built:** delegation to a live model during a run (adopted systems are code; seats are fixed at generation; a seat's remit cannot widen mid-run, `orchestrator/src/run.ts`); adoption learning from performance (buyers use the vendor's figures, and the stated error rate is the true one); skills by use and fading; know-how or data held by systems; tender, award and remit-request forms for seats; new work for displaced people.
-- **Where it goes next:** foundations-2 phase 4 (`docs/design/foundations-2.md` §7: services anyone can buy, technologies as goods, firm entry, skills by use), so that delegation follows from general laws, not a rule written for one study.
-- **Caution for any delegation study:** if the delegating actors follow a rule written for the study, its finding is that rule's weights. The decision must come from the general decision law, applied to what actors have actually seen, fixed and preregistered.
+**Status (2026-11-07, read against main at 9ad4b0a0):** much of the ground is built; no delegation study is defined yet.
+- **Built:** adoption by the numbers for shops, factories and the rates and planning offices, with licence terms, exit
+  fees and the vendor's off-switch (`kernel/crates/actors/src/market/automation.rs`, `offices/systems.rs`); the
+  measures of a human in the decision, dependence, reversibility, concentration and authorship (`measure/src/stewardship.ts`).
+  Delegation D0 to D7 (assistants as services anyone can buy, levels per kind of matter, the principal's rule, handover,
+  forks that intervene, assistant seats, persons as principals; docs/decisions.md 2026-10-31), with real assistant prices
+  for au-vic, gb-eng and us-oh. Foundations-2 phase 4 in part: skills that grow with use and fade (E4), the outside's
+  capability released over time and tagged for measurement only (E2a), tools as goods (E2b), a factory founded in works
+  for sale (E3, first part), compute on the town's network with a local host (P4, E5), and the census of who can still
+  do the work (M8). Phase 3 (law 9: bodies, goods and vehicles move along ways, with time, capacity and fuel). An
+  optional learned citizen mind, and years at 10,000 people with tiered storage.
+- **Not built:** M7, what the town gives to AI (its share of energy, water, land and hours); every other workplace on
+  the network (WM-15); new premises built for a venture (the rest of E3); adoption that learns from performance
+  (buyers still read the vendor's figures); know-how or data held by systems; new work for displaced people.
+- **Not decided:** the experiment itself. The owner's TARA proposal (`docs/north-star.md`) is the plan's north star; a
+  study's definition, measures and preregistration are his to approve before anything is run.
+- **Caution for any delegation study:** if the delegating actors follow a rule written for the study, its finding is that
+  rule's weights. The decision must come from the general decision law, applied to what actors have actually seen, fixed
+  and preregistered.
 
 The plan as first written (2026-10-15) follows. The owner's direction (2026-10-15): "The whole point of
 the platform is to model gradual disempowerment scenarios", real-world centred, robustness and real power before
