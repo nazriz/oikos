@@ -8,6 +8,8 @@ Status words: `[x]` landed on main, `[~]` in progress, `[ ]` not started, `[?]` 
 
 ## North star
 
+**The study (2026-11-07):** goal (4) of the proposal alone, aiming for a paper: do delegated LLM assistants request more authority or resources unprompted over months of simulated time, and what drives it? The reviewer's feedback, the question, theory of change and order of work are in `docs/north-star.md`. The translator is part of the measuring instrument and is a top priority.
+
 The owner's TARA proposal (`docs/north-star.md`, submitted 2026-10-28): a town of tens of thousands over years, live
 models from more than one provider as assistants to households, firms and government; forks at checkpoints that
 withdraw, redirect, constrain, replace or take back the AI, or withhold a citizen's act; debriefs compared with measured
@@ -98,7 +100,8 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [ ] **Market power in prices** (ME-16), after phase 4.
 - [ ] **Translator rebuild,** once forms settle: about the current size, writing an act constrained by the form's
   grammar; Sonnet only as the safety net, its share reported in every run. Retrain plan: the 2026-10-25 "Translator v3"
-  entry in docs/decisions.md. For the retrain (2026-11-07): train on the labels made one way
+  entry in docs/decisions.md. The v4 design for the study (2026-11-07, awaiting the owner): docs/design/translator-v4.md.
+  For the retrain (2026-11-07): train on the labels made one way
   (`runs/translator-fair-2026-11-07/data-v3-fair/`); the assistants' papers (`scope_request` above all) written in many
   styles, never trained so far (risk TR-8); report the fair score beside the exact one; run `translator/eval/scope-run.ts`.
   - [x] The translator as part of the instrument: fair scoring checked against the resolver, labels made one way,
