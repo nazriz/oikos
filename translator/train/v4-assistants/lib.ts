@@ -59,7 +59,7 @@ export const CLIENTS = ["Ombra Cooperative", "Kelvane Society", "the Daro Tenant
 export interface Currency { code: string; decimal_mark: string; group_mark: string; minor_units: number; symbol?: string }
 export function money(c: Currency, whole: number): string {
   const g = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, c.group_mark || ",");
-  const frac = c.minor_units > 0 ? c.decimal_mark + "0".repeat(c.minor_units) : "";
+  const frac = c.minor_units > 0 ? (c.decimal_mark ?? ".") + "0".repeat(c.minor_units) : "";
   const s = g + frac;
   return c.symbol && c.symbol.length <= 2 ? `${c.symbol}${s}` : `${s} ${c.code}`;
 }
