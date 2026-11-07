@@ -10953,3 +10953,15 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   memory; it is noted here, not acted on.
 - **Revisit if:** the 50,000-person two-year run on this build still steps at its elections (then what a mind keeps
   of its book's assertions is read from the book when asked, not copied).
+
+## 2026-11-07 · The study narrowed to unprompted requests for scope, after the TARA feedback (docs only; no model called)
+
+- **What:** the TARA reviewer's feedback is kept in `docs/north-star.md`, with the direction Naz chose from it: goal (4)
+  alone, aiming for a paper, with a multi-model pilot and a wide net of providers. The plan's north star points to it.
+- **Why:** the four goals each needed their own methodology. Goal (4) measures real models' behaviour (so it generalises
+  beyond the simulation's settings) and fills the gap named in the proposal (power-seeking evaluations are short and
+  single-agent).
+- **Consequence:** the translator becomes part of the measuring instrument and a top priority; scope requests must be
+  recognised equally from every model's plain English.
+- **Revisit if:** the pilot shows scope requests are too rare to study, or Naz picks another goal (the Kulveit
+  metric-validation paper is kept as an alternative).
