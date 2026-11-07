@@ -80,12 +80,70 @@ def slot_names(grammar: dict) -> list[str]:
     return names
 
 
+def field_type(said: str) -> tuple[str, list[str]]:
+    """A field's type as its line says it (`amount, required`; `one of yes | no`), and a choice's options."""
+    said = _REQUIRED.sub("", said).strip().rstrip(",").strip()
+    if said.startswith("one of "):
+        return "choice", [o.strip() for o in said[7:].split("|") if o.strip()]
+    return said, []
+
+
+# Field-type masks (docs/design/translator-v3.md, section 1): what a copied value of a form's field may be, by its type,
+# before the model scores it, so that a value of the wrong kind cannot be written. Each is a condition every value the
+# resolver reads as that type meets (contracts/test/dates.json and amounts.json hold that: translator/test/
+# model-slots.test.ts), not the resolver's whole reading: a value that passes may still be asked about.
+ONLY_IDS = {"record", "structure", "lot", "account", "space", "cell"}
+NAMES_OR_IDS = {"entity", "person", "position"}
+_NUMBER_WORDS = {"zero", "nil", "none", "no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+                 "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
+                 "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety", "hundred", "thousand", "million", "billion",
+                 "lakh", "lakhs", "crore", "crores", "half", "dozen", "a"}
+_ID = re.compile(r"^[a-z0-9_.:/-]+$")
+_SENTENCE = re.compile(r"[:;]|\.$")
+# (An id with a figure in it, a record's, an account's, a place's or a person's, is not an amount: `kr0` is.)
+_NOT_AN_AMOUNT = re.compile(r"^((rec|msg|str|cell|sp|draft|ent|pos|par)\.\d|(acc|lot|law|form|house|apts|shop|job)-|[a-z]\d{3,}$)")
+
+
+def _an_id(x: str) -> bool:
+    return bool(_ID.match(x))
+
+
+def fits_type(kind: str, text: str, ftype: str | None, options: list[str] | None = None) -> bool:
+    """Whether a value copied as `kind` (id, text, word) with these characters may stand in a field of this type."""
+    if ftype is None:
+        return True
+    v = as_word(text) if kind == "word" else text.strip()
+    if ftype == "choice":
+        return not options or v in options
+    if ftype in ONLY_IDS:
+        # (A record, an account or a place is named by its id: quoted, the resolver asks what it is.)
+        return kind != "text" and _an_id(v)
+    if ftype in NAMES_OR_IDS:
+        return _an_id(v) if kind != "text" else len(v.split()) <= 6 and not _SENTENCE.search(v)
+    if ftype in ("amount", "count"):
+        words = re.findall(r"[a-z]+", v.lower())
+        some = any(c.isdigit() for c in v) or any(w in _NUMBER_WORDS for w in words)
+        return some and not _NOT_AN_AMOUNT.search(v)
+    if ftype == "date":
+        return any(c.isdigit() for c in v) and len(v.split()) <= 8
+    return True
+
+
+def masks_refuse(amounts: dict, dates: dict) -> list[str]:
+    """Every amount and date the resolvers read (contracts/test/amounts.json `cases`, dates.json `reads`) that the field
+    masks would not let be written: none, or the masks close off right answers."""
+    out = [f"amount {c[1]}" for c in amounts["cases"] if c[2] is not None and not fits_type("text", c[1], "amount")]
+    return out + [f"date {c['text']}" for c in dates["reads"] if not fits_type("text", c["text"], "date")]
+
+
 class Forms:
     """The forms shown in an input: every line after the first that begins `- `, each with its fields (name, whether
     it must be filled in, where the name stands in the input's characters)."""
 
     def __init__(self, text: str):
         self.lines: list[dict] = []
+        # (Each field's type, and a choice's options, by where its name stands.)
+        self.types: dict[int, tuple[str, list[str]]] = {}
         nl = text.find("\n")
         while nl >= 0:
             nxt = text.find("\n", nl + 1)
@@ -104,6 +162,7 @@ class Forms:
                         seen.add(m.group(1))
                         a = at + f + 9 + m.start(1)
                         fields.append((m.group(1), bool(_REQUIRED.search(m.group(2))), a, a + len(m.group(1))))
+                        self.types[a] = field_type(m.group(2))
                 self.lines.append({"line": line, "head": line if f < 0 else line[:f], "fields": fields})
             nl = nxt
 
@@ -302,6 +361,13 @@ class Follow:
             else:
                 span = covering(self.t, at[0], at[1])
         return self.slots[slot], span, self.masks.of(key)
+
+    def wants(self) -> tuple[str, list[str]] | None:
+        """The type of the form's field being decided now, and a choice's options; None where it is not a field."""
+        state = self.machine.state
+        if state is None or state[0] != "field" or state[2][0] != "value":
+            return None
+        return self.machine.forms.types.get(state[1][0])
 
     def take_tokens(self, step) -> None:
         """A decision whose span is in tokens (a model's own answer)."""

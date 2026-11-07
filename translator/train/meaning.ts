@@ -20,6 +20,10 @@
 //               the whole job, so four people doing 12 units is not four jobs of 12.
 //   a hold      `statement(kind=hold, hold=x)` is `statement(hold=x)`
 //   names       what a line calls the thing it makes is the writer's choice; one that nothing uses is no part of it
+//   id or words the same span written bare or quoted is one value, as the resolver reads it, except where the
+//               argument is read as an id and the words are a record's, an account's or a place's id: quoted, that
+//               is asked about (it is never a name the seat knows), bare it is acted on (READ_AS_ID, NOT_A_NAME;
+//               contracts/test/id-or-words.json holds this and the trained translator's fair scorer to the resolver)
 //
 // With `freeText: false` (0.9.4's ruling A, 2026-10-10: `sameButForFreeText`), what is copied free text is left out of
 // the comparison, as the scorer of the real requests has always left it (translator/eval/pilot-run.ts): three good
@@ -59,7 +63,27 @@ const LABELS: { [fn: string]: string[] } = { entity: ["kind"], position: ["role"
 /** Calls that mean the same made once to several or once to each: the function, and the argument listing them. */
 export const ONE_EACH: { [fn: string]: string } = { message: "to" };
 
+/** Arguments the resolver reads as an id or a name the seat knows (kernel/crates/resolver `id`, `need`, `ids`, `basis`,
+ * `visible`), as translator/model/py/fair.py `IDS` (less the arguments one function reads as words there). */
+const READ_AS_ID = new Set(["to", "from", "at", "from_at", "basis", "visible", "holder", "against", "appoint", "transfer", "release", "retire", "remove", "vacate", "withdraw", "with", "notice", "sign", "settles", "line", "investigate", "survey", "taken_at", "on", "materials_at", "close", "in", "who", "ballot", "hold", "cells", "re", "task", "type", "for", "by", "kind", "position", "registry"]);
+const READ_AS_WORDS_BY_FN = new Set(["money.for", "entity.kind", "statement.kind", "entity.position", "goods.by"]);
+/** A form's field types the resolver reads as words, not as an id. */
+const FIELD_WORDS = new Set(["amount", "duration", "count", "date", "choice", "structure_type", "text"]);
+/** Ids that are never a name the seat knows (records, accounts, laws, forms, messages, places): fair.py `_NOT_A_NAME`. */
+export const NOT_A_NAME = /^(rec|msg|str|cell|sp|draft)\.|^(acc|lot|law|form|house|apts|shop)-/;
+const readAsId = (fn: string, key: string, fields: { [name: string]: { type: string } } | undefined): boolean =>
+  fn === "form" ? key === "to" || (key !== "form" && key !== "for" && !FIELD_WORDS.has(fields?.[key]?.type ?? "text")) : READ_AS_ID.has(key) && !READ_AS_WORDS_BY_FN.has(`${fn}.${key}`);
+
 type Norm = string | Norm[] | { [k: string]: Norm };
+/** A name where an id goes, as the seat finds it (Knowledge::by_name) among those it knows by an id: as written, without
+ * `the`, without a closing word for a post; the id it is where that is written as an id (fair.py `as_found`). */
+function foundAs(x: string): string {
+  const lower = x.trim().toLowerCase();
+  const bare = lower.startsWith("the ") ? lower.slice(4).trimStart() : lower;
+  const post = /^(.*\S)\s+(job|post|position|office)$/.exec(bare)?.[1];
+  const asId = (y: string) => /^[a-z0-9_.:\/-]+$/.test(y) && !NOT_A_NAME.test(y);
+  return post !== undefined && asId(post) ? post : asId(bare) ? bare : x;
+}
 
 const attempt = <T>(f: () => T): T | undefined => {
   try {
@@ -145,6 +169,8 @@ function call(c: calls.Call, ctx: MeaningContext, names: Map<string, string>): {
     if (c.fn === "form" && key === "form" && form !== undefined) n = form;
     else if ("call" in v) n = call(v.call, ctx, names);
     else if ("var" in v) n = { made: names.get(v.var) ?? v.var };
+    else if ("text" in v && readAsId(c.fn, key, fields) && NOT_A_NAME.test(v.text.trim())) n = { asked: v.text.trim() };
+    else if (("text" in v || ("id" in v && /[A-Z]/.test(v.id) && !names.has(v.id))) && readAsId(c.fn, key, fields)) n = foundAs("text" in v ? v.text : v.id);
     else if ("id" in v) n = names.has(v.id) ? { made: names.get(v.id)! } : scalar(kind, v.id, ctx);
     else if ("text" in v) n = scalar(kind, loose && kind === undefined ? v.text.replace(/[.\s]+$/, "") : v.text, ctx);
     else if (Array.isArray(v.json) && v.json.every((x) => typeof x === "string")) {

@@ -274,6 +274,43 @@ class Translator(nn.Module):
                     break
         return steps, math.exp(sure), {**{k: math.exp(v) for k, v in parts.items()}, "least": math.exp(least)}
 
+    # Field-type masks (slots.fits_type; docs/design/translator-v3.md, section 1): on, a form's field takes only a value
+    # its type allows. The choices are tried from the likeliest; a copy, at its likeliest spans that fit (the best
+    # TYPED_SPANS starts, each with its best TYPED_SPANS ends); a choice with none that fits gives way to the next.
+    type_masks = True
+    TYPED_SPANS = 8
+
+    def typed_choice(self, state, p, read, pad, follow, wants):
+        from slots import fits_type
+        dev = p.device
+        ftype, options = wants
+        order = [int(i) for i in torch.argsort(p, descending=True) if torch.isfinite(p[i])]
+        for c in order:
+            if c < self.first_pointer:
+                return c, 0, 0, None, None
+            kind = torch.tensor([[c - self.first_pointer]], device=dev)
+            ps = F.log_softmax(self.start_scores(state, kind, read, pad)[0, 0], -1)
+            best = None
+            for a in torch.topk(ps, min(self.TYPED_SPANS, ps.shape[0])).indices.tolist():
+                pe = F.log_softmax(self.end_scores(state, kind, torch.tensor([[a]], device=dev), read, pad)[0, 0], -1)
+                for z in torch.topk(pe, min(self.TYPED_SPANS, pe.shape[0])).indices.tolist():
+                    if z < a or not torch.isfinite(pe[z]):
+                        continue
+                    x, y = follow.t.span[a][0], follow.t.span[z][1]
+                    if fits_type(POINTERS[c - self.first_pointer], follow.text[x:y] if y > x else "", ftype, options):
+                        score = float(ps[a]) + float(pe[z])
+                        if best is None or score > best[0]:
+                            best = (score, a, z, ps, pe)
+            if best is not None:
+                return c, best[1], best[2], best[3], best[4]
+        # (Nothing it may take fits: its likeliest, as without the masks; the resolver asks.)
+        c = order[0]
+        kind = torch.tensor([[c - self.first_pointer]], device=dev)
+        ps = F.log_softmax(self.start_scores(state, kind, read, pad)[0, 0], -1)
+        a = int(ps.argmax())
+        pe = F.log_softmax(self.end_scores(state, kind, torch.tensor([[a]], device=dev), read, pad)[0, 0], -1)
+        return c, a, int(pe.argmax()), ps, pe
+
     @torch.no_grad()
     def translate_slots(self, f: dict[str, torch.Tensor], follow, masks: torch.Tensor | None = None, whole: bool = False) -> tuple[list, float, dict]:
         """One request, greedily, slot by slot: `follow` (slots.Follow) says what is to be decided next and what it
@@ -310,13 +347,17 @@ class Translator(nn.Module):
             allowed = (follow.masks.rows[mask] if masks is None else masks[mask]).to(dev)
             p = F.log_softmax(self.choose(state)[0, 0].masked_fill(~allowed, float("-inf")), -1)
             c = int(p.argmax())
+            wants = follow.wants() if self.type_masks and hasattr(follow, "wants") else None
+            if wants is not None:
+                c, a, z, ps, pe = self.typed_choice(state, p, read, pad, follow, wants)
             sure += float(p[c]); parts["choices"] += float(p[c]); least = min(least, float(p[c]))
             if c >= self.first_pointer:
                 kind = torch.tensor([[c - self.first_pointer]], device=dev)
-                ps = F.log_softmax(self.start_scores(state, kind, read, pad)[0, 0], -1)
-                a = int(ps.argmax())
-                pe = F.log_softmax(self.end_scores(state, kind, torch.tensor([[a]], device=dev), read, pad)[0, 0], -1)
-                z = int(pe.argmax())
+                if wants is None:
+                    ps = F.log_softmax(self.start_scores(state, kind, read, pad)[0, 0], -1)
+                    a = int(ps.argmax())
+                    pe = F.log_softmax(self.end_scores(state, kind, torch.tensor([[a]], device=dev), read, pad)[0, 0], -1)
+                    z = int(pe.argmax())
                 sure += float(ps[a]) + float(pe[z])
                 parts["texts" if POINTERS[c - self.first_pointer] == "text" else "places"] += float(ps[a]) + float(pe[z])
                 least = min(least, float(ps[a]), float(pe[z]))

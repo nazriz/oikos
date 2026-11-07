@@ -10953,3 +10953,57 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   memory; it is noted here, not acted on.
 - **Revisit if:** the 50,000-person two-year run on this build still steps at its elections (then what a mind keeps
   of its book's assertions is read from the book when asked, not copied).
+
+## 2026-11-07 · The translator as part of the instrument: fair scoring, field-type masks, the scope-request check (no model trained, no paid call)
+
+Naz: the translator is part of the measuring instrument; the delegation study depends on it reading every model's
+words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned on a test set). Everything is in
+`runs/translator-fair-2026-11-07/` on the run server.
+
+- **Fair scoring (translator/model/py/fair.py).** The trainer's score counts a pass right only where every decision
+  is the label's. Now an answer also counts where the resolver would act on it the same: the same value bare or quoted
+  where the argument is read as words (an amount, a count, a date, a choice, a form's name) or as the id of something
+  the seat knows by name (an organisation, a person, a post); never where it is a record's, an account's or a place's
+  id, which quoted is asked about (`named` finds only names); the same value copied from elsewhere in the input (an
+  option from the form's line); copied free text whose edges differ only by punctuation or at most two words with no
+  figure. Checked against the resolver, not assumed: `contracts/test/id-or-words.json`, 13 pairs resolved by the
+  engine's resolver (`id_or_words_as_the_shared_table_says`) and read by both scorers (translator/test/free-text.test.ts).
+  `meaning.ts` (the scorer of the test pilots and of release) follows the same table: a quoted record's or account's
+  id is no longer the bare one, and a post's id with a capital is its name.
+  **validation-real (724 passes): exact 583 (80.5%), fair 642 (88.7%).** Of the 59 now counted: 39 bare or quoted alone,
+  9 free-text edges alone, 4 the same value from elsewhere, 7 two of these. **The test pilots (RR, translator/eval/rr.ts) do not move**:
+  already scored by meaning, as released 69 right and 6 wrong of 75 drafts (8.0%), unreleased 173 right and 182 wrong
+  of 359.
+- **Labels made one way** (`fair.py` `canonical`): where the key wrote one kind of value both ways, read as an id it
+  is bare where written as an id (a quoted record's id was asked about: the label was wrong), read as words a number
+  quoted and a word bare, as the key mostly does. Copies in `runs/translator-fair-2026-11-07/data-v3-fair/` (the
+  originals untouched): train 5,380 decisions in 4,942 of 87,315 rows, validation 173, validation-uf 17,
+  validation-real 86. Against them the model scores fair 646 and exact 548 (it learnt the mixed key). For the retrain.
+- **Field-type masks** (translator-v3 section 1, now built: py/slots.py `fits_type`, py/model.py `typed_choice`, on
+  in serving). A form's field takes only a value its type allows: a choice one of its options; a record, account, lot,
+  structure, space or cell an id written bare; an entity, person or post an id or a short name; an amount or count a
+  figure or number word and never an id with a figure; a date a figure. The choices are tried from the likeliest, a
+  copy at its likeliest spans that fit. Each is a condition every amount and date the resolvers read meets
+  (amounts.json, dates.json; translator/test/model-slots.test.ts). **Effect: small.** validation-real and the unseen
+  forms unchanged (a first draft that refused `four` and `kr0` as ids was caught and fixed); on the test pilots as
+  released wrong drafts 6 to 5 (5 of 74, 6.8%), unreleased 182 to 181. What is left wrong is a wrong value of the right
+  kind (an amount, the side of a membership, a record), which a mask cannot see.
+- **A request of several lines** (a checklist, a list) crashed the reader (`predict.py`, a line of the request read as
+  a form): the adapter shows the request on one line, each break a space, every character where it stood (`oneLine`).
+  No test pilot request had a break; a list-writing seat's every multi-line request would have failed.
+- **The scope-request check (translator/eval/scope-run.ts, scope-requests.jsonl).** 148 assistants' requests, 67
+  asking for more scope or means and 81 easily confused with one (advice that the client should spend more, a request
+  to go ahead, a report of missing access, a handover, a letter, the client's own grant application), written for this
+  from one brief by claude-sonnet-5-5 (formal, structured, terse), claude-haiku-5-5 (hedged, blunt, second-language)
+  and codex gpt-6-luna (plain, checklist); none from a pilot. A test set: not for training. **`scope_request` and the
+  other assistants' papers were never in this model's training** (they came after it): a retrain item. Our model
+  alone files `scope_request` for **20 of 67 (30%)**, and for **none of the 81** others. It is a matter of words: 14 of
+  20 codex requests (which say "file a scope request"), 5 of 27 sonnet, 1 of 20 haiku; structured, blunt and
+  second-language styles 0. The rest it reads as no act (21), a letter (10), a claim (7) or other forms. As served,
+  66 of 67 go behind to Sonnet (the form is on trial, a kind unreleased, cut off, form check, or a refusal that does
+  not stand), so the study counts Sonnet's reading; one is refused `not_an_act` at 0.97, which stands, and is lost.
+  Sonnet's reading was not measured (it is the seats' subscription). Risk TR-8.
+- **Revisit if** the resolver's `named` comes to find records or accounts by their ids (then quoted ids are the same
+  everywhere); a retrain on `data-v3-fair` moves exact toward fair; a mask is seen to refuse a value a resolver reads;
+  Sonnet behind is measured on the scope set (before the study counts requests for more scope); or `not_an_act` is
+  seen to stand over a request that asks for something.
