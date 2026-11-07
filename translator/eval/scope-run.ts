@@ -47,7 +47,8 @@ interface Case { id: string; writer: string; style: string; situation: string; l
 const cases: Case[] = readFileSync(file, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
 const adapter = new DecideAdapter(model.slice(7), { first: true, quiet: true });
 await adapter.ready();
-const rows = [];
+interface Read { id: string; writer: string; style: string; label: string; scope: boolean; read_as_scope: boolean; level_asked: string | null; level_read: string | null; served: string; wrote: string; sure: number }
+const rows: Read[] = [];
 for (const c of cases) {
   const a = await adapter.translate(c.request, SITUATIONS[c.situation]!, { who: `scope/${c.situation}` });
   const wrote = a.wrote ?? a.program;
