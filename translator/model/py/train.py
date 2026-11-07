@@ -21,6 +21,7 @@ from safetensors.torch import save_file
 
 from model import Config, POINTERS, Translator, features
 from limits import reader_pieces
+from fair import compare
 from slots import Follow, Masks, slot_names
 from tokens import spans, text_of, to_pieces, tokenize
 
@@ -292,6 +293,7 @@ def score(model: Translator, items: list[dict], device: torch.device) -> dict:
     total = {"positive": 0, "refusal": 0}
     by_mode: dict = {}
     results = []
+    fair = 0
     for i in items:
         if "slot" in i:
             steps, sure, _ = model.translate_slots(single(i["f"], device), Follow(model.cfg.grammar, model.cfg.slots, model.masks, i["text"], i["tokens"], mode=i["row"].get("mode", "full")))
@@ -301,13 +303,16 @@ def score(model: Translator, items: list[dict], device: torch.device) -> dict:
         if "tokens" in i:
             steps = to_pieces(i["tokens"], i["row"]["at"], steps)
         ok = steps == i["row"]["steps"]
+        # (Fair: as the resolver would act on it, fair.py; slot-by-slot models only.)
+        fair_ok = ok or (model.cfg.decoding in ("slots", "cards") and compare(i["row"], steps, model.cfg.grammar)[0])
+        fair += fair_ok
         kind = i["row"]["kind"]
         total[kind] += 1; right[kind] += ok
         mode = i["row"].get("mode")
         if mode:
             by_mode.setdefault(mode, [0, 0]); by_mode[mode][0] += ok; by_mode[mode][1] += 1
-        results.append({"id": i["row"]["id"], "right": ok, "sure": sure, "steps": steps, **({"mode": mode} if mode else {})})
-    return {"right": sum(right.values()), "of": len(items), "by_kind": {k: [right[k], total[k]] for k in total}, **({"by_mode": by_mode} if by_mode else {}), "results": results}
+        results.append({"id": i["row"]["id"], "right": ok, "fair": fair_ok, "sure": sure, "steps": steps, **({"mode": mode} if mode else {})})
+    return {"right": sum(right.values()), "fair": fair, "of": len(items), "by_kind": {k: [right[k], total[k]] for k in total}, **({"by_mode": by_mode} if by_mode else {}), "results": results}
 
 
 def main() -> None:

@@ -187,6 +187,9 @@ export const CUT_OFF = 0.1;
 export type Withheld = "cut_off" | "form_check" | "no_program" | "too_long" | "form_not_shown" | "forms_subset" | "form_unseen" | "type_unreleased" | "probation";
 
 /** A field's kind of value as a form's line shows it: `choice` for one of a few options, else the type it names. */
+/** A request as the model is shown it: on one line, each line break a space (adapter.translate). */
+export const oneLine = (request: string): string => request.replace(/[\r\n]/g, " ");
+
 export function fieldTypes(line: string): string[] {
   const f = line.indexOf(": fields ");
   if (f < 0) return [];
@@ -406,7 +409,10 @@ export class DecideAdapter implements LlmAdapter {
     for (;;) {
       at_ = taken(order, n);
       forms = at_.map((i) => all[i]!);
-      input = inputOf(request, forms);
+      // (A request of several lines, a list or a checklist, is read as one: a new line is where the input's next form
+      // begins, so a request's own would be read as forms, and a line of it that starts "- " as a form. A space in
+      // its place keeps every character where it stood.)
+      input = inputOf(oneLine(request), forms);
       ps = pieces(input);
       const breaks: number[] = [];
       for (let at = input.indexOf("\n"); at >= 0; at = input.indexOf("\n", at + 1)) breaks.push(ps.findIndex((p) => p.at[0] > at));
