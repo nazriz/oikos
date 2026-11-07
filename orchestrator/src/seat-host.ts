@@ -53,6 +53,8 @@ export interface ModelSeatOptions {
   budget?: Budget;
   framing: FramingSpec;
   effort?: string;
+  /** The most output a call may take, thinking included (default the participant's 4,000): an arm's `params.max_tokens`. */
+  maxTokens?: number;
   /** For a mock adapter: the post's code brain, which the mock seat reads its decisions from (participants/src/llm/mock.ts). */
   brain?: DetachedActor;
   /** Wraps the seat's adapter as it is used (the experiment's call recorder; for the mock, after the brain is put in). */
@@ -135,13 +137,16 @@ export class ModelSeat {
     this.dayBook = made.dayBook;
     this.view = new View(new Set(made.standingIds));
     this.ctx = ctxFor(o.seat, made.office?.id ?? "self", made.entity, {});
-    const config = { ...made.config, ...(o.effort ? { effort: o.effort } : {}) };
+    const config = { ...made.config, ...(o.effort ? { effort: o.effort } : {}), ...(o.maxTokens ? { maxTokens: o.maxTokens } : {}) };
 
     // What is kept back of the fork's limit for the debrief (VISION 15, point 7): no other call may spend it.
     if (o.budget) {
       const seatModel = `${o.adapter.provider}/${o.adapter.model}`;
       const calls = stepsOf("full", 3, true).length + 2;
-      const need = endNeedMicroUsd(endCosts(), { seats: 1, seatModel, seatReckoned: reckonedEndMicroUsd({ seats: 1, seatPrice: o.prices[seatModel], calls, promptChars: DEBRIEF_PROMPT_CHARS, answerTokens: Math.round(DEBRIEF_ANSWER_TOKENS / 2) }) });
+      // (Seats that share their fork's limit, a template steward's, keep back for every one of them: each seat made adds its own.)
+      const shared = o.budget as Budget & { seats?: number };
+      const seats = (shared.seats = (shared.seats ?? 0) + 1);
+      const need = endNeedMicroUsd(endCosts(), { seats, seatModel, seatReckoned: reckonedEndMicroUsd({ seats, seatPrice: o.prices[seatModel], calls, promptChars: DEBRIEF_PROMPT_CHARS, answerTokens: Math.round(DEBRIEF_ANSWER_TOKENS / 2) }) });
       o.budget.keptBackMicroUsd = keptBackFor(o.budget.limitMicroUsd, need.microusd).microusd;
       this.keptBack = o.budget.keptBackMicroUsd;
     }
@@ -199,9 +204,20 @@ export class ModelSeat {
   /** A log entry from the fork on (the debrief's record of what the seat did), and what of it the seat is told. */
   see(entry: any): void {
     this.records.add(entry);
+    // (A mock seat's brain is its code unit: told the id of each act of the seat's as it starts, as run.ts tells a twin
+    // seat's, so it knows its own outcomes. Not of an act the mock was scripted to make beside it: the brain never asked.)
+    const b = entry?.body;
+    if (this.o.brain && this.o.adapter.provider === "mock" && entry?.kind === "event" && b?.event === "action_started" && b.participant === this.o.seat) {
+      if (this.scripted > 0) this.scripted--;
+      else this.o.brain.sent(b.action);
+    }
     for (const n of toldOf(entry, this.o.seat, this.t, { thinking: this.lastThinking, letter: this.lastLetter })) this.notices.push(n);
   }
   private lastThinking = 0;
+  /** (Shown its channels whole: at its first sitting.) */
+  private handedOver = false;
+  /** (A mock seat's acts the mock was scripted to make, its brain not asking: not told to the brain as its own.) */
+  private scripted = 0;
   private lastLetter = false;
 
   async decide(w: SeatWake): Promise<{ action: object }> {
@@ -210,12 +226,20 @@ export class ModelSeat {
     inCurrency(this.currency);
     inCalendar(this.calendar);
     let raw: Observation = { ...w.observation, entity: this.entity };
+    // (A seat that takes a post over during a run, at a fork or once its system is put to work, is shown its channels
+    // whole at its first sitting: what was sent of them before went to its code twin, or to nobody. Its brain, where the
+    // mock plays it, is handed what the kernel sent, as before: a twin already knows the rest.)
+    const sent = raw;
+    if (!this.handedOver) {
+      this.handedOver = true;
+      try { const full = this.o.world.view(this.o.seat); if (full?.channels) raw = { ...joinRaw(full, raw), entity: this.entity } as Observation; } catch { /* (a seat the engine has no picture of yet: what it was sent) */ }
+    }
     // (What a model seat was shown is recorded in full: training data, as in every pilot.)
     this.o.world.annotate({ annotation: "observation", subject: this.o.seat, data: { t: w.t, observation: { ...raw, channels: Object.entries(raw.channels ?? {}).map(([path, c]) => ({ path, ...(c as object) })) } } });
     for (let turn = 0; turn < TURNS_PER_WAKE; turn++) {
       this.knowledge.absorb(raw);
       const obs: Observation = { ...this.view.apply(raw), woke_for: w.woke_for as Observation["woke_for"], since: w.since };
-      (obs as any)[RAW] = raw;
+      (obs as any)[RAW] = turn === 0 ? sent : raw;
       this.tally?.absorb(obs);
       this.dayBook.absorb(obs);
       if (this.roster) { this.roster.absorb(obs); this.knowledge.ownStaff = { role: this.roster.now(obs.t).role, inPost: this.roster.count(obs.t) }; }
@@ -326,6 +350,7 @@ export class ModelSeat {
     this.o.world.annotate({ annotation: "signoff", participant: this.o.seat, draft: d.id, draft_hash: p.hash, decision, ...(note ? { note } : {}) });
     this.arranged?.signed(d.id, decision);
     if (decision !== "accept") return undefined;
+    if (this.o.brain && this.o.adapter.provider === "mock" && /form=scope_request\b/.test(d.proposal ?? "")) this.scripted++;
     let by: string[] | undefined;
     if (d.call) try { by = this.performers(calls.parseProgram(d.call)).by; } catch { /* (a call that does not read names no one) */ }
     return { type: "act", blocks: d.blocks, ...(by?.length ? { by } : {}), ...(p.reasoning ? { reasoning: p.reasoning } : {}),
@@ -438,7 +463,7 @@ function withBrain(adapter: LlmAdapter, o: ModelSeatOptions, made: ReturnType<ty
   const part = o.config.participants.find((p: any) => p.id === o.seat);
   const pp = part?.controller?.params ?? {};
   const bctx = ctxFor(o.seat, cap ?? "self", made.entity, pp.mock?.params ?? {});
-  const mb: MockBrain = { controller: controller as any, ctx: bctx, capacity: cap ?? "self", cadence: brain.schedule().cadence };
+  const mb: MockBrain = { controller: controller as any, ctx: bctx, capacity: cap ?? "self", cadence: brain.schedule().cadence, ...(pp.mock?.scope_after_days !== undefined ? { scopeAt: o.world.t() + pp.mock.scope_after_days * 86_400 } : {}) };
   const policies = mockPolicies(new Map([[o.seat, mb]]));
   // (The mock's own name stays: the log says the mock answered, whatever the arm's model is called.)
   return new MockAdapter(adapter.model, policies);

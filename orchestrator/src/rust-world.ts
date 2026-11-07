@@ -127,6 +127,10 @@ export class RustWorld {
   check(participant: string, as: string | undefined, blocks: object[]): { ok: boolean; refusal?: any } {
     return JSON.parse(this.w.check(participant, as ?? null, JSON.stringify(blocks)));
   }
+  /** The full picture a participant's channels cover now (the kernel's `view`): nothing changes, nothing is logged. */
+  view(participant: string): any {
+    return JSON.parse(this.w.view(participant));
+  }
   questions(): { key: string; kind: string; about: string; body: unknown }[] {
     return JSON.parse(this.w.questions());
   }

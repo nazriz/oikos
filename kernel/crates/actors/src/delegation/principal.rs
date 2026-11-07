@@ -68,6 +68,32 @@ pub struct Params {
     /// The papers that say a matter went wrong, when they come back citing it (a complaint, a request to put it right).
     #[serde(default)]
     pub complaints: Vec<String>,
+    /// A delegation it has already decided on, by hand (`Commit`): absent, its rule decides everything.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commit: Option<Commit>,
+}
+
+/// A delegation decided by hand before its rule weighs anything (a study's design, or an owner's earlier choice, written
+/// into its parameters with the reason: docs/behaviour/assistants.md, "A delegation decided by hand"): the offer it takes,
+/// the level it puts each kind at once the service is in use, until when it holds those levels, and until when it keeps
+/// the service. Inside those times its rule does not change them; after them its rule takes over as ever. Its own word,
+/// as a remit's `hold_until` is: nothing outside it holds it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Commit {
+    /// The offer it takes (the offer's id, as published).
+    pub offer: String,
+    /// The level of each kind once the service is in use (kinds not named are left to its rule).
+    #[serde(default)]
+    pub levels: BTreeMap<String, Level>,
+    /// Until when (world seconds) it holds those levels.
+    #[serde(default)]
+    pub levels_until: i64,
+    /// Until when (world seconds) it keeps the service: it does not leave or replace it before then.
+    #[serde(default)]
+    pub keep_until: i64,
+    /// Why, in words: in every decision it logs under it.
+    #[serde(default)]
+    pub why: String,
 }
 fn d_finds() -> i64 {
     8_000
@@ -180,7 +206,8 @@ pub struct Delegating {
 impl Delegating {
     pub fn new(ctx: &Ctx, params: Value, inner: Box<dyn Actor>) -> Result<Self, String> {
         let p: Params = serde_json::from_value(params).map_err(|e| format!("{}: delegation: {e}", ctx.participant))?;
-        let next_review = p.review_days.max(1) * DAY;
+        // (A delegation decided by hand is taken up on the first day, not at the first review.)
+        let next_review = if p.commit.is_some() { DAY } else { p.review_days.max(1) * DAY };
         let me = ctx.entity.clone();
         Ok(Delegating {
             inner,
@@ -569,6 +596,11 @@ impl State {
             .is_some_and(|h| t < h)
     }
 
+    /// Whether a delegation decided by hand still keeps the service (it does not leave or replace it before then).
+    fn kept(&self, t: i64) -> bool {
+        self.p.commit.as_ref().is_some_and(|c| t < c.keep_until)
+    }
+
     /// Whether any remit of its own still holds it from changing its services (a withdrawal or a taking back held).
     fn holding(&self, t: i64) -> bool {
         self.book.all(Remit::KIND).filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str())).filter_map(|r| papers::read::<Remit>(r)).any(|x| x.hold_until.is_some_and(|h| t < h))
@@ -671,6 +703,10 @@ impl State {
             calls.push(say(Brief::KIND, &words, Say { to: Some(vec![e.offer.provider.clone()]), visible: Some(Visible::Only(vec![self.me.clone(), e.offer.provider.clone()])), basis: Some(a.clone()), data: Some(papers::data(&b)), ..Default::default() }));
             let s: Step<()> = because(format!("The service {} is in force: putting its system to work.", e.offer.title), calls);
             self.queue.push(Own { program: program_text(&s.program()), why: s.why.clone().unwrap_or_default(), then: Then::Briefed { agreement: a } });
+            // (A delegation decided by hand: its levels set the day after, not at the next review.)
+            if self.p.commit.is_some() {
+                self.next_review = self.next_review.min(t + DAY);
+            }
         }
         if t >= self.next_review {
             self.next_review = t + self.p.review_days.max(1) * DAY;
@@ -691,7 +727,7 @@ impl State {
             let a = e.agreement.clone().unwrap_or_default();
             let seen: BTreeMap<String, Seen> = e.offer.kinds.iter().filter_map(|k| self.seen.get(&Self::key(&a, k)).map(|s| (k.clone(), s.clone()))).collect();
             let x = rule::appraise(&terms(&e.offer), &kinds, &seen, &w, true);
-            if rule::leaving(&x, e.offer.exit, &w) && !self.holding(t) {
+            if rule::leaving(&x, e.offer.exit, &w) && !self.holding(t) && !self.kept(t) {
                 let mut inputs = self.inputs(&e, &seen);
                 inputs.push(e.delivery.clone());
                 cx.decided(json!({ "domain": "delegation", "choice": "leave", "agreement": a, "saving": x.saving.to_string(), "fee": x.fee.to_string(), "volume": volume, "inputs": inputs }));
@@ -703,7 +739,7 @@ impl State {
                 return;
             }
             // (Another provider's offer that pays better by more than changing costs: leaving this one for it.)
-            if !self.holding(t) {
+            if !self.holding(t) && !self.kept(t) {
                 let change = |o: &ServiceOffer| i128::from(e.offer.exit.max(0) + o.setup.max(0)) / i128::from(w.horizon_months.max(1));
                 let better = services::offers_of(&self.book)
                     .into_iter()
@@ -725,6 +761,15 @@ impl State {
                 }
             }
             for k in &e.offer.kinds {
+                // (A level decided by hand, while it holds: written once, held by its remit's own word.)
+                if let Some((want, until, why)) = self.p.commit.as_ref().filter(|c| c.offer == e.offer.id && t < c.levels_until).and_then(|c| c.levels.get(k).map(|l| (*l, c.levels_until, c.why.clone()))) {
+                    if self.remit(&a, k) != want && !self.held(&a, k, t) {
+                        cx.decided(json!({ "domain": "delegation", "choice": "remit", "agreement": a, "kind": k, "from": self.remit(&a, k), "to": want, "committed": why, "hold_until": until, "inputs": self.inputs(&e, &seen) }));
+                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: Some(until) };
+                        self.paper(Remit::KIND, &format!("From now, {}s: {}.", k.replace('_', " "), want.words()), &a, &a, papers::data(&r), Then::Plain);
+                    }
+                    continue;
+                }
                 let Some(kind) = kinds.get(k) else { continue };
                 if self.held(&a, k, t) {
                     continue;
@@ -752,6 +797,19 @@ impl State {
             return;
         }
         self.ordering = None;
+        // (A delegation decided by hand: the offer it named, whatever its rule would say, once it can see it on offer.)
+        if let Some(c) = self.p.commit.clone().filter(|c| t < c.keep_until) {
+            match services::offers_of(&self.book).into_iter().find(|(_, o)| o.id == c.offer && o.for_ == self.p.takes()) {
+                Some((rec, o)) => {
+                    let x = rule::appraise(&terms(&o), &kinds, &BTreeMap::new(), &w, false);
+                    cx.decided(json!({ "domain": "delegation", "choice": "engage", "offer": o.id, "provider": o.provider, "committed": c.why, "levels": c.levels, "saving": x.saving.to_string(), "fee": x.fee.to_string(), "volume": volume, "inputs": [rec] }));
+                    self.order(&o, &x, t, cx);
+                }
+                // (Not on offer yet where it can see: it looks again tomorrow.)
+                None => self.next_review = self.next_review.min(t + DAY),
+            }
+            return;
+        }
         // (No service in use: whether one it can see on offer pays.)
         let mut top: Option<(String, ServiceOffer, Appraisal)> = None;
         for (rec, o) in services::offers_of(&self.book) {

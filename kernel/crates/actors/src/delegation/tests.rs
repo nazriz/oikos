@@ -210,6 +210,41 @@ fn a_service_too_dear_for_what_it_saves_is_not_taken() {
 }
 
 #[test]
+fn a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after() {
+    // (A study's design: the principal has decided to take this offer, notices at draft, for 60 days, and to keep the
+    // service for 90; the offer is far too dear for its rule ever to take.)
+    let script: Vec<Value> = (1..=120).map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
+    let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 60 * DAY, "keep_until": 90 * DAY, "why": "the study's design" });
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "commit": commit } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    let day1 = all(&h.wake(DAY + 3600, world(vec![offer_rec(5_000_000)])));
+    assert!(day1.contains("kind=order") && day1.contains("service:assist"), "it takes the offer it decided on, on the first day: {day1}");
+    let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).unwrap() as i64 + 1);
+    h.wake(32 * DAY + 3600, world(set_up(&order)));
+    h.wake(33 * DAY + 3600, world(vec![signed()]));
+    let remit = h.sent.iter().rev().find(|p| p.contains("kind=remit")).cloned().unwrap_or_default();
+    assert!(remit.contains("\"level\":\"draft\"") && remit.contains(&format!("\"hold_until\":{}", 60 * DAY)), "its levels once in use, held by its own word: {}", all(&h.sent));
+    let d = h.decisions.iter().find(|d| d["choice"] == "remit").expect("the remit's decision");
+    assert_eq!(d["committed"], "the study's design");
+    // (Its review days come and go: too dear to keep by its rule, it keeps the service until the day it said.)
+    let held = json!({ "id": "rec.remit", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 34 * DAY, "visible_to": [ME, PROV],
+        "kind": "remit", "text": "From now", "addressed_to": [PROV], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "notice_to_vacate", "level": "draft", "hold_until": 60 * DAY } });
+    let mut kept = String::new();
+    for d in 35..=89 {
+        kept.push_str(&all(&h.wake(d * DAY + 3600, world(if d == 35 { vec![held.clone()] } else { vec![] }))));
+    }
+    assert!(!kept.contains("notice=agr.1") && !h.decisions.iter().any(|d| d["choice"] == "leave"), "no leaving before the day it said");
+    let mut after = String::new();
+    for d in 90..=125 {
+        after.push_str(&all(&h.wake(d * DAY + 3600, world(vec![]))));
+    }
+    // (The service as delivered is the cheap one: by its rule it keeps it, and moves the level where the rule says.)
+    assert!(after.lines().any(|l| l.contains("kind=remit") && l.contains("\"level\":\"alone\"") && !l.contains("hold_until")), "then its rule takes over: {after}");
+}
+
+#[test]
 fn levels_are_read_from_the_newest_remit_and_lines_name_their_kinds() {
     let p = parse_program(&format!("{NOTICE}\nstatement(withdraw=rec.4)")).unwrap();
     assert_eq!(kinds_of(&p), vec!["notice_to_vacate".to_string()]);

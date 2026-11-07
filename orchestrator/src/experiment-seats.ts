@@ -28,7 +28,7 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { costMicroUsd, MockAdapter, mockPolicies, PRICES, type FramingSpec, type LlmAdapter, type Price } from "@oikos/participants/llm";
+import { costMicroUsd, MockAdapter, mockPolicies, PRICES, type Budget, type FramingSpec, type LlmAdapter, type Price } from "@oikos/participants/llm";
 import { chooseModel, priceTable } from "./models";
 import { ModelSeat, waitingAdapter } from "./seat-host";
 import type { ExperimentSpec, SeatFactories, SeatFactory } from "./experiment";
@@ -53,13 +53,22 @@ export interface SeatsSpec {
   /** A key that bills a card may be used (`openai/`): only with the owner's go-ahead. (`anthropic/` is the prepaid
    * credit, allowed: OIKOS_ANTHROPIC_KEY.) */
   allow_paid_api?: boolean;
+  /** Models otherwise never seated (the largest Claude model, Fable) that the owner has allowed for this experiment, on
+   * the API's prepaid credit only (`anthropic/`), each with his word and its date: the refusal stands for every other
+   * route (a plan's usage, which is what the rule protects) and for the translator. gpt-6-astra is never allowed. */
+  allow_models?: { model: string; why: string }[];
   /** The most calls of one provider in flight at once in a worker process (default 4): a plan's rate, and the machine's
    * memory (each `claude -p` is a process). Only when a fork's calls are made changes; never what the world does. */
   calls_at_once?: number;
 }
 
-/** Models that are never seated or used as a translator here, by the owner's word. */
+/** Models that are never seated or used as a translator here, by the owner's word (2026-10-09: "it drains usage too
+ * much", of his plan), unless an experiment names one in `seats.allow_models` for the API's credit. */
 export const NEVER = /astra|fable|opus/i;
+
+/** Whether a spec allows an otherwise refused model in a seat: on the API's credit, named with a reason, never astra. */
+export const allowedSeat = (spec: ExperimentSpec, model: string): boolean =>
+  model.startsWith("anthropic/") && !/astra/i.test(model) && !!spec.seats?.allow_models?.some((x) => x.model === model && x.why?.trim());
 /** Providers through what the owner already has (a plan, a subscription, the API credit his plan includes; nothing
  * billed beyond it): the default allowed. */
 export const PLAN_PROVIDERS = new Set(["anthropic", "claude-code", "codex"]);
@@ -73,7 +82,7 @@ export function modelProblems(spec: ExperimentSpec): string[] {
   const check = (what: string, m: string | undefined, translator = false) => {
     if (!m) return;
     const provider = m.split("/")[0]!;
-    if (NEVER.test(m)) out.push(`${what}: ${m} is never used here (the largest Claude model, Fable and gpt-6-astra are not)`);
+    if (NEVER.test(m) && !(what.startsWith("arm ") && allowedSeat(spec, m))) out.push(`${what}: ${m} is never used here (the largest Claude model, Fable and gpt-6-astra are not${what.startsWith("arm ") ? ", unless seats.allow_models names it on the API's credit with the owner's word" : ""})`);
     if (PAID.has(provider) && !spec.seats?.allow_paid_api) out.push(`${what}: ${m} is a paid API; seats go through what the owner has (anthropic/, claude-code/, codex/) unless the owner's go-ahead sets seats.allow_paid_api`);
     if (!PLAN_PROVIDERS.has(provider) && !PAID.has(provider) && provider !== "mock" && !(translator && provider === "decide")) out.push(`${what}: provider ${provider} is not one an experiment seats (anthropic, claude-code, codex${translator ? ", decide for our own translator" : ""})`);
   };
@@ -192,17 +201,32 @@ export function closeAdapters(): void {
  * The seat factory for the providers an experiment seats: a `ModelSeat` (seat-host.ts) in the post, the translator
  * arrangement, the arm's framing, the fork's spending limit, and in a dry run the mock in each model's place.
  */
+/** One fork's record of calls and one spending limit, shared by every seat of the fork (by its world: a template steward
+ * has several seats, made as their systems first wake, and together they may spend only the fork's limit). */
+const forkShares = new WeakMap<object, Map<string, { rec: ReturnType<typeof callRecorder>; budget?: Budget }>>();
+
 export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
   const make: SeatFactory = (a) => {
     if (!a.world || !a.config || a.seed === undefined || !a.dir) throw new Error("a model seat needs its fork (the harness passes world, config, seed and dir)");
     const dry = mockModels(spec);
     const arm = spec.arms.find((x) => x.steward.kind === "model" && x.steward.model === a.model && (!a.arm || x.name === a.arm))!;
     const steward = arm.steward as Extract<typeof arm.steward, { kind: "model" }>;
-    const rec = callRecorder(join(a.dir, `${a.arm ?? "arm"}.calls.jsonl`), { seed: a.seed, arm: arm.name, seat: a.seat });
-    // (A fork taken up again after an interruption: what its earlier attempts spent comes off its limit, so the
-    // experiment's total still holds.)
-    const allotted = forkLimits(spec)[arm.name];
-    const limit = allotted === undefined ? undefined : Math.max(0, allotted - rec.earlierMicroUsd / 1e6);
+    const key = `${a.dir}|${arm.name}|${a.seed}`;
+    let forks = forkShares.get(a.world);
+    if (!forks) forkShares.set(a.world, (forks = new Map()));
+    let fork = forks.get(key);
+    if (!fork) {
+      const rec = callRecorder(join(a.dir, `${a.arm ?? "arm"}.calls.jsonl`), { seed: a.seed, arm: arm.name, seat: a.seat });
+      // (A fork taken up again after an interruption: what its earlier attempts spent comes off its limit, so the
+      // experiment's total still holds.)
+      const allotted = forkLimits(spec)[arm.name];
+      const limit = allotted === undefined ? undefined : Math.max(0, allotted - rec.earlierMicroUsd / 1e6);
+      fork = { rec, ...(limit !== undefined ? { budget: { limitMicroUsd: Math.round(limit * 1e6), spentMicroUsd: 0 } } : {}) };
+      forks.set(key, fork);
+    }
+    const rec = fork.rec.forSeat(a.seat);
+    // (A system delivered during the run is not in the config: it is seated as its template's, which the cast knows.)
+    const config = a.config.participants.some((p: any) => p.id === a.seat) ? a.config : withDelivered(a.config, a.seat, a.cast?.parts.get(a.seat)?.template, a.cast?.held(a.seat).map((x) => x.id) ?? []);
     const prices: Record<string, Price> = { ...PRICES, ...priceTable() };
     // (In a dry run the mock plays every model, priced as the model it plays, so the limits bite as they would. Each
     // attempt at a call is recorded, inside the wait for a shut window: a wait is a refused call, then another.)
@@ -223,10 +247,10 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
     const debriefsFile = join(a.dir, `${a.arm ?? "arm"}.debriefs.jsonl`);
     if (!existsSync(a.dir)) mkdirSync(a.dir, { recursive: true });
     const seat = new ModelSeat({
-      world: a.world, config: a.config, seat: a.seat, post: a.post, seed: a.seed, model: a.model, adapter: seatAdapter,
+      world: a.world, config, seat: a.seat, post: a.post, seed: a.seed, model: a.model, adapter: seatAdapter,
       translator: { behind, ...(first ? { first, arrangement: t?.arrangement ?? "then" } : {}) }, prices,
-      ...(limit !== undefined ? { budget: { limitMicroUsd: Math.round(limit * 1e6), spentMicroUsd: 0 } } : {}),
-      framing: steward.framing ?? spec.seats?.framing ?? "unstated", ...(a.effort ? { effort: a.effort } : {}),
+      ...(fork.budget ? { budget: fork.budget } : {}),
+      framing: steward.framing ?? spec.seats?.framing ?? "unstated", ...(a.effort ? { effort: a.effort } : {}), ...(typeof steward.params?.max_tokens === "number" ? { maxTokens: steward.params.max_tokens } : {}),
       ...(a.brain ? { brain: a.brain } : {}), ...(dry ? { record: (x: LlmAdapter) => rec.wrap(x, a.model) } : {}), debriefsFile, untilT: spec.untilDay * 86_400, ...(a.cast ? { cast: a.cast } : {}),
     });
     seat.start();
@@ -234,6 +258,17 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
   };
   const wait = (x: LlmAdapter) => waitingAdapter(x, { waitMs: 15 * 60_000, maxWaitMs: (spec.seats?.wait_for_window_hours ?? 12) * 3_600_000 });
   return { anthropic: make, "claude-code": make, codex: make, ...(spec.seats?.allow_paid_api ? { openai: make } : {}) };
+}
+
+/** The config with a system delivered during the run added as its template makes it (its controller, framing and
+ * title): a seat is made from the config's participant. Unknown template: the config as it is (the seat then says so). */
+export function withDelivered(config: any, seat: string, template?: string, holds: string[] = []): any {
+  const t = (config.templates ?? []).find((x: any) => x.id === template);
+  if (!t) return config;
+  const part = { id: seat, kind: "system", template: t.id, ...(t.supplier ? { supplier: t.supplier } : {}), ...(t.title ? { title: t.title } : {}), controller: structuredClone(t.controller), ...(t.framing ? { framing: structuredClone(t.framing) } : {}) };
+  // (And the posts it holds now, as the cast has them: the config's are as they were at the start, vacant.)
+  const positions = (config.positions ?? []).map((x: any) => (holds.includes(x.id) ? { ...x, holder: seat } : x));
+  return { ...config, participants: [...config.participants, part], positions };
 }
 
 /** The mock in a model's place: named for the model it plays, so the log and the costs say which arm it was. */
@@ -267,11 +302,11 @@ export function callRecorder(file: string, who: { seed: number; arm: string; sea
   const earlierMicroUsd = earlier.reduce((a: number, x: any) => a + (Number(x.cost_microusd) || 0), 0);
   const st: CallStats = { attempt, calls: 0, errors: 0, input_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, output_tokens: 0, cost_microusd: 0, earlier_microusd: earlierMicroUsd, ms: { total: 0, p50: null, p95: null, max: null }, by: {}, error_kinds: {} };
   const times: number[] = [];
-  const wrap = (a: LlmAdapter, named: string): LlmAdapter => ({
+  const wrap = (a: LlmAdapter, named: string, seat: string = who.seat): LlmAdapter => ({
     provider: a.provider, model: a.model,
     complete: async (req) => {
       const t0 = performance.now();
-      const line: any = { attempt, seed: who.seed, arm: who.arm, seat: who.seat, subject: req.subject, purpose: req.purpose, model: named, at: new Date().toISOString() };
+      const line: any = { attempt, seed: who.seed, arm: who.arm, seat, subject: req.subject, purpose: req.purpose, model: named, at: new Date().toISOString() };
       const k = `${req.purpose} ${named}`;
       const b = (st.by[k] ??= { calls: 0, errors: 0, input_tokens: 0, cache_read_tokens: 0, output_tokens: 0, cost_microusd: 0, ms: 0 });
       try {
@@ -296,5 +331,8 @@ export function callRecorder(file: string, who: { seed: number; arm: string; sea
     },
   });
   const summary = (): CallStats => ({ ...st, ms: { total: st.ms.total, p50: quantile(times, 0.5), p95: quantile(times, 0.95), max: times.length ? Math.max(...times) : null } });
-  return { wrap, summary, attempt, earlierMicroUsd };
+  /** The same record, its lines naming another seat of the fork (a template steward's seats share one record). */
+  const forSeat = (seat: string) => ({ ...self, wrap: (a: LlmAdapter, named: string) => wrap(a, named, seat) });
+  const self = { wrap, summary, attempt, earlierMicroUsd, forSeat };
+  return self;
 }
