@@ -187,7 +187,7 @@ const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "
  * kinds `also`), looked into with what to find; and who's who, one at a time. Until 2026-11-08 the terms and matters
  * were one channel set out whole at every sitting and the post had nothing to look into: the scope pilot's seats asked
  * to check what they had been handed and whether a paper had gone, and could not; and a collector they knew only as an
- * id in a referral's words could not be named (risk register: docs/risks.md). */
+ * id in a referral's words could not be named (docs/decisions.md, 2026-11-08, "The scope pilot's first round"). */
 const ASSISTANT_TERMS = ["service_delivery", "service_ended", "brief", "remit"];
 const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "handover"];
 const assistantChannels = (also: string[] = []) => [

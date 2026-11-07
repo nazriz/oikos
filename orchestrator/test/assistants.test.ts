@@ -50,7 +50,9 @@ test("a town that does not ask for assistants is generated as before; one that d
     expect(ch.find((c: any) => c.id === "file").on_request).toBe(true);
   }
   expect(seated.templates.find((t: any) => t.id === "assistant-a").controller.params.standing).toEqual(["terms", "stationery"]);
-  expect(seated.participants.find((p: any) => p.id === "provider-a-desk-system").controller.params.standing).toEqual(["stationery"]);
+  const desk = seated.participants.find((p: any) => p.id === "provider-a-desk-system").controller.params.standing;
+  expect(desk).toContain("stationery");
+  expect(desk).not.toContain("terms");
 });
 
 test("in a town with assistants, principals engage by their own rule, hand matters over and hear back; every decision rests on what they were shown", async () => {

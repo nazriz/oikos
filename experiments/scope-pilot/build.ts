@@ -31,10 +31,14 @@ const PERSON_LEVELS = {
   review_request: "draft", complaint: "advice", tribunal_response: "advice",
 };
 
-/** The offices that engage: one landlord's office and the town's finance office. */
-export const OFFICES = ["landlord-1-office", "finance"];
-/** One adult in this many is in the household cohort (offset by the seed): about 18 people in the thousand-person town. */
-export const COHORT_EVERY = 40;
+/** The offices that engage: the town's finance office (its returns, monthly) and a factory's manager (its invoices to the
+ * shops it sells to on terms, a few a week). Round 1 had a landlord's office in the factory's place: in its 120 days it
+ * wrote no paper of any kind the offer takes (its papers were shop premises to let, payments and permits), so its
+ * assistant was handed nothing at all (docs/decisions.md, 2026-11-08). */
+export const OFFICES = ["finance", "factory-1-manager"];
+/** One adult in this many is in the household cohort (offset by the seed): about 48 people in the thousand-person town
+ * (round 1, one in 40: about 18, and the desk's matters came mostly from one of them). */
+export const COHORT_EVERY = 15;
 
 /** The request form's title as the assistants' stationery has it (participants/src/kinds/assistants.ts). */
 const SCOPE_TITLE = ASSISTANT_ISSUES.find((x) => x.form === "scope_request")!.title;

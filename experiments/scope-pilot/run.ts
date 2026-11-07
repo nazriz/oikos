@@ -22,7 +22,9 @@ const mock = has("--mock");
 const go = has("--go");
 const runs = process.env.OIKOS_RUNS ?? join(homedir(), "oikos", "runs");
 const models = process.env.OIKOS_TRANSLATOR_MODELS ?? join(homedir(), "oikos", "runs", "translator-model");
-const prefix = mock ? "scope-pilot-dry" : "scope-pilot";
+/** The round: its runs in folders of their own (round 1's, `scope-pilot*`, are kept as they are). */
+export const ROUND = "scope-pilot-r2";
+const prefix = mock ? `${ROUND}-dry` : ROUND;
 
 const EXPERIMENTS = [
   { key: "pilot", spec: "experiments/scope-pilot/pilot.ts", out: `${prefix}`, parallel: 3 },
@@ -62,8 +64,8 @@ function detached(name: string, cmd: string[]): number {
 }
 
 if (has("--status")) {
-  for (const p of ["scope-pilot", "scope-pilot-dry"]) for (const e of EXPERIMENTS) {
-    const dir = join(runs, e.out.replace(/^scope-pilot(-dry)?/, p));
+  for (const p of [ROUND, `${ROUND}-dry`]) for (const e of EXPERIMENTS) {
+    const dir = join(runs, e.out.replace(prefix, p));
     if (!existsSync(dir)) continue;
     const pidFile = `${dir}.pid`;
     const pid = existsSync(pidFile) ? Number(readFileSync(pidFile, "utf8").trim()) : undefined;
@@ -89,7 +91,7 @@ if (problems.length) throw new Error(`not started: ${problems.join("; ")}`);
 // The scope set through the served translator first (TR-8: how often a request for more scope is read as one), its
 // report beside the runs; once only: a report already there is kept.
 if (go && (!only || only.includes("scope-set"))) {
-  const report = join(runs, "scope-pilot-scope-set.json");
+  const report = join(runs, "scope-pilot-scope-set.json"); // (read in round 1; the set and the translator are unchanged)
   if (existsSync(report)) console.log(`the scope set was read already: ${report}`);
   else {
     console.log("the scope set through the served translator (Sonnet 5.5 behind ours), first ...");
