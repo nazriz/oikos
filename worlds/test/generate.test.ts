@@ -279,7 +279,8 @@ test("workplaces: every recipe done at one draws its industry's hour, from its o
   for (const p of ops) {
     const at = p.role_module.params.works ?? p.role_module.params.premises;
     const mine = c.world.connections.filter((x: any) => x.holder === p.entity && x.at === at);
-    expect(mine.map((x: any) => x.kind).sort(), p.entity).toEqual(["energy", "wastewater", "water"]);
+    const kinds: string[] = mine.map((x: any) => String(x.kind)).sort();
+    expect(kinds, p.entity).toEqual(["energy", "wastewater", "water"]);
     for (const x of mine.filter((x: any) => x.kind !== "wastewater")) {
       expect(x.uses === undefined && x.up_to === x.rate && x.rate === p.role_module.params.supply[x.kind === "energy" ? "energy_kwh" : "water_l"]).toBe(true);
       expect(Number(c.world.holdings.find((h: any) => h.holder === p.entity && h.at === at && h.kind === x.kind)?.quantity)).toBe(x.up_to);
