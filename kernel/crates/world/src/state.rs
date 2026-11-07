@@ -82,7 +82,7 @@ pub struct State {
     /// holder is handed it as the payments it has not yet been told of, so it reads its office's books and not an empty
     /// memory. Derived from the log (never serialised, so the state and its hash are unchanged).
     #[serde(skip)]
-    pub ledgers: Map<String, imbl::Vector<Arc<Transaction>>>,
+    pub ledgers: Map<String, Ledger>,
     /// Future physical effects and acts in progress, sorted by (at, seq).
     pub schedule: Schedule,
     /// Each actor's timeline (docs/design/rebuild.md 6.3): when each of its lanes is next free. A person's is keyed by
@@ -452,18 +452,103 @@ pub struct AgreementMarks {
 impl State {
     /// The reading of an agreement by its terms, now (docs/design/rebuild.md section 7), if it's an agreement.
     pub fn reading(&self, agreement: &str) -> Option<oikos_terms::Reading> {
-        let stored = self.records.get(agreement)?;
-        let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { return None };
+        let r = self.records.get(agreement)?.record();
+        let crate::blocks::RecordBody::Agreement { terms } = &r.body else { return None };
         let m = self.marks.get(agreement).cloned().unwrap_or_default();
         Some(oikos_terms::read(terms, &m.signatures, &m.notices, self.t))
     }
 }
 
+/// An office's file of payments (`State::ledgers`), in the order made: its last weeks in memory, what is older on the
+/// run's cold file (docs/design/tiered-storage.md), each payment there as it serialises. It is read only when the post
+/// changes hands (`set_holder`), and then whole, the same payments in the same order wherever they were held.
+#[derive(Clone, Default)]
+pub struct Ledger {
+    cold: Vec<ColdPayments>,
+    hot: imbl::Vector<Arc<Transaction>>,
+}
+
+#[derive(Clone)]
+struct ColdPayments {
+    file: Arc<crate::held::ColdFile>,
+    block: u32,
+    count: u32,
+}
+
+impl Ledger {
+    pub fn push_back(&mut self, tx: Arc<Transaction>) {
+        self.hot.push_back(tx);
+    }
+    pub fn len(&self) -> usize {
+        self.cold.iter().map(|c| c.count as usize).sum::<usize>() + self.hot.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    /// Every payment on file, in the order made (those on disk read back).
+    pub fn all(&self) -> imbl::Vector<Arc<Transaction>> {
+        if self.cold.is_empty() {
+            return self.hot.clone();
+        }
+        let mut out: imbl::Vector<Arc<Transaction>> = imbl::Vector::new();
+        for c in &self.cold {
+            for b in c.file.items(c.block) {
+                let tx: Transaction = serde_json::from_slice(&b).unwrap_or_else(|e| panic!("a payment on an office's file could not be read back: {e}"));
+                out.push_back(Arc::new(tx));
+            }
+        }
+        out.append(self.hot.clone());
+        out
+    }
+    /// How many of the payments in memory were made before `before` (they are at its front: the file is in time order).
+    pub fn old(&self, before: i64) -> usize {
+        self.hot.iter().take_while(|tx| tx.t < before).count()
+    }
+    /// The payments made before `before` written to `file`, and let go of in memory: how many.
+    pub fn cool(&mut self, file: &Arc<crate::held::ColdFile>, before: i64) -> std::io::Result<usize> {
+        let n = self.old(before);
+        if n == 0 {
+            return Ok(0);
+        }
+        let rest = self.hot.split_off(n);
+        let bytes: Vec<Vec<u8>> = self.hot.iter().map(|tx| serde_json::to_vec(&**tx)).collect::<Result<_, _>>().map_err(std::io::Error::other)?;
+        #[cfg(debug_assertions)]
+        for (b, tx) in bytes.iter().zip(self.hot.iter()) {
+            assert_eq!(&serde_json::from_slice::<Transaction>(b).expect("a payment read back"), &**tx, "a payment read back is not the payment");
+        }
+        let block = file.append(&bytes)?;
+        self.cold.push(ColdPayments { file: file.clone(), block, count: n as u32 });
+        self.hot = rest;
+        Ok(n)
+    }
+}
+
+impl std::fmt::Debug for Ledger {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.all().fmt(f)
+    }
+}
+
+impl PartialEq for Ledger {
+    fn eq(&self, other: &Ledger) -> bool {
+        self.all() == other.all()
+    }
+}
+impl Eq for Ledger {}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Stored {
     pub seq: u64,
-    /// Records are immutable once made, so copies of the state share them.
-    pub record: Arc<Record>,
+    /// Records are immutable once made, so copies of the state share them: each is held once, in memory while it is
+    /// read and on disk once it is cold (`oikos_contracts::held`; docs/design/tiered-storage.md).
+    pub record: crate::held::Rec,
+}
+
+impl Stored {
+    /// The record, read (from memory, or back from disk).
+    pub fn record(&self) -> Arc<Record> {
+        self.record.load()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -984,7 +1069,7 @@ impl State {
         self.counters.record_seq += 1;
         let seq = self.counters.record_seq;
         self.record_order.push_back(record.id);
-        self.records.insert(record.id, Stored { seq, record });
+        self.records.insert(record.id, Stored { seq, record: crate::held::Rec::from_arc(record) });
     }
 
     /// What a record adds to the derived lookups (`agreements_of`, `marks`), as it is stored.
@@ -1005,10 +1090,10 @@ impl State {
             }
             crate::blocks::RecordBody::Withdrawal { withdraws, .. } => {
                 // (Only its owner ends a paper's standing: the same test as perception's `taken_down`.)
-                let by_owner = self.records.get(withdraws).is_some_and(|t| {
+                let by_owner = self.records.get(withdraws).map(|t| t.record()).is_some_and(|t| {
                     let owner = |r: &Record| -> Vec<Id> { r.speaks_for.iter().cloned().chain(self.author_entity(r)).collect() };
                     let by = owner(record);
-                    matches!(t.record.body, crate::blocks::RecordBody::Agreement { .. }) && owner(&t.record).iter().any(|o| by.contains(o))
+                    matches!(t.body, crate::blocks::RecordBody::Agreement { .. }) && owner(&t).iter().any(|o| by.contains(o))
                 });
                 if by_owner {
                     let m = self.marks.entry(*withdraws).or_default();
@@ -1045,7 +1130,7 @@ impl State {
         // before it, and every record it can take down was.)
         let order: Vec<Id> = self.record_order.iter().cloned().collect();
         for id in order {
-            if let Some(r) = self.records.get(&id).map(|s| s.record.clone()) {
+            if let Some(r) = self.records.get(&id).map(|s| s.record()) {
                 self.mark(&r);
             }
         }
@@ -1206,7 +1291,7 @@ impl State {
             let key = transactions_key(position, &self.positions[position].entity);
             if let Some(ledger) = self.ledgers.get(&key) {
                 if let Some(p) = self.participants.get_mut(&h) {
-                    Arc::make_mut(p).new_transactions.insert(key.into(), ledger.clone());
+                    Arc::make_mut(p).new_transactions.insert(key.into(), ledger.all());
                 }
             }
             // And so does every channel of it, whole: what the holder looked through before, in an earlier tenure (a person
@@ -1262,6 +1347,9 @@ impl CellCosts {
         self.seconds[(dy * self.w + dx) as usize]
     }
 }
+/// How many trips worked out are kept at most (`GroundCache::put`).
+const TRIPS_KEPT: usize = 1 << 20;
+
 impl GroundCache {
     /// The ground has changed: every trip is worked out afresh.
     pub fn changed(&mut self) {
@@ -1273,6 +1361,17 @@ impl GroundCache {
     }
     pub fn put(&self, from: &str, to: &str, speed: i64, seconds: i64) {
         if let Ok(mut trips) = self.trips.lock() {
+            // (Bounded: the pairs of places a long run's people go between grow with it, SC-6. Past the bound the
+            // trips of an earlier ground go, then all: they are worked out again when wanted, the same.)
+            if trips.len() >= TRIPS_KEPT {
+                let stale: Vec<(Id, Id, i64)> = trips.iter().filter(|(_, (e, _))| *e != self.epoch).map(|(k, _)| *k).collect();
+                for k in stale {
+                    trips.remove(&k);
+                }
+                if trips.len() >= TRIPS_KEPT {
+                    *trips = Default::default();
+                }
+            }
             trips.insert((Id::new(from), Id::new(to), speed), (self.epoch, seconds));
         }
     }
@@ -1305,4 +1404,31 @@ impl std::fmt::Debug for GroundCache {
 /// told of a payment in each (foundations F6).
 pub fn transactions_key(capacity: &str, entity: &str) -> String {
     format!("{capacity}|{entity}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_office_file_whose_old_payments_went_to_disk_reads_back_the_same_payments_in_order() {
+        let path = std::env::temp_dir().join(format!("oikos-ledger-{}.cold", std::process::id()));
+        let tier = crate::held::Tier::on(&path, crate::held::Policy::default()).expect("tier");
+        let file = tier.file().expect("on");
+        let tx = |t: i64, memo: &str| {
+            Arc::new(Transaction { t, from: "a".into(), to: "b".into(), amount: crate::money::parse("1250").unwrap(), currency: "USD".into(), by: "p1".into(), settles: (t % 2 == 0).then(|| "rec.4".into()), per_instruction: None, memo: Some(memo.into()), line: None })
+        };
+        let mut l = Ledger::default();
+        for i in 0..600 {
+            l.push_back(tx(i * 100, &format!("payment \"{i}\" é")));
+        }
+        let before = l.all();
+        assert_eq!(l.cool(&file, 30_000).expect("written"), 300);
+        assert_eq!(l.cool(&file, 30_000).expect("nothing more"), 0);
+        l.push_back(tx(60_000, "later"));
+        assert_eq!(l.len(), 601);
+        let after = l.all();
+        assert_eq!(after.iter().take(600).map(|x| (**x).clone()).collect::<Vec<_>>(), before.iter().map(|x| (**x).clone()).collect::<Vec<_>>());
+        assert_eq!(after.back().map(|x| x.memo.clone()), Some(Some("later".into())));
+    }
 }

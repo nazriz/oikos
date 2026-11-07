@@ -14,6 +14,7 @@ use oikos_perception::{
     AccountItem, BodyView, ChannelData, ConnectionItem, EntityItem, HeldPosition, HoldingItem, LinkItem, Observation, OwnRecord, PositionItem, SiteCell,
 };
 use oikos_world::blocks::{Id, Record};
+use oikos_world::held::Rec;
 use oikos_world::state::{Message, Outcome, ParticipantStatus, Transaction};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -64,9 +65,27 @@ pub struct Picture {
     /// Why it woke (cadence, news, asked, done, start) and how long since its last wake (contracts 0.7).
     pub woke_for: String,
     pub since: i64,
+    /// Each record its channels show, as the world holds it, by where the record shown is in memory (`held_of`): what a
+    /// book keeps, so that a record it no longer reads can leave memory (docs/design/tiered-storage.md).
+    pub held: Held,
+}
+
+/// The records a picture shows, as held (`Picture::held`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Held(BTreeMap<usize, Rec>);
+
+impl Held {
+    pub fn insert(&mut self, shown: &Arc<Record>, r: Rec) {
+        self.0.insert(Arc::as_ptr(shown) as usize, r);
+    }
 }
 
 impl Picture {
+    /// A record this picture shows, as the world holds it; one made by hand (a test's) is held as it is.
+    pub fn held_of(&self, r: &Arc<Record>) -> Rec {
+        self.held.0.get(&(Arc::as_ptr(r) as usize)).cloned().unwrap_or_else(|| Rec::from_arc(r.clone()))
+    }
+
     /// The records of a channel (empty if it is not a records channel or has none).
     pub fn records(&self, channel: &str) -> &[Arc<Record>] {
         match self.channels.get(channel) {
@@ -145,7 +164,7 @@ pub struct View {
     visits: BTreeMap<Id, Visit>,
     directories: BTreeMap<Id, DirectoryKept>,
     /// Records of a channel kept whole, in the order first seen (a record seen again keeps its place, as a JS Map does).
-    kept: BTreeMap<Id, (Vec<Arc<Record>>, BTreeMap<Id, usize>)>,
+    kept: BTreeMap<Id, (Vec<Rec>, BTreeMap<Id, usize>)>,
     /// Each channel's picture as last made, rebuilt only when the channel changed.
     cache_accounts: BTreeMap<Id, Arc<Vec<AccountItem>>>,
     cache_holdings: BTreeMap<Id, Arc<Vec<HoldingItem>>>,
@@ -171,6 +190,17 @@ impl View {
         let mut channels: BTreeMap<Id, Seen> = BTreeMap::new();
         let mut new_txs: BTreeMap<Id, Vec<Arc<Transaction>>> = BTreeMap::new();
         let mut fresh_sites: BTreeSet<Id> = BTreeSet::new();
+        let mut held = Held::default();
+        let shown = |records: Vec<Rec>, held: &mut Held| -> Vec<Arc<Record>> {
+            records
+                .into_iter()
+                .map(|r| {
+                    let a = r.load();
+                    held.insert(&a, r);
+                    a
+                })
+                .collect()
+        };
         for (full_id, ch) in obs.channels {
             let Some(id) = in_capacity(&full_id, capacity) else { continue };
             let id = id.to_string();
@@ -250,7 +280,7 @@ impl View {
                 }
                 ChannelData::Records { records, search, whole } => {
                     if search == Some(true) {
-                        channels.insert(id.into(), Seen::Records { records, search: true });
+                        channels.insert(id.into(), Seen::Records { records: shown(records, &mut held), search: true });
                     } else if self.full.contains(id.as_str()) {
                         let (list, at) = self.kept.entry(id.into()).or_default();
                         if whole == Some(true) {
@@ -258,16 +288,17 @@ impl View {
                             at.clear();
                         }
                         for r in records {
-                            match at.get(&r.id) {
+                            let rid = r.id();
+                            match at.get(&rid) {
                                 Some(&i) => list[i] = r,
                                 None => {
-                                    at.insert(r.id, list.len());
+                                    at.insert(rid, list.len());
                                     list.push(r);
                                 }
                             }
                         }
                     } else {
-                        channels.insert(id.into(), Seen::Records { records, search: false });
+                        channels.insert(id.into(), Seen::Records { records: shown(records, &mut held), search: false });
                     }
                 }
             }
@@ -299,7 +330,7 @@ impl View {
             channels.insert(*id, Seen::Directory { entities, positions });
         }
         for (id, (list, _)) in &self.kept {
-            channels.insert(*id, Seen::Records { records: list.clone(), search: false });
+            channels.insert(*id, Seen::Records { records: shown(list.clone(), &mut held), search: false });
         }
         let as_position = match capacity {
             None | Some("self") => None,
@@ -320,6 +351,7 @@ impl View {
             readings: obs.readings,
             woke_for: woke_for.to_string(),
             since,
+            held,
         }
     }
 }

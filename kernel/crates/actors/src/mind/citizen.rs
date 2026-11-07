@@ -487,11 +487,13 @@ pub struct State {
     // talk
     /// (Each boxed: a map's node holds room for eleven, and a told item is some 250 bytes. SC-1.)
     pub told_us: BTreeMap<String, (Box<News>, i64)>,
-    pub talked: BTreeMap<String, i64>,
+    /// (Keyed by interned ids, ordered and written as the strings they are: a person comes to know some hundreds over
+    /// years, each a string apiece before: SC-6.)
+    pub talked: BTreeMap<oikos_core::Id, i64>,
     /// People we have come to know by talking with them, mourning with them or meeting them at a gathering (TS's
     /// `peopleWeKnow`, kept at the same places): those asked whether we may stay when we have no home.
     #[serde(default)]
-    pub people_known: BTreeSet<String>,
+    pub people_known: BTreeSet<oikos_core::Id>,
     /// The people we know from homes and workplaces shared, with when, in the order TS's Map kept them.
     pub contacts: Vec<(String, i64)>,
     pub asked_how: Vec<String>,
@@ -563,7 +565,9 @@ pub struct State {
     pub readings: BTreeMap<String, Option<PaperRead>>,
     /// What the last `treated` with a paper's words moved, to go on the outcome that follows it.
     pub last_read: Option<(String, Json)>,
-    pub teachings: BTreeMap<String, Vec<String>>,
+    /// The assertions in the book, by who teaches them, as of the last refresh (ids, not copies of their text: each
+    /// person's book holds every public assertion of the last month, so a copy each grew as the town squared, SC-6).
+    pub teachings: BTreeMap<oikos_core::Id, Vec<oikos_core::Id>>,
     /// Practices in the book, by id, and who holds them.
     pub practice_hosts: BTreeMap<String, String>,
     // the record
@@ -863,23 +867,24 @@ impl CitizenMind {
     }
     /// The teachings in the book, by who teaches them (refreshed when the mind is given the book).
     pub fn refresh_teachings(&mut self, book: &Book) {
-        let mut m: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut m: BTreeMap<oikos_core::Id, Vec<oikos_core::Id>> = BTreeMap::new();
         for r in book.assertions() {
-            m.entry((r.speaks_for.unwrap_or_else(|| r.author.clone().into())).to_string()).or_default().push(r.id.to_string());
+            m.entry(r.speaks_for.unwrap_or_else(|| r.author.clone().into())).or_default().push(r.id);
         }
+        m.values_mut().for_each(Vec::shrink_to_fit);
         self.s.teachings = m;
         self.s.practice_hosts = book.practices().map(|r| (r.id.to_string(), r.speaks_for.map_or_else(|| r.author.to_string(), |x| x.to_string()))).collect();
     }
     /// How strongly we hold what a host teaches (the most of its teachings: citizen.ts `holdTo`).
     pub fn hold_to(&self, host: &str) -> i64 {
-        self.s.teachings.get(host).map_or(0, |ids| ids.iter().map(|id| *self.s.beliefs.get(id).unwrap_or(&0)).max().unwrap_or(0)).max(0)
+        self.s.teachings.get(host).map_or(0, |ids| ids.iter().map(|id| *self.s.beliefs.get(id.as_str()).unwrap_or(&0)).max().unwrap_or(0)).max(0)
     }
     /// Nearer certainty, by a share of the way (citizen.ts `strengthen`), and the record of it.
     pub fn strengthened(&mut self, host: &str, bps: i64) -> Json {
         let before = self.hold_to(host);
         for id in self.s.teachings.get(host).cloned().unwrap_or_default() {
-            let b = *self.s.beliefs.get(&id).unwrap_or(&0);
-            self.s.beliefs.insert(id, b + round(((10_000 - b) * bps) as f64 / 10_000.0));
+            let b = *self.s.beliefs.get(id.as_str()).unwrap_or(&0);
+            self.s.beliefs.insert(id.to_string(), b + round(((10_000 - b) * bps) as f64 / 10_000.0));
         }
         json!({ "host": host, "before": before, "after": self.hold_to(host) })
     }
@@ -1342,7 +1347,11 @@ impl CitizenMind {
         let doubt = d.doubt.unwrap_or_else(|| if MONEY_MATTERS.contains(&d.domain.as_str()) { round(self.s.feelings.level(Emotion::Fear, "money", t) as f64 / 2.0) } else { 0 });
         let circ = self.circumstances(life, d.bedrooms_needed);
         let options: Vec<person::Choice> = d.options.iter().map(|c| person::Choice { key: c.key.clone(), facts: c.facts.as_ref().map(facts_in), others: c.others, meaning: c.meaning }).collect();
-        let mut rng = cx.rng(d.purpose.as_deref().unwrap_or(&d.domain));
+        let purpose = d.purpose.as_deref().unwrap_or(&d.domain);
+        let mut rng = match d.purpose_ends {
+            Some(ends) => cx.rng_until(purpose, ends),
+            None => cx.rng(purpose),
+        };
         let ask = person::Ask { options, current: d.current.clone(), levels, circ: circ.clone(), satisfied_here: d.satisfied_here, doubt: Some(doubt) };
         let got = self.s.mind.decide(&d.domain, &mut rng, &ask);
         cx.drew(&rng);

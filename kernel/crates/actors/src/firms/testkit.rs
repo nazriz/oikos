@@ -66,8 +66,7 @@ pub fn picture(t: i64, entity: &str, records: Vec<Arc<Record>>, accounts: &[(&st
         asking: vec![],
         readings: BTreeMap::new(),
         woke_for: "cadence".into(),
-        since: 0,
-    }
+        since: 0, held: Default::default() }
 }
 
 pub fn ctx(participant: &str, entity: &str) -> Ctx {

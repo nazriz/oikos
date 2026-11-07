@@ -104,7 +104,7 @@ fn a_systems_lanes_work_inside_its_hours_and_a_backlog_is_a_queue() {
     // Ten decisions of 4,500 s are 12.5 hours of work: a day's eight, and four and a half the next day.
     assert_eq!(spans.last().unwrap().1, DAY + 9 * H + (45_000 - 8 * H));
     run.command(&Command::Advance { to: 2 * DAY }).unwrap();
-    let decided = run.kernel().state().records.values().filter(|r| r.record.body.kind_name() == "statement" && serde_json::to_value(&r.record).unwrap()["kind"] == "benefit_decision").count();
+    let decided = run.kernel().state().records.values().filter(|r| r.record.load().body.kind_name() == "statement" && serde_json::to_value(&r.record).unwrap()["kind"] == "benefit_decision").count();
     assert_eq!(decided, 10, "every decision was made, the backlog queued");
 }
 

@@ -596,7 +596,8 @@ fn agreements_reply(st: &oikos_world::state::State, req: &Value) -> Result<Value
                 .iter()
                 .filter_map(|id| {
                     let stored = st.records.get(id.as_str())?;
-                    let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { return None };
+                    let record = stored.record();
+                    let crate::blocks::RecordBody::Agreement { terms } = &record.body else { return None };
                     Some(json!({ "id": id, "template": terms.template, "parties": terms.parties, "reading": st.reading(id)? }))
                 })
                 .collect();

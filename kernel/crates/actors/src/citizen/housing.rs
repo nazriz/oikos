@@ -2291,8 +2291,7 @@ mod tests {
             asking: vec![],
             readings: readings.iter().map(|(id, st, e)| (oikos_sight::Id::new(id), oikos_sight::Reading { of: "agreement", status: st, ends_at: *e, ended_by: None, reader: "terms" })).collect(),
             woke_for: "cadence".into(),
-            since: 0,
-        }
+            since: 0, held: Default::default() }
     }
     fn acc(balance: i64) -> Option<OwnAccount> {
         Some(OwnAccount { account: "acc-c1".into(), balance, custodian: "bank".into(), currency: "XTS".into() })

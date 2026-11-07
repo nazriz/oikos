@@ -92,7 +92,7 @@ fn employ(run: &mut R, employer: &str, employer_participant: &str, position: Opt
     let propose = cmd(employer_participant, position, json!([{"block": "propose_agreement", "terms": {"parties": [employer, worker], "commitments": [{"who": employer, "does": {"outcome": {"money": {"to": format!("acc-{worker}"), "amount": "100"}}}, "every": 2_592_000}]}, "speaks_for": employer}]));
     let r = step(run, &propose).expect("accepted");
     let _ = r;
-    let id = run.kernel().state().record_order.iter().rev().find(|id| run.kernel().state().records[*id].record.body.kind_name() == "agreement").cloned().expect("an agreement");
+    let id = run.kernel().state().record_order.iter().rev().find(|id| run.kernel().state().records[*id].record().body.kind_name() == "agreement").cloned().expect("an agreement");
     let sign_worker = cmd(&format!("{worker}-self"), None, json!([{"block": "sign_agreement", "agreement": id, "as": worker}]));
     step(run, &sign_worker).expect("accepted");
     let sign_employer = cmd(employer_participant, position, json!([{"block": "sign_agreement", "agreement": id, "as": employer}]));

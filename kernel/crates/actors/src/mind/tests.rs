@@ -36,8 +36,7 @@ fn pic(t: i64) -> Picture {
         asking: vec![],
         readings: BTreeMap::new(),
         woke_for: "cadence".into(),
-        since: 0,
-    }
+        since: 0, held: Default::default() }
 }
 
 fn life(t: i64) -> Life {

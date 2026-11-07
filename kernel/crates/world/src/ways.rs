@@ -225,7 +225,24 @@ pub fn tree_cached(s: &Statics, st: &State, w: &Ways, from: u32, speed: Option<i
     }
     let t = Arc::new(tree(s, w, from, speed));
     if let Ok(mut kept) = st.ground.trees.lock() {
+        // (Bounded: a tree is as long as the town has nodes, and a long run comes to start from most of them, so the
+        // cache grew as the town's nodes squared (152 MB at 10,000 people by day 71: SC-6). Past the bound, the trees of
+        // another epoch go first, then all: they are worked out again when wanted, the same.)
+        let bytes = t.best.len().max(1) * (std::mem::size_of::<Option<i64>>() + std::mem::size_of::<Option<u32>>());
+        if kept.len() * bytes >= TREES_KEPT_BYTES {
+            let epoch = st.ground.epoch;
+            let stale: Vec<(u32, i64)> = kept.iter().filter(|(_, (e, _))| *e != epoch).map(|(k, _)| *k).collect();
+            for k in stale {
+                kept.remove(&k);
+            }
+            if kept.len() * bytes >= TREES_KEPT_BYTES {
+                *kept = Default::default();
+            }
+        }
         kept.insert(key, (st.ground.epoch, t.clone()));
     }
     t
 }
+
+/// How many bytes of quickest-time trees are kept at most (`tree_cached`).
+const TREES_KEPT_BYTES: usize = 64 << 20;

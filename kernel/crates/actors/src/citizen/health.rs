@@ -384,8 +384,7 @@ mod tests {
             asking: vec![],
             readings: Default::default(),
             woke_for: "cadence".into(),
-            since: 0,
-        };
+            since: 0, held: Default::default() };
         assert_eq!(c.until(&pic(9 * HOUR)), Some(DAY + 8 * HOUR));
         assert_eq!(c.until(&pic(4 * DAY + 20 * HOUR)), Some(7 * DAY + 8 * HOUR), "Friday evening: Monday morning");
     }

@@ -106,8 +106,7 @@ impl Driver {
                 asking: vec![],
                 readings: BTreeMap::new(),
                 woke_for: if first { "cadence".into() } else { "done".into() },
-                since: DAY,
-            };
+                since: DAY, held: Default::default() };
             first = false;
             let mut cx = Cx::new(t, &self.ctx, &mut self.draws, 7, vec![]);
             match self.actor.step(&pic, &mut cx) {
@@ -238,7 +237,7 @@ fn an_investigation_that_finds_the_taker_is_charged_and_one_that_does_not_is_clo
         channels.insert("mine".into(), Seen::Records { records, search: false });
         channels.insert("premises".into(), premises(&["officer-1"]));
         Picture { participant: "police-oic-system".into(), t, status: oikos_sight::ParticipantStatus::Active, entity: ME.into(), as_position: Some("police-oic".into()), body: None, positions: vec![],
-            outcomes: outcomes.into_iter().map(|o| serde_json::from_value(o).unwrap()).collect(), inbox: vec![], channels, asking: vec![], readings: BTreeMap::new(), woke_for: "done".into(), since: DAY }
+            outcomes: outcomes.into_iter().map(|o| serde_json::from_value(o).unwrap()).collect(), inbox: vec![], channels, asking: vec![], readings: BTreeMap::new(), woke_for: "done".into(), since: DAY, held: Default::default() }
     };
     let t = DAY + 10 * 3600;
     let mut draws = Draws::new("police-oic-system", "police-oic");
@@ -319,6 +318,25 @@ fn asked_to_come_to_someone_lying_dead_on_the_road_an_officer_goes_and_reports_t
     assert_eq!(found.len(), 1, "{:?}", w.calls);
     assert!(found[0].to_string().contains("ann") && found[0].to_string().contains("cell.4.2"));
     assert!(w.looks.is_empty(), "found there once: asked again about the place, they do not go again");
+}
+
+#[test]
+fn a_round_of_calls_goes_out_one_at_a_time_and_the_next_when_the_officer_is_back() {
+    // (Main's 50,000-person town, 2026-11-02: four thousand missing-person calls queued, and the station sent a round of
+    // sixteen at every wake, each wake the one after it in the same moment, until the engine stopped the run.) Three homes
+    // asked about, nine places each (a home and the street round it): more than a round holds.
+    let asks: Vec<_> = (0..3).map(|i| st(&format!("rec.8{i}"), 5 * DAY, "welfare_check_request", &format!("home-{i}"), &[ME], json!({ "space": format!("cell.{}.5", 10 + 5 * i), "structure": format!("cell.{}.5", 10 + 5 * i), "at": format!("cell.{}.5", 10 + 5 * i), "since": 4 * DAY, "missing": format!("p{i}") }))).collect();
+    let mut s = station();
+    let w = s.wake(5 * DAY + 10 * 3600, [staff_records(), asks].concat(), vec![("premises", premises(&["officer-1"]))], &|_| false);
+    assert_eq!(w.looks.len(), 1, "{:?}", w.looks);
+    // Woken again in the same moment, the round still out: no other goes.
+    let w = s.wake(5 * DAY + 10 * 3600, vec![], vec![("premises", premises(&["officer-1"]))], &|_| false);
+    assert!(w.looks.is_empty(), "{:?}", w.looks);
+    // Back: the next round goes.
+    let home: oikos_sight::SiteCell = serde_json::from_value(json!({ "cell": "cell.10.5", "x": 10, "y": 5 })).unwrap();
+    let back = Seen::Sites { as_of: 5 * DAY + 13 * 3600, cells: Arc::new(vec![home]), visit: Some(Visit { seen_at: Default::default(), fresh: vec!["cell.10.5".into()] }) };
+    let w = s.wake(5 * DAY + 13 * 3600, vec![], vec![("premises", premises(&["officer-1"])), ("calls", back)], &|_| false);
+    assert_eq!(w.looks.len(), 1, "{:?}", w.looks);
 }
 
 #[test]

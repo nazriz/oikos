@@ -83,6 +83,10 @@ fn options(v: &Value) -> Result<Options, String> {
     engine.withhold = crate::engine::withholds(&v["withhold"])?;
     engine.at_fork = crate::engine::at_forks(&v["at_fork"])?;
     engine.capture_citizens = v["capture_citizens"].as_str().filter(|p| !p.is_empty()).map(String::from);
+    // (The world's records nobody reads held on disk, docs/design/tiered-storage.md: where `cold` says, or beside the
+    // log; OIKOS_COLD=off keeps them in memory. The same results either way.)
+    let cold_on = std::env::var("OIKOS_COLD").map_or(true, |x| x != "off");
+    engine.cold = v["cold"].as_str().filter(|p| !p.is_empty()).map(PathBuf::from).or_else(|| v["log"].as_str().map(|l| PathBuf::from(format!("{l}.cold")))).filter(|_| cold_on);
     if let Some(n) = v["share_at"].as_u64() {
         engine.share_at = n as usize;
     }

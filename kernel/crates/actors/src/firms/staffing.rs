@@ -539,6 +539,15 @@ pub struct Staffing {
     /// Credit the collector has agreed we may set against our next return, not yet used: (its decision, the collector, what is left).
     #[serde(default)]
     set_offs: Vec<(String, String, i64)>,
+    /// Our own standing requests (the wage orders we gave), in the order seen, as far as the book's requests have been
+    /// read for them, and the last one read there (`adopt_orders`: it went through every request on the book, a bank's
+    /// every payment, at every wake: SC-6).
+    #[serde(default)]
+    own_requests: Vec<String>,
+    #[serde(default)]
+    requests_read: usize,
+    #[serde(default)]
+    request_last: Option<String>,
 }
 
 impl Staffing {
@@ -586,6 +595,9 @@ impl Staffing {
             asked_answered: BTreeSet::new(),
             tax_seen: BTreeSet::new(),
             set_offs: vec![],
+            own_requests: vec![],
+            requests_read: 0,
+            request_last: None,
         }
     }
 
@@ -1043,11 +1055,27 @@ impl Staffing {
     /// withholds, the agreed wage less what it pays, charge by charge as the law reckons it where that comes to the same.
     fn adopt_orders(&mut self, book: &Book, law: Option<&IncomeTaxLaw>, t: i64) {
         let me = self.me.clone();
-        for r in book.open("request") {
-            let d = data(r);
-            if r.speaks_for.as_deref() != Some(me.as_str()) || !d.get("every").is_some_and(truthy) {
-                continue;
+        // Our own standing requests, the new ones read from where we left off (a book that has let papers go since, the
+        // list not where it was, is read again from its start). Then each still standing, in the order seen: the book's
+        // open requests of ours, as going through all of them found them.
+        let seen = book.all("request").len();
+        let still = self.requests_read == 0 || (seen >= self.requests_read && book.all("request").nth(self.requests_read - 1).map(|r| r.id.to_string()) == self.request_last);
+        if !still {
+            self.requests_read = 0;
+            self.own_requests.clear();
+        }
+        for r in book.all("request").skip(self.requests_read) {
+            if r.speaks_for.as_deref() == Some(me.as_str()) && data(r).get("every").is_some_and(truthy) {
+                self.own_requests.push(r.id.to_string());
             }
+        }
+        if seen > self.requests_read {
+            self.request_last = book.all("request").nth(seen - 1).map(|r| r.id.to_string());
+        }
+        self.requests_read = seen;
+        let own: Vec<Arc<Record>> = self.own_requests.iter().filter(|id| !book.withdrawn(id)).filter_map(|id| book.get(id).cloned()).collect();
+        for r in &own {
+            let d = data(r);
             for b in crate::common::bases_of(r) {
                 // (Not one whose replacement is made but not yet on the book: the act waits for its performer's time.)
                 if self.orders.contains_key(b.as_str()) || self.is_replacing(b, t) {

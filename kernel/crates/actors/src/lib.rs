@@ -423,6 +423,25 @@ impl<'a> Cx<'a> {
         }
         r
     }
+    /// `rng`, for a matter that is over at `ends`: drawn for only before then (`Draws::key_until`).
+    pub fn rng_until(&mut self, purpose: &str, ends: i64) -> Rng {
+        if let Some(d) = self.drawn.as_mut() {
+            d.push(purpose.to_string());
+        }
+        let key = self.draws.key_until(self.t, purpose, ends);
+        let parts: Vec<&str> = key.iter().map(String::as_str).collect();
+        let r = self.randomness.stream(&parts);
+        if self.ctx.world.capture {
+            self.streams.push(Drawn { start: r.clone(), key, values: None });
+        }
+        r
+    }
+    /// `rng`, for a matter drawn for once, in this moment, and never again (a paper's one reading: what came by one
+    /// delivery): over once drawn.
+    pub fn rng_once(&mut self, purpose: &str) -> Rng {
+        let ends = self.t + 1;
+        self.rng_until(purpose, ends)
+    }
     /// A stream for a purpose alone: the same for whoever draws it (a fact about a thing, not about who meets it).
     pub fn chance(&mut self, purpose: &str) -> Rng {
         if let Some(d) = self.drawn.as_mut() {

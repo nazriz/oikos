@@ -721,7 +721,7 @@ impl CitizenMind {
                     })
                     .map(|(k, _)| k.clone())
                     .unwrap_or_else(|| pool.last().unwrap().clone());
-                self.s.talked.insert(who.clone(), t);
+                self.s.talked.insert(oikos_core::Id::new(&who), t);
                 out.steps.push(because("Catching up with someone we know.", vec![message(&[who], catching_up::ASK, None)]));
             }
         }
@@ -798,12 +798,12 @@ impl CitizenMind {
         let mut holds: Vec<String> = vec![];
         let mut leans: Vec<String> = vec![];
         for (host, ids) in &self.s.teachings {
-            let ids: Vec<i64> = ids.iter().map(|id| *self.s.beliefs.get(id).unwrap_or(&0)).collect();
+            let ids: Vec<i64> = ids.iter().map(|id| *self.s.beliefs.get(id.as_str()).unwrap_or(&0)).collect();
             if ids.iter().any(|&b| b >= self.p.belief.tell_at_bps) {
-                holds.push(host.clone());
+                holds.push(host.to_string());
             }
             if ids.iter().any(|&b| b >= self.p.belief.affiliate_bps && b < self.p.belief.tell_at_bps) {
-                leans.push(host.clone());
+                leans.push(host.to_string());
             }
         }
         parts.extend(holds.iter().map(|h| catching_up::holds(h)));
@@ -901,7 +901,7 @@ impl CitizenMind {
             .take(6)
             .map(|(teaching, bps)| {
                 let mut o = json!({ "teaching": teaching, "bps": bps });
-                if let Some(from) = self.s.teachings.iter().find(|(_, ids)| ids.contains(teaching)).map(|(h, _)| h.clone()) {
+                if let Some(from) = self.s.teachings.iter().find(|(_, ids)| ids.iter().any(|i| i.as_str() == teaching.as_str())).map(|(h, _)| h.to_string()) {
                     o["from"] = json!(from);
                 }
                 o

@@ -18,5 +18,5 @@ pub mod ways;
 pub use kernel::{Command, ProtocolError, World};
 
 // The shared core and the contract types, where the kernel has always had them.
-pub use oikos_contracts::{blocks, config, contracts, events, vocab};
+pub use oikos_contracts::{blocks, config, contracts, events, held, vocab};
 pub use oikos_core::{canon, money, rng};

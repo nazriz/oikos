@@ -10713,8 +10713,54 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **And:** the participants' world words gained `not_carried` (the kernel's words had it; `render.test.ts` holds that every
   refusal has world words). With the fix in, the representation towns' pins moved (a taking in the month where a
   carried theft had been refused) and were re-taken; culture-dial's did not move.
+- **Revisit if:** an act's trip should be tied to that act alone (f2-s5 adds `Exec.act`: then `tr.act` is the check), or
+  takings come to be acts of their own before the trip home.
 - **Then, in the f2-s5 landing:** with `Exec.act` (S5's), the trip counted is the taker's own for this act (`tr.act`).
 - **Revisit if:** takings come to be acts of their own before the trip home.
+
+## 2026-11-02 · Tiered storage: the world's records nobody reads held on disk, and what else grew with a run (SC-1, SC-6; branch `tiered-storage`; no result changes; no model called)
+
+- **What was asked:** Naz approved the proposal (docs/design/tiered-storage.md, then a proposal) on 2026-11-02 ("Yes to
+  all"): records out of memory once cold, read back on demand, the actors' books holding records through the shared
+  store rather than direct pointers; then the other growers fixed where they are a mechanism's fault; results
+  byte-identical; 50,000 people for two years or more within about 40 GB the goal.
+- **Built** (docs/design/tiered-storage.md says how): every holder of a record holds a `Rec`, a handle to its one slot;
+  the kernel's `Tier` moves records filed 30 days ago and unread for 14 to the run's cold file (`<out>/<run>.cold`,
+  removed at the end) in compressed blocks of 64, and a read brings one back; the state hash streams a cold record's
+  bytes as they are; books keep handles and let what they read go at their next day; the delivered cache is keyed by
+  slot and drops entries a week unshown; the offices' files of payments put what is past 30 days on the same file.
+- **Readers fixed** (found with `OIKOS_COLD_WHO`, which counts who reads old records): lists collected whole to skip what
+  was read (trade desk, producer, electoral office); a person's weekly going-through of public goings-on and weekly
+  plan reading every record of their book; a payroll going through every request on its book at every wake for its own
+  wage orders (at the bank's staff payroll, every payment anyone made: 450,000 of 1.17 million records held for it at
+  day 120 of the 10,000 town; `OIKOS_COLD_WHO_STACK` names where a reader reads). Each also cost the run's own thread
+  time growing with the run.
+- **Other growers fixed:** the resolver's addressed statements (a map from every addressed statement each participant
+  saw to its addressees) held by number with each list of addressees once; the twins' per-matter draw counts let go when
+  a matter says it is over (`Cx::rng_until`, `rng_once`: a gathering once it begins, a delivered order's faultiness once
+  drawn; no draw is named differently: a matter is never drawn for once it says it is over); the travel caches (quickest-time trees, 152 MB at
+  10,000 people by day 71, and trips) bounded.
+- **Results, shown:** the six pinned towns for a month, every record sent to disk from its second day whenever unread that
+  day, at main's state and log, with and without; 10,000 people for 60 and for 180 days and 1,000 for 180 at main's state
+  hash and log digest; `kernel/tests/a1_citizen.rs` holds a tiered town to one held in memory, byte for byte.
+- **Measured** (docs/design/performance.md, "Tiered storage"), on main f2a3568a: 10,000 people grow 8.8 MB a simulated
+  day against 24.3 (-64%), a footprint of 4.18 GB against 6.22 at day 180, the same state and log; 1,000 people for 180
+  days 533 to 557 MB against 691 to 695; the run's own thread within noise. 50,000 people (an earlier build, before the
+  payroll's fix) 17.4 GB against 23.6 at day 89, both stopped there by a fault of main's (the police post's wakes), so two
+  years at 50,000 are not measured yet: projected some 45 to 50 GB. Still growing: what stays of every record when it is
+  cold (slot, map entries, book entries: some 250 to 350 bytes a record), the units' views and knowledge, the actors' own
+  state.
+- **The budget:** the month's ceiling held at 270 KB a person: a month holds no record past the tier's 30 days, so its
+  measure did not move (main and the branch alike, about 218 KB on the release kernel, up to 250 on the gate's build the
+  merge measures with); a growth budget added (the same town's half-year past its month, 1,700 bytes a person a day; main
+  f2a3568a about 2,450, the branch 1,410 to 1,570), `orchestrator/test/memory-budget.test.ts`, slow tier (+90 s).
+- **Decided here, not in the proposal:** records leave memory one by one by when last read, not a month's segment at a
+  time; the cold file is the run's scratch, removed at its end (a snapshot carries every record whole, so nothing that
+  needs it outlives the run; kept, it would be gigabytes a run at 50,000); OIKOS_COLD=off keeps the old way.
+- **Revisit if:** a run's reads back from disk climb (a reader that goes through old records daily: then that reader is
+  the fault, as these were); a study's run needs to resume from a snapshot without the records whole in it; the cold
+  file's disk passes what the run server has to spare; 50,000 for two years does not fit (then the per-record cost that
+  stays when cold, the books' entries, and the units' views are next).
 
 ## 2026-11-02 · Law 9 is a hard rule in CLAUDE.md (landing `f2-s5`; project rules; no model called)
 
@@ -10815,3 +10861,95 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
 - **Not changed:** a child coming home to a dwelling whose tenancy has ended (the leave refused while they were out) is
   left as found; it is a behaviour question (who tells a child the home is gone?), not this fault.
 - **Revisit if:** households move with other members than children (the adults are told and come themselves).
+
+## 2026-11-02 · Tiered storage, a second step: 50,000 people measured to day 89, and what every record keeps made smaller (SC-6; branch `tiered-storage`; no result changes; no model called)
+
+- **50,000 people** (docs/design/performance.md, "Tiered storage"): resident 14.7 GB at day 80 against main's 21.8, growing
+  54 MB a simulated day against 110 (days 30 to 80). Main and both tiered builds stop at the same moment, t=7754574 on day
+  89, "participants kept waking each other (1000 rounds in one moment): c3090-self|police-oic among them": a fault of
+  main's (law 9's owners have it), so two years at 50,000 are not measured yet. Projected from the 10,000 town (whose
+  growth fell by a third once its first months were past): near 38 GB for two years, 50 GB if it does not fall.
+- **A snapshot of the 50,000 town does not fit:** at day 80 the footprint went from 22.5 to 82 GB while it was written (main
+  f2a3568a's binary host; `runs/tier-50000-police-snapshot`). Recorded under SC-2's resume, not fixed here: a snapshot would
+  have to be written as the state hash is, streamed.
+- **Smaller:** whom a person has talked with and come to know keyed by interned ids (the same order, the same words
+  written out); a book's places of minted ids in four bytes; the tier reads when a record was filed from its slot. 10,000
+  people for 180 days at landed main's state hash and log digest (`8e91f08e`, `061b34ba`), peak resident 4.39 GB against
+  4.58.
+- **Revisit if:** the police post's loop is fixed (then 50,000 for two years, measured); the projection's fall does not come.
+
+## 2026-11-02 · The police send one round of calls at a time, and a household reports one missing once until they are home (WM-6, after a 50,000-person run stopped; results move; no model called)
+
+- **What we saw:** main's 50,000-person town stopped at day 89 (t=7754574): "participants kept waking each other (1000
+  rounds in one moment)". Replayed with a line per wake from round 990, it was the police station: at each wake it sent
+  a round of calls (16 places) while the one before was still out, and each wake was the next in the same moment, so it
+  sent its whole list at once. The list held about four thousand missing-person calls of 729 people in 89 days (6 of them
+  dead): a household reported a member missing again for each of their goings, and one who lives elsewhere and drops by
+  was reported up to 86 times.
+- **Police:** a round of calls goes out, and the next when the officer is back (what they found comes in), as the works
+  office's inspector does; waited for until the next day at most (a round whose places were none to go to brings
+  nothing back). Law 9: a going takes the goer's time.
+- **Household:** a member is reported missing once, until they are seen home again (`missing:<person>`), not once for
+  each going.
+- **Test:** police/tests.rs, a round goes out one at a time and the next when the officer is back (fails without it).
+- **Not done:** the household still cannot tell a member who lives elsewhere from one who has not come home (it knows
+  their departures, not their other homes); such a member is reported once each time they drop by and go. Revisit if a
+  result counts missing-person reports (then the household asks the member first, by message, and reports only if no
+  answer comes).
+
+## 2026-11-03 · Perception's log of what changed keeps each id's latest entry (SC-6; branch `tiered-storage-changes`; no result changes; no model called)
+
+- **Found** (a heap profile of the 10,000-person town, days 98 to 240): what still grows is spread thin, 9.2 MB a
+  simulated day in all. Of it, perception's log of which accounts changed (`Changes::log`) kept an entry for every change
+  of every account for the whole run (0.35 MB a day there). Only an id's latest entry answers "which ids changed after
+  this stamp", so the earlier ones are let go once the log holds four times as many entries as the ids it names.
+- **Results:** 10,000 people for 180 days at main 0736a870's state hash and log digest (`1aa21c64`, `2c48bf87`); peak
+  resident 4.38 GB against 4.45.
+- **Also measured:** the 50,000-person two-year run on main (`runs/tier-50000-2y`) is past the day-89 stop (fixed on
+  main); resident 18.4 GB at day 130, growing some 74 MB a day from day 30 to 90 and 47 from 100 to 130.
+- **Revisit if:** a reader of the log comes to need an id's earlier stamps (none does: `since` asks only for what came after one).
+
+## 2026-11-03 · Minted record ids held by their number (SC-6; amends R1, "Ids interned"; branch `tiered-storage`; no result changes; no model called)
+
+- **Found** (a heap profile of the 10,000-person town, days 98 to 240): of the 9.2 MB a simulated day that still grows,
+  some 1.3 MB was interned record ids. A record's id (`rec.<n>`) is minted once a record and is the most numerous id a
+  run holds (3.8 million of them in 10,000 people's 180 days); R1 kept each in the interner's sharded hash tables,
+  whose slots, at most half full and doubling, cost some 60 bytes an id besides its text.
+- **Change** (kernel/crates/core/src/id.rs): an id whose text is a minted record id in canonical form (`rec.` then a
+  number written without a leading zero, below 2^32) is found by its number, in chunks of 4,096, not in the tables.
+  R1's design otherwise stands: still one copy of each text for the process, an `Id` still a handle on it, ordered,
+  hashed and serialised as the text, so every map's order, every hash and the log are as before. Any other text,
+  `rec.007` included, is interned as before. (The simplest form asked for was a number with its text rendered on
+  demand; it is not taken because an `Id` is a `&'static str` everywhere, and making it an enum would touch every
+  reader for a further saving of about ten bytes an id.)
+- **Results:** the six pinned towns for a month at main's state hashes and log digests; 10,000 people for 180 days at
+  main's state hash and log digest (`1aa21c64`, `2c48bf87`). Peak resident, sampled each minute, 3.80 GB against 4.04
+  for the build before it.
+- **Revisit if:** record ids are minted in another form (then `minted` learns it, or they go back to the tables, which
+  still work); or a run passes 2^32 records (held in the tables beyond that, correct but without the saving); or the
+  texts themselves show in a profile (then the number held and the text written when read, which needs `Id` to change
+  from a `&'static str`).
+
+## 2026-11-04 · Citizens hold the book's teachings as ids (SC-6; branch `tiered-storage-teachings`; no result changes; no model called)
+
+- **Found:** the 50,000-person two-year run on main 0736a870 (`runs/tier-50000-2y`) was stopped by its 44 GB guard at
+  day 707 of 730. Its footprint did not climb evenly: it stepped by some 8 GB over days 305 to 309 (25.1 to 33.8 GB
+  resident) and grew about 30 MB a day before and after. A 10,000-person town on main steps too, by 0.4 GB on days 306
+  to 308. Its full log (`runs/tier-10000-log312`) shows why. Days 303 to 311 hold the first election's nominations, about 200
+  public statements, nearly all of them citizens standing, each carrying its platform as an assertion. Every person's
+  book keeps each public assertion for a month (`public_memory`), and each citizen's mind rebuilt, at every wake, a
+  private copy of the ids of all of them as text (`teachings`, host -> ids). Candidates grow with the town and so do
+  the people who read them, so the copies grew as the town squared: 0.25 GB of a heap profile's growth across the
+  10,000 town's step (`runs/tier-10000-hp340`, dumps 52 and 53). Freed a month later, the memory stayed with the
+  allocator and was reused, so the 50,000-person run's resident size held near 34 GB for the next 250 days.
+- **Change** (kernel/crates/actors/src/mind/citizen.rs, voice.rs): `teachings` holds `Id`s (8 bytes each, the one copy
+  of the text) in place of `String`s. It is still built from the same book at the same moments, ordered by the
+  host's text, and saved as the same text.
+- **Results:** the six pinned towns for a month at main's state hashes and log digests. 10,000 people for 340 days at
+  main's state hash and log digest (`88077fb9`, `d3377966`). The 10,000 town's step was 0.2 GB in place of 0.4; its
+  resident size was 5.2 GB at day 310 against 5.6, with a peak of 5.45 GB against 5.62 for main (`runs/tier-10000-log312`, to day 312).
+- **Not changed:** each person's book still holds every public assertion of the last month, and that is what they
+  know. Whether some 2% of the people standing for council is plausible is a question about the citizens' rules, not
+  memory; it is noted here, not acted on.
+- **Revisit if:** the 50,000-person two-year run on this build still steps at its elections (then what a mind keeps
+  of its book's assertions is read from the book when asked, not copied).

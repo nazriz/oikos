@@ -108,7 +108,7 @@ fn f3_a_world_whose_post_is_held_by_anothers_system_does_not_load() {
 fn employ(run: &mut R, employer: &str, by: &str, position: Option<&str>, worker: &str) {
     let propose = cmd(by, position, json!([{"block": "propose_agreement", "terms": {"parties": [employer, worker], "commitments": [{"who": employer, "does": {"outcome": {"money": {"to": format!("acc-{worker}"), "amount": "100"}}}, "every": 2_592_000}]}, "speaks_for": employer}]));
     step(run, &propose).expect("accepted");
-    let id = run.kernel().state().record_order.iter().rev().find(|id| run.kernel().state().records[*id].record.body.kind_name() == "agreement").cloned().expect("an agreement");
+    let id = run.kernel().state().record_order.iter().rev().find(|id| run.kernel().state().records[*id].record.load().body.kind_name() == "agreement").cloned().expect("an agreement");
     step(run, &cmd(&format!("{worker}-self"), None, json!([{"block": "sign_agreement", "agreement": id, "as": worker}]))).expect("accepted");
     step(run, &cmd(by, position, json!([{"block": "sign_agreement", "agreement": id, "as": employer}]))).expect("accepted");
 }

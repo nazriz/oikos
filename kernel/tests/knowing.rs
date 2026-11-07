@@ -241,7 +241,7 @@ fn a_register_answers_by_holder_only_those_it_is_bound_to() {
     let c = with_channel(Some("developer"), json!({"id": "titles", "kind": "records", "way": "ask", "of": "city", "by": ["holder", "id"], "match": {"records": ["claim"]}, "on_request": true}));
     let mut run = Run::start(c, "knowing-holder", Vec::new(), None).unwrap();
     let titles = |o: &Observation| match o.channels.get("developer/titles") {
-        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id).collect::<Vec<_>>(),
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id()).collect::<Vec<_>>(),
         _ => vec![],
     };
     let o = look(&mut run, "developer-system", json!([{"channel": "developer/titles", "query": {"where": [{"field": "holder", "op": "=", "value": "city"}], "order": {"field": "id"}, "limit": 200}}])).unwrap();
@@ -370,7 +370,7 @@ fn a_keeper_answers_in_its_own_time_a_clerk_slowly_and_a_system_fast() {
     let titles = json!({"id": "titles", "kind": "records", "way": "ask", "of": "city", "by": ["holder", "id"], "match": {"records": ["claim"]}, "on_request": true});
     let ask = |a: &str| json!([{"channel": "developer/titles", "query": {"where": [{"field": "holder", "op": "=", "value": a}], "order": {"field": "id"}, "limit": 200}}]);
     let got = |o: &Observation| match o.channels.get("developer/titles") {
-        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id).collect::<Vec<_>>(),
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id()).collect::<Vec<_>>(),
         _ => vec![],
     };
     let asked = |run: &mut Run<Vec<u8>>| -> (Observation, Vec<(i64, i64, String)>) {
@@ -449,7 +449,7 @@ fn an_advance_to_news_stops_where_a_keeper_answers_an_office() {
 fn an_answer_needs_a_performer_present_and_on_duty_and_counts_against_the_day() {
     let titles = json!({"id": "titles", "kind": "records", "way": "ask", "of": "city", "by": ["holder", "id"], "match": {"records": ["claim"]}, "on_request": true});
     let got = |o: &Observation| match o.channels.get("developer/titles") {
-        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id).collect::<Vec<_>>(),
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id()).collect::<Vec<_>>(),
         _ => vec![],
     };
     let ask = |run: &mut Run<Vec<u8>>| {
@@ -525,7 +525,7 @@ fn two_answers_from_one_keeper_arriving_together_are_both_shown() {
     run.command(&Command::Advance { to: 120 }).unwrap();
     let o = run.command(&Command::Observe { participant: "developer-system".into(), only: None }).unwrap().observation.unwrap();
     let ids: Vec<String> = match o.channels.get("developer/titles") {
-        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id).map(|x| x.to_string()).collect(),
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id()).map(|x| x.to_string()).collect(),
         other => panic!("{other:?}"),
     };
     assert!(ids.contains(&"title-lot-a".to_string()), "the first answer: {ids:?}");

@@ -838,8 +838,7 @@ mod tests {
             asking: vec![],
             readings: Default::default(),
             woke_for: "cadence".into(),
-            since: 0,
-        }
+            since: 0, held: Default::default() }
     }
     fn msg(id: &str, from: &str, text: &str, re: Option<&str>) -> Value {
         json!({ "id": id, "t": 0, "from": from, "to": ["p.ann"], "text": text, "re": re })

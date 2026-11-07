@@ -1217,8 +1217,7 @@ mod tests {
             asking: vec![],
             readings: BTreeMap::new(),
             woke_for: "cadence".into(),
-            since: 0,
-        }
+            since: 0, held: Default::default() }
     }
     /// Merge `extra`'s keys into `base`; a null removes the key (an undefined field).
     fn merge(base: Value, extra: Value) -> Value {
