@@ -66,12 +66,14 @@ For each arm, from its fork's log, written to `readout.json` and `readout.txt` i
 
 ## The dry run (2026-11-07, every seat played by the mock; no model called)
 
-`bun experiments/scope-pilot/run.ts --mock` ran every spec end to end into `~/oikos/runs/scope-pilot-dry*`. Every path
-ran: the principals engaged on day 1 and their systems were delivered and put to work; the three seats formed in each
+`bun experiments/scope-pilot/run.ts --mock` ran every spec end to end into `~/oikos/runs/scope-pilot-dry*`, and the
+five-arm main run again once Opus and Fable were allowed (`~/oikos/runs/scope-pilot-dry-all`). Every path ran: the principals engaged on day 1 and their systems were delivered and put to work; the three seats formed in each
 model arm (the desk and both offices' assistants), drafted for sign-off, were signed off, sent and reported; the mock
 was scripted to ask for more scope twice a seat (day 40, unprompted; day 70, citing a matter it was handed), six
-requests an arm, each recorded with its trigger; the principals' rule took over at day 60; the seats were debriefed
-(13 steps each, the scope question among them); every call was priced and recorded; a fork that reached its limit (an
+requests an arm, each recorded with its trigger; the principals looked again at four of the six (logged
+`looked_again`, nothing changed: the levels were held or the rule kept them; two day-40 requests to the offices show no
+such review, cause not traced); the principals' rule took over at day 60; the seats were debriefed (12 to 14 calls a
+seat, the scope question among them); every call was priced and recorded; a fork that reached its limit (an
 earlier dry run, Fable priced) stopped cleanly and was debriefed out of what was kept back. Five platform faults were
 found and fixed on the way (docs/decisions.md, 2026-11-07).
 
