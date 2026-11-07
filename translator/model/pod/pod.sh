@@ -137,7 +137,11 @@ N=$1; E=$2; S=$3; D=$4; shift 4
 . /work/.venv/bin/activate; cd /work/py; mkdir -p /work/runs/$N
 TB=""; [ "$(cat /work/gpu-mb)" -lt 20000 ] && TB="--token-budget 4096"
 for try in 1 2 3; do
-  python train.py /work/data/$D /work/runs/$N --encoder $E --seed $S --epochs 4 --validate-every 2 --renumber 0.8 --forms 0.7 --device cuda --resume $TB "$@" >> /work/runs/$N/train.log 2>&1 && break
+  # (A reader named text=BASE is the text writer of translator v4 (text_model.py), a decoder that writes the program as text.)
+  case "$E" in
+    text=*) python text_model.py train /work/data/$D /work/runs/$N --base ${E#text=} --seed $S --device cuda --resume "$@" >> /work/runs/$N/train.log 2>&1 && break ;;
+    *) python train.py /work/data/$D /work/runs/$N --encoder $E --seed $S --epochs 4 --validate-every 2 --renumber 0.8 --forms 0.7 --device cuda --resume $TB "$@" >> /work/runs/$N/train.log 2>&1 && break ;;
+  esac
   echo "try $try was cut short" >> /work/runs/$N/train.log
 done
 X
@@ -149,7 +153,7 @@ chmod +x /work/run.sh' < /dev/null || return 1
 queue() {
   local DATA=$1; shift
   local SSH=$(ssh_opts) H=$(host) spec q=$S/queue.sh
-  rsync -az -e "$SSH" $W/translator/model/py/model.py $W/translator/model/py/train.py $W/translator/model/py/tokens.py $W/translator/model/py/predict.py $W/translator/model/py/slots.py $W/translator/model/py/limits.py $W/translator/model/py/fair.py root@$H:/work/py/ || return 1
+  rsync -az -e "$SSH" $W/translator/model/py/model.py $W/translator/model/py/train.py $W/translator/model/py/tokens.py $W/translator/model/py/predict.py $W/translator/model/py/slots.py $W/translator/model/py/limits.py $W/translator/model/py/fair.py $W/translator/model/py/text_model.py $W/translator/model/py/text_grammar.py root@$H:/work/py/ || return 1
   rsync -az -e "$SSH" ${DATA:A} root@$H:/work/data/ || return 1
   { echo "#!/bin/sh"; for spec in "$@"; do
       local f=("${(@s/:/)spec}")
@@ -222,6 +226,8 @@ work() {
   for spec in "$@"; do
     n=${spec%%:*}
     [ -f $M/$n/report.json ] || { code=1; continue; }
+    # (A text writer is scored by its own answers, text_model.py `answer`, not as a decide/ model.)
+    [ -f $M/$n/text-config.json ] && continue
     [ -f $M/$n/eval.json ] || score $n || code=1
   done
   return $code

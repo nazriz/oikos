@@ -270,6 +270,26 @@ def main() -> None:
         wrong = table_check(args[1])
         print(json.dumps({"wrong": wrong}))
         sys.exit(1 if wrong else 0)
+    if args[:1] == ["--canonical"]:
+        # fair.py --canonical <export dir> <out dir>: every side's labels made one way (translator v4 trains on these),
+        # export.json and vocabulary.json copied beside them.
+        import shutil
+        src, dst = Path(args[1]), Path(args[2])
+        dst.mkdir(parents=True, exist_ok=True)
+        grammar = json.loads((src / "export.json").read_text())["grammar"]
+        made = {}
+        for side in sorted(src.glob("*.jsonl")):
+            n = 0
+            with open(dst / side.name, "w") as f:
+                for l in side.read_text().splitlines():
+                    if l.strip():
+                        c, k = canonical(json.loads(l), grammar); n += k
+                        f.write(json.dumps(c) + "\n")
+            made[side.stem] = n
+        for x in ("export.json", "vocabulary.json"):
+            shutil.copy(src / x, dst / x)
+        print(json.dumps({"label_decisions_made_one_way": made}))
+        return
     def flag(name):
         if name in args:
             i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v

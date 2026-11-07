@@ -23,7 +23,7 @@ from model import Config, POINTERS, Translator, features
 from limits import reader_pieces
 from fair import compare
 from slots import Follow, Masks, slot_names
-from tokens import spans, text_of, to_pieces, tokenize
+from tokens import piece_aligned, spans, text_of, to_pieces, tokenize
 
 
 def load(path: Path) -> list[dict]:
@@ -353,7 +353,7 @@ def main() -> None:
     if a.encoder:
         from transformers import AutoConfig, AutoTokenizer
         made = AutoConfig.from_pretrained(a.encoder)
-        tokenizer = AutoTokenizer.from_pretrained(a.encoder)
+        tokenizer = piece_aligned(AutoTokenizer.from_pretrained(a.encoder))
         width = a.width or made.hidden_size
         # An encoder that knows a token's place only by how far it is from another reads past the length it was
         # trained at; one that counts places from the start can't.
