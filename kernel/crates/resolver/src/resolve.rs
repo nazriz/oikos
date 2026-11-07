@@ -1752,6 +1752,45 @@ mod tests {
         }
     }
 
+    /// The same span written as an id or as words, acted on the same or not (contracts/test/id-or-words.json): what
+    /// the trained translator's fair scorer (translator/model/py/fair.py) counts as one answer must be one act here.
+    #[test]
+    fn id_or_words_as_the_shared_table_says() {
+        let table: Json = serde_json::from_str(include_str!("../../../../contracts/test/id-or-words.json")).unwrap();
+        let seats: Json = json!({
+            "forms": serde_json::from_str::<Json>(include_str!("../../../../contracts/test/forms.json")).unwrap(),
+            "holds": serde_json::from_str::<Json>(include_str!("../../../../contracts/test/holds.json")).unwrap(),
+        });
+        let cases = table["cases"].as_array().unwrap();
+        assert!(cases.len() >= 12);
+        let written = |v: &Json| {
+            let x = v[1].as_str().unwrap();
+            if v[0] == "text" { format!("{x:?}") } else { x.to_string() }
+        };
+        for c in cases {
+            let name = c["name"].as_str().unwrap();
+            let seat = &seats[c["seat"].as_str().unwrap()];
+            let mut k = Knowledge::new(Currency::from_config(&seat["currency"]));
+            k.absorb(&seat["observation"]);
+            let out: Vec<Json> = ["a", "b"]
+                .iter()
+                .map(|side| {
+                    let src = c["program"].as_str().unwrap().replace("{}", &written(&c[*side]));
+                    match resolve(&parse_program(&src).unwrap_or_else(|e| panic!("{name}: {e:?}")), &k, &|_| None, c["as"].as_str()) {
+                        Resolution::Blocks(b) => json!({ "blocks": b }),
+                        Resolution::Questions { questions, .. } => json!({ "asks": questions }),
+                    }
+                })
+                .collect();
+            if c["same"] == true {
+                assert!(out[0].get("blocks").is_some(), "{name}: {}", out[0]);
+                assert_eq!(out[0], out[1], "{name}");
+            } else {
+                assert_ne!(out[0], out[1], "{name}");
+            }
+        }
+    }
+
     /// Standing work orders: the table this resolver and the repository's TypeScript one are both held to
     /// (contracts/test/standing-work.json; translator/test/standing-work.test.ts reads the same file).
     #[test]

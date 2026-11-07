@@ -1187,6 +1187,22 @@ The mechanism:
   what it means.
 - **Fix when:** before any experiment that seats a utility or operator post, or a household that is to set its use.
 
+### TR-8 · A request for more scope is read by our translator only when it is named
+- **Gap:** On a labelled set of 148 assistants' requests in eight styles by three writers (translator/eval/
+  scope-requests.jsonl), `pod-small-v3-s2` files `scope_request` for 20 of 67 requests for more scope or means (30%),
+  14 of them where the request says "scope request"; none of 81 other requests is filed as one. The form was never in
+  its training. As served, 66 of the 67 go behind to Sonnet (on trial, kind unreleased, cut off, form check) or are
+  refused in a way that goes behind; one ("I should like to be allowed to see her bank statements") is refused
+  `not_an_act` at 0.97, a refusal that stands, and is lost. Sonnet's own reading of these was not measured.
+- **Where:** `translator/eval/scope-run.ts`; decisions 2026-11-07 "The translator as part of the instrument".
+- **Effect:** The delegation study counts `scope_request` acts. What it counts is Sonnet's reading of each request
+  (ours goes behind), and an ask written as a list, bluntly or in a second language would be lost if ours were ever
+  served for it; a standing refusal loses one outright. Unprompted asks would be undercounted, unevenly by seat model.
+- **L / I:** high / high · **Status:** to fix (the next round: the assistants' papers in training, written in many styles)
+- **Notice by:** `bun translator/eval/scope-run.ts decide/<model>` on each new model; scope requests in a pilot's log
+  against its seats' words.
+- **Fix when:** before the delegation study counts requests for more scope; measure Sonnet behind on the same set first.
+
 ### TR-3 · Errors differ by seat model and by place
 - **Gap:** Accuracy differs 15 to 40 points by seat model and profile on small cells; money on unseen pilots 0 of 7;
   currency words (a Brazilian "conto", "Rs", "A$", numbers in words) are not all handled.

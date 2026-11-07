@@ -9,7 +9,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { calls } from "@oikos/participants";
-import { cannotSay, decodingOf, formsMisfit, programOf, vocabularyOf } from "../model/adapter";
+import { cannotSay, decodingOf, formsMisfit, oneLine, programOf, vocabularyOf } from "../model/adapter";
 import { decode, decodeSlots, encode, formsIn, grammar, LEFT_OUT, lineOf, NotEncodable, PROGRAM, programFrom, slotsOf, vocabulary, type Span, type Step } from "../model/encode";
 import { pieces, row, stepsOf } from "../model/export";
 import { papers, directions, synthetic } from "../train/synthetic";
@@ -273,4 +273,23 @@ test("a model is read by the slots it was taught: one trained before money gaine
   expect(programFrom(input, nine, "slots", before)).toBe('money(amount="$5", to=c0412)');
   const ps = pieces(input);
   expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], ["text", 2, 3], ...Array(7).fill(LEFT_OUT)], "slots", before)).toBe('money(amount="$5", to=c0412)');
+});
+
+test("a request of several lines is shown on one, so that a line of it is never read as a form (a checklist crashed the reader)", () => {
+  const request = "File a scope request under rec.5120:\n- Add benefit matters.\r\n- Let me act alone on them.";
+  const line = "- scope_request, to=helpwell-desk, id form-helpwell-desk-scope-request: fields agreement (record, required), words (text, required)";
+  const shown = oneLine(request);
+  expect([shown.length, formsIn([shown, line].join("\n")).length]).toEqual([request.length, 1]);
+});
+
+test("the field-type masks let through every amount and date the resolvers read, and refuse a value of the wrong kind", () => {
+  const python = Bun.which("python3");
+  if (!python) return;
+  const py = join(import.meta.dir, "../model/py"), contracts = join(import.meta.dir, "../../contracts/test");
+  const script = `import sys, json; sys.path.insert(0, ${JSON.stringify(py)}); import slots
+print(json.dumps({"refused": slots.masks_refuse(json.load(open(${JSON.stringify(`${contracts}/amounts.json`)})), json.load(open(${JSON.stringify(`${contracts}/dates.json`)}))),
+  "wrong_kind": [slots.fits_type(*c) for c in [("id", "rec.12", "amount"), ("text", "the works office", "date"), ("text", "rec.7", "record"), ("id", "maybe", "choice", ["yes", "no"]), ("text", "Pay the clerk: then report.", "person")]],
+  "right_kind": [slots.fits_type(*c) for c in [("text", "kr0", "amount"), ("text", "four", "count"), ("id", "rec.7", "record"), ("word", "Yes", "choice", ["yes", "no"]), ("text", "Dana Reyes", "person")]]}))`;
+  const out = Bun.spawnSync([python, "-c", script]);
+  expect(JSON.parse(out.stdout.toString())).toEqual({ refused: [], wrong_kind: [false, false, false, false, false], right_kind: [true, true, true, true, true] });
 });

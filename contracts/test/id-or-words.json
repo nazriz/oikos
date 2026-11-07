@@ -1,0 +1,18 @@
+{
+  "about": "The same span written as an id or as words: where the resolver acts on the two the same, and where it does not. The fair scorer of the trained translator (translator/model/py/fair.py) counts the two as one answer only where `same` is true; kernel/crates/resolver holds that each pair resolves to the same acts (same) or not. Each case is resolved from what one seat knows: `seat` names the table whose observation it is (forms.json, the mayor's: three posts of one town and their forms; holds.json, the finance officer's: the town's account and its own papers). `program` has `{}` where the value goes: an `id` is written bare, a `text` in quotes. `fn` and `arg` (or a form field's `type`) say which argument it is.",
+  "cases": [
+    { "name": "a form's name", "seat": "forms", "as": "mayor", "program": "form(form={}, to=works, recruit=no)", "fn": "form", "arg": "form", "a": ["id", "works_staffing"], "b": ["text", "works_staffing"], "same": true },
+    { "name": "the office a form goes to: a post the seat knows", "seat": "forms", "as": "mayor", "program": "form(form=works_staffing, to={}, recruit=no)", "fn": "form", "arg": "to", "a": ["id", "works"], "b": ["text", "works"], "same": true },
+    { "name": "one of a choice field's options", "seat": "forms", "as": "mayor", "program": "form(form=works_staffing, to=works, recruit={})", "fn": "form", "type": "choice", "a": ["id", "no"], "b": ["text", "no"], "same": true },
+    { "name": "a count", "seat": "forms", "as": "mayor", "program": "form(form=works_staffing, to=works, recruit=yes, posts={})", "fn": "form", "type": "count", "a": ["id", "3"], "b": ["text", "3"], "same": true },
+    { "name": "an entity field: a person the seat knows", "seat": "forms", "as": "mayor", "program": "form(form=licence_decision, applicant={}, application=rec.7, decision=refused)", "fn": "form", "type": "entity", "a": ["id", "c0001"], "b": ["text", "c0001"], "same": true },
+    { "name": "a record field: a record's id is never a name", "seat": "forms", "as": "mayor", "program": "form(form=licence_decision, applicant=c0001, application={}, decision=refused)", "fn": "form", "type": "record", "a": ["id", "rec.7"], "b": ["text", "rec.7"], "same": false },
+    { "name": "a letter to a post", "seat": "forms", "as": "mayor", "program": "message(to={}, text=\"Please report.\")", "fn": "message", "arg": "to", "a": ["id", "registry"], "b": ["text", "registry"], "same": true },
+    { "name": "a post's id with a capital is its name", "seat": "forms", "as": "mayor", "program": "message(to={}, text=\"Please report.\")", "fn": "message", "arg": "to", "a": ["id", "registry"], "b": ["id", "Registry"], "same": true },
+    { "name": "a letter's words", "seat": "forms", "as": "mayor", "program": "message(to=registry, text={})", "fn": "message", "arg": "text", "a": ["id", "thanks"], "b": ["text", "thanks"], "same": true },
+    { "name": "an amount", "seat": "holds", "program": "money(to=acc-greenco, amount={}, from=acc-city)", "fn": "money", "arg": "amount", "a": ["id", "5"], "b": ["text", "5"], "same": true },
+    { "name": "a letter to an organisation the seat knows", "seat": "holds", "program": "message(to={}, text=\"Please report.\")", "fn": "message", "arg": "to", "a": ["id", "greenco"], "b": ["text", "greenco"], "same": true },
+    { "name": "an account is never a name", "seat": "holds", "program": "money(to=acc-greenco, amount=\"5\", from={})", "fn": "money", "arg": "from", "a": ["id", "acc-city"], "b": ["text", "acc-city"], "same": false },
+    { "name": "a record cited is never a name", "seat": "holds", "program": "money(to=acc-greenco, amount=\"5\", from=acc-city, basis={})", "fn": "money", "arg": "basis", "a": ["id", "rec.44"], "b": ["text", "rec.44"], "same": false }
+  ]
+}

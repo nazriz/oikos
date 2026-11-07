@@ -1,5 +1,8 @@
 // Ruling A (2026-10-10): copied free text is not compared where two readers, or a model and a label, are compared.
 import { expect, test } from "bun:test";
+import { join } from "node:path";
+import FORMS from "../../contracts/test/forms.json";
+import ID_OR_WORDS from "../../contracts/test/id-or-words.json";
 import { sameButForFreeText, sameMeaning } from "../train/meaning";
 import { passesSet, textExact, type SetCase } from "../eval/set-run";
 import { labelled } from "../train/readers";
@@ -50,4 +53,16 @@ test("two readers who differ in free text alone make an example, and it is one r
   const both = labelled([u], [{ reader: "a", answers: [{ id: u.id, program: 'message(to="the clerk", text="minutes wanted")' }] }, { reader: "b", answers: [{ id: u.id, program: 'message(to="the clerk", text="hand over the minutes")' }] }]);
   expect(both.examples).toEqual([]);
   expect(both.rejects[0]!.why).toBe("reworded_text");
+});
+
+test("id or words: the same span bare or quoted is one value where the resolver acts on the two alike, in both scorers (contracts/test/id-or-words.json)", () => {
+  // (The engine's resolver is held to each case: kernel/crates/resolver, id_or_words_as_the_shared_table_says.)
+  const records = FORMS.observation.channels.forms.records as unknown as { id: string; data: { form: string; office?: string; fields: { [k: string]: { type: string } } } }[];
+  const forms = records.map((r) => ({ form: r.data.form, to: r.data.office ?? "", id: r.id, fields: r.data.fields }));
+  const written = ([kind, x]: string[]) => (kind === "text" ? JSON.stringify(x) : x!);
+  for (const c of ID_OR_WORDS.cases) expect([c.name, sameMeaning(c.program.replace("{}", written(c.a)), c.program.replace("{}", written(c.b)), { forms })]).toEqual([c.name, c.same]);
+  const python = Bun.which("python3");
+  if (!python) return; // (No Python here: the trainer's scorer is not run.)
+  const out = Bun.spawnSync([python, join(import.meta.dir, "../model/py/fair.py"), "--table", join(import.meta.dir, "../../contracts/test/id-or-words.json")]);
+  expect(JSON.parse(out.stdout.toString())).toEqual({ wrong: [] });
 });

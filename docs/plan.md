@@ -101,6 +101,12 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [ ] **Translator rebuild,** once forms settle: about the current size, writing an act constrained by the form's
   grammar; Sonnet only as the safety net, its share reported in every run. Retrain plan: the 2026-10-25 "Translator v3"
   entry in docs/decisions.md. The v4 design for the study (approved 2026-11-07): docs/design/translator-v4.md.
+  For the retrain (2026-11-07): train on the labels made one way
+  (`runs/translator-fair-2026-11-07/data-v3-fair/`); the assistants' papers (`scope_request` above all) written in many
+  styles, never trained so far (risk TR-8); report the fair score beside the exact one; run `translator/eval/scope-run.ts`.
+  - [x] The translator as part of the instrument: fair scoring checked against the resolver, labels made one way,
+    field-type masks, requests of several lines, the scope-request check (decisions 2026-11-07).
+  - [ ] Sonnet behind measured on the scope-request set, before the delegation study counts requests for more scope.
   - [x] v4 step 1: data by code (rows re-rendered inside real seats' card lists; the length check before training).
   - [ ] v4 step 2: the Claude pilot's test split; keying; rewrites in several voices (45 USD cap).
   - [ ] v4 step 3: reader swap (ettin-encoder-150m); the text writer (Gemma 3 270M under the grammar, copy constraint).
