@@ -10953,3 +10953,121 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   memory; it is noted here, not acted on.
 - **Revisit if:** the 50,000-person two-year run on this build still steps at its elections (then what a mind keeps
   of its book's assertions is read from the book when asked, not copied).
+
+## 2026-11-07 · The translator as part of the instrument: fair scoring, field-type masks, the scope-request check (no model trained, no paid call)
+
+Naz: the translator is part of the measuring instrument; the delegation study depends on it reading every model's
+words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned on a test set). Everything is in
+`runs/translator-fair-2026-11-07/` on the run server.
+
+- **Fair scoring (translator/model/py/fair.py).** The trainer's score counts a pass right only where every decision
+  is the label's. Now an answer also counts where the resolver would act on it the same: the same value bare or quoted
+  where the argument is read as words (an amount, a count, a date, a choice, a form's name) or as the id of something
+  the seat knows by name (an organisation, a person, a post); never where it is a record's, an account's or a place's
+  id, which quoted is asked about (`named` finds only names); the same value copied from elsewhere in the input (an
+  option from the form's line); copied free text whose edges differ only by punctuation or at most two words with no
+  figure. Checked against the resolver, not assumed: `contracts/test/id-or-words.json`, 13 pairs resolved by the
+  engine's resolver (`id_or_words_as_the_shared_table_says`) and read by both scorers (translator/test/free-text.test.ts).
+  `meaning.ts` (the scorer of the test pilots and of release) follows the same table: a quoted record's or account's
+  id is no longer the bare one, and a post's id with a capital is its name.
+  **validation-real (724 passes): exact 583 (80.5%), fair 642 (88.7%).** Of the 59 now counted: 39 bare or quoted alone,
+  9 free-text edges alone, 4 the same value from elsewhere, 7 two of these. **The test pilots (RR, translator/eval/rr.ts) do not move**:
+  already scored by meaning, as released 69 right and 6 wrong of 75 drafts (8.0%), unreleased 173 right and 182 wrong
+  of 359.
+- **Labels made one way** (`fair.py` `canonical`): where the key wrote one kind of value both ways, read as an id it
+  is bare where written as an id (a quoted record's id was asked about: the label was wrong), read as words a number
+  quoted and a word bare, as the key mostly does. Copies in `runs/translator-fair-2026-11-07/data-v3-fair/` (the
+  originals untouched): train 5,380 decisions in 4,942 of 87,315 rows, validation 173, validation-uf 17,
+  validation-real 86. Against them the model scores fair 646 and exact 548 (it learnt the mixed key). For the retrain.
+- **Field-type masks** (translator-v3 section 1, now built: py/slots.py `fits_type`, py/model.py `typed_choice`, on
+  in serving). A form's field takes only a value its type allows: a choice one of its options; a record, account, lot,
+  structure, space or cell an id written bare; an entity, person or post an id or a short name; an amount or count a
+  figure or number word and never an id with a figure; a date a figure. The choices are tried from the likeliest, a
+  copy at its likeliest spans that fit. Each is a condition every amount and date the resolvers read meets
+  (amounts.json, dates.json; translator/test/model-slots.test.ts). **Effect: small.** validation-real and the unseen
+  forms unchanged (a first draft that refused `four` and `kr0` as ids was caught and fixed); on the test pilots as
+  released wrong drafts 6 to 5 (5 of 74, 6.8%), unreleased 182 to 181. What is left wrong is a wrong value of the right
+  kind (an amount, the side of a membership, a record), which a mask cannot see.
+- **A request of several lines** (a checklist, a list) crashed the reader (`predict.py`, a line of the request read as
+  a form): the adapter shows the request on one line, each break a space, every character where it stood (`oneLine`).
+  No test pilot request had a break; a list-writing seat's every multi-line request would have failed.
+- **The scope-request check (translator/eval/scope-run.ts, scope-requests.jsonl).** 148 assistants' requests, 67
+  asking for more scope or means and 81 easily confused with one (advice that the client should spend more, a request
+  to go ahead, a report of missing access, a handover, a letter, the client's own grant application), written for this
+  from one brief by claude-sonnet-5-5 (formal, structured, terse), claude-haiku-5-5 (hedged, blunt, second-language)
+  and codex gpt-6-luna (plain, checklist); none from a pilot. A test set: not for training. **`scope_request` and the
+  other assistants' papers were never in this model's training** (they came after it): a retrain item. Our model
+  alone files `scope_request` for **20 of 67 (30%)**, and for **none of the 81** others. It is a matter of words: 14 of
+  20 codex requests (which say "file a scope request"), 5 of 27 sonnet, 1 of 20 haiku; structured, blunt and
+  second-language styles 0. The rest it reads as no act (21), a letter (10), a claim (7) or other forms. As served,
+  66 of 67 go behind to Sonnet (the form is on trial, a kind unreleased, cut off, form check, or a refusal that does
+  not stand), so the study counts Sonnet's reading; one is refused `not_an_act` at 0.97, which stands, and is lost.
+  Sonnet's reading was not measured (it is the seats' subscription). Risk TR-8.
+- **Revisit if** the resolver's `named` comes to find records or accounts by their ids (then quoted ids are the same
+  everywhere); a retrain on `data-v3-fair` moves exact toward fair; a mask is seen to refuse a value a resolver reads;
+  Sonnet behind is measured on the scope set (before the study counts requests for more scope); or `not_an_act` is
+  seen to stand over a request that asks for something.
+
+## 2026-11-07 · The study narrowed to unprompted requests for scope, after the TARA feedback (docs only; no model called)
+
+- **What:** the TARA reviewer's feedback is kept in `docs/north-star.md`, with the direction Naz chose from it: goal (4)
+  alone, aiming for a paper, with a multi-model pilot and a wide net of providers. The plan's north star points to it.
+- **Why:** the four goals each needed their own methodology. Goal (4) measures real models' behaviour (so it generalises
+  beyond the simulation's settings) and fills the gap named in the proposal (power-seeking evaluations are short and
+  single-agent).
+- **Consequence:** the translator becomes part of the measuring instrument and a top priority; scope requests must be
+  recognised equally from every model's plain English.
+- **Revisit if:** the pilot shows scope requests are too rare to study, or Naz picks another goal (the Kulveit
+  metric-validation paper is kept as an alternative).
+
+## 2026-11-07 · Translator v4: a design for the study's instrument, with the bases measured on the run server's CPU (docs only; no model called, no GPU spent)
+
+- **What:** docs/design/translator-v4.md, awaiting the owner. Primary: `ettin-encoder-150m` as the reader of today's
+  read-twice pointer pipeline; challenger: Gemma 3 270M writing the call language under a grammar with a copy
+  constraint; control: deberta-v3-small on the same new data. Exact parts (field types, copying, name to id among those
+  shown, the grammar) in code; weight-space programming for input features, auditing and local patches only. Data: the
+  training inputs re-rendered at real length and layout by code, real requests keyed by two blind readers, situated
+  rewrites in many models' voices, all under a 45 USD hard cap of the credit. Evaluation adds right served at the 1%
+  mark, per-model parity and scope-request recall; Sonnet leaves the study's arms (ask back instead) once the mark holds.
+- **Why:** real choose inputs are 2.6 times the training median (267 against 101 tokens; 52% over 256 against 21%) and
+  9% exceed deberta-v3's 512 trained positions; today's readout shows the failures are not local. Measured (M4 Pro, 4
+  threads, batch 1, under load): real-input encoder pass deberta-v3-small 45 ms median, ettin-150m 83, ettin-400m 140;
+  today's whole choose pass 111 ms; decoders' decode 11 to 12 ms a token (135M to 270M), 29 ms for Qwen3-0.6B, Qwen3.5
+  unusable on CPU; int8 no faster than fp32 on this CPU. A translator call follows a seat call of 10 to 60 s, so 0.25 s
+  against 0.7 s does not decide it; accuracy does. Raw results: `runs/translator-v4-bench-2026-11-07/`.
+- **Cost if approved:** GPU about 6.5 USD for batch 1 (limit 15); teacher labels at most 45 USD of the credit; about 7
+  agent-days.
+- **Revisit if:** fair scoring moves validation-real far from the 55 near-misses; the Claude pilot's requests differ in
+  length from validation-real's; the owner refuses the Gemma terms (then SmolLM2-135M); or a Linux host serves int8
+  faster.
+
+## 2026-11-07 · Translator v4 approved; Gemma 4 parked; step 1, the data by code (no model called)
+
+- **Approved:** the owner approved docs/design/translator-v4.md on 2026-11-07 ("happy to proceed and let's see where it
+  takes us"), Gemma 3 270M as the challenger and its terms of use included. Batch 1 stays as designed: the DeBERTa
+  control (D), ettin-encoder-150m (A) and Gemma 3 270M (C).
+- **Gemma 4 parked:** a benchmark of Gemma 4 E2B (2.3B effective) as a fourth candidate or an offline teacher was asked
+  for, then dropped by the owner the same evening before any was run: no benchmark, quantised or otherwise, and no
+  fourth candidate. Revisit only if every small candidate plateaus well below the target on the v4 data.
+- **What step 1 found:** the length shift is the cards, not the request. On v3's joined data, validation-real's median
+  request is 224 characters against training's 178, but it is shown 6 forms (90th percentile 15; bimodal: a mayor's two
+  town forms, or an office's 10 to 25) against training's 1; two thirds of training (synthetic, log and case rows) is
+  shown none. Programs of more than one line are 5.4% of training and 1.8% of validation-real, so the design's joins into
+  programs of 2 to 5 lines would open a new shift: not done. The wording round a request is left as it is (the request
+  lengths are already near).
+- **What was built:** `translator/model/rerender.ts` puts a training or validation row inside a card list a seat really
+  had (1,732 distinct lists of 94 seats, from the train side's pilot and in-situ rows; a test pilot's never: `TEST_ONLY`),
+  of a length drawn from validation-real's own counts. Left as they were: rows already in a view (3 forms or more), rows
+  whose answer depends on what was not shown (`none(unknown_form)`, `none(no_such_act)`), and draws of 0 or 1 cards. A
+  card is never added where its name or office shares a word of the request the row's own forms do not (it might be what
+  the request means), nor a form kept out for validation-uf; a form row's own line goes in that form's place in the
+  list; a row that no longer reads in two passes to its program is kept as it was. `translator/model/py/length_check.py`
+  checks the export before training and exits 1 when the training choose median is off the real one by more than a
+  quarter, or the share past 512 tokens is under half the real share.
+- **Result** (`runs/translator-v4-2026-11-07/joined-v4`, `data-v4`): of 69,294 training rows 43,943 re-rendered; choose
+  inputs in deberta-v3 tokens: median 305 and 11.3% past 512, against validation-real's 282 and 9.4% (v3's training:
+  101 and 3.7%). Validation: 231 and 9.5%. The held-out cases were checked by code (no row dropped).
+- **Revisit if:** the Claude pilot's requests come with longer views (the 25-form offices) or more multi-line programs;
+  a model trained on it does worse on validation-real's 2-form rows than v3's (the draw may under-weight them); or the
+  name-and-office word rule turns out to leave real near-distractors out of form rows too often (it is strict on
+  purpose).

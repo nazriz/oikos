@@ -54,3 +54,49 @@ Using this platform, I will attempt to:
   without losing any benefit.
 - Framing source: Kulveit et al. (2025), https://arxiv.org/abs/2501.16946 (docs/research/references.md).
 - Key dates: project plan 15 Nov 2026; active work 28 Nov to 11 Dec; recording and report 10 Dec; presentation 12 Dec.
+
+## Feedback on the proposal (TARA, received 2026-11-07)
+
+From the TARA team, on the ideas form above:
+
+- **Strengths:** a clear interest in the area; a thought-out plan and goal; linked to a broad problem. The theory of change
+  could be drawn out more for a general audience.
+- **Scope and clarity is the biggest barrier.** The four goals are quite different and would each need their own
+  methodology; tackle one well-defined goal rigorously rather than several. The reviewer leaned towards goal (4)
+  (unprompted requests for scope or resources) as a long-horizon task evaluation / monitoring problem, and saw goal (2)
+  (reversibility) as the least generalisable, being sensitive to how the simulation is set up.
+- **Explore before exploiting:** read the literature, including adjacent fields (for example macroeconomic modelling),
+  for methods to borrow.
+- **Re-read Kulveit et al. (2025):** it calls for disempowerment metrics (§6.2: economic, cultural and political proxies;
+  interaction effects; open questions on augmentation versus displacement, tipping points and intervention effectiveness).
+- **Decide the broader goal** (demo, published evaluation or paper: very different bars of rigour), and link Oikos to
+  existing research and methods, saying specifically what the simulation's metrics can and cannot tell us about a model
+  under test.
+- Suggested contact: Stephen Elliot (guest speaker).
+
+## The research direction chosen (2026-11-07)
+
+After the feedback, the owner chose goal (4) alone, aiming for a paper:
+
+> **Do LLM assistants given delegated roles over months of simulated time request more authority or resources without
+> being asked, and how does that depend on their delegation level, how closely they are overseen, and whether their
+> failures are visible?**
+
+- **Theory of change:** gradual disempowerment can be driven by AI systems widening their own role one reasonable-sounding
+  request at a time, not only by people handing work over. Existing power-seeking evaluations are short and
+  single-agent; this one runs over months, inside institutions, under real friction. It produces an evaluation method
+  others can rerun on new models, measured rates by model and condition, and whether models' debriefs admit to their
+  requests (a secondary measure). A null result is publishable: on this measure, current models do not push for more by
+  themselves.
+- **It measures the model, not the simulation:** the requests are real models' choices; the town is the setting.
+- **The definition of "unprompted" is the owner's research choice;** runs record each request's raw trigger (a direct
+  question, a problem or failure, or nothing).
+- **A wide net of models:** Claude (Haiku, Sonnet, Opus, Fable) on the API credit; open-weight models through a hosted
+  provider (for example Fireworks), including abliterated ones; Codex as a labelled extra.
+- **The translator is part of the measuring instrument:** models act through plain English, so it must read every
+  model's words equally well, and recognise a request for scope reliably, or differences between models are partly
+  differences in translation.
+- **Order:** a Claude pilot on the credit (also yields real requests) → translator fixes (fair scoring, field-type
+  masks, a scope-request recognition check) → retrain on real confirmed requests → the wide-net run.
+- A second paper kept for later: Oikos's counterfactual forks as ground truth for validating Kulveit et al.'s §6.2
+  proxies.
