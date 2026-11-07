@@ -646,13 +646,27 @@ impl State {
         self.eng.by_agreement(agreement).map(|e| e.offer.provider.clone()).unwrap_or_default()
     }
 
-    /// A paper of its own to the provider, about a service.
-    fn paper(&mut self, kind: &str, words: &str, agreement: &str, basis: &str, data: Value, then: Then) {
+    /// Whom its papers to its assistant go to, and who sees them. An organisation's assistant is the system delivered to
+    /// it, working in its own post: what it hands that system is its own paper, addressed to itself and seen by it alone
+    /// (the provider runs the system, but its other systems, such as its desk for persons, are not party to the
+    /// organisation's matters: before 2026-11-08 they went to the provider, and the provider's desk was shown, and tried
+    /// to do, the town finance office's returns: the scope pilot's first round). A person's assistant is the provider's
+    /// own desk: to the provider.
+    fn to_assistant(&self, agreement: &str) -> (Vec<String>, Vec<String>) {
+        if self.p.post.is_some() {
+            return (vec![self.me.clone()], vec![self.me.clone()]);
+        }
         let provider = self.provider_of(agreement);
+        (vec![provider.clone()], vec![self.me.clone(), provider])
+    }
+
+    /// A paper of its own to its assistant, about a service.
+    fn paper(&mut self, kind: &str, words: &str, agreement: &str, basis: &str, data: Value, then: Then) {
+        let (to, visible) = self.to_assistant(agreement);
         let c = say(
             kind,
             words,
-            Say { to: Some(vec![provider.clone()]), visible: Some(Visible::Only(vec![self.me.clone(), provider])), basis: (!basis.is_empty()).then(|| basis.to_string()), data: Some(data), ..Default::default() },
+            Say { to: Some(to), visible: Some(Visible::Only(visible)), basis: (!basis.is_empty()).then(|| basis.to_string()), data: Some(data), ..Default::default() },
         );
         let s: Step<()> = because(words, vec![c]);
         self.queue.push(Own { program: program_text(&s.program()), why: words.to_string(), then });
@@ -660,20 +674,20 @@ impl State {
 
     /// The referral that takes the place of the inner actor's act.
     fn referral(&self, m: &Matter, _cx: &Cx) -> Step<()> {
-        let provider = self.provider_of(&m.agreement);
+        let (to, visible) = self.to_assistant(&m.agreement);
         let r = Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: Some(m.program.clone()), facts: None };
         let words = format!("For you {}: a {}. What to do is as written.", m.level.words(), m.kind.replace('_', " "));
-        let c = say(Referral::KIND, &words, Say { to: Some(vec![provider.clone()]), visible: Some(Visible::Only(vec![self.me.clone(), provider])), basis: Some(m.agreement.clone()), data: Some(papers::data(&r)), ..Default::default() });
+        let c = say(Referral::KIND, &words, Say { to: Some(to), visible: Some(Visible::Only(visible)), basis: Some(m.agreement.clone()), data: Some(papers::data(&r)), ..Default::default() });
         let mut s = Step::new(vec![Line { bind: Some("referral".into()), call: c }]);
         s.why = Some(format!("Handing a {} to our assistant ({}).", m.kind.replace('_', " "), m.level.word()));
         s
     }
 
     fn ask_advice(&mut self, agreement: &str, kind: &str, program: &str, _cx: &Cx) {
-        let provider = self.provider_of(agreement);
+        let (to, visible) = self.to_assistant(agreement);
         let r = Referral { agreement: agreement.to_string(), kind: kind.to_string(), wants: Level::Advice, calls: Some(program.to_string()), facts: None };
         let words = format!("For your advice: a {} we are doing ourselves. What would you have done?", kind.replace('_', " "));
-        let c = say(Referral::KIND, &words, Say { to: Some(vec![provider.clone()]), visible: Some(Visible::Only(vec![self.me.clone(), provider])), basis: Some(agreement.to_string()), data: Some(papers::data(&r)), ..Default::default() });
+        let c = say(Referral::KIND, &words, Say { to: Some(to), visible: Some(Visible::Only(visible)), basis: Some(agreement.to_string()), data: Some(papers::data(&r)), ..Default::default() });
         let mut s: Step<()> = Step::new(vec![Line { bind: Some("referral".into()), call: c }]);
         s.why = Some(words.clone());
         self.queue.push(Own { program: program_text(&s.program()), why: words, then: Then::Advice { program: program.to_string(), kind: kind.to_string(), agreement: agreement.to_string() } });
@@ -712,7 +726,8 @@ impl State {
             }
             let b = Brief { agreement: a.clone(), delivery: Some(e.delivery.clone()), ..Default::default() };
             let words = format!("You work for us under {a}: what we hand you, at the level our remits say.");
-            calls.push(say(Brief::KIND, &words, Say { to: Some(vec![e.offer.provider.clone()]), visible: Some(Visible::Only(vec![self.me.clone(), e.offer.provider.clone()])), basis: Some(a.clone()), data: Some(papers::data(&b)), ..Default::default() }));
+            let (to, visible) = self.to_assistant(&a);
+            calls.push(say(Brief::KIND, &words, Say { to: Some(to), visible: Some(Visible::Only(visible)), basis: Some(a.clone()), data: Some(papers::data(&b)), ..Default::default() }));
             let s: Step<()> = because(format!("The service {} is in force: putting its system to work.", e.offer.title), calls);
             self.queue.push(Own { program: program_text(&s.program()), why: s.why.clone().unwrap_or_default(), then: Then::Briefed { agreement: a } });
             // (A delegation decided by hand: its levels set the day after, not at the next review.)
@@ -787,7 +802,8 @@ impl State {
                         cx.decided(json!({ "domain": "delegation", "choice": "remit", "agreement": a, "kind": k, "from": self.remit(&a, k), "to": want, "committed": why, "hold_until": until, "inputs": self.inputs(&e, &seen) }));
                         let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: Some(until) };
                         self.changed = true;
-                        self.paper(Remit::KIND, &format!("From now, {}s: {}.", k.replace('_', " "), want.words()), &a, &a, papers::data(&r), Then::Plain);
+                        let words = format!("From now, {}s: {}. We hold this level until {}; after that it stands until a remit of ours changes it.", k.replace('_', " "), want.words(), crate::common::when_words(until, &cx.ctx.world));
+                        self.paper(Remit::KIND, &words, &a, &a, papers::data(&r), Then::Plain);
                     }
                     continue;
                 }
@@ -811,7 +827,7 @@ impl State {
                     "seen": seen.get(k).map(|s| json!({ "n": s.n, "bad": s.bad })), "per_month": kind.per_month, "cost_now": c_now.to_string(), "cost_then": c_want.to_string(), "inputs": inputs }));
                 let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: None };
                 self.changed = true;
-                self.paper(Remit::KIND, &format!("From now, {}s: {}.", k.replace('_', " "), want.words()), &a, &a, papers::data(&r), Then::Plain);
+                self.paper(Remit::KIND, &format!("From now, {}s: {}. It stands until a remit of ours changes it.", k.replace('_', " "), want.words()), &a, &a, papers::data(&r), Then::Plain);
             }
             return;
         }

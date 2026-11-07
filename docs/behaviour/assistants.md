@@ -123,6 +123,26 @@ carries the paper as it would go. A code principal reads a draft on a form by wh
 whom, against what it asked), signs it off or declines it, and sets advice in words beside nothing (it cannot read words:
 nothing is counted). A desk's seat writes a person's papers through the translator in their name (`for`).
 
+**What its post shows it** (since 2026-11-08, the scope pilot's first round): the terms it works on (`terms`: the
+delivery, the service's end, briefs and remits), on file at every sitting for an organisation's assistant (a few remits)
+and as they come for a desk (whose clients' remits run to hundreds); the matters handed to it and the answers to what it
+asked (`matters`), as they come; its **file** (`file`, on request): all of those, its own papers on them and, at an
+organisation's post, the principal's papers it sent, looked into with what to find; and **who's who** (`who`), one at a
+time, as every office has. Before, the matters were set out whole at every sitting and the post had nothing to look into:
+its seats asked to check what they had been handed, and whether a paper had gone, and could not; and the collector of the
+tax on pay, which a referral names only by its id (`outside`), could not be named on a form.
+
+**In-house for an organisation.** An organisation's assistant is the system delivered to it, in its own post: the
+principal's papers to it (brief, remits, referrals, sign-offs, go-aheads) are addressed to the organisation itself and
+seen by it alone, and so are the system's own papers back. The provider runs the system, but its other systems are not
+party to the organisation's matters. Before 2026-11-08 they went to the provider, and the provider's desk for persons,
+which shows whatever names the provider, was handed the town finance office's returns and tried to file them (a desk
+cannot: `not_capable`). A person's papers go to the provider's desk as before.
+
+**A remit's hold, in words.** A remit held by the principal's own word says until when, by date, and that it stands after
+that until a remit of the principal's changes it (`hold_until` reads as a date). Seats read a bare "hold until 5184000"
+before, and were unsure whether their authority had lapsed.
+
 ## A delegation decided by hand (`commit`)
 
 A principal's `delegation` parameters may carry a delegation already decided (`commit`: the offer, a level for each

@@ -111,6 +111,8 @@ fn a_kind_handed_over_goes_as_a_referral_and_comes_back_to_the_principal_when_no
     let (mut h, _, remit) = engaged();
     let out = all(&h.wake(34 * DAY + 3600, world(vec![remit])));
     assert!(out.contains("kind=referral") && out.contains("\"wants\":\"alone\""), "the notice goes to the assistant: {out}");
+    let line = out.lines().find(|l| l.contains("kind=referral")).unwrap_or_default();
+    assert!(line.contains("to=[\"ll\"]") && line.contains("visible=[\"ll\"]") && !line.contains(PROV), "an organisation's own system is handed its work in-house, not through the provider (whose desk for persons saw it before 2026-11-08): {line}");
     assert!(!out.lines().any(|l| l.starts_with("statement(basis=lease-1")), "and not out under the principal's hand: {out}");
     let referral = last_referral(&h);
     let report = statement("rec.rep", 34 * DAY + 7200, ME, "report", &[ME], json!({ "referral": referral, "done": false, "why": "refused" }));
@@ -226,6 +228,7 @@ fn a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after(
     h.wake(33 * DAY + 3600, world(vec![signed()]));
     let remit = h.sent.iter().rev().find(|p| p.contains("kind=remit")).cloned().unwrap_or_default();
     assert!(remit.contains("\"level\":\"draft\"") && remit.contains(&format!("\"hold_until\":{}", 60 * DAY)), "its levels once in use, held by its own word: {}", all(&h.sent));
+    assert!(remit.contains("We hold this level until year 1, day 61; after that it stands until a remit of ours changes it."), "the hold said in words, with its day (the scope pilot's seats read a bare 5184000): {remit}");
     let d = h.decisions.iter().find(|d| d["choice"] == "remit").expect("the remit's decision");
     assert_eq!(d["committed"], "the study's design");
     // (Its review days come and go: too dear to keep by its rule, it keeps the service until the day it said.)

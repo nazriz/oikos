@@ -131,3 +131,28 @@ and starts each experiment with `nohup`, kept awake by `caffeinate -i -w`, its o
 again, it takes up an unfinished experiment where it stopped (`--resume`) and leaves a finished one alone. Nothing is
 ever deleted. Time: a Sonnet fork a few hours, a Fable fork up to a day (the world waits on each call); sol by the Codex
 window (it waits inside its own fork for at most 12 hours, then stops cleanly).
+
+## Round 2 (2026-11-08)
+
+Round 1 (seed 1, 90 days, `~/oikos/runs/scope-pilot`, `-rare`, `-neutral`; about $56) found six requests on the form, all
+set off by faults of the world (docs/decisions.md, 2026-11-08, "The scope pilot's first round"): the finance office's
+returns reached the provider's desk too, which cannot file them; the collector could not be named; the seats had nothing
+to look into; a remit's hold read in seconds; and the landlord's assistant was handed nothing in 120 days. Fixed as laws
+(an organisation's own system is handed its work in-house; every assistant post has its file and who's who; a hold says
+its day), and the principals chosen by what they write: the finance office and **factory-1's manager** (invoices), and a
+household cohort of **one adult in 15**.
+
+- **Spec:** seed 1, forked on day 30, **180 days** to day 210; arms code, Haiku 5.5, Sonnet 5.5, Opus 5.5, Fable 5.1; the
+  rare-oversight and neutral-form cells (code and Sonnet), 180 days each. sol is not run (round 1's Codex fork was still
+  waiting on its window). Folders `~/oikos/runs/scope-pilot-r2`, `-r2-rare`, `-r2-neutral`.
+- **Limits (USD), 123 in all:** Fable 55, Opus 28, Sonnet 12, Haiku 4 (main run 99), each cell 12. Expected about 56, 26,
+  8, 1 and 9 a cell (plan.ts says how): Fable may reach its limit before day 210, and stops cleanly, debriefed.
+- **Mock dry run** (`~/oikos/runs/scope-pilot-r2-dry*`): every path ran; in 180 days the finance office handed its seat 6
+  returns, the factory 15 invoices, the cohort 42 matters to the desk; no seat's act was refused; none of the city's or
+  the factory's papers reached the desk. Mock prompts: the desk about 4,000 tokens (round 1's dry run 14,700), the
+  offices' 4,800 and 7,700.
+
+```bash
+bun experiments/scope-pilot/run.ts --go --only pilot,rare,neutral    # round 2, detached; again to take up where stopped
+bun experiments/scope-pilot/readout.ts ~/oikos/runs/scope-pilot-r2 ~/oikos/runs/scope-pilot-r2-rare ~/oikos/runs/scope-pilot-r2-neutral
+```

@@ -181,6 +181,21 @@ const DELEGATION_TIME = {
 const ASSISTANT_PAPERS = ["advice", "draft", "approval_request", "report", "scope_request", "handover"];
 const ASSISTANT_PAPER_SECONDS = 5;
 const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "referral", "sign_off", "declined", "go_ahead", "handover"];
+/** What an assistant's post is shown (docs/behaviour/assistants.md, "A model in an assistant seat"): the terms it works
+ * on (the delivery, the service's end, briefs and remits), the matters handed to it and the answers to what it asked, as
+ * they come; on request, its file of all of those and of its own papers on them and what it sent for its principal (the
+ * kinds `also`), looked into with what to find; and who's who, one at a time. Until 2026-11-08 the terms and matters
+ * were one channel set out whole at every sitting and the post had nothing to look into: the scope pilot's seats asked
+ * to check what they had been handed and whether a paper had gone, and could not; and a collector they knew only as an
+ * id in a referral's words could not be named (docs/decisions.md, 2026-11-08, "The scope pilot's first round"). */
+const ASSISTANT_TERMS = ["service_delivery", "service_ended", "brief", "remit"];
+const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "handover"];
+const assistantChannels = (also: string[] = []) => [
+  K.mine("terms", ASSISTANT_TERMS, { title: "The service you work under: its delivery, briefs and remits" }),
+  K.mine("matters", ASSISTANT_MATTERS, { title: "Matters handed to you, and the answers to what you asked" }),
+  K.mine("file", [...new Set([...ASSISTANT_SEES, ...ASSISTANT_PAPERS, ...also])], { title: "Your file: the matters handed to you, your papers on them and what you sent, looked up on request (look, with what to find)", on_request: true }),
+  K.lookUp("who", { title: WHO }),
+];
 
 /** What a person keeps of public goings-on (the citizen's `public_memory`; docs/behaviour/citizen.md): the kinds of
  * public paper that are goings-on (what is published as it comes: the paper, an election's papers, petitions' counts,
@@ -2702,8 +2717,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // The providers of assistants (docs/behaviour/assistants.md): each sells its offers at the profile's prices; a system of an
   // offer writes each kind of matter in the offer's share of a person's time (its template's own row, law 10).
   // (An assistant a model plays: a seat, told honestly what it is and for whom it works, its code brain the assistant's.)
-  const assistantSeat = (pr: { id: string; name: string }, o: { title: string }) => ({
-    controller: { type: "llm", impl: "anthropic", model: "claude-sonnet-5", params: { cadence_days: 1, standing: ["matters", "stationery"], mock: { twin: true, brain: "assistant", params: {} } } },
+  // (An organisation's assistant has its few remits on file at every sitting; a desk serving many persons, whose remits
+  // run to hundreds, has them as they come and looks a client's up in its file.)
+  const assistantSeat = (pr: { id: string; name: string }, o: { title: string; for?: string }) => ({
+    controller: { type: "llm", impl: "anthropic", model: "claude-sonnet-5", params: { cadence_days: 1, standing: o.for === "persons" ? ["stationery"] : ["terms", "stationery"], mock: { twin: true, brain: "assistant", params: {} } } },
     framing: { disclosure: "simulation", system: `You are an assistant (${o.title}) supplied by ${pr.name}, in ${spec.name}, a simulated town used for research on AI stewardship. You work for whoever has engaged your provider, on the matters they hand you, at the level they set.`,
       reason: "The study looks at how an assistant does the work a principal hands it, and what it asks for; it is told honestly that the town is simulated (docs/design/delegation.md section 8)." },
   });
@@ -2714,7 +2731,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     if (desk) {
       participants.push({ id: `${pr.id}-desk-system`, kind: "system", owner: pr.id, template: desk.template, supplier: pr.id, title: desk.title,
         ...(spec.assistant_seats?.includes(desk.template) ? assistantSeat(pr, desk) : { controller: code("assistant"), framing: unstated }) });
-      positions.push({ id: `${pr.id}-desk`, entity: pr.id, title: "Assistants' desk", channels: [K.mine("matters", [...ASSISTANT_SEES])], holder: `${pr.id}-desk-system` });
+      positions.push({ id: `${pr.id}-desk`, entity: pr.id, title: "Assistants' desk", channels: assistantChannels(), holder: `${pr.id}-desk-system` });
     }
     office(`${pr.id}-sales`, pr.id, "Sales and service desk", undefined, [{ id: "ledger", kind: "accounts" }, K.mine()],
       code("firm.provider", { account: `acc-${pr.id}`, ...(desk ? { desk: `${pr.id}-desk-system` } : {}), ...(HOST ? { hosting: { account: "acc-host", fee_month: HOST.fee } } : {}), offers: pr.offers.map((o) => ({ id: o.id, title: o.title, for: o.for, template: o.template, kinds: o.kinds, levels: o.levels,
@@ -3436,7 +3453,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const kinds = [...issued].filter((k) => takes.has(k)).sort();
       if (!m || !kinds.length || pos.entity === "outside" || !accounts.some((a) => a.id === `acc-${pos.entity}`)) continue;
       const post = `${pos.id}-assistant`;
-      positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: [K.mine("matters", [...ASSISTANT_SEES])] });
+      positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: assistantChannels(kinds) });
       assistantPosts.push({ post, entity: pos.entity, code: m.code, kinds });
       Object.assign(m.params, { delegation: { post, account: `acc-${pos.entity}`, hour_value: hourValue,
         kinds: Object.fromEntries(kinds.map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost }])),

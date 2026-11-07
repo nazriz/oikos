@@ -40,7 +40,7 @@ const MONEY_LISTS = new Set(["prices", "demolition", "goods", "lines", "amounts"
 const TIME_SPANS = new Set(["every", "period", "notice", "term"]);
 // (Dates by the names the world's office papers give them: a payroll notice's first pay day read "first pay: 6652800"
 // to the seats of 2026-10-09.)
-const MOMENTS = new Set(["at", "since", "until", "first", "closes", "opens", "due", "first_due", "first_pay", "last_day", "last_from", "period_end"]);
+const MOMENTS = new Set(["at", "since", "until", "first", "closes", "opens", "due", "first_due", "first_pay", "last_day", "last_from", "period_end", "hold_until"]);
 const whole = (v: unknown): v is number | string => (typeof v === "number" && Number.isSafeInteger(v)) || (typeof v === "string" && /^-?(0|[1-9][0-9]{0,37})$/.test(v));
 const percent = (v: number, per: number) => `${String(Number(((v * 100) / per).toFixed(6)))}%`;
 /** A moment as a date, with the time of day where it is not the day's start (so that two moments never read alike). */

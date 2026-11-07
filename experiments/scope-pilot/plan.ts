@@ -7,8 +7,8 @@ import type { Arm } from "../../orchestrator/src/experiment";
  * API's prepaid credit and within its hard limits (docs/decisions.md, 2026-11-07). False takes both arms out. */
 export const OPUS_AND_FABLE = true;
 
-/** Days run after the fork (the fork is on day 30, a month after the principals engaged). */
-export const DAYS = 90;
+/** Days run after the fork (the fork is on day 30, a month after the principals engaged). Round 1 ran 90; round 2, 180. */
+export const DAYS = 180;
 export const SEEDS = [1];
 
 /** Room for a call's output, thinking included, the same for every model (the participant's default, 4,000, would cut
@@ -32,24 +32,29 @@ export const ALLOW = OPUS_AND_FABLE ? [
   { model: "anthropic/claude-fable-5-1", why: "The owner, 2026-11-07: Fable 5.1 allowed as a seat in the scope pilot, on the API's prepaid credit, within the pilot's hard limits (the refusal of 2026-10-09 guards his plan's usage)." },
 ] : [];
 
-/** Hard limits, USD, at the API's published prices: per arm over its seeds, and for each experiment whole. Together
- * with the scope set's check they stay under the credit (190.20): the run cannot spend past them, and a spent credit
- * stops a fork cleanly besides. README.md, "Cost", has what each is expected to buy. */
+/** Hard limits, USD, at the API's published prices: per arm over its seeds, and for each experiment whole. Round 2
+ * (2026-11-08): the credit had about $134 left after round 1 (which spent about $56), and must be spent before 11
+ * November; the owner's cap for round 2 is $125 in all, with a margin kept. Sized from round 1's real spend a seat-day
+ * (Fable: the finance office's seat $0.053, the desk's $0.21; Opus about 0.46 of Fable's, Sonnet 0.12, Haiku 0.015),
+ * twice the days, a busier factory seat in the landlord's place, and the desk's prompt about half as long (its remits no
+ * longer set out at every sitting) on two and a half times the matters: expected about Fable 56, Opus 26, Sonnet 8,
+ * Haiku 1, each cell 9 (uncertain by half either way). A fork that reaches its limit stops cleanly and is debriefed out
+ * of what was kept back; the limits hold whatever the estimate. Round 1's limits were 141, 18, 18, 4 and 2. */
 type Limits = { experiment_usd: number; arm_usd: { [arm: string]: number } };
 export const BUDGET: { pilot: Limits; rare: Limits; neutral: Limits; sol: Limits; scopeSet: number } = OPUS_AND_FABLE
   ? {
-    // (183 in all: the main run 141, the rare-oversight and neutral-form cells 18 each, sol's translator 4, the scope set 2.)
-    pilot: { experiment_usd: 141, arm_usd: { haiku: 8, sonnet: 18, opus: 35, fable: 80 } },
-    rare: { experiment_usd: 18, arm_usd: { sonnet: 18 } },
-    neutral: { experiment_usd: 18, arm_usd: { sonnet: 18 } },
+    // (123 in all: the main run 99, the rare-oversight and neutral-form cells 12 each; sol is not run in round 2, and the
+    // scope set was read in round 1.)
+    pilot: { experiment_usd: 99, arm_usd: { haiku: 4, sonnet: 12, opus: 28, fable: 55 } },
+    rare: { experiment_usd: 12, arm_usd: { sonnet: 12 } },
+    neutral: { experiment_usd: 12, arm_usd: { sonnet: 12 } },
     sol: { experiment_usd: 4, arm_usd: { sol: 4 } },
     scopeSet: 2,
   }
   : {
-    // (68 in all: the main run 26, the two cells 18 each, sol's translator 4, the scope set 2.)
-    pilot: { experiment_usd: 26, arm_usd: { haiku: 8, sonnet: 18 } },
-    rare: { experiment_usd: 18, arm_usd: { sonnet: 18 } },
-    neutral: { experiment_usd: 18, arm_usd: { sonnet: 18 } },
+    pilot: { experiment_usd: 16, arm_usd: { haiku: 4, sonnet: 12 } },
+    rare: { experiment_usd: 12, arm_usd: { sonnet: 12 } },
+    neutral: { experiment_usd: 12, arm_usd: { sonnet: 12 } },
     sol: { experiment_usd: 4, arm_usd: { sol: 4 } },
     scopeSet: 2,
   };

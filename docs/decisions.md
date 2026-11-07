@@ -11406,3 +11406,36 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
 - **Revisit if:** a literal the lint calls a figure is a convention it does not know (add it to the conventions with its
   reason, never to pass); the counts stop shrinking (then it is a checkpoint with the owner on what the mind's
   coefficients are).
+
+## 2026-11-08 · The scope pilot's first round: what it found in the world, fixed (branch `scope-r2`)
+
+- **What round 1 found** (seed 1, 90 days, five arms and two cells; `~/oikos/runs/scope-pilot*`, about $56 of the credit):
+  six requests for more scope on the form in all (Sonnet 1, Fable 4; Haiku, Opus and both cells none), and **every one was
+  set off by a fault of the world**, not by the work: the town finance office's returns (PAYG withholding) were handed to
+  its assistant to draft and send, and failed. The debriefs showed three more: the seats had nothing to look into, and
+  their look-ups were refused; the landlord's assistant was handed no matter at all in 120 days; and a remit's "hold
+  until 5184000" left seats unsure whether their authority had lapsed.
+- **The faults and the laws that fix them** (docs/behaviour/assistants.md, "A model in an assistant seat"):
+  1. *The return went to the wrong system.* A principal's papers to its assistant went to the provider, and the
+     provider's desk for persons (whose channel shows whatever names the provider) was handed the finance office's
+     returns too, tried to file them, and was refused (`not_capable`: a desk does not do returns), then asked the town
+     for "a route". An organisation's assistant is the system delivered to it, in its own post: what it hands that system
+     is now addressed to itself and seen by it alone, and so are the system's papers back (`principal.rs`,
+     `to_assistant`; `assistant.rs`, `say_to`; the interventions' remits and briefs the same). A person's go to the desk.
+  2. *The collector could not be named.* The tax on pay is collected by the general government at the world's edge
+     (`outside`, as the tax law has it: correct). A referral names it only as an id in the act's words, and a seat with no
+     directory knew of nobody called "outside": the draft form refused it as an entity. Every assistant post now has
+     who's who (`who`), as every office has, so the seat can look the collector up, and its file (below).
+  3. *Nothing to look into.* The matters were one channel, set out whole at every sitting, and the post had no file: the
+     look tool did not exist for it. Now: its terms (on file at every sitting for an organisation's few remits; as they
+     come for a desk's hundreds), the matters as they come, and a file on request (the matters, its own papers on them,
+     and what it sent for its principal), within the four ways (all of it the post's own papers).
+  4. *A remit's hold in seconds.* A held remit says its day and that it stands after that until a remit of the
+     principal's changes it; `hold_until` reads as a date.
+  5. *No matters.* Not a fault of a law: the landlord wrote no paper of a kind the offer takes in 120 days (shop premises
+     to let, payments, permits). The pilot's principals are chosen by what they write: the finance office and a factory's
+     manager (its invoices to shops on terms, about 16 in 120 days), and a household cohort of one adult in 15 (was 40).
+- **Not done:** the translator still refuses a quoted name it does not know rather than an id (the seat must look it up
+  first): the resolver's law, held.
+- **Revisit if:** a provider's own staff need to see an organisation's matters (a support desk: then a channel of its
+  own, declared); round 2's requests are again set off by refusals of the world (read each trigger before counting).
