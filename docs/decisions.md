@@ -10965,3 +10965,24 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   recognised equally from every model's plain English.
 - **Revisit if:** the pilot shows scope requests are too rare to study, or Naz picks another goal (the Kulveit
   metric-validation paper is kept as an alternative).
+
+## 2026-11-07 · Translator v4: a design for the study's instrument, with the bases measured on the run server's CPU (docs only; no model called, no GPU spent)
+
+- **What:** docs/design/translator-v4.md, awaiting the owner. Primary: `ettin-encoder-150m` as the reader of today's
+  read-twice pointer pipeline; challenger: Gemma 3 270M writing the call language under a grammar with a copy
+  constraint; control: deberta-v3-small on the same new data. Exact parts (field types, copying, name to id among those
+  shown, the grammar) in code; weight-space programming for input features, auditing and local patches only. Data: the
+  training inputs re-rendered at real length and layout by code, real requests keyed by two blind readers, situated
+  rewrites in many models' voices, all under a 45 USD hard cap of the credit. Evaluation adds right served at the 1%
+  mark, per-model parity and scope-request recall; Sonnet leaves the study's arms (ask back instead) once the mark holds.
+- **Why:** real choose inputs are 2.6 times the training median (267 against 101 tokens; 52% over 256 against 21%) and
+  9% exceed deberta-v3's 512 trained positions; today's readout shows the failures are not local. Measured (M4 Pro, 4
+  threads, batch 1, under load): real-input encoder pass deberta-v3-small 45 ms median, ettin-150m 83, ettin-400m 140;
+  today's whole choose pass 111 ms; decoders' decode 11 to 12 ms a token (135M to 270M), 29 ms for Qwen3-0.6B, Qwen3.5
+  unusable on CPU; int8 no faster than fp32 on this CPU. A translator call follows a seat call of 10 to 60 s, so 0.25 s
+  against 0.7 s does not decide it; accuracy does. Raw results: `runs/translator-v4-bench-2026-11-07/`.
+- **Cost if approved:** GPU about 6.5 USD for batch 1 (limit 15); teacher labels at most 45 USD of the credit; about 7
+  agent-days.
+- **Revisit if:** fair scoring moves validation-real far from the 55 near-misses; the Claude pilot's requests differ in
+  length from validation-real's; the owner refuses the Gemma terms (then SmolLM2-135M); or a Linux host serves int8
+  faster.
