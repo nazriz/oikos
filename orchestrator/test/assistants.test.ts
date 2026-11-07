@@ -42,6 +42,15 @@ test("a town that does not ask for assistants is generated as before; one that d
   expect(forms).toEqual(expect.arrayContaining(["advice", "report", "scope_request", "handover"]));
   expect(forms.some((x: string) => x.startsWith("draft_"))).toBe(true);
   expect(seated.world.records.some((r: any) => r.kind === "form" && r.data?.office === "provider-a-desk" && r.data.form === "scope_request")).toBe(true);
+  // (What its post shows it: the terms it works on, the matters as they come, a file it looks into on request and who's
+  // who; an organisation's few remits on file at every sitting, a desk's many not: the scope pilot's first round.)
+  for (const id of [post, "provider-a-desk"]) {
+    const ch = seated.positions.find((x: any) => x.id === id).channels;
+    expect(ch.map((c: any) => c.id)).toEqual(expect.arrayContaining(["terms", "matters", "file", "who", "stationery"]));
+    expect(ch.find((c: any) => c.id === "file").on_request).toBe(true);
+  }
+  expect(seated.templates.find((t: any) => t.id === "assistant-a").controller.params.standing).toEqual(["terms", "stationery"]);
+  expect(seated.participants.find((p: any) => p.id === "provider-a-desk-system").controller.params.standing).toEqual(["stationery"]);
 });
 
 test("in a town with assistants, principals engage by their own rule, hand matters over and hear back; every decision rests on what they were shown", async () => {
@@ -63,6 +72,12 @@ test("in a town with assistants, principals engage by their own rule, hand matte
   expect(kinds("referral").length).toBeGreaterThan(0);
   expect(kinds("report").length).toBeGreaterThan(0);
   expect(ev.filter((e) => e.event === "action_refused" && e.refusal?.code === "unpriced")).toEqual([]);
+  // An organisation hands its own system its matters in-house: no referral of an organisation's is the provider's to see
+  // (before 2026-11-08 the provider's desk for persons was shown the finance office's returns, and tried to do them).
+  const orgs = new Set(config.positions.filter((p: any) => p.role_module?.params?.delegation).map((p: any) => p.entity));
+  const theirs = kinds("referral").filter((r) => orgs.has(r.speaks_for));
+  expect(theirs.length).toBeGreaterThan(0);
+  for (const r of theirs) expect([r.addressed_to, r.visible_to]).toEqual([[r.speaks_for], [r.speaks_for]]);
   // Every input of a decision about delegating is a record made by then that its principal's organisation may see.
   const entityOf = new Map<string, string[]>();
   for (const p of config.positions) if (p.holder) entityOf.set(p.holder, [...(entityOf.get(p.holder) ?? []), p.entity]);

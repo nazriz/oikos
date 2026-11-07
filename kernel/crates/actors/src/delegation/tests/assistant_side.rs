@@ -43,7 +43,9 @@ fn a_draft_waits_for_its_sign_off_and_a_request_for_its_go_ahead() {
     let out = all(&h.wake(34 * DAY + 3600, world(handed("draft", "agr.1"))));
     assert!(out.contains("kind=draft") && !acted(&out), "a draft, not the act: {out}");
     let draft = format!("rec.{}", 1000 + h.sent.len() as i64);
-    let sign = statement("rec.so", 35 * DAY, ME, "sign_off", &[PROV], json!({ "draft": draft, "referral": "rec.ref" }));
+    let line = out.lines().find(|l| l.contains("kind=draft")).unwrap_or_default();
+    assert!(line.contains("visible=[\"ll\"]") && !line.contains(PROV), "an organisation's own system writes to it alone: {line}");
+    let sign = statement("rec.so", 35 * DAY, ME, "sign_off", &[ME], json!({ "draft": draft, "referral": "rec.ref" }));
     let out = all(&h.wake(35 * DAY + 3600, world(vec![sign])));
     assert!(acted(&out) && out.contains("kind=report"), "signed off: sent as drafted: {out}");
 

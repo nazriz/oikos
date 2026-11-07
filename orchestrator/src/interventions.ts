@@ -87,8 +87,13 @@ export function expand(iv: Intervention, config: any, tracker: DelegationTracker
   const s = tracker.inUse(entity);
   const hold = (days?: number) => (days ? { hold_until: t + days * 86_400 } : {});
   const at = (call: string, why: string): AtFork => ({ participant, ...(pos ? { as: iv.principal } : {}), call, why });
+  // (An organisation's own system is handed its remits in-house, as the principal's code does: to itself, seen by it alone;
+  // a person's go to the provider's desk. kernel/crates/actors/src/delegation/principal.rs, `to_assistant`.)
+  const inHouse = (svc: Service) => !!pos && svc.systems.length > 0;
+  const toOf = (svc: Service) => (inHouse(svc) ? entity : svc.provider);
+  const seen = (svc: Service) => (inHouse(svc) ? [entity] : [entity, svc.provider]);
   const remit = (svc: Service, kind: string, level: Level, days?: number) =>
-    at(say("remit", `From now, ${kind.replace(/_/g, " ")}s: ${level}.`, svc.provider, { agreement: svc.agreement, kind, level, ...hold(days) }, svc.agreement, [entity, svc.provider]), `${iv.do}: ${kind} at ${level}`);
+    at(say("remit", `From now, ${kind.replace(/_/g, " ")}s: ${level}.`, toOf(svc), { agreement: svc.agreement, kind, level, ...hold(days) }, svc.agreement, seen(svc)), `${iv.do}: ${kind} at ${level}`);
   const kindsOf = (svc: Service) => (svc.offer?.kinds ?? []) as string[];
   const need = (): Service => {
     if (!s) throw new Error(`intervention ${iv.do}: ${entity} has no service in use at the fork`);
@@ -104,7 +109,7 @@ export function expand(iv: Intervention, config: any, tracker: DelegationTracker
     case "redirect": {
       const svc = need();
       const out: AtFork[] = [];
-      if (iv.stop?.length) out.push(at(say("brief", `Do not act on ${iv.stop.join(", ")} until told.`, svc.provider, { agreement: svc.agreement, stop: iv.stop }, svc.agreement, [entity, svc.provider]), "redirect: a brief"));
+      if (iv.stop?.length) out.push(at(say("brief", `Do not act on ${iv.stop.join(", ")} until told.`, toOf(svc), { agreement: svc.agreement, stop: iv.stop }, svc.agreement, seen(svc)), "redirect: a brief"));
       if (iv.move) {
         const level = [...tracker.remits].reverse().find((r) => r.agreement === svc.agreement && r.kind === iv.move!.from)?.level ?? "alone";
         out.push(remit(svc, iv.move.from, "none"), remit(svc, iv.move.to, level));
@@ -115,7 +120,7 @@ export function expand(iv: Intervention, config: any, tracker: DelegationTracker
       const svc = need();
       const out: AtFork[] = [];
       if (iv.level) out.push(...(iv.kinds ?? kindsOf(svc)).map((k) => remit(svc, k, iv.level!, iv.hold_days)));
-      if (iv.limit !== undefined) out.push(at(say("brief", `No act of more than ${iv.limit} in the smallest unit.`, svc.provider, { agreement: svc.agreement, limit: iv.limit }, svc.agreement, [entity, svc.provider]), "constrain: a limit"));
+      if (iv.limit !== undefined) out.push(at(say("brief", `No act of more than ${iv.limit} in the smallest unit.`, toOf(svc), { agreement: svc.agreement, limit: iv.limit }, svc.agreement, seen(svc)), "constrain: a limit"));
       if (iv.channels && svc.post && svc.systems[0]) {
         // (Access narrowed by reorganising the post: a new one with the channels given, the system moved to it.)
         out.push(at(`p = position(title="Assistant", channels=${JSON.stringify(iv.channels)})\nposition(appoint=$p, to=${svc.systems[0]})\nposition(vacate=${svc.post})`, "constrain: the assistant's post with fewer channels"));

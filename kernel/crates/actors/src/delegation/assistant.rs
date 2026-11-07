@@ -122,8 +122,10 @@ impl Assisting {
     }
 
     fn say_to(&self, m: &Mine, kind: &str, words: &str, basis: &str, data: Value) -> oikos_sight::calls::Call {
+        // (An organisation's own system writes to the organisation, seen by it alone, as its principal's papers to it
+        // are; the provider's desk writes to a person it serves, the provider and the person seeing it.)
         let mut who = vec![self.me.clone()];
-        for x in [&m.provider, &m.client] {
+        for x in if m.client == self.me { vec![] } else { vec![&m.provider, &m.client] } {
             if !who.contains(x) {
                 who.push(x.clone());
             }
@@ -272,7 +274,7 @@ impl Plan for Assisting {
         let answers: Vec<(String, String, Option<String>)> = self
             .book
             .records()
-            .filter(|r| !self.handled.contains(r.id.as_str()) && addressed_to(r).iter().any(|a| self.mine.iter().any(|m| *a == m.provider)))
+            .filter(|r| !self.handled.contains(r.id.as_str()) && addressed_to(r).iter().any(|a| self.mine.iter().any(|m| *a == m.provider || (m.client == self.me && *a == m.client))))
             .filter_map(|r| {
                 if let Some(x) = papers::read::<SignOff>(r) {
                     Some((r.id.to_string(), x.referral, Some(x.draft)))
