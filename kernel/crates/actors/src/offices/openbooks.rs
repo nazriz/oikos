@@ -15,6 +15,8 @@
 //!   shows (`num`, `finite`, `js`), and as nothing where TS threw (`amt`: an amount that is not one is 0 here; in TS it
 //!   stopped the clerk's wake).
 
+use oikos_core::frozen::{JsonRead, JsonRef};
+use oikos_core::Frozen;
 use super::books::{OfficeBooks, OpenHeading, OpenItem};
 use crate::common::{
     addressed_to, bases_of, bill_settled, brought_forward, cites, data, made_at, money_words, notices_of, own_account, when_words, Book, Fields, DAY,
@@ -33,15 +35,15 @@ pub(crate) type R = Arc<Record>;
 // ---------------------------------------------------------------- the small readings every reader shares
 
 /// What a template literal writes of a value that may be absent, as JavaScript writes it ("undefined", "null").
-pub fn js(v: Option<&Value>) -> String {
-    match v {
+pub fn js<V: JsonRead + ?Sized>(v: Option<&V>) -> String {
+    match v.map(JsonRead::view) {
         None => "undefined".into(),
-        Some(Value::Null) => "null".into(),
-        Some(Value::String(s)) => s.clone(),
-        Some(Value::Bool(b)) => b.to_string(),
-        Some(Value::Number(n)) => n.to_string(),
-        Some(Value::Array(a)) => a.iter().map(|x| js(Some(x))).collect::<Vec<_>>().join(","),
-        Some(Value::Object(_)) => "[object Object]".into(),
+        Some(JsonRef::Null) => "null".into(),
+        Some(JsonRef::String(s)) => s.to_string(),
+        Some(JsonRef::Bool(b)) => b.to_string(),
+        Some(JsonRef::Number(n)) => n.to_string(),
+        Some(JsonRef::Array(a)) => a.iter().map(|x| js(Some(&x))).collect::<Vec<_>>().join(","),
+        Some(JsonRef::Object(_)) => "[object Object]".into(),
     }
 }
 
@@ -51,25 +53,25 @@ pub fn jss(s: Option<&str>) -> String {
 }
 
 /// `String(x ?? "").replace(/_/g, " ")`: a label written with underscores, in words.
-pub fn words(v: Option<&Value>) -> String {
-    match v {
-        None | Some(Value::Null) => String::new(),
-        Some(x) => js(Some(x)).replace('_', " "),
+pub fn words<V: oikos_core::frozen::JsonRead + ?Sized>(v: Option<&V>) -> String {
+    match v.map(oikos_core::frozen::JsonRead::view) {
+        None | Some(oikos_core::frozen::JsonRef::Null) => String::new(),
+        Some(x) => js(Some(&x)).replace('_', " "),
     }
 }
 
 /// JavaScript's `Number(x)` where it is a whole number of seconds or cents: none is NaN (or not whole here).
-pub fn num(v: Option<&Value>) -> Option<i64> {
-    match v? {
-        Value::Null => Some(0),
-        Value::Bool(b) => Some(i64::from(*b)),
-        Value::Number(n) => n.as_i64().or_else(|| crate::papers::lenient::whole(&Value::Number(n.clone()))),
-        Value::String(s) => {
+pub fn num<V: JsonRead + ?Sized>(v: Option<&V>) -> Option<i64> {
+    match v?.view() {
+        JsonRef::Null => Some(0),
+        JsonRef::Bool(b) => Some(i64::from(b)),
+        JsonRef::Number(n) => n.as_i64().or_else(|| JsonRef::Number(n).whole()),
+        JsonRef::String(s) => {
             let t = s.trim();
             if t.is_empty() {
                 Some(0)
             } else {
-                t.parse::<i64>().ok().or_else(|| crate::papers::lenient::whole(&Value::String(t.to_string())))
+                t.parse::<i64>().ok().or_else(|| JsonRef::String(t).whole())
             }
         }
         _ => None,
@@ -77,35 +79,35 @@ pub fn num(v: Option<&Value>) -> Option<i64> {
 }
 
 /// `Number.isFinite(Number(x))` of a value present and not null or empty (venues' `finite`): its number.
-pub fn finite(v: Option<&Value>) -> Option<i64> {
-    match v {
-        None | Some(Value::Null) => None,
-        Some(Value::String(s)) if s.is_empty() => None,
-        x => num(x),
+pub fn finite<V: JsonRead + ?Sized>(v: Option<&V>) -> Option<i64> {
+    match v.map(JsonRead::view) {
+        None | Some(JsonRef::Null) => None,
+        Some(JsonRef::String(s)) if s.is_empty() => None,
+        x => num(x.as_ref()),
     }
 }
 
 /// An amount in cents (money.ts `cents`): a whole number, or digits; anything else is 0 (TS threw).
-pub fn amt(v: Option<&Value>) -> i64 {
-    match v {
-        Some(Value::Number(n)) => n.as_i64().unwrap_or(0),
-        Some(Value::String(s)) => s.parse::<i64>().unwrap_or(0),
+pub fn amt<V: JsonRead + ?Sized>(v: Option<&V>) -> i64 {
+    match v.map(JsonRead::view) {
+        Some(JsonRef::Number(n)) => n.as_i64().unwrap_or(0),
+        Some(JsonRef::String(s)) => s.parse::<i64>().unwrap_or(0),
         _ => 0,
     }
 }
 
 /// A string field of a paper's data, or "" (venues' `text`).
-pub fn text_of(v: Option<&Value>) -> &str {
-    v.and_then(Value::as_str).unwrap_or("")
+pub fn text_of<V: JsonRead + ?Sized>(v: Option<&V>) -> &str {
+    v.and_then(|x| x.view().as_str()).unwrap_or("")
 }
 
 /// A field present at all (not `undefined`): JSON null counts, as in JavaScript.
-pub fn has(d: &Value, key: &str) -> bool {
+pub fn has(d: &oikos_core::Frozen, key: &str) -> bool {
     d.get(key).is_some()
 }
 
 /// A field that a paper's reader would take as true (`!!x`).
-pub fn on(d: &Value, key: &str) -> bool {
+pub fn on(d: &oikos_core::Frozen, key: &str) -> bool {
     d.get(key).is_some_and(crate::common::truthy)
 }
 
@@ -148,7 +150,7 @@ pub fn latest<'a>(it: impl IntoIterator<Item = &'a R>) -> Option<&'a R> {
 }
 
 /// A statement's kind-specific data, as an object (the `(r.data ?? {})` of TS).
-pub fn d(r: &Record) -> &Value {
+pub fn d(r: &Record) -> &Frozen {
     data(r)
 }
 
@@ -239,11 +241,11 @@ impl Money {
         for tx in pic.transactions() {
             if tx.from == acc.account {
                 if let Some(s) = &tx.settles {
-                    self.settled.insert(s.clone());
+                    self.settled.insert(s.to_string());
                 }
             }
             if tx.to == acc.account && tx.from != acc.account {
-                self.received.entry(tx.from.clone()).or_default().push(Receipt {
+                self.received.entry(tx.from.to_string()).or_default().push(Receipt {
                     t: tx.t,
                     amount: crate::common::cents(tx.amount),
                     memo: tx.memo.clone().filter(|m| !m.is_empty()),
@@ -287,7 +289,7 @@ pub fn asked_of_us(book: &Book, me: &str, money: &Money, extra: &[Forms], w: &Wo
             if has(x, "amount") { format!(", {}", usd(amt(x.get("amount")), w)) } else { String::new() },
             when(made_at(r), w),
         );
-        requests.push(OpenItem::new(r.id.clone(), line).since(made_at(r)).amount(has(x, "amount").then(|| amt(x.get("amount")))));
+        requests.push(OpenItem::new(r.id, line).since(made_at(r)).amount(has(x, "amount").then(|| amt(x.get("amount")))));
     }
     let mut all = vec![Forms { notice: paper::NOTICE, response: paper::RESPONSE, decision: paper::DECISION }];
     all.extend(extra.iter().map(|f| Forms { notice: f.notice, response: f.response, decision: f.decision }));
@@ -313,23 +315,23 @@ pub fn asked_of_us(book: &Book, me: &str, money: &Money, extra: &[Forms], w: &Wo
                 app,
                 by.map_or(String::new(), |b| format!(", to be answered by {}", date_words(b, w))),
             );
-            notices.push(OpenItem::new(n.id.clone(), line).since(made_at(n)));
+            notices.push(OpenItem::new(n.id, line).since(made_at(n)));
         }
         for y in book.open(f.decision) {
             let x = d(y);
-            if x.s("against") != Some(me) || x.s("finding") != Some("pay") || money.settled.contains(&y.id) {
+            if x.s("against") != Some(me) || x.s("finding") != Some("pay") || money.settled.contains(y.id.as_str()) {
                 continue;
             }
             let line = format!(
                 "{}: {} {} that we pay {} {}{}, not paid",
                 y.id,
                 jss(y.speaks_for.as_deref()),
-                if x.get("binding") == Some(&Value::Bool(false)) { "recommends" } else { "orders" },
+                if x.get("binding").and_then(|x| x.as_bool()) == Some(false) { "recommends" } else { "orders" },
                 if x.get("applicant").is_some_and(|v| !v.is_null()) { js(x.get("applicant")) } else { "the applicant".into() },
                 usd(amt(x.get("amount")), w),
                 finite_present(x.get("due")).map_or(String::new(), |b| format!(" by {}", date_words(b, w))),
             );
-            decisions.push(OpenItem::new(y.id.clone(), line).since(y.at).amount(has(x, "amount").then(|| amt(x.get("amount")))));
+            decisions.push(OpenItem::new(y.id, line).since(y.at).amount(has(x, "amount").then(|| amt(x.get("amount")))));
         }
     }
     [
@@ -341,7 +343,7 @@ pub fn asked_of_us(book: &Book, me: &str, money: &Money, extra: &[Forms], w: &Wo
 }
 
 /// `Number.isFinite(Number(x))` as TS wrote it for a field that may be absent: absent is not finite.
-fn finite_present(v: Option<&Value>) -> Option<i64> {
+fn finite_present<V: JsonRead + ?Sized>(v: Option<&V>) -> Option<i64> {
     match v {
         None => None,
         x => num(x),
@@ -353,12 +355,12 @@ pub fn owed_by_us(book: &Book, me: &str, money: &Money, w: &WorldInfo) -> Vec<Op
     let mut invoices = vec![];
     for r in book.open("invoice") {
         let m = d(r).get("outcome").and_then(|o| o.get("money"));
-        if !addressed(r, me) || !m.is_some_and(crate::common::truthy) || money.settled.contains(&r.id) {
+        if !addressed(r, me) || !m.is_some_and(crate::common::truthy) || money.settled.contains(r.id.as_str()) {
             continue;
         }
         let a = amt(m.and_then(|m| m.get("amount")));
-        let line = format!("{}: invoice from {} for {}, dated {}, not paid", r.id, r.speaks_for.clone().unwrap_or_else(|| r.author.clone()), usd(a, w), when(made_at(r), w));
-        invoices.push(OpenItem::new(r.id.clone(), line).since(made_at(r)).amount(Some(a)));
+        let line = format!("{}: invoice from {} for {}, dated {}, not paid", r.id, r.speaks_for.unwrap_or_else(|| r.author.clone().into()), usd(a, w), when(made_at(r), w));
+        invoices.push(OpenItem::new(r.id, line).since(made_at(r)).amount(Some(a)));
     }
     let mut sums = vec![];
     for r in book.of_type("claim") {
@@ -387,7 +389,7 @@ pub fn owed_by_us(book: &Book, me: &str, money: &Money, w: &WorldInfo) -> Vec<Op
                 format!(" (one bill: the city's notice for it is {}, and paying either settles it)", notices.iter().map(|n| n.id.as_str()).collect::<Vec<_>>().join(", "))
             }
         );
-        sums.push(OpenItem::new(r.id.clone(), line).since(r.at).amount(Some(a)));
+        sums.push(OpenItem::new(r.id, line).since(r.at).amount(Some(a)));
     }
     [heading("Invoices addressed to us, not paid", invoices), heading("Sums recorded against us (rates, fines), not paid", sums)].concat()
 }
@@ -395,7 +397,7 @@ pub fn owed_by_us(book: &Book, me: &str, money: &Money, w: &WorldInfo) -> Vec<Op
 /// When rent under a lease first falls due, counted from when the lease begins (`begins`): the day the lease itself
 /// names (`attrs.first_due`, so long after it begins: a tenancy's own rent day), or the day it begins.
 pub fn first_due_of(a: &Record, begins: i64) -> i64 {
-    let fd = terms_of(a).and_then(|t| t.attrs.as_ref()).and_then(|x| x.get("first_due")).and_then(Value::as_i64).filter(|n| *n > 0).unwrap_or(0);
+    let fd = terms_of(a).and_then(|t| t.attrs.as_ref()).and_then(|x| x.get("first_due")).and_then(|x| x.as_i64()).filter(|n| *n > 0).unwrap_or(0);
     begins + fd
 }
 
@@ -470,7 +472,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
     let mut paying: BTreeMap<String, Option<String>> = BTreeMap::new();
     for r in book.all("rental_application") {
         if let Some(s) = r.speaks_for.as_ref().filter(|s| !s.is_empty()) {
-            paying.entry(s.clone()).or_insert_with(|| d(r).s("account").map(String::from));
+            paying.entry(s.to_string()).or_insert_with(|| d(r).s("account").map(String::from));
         }
     }
     for a in &leases {
@@ -568,7 +570,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
                     None => String::new(),
                 }
             );
-            gone.push(OpenItem::new(a.id.clone(), line).since(left).amount((behind > 0).then_some(behind)));
+            gone.push(OpenItem::new(a.id, line).since(left).amount((behind > 0).then_some(behind)));
             continue;
         }
         if rent <= 0 || behind < rent {
@@ -612,7 +614,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
             asked.get(a.id.as_str()).map_or(String::new(), |at| format!("; we wrote to ask for it {}", date_words(*at, w))),
             if noticed(a) { "; notice has been given on the lease" } else { "" },
         );
-        arrears.push(OpenItem::new(a.id.clone(), line).since(oldest).amount(Some(behind)));
+        arrears.push(OpenItem::new(a.id, line).since(oldest).amount(Some(behind)));
     }
     if let Some(law) = law {
         for a in &leases {
@@ -710,12 +712,12 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
                 }
                 let mut terms: Vec<String> = vec![];
                 for r in book.all("plan_answer") {
-                    if r.speaks_for.as_deref() == Some(tenant.as_str()) && d(r).s("lease") == Some(a.id.as_str()) && d(r).get("accepts") == Some(&Value::Bool(true)) && r.at >= ap.at {
+                    if r.speaks_for.as_deref() == Some(tenant.as_str()) && d(r).s("lease") == Some(a.id.as_str()) && d(r).get("accepts").and_then(|x| x.as_bool()) == Some(true) && r.at >= ap.at {
                         terms.push(format!("{tenant} accepted our offer of a plan {} ({})", date_words(r.at, w), r.id));
                     }
                 }
                 for r in book.all("variation_answer") {
-                    if r.speaks_for.as_deref() == Some(me) && addressed(r, &tenant) && d(r).get("granted") == Some(&Value::Bool(true)) && r.at >= ap.at {
+                    if r.speaks_for.as_deref() == Some(me) && addressed(r, &tenant) && d(r).get("granted").and_then(|x| x.as_bool()) == Some(true) && r.at >= ap.at {
                         terms.push(format!("we granted {tenant}'s request {} ({})", date_words(r.at, w), r.id));
                     }
                 }
@@ -748,7 +750,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
                     }
                 );
             }
-            ending.push(OpenItem::new(a.id.clone(), format!("{}: {home}; {owes}; {stage}", a.id)).since(since).amount(now));
+            ending.push(OpenItem::new(a.id, format!("{}: {home}; {owes}; {stage}", a.id)).since(since).amount(now));
         }
     }
     // ---- tenancies near their end ----
@@ -770,7 +772,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
             lease_terms(a, &tenant).space.map_or(String::new(), |s| format!(" at {s}")),
             date_words(ends, w)
         );
-        closing.push(OpenItem::new(a.id.clone(), line).since(ends));
+        closing.push(OpenItem::new(a.id, line).since(ends));
     }
     // ---- homes to let ----
     let listings: Vec<&R> = book.open("rental_listing").filter(|l| l.speaks_for.as_deref() == Some(me)).collect();
@@ -781,7 +783,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
         .map(|l| {
             let x = d(l);
             OpenItem::new(
-                l.id.clone(),
+                l.id,
                 format!("{}: {} has been listed at {} a month since {} and is not let", l.id, js(x.get("space")), usd(amt(x.get("rent")), w), date_words(l.at, w)),
             )
             .since(l.at)
@@ -795,7 +797,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
             let what = listings.iter().find(|l| Some(l.id.as_str()) == x.s("listing")).and_then(|l| d(l).get("space")).filter(|v| crate::common::truthy(v)).map_or_else(|| js(x.get("listing")), |v| js(Some(v)));
             let people = x.get("household").and_then(|h| h.get("people")).filter(|v| crate::common::truthy(v));
             OpenItem::new(
-                r.id.clone(),
+                r.id,
                 format!(
                     "{}: {} applied {} for {}{}; no lease offered",
                     r.id,
@@ -816,7 +818,7 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
         .map(|r| {
             let said: String = crate::common::text(r).chars().take(120).collect();
             OpenItem::new(
-                r.id.clone(),
+                r.id,
                 format!(
                     "{}: {} asks, {}: \"{}\"{}; not answered",
                     r.id,
@@ -834,14 +836,14 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
     let repairs: Vec<OpenItem> = book
         .open("repair_order")
         .filter(|r| r.speaks_for.as_deref() == Some(me) && !finished.iter().any(|x| d(x).get("structure") == d(r).get("structure") && x.at >= r.at))
-        .map(|r| OpenItem::new(r.id.clone(), format!("{}: the repair of {} was ordered {} and is not reported done", r.id, js(d(r).get("structure")), date_words(r.at, w))).since(r.at))
+        .map(|r| OpenItem::new(r.id, format!("{}: the repair of {} was ordered {} and is not reported done", r.id, js(d(r).get("structure")), date_words(r.at, w))).since(r.at))
         .collect();
     // ---- a tenant's death registered, the lease still standing ----
     let dead: BTreeSet<String> = book.all("death_registration").chain(book.all("death_certificate")).map(|r| js(d(r).get("deceased"))).collect();
     let estates: Vec<OpenItem> = active
         .iter()
         .filter(|a| dead.contains(&tenant_of(a)) && !noticed(a))
-        .map(|a| OpenItem::new(a.id.clone(), format!("{}: the tenant {} is registered as having died; the lease still stands", a.id, tenant_of(a))).since(a.at))
+        .map(|a| OpenItem::new(a.id, format!("{}: the tenant {} is registered as having died; the lease still stands", a.id, tenant_of(a))).since(a.at))
         .collect();
     [
         heading("Rent in arrears", arrears),
@@ -860,9 +862,9 @@ fn landlord(base: &Base, me: &str, notice_days: i64, t: i64, w: &WorldInfo) -> V
 }
 
 /// `String(r.data?.application ?? "")`.
-fn words_app(x: &Value) -> String {
+fn words_app(x: &oikos_core::Frozen) -> String {
     match x.get("application") {
-        None | Some(Value::Null) => String::new(),
+        None | Some(Frozen::Null) => String::new(),
         v => js(v),
     }
 }
@@ -915,7 +917,7 @@ fn support(base: &Base, me: &str, w: &WorldInfo) -> Vec<OpenHeading> {
         .map(|r| {
             let x = d(r);
             let by = finite_present(x.get("by"));
-            let who = if matches!(&r.body, RecordBody::Statement { kind, .. } if kind == "evidence_request") { "the claimant".to_string() } else { addressed_to(r).first().cloned().unwrap_or_else(|| "the last employer".into()) };
+            let who = if matches!(&r.body, RecordBody::Statement { kind, .. } if kind == "evidence_request") { "the claimant".to_string() } else { addressed_to(r).first().map(|x| x.to_string()).unwrap_or_else(|| "the last employer".into()) };
             let line = format!(
                 "{}: {} was asked {} for {} ({}), due by {}; not yet answered",
                 js(x.get("claim")),
@@ -925,7 +927,7 @@ fn support(base: &Base, me: &str, w: &WorldInfo) -> Vec<OpenHeading> {
                 r.id,
                 by.map_or("no day given".to_string(), |b| date_words(b, w))
             );
-            OpenItem::new(r.id.clone(), line).since(r.at).due(by)
+            OpenItem::new(r.id, line).since(r.at).due(by)
         })
         .collect();
     [

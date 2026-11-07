@@ -11,9 +11,10 @@
 //! `slice` did.
 
 use oikos_perception::{
-    AccountItem, BodyView, ChannelData, EntityItem, HeldPosition, HoldingItem, Observation, OwnRecord, PositionItem, SiteCell,
+    AccountItem, BodyView, ChannelData, ConnectionItem, EntityItem, HeldPosition, HoldingItem, LinkItem, Observation, OwnRecord, PositionItem, SiteCell,
 };
 use oikos_world::blocks::{Id, Record};
+use oikos_world::held::Rec;
 use oikos_world::state::{Message, Outcome, ParticipantStatus, Transaction};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -30,9 +31,10 @@ pub struct Visit {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Seen {
     /// Its accounts in full (by id), and the transactions new since the last look.
-    Accounts { accounts: Arc<Vec<AccountItem>>, transactions: Vec<Transaction> },
-    /// What it holds where, in full (a holding gone to nothing drops out).
-    Holdings { holdings: Arc<Vec<HoldingItem>> },
+    Accounts { accounts: Arc<Vec<AccountItem>>, transactions: Vec<Arc<Transaction>> },
+    /// What it holds where, in full (a holding gone to nothing drops out); what flows to it, and for an operator its
+    /// network (foundations-2 C3), whole as last seen.
+    Holdings { holdings: Arc<Vec<HoldingItem>>, connections: Arc<Vec<ConnectionItem>>, links: Arc<Vec<LinkItem>> },
     /// Its own record, when it changed.
     OwnRecord { record: Option<OwnRecord> },
     /// What is new (or a search's results, or everything for a channel kept whole).
@@ -63,9 +65,27 @@ pub struct Picture {
     /// Why it woke (cadence, news, asked, done, start) and how long since its last wake (contracts 0.7).
     pub woke_for: String,
     pub since: i64,
+    /// Each record its channels show, as the world holds it, by where the record shown is in memory (`held_of`): what a
+    /// book keeps, so that a record it no longer reads can leave memory (docs/design/tiered-storage.md).
+    pub held: Held,
+}
+
+/// The records a picture shows, as held (`Picture::held`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Held(BTreeMap<usize, Rec>);
+
+impl Held {
+    pub fn insert(&mut self, shown: &Arc<Record>, r: Rec) {
+        self.0.insert(Arc::as_ptr(shown) as usize, r);
+    }
 }
 
 impl Picture {
+    /// A record this picture shows, as the world holds it; one made by hand (a test's) is held as it is.
+    pub fn held_of(&self, r: &Arc<Record>) -> Rec {
+        self.held.0.get(&(Arc::as_ptr(r) as usize)).cloned().unwrap_or_else(|| Rec::from_arc(r.clone()))
+    }
+
     /// The records of a channel (empty if it is not a records channel or has none).
     pub fn records(&self, channel: &str) -> &[Arc<Record>] {
         match self.channels.get(channel) {
@@ -87,19 +107,41 @@ impl Picture {
             _ => &[],
         })
     }
+    /// Every transaction new in this observation, as held: one copy shared with the world's queues and whoever keeps it.
+    pub fn transactions_held(&self) -> impl Iterator<Item = &Arc<Transaction>> {
+        self.channels.values().flat_map(|c| match c {
+            Seen::Accounts { transactions, .. } => transactions.as_slice(),
+            _ => &[],
+        })
+    }
     /// Every transaction new in this observation.
     pub fn transactions(&self) -> impl Iterator<Item = &Transaction> {
         self.channels.values().flat_map(|c| match c {
             Seen::Accounts { transactions, .. } => transactions.as_slice(),
             _ => &[],
-        })
+        }).map(|x| &**x)
     }
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct SitesKept {
     as_of: i64,
-    cells: BTreeMap<Id, SiteCell>,
+    /// In cell order, as the picture gives them: the one list the view keeps and hands out (it was kept as a map and
+    /// copied into the picture's list besides, each cell twice: SC-1). Written as a map by cell, as it always was.
+    #[serde(with = "cells_by_id")]
+    cells: Arc<Vec<SiteCell>>,
+}
+
+/// A list of cells in cell order, written and read as a map by cell (the shape a view's snapshot has always had).
+mod cells_by_id {
+    use super::{Arc, BTreeMap, Id, SiteCell};
+    use serde::{Deserialize, Deserializer, Serializer};
+    pub fn serialize<S: Serializer>(cells: &Arc<Vec<SiteCell>>, s: S) -> Result<S::Ok, S::Error> {
+        s.collect_map(cells.iter().map(|c| (&c.cell, c)))
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Arc<Vec<SiteCell>>, D::Error> {
+        Ok(Arc::new(BTreeMap::<Id, SiteCell>::deserialize(d)?.into_values().collect()))
+    }
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -115,15 +157,17 @@ pub struct View {
     full: BTreeSet<Id>,
     accounts: BTreeMap<Id, BTreeMap<Id, AccountItem>>,
     holdings: BTreeMap<Id, BTreeMap<String, HoldingItem>>,
+    /// What flows, each holdings channel's as last delivered (whole at every look).
+    #[serde(default)]
+    flows: BTreeMap<Id, (Arc<Vec<ConnectionItem>>, Arc<Vec<LinkItem>>)>,
     sites: BTreeMap<Id, SitesKept>,
     visits: BTreeMap<Id, Visit>,
     directories: BTreeMap<Id, DirectoryKept>,
     /// Records of a channel kept whole, in the order first seen (a record seen again keeps its place, as a JS Map does).
-    kept: BTreeMap<Id, (Vec<Arc<Record>>, BTreeMap<Id, usize>)>,
+    kept: BTreeMap<Id, (Vec<Rec>, BTreeMap<Id, usize>)>,
     /// Each channel's picture as last made, rebuilt only when the channel changed.
     cache_accounts: BTreeMap<Id, Arc<Vec<AccountItem>>>,
     cache_holdings: BTreeMap<Id, Arc<Vec<HoldingItem>>>,
-    cache_sites: BTreeMap<Id, Arc<Vec<SiteCell>>>,
     cache_directories: BTreeMap<Id, (Arc<Vec<EntityItem>>, Arc<Vec<PositionItem>>)>,
 }
 
@@ -144,30 +188,44 @@ impl View {
     /// returns the picture the actor reads. `entity`: whom it acts for in that capacity.
     pub fn apply(&mut self, obs: Observation, capacity: Option<&str>, entity: &str, woke_for: &str, since: i64) -> Picture {
         let mut channels: BTreeMap<Id, Seen> = BTreeMap::new();
-        let mut new_txs: BTreeMap<Id, Vec<Transaction>> = BTreeMap::new();
+        let mut new_txs: BTreeMap<Id, Vec<Arc<Transaction>>> = BTreeMap::new();
         let mut fresh_sites: BTreeSet<Id> = BTreeSet::new();
+        let mut held = Held::default();
+        let shown = |records: Vec<Rec>, held: &mut Held| -> Vec<Arc<Record>> {
+            records
+                .into_iter()
+                .map(|r| {
+                    let a = r.load();
+                    held.insert(&a, r);
+                    a
+                })
+                .collect()
+        };
         for (full_id, ch) in obs.channels {
             let Some(id) = in_capacity(&full_id, capacity) else { continue };
             let id = id.to_string();
             match ch {
                 ChannelData::Accounts { accounts, transactions } => {
-                    let m = self.accounts.entry(id.clone()).or_default();
+                    let m = self.accounts.entry(id.clone().into()).or_default();
                     if !accounts.is_empty() {
-                        self.cache_accounts.remove(&id);
+                        self.cache_accounts.remove(id.as_str());
                     }
                     for a in accounts {
                         if a.closed == Some(true) {
                             m.remove(&a.account);
                         } else {
-                            m.insert(a.account.clone(), a);
+                            m.insert(a.account, a);
                         }
                     }
-                    new_txs.insert(id, transactions);
+                    new_txs.insert(id.into(), transactions);
                 }
-                ChannelData::Holdings { holdings } => {
-                    let m = self.holdings.entry(id.clone()).or_default();
+                ChannelData::Holdings { holdings, connections, links } => {
+                    if !connections.is_empty() || !links.is_empty() || self.flows.contains_key(id.as_str()) {
+                        self.flows.insert(id.clone().into(), (Arc::new(connections), Arc::new(links)));
+                    }
+                    let m = self.holdings.entry(id.clone().into()).or_default();
                     if !holdings.is_empty() {
-                        self.cache_holdings.remove(&id);
+                        self.cache_holdings.remove(id.as_str());
                     }
                     for h in holdings {
                         let k = format!("{}|{}", h.at, h.kind);
@@ -180,92 +238,99 @@ impl View {
                 }
                 ChannelData::Sites { as_of, cells, whole, visited } => {
                     let changed = !cells.is_empty() || whole == Some(true);
-                    let v = self.sites.entry(id.clone()).or_default();
+                    let v = self.sites.entry(id.clone().into()).or_default();
                     if whole == Some(true) {
-                        v.cells.clear();
+                        v.cells = Arc::default();
                     }
                     v.as_of = as_of;
                     if visited == Some(true) {
-                        let m = self.visits.entry(id.clone()).or_default();
+                        let m = self.visits.entry(id.clone().into()).or_default();
                         for c in &cells {
-                            m.seen_at.insert(c.cell.clone(), as_of);
+                            m.seen_at.insert(c.cell, as_of);
                         }
-                        m.fresh = cells.iter().map(|c| c.cell.clone()).collect();
+                        m.fresh = cells.iter().map(|c| c.cell).collect();
                     }
-                    for c in cells {
-                        v.cells.insert(c.cell.clone(), c);
+                    if changed && !cells.is_empty() {
+                        // (Put in place by cell, a cell seen again replacing what was seen of it; copied first only if
+                        // a picture still holds the list.)
+                        let kept = Arc::make_mut(&mut v.cells);
+                        for c in cells {
+                            match kept.binary_search_by(|x| x.cell.cmp(&c.cell)) {
+                                Ok(i) => kept[i] = c,
+                                Err(i) => kept.insert(i, c),
+                            }
+                        }
                     }
-                    if changed {
-                        self.cache_sites.remove(&id);
-                    }
-                    fresh_sites.insert(id);
+                    fresh_sites.insert(id.into());
                 }
                 ChannelData::Directory { entities, positions } => {
-                    let v = self.directories.entry(id.clone()).or_default();
+                    let v = self.directories.entry(id.clone().into()).or_default();
                     if !entities.is_empty() || !positions.is_empty() {
-                        self.cache_directories.remove(&id);
+                        self.cache_directories.remove(id.as_str());
                     }
                     for e in entities {
-                        v.entities.insert(e.entity.clone(), e);
+                        v.entities.insert(e.entity, e);
                     }
                     for p in positions {
-                        v.positions.insert(p.position.clone(), p);
+                        v.positions.insert(p.position, p);
                     }
                 }
                 ChannelData::OwnRecord { record } => {
-                    channels.insert(id, Seen::OwnRecord { record });
+                    channels.insert(id.into(), Seen::OwnRecord { record });
                 }
                 ChannelData::Records { records, search, whole } => {
                     if search == Some(true) {
-                        channels.insert(id, Seen::Records { records, search: true });
-                    } else if self.full.contains(&id) {
-                        let (list, at) = self.kept.entry(id).or_default();
+                        channels.insert(id.into(), Seen::Records { records: shown(records, &mut held), search: true });
+                    } else if self.full.contains(id.as_str()) {
+                        let (list, at) = self.kept.entry(id.into()).or_default();
                         if whole == Some(true) {
                             list.clear();
                             at.clear();
                         }
                         for r in records {
-                            match at.get(&r.id) {
+                            let rid = r.id();
+                            match at.get(&rid) {
                                 Some(&i) => list[i] = r,
                                 None => {
-                                    at.insert(r.id.clone(), list.len());
+                                    at.insert(rid, list.len());
                                     list.push(r);
                                 }
                             }
                         }
                     } else {
-                        channels.insert(id, Seen::Records { records, search: false });
+                        channels.insert(id.into(), Seen::Records { records: shown(records, &mut held), search: false });
                     }
                 }
             }
         }
         for (id, m) in &self.accounts {
-            let accounts = self.cache_accounts.entry(id.clone()).or_insert_with(|| Arc::new(m.values().cloned().collect())).clone();
-            channels.insert(id.clone(), Seen::Accounts { accounts, transactions: new_txs.remove(id).unwrap_or_default() });
+            let accounts = self.cache_accounts.entry(*id).or_insert_with(|| Arc::new(m.values().cloned().collect())).clone();
+            channels.insert(*id, Seen::Accounts { accounts, transactions: new_txs.remove(id).unwrap_or_default() });
         }
         for (id, m) in &self.holdings {
-            let holdings = self.cache_holdings.entry(id.clone()).or_insert_with(|| Arc::new(m.values().cloned().collect())).clone();
-            channels.insert(id.clone(), Seen::Holdings { holdings });
+            let holdings = self.cache_holdings.entry(*id).or_insert_with(|| Arc::new(m.values().cloned().collect())).clone();
+            let (connections, links) = self.flows.get(id).cloned().unwrap_or_default();
+            channels.insert(*id, Seen::Holdings { holdings, connections, links });
         }
         for (id, v) in &self.sites {
-            let cells = self.cache_sites.entry(id.clone()).or_insert_with(|| Arc::new(v.cells.values().cloned().collect())).clone();
+            let cells = v.cells.clone();
             // (The cells a visit saw are said once, with the observation that brings them.)
             let visit = self
                 .visits
                 .get(id)
                 .map(|m| Visit { seen_at: m.seen_at.clone(), fresh: if fresh_sites.contains(id) { m.fresh.clone() } else { vec![] } });
-            channels.insert(id.clone(), Seen::Sites { as_of: v.as_of, cells, visit });
+            channels.insert(*id, Seen::Sites { as_of: v.as_of, cells, visit });
         }
         for (id, v) in &self.directories {
             let (entities, positions) = self
                 .cache_directories
-                .entry(id.clone())
+                .entry(*id)
                 .or_insert_with(|| (Arc::new(v.entities.values().cloned().collect()), Arc::new(v.positions.values().cloned().collect())))
                 .clone();
-            channels.insert(id.clone(), Seen::Directory { entities, positions });
+            channels.insert(*id, Seen::Directory { entities, positions });
         }
         for (id, (list, _)) in &self.kept {
-            channels.insert(id.clone(), Seen::Records { records: list.clone(), search: false });
+            channels.insert(*id, Seen::Records { records: shown(list.clone(), &mut held), search: false });
         }
         let as_position = match capacity {
             None | Some("self") => None,
@@ -275,8 +340,8 @@ impl View {
             participant: obs.participant,
             t: obs.t,
             status: obs.status,
-            entity: entity.to_string(),
-            as_position,
+            entity: entity.to_string().into(),
+            as_position: as_position.map(Into::into),
             body: obs.body,
             positions: obs.positions,
             outcomes: obs.outcomes,
@@ -286,6 +351,7 @@ impl View {
             readings: obs.readings,
             woke_for: woke_for.to_string(),
             since,
+            held,
         }
     }
 }

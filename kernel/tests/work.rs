@@ -2,7 +2,7 @@
 //! working hours in a day; inputs are used up and outputs made; state variables (wear) change with time, occupancy
 //! and work, exactly; a building completes only with its materials, its labour and its time; demolition takes labour.
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};
@@ -66,24 +66,25 @@ fn work_needs_people_at_work_with_time_left_and_the_inputs() {
 }
 
 #[test]
-fn wear_rises_by_the_day_and_with_occupants_and_mending_lowers_it_exactly() {
+fn wear_rises_by_the_day_and_mending_lowers_it_exactly() {
     let mut run = town();
     let wear = |run: &Run<Vec<u8>>, sid: &str| {
         let st = run.kernel().state();
         let cfg = &run.kernel().statics().config.catalogue.variables[0];
         oikos_kernel::exec::variable_at(st, sid, cfg, st.t).unwrap()
     };
-    // The house (alice inside): 100 at the start, +1 a day and +2 per occupant a day: 3 a day.
+    // The house (alice inside): 100 at the start, +1 a day. (A variable is a condition: it does not grow by its
+    // occupants, law 8; until foundations-2 C4 this world's wear rose 2 a day for each.)
     assert_eq!(wear(&run, "s-house"), 100);
     advance(&mut run, 10 * DAY);
-    assert_eq!(wear(&run, "s-house"), 130);
-    // Alice leaves: from then on, 1 a day.
+    assert_eq!(wear(&run, "s-house"), 110);
+    // Alice leaves: still 1 a day (to the twentieth day).
     act(&mut run, "alice-self", None, json!([{"block": "vacate", "occupant": "alice", "from": "s-house"}])).unwrap();
     advance(&mut run, 20 * DAY);
-    assert_eq!(wear(&run, "s-house"), 140);
+    assert_eq!(wear(&run, "s-house"), 120);
     // Mending (carol, from the shop) takes 50 off a unit, down to the minimum and no further.
     act(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "mend", "units": 2, "at": "s-shop", "performers": ["carol"], "on": "s-house"}])).unwrap();
-    assert_eq!(wear(&run, "s-house"), 40);
+    assert_eq!(wear(&run, "s-house"), 20);
     act(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "mend", "units": 2, "at": "s-shop", "performers": ["carol"], "on": "s-house"}])).unwrap();
     assert_eq!(wear(&run, "s-house"), 0);
     // Seen with its trend: a look shows the value on a day and the rate, and today's value follows from them.
@@ -97,7 +98,7 @@ fn a_building_completes_only_with_its_materials_its_labour_and_its_time() {
     let mut run = town();
     // A house needs 300 kg of materials (the builder's, at the flats), 4 hours' building, and 20 days.
     let r = act(&mut run, "builder-system", Some("builder"), json!([{"block": "construct", "at": "cell.2.1", "structure_type": "house", "materials_at": "s-flats", "ref": "h"}])).unwrap();
-    let house = r.iter().find_map(|e| match e { EventBody::StructureStarted { structure, .. } => Some(structure.clone()), _ => None }).unwrap();
+    let house = r.iter().find_map(|e| match e { EventBody::StructureStarted { structure, .. } => Some(*structure), _ => None }).unwrap();
     assert_eq!(run.kernel().state().holding("buildco", "s-flats", "materials"), 5000 - 300);
     let build = |run: &mut Run<Vec<u8>>, seconds: u64| act(run, "builder-system", Some("builder"), json!([{"block": "work", "task": "build", "units": seconds, "at": "s-flats", "performers": ["bob"], "on": house}]));
     // Its time passes, but it isn't built: it waits for its labour.
@@ -122,7 +123,7 @@ fn a_building_completes_only_with_its_materials_its_labour_and_its_time() {
 fn labour_done_first_completes_when_its_time_is_up() {
     let mut run = town();
     let r = act(&mut run, "builder-system", Some("builder"), json!([{"block": "construct", "at": "cell.2.1", "structure_type": "shop", "materials_at": "s-flats", "ref": "s"}])).unwrap();
-    let shop = r.iter().find_map(|e| match e { EventBody::StructureStarted { structure, .. } => Some(structure.clone()), _ => None }).unwrap();
+    let shop = r.iter().find_map(|e| match e { EventBody::StructureStarted { structure, .. } => Some(*structure), _ => None }).unwrap();
     act(&mut run, "builder-system", Some("builder"), json!([{"block": "work", "task": "build", "units": 7200, "at": "s-flats", "performers": ["bob"], "on": shop}])).unwrap();
     assert!(!run.kernel().state().structures[&shop].complete, "labour done, but not its 30 days");
     advance(&mut run, 31 * DAY);
@@ -187,9 +188,9 @@ fn a_demolition_settles_the_building_and_records_who_left() {
         let cfg = &run.kernel().statics().config.catalogue.variables[0];
         oikos_kernel::exec::variable_at(st, "s-house", cfg, st.t).unwrap()
     };
-    // The house, alice inside: 100 at the start, 3 a day.
+    // The house, alice inside: 100 at the start, 1 a day.
     advance(&mut run, 10 * DAY);
-    assert_eq!(wear(&run), 130);
+    assert_eq!(wear(&run), 110);
     // Demolition begins (the house needs an hour's work to come down): alice is out at once.
     let r = act(&mut run, "developer-system", Some("developer"), json!([{"block": "demolish", "structure": "s-house"}])).unwrap();
     assert!(r.iter().any(|e| matches!(e, EventBody::Vacated { occupant, reason: VacateReason::Demolition, .. } if occupant == "alice")));
@@ -198,10 +199,10 @@ fn a_demolition_settles_the_building_and_records_who_left() {
     assert!(st.structures_of("alice").is_empty());
     let gone = st.departures.get("s-house/dwelling.1").expect("the departure is recorded");
     assert_eq!(gone.iter().map(|d| (d.occupant.as_str(), d.reason)).collect::<Vec<_>>(), vec![("alice", VacateReason::Demolition)]);
-    // Its wear is what her ten days there made it, and rises from there at an empty house's 1 a day.
-    assert_eq!(wear(&run), 130);
+    // Its wear is what its ten days made it, and rises from there at 1 a day.
+    assert_eq!(wear(&run), 110);
     advance(&mut run, 20 * DAY);
-    assert_eq!(wear(&run), 140);
+    assert_eq!(wear(&run), 120);
     run.finish("completed", None).unwrap();
     oikos_kernel::replay(&run.into_log(), None).unwrap();
 }

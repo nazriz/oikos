@@ -19,6 +19,7 @@
 //!
 //! Like the shop it is generic over its body (body.rs): its employer, bank, union and failure dealings are lane C1's.
 
+use oikos_core::Frozen;
 use super::automation::{self, params_from, Adoption, AdoptionParams, AdoptionThen, Fleet};
 use super::body::{lift, Body, BodyThen, House, PlainBody, Review, Stage, Standing, Surplus, Want, Wind};
 use super::lengnick::{move_wage, pay_out, Expectation, From as Payer, Lengnick, WageMonth};
@@ -76,6 +77,27 @@ pub struct Params {
     pub automation: Option<AdoptionParams>,
     pub lengnick: Lengnick,
     pub figures: PriceFigures,
+    /// A factory founded in the run (entry.md; foundations-2 E3): its founder, capital, the listing of its works, its bank.
+    /// None founded: a factory the town began with.
+    #[serde(default)]
+    pub founding: super::founding::Founding,
+    /// A tool its work may be done with (foundations-2 E2: a technology that is a good), as its supplier sells it, and how it
+    /// weighs buying one. None: it looks at none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<ToolParams>,
+}
+
+/// A tool for the work (foundations-2 E2): the kind, the share of the time the work takes with it, and the comparison by the
+/// numbers a firm makes of any technology (`automation.rs`): what it saves of its staff's time a month against its price
+/// spread over the payback a firm asks, by the hurdle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolParams {
+    pub kind: String,
+    /// Who sells it (its price list, read as the supplier's is).
+    pub seller: String,
+    pub labour_bps: i64,
+    pub payback_months: i64,
+    pub hurdle_bps: i64,
 }
 
 impl Params {
@@ -109,10 +131,20 @@ impl Params {
             builder: ctx.param("builder", String::new())?,
             premises_sale_bps: ctx.param("premises_sale_bps", 5000)?,
             export_probe_bps: ctx.param("export_probe_bps", 1000)?,
-            automation: params_from(ctx.params.get("automation").unwrap_or(&Value::Null))?,
+            automation: params_from(&ctx.params.get("automation").map(Frozen::to_value).unwrap_or(Value::Null))?,
             lengnick: Lengnick::read(ctx)?,
             figures: PriceFigures::read(ctx)?,
+            tool: ctx.param("tool", None)?,
+            founding: super::founding::Founding {
+                founder: ctx.param("founder", None)?,
+                capital: ctx.param("capital", 0)?,
+                listing: ctx.param("listing", None)?,
+                bank: ctx.param("bank", String::new())?,
+            },
         };
+        if p.founding.founder.is_some() && p.founding.bank.is_empty() {
+            return Err("firm.producer: a factory someone founds names its bank (`bank`)".into());
+        }
         Ok(p)
     }
     fn work_day(&self, t: i64) -> bool {
@@ -141,13 +173,13 @@ pub enum Then {
     /// A system ordered (its outcome says whether the offer is still one it has an order out for).
     Adoption(AdoptionThen),
     /// An order filled: on terms, billed when the goods went; refused, the whole order is refunded.
-    Filled { order: Order, q: i64, t: i64 },
+    Filled { order: Order, q: i64, t: i64, },
     /// An input order sent.
-    Bought { kind: String, quantity: i64, seller_account: String, cost: i64, terms: bool },
+    Bought { kind: String, quantity: i64, seller_account: String, cost: i64, terms: bool, },
     /// The day's making: `units` all told, of which `by_system` were given to our systems.
-    Made { units: i64, qc: i64, share: i64, crew: Vec<String>, by_system: Vec<(String, i64, i64)>, t: i64, started: i64 },
+    Made { units: i64, qc: i64, share: i64, crew: Vec<String>, by_system: Vec<(String, i64, i64)>, t: i64, started: i64, },
     /// A shipment to the outside, of `q` at `unit` each, sent at `t`.
-    Exported { q: i64, unit: i64, t: i64 },
+    Exported { q: i64, unit: i64, t: i64, },
 }
 impl From<TradeThen> for Then {
     fn from(t: TradeThen) -> Then {
@@ -179,9 +211,13 @@ pub struct Factory<B: Body> {
     committed: Committed,
     room: ExportRoom,
     invoices_read: usize,
-    /// Makings ordered whose crew has not had the hours for them yet: (units, by).
+    /// Makings ordered whose outcome has not come back yet: (units, when planned).
     making: Vec<(i64, i64)>,
     on_order: BTreeMap<String, i64>,
+    /// Delivered and still on the road to us (law 9: the seller's note says when they arrive): (kind, quantity, when).
+    /// They stay on order until then.
+    #[serde(default)]
+    coming: Vec<(String, i64, i64)>,
     order_qty: BTreeMap<String, (String, i64)>,
     used: BTreeMap<String, i64>,
     used_day: i64,
@@ -219,12 +255,15 @@ pub struct Factory<B: Body> {
     /// What making a unit costs us now (inputs and hours): the regular price a clearance states.
     #[serde(default)]
     cost_now: i64,
+    /// Setting up, for a factory founded in the run (market/founding.rs): until it is ready it does nothing else.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    setup: Option<super::founding::Setup>,
 }
 
 impl<B: Body> Factory<B> {
     pub fn new(ctx: &Ctx, p: Params, body: B) -> Self {
         let me = ctx.entity.clone();
-        let sells = (p.terms_days > 0).then_some(SellingTerms { days: p.terms_days, stop_after_days: p.terms_stop_after_days, claim_after_days: p.terms_claim_after_days });
+        let sells = (p.terms_days > 0).then_some(SellingTerms { days: p.terms_days, stop_after_days: p.terms_stop_after_days, claim_after_days: p.terms_claim_after_days, });
         Factory {
             expectation: Expectation::new(p.adjust.smooth_months, None),
             orders: OrderBook::new(&me, None, sells),
@@ -235,6 +274,7 @@ impl<B: Body> Factory<B> {
             invoices_read: 0,
             making: vec![],
             on_order: BTreeMap::new(),
+            coming: vec![],
             order_qty: BTreeMap::new(),
             used: BTreeMap::new(),
             used_day: -1,
@@ -263,6 +303,7 @@ impl<B: Body> Factory<B> {
             sys_used: BTreeMap::new(),
             stock_meter: StockMeter::default(),
             cost_now: 0,
+            setup: p.founding.founder.is_some().then(|| super::founding::Setup { asked: -1, ..Default::default() }),
             body,
             book: Book::new(),
             p,
@@ -280,7 +321,7 @@ impl<B: Body> Factory<B> {
     }
 
     fn premises_of(&self, pic: &Picture) -> Option<(String, String, String)> {
-        sites(pic).find_map(|c| c.structure.as_ref().filter(|s| s.structure == self.p.works).map(|s| (s.structure.clone(), s.structure_type.clone(), c.cell.clone())))
+        sites(pic).find_map(|c| { c.structure.as_ref().filter(|s| s.structure == self.p.works).map(|s| (s.structure.to_string(), s.structure_type.to_string(), c.cell.to_string()))})
     }
     fn room_at_work(&self, pic: &Picture, staff: i64) -> i64 {
         let sp = sites(pic).find(|c| c.structure.as_ref().is_some_and(|s| s.structure == self.p.works)).and_then(|c| c.structure.as_ref().and_then(|s| s.spaces.iter().find(|x| x.kind == "workplace").cloned()));
@@ -290,12 +331,12 @@ impl<B: Body> Factory<B> {
         }
     }
     /// The world market's standing offer for what we make, if one is open: its latest, with its record.
-    fn export_offer(&self, t: i64) -> Option<(String, Value)> {
+    fn export_offer(&self, t: i64) -> Option<(String, Frozen)> {
         self.book
             .open("buying_offer")
-            .filter(|r| r.speaks_for.as_deref() == Some(self.p.market.as_str()) && data(r).s("kind") == Some(self.p.output.as_str()) && data(r).i("until").unwrap_or(i64::MAX) > t)
+            .filter(|r| { r.speaks_for.as_deref() == Some(self.p.market.as_str()) && data(r).s("kind") == Some(self.p.output.as_str()) && data(r).i("until").unwrap_or(i64::MAX) > t})
             .max_by(|a, b| a.at.cmp(&b.at).then_with(|| crate::common::filed_before(&b.id, &a.id)))
-            .map(|r| (r.id.clone(), data(r).clone()))
+            .map(|r| (r.id.to_string(), data(r).clone()))
     }
 }
 
@@ -318,25 +359,36 @@ impl<B: Body> Plan for Factory<B> {
         }
         let acct = own_account(pic);
         let account = acct.as_ref().map(|a| a.account.as_str());
+        if let Some(su) = self.setup.as_mut() {
+            su.absorb(pic, account, "", "");
+        }
         self.orders.take(pic, account);
         self.committed.take(pic, account);
         self.payables.take(&self.book);
         for d in self.deliveries.take(&self.book, &self.me) {
             if let Some((kind, q)) = self.order_qty.remove(&d.order) {
-                let e = self.on_order.entry(kind).or_insert(0);
-                *e = (*e - q).max(0);
+                self.coming.push((kind, q, d.arrives.unwrap_or(pic.t)));
             }
         }
+        // (What has arrived is no longer on order: it is held.)
+        let t = pic.t;
+        let (here, still): (Vec<_>, Vec<_>) = std::mem::take(&mut self.coming).into_iter().partition(|x| x.2 <= t);
+        self.coming = still;
+        for (kind, q, _) in here {
+            let e = self.on_order.entry(kind).or_insert(0);
+            *e = (*e - q).max(0);
+        }
         // What the outside sent back unpaid is what we learn our room from.
-        let notes: Vec<_> = self.book.all("invoice_declined").cloned().collect();
-        for n in notes.iter().skip(self.invoices_read) {
+        let declined = self.book.all("invoice_declined").len();
+        let notes: Vec<_> = self.book.all("invoice_declined").skip(self.invoices_read).cloned().collect();
+        for n in notes.iter() {
             if crate::common::addressed_to(n).iter().any(|a| *a == self.me) {
                 if let Some(back) = data(n).i("returned") {
                     self.room.sent_back(back);
                 }
             }
         }
-        self.invoices_read = notes.len();
+        self.invoices_read = declined;
     }
 
     fn until(&self, pic: &Picture) -> Option<i64> {
@@ -375,7 +427,7 @@ impl<B: Body> Plan for Factory<B> {
                 };
                 match id {
                     Some(id) => {
-                        self.order_qty.insert(id, (kind.clone(), *quantity));
+                        self.order_qty.insert(id.to_string(), (kind.clone(), *quantity));
                     }
                     None => {
                         let e = self.on_order.entry(kind.clone()).or_insert(0);
@@ -392,19 +444,25 @@ impl<B: Body> Plan for Factory<B> {
                     Done::Outcome(o) => Some(o),
                     _ => None,
                 };
+                // (No longer in flight: made, and in our stock, or not made. Until 2026-10-26 a making was counted in flight
+                // for twice its hours from when it was planned, not sent; a manager with other acts before it sent it after
+                // that, woke while it was under way, and ordered the day's work again past the band's top: docs/decisions.md,
+                // "Main red after foundations-2 phase 1".)
+                if let Some(i) = self.making.iter().position(|m| m.0 == *units && m.1 == *started) {
+                    self.making.remove(i);
+                }
                 if outcome.is_some_and(|o| o.status == OutcomeStatus::Applied) {
                     if *qc > 0 {
                         self.pace.done(crew, t.div_euclid(DAY));
                     }
                     return vec![];
                 }
-                self.making.retain(|m| !(m.0 == *units && m.1 > *started));
                 for (id, n, secs) in by_system {
                     let used = self.sys_used.get(id).copied().unwrap_or(0);
                     self.sys_used.insert(id.clone(), (used - n * secs).max(0));
                 }
                 // (A system the world refuses is switched off, or not ours: not counted on again.)
-                if !by_system.is_empty() && outcome.and_then(|o| o.refusal.as_ref()).is_some_and(|f| matches!(code_name(f).as_str(), "not_capable" | "participant_inactive" | "unknown_participant" | "not_theirs")) {
+                if !by_system.is_empty() && outcome.and_then(|o| o.refusal.as_ref()).is_some_and(|f| { matches!(code_name(f).as_str(), "not_capable" | "participant_inactive" | "unknown_participant" | "not_theirs")}) {
                     for (id, _, _) in by_system {
                         self.fleet.gone(id);
                     }
@@ -478,8 +536,18 @@ impl<B: Body> Factory<B> {
         if let (Some(a), Standing::Closed) = (&acct, self.body.standing()) {
             let where_ = self.premises_of(pic);
             let worth = where_.as_ref().and_then(|w| published_price(&self.book, &self.p.builder, &w.1, "prices"));
-            let w = Wind { pic, book: &self.book, acct: a, stage: Stage::Closed, premises: where_, sale_price: worth.map(|w| w * self.p.premises_sale_bps / 10_000), paid_suppliers: 0, staying: false };
+            let w = Wind { pic, book: &self.book, acct: a, stage: Stage::Closed, premises: where_, sale_price: worth.map(|w| w * self.p.premises_sale_bps / 10_000), paid_suppliers: 0, staying: false, };
             return lift(self.body.wind_up(&w, cx), Then::Body);
+        }
+        // (A factory founded in the run sets itself up first: its account, its founder's capital, its works bought.)
+        if let Some(mut su) = self.setup.take().filter(|s| !s.ready) {
+            let firm = super::founding::Firm { me: &self.me, what: "factory", founding: &self.p.founding, from_home: false, sale_board: "", premises: &self.p.works };
+            let (set, close) = su.setting_up::<Then>(&firm, &self.book, pic, acct.as_ref(), cx);
+            if close {
+                self.body.close();
+            }
+            self.setup = Some(su);
+            return set;
         }
         let Some(acct) = acct else { return steps };
         if self.body.winding_due(t) {
@@ -489,7 +557,7 @@ impl<B: Body> Factory<B> {
             let mut steps: Vec<Step<Then>> = lift(staff_steps, Then::Body);
             let (owed, paid) = self.payables.settle::<Then>(t, &acct.account, acct.balance - staff_paid, Some(&mut self.committed), cx);
             steps.extend(owed);
-            let w = Wind { pic, book: &self.book, acct: &acct, stage: Stage::Due, premises: None, sale_price: None, paid_suppliers: staff_paid + paid, staying: false };
+            let w = Wind { pic, book: &self.book, acct: &acct, stage: Stage::Due, premises: None, sale_price: None, paid_suppliers: staff_paid + paid, staying: false, };
             steps.extend(lift(self.body.wind_up(&w, cx), Then::Body));
             return steps;
         }
@@ -501,7 +569,7 @@ impl<B: Body> Factory<B> {
         let offer_now = self.export_offer(t);
         if self.last_demand < 0 {
             let first = self.book.open("buying_offer").find(|r| r.speaks_for.as_deref() == Some(self.p.market.as_str()) && data(r).s("kind") == Some(self.p.output.as_str()));
-            let share = first.and_then(|r| data(r).get("quantities").and_then(|q| q.get(&me)).and_then(Value::as_i64));
+            let share = first.and_then(|r| data(r).get("quantities").and_then(|q| q.get(&me)).and_then(|x| x.as_i64()));
             self.last_demand = share.unwrap_or_else(|| self.p.monthly_units(nw));
         }
         if self.headcount < 0 {
@@ -525,7 +593,7 @@ impl<B: Body> Factory<B> {
         let export_unit = offer_now.as_ref().map_or(0, |(_, d)| d.i("unit_price").unwrap_or(0));
         let export_share = offer_now.as_ref().map_or(0, |(_, d)| {
             let q = d.i("quantity").unwrap_or(0);
-            self.room.share(q, d.get("quantities").and_then(|x| x.get(&me)).and_then(Value::as_i64))
+            self.room.share(q, d.get("quantities").and_then(|x| x.get(&me)).and_then(|x| x.as_i64()))
         });
         let known = self.last_domestic + export_share;
         let home_ok = self.price >= input_cost;
@@ -562,7 +630,7 @@ impl<B: Body> Factory<B> {
                 &self.p.lengnick,
                 &self.p.figures,
                 &mut rng,
-                &Signals { price: self.price, marginal_cost, demand: self.last_domestic.max(0), turned_away: self.last_short, stock: self.stock_meter.month(stock), can_supply: None, rivals: &rivals },
+                &Signals { price: self.price, marginal_cost, demand: self.last_domestic.max(0), turned_away: self.last_short, stock: self.stock_meter.month(stock), can_supply: None, rivals: &rivals, },
                 &money,
             );
             self.price = moved.price;
@@ -592,7 +660,7 @@ impl<B: Body> Factory<B> {
             } else {
                 Surplus::OverStaffed
             };
-            let r = Review { needed: nw, trade: demand_words, notice_days: self.p.notice_days, expected, last_demand: self.last_demand, surplus, stock, phi_low_bps: l.phi_low_bps };
+            let r = Review { needed: nw, trade: demand_words, notice_days: self.p.notice_days, expected, last_demand: self.last_demand, surplus, stock, phi_low_bps: l.phi_low_bps, };
             let staffed = self.body.review(&self.book, t, &r, nw, cx);
             self.headcount = staffed.headcount;
             self.headcount_why = format!("{}{}", staffed.why, if why.is_empty() { String::new() } else { format!("; {}", why.join("; ")) });
@@ -637,10 +705,10 @@ impl<B: Body> Factory<B> {
         let months = self.body.months_in_hand(&self.book);
         let can_post = trading && acct.balance >= months * ((nw + 1) * self.wage * MONTH / self.p.period) && self.room_at_work(pic, nw) > 0;
         let postable = trading && self.room_at_work(pic, nw) > 0;
-        let want = Want { target: if trading { self.p.max_staff.min(self.headcount) } else { 0 }, wage: self.wage, can_post, postable, headcount: self.headcount, headcount_why: self.headcount_why.clone() };
+        let want = Want { target: if trading { self.p.max_staff.min(self.headcount) } else { 0 }, wage: self.wage, can_post, postable, headcount: self.headcount, headcount_why: self.headcount_why.clone(), };
         // (What a day without our work costs in output sold, and the share of our work that systems do: the employer's side of bargaining.)
         let system_bps = if self.last_demand > 0 { ((self.system_units(self.last_demand) * 10_000 * 2 + self.last_demand) / (2 * self.last_demand)).clamp(0, 10_000) } else { 0 };
-        let house = House { pic, book: &self.book, acct: &acct, want, trading, workers: workers.len(), operator: false, takings_per_day: self.takings.per_day(t), system_bps };
+        let house = House { pic, book: &self.book, acct: &acct, want, trading, workers: workers.len(), operator: false, takings_per_day: self.takings.per_day(t), system_bps, };
         let dealt = self.body.dealings(&house, cx);
         steps.extend(lift(dealt.steps, Then::Body));
         for rise in dealt.wage_rises {
@@ -657,7 +725,7 @@ impl<B: Body> Factory<B> {
         }
 
         if self.price != self.published_price && trading {
-            let old: Vec<String> = self.book.open("price_list").filter(|r| r.speaks_for.as_deref() == Some(&me)).map(|r| r.id.clone()).collect();
+            let old: Vec<String> = self.book.open("price_list").filter(|r| r.speaks_for.as_deref() == Some(&me)).map(|r| r.id).map(|x| x.to_string()).collect();
             self.published_price = self.price;
             let mut prices = BTreeMap::new();
             prices.insert(self.p.output.clone(), self.price);
@@ -734,11 +802,43 @@ impl<B: Body> Factory<B> {
                 if q < wanted { ", as many as we can pay for".to_string() } else { String::new() }
             );
             let mut st = order::<Then>(
-                &Ordering { me: me.clone(), seller: self.p.supplier.clone(), seller_account: sacct.clone(), kind: kind.clone(), quantity: q, unit_price: unit, to: None, at: self.p.works.clone(), from: acct.account.clone(), why, retry_of: None, for_days: None, terms: (terms > 0).then_some(terms) },
+                &Ordering { me: me.clone(), seller: self.p.supplier.clone(), seller_account: sacct.clone(), kind: kind.clone(), quantity: q, unit_price: unit, to: None, at: self.p.works.clone(), from: acct.account.clone(), why, retry_of: None, for_days: None, terms: (terms > 0).then_some(terms), },
                 cx,
             );
             st.then = Some(Then::Bought { kind: kind.clone(), quantity: q, seller_account: sacct, cost: q * unit, terms: terms > 0 });
             steps.push(st);
+        }
+        // A tool for each of our staff, where our supplier sells one and it pays by the numbers: the time it saves them, at
+        // their wage, against its price over the payback we ask, by the hurdle (the comparison any technology is weighed by).
+        if let (Some(tp), true) = (self.p.tool.clone(), trading) {
+            let have = held(pic, &self.p.works, &tp.kind) + self.on_order.get(&tp.kind).copied().unwrap_or(0);
+            let staff = nw.max(self.headcount);
+            let sold = goods_prices(&self.book, &tp.seller);
+            if let (Some(unit), Some(sacct), true) = (sold.prices.get(&tp.kind).copied(), sold.account.clone(), have < staff) {
+                let saves = self.wage * MONTH / self.p.period.max(1) * (10_000 - tp.labour_bps).max(0) / 10_000;
+                let costs = unit / tp.payback_months.max(1);
+                let q = (staff - have).min(spare.div_euclid(unit.max(1)));
+                // (Its seller's least order is kept, as for inputs: a smaller want is not ordered.)
+                if q > 0 && q >= sold.min_order.unwrap_or(1) && saves * 10_000 >= costs * (10_000 + tp.hurdle_bps) {
+                    spare -= q * unit;
+                    self.committed.add(&sacct, q * unit, t);
+                    *self.on_order.entry(tp.kind.clone()).or_insert(0) += q;
+                    let why = format!(
+                        "A {} saves each of our staff {}% of their time, worth {} a month at their wage, against {} a month of its price over {} months: ordering {q}.",
+                        tp.kind,
+                        (10_000 - tp.labour_bps) / 100,
+                        money(saves),
+                        money(costs),
+                        tp.payback_months
+                    );
+                    let mut st = order::<Then>(
+                        &Ordering { me: me.clone(), seller: tp.seller.clone(), seller_account: sacct.clone(), kind: tp.kind.clone(), quantity: q, unit_price: unit, to: None, at: self.p.works.clone(), from: acct.account.clone(), why, retry_of: None, for_days: None, terms: None },
+                        cx,
+                    );
+                    st.then = Some(Then::Bought { kind: tp.kind.clone(), quantity: q, seller_account: sacct, cost: q * unit, terms: false });
+                    steps.push(st);
+                }
+            }
         }
         if losing && trading && t >= self.next_losing_note {
             self.next_losing_note = t + MONTH;
@@ -756,12 +856,12 @@ impl<B: Body> Factory<B> {
             let mut v = std::collections::BTreeSet::new();
             for c in sites(pic).filter(|c| c.structure.as_ref().is_some_and(|s| s.structure == self.p.works)) {
                 for sp in c.structure.iter().flat_map(|s| s.spaces.iter()).filter(|sp| sp.kind == "workplace") {
-                    for o in sp.occupants.iter().flatten().filter(|o| workers.contains(o)) {
-                        v.insert(o.clone());
+                    for o in sp.occupants.iter().flatten().filter(|o| workers.contains(&o.to_string())) {
+                        v.insert(*o);
                     }
                 }
             }
-            v.into_iter().collect()
+            v.into_iter().map(|x| x.to_string()).collect()
         };
         let enough = stock * 10_000 > self.p.lengnick.phi_high_bps * self.last_demand;
         // (Systems of ours work whatever the day and hour, within their own day; people only on a working day, those here.)
@@ -769,11 +869,11 @@ impl<B: Body> Factory<B> {
         let sys_room = |s: &Self, id: &str, seconds: i64| (DAY - s.sys_used.get(id).copied().unwrap_or(0)).div_euclid(seconds.max(1));
         let people_work = self.p.work_day(t) && !present.is_empty();
         if (people_work || !sys_working.is_empty()) && !enough && trading {
-            let (crew, each) = if people_work { team(&present, |w| (self.p.working_day * self.body.hours_bps(w, t) / 10_000 - self.used.get(w).copied().unwrap_or(0)).max(0)) } else { (vec![], 0) };
+            let (crew, each) = if people_work { team(&present, |w| { (self.p.working_day * self.body.hours_bps(w, t) / 10_000 - self.used.get(w).copied().unwrap_or(0)).max(0)}) } else { (vec![], 0) };
             let per_unit = if crew.is_empty() { 0 } else { self.pace.per_unit(&crew) };
             let by_hours = if crew.is_empty() { 0 } else { each * crew.len() as i64 / per_unit };
             let by_inputs = self.p.per_unit.iter().map(|(k, q)| held(pic, &self.p.works, k) / q.max(&1)).min().unwrap_or(0);
-            let in_flight: i64 = self.making.iter().filter(|x| x.1 > t).map(|x| x.0).sum();
+            let in_flight: i64 = self.making.iter().filter(|x| x.1 + DAY > t).map(|x| x.0).sum();
             // No further than the top of the band: a day's making can be a lot next to a month's demand.
             let room = ((self.p.lengnick.phi_high_bps * self.last_demand + 9999).div_euclid(10_000) - stock - in_flight).max(0);
             // Our systems make their share first (what they can do of the day's making, as far as their own day goes); our people the rest.
@@ -804,10 +904,9 @@ impl<B: Body> Factory<B> {
                         *self.used.entry(w.clone()).or_insert(0) += share;
                     }
                 }
-                // (Its crew may be busy first: twice the hours it needs, to be safe.)
-                let by = t + 2 * by_system.iter().map(|b| b.1 * b.2).fold(share, i64::max);
-                self.making.retain(|x| x.1 > t);
-                self.making.push((units, by));
+                // (In flight until its outcome comes back: made, or refused. A day is the most it is counted for, should none.)
+                self.making.retain(|x| x.1 + DAY > t);
+                self.making.push((units, t));
                 let why = format!(
                     "The day's work: {}{}{} making {units} {}{}{}.",
                     if qc > 0 { format!("{} of our workers", crew.len()) } else { String::new() },
@@ -877,12 +976,12 @@ impl<B: Body> Factory<B> {
                 self.next_shipment = t + 7 * DAY;
                 let l = self.p.lengnick;
                 let keep = ((l.phi_low_bps + l.phi_high_bps) * self.last_domestic / 2 + 9999).div_euclid(10_000);
-                let room = self.room.open(d.i("quantity").unwrap_or(0), d.get("quantities").and_then(|x| x.get(&me)).and_then(Value::as_i64));
+                let room = self.room.open(d.i("quantity").unwrap_or(0), d.get("quantities").and_then(|x| x.get(&me)).and_then(|x| x.as_i64()));
                 let q = (left - keep).min(room);
                 if q > 0 && abroad_ok {
                     let unit = d.i("unit_price").unwrap_or(0);
                     self.room.shipped(q);
-                    let ship = call("goods", vec![("kind", Some(arg(&self.p.output))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&self.p.market))), ("at", Some(arg(&self.p.market))), ("from_at", Some(arg(&self.p.works)))]);
+                    let ship = call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.output))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&self.p.market))), ("at", Some(arg(&self.p.market))), ("from_at", Some(arg(&self.p.works)))]);
                     let invoice = say(
                         "invoice",
                         &format!("Invoice: {q} {} at {} each, {}.", self.p.output, money(unit), money(q * unit)),
@@ -949,6 +1048,12 @@ pub fn manifest() -> Value {
     add("clearance_floor_bps", 8000, "bps", "the lowest a clearance sale takes a price, as a share of marginal cost");
     add("rival_days", 60, "days", "how old a rival's price list may be and still count");
     add("export_probe_bps", 1000, "bps", "how far an exporter probes its room upward when the outside sent nothing back (docs/behaviour/boundary.md, Exports)");
+    // (A factory founded in the run: docs/behaviour/entry.md, "Founding a factory".)
+    for (k, what) in [("founder", "who founded it, where someone founded it (none: the town began with it)"), ("listing", "the listing of the works it was founded to buy"), ("bank", "the bank it opens its account at, where someone founded it")] {
+        params.insert(k.into(), json!({ "schema": { "type": ["string", "null"], "description": what }, "source": "the world gives it (no default)" }));
+    }
+    params.insert("tool".into(), json!({ "schema": { "type": ["object", "null"], "description": "a tool its work may be done with, as its supplier sells it, and how it weighs buying one (kind, labour_bps, payback_months, hurdle_bps)" }, "source": "the world gives it (no default): the technology on offer" }));
+    params.insert("capital".into(), json!({ "schema": { "type": "integer", "description": "the capital its founder puts in, where someone founded it, in the smallest unit of the world's money" }, "default": 0, "source": "the world gives it: the founder's (the price of the works and the venture's capital)" }));
     m
 }
 

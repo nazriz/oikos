@@ -2,6 +2,7 @@
 //! `approvalOf`, `Pace`; docs/behaviour/standing-work.md, directions.md). Who may do what is law and contract, as
 //! data (foundations F8): a standing work order, a procedure's `directions` and `approval`, all records on file.
 
+use oikos_core::Frozen;
 use super::book::Book;
 use super::{bases_of, data, first_due, is_kind, Fields, DAY};
 use crate::steps::{because, call, secs, Say, Step, Visible};
@@ -66,7 +67,7 @@ pub fn approval_of(book: &Book, procedure: &str) -> Option<(String, i64)> {
         return None;
     }
     let a = data(book.get(procedure)?).get("approval")?;
-    Some((a.s("by")?.to_string(), a.get("over").and_then(Value::as_i64)?))
+    Some((a.s("by")?.to_string(), a.get("over").and_then(|x| x.as_i64())?))
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,7 +129,7 @@ impl StandingWork {
     fn orders<'a>(&'a self, book: &'a Book) -> impl Iterator<Item = &'a Arc<Record>> + 'a {
         book.open("work_order").filter(move |x| {
             x.speaks_for.as_deref() == Some(self.me.as_str())
-                && (self.offices.is_empty() || x.position.as_ref().is_none_or(|p| self.offices.contains(p)))
+                && (self.offices.is_empty() || x.position.as_ref().is_none_or(|p| self.offices.contains(p.as_str())))
         })
     }
 
@@ -145,26 +146,26 @@ impl StandingWork {
         let d = data(r);
         let from = first_due(r, 0);
         let schedule = d.s("schedule").filter(|s| !s.is_empty()).map(String::from);
-        let every = d.get("every").and_then(Value::as_i64);
-        let until = d.get("until").and_then(Value::as_i64);
+        let every = d.get("every").and_then(|x| x.as_i64());
+        let until = d.get("until").and_then(|x| x.as_i64());
         if (schedule.is_none() && every.is_none_or(|e| e <= 0)) || t < from || until.is_some_and(|u| t >= u) {
             return None;
         }
         if book.on_hold(&r.id, Some(std::slice::from_ref(&self.me))) {
             return None;
         }
-        let w = d.get("work").cloned().unwrap_or(Value::Null);
+        let w = d.get("work").cloned().unwrap_or((Value::Null).into());
         let list = |k: &str| match w.get(k) {
-            Some(Value::Array(a)) if a.iter().all(Value::is_string) => a.iter().filter_map(|x| x.as_str().map(String::from)).collect(),
+            Some(Frozen::Array(a)) if a.iter().all(|x| x.is_string()) => a.iter().filter_map(|x| x.as_str().map(String::from)).collect(),
             _ => vec![],
         };
         Some(WorkOrder {
-            id: r.id.clone(),
+            id: r.id.to_string(),
             task: task.to_string(),
             at: w.s("at").map(String::from),
             on: list("on"),
             by: list("by"),
-            units: w.get("units").and_then(Value::as_i64),
+            units: w.get("units").and_then(|x| x.as_i64()),
             every: if schedule.is_none() { every.unwrap_or(0) } else { 0 },
             schedule,
             from,
@@ -299,7 +300,7 @@ impl StandingWork {
             let task = Self::task_of(r).unwrap_or("").to_string();
             let every = data(r).i("every").unwrap_or(0);
             let schedule = data(r).s("schedule").map(String::from);
-            let head = |state, words: String| Line { order: Some(r.id.clone()), task: task.clone(), every, schedule: schedule.clone(), state, why: None, count: None, words };
+            let head = |state, words: String| Line { order: Some(r.id.to_string()), task: task.clone(), every, schedule: schedule.clone(), state, why: None, count: None, words };
             if !named.contains(&task.as_str()) {
                 lines.push(head("no_such_task", format!("not carried out: the staff have no routine called \"{task}\" (their routines: {})", named.join(", "))));
                 continue;
@@ -309,7 +310,7 @@ impl StandingWork {
                 lines.push(head("replaced", format!("replaced by {}", latest.id)));
                 continue;
             }
-            let from = r.at + data(r).get("first").and_then(Value::as_i64).unwrap_or(0);
+            let from = r.at + data(r).get("first").and_then(|x| x.as_i64()).unwrap_or(0);
             if book.on_hold(&r.id, Some(std::slice::from_ref(&self.me))) {
                 lines.push(head("on_hold", "on hold: not carried out while the hold stands".into()));
                 continue;
@@ -318,7 +319,7 @@ impl StandingWork {
                 lines.push(head("not_begun", format!("begins {}", dated(from))));
                 continue;
             }
-            if let Some(u) = data(r).get("until").and_then(Value::as_i64).filter(|u| t >= *u) {
+            if let Some(u) = data(r).get("until").and_then(|x| x.as_i64()).filter(|u| t >= *u) {
                 lines.push(head("ended", format!("ended {}", dated(u))));
                 continue;
             }
@@ -398,7 +399,7 @@ impl StandingWork {
                 .iter()
                 .map(|x| {
                     let p = x["person"].as_str().unwrap_or("");
-                    match x.get("last").and_then(Value::as_i64) {
+                    match x.get("last").and_then(|x| x.as_i64()) {
                         Some(at) => format!("{p} last worked {} ({})", dated(at), x["task"].as_str().unwrap_or("")),
                         None if x.get("no_place").is_some() => {
                             format!("{p} has not come in to work (no place of work in the employment agreement or the advertisement it cites)")
@@ -586,7 +587,7 @@ impl Directions {
     /// whether or not the office's draw of compliance follows it: a clerk reads what is on file and draws nothing.
     pub fn stands<'a>(&self, book: &'a Book, form: &str) -> Option<&'a Arc<Record>> {
         let may = self.may(book);
-        let d = self.filed(book, Some(form)).into_iter().rev().find(|x| x.position.as_ref().is_some_and(|p| may.contains(p)))?;
+        let d = self.filed(book, Some(form)).into_iter().rev().find(|x| x.position.as_ref().is_some_and(|p| may.contains(&p.to_string())))?;
         (!book.on_hold(&d.id, None)).then_some(d)
     }
 
@@ -595,7 +596,7 @@ impl Directions {
         let Some(rule) = (!self.under.is_empty()).then(|| book.current(&self.under)).flatten() else { return vec![] };
         let d = data(rule).get("directions");
         let posts = self.office.as_ref().and_then(|o| d.and_then(|d| d.get("offices")).and_then(|x| x.get(o))).or_else(|| d.and_then(|d| d.get("by")));
-        posts.and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default()
+        posts.and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default()
     }
 
     /// The form a direction was filed on, if it cites one of this office's.
@@ -607,7 +608,7 @@ impl Directions {
     fn filed<'a>(&self, book: &'a Book, form: Option<&str>) -> Vec<&'a Arc<Record>> {
         let mut v: Vec<&Arc<Record>> = book
             .open("direction")
-            .filter(|d| super::addressed_to(d).contains(&self.entity))
+            .filter(|d| super::addressed_to(d).iter().any(|x| x == &self.entity))
             .filter(|d| self.form_of(book, d).is_some_and(|f| form.is_none_or(|x| data(f).s("form") == Some(x))))
             .collect();
         v.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| super::filed_before(&a.id, &b.id)));
@@ -617,7 +618,7 @@ impl Directions {
     /// The direction in force on a form: the latest standing one from a post that may direct us, if we follow it.
     pub fn standing<'a>(&self, book: &'a Book, form: &str, cx: &mut Cx) -> Option<&'a Arc<Record>> {
         let may = self.may(book);
-        let d = self.filed(book, Some(form)).into_iter().rev().find(|x| x.position.as_ref().is_some_and(|p| may.contains(p)))?;
+        let d = self.filed(book, Some(form)).into_iter().rev().find(|x| x.position.as_ref().is_some_and(|p| may.contains(&p.to_string())))?;
         if book.on_hold(&d.id, None) {
             return None;
         }
@@ -634,13 +635,13 @@ impl Directions {
         let may = self.may(book);
         let mut steps = vec![];
         for d in self.filed(book, None) {
-            if self.answered.contains(&d.id) || self.acknowledged.contains(&d.id) || d.author == self.participant {
+            if self.answered.contains(d.id.as_str()) || self.acknowledged.contains(d.id.as_str()) || d.author == self.participant {
                 continue;
             }
             let form = self.form_of(book, d).and_then(|f| data(f).s("form")).unwrap_or("").to_string();
-            let author = std::slice::from_ref(&d.author);
-            if d.position.as_ref().is_some_and(|p| may.contains(p)) {
-                self.acknowledged.insert(d.id.clone());
+            let author = &[d.author.to_string()][..];
+            if d.position.as_ref().is_some_and(|p| may.contains(&p.to_string())) {
+                self.acknowledged.insert(d.id.to_string());
                 let fw = if form.is_empty() { "form".to_string() } else { form.replace('_', " ") };
                 steps.push(because(
                     format!("A direction from {} on our {fw} form: acknowledging it.", d.position.as_deref().unwrap_or("")),
@@ -651,7 +652,7 @@ impl Directions {
                     )],
                 ));
             } else {
-                self.answered.insert(d.id.clone());
+                self.answered.insert(d.id.to_string());
                 let rule = if !self.under.is_empty() && !may.is_empty() {
                     format!("This office takes directions on its forms only from those {} names.", self.under)
                 } else {

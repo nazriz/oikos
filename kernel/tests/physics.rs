@@ -3,7 +3,7 @@
 //! here: no test that anything illegal is refused, because the kernel doesn't
 //! know the law (D19).
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};
@@ -37,7 +37,7 @@ fn balance(run: &Run<Vec<u8>>, acc: &str) -> i128 {
 
 fn created(r: &Response, name: &str) -> String {
     match &r.events[0].body {
-        EventBody::ActionApplied { created: Some(c), .. } => c[name].clone(),
+        EventBody::ActionApplied { created: Some(c), .. } => c[name].to_string(),
         other => panic!("expected an applied action, got {other:?}"),
     }
 }
@@ -61,6 +61,14 @@ fn money_cant_be_conjured_or_overdrawn() {
     assert_eq!(refusal(&r), Some(RefusalCode::InsufficientFunds));
     let r = act(&mut run, "bank-payments", json!([{"block": "transfer", "from": "acc-outside", "to": "acc-bob", "amount": "1"}]));
     assert_eq!(refusal(&r), Some(RefusalCode::NotCustodian), "only the outside world holds its own account");
+    // A payment moves a whole positive amount: one of nothing, or of less, is no payment (a bill is not settled by it).
+    let before = (balance(&run, "acc-bob"), balance(&run, "acc-devco"));
+    for amount in ["0", "-5"] {
+        // (Refused as an act, or not taken as one: either way nothing moves.)
+        let r = run.done(&rb_act("bank-payments", json!([{"block": "transfer", "from": "acc-bob", "to": "acc-devco", "amount": amount}])));
+        assert!(r.as_ref().map_or(true, |r| refusal(r).is_some()), "a transfer of {amount} is refused");
+    }
+    assert_eq!((balance(&run, "acc-bob"), balance(&run, "acc-devco")), before);
 }
 
 #[test]
@@ -130,7 +138,7 @@ fn the_river_scenario_an_illegal_building_goes_up_because_physics_allows_it() {
     assert!(!r.events.iter().any(|e| matches!(&e.body, EventBody::Transfer { .. })));
     // Ownership is untouched: the city's title record still says what it said.
     assert!(run.kernel().state().records.contains_key("title-p12"));
-    assert_eq!(run.kernel().state().structures[&house].built_by.as_deref(), Some("buildco"));
+    assert_eq!(run.kernel().state().structures[house.as_str()].built_by.as_deref(), Some("buildco"));
 
     // The inspector is shown none of the river bank: it sees what stands there by going (docs/design/knowing.md).
     // Until 2026-10-08 this test had a patrol channel over the bank's cells, looked through every 14 days; a map of
@@ -231,8 +239,8 @@ fn records_are_append_only_attributed_and_never_judged() {
     let forged = created(&r, "f");
     let st = run.kernel().state();
     assert_eq!(st.records["title-p12"], original, "the original title is untouched");
-    let f = &st.records[&forged].record;
-    assert_eq!((f.author.as_str(), f.position.as_deref(), f.speaks_for.as_deref()), ("developer-system", Some("developer"), Some("city")), "who really wrote it, and in what capacity, is recorded");
+    let f = &st.records[forged.as_str()].record;
+    assert_eq!((f.load().author.as_str(), f.load().position.as_deref(), f.load().speaks_for.as_deref()), ("developer-system", Some("developer"), Some("city")), "who really wrote it, and in what capacity, is recorded");
     // References must point at the right kind of record; that's mechanics, not law.
     let r = act(&mut run, "developer", json!([{"block": "transfer_claim", "claim": "law-river", "to": "devco"}]));
     assert_eq!(refusal(&r), Some(RefusalCode::WrongRecordKind));
@@ -265,7 +273,7 @@ fn visibility_decides_who_perceives_what() {
     let mut run = Run::start(c, "visibility", Vec::new(), None).unwrap();
     let sees = |run: &mut Run<Vec<u8>>, participant: &str, id: &str| {
         let obs = run.command(&Command::Observe { participant: participant.into(), only: None }).unwrap().observation.unwrap();
-        obs.channels.values().any(|c| matches!(c, ChannelData::Records { records, .. } if records.iter().any(|r| r.id == id)))
+        obs.channels.values().any(|c| matches!(c, ChannelData::Records { records, .. } if records.iter().any(|r| r.id() == id)))
     };
     // Bob's lease is visible to Bob and devco, not to Alice.
     assert!(sees(&mut run, "bob-self", "lease-bob"));
@@ -281,20 +289,20 @@ fn visibility_decides_who_perceives_what() {
     let vote = match &r.events[1].body {
         EventBody::Recorded { record } => {
             assert!(matches!(record.body, RecordBody::Vote { .. }));
-            record.id.clone()
+            record.id
         }
         other => panic!("{other:?}"),
     };
     let rec = &run.kernel().state().records[&vote].record;
     assert_eq!(
-        rec.visible_to,
-        oikos_kernel::blocks::Visibility::only(["alice".to_string(), "city".to_string()]),
+        rec.load().visible_to,
+        oikos_kernel::blocks::Visibility::only(["alice".into(), "city".into()]),
         "voter and the ballot's runner"
     );
     assert!(sees(&mut run, "alice-self", &vote));
     // One look for Bob (a look delivers each new record once): the public ballot, but not Alice's vote.
     let obs = run.command(&Command::Observe { participant: "bob-self".into(), only: None }).unwrap().observation.unwrap();
-    let got = |id: &str| obs.channels.values().any(|c| matches!(c, ChannelData::Records { records, .. } if records.iter().any(|r| r.id == id)));
+    let got = |id: &str| obs.channels.values().any(|c| matches!(c, ChannelData::Records { records, .. } if records.iter().any(|r| r.id() == id)));
     assert!(!got(&vote));
     assert!(got(&ballot), "the ballot itself is public, so Bob's channel does show public records");
 }

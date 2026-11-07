@@ -3,12 +3,12 @@
 //! scale, from the number's own digits, never through a binary float; and a ratio is written back in words the way
 //! JavaScript prints a short decimal.
 
-use serde_json::Value;
+use oikos_core::frozen::{JsonRead, JsonRef};
 
 /// A JSON number as a whole number of `1/scale` (half away from nought on any digits past the scale), or none where it
 /// is not a plain decimal number.
-pub fn scaled(v: &Value, scale: i64) -> Option<i64> {
-    let n = v.as_number()?;
+pub fn scaled<V: JsonRead + ?Sized>(v: &V, scale: i64) -> Option<i64> {
+    let JsonRef::Number(n) = v.view() else { return None };
     if let Some(i) = n.as_i64() {
         return i.checked_mul(scale);
     }

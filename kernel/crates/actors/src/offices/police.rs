@@ -26,6 +26,8 @@
 //! hours left in their working day (docs/risks.md, PB-16); the `compliance_bps` coins live in the planning officer,
 //! the inspector, landlords and the union, which other lanes port.
 
+use oikos_core::frozen::{JsonRead, JsonRef};
+use oikos_core::Frozen;
 use crate::common::{
     addressed_to, data, filed_before, go_see, money_words, next_look, out_of_time, visited, work::ReportOf, work::Routine, Book,
     Fields, Part, StandingWork, DAY, VISIT_MAX,
@@ -62,10 +64,10 @@ pub(crate) fn param(ty: &str, words: Option<&str>, default: Value, unit: Option<
 }
 
 /// The text of a JSON value as TS's `String(x)` writes the ones a paper holds (a string, a number); nothing otherwise.
-pub(crate) fn as_text(v: Option<&Value>) -> String {
-    match v {
-        Some(Value::String(s)) => s.clone(),
-        Some(Value::Number(n)) => n.to_string(),
+pub(crate) fn as_text<V: JsonRead + ?Sized>(v: Option<&V>) -> String {
+    match v.map(JsonRead::view) {
+        Some(JsonRef::String(s)) => s.to_string(),
+        Some(JsonRef::Number(n)) => n.to_string(),
         _ => String::new(),
     }
 }
@@ -87,6 +89,9 @@ struct Params {
     account: String,
     officers: i64,
     role: String,
+    /// The role of the station's head in their agreement: a sworn officer, who takes the station's work after its officers.
+    #[serde(default)]
+    in_charge_role: String,
     wage: i64,
     period: i64,
     notice_days: i64,
@@ -111,6 +116,7 @@ impl Params {
             account: ctx.need("account", "police.station")?,
             officers: ctx.param("officers", 0)?,
             role: ctx.param("role", "police officer".to_string())?,
+            in_charge_role: ctx.param("in_charge_role", "officer in charge".to_string())?,
             wage: ctx.param("wage", 0)?,
             period: ctx.param("period", 14 * DAY)?,
             notice_days: ctx.param("notice_days", 14)?,
@@ -135,6 +141,7 @@ impl Kind for Station {
     }
     // Ported to Rust (version string kept as the TS manifest has it): reads what it has done from its own file (reports, warrants, deaths found), so a successor carries on;
     // a warrant against a tenant registered dead is not carried out; a warrant not yet due no longer holds up those behind it.
+    // 0.7.0: the station's head (in_charge_role) is a sworn officer, and takes the station's work after its officers when there;
     // 0.6.0 (TS): run in parts where a model holds the office (part): the officers carry out warrants, look into reports
     // and call at homes under standing work orders in force at the start, and report what they did; 0.5.1: returns of tax
     // withheld are filed on the days the law states; 0.5.0: a warrant carried out says how many of the household were there
@@ -142,7 +149,7 @@ impl Kind for Station {
     // possession, in an officer's hours; 0.3.1: a death that someone at home outlived by more than a day is not "found" at a
     // later call; 0.3.0: calls at a home when asked to (a welfare check), by going there; no longer shown the town's homes.
     fn version(&self) -> &'static str {
-        "0.6.0"
+        "0.7.0"
     }
     fn doc(&self) -> &'static str {
         "docs/behaviour/crime.md"
@@ -157,6 +164,7 @@ impl Kind for Station {
                 "building": param("string", Some("the station, and where its officers work (the world must say)"), json!(""), None, true, None),
                 "calls_channel": param("string", None, json!(""), None, false, None),
                 "channel": param("string", None, json!("premises"), None, false, None),
+                "in_charge_role": param("string", Some("the station head's role in their agreement: a sworn officer, who takes the station's work after its officers"), json!("officer in charge"), None, false, Some("placeholder")),
                 "industry": param("string", None, json!("public_safety"), None, false, None),
                 "look_at": param("integer", None, json!(0), None, false, None),
                 "look_days": param("integer", None, json!(5), Some("days"), false, None),
@@ -224,6 +232,7 @@ impl Kind for Station {
             answered: BTreeSet::new(),
             found: vec![],
             told: BTreeSet::new(),
+            out_since: None,
         })))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
@@ -297,6 +306,11 @@ struct Police {
     found: Vec<(String, String)>,
     told: BTreeSet<String>,
     calling_now: bool,
+    /// An officer out on a round of calls, sent when: the next round goes when they are back (law 9: a going takes the
+    /// goer's time; a station that sent a round every time it woke sent its whole list in one moment). Waited for until
+    /// the next day at most (a round whose places were none to go to brings nothing back).
+    #[serde(default)]
+    out_since: Option<i64>,
 }
 
 impl Police {
@@ -314,10 +328,10 @@ impl Plan for Police {
         self.staff.absorb(pic);
         for o in &pic.outcomes {
             if let Some(inv) = &o.investigated {
-                self.results.insert(o.action.clone(), inv.get("taker").and_then(Value::as_str).map(String::from));
+                self.results.insert(o.action.to_string(), inv.get("taker").and_then(|x| x.as_str()).map(String::from));
             }
         }
-        if let Some(Seen::Sites { cells, .. }) = pic.channels.get(&self.p.channel) {
+        if let Some(Seen::Sites { cells, .. }) = pic.channels.get(self.p.channel.as_str()) {
             for c in cells.iter() {
                 if let Some(s) = &c.structure {
                     if s.structure == self.p.building {
@@ -329,41 +343,64 @@ impl Plan for Police {
         // Asked to call at a home, taken as it comes in so that an officer sets out at this wake (once for each home and
         // each silence: several neighbours may ask).
         if self.routines.does(&self.book, CALLS, t, DAY).is_some() {
-            let asks: Vec<_> = self.book.open("welfare_check_request").filter(|x| addressed_to(x).contains(&self.me) && !self.taken_calls.contains(&x.id)).cloned().collect();
+            let asks: Vec<_> = self.book.open("welfare_check_request").filter(|x| addressed_to(x).iter().any(|x| x == &self.me) && !self.taken_calls.contains(x.id.as_str())).cloned().collect();
             for r in asks {
-                self.taken_calls.insert(r.id.clone());
+                self.taken_calls.insert(r.id.to_string());
                 // (To the ground the home stands on, where the request says it: a building may be gone, its ground is there.)
                 let d = data(&r);
                 let space = as_text(d.get("space"));
                 let structure = d.get("at").or_else(|| d.get("structure")).map(|v| as_text(Some(v))).unwrap_or_default();
                 let silence = format!("{space}@{}", as_text(d.get("since")));
-                if space.is_empty() || structure.is_empty() || self.answered.contains(&silence) {
+                if space.is_empty() || structure.is_empty() || self.answered.contains(&silence) || self.answered.contains(&format!("{structure}@found")) {
                     continue;
                 }
                 self.answered.insert(silence);
+                // (One who has not come home: the home, and the street outside it, each cell next to its ground.)
+                if d.get("missing").is_some_and(|m| !m.is_null()) {
+                    if let Some((x, y)) = structure.strip_prefix("cell.").and_then(|r| r.split_once('.')).and_then(|(x, y)| Some((x.parse::<i64>().ok()?, y.parse::<i64>().ok()?))) {
+                        for (dx, dy) in [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)] {
+                            let c = format!("cell.{}.{}", x + dx, y + dy);
+                            self.calls.push(Call { space: c.clone(), structure: c });
+                        }
+                    }
+                }
                 self.calls.push(Call { space, structure });
             }
         }
         // What a call found: whoever died in the home we were asked about (having gone in, we see who left it and why).
         if !self.p.calls_channel.is_empty() {
-            for c in visited(pic, &self.p.calls_channel) {
+            let back = visited(pic, &self.p.calls_channel);
+            if !back.is_empty() || self.out_since.is_some_and(|s| pic.t >= s + DAY) {
+                self.out_since = None;
+            }
+            for c in back {
+                // (Asked to come to a place on the road where someone lies dead: whoever lies there is found there.)
+                if !c.remains.is_empty() && self.called.remove(c.cell.as_str()) {
+                    for r in &c.remains {
+                        if self.told.insert(r.to_string()) {
+                            self.found.push((r.to_string(), c.cell.to_string()));
+                        }
+                        // (Found here once: asked again about this place, we have reported whoever lies there.)
+                        self.answered.insert(format!("{}@found", c.cell));
+                    }
+                }
                 for sp in c.structure.iter().flat_map(|s| s.spaces.iter()) {
-                    if !self.called.remove(&sp.space) {
+                    if !self.called.remove(sp.space.as_str()) {
                         continue;
                     }
                     let left = sp.left.clone().unwrap_or_default();
                     for l in &left {
-                        if l.reason != oikos_contracts::events::VacateReason::Died || self.told.contains(&l.occupant) {
+                        if l.reason != oikos_contracts::events::VacateReason::Died || self.told.contains(l.occupant.as_str()) {
                             continue;
                         }
-                        self.told.insert(l.occupant.clone());
+                        self.told.insert(l.occupant.to_string());
                         // Someone who went on living there after the death (they left the home more than a day after it)
                         // was at home with it: the death was theirs to report, long ago, and is no finding of ours. Only
                         // a death nobody at home outlived is found by a call.
                         if left.iter().any(|x| x.occupant != l.occupant && x.at > l.at + DAY) {
                             continue;
                         }
-                        self.found.push((l.occupant.clone(), sp.space.clone()));
+                        self.found.push((l.occupant.to_string(), sp.space.to_string()));
                     }
                 }
             }
@@ -450,8 +487,19 @@ impl Plan for Police {
         let mine: BTreeSet<&String> = workers.iter().collect();
         let here: Vec<String> = {
             let occ = self.view.as_ref().and_then(|v| v.spaces.iter().find(|sp| sp.space == self.p.workplace)).and_then(|sp| sp.occupants.clone()).unwrap_or_default();
-            let set: BTreeSet<String> = occ.into_iter().filter(|w| mine.contains(w)).collect();
-            set.into_iter().collect()
+            let set: BTreeSet<String> = occ.iter().map(|x| x.to_string()).filter(|w| mine.contains(w)).collect();
+            let mut here: Vec<String> = set.into_iter().collect();
+            // (The officer in charge is a sworn officer too: at the station, they take the station's work after its officers,
+            // as the officer in charge of a small station does when the officers are away. 2026-10-25: a one-officer
+            // station whose officer was off injured carried out no warrant and looked into no report for a month.)
+            if !self.p.in_charge_role.is_empty() {
+                for oic in self.staff.in_role(&self.book, t, &self.p.in_charge_role) {
+                    if !here.contains(&oic) && occ.iter().any(|x| *x ==oic) {
+                        here.push(oic);
+                    }
+                }
+            }
+            here
         };
         let free = |used: &BTreeMap<String, i64>, w: &String| self.p.working_day - used.get(w).copied().unwrap_or(0) >= self.p.task_seconds;
 
@@ -473,7 +521,7 @@ impl Plan for Police {
         // the landlord are told it is done. With no officer free it waits for one; one not carried out by its last day
         // lapses, and the landlord must ask again. A tenant the register of deaths shows dead is not put out.
         let mut waiting: Vec<std::sync::Arc<oikos_sight::Record>> = if carrying {
-            self.book.open("warrant").filter(|x| addressed_to(x).contains(&me) && !dealt.contains(&x.id)).cloned().collect()
+            self.book.open("warrant").filter(|x| addressed_to(x).iter().any(|x| x == &me) && !dealt.contains(x.id.as_str())).cloned().collect()
         } else {
             vec![]
         };
@@ -494,7 +542,7 @@ impl Plan for Police {
                 let lease = as_text(d.get("lease"));
                 let space = as_text(d.get("space"));
                 let household: Vec<String> = match d.get("household") {
-                    Some(Value::Array(a)) => a.iter().filter_map(|x| x.as_str().map(String::from)).collect(),
+                    Some(Frozen::Array(a)) => a.iter().filter_map(|x| x.as_str().map(String::from)).collect(),
                     _ => vec![tenant.to_string()],
                 };
                 let lapse = |steps: &mut Vec<Step<Then>>, why: String, words: String, reason: Option<&str>| {
@@ -502,15 +550,15 @@ impl Plan for Police {
                     if let Some(r) = reason {
                         dd["reason"] = json!(r);
                     }
-                    steps.push(Self::st(why, say("warrant_lapsed", &words, Say { to: Some(vec![landlord.clone()]), visible: Some(Visible::Only(vec![me.clone(), landlord.clone()])), basis: Some(w.id.clone()), data: Some(dd), ..Default::default() })));
+                    steps.push(Self::st(why, say("warrant_lapsed", &words, Say { to: Some(vec![landlord.clone()]), visible: Some(Visible::Only(vec![me.clone(), landlord.clone()])), basis: Some(w.id.to_string()), data: Some(dd), ..Default::default() })));
                 };
                 if until.is_some_and(|u| t > u + DAY) {
-                    self.settled.insert(w.id.clone());
+                    self.settled.insert(w.id.to_string());
                     lapse(&mut steps, format!("The warrant {} ran out before an officer could carry it out: telling {landlord}.", w.id), format!("Warrant {} was not carried out by its last day, and has lapsed.", w.id), None);
                     continue;
                 }
                 if registered.contains(tenant) {
-                    self.settled.insert(w.id.clone());
+                    self.settled.insert(w.id.to_string());
                     lapse(
                         &mut steps,
                         format!("The register of deaths shows {tenant} dead: warrant {} is not carried out. Telling {landlord}.", w.id),
@@ -520,15 +568,15 @@ impl Plan for Police {
                     continue;
                 }
                 let Some(officer) = here.iter().find(|x| free(&self.used, x)).cloned() else { break };
-                self.settled.insert(w.id.clone());
+                self.settled.insert(w.id.to_string());
                 carried += 1;
                 self.routines.did(WARRANTS, t, 1, std::slice::from_ref(&officer));
                 *self.used.entry(officer.clone()).or_insert(0) += self.p.task_seconds;
                 // (Each on their own: someone not at home is not there to be put out, and comes back to a home that is no
                 // longer theirs. The warrant gives the landlord possession whoever is there; what the officer says is what
                 // they found: how many of the household were put out, or that nobody was there and nobody was removed.)
-                let exec = Executed { warrant: w.id.clone(), lease, tenant: tenant.to_string(), landlord, space: space.clone(), household: household.clone() };
-                self.puts.insert(w.id.clone(), 0);
+                let exec = Executed { warrant: w.id.to_string(), lease, tenant: tenant.to_string(), landlord, space: space.clone(), household: household.clone() };
+                self.puts.insert(w.id.to_string(), 0);
                 for (i, who) in household.iter().enumerate() {
                     let c = call("occupancy", vec![("in", Some(arg(structure))), ("who", Some(arg(who))), ("leave", Some(arg("yes")))]);
                     let mut s = Self::st(format!("Carrying out warrant {} at {space}: putting {who} out, if they are there.", w.id), c);
@@ -553,14 +601,14 @@ impl Plan for Police {
             self.routines.held_up(WARRANTS, &why);
         }
         let still = waiting.len() as i64 - carried;
-        self.routines.note(WARRANTS, (still > 0).then(|| format!("{still} still waiting, the oldest {}", waiting.iter().find(|w| !self.settled.contains(&w.id)).map_or("", |w| w.id.as_str()))));
+        self.routines.note(WARRANTS, (still > 0).then(|| format!("{still} still waiting, the oldest {}", waiting.iter().find(|w| !self.settled.contains(w.id.as_str())).map_or("", |w| w.id.as_str()))));
 
         // Reports of goods taken, in the order they came, as the officers' hours allow.
         let mut queue: Vec<std::sync::Arc<oikos_sight::Record>> = if looking {
             let under_way: BTreeSet<&str> = self.asked.values().map(|q| q.report.as_str()).collect();
             self.book
                 .open("crime_report")
-                .filter(|x| addressed_to(x).contains(&me) && x.speaks_for.is_some() && !dealt.contains(&x.id) && !under_way.contains(x.id.as_str()))
+                .filter(|x| addressed_to(x).iter().any(|x| x == &me) && x.speaks_for.is_some() && !dealt.contains(x.id.as_str()) && !under_way.contains(x.id.as_str()))
                 .cloned()
                 .collect()
         } else {
@@ -571,7 +619,7 @@ impl Plan for Police {
         for r in &queue {
             let Some(officer) = here.iter().find(|w| free(&self.used, w)).cloned() else { break };
             let d = data(r);
-            let q = Inquiry { report: r.id.clone(), from: r.speaks_for.clone().unwrap_or_default(), at: as_text(d.get("at")), kind: as_text(d.get("kind")), value: d.i("value").unwrap_or(0), account: d.s("account").map(String::from) };
+            let q = Inquiry { report: r.id.to_string(), from: r.speaks_for.unwrap_or_default().to_string(), at: as_text(d.get("at")), kind: as_text(d.get("kind")), value: d.i("value").unwrap_or(0), account: d.s("account").map(String::from) };
             looked += 1;
             self.routines.did(REPORTS, t, 1, std::slice::from_ref(&officer));
             *self.used.entry(officer.clone()).or_insert(0) += self.p.task_seconds;
@@ -619,10 +667,14 @@ impl Plan for Police {
 
     /// Going to the homes we are asked to call at (an officer's going: it takes the station's time; what is found comes
     /// when they are back).
-    fn looks(&mut self, _pic: &Picture) -> Vec<LookRequest> {
-        if self.p.calls_channel.is_empty() || self.calls.is_empty() || !self.calling_now {
+    fn looks(&mut self, pic: &Picture) -> Vec<LookRequest> {
+        // (A place on the road where we found whoever lay there is not gone to again.)
+        let answered = &self.answered;
+        self.calls.retain(|c| !answered.contains(&format!("{}@found", c.structure)));
+        if self.p.calls_channel.is_empty() || self.calls.is_empty() || !self.calling_now || self.out_since.is_some() {
             return vec![];
         }
+        self.out_since = Some(pic.t);
         let n = self.calls.len().min(VISIT_MAX);
         let go: Vec<Call> = self.calls.drain(..n).collect();
         let mut places: Vec<String> = vec![];
@@ -640,7 +692,7 @@ impl Plan for Police {
             Then::Look(q) => {
                 match done {
                     Done::Outcome(o) if o.status == oikos_sight::OutcomeStatus::Applied => {
-                        self.asked.insert(o.action.clone(), q.clone());
+                        self.asked.insert(o.action.to_string(), q.clone());
                     }
                     other => {
                         // (Not done: the report stays on the file unanswered and is taken up again.)

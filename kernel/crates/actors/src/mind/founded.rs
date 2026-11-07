@@ -25,6 +25,7 @@
 //!   possession), so those branches are left to lane E. Reads of a paper's data are lenient, as TS's were, through
 //!   `Fields`; what it writes goes through the typed papers.
 
+use oikos_core::frozen::JsonRef;
 use super::founding::{accept_gathering, accept_membership, accept_purpose, membership_offer, slice16, words_came, words_question, Came, GatherBounds, Hall, MembershipBounds};
 use crate::common::{
     addressed_to, cites, data, filed_before, money_words, own_banked, part, when_words, withdraw, Book, Fields, Occurrences, OwnAccount, Piece, DAY, MONTH,
@@ -130,13 +131,14 @@ pub struct Hearings {
 
 /// Whether an application says what it is about: it gives its particulars, or names a paper, a place, a sum, what is
 /// sought, or evidence (frictions.ts `hasParticulars`).
-fn has_particulars(d: &Value) -> bool {
+fn has_particulars<V: oikos_core::frozen::JsonRead + ?Sized>(d: &V) -> bool {
+    let d = d.view();
     let num_pos = match d.get("amount") {
-        Some(Value::Number(n)) => n.as_f64().is_some_and(|x| x > 0.0),
-        Some(Value::String(s)) => s.trim().parse::<f64>().is_ok_and(|x| x > 0.0),
+        Some(JsonRef::Number(n)) => n.as_f64().is_some_and(|x| x > 0.0),
+        Some(JsonRef::String(s)) => s.trim().parse::<f64>().is_ok_and(|x| x > 0.0),
         _ => false,
     };
-    d.get("particulars").and_then(Value::as_str).is_some_and(|p| !p.trim().is_empty())
+    d.get("particulars").and_then(|x| x.as_str()).is_some_and(|p| !p.trim().is_empty())
         || d.get("about").is_some()
         || d.get("structure").is_some()
         || d.get("seeks").is_some()
@@ -156,7 +158,7 @@ fn response_to<'a>(book: &'a Book, kind: &str, application: &str, from: &str) ->
 }
 
 /// The truthy string of a data field (`...(d.about ? { about } : {})`).
-fn truthy_s(d: &Value, k: &str) -> Option<String> {
+fn truthy_s<V: Fields + ?Sized>(d: &V, k: &str) -> Option<String> {
     d.s(k).filter(|s| !s.is_empty()).map(String::from)
 }
 
@@ -277,27 +279,27 @@ impl Hearings {
             let against = d.s("against").or_else(|| nd.s("against")).unwrap_or("").to_string();
             let answer_by = nd.i("answer_by").or_else(|| nd.i("hearing_at")).unwrap_or(t);
             let hears = hears_of(&self.hears, &matter).unwrap_or(Hears { about: matter.clone(), ..Default::default() });
-            self.cases.insert(id.clone(), Case { id, matter, applicant: a.speaks_for.clone().unwrap_or_default(), against, at: a.at, answer_by, data: d.clone(), hears });
+            self.cases.insert(id.clone(), Case { id, matter, applicant: a.speaks_for.unwrap_or_default().to_string(), against, at: a.at, answer_by, data: d.to_value(), hears });
         }
 
         // ---- applications: taken, and the other side told ----
-        let mut apps: Vec<&Arc<Record>> = book.open("application").filter(|x| addressed_to(x).contains(&me) && !self.seen.contains(&x.id)).collect();
+        let mut apps: Vec<&Arc<Record>> = book.open("application").filter(|x| addressed_to(x).iter().any(|x| x == &me) && !self.seen.contains(x.id.as_str())).collect();
         apps.sort_by(|x, y| by_filed(x, y));
         for a in apps {
             let d = data(a);
             let matter = d.s("matter").or_else(|| d.s("kind")).unwrap_or("").to_string();
-            self.seen.insert(a.id.clone());
-            let applicant = a.speaks_for.clone().unwrap_or_default();
+            self.seen.insert(a.id.to_string());
+            let applicant = a.speaks_for.unwrap_or_default();
             let hears = hears_of(&self.hears, &matter);
             let against = d.s("against").unwrap_or("").to_string();
             let c = Case {
-                id: a.id.clone(),
+                id: a.id.to_string(),
                 matter: matter.clone(),
-                applicant: applicant.clone(),
+                applicant: applicant.to_string(),
                 against: against.clone(),
                 at: a.at,
                 answer_by: t + self.answer_days * DAY,
-                data: d.clone(),
+                data: d.to_value(),
                 hears: hears.clone().unwrap_or(Hears { about: matter.clone(), ..Default::default() }),
             };
             self.count("applications");
@@ -311,7 +313,7 @@ impl Hearings {
                 self.decide(&mut steps, &c, "rejected", "it names nobody it is against.", Extra::default(), "An application against no one: saying so.".into(), true, t);
                 continue;
             }
-            self.cases.insert(a.id.clone(), c.clone());
+            self.cases.insert(a.id.to_string(), c.clone());
             let seeking = match d.get("amount").and_then(lenient::whole) {
                 Some(n) if n != 0 => format!(", seeking {}", usd(n, cx)),
                 _ => String::new(),
@@ -323,10 +325,10 @@ impl Hearings {
                 if can.iter().any(|x| x == "mediate") { ", and say whether you will meet them with us" } else { "" }
             );
             let notice = VenueNotice {
-                application: a.id.clone(),
+                application: a.id.to_string(),
                 kind: matter.clone(),
                 matter: Some(matter.clone()),
-                applicant: applicant.clone(),
+                applicant: applicant.to_string(),
                 against: against.clone(),
                 hearing_at: c.answer_by,
                 answer_by: Some(c.answer_by),
@@ -341,9 +343,9 @@ impl Hearings {
                     ComplaintNotice::KIND,
                     &text,
                     Say {
-                        to: Some(vec![applicant.clone(), against.clone()]),
-                        visible: Some(Visible::Only(vec![applicant.clone(), against.clone(), me.clone()])),
-                        basis: Some(a.id.clone()),
+                        to: Some(vec![applicant.to_string(), against.clone()]),
+                        visible: Some(Visible::Only(vec![applicant.to_string(), against.clone(), me.clone()])),
+                        basis: Some(a.id.to_string()),
                         data: Some(paper_data(&ComplaintNotice(notice))),
                         ..Default::default()
                     },
@@ -371,7 +373,7 @@ impl Hearings {
             let binding = can.iter().any(|x| x == "order");
             let due = t + self.within_days * DAY;
             let r = response_to(book, ComplaintResponse::KIND, &c.id, &c.against);
-            let x = r.map_or(&Value::Null, |r| data(r));
+            let x = r.map_or(&oikos_core::frozen::NULL, |r| data(r));
             let claimed = c.data.get("amount").and_then(lenient::whole).unwrap_or(0);
             let verb = if binding { "is to" } else { "should" };
             // An application that says nothing of what it is about is turned away with leave to apply again with its
@@ -723,7 +725,7 @@ impl Kind for Founded {
         })
     }
     fn cadence(&self, ctx: &Ctx) -> i64 {
-        if ctx.params.get("shape").and_then(Value::as_str) == Some("cause") {
+        if ctx.params.get("shape").and_then(|x| x.as_str()) == Some("cause") {
             DAY
         } else {
             7 * DAY
@@ -841,7 +843,7 @@ impl Group {
                 RecordBody::Agreement { terms }
                     if terms.template.as_deref() == Some("membership") && terms.parties.first() == Some(&self.me) && self.book.in_force(&r.id) =>
                 {
-                    Some(Member { who: terms.parties.get(1).cloned().unwrap_or_default(), agreement: r.id.clone(), at: r.at })
+                    Some(Member { who: terms.parties.get(1).cloned().unwrap_or_default(), agreement: r.id.to_string(), at: r.at })
                 }
                 _ => None,
             })
@@ -1120,9 +1122,9 @@ impl Group {
             .and_then(|s| {
                 part(s, Piece::Offer)
                     .pointer("/terms/commitments")
-                    .and_then(Value::as_array)
+                    .and_then(|x| x.as_array())
                     .and_then(|cs| {
-                        cs.iter().find(|x| x.get("who").and_then(Value::as_str) == Some("taker") && x.pointer("/does/outcome/money").is_some_and(|m| !m.is_null()))
+                        cs.iter().find(|x| x.get("who").and_then(|x| x.as_str()) == Some("taker") && x.pointer("/does/outcome/money").is_some_and(|m| !m.is_null()))
                     })
                     .and_then(|x| x.pointer("/does/outcome/money/amount").and_then(lenient::whole))
             })
@@ -1133,11 +1135,11 @@ impl Group {
         let mut offers: Vec<Step<()>> = vec![];
         let mut applied = 0;
         for a in &applications {
-            if self.handled.contains(&a.id) || !addressed_to(a).contains(&me) {
+            if self.handled.contains(a.id.as_str()) || !addressed_to(a).iter().any(|x| x == &me) {
                 continue;
             }
-            self.handled.insert(a.id.clone());
-            let who = a.speaks_for.clone().unwrap_or_default();
+            self.handled.insert(a.id.to_string());
+            let who = a.speaks_for.unwrap_or_default();
             if in_force.contains(who.as_str()) {
                 continue;
             }
@@ -1161,11 +1163,11 @@ impl Group {
         if let (true, Some(acc)) = (draws > 0, acc.as_ref()) {
             let claims: Vec<Arc<Record>> = self.book.open("fund_claim").cloned().collect();
             for r in claims {
-                if self.handled.contains(&r.id) || !addressed_to(&r).contains(&me) {
+                if self.handled.contains(r.id.as_str()) || !addressed_to(&r).iter().any(|x| x == &me) {
                     continue;
                 }
-                self.handled.insert(r.id.clone());
-                let who = r.speaks_for.clone().unwrap_or_default();
+                self.handled.insert(r.id.to_string());
+                let who = r.speaks_for.unwrap_or_default();
                 let m = now.iter().find(|x| x.who == who);
                 let d = data(&r);
                 let want = draws.min(d.i("amount").unwrap_or(draws));
@@ -1176,7 +1178,7 @@ impl Group {
                     "not a member"
                 } else if t - m.map_or(0, |m| m.at) < f.qualify_days * DAY {
                     "not yet a member long enough"
-                } else if self.drew.get(&who).is_some_and(|last| t - last < f.every_days * DAY) {
+                } else if self.drew.get(who.as_str()).is_some_and(|last| t - last < f.every_days * DAY) {
                     "drew not long ago"
                 } else if balance < want {
                     "the fund has not got it"
@@ -1187,7 +1189,7 @@ impl Group {
                 };
                 self.count(if why.is_empty() { "draws_paid" } else { "draws_refused" }, 1);
                 if why.is_empty() {
-                    self.drew.insert(who.clone(), t);
+                    self.drew.insert(who.to_string(), t);
                     self.remember(t, "fund_drawn", Some(&who), want);
                     self.balance = Some(balance - want);
                 }
@@ -1201,7 +1203,7 @@ impl Group {
                 let mut calls = vec![say(
                     "fund_decision",
                     &words,
-                    Say { to: Some(vec![who.clone()]), visible: Some(Visible::Only(vec![me.clone(), who.clone()])), basis: Some(r.id.clone()), data: Some(paper_data(&decision)), ..Default::default() },
+                    Say { to: Some(vec![who.to_string()]), visible: Some(Visible::Only(vec![me.clone(), who.to_string()])), basis: Some(r.id.to_string()), data: Some(paper_data(&decision)), ..Default::default() },
                 )];
                 if why.is_empty() {
                     let to = given.unwrap_or_default();
@@ -1397,7 +1399,7 @@ impl Plan for Group {
             if a.kind != "words" {
                 continue;
             }
-            if a.body.get("done").and_then(Value::as_bool) == Some(false) {
+            if a.body.get("done").and_then(|x| x.as_bool()) == Some(false) {
                 self.redo.insert(part);
             } else if self.asked.contains_key(&part) {
                 self.answers.insert(part, a.body);

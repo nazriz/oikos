@@ -16,6 +16,7 @@
 //! be written; a complaint not written is recorded against the norm only the first time (TS also recorded a later
 //! letter written); TS's "inner.experience" weight 2 is `weight_bps` 20,000.
 
+use oikos_core::Frozen;
 use super::mind::{ConductAsk, Event, GrievanceView, Intent, Opening, Openings, Outcome, Treated, WantView, Way};
 use super::params::Params;
 #[allow(unused_imports)]
@@ -148,7 +149,7 @@ fn facts(v: Value) -> BTreeMap<String, Value> {
     }
 }
 
-fn offer_of(r: &Record) -> Option<&Value> {
+fn offer_of(r: &Record) -> Option<&Frozen> {
     match &r.body {
         RecordBody::Statement { offer, .. } => offer.as_ref(),
         _ => None,
@@ -165,10 +166,10 @@ fn friction_dial(cx: &Cx) -> i64 {
 }
 
 /// What an offer would bring, in the typed outcomes a want seeks (wants.ts `bringsOf`, without what it asks now).
-pub fn brings_of(offer: Option<&Value>) -> Vec<String> {
+pub fn brings_of(offer: Option<&Frozen>) -> Vec<String> {
     let mut out = BTreeSet::new();
     let none = vec![];
-    let cs = offer.and_then(|o| o.get("terms")).and_then(|t| t.get("commitments")).and_then(Value::as_array).unwrap_or(&none);
+    let cs = offer.and_then(|o| o.get("terms")).and_then(|t| t.get("commitments")).and_then(|x| x.as_array()).unwrap_or(&none);
     for c in cs {
         let Some(o) = c.get("does").and_then(|d| d.get("outcome")) else { continue };
         let taker = c.s("who") == Some("taker");
@@ -196,19 +197,19 @@ pub fn brings_of(offer: Option<&Value>) -> Vec<String> {
 fn decision_law(book: &crate::common::Book, kind_: &str, payment: Option<&str>) -> Option<Value> {
     let mut best: Option<(i64, Value)> = None;
     for l in book.open("law") {
-        let Some(list) = data(l).get("decisions").and_then(Value::as_array) else { continue };
+        let Some(list) = data(l).get("decisions").and_then(|x| x.as_array()) else { continue };
         for d in list {
             if d.s("kind") != Some(kind_) {
                 continue;
             }
-            let pays = d.get("payments").and_then(Value::as_array);
+            let pays = d.get("payments").and_then(|x| x.as_array());
             let fits = pays.is_none_or(|ps| payment.is_some_and(|p| ps.iter().any(|x| x.as_str() == Some(p))));
             if !fits {
                 continue;
             }
             let score = (if pays.is_some() { 1_000_000_000_000 } else { 0 }) + l.at;
             if best.as_ref().is_none_or(|(b, _)| score > *b) {
-                best = Some((score, d.clone()));
+                best = Some((score, d.to_value()));
             }
         }
     }
@@ -265,7 +266,7 @@ fn div_round(n: i64, d: i64) -> i64 {
 impl Person {
     /// What kind of institution someone is to us (citizen.ts `kindOf`).
     fn recourse_kind_of(&self, who: &str, params: &crate::Params) -> String {
-        if let Some(k) = params.get("institutions").and_then(|i| i.get(who)).and_then(Value::as_str) {
+        if let Some(k) = params.get("institutions").and_then(|i| i.get(who)).and_then(|x| x.as_str()) {
             return k.to_string();
         }
         let p = &self.p;
@@ -431,23 +432,23 @@ impl Person {
         // (Whether a notice of rent increase breaks the law, read as it comes: the ways for a want read it later.)
         if self.p.tribunal.is_some() {
             for r in &fresh {
-                if !is_statement(r) || kind(r) != Some("rent_increase") || !addressed_to(r).contains(&me) {
+                if !is_statement(r) || kind(r) != Some("rent_increase") || !addressed_to(r).iter().any(|x| x == &me) {
                     continue;
                 }
-                let Some(by) = r.speaks_for.clone() else { continue };
+                let Some(by) = r.speaks_for else { continue };
                 let act = json!({ "block": "publish", "kind": "rent_increase", "data": data(r).clone() });
                 if !crate::common::breaches(&mut self.book, &act, &by, r.at).is_empty() {
-                    self.recourse.breaching.insert(r.id.clone());
+                    self.recourse.breaching.insert(r.id.to_string());
                 }
             }
         }
         for r in &fresh {
-            if !is_statement(r) || kind(r) != Some("variation_answer") || !addressed_to(r).contains(&me) {
+            if !is_statement(r) || kind(r) != Some("variation_answer") || !addressed_to(r).iter().any(|x| x == &me) {
                 continue;
             }
             let d = data(r).clone();
             let about = d.s("about").unwrap_or_default().to_string();
-            let by = r.speaks_for.clone().unwrap_or_else(|| r.author.clone());
+            let by = r.speaks_for.unwrap_or_else(|| r.author.clone().into());
             let ok = d.flag("granted");
             self.way_outcome(w, "ask", if ok { "granted" } else { "refused" }, &by, if ok { 10_000 } else { 1_000 }, json!({ "about": about }));
             // (TS's `landing` and the tie: the mind moves trust and the tie from how we were treated.)
@@ -484,7 +485,7 @@ impl Person {
                     continue;
                 }
                 let matter = d.s("matter").or(d.s("kind")).unwrap_or_default().to_string();
-                let to0 = addressed_to(r).first().cloned();
+                let to0 = addressed_to(r).first().map(|x| x.to_string());
                 let party = d.s("against").map(String::from).or(to0.clone()).unwrap_or_default();
                 let since = d.i("since").unwrap_or(r.at);
                 if matter.is_empty() || party.is_empty() {
@@ -502,24 +503,24 @@ impl Person {
             }
         }
         for r in &fresh {
-            if !is_statement(r) || !addressed_to(r).contains(&me) {
+            if !is_statement(r) || !addressed_to(r).iter().any(|x| x == &me) {
                 continue;
             }
-            let by = r.speaks_for.clone().unwrap_or_else(|| r.author.clone());
+            let by = r.speaks_for.unwrap_or_else(|| r.author.clone().into());
             let d = data(r).clone();
             let k = kind(r).unwrap_or_default();
             // An office that waits for papers before it decides our claim asks for them: we send what we have.
             if k == paper::EVIDENCE_REQUEST {
                 if let (Some(claim), Some(need)) = (d.s("claim"), d.s("need")) {
-                    if by != me && self.recourse.evidence_sent.insert(r.id.clone()) {
+                    if by != me && self.recourse.evidence_sent.insert(r.id.to_string()) {
                         let last = self.s.last_employer.clone().or(self.s.job.as_ref().map(|j| j.employer.clone()));
-                        let e = crate::papers::finance::Evidence { claim: claim.into(), need: Some(need.into()), request: Some(r.id.clone()), last_employer: last };
+                        let e = crate::papers::finance::Evidence { claim: claim.into(), need: Some(need.into()), request: Some(r.id.to_string()), last_employer: last };
                         w.push(because(
                             format!("{by} asks for papers for our claim {claim} ({}): sending them.", d.s("what").unwrap_or("what the law asks")),
                             vec![say(
                                 paper::EVIDENCE,
                                 &format!("For my claim {claim}: {}, as asked.", d.s("what").unwrap_or("the papers asked for")),
-                                Say { to: Some(vec![by.clone()]), visible: Some(Visible::Only(vec![me.clone(), by.clone()])), basis: Some(r.id.clone()), data: Some(crate::papers::data(&e)), ..Default::default() },
+                                Say { to: Some(vec![by.to_string()]), visible: Some(Visible::Only(vec![me.clone(), by.to_string()])), basis: Some(r.id.to_string()), data: Some(crate::papers::data(&e)), ..Default::default() },
                             )],
                         ));
                     }
@@ -554,12 +555,12 @@ impl Person {
                 }
                 // (Refused: what is tried next is the mind's.)
             } else if (k == paper::DECISION || k == "tribunal_order") && d.s("applicant") == Some(me.as_str()) && d.s("matter").is_some() {
-                let Some(key) = self.recourse.grievances.values().find(|g| Some(g.matter.as_str()) == d.s("matter") && Some(g.party.as_str()) == d.s("against") && g.applied.contains_key(&by)).map(|g| g.key.clone()) else { continue };
+                let Some(key) = self.recourse.grievances.values().find(|g| Some(g.matter.as_str()) == d.s("matter") && Some(g.party.as_str()) == d.s("against") && g.applied.contains_key(by.as_str())).map(|g| g.key.clone()) else { continue };
                 let f = d.s("finding").unwrap_or_default().to_string();
-                let binding = d.get("binding") != Some(&Value::Bool(false));
+                let binding = d.get("binding").and_then(|x| x.as_bool()) != Some(false);
                 let (matter, seeks, since_applied) = {
                     let g = self.recourse.grievances.get_mut(&key).unwrap_or_else(|| unreachable!());
-                    let a = g.applied.entry(by.clone()).or_default();
+                    let a = g.applied.entry(by.to_string()).or_default();
                     a.finding = Some(f.clone());
                     (g.matter.clone(), g.seeks.clone(), a.t)
                 };
@@ -573,7 +574,7 @@ impl Person {
                 if f == "settled" {
                     self.ended(w, &key, "settled", true);
                 } else if won {
-                    let o = Ordered { id: r.id.clone(), by: by.clone(), binding, due: d.i("due").unwrap_or(t + 28 * DAY), amount: if f == "pay" { d.i("amount").unwrap_or(0) } else { 0 }, enforced: false };
+                    let o = Ordered { id: r.id.to_string(), by: by.to_string(), binding, due: d.i("due").unwrap_or(t + 28 * DAY), amount: if f == "pay" { d.i("amount").unwrap_or(0) } else { 0 }, enforced: false };
                     if let Some(g) = self.recourse.grievances.get_mut(&key) {
                         g.ordered = Some(o);
                     }
@@ -658,7 +659,7 @@ impl Person {
         if let (Some(dr), Some(h), true) = (self.p.frictions.disrepair.clone(), &home, friction_dial(w.cx) > 0) {
             let site = self.absorbed.home_site.clone().filter(|s| s.structure == h.structure);
             if let (false, true, Some(site)) = (h.owned, self.is_leaseholder(), site) {
-                let level = site.variables.as_ref().and_then(|v| v.get(&dr.variable)).map_or(0, |v| crate::common::variable_today(v, t));
+                let level = site.variables.as_ref().and_then(|v| v.get(dr.variable.as_str())).map_or(0, |v| crate::common::variable_today(v, t));
                 let k0 = gkey("disrepair", &h.landlord, None);
                 let g0 = self.recourse.grievances.get(&k0).cloned();
                 if level >= dr.at && g0.is_none() {
@@ -702,7 +703,12 @@ impl Person {
         let (Some(to), Some(home)) = (self.p.complain_to.clone(), self.s.home.clone()) else { return };
         let site = self.absorbed.home_site.clone().filter(|s| s.structure == home.structure);
         let Some(site) = site.filter(|_| self.is_leaseholder()) else { return };
-        let now = site.variables.as_ref().and_then(|v| v.get(&self.p.complain_about)).map_or(0, |v| crate::common::variable_today(v, t));
+        let now = if self.p.complain_about_held {
+            // (Waste a kind we hold at home, law 8: what is in the bin is what we hold of it there.)
+            if self.absorbed.bin_seen.structure == home.structure { self.absorbed.bin_seen.value } else { 0 }
+        } else {
+            site.variables.as_ref().and_then(|v| v.get(self.p.complain_about.as_str())).map_or(0, |v| crate::common::variable_today(v, t))
+        };
         if self.absorbed.bin_seen.structure != home.structure {
             let b = &mut self.absorbed.bin_seen;
             b.structure = home.structure.clone();
@@ -781,7 +787,7 @@ impl Person {
             .book
             .claims_by(ClaimKey::Holder, &me)
             .filter_map(|c| match &c.body {
-                RecordBody::Claim { holder, counterparty, about, .. } if *holder == me && about.s("kind") == Some("debt") => Some((c.id.clone(), counterparty.clone(), about.i("amount").unwrap_or(0))),
+                RecordBody::Claim { holder, counterparty, about, .. } if *holder == me && about.s("kind") == Some("debt") => Some((c.id.to_string(), counterparty.map(|x| x.to_string()), about.i("amount").unwrap_or(0))),
                 _ => None,
             })
             .collect();
@@ -795,13 +801,13 @@ impl Person {
         let orders: Vec<Arc<Record>> = self
             .book
             .open("tribunal_order")
-            .filter(|x| addressed_to(x).contains(&me) && data(x).s("applicant") == Some(me.as_str()) && !self.recourse.enforcing.contains(&x.id))
+            .filter(|x| addressed_to(x).iter().any(|x| x == &me) && data(x).s("applicant") == Some(me.as_str()) && !self.recourse.enforcing.contains(x.id.as_str()))
             .cloned()
             .collect();
         for o in orders {
             let d = data(&o).clone();
             if d.s("kind") == Some("rent_increase") {
-                self.recourse.enforcing.insert(o.id.clone());
+                self.recourse.enforcing.insert(o.id.to_string());
                 if d.s("finding") == Some("valid") {
                     if let Some(n) = d.s("notice") {
                         self.housing.upheld.push(n.into());
@@ -813,7 +819,7 @@ impl Person {
             if d.s("kind") != Some("debt") || d.s("finding") != Some("pay") || t < due + DAY {
                 continue;
             }
-            self.recourse.enforcing.insert(o.id.clone());
+            self.recourse.enforcing.insert(o.id.to_string());
             let claim = d.s("claim").unwrap_or_default().to_string();
             let ordered = d.i("amount").unwrap_or(0);
             let of_claim = self.book.get(&claim).and_then(|c| match &c.body {
@@ -822,7 +828,7 @@ impl Person {
             });
             let unpaid = ordered.min(of_claim.unwrap_or(ordered) - self.absorbed_settled(&claim));
             if unpaid > 0 {
-                let e = crate::papers::citizen::EnforcementRequest { order: o.id.clone(), unpaid };
+                let e = crate::papers::citizen::EnforcementRequest { order: o.id.to_string(), unpaid };
                 w.push(because(
                     format!(
                         "The tribunal ordered {} to pay us {} by day {}, and {} is still unpaid: asking for the order to be enforced.",
@@ -834,7 +840,7 @@ impl Person {
                     vec![say(
                         "enforcement_request",
                         &format!("Request to enforce order {}: {} unpaid.", o.id, Self::usd_of(w, unpaid)),
-                        Say { to: Some(vec![tr.entity.clone()]), visible: Some(Visible::Only(vec![me.clone(), tr.entity.clone()])), basis: Some(o.id.clone()), data: Some(crate::papers::data(&e)), ..Default::default() },
+                        Say { to: Some(vec![tr.entity.clone()]), visible: Some(Visible::Only(vec![me.clone(), tr.entity.clone()])), basis: Some(o.id.to_string()), data: Some(crate::papers::data(&e)), ..Default::default() },
                     )],
                 ));
             }
@@ -842,11 +848,11 @@ impl Person {
         let claims: Vec<Arc<Record>> = self.book.claims_by(ClaimKey::Holder, &me).cloned().collect();
         for c in claims {
             let RecordBody::Claim { holder, counterparty: Some(by), about, .. } = &c.body else { continue };
-            let forced = self.s.apply_debt_now.contains(&c.id);
-            if *holder != me || about.s("kind") != Some("debt") || self.recourse.pursued.contains(&c.id) || (!forced && t - c.at < tr.apply_after_days * DAY) {
+            let forced = self.s.apply_debt_now.contains(c.id.as_str());
+            if *holder != me || about.s("kind") != Some("debt") || self.recourse.pursued.contains(c.id.as_str()) || (!forced && t - c.at < tr.apply_after_days * DAY) {
                 continue;
             }
-            self.recourse.pursued.insert(c.id.clone());
+            self.recourse.pursued.insert(c.id.to_string());
             let owed = about.i("amount").unwrap_or(0) - self.absorbed_settled(&c.id);
             let Some(acc) = w.acc.clone().filter(|_| owed > 0) else { continue };
             let draw = w.cx.rng(&format!("apply-{}", c.id)).below(10_000) as i64;
@@ -863,8 +869,8 @@ impl Person {
                     &format!("Application: {by} owes us {} ({what}, recorded as {}).", Self::usd_of(w, owed), c.id),
                     Say {
                         to: Some(vec![tr.entity.clone()]),
-                        visible: Some(Visible::Only(vec![me.clone(), tr.entity.clone(), by.clone()])),
-                        basis: Some(c.id.clone()),
+                        visible: Some(Visible::Only(vec![me.clone(), tr.entity.clone(), by.to_string()])),
+                        basis: Some(c.id.to_string()),
                         data: Some(json!({ "kind": "debt", "against": by, "claim": c.id, "amount": owed, "account": acc.account, "evidence": serde_json::to_value(&*c).unwrap_or(Value::Null) })),
                         ..Default::default()
                     },
@@ -935,7 +941,7 @@ impl Person {
             }
             Intent::ChallengeRent { notice } => {
                 let (Some(tr), Some(n)) = (self.p.tribunal.clone(), self.book.get(notice).cloned()) else { return };
-                let Some(by) = n.speaks_for.clone() else { return };
+                let Some(by) = n.speaks_for else { return };
                 if self.housing.is_challenged(notice) || !self.recourse.challenged.insert(notice.clone()) {
                     return;
                 }
@@ -946,7 +952,7 @@ impl Person {
                         &format!("Application: the notice of rent increase {notice} from {by} breaks the law; we ask that it be found invalid."),
                         Say {
                             to: Some(vec![tr.entity.clone()]),
-                            visible: Some(Visible::Only(vec![me.clone(), tr.entity.clone(), by.clone()])),
+                            visible: Some(Visible::Only(vec![me.clone(), tr.entity.clone(), by.to_string()])),
                             basis: Some(notice.clone()),
                             data: Some(json!({ "kind": "rent_increase", "against": by, "notice": notice, "evidence": serde_json::to_value(&*n).unwrap_or(Value::Null) })),
                             ..Default::default()
@@ -997,8 +1003,8 @@ impl Person {
                 if let Some(x) = self.recourse.grievances.get_mut(grievance) {
                     x.applied.insert(venue.clone(), Applied { t, finding: None });
                 }
-                let offer = offer_of(&h).cloned().unwrap_or(Value::Null);
-                let form = offer.get("hears").and_then(Value::as_array).and_then(|a| a.iter().find(|x| x.s("about") == Some(g.matter.as_str()))).and_then(|x| x.s("form")).unwrap_or(paper::APPLICATION).to_string();
+                let offer = offer_of(&h).cloned().unwrap_or_default();
+                let form = offer.get("hears").and_then(|x| x.as_array()).and_then(|a| a.iter().find(|x| x.s("about") == Some(g.matter.as_str()))).and_then(|x| x.s("form")).unwrap_or(paper::APPLICATION).to_string();
                 let fee_to = venue_fee(&offer).map(|f| f.0);
                 let words = g.matter.replace('_', " ");
                 let decided_at = self.decided_at(&g);
@@ -1082,12 +1088,12 @@ impl Person {
 }
 
 /// What applying to a venue costs, where its terms say: (to whom, cents).
-fn venue_fee(offer: &Value) -> Option<(String, i64)> {
+fn venue_fee(offer: &Frozen) -> Option<(String, i64)> {
     let none = vec![];
     offer
         .get("terms")
         .and_then(|t| t.get("commitments"))
-        .and_then(Value::as_array)
+        .and_then(|x| x.as_array())
         .unwrap_or(&none)
         .iter()
         .filter(|c| c.s("who") == Some("taker"))
@@ -1183,12 +1189,12 @@ impl Openings for Ways<'_> {
             }
             if let (true, Some(whom)) = (hears.iter().any(|h| h == "debt"), want.whom.as_ref()) {
                 let owed = book.claims_by(ClaimKey::Holder, me).find(|c| match &c.body {
-                    RecordBody::Claim { holder, counterparty, about, .. } => holder == me && about.s("kind") == Some("debt") && counterparty.as_ref() == Some(whom) && !r.pursued.contains(&c.id),
+                    RecordBody::Claim { holder, counterparty, about, .. } => holder == me && about.s("kind") == Some("debt") && counterparty.as_deref() == Some(whom.as_str()) && !r.pursued.contains(c.id.as_str()),
                     _ => false,
                 });
                 if let Some(c) = owed {
-                    let mut o = Self::open(format!("desk:{desk}"), "desk", Intent::ApplyDebt { claim: c.id.clone() });
-                    o.on = Some(c.id.clone());
+                    let mut o = Self::open(format!("desk:{desk}"), "desk", Intent::ApplyDebt { claim: c.id.to_string() });
+                    o.on = Some(c.id.to_string());
                     o.by = Some(desk.clone());
                     o.brings = vec!["money.to".into()];
                     o.bears = vec![whom.clone()];
@@ -1212,7 +1218,7 @@ impl Openings for Ways<'_> {
             for id in &p.s.found_petitions {
                 let Some(pet) = book.get(id) else { continue };
                 let signed = p.s.sign_now.contains(id) || book.of_type("vote").any(|v| v.speaks_for.as_deref() == Some(me) && matches!(&v.body, RecordBody::Vote { ballot, choice } if ballot == id && choice == "sign"));
-                let tagged = data(pet).get("demand").and_then(|d| d.get("tags")).and_then(Value::as_array).is_some_and(|a| a.iter().any(|x| x.as_str() == Some("tenant_protection")));
+                let tagged = data(pet).get("demand").and_then(|d| d.get("tags")).and_then(|x| x.as_array()).is_some_and(|a| a.iter().any(|x| x.as_str() == Some("tenant_protection")));
                 if pet.speaks_for.as_deref() == Some(me) || signed || !tagged {
                     continue;
                 }
@@ -1226,11 +1232,11 @@ impl Openings for Ways<'_> {
         // An election called: it bears on the town.
         if let Some(town) = &p.p.electoral_town {
             for n in book.open("election_notice") {
-                if p.s.stand_now.contains(&n.id) || t >= data(n).i("nominations_close_at").unwrap_or(0) {
+                if p.s.stand_now.contains(n.id.as_str()) || t >= data(n).i("nominations_close_at").unwrap_or(0) {
                     continue;
                 }
-                let mut o = Self::open(format!("stand:{}", n.id), "stand", Intent::Stand { notice: n.id.clone() });
-                o.on = Some(n.id.clone());
+                let mut o = Self::open(format!("stand:{}", n.id), "stand", Intent::Stand { notice: n.id.to_string() });
+                o.on = Some(n.id.to_string());
                 o.bears = std::iter::once(town.clone()).chain(p.p.complain_to.clone()).collect();
                 o.others = Some(0);
                 out.push(o);
@@ -1250,6 +1256,10 @@ impl Openings for Ways<'_> {
             // A review asked for and never answered, where the law takes silence as a refusal after so many days (a
             // deemed refusal): the appeal's days run from then, as from an answer (MT-21).
             let deemed = review.and_then(|r| r.i("deemed_refused_days")).zip(g.asked).map(|(d, a)| a + d * DAY).filter(|at| g.answered_at.is_none() && t >= *at);
+            // Where the law has no deemed refusal but a complaint of the delay (an ombudsman's, a complaints examiner's,
+            // a representative's caseworker's): after so many days unanswered, a body that only recommends may be
+            // brought it; the appeal stays shut until an answer comes (MT-21).
+            let complain = review.and_then(|r| r.i("complaint_after_days")).zip(g.asked).map(|(d, a)| a + d * DAY).is_some_and(|at| g.answered_at.is_none() && deemed.is_none() && t >= at);
             let may_apply = law.is_none() || {
                 if review.is_some() && g.answer.is_none() && deemed.is_none() {
                     false
@@ -1267,13 +1277,18 @@ impl Openings for Ways<'_> {
                 out.push(o);
             }
             // (A venue is for what asking did not settle: after a no, nothing, or a yes not done.)
-            let after_asking = g.answer.as_deref().is_some_and(|a| a != "granted") || (law.is_some() && review.is_none()) || deemed.is_some();
-            if after_asking && may_apply {
+            let after_asking = g.answer.as_deref().is_some_and(|a| a != "granted") || (law.is_some() && review.is_none()) || deemed.is_some() || complain;
+            if after_asking && (may_apply || complain) {
                 for h in book.hearings() {
-                    let venue = h.speaks_for.clone().unwrap_or_else(|| h.author.clone());
+                    let venue = h.speaks_for.unwrap_or_else(|| h.author.clone().into());
                     let Some(offer) = offer_of(h) else { continue };
-                    let hears = offer.get("hears").and_then(Value::as_array).is_some_and(|a| a.iter().any(|x| x.s("about") == Some(g.matter.as_str())));
-                    if !hears || venue == g.party || venue == me || g.applied.contains_key(&venue) {
+                    let entry = offer.get("hears").and_then(|x| x.as_array()).and_then(|a| a.iter().find(|x| x.s("about") == Some(g.matter.as_str())));
+                    let hears = entry.is_some();
+                    // (Under a complaint of delay alone, only a body that recommends: one that orders hears appeals.)
+                    // (A body that says nothing of what it can do orders, as `Hears::can` reads it.)
+                    let can = entry.and_then(|e| e.get("can")).and_then(|c| c.as_array());
+                    let orders = can.is_none_or(|c| c.is_empty() || c.iter().any(|x| x.as_str() == Some("order")));
+                    if !hears || (!may_apply && orders) || venue == g.party || venue == me || g.applied.contains_key(venue.as_str()) {
                         continue;
                     }
                     if let Some(m) = offer.get("to").and_then(|x| x.s("members_of")) {
@@ -1285,9 +1300,9 @@ impl Openings for Ways<'_> {
                     if cost > acc.balance {
                         continue;
                     }
-                    let mut o = Self::open(format!("desk:{venue}"), "desk", Intent::Venue { grievance: g.key.clone(), venue: venue.clone(), hearing: h.id.clone(), cost });
-                    o.on = Some(h.id.clone());
-                    o.by = Some(venue.clone());
+                    let mut o = Self::open(format!("desk:{venue}"), "desk", Intent::Venue { grievance: g.key.clone(), venue: venue.to_string(), hearing: h.id.to_string(), cost });
+                    o.on = Some(h.id.to_string());
+                    o.by = Some(venue.to_string());
                     o.bears = vec![g.party.clone()];
                     o.cost = (cost > 0).then_some(cost);
                     o.venue = true;
@@ -1475,9 +1490,9 @@ mod tests {
     }
     fn pic(t: i64, records: Vec<Arc<Record>>) -> Picture {
         let mut channels = BTreeMap::new();
-        channels.insert("papers".to_string(), Seen::Records { records, search: false });
+        channels.insert("papers".into(), Seen::Records { records, search: false });
         let a = oikos_sight::AccountItem { account: "acc-c1".into(), holder: ME.into(), custodian: "bank".into(), currency: "XTS".into(), balance: 5_000_000, closed: None };
-        channels.insert("accounts".to_string(), Seen::Accounts { accounts: Arc::new(vec![a]), transactions: vec![] });
+        channels.insert("accounts".into(), Seen::Accounts { accounts: Arc::new(vec![a]), transactions: vec![] });
         Picture {
             participant: "c1-self".into(),
             t,
@@ -1492,8 +1507,7 @@ mod tests {
             asking: vec![],
             readings: BTreeMap::new(),
             woke_for: "cadence".into(),
-            since: 0,
-        }
+            since: 0, held: Default::default() }
     }
     fn acc() -> Option<OwnAccount> {
         Some(OwnAccount { account: "acc-c1".into(), balance: 5_000_000, custodian: "bank".into(), currency: "XTS".into() })
@@ -1502,7 +1516,7 @@ mod tests {
     /// out, as (kind, text, to, basis, data), and every call's name.
     fn at(p: &mut Person, c: &Ctx, pc: &Picture, part: impl FnOnce(&mut Person, &mut Week)) -> (Vec<(String, String, Value, Option<String>, Value)>, Vec<String>) {
         let fresh = p.book.absorb(pc);
-        p.absorbed.fresh = fresh.iter().map(|r| r.id.clone()).collect();
+        p.absorbed.fresh = fresh.iter().map(|r| r.id).map(|x| x.to_string()).collect();
         let mut d = Draws::default();
         let mut cx = crate::Cx::new(pc.t, c, &mut d, 1, vec![]);
         let mut w = Week { pic: pc, cx: &mut cx, t: pc.t, acc: acc(), steps: vec![] };
@@ -1625,10 +1639,10 @@ mod tests {
         let c = ctx(params.clone(), true);
         let mut p = person(&c, 0);
         tenant(&mut p);
-        p.absorbed.home_site = Some(site(10_000));
+        p.absorbed.home_site = Some(std::sync::Arc::new(site(10_000)));
         at(&mut p, &c, &pic(DAY, vec![]), |p, w| p.disrepair(w));
         assert!(p.recourse.grievances.is_empty());
-        p.absorbed.home_site = Some(site(60_000));
+        p.absorbed.home_site = Some(std::sync::Arc::new(site(60_000)));
         at(&mut p, &c, &pic(8 * DAY, vec![]), |p, w| p.disrepair(w));
         let g = &p.recourse.grievances["disrepair:landlord-1"];
         assert_eq!((g.structure.as_deref(), g.seeks.as_deref()), (Some("apts-1"), Some("repair")));
@@ -1638,14 +1652,14 @@ mod tests {
         let (out, _) = at(&mut p, &c, &pc, |p, w| p.carry_out(w, &o.intent, None));
         assert_eq!(out[0].4, json!({ "matter": "disrepair", "against": "landlord-1", "structure": "apts-1", "seeks": "repair" }));
         assert_eq!(out[0].1, "Request: please put this right (disrepair at apts-1).");
-        p.absorbed.home_site = Some(site(0));
+        p.absorbed.home_site = Some(std::sync::Arc::new(site(0)));
         at(&mut p, &c, &pic(20 * DAY, vec![]), |p, w| p.disrepair(w));
         assert!(p.recourse.grievances.is_empty());
         assert!(said(&p).iter().any(|x| x["kind"] == "ended" && x["facts"]["how"] == "repaired"));
         let off = ctx(params, false);
         let mut q = person(&off, 0);
         tenant(&mut q);
-        q.absorbed.home_site = Some(site(60_000));
+        q.absorbed.home_site = Some(std::sync::Arc::new(site(60_000)));
         at(&mut q, &off, &pic(8 * DAY, vec![]), |p, w| p.disrepair(w));
         assert!(q.recourse.grievances.is_empty());
     }
@@ -1706,7 +1720,7 @@ mod tests {
         let c = ctx(json!({ "complain_to": "town", "complain_bps": 10_000 }), true);
         let mut p = person(&c, 8_000);
         tenant(&mut p);
-        p.absorbed.home_site = Some(site(5_000));
+        p.absorbed.home_site = Some(std::sync::Arc::new(site(5_000)));
         p.absorbed.bin_seen.structure = "apts-1".into();
         p.absorbed.bin_seen.emptied_at = 0;
         let (none, _) = at(&mut p, &c, &pic(5 * DAY, vec![]), |p, w| p.complaints(w));
@@ -1724,7 +1738,7 @@ mod tests {
         let c0 = ctx(json!({ "complain_to": "town", "complain_bps": 0 }), true);
         let mut q = person(&c0, 8_000);
         tenant(&mut q);
-        q.absorbed.home_site = Some(site(5_000));
+        q.absorbed.home_site = Some(std::sync::Arc::new(site(5_000)));
         q.absorbed.bin_seen.structure = "apts-1".into();
         q.absorbed.bin_seen.emptied_at = 0;
         assert!(at(&mut q, &c0, &pic(8 * DAY, vec![]), |p, w| p.complaints(w)).0.is_empty());
@@ -1784,16 +1798,24 @@ mod tests {
     /// A refused claim whose law requires a review before an appeal, with or without a deemed refusal; asked for at
     /// day 10 and never answered (MT-21).
     fn unanswered_review(deemed: Option<i64>) -> (Ctx, Person, Vec<Arc<Record>>) {
+        unanswered_review_with(deemed, None)
+    }
+    fn unanswered_review_with(deemed: Option<i64>, complaint: Option<i64>) -> (Ctx, Person, Vec<Arc<Record>>) {
         let c = ctx(json!({}), true);
         let mut p = person(&c, 0);
         let mut review = json!({ "within_days": 30, "grounds": "any", "required": true });
         if let Some(d) = deemed {
             review["deemed_refused_days"] = json!(d);
         }
+        if let Some(d) = complaint {
+            review["complaint_after_days"] = json!(d);
+        }
         let law = rec(json!({ "id": "law-decisions", "record": "statement", "author": "genesis", "speaks_for": "outside", "at": 0, "visible_to": "public", "kind": "law", "text": "Decisions.",
             "data": { "decisions": [{ "kind": "benefit_decision", "name": "Support", "payments": ["pension"], "review": review, "appeal": { "matter": "claim_refused", "within_days": 30, "grounds": "any error" } }] } }));
         let dec = statement("dec-1", 5 * DAY, "benefit_decision", "support", json!({ "claim": "cl-1", "payment": "pension", "granted": false, "reason": "papers" }));
-        let world = vec![law, dec, hearing("h1", "tribunal", "claim_refused")];
+        let ombudsman = rec(json!({ "id": "h2", "record": "statement", "author": "ombudsman-office", "speaks_for": "ombudsman", "at": 0, "visible_to": "public", "kind": "offer", "text": "We hear these.",
+            "offer": { "take_up": "apply", "hears": [{ "about": "claim_refused", "can": ["recommend"], "undoes": true }] } }));
+        let world = vec![law, dec, hearing("h1", "tribunal", "claim_refused"), ombudsman];
         at(&mut p, &c, &pic(5 * DAY, world.clone()), |p, w| {
             let g = p.grieve(w, "claim_refused", "support", Some("dec-1"), None, None, 10_000, "security", Some("papers"));
             g.seeks = Some("pension".into());
@@ -1817,7 +1839,7 @@ mod tests {
         // 91 days after asking: taken as refused; the tribunal is open, and the application says when the review was asked.
         let pc = pic(101 * DAY, vec![]);
         let venues: Vec<Opening> = ways(&p, &pc, &wnt).into_iter().filter(|o| o.venue).collect();
-        assert_eq!(venues.iter().map(|o| o.key.as_str()).collect::<Vec<_>>(), ["desk:tribunal"]);
+        assert_eq!(venues.iter().map(|o| o.key.as_str()).collect::<Vec<_>>(), ["desk:tribunal", "desk:ombudsman"]);
         let intent = venues[0].intent.clone();
         let (out, _) = at(&mut p, &c, &pc, |p, w| p.carry_out(w, &intent, None));
         assert_eq!((out[0].4["review_asked_on"].as_i64(), out[0].4.get("reviewed_on")), (Some(10 * DAY), None));
@@ -1835,6 +1857,23 @@ mod tests {
         for d in [31, 101, 200] {
             assert!(ways(&p, &pic(d * DAY, vec![]), &wnt).iter().all(|o| !o.venue), "day {d}: the law's route, as the place has it");
         }
+    }
+
+    #[test]
+    fn where_the_law_has_a_complaint_of_delay_an_unanswered_review_may_go_to_the_body_that_recommends_never_to_the_appeal() {
+        let wnt = want("claim_refused", "support", Some(("dec-1", "claim_refused")), &["money.to"]);
+        let (c, mut p, _) = unanswered_review_with(None, Some(21));
+        at(&mut p, &c, &pic(30 * DAY, vec![]), |p, w| p.disrepair(w));
+        let venues = |p: &Person, d: i64| ways(p, &pic(d * DAY, vec![]), &wnt).into_iter().filter(|o| o.venue).map(|o| o.key).collect::<Vec<_>>();
+        // Asked on day 10: from day 31 the ombudsman, and only it; the tribunal (which orders) stays shut, at any time.
+        assert_eq!(venues(&p, 30), Vec::<String>::new(), "before the law's days");
+        for d in [31, 101, 400] {
+            assert_eq!(venues(&p, d), ["desk:ombudsman"], "day {d}");
+        }
+        // An answer ends the complaint of delay: from then the law's appeal, from the answer.
+        p.recourse.grievances.values_mut().next().unwrap().answered_at = Some(200 * DAY);
+        p.recourse.grievances.values_mut().next().unwrap().answer = Some("refused".into());
+        assert!(venues(&p, 201).contains(&"desk:tribunal".to_string()));
     }
 
     #[test]

@@ -16,6 +16,8 @@
 //! - The mayor's office is the position the clerk keeps books for (`office`); the TS fell back to the participant's own
 //!   authorship when there was none, which a clerk never has.
 
+use oikos_core::frozen::{JsonRead, JsonRef};
+use oikos_core::Frozen;
 use super::books::{OfficeBooks, OpenHeading, OpenItem};
 use super::openbooks::{addressed, amt, by_day, d, date_words, heading, js, num, pressing, terms_of, usd, when, R};
 use crate::common::{approval_of, bases_of, cents, duration_words, made_at, text, truthy, Book, Directions, Fields, DAY, YEAR};
@@ -36,10 +38,10 @@ fn is_statement(r: &Record) -> bool {
 }
 
 /// A template literal of `x ?? y` for a field: its words, or the default where it is absent or null.
-fn or_words(v: Option<&Value>, otherwise: &str) -> String {
-    match v {
-        None | Some(Value::Null) => otherwise.to_string(),
-        x => js(x),
+fn or_words<V: JsonRead + ?Sized>(v: Option<&V>, otherwise: &str) -> String {
+    match v.map(JsonRead::view) {
+        None | Some(JsonRef::Null) => otherwise.to_string(),
+        x => js(x.as_ref()),
     }
 }
 
@@ -59,13 +61,13 @@ fn ps(params: &Map<String, Value>, key: &str, otherwise: &str) -> String {
 /// `Number(r.data?.period_end ?? r.at)`.
 fn period_end(r: &Record) -> i64 {
     match d(r).get("period_end") {
-        None | Some(Value::Null) => r.at,
+        None | Some(Frozen::Null) => r.at,
         v => num(v).unwrap_or(r.at),
     }
 }
 
 /// `durationWords(Number(x))`.
-fn dur(v: Option<&Value>) -> String {
+fn dur(v: Option<&Frozen>) -> String {
     num(v).map_or_else(|| "NaN seconds".to_string(), duration_words)
 }
 
@@ -88,7 +90,7 @@ fn year_in_days(year: i64) -> String {
 
 /// A budget's lines as written (`name -> cents`), in the order the paper keeps them.
 fn lines_of(b: Option<&Record>) -> Vec<(String, i64)> {
-    b.and_then(|b| d(b).get("lines")).and_then(Value::as_object).map(|m| m.iter().map(|(k, v)| (k.clone(), amt(Some(v)))).collect()).unwrap_or_default()
+    b.and_then(|b| d(b).get("lines")).and_then(|x| x.as_object()).map(|m| m.iter().map(|(k, v)| (k.to_string(), amt(Some(v)))).collect()).unwrap_or_default()
 }
 
 fn lines_words(lines: &[(String, i64)], w: &WorldInfo) -> String {
@@ -97,7 +99,7 @@ fn lines_words(lines: &[(String, i64)], w: &WorldInfo) -> String {
 
 /// Is a budget's year this year (`b.data?.year === year`).
 fn year_is(b: &Record, year: i64) -> bool {
-    d(b).get("year").and_then(Value::as_i64) == Some(year)
+    d(b).get("year").and_then(|x| x.as_i64()) == Some(year)
 }
 
 /// The town's budget for a year, of those adopted (the latest, if the council adopted more than one for it).
@@ -109,7 +111,7 @@ fn budget_for(book: &Book, year: i64) -> Option<&R> {
 fn dead(book: &Book) -> BTreeMap<String, i64> {
     let mut m = BTreeMap::new();
     for r in book.all("death_registration").chain(book.all("death_certificate")) {
-        if let Some(who) = d(r).get("deceased").and_then(Value::as_str) {
+        if let Some(who) = d(r).get("deceased").and_then(|x| x.as_str()) {
             m.entry(who.to_string()).or_insert(r.at);
         }
     }
@@ -117,23 +119,23 @@ fn dead(book: &Book) -> BTreeMap<String, i64> {
 }
 
 /// `t >= (closes_at ?? Infinity)`.
-fn closed_by(t: i64, closes_at: Option<&Value>) -> bool {
+fn closed_by(t: i64, closes_at: Option<&Frozen>) -> bool {
     match closes_at {
-        None | Some(Value::Null) => false,
+        None | Some(Frozen::Null) => false,
         v => num(v).is_some_and(|c| t >= c),
     }
 }
 
 /// `Number.isFinite(x)` (no coercion: only a number is).
-fn finite_number(v: Option<&Value>) -> Option<i64> {
+fn finite_number(v: Option<&Frozen>) -> Option<i64> {
     match v {
-        Some(Value::Number(n)) => n.as_i64().or_else(|| n.as_f64().filter(|f| f.is_finite()).map(|f| f as i64)),
+        Some(Frozen::Number(n)) => n.as_i64().or_else(|| n.as_f64().filter(|f| f.is_finite()).map(|f| f as i64)),
         _ => None,
     }
 }
 
 /// `dateWords(x)` of something that may not be a number.
-fn date_of(v: Option<&Value>, w: &WorldInfo) -> String {
+fn date_of(v: Option<&Frozen>, w: &WorldInfo) -> String {
     num(v).map_or_else(|| "year NaN, day NaN".to_string(), |t| date_words(t, w))
 }
 
@@ -210,11 +212,11 @@ impl Paid {
                 self.said_for.push(SaidFor { t: tx.t, memo: m.clone(), amount: cents(tx.amount) });
             }
             if let Some(s) = tx.settles.as_ref().filter(|s| !s.is_empty()) {
-                self.settled.insert(s.clone());
-                self.settling.push(Settling { id: s.clone(), t: tx.t, amount: cents(tx.amount), line: line.clone() });
+                self.settled.insert(s.to_string());
+                self.settling.push(Settling { id: s.to_string(), t: tx.t, amount: cents(tx.amount), line: line.clone() });
             }
             if let Some(o) = tx.per_instruction.as_ref().filter(|s| !s.is_empty()) {
-                self.by_order.push(ByOrder { t: tx.t, order: o.clone(), amount: cents(tx.amount), line });
+                self.by_order.push(ByOrder { t: tx.t, order: o.to_string(), amount: cents(tx.amount), line });
             }
         }
         self.account = Some(acc.account);
@@ -311,7 +313,7 @@ impl OfficeBooks for Reader {
                 let office = self.office.clone();
                 for r in fresh.iter().filter(|r| !office.is_empty() && r.position.as_deref() == Some(office.as_str())) {
                     for b in bases_of(r) {
-                        self.st.acted.insert(b.clone());
+                        self.st.acted.insert(b.to_string());
                     }
                     // (A paper of the office's own that names a petition in its words is the office acting on it, as one
                     // that cites it is: a seat put two petitions to the council on the proposal form, whose paper cites
@@ -371,7 +373,7 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
     let mut invoices = vec![];
     for r in book.open("invoice") {
         let money = d(r).get("outcome").and_then(|o| o.get("money")).filter(|m| truthy(m));
-        if !addressed(r, me) || money.is_none() || paid.settled.contains(&r.id) {
+        if !addressed(r, me) || money.is_none() || paid.settled.contains(r.id.as_str()) {
             continue;
         }
         let amount = amt(money.and_then(|m| m.get("amount")));
@@ -379,19 +381,19 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
         let line = format!(
             "{}: invoice from {} for {}, dated {}, not paid{}",
             r.id,
-            r.speaks_for.clone().unwrap_or_else(|| r.author.clone()),
+            r.speaks_for.unwrap_or_else(|| r.author.clone().into()),
             usd(amount, w),
             when(made_at(r), w),
             match (&rule, over) {
                 (Some((_, over_figure)), true) => format!(
                     "; it is over the payments procedure's figure of {} and {}",
                     usd(*over_figure, w),
-                    if approved.contains(&r.id) { "the mayor's written approval is on file" } else { "the mayor's written approval is not on file" }
+                    if approved.contains(r.id.as_str()) { "the mayor's written approval is on file" } else { "the mayor's written approval is not on file" }
                 ),
                 _ => String::new(),
             }
         );
-        invoices.push(OpenItem::new(r.id.clone(), line).since(made_at(r)).amount(Some(amount)));
+        invoices.push(OpenItem::new(r.id, line).since(made_at(r)).amount(Some(amount)));
     }
     // ---- wages: the standing payments on file, by the agreement each rests on ----
     let mut orders: Vec<(String, Vec<&R>)> = vec![]; // agreement -> its standing payments, not withdrawn
@@ -400,7 +402,7 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
             for b in bases_of(r) {
                 match orders.iter_mut().find(|(a, _)| a == b) {
                     Some((_, rs)) => rs.push(r),
-                    None => orders.push((b.clone(), vec![r])),
+                    None => orders.push((b.to_string(), vec![r])),
                 }
             }
         }
@@ -427,7 +429,7 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
             continue;
         }
         let signed = book.signed_at(&a.id).unwrap_or(a.at);
-        let told = starters.get(&a.id);
+        let told = starters.get(a.id.as_str());
         // (The office waits a few days for the hiring office's notice before it sets the wage up from the agreement.)
         if told.is_none() && t - signed < p.payroll_wait_days * DAY {
             continue;
@@ -445,14 +447,14 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
                     "; the hiring office's payroll notice {} names it{}",
                     n.id,
                     match d(n).get("line") {
-                        Some(Value::String(l)) => format!(", as a post the {l} line of the adopted budget pays for"),
+                        Some(Frozen::String(l)) => format!(", as a post the {l} line of the adopted budget pays for"),
                         _ => String::new(),
                     }
                 ),
                 None => "; no payroll notice has come for it".to_string(),
             }
         );
-        unpaid.push(OpenItem::new(a.id.clone(), line).since(signed).amount(Some(pays.wage)));
+        unpaid.push(OpenItem::new(a.id, line).since(signed).amount(Some(pays.wage)));
     }
     let mut stale = vec![];
     for (agreement, rs) in &orders {
@@ -472,7 +474,7 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
         for r in rs {
             let amount = amt(d(r).get("outcome").and_then(|o| o.get("money")).and_then(|m| m.get("amount")));
             let line = format!("{}: a standing payment of {} every {} for {}, under agreement {}, is not withdrawn", r.id, usd(amount, w), dur(d(r).get("every")), words, agreement);
-            stale.push(OpenItem::new(r.id.clone(), line).since(since).amount(Some(amount)));
+            stale.push(OpenItem::new(r.id, line).since(since).amount(Some(amount)));
         }
     }
     // ---- the budget for the year ----
@@ -517,7 +519,7 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
     let last: Option<&R> = adopted.or_else(|| {
         let mut best: Option<(&R, i64)> = None;
         for b in book.open("budget") {
-            let Some(y) = d(b).get("year").and_then(Value::as_i64).filter(|y| *y < year) else { continue };
+            let Some(y) = d(b).get("year").and_then(|x| x.as_i64()).filter(|y| *y < year) else { continue };
             if best.is_none_or(|(c, cy)| y > cy || (y == cy && b.at > c.at)) {
                 best = Some((b, y));
             }
@@ -577,7 +579,7 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
             by_line(&lines),
             said_words
         );
-        budget.push(OpenItem::new(adopted.id.clone(), line).running().since(adopted.at).amount(Some(total - spent)));
+        budget.push(OpenItem::new(adopted.id, line).running().since(adopted.at).amount(Some(total - spent)));
     } else {
         let lines = lines_of(last.map(|l| l.as_ref()));
         let total: i64 = lines.iter().map(|(_, v)| v).sum();
@@ -601,7 +603,7 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
     // ---- tax withheld from wages, not yet paid over ----
     let mut latest_report: Vec<(String, &R)> = vec![]; // collector -> its latest report
     for r in &reports {
-        let c = crate::common::addressed_to(r).first().cloned().unwrap_or_else(|| "the collector".to_string());
+        let c = crate::common::addressed_to(r).first().map(|x| x.to_string()).unwrap_or_else(|| "the collector".to_string());
         match latest_report.iter_mut().find(|(k, _)| *k == c) {
             Some((_, was)) => {
                 if period_end(r) >= period_end(was) {
@@ -624,7 +626,7 @@ fn finance(st: &State, me: &str, p: &FinanceParams, staffing: &Staffing, t: i64,
                 usd(paid_over, w),
                 usd(owing, w)
             );
-            tax.push(OpenItem::new(r.id.clone(), line).since(r.at).amount(Some(owing)));
+            tax.push(OpenItem::new(r.id, line).since(r.at).amount(Some(owing)));
         }
     }
     if withheld_since > 0 {
@@ -765,7 +767,7 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
         let Some(pet) = petitions.iter().rev().find(|p| p.id == id) else { continue };
         let sig = d(c).get("signatures").filter(|v| v.is_number());
         if c.speaks_for == pet.speaks_for {
-            if let Some(n) = sig.and_then(|v| v.as_i64().or_else(|| v.as_f64().map(|f| f as i64))) {
+            if let Some(n) = sig.and_then(|v| v.as_i64().or_else(|| v.as_number().and_then(serde_json::Number::as_f64).map(|f| f as i64))) {
                 counts.insert(pet.id.as_str(), n);
             }
         }
@@ -773,7 +775,7 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
     let threshold = format!("the town's threshold of {needed} signature{}", plural(needed, "", "s"));
     let (mut over, mut below) = (vec![], vec![]);
     for pet in &petitions {
-        if acted.contains(&pet.id) {
+        if acted.contains(pet.id.as_str()) {
             continue;
         }
         let n = counts.get(pet.id.as_str()).copied().unwrap_or(0);
@@ -787,21 +789,21 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
         let base = format!(
             "{}: {}'s petition of {} ({what}) has {n} signature{} by its organiser's latest count",
             pet.id,
-            pet.speaks_for.clone().unwrap_or_else(|| pet.author.clone()),
+            pet.speaks_for.unwrap_or_else(|| pet.author.clone().into()),
             date_words(pet.at, w),
             plural(n, "", "s")
         );
         if reached(n) {
-            over.push(OpenItem::new(pet.id.clone(), format!("{base}, at or over {threshold}; it has not been put to the council or answered")).since(pet.at));
+            over.push(OpenItem::new(pet.id, format!("{base}, at or over {threshold}; it has not been put to the council or answered")).since(pet.at));
         } else if addressed(pet, me) {
-            below.push(OpenItem::new(pet.id.clone(), format!("{base}, short of {threshold}")).since(pet.at));
+            below.push(OpenItem::new(pet.id, format!("{base}, short of {threshold}")).since(pet.at));
         }
     }
     // ---- invoices for work the office commissioned, awaiting its approval ----
     let approvals: BTreeSet<String> = book.open("approval").filter(|a| ours(a)).map(|a| js(d(a).get("invoice"))).collect();
     let mut invoices = vec![];
     for inv in book.open("invoice") {
-        if !addressed(inv, me) || approvals.contains(&inv.id) || paid.settled.contains(&inv.id) {
+        if !addressed(inv, me) || approvals.contains(inv.id.as_str()) || paid.settled.contains(inv.id.as_str()) {
             continue;
         }
         let Some(ag) = bases_of(inv).iter().filter_map(|b| book.get(b)).find(|x| terms_of(x).is_some() && ours(x)) else { continue };
@@ -809,17 +811,17 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
         let line = format!(
             "{}: invoice from {} for {}, dated {}, for work commissioned under {}; no written approval of ours is on file",
             inv.id,
-            inv.speaks_for.clone().unwrap_or_else(|| inv.author.clone()),
+            inv.speaks_for.unwrap_or_else(|| inv.author.clone().into()),
             usd(amount, w),
             date_words(inv.at, w),
             ag.id
         );
-        invoices.push(OpenItem::new(inv.id.clone(), line).since(inv.at).amount(Some(amount)));
+        invoices.push(OpenItem::new(inv.id, line).since(inv.at).amount(Some(amount)));
     }
     // ---- permits granted on the office's applications, no builder commissioned ----
     let mut permits = vec![];
     for dec in book.open("permit_decision") {
-        if acted.contains(&dec.id) || !addressed(dec, me) || d(dec).s("decision") != Some("granted") {
+        if acted.contains(dec.id.as_str()) || !addressed(dec, me) || d(dec).s("decision") != Some("granted") {
             continue;
         }
         let Some(app) = book.get(&js(d(dec).get("application"))).filter(|a| is_statement(a) && ours(a)) else { continue };
@@ -831,7 +833,7 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
             app.id,
             date_words(dec.at, w)
         );
-        permits.push(OpenItem::new(dec.id.clone(), line).since(dec.at));
+        permits.push(OpenItem::new(dec.id, line).since(dec.at));
     }
     // ---- the budget ----
     let year = t.div_euclid(YEAR) + 1;
@@ -845,17 +847,17 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
     let mut tabled = vec![];
     for r in book.open("proposal") {
         let enact = d(r).get("enact");
-        if !ours(r) || enact.and_then(|e| e.get("kind")).and_then(Value::as_str) != Some("budget") {
+        if !ours(r) || enact.and_then(|e| e.get("kind")).and_then(|x| x.as_str()) != Some("budget") {
             continue;
         }
         let b = ballot_of.get(r.id.as_str());
-        if b.is_some_and(|b| decided.contains(&b.id)) {
+        if b.is_some_and(|b| decided.contains(b.id.as_str())) {
             continue;
         }
         let y = js(enact.and_then(|e| e.get("data")).and_then(|x| x.get("year")));
         let state = match b {
             Some(b) => {
-                if d(b).get("closed") == Some(&Value::Bool(true)) || closed_by(t, d(b).get("closes_at")) {
+                if d(b).get("closed").and_then(|x| x.as_bool()) == Some(true) || closed_by(t, d(b).get("closes_at")) {
                     format!("its ballot {} has closed and no result is on file", b.id)
                 } else {
                     format!("its ballot {} is open until {}", b.id, date_of(d(b).get("closes_at"), w))
@@ -863,7 +865,7 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
             }
             None => "no ballot has been opened".to_string(),
         };
-        tabled.push(OpenItem::new(r.id.clone(), format!("{}: the budget for year {y} tabled {}; {state}", r.id, date_words(r.at, w))).since(r.at));
+        tabled.push(OpenItem::new(r.id, format!("{}: the budget for year {y} tabled {}; {state}", r.id, date_words(r.at, w))).since(r.at));
     }
     let mut missing = vec![];
     if budget_for(book, year).is_none() {
@@ -881,7 +883,7 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
     let mut kinds: BTreeMap<String, (i64, i64)> = BTreeMap::new();
     let mut open: Vec<&R> = vec![];
     for c in book.open("complaint") {
-        if !addressed(c, me) || acted.contains(&c.id) {
+        if !addressed(c, me) || acted.contains(c.id.as_str()) {
             continue;
         }
         open.push(c);
@@ -905,20 +907,20 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
             let line = format!(
                 "{}: {} complained {} about {}{}{}",
                 c.id,
-                c.speaks_for.clone().unwrap_or_else(|| c.author.clone()),
+                c.speaks_for.unwrap_or_else(|| c.author.clone().into()),
                 date_words(c.at, w),
                 or_words(x.get("about"), "the town's services").replace('_', " "),
                 if x.get("structure").is_some_and(truthy) { format!(" at {}", js(x.get("structure"))) } else { String::new() },
                 if x.get("days").is_some() { format!(", saying it had gone about {} days", js(x.get("days"))) } else { String::new() }
             );
-            OpenItem::new(c.id.clone(), line).since(c.at)
+            OpenItem::new(c.id, line).since(c.at)
         })
         .collect();
     // ---- debts claimed against the town ----
     let mut debts = vec![];
     for r in book.of_type("claim") {
         let RecordBody::Claim { position, holder, counterparty, about } = &r.body else { continue };
-        if *position != oikos_contracts::blocks::Position::Right || counterparty.as_deref() != Some(me) || paid.settled.contains(&r.id) || book.released(&r.id) {
+        if *position != oikos_contracts::blocks::Position::Right || counterparty.as_deref() != Some(me) || paid.settled.contains(r.id.as_str()) || book.released(&r.id) {
             continue;
         }
         let amount = about.get("amount").map(|a| amt(Some(a)));
@@ -931,7 +933,7 @@ fn mayor(rd: &Reader, threshold_bps: i64, population: i64, budget_lead_days: i64
             if about.get("for").is_some_and(truthy) { format!(": {}", js(about.get("for"))) } else { String::new() },
             date_words(r.at, w)
         );
-        debts.push(OpenItem::new(r.id.clone(), line).since(r.at).amount(amount));
+        debts.push(OpenItem::new(r.id, line).since(r.at).amount(amount));
     }
     [
         heading("Petitions at or over the town's threshold, not put to the council or answered", over),
@@ -968,7 +970,7 @@ fn employer(st: &State, me: &str, payroll_office: &str, staffing: &Staffing, dir
     // ---- applications for an advertised post, not answered ----
     let posts = staffing.postings(book);
     let contracts = staffing.contracts(book);
-    let offered_on: BTreeSet<&str> = contracts.iter().flat_map(|a| bases_of(a).iter().map(String::as_str)).collect();
+    let offered_on: BTreeSet<&str> = contracts.iter().flat_map(|a| bases_of(a).iter().map(|x| x.as_str())).collect();
     let mut applications = vec![];
     if !posts.is_empty() {
         for a in book.open("job_application") {
@@ -980,13 +982,13 @@ fn employer(st: &State, me: &str, payroll_office: &str, staffing: &Staffing, dir
             let line = format!(
                 "{}: {} applied {} for the post advertised in {}{}; no offer has been made{}",
                 a.id,
-                a.speaks_for.clone().unwrap_or_else(|| a.author.clone()),
+                a.speaks_for.unwrap_or_else(|| a.author.clone().into()),
                 date_words(a.at, w),
                 post.id,
                 if d(post).get("role").is_some_and(truthy) { format!(" ({})", js(d(post).get("role"))) } else { String::new() },
                 if book.on_hold(&post.id, Some(&[me.to_string()])) { "; the advertisement is on hold" } else { "" }
             );
-            applications.push(OpenItem::new(a.id.clone(), line).since(a.at));
+            applications.push(OpenItem::new(a.id, line).since(a.at));
         }
     }
     // ---- starters and leavers the finance office has not been told of ----
@@ -998,7 +1000,7 @@ fn employer(st: &State, me: &str, payroll_office: &str, staffing: &Staffing, dir
         for a in staffing.staff(book, t) {
             let signed = book.signed_at(&a.id);
             // (Those the organisation started with were on its payroll before the year began.)
-            let Some(signed) = signed.filter(|_| a.author != "genesis" && !starter_sent.contains(&a.id) && staffing.payee(book, a).is_some_and(|p| !p.is_empty())) else { continue };
+            let Some(signed) = signed.filter(|_| a.author != "genesis" && !starter_sent.contains(a.id.as_str()) && staffing.payee(book, a).is_some_and(|p| !p.is_empty())) else { continue };
             let worker = terms_of(a).and_then(|x| x.parties.get(1)).map(String::as_str);
             let pays = job_terms(a, worker.unwrap_or(""), None);
             let line = format!(
@@ -1009,11 +1011,11 @@ fn employer(st: &State, me: &str, payroll_office: &str, staffing: &Staffing, dir
                 usd(pays.wage, w),
                 duration_words(pays.period)
             );
-            starters.push(OpenItem::new(a.id.clone(), line).since(signed).amount(Some(pays.wage)));
+            starters.push(OpenItem::new(a.id, line).since(signed).amount(Some(pays.wage)));
         }
         let deaths = dead(book);
         for a in &contracts {
-            if !book.concluded(&a.id) || leaver_sent.contains(&a.id) {
+            if !book.concluded(&a.id) || leaver_sent.contains(a.id.as_str()) {
                 continue;
             }
             let worker = super::openbooks::jss(terms_of(a).and_then(|x| x.parties.get(1)).map(String::as_str));
@@ -1024,7 +1026,7 @@ fn employer(st: &State, me: &str, payroll_office: &str, staffing: &Staffing, dir
                 a.id,
                 if died { format!("died (registered {})", date_words(end, w)) } else { format!("leaves on {}", date_words(end, w)) }
             );
-            leavers.push(OpenItem::new(a.id.clone(), line).since(end));
+            leavers.push(OpenItem::new(a.id, line).since(end));
         }
     }
     // ---- directions that stand ----
@@ -1049,11 +1051,11 @@ fn employer(st: &State, me: &str, payroll_office: &str, staffing: &Staffing, dir
         let line = format!(
             "{}: {} directed the office on {}, {}: {says}; it stands until replaced or withdrawn",
             dir.id,
-            dir.position.clone().unwrap_or_else(|| dir.author.clone()),
+            dir.position.unwrap_or_else(|| dir.author.clone().into()),
             form_words(form),
             date_words(dir.at, w)
         );
-        directed.push(OpenItem::new(dir.id.clone(), line).since(dir.at));
+        directed.push(OpenItem::new(dir.id, line).since(dir.at));
     }
     [
         heading("Applications for an advertised post, not answered", applications),
@@ -1065,8 +1067,8 @@ fn employer(st: &State, me: &str, payroll_office: &str, staffing: &Staffing, dir
 }
 
 /// `Number.isSafeInteger(x)`.
-fn safe_integer(v: &Value) -> Option<i64> {
-    let n = v.as_i64().or_else(|| v.as_f64().filter(|f| f.fract() == 0.0 && f.is_finite()).map(|f| f as i64))?;
+fn safe_integer(v: &Frozen) -> Option<i64> {
+    let n = v.as_i64().or_else(|| v.as_number().and_then(serde_json::Number::as_f64).filter(|f| f.fract() == 0.0 && f.is_finite()).map(|f| f as i64))?;
     (n.abs() <= (1 << 53) - 1).then_some(n)
 }
 
@@ -1082,7 +1084,7 @@ fn planning(book: &Book, me: &str, w: &WorldInfo) -> Vec<OpenHeading> {
         if let Some(a) = d(dec).s("application") {
             decided.insert(a);
         }
-        decided.extend(bases_of(dec).iter().map(String::as_str));
+        decided.extend(bases_of(dec).iter().map(|x| x.as_str()));
     }
     let items: Vec<OpenItem> = book
         .open("permit_application")
@@ -1091,12 +1093,12 @@ fn planning(book: &Book, me: &str, w: &WorldInfo) -> Vec<OpenHeading> {
             let line = format!(
                 "{}: {} applied {} for a permit to build {} on {}; no decision has been made",
                 a.id,
-                a.speaks_for.clone().unwrap_or_else(|| a.author.clone()),
+                a.speaks_for.unwrap_or_else(|| a.author.clone().into()),
                 when(made_at(a), w),
                 or_words(d(a).get("structure_type"), "(the kind of building is not said)"),
                 or_words(d(a).get("lot"), "(no lot is named)")
             );
-            OpenItem::new(a.id.clone(), line).since(made_at(a))
+            OpenItem::new(a.id, line).since(made_at(a))
         })
         .collect();
     heading("Permit applications, not decided", items)
@@ -1112,21 +1114,21 @@ fn clerk(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
     let results: BTreeSet<String> = book.open("ballot_result").filter(|r| r.speaks_for.as_deref() == Some(me)).map(|r| js(d(r).get("ballot"))).collect();
     let proposals: Vec<OpenItem> = book
         .open("proposal")
-        .filter(|r| addressed(r, me) && !balloted.contains(&r.id))
+        .filter(|r| addressed(r, me) && !balloted.contains(r.id.as_str()))
         .map(|r| {
             let said: String = text(r).chars().take(120).collect();
             let line = format!(
                 "{}: {} put a proposal to the council on {} ({said}); no ballot has been opened",
                 r.id,
-                r.speaks_for.clone().unwrap_or_else(|| r.author.clone()),
+                r.speaks_for.unwrap_or_else(|| r.author.clone().into()),
                 date_words(r.at, w)
             );
-            OpenItem::new(r.id.clone(), line).since(r.at)
+            OpenItem::new(r.id, line).since(r.at)
         })
         .collect();
     let closed: Vec<OpenItem> = ballots
         .iter()
-        .filter(|b| d(b).s("electorate") == Some("council") && (d(b).get("closed") == Some(&Value::Bool(true)) || closed_by(t, d(b).get("closes_at"))) && !results.contains(&b.id))
+        .filter(|b| d(b).s("electorate") == Some("council") && (d(b).get("closed").and_then(|x| x.as_bool()) == Some(true) || closed_by(t, d(b).get("closes_at"))) && !results.contains(b.id.as_str()))
         .map(|b| {
             let closes = finite_number(d(b).get("closes_at"));
             let line = format!(
@@ -1138,7 +1140,7 @@ fn clerk(book: &Book, me: &str, t: i64, w: &WorldInfo) -> Vec<OpenHeading> {
                     None => "has closed".to_string(),
                 }
             );
-            OpenItem::new(b.id.clone(), line).since(closes.unwrap_or(b.at))
+            OpenItem::new(b.id, line).since(closes.unwrap_or(b.at))
         })
         .collect();
     [heading("Proposals to the council with no ballot opened", proposals), pressing("Ballots closed with no result declared", closed)].concat()
@@ -1207,7 +1209,7 @@ mod tests {
         let acc = format!("acc-{entity}");
         let mut pic = picture(t, entity, records, &[(acc.as_str(), entity, 900_000_000)], txs);
         for (id, status, ends_at) in readings {
-            pic.readings.insert((*id).to_string(), oikos_sight::Reading { of: "agreement", status, ends_at: *ends_at, ended_by: None, reader: "k" });
+            pic.readings.insert(((*id).to_string()).into(), oikos_sight::Reading { of: "agreement", status, ends_at: *ends_at, ended_by: None, reader: "k" });
         }
         b.absorb(&pic);
     }

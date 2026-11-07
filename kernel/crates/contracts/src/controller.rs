@@ -6,8 +6,10 @@
 //! matter of how it is kept, never of what it says.
 
 use oikos_core::canon;
+use oikos_core::frozen::{Frozen, Obj};
+use oikos_core::Id;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, Weak};
 
@@ -16,12 +18,12 @@ use std::sync::{Arc, Mutex, Weak};
 const SHARE_AT: usize = 128;
 
 /// One member of a params map: its name and value.
-pub type Member = (String, Value);
+pub type Member = (Id, Frozen);
 
 #[derive(Clone)]
 pub struct Controller {
-    /// The controller as given, its params without the members in `shared`.
-    top: Arc<Value>,
+    /// The controller as given, its params without the members in `shared` (frozen: R2).
+    top: Frozen,
     /// The params' long members, in name order, each held once for everyone who has it alike (empty: none apart).
     shared: Arc<[Arc<Member>]>,
 }
@@ -50,7 +52,7 @@ impl Controller {
             let m = match held.get(&buf).and_then(Weak::upgrade) {
                 Some(m) => m,
                 None => {
-                    let m = Arc::new((k, x));
+                    let m = Arc::new((Id::from_string(k), Frozen::from(x)));
                     // (Members no one holds any more are let go of now and then.)
                     if held.len() % 4096 == 4095 {
                         held.retain(|_, w| w.strong_count() > 0);
@@ -62,22 +64,22 @@ impl Controller {
             shared.push(m);
         }
         // (In name order already: the map's own order.)
-        Controller { top: Arc::new(v), shared: shared.into() }
+        Controller { top: Frozen::from(v), shared: shared.into() }
     }
 
     fn whole(v: Value) -> Controller {
-        Controller { top: Arc::new(v), shared: Arc::from([]) }
+        Controller { top: Frozen::from(v), shared: Arc::from([]) }
     }
 
     /// A member of the controller other than its params (`params`, `params_value`): its type, impl, code...
-    pub fn get(&self, key: &str) -> Option<&Value> {
+    pub fn get(&self, key: &str) -> Option<&Frozen> {
         assert!(key != "params", "a controller's params are read with `params_value` or `parts` (they are kept in parts)");
         self.top.get(key)
     }
 
     /// The controller as given, whole.
     pub fn to_value(&self) -> Value {
-        let mut v = (*self.top).clone();
+        let mut v = self.top.to_value();
         if !self.shared.is_empty() {
             v["params"] = self.params_value();
         }
@@ -87,19 +89,19 @@ impl Controller {
     /// Its params as given, whole (null where it has none).
     pub fn params_value(&self) -> Value {
         let mut m = match self.top.get("params") {
-            Some(Value::Object(m)) => m.clone(),
-            Some(other) => return other.clone(),
+            Some(Frozen::Object(m)) => m.to_map(),
+            Some(other) => return other.to_value(),
             None => return Value::Null,
         };
         for x in self.shared.iter() {
-            m.insert(x.0.clone(), x.1.clone());
+            m.insert(x.0.to_string(), x.1.to_value());
         }
         Value::Object(m)
     }
 
     /// How it is kept: the controller with its own params, and the members shared (for a view of the params that
     /// reads both: the actors' `Params`).
-    pub fn parts(&self) -> (&Arc<Value>, &Arc<[Arc<Member>]>) {
+    pub fn parts(&self) -> (&Frozen, &Arc<[Arc<Member>]>) {
         (&self.top, &self.shared)
     }
 
@@ -109,9 +111,9 @@ impl Controller {
     }
 }
 
-/// The members of a map and of a list of members apart from it (keys apart; the list in name order), in key order: the
-/// order a map of them all would give.
-pub fn merged<'a>(a: &'a Map<String, Value>, b: &'a [Arc<Member>]) -> impl Iterator<Item = (&'a String, &'a Value)> {
+/// The members of an object and of a list of members apart from it (keys apart; the list in name order), in key order:
+/// the order an object of them all would give.
+pub fn merged<'a>(a: &'a Obj, b: &'a [Arc<Member>]) -> impl Iterator<Item = (&'a Id, &'a Frozen)> {
     let mut x = a.iter().peekable();
     let mut y = b.iter().map(|m| (&m.0, &m.1)).peekable();
     std::iter::from_fn(move || match (x.peek(), y.peek()) {
@@ -161,7 +163,7 @@ impl From<Value> for Controller {
 
 impl Default for Controller {
     fn default() -> Controller {
-        Controller::whole(Value::Null)
+        Controller { top: Frozen::Null, shared: Arc::from([]) }
     }
 }
 
@@ -190,13 +192,13 @@ impl Serialize for Controller {
         if self.shared.is_empty() {
             return self.top.serialize(s);
         }
-        let Value::Object(top) = &*self.top else { unreachable!("a controller with shared params is an object") };
-        struct Params<'a>(&'a Map<String, Value>, &'a [Arc<Member>]);
+        let Frozen::Object(top) = &self.top else { unreachable!("a controller with shared params is an object") };
+        struct Params<'a>(&'a Obj, &'a [Arc<Member>]);
         impl Serialize for Params<'_> {
             fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
                 let mut m = s.serialize_map(Some(self.0.len() + self.1.len()))?;
                 for (k, v) in merged(self.0, self.1) {
-                    m.serialize_entry(k, v)?;
+                    m.serialize_entry(k.as_str(), v)?;
                 }
                 m.end()
             }
@@ -204,8 +206,8 @@ impl Serialize for Controller {
         let mut m = s.serialize_map(Some(top.len()))?;
         for (k, v) in top {
             match (k.as_str(), v) {
-                ("params", Value::Object(own)) => m.serialize_entry(k, &Params(own, &self.shared))?,
-                _ => m.serialize_entry(k, v)?,
+                ("params", Frozen::Object(own)) => m.serialize_entry(k.as_str(), &Params(own, &self.shared))?,
+                _ => m.serialize_entry(k.as_str(), v)?,
             }
         }
         m.end()

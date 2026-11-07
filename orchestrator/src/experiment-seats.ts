@@ -227,7 +227,7 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
       translator: { behind, ...(first ? { first, arrangement: t?.arrangement ?? "then" } : {}) }, prices,
       ...(limit !== undefined ? { budget: { limitMicroUsd: Math.round(limit * 1e6), spentMicroUsd: 0 } } : {}),
       framing: steward.framing ?? spec.seats?.framing ?? "unstated", ...(a.effort ? { effort: a.effort } : {}),
-      ...(a.brain ? { brain: a.brain } : {}), ...(dry ? { record: (x: LlmAdapter) => rec.wrap(x, a.model) } : {}), debriefsFile, untilT: spec.untilDay * 86_400,
+      ...(a.brain ? { brain: a.brain } : {}), ...(dry ? { record: (x: LlmAdapter) => rec.wrap(x, a.model) } : {}), debriefsFile, untilT: spec.untilDay * 86_400, ...(a.cast ? { cast: a.cast } : {}),
     });
     seat.start();
     return Object.assign(seat, { calls: () => rec.summary() });

@@ -7,7 +7,7 @@
 
 import { expect, test } from "bun:test";
 import { advertisedJob, Book, jobTerms, StandingWork } from "../src/shared/common";
-import { modules } from "../src/index";
+import { modules, Roster } from "../src/index";
 import { inCurrency } from "../src/money";
 import { context, DAY, statement, wake } from "./stepping";
 import { engine } from "./engine";
@@ -163,4 +163,13 @@ test("a report at once when how an order stands changes, and each week otherwise
     other.did("collect", 0, { units: 1 });
     expect(other.report(b, 8 * 3600, { office: "works", from: "the works crew", tasks: { collect: ["calls"] }, inPost: ["c0001"] })).toEqual([]);
   }
+});
+
+test("the office-holder's list of its standing orders is its own organisation's: another body's order for the same task, seen on the file, is not among them", () => {
+  const roster = new Roster(context("works-system", "city", {}, { position: "works" }), "city", "works", { role: "crew member" } as any, ["collect"]);
+  roster.absorb({ t: 2 * DAY, entity: "city", channels: { all: { kind: "records", records: [
+    order("ord-ours", DAY, "collect", 7 * DAY),
+    order("ord-county", DAY, "collect", 7 * DAY, { author: "county-works", in_position: undefined, speaks_for: "county" }),
+  ] } }, outcomes: [], inbox: [] } as any);
+  expect(roster.orders(2 * DAY).map((o) => o.order)).toEqual(["ord-ours"]);
 });

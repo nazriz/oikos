@@ -109,13 +109,13 @@ impl Waits {
 
     fn evidence_in(&self, book: &Book, claim: &Record, who: &str, need: &str) -> bool {
         book.open(kind::EVIDENCE)
-            .any(|r| r.speaks_for.as_deref() == Some(who) && addressed_to(r).contains(&self.me) && data(r).s("claim") == Some(&claim.id) && data(r).s("need") == Some(need))
+            .any(|r| r.speaks_for.as_deref() == Some(who) && addressed_to(r).iter().any(|x| x == &self.me) && data(r).s("claim") == Some(&claim.id) && data(r).s("need") == Some(need))
     }
 
     pub fn state<T>(&mut self, book: &Book, law: Option<&DecisionLaw>, c: &Record, t: i64) -> Waiting<T> {
         let needs = law.map(|l| l.needs.as_slice()).unwrap_or(&[]);
         let mut steps: Vec<Step<T>> = vec![];
-        let who = c.speaks_for.clone().unwrap_or_default();
+        let who = c.speaks_for.unwrap_or_default();
         let (mut waiting, mut lapsed): (bool, Option<String>) = (false, None);
         for n in needs {
             let key = format!("{}|{}", c.id, n.id);
@@ -123,7 +123,7 @@ impl Waits {
                 From::Claimant => self.evidence_in(book, c, &who, &n.id),
                 From::Employer => book
                     .open(kind::CONFIRMATION)
-                    .any(|r| addressed_to(r).contains(&self.me) && data(r).s("claim") == Some(&c.id) && data(r).s("need") == Some(&n.id)),
+                    .any(|r| { addressed_to(r).iter().any(|x| x == &self.me) && data(r).s("claim") == Some(&c.id) && data(r).s("need") == Some(&n.id)}),
             };
             if came {
                 continue;
@@ -148,7 +148,7 @@ impl Waits {
                 self.asked.insert(key, asking.clone());
                 let mut d = serde_json::json!({ "claim": c.id, "need": n.id, "what": n.what, "by": asking.by });
                 if n.from == From::Employer {
-                    d["about"] = who.clone().into();
+                    d["about"] = who.into();
                 }
                 let by_day = asking.by.div_euclid(DAY);
                 let step = match n.from {
@@ -157,7 +157,7 @@ impl Waits {
                         vec![say(
                             kind::EVIDENCE_REQUEST,
                             &format!("For your claim {}: please send {}, within {} days (by day {by_day}).", c.id, n.what, n.within_days),
-                            Say { to: Some(vec![who.clone()]), visible: Some(Visible::Only(vec![who.clone(), self.me.clone()])), basis: Some(c.id.clone()), data: Some(d), ..Default::default() },
+                            Say { to: Some(vec![who.to_string()]), visible: Some(Visible::Only(vec![who.to_string(), self.me.clone()])), basis: Some(c.id.to_string()), data: Some(d), ..Default::default() },
                         )],
                     ),
                     From::Employer => {
@@ -167,7 +167,7 @@ impl Waits {
                             vec![say(
                                 kind::CONFIRMATION_REQUEST,
                                 &format!("For the claim {} of {who}: please confirm {}, within {} days (by day {by_day}).", c.id, n.what, n.within_days),
-                                Say { to: Some(vec![employer.clone()]), visible: Some(Visible::Only(vec![employer, self.me.clone()])), basis: Some(c.id.clone()), data: Some(d), ..Default::default() },
+                                Say { to: Some(vec![employer.clone()]), visible: Some(Visible::Only(vec![employer, self.me.clone()])), basis: Some(c.id.to_string()), data: Some(d), ..Default::default() },
                             )],
                         )
                     }
@@ -258,7 +258,7 @@ impl Reconsiderations {
             .collect();
         let mut requests: Vec<Arc<Record>> = book
             .open(kind::REQUEST)
-            .filter(|x| addressed_to(x).contains(&self.me) && !self.handled.contains(&x.id) && !answered.contains(&x.id))
+            .filter(|x| { addressed_to(x).iter().any(|x| x == &self.me) && !self.handled.contains(x.id.as_str()) && !answered.contains(x.id.as_str()) })
             .cloned()
             .collect();
         requests.sort_by(|a, b| made_at(a).cmp(&made_at(b)).then_with(|| a.id.cmp(&b.id)));
@@ -273,13 +273,13 @@ impl Reconsiderations {
             let payment = data(about).s("payment");
             let Some(law) = decision_law(book, about_kind, payment) else { continue };
             let Some(review) = law.review.clone() else { continue };
-            self.handled.insert(r.id.clone());
-            let from = r.speaks_for.clone().unwrap_or_default();
+            self.handled.insert(r.id.to_string());
+            let from = r.speaks_for.unwrap_or_default();
             let matter = data(r).s("matter").unwrap_or_default().to_string();
             let left = law::days_left(about.at, review.within_days, t);
             let said = |this: &mut Self, granted: bool, outcome: &str, found: &str, words: &str, more: Vec<Step<T>>, steps: &mut Vec<Step<T>>| {
                 this.count(&format!("review_{outcome}"));
-                let who_only = Visible::Only(vec![from.clone(), this.me.clone()]);
+                let who_only = Visible::Only(vec![from.to_string(), this.me.clone()]);
                 let review_data = serde_json::json!({ "decision": about.id, "kind": about_kind, "request": r.id, "outcome": outcome, "found": found, "asked_by": from, "decided_on": about.at });
                 let mut answer = serde_json::json!({ "request": r.id, "matter": matter, "granted": granted, "review": outcome, "decision": about.id });
                 if !granted {
@@ -291,15 +291,15 @@ impl Reconsiderations {
                         say(
                             kind::REVIEW,
                             &format!("Review of {}, asked by {from}: {words}", about.id),
-                            Say { to: Some(vec![from.clone()]), visible: Some(who_only), basis: Some(about.id.clone()), data: Some(review_data), ..Default::default() },
+                            Say { to: Some(vec![from.to_string()]), visible: Some(who_only), basis: Some(about.id.to_string()), data: Some(review_data), ..Default::default() },
                         ),
                         say(
                             kind::ANSWER,
                             &format!("Answer to your request {}: {}: {words}", r.id, if granted { "yes" } else { "no" }),
                             Say {
-                                to: Some(vec![from.clone()]),
-                                visible: Some(Visible::Only(vec![from.clone(), this.me.clone()])),
-                                basis: Some(r.id.clone()),
+                                to: Some(vec![from.to_string()]),
+                                visible: Some(Visible::Only(vec![from.to_string(), this.me.clone()])),
+                                basis: Some(r.id.to_string()),
                                 data: Some(answer),
                                 ..Default::default()
                             },
@@ -319,16 +319,16 @@ impl Reconsiderations {
                 Some("upheld") => Some(Result_::Upheld),
                 _ => None,
             });
-            if let Some(first) = self.done.get(&about.id).copied().or(filed) {
+            if let Some(first) = self.done.get(about.id.as_str()).copied().or(filed) {
                 let (outcome, words) = if first == Result_::Changed { ("changed", "it was found wrong and has been put right.") } else { ("upheld", "it was looked at and stands.") };
                 said(self, first == Result_::Changed, outcome, "it has been looked at already", words, vec![], &mut steps);
                 continue;
             }
             let Some(out) = redo(book, about, r) else {
-                self.handled.remove(&r.id);
+                self.handled.remove(r.id.as_str());
                 continue;
             };
-            self.done.insert(about.id.clone(), if out.changed { Result_::Changed } else { Result_::Upheld });
+            self.done.insert(about.id.to_string(), if out.changed { Result_::Changed } else { Result_::Upheld });
             let words = if out.changed { format!("found wrong: {}; put right.", out.found) } else { format!("looked at again: {}; it stands.", out.found) };
             said(self, out.changed, if out.changed { "changed" } else { "upheld" }, &out.found, &words, out.steps, &mut steps);
         }

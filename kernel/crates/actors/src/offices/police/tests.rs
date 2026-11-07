@@ -88,9 +88,9 @@ impl Driver {
         let mut first = true;
         for _ in 0..60 {
             let mut channels = BTreeMap::new();
-            channels.insert("mine".to_string(), Seen::Records { records: if first { records.clone() } else { vec![] }, search: false });
+            channels.insert("mine".into(), Seen::Records { records: if first { records.clone() } else { vec![] }, search: false });
             for (k, v) in &extra {
-                channels.insert((*k).to_string(), if first { v.clone() } else { match v { Seen::Sites { .. } => v.clone(), _ => v.clone() } });
+                channels.insert((*k).into(), if first { v.clone() } else { match v { Seen::Sites { .. } => v.clone(), _ => v.clone() } });
             }
             let pic = Picture {
                 participant: "police-oic-system".into(),
@@ -106,8 +106,7 @@ impl Driver {
                 asking: vec![],
                 readings: BTreeMap::new(),
                 woke_for: if first { "cadence".into() } else { "done".into() },
-                since: DAY,
-            };
+                since: DAY, held: Default::default() };
             first = false;
             let mut cx = Cx::new(t, &self.ctx, &mut self.draws, 7, vec![]);
             match self.actor.step(&pic, &mut cx) {
@@ -235,10 +234,10 @@ fn an_investigation_that_finds_the_taker_is_charged_and_one_that_does_not_is_clo
     // Two reports; one officer has hours for two a day (8h / 4h).
     let pic = |t: i64, outcomes: Vec<Value>, records: Vec<Arc<Record>>| {
         let mut channels = BTreeMap::new();
-        channels.insert("mine".to_string(), Seen::Records { records, search: false });
-        channels.insert("premises".to_string(), premises(&["officer-1"]));
+        channels.insert("mine".into(), Seen::Records { records, search: false });
+        channels.insert("premises".into(), premises(&["officer-1"]));
         Picture { participant: "police-oic-system".into(), t, status: oikos_sight::ParticipantStatus::Active, entity: ME.into(), as_position: Some("police-oic".into()), body: None, positions: vec![],
-            outcomes: outcomes.into_iter().map(|o| serde_json::from_value(o).unwrap()).collect(), inbox: vec![], channels, asking: vec![], readings: BTreeMap::new(), woke_for: "done".into(), since: DAY }
+            outcomes: outcomes.into_iter().map(|o| serde_json::from_value(o).unwrap()).collect(), inbox: vec![], channels, asking: vec![], readings: BTreeMap::new(), woke_for: "done".into(), since: DAY, held: Default::default() }
     };
     let t = DAY + 10 * 3600;
     let mut draws = Draws::new("police-oic-system", "police-oic");
@@ -283,7 +282,7 @@ fn asked_to_call_at_a_home_an_officer_goes_and_whoever_died_alone_is_reported_on
     assert!(w.looks[0].to_string().contains("house-1"));
     // Back: what is there is shown at the next wake.
     let cell = home(1, &[], json!([{ "occupant": "ann", "reason": "died", "at": 3 * DAY }]));
-    let back = Seen::Sites { as_of: 5 * DAY + 13 * 3600, cells: Arc::new(vec![cell]), visit: Some(Visit { seen_at: [("h1".to_string(), 5 * DAY + 13 * 3600)].into(), fresh: vec!["h1".into()] }) };
+    let back = Seen::Sites { as_of: 5 * DAY + 13 * 3600, cells: Arc::new(vec![cell]), visit: Some(Visit { seen_at: [("h1".into(), 5 * DAY + 13 * 3600)].into(), fresh: vec!["h1".into()] }) };
     let w = s.wake(6 * DAY + 10 * 3600, vec![ask2], vec![("premises", premises(&["officer-1"])), ("calls", back)], &|_| false);
     assert_eq!(w.of("death_notification").len(), 1, "{:?}", w.calls);
     assert!(w.looks.is_empty(), "the same silence is not called at twice");
@@ -301,6 +300,43 @@ fn a_home_nobody_asked_about_is_never_gone_to_and_a_death_someone_outlived_is_no
     let back = Seen::Sites { as_of: 70 * DAY + 13 * 3600, cells: Arc::new(vec![cell]), visit: Some(Visit { seen_at: Default::default(), fresh: vec!["h1".into()] }) };
     let w = s.wake(71 * DAY + 10 * 3600, vec![], vec![("premises", premises(&["officer-1"])), ("calls", back)], &|_| false);
     assert!(w.of("death_notification").is_empty());
+}
+
+#[test]
+fn asked_to_come_to_someone_lying_dead_on_the_road_an_officer_goes_and_reports_them_found_there_once() {
+    // (Law 9: someone who died on their way lies on the road, and whoever came by asked the police to come.)
+    let ask = st("rec.70", 5 * DAY, "welfare_check_request", "passer-1", &[ME], json!({ "space": "cell.4.2", "structure": "cell.4.2", "at": "cell.4.2", "since": 5 * DAY }));
+    let ask2 = st("rec.71", 6 * DAY, "welfare_check_request", "passer-2", &[ME], json!({ "space": "cell.4.2", "structure": "cell.4.2", "at": "cell.4.2", "since": 6 * DAY }));
+    let mut s = station();
+    let w = s.wake(5 * DAY + 10 * 3600, [staff_records(), vec![ask]].concat(), vec![("premises", premises(&["officer-1"]))], &|_| false);
+    assert_eq!(w.looks.len(), 1, "{:?}", w.looks);
+    assert!(w.looks[0].to_string().contains("cell.4.2"));
+    let road: oikos_sight::SiteCell = serde_json::from_value(json!({ "cell": "cell.4.2", "x": 4, "y": 2, "remains": ["ann"] })).unwrap();
+    let back = Seen::Sites { as_of: 5 * DAY + 13 * 3600, cells: Arc::new(vec![road]), visit: Some(Visit { seen_at: Default::default(), fresh: vec!["cell.4.2".into()] }) };
+    let w = s.wake(6 * DAY + 10 * 3600, vec![ask2], vec![("premises", premises(&["officer-1"])), ("calls", back)], &|_| false);
+    let found = w.of("death_notification");
+    assert_eq!(found.len(), 1, "{:?}", w.calls);
+    assert!(found[0].to_string().contains("ann") && found[0].to_string().contains("cell.4.2"));
+    assert!(w.looks.is_empty(), "found there once: asked again about the place, they do not go again");
+}
+
+#[test]
+fn a_round_of_calls_goes_out_one_at_a_time_and_the_next_when_the_officer_is_back() {
+    // (Main's 50,000-person town, 2026-11-02: four thousand missing-person calls queued, and the station sent a round of
+    // sixteen at every wake, each wake the one after it in the same moment, until the engine stopped the run.) Three homes
+    // asked about, nine places each (a home and the street round it): more than a round holds.
+    let asks: Vec<_> = (0..3).map(|i| st(&format!("rec.8{i}"), 5 * DAY, "welfare_check_request", &format!("home-{i}"), &[ME], json!({ "space": format!("cell.{}.5", 10 + 5 * i), "structure": format!("cell.{}.5", 10 + 5 * i), "at": format!("cell.{}.5", 10 + 5 * i), "since": 4 * DAY, "missing": format!("p{i}") }))).collect();
+    let mut s = station();
+    let w = s.wake(5 * DAY + 10 * 3600, [staff_records(), asks].concat(), vec![("premises", premises(&["officer-1"]))], &|_| false);
+    assert_eq!(w.looks.len(), 1, "{:?}", w.looks);
+    // Woken again in the same moment, the round still out: no other goes.
+    let w = s.wake(5 * DAY + 10 * 3600, vec![], vec![("premises", premises(&["officer-1"]))], &|_| false);
+    assert!(w.looks.is_empty(), "{:?}", w.looks);
+    // Back: the next round goes.
+    let home: oikos_sight::SiteCell = serde_json::from_value(json!({ "cell": "cell.10.5", "x": 10, "y": 5 })).unwrap();
+    let back = Seen::Sites { as_of: 5 * DAY + 13 * 3600, cells: Arc::new(vec![home]), visit: Some(Visit { seen_at: Default::default(), fresh: vec!["cell.10.5".into()] }) };
+    let w = s.wake(5 * DAY + 13 * 3600, vec![], vec![("premises", premises(&["officer-1"])), ("calls", back)], &|_| false);
+    assert_eq!(w.looks.len(), 1, "{:?}", w.looks);
 }
 
 #[test]

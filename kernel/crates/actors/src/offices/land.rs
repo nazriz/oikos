@@ -4,7 +4,6 @@
 
 use crate::common::{cells_of, filed_before, Book, ClaimKey};
 use oikos_sight::RecordBody;
-use serde_json::Value;
 use std::collections::BTreeMap;
 
 /// A lot an owner holds: its cells and the structures its papers show on it, each with its type.
@@ -20,24 +19,24 @@ pub struct OwnLot {
 pub fn owner_of(book: &Book, lot: &str) -> Option<String> {
     let titles: Vec<_> = book
         .claims_by(ClaimKey::Object, lot)
-        .filter(|c| matches!(&c.body, RecordBody::Claim { about, .. } if about.get("kind").and_then(Value::as_str) == Some("ownership")) && !book.released(&c.id) && !book.withdrawn(&c.id))
+        .filter(|c| matches!(&c.body, RecordBody::Claim { about, .. } if about.get("kind").and_then(|x| x.as_str()) == Some("ownership")) && !book.released(&c.id) && !book.withdrawn(&c.id))
         .collect();
     let mut holder = None;
     for c in &titles {
         if let RecordBody::Claim { holder: h, .. } = &c.body {
-            holder = Some(h.clone());
+            holder = Some(*h);
         }
     }
     for r in book.of_type("claim_transfer") {
         if let RecordBody::ClaimTransfer { claim, to } = &r.body {
             if let Some(c) = titles.iter().find(|x| &x.id == claim) {
                 if r.speaks_for.as_ref() == holder.as_ref() || r.speaks_for == c.speaks_for {
-                    holder = Some(to.clone());
+                    holder = Some(*to);
                 }
             }
         }
     }
-    holder
+    holder.map(|x| x.to_string())
 }
 
 /// The land an owner holds, as its papers show it: its latest asset register, titles that have come to it since, and
@@ -46,14 +45,14 @@ pub fn own_land(book: &Book, owner: &str) -> Vec<OwnLot> {
     let mut lots: BTreeMap<String, OwnLot> = BTreeMap::new();
     let register = book.open("asset_register").filter(|r| r.speaks_for.as_deref() == Some(owner)).max_by_key(|r| r.at);
     if let Some(reg) = register {
-        for a in crate::common::data(reg).get("assets").and_then(Value::as_array).into_iter().flatten() {
-            let Some(lot) = a.get("lot").and_then(Value::as_str) else { continue };
+        for a in crate::common::data(reg).get("assets").and_then(|x| x.as_array()).into_iter().flatten() {
+            let Some(lot) = a.get("lot").and_then(|x| x.as_str()) else { continue };
             let x = lots.entry(lot.to_string()).or_insert_with(|| OwnLot {
                 lot: lot.to_string(),
-                cells: a.get("cells").and_then(Value::as_array).map(|c| c.iter().filter_map(Value::as_str).map(String::from).collect()).unwrap_or_default(),
+                cells: a.get("cells").and_then(|x| x.as_array()).map(|c| c.iter().filter_map(|x| x.as_str()).map(String::from).collect()).unwrap_or_default(),
                 structures: vec![],
             });
-            if let (Some(s), Some(ty)) = (a.get("structure").and_then(Value::as_str), a.get("type").and_then(Value::as_str)) {
+            if let (Some(s), Some(ty)) = (a.get("structure").and_then(|x| x.as_str()), a.get("type").and_then(|x| x.as_str())) {
                 if !s.is_empty() && !ty.is_empty() {
                     x.structures.push((s.to_string(), ty.to_string()));
                 }
@@ -64,8 +63,8 @@ pub fn own_land(book: &Book, owner: &str) -> Vec<OwnLot> {
     // (Land that has come to it since: its titles are its own papers.)
     for c in book.claims_by(ClaimKey::Holder, owner) {
         if let RecordBody::Claim { about, .. } = &c.body {
-            if about.get("kind").and_then(Value::as_str) == Some("ownership") {
-                if let Some(o) = about.get("object").and_then(Value::as_str) {
+            if about.get("kind").and_then(|x| x.as_str()) == Some("ownership") {
+                if let Some(o) = about.get("object").and_then(|x| x.as_str()) {
                     lots.entry(o.to_string()).or_insert_with(|| OwnLot { lot: o.to_string(), cells: own_cells(o), structures: vec![] });
                 }
             }
@@ -78,8 +77,8 @@ pub fn own_land(book: &Book, owner: &str) -> Vec<OwnLot> {
             }
             if let Some(c) = book.get(claim) {
                 if let RecordBody::Claim { about, .. } = &c.body {
-                    if about.get("kind").and_then(Value::as_str) == Some("ownership") {
-                        if let Some(o) = about.get("object").and_then(Value::as_str) {
+                    if about.get("kind").and_then(|x| x.as_str()) == Some("ownership") {
+                        if let Some(o) = about.get("object").and_then(|x| x.as_str()) {
                             lots.entry(o.to_string()).or_insert_with(|| OwnLot { lot: o.to_string(), cells: own_cells(o), structures: vec![] });
                         }
                     }
@@ -91,14 +90,14 @@ pub fn own_land(book: &Book, owner: &str) -> Vec<OwnLot> {
     notices.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
     for n in notices {
         let d = crate::common::data(n);
-        if let Some(removes) = d.get("removes").and_then(Value::as_str) {
+        if let Some(removes) = d.get("removes").and_then(|x| x.as_str()) {
             for x in lots.values_mut() {
                 x.structures.retain(|(s, _)| s != removes);
             }
-        } else if let (Some(lot), Some(structure)) = (d.get("lot").and_then(Value::as_str), d.get("structure").and_then(Value::as_str)) {
+        } else if let (Some(lot), Some(structure)) = (d.get("lot").and_then(|x| x.as_str()), d.get("structure").and_then(|x| x.as_str())) {
             if let Some(x) = lots.get_mut(lot) {
                 if !x.structures.iter().any(|(s, _)| s == structure) {
-                    x.structures.push((structure.to_string(), d.get("structure_type").and_then(Value::as_str).unwrap_or("").to_string()));
+                    x.structures.push((structure.to_string(), d.get("structure_type").and_then(|x| x.as_str()).unwrap_or("").to_string()));
                 }
             }
         }
@@ -109,6 +108,7 @@ pub fn own_land(book: &Book, owner: &str) -> Vec<OwnLot> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
     use oikos_sight::Record;
     use std::sync::Arc;
 

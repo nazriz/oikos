@@ -3,6 +3,51 @@
 **Source:** `participants/src/behaviour/utilities.ts`; households' side in `citizen.ts`. Design:
 docs/design/world-expansion.md §6.1, contract §6.4 (signed 2026-10-01). Figures: the profile's `utilities`, with sources.
 
+## Since foundations-2 C4 (2026-10-26; law 8, docs/nothing-from-nothing.md): what flows is the network's
+
+`utility.water` 0.4.0 and `utility.energy` 0.5.0. **Where this section and the older ones below disagree, this one holds**;
+the older ones are kept for what they record of how the offices came to be.
+
+- **The town's network** (`worlds/generator/network.ts`): from the water works, a main to each district of the town (its
+  quarters around the middle of the homes) and a service from the district to every home; the same for the electricity
+  feeders from the substation and the sewer back to the works. Capacities are what the homes ask at the start times the
+  profile's peak (pipes) and margin over the peak hour (wires); heads, losses, the store and the hourly load shape are the
+  profile's `utilities.network` (stand-ins, the same in every profile, to confirm). The kernel settles each connection
+  every hour (electricity, by the day's shape) or day (water, wastewater) by the network's physics (pressure, ratings and
+  trips, a drain): **no rule shares anything out** (docs/design/foundations-2.md 2.1).
+- **A household's use is its own setting.** Each occupied home's leaseholder holds a water, an electricity and a sewer
+  connection at the start, at rates it uses by its own rule (the profile's litres a head times its people; kWh a day for
+  the household: the figures that were the utilities' assumed use), and sets them again when the household changes. Water
+  delivered is used at once by the recipe `use_water` (a litre in, a litre of wastewater out); a kWh by `use_energy`
+  (dissipated, with the grid's emissions). A household that takes up a home with no connection of its asks to be supplied
+  (`supply_request`, with the kind and its rate); one that leaves turns its old connections down to nothing and asks for
+  them to be stopped (`supply_end`).
+- **The water corporation** operates the main and the sewer: it opens a household's water and sewer connections on its
+  request and closes them when the household has gone, died or asked; each day it draws from the river what keeps its
+  store full (`storage`, two days' use: no assumed use a head) and treats what the sewer brought back (`treat_wastewater`:
+  a kilolitre in, put back on the land at the works). When the river cannot give it, it announces restrictions (as
+  before); the store then falls, its head with it, and the far end and the high ground go short first. **Bills from
+  meters** read on a round (a visit: the meters on the premises), to whom the place's law says (`bill_to`, law data per
+  profile, WM-12): the owner of each property on the roll, by its buildings' meters, or the occupant of each connection.
+- **The energy retailer** operates the feeders: it connects and disconnects as the water corporation does; buys from the
+  grid when its stock falls below a fortnight of what its meters say the town uses a day; bills each connection for its
+  days and what its meter moved (read from afar), a wrong bill being a slip on the units, and answers a wrong bill from its
+  own readings. A feeder that trips is reclosed by a crew; one that trips again within a week with feeders under it has
+  them put on a rotation, each off an hour in turn (a standing schedule), except a feeder serving a connection on its
+  protected list (`protected_customers`, its own paper). Supply agreements and tariffs are content: the standing tariff
+  is published (`utility_tariff`), and whether a customer is firm or interruptible is an agreement's term, which the kernel
+  never reads.
+- **Waste** is what households use up: each unit of goods, food, clothing or a meal out becomes so many kilograms of waste
+  in the household's holding at home (the profile's waste a head a day over what a person spends in the shops, by the unit's price: derived);
+  the works' crew collects it from where it is held (`collect`: up to 10 kg a unit, never more than is there) and sees what
+  is left. The household's bin is what it holds of it at home.
+- **Gone:** the `water_used` and `waste` variables, the corporation's draw for the published population, its own reckoning
+  of how use answers price and restrictions (`price_elasticity_bps`, `restriction_cut_bps`: WM-12's open half moves to the
+  household, still to be sourced), the retailer's `units_per_customer_per_day` and the energy used up at the depot.
+- **Leaves out (new):** households do not yet read the tariff or a restriction, so neither changes the rate they set; a
+  seat cannot act on connections or links (TR-7); the network is a tree (a meshed main's second path ignored) with linear
+  losses and ratings only (foundations-2 2.6); treated effluent is put on the works' own cell.
+
 ## The physics (kernel)
 
 - **The river carries water:** a `water` field, fed along the river's cover each day, flowing downstream and lost

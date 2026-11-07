@@ -112,6 +112,26 @@ lost before the post), so the fork is its parent to the hash until that act. The
 (`kernel/tests/host.rs`) and through the harness (`orchestrator/test/experiment.test.ts`). It withholds whoever's act it
 names, a citizen's or an office's; it does not reach an act a host's own seat makes through its own commands.
 
+**Interventions at the fork** (docs/design/delegation.md section 7; `orchestrator/src/interventions.ts`). An arm may
+have its town's principals act at the fork's moment, in their own names and posts (`intervene`):
+
+```json
+{ "name": "taken-back", "steward": { "kind": "code" },
+  "intervene": [{ "do": "take_back", "principal": "landlord-2-office", "hold_days": 180 }] }
+```
+
+`grant` and `change` (a kind at a level), `withdraw` (every kind to none, and notice on the service), `take_back` (kinds
+to none), `redirect` (a brief: kinds the assistant is not to act on; or a kind's level moved to another kind),
+`constrain` (lower levels, a limit, or the assistant's post reorganised with fewer channels), `replace` (notice on the
+service in use and an order from another offer), or `act` (any act, in the call language, as a named participant). Each
+is expanded, outside the world, from what the base's log shows of the principal's services at the fork (kept as
+`seed-N/delegation.json`), into the acts the principal would make; the engine carries them out at the fork's moment
+(`at_fork`, kernel/src/engine.rs), each after a `note` whose data is `intervened`. Nobody in the world is told it was an
+intervention: the principal finds its own new record and its own rule takes it up. `hold_days` writes the principal's own
+word that it will not change that before then (`hold_until` on its remit), which its rule honours; without it, whether
+the principal goes back is part of what is measured. An arm cannot withhold an assistant's request for more scope (the
+route is always open: the harness refuses the spec). A fork with no intervention is its parent to the hash.
+
 **A comparison that cannot move is not run.** A town without `living` has `dials.initiative_bps` and
 `dials.friction_bps` at 0: nothing goes wrong for anyone, and nobody asks for a review, appeals, complains or petitions
 (docs/behaviour/frictions.md). The harness refuses a registration that names a measure of the responsiveness or recourse
@@ -256,10 +276,13 @@ fork's end it is debriefed (the fixed interview) and its words go to `seed-N/<ar
   decision changed afterwards (1/0). With the act withheld in a twin arm, its difference in differences says whether
   the request still bites under each steward (MT-21: a town-wide count is swamped).
 
-What a pilot's host does that this one does not, yet: the cast as it changes during a fork (who is who is the fork's
-config); thinking time in world seconds; an act the engine will not take as written is noted by the engine and not
-told to the seat in words; exit accounts and the composer. A fork is taken up again from its seed's snapshot, not
-from where it stopped (a model fork run again is a new sample). A real model's answers are not reproducible: each (seed, arm)
+As a pilot's (MT-22): the seat is told, in the world's words, what the engine would not take as written, the
+questions of a call it could not read, and when what it did will be done; who is who follows the cast through the
+base and the fork (`seed-N/cast.json`); its thinking takes world time where the world's `thinking_time` says so (by
+its tokens, sent with its act); where the world has a composer, its pieces are composed (by the mock) in the base and
+every fork, and a fork ends with exit accounts (`seed-N/composer.json` carries both across the fork). Not yet: a fork
+is taken up again from its seed's snapshot, not from where it stopped (a model fork run again is a new sample); a
+fork answers no `consult` or `reading` question. A real model's answers are not reproducible: each (seed, arm)
 with a model is one sample.
 
 `experiments/tara-draft/` is the draft for the owner's TARA project (README there).

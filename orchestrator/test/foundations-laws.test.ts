@@ -26,7 +26,7 @@ const town = () => generate({ ...spec, factories: 5, living: spec.living ?? {} }
 test("laws 6 and 7, and law 1's money and goods, are kept already, each by a test that exists", () => {
   const holds: [string, string][] = [
     ["kernel/tests/money_conservation.rs", "law 1: money is conserved"],
-    ["kernel/tests/goods.rs", "law 1: goods are held, moved by their holder"],
+    ["kernel/tests/conservation.rs", "law 1: goods are held, moved by their holder; law 8: nothing physical from nothing"],
     ["kernel/tests/statements_have_no_power.rs", "law 6: authority is a record the readers apply, never the kernel's refusal"],
     ["kernel/tests/knowing.rs", "law 7: information lives with its keeper"],
     ["orchestrator/test/no-god-view.test.ts", "law 7: the backstop"],
@@ -222,7 +222,8 @@ test("F7: law 5: a living town's slips are rows of its table, each with a source
   const c = town();
   const slip = c.orchestration.slip;
   expect(slip, "the table of slips").toBeDefined();
-  const tasks = ["publish/benefit_decision", "publish/venue_decision", "publish/invoice/metered_bill", "transfer/wages"];
+  // (2026-10-25: and the tax collector's decision on a claim for tax paid and not owed, docs/behaviour/public-finance.md.)
+  const tasks = ["publish/benefit_decision", "publish/venue_decision", "publish/invoice/metered_bill", "publish/tax_credit_decision", "transfer/wages"];
   for (const t of tasks) {
     expect(slip.person[t], t).toBeDefined();
     expect(String(slip.sources[`person.${t}`] ?? "").length, `${t}: its source`).toBeGreaterThan(20);

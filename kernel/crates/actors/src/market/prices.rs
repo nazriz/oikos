@@ -246,9 +246,9 @@ pub fn rivals_seen(book: &Book, me: &str, kind: &str, level: Level, t: i64, max_
     for r in book.open("price_list") {
         let Some(s) = r.speaks_for.as_deref().filter(|s| *s != me) else { continue };
         let d = data(r);
-        let Some(p) = d.get("goods").and_then(|g| g.get(kind)).and_then(serde_json::Value::as_i64).filter(|p| *p > 0) else { continue };
+        let Some(p) = d.get("goods").and_then(|g| g.get(kind)).and_then(|x| x.as_i64()).filter(|p| *p > 0) else { continue };
         // (A clearance is not a rival's going price: what it charges once the lot is gone is: docs/behaviour/sourcing.md.)
-        let p = d.get("clearance").and_then(|c| c.get("regular")).and_then(serde_json::Value::as_i64).filter(|r| *r > p).unwrap_or(p);
+        let p = d.get("clearance").and_then(|c| c.get("regular")).and_then(|x| x.as_i64()).filter(|r| *r > p).unwrap_or(p);
         let wholesale = d.i("min_order").is_some_and(|m| m > 1);
         if (level == Level::Wholesale) != wholesale || t - r.at > max_age {
             continue;

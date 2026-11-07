@@ -18,15 +18,16 @@
 //! sample of a round is drawn from the stream `sample-<species>-<round>` as the TS did. Its staff are the reduced
 //! `Staff` in environment_staff.rs until C1's `Staffing` lands.
 
+use oikos_core::frozen::{JsonRead, JsonRef};
 use super::environment_staff::{lift, Own, Staff, StaffOpts, StaffThen, Want};
 use crate::common::asking::{ask, Asked};
-use crate::common::{data, lot_of, money_words, next_look, out_of_time, team, withdraw, Book, Directions, DAY, MONTH, YEAR};
+use crate::common::{data, lot_of, money_words, next_look, out_of_time, team, withdraw, Book, Directions, Pace, DAY, MONTH, YEAR};
 use crate::papers::market::{EnvironmentReport, HabitatMap, HabitatRegister, SpeciesCount};
 use crate::papers::{self, Paper};
 use crate::steps::{arg, because, call, json, say, Done, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
 use oikos_sight::calls::Line;
-use oikos_sight::{LookRequest, Record, Seen};
+use oikos_sight::{Id, LookRequest, Record, Seen};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -120,7 +121,7 @@ impl Kind for Environment {
         "city.environment"
     }
     fn version(&self) -> &'static str {
-        "0.5.2"
+        "0.5.3"
     }
     fn doc(&self) -> &'static str {
         "docs/behaviour/environment.md"
@@ -148,7 +149,14 @@ impl Kind for Environment {
 pub enum Then {
     Staff(StaffThen),
     /// A survey sent: the species and the cells, and who went.
-    Survey { species: String, cells: Vec<String>, crew: Vec<String> },
+    Survey {
+        species: String,
+        cells: Vec<String>,
+        crew: Vec<String>,
+        /// Each one's seconds of it, as counted when it was sent (given back if it is refused).
+        #[serde(default)]
+        share: i64,
+    },
     /// The register published: its id is kept to be withdrawn by the next.
     Register,
 }
@@ -161,13 +169,16 @@ struct Office {
     directions: Directions,
     staff: Staff,
     /// Cell -> its cover.
-    cover: BTreeMap<String, String>,
+    cover: BTreeMap<Id, Id>,
     mapped: BTreeSet<String>,
     asked: Asked,
     /// The workplace as last seen: its capacity and who is in it.
     room: Option<(i64, Vec<String>)>,
     /// Staff -> seconds worked today.
     used: BTreeMap<String, i64>,
+    /// How long a cell takes each of our staff, as the world has shown us: the stated time at first, slower where a
+    /// refusal said what a batch needs (common::Pace, as the factories and shops learn theirs).
+    pace: Pace,
     used_day: i64,
     round: i64,
     next_round: i64,
@@ -209,6 +220,7 @@ impl Office {
             asked: Asked::default(),
             room: None,
             used: BTreeMap::new(),
+            pace: Pace::new(p.survey_labour),
             used_day: -1,
             round: 0,
             next_round: 30 * DAY, // (a month in, to have seen the land and hired)
@@ -325,15 +337,15 @@ fn percent_words(bps: i64) -> String {
 fn staffing_under(d: Option<&Record>) -> (bool, Option<i64>) {
     let Some(d) = d else { return (true, None) };
     let f = data(d);
-    let posts = f.get("posts").and_then(Value::as_i64).filter(|n| *n > 0);
-    (f.get("recruit").and_then(Value::as_str) != Some("no"), posts)
+    let posts = f.get("posts").and_then(|x| x.as_i64()).filter(|n| *n > 0);
+    (f.get("recruit").and_then(|x| x.as_str()) != Some("no"), posts)
 }
 
 /// A budget line as a number of cents (a figure or the text of one).
-fn amount(v: Option<&Value>) -> i64 {
-    match v {
-        Some(Value::Number(n)) => n.as_i64().unwrap_or(0),
-        Some(Value::String(s)) => s.parse().unwrap_or(0),
+fn amount<V: JsonRead + ?Sized>(v: Option<&V>) -> i64 {
+    match v.map(JsonRead::view) {
+        Some(JsonRef::Number(n)) => n.as_i64().unwrap_or(0),
+        Some(JsonRef::String(s)) => s.parse().unwrap_or(0),
         _ => 0,
     }
 }
@@ -346,10 +358,10 @@ impl Plan for Office {
         self.staff.absorb(pic);
         let mut maps: Vec<(String, HabitatMap)> = vec![];
         for r in self.book.open("habitat_map") {
-            if self.mapped.contains(&r.id) || r.speaks_for.as_deref() != Some(self.me.as_str()) {
+            if self.mapped.contains(r.id.as_str()) || r.speaks_for.as_deref() != Some(self.me.as_str()) {
                 continue;
             }
-            maps.push((r.id.clone(), papers::read::<HabitatMap>(r).unwrap_or(HabitatMap { areas: vec![], built: vec![] })));
+            maps.push((r.id.to_string(), papers::read::<HabitatMap>(r).unwrap_or(HabitatMap { areas: vec![], built: vec![] })));
         }
         for (id, m) in maps {
             self.mapped.insert(id);
@@ -357,32 +369,32 @@ impl Plan for Office {
             for a in &m.areas {
                 for y in a.y..a.y + a.h {
                     for x in a.x..a.x + a.w {
-                        self.cover.insert(format!("cell.{x}.{y}"), a.cover.clone());
+                        self.cover.insert(Id::new(&format!("cell.{x}.{y}")), Id::new(&a.cover));
                     }
                 }
             }
             for c in m.built {
-                self.cover.insert(c, "built".into());
+                self.cover.insert(Id::new(&c), "built".into());
             }
         }
         let mut built: Vec<(String, String)> = vec![];
         for n in self.book.open("building_notice") {
-            if !self.mapped.contains(&n.id) {
-                if let Some(at) = data(n).get("at").and_then(Value::as_str) {
-                    built.push((n.id.clone(), at.to_string()));
+            if !self.mapped.contains(n.id.as_str()) {
+                if let Some(at) = data(n).get("at").and_then(|x| x.as_str()) {
+                    built.push((n.id.to_string(), at.to_string()));
                 }
             }
         }
         for (id, at) in built {
             self.mapped.insert(id);
-            self.cover.insert(at, "built".into());
+            self.cover.insert(Id::new(&at), "built".into());
         }
         for ch in pic.channels.values() {
             if let Seen::Sites { cells, .. } = ch {
                 for c in cells.iter() {
                     if let Some(s) = c.structure.as_ref().filter(|s| s.structure == self.p.depot) {
                         if let Some(sp) = s.spaces.iter().find(|sp| sp.space == self.p.workplace) {
-                            let here = sp.occupants.iter().flatten().cloned().collect();
+                            let here = sp.occupants.iter().flatten().cloned().map(|x| x.to_string()).collect();
                             self.room = Some((i64::from(sp.capacity), here));
                         }
                     }
@@ -393,9 +405,9 @@ impl Plan for Office {
         for o in &pic.outcomes {
             let Some(sv) = &o.surveyed else { continue };
             self.pending = (self.pending - 1).max(0);
-            let Some(of) = sv.get("of").and_then(Value::as_str) else { continue };
+            let Some(of) = sv.get("of").and_then(|x| x.as_str()) else { continue };
             let m = self.found.entry(of.to_string()).or_default();
-            if let Some(cells) = sv.get("cells").and_then(Value::as_object) {
+            if let Some(cells) = sv.get("cells").and_then(|x| x.as_object()) {
                 for (cell, n) in cells {
                     m.insert(cell.clone(), n.as_i64().unwrap_or(0));
                 }
@@ -408,7 +420,7 @@ impl Plan for Office {
         let mut steps: Vec<Step<Then>> = vec![];
         // ---- staff: what the adopted budget's line pays for ----
         let year = t.div_euclid(YEAR) + 1;
-        let budget = self.book.open("budget").filter(|b| data(b).get("year").and_then(Value::as_i64) == Some(year)).max_by_key(|b| b.at).cloned();
+        let budget = self.book.open("budget").filter(|b| data(b).get("year").and_then(|x| x.as_i64()) == Some(year)).max_by_key(|b| b.at).cloned();
         let line = budget.as_ref().map_or(0, |b| amount(data(b).get("lines").and_then(|l| l.get(&self.p.staff_line))));
         let workers = self.staff.workers(&self.book, t);
         let annual = self.annual();
@@ -472,12 +484,12 @@ impl Plan for Office {
             self.next_round = t + self.p.survey_every_days * DAY;
             self.found.clear();
             for s in &self.p.species {
-                let mut habitat: Vec<&String> = self.cover.iter().filter(|(_, c)| s.covers.contains(c)).map(|(cell, _)| cell).collect();
+                let mut habitat: Vec<&Id> = self.cover.iter().filter(|(_, c)| s.covers.iter().any(|x| x == c.as_str())).map(|(cell, _)| cell).collect();
                 let mut r = cx.rng(&format!("sample-{}-{}", s.id, self.round));
                 let mut cells: Vec<String> = vec![];
                 while (cells.len() as i64) < self.p.sample_cells && !habitat.is_empty() {
                     let i = r.below(habitat.len() as u64) as usize;
-                    cells.push(habitat.remove(i).clone());
+                    cells.push(habitat.remove(i).to_string());
                 }
                 if !cells.is_empty() {
                     self.queue.push((s.id.clone(), cells));
@@ -495,7 +507,9 @@ impl Plan for Office {
             let mine: BTreeSet<&String> = workers.iter().collect();
             let here: Vec<String> = self.room.iter().flat_map(|(_, o)| o.iter()).filter(|w| mine.contains(w)).cloned().collect::<BTreeSet<_>>().into_iter().collect();
             let (crew, each) = team(&here, |w| self.p.working_day - self.used.get(w).copied().unwrap_or(0));
-            let mut cells_today = if crew.is_empty() { 0 } else { each * crew.len() as i64 / self.p.survey_labour };
+            // (A cell at the crew's own pace, as the world has shown it: the stated time until a refusal says otherwise.)
+            let per_cell = self.pace.per_unit(&crew);
+            let mut cells_today = if crew.is_empty() { 0 } else { each * crew.len() as i64 / per_cell };
             while cells_today > 0 && !self.queue.is_empty() {
                 let take = (cells_today as usize).min(self.queue[0].1.len());
                 let batch: Vec<String> = self.queue[0].1.drain(..take).collect();
@@ -504,7 +518,7 @@ impl Plan for Office {
                     self.queue.remove(0);
                 }
                 cells_today -= batch.len() as i64;
-                let share = (batch.len() as i64 * self.p.survey_labour + crew.len() as i64 - 1) / crew.len() as i64;
+                let share = (batch.len() as i64 * per_cell + crew.len() as i64 - 1) / crew.len() as i64;
                 for w in &crew {
                     *self.used.entry(w.clone()).or_insert(0) += share;
                 }
@@ -522,7 +536,7 @@ impl Plan for Office {
                         ],
                     )],
                 );
-                st.then = Some(Then::Survey { species, cells: batch, crew: crew.clone() });
+                st.then = Some(Then::Survey { species, cells: batch, crew: crew.clone(), share });
                 steps.push(st);
             }
         }
@@ -554,15 +568,27 @@ impl Plan for Office {
     fn then(&mut self, token: &Then, done: Done, cx: &mut Cx) -> Vec<Step<Then>> {
         match token {
             Then::Staff(t) => lift(self.staff.then(t, done, cx), Then::Staff),
-            Then::Survey { species, cells, crew } => {
+            Then::Survey { species, cells, crew, share } => {
                 if done.applied() {
+                    // (Done in the time we gave it: perhaps they are quicker than we think, once a week.)
+                    self.pace.done(crew, cx.t.div_euclid(DAY));
                     return vec![];
                 }
                 self.pending = (self.pending - 1).max(0);
                 // (Not done: back to the queue for another day, the staff's day as the world counts it.)
                 self.queue.push((species.clone(), cells.clone()));
+                // (Its hours were never worked: given back to the whole crew, and the crew's pace learnt from what the world
+                // says the batch needs. Until 2026-11-01 neither: a crew slower than the stated time (skill, E4) was asked
+                // for the same day's fieldwork at every look, and refused each time; docs/decisions.md.)
+                for w in crew {
+                    let u = self.used.get(w).copied().unwrap_or(0);
+                    self.used.insert(w.clone(), (u - share).max(0));
+                }
                 let short = match done {
-                    Done::Outcome(o) => out_of_time(o),
+                    Done::Outcome(o) => {
+                        self.pace.refused(o, cells.len() as i64, crew);
+                        out_of_time(o)
+                    }
                     _ => None,
                 };
                 match short {
@@ -580,7 +606,7 @@ impl Plan for Office {
             Then::Register => {
                 if let Done::Outcome(o) = done {
                     if let Some(id) = o.created.as_ref().and_then(|c| c.get("register")) {
-                        self.register = Some(id.clone());
+                        self.register = Some(id.to_string());
                     }
                 }
                 vec![]

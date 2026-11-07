@@ -44,7 +44,7 @@ allows only its own scope (`contracts/world-config.schema.json`, `Channel`):
 | Way | What a channel of that way may be | What it may not |
 |---|---|---|
 | `mine` (and accounts, holdings) | Records naming the seat's own entity | Records naming anyone else (`involving` is gone from the contract) |
-| `here` | The ground, or notices put up, near where the seat is (`{near}`; a map at most 2 cells around) or at an organisation's own premises (`{premises: [cells]}`; one organisation's only) | Everywhere, a place, a list of other cells |
+| `here` | The ground, or notices put up, near where the seat is (`{near}`; a map at most 2 cells around) or at an organisation's own premises (`{premises: [cells]}`; one organisation's only), or the ground of premises it holds by an agreement in force (`{held: "occupancy"}`: a unit it leases; nothing until it holds one) | Everywhere, a place, a list of other cells |
 | `visit` | Nothing until a look names 1 to 16 places; then what was there, after the time it takes | A standing map |
 | `published` | Kinds the world declares published (`knowing.published`, each with its reason); a board only on request, by searching, a few at a time; a named supplier's own lists (`from`) | A kind nobody published; "any record"; a board shown |
 | `ask` | A register its declared keeper keeps, on request, to a search that names its subject by a field the keeper answers by, to that asker; the directory, to a look-up that says whom | The register shown; a search with no subject; a field the keeper does not answer by (the land register by holder, for anyone not listed) |
@@ -94,7 +94,7 @@ answered with the next observation, at once; a visit when the looker is back. Wo
 the crew left (`outcome.seen`).
 
 **To give a seat a channel** (`worlds/generator/knowing.ts`): `mine`, `published`, `board`, `from`, `posted`,
-`premises`, `around`, `visits`, `ask`, `lookUp`, `kept`. There is no helper for anything else.
+`premises`, `held`, `around`, `visits`, `ask`, `lookUp`, `kept`. There is no helper for anything else.
 
 **To declare a keeper.** Only for a collection the office itself makes, or that is addressed to it entry by entry.
 

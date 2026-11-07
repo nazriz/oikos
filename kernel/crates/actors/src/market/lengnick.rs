@@ -173,7 +173,7 @@ pub fn shareholders(book: &Book, firm: &str) -> Vec<Holder> {
     let Some(r) = mine.first() else { return vec![] };
     let d = data(r);
     d.get("holders")
-        .and_then(Value::as_array)
+        .and_then(|x| x.as_array())
         .map(|hs| {
             hs.iter()
                 .map(|h| Holder {

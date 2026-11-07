@@ -2,7 +2,7 @@
 //! thinking; a person does one thing at a time, in whatever capacity; a system as many at once as it has lanes; and an
 //! act takes effect when it's done, not when it's begun.
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};
@@ -13,7 +13,7 @@ use oikos_kernel::run::Run;
 fn act(participant: &str, position: Option<&str>, blocks: Value, thinking: Option<i64>) -> Command {
     Command::Act {
         participant: participant.into(),
-        position: position.map(String::from),
+        position: position.map(Into::into),
         blocks: serde_json::from_value(blocks).unwrap(),
         by: vec![],
         provenance: json!({"via": "direct"}),
@@ -42,7 +42,7 @@ fn balance(run: &Run<Vec<u8>>, acc: &str) -> i128 {
 #[test]
 fn an_act_takes_effect_when_done() {
     let mut config = riverbend();
-    config["orchestration"]["act_time"] = json!({ "system": { "transfer": 5 }, "person": { "message": 120 } });
+    config["orchestration"]["act_time"] = json!({"default": 1, "system": { "transfer": 5 }, "person": { "message": 120 } });
     let mut run = Run::start(config, "time", Vec::new(), None).unwrap();
     let before = balance(&run, "acc-alice");
     assert_eq!(begun(&mut run, &act("bank-payments-system", Some("bank-payments"), pay(100), None)), (0, 5));

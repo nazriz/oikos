@@ -117,6 +117,12 @@
         },
         {
           "$ref": "#/$defs/take"
+        },
+        {
+          "$ref": "#/$defs/connection"
+        },
+        {
+          "$ref": "#/$defs/link"
         }
       ]
     },
@@ -277,7 +283,7 @@
       }
     },
     "occupy": {
-      "description": "PHYSICAL. A body goes into a space: the acting person, or someone they bring ('who'), who must be alive and in the world. Refused only if the structure is incomplete or the space is full (its physical capacity: how many bodies could fit at all, not how many should).",
+      "description": "PHYSICAL. A body goes into a space: the acting person, or someone they bring ('who'), who must be alive and in the world, on foot or by a vehicle ('vehicle'). Refused only if the structure is incomplete or the space is full (its physical capacity: how many bodies could fit at all, not how many should).",
       "type": "object",
       "required": [
         "block",
@@ -299,6 +305,10 @@
           ]
         },
         "who": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "vehicle": {
+          "description": "Law 9 (foundations-2 S2): the vehicle it goes by, driven: one the body may drive (its owner's, or one its owner lets), standing where it sets out. It takes the trip at the vehicle's speed along the world's ways, and stands where the body arrives. Refused if it is not there, or not theirs to drive. None: on foot.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
         }
       }
@@ -1120,6 +1130,18 @@
         "to_at": {
           "description": "Where they go: a structure, or for an edge, itself.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "carried": {
+          "description": "Law 9 (foundations-2 S4): the acting person carries them. In a world one travels, goods between two buildings go only with a carrier, who goes by where they are and where they go, and back where it set out unless the act takes it into a building (its trip is the act's time and its own); to or from an edge's outside they go by the outside's freight, which takes its time from the edge's node. Refused `not_carried` with no carrier.",
+          "type": "boolean"
+        },
+        "carrier": {
+          "description": "Law 9 (S4): someone else who carries them, whom the actor may direct.",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "vehicle": {
+          "description": "Law 9 (S4): the vehicle the carrier drives (one it may drive, standing where it sets out).",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
         }
       }
     },
@@ -1724,6 +1746,104 @@
         },
         "at": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        }
+      }
+    },
+    "connection": {
+      "description": "An act on a connection (foundations-2 C3, law 8; docs/nothing-from-nothing.md). Its operator (the holder of the supply whose tree the node is on) opens one (`open` with `kind`, `node`, `to`, `at`, `rate`; or, naming a closed `connection`, opens it again), closes it, interrupts or restores it; its user or its operator sets its rate (`set`). The kernel stores the supply contracts and never reads them.",
+      "type": "object",
+      "required": [
+        "block",
+        "op"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "connection"
+        },
+        "op": {
+          "enum": [
+            "open",
+            "set",
+            "close",
+            "interrupt",
+            "restore"
+          ]
+        },
+        "connection": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "kind": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+        },
+        "node": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
+        "to": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "at": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "rate": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000000
+        },
+        "uses": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+        },
+        "meter": {
+          "enum": [
+            "on_site",
+            "remote"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    },
+    "link": {
+      "description": "An act on a link by its operator: shut it, open it, reclose it after it tripped, or put it on a rotation (a standing schedule: off for `off` seconds of every `every`, counted from `from`; `off` nought ends it). Only the act is logged; the schedule's effects are state.",
+      "type": "object",
+      "required": [
+        "block",
+        "link",
+        "op"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "link"
+        },
+        "link": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
+        "op": {
+          "enum": [
+            "shut",
+            "open",
+            "reclose",
+            "rotate"
+          ]
+        },
+        "every": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31622400
+        },
+        "from": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "off": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 31622400
         }
       }
     }

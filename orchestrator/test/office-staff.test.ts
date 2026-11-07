@@ -57,7 +57,8 @@ test("a works seat with no crew is told so, at its first sitting and when it cha
   expect(withList).toBeGreaterThanOrEqual(2);
   expect(withList).toBeLessThan(shown.length / 2); // (not at every sitting: only where it changed)
   // A later order, with a crew in post, says nothing of nobody.
-  expect(log.some((e) => e.kind === "event" && JSON.stringify(e.body).includes('"waste"'))).toBe(true);
+  // (The crew collects: waste is held where it is made, law 8, and a collection is the work `collect` on an address.)
+  expect(log.some((e) => e.kind === "event" && e.body.event === "worked" && e.body.task === "collect")).toBe(true);
 }, 300_000);
 
 test("every office that employs staff says so in its module; the others have none to show", () => {

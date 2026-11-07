@@ -3,7 +3,7 @@
 // only process this package ever starts, and only that binary: test/read-only.test.ts checks it. A pilot's viewer data
 // (`pilot.json`, made by pilotDataOf without debriefs) is written beside the runs, in the views folder, never inside a run.
 
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { assertOutside, logOfRun, viewsRoot, type RunEntry } from "./paths";
 import { pilotDataOf } from "./server";
@@ -20,7 +20,17 @@ export function rustBinary(): string | undefined {
 export interface RustLayer { api: string; stop(): void }
 
 /** Starts the service for `runs`. A pilot's data is made with the existing `pilotDataOf` and given to it. */
-export async function startRust(runs: RunEntry[], o: { log?: (s: string) => void; bin?: string; withPilots?: boolean } = {}): Promise<RustLayer> {
+/** Does a run have seats (a pilot, or a world run with a post given to a model)? Read from its folder's PILOT.txt and
+ * batch.json only: a run with none needs no pilot data, and reading it would hold up the first sight of a big town. */
+export function hasSeats(dir: string): boolean {
+  if (existsSync(join(dir, "PILOT.txt"))) return true;
+  try {
+    const b = JSON.parse(readFileSync(join(dir, "batch.json"), "utf8"));
+    return (b.sets ?? []).some((x: string) => /=\s*llm\b/.test(x)) || JSON.stringify(b.spec ?? {}).includes('"llm"') || !!b.model;
+  } catch { return false; }
+}
+
+export async function startRust(runs: RunEntry[], o: { log?: (s: string) => void; bin?: string; withPilots?: boolean; onlySeated?: boolean } = {}): Promise<RustLayer> {
   const bin = o.bin ?? rustBinary();
   if (!bin) throw new Error("oikos-explore is not built: run `cargo build --release -p oikos-explore` in kernel/");
   const say = o.log ?? (() => {});
@@ -28,7 +38,7 @@ export async function startRust(runs: RunEntry[], o: { log?: (s: string) => void
   for (const r of runs) {
     const log = r.log ?? logOfRun(r.dir);
     let spec = `${r.key}=${log}`;
-    if (o.withPilots !== false && (r.pilot || existsSync(join(r.dir, "batch.json")))) {
+    if (o.withPilots !== false && (r.pilot || existsSync(join(r.dir, "batch.json"))) && (!o.onlySeated || hasSeats(r.dir))) {
       const out = join(viewsRoot(r.dir), `${r.key}.pilot.json`);
       assertOutside(r.dir, out);
       mkdirSync(dirname(out), { recursive: true });

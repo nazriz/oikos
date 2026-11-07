@@ -4,7 +4,7 @@
 //! (The libraries of the lane, tax, returns, payments, orgwants and practice, are not kinds: their tests are beside
 //! the code, in `oikos-rules` and `oikos-actors`.)
 
-mod common;
+use crate::common;
 
 use oikos_kernel::engine::{run_code_world, EngineOptions};
 use serde_json::{json, Value};
@@ -26,7 +26,7 @@ fn payroll_world(part: &str) -> Value {
     c["clock"]["run_seconds"] = json!(60 * DAY);
     for p in c["participants"].as_array_mut().unwrap() {
         match p["id"].as_str().unwrap() {
-            "finance-system" => p["controller"] = json!({ "type": "code", "impl": "body.payroll", "params": { "part": part, "watch": ["mayor"], "who": "who", "after_days": 14 } }),
+            "finance-system" => { p["controller"] = json!({ "type": "code", "impl": "body.payroll", "params": { "part": part, "watch": ["mayor"], "who": "who", "after_days": 14 } })}
             "inspector-system" => {
                 p["controller"] = json!({ "type": "code", "impl": "stub.script", "params": { "script": [
                     { "at": 5 * DAY, "call": "statement(kind=payroll_notice, text=\"Payroll notice from the hiring office.\", to=[\"city\"], visible=[\"city\"], data={\"notice\": \"starter\", \"employee\": \"alice-self\", \"agreement\": \"none\"})" }

@@ -32,7 +32,7 @@ import { cpus, homedir, loadavg } from "node:os";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { realpathSync } from "node:fs";
-import { buildJobs, defaultPriority, insideSlot, poolSize, take } from "./slots";
+import { buildJobs, defaultPriority, insideSlot, poolSize, take, usedBy, type Used } from "./slots";
 
 const repo = join(import.meta.dir, "..");
 const args = process.argv.slice(2);
@@ -73,6 +73,8 @@ function allowed(running: number): number {
 // How long each file took last time (kept beside this script): the slowest go first, so the run ends when they do.
 const timesPath = join(repo, "scripts", "test-times.json");
 const times: Record<string, number> = !custom && existsSync(timesPath) ? JSON.parse(readFileSync(timesPath, "utf8")) : {};
+/** The times as recorded before this run (`times` is updated as files end): the budget reads the machine's load from them. */
+const recorded: Record<string, number> = { ...times };
 // The tiers (scripts/test-tiers.json, under --root its own): the slow tier is named file by file, with why; every other
 // test file is the gate's. The gate never runs the slow tier: CI runs both on every push to main, and nightly
 // (scripts/tiers.test.ts holds that every file is in exactly one, and that CI runs them all).
@@ -131,7 +133,7 @@ function gateBuild() {
   // (The merge's build takes six: nothing of the gate can start before it, but asking the whole pool waited minutes for
   // the last tokens on a busy machine. The kernel's test programs are built
   // after, beside the test files: 2026-10-24, building them here first made a kernel change's gate 220 s, beside 170 s.)
-  const cmd = `cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace -q && cargo build --release --manifest-path kernel/Cargo.toml --target wasm32-unknown-unknown -p oikos-law -q`;
+  const cmd = `bun scripts/disk-tidy.ts --prune-incremental --apply && cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace -q && cargo build --release --manifest-path kernel/Cargo.toml --target wasm32-unknown-unknown -p oikos-law -q`;
   if (!run(["bun", join(import.meta.dir, "slots.ts"), "--weight", String(defaultPriority() ? 6 : 4), "--what", "kernel build (gate profile)", "--", "sh", "-c", cmd], repo)) stop("the gate build of the kernel failed: run `cargo build --profile gate --manifest-path kernel/Cargo.toml --workspace` and read its errors");
   const lib = ["liboikos_napi.dylib", "liboikos_napi.so"].map((f) => join(target, "gate", f)).find((f) => existsSync(f));
   process.env.OIKOS_KERNEL = join(target, "gate", "oikos-kernel");
@@ -305,7 +307,7 @@ function kernelCrates(changedFiles: string[]): string[] | undefined {
 async function kernelCargoTests(crates?: string[]) {
   // (The `gate` profile: release's optimisation and overflow checks, without its whole-program link: the same tests, built in
   // a fraction of the time. 2026-10-24: `cargo test --release` built each of ~50 test programs with a fat LTO link.)
-  const slot = await take(4, `the kernel's tests (cargo test${crates ? ` -p ${crates.join(" -p ")}` : ""})`, { borrow: true });
+  const slot = await take(4, `the kernel's tests (cargo test${crates ? ` -p ${crates.join(" -p ")}` : ""})`, { borrow: true, cls: "build" });
   const which = crates ? crates.flatMap((c) => ["-p", c]) : ["--workspace"];
   if (crates) console.log(`kernel tests (cargo test): ${crates.join(", ")}`);
   // (cargo-nextest where it is installed: every test its own process, the test programs side by side, where `cargo test`
@@ -318,12 +320,13 @@ async function kernelCargoTests(crates?: string[]) {
   const cmd = nextest
     ? `cargo nextest run --cargo-profile gate ${m.join(" ")} --test-threads ${jobs} --no-fail-fast --status-level fail --final-status-level fail --hide-progress-bar && cargo test --profile gate ${m.join(" ")} --doc -q`
     : `cargo test --profile gate ${m.join(" ")} -q`;
+  const tk = Date.now();
   const k = Bun.spawn(["sh", "-c", cmd], { cwd: repo, stdout: "pipe", stderr: "pipe", env: { ...insideSlot(4), CARGO_BUILD_JOBS: jobs } });
   children.add(k);
   const out = (await Promise.all([new Response(k.stdout).text(), new Response(k.stderr).text()])).join("");
   const ok = (await k.exited) === 0;
   children.delete(k);
-  slot?.release();
+  slot?.release(usedBy(k, tk));
   console.log(`${ok ? "ok  " : "FAIL"} kernel (cargo test) ${((performance.now() - t0) / 1000).toFixed(0)}s`);
   if (!ok) { failed++; console.log(out.split("\n").filter((l) => /FAILED|FAIL \[|panicked|error/.test(l)).slice(0, 40).join("\n")); }
 }
@@ -336,9 +339,9 @@ const record: Record<string, { secs: number; ok: boolean; tests: number }> = {};
 const bad: string[] = [];
 const lateTimeouts: string[] = [];
 
-type Result ={ code: number; text: string; secs: number; npass: number; nfail: number; onlyTimeouts: boolean };
+type Result ={ code: number; text: string; secs: number; npass: number; nfail: number; onlyTimeouts: boolean; used?: Used };
 async function runFile(f: string): Promise<Result> {
-  const s = performance.now();
+  const s = performance.now(), t0 = Date.now();
   const p = Bun.spawn(["bun", "test", f], { cwd: root, stdout: "pipe", stderr: "pipe", env: insideSlot(1, { ...process.env, NODE_ENV: "test" }) });
   children.add(p);
   const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
@@ -351,7 +354,7 @@ async function runFile(f: string): Promise<Result> {
   const timedOut = (text.match(/timed out after \d+\s*ms/g) ?? []).length;
   const otherErrors = text.split("\n").filter((l) => /^\s*(error|Error|TypeError|ReferenceError|SyntaxError)\b|Unhandled|Cannot find module|panicked/.test(l) && !/timed out after/.test(l));
   const onlyTimeouts = code !== 0 && timedOut > 0 && timedOut >= nfail && !otherErrors.length;
-  return { code, text, secs: (performance.now() - s) / 1000, npass: Number(/^\s*(\d+) pass/m.exec(text)?.[1] ?? 0), nfail, onlyTimeouts };
+  return { code, text, secs: (performance.now() - s) / 1000, npass: Number(/^\s*(\d+) pass/m.exec(text)?.[1] ?? 0), nfail, onlyTimeouts, used: usedBy(p, t0) };
 }
 const tail = (f: string, text: string) => `\n== ${f}\n${text.split("\n").filter((l) => !/^\s*$/.test(l)).slice(-60).join("\n")}`;
 
@@ -370,7 +373,8 @@ async function worker() {
     const f = files[next++];
     if (!slot || !f) { slot?.release(); return; }
     running++;
-    const r = await runFile(f).finally(() => slot.release());
+    let r: Result | undefined;
+    try { r = await runFile(f); } finally { slot.release(r?.used); }
     running--;
     times[f] = Math.round(r.secs * 10) / 10;
     record[f] = { secs: times[f]!, ok: r.code === 0, tests: r.npass + r.nfail };
@@ -419,11 +423,18 @@ if (!custom && !filters.length && !list) {
     const own = Object.entries(record).filter(([f]) => !slowChosenSet.has(f));
     const slowRan = Object.entries(record).filter(([f]) => slowChosenSet.has(f));
     if (slowRan.length) console.log(`(budgets: the slow tier's files the change reached took ${slowRan.reduce((n, [, r]) => n + r.secs, 0).toFixed(0)} file-seconds, not counted: ${slowRan.map(([f, r]) => `${f} ${r.secs}s`).join(", ")})`);
-    const long = own.filter(([, r]) => r.secs > budgets.gate.file_seconds).map(([f, r]) => `${f} ${r.secs}s`);
-    if (long.length) { over = true; console.log(`BUDGET: gate files over ${budgets.gate.file_seconds}s: ${long.join(", ")} ${say}`); }
-    const total = own.reduce((n, [, r]) => n + r.secs, 0);
-    console.log(`(budgets: the gate's files took ${total.toFixed(0)} file-seconds of its ${budgets.gate.file_seconds_total})`);
-    if (total > budgets.gate.file_seconds_total) { over = true; console.log(`BUDGET: the gate's files took ${total.toFixed(0)} file-seconds, over its ${budgets.gate.file_seconds_total} ${say}`); }
+    const raw = own.reduce((n, [, r]) => n + r.secs, 0);
+    // (Load-adjusted: files share cores, so under load every file runs slower. The load is the median of this run's time over the
+    // recorded time, across the files that have one; the total is divided by it when it is over 1. 2026-10-26: a gate went 32 s
+    // over at load 20 to 27 with nothing of its own added.)
+    const ratios = own.filter(([f]) => recorded[f]! > 1).map(([f, r]) => r.secs / recorded[f]!).sort((x, y) => x - y);
+    const load = ratios.length >= 10 ? Math.max(1, ratios[Math.floor(ratios.length / 2)]!) : 1;
+    const total = raw / load;
+    // (The per-file limit is read at the same load: a 91 s file at load 1.3 is a 70 s file.)
+    const long = own.filter(([, r]) => r.secs / load > budgets.gate.file_seconds).map(([f, r]) => `${f} ${r.secs}s`);
+    if (long.length) { over = true; console.log(`BUDGET: gate files over ${budgets.gate.file_seconds}s at the recorded load: ${long.join(", ")} ${say}`); }
+    console.log(`(budgets: the gate's files took ${raw.toFixed(0)} file-seconds${load > 1 ? `, ${total.toFixed(0)} at the recorded load (this run ran ${load.toFixed(2)}x slower)` : ""} of its ${budgets.gate.file_seconds_total})`);
+    if (total > budgets.gate.file_seconds_total) { over = true; console.log(`BUDGET: the gate's files took ${total.toFixed(0)} file-seconds (load-adjusted), over its ${budgets.gate.file_seconds_total} ${say}`); }
   } else if (tierFlag === "slow") {
     // (Less the seconds the run stood waiting on the machine with nothing of its own running.)
     const wall = (performance.now() - t0) / 1000 - stalled;

@@ -2,6 +2,8 @@
 // serve the explorer on 127.0.0.1. `oikos explore --all [--runs DIR] [more run dirs...]`: every run with a pilot, picked in
 // the page, each indexed when first opened. `oikos explore index <run-dir> [--rebuild]`: the index only.
 // `--rust` (with either): the built Rust data layer (kernel/crates/explore) answers the API instead of the TS index.
+// `--engine bevy`: the Bevy explorer (explorer/; built by `bun explorer/build.ts`) instead of the Three.js one; it implies
+// `--rust`.
 
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -29,7 +31,10 @@ export async function runExplore(argv: string[]): Promise<void> {
   const take = (name: string) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
   const has = (name: string) => { const i = args.indexOf(`--${name}`); if (i < 0) return false; args.splice(i, 1); return true; };
   const port = Number(take("port") ?? 4321), prefix = take("prefix") ?? "", runsDir = resolve(take("runs") ?? process.env.OIKOS_RUNS ?? defaultRuns());
-  const all = has("all"), rebuild = has("rebuild"), rust = has("rust");
+  const engine = take("engine") ?? "three";
+  if (engine !== "three" && engine !== "bevy") throw new Error(`--engine is three (the default) or bevy, not ${engine}`);
+  // (the Bevy explorer streams tracks by window and reads the Rust data layer: it never re-indexes in TS)
+  const all = has("all"), rebuild = has("rebuild"), rust = has("rust") || engine === "bevy";
   const say = (s: string) => console.error(s);
   if (args[0] === "index") {
     const dir = args[1];
@@ -51,8 +56,9 @@ export async function runExplore(argv: string[]): Promise<void> {
     if (rebuild) await openIndex(runs[0]!, { log: say, rebuild: true });
   }
   // (--rust: the Rust data layer answers /api; the TS index is not built. Default until the cut-over: the TS index.)
-  const layer = rust ? await startRust(runs, { log: say }) : undefined;
-  const { url } = await serve({ port, prefix: prefix.replace(/\/+$/, ""), runs, single, log: say, api: layer?.api });
+  // (the Bevy explorer shows a big town at once: a run with no seats is not read for pilot data first)
+  const layer = rust ? await startRust(runs, { log: say, onlySeated: engine === "bevy" }) : undefined;
+  const { url } = await serve({ port, prefix: prefix.replace(/\/+$/, ""), runs, single, log: say, api: layer?.api, engine });
   console.log(`explorer: ${url}${single ? "" : ` (${runs.length} runs)`}`);
 }
 

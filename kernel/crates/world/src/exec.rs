@@ -21,6 +21,7 @@ use crate::state::{transactions_key,
     Scheduled, Sex, State, Structure, Transaction,
 };
 use crate::statics::Statics;
+use oikos_core::Frozen;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -57,9 +58,16 @@ pub struct Exec<'a> {
     /// The buildings worked on by people sent to them, in the order first worked on (what they see is made when the
     /// act is done).
     pub worked_on: Vec<Id>,
+    /// The kinds a collection in this act took (what those who did it see is left of them at the buildings worked on).
+    pub collected: BTreeSet<Id>,
     /// Who the action named to do its work, and whether their being at work was looked at when it began (F3).
     pub by: &'a [Id],
     pub started: bool,
+    /// Goods sent by the outside's freight in this act: where to, and how long on the road.
+    pub freight: BTreeMap<Id, i64>,
+    /// The act being applied, when it is one begun before (law 9: a body on its way for it arrives; one on its way for
+    /// another act is not here to be moved).
+    pub act: Option<&'a str>,
 }
 
 pub struct ExecResult {
@@ -69,6 +77,8 @@ pub struct ExecResult {
     pub investigated: Option<Value>,
     /// The buildings worked on, each as those who worked on it left it (for the actor alone).
     pub seen: Vec<crate::sites::SiteStructure>,
+    /// Goods the act sent by the outside's freight: where to, and how long they take to get there (for the actor alone).
+    pub freight: BTreeMap<Id, i64>,
 }
 
 /// Can this participant act now? (Active, or opted out with a stand-in carrying on.)
@@ -83,12 +93,167 @@ pub fn can_act(p: &Participant) -> bool {
 /// Apply `blocks` for `participant` (in `position`, or as itself) to `st`. On error, `st` is left
 /// partly modified and must be discarded.
 pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id]) -> R<ExecResult> {
-    exec_action_seen(s, st, participant, position, blocks, by, None, false)
+    exec_action_seen(s, st, participant, position, blocks, by, None, false, None)
 }
 
 /// A person who is to do work: alive and in the world; and, if `at` is given, in that structure (in a space of the
 /// given kind, if given); else in a space of the kind the world says work is done in (`orchestration.performers_in`),
 /// if it says. The one rule for a `work`'s performers and for an action's `by` (foundations F3).
+/// A body sets out (law 9, foundations-2 S3): out of the space it is in, on its way to `to` until `arrives` (its own building
+/// again, for a visit there and back), driving `vehicle` (which goes with it) if it named one it may drive from here. A body
+/// that is dead, gone, already on its way or in no building does not set out; nor one whose vehicle is not there to take
+/// (its act is refused when due).
+#[allow(clippy::too_many_arguments)]
+pub fn depart(s: &Statics, st: &mut State, body: &str, to: &str, via: &[Id], fuel: Option<(Id, Money, i64)>, arrives: i64, vehicle: Option<&str>, act: Option<&str>, by: &str) -> Vec<Timed> {
+    if !st.body(body).is_some_and(|b| b.alive && b.present) || st.transit.contains_key(body) {
+        return vec![];
+    }
+    let Some(from) = st.structures_of(body).into_iter().next() else { return vec![] };
+    if act.is_some() && from == to && via.is_empty() {
+        return vec![];
+    }
+    let Some(space) = st.occupancy.get(&from).and_then(|m| m.iter().find(|(_, b)| b.contains(body)).map(|(sp, _)| *sp)) else { return vec![] };
+    if vehicle.is_some_and(|v| driven_speed(s, st, v, body, &from).is_err()) {
+        return vec![];
+    }
+    let mut events = vec![];
+    // (Its fuel, S5: drawn from its owner's holding at the vehicle as it sets out; too little now, it does not set out.)
+    if let (Some(v), Some((kind, _, metres))) = (vehicle, fuel) {
+        let x = st.vehicles[v].clone();
+        let per = s.config.travel.as_ref().and_then(|t| t.vehicle_types.iter().find(|t| t.id == x.type_)).and_then(|t| t.fuel_per_100km).unwrap_or(0);
+        let owed = x.fuel_owed as i128 + metres as i128 * per as i128 * 10;
+        let q = (owed / 1_000_000) as Money;
+        let key = crate::state::holding_key(&x.owner, v, &kind);
+        let have = st.holdings.get(&key).map_or(0, |h| h.quantity);
+        if have < q {
+            return vec![];
+        }
+        st.vehicles.get_mut(v).unwrap().fuel_owed = (owed % 1_000_000) as i64;
+        if q > 0 {
+            let c = st.stamp();
+            st.holdings.insert(key, crate::state::Holding { kind, holder: x.owner, at: Id::new(v), quantity: have - q, changed: c });
+            events.push(Timed::new(st.t, EventBody::FuelUsed { vehicle: Id::new(v), kind, quantity: q, metres, by: Id::new(by) }));
+        }
+    }
+    leave_spaces(s, st, &from, Some(body), None, VacateReason::Left, Some(by), &mut events);
+    st.touch_structure(&from);
+    st.moved(body);
+    if let Some(v) = vehicle {
+        st.vehicles.get_mut(v).unwrap().at = Id::new(body);
+    }
+    let t = st.t;
+    st.transit.insert(Id::new(body), crate::state::Transit { from, space, to: Id::new(to), via: via.to_vec(), departed: t, arrives, vehicle: vehicle.map(Id::new), act: act.map(Id::new) });
+    events
+}
+
+/// Where a body on its way has come to at `t` (law 9): the cell that far along the trip, by the straight line between the
+/// buildings it goes by (the known limit: the way is not drawn cell by cell).
+pub fn where_on_the_way(st: &State, tr: &crate::state::Transit, t: i64) -> Option<Id> {
+    let cell_of = |sid: &Id| st.structures.get(sid).and_then(|x| crate::config::cell_xy(&x.at));
+    let mut pts: Vec<(i64, i64)> = std::iter::once(&tr.from).chain(tr.via.iter()).chain(std::iter::once(&tr.to)).filter_map(cell_of).collect();
+    if tr.to == tr.from && tr.via.is_empty() {
+        // (A visit there and back: half the way out, half back; its places are not kept, so the body lies at home's door.)
+        pts.truncate(1);
+    }
+    let first = *pts.first()?;
+    let lens: Vec<i64> = pts.windows(2).map(|p| (p[1].0 - p[0].0).abs() + (p[1].1 - p[0].1).abs()).collect();
+    let total: i64 = lens.iter().sum();
+    let span = (tr.arrives - tr.departed).max(1);
+    let mut d = (total as i128 * (t - tr.departed).clamp(0, span) as i128 / span as i128) as i64;
+    let mut at = first;
+    for (i, l) in lens.iter().enumerate() {
+        if d <= *l {
+            let (a, b) = (pts[i], pts[i + 1]);
+            at = (a.0 + (b.0 - a.0) * d / (*l).max(1), a.1 + (b.1 - a.1) * d / (*l).max(1));
+            break;
+        }
+        d -= l;
+        at = pts[i + 1];
+    }
+    let id = Id::new(&crate::config::cell_id(at.0, at.1));
+    st.cells.contains_key(&id).then_some(id)
+}
+
+/// Whoever comes by the dead lying on the road sees them (law 9: they are there): at the end of a trip, each of the remains
+/// within a cell and a half of the way it went (the straight line between the buildings it went by) is seen, as a look at
+/// that cell would show it, through the channel of what one saw on one's way (`config::ON_THE_WAY`).
+pub fn seen_on_the_way(s: &Statics, st: &mut State, body: &str, tr: &crate::state::Transit) {
+    if st.remains.is_empty() {
+        return;
+    }
+    let cell_of = |sid: &Id| st.structures.get(sid).and_then(|x| crate::config::cell_xy(&x.at));
+    let pts: Vec<(i64, i64)> = std::iter::once(&tr.from).chain(tr.via.iter()).chain(std::iter::once(&tr.to)).filter_map(cell_of).collect();
+    let near = |r: (i64, i64)| {
+        pts.windows(2).any(|p| {
+            let ((ax, ay), (bx, by)) = (p[0], p[1]);
+            let (dx, dy, rx, ry) = ((bx - ax) as i128, (by - ay) as i128, (r.0 - ax) as i128, (r.1 - ay) as i128);
+            let len2 = dx * dx + dy * dy;
+            if len2 == 0 {
+                return rx * rx + ry * ry <= 2;
+            }
+            let dot = rx * dx + ry * dy;
+            let cross = rx * dy - ry * dx;
+            (0..=len2).contains(&dot) && cross * cross <= 2 * len2
+        }) || pts.iter().any(|p| (p.0 - r.0).pow(2) + (p.1 - r.1).pow(2) <= 2)
+    };
+    let mut cells: Vec<Id> = st.remains.iter().filter(|(dead, _)| dead.as_str() != body).map(|(_, c)| *c).filter(|c| crate::config::cell_xy(c).is_some_and(near)).collect();
+    cells.sort();
+    cells.dedup();
+    if cells.is_empty() {
+        return;
+    }
+    let Some(participant) = st.body(body).and_then(|b| b.participant).filter(|p| st.participants.contains_key(p.as_str())) else { return };
+    // (Shown as a look at that cell, through a channel of its own: what one saw on one's way, `ON_THE_WAY`.)
+    let channel = Id::new(crate::config::ON_THE_WAY);
+    let mut shown = vec![];
+    let seen: Vec<crate::sites::SiteCell> = cells.iter().filter_map(|c| st.cells.get(c).map(|x| crate::sites::site_cell(s, st, c, x, body, false, &mut shown))).collect();
+    let t = st.t;
+    Arc::make_mut(st.participants.get_mut(participant.as_str()).unwrap()).pending.entry(crate::config::SELF.to_string()).or_default().visits.push(crate::sites::Visited { channel, as_of: t, cells: seen });
+}
+
+/// A body on its way for an act that was refused, or back from a visit: it is where it set out from, in the space it left
+/// (if there is still room), and its vehicle with it. (A refused trip's way there and back is the known limit: the time
+/// was spent, the body is home.) Dead or gone on the way: only off the road.
+pub fn come_back(s: &Statics, st: &mut State, body: &str, by: &str) -> Vec<Timed> {
+    let Some(tr) = st.transit.remove(body) else { return vec![] };
+    if let Some(v) = tr.vehicle.and_then(|v| st.vehicles.get_mut(&v)) {
+        v.at = tr.from;
+    }
+    seen_on_the_way(s, st, body, &tr);
+    if !st.body(body).is_some_and(|b| b.alive && b.present) {
+        return vec![];
+    }
+    let room = st.structures.get(&tr.from).is_some_and(|x| x.complete) && crate::config::split_space(&tr.space).and_then(|(sid, local)| st.structures.get(sid).and_then(|x| s.space(&x.structure_type, local))).is_some_and(|spec| st.occupancy.get(&tr.from).and_then(|m| m.get(&tr.space)).map_or(0, |b| b.len()) < spec.capacity as usize);
+    if !room {
+        return vec![];
+    }
+    settle(s, st, &tr.from);
+    st.enter(&tr.from, &tr.space, body);
+    st.touch_structure(&tr.from);
+    st.moved(body);
+    vec![Timed::new(st.t, EventBody::Occupied { occupant: Id::new(body), space: tr.space, by: Id::new(by), vehicle: tr.vehicle })]
+}
+
+/// The bodies an act was taking somewhere, back where they set out, the act refused.
+pub fn turn_back(s: &Statics, st: &mut State, act: &str, by: &str) -> Vec<Timed> {
+    let bodies: Vec<Id> = st.transit.iter().filter(|(_, t)| t.act.as_deref() == Some(act)).map(|(b, _)| *b).collect();
+    bodies.iter().flat_map(|b| come_back(s, st, b, by)).collect()
+}
+
+/// The speed a body drives a vehicle at (law 9, foundations-2 S2): one it may drive (its owner's, or one its owner lets),
+/// standing where the body sets out from; refused otherwise.
+pub fn driven_speed(s: &Statics, st: &State, vehicle: &str, body: &str, from: &str) -> R<i64> {
+    let v = st.vehicles.get(vehicle).ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("no vehicle {vehicle}")))?;
+    if !v.may_drive(body) {
+        return Err(refuse(RefusalCode::NotTheirs, format!("{body} may not drive {vehicle}")));
+    }
+    if v.at != from {
+        return Err(refuse(RefusalCode::NotPresent, format!("{vehicle} is at {}, not at {from}", v.at)));
+    }
+    let t = s.config.travel.as_ref().and_then(|t| t.vehicle_types.iter().find(|x| x.id == v.type_));
+    Ok(t.map_or(1, |t| t.speed_kmh))
+}
+
 pub fn check_at_work(s: &Statics, st: &State, p: &str, at: Option<&str>, space: Option<&str>) -> R<()> {
     // (A system has no body to be anywhere: it does the work while it is in service. Whether its template lists the
     // work is looked at when the act is ordered, `check_system_does`.)
@@ -142,7 +307,7 @@ pub fn check_system_does(s: &Statics, st: &State, sys: &str, org: Option<&str>, 
         }
     }
     // (Every system names a template, and a template says what it does: the world does not load otherwise.)
-    let rows: &[oikos_contracts::config::Does] = x.template.as_ref().and_then(|t| s.templates.get(t)).and_then(|t| t.does.as_deref()).unwrap_or(&[]);
+    let rows: &[oikos_contracts::config::Does] = x.template.as_ref().and_then(|t| s.templates.get(t.as_str())).and_then(|t| t.does.as_deref()).unwrap_or(&[]);
     for b in blocks {
         let makes = b.makes();
         if !rows.iter().any(|r| r.covers(b.name(), makes.as_deref())) {
@@ -167,7 +332,8 @@ pub fn may_direct(st: &State, entity: &str, person: &str) -> bool {
     });
     holds
         || st.agreements_of.get(person).into_iter().flatten().any(|id| {
-            let Some(RecordBody::Agreement { terms }) = st.records.get(id).map(|r| &r.record.body) else { return false };
+            let Some(r) = st.records.get(id).map(|r| r.record()) else { return false };
+            let RecordBody::Agreement { terms } = &r.body else { return false };
             terms.parties.iter().any(|p| p == entity) && {
                 let m = st.marks.get(id).cloned().unwrap_or_default();
                 matches!(oikos_terms::read(terms, &m.signatures, &m.notices, st.t).status, "in_force" | "ending")
@@ -193,7 +359,7 @@ pub fn inactive_refusal(st: &State, participant: &str, position: Option<&str>) -
 /// What `exec_action` takes besides the blocks, for an act whose work was ordered earlier: `seen` says who was where
 /// when it was; `by` is who the action named; `started` that the performers' being there was looked at when the work
 /// began (so it is not looked at again when it ends).
-pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], seen: Option<&BTreeMap<Id, Vec<Id>>>, started: bool) -> R<ExecResult> {
+pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], seen: Option<&BTreeMap<Id, Vec<Id>>>, started: bool, act: Option<&str>) -> R<ExecResult> {
     let p = st.participants.get(participant).ok_or_else(|| refuse(RefusalCode::UnknownParticipant, format!("no participant {participant}")))?;
     if !can_act(p) {
         return Err(inactive_refusal(st, participant, position));
@@ -204,9 +370,9 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
             if x.holder.as_deref() != Some(participant) {
                 return Err(refuse(RefusalCode::NotInPosition, format!("{participant} doesn't hold {pos}")));
             }
-            x.entity.clone()
+            x.entity
         }
-        None => p.person.clone().ok_or_else(|| refuse(RefusalCode::NotInPosition, format!("{participant} is a system: it acts only in a position")))?,
+        None => { p.person.ok_or_else(|| refuse(RefusalCode::NotInPosition, format!("{participant} is a system: it acts only in a position")))?}
     };
     // A person's participant acts through a body that lives.
     if p.kind == ParticipantKind::Person {
@@ -235,7 +401,7 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
             }
         }
     }
-    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, seen, worked_on: vec![], by, started };
+    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, seen, worked_on: vec![], collected: BTreeSet::new(), by, started, freight: BTreeMap::new(), act };
     for (i, b) in blocks.iter().enumerate() {
         ex.block(b, i).map_err(|mut r| {
             r.block.get_or_insert(i);
@@ -244,8 +410,21 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
     }
     // Those who did the work were there: each building worked on, as it is when the act is done (one brought down
     // by it leaves nothing to see).
-    let seen = ex.worked_on.iter().filter(|sid| ex.st.structures.contains_key(*sid)).map(|sid| crate::sites::site_structure(ex.s, ex.st, sid, &ex.entity, false)).collect();
-    Ok(ExecResult { events: ex.events, created: ex.refs, surveyed: ex.surveyed, investigated: ex.investigated, seen })
+    let seen = ex
+        .worked_on
+        .iter()
+        .filter(|sid| ex.st.structures.contains_key(*sid))
+        .map(|sid| {
+            let mut x = crate::sites::site_structure(ex.s, ex.st, sid, &ex.entity, false);
+            // (A bin emptied: what is left of what was collected, as those who emptied it saw.)
+            for k in &ex.collected {
+                let left: Money = ex.st.holdings.values().filter(|h| &h.at == sid && &h.kind == k && h.holder != ex.entity).map(|h| h.quantity.max(0)).sum();
+                x.left.insert(*k, left);
+            }
+            x
+        })
+        .collect();
+    Ok(ExecResult { events: ex.events, created: ex.refs, surveyed: ex.surveyed, investigated: ex.investigated, seen, freight: ex.freight })
 }
 
 // ---------------- life: shared by acts and scheduled effects ----------------
@@ -282,13 +461,13 @@ fn begin_condition(s: &Statics, st: &mut State, person: &str, kind: ConditionKin
     let t = st.t;
     let id = st.mint("cnd");
     if let Some(b) = st.entities.get_mut(person).and_then(|e| e.body.as_mut()) {
-        b.conditions.push(Condition { id: id.clone(), kind, severity: severity.clone(), since: t, until, death_at: death_at.map(|d| d.max(t)), treated: false });
+        b.conditions.push(Condition { id, kind, severity: severity.clone(), since: t, until, death_at: death_at.map(|d| d.max(t)), treated: false });
     }
-    st.schedule(until.max(t + s.tick), Sched::ConditionEnds { person: person.into(), condition: id.clone() });
+    st.schedule(until.max(t + s.tick), Sched::ConditionEnds { person: person.into(), condition: id });
     if let Some(d) = death_at {
-        st.schedule(d.max(t), Sched::Death { person: person.into(), cause: death_cause(kind), condition: Some(id.clone()) });
+        st.schedule(d.max(t), Sched::Death { person: person.into(), cause: death_cause(kind), condition: Some(id) });
     }
-    (id.clone(), vec![Timed::new(t, EventBody::ConditionBegan { person: person.into(), condition: id, kind, severity, until })])
+    (id, vec![Timed::new(t, EventBody::ConditionBegan { person: person.into(), condition: id, kind, severity, until })])
 }
 
 /// The whole day a time falls in.
@@ -307,16 +486,15 @@ pub fn variable_at(st: &State, sid: &str, var: &crate::config::VariableCfg, t: i
     let x = st.structures.get(sid)?;
     let (v, since) = *x.variables.get(&var.id)?;
     let days = (day_of(t) - since).max(0);
-    let occupants = st.occupancy.get(sid).map_or(0, |m| m.values().map(|b| b.len()).sum::<usize>()) as i64;
-    let rate = var.per_day.saturating_add(var.per_occupant_per_day.saturating_mul(occupants));
+    let rate = var.per_day;
     Some(v.saturating_add(rate.saturating_mul(days)).clamp(var.min, var.max))
 }
 
 /// Settle a structure's variables to now: before its occupancy changes, or work changes one.
 fn settle(s: &Statics, st: &mut State, sid: &str) {
     let t = st.t;
-    let Some(ty) = st.structures.get(sid).map(|x| x.structure_type.clone()) else { return };
-    let now: Vec<(Id, i64)> = vars_for(s, &ty).filter_map(|v| variable_at(st, sid, v, t).map(|x| (v.id.clone(), x))).collect();
+    let Some(ty) = st.structures.get(sid).map(|x| x.structure_type) else { return };
+    let now: Vec<(Id, i64)> = vars_for(s, &ty).filter_map(|v| variable_at(st, sid, v, t).map(|x| (v.id, x))).collect();
     if let Some(x) = st.structures.get_mut(sid) {
         for (id, v) in now {
             x.variables.insert(id, (v, day_of(t)));
@@ -326,7 +504,7 @@ fn settle(s: &Statics, st: &mut State, sid: &str) {
 
 /// A structure's variables at their initial values, from a time (when it's begun, or at genesis).
 pub fn init_variables(s: &Statics, ty: &str, t: i64) -> std::collections::BTreeMap<Id, (i64, i64)> {
-    vars_for(s, ty).map(|v| (v.id.clone(), (v.initial, day_of(t)))).collect()
+    vars_for(s, ty).map(|v| (v.id, (v.initial, day_of(t)))).collect()
 }
 
 /// Bodies leave a structure's spaces: the one way out, whatever the cause (leaving, being removed, dying, crossing out
@@ -356,9 +534,9 @@ fn leave_spaces(s: &Statics, st: &mut State, sid: &str, who: Option<&str>, only:
             match who {
                 Some(w) => {
                     bodies.remove(w);
-                    left.push((space.clone(), w.to_string()));
+                    left.push((*space, w.to_string().into()));
                 }
-                None => left.extend(std::mem::take(bodies).into_iter().map(|b| (space.clone(), b))),
+                None => left.extend(std::mem::take(bodies).into_iter().map(|b| (*space, b))),
             }
         }
         m.retain(|_, b| !b.is_empty());
@@ -369,7 +547,7 @@ fn leave_spaces(s: &Statics, st: &mut State, sid: &str, who: Option<&str>, only:
     for (space, body) in &left {
         st.left_space(sid, body);
         st.record_departure(space, body, reason);
-        events.push(Timed::new(t, EventBody::Vacated { occupant: body.clone(), space: space.clone(), by: by.map(String::from), reason }));
+        events.push(Timed::new(t, EventBody::Vacated { occupant: *body, space: *space, by: by.map(String::from).map(Into::into), reason }));
     }
     left
 }
@@ -417,7 +595,7 @@ fn end_participant(st: &mut State, participant: &str, reason: EndReason) -> Vec<
 
 /// Every seat sharing a person's body (a model in one of the person's posts), apart from the person's own participant.
 fn seats_of(st: &State, person: &str, own: Option<&str>) -> Vec<Id> {
-    st.participants.iter().filter(|(id, p)| p.person.as_deref() == Some(person) && own != Some(id.as_str()) && p.status != ParticipantStatus::Ended).map(|(id, _)| id.clone()).collect()
+    st.participants.iter().filter(|(id, p)| p.person.as_deref() == Some(person) && own != Some(id.as_str()) && p.status != ParticipantStatus::Ended).map(|(id, _)| *id).collect()
 }
 
 fn die(s: &Statics, st: &mut State, person: &str, cause: DeathCause) -> Vec<Timed> {
@@ -426,14 +604,25 @@ fn die(s: &Statics, st: &mut State, person: &str, cause: DeathCause) -> Vec<Time
     if !b.alive {
         return vec![];
     }
-    let participant = b.participant.clone();
+    let participant = b.participant;
     let seats = seats_of(st, person, participant.as_deref());
     let mut events = vacate_all(s, st, person, VacateReason::Died, None);
+    // (Dead on the way, law 9: the body lies where it had come to on the road, and its vehicle with it.)
+    let mut lies_at = None;
+    if let Some(tr) = st.transit.remove(person) {
+        if let Some(cell) = where_on_the_way(st, &tr, t) {
+            if let Some(v) = tr.vehicle.and_then(|v| st.vehicles.get_mut(&v)) {
+                v.at = cell;
+            }
+            st.remains.insert(Id::new(person), cell);
+            lies_at = Some(cell);
+        }
+    }
     if let Some(b) = st.entities.get_mut(person).and_then(|e| e.body.as_mut()) {
         b.alive = false;
         b.conditions.clear();
     }
-    events.push(Timed::new(t, EventBody::PersonDied { person: person.into(), died_of: cause }));
+    events.push(Timed::new(t, EventBody::PersonDied { person: person.into(), died_of: cause, lies_at }));
     if let Some(p) = participant {
         events.extend(end_participant(st, &p, EndReason::Died));
     }
@@ -484,13 +673,13 @@ fn create_participant(s: &Statics, st: &mut State, template: &str, person: Optio
     let traits = draw_traits(s, &tpl.traits, &id);
     let c = st.stamp();
     st.participants.insert(
-        id.clone(),
+        id,
         Arc::new(Participant {
             kind: tpl.kind,
-            person: person.clone(),
-            owner: owner.clone(),
+            person,
+            owner,
             template: Some(template.into()),
-            supplier: supplier.clone(),
+            supplier,
             def: Arc::new(ParticipantDef {
                 title: title.or_else(|| tpl.title.clone()),
                 channels: Arc::new(tpl.channels.clone()),
@@ -507,7 +696,7 @@ fn create_participant(s: &Statics, st: &mut State, template: &str, person: Optio
             looks: BTreeMap::new(),
         }),
     );
-    let ev = Timed::new(t, EventBody::ParticipantCreated { participant: id.clone(), kind: tpl.kind, person, owner, template: template.into(), supplier, traits });
+    let ev = Timed::new(t, EventBody::ParticipantCreated { participant: id, kind: tpl.kind, person, owner, template: template.into(), supplier, traits });
     (id, vec![ev])
 }
 
@@ -519,7 +708,7 @@ fn create_person(s: &Statics, st: &mut State, name: &str, born_at: i64, sex: Opt
     let id = st.mint("ent");
     let c = st.stamp();
     st.entities.insert(
-        id.clone(),
+        id,
         Entity {
             kind: PERSON.into(),
             name: name.into(),
@@ -531,16 +720,16 @@ fn create_person(s: &Statics, st: &mut State, name: &str, born_at: i64, sex: Opt
     // The parents' bodies record the child.
     for p in &parents {
         if let Some(b) = st.entities.get_mut(p).and_then(|e| e.body.as_mut()) {
-            b.children.push(id.clone());
+            b.children.push(id);
         }
         if let Some(e) = st.entities.get_mut(p) {
             e.changed = c;
         }
     }
-    let (pid, mut pev) = create_participant(s, st, template, Some(id.clone()), None, None, None);
-    st.entities.get_mut(&id).unwrap().body.as_mut().unwrap().participant = Some(pid.clone());
+    let (pid, mut pev) = create_participant(s, st, template, Some(id), None, None, None);
+    st.entities.get_mut(&id).unwrap().body.as_mut().unwrap().participant = Some(pid);
     schedule_birthday(s, st, &id, born_at);
-    let mut events = vec![Timed::new(t, EventBody::PersonCreated { person: id.clone(), name: name.into(), born_at, sex, parents, participant: Some(pid) })];
+    let mut events = vec![Timed::new(t, EventBody::PersonCreated { person: id, name: name.into(), born_at, sex, parents, participant: Some(pid) })];
     events.append(&mut pev);
     (id, events)
 }
@@ -580,7 +769,7 @@ fn yearly_draws(s: &Statics, st: &mut State, person: &str, t: i64) {
     if let Some(oc) = &life.other_causes {
         if within(oc.at(age) as i64, "other") {
             let at = t + uniform(s, &["life", &person, &a, "other-when"], window);
-            st.schedule(at, Sched::Death { person: person.clone(), cause: DeathCause::Other, condition: None });
+            st.schedule(at, Sched::Death { person: person.clone().into(), cause: DeathCause::Other, condition: None });
         }
     }
     if let Some(ill) = life.illness.as_ref().filter(|ill| !ill.fields.is_empty()) {
@@ -591,7 +780,7 @@ fn yearly_draws(s: &Statics, st: &mut State, person: &str, t: i64) {
         let max_bps = p.saturating_add(most).clamp(0, 10_000) as u32;
         if max_bps > 0 && within(max_bps as i64, "ill") {
             let at = t + uniform(s, &["life", &person, &a, "ill-when"], window);
-            st.schedule(at, Sched::IllnessExposure { person: person.clone(), max_bps, age });
+            st.schedule(at, Sched::IllnessExposure { person: person.clone().into(), max_bps, age });
         }
     } else if let Some(ill) = &life.illness {
         let p = crate::config::ByAge { by_age: ill.by_age.clone() }.at(age);
@@ -599,7 +788,7 @@ fn yearly_draws(s: &Statics, st: &mut State, person: &str, t: i64) {
             let onset = t + uniform(s, &["life", &person, &a, "ill-when"], window);
             let (severity, duration, death) = draw_severity(s, &ill.severity, age, &["life", &person, &a, "ill-how"]);
             st.schedule(onset, Sched::ConditionBegins {
-                person: person.clone(), kind: ConditionKind::Illness, severity, until: onset + duration, death_at: death.map(|d| onset + d),
+                person: person.clone().into(), kind: ConditionKind::Illness, severity, until: onset + duration, death_at: death.map(|d| onset + d),
             });
         }
     }
@@ -608,10 +797,10 @@ fn yearly_draws(s: &Statics, st: &mut State, person: &str, t: i64) {
         let max_bps = (inj.bps + most * 2).min(10_000);
         if max_bps > 0 && within(max_bps as i64, "exposed") {
             let at = t + uniform(s, &["life", &person, &a, "exposed-when"], window);
-            st.schedule(at, Sched::Exposure { person: person.clone(), max_bps });
+            st.schedule(at, Sched::Exposure { person: person.clone().into(), max_bps });
         }
     }
-    st.schedule(born + (age + 1) * year, Sched::Birthday { person: person.clone() });
+    st.schedule(born + (age + 1) * year, Sched::Birthday { person: person.clone().into() });
 }
 
 
@@ -635,9 +824,9 @@ pub fn nature_land(s: &Statics, st: &State, ground: &oikos_nature::Ground) -> oi
             _ => &st.cells[id],
         };
         let building = c.structure.as_ref().and_then(|x| st.structures.get(x));
-        land.cover.push(oikos_nature::cover_of(cat, c.terrain.as_deref(), building.map(|b| s.types.get(&b.structure_type).and_then(|t| t.cover.as_deref()))));
+        land.cover.push(oikos_nature::cover_of(cat, c.terrain.as_deref(), building.map(|b| s.types.get(b.structure_type.as_str()).and_then(|t| t.cover.as_deref()))));
         land.built.push(building.is_some());
-        land.anchored.push(building.filter(|b| &b.at == id && b.complete).map(|b| vec![b.structure_type.clone()]).unwrap_or_default());
+        land.anchored.push(building.filter(|b| &b.at == id && b.complete).map(|b| vec![b.structure_type]).unwrap_or_default());
     }
     land
 }
@@ -652,7 +841,7 @@ fn nature_day(s: &Statics, st: &mut State, day: i64) -> Vec<Timed> {
     let out = oikos_nature::step_day(&s.config.catalogue, ground, &land, &mut n, day, &s.randomness);
     let mut events = vec![];
     // Cells whose look changed: a cover that succeeded, or a conspicuous species come or gone (views deliver changes).
-    let mut touched: BTreeSet<Id> = out.cover_changes.iter().map(|(c, _)| c.clone()).collect();
+    let mut touched: BTreeSet<Id> = out.cover_changes.iter().map(|(c, _)| *c).collect();
     for sp in s.config.catalogue.species.iter().filter(|sp| sp.conspicuous) {
         let (before, after) = (now.populations.get(&sp.id), n.populations.get(&sp.id));
         let cells: BTreeSet<&Id> = before.into_iter().chain(after).flat_map(|m| m.keys()).collect();
@@ -660,7 +849,7 @@ fn nature_day(s: &Statics, st: &mut State, day: i64) -> Vec<Timed> {
             let had = before.is_some_and(|m| m.contains_key(cell));
             let has = after.is_some_and(|m| m.contains_key(cell));
             if had != has {
-                touched.insert(cell.clone());
+                touched.insert(*cell);
             }
         }
     }
@@ -668,7 +857,7 @@ fn nature_day(s: &Statics, st: &mut State, day: i64) -> Vec<Timed> {
         let c = st.stamp();
         for (cell, cover) in &out.cover_changes {
             if let Some(x) = st.cells.get_mut(cell) {
-                x.terrain = Some(cover.clone());
+                x.terrain = Some(cover.to_string());
             }
         }
         if !out.cover_changes.is_empty() {
@@ -704,14 +893,14 @@ fn floods(s: &Statics, st: &mut State, t: i64) -> Vec<Timed> {
     let ids: Vec<Id> = st.structures.keys().cloned().collect();
     for sid in ids {
         let x = &st.structures[&sid];
-        let Some(fl) = s.types.get(&x.structure_type).and_then(|ty| ty.floods.clone()) else { continue };
+        let Some(fl) = s.types.get(x.structure_type.as_str()).and_then(|ty| ty.floods.clone()) else { continue };
         let base = s.config.catalogue.fields.iter().find(|f| f.id == fl.field).map_or(0, |f| f.baseline);
         let level = x.cells.iter().map(|c| st.nature.as_deref().and_then(|n| n.fields.get(&fl.field)).and_then(|m| m.get(c)).copied().unwrap_or(base)).max().unwrap_or(base);
         let was = st.flooded.contains(&sid);
         if level > fl.above {
             if !was {
-                st.flooded.insert(sid.clone());
-                events.push(Timed::new(t, EventBody::Flooded { structure: sid.clone(), level }));
+                st.flooded.insert(sid);
+                events.push(Timed::new(t, EventBody::Flooded { structure: sid, level }));
                 // (Settled as it floods, whether or not anyone is inside: its wear is about to rise.)
                 settle(s, st, &sid);
                 for (_, b) in leave_spaces(s, st, &sid, None, None, VacateReason::Flooded, None, &mut events) {
@@ -743,20 +932,39 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
     let t = item.at;
     match item.what {
         Sched::NatureDay { day } => nature_day(s, st, day),
+        Sched::Settle => crate::network::settle(s, st, t),
         Sched::CounterCensus => {
             st.schedule(t + 30 * 86_400, Sched::CounterCensus);
             vec![Timed::new(t, EventBody::CounterCensus { counters: st.totals.clone() })]
+        }
+        Sched::SkillCensus => {
+            st.schedule(t + 30 * 86_400, Sched::SkillCensus);
+            let mut skills: BTreeMap<Id, Vec<i64>> = BTreeMap::new();
+            for cfg in s.config.catalogue.body_variables.iter().filter(|v| v.practice.is_some() && v.max > v.min) {
+                let mut bands = vec![0i64; 10];
+                for b in st.entities.values().filter_map(|e| e.body.as_ref()).filter(|b| b.alive) {
+                    let v = b.variables.get(&cfg.id).map_or(cfg.initial, |x| crate::state::body_variable_at(cfg, *x, t).0);
+                    let band = ((v - cfg.min) as i128 * 10 / (cfg.max - cfg.min) as i128).clamp(0, 9) as usize;
+                    bands[band] += 1;
+                }
+                skills.insert(cfg.id, bands);
+            }
+            vec![Timed::new(t, EventBody::SkillCensus { skills })]
         }
         Sched::StructureComplete { structure } => match st.structures.get_mut(&structure) {
             Some(x) if !x.complete && x.completes_at == Some(item.at) => {
                 // Its time is up; it's complete if its building work is done too (phase B), or else as soon as it is.
                 x.completes_at = None;
-                let needed = s.types.get(&x.structure_type).map_or(0, |ty| ty.build_labour);
+                let needed = s.types.get(x.structure_type.as_str()).map_or(0, |ty| ty.build_labour);
                 if x.labour_done < needed {
                     st.touch_structure(&structure);
                     return vec![];
                 }
                 x.complete = true;
+                // (A way finished is part of the ways from now: trips are worked out afresh.)
+                if s.types.get(x.structure_type.as_str()).is_some_and(|ty| ty.way.is_some()) {
+                    st.ground.changed();
+                }
                 st.touch_structure(&structure);
                 vec![Timed::new(t, EventBody::StructureCompleted { structure })]
             }
@@ -775,7 +983,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             }
             // The danger where the body is now: the baseline, plus each place it's in (thinning:
             // this candidate was drawn at the highest rate, and is kept at the true one).
-            let here: u32 = st.structures_of(&person).iter().filter_map(|sid| s.types.get(&st.structures[sid].structure_type)?.injury_bps).sum();
+            let here: u32 = st.structures_of(&person).iter().filter_map(|sid| s.types.get(st.structures[sid].structure_type.as_str())?.injury_bps).sum();
             let rate = (inj.bps + here).min(max_bps);
             let tk = t.to_string();
             if uniform(s, &["life", &person, &tk, "injured"], max_bps as i64) >= rate as i64 {
@@ -793,7 +1001,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             }
             let base = crate::config::ByAge { by_age: ill.by_age.clone() }.at(age) as i64;
             // The fields in the cell where the body is (the corner cell of a structure it's in); none outside one.
-            let cell = st.structures_of(&person).first().map(|sid| st.structures[sid].at.clone());
+            let cell = st.structures_of(&person).first().map(|sid| st.structures[sid].at);
             let extra: i64 = cell.map_or(0, |c| {
                 ill.fields
                     .iter()
@@ -843,16 +1051,29 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             if !st.participants.get(&participant).is_some_and(|p| p.status == crate::state::ParticipantStatus::Active) {
                 return vec![];
             }
-            let channel = look.channel.clone();
-            let key = position.clone().unwrap_or_else(|| crate::config::SELF.to_string());
-            let pending = std::sync::Arc::make_mut(st.participants.get_mut(&participant).unwrap()).pending.entry(key).or_default();
+            let channel = look.channel;
+            let key = position.unwrap_or_else(|| (crate::config::SELF.to_string()).into());
+            let pending = std::sync::Arc::make_mut(st.participants.get_mut(&participant).unwrap()).pending.entry(key.to_string()).or_default();
             if let Some(i) = pending.asked.iter().position(|c| *c == look.channel) {
                 pending.asked.remove(i);
             }
             pending.asks.push(look);
             vec![Timed::new(t, EventBody::AskAnswered { participant, position, channel })]
         }
-        Sched::Visit { participant, position, channel, places, cells, names } => crate::sites::end(s, st, &participant, position.as_deref(), &channel, places, &cells, names),
+        Sched::Visit { participant, position, channel, places, cells, names } => {
+            let person = st.participants.get(participant.as_str()).filter(|_| position.is_none()).and_then(|p| p.person);
+            let mut out = person.map(|b| come_back(s, st, &b, &participant)).unwrap_or_default();
+            out.extend(crate::sites::end(s, st, &participant, position.as_deref(), &channel, places, &cells, names));
+            out
+        }
+        Sched::Depart { body, to, via, fuel, arrives, vehicle, act, by } => depart(s, st, &body, &to, &via, fuel, arrives, vehicle.as_deref(), act.as_deref(), &by),
+        Sched::Arrival { kind, quantity, holder, at } => {
+            let key = crate::state::holding_key(&holder, &at, &kind);
+            let q = st.holdings.get(&key).map_or(0, |h| h.quantity).saturating_add(quantity).clamp(-MAX_MONEY, MAX_MONEY);
+            let c = st.stamp();
+            st.holdings.insert(key, crate::state::Holding { kind, holder, at, quantity: q, changed: c });
+            vec![]
+        }
         Sched::BirthDue { parents, name, template } => {
             let Some(b) = st.body(&parents[0]) else { return vec![] };
             if !b.alive {
@@ -891,7 +1112,7 @@ impl<'a> Exec<'a> {
                 .get(name)
                 .cloned()
                 .ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("${name} is not bound earlier in this action"))),
-            None => Ok(x.to_string()),
+            None => Ok(Id::new(x)),
         }
     }
 
@@ -908,7 +1129,7 @@ impl<'a> Exec<'a> {
 
     fn bind(&mut self, name: &Option<String>, id: &str) -> R<()> {
         if let Some(n) = name {
-            if self.refs.insert(n.clone(), id.to_string()).is_some() {
+            if self.refs.insert(n.clone(), id.to_string().into()).is_some() {
                 return Err(refuse(RefusalCode::DuplicateRef, format!("${n} is bound twice")));
             }
         }
@@ -957,7 +1178,7 @@ impl<'a> Exec<'a> {
         if (self.now() - b.born_at) / life.year >= majority as i64 {
             return no("decides for themselves: nobody else can take them out of the world");
         }
-        let kin = b.parents.iter().any(|p| *p == self.entity || self.st.body(p).is_some_and(|pb| pb.parents.iter().any(|g| *g == self.entity)));
+        let kin = b.parents.iter().any(|p| *p == self.entity || self.st.body(p).is_some_and(|pb| pb.parents.contains(&self.entity)));
         let guardian = self.position.is_some_and(|p| life.guardians.iter().any(|g| g == p));
         if kin || guardian || (b.parents.is_empty() && self.position.is_none()) {
             Ok(())
@@ -968,7 +1189,7 @@ impl<'a> Exec<'a> {
 
     fn acting_person(&self) -> R<Id> {
         match self.position {
-            None => Ok(self.entity.clone()),
+            None => Ok(self.entity),
             Some(p) => Err(refuse(RefusalCode::NotAPerson, format!("acting as {p}, not as a person"))),
         }
     }
@@ -977,7 +1198,7 @@ impl<'a> Exec<'a> {
     fn own_body(&self) -> R<Id> {
         self.st.participants[self.participant]
             .person
-            .clone()
+
             .ok_or_else(|| refuse(RefusalCode::NotAPerson, format!("{} is a system and has no body", self.participant)))
     }
 
@@ -986,7 +1207,7 @@ impl<'a> Exec<'a> {
         if self.position.is_none() || self.st.body(&self.entity).is_some() {
             return Err(refuse(RefusalCode::NotTheirs, "only an organisation, acting through one of its positions, can do this"));
         }
-        Ok(self.entity.clone())
+        Ok(self.entity)
     }
 
     /// A structure comes down: off the ground, and gone (what was held there stays held there, to be moved out).
@@ -997,17 +1218,17 @@ impl<'a> Exec<'a> {
         self.st.flooded.remove(sid);
         self.st.ground.changed();
         let c = self.st.stamp();
-        let cleared = self.st.nature.is_some().then(|| self.s.config.catalogue.cleared_cover.clone()).flatten();
+        let cleared = self.st.nature.is_some().then(|| self.s.config.catalogue.cleared_cover).flatten();
         for cell in &x.cells {
             let p = self.st.cells.get_mut(cell).unwrap();
             p.structure = None;
             p.changed = c;
             // (Nature: the ground it stood on is cleared land, which grows back as its cover succeeds.)
             if let Some(cl) = &cleared {
-                p.terrain = Some(cl.clone());
+                p.terrain = Some(cl.to_string());
             }
         }
-        self.emit(EventBody::StructureDemolished { structure: sid.to_string(), by: self.participant.into() });
+        self.emit(EventBody::StructureDemolished { structure: sid.to_string().into(), by: self.participant.into() });
     }
 
     /// Work (phase B): performers at a structure spend their time on units of a task. The kernel checks only physics:
@@ -1067,7 +1288,7 @@ impl<'a> Exec<'a> {
             return Err(refuse(RefusalCode::NotAtWork, format!("{task} takes time: say who does it")));
         }
         let kind = spec.as_ref().and_then(|x| x.in_space.clone());
-        let work_block = Block::Work { task: task.into(), units, at: at.clone(), performers: vec![], on: None, survey: None, investigate: None };
+        let work_block = Block::Work { task: task.into(), units, at: at.to_string(), performers: vec![], on: None, survey: None, investigate: None };
         for p in &who {
             if self.st.participants.get(p).is_some_and(|x| x.kind == ParticipantKind::System) {
                 // (A system does the work if it is the organisation's and its template lists the task: foundations F4.)
@@ -1088,7 +1309,7 @@ impl<'a> Exec<'a> {
             let rows: Vec<Option<i64>> = who
                 .iter()
                 .map(|p| {
-                    let t = self.st.participants.get(p).and_then(|x| x.template.as_ref()).and_then(|t| self.s.templates.get(t))?;
+                    let t = self.st.participants.get(p).and_then(|x| x.template.as_ref()).and_then(|t| self.s.templates.get(t.as_str()))?;
                     t.does.as_ref()?.iter().find(|r| r.covers("work", work_block.makes().as_deref())).and_then(|r| r.seconds)
                 })
                 .collect();
@@ -1109,6 +1330,24 @@ impl<'a> Exec<'a> {
                 total = ((total as i128 * factor + 9_999) / 10_000).max(1) as i64;
             }
         }
+        // A tool (foundations-2 E2): held where the work is done, enough for each person at it, the work takes its share of the time.
+        if let Some(tl) = spec.as_ref().and_then(|x| x.tool.as_ref()).filter(|_| n_systems < who.len() && total > 0) {
+            let people = (who.len() - n_systems) as i64;
+            if self.st.holding(&self.entity, &at, &tl.kind) >= tl.per_performer.saturating_mul(people) as Money {
+                total = ((total as i128 * tl.labour_bps as i128 + 9_999) / 10_000).max(1) as i64;
+            }
+        }
+        // A practised skill (foundations-2 E4): the labour scales with the people's mean of it too, as it stands now.
+        if let Some(sk) = spec.as_ref().and_then(|x| x.skill.as_ref()).filter(|_| n_systems < who.len() && total > 0) {
+            if let Some(cfg) = self.s.config.catalogue.body_variables.iter().find(|v| v.id == sk.variable) {
+                let now = self.now();
+                let people: Vec<&Id> = who.iter().filter(|p| self.st.body(p).is_some()).collect();
+                if !people.is_empty() {
+                    let sum: i128 = people.iter().map(|p| self.st.body(p).and_then(|b| b.variables.get(&cfg.id)).map_or(cfg.initial, |x| crate::state::body_variable_at(cfg, *x, now).0) as i128).sum();
+                    total = sk.scale(cfg, (sum / people.len() as i128) as i64, total);
+                }
+            }
+        }
         // (How much of a performer's working day is left is read where the work is placed: on their timeline, when the act
         // begins. Here a work is refused only if it is longer than a day, or the world has no day.)
         let share = if who.is_empty() { 0 } else { (total + who.len() as i64 - 1) / who.len() as i64 };
@@ -1119,7 +1358,7 @@ impl<'a> Exec<'a> {
             }
         }
         // What's used up must be here, held by the actor.
-        let me = self.entity.clone();
+        let me = self.entity;
         let need = |per: &crate::money::Money| per.checked_mul(units as i128).filter(|x| *x <= MAX_MONEY);
         if let Some(x) = &spec {
             for (k, per) in &x.consumes {
@@ -1144,7 +1383,7 @@ impl<'a> Exec<'a> {
                 let min = self.s.config.catalogue.fields.iter().find(|f| f.id == d.field).map_or(0, |f| f.min);
                 let mut cells: BTreeSet<Id> = BTreeSet::new();
                 for c in &self.st.structures[&at].cells {
-                    cells.insert(c.clone());
+                    cells.insert(*c);
                     if let Some((x, y)) = crate::config::cell_xy(c) {
                         for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
                             let n = crate::config::cell_id(x + dx, y + dy);
@@ -1159,10 +1398,11 @@ impl<'a> Exec<'a> {
                 if value(&best) - need < min {
                     return Err(refuse(RefusalCode::FieldExhausted, format!("not enough {} near {at}: {} there, {need} needed", d.field, value(&best))));
                 }
-                Some((d.field.clone(), best.clone(), value(&best) - need))
+                Some((d.field, best, value(&best) - need))
             }
         };
-        // What's worked on: bodies (a person there, or everyone in a space of the place), or a structure.
+        // What's worked on: bodies (a person there, or everyone in a space of the place), or a structure (where the act took its
+        // crew, law 9 S4: `travel::journeys`).
         let bodies: Option<Vec<Id>> = match &on {
             Some(o) if self.st.body(o).is_some() => {
                 self.living_present(o)?;
@@ -1170,7 +1410,7 @@ impl<'a> Exec<'a> {
                 if !was_there && !self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(o))) {
                     return Err(refuse(RefusalCode::NotPresent, format!("{o} isn't at {at}")));
                 }
-                Some(vec![o.clone()])
+                Some(vec![*o])
             }
             Some(o) if split_space(o).is_some_and(|(sid, _)| sid == at) => {
                 let (_, local) = split_space(o).unwrap();
@@ -1191,8 +1431,8 @@ impl<'a> Exec<'a> {
             (None, Some(_)) => return Err(refuse(RefusalCode::NoBodyEffect, format!("{task} is work on bodies: say on whom (a person there, or a space of {at})"))),
             _ => {}
         }
-        let target = on.clone().unwrap_or_else(|| at.clone());
-        if bodies.is_none() && (builtin || spec.as_ref().is_some_and(|x| !x.changes.is_empty())) {
+        let target = on.unwrap_or(at);
+        if bodies.is_none() && (builtin || spec.as_ref().is_some_and(|x| !x.changes.is_empty() || x.collects.is_some())) {
             let t = self.st.structures.get(&target).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {target}")))?;
             if task == TASK_BUILD && (t.complete || t.demolition.is_some()) {
                 return Err(refuse(RefusalCode::NotBeingBuilt, format!("{target} isn't being built")));
@@ -1204,35 +1444,63 @@ impl<'a> Exec<'a> {
         // Done: time spent, inputs used, outputs made, changes applied, progress made.
         let c = self.st.stamp();
         if let Some(x) = &spec {
-            for (k, per) in &x.consumes {
+            // (A recipe's nought is stated, law 8, and moves nothing: no holding is made for it.)
+            for (k, per) in x.consumes.iter().filter(|(_, p)| **p != 0) {
                 let q = need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an input"))?;
                 self.add_holding(&me, &at, k, -q, c)?;
             }
-            for (k, per) in &x.produces {
+            for (k, per) in x.produces.iter().filter(|(_, p)| **p != 0) {
                 // (Refused if what's made would take the holding beyond the range of a quantity.)
                 let q = need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an output"))?;
                 self.add_holding(&me, &at, k, q, c)?;
             }
+            // Collected from the structure worked on: what its holders hold there of the kind, up to what the units take, in
+            // the holders' order; what is not there is not taken (law 8: nothing made, a bin emptied).
+            if let (Some(cl), None) = (&x.collects, &bodies) {
+                self.collected.insert(cl.kind);
+                let mut want = (cl.per_unit as Money).saturating_mul(units as Money);
+                let mut held: Vec<(Id, Money)> = self.st.holdings.values().filter(|h| h.at == target && h.kind == cl.kind && h.quantity > 0 && h.holder != me).map(|h| (h.holder, h.quantity)).collect();
+                // (Bin after bin until the loads run out, beginning at a different one each day: no holder is always last.)
+                if !held.is_empty() {
+                    let start = day_of(self.now()).rem_euclid(held.len() as i64) as usize;
+                    held.rotate_left(start);
+                }
+                for (holder, q) in held {
+                    if want <= 0 {
+                        break;
+                    }
+                    let take = q.min(want);
+                    want -= take;
+                    self.add_holding(&holder, &target, &cl.kind, -take, c)?;
+                    self.add_holding(&me, &at, &cl.kind, take, c)?;
+                }
+            }
             if !x.changes.is_empty() && bodies.is_none() {
                 settle(self.s, self.st, &target);
-                let ty = self.st.structures[&target].structure_type.clone();
+                let ty = self.st.structures[&target].structure_type;
                 let vars: Vec<crate::config::VariableCfg> = vars_for(self.s, &ty).cloned().collect();
                 let s = self.st.structures.get_mut(&target).unwrap();
                 for (v, by) in &x.changes {
                     if let (Some(cfg), Some(cur)) = (vars.iter().find(|c| &c.id == v), s.variables.get(v).copied()) {
-                        s.variables.insert(v.clone(), (cur.0.saturating_add(by.saturating_mul(units as i64)).clamp(cfg.min, cfg.max), cur.1));
+                        s.variables.insert(*v, (cur.0.saturating_add(by.saturating_mul(units as i64)).clamp(cfg.min, cfg.max), cur.1));
                     }
                 }
                 self.st.touch_structure(&target);
             }
         }
-        // Drawn from the field; emitted to fields (at the corner cell) and counters.
+        // Drawn from the field; emitted to fields (at the corner cell) and counters. A field that holds a kind (law 8):
+        // what is drawn goes into the actor's holding there, and nothing is drawn into nothing.
         if let Some((field, cell, left)) = drawn {
+            let kind = self.s.config.catalogue.fields.iter().find(|f| f.id == field).and_then(|f| f.kind);
             let n = Arc::make_mut(self.st.nature.as_mut().unwrap());
+            let had = n.fields.get(&field).and_then(|m| m.get(&cell)).copied().unwrap_or(0);
             n.fields.entry(field).or_default().insert(cell, left);
+            if let Some(k) = kind {
+                self.add_holding(&me, &at, &k, (had - left) as Money, c)?;
+            }
         }
         if let Some(x) = spec.as_ref().filter(|x| !x.emits.is_empty()) {
-            let corner = self.st.structures[&at].at.clone();
+            let corner = self.st.structures[&at].at;
             for (k, per) in &x.emits {
                 let by = per.saturating_mul(units.min(i64::MAX as u64) as i64);
                 if let Some(v) = self.st.totals.get_mut(k) {
@@ -1240,13 +1508,24 @@ impl<'a> Exec<'a> {
                 } else if let Some(f) = self.s.config.catalogue.fields.iter().find(|f| &f.id == k) {
                     if let Some(n) = self.st.nature.as_mut().map(Arc::make_mut) {
                         let cur = n.fields.get(k).and_then(|m| m.get(&corner)).copied().unwrap_or(f.baseline);
-                        n.fields.entry(k.clone()).or_default().insert(corner.clone(), cur.saturating_add(by).clamp(f.min, f.max));
+                        // (A field that holds a kind is a stock: what is put on a cell beyond its bound is refused, not lost.)
+                        if f.kind.is_some() && cur.checked_add(by).is_none_or(|x| x > f.max) {
+                            return Err(refuse(RefusalCode::Overflow, format!("{k} at {corner} would pass its most ({})", f.max)));
+                        }
+                        n.fields.entry(*k).or_default().insert(corner, cur.saturating_add(by).clamp(f.min, f.max));
                     }
                 }
             }
         }
         let someone_there = !who.is_empty();
-        self.emit(EventBody::Worked { task: task.into(), units, at: at.clone(), on: on.clone(), performers: who, labour: total, by: self.participant.into() });
+        // Each person's share of the time is practice at the task's skill (foundations-2 E4).
+        if let Some(cfg) = spec.as_ref().and_then(|x| x.skill.as_ref()).and_then(|sk| self.s.config.catalogue.body_variables.iter().find(|v| v.id == sk.variable)) {
+            if total > 0 && !who.is_empty() {
+                let share = (total + who.len() as i64 - 1) / who.len() as i64;
+                self.practise(&who, cfg, share);
+            }
+        }
+        self.emit(EventBody::Worked { task: task.into(), units, at, on, performers: who, labour: total, by: self.participant.into() });
         if let (Some(bodies), Some(ob)) = (&bodies, &on_body) {
             for b in bodies {
                 self.on_body(b, ob, units);
@@ -1267,26 +1546,29 @@ impl<'a> Exec<'a> {
             // moves with every act anyone has made, and two towns that differ by one act would draw alike nowhere.)
             let (who, day) = (self.participant.to_string(), self.now().div_euclid(86_400).to_string());
             let mut rng = self.s.randomness.stream(&["investigate", &who, &from, &at, &iv.kind, &day, &idx]);
-            let taker = found.as_ref().filter(|_| rng.below(10_000) < chance as u64).map(|x| x.by.clone());
+            let taker = found.as_ref().filter(|_| rng.below(10_000) < chance as u64).map(|x| x.by);
             self.investigated = Some(serde_json::json!({ "from": from, "at": at, "kind": iv.kind, "taken": found.is_some(), "taker": taker }));
         }
         // Those who did it were there: what the building is like as they leave it is theirs to know (a demolition's
         // last day leaves nothing to see). Work nobody is named as doing sends nobody: nothing is seen.
         let worked_on_building = someone_there && bodies.is_none() && on.is_some() && self.st.structures.contains_key(&target);
         if task == TASK_BUILD {
-            let needed = self.s.types[&self.st.structures[&target].structure_type].build_labour;
+            let needed = self.s.types[self.st.structures[&target].structure_type.as_str()].build_labour;
             let s = self.st.structures.get_mut(&target).unwrap();
             s.labour_done = s.labour_done.saturating_add(total);
             // Complete once the work is done, if its build time has passed (else when it does).
             if s.labour_done >= needed && s.completes_at.is_none() {
                 s.complete = true;
+                if self.s.types.get(s.structure_type.as_str()).is_some_and(|ty| ty.way.is_some()) {
+                    self.st.ground.changed();
+                }
                 self.st.touch_structure(&target);
-                self.emit(EventBody::StructureCompleted { structure: target.clone() });
+                self.emit(EventBody::StructureCompleted { structure: target });
             } else {
                 self.st.touch_structure(&target);
             }
         } else if task == TASK_DEMOLISH {
-            let needed = self.s.types[&self.st.structures[&target].structure_type].demolition_labour;
+            let needed = self.s.types[self.st.structures[&target].structure_type.as_str()].demolition_labour;
             let s = self.st.structures.get_mut(&target).unwrap();
             let done = s.demolition.unwrap_or(0).saturating_add(total);
             s.demolition = Some(done);
@@ -1298,10 +1580,22 @@ impl<'a> Exec<'a> {
         }
         if worked_on_building && self.st.structures.contains_key(&target) {
             if !self.worked_on.contains(&target) {
-                self.worked_on.push(target.clone());
+                self.worked_on.push(target);
             }
         }
         Ok(())
+    }
+
+    /// Time spent at a practised skill (foundations-2 E4): each person's skill settled to now and the practice added.
+    fn practise(&mut self, who: &[Id], cfg: &crate::config::BodyVariableCfg, seconds: i64) {
+        let now = self.now();
+        for p in who {
+            let Some(b) = self.st.entities.get_mut(p).and_then(|e| e.body.as_mut()) else { continue };
+            let cur = b.variables.get(&cfg.id).copied().unwrap_or((cfg.initial, now));
+            if let Some(new) = crate::state::practise(cfg, cur, now, seconds) {
+                b.variables.insert(cfg.id, new);
+            }
+        }
     }
 
     /// Work done to a body (services): its variables changed, and care given for its conditions (each once).
@@ -1317,14 +1611,14 @@ impl<'a> Exec<'a> {
             let cur = b.variables.get(v).copied().unwrap_or((cfg.initial, now));
             let (val, at) = crate::state::body_variable_at(cfg, cur, now);
             let new = val.saturating_add(per.saturating_mul(units.min(i64::MAX as u64) as i64)).clamp(cfg.min, cfg.max);
-            b.variables.insert(v.clone(), (new, at));
-            events.push(EventBody::BodyChanged { person: person.into(), variable: v.clone(), value: new });
+            b.variables.insert(*v, (new, at));
+            events.push(EventBody::BodyChanged { person: person.into(), variable: *v, value: new });
         }
         for c in b.conditions.iter_mut().filter(|c| !c.treated && c.until > now) {
             let Some(tr) = ob.treats.iter().find(|tr| tr.kind == c.kind && tr.severity.as_ref().is_none_or(|x| x == &c.severity) && units >= tr.units) else { continue };
             let keep = |d: i64| now + ((d - now).max(0) as i128 * tr.days_kept_bps as i128 / 10_000) as i64;
             c.until = keep(c.until).max(now + tick);
-            schedule.push((c.until, Sched::ConditionEnds { person: person.into(), condition: c.id.clone() }));
+            schedule.push((c.until, Sched::ConditionEnds { person: person.into(), condition: c.id }));
             let mut called_off = false;
             if let Some(d) = c.death_at.filter(|d| *d >= now) {
                 // (The condition by its kind and onset, not by the number it was given: that is its place in the order
@@ -1334,14 +1628,14 @@ impl<'a> Exec<'a> {
                 if rng.below(10_000) < tr.fatal_kept_bps as u64 {
                     let nd = keep(d).min(c.until - 1).max(now);
                     c.death_at = Some(nd);
-                    schedule.push((nd, Sched::Death { person: person.into(), cause: death_cause(c.kind), condition: Some(c.id.clone()) }));
+                    schedule.push((nd, Sched::Death { person: person.into(), cause: death_cause(c.kind), condition: Some(c.id) }));
                 } else {
                     c.death_at = None;
                     called_off = true;
                 }
             }
             c.treated = true;
-            events.push(EventBody::ConditionTreated { person: person.into(), condition: c.id.clone(), by: self.participant.into(), until: c.until, death_called_off: called_off });
+            events.push(EventBody::ConditionTreated { person: person.into(), condition: c.id, by: self.participant.into(), until: c.until, death_called_off: called_off });
         }
         for (t, what) in schedule {
             self.st.schedule(t, what);
@@ -1375,7 +1669,7 @@ impl<'a> Exec<'a> {
                     oikos_nature::survey_value(v, 9_000, &mut rng)
                 }
             };
-            found.insert(cell.clone(), Value::from(est));
+            found.insert(cell.to_string(), Value::from(est));
         }
         serde_json::json!({ "of": sv.of, "cells": found })
     }
@@ -1402,8 +1696,8 @@ impl<'a> Exec<'a> {
         self.st.accounts.get(id).map(|a| &**a).ok_or_else(|| refuse(RefusalCode::UnknownAccount, format!("no account {id}")))
     }
 
-    fn record_of_kind(&self, id: &str, kind: &str) -> R<&Record> {
-        let r = &*self.st.records.get(id).ok_or_else(|| refuse(RefusalCode::UnknownRecord, format!("no record {id}")))?.record;
+    fn record_of_kind(&self, id: &str, kind: &str) -> R<Arc<Record>> {
+        let r = self.st.records.get(id).ok_or_else(|| refuse(RefusalCode::UnknownRecord, format!("no record {id}")))?.record();
         if kind != "any" && r.body.kind_name() != kind {
             return Err(refuse(RefusalCode::WrongRecordKind, format!("{id} is a {}, not a {kind}", r.body.kind_name())));
         }
@@ -1440,12 +1734,12 @@ impl<'a> Exec<'a> {
         let id = self.st.mint("pos");
         let c = self.st.stamp();
         self.st.add_position(
-            id.clone(),
-            Position { entity: entity.into(), title: title.clone(), role: role.clone(), channels: Arc::new(channels.to_vec()), role_module: role_module.clone(), holder: holder.clone(), changed: c },
+            id,
+            Position { entity: entity.into(), title: title.clone(), role: role.clone(), channels: Arc::new(channels.to_vec()), role_module: role_module.clone(), holder, changed: c },
         );
-        self.emit(EventBody::PositionCreated { position: id.clone(), entity: entity.into(), by: self.participant.into(), title: title.clone(), role: role.clone(), role_module: role_module.clone() });
+        self.emit(EventBody::PositionCreated { position: id, entity: entity.into(), by: self.participant.into(), title: title.clone(), role: role.clone(), role_module: role_module.clone() });
         if holder.is_some() {
-            self.emit(EventBody::Appointed { position: id.clone(), holder, by: Some(self.participant.into()) });
+            self.emit(EventBody::Appointed { position: id, holder, by: Some(self.participant.into()) });
         }
         Ok(id)
     }
@@ -1493,18 +1787,18 @@ impl<'a> Exec<'a> {
             b.balance += amount;
             b.changed = c;
         }
-        let tx = Transaction {
+        let tx = Arc::new(Transaction {
             t: self.now(),
             from: from.into(),
             to: to.into(),
             amount,
-            currency: src.currency.clone(),
+            currency: src.currency,
             by: self.participant.into(),
-            settles: settles.clone(),
-            per_instruction: per_instruction.clone(),
+            settles,
+            per_instruction,
             memo: memo.clone(),
             line: line.clone(),
-        };
+        });
         // Everyone who acts for an entity concerned hears of it, through that entity's accounts.
         let concerned: BTreeSet<&str> = [src.holder.as_str(), src.custodian.as_str(), dst.holder.as_str(), dst.custodian.as_str()].into();
         let mut told: BTreeSet<(Id, Id)> = BTreeSet::new();
@@ -1515,7 +1809,7 @@ impl<'a> Exec<'a> {
             // the first to look does not take it from the other (foundations F6).
             for (p, cap) in self.st.acting_for(e) {
                 if self.st.sees_accounts(&p, &cap) {
-                    told.insert((p, transactions_key(&cap, e)));
+                    told.insert((p, transactions_key(&cap, e).into()));
                 }
             }
             // An office keeps its payments on file whoever holds the post, or nobody does (a new holder is handed them).
@@ -1533,7 +1827,7 @@ impl<'a> Exec<'a> {
             from: from.into(),
             to: to.into(),
             amount,
-            currency: src.currency.clone(),
+            currency: src.currency,
             by: self.participant.into(),
             reason,
             settles,
@@ -1554,9 +1848,9 @@ impl<'a> Exec<'a> {
         };
         let id = self.st.mint("rec");
         let rec = Record {
-            id: id.clone(),
+            id,
             author: self.participant.into(),
-            position: self.position.map(String::from),
+            position: self.position.map(String::from).map(Into::into),
             speaks_for,
             at: self.now(),
             visible_to,
@@ -1578,8 +1872,8 @@ impl<'a> Exec<'a> {
     /// Who sees a record when its author doesn't say (contracts/README.md,
     /// "Records"). The author's entity can always see its own records.
     fn default_visibility(&self, body: &RecordBody, speaks_for: Option<&str>) -> R<Visibility> {
-        let mut base: Vec<Id> = vec![self.entity.clone()];
-        base.extend(speaks_for.map(String::from));
+        let mut base: Vec<Id> = vec![self.entity];
+        base.extend(speaks_for.map(Id::new));
         let inherit = |id: &str| -> R<Visibility> { Ok(self.record_of_kind(id, "any")?.visible_to.clone()) };
         let widen = |v: Visibility, more: Vec<Id>| match v {
             Visibility::Public(_) => Visibility::public(),
@@ -1587,11 +1881,11 @@ impl<'a> Exec<'a> {
         };
         Ok(match body {
             RecordBody::EntityDeclaration { .. } => Visibility::public(),
-            RecordBody::Claim { holder, counterparty: Some(c), .. } => Visibility::only(base.into_iter().chain([holder.clone(), c.clone()])),
+            RecordBody::Claim { holder, counterparty: Some(c), .. } => Visibility::only(base.into_iter().chain([*holder, *c])),
             RecordBody::Claim { .. } => Visibility::public(),
-            RecordBody::ClaimTransfer { claim, to } => widen(inherit(claim)?, base.into_iter().chain([to.clone()]).collect()),
+            RecordBody::ClaimTransfer { claim, to } => widen(inherit(claim)?, base.into_iter().chain([*to]).collect()),
             RecordBody::ClaimRelease { claim } => widen(inherit(claim)?, base),
-            RecordBody::Agreement { terms } => Visibility::only(base.into_iter().chain(terms.parties.iter().cloned())),
+            RecordBody::Agreement { terms } => Visibility::only(base.into_iter().chain(terms.parties.iter().map(|p| Id::new(p)))),
             RecordBody::Signature { agreement, .. } | RecordBody::Notice { agreement, .. } => widen(inherit(agreement)?, base),
             RecordBody::Statement { addressed_to: Some(a), .. } => Visibility::only(base.into_iter().chain(a.iter().cloned())),
             RecordBody::Statement { .. } => Visibility::public(),
@@ -1599,7 +1893,7 @@ impl<'a> Exec<'a> {
             RecordBody::Vote { ballot, .. } => {
                 // A vote is seen by the voter and whoever runs the ballot, not by everyone.
                 let b = self.record_of_kind(ballot, "statement")?;
-                let counter = self.st.author_entity(b).or_else(|| b.speaks_for.clone());
+                let counter = self.st.author_entity(&b).or(b.speaks_for);
                 Visibility::only(base.into_iter().chain(counter))
             }
         })
@@ -1608,13 +1902,13 @@ impl<'a> Exec<'a> {
     fn resolve_terms(&self, t: &AgreementTerms) -> R<AgreementTerms> {
         let mut t = t.clone();
         for p in &mut t.parties {
-            *p = self.r(p)?;
+            *p = self.r(p)?.to_string();
         }
         for c in &mut t.commitments {
-            c.who = self.r(&c.who)?;
+            c.who = self.r(&c.who)?.to_string();
         }
         for x in t.termination.iter_mut().flatten() {
-            x.party = self.r(&x.party)?;
+            x.party = self.r(&x.party)?.to_string();
         }
         Ok(t)
     }
@@ -1650,14 +1944,14 @@ impl<'a> Exec<'a> {
         for id in to {
             if let Some(p) = self.st.participants.get(id) {
                 if p.person.is_some() {
-                    out.insert((id.clone(), SELF.to_string()));
+                    out.insert((*id, Id::new(SELF)));
                 } else {
                     for pos in self.st.held_by(id) {
-                        out.insert((id.clone(), pos.clone()));
+                        out.insert((*id, Id::new(pos)));
                     }
                 }
             } else if let Some(x) = self.st.positions.get(id) {
-                out.extend(x.holder.iter().map(|h| (h.clone(), id.clone())));
+                out.extend(x.holder.iter().map(|h| (*h, *id)));
             } else if self.st.entities.contains_key(id) {
                 out.extend(self.st.acting_for(id));
             } else {
@@ -1673,7 +1967,7 @@ impl<'a> Exec<'a> {
             // ---------------- physical ----------------
             Block::Transfer { from, to, amount, settles, per_instruction, memo, line } => {
                 let (from, to) = (self.r(from)?, self.r(to)?);
-                let custodian = self.account(&from)?.custodian.clone();
+                let custodian = self.account(&from)?.custodian;
                 if custodian != self.entity {
                     return Err(refuse(
                         RefusalCode::NotCustodian,
@@ -1695,7 +1989,11 @@ impl<'a> Exec<'a> {
                 if !(1..=MAX_MONEY).contains(quantity) {
                     return Err(refuse(RefusalCode::Overflow, "quantity out of range"));
                 }
-                if !self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(&me))) {
+                // (Law 9: an act that takes the taker somewhere, as taking goods home does, set them out when it began; when it is
+                // done they were there if their way, for this act, set out from it or went by it, as a carrier's is read for `move_goods`.)
+                let here = self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(&me)));
+                let went = self.started && self.st.transit.get(me.as_str()).is_some_and(|t| (t.from == at || t.via.contains(&at)) && (self.act.is_none() || t.act.as_deref() == self.act));
+                if !here && !went {
                     return Err(refuse(RefusalCode::NotPresent, format!("{me} isn't at {at}")));
                 }
                 let have = self.st.holding(&from, &at, kind);
@@ -1707,11 +2005,11 @@ impl<'a> Exec<'a> {
                 self.add_holding(&from, &at, kind, -*quantity, c)?;
                 self.add_holding(&me, &at, kind, *quantity, c)?;
                 let t = self.now();
-                self.st.takings.push(crate::state::Taking { t, by: me.clone(), from: from.clone(), kind: kind.clone(), at: at.clone() });
-                self.emit(EventBody::Taken { by: me, from, kind: kind.clone(), quantity: *quantity, at });
+                self.st.takings.push_back(crate::state::Taking { t, by: me, from, kind: *kind, at });
+                self.emit(EventBody::Taken { by: me, from, kind: *kind, quantity: *quantity, at });
                 Ok(())
             }
-            Block::MoveGoods { kind, quantity, from_at, to, to_at } => {
+            Block::MoveGoods { kind, quantity, from_at, to, to_at, carried, carrier, vehicle: _ } => {
                 let (from_at, to, to_at) = (self.r(from_at)?, self.r(to)?, self.r(to_at)?);
                 if !self.s.config.catalogue.resources.iter().any(|r| &r.id == kind) {
                     return Err(refuse(RefusalCode::UnknownResource, format!("the world has no resource {kind}")));
@@ -1720,14 +2018,14 @@ impl<'a> Exec<'a> {
                     return Err(refuse(RefusalCode::Overflow, "quantity out of range"));
                 }
                 self.entity_exists(&to)?;
-                // Where goods can be: a structure (standing or begun), or an edge's own outside.
-                let place_ok = |who: &str, at: &str| self.st.structures.contains_key(at) || (self.s.is_boundary(who) && at == who);
+                // Where goods can be: a structure (standing or begun), a vehicle (its tank, its load: S5), or an edge's own outside.
+                let place_ok = |who: &str, at: &str| self.st.structures.contains_key(at) || self.st.vehicles.contains_key(at) || (self.s.is_boundary(who) && at == who);
                 if !place_ok(&to, &to_at) {
                     return Err(refuse(RefusalCode::UnknownPlace, format!("{to_at} isn't somewhere {to} can hold goods")));
                 }
                 // Only the holder moves its goods (custody, as for money one keeps oneself). An edge's goods come from
                 // outside, so its holding may go negative (D31, as for money); anyone else's must be there.
-                let me = self.entity.clone();
+                let me = self.entity;
                 let edge = self.s.is_boundary(&me);
                 let have = self.st.holding(&me, &from_at, kind);
                 if !edge && have < *quantity {
@@ -1739,30 +2037,88 @@ impl<'a> Exec<'a> {
                 if have.checked_sub(*quantity).is_none_or(|x| x < -MAX_MONEY) {
                     return Err(refuse(RefusalCode::Overflow, "the edge's holding would go beyond the range of a quantity"));
                 }
+                // A scarce kind (C6): an edge sells from outside no more than its quantity a period.
+                if edge && from_at == me {
+                    if let Some(x) = self.s.config.world.scarce.iter().find(|x| x.edge == me && &x.kind == kind) {
+                        let period = self.now().div_euclid(x.every);
+                        let key = format!("{me}|{kind}");
+                        let sold = self.st.scarce_sold.get(&key).filter(|(p, _)| *p == period).map_or(0, |(_, q)| *q);
+                        if sold + *quantity > x.quantity {
+                            return Err(refuse(RefusalCode::BeyondSupply, format!("{me} has {} {kind} left to sell this period ({} a period)", (x.quantity - sold).max(0), x.quantity)));
+                        }
+                        self.st.scarce_sold.insert(key, (period, sold + *quantity));
+                    }
+                }
                 let there = self.st.holding(&to, &to_at, kind);
                 if !(me == to && from_at == to_at) && there.checked_add(*quantity).is_none_or(|x| x > MAX_MONEY) {
                     return Err(refuse(RefusalCode::Overflow, "the holding would exceed the range of a quantity"));
                 }
+                // Law 9 (foundations-2 S4): in a world one travels, goods between two places are carried. To or from an edge's
+                // outside, by the outside's freight, from the edge's node (in its time, if the world has the node); between
+                // buildings, by a body the act took by both (the acting person's own, or one the actor may direct).
+                let (mut carrier_was, mut arrives) = (None, None);
+                // (A vehicle is where it stands: goods between it and the building it stands at are within one place.)
+                let place_of = |x: &Id| self.st.vehicles.get(x.as_str()).map_or(*x, |v| v.at);
+                let one_place = place_of(&from_at) == place_of(&to_at);
+                if self.s.config.catalogue.travel.is_some() && from_at != to_at && !one_place {
+                    let outside = (edge && from_at == me).then_some((me, to_at)).or_else(|| (self.s.is_boundary(&to) && to_at == to).then_some((to, from_at)));
+                    if let Some((e, there)) = outside {
+                        carrier_was = Some(e);
+                        arrives = crate::travel::freight_seconds(self.s, self.st, &e, &there).filter(|x| *x > 0).map(|x| self.now() + x);
+                        if let (Some(a), true) = (arrives, to_at == there) {
+                            self.freight.insert(to_at, a - self.now());
+                        }
+                    } else {
+                        let body = match carrier {
+                            Some(c) => self.r(c)?,
+                            None if *carried => self.own_body()?,
+                            None => return Err(refuse(RefusalCode::NotCarried, format!("{kind} from {from_at} to {to_at} needs a carrier: someone to take it there"))),
+                        };
+                        if self.own_body().ok() != Some(body) && !may_direct(self.st, &me, &body) {
+                            return Err(refuse(RefusalCode::NotTheirs, format!("{me} may not send {body} with its goods")));
+                        }
+                        self.living_present(&body)?;
+                        // (When the act is done, the carrier has been by both: it went where the goods were and where they go.)
+                        if self.started {
+                            // (A vehicle the goods go into is where it stands, or with the carrier who drives it.)
+                            let by = |t: &crate::state::Transit, x: &Id| {
+                                let at = place_of(x);
+                                t.from == at || t.via.contains(&at) || t.to == at || t.vehicle == Some(*x) || at.as_str() == body.as_str()
+                            };
+                            let went = self.st.transit.get(body.as_str()).is_some_and(|t| by(t, &from_at) && by(t, &to_at));
+                            if !went {
+                                return Err(refuse(RefusalCode::NotPresent, format!("{body} has not been by {from_at} and {to_at}")));
+                            }
+                        }
+                        carrier_was = Some(body);
+                    }
+                }
                 if !(me == to && from_at == to_at) {
                     let c = self.st.stamp();
                     self.add_holding(&me, &from_at, kind, -*quantity, c)?;
-                    self.add_holding(&to, &to_at, kind, *quantity, c)?;
+                    match arrives {
+                        // (On their way by the outside's freight: theirs when they arrive.)
+                        Some(at) => {
+                            self.st.schedule(at, crate::state::Sched::Arrival { kind: *kind, quantity: *quantity, holder: to, at: to_at });
+                        }
+                        None => self.add_holding(&to, &to_at, kind, *quantity, c)?,
+                    }
                 }
-                self.emit(EventBody::GoodsMoved { kind: kind.clone(), quantity: *quantity, from: me, from_at, to, to_at, by: self.participant.into() });
+                self.emit(EventBody::GoodsMoved { kind: *kind, quantity: *quantity, from: me, from_at, to, to_at, by: self.participant.into(), carrier: carrier_was, arrives });
                 Ok(())
             }
 
             Block::OpenAccount { holder, currency, bind } => {
                 let holder = self.r(holder)?;
                 self.entity_exists(&holder)?;
-                let currency = currency.clone().unwrap_or_else(|| self.s.currency.clone());
+                let currency = (*currency).unwrap_or(self.s.currency);
                 if !self.s.config.world.currencies.iter().any(|c| c.code == currency) {
                     return Err(refuse(RefusalCode::UnknownCurrency, format!("the world has no currency {currency}")));
                 }
                 let id = self.st.mint("acc");
                 let c = self.st.stamp();
-                self.st.accounts.insert(id.clone(), Arc::new(Account { holder: holder.clone(), custodian: self.entity.clone(), currency: currency.clone(), balance: 0, changed: c }));
-                self.emit(EventBody::AccountOpened { account: id.clone(), holder, custodian: self.entity.clone(), currency, by: self.participant.into() });
+                self.st.accounts.insert(id, Arc::new(Account { holder, custodian: self.entity, currency, balance: 0, changed: c }));
+                self.emit(EventBody::AccountOpened { account: id, holder, custodian: self.entity, currency, by: self.participant.into() });
                 self.bind(bind, &id)
             }
 
@@ -1780,7 +2136,7 @@ impl<'a> Exec<'a> {
                 }
                 let c = self.st.stamp();
                 if let Some(gone) = self.st.accounts.remove(&account) {
-                    self.st.closed_accounts.insert(account.clone(), crate::state::ClosedAccount { holder: gone.holder.clone(), custodian: gone.custodian.clone(), currency: gone.currency.clone(), changed: c });
+                    self.st.closed_accounts.insert(account, crate::state::ClosedAccount { holder: gone.holder, custodian: gone.custodian, currency: gone.currency, changed: c });
                 }
                 self.emit(EventBody::AccountClosed { account, by: self.participant.into() });
                 Ok(())
@@ -1790,7 +2146,7 @@ impl<'a> Exec<'a> {
                 let ty = self
                     .s
                     .types
-                    .get(structure_type)
+                    .get(structure_type.as_str())
                     .ok_or_else(|| refuse(RefusalCode::UnknownStructureType, format!("no structure type {structure_type}")))?
                     .clone();
                 let cells = footprint_cells(&self.s.detailed, at, ty.footprint)
@@ -1810,7 +2166,7 @@ impl<'a> Exec<'a> {
                 }
                 // Its materials come from the builder's own holding where it keeps them (phase B: no more money paid to
                 // nowhere for them).
-                let me = self.entity.clone();
+                let me = self.entity;
                 let yard = match materials_at {
                     Some(m) => Some(self.r(m)?),
                     None if ty.materials.is_empty() => None,
@@ -1833,12 +2189,12 @@ impl<'a> Exec<'a> {
                 }
                 let id = self.st.mint("str");
                 self.st.structures.insert(
-                    id.clone(),
+                    id,
                     Structure {
-                        at: at.clone(),
+                        at: *at,
                         cells: cells.clone(),
-                        structure_type: structure_type.clone(),
-                        built_by: Some(self.entity.clone()),
+                        structure_type: *structure_type,
+                        built_by: Some(self.entity),
                         complete: false,
                         completes_at: Some(completes),
                         labour_done: 0,
@@ -1850,15 +2206,15 @@ impl<'a> Exec<'a> {
                 self.st.ground.changed();
                 for cell in &cells {
                     let p = self.st.cells.get_mut(cell).unwrap();
-                    p.structure = Some(id.clone());
+                    p.structure = Some(id);
                     p.changed = c;
                 }
-                self.st.schedule(completes, Sched::StructureComplete { structure: id.clone() });
+                self.st.schedule(completes, Sched::StructureComplete { structure: id });
                 self.emit(EventBody::StructureStarted {
-                    structure: id.clone(),
-                    on: at.clone(),
-                    structure_type: structure_type.clone(),
-                    built_by: self.entity.clone(),
+                    structure: id,
+                    on: *at,
+                    structure_type: *structure_type,
+                    built_by: self.entity,
                     at: completes,
                 });
                 self.bind(bind, &id)
@@ -1876,7 +2232,7 @@ impl<'a> Exec<'a> {
                 for (_, occupant) in leave_spaces(self.s, self.st, &sid, None, None, VacateReason::Demolition, Some(self.participant), &mut self.events) {
                     self.st.moved(&occupant);
                 }
-                if self.s.types[&x.structure_type].demolition_labour > 0 {
+                if self.s.types[x.structure_type.as_str()].demolition_labour > 0 {
                     self.st.structures.get_mut(&sid).unwrap().demolition = Some(0);
                     self.st.touch_structure(&sid);
                     self.emit(EventBody::DemolitionStarted { structure: sid, by: self.participant.into() });
@@ -1888,13 +2244,27 @@ impl<'a> Exec<'a> {
 
             Block::Work { task, units, at, performers, on, survey, investigate } => self.work(index, task, *units, at, performers, on, survey.as_ref(), investigate.as_ref()),
 
-            Block::Occupy { space, who } => {
+            Block::Occupy { space, who, vehicle } => {
                 let space = self.r(space)?;
                 let who = match who {
                     Some(w) => self.r(w)?,
                     None => self.acting_person()?,
                 };
                 self.living_present(&who)?;
+                let vehicle = match vehicle {
+                    Some(v) => Some(self.r(v)?),
+                    None => None,
+                };
+                // (On its way here, S3: it arrives, with the vehicle it went by, if it found the one it named where it set out;
+                // if not, it walked: the vehicle it named is not looked for again.)
+                let on_way = self.st.transit.contains_key(who.as_str());
+                // (On its way for another act, a body is not here to be sent anywhere: it is out on that, until it is done.)
+                if let Some(tr) = self.st.transit.get(who.as_str()) {
+                    if tr.act.is_some() && tr.act.as_deref() != self.act {
+                        return Err(refuse(RefusalCode::NotPresent, format!("{who} is out on the way to {}", tr.to)));
+                    }
+                }
+                let vehicle = if on_way { self.st.transit.get(who.as_str()).and_then(|t| t.vehicle) } else { vehicle };
                 let (sid, local) = split_space(&space).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{space} isn't a space")))?;
                 let x = self.st.structures.get(sid).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {sid}")))?;
                 let spec = self.s.space(&x.structure_type, local).ok_or_else(|| refuse(RefusalCode::UnknownSpace, format!("{sid} has no space {local}")))?;
@@ -1916,6 +2286,20 @@ impl<'a> Exec<'a> {
                     return Err(refuse(RefusalCode::Flooded, format!("{sid} is under water")));
                 }
                 let sid = sid.to_string();
+                // (Driven here: the vehicle must be one the body may drive, standing where it set out; it stands here now.)
+                if let Some(v) = &vehicle {
+                    let from = if on_way { Id::new(&who) } else { self.st.structures_of(&who).into_iter().next().ok_or_else(|| refuse(RefusalCode::NotPresent, format!("{who} is nowhere to drive {v} from")))? };
+                    driven_speed(self.s, self.st, v, &who, &from)?;
+                    // (Named for a trip and not gone on it: it was not there to take as the body set out, so it never did.)
+                    if self.started && !on_way && self.s.config.catalogue.travel.is_some() && from != sid.as_str() {
+                        return Err(refuse(RefusalCode::NotPresent, format!("{who} never set out with {v}")));
+                    }
+                }
+                if on_way {
+                    if let Some(tr) = self.st.transit.remove(who.as_str()) {
+                        seen_on_the_way(self.s, self.st, &who, &tr);
+                    }
+                }
                 // A body is in one place at a time: coming here, it leaves wherever else it was.
                 for other in self.st.structures_of(&who) {
                     leave_spaces(self.s, self.st, &other, Some(&who), None, VacateReason::Left, Some(self.participant), &mut self.events);
@@ -1925,7 +2309,10 @@ impl<'a> Exec<'a> {
                 self.st.enter(&sid, &space, &who);
                 self.st.touch_structure(&sid);
                 self.st.moved(&who);
-                self.emit(EventBody::Occupied { occupant: who, space, by: self.participant.into() });
+                if let Some(v) = &vehicle {
+                    self.st.vehicles.get_mut(v.as_str()).unwrap().at = Id::new(&sid);
+                }
+                self.emit(EventBody::Occupied { occupant: who, space, by: self.participant.into(), vehicle: vehicle.map(|v| Id::new(&v)) });
                 Ok(())
             }
 
@@ -1967,7 +2354,7 @@ impl<'a> Exec<'a> {
                         let (Some(name), Some(born_at), Some(template)) = (name, born_at, template) else {
                             return Err(refuse(RefusalCode::UnknownTemplate, "a newcomer needs a name, a birth time and a template"));
                         };
-                        if self.s.templates.get(template).is_none_or(|t| t.kind != ParticipantKind::Person) {
+                        if self.s.templates.get(template.as_str()).is_none_or(|t| t.kind != ParticipantKind::Person) {
                             return Err(refuse(RefusalCode::UnknownTemplate, format!("no template {template} for a person")));
                         }
                         if *born_at > self.now() {
@@ -1978,13 +2365,13 @@ impl<'a> Exec<'a> {
                         id
                     }
                 };
-                self.emit(EventBody::PersonArrived { person: id.clone(), via: self.entity.clone(), by: self.participant.into() });
+                self.emit(EventBody::PersonArrived { person: id, via: self.entity, by: self.participant.into() });
                 if let Some(amount) = carrying {
                     let acc = self.st.mint("acc");
                     let c = self.st.stamp();
-                    let currency = self.s.currency.clone();
-                    self.st.accounts.insert(acc.clone(), Arc::new(Account { holder: id.clone(), custodian: id.clone(), currency: currency.clone(), balance: 0, changed: c }));
-                    self.emit(EventBody::AccountOpened { account: acc.clone(), holder: id.clone(), custodian: id.clone(), currency, by: self.participant.into() });
+                    let currency = self.s.currency;
+                    self.st.accounts.insert(acc, Arc::new(Account { holder: id, custodian: id, currency, balance: 0, changed: c }));
+                    self.emit(EventBody::AccountOpened { account: acc, holder: id, custodian: id, currency, by: self.participant.into() });
                     let boundary = self.s.boundary_account(&self.entity).to_string();
                     self.move_money(&boundary, &acc, *amount, TransferReason::Carried, None, None, None, None)?;
                 }
@@ -2001,13 +2388,13 @@ impl<'a> Exec<'a> {
                 // refuse a person who takes another; what a seat may ask for is the resolver's to limit (it takes only itself).
                 // Which edge they leave by: named, or the default.
                 let to = match to {
-                    Some(e) if self.s.is_boundary(e) => e.clone(),
+                    Some(e) if self.s.is_boundary(e) => *e,
                     Some(e) => return Err(refuse(RefusalCode::NotABoundary, format!("{e} isn't one of the world's edges"))),
-                    None => self.s.boundary().to_string(),
+                    None => self.s.boundary().to_string().into(),
                 };
                 self.living_present(&who)?;
                 self.may_take_out(&who)?;
-                let own = self.st.body(&who).and_then(|b| b.participant.clone());
+                let own = self.st.body(&who).and_then(|b| b.participant);
                 let seats = seats_of(self.st, &who, own.as_deref());
                 let events = vacate_all(self.s, self.st, &who, VacateReason::Departed, Some(self.participant));
                 self.emit_all(events);
@@ -2017,7 +2404,7 @@ impl<'a> Exec<'a> {
                 // Someone who has gone from the world holds no post in it: their posts fall vacant for whoever appoints to them
                 // to fill, and every seat sharing their body ends (a model in one of their posts goes with the post). Their
                 // own participant lives on for their own affairs abroad (their money, their words) and for a return.
-                let abroad: BTreeSet<Id> = self.s.config.positions.iter().filter(|x| x.holds_abroad).map(|x| x.id.clone()).collect();
+                let abroad: BTreeSet<Id> = self.s.config.positions.iter().filter(|x| x.holds_abroad).map(|x| x.id).collect();
                 let mut ended = own.map(|p| vacate_positions(self.st, &p, &abroad)).unwrap_or_default();
                 for seat in seats {
                     ended.extend(end_participant(self.st, &seat, EndReason::Departed));
@@ -2035,7 +2422,7 @@ impl<'a> Exec<'a> {
                 if age < bp.ages[0] as i64 || age > bp.ages[1] as i64 {
                     return Err(refuse(RefusalCode::NotFertile, format!("{me} is {age}")));
                 }
-                if self.s.templates.get(template).is_none_or(|t| t.kind != ParticipantKind::Person) {
+                if self.s.templates.get(template.as_str()).is_none_or(|t| t.kind != ParticipantKind::Person) {
                     return Err(refuse(RefusalCode::UnknownTemplate, format!("no template {template} for a person")));
                 }
                 // Biology, where the world models sex: only a female body bears a child, and the other parent is male.
@@ -2043,7 +2430,7 @@ impl<'a> Exec<'a> {
                 if my_sex == Some(Sex::Male) {
                     return Err(refuse(RefusalCode::NotFertile, format!("{me} can't bear a child")));
                 }
-                let mut parents = vec![me.clone()];
+                let mut parents = vec![me];
                 if let Some(o) = other_parent {
                     let o = self.r(o)?;
                     if o == me {
@@ -2059,7 +2446,7 @@ impl<'a> Exec<'a> {
                     parents.push(o);
                 }
                 let due = self.later(bp.gestation)?;
-                self.st.schedule(due, Sched::BirthDue { parents: parents.clone(), name: name.clone(), template: template.clone() });
+                self.st.schedule(due, Sched::BirthDue { parents: parents.clone(), name: name.clone(), template: *template });
                 self.emit(EventBody::BirthStarted { parents, due });
                 Ok(())
             }
@@ -2094,8 +2481,8 @@ impl<'a> Exec<'a> {
                 let position = self.r(position)?;
                 let x = self.st.positions.get(&position).ok_or_else(|| refuse(RefusalCode::UnknownPosition, format!("no position {position}")))?;
                 // The post's own organisation fills it, or the authority its constitution names (an owner, a board, the council).
-                let authority = self.s.config.positions.iter().find(|c| c.id == position).and_then(|c| c.appointed_by.clone());
-                let org = if authority.as_deref() == Some(self.entity.as_str()) && self.entity != x.entity { self.entity.clone() } else { self.acting_org()? };
+                let authority = self.s.config.positions.iter().find(|c| c.id == position).and_then(|c| c.appointed_by);
+                let org = if authority.as_deref() == Some(self.entity.as_str()) && self.entity != x.entity { self.entity } else { self.acting_org()? };
                 if x.entity != org && authority.as_deref() != Some(org.as_str()) {
                     return Err(refuse(RefusalCode::NotTheirs, format!("{position} is {}'s, not {org}'s", x.entity)));
                 }
@@ -2111,7 +2498,7 @@ impl<'a> Exec<'a> {
                     }
                 }
                 let c = self.st.stamp();
-                self.st.set_holder(&position, holder.clone(), c);
+                self.st.set_holder(&position, holder, c);
                 self.emit(EventBody::Appointed { position, holder, by: Some(self.participant.into()) });
                 Ok(())
             }
@@ -2120,16 +2507,30 @@ impl<'a> Exec<'a> {
                 // The supplier's act (foundations F4): the acting organisation delivers a system from a template it supplies,
                 // to a client organisation (itself, if none is named). The system belongs to the client.
                 let org = self.acting_org()?;
-                let tpl = self.s.templates.get(template).filter(|t| t.kind == ParticipantKind::System);
+                let tpl = self.s.templates.get(template.as_str()).filter(|t| t.kind == ParticipantKind::System);
                 let Some(tpl) = tpl else {
                     return Err(refuse(RefusalCode::UnknownTemplate, format!("no template {template} for a system")));
                 };
                 if tpl.supplier.as_deref() != Some(org.as_str()) {
                     return Err(refuse(RefusalCode::NotSupplier, format!("{org} doesn't supply {template}")));
                 }
+                // (A technology not yet released is not made: nothing from nothing, foundations-2 E2.)
+                if let Some(r) = tpl.released.filter(|r| *r > self.now()) {
+                    return Err(refuse(RefusalCode::UnknownTemplate, format!("{template} is not made until {r}: nobody can deliver one yet")));
+                }
+                // (A system that runs on hardware in the world is delivered only where there is hardware for its lanes beside
+                // the systems already there: foundations-2 P4.)
+                if let Some(ro) = &tpl.runs_on {
+                    let on_it = |p: &Participant| p.status != ParticipantStatus::Ended && p.template.as_deref().and_then(|t| self.s.templates.get(t)).and_then(|t| t.runs_on.as_ref()).is_some_and(|r| r.holder == ro.holder && r.at == ro.at && r.hardware == ro.hardware);
+                    let used: i64 = self.st.participants.values().filter(|p| on_it(p)).map(|p| p.def.lanes.unwrap_or(1) as i64 * ro.per_lane).sum();
+                    let held = self.st.holding(&ro.holder, &ro.at, &ro.hardware);
+                    if held < (used + ro.per_lane) as Money {
+                        return Err(refuse(RefusalCode::InsufficientQuantity, format!("{} holds {held} {} at {}, and the systems there take {used}: no room to run another {template}", ro.holder, ro.hardware, ro.at)));
+                    }
+                }
                 let client = match to {
                     Some(t) => self.r(t)?,
-                    None => org.clone(),
+                    None => org,
                 };
                 match self.st.entities.get(&client) {
                     None => return Err(refuse(RefusalCode::UnknownEntity, format!("no entity {client}"))),
@@ -2169,10 +2570,10 @@ impl<'a> Exec<'a> {
                 let id = self.st.mint("ent");
                 self.st.counters.created_entities += 1;
                 let c = self.st.stamp();
-                self.st.entities.insert(id.clone(), Entity { kind: kind.clone(), name: name.clone(), changed: c, moved: 0, body: None });
-                self.emit(EventBody::EntityCreated { entity: id.clone(), kind: kind.clone(), name: name.clone() });
+                self.st.entities.insert(id, Entity { kind: kind.clone(), name: name.clone(), changed: c, moved: 0, body: None });
+                self.emit(EventBody::EntityCreated { entity: id, kind: kind.clone(), name: name.clone() });
                 self.new_record(
-                    RecordBody::EntityDeclaration { entity: id.clone(), kind: kind.clone(), name: name.clone() },
+                    RecordBody::EntityDeclaration { entity: id, kind: kind.clone(), name: name.clone() },
                     speaks_for,
                     visible_to.clone(),
                     None,
@@ -2186,7 +2587,7 @@ impl<'a> Exec<'a> {
             }
 
             Block::RecordClaim { position, holder, counterparty, about, basis, speaks_for, visible_to, bind } => {
-                let body = RecordBody::Claim { position: *position, holder: self.r(holder)?, counterparty: self.ro(counterparty)?, about: about.clone() };
+                let body = RecordBody::Claim { position: *position, holder: self.r(holder)?, counterparty: self.ro(counterparty)?, about: Frozen::of(about) };
                 let id = self.new_record(body, self.ro(speaks_for)?, visible_to.clone(), self.cited(basis)?)?;
                 self.bind(bind, &id)
             }
@@ -2221,14 +2622,14 @@ impl<'a> Exec<'a> {
                 // took first decides it: a withdrawal not yet stored does not stop a signature.
                 if let Some(m) = self.st.marks.get(&agreement) {
                     if let (Some(at), Some(stored)) = (m.withdrawn_at, self.st.records.get(&agreement)) {
-                        if let RecordBody::Agreement { terms } = &stored.record.body {
+                        if let RecordBody::Agreement { terms } = &stored.record().body {
                             if !terms.parties.iter().all(|p| m.signatures.iter().any(|s| &s.party == p)) {
                                 return Err(refuse(RefusalCode::OfferWithdrawn, format!("{agreement} was withdrawn by its maker at {at}; it can no longer be signed")));
                             }
                         }
                     }
                 }
-                let id = self.new_record(RecordBody::Signature { agreement, party: party.clone() }, Some(party), None, None)?;
+                let id = self.new_record(RecordBody::Signature { agreement, party }, Some(party), None, None)?;
                 self.bind(bind, &id)
             }
 
@@ -2236,7 +2637,7 @@ impl<'a> Exec<'a> {
                 let agreement = self.r(agreement)?;
                 self.record_of_kind(&agreement, "agreement")?;
                 let party = self.r(party)?;
-                let id = self.new_record(RecordBody::Notice { agreement, party: party.clone(), text: text.clone() }, Some(party), None, None)?;
+                let id = self.new_record(RecordBody::Notice { agreement, party, text: text.clone() }, Some(party), None, None)?;
                 self.bind(bind, &id)
             }
 
@@ -2248,17 +2649,17 @@ impl<'a> Exec<'a> {
                     }
                 }
                 let body = RecordBody::Statement {
-                    kind: kind.clone(),
+                    kind: Id::new(kind),
                     text: text.clone(),
-                    data: data.clone(),
-                    adico: adico.clone(),
-                    formal: formal.clone(),
-                    offer: offer.clone(),
-                    practice: practice.clone(),
-                    assertion: assertion.clone(),
-                    registry: registry.clone(),
+                    data: data.as_ref().map(Frozen::of),
+                    adico: adico.as_ref().map(Frozen::of),
+                    formal: formal.as_ref().map(Frozen::of),
+                    offer: offer.as_ref().map(Frozen::of),
+                    practice: practice.as_ref().map(Frozen::of),
+                    assertion: assertion.as_ref().map(Frozen::of),
+                    registry: registry.as_ref().map(Frozen::of),
                     addressed_to,
-                    place: place.clone(),
+                    place: *place,
                 };
                 let id = self.new_record(body, self.ro(speaks_for)?, visible_to.clone(), self.cited(basis)?)?;
                 self.bind(bind, &id)
@@ -2280,25 +2681,138 @@ impl<'a> Exec<'a> {
 
             Block::Message { to, text, re } => {
                 let recipients = self.recipients(to)?;
-                let mid = self.st.mint("msg");
+                let mid = self.st.mint_passing("msg");
                 let msg = Message {
                     id: mid.clone(),
                     t: self.now(),
                     from: self.participant.into(),
-                    from_position: self.position.map(String::from),
-                    from_entity: Some(self.entity.clone()),
+                    from_position: self.position.map(String::from).map(Into::into),
+                    from_entity: Some(self.entity),
                     to: to.clone(),
                     text: text.clone(),
-                    re: re.clone(),
+                    re: *re,
                 };
                 let mut reached = BTreeSet::new();
                 for (p, capacity) in &recipients {
-                    Arc::make_mut(self.st.participants.get_mut(p).unwrap()).pending.entry(capacity.clone()).or_default().inbox.push(msg.clone());
-                    reached.insert(p.clone());
+                    Arc::make_mut(self.st.participants.get_mut(p).unwrap()).pending.entry(capacity.to_string()).or_default().inbox.push(msg.clone());
+                    reached.insert(*p);
                 }
-                self.emit(EventBody::MessageDelivered { message: mid, participant: self.participant.into(), to: reached.into_iter().collect() });
+                self.emit(EventBody::MessageDelivered { message: mid.into(), participant: self.participant.into(), to: reached.into_iter().collect() });
                 Ok(())
             }
+
+            Block::Connection { op, connection, kind, node, to, at, rate, uses, meter, bind } => self.connection(*op, connection, kind, node, to, at, *rate, uses, *meter, bind),
+            Block::Link { link, op, every, from, off } => self.link(link, *op, *every, *from, *off),
         }
+    }
+
+    /// An act on a connection (foundations-2 C3): its operator opens, closes, interrupts and restores it; its user or its
+    /// operator sets its rate. Whose a connection is, is the network's: the holder of the supply whose tree its node is on.
+    #[allow(clippy::too_many_arguments)]
+    fn connection(&mut self, op: crate::blocks::ConnOp, connection: &Option<String>, kind: &Option<Id>, node: &Option<Id>, to: &Option<String>, at: &Option<String>, rate: Option<i64>, uses: &Option<Id>, meter: Option<crate::config::MeterKind>, bind: &Option<String>) -> R<()> {
+        use crate::blocks::ConnOp;
+        let (Some(n), Some(net)) = (self.s.config.world.network.as_ref(), self.s.net.clone()) else {
+            return Err(refuse(RefusalCode::NotModelled, "this world has no network for anything to flow on"));
+        };
+        if rate.is_some_and(|r| !(0..=oikos_contracts::network::MAX_FLOW).contains(&r)) {
+            return Err(refuse(RefusalCode::Overflow, "a rate out of range"));
+        }
+        let me = self.entity;
+        let stamp = self.st.stamp();
+        let by: Id = self.participant.into();
+        let mut ns = (**self.st.network.as_ref().expect("a world with a network has its state")).clone();
+        let (id, event) = match (op, connection) {
+            (ConnOp::Open, None) => {
+                let (Some(kind), Some(node), Some(to), Some(at)) = (kind, node, to, at) else {
+                    return Err(refuse(RefusalCode::UnknownRef, "a connection opened says of what, on which node, for whom and where"));
+                };
+                let (to, at) = (self.r(to)?, self.r(at)?);
+                self.entity_exists(&to)?;
+                if !self.st.structures.contains_key(&at) {
+                    return Err(refuse(RefusalCode::UnknownStructure, format!("no structure {at}")));
+                }
+                let supply = net.trees.supply_of(n, kind, node).ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("no supply of {kind} reaches node {node}")))?;
+                if n.supplies[supply].holder != me {
+                    return Err(refuse(RefusalCode::NotTheirs, format!("{me} does not operate the supply of {kind} at {node} ({}'s)", n.supplies[supply].holder)));
+                }
+                if let Some(u) = uses {
+                    let tasks: BTreeMap<&str, &crate::config::TaskCfg> = self.s.config.catalogue.tasks.iter().map(|t| (t.id.as_str(), t)).collect();
+                    oikos_contracts::network::check_use(&tasks, &self.s.config.catalogue.fields.iter().map(|f| f.id.as_str()).collect(), u, kind).map_err(|e| refuse(RefusalCode::UnknownTask, e))?;
+                }
+                ns.opened += 1;
+                let id = Id::from_string(format!("conn.{}", ns.opened));
+                let r = rate.unwrap_or(0);
+                ns.add(crate::network::Connection { id, kind: *kind, node: *node, supply: supply as u32, holder: to, at, rate: r, meter: 0, uses: *uses, reading: meter.unwrap_or_default(), closed: false, interrupted: false, changed: stamp });
+                (id, EventBody::ConnectionChanged { connection: id, op: "open".into(), rate: Some(r), kind: Some(*kind), node: Some(*node), holder: Some(to), at: Some(at), by })
+            }
+            (op, connection) => {
+                let Some(c) = connection else { return Err(refuse(RefusalCode::UnknownRef, "say which connection")) };
+                let id = self.r(c)?;
+                let ci = *ns.index.by_id.get(&id).ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("no connection {id}")))?;
+                let operator = n.supplies[ns.connections[ci].supply as usize].holder == me;
+                let user = ns.connections[ci].holder == me;
+                let x = &mut ns.connections[ci];
+                match op {
+                    ConnOp::Set => {
+                        if !operator && !user {
+                            return Err(refuse(RefusalCode::NotTheirs, format!("{id} is neither {me}'s nor on a supply {me} operates")));
+                        }
+                        x.rate = rate.ok_or_else(|| refuse(RefusalCode::UnknownRef, "set it to what rate?"))?;
+                    }
+                    _ if !operator => return Err(refuse(RefusalCode::NotTheirs, format!("only its operator may {} {id}", op.name()))),
+                    ConnOp::Open => x.closed = false,
+                    ConnOp::Close => x.closed = true,
+                    ConnOp::Interrupt => x.interrupted = true,
+                    ConnOp::Restore => x.interrupted = false,
+                }
+                x.changed = stamp;
+                let r = (op == ConnOp::Set).then_some(x.rate);
+                (id, EventBody::ConnectionChanged { connection: id, op: op.name().into(), rate: r, kind: None, node: None, holder: None, at: None, by })
+            }
+        };
+        self.st.network = Some(Arc::new(ns));
+        self.emit(event);
+        self.bind(bind, &id)
+    }
+
+    /// An act on a link by its operator (the holder of the supply whose tree it is in): shut, open, reclose after a trip,
+    /// or a rotation declared (a standing schedule; its effects are state, and only this act is logged).
+    fn link(&mut self, link: &str, op: crate::blocks::LinkOp, every: Option<i64>, from: Option<i64>, off: Option<i64>) -> R<()> {
+        use crate::blocks::LinkOp;
+        let (Some(n), Some(net)) = (self.s.config.world.network.as_ref(), self.s.net.clone()) else {
+            return Err(refuse(RefusalCode::NotModelled, "this world has no network"));
+        };
+        let li = *net.trees.link_ix.get(link).ok_or_else(|| refuse(RefusalCode::UnknownRef, format!("no link {link}")))?;
+        let supply = net.trees.link_tree[li].ok_or_else(|| refuse(RefusalCode::NotModelled, format!("link {link} is on no supply's tree (cut to make the trees, or reached by none)")))?;
+        let me = self.entity;
+        if n.supplies[supply].holder != me {
+            return Err(refuse(RefusalCode::NotTheirs, format!("{me} does not operate link {link} ({}'s)", n.supplies[supply].holder)));
+        }
+        let now = self.now();
+        let mut ns = (**self.st.network.as_ref().expect("a world with a network has its state")).clone();
+        let l = &mut ns.links[li];
+        let mut rotation = None;
+        match op {
+            LinkOp::Shut => l.shut = true,
+            LinkOp::Open => l.shut = false,
+            LinkOp::Reclose => l.tripped = false,
+            LinkOp::Rotate => {
+                let off = off.unwrap_or(0);
+                if off <= 0 {
+                    l.rotation = None;
+                } else {
+                    let every = every.ok_or_else(|| refuse(RefusalCode::UnknownRef, "a rotation says how often it comes round"))?;
+                    if every < off || every > 366 * 86_400 {
+                        return Err(refuse(RefusalCode::Overflow, "a rotation is off for no longer than it comes round, within a year"));
+                    }
+                    let r = crate::network::Rotation { every, from: from.unwrap_or(now), off };
+                    rotation = Some(serde_json::json!({ "every": r.every, "from": r.from, "off": r.off }));
+                    l.rotation = Some(r);
+                }
+            }
+        }
+        self.st.network = Some(Arc::new(ns));
+        self.emit(EventBody::LinkChanged { link: link.into(), op: op.name().into(), by: Some(self.participant.into()), load: None, capacity: None, rotation });
+        Ok(())
     }
 }

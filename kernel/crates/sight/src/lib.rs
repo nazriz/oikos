@@ -13,17 +13,18 @@ pub mod action;
 pub mod view;
 
 pub use action::{Action, Provenance};
-pub use view::{Picture, Seen, View, Visit};
+pub use view::{Held, Picture, Seen, View, Visit};
 
 /// The observation as the engine builds it (contracts/participant-api.schema.json, Observation), and its parts.
 pub use oikos_perception::{
-    AccountItem, BodyView, ChannelData, ChildView, ConditionView, EntityItem, HeldPosition, HoldingItem, Observation, OwnRecord,
+    AccountItem, BodyView, ChannelData, ChildView, ConditionView, ConnectionItem, EntityItem, HeldPosition, HoldingItem, LinkItem, MeterView, Observation, OwnRecord,
     PositionItem, SiteCell, SiteSpace, SiteStructure, VariableView,
 };
 /// An agreement read by its terms, as an observation carries it.
 pub use oikos_terms::Reading;
 /// Records and blocks (contracts/blocks.schema.json), ids, money, look requests.
 pub use oikos_world::blocks::{Block, Id, Record, RecordBody};
+pub use oikos_world::held::Rec;
 pub use oikos_world::config::{CmpOp, Condition, LookRequest, Order, Query, Visit as Going, Who};
 pub use oikos_world::money::Money;
 pub use oikos_world::state::{Message, Outcome, OutcomeStatus, ParticipantStatus, RefusalInfo, Transaction};

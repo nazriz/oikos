@@ -10,7 +10,7 @@
 //!
 //! Channel paths: a personal channel is its id; a position's is `<position>/<channel>`.
 
-use crate::blocks::{Id, Record};
+use crate::blocks::{Frozen, Id, Record};
 use crate::config::{cell_id, Area, Channel, ChannelKind, CmpOp, LookRequest, Occupants, ParticipantKind, Query, RecordFilter, Way, Who, SELF};
 use crate::geo::{within, Rect};
 use crate::state::{Look, Message, Outcome, ParticipantStatus, State, Transaction};
@@ -81,6 +81,36 @@ pub struct BodyView {
     /// Its children, as a parent knows them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<ChildView>,
+    /// The vehicles it may drive (its own, and those their owners let it), each where it stands (law 9: its own things).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vehicles: Vec<VehicleView>,
+    /// On its way (law 9, S3): where to, and when it arrives.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_way: Option<OnWayView>,
+}
+
+/// A body's trip, as it knows it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OnWayView {
+    pub to: Id,
+    pub arrives: i64,
+}
+
+/// A vehicle as one who may drive it knows it: what it is and where it stands.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VehicleView {
+    pub vehicle: Id,
+    #[serde(rename = "type")]
+    pub type_: Id,
+    pub at: Id,
+    /// What it runs on, what its tank holds of it now (its owner's holding at the vehicle) and holds full (law 9, S5).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fuel: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::money::opt_amount")]
+    pub in_tank: Option<crate::money::Money>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tank: Option<i64>,
+    pub owner: Id,
 }
 
 /// A child, as their parent knows them.
@@ -108,14 +138,24 @@ pub struct HeldPosition {
 pub struct OwnRecord {
     pub n: u64,
     pub at: i64,
-    pub sections: std::collections::BTreeMap<String, serde_json::Value>,
+    pub sections: std::collections::BTreeMap<Id, Frozen>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ChannelData {
-    Accounts { accounts: Vec<AccountItem>, transactions: Vec<Transaction> },
-    Holdings { holdings: Vec<HoldingItem> },
+    Accounts { accounts: Vec<AccountItem>, transactions: Vec<Arc<Transaction>> },
+    Holdings {
+        holdings: Vec<HoldingItem>,
+        /// What flows to it (foundations-2 C3): its own connections, with their meters (it is there: they are its own);
+        /// and, for a supply's operator, every connection on its network, with the meters it reads from afar. Whole at
+        /// every look (a meter moves every settlement).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        connections: Vec<ConnectionItem>,
+        /// A supply's operator's network: each link's state and its last load (its own instruments: the operator keeps it).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        links: Vec<LinkItem>,
+    },
     /// The entity's own record, when it has changed since the last look (or in the full picture); absent otherwise.
     OwnRecord {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -123,7 +163,7 @@ pub enum ChannelData {
     },
     Records {
         /// (The state's own records, shared: a record is immutable once made, and one is shown to many.)
-        records: Vec<Arc<Record>>,
+        records: Vec<crate::held::Rec>,
         /// Set when these are a search's results (what matches now), not what's new since the last look.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         search: Option<bool>,
@@ -142,6 +182,86 @@ pub enum ChannelData {
         visited: Option<bool>,
     },
     Directory { entities: Vec<EntityItem>, positions: Vec<PositionItem> },
+}
+
+/// A connection as its user or its operator sees it (foundations-2 C3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectionItem {
+    pub id: Id,
+    pub kind: Id,
+    pub at: Id,
+    pub node: Id,
+    /// Its user (shown to its operator; the user's own are its own).
+    pub holder: Id,
+    pub rate: i64,
+    /// What it has delivered since it was opened: shown to its user, and to its operator where it reads it from afar.
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::money::opt_amount")]
+    pub meter: Option<crate::money::Money>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub closed: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub interrupted: bool,
+    /// The looker operates its supply.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub operated: bool,
+}
+
+/// A link of an operator's network as its own instruments show it (foundations-2 C3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LinkItem {
+    pub id: Id,
+    pub mode: String,
+    pub from: Id,
+    pub to: Id,
+    pub capacity: i64,
+    pub load: i64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shut: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub tripped: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rotation: Option<oikos_world::network::Rotation>,
+}
+
+/// What flows to an entity, as it may see it: its own connections (theirs, with their meters), and, where it operates a
+/// supply, the connections on its network (the meters it reads from afar) and its links. Nobody else's (docs/no-god-view.md:
+/// the network's whole map is its operator's register).
+pub fn flows_of(s: &Statics, st: &State, me: &str) -> (Vec<ConnectionItem>, Vec<LinkItem>) {
+    let (Some(ns), Some(n), Some(net)) = (st.network.as_deref(), s.config.world.network.as_ref(), s.net.as_ref()) else { return (vec![], vec![]) };
+    let item = |c: &oikos_world::network::Connection, operated: bool| ConnectionItem {
+        id: c.id,
+        kind: c.kind,
+        at: c.at,
+        node: c.node,
+        holder: c.holder,
+        rate: c.rate,
+        meter: (!operated || c.reading == crate::config::MeterKind::Remote || c.holder == me).then_some(c.meter),
+        closed: c.closed,
+        interrupted: c.interrupted,
+        operated,
+    };
+    let mut seen = BTreeSet::new();
+    let mut conns = vec![];
+    let mut links = vec![];
+    for (k, sup) in n.supplies.iter().enumerate().filter(|(_, x)| x.holder == me) {
+        for &ci in ns.index.by_supply.get(&(k as u32)).into_iter().flatten() {
+            if seen.insert(ci) {
+                conns.push((ci, item(&ns.connections[ci], true)));
+            }
+        }
+        let _ = sup;
+        for (li, l) in n.links.iter().enumerate().filter(|(li, _)| net.trees.link_tree[*li] == Some(k)) {
+            let x = &ns.links[li];
+            links.push(LinkItem { id: l.id, mode: l.mode.clone(), from: l.from, to: l.to, capacity: l.capacity, load: x.load, shut: x.shut, tripped: x.tripped, rotation: x.rotation });
+        }
+    }
+    for &ci in ns.index.by_holder.get(me).into_iter().flatten() {
+        if seen.insert(ci) {
+            conns.push((ci, item(&ns.connections[ci], false)));
+        }
+    }
+    conns.sort_by_key(|(ci, _)| *ci);
+    (conns.into_iter().map(|(_, c)| c).collect(), links)
 }
 
 /// A holding the capacity's entity has: how much of a kind, where (0: it's all gone from there).
@@ -166,7 +286,7 @@ pub struct AccountItem {
     pub closed: Option<bool>,
 }
 
-pub use crate::sites::{SiteCell, SiteSpace, SiteStructure, VariableView};
+pub use crate::sites::{MeterView, SiteCell, SiteSpace, SiteStructure, VariableView};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntityItem {
@@ -194,17 +314,43 @@ pub struct PositionItem {
 }
 
 /// Can those acting for `entity` perceive this record? The author's entity always can.
+/// The buildings where an agreement now in force (or running out its notice) has another party give `entity`
+/// occupancy of a space: premises it holds by agreement, such as a lease. By the agreements' own terms, read as they
+/// read now; the meaning of each is nobody's to judge here, only where it puts its occupant.
+pub fn held_structures(st: &State, entity: &str) -> Vec<Id> {
+    let mut out: BTreeSet<Id> = BTreeSet::new();
+    for id in st.agreements_of.get(entity).into_iter().flatten() {
+        let Some(r) = st.records.get(id).map(|x| x.record()) else { continue };
+        let crate::blocks::RecordBody::Agreement { terms } = &r.body else { continue };
+        if !st.reading(id).is_some_and(|r| r.status == "in_force" || r.status == "ending") {
+            continue;
+        }
+        for c in terms.commitments.iter().filter(|c| c.who != entity) {
+            let Some(o) = c.does.get("outcome").and_then(|o| o.get("occupancy")) else { continue };
+            if o.get("who").and_then(|x| x.as_str()) != Some(entity) || o.get("leave").and_then(|x| x.as_bool()) == Some(true) {
+                continue;
+            }
+            let Some(space) = o.get("in").and_then(|x| x.as_str()) else { continue };
+            let sid = crate::config::split_space(space).map_or(space, |(s, _)| s);
+            if st.structures.contains_key(sid) {
+                out.insert(sid.to_string().into());
+            }
+        }
+    }
+    out.into_iter().collect()
+}
+
 pub fn can_see(st: &State, rec: &Record, entity: &str) -> bool {
     rec.visible_to.allows(entity) || st.author_entity(rec).as_deref() == Some(entity)
 }
 
 /// Where a record physically is: the cell a statement was put up on, and the same place for
 /// taking it down (a withdrawal of a placed statement).
-pub fn place_of<'a>(st: &'a State, rec: &'a Record) -> Option<&'a Id> {
+pub fn place_of(st: &State, rec: &Record) -> Option<Id> {
     match &rec.body {
-        crate::blocks::RecordBody::Statement { place, .. } => place.as_ref(),
-        crate::blocks::RecordBody::Withdrawal { withdraws, .. } => match &st.records.get(withdraws)?.record.body {
-            crate::blocks::RecordBody::Statement { place, .. } => place.as_ref(),
+        crate::blocks::RecordBody::Statement { place, .. } => *place,
+        crate::blocks::RecordBody::Withdrawal { withdraws, .. } => match &st.records.get(withdraws)?.record().body {
+            crate::blocks::RecordBody::Statement { place, .. } => *place,
             _ => None,
         },
         _ => None,
@@ -217,7 +363,7 @@ fn placed_ok(st: &State, rec: &Record, me: &str, area: Option<&Scope>) -> bool {
     match (place_of(st, rec), area) {
         (None, None) => true,
         (None, Some(_)) => false,
-        (Some(p), Some(scope)) => scope.covers(p),
+        (Some(p), Some(scope)) => scope.covers(&p),
         (Some(_), None) => st.author_entity(rec).as_deref() == Some(me) || rec.speaks_for.as_deref() == Some(me),
     }
 }
@@ -241,12 +387,12 @@ impl Scope {
 /// Entities a record involves: those it names, its author's entity, and (one
 /// hop) those named by any record it refers to. A signature on my agreement,
 /// or a withdrawal of my listing, involves me (D32).
-fn involved(st: &State, rec: &Record) -> Vec<String> {
-    let mut v: Vec<String> = rec.entities_named().into_iter().map(String::from).chain(st.author_entity(rec)).collect();
+fn involved(st: &State, rec: &Record) -> Vec<Id> {
+    let mut v: Vec<Id> = rec.entities_named().into_iter().map(Id::new).chain(st.author_entity(rec)).collect();
     for other in rec.body.records_referenced() {
-        if let Some(o) = st.records.get(other) {
-            v.extend(o.record.entities_named().into_iter().map(String::from));
-            v.extend(st.author_entity(&o.record));
+        if let Some(o) = st.records.get(other).map(|x| x.record()) {
+            v.extend(o.entities_named().into_iter().map(Id::new));
+            v.extend(st.author_entity(&o));
         }
     }
     v
@@ -254,12 +400,13 @@ fn involved(st: &State, rec: &Record) -> Vec<String> {
 
 /// The record a withdrawal takes down: the one it names, if whoever withdraws it is its own author's entity or
 /// whoever it speaks for (anyone may record that they "withdraw" anything; only its owner ends its standing).
-fn taken_down<'a>(st: &'a State, rec: &Record) -> Option<&'a crate::state::Stored> {
+fn taken_down(st: &State, rec: &Record) -> Option<(u64, Arc<Record>)> {
     let crate::blocks::RecordBody::Withdrawal { withdraws, .. } = &rec.body else { return None };
-    let target = st.records.get(withdraws)?;
-    let owner = |r: &Record| -> Vec<String> { r.speaks_for.iter().cloned().chain(st.author_entity(r)).collect() };
+    let stored = st.records.get(withdraws)?;
+    let target = stored.record();
+    let owner = |r: &Record| -> Vec<Id> { r.speaks_for.iter().cloned().chain(st.author_entity(r)).collect() };
     let by = owner(rec);
-    owner(&target.record).iter().any(|o| by.contains(o)).then_some(target)
+    owner(&target).iter().any(|o| by.contains(o)).then_some((stored.seq, target))
 }
 
 /// Does a channel's filter show this record? `news`: what a look delivers, where a statement being taken down is
@@ -271,10 +418,11 @@ fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&Want>, news
     }
     // (What the filter's `statement_kinds` and `has` are asked of: the record, or the statement it takes down.)
     let rec_itself = rec;
-    let rec = if news && (f.statement_kinds.is_some() || f.has.is_some()) { taken_down(st, rec).map_or(rec, |t| &*t.record) } else { rec };
+    let target = if news && (f.statement_kinds.is_some() || f.has.is_some()) { taken_down(st, rec) } else { None };
+    let rec = target.as_ref().map_or(rec, |(_, t)| &**t);
     if let Some(kinds) = &f.statement_kinds {
         match &rec.body {
-            crate::blocks::RecordBody::Statement { kind, .. } if kinds.contains(kind) => {}
+            crate::blocks::RecordBody::Statement { kind, .. } if kinds.iter().any(|k| k == kind) => {}
             _ => return false,
         }
     }
@@ -339,18 +487,19 @@ impl<'a> Want<'a> {
 pub struct RecordIndex {
     indexed: usize,
     /// The records in the order they were made (record with seq q is `by_seq[q - 1]`): the state's own, shared.
-    by_seq: Vec<Arc<Record>>,
-    by_record: BTreeMap<&'static str, Vec<u64>>,
-    by_kind: BTreeMap<String, Vec<u64>>,
-    by_entity: BTreeMap<String, Vec<u64>>,
+    by_seq: Vec<crate::held::Rec>,
+    /// (Sequence numbers held as `u32`, in order: a run's records number fewer than four billion. Each list is a
+    /// record's few bytes for as long as the run lasts, so they are kept small: SC-6.)
+    by_record: BTreeMap<&'static str, Vec<u32>>,
+    by_kind: BTreeMap<Id, Vec<u32>>,
+    by_entity: BTreeMap<Id, Vec<u32>>,
     /// Statements by the structured fields they carry (what a channel's `has` asks for): a practice, an offer...
-    by_has: BTreeMap<&'static str, Vec<u64>>,
-    /// Records still standing (not withdrawn by their own author or whoever they speak for), by
-    /// statement kind and by record kind: what a search for standing records scans.
-    standing_kind: BTreeMap<String, BTreeSet<u64>>,
-    standing_record: BTreeMap<&'static str, BTreeSet<u64>>,
+    by_has: BTreeMap<&'static str, Vec<u32>>,
+    /// Records taken down (withdrawn by their own author or whoever they speak for). Everything else stands but a
+    /// withdrawal itself: what a search for standing records reads, from the lists above, less these.
+    taken: BTreeSet<u32>,
     /// cell -> records placed there (and withdrawals of them).
-    by_place: BTreeMap<Id, Vec<u64>>,
+    by_place: BTreeMap<Id, Vec<u32>>,
     /// The latest record placed anywhere (0: none).
     placed_last: u64,
     accounts: Option<AccountsByEntity>,
@@ -424,8 +573,8 @@ impl<V: Clone + PartialEq> Changes<V> {
                             Some(n) => *n,
                             None => {
                                 let n = self.ids.len() as u32;
-                                self.ids.push(id.clone());
-                                self.numbers.insert(id.clone(), n);
+                                self.ids.push(*id);
+                                self.numbers.insert(*id, n);
                                 n
                             }
                         };
@@ -433,6 +582,18 @@ impl<V: Clone + PartialEq> Changes<V> {
                     }
                 }
                 self.log[start..].sort_unstable();
+                // (Only an id's latest entry answers anything: "which ids have a stamp above this one" is the same
+                // with its earlier ones gone. Let go of once they outnumber the ids four to one: an account changes at
+                // every payment, and the log held every change of the run, SC-6.)
+                if self.log.len() > 4 * self.ids.len() + 4096 {
+                    let mut latest: Vec<u64> = vec![0; self.ids.len()];
+                    for &(c, n) in &self.log {
+                        latest[n as usize] = latest[n as usize].max(c);
+                    }
+                    self.log.retain(|&(c, n)| c == latest[n as usize]);
+                    self.log.dedup();
+                    self.log.shrink_to_fit();
+                }
             }
         }
         self.seen = Some(now.clone());
@@ -469,7 +630,9 @@ impl RecordIndex {
         assert!(self.indexed <= st.record_order.len(), "the record index is ahead of the state it's asked about");
         for i in self.indexed..st.record_order.len() {
             let stored = &st.records[&st.record_order[i]];
-            let (seq, rec) = (stored.seq, &*stored.record);
+            let record = stored.record();
+            let rec = &*record;
+            let seq = u32::try_from(stored.seq).expect("fewer than four billion records");
             self.by_seq.push(stored.record.clone());
             self.by_record.entry(rec.body.kind_name()).or_default().push(seq);
             if let crate::blocks::RecordBody::Statement { kind, offer, practice, assertion, registry, adico, formal, .. } = &rec.body {
@@ -479,33 +642,22 @@ impl RecordIndex {
                     self.by_has.entry(field).or_default().push(seq);
                 }
             }
-            let who: BTreeSet<String> = involved(st, rec).into_iter().collect();
+            let who: BTreeSet<Id> = involved(st, rec).into_iter().collect();
             for e in who {
                 self.by_entity.entry(e).or_default().push(seq);
             }
             if let Some(p) = place_of(st, rec) {
-                self.by_place.entry(p.clone()).or_default().push(seq);
-                self.placed_last = self.placed_last.max(seq);
+                self.by_place.entry(p).or_default().push(seq);
+                self.placed_last = self.placed_last.max(u64::from(seq));
             }
             // Everything stands when made, except a withdrawal: it takes something down.
-            if !matches!(rec.body, crate::blocks::RecordBody::Withdrawal { .. }) {
-                self.standing_record.entry(rec.body.kind_name()).or_default().insert(seq);
-            }
-            if let crate::blocks::RecordBody::Statement { kind, .. } = &rec.body {
-                self.standing_kind.entry(kind.clone()).or_default().insert(seq);
-            }
             // A withdrawal by the record's own author (or whoever it speaks for) ends its standing, and is news
             // wherever statements like the one it takes down are shown (`matches`): found by that statement's
             // kind and by the fields it carries.
-            if let Some(target) = taken_down(st, rec) {
-                let t = &*target.record;
-                if let Some(set) = self.standing_record.get_mut(t.body.kind_name()) {
-                    set.remove(&target.seq);
-                }
+            if let Some((target_seq, target)) = taken_down(st, rec) {
+                let t = &*target;
+                self.taken.insert(u32::try_from(target_seq).expect("fewer than four billion records"));
                 if let crate::blocks::RecordBody::Statement { kind, offer, practice, assertion, registry, adico, formal, .. } = &t.body {
-                    if let Some(set) = self.standing_kind.get_mut(kind) {
-                        set.remove(&target.seq);
-                    }
                     self.by_kind.entry(kind.clone()).or_default().push(seq);
                     let carries = [("offer", offer.is_some()), ("practice", practice.is_some()), ("assertion", assertion.is_some()), ("registry", registry.is_some()), ("adico", adico.is_some()), ("formal", formal.is_some()), ("hears", offer.as_ref().is_some_and(|o| o.get("hears").is_some()))];
                     for (field, _) in carries.into_iter().filter(|(_, x)| *x) {
@@ -519,15 +671,15 @@ impl RecordIndex {
 
     /// Sequence numbers above `after` that might match the filter, in order.
     fn candidates(&self, f: &RecordFilter, want: Option<&Want>, after: u64) -> Option<Vec<u64>> {
-        fn tail(v: &[u64], after: u64) -> &[u64] {
-            &v[v.partition_point(|&q| q <= after)..]
+        fn tail(v: &[u32], after: u64) -> &[u32] {
+            &v[v.partition_point(|&q| u64::from(q) <= after)..]
         }
-        let mut options: Vec<Vec<&[u64]>> = vec![];
+        let mut options: Vec<Vec<&[u32]>> = vec![];
         if let Some(k) = &f.records {
             options.push(k.iter().filter_map(|x| self.by_record.get(x.as_str())).map(|v| tail(v, after)).collect());
         }
         if let Some(k) = &f.statement_kinds {
-            options.push(k.iter().filter_map(|x| self.by_kind.get(x)).map(|v| tail(v, after)).collect());
+            options.push(k.iter().filter_map(|x| self.by_kind.get(x.as_str())).map(|v| tail(v, after)).collect());
         }
         if let Some(w) = want {
             options.push(w.entities().iter().filter_map(|e| self.by_entity.get(*e)).map(|v| tail(v, after)).collect());
@@ -537,20 +689,31 @@ impl RecordIndex {
             options.push(self.by_has.get(h.as_str()).map(|v| tail(v, after)).into_iter().collect());
         }
         let best = options.into_iter().min_by_key(|lists| lists.iter().map(|l| l.len()).sum::<usize>())?;
-        let mut seqs: Vec<u64> = best.into_iter().flatten().copied().collect();
+        let mut seqs: Vec<u64> = best.into_iter().flatten().map(|&q| u64::from(q)).collect();
         seqs.sort_unstable();
         seqs.dedup();
         Some(seqs)
     }
 
+    /// Whether the record numbered `seq` is a withdrawal.
+    fn is_withdrawal(&self, seq: u32) -> bool {
+        self.by_record.get("withdrawal").is_some_and(|w| w.binary_search(&seq).is_ok())
+    }
+
+    /// Whether the record numbered `seq` stands: not a withdrawal, and not taken down.
+    fn stands(&self, seq: u32) -> bool {
+        !self.taken.contains(&seq) && !self.is_withdrawal(seq)
+    }
+
     /// Standing records that might match the filter, newest first.
     fn standing(&self, f: &RecordFilter) -> Vec<u64> {
+        // (A statement kind's list holds the withdrawals of its statements too, and a withdrawal never stands.)
         let mut seqs: Vec<u64> = if let Some(kinds) = &f.statement_kinds {
-            kinds.iter().filter_map(|k| self.standing_kind.get(k)).flatten().copied().collect()
+            kinds.iter().filter_map(|k| self.by_kind.get(k.as_str())).flatten().filter(|&&q| self.stands(q)).map(|&q| u64::from(q)).collect()
         } else if let Some(kinds) = &f.records {
-            kinds.iter().filter_map(|k| self.standing_record.get(k.as_str())).flatten().copied().collect()
+            kinds.iter().filter(|k| k.as_str() != "withdrawal").filter_map(|k| self.by_record.get(k.as_str())).flatten().filter(|&&q| !self.taken.contains(&q)).map(|&q| u64::from(q)).collect()
         } else {
-            self.standing_record.values().flatten().copied().collect()
+            self.by_record.iter().filter(|(k, _)| **k != "withdrawal").flat_map(|(_, v)| v).filter(|&&q| !self.taken.contains(&q)).map(|&q| u64::from(q)).collect()
         };
         seqs.sort_unstable_by(|a, b| b.cmp(a));
         seqs.dedup();
@@ -559,7 +722,7 @@ impl RecordIndex {
 
     /// Is this record still standing?
     fn is_standing(&self, rec: &Record, seq: u64) -> bool {
-        self.standing_record.get(rec.body.kind_name()).is_some_and(|x| x.contains(&seq))
+        !matches!(rec.body, crate::blocks::RecordBody::Withdrawal { .. }) && u32::try_from(seq).is_ok_and(|q| !self.taken.contains(&q))
     }
 
     /// Records placed within the scope, above `after`, in order.
@@ -569,9 +732,9 @@ impl RecordIndex {
             return vec![];
         }
         let mut seqs: Vec<u64> = vec![];
-        let mut tail = |v: &Vec<u64>| {
-            if v.last().is_some_and(|&q| q > after) {
-                seqs.extend_from_slice(&v[v.partition_point(|&q| q <= after)..]);
+        let mut tail = |v: &Vec<u32>| {
+            if v.last().is_some_and(|&q| u64::from(q) > after) {
+                seqs.extend(v[v.partition_point(|&q| u64::from(q) <= after)..].iter().map(|&q| u64::from(q)));
             }
         };
         match scope {
@@ -583,7 +746,7 @@ impl RecordIndex {
         seqs.sort_unstable();
         #[cfg(debug_assertions)]
         {
-            let plain = |v: &Vec<u64>| v[v.partition_point(|&q| q <= after)..].to_vec();
+            let plain = |v: &Vec<u32>| v[v.partition_point(|&q| u64::from(q) <= after)..].iter().map(|&q| u64::from(q)).collect::<Vec<u64>>();
             let mut all: Vec<u64> = match scope {
                 Scope::Everywhere => self.by_place.values().flat_map(plain).collect(),
                 Scope::Cells(ps) => ps.iter().filter_map(|p| self.by_place.get(p)).flat_map(plain).collect(),
@@ -601,6 +764,17 @@ impl RecordIndex {
         let keep = || self.scopes.write().unwrap_or_else(|e| e.into_inner());
         match area {
             Area::All(_) => Scope::Everywhere,
+            // (Worked out afresh each look: few organisations hold premises by agreement, and each holds few.)
+            Area::Held(_) => {
+                let mut cells = BTreeSet::new();
+                for sid in held_structures(st, me) {
+                    let x = &st.structures[&sid];
+                    if let Some(f) = s.types.get(&x.structure_type).map(|t| t.footprint) {
+                        cells.extend(crate::config::footprint_cells(&s.detailed, &x.at, f).unwrap_or_default());
+                    }
+                }
+                Scope::Cells(std::sync::Arc::new(cells))
+            }
             Area::Cells(cs) | Area::Premises(crate::config::Premises { premises: cs }) => {
                 if let Some(cells) = known().listed_cells.get(cs) {
                     return Scope::Cells(cells.clone());
@@ -645,7 +819,7 @@ impl RecordIndex {
                     }
                 }
                 let cells = std::sync::Arc::new(cells);
-                Scope::Cells(keep().place_cells.entry(p.place.clone()).or_insert(cells).clone())
+                Scope::Cells(keep().place_cells.entry(p.place).or_insert(cells).clone())
             }
         }
     }
@@ -656,9 +830,9 @@ impl RecordIndex {
         if self.accounts.as_ref().is_none_or(|(k, _)| *k != key) {
             let mut m: BTreeMap<Id, Vec<Id>> = BTreeMap::new();
             for (id, a) in st.accounts.iter() {
-                m.entry(a.holder.clone()).or_default().push(id.clone());
+                m.entry(a.holder).or_default().push(*id);
                 if a.custodian != a.holder {
-                    m.entry(a.custodian.clone()).or_default().push(id.clone());
+                    m.entry(a.custodian).or_default().push(*id);
                 }
             }
             self.accounts = Some((key, m));
@@ -671,7 +845,7 @@ impl RecordIndex {
         let key = (st.counters.acc, st.accounts.len());
         match self.accounts.as_ref().filter(|(k, _)| *k == key) {
             Some((_, m)) => std::borrow::Cow::Borrowed(m.get(entity).map(Vec::as_slice).unwrap_or(&[])),
-            None => std::borrow::Cow::Owned(st.accounts.iter().filter(|(_, a)| a.holder == entity || a.custodian == entity).map(|(id, _)| id.clone()).collect()),
+            None => std::borrow::Cow::Owned(st.accounts.iter().filter(|(_, a)| a.holder == entity || a.custodian == entity).map(|(id, _)| *id).collect()),
         }
     }
 
@@ -698,30 +872,30 @@ fn has_directory(st: &State, participant: &str, only: Option<&str>) -> bool {
 /// A field a search can use. Purely mechanical: names a place in a record, and never says what it means.
 pub use oikos_world::kernel::known_field;
 
-fn field(r: &Record, f: &str) -> Option<Value> {
-    let path = |v: &Value, p: &str| p.split('.').try_fold(v, |v, k| v.get(k)).cloned();
+fn field(r: &Record, f: &str) -> Option<Frozen> {
+    let path = |v: &Frozen, p: &str| p.split('.').try_fold(v, |v, k| v.get(k)).cloned();
     match f {
-        "id" => Some(Value::from(r.id.as_str())),
-        "record" => Some(Value::from(r.body.kind_name())),
+        "id" => Some(text(r.id.as_str())),
+        "record" => Some(text(r.body.kind_name())),
         // (The claim a transfer or a release names: how a register is asked what has become of one title.)
         "claim" => match &r.body {
-            crate::blocks::RecordBody::ClaimTransfer { claim, .. } | crate::blocks::RecordBody::ClaimRelease { claim } => Some(Value::from(claim.as_str())),
+            crate::blocks::RecordBody::ClaimTransfer { claim, .. } | crate::blocks::RecordBody::ClaimRelease { claim } => Some(text(claim.as_str())),
             _ => None,
         },
         // (Who holds a claim: how a register is asked for one holder's titles, by those it answers that to.)
         "holder" => match &r.body {
-            crate::blocks::RecordBody::Claim { holder, .. } => Some(Value::from(holder.as_str())),
+            crate::blocks::RecordBody::Claim { holder, .. } => Some(text(holder.as_str())),
             _ => None,
         },
         "kind" => match &r.body {
-            crate::blocks::RecordBody::Statement { kind, .. } => Some(Value::from(kind.as_str())),
+            crate::blocks::RecordBody::Statement { kind, .. } => Some(text(kind.as_str())),
             _ => None,
         },
-        "at" => Some(Value::from(r.at)),
-        "author" => Some(Value::from(r.author.as_str())),
-        "speaks_for" => r.speaks_for.as_deref().map(Value::from),
+        "at" => Some(Frozen::Number(r.at.into())),
+        "author" => Some(text(r.author.as_str())),
+        "speaks_for" => r.speaks_for.as_deref().map(text),
         // (Of several, the one cited first: what a search orders by. Whether one is cited at all is `holds`.)
-        "basis" => r.basis.as_ref().map(|b| Value::from(b.first())),
+        "basis" => r.basis.as_ref().map(|b| text(b.first())),
         _ => {
             if let Some(p) = f.strip_prefix("data.") {
                 match &r.body {
@@ -740,12 +914,41 @@ fn field(r: &Record, f: &str) -> Option<Value> {
     }
 }
 
+/// A field's text (an id, a kind), as a search compares it.
+fn text(s: &str) -> Frozen {
+    Frozen::String(s.into())
+}
+
+/// What a value is, as a search compares it: an integer, a string or a truth; anything else doesn't compare.
+enum Scalar<'a> {
+    Int(Option<i64>),
+    Str(&'a str),
+    Bool(bool),
+    Other,
+}
+fn scalar_of(v: &Value) -> Scalar<'_> {
+    match v {
+        Value::Number(n) => Scalar::Int(n.as_i64()),
+        Value::String(s) => Scalar::Str(s),
+        Value::Bool(b) => Scalar::Bool(*b),
+        _ => Scalar::Other,
+    }
+}
+fn scalar(v: &Frozen) -> Scalar<'_> {
+    match v {
+        Frozen::Number(n) => Scalar::Int(n.as_i64()),
+        Frozen::String(s) => Scalar::Str(s),
+        Frozen::Bool(b) => Scalar::Bool(*b),
+        _ => Scalar::Other,
+    }
+}
+
 /// Compare two JSON values of the same type (integers numerically, strings by bytes); anything else doesn't compare.
-fn compare(a: &Value, b: &Value) -> Option<std::cmp::Ordering> {
+fn compare(a: Scalar<'_>, b: Scalar<'_>) -> Option<std::cmp::Ordering> {
     match (a, b) {
-        (Value::Number(x), Value::Number(y)) => Some(x.as_i64()?.cmp(&y.as_i64()?)),
-        (Value::String(x), Value::String(y)) => Some(x.as_bytes().cmp(y.as_bytes())),
-        (Value::Bool(x), Value::Bool(y)) => Some(x.cmp(y)),
+        (Scalar::Int(x), Scalar::Int(y)) => Some(x?.cmp(&y?)),
+        (Scalar::Str(x), Scalar::Str(y)) => Some(x.as_bytes().cmp(y.as_bytes())),
+        (Scalar::Bool(x), Scalar::Bool(y)) => Some(x.cmp(&y)),
         _ => None,
     }
 }
@@ -758,10 +961,10 @@ fn holds(r: &Record, c: &crate::config::Condition) -> bool {
     }
     let Some(v) = field(r, &c.field) else { return false };
     // A list: it equals a value it holds, and differs from one it does not (a plan's cells: which lot is this cell on).
-    if let (Value::Array(items), CmpOp::Eq | CmpOp::Ne) = (&v, c.op) {
-        return items.iter().any(|x| compare(x, &c.value) == Some(Equal)) == (c.op == CmpOp::Eq);
+    if let (Frozen::Array(items), CmpOp::Eq | CmpOp::Ne) = (&v, c.op) {
+        return items.iter().any(|x| compare(scalar(x), scalar_of(&c.value)) == Some(Equal)) == (c.op == CmpOp::Eq);
     }
-    let Some(o) = compare(&v, &c.value) else { return false };
+    let Some(o) = compare(scalar(&v), scalar_of(&c.value)) else { return false };
     match c.op {
         CmpOp::Eq => o == Equal,
         CmpOp::Ne => o != Equal,
@@ -798,11 +1001,11 @@ fn capacities<'a>(st: &'a State, participant: &str) -> Vec<Capacity<'a>> {
     let p = &st.participants[participant];
     let mut v = vec![];
     if let (ParticipantKind::Person, Some(person)) = (p.kind, &p.person) {
-        v.push(Capacity { key: SELF.into(), prefix: String::new(), entity: person.clone(), channels: &p.def.channels });
+        v.push(Capacity { key: SELF.into(), prefix: String::new(), entity: *person, channels: &p.def.channels });
     }
     for id in st.held_by(participant) {
         let x = &st.positions[id];
-        v.push(Capacity { key: id.clone(), prefix: format!("{id}/"), entity: x.entity.clone(), channels: &x.channels });
+        v.push(Capacity { key: *id, prefix: format!("{id}/"), entity: x.entity, channels: &x.channels });
     }
     v
 }
@@ -851,9 +1054,9 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
         if only.is_some_and(|o| o != cap.key) {
             continue;
         }
-        let me = cap.entity.clone();
+        let me = cap.entity;
         for ch in cap.channels {
-            let path = format!("{}{}", cap.prefix, ch.id);
+            let path = Id::from_string(format!("{}{}", cap.prefix, ch.id));
             let asked = requested.iter().find(|l| l.channel == path);
             let area = match &ch.kind {
                 ChannelKind::Records { area, .. } | ChannelKind::Sites { area, .. } => area.as_ref(),
@@ -866,7 +1069,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             if let (false, ChannelKind::Records { way, filter, from, of, by, .. }) = (searches.is_empty(), &ch.kind) {
                 let scope = area.map(|a| index.scope(s, st, a, &me));
                 let want = Want::of(*way, from.as_ref(), &me);
-                let mut found: Vec<Arc<Record>> = vec![];
+                let mut found: Vec<crate::held::Rec> = vec![];
                 for q in searches {
                     // How many one answer gives is the keeper's to say, and a board's how many one reading takes in.
                     let most = match way {
@@ -878,7 +1081,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         _ => None,
                     };
                     for r in search(st, index, &me, filter, want.as_ref(), scope.as_ref(), q, most) {
-                        if !found.iter().any(|x| x.id == r.id) {
+                        if !found.iter().any(|x| x.same(&r)) {
                             found.push(r);
                         }
                     }
@@ -905,7 +1108,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             if mode == Mode::Look && ch.on_request == Some(true) && asked.is_none() {
                 continue; // perceived only when asked
             }
-            let last = if mode == Mode::Full { None } else { p.looks.get(&path).copied() };
+            let last = if mode == Mode::Full { None } else { p.looks.get(path.as_str()).copied() };
             // A post given back to someone who held it before: a first look, said to be whole (`Look::anew`).
             let anew = last.is_some_and(|l| l.anew);
             let last = last.filter(|l| !l.anew);
@@ -916,7 +1119,13 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             }
             // A channel that looks near the capacity's entity looks from where it is now: if it has moved
             // since the last look, the whole of its new surroundings replaces the old.
-            let from = matches!(area, Some(Area::Near(_))).then(|| st.entities.get(&me).map_or(0, |e| e.moved));
+            // (Premises held by agreement: the area moves when the buildings held do; `from` is which they are, as a
+            // number a config can carry: a look is saved with the run, and its numbers are JSON's safe integers.)
+            let from = match area {
+                Some(Area::Near(_)) => Some(st.entities.get(&me).map_or(0, |e| e.moved)),
+                Some(Area::Held(_)) => Some(held_structures(st, &me).iter().fold(0xcbf2_9ce4_8422_2325u64, |h, s| s.bytes().chain([0u8]).fold(h, |h, b| (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3))) & ((1u64 << 52) - 1)),
+                _ => None,
+            };
             let moved = last.is_some_and(|l| l.from != from);
             let whole = (moved || anew).then_some(true);
             let scope = area.map(|a| index.scope(s, st, a, &me));
@@ -925,7 +1134,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             let changed = |c: u64| after.is_none_or(|a| c > a);
             let data = match &ch.kind {
                 ChannelKind::Accounts => {
-                    let item = |id: &Id, a: &crate::state::Account| AccountItem { account: id.clone(), holder: a.holder.clone(), custodian: a.custodian.clone(), currency: a.currency.clone(), balance: a.balance, closed: None };
+                    let item = |id: &Id, a: &crate::state::Account| AccountItem { account: *id, holder: a.holder, custodian: a.custodian, currency: a.currency, balance: a.balance, closed: None };
                     // Whoever has many accounts (a bank keeps a town's) is shown the few that changed since its last
                     // look from the list of changes, not by going through them all: the same accounts.
                     let mine = index.accounts_of(st, &me);
@@ -945,13 +1154,13 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                     if after.is_some() || anew {
                         for (id, x) in st.closed_accounts.iter() {
                             if (x.holder == me || x.custodian == me) && changed(x.changed) {
-                                accounts.push(AccountItem { account: id.clone(), holder: x.holder.clone(), custodian: x.custodian.clone(), currency: x.currency.clone(), balance: 0, closed: Some(true) });
+                                accounts.push(AccountItem { account: *id, holder: x.holder, custodian: x.custodian, currency: x.currency, balance: 0, closed: Some(true) });
                             }
                         }
                     }
                     accounts.sort_by(|a, b| a.account.cmp(&b.account));
                     let queue = crate::state::transactions_key(&cap.key, &me);
-                    let transactions = if mode == Mode::Look { p.new_transactions.get(&queue).map(|q| q.iter().cloned().collect()).unwrap_or_default() } else { vec![] };
+                    let transactions = if mode == Mode::Look { p.new_transactions.get(queue.as_str()).map(|q| q.iter().cloned().collect()).unwrap_or_default() } else { vec![] };
                     if mode == Mode::Look {
                         drained.push(queue);
                     }
@@ -966,9 +1175,10 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         .range(lo..hi)
                         // What's new includes a holding gone to nothing (so a view drops it); the full picture is only what's held.
                         .filter(|(_, h)| changed(h.changed) && (after.is_some() || anew || h.quantity != 0))
-                        .map(|(_, h)| HoldingItem { kind: h.kind.clone(), at: h.at.clone(), quantity: h.quantity })
+                        .map(|(_, h)| HoldingItem { kind: h.kind, at: h.at, quantity: h.quantity })
                         .collect();
-                    ChannelData::Holdings { holdings }
+                    let (connections, links) = flows_of(s, st, &me);
+                    ChannelData::Holdings { holdings, connections, links }
                 }
                 // Its own record, and nobody else's: the channel names no one, and `me` is the capacity's own entity.
                 ChannelKind::OwnRecord => ChannelData::OwnRecord { record: st.entity_records.get(&me).filter(|r| changed(r.changed)).map(|r| OwnRecord { n: r.n, at: r.at, sections: r.sections.clone() }) },
@@ -985,7 +1195,10 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         records: seqs
                             .into_iter()
                             .map(|q| &by_seq[(q - 1) as usize])
-                            .filter(|r| can_see(st, r, &me) && placed_ok(st, r, &me, scope.as_ref()) && matches(st, r, filter, want.as_ref(), true))
+                            .filter(|h| {
+                                let r = h.load();
+                                can_see(st, &r, &me) && placed_ok(st, &r, &me, scope.as_ref()) && matches(st, &r, filter, want.as_ref(), true)
+                            })
                             .cloned()
                             .collect(),
                         search: None,
@@ -1025,13 +1238,13 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                     }
                 }
                 ChannelKind::Directory { .. } => {
-                    let entity = |(id, e): (&Id, &crate::state::Entity)| EntityItem { entity: id.clone(), kind: e.kind.clone(), name: e.name.clone(), participant: e.body.as_ref().and_then(|b| b.participant.clone()) };
+                    let entity = |(id, e): (&Id, &crate::state::Entity)| EntityItem { entity: *id, kind: e.kind.clone(), name: e.name.clone(), participant: e.body.as_ref().and_then(|b| b.participant) };
                     let position = |(id, x): (&Id, &crate::state::Position)| PositionItem {
-                        position: id.clone(),
-                        entity: x.entity.clone(),
+                        position: *id,
+                        entity: x.entity,
                         title: x.title.clone(),
                         role: x.role.clone(),
-                        holder: x.holder.clone(),
+                        holder: x.holder,
                         held_by: x.holder.as_ref().and_then(|h| {
                             let hp = st.participants.get(h)?;
                             match &hp.person {
@@ -1060,7 +1273,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             };
             if mode == Mode::Look {
                 let cursor = if matches!(ch.kind, ChannelKind::Records { .. }) { st.counters.record_seq } else { st.counters.change };
-                looks.push((path.clone(), Look { at: st.t, cursor, from, anew: false }));
+                looks.push((path, Look { at: st.t, cursor, from, anew: false }));
             }
             channels.insert(path, data);
         }
@@ -1071,41 +1284,55 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
         children: b
             .children
             .iter()
-            .filter_map(|c| st.body(c).map(|cb| ChildView { person: c.clone(), born_at: cb.born_at, sex: cb.sex, alive: cb.alive }))
+            .filter_map(|c| st.body(c).map(|cb| ChildView { person: *c, born_at: cb.born_at, sex: cb.sex, alive: cb.alive }))
             .collect(),
         present: b.present,
         alive: b.alive,
         parents: b.parents.clone(),
-        conditions: b.conditions.iter().map(|c| ConditionView { id: c.id.clone(), kind: c.kind, severity: c.severity.clone(), since: c.since, until: c.until, treated: c.treated }).collect(),
+        conditions: b.conditions.iter().map(|c| ConditionView { id: c.id, kind: c.kind, severity: c.severity.clone(), since: c.since, until: c.until, treated: c.treated }).collect(),
         variables: s
             .config
             .catalogue
             .body_variables
             .iter()
-            .filter_map(|cfg| b.variables.get(&cfg.id).map(|x| (cfg.id.clone(), crate::state::body_variable_at(cfg, *x, st.t).0)))
+            .filter_map(|cfg| b.variables.get(&cfg.id).map(|x| (cfg.id, crate::state::body_variable_at(cfg, *x, st.t).0)))
             .collect(),
-        in_space: st.structures_of(person).into_iter().find_map(|sid| st.occupancy.get(&sid)?.iter().find(|(_, bodies)| bodies.contains(person)).map(|(sp, _)| sp.clone())),
+        in_space: st.structures_of(person).into_iter().find_map(|sid| st.occupancy.get(&sid)?.iter().find(|(_, bodies)| bodies.contains(person)).map(|(sp, _)| *sp)),
+        vehicles: s
+            .drivers_of
+            .get(person)
+            .into_iter()
+            .flatten()
+            .filter_map(|v| {
+                let x = st.vehicles.get(v)?;
+                let t = s.config.travel.as_ref().and_then(|t| t.vehicle_types.iter().find(|t| t.id == x.type_));
+                let fuel = t.and_then(|t| t.fuel);
+                Some(VehicleView { vehicle: *v, type_: x.type_, at: x.at, fuel, in_tank: fuel.map(|k| st.holding(&x.owner, v, &k)), tank: t.and_then(|t| t.tank), owner: x.owner })
+            })
+            .collect(),
+        on_way: st.transit.get(person).map(|x| OnWayView { to: x.to, arrives: x.arrives }),
     });
     let positions = st
         .held_by(participant)
         .into_iter()
         .map(|id| (id, &st.positions[id]))
-        .map(|(id, x)| HeldPosition { position: id.clone(), entity: x.entity.clone(), title: x.title.clone(), role: x.role.clone() })
+        .map(|(id, x)| HeldPosition { position: *id, entity: x.entity, title: x.title.clone(), role: x.role.clone() })
         .collect();
     // Readings of the agreements the records here bring.
     let mut readings = BTreeMap::new();
     for ch in channels.values() {
         if let ChannelData::Records { records, .. } = ch {
             for r in records {
+                let r = r.load();
                 let agreement = match &r.body {
-                    crate::blocks::RecordBody::Agreement { .. } => Some(&r.id),
-                    crate::blocks::RecordBody::Signature { agreement, .. } | crate::blocks::RecordBody::Notice { agreement, .. } => Some(agreement),
+                    crate::blocks::RecordBody::Agreement { .. } => Some(r.id),
+                    crate::blocks::RecordBody::Signature { agreement, .. } | crate::blocks::RecordBody::Notice { agreement, .. } => Some(*agreement),
                     _ => None,
                 };
                 if let Some(a) = agreement {
-                    if !readings.contains_key(a) {
-                        if let Some(x) = st.reading(a) {
-                            readings.insert(a.clone(), x);
+                    if !readings.contains_key(&a) {
+                        if let Some(x) = st.reading(&a) {
+                            readings.insert(a, x);
                         }
                     }
                 }
@@ -1116,7 +1343,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
         participant: participant.into(),
         t: st.t,
         status: p.status,
-        entity: p.person.clone(),
+        entity: p.person,
         body,
         positions,
         outcomes: vec![],
@@ -1126,7 +1353,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
         asking: vec![],
         readings,
     };
-    (obs, looks, drained)
+    (obs, looks, drained.into_iter().map(Into::into).collect())
 }
 
 /// How many entries one look-up returns at most (the holders of one office, those of one name).
@@ -1140,20 +1367,20 @@ fn looked_up(st: &State, whom: &[&Who]) -> ChannelData {
     let (mut entities, mut positions) = (BTreeMap::new(), BTreeMap::new());
     for who in whom {
         let ChannelData::Directory { entities: es, positions: ps } = looked_up_one(st, who) else { continue };
-        entities.extend(es.into_iter().map(|e| (e.entity.clone(), e)));
-        positions.extend(ps.into_iter().map(|p| (p.position.clone(), p)));
+        entities.extend(es.into_iter().map(|e| (e.entity, e)));
+        positions.extend(ps.into_iter().map(|p| (p.position, p)));
     }
     ChannelData::Directory { entities: entities.into_values().collect(), positions: positions.into_values().collect() }
 }
 
 fn looked_up_one(st: &State, who: &Who) -> ChannelData {
-    let entity = |id: &Id, e: &crate::state::Entity| EntityItem { entity: id.clone(), kind: e.kind.clone(), name: e.name.clone(), participant: e.body.as_ref().and_then(|b| b.participant.clone()) };
+    let entity = |id: &Id, e: &crate::state::Entity| EntityItem { entity: *id, kind: e.kind.clone(), name: e.name.clone(), participant: e.body.as_ref().and_then(|b| b.participant) };
     let position = |id: &Id, x: &crate::state::Position| PositionItem {
-        position: id.clone(),
-        entity: x.entity.clone(),
+        position: *id,
+        entity: x.entity,
         title: x.title.clone(),
         role: x.role.clone(),
-        holder: x.holder.clone(),
+        holder: x.holder,
         held_by: x.holder.as_ref().and_then(|h| {
             let hp = st.participants.get(h)?;
             match &hp.person {
@@ -1176,7 +1403,7 @@ fn looked_up_one(st: &State, who: &Who) -> ChannelData {
         Who { name: Some(name), .. } => {
             // (A name is matched whole, whatever its capitals; an id, a role, exactly.)
             let same = |a: &str| a.eq_ignore_ascii_case(name);
-            let person = st.participants.get(name).and_then(|x| x.person.as_ref());
+            let person = st.participants.get(name.as_str()).and_then(|x| x.person.as_ref());
             entities.extend(st.entities.iter().filter(|(id, e)| *id == name || same(&e.name) || person == Some(*id)).take(LOOKED_UP_MAX).map(|(id, e)| entity(id, e)));
             positions.extend(st.positions.iter().filter(|(id, x)| *id == name || x.title.as_deref().is_some_and(same) || x.role.as_ref() == Some(name)).take(LOOKED_UP_MAX).map(|(id, x)| position(id, x)));
         }
@@ -1189,7 +1416,7 @@ fn looked_up_one(st: &State, who: &Who) -> ChannelData {
 /// and the query, now. Standing records only if asked; ordered as asked (newest first by default);
 /// at most `limit` (default 20).
 #[allow(clippy::too_many_arguments)]
-fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want: Option<&Want>, area: Option<&Scope>, q: &Query, most: Option<u32>) -> Vec<Arc<Record>> {
+fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want: Option<&Want>, area: Option<&Scope>, q: &Query, most: Option<u32>) -> Vec<crate::held::Rec> {
     let at_seq = |seq: u64| &index.by_seq[(seq - 1) as usize];
     // A search for one record by its id reads that record, not the register it is in (the same answer: every other
     // condition is still asked of it below).
@@ -1204,12 +1431,12 @@ fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want
             None => one,
         }
         .into_iter()
-        .filter(|&seq| q.standing != Some(true) || index.is_standing(at_seq(seq), seq))
+        .filter(|&seq| q.standing != Some(true) || index.is_standing(&at_seq(seq).load(), seq))
         .collect()
     } else if let Some(sc) = area {
         let mut v = index.placed(sc, 0);
         if q.standing == Some(true) {
-            v.retain(|&seq| index.is_standing(at_seq(seq), seq));
+            v.retain(|&seq| index.is_standing(&at_seq(seq).load(), seq));
         }
         v.reverse();
         v
@@ -1221,16 +1448,16 @@ fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want
         v
     };
     let conditions = q.conditions.as_deref().unwrap_or(&[]);
-    let mut hits: Vec<(u64, &Arc<Record>)> = seqs
+    let mut hits: Vec<(u64, &crate::held::Rec, Arc<Record>)> = seqs
         .into_iter()
-        .map(|seq| (seq, at_seq(seq)))
-        .filter(|(_, r)| can_see(st, r, me) && placed_ok(st, r, me, area) && matches(st, r, filter, want, false) && conditions.iter().all(|c| holds(r, c)))
+        .map(|seq| (seq, at_seq(seq), at_seq(seq).load()))
+        .filter(|(_, _, r)| can_see(st, r, me) && placed_ok(st, r, me, area) && matches(st, r, filter, want, false) && conditions.iter().all(|c| holds(r, c)))
         .collect();
     if let Some(o) = &q.order {
         // Records without the field sort last; ties keep newest first.
-        hits.sort_by(|(sa, a), (sb, b)| match (field(a, &o.field), field(b, &o.field)) {
+        hits.sort_by(|(sa, _, a), (sb, _, b)| match (field(a, &o.field), field(b, &o.field)) {
             (Some(x), Some(y)) => {
-                let c = compare(&x, &y).unwrap_or(std::cmp::Ordering::Equal);
+                let c = compare(scalar(&x), scalar(&y)).unwrap_or(std::cmp::Ordering::Equal);
                 (if o.desc { c.reverse() } else { c }).then(sb.cmp(sa))
             }
             (Some(_), None) => std::cmp::Ordering::Less,
@@ -1239,5 +1466,5 @@ fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want
         });
     }
     let limit = q.limit.unwrap_or(20).min(most.unwrap_or(u32::MAX));
-    hits.into_iter().take(limit as usize).map(|(_, r)| r.clone()).collect()
+    hits.into_iter().take(limit as usize).map(|(_, h, _)| h.clone()).collect()
 }

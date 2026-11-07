@@ -1,16 +1,19 @@
 //! World time's semantics (docs/design/rebuild.md section 6): acting costs time. Every act takes its actor time, by the
-//! act's kind and the actor's kind (the world's `orchestration.act_time`); the actor is busy until it's done, and it
-//! takes effect then. A person has one timeline, shared by every capacity they act in; a system carries out as many
-//! acts at once as it has lanes.
+//! act's kind and the actor's kind (the world's `orchestration.act_time`, and a system template's own rows); the actor is
+//! busy until it's done, and it takes effect then. A person has one timeline, shared by every capacity they act in; a
+//! system carries out as many acts at once as it has lanes, within its template's hours (law 10, foundations-2).
 //!
 //! Pure functions: the kernel keeps the timelines in its state and applies acts when they're done.
 
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
-/// With no `act_time` in the world, and for an act kind its table doesn't name: every act takes one second, close to
-/// the instant acts of before (the first parity step, rebuild.md section 14).
-pub const DEFAULT_ACT_SECONDS: i64 = 1;
+/// The second it takes to tell someone else to do an act (an act whose work is all others', `by`): the order itself,
+/// not the work, which is charged to whoever does it. A convention of the platform, not read from the table (a known
+/// limit, docs/all-work-takes-time.md), and not a fallback for an unpriced act: since foundations-2 P2 there is none,
+/// and an act nobody priced is refused (`unpriced`).
+pub const ORDER_SECONDS: i64 = 1;
 
 /// Who's acting: a person (one timeline) or a system (lanes).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,12 +22,125 @@ pub enum Actor {
     System,
 }
 
-/// The world's table of act times (`orchestration.act_time`).
+const DAY: i64 = 86_400;
+
+/// A daily window of work (a template's `hours`, law 10): from `from` seconds after midnight, for `seconds`. A system's
+/// lanes work only inside it; work not finished by the window's end goes on in the next working day's. Days it is closed
+/// (`closed`: a working calendar's days of rest and holidays, config data) have no window: the work waits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Hours {
+    pub from: i64,
+    pub seconds: i64,
+    pub closed: Option<Arc<Closed>>,
+}
+
+/// The days a window does not open (a working calendar, law 10): days of the world's week (day `d` of the run is the
+/// week's day `d mod 7`) and single days of the run (holidays), counted from its first. A day is the window's opening's.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Closed {
+    week: [bool; 7],
+    days: BTreeSet<i64>,
+}
+
+impl Closed {
+    /// The days of rest (days of the world's week, 0 to 6) and the holidays (days of the run). None if every day of the
+    /// week is closed (work could never be done) or a day of the week is out of range.
+    pub fn new(weekdays: &[i64], days: &[i64]) -> Option<Self> {
+        let mut week = [false; 7];
+        for &w in weekdays {
+            *week.get_mut(usize::try_from(w).ok()?)? = true;
+        }
+        (!week.iter().all(|x| *x)).then(|| Closed { week, days: days.iter().copied().collect() })
+    }
+
+    /// Whether day `d` of the run (counted from its first, 0) has no window.
+    pub fn shut(&self, d: i64) -> bool {
+        self.week[d.rem_euclid(7) as usize] || self.days.contains(&d)
+    }
+}
+
+impl Hours {
+    /// A window the contract allows: it opens within the day and lasts at least a second and at most the whole day.
+    pub fn new(from: i64, seconds: i64) -> Option<Self> {
+        ((0..DAY).contains(&from) && (1..=DAY).contains(&seconds)).then_some(Hours { from, seconds, closed: None })
+    }
+
+    /// The same window, not opening on a working calendar's closed days.
+    pub fn closed_on(self, closed: Closed) -> Self {
+        Hours { closed: Some(Arc::new(closed)), ..self }
+    }
+
+    /// When the window that `t` is in opened (the latest opening at or before `t`).
+    fn opened(&self, t: i64) -> i64 {
+        (t - self.from).div_euclid(DAY) * DAY + self.from
+    }
+
+    /// Whether the window opening at `opened` opens at all (not on a closed day).
+    fn opens(&self, opened: i64) -> bool {
+        self.closed.as_ref().is_none_or(|c| !c.shut(opened.div_euclid(DAY)))
+    }
+
+    /// The first opening at or after `opened` (an opening) on a day that is not closed. (A week always has an open day,
+    /// `Closed::new`, so the walk ends past the last holiday at the latest.)
+    fn next_open(&self, mut opened: i64) -> i64 {
+        while !self.opens(opened) {
+            opened += DAY;
+        }
+        opened
+    }
+
+    /// The first moment of work at or after `t`: `t` itself inside an open window, else the next open window's opening.
+    pub fn open_from(&self, t: i64) -> i64 {
+        let opened = self.opened(t);
+        if t - opened < self.seconds && self.opens(opened) {
+            t
+        } else {
+            self.next_open(opened + DAY)
+        }
+    }
+
+    /// When `seconds` of work begun at `start` (a moment of work) are done: inside the window if they fit, else carried
+    /// on through the next open days' windows. Arithmetic where every day is open; a walk over the days where some are not.
+    pub fn finish(&self, start: i64, seconds: i64) -> i64 {
+        if seconds <= 0 {
+            return start;
+        }
+        let opened = self.opened(start);
+        let left_today = opened + self.seconds - start;
+        if seconds <= left_today {
+            return start + seconds;
+        }
+        let rest = seconds - left_today;
+        if self.closed.is_none() {
+            // (Whole windows after today's, then the part of the last.)
+            let whole = (rest - 1) / self.seconds;
+            return opened + DAY * (1 + whole) + (rest - whole * self.seconds);
+        }
+        let (mut at, mut rest) = (self.next_open(opened + DAY), rest);
+        while rest > self.seconds {
+            rest -= self.seconds;
+            at = self.next_open(at + DAY);
+        }
+        at + rest
+    }
+}
+
+/// A system template's own rows (its `does` rows that state `seconds`, but `work`'s, whose seconds are a unit's: read
+/// where the work's labour is) and its hours.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TemplateTimes {
+    /// By `block` or `block/kind`, as the world's table is keyed (the narrower is read first).
+    pub rows: BTreeMap<String, i64>,
+    pub hours: Option<Hours>,
+}
+
+/// The world's table of act times (`orchestration.act_time`), and each system template's own rows.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ActTimes {
     person: BTreeMap<String, i64>,
     system: BTreeMap<String, i64>,
     default: Option<i64>,
+    templates: BTreeMap<String, TemplateTimes>,
 }
 
 impl ActTimes {
@@ -32,42 +148,62 @@ impl ActTimes {
     pub fn from_orchestration(orchestration: &Value) -> Self {
         let t = &orchestration["act_time"];
         let table = |k: &str| t[k].as_object().map(|m| m.iter().filter_map(|(kind, s)| s.as_i64().map(|s| (kind.clone(), s))).collect()).unwrap_or_default();
-        Self { person: table("person"), system: table("system"), default: t["default"].as_i64() }
+        Self { person: table("person"), system: table("system"), default: t["default"].as_i64(), templates: BTreeMap::new() }
     }
 
-    /// How long one act of this kind takes this kind of actor.
-    pub fn of(&self, actor: Actor, kind: &str) -> i64 {
-        let table = match actor {
-            Actor::Person => &self.person,
-            Actor::System => &self.system,
-        };
-        table.get(kind).copied().or(self.default).unwrap_or(DEFAULT_ACT_SECONDS)
+    /// With a system template's own rows and hours (made once, at load).
+    pub fn with_template(mut self, id: &str, times: TemplateTimes) -> Self {
+        if !times.rows.is_empty() || times.hours.is_some() {
+            self.templates.insert(id.to_string(), times);
+        }
+        self
     }
 
-    /// How long one act takes that makes something the table may name (`publish/benefit_decision`): that row if the
-    /// table has it, else the block's own (docs/design/foundations.md law 2; F2).
-    pub fn of_making(&self, actor: Actor, block: &str, makes: Option<&str>) -> i64 {
-        let table = match actor {
-            Actor::Person => &self.person,
-            Actor::System => &self.system,
-        };
-        makes.and_then(|m| table.get(m).copied()).unwrap_or_else(|| self.of(actor, block))
+    /// A template's hours, if it states them.
+    pub fn hours(&self, template: Option<&str>) -> Option<Hours> {
+        self.templates.get(template?)?.hours.clone()
     }
 
-    /// A row of the table by its key, as the table has it (none: the table says nothing of it, and no default stands in).
-    pub fn row(&self, actor: Actor, key: &str) -> Option<i64> {
+    fn table(&self, actor: Actor) -> &BTreeMap<String, i64> {
         match actor {
             Actor::Person => &self.person,
             Actor::System => &self.system,
         }
-        .get(key)
-        .copied()
+    }
+
+    /// How long one act takes that makes something the table may name (`publish/benefit_decision`), done by this kind of
+    /// actor (and, for a system, one from this template): the template's own row for what is made, then for the block
+    /// (never `work`'s, whose template seconds are a unit's); then the world's row for what is made, then for the block;
+    /// then the world's stated `default`. None: nobody priced it, and the act is refused (`unpriced`; foundations-2 P2).
+    pub fn seconds(&self, actor: Actor, template: Option<&str>, block: &str, makes: Option<&str>) -> Option<i64> {
+        if actor == Actor::System && block != "work" {
+            if let Some(own) = template.and_then(|t| self.templates.get(t)) {
+                if let Some(s) = makes.and_then(|m| own.rows.get(m)).or_else(|| own.rows.get(block)) {
+                    return Some(*s);
+                }
+            }
+        }
+        let table = self.table(actor);
+        makes.and_then(|m| table.get(m)).or_else(|| table.get(block)).copied().or(self.default)
+    }
+
+    /// A row of the table by its key, as the table has it (none: the table says nothing of it, and no default stands in).
+    pub fn row(&self, actor: Actor, key: &str) -> Option<i64> {
+        self.table(actor).get(key).copied()
     }
 
     /// How long a program of several steps takes: the sum of its steps' times, each a block and what it makes if the
-    /// block says (never less than a second, so acting always moves time on).
-    pub fn program(&self, actor: Actor, steps: impl IntoIterator<Item = (&'static str, Option<String>)>) -> i64 {
-        steps.into_iter().map(|(b, m)| self.of_making(actor, b, m.as_deref())).sum::<i64>().max(1)
+    /// block says (never less than a second, so acting always moves time on). Err: the first step nobody priced (what it
+    /// makes, else its block).
+    pub fn program<'a>(&self, actor: Actor, template: Option<&str>, steps: impl IntoIterator<Item = (&'a str, Option<String>)>) -> Result<i64, String> {
+        let mut sum = 0i64;
+        for (b, m) in steps {
+            match self.seconds(actor, template, b, m.as_deref()) {
+                Some(s) => sum = sum.saturating_add(s),
+                None => return Err(m.unwrap_or_else(|| b.to_string())),
+            }
+        }
+        Ok(sum.max(1))
     }
 }
 
@@ -81,12 +217,26 @@ pub const FREE: i64 = -9_007_199_254_740_991;
 /// Places an act ready to start at `ready` (after any thinking) and taking `seconds` on the lane that frees first
 /// (the lowest-numbered, of those free at the same time): returns when it starts and when it's done.
 pub fn place(lanes: &mut Vec<i64>, count: usize, ready: i64, seconds: i64) -> (i64, i64) {
+    place_within(lanes, count, ready, seconds, None)
+}
+
+/// As `place`, for lanes that work only within daily `hours` (a system template's, law 10): the act starts at the first
+/// moment of work from when it is ready and its lane is free, and what does not fit in that day's window goes on in the
+/// next day's, so that work coming faster than the hours take it is a queue, never a refusal. No hours: any time of day,
+/// as a person's timeline is placed (a person's working day is counted where their work is placed).
+pub fn place_within(lanes: &mut Vec<i64>, count: usize, ready: i64, seconds: i64, hours: Option<Hours>) -> (i64, i64) {
     let count = count.max(1);
     lanes.resize(count.max(lanes.len()), FREE);
     lanes.truncate(count);
     let (i, free) = lanes.iter().copied().enumerate().min_by_key(|&(i, f)| (f, i)).expect("at least one lane");
-    let start = ready.max(free);
-    let done = start + seconds;
+    let from = ready.max(free);
+    let (start, done) = match hours {
+        None => (from, from + seconds),
+        Some(h) => {
+            let start = h.open_from(from);
+            (start, h.finish(start, seconds))
+        }
+    };
     lanes[i] = done;
     (start, done)
 }
@@ -97,18 +247,44 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn act_times_by_actor_and_kind_with_defaults() {
+    fn act_times_by_actor_and_kind_with_a_stated_default() {
         let t = ActTimes::from_orchestration(&json!({ "act_time": { "person": { "message": 120 }, "system": { "transfer": 2 }, "default": 30 } }));
-        assert_eq!(t.of(Actor::Person, "message"), 120);
-        assert_eq!(t.of(Actor::System, "transfer"), 2);
-        assert_eq!(t.of(Actor::Person, "transfer"), 30); // the world's default
-        assert_eq!(t.program(Actor::Person, [("message", None), ("transfer", None)]), 150);
+        assert_eq!(t.seconds(Actor::Person, None, "message", None), Some(120));
+        assert_eq!(t.seconds(Actor::System, None, "transfer", None), Some(2));
+        assert_eq!(t.seconds(Actor::Person, None, "transfer", None), Some(30)); // the world's stated default
+        assert_eq!(t.program(Actor::Person, None, [("message", None), ("transfer", None)]), Ok(150));
         let t2 = ActTimes::from_orchestration(&json!({ "act_time": { "person": { "publish": 900, "publish/decision": 2400 } } }));
-        assert_eq!(t2.of_making(Actor::Person, "publish", Some("publish/decision")), 2400);
-        assert_eq!(t2.of_making(Actor::Person, "publish", Some("publish/notice")), 900);
-        assert_eq!(t2.of_making(Actor::System, "publish", Some("publish/decision")), DEFAULT_ACT_SECONDS);
+        assert_eq!(t2.seconds(Actor::Person, None, "publish", Some("publish/decision")), Some(2400));
+        assert_eq!(t2.seconds(Actor::Person, None, "publish", Some("publish/notice")), Some(900));
+    }
+
+    #[test]
+    fn an_act_nobody_priced_has_no_time_and_says_which_step() {
+        // (No implicit second: foundations-2 P2. The kernel refuses such an act, `unpriced`.)
+        let t = ActTimes::from_orchestration(&json!({ "act_time": { "person": { "publish": 900 } } }));
+        assert_eq!(t.seconds(Actor::System, None, "publish", Some("publish/decision")), None);
+        assert_eq!(t.program(Actor::Person, None, [("publish", Some("publish/x".to_string())), ("transfer", None)]), Err("transfer".to_string()));
+        assert_eq!(t.program(Actor::System, None, [("publish", Some("publish/decision".to_string()))]), Err("publish/decision".to_string()));
         let none = ActTimes::from_orchestration(&json!({}));
-        assert_eq!(none.of(Actor::System, "anything"), DEFAULT_ACT_SECONDS);
+        assert_eq!(none.seconds(Actor::System, None, "anything", None), None);
+    }
+
+    #[test]
+    fn a_systems_template_rows_come_first_then_the_worlds() {
+        let rows = BTreeMap::from([("publish/benefit_decision".to_string(), 4500), ("message".to_string(), 60), ("work".to_string(), 7)]);
+        let t = ActTimes::from_orchestration(&json!({ "act_time": { "system": { "publish": 1, "message": 1, "work": 1, "transfer": 1 } } }))
+            .with_template("casework", TemplateTimes { rows, hours: None });
+        // Its own row for what is made, then its own for the block.
+        assert_eq!(t.seconds(Actor::System, Some("casework"), "publish", Some("publish/benefit_decision")), Some(4500));
+        assert_eq!(t.seconds(Actor::System, Some("casework"), "message", None), Some(60));
+        // The world's system row where the template says nothing of it, and for any other template.
+        assert_eq!(t.seconds(Actor::System, Some("casework"), "publish", Some("publish/notice")), Some(1));
+        assert_eq!(t.seconds(Actor::System, Some("casework"), "transfer", None), Some(1));
+        assert_eq!(t.seconds(Actor::System, Some("other"), "publish", Some("publish/benefit_decision")), Some(1));
+        // A work row's seconds are a unit's (read where the work's labour is): not the act's.
+        assert_eq!(t.seconds(Actor::System, Some("casework"), "work", Some("work/x".to_string()).as_deref()), Some(1));
+        // A person is never read from a template.
+        assert_eq!(t.seconds(Actor::Person, Some("casework"), "message", None), None);
     }
 
     #[test]
@@ -147,5 +323,92 @@ mod tests {
         // More lanes than before: the new ones are free now.
         assert_eq!(place(&mut tl, 4, 7, 1), (7, 8));
         assert_eq!(tl, vec![110, 150, 10, 8]);
+    }
+
+    const H: i64 = 3_600;
+
+    #[test]
+    fn hours_are_a_window_of_the_day() {
+        assert_eq!(Hours::new(-1, H), None);
+        assert_eq!(Hours::new(DAY, H), None);
+        assert_eq!(Hours::new(0, 0), None);
+        assert_eq!(Hours::new(0, DAY + 1), None);
+        assert!(Hours::new(0, DAY).is_some());
+        let h = Hours::new(9 * H, 8 * H).unwrap();
+        // Inside the window: now. Before it: its opening. After it: tomorrow's.
+        assert_eq!(h.open_from(10 * H), 10 * H);
+        assert_eq!(h.open_from(9 * H), 9 * H);
+        assert_eq!(h.open_from(3 * H), 9 * H);
+        assert_eq!(h.open_from(17 * H), DAY + 9 * H);
+        assert_eq!(h.open_from(23 * H), DAY + 9 * H);
+        // Long before the world began, and a lane never used.
+        assert_eq!(h.open_from(-DAY + 20 * H), 9 * H);
+        assert!(h.open_from(FREE) <= 9 * H);
+    }
+
+    #[test]
+    fn work_that_does_not_fit_the_day_goes_on_the_next_and_is_never_refused() {
+        let h = Some(Hours::new(9 * H, 8 * H).unwrap());
+        let mut tl = vec![];
+        // Ready at 3 in the morning: begins at 9, an hour and a quarter's case done at a quarter past ten.
+        assert_eq!(place_within(&mut tl, 1, 3 * H, 4_500, h.clone()), (9 * H, 9 * H + 4_500));
+        // Ready at 4 in the afternoon, two hours' work: one today, one tomorrow from 9.
+        let mut tl = vec![];
+        assert_eq!(place_within(&mut tl, 1, 16 * H, 2 * H, h.clone()), (16 * H, DAY + 10 * H));
+        // Exactly the rest of the day: done at closing, not tomorrow.
+        let mut tl = vec![];
+        assert_eq!(place_within(&mut tl, 1, 16 * H, H, h.clone()), (16 * H, 17 * H));
+        // Twenty hours of work begun at opening: 8 + 8 + 4, done at 1 in the afternoon of the third day.
+        let mut tl = vec![];
+        assert_eq!(place_within(&mut tl, 1, 9 * H, 20 * H, h.clone()), (9 * H, 2 * DAY + 13 * H));
+        // Exactly three windows: done at the third day's closing.
+        let mut tl = vec![];
+        assert_eq!(place_within(&mut tl, 1, 0, 24 * H, h.clone()), (9 * H, 2 * DAY + 17 * H));
+        // After closing, nothing begins until tomorrow; a queue builds on the lane, and a second lane takes the next.
+        let mut tl = vec![];
+        assert_eq!(place_within(&mut tl, 2, 18 * H, 4 * H, h.clone()), (DAY + 9 * H, DAY + 13 * H));
+        assert_eq!(place_within(&mut tl, 2, 18 * H, 4 * H, h.clone()), (DAY + 9 * H, DAY + 13 * H));
+        assert_eq!(place_within(&mut tl, 2, 18 * H, 6 * H, h.clone()), (DAY + 13 * H, 2 * DAY + 11 * H));
+        // Zero seconds: when it could begin (what the kernel asks to learn when a lane is next free for work).
+        let mut tl = vec![];
+        assert_eq!(place_within(&mut tl, 1, 20 * H, 0, h.clone()), (DAY + 9 * H, DAY + 9 * H));
+        // A window across midnight: from 10 at night for 8 hours.
+        let n = Some(Hours::new(22 * H, 8 * H).unwrap());
+        let mut tl = vec![];
+        assert_eq!(place_within(&mut tl, 1, 12 * H, 3 * H, n.clone()), (22 * H, DAY + H));
+        assert_eq!(place_within(&mut tl, 1, DAY + 5 * H, 2 * H, n.clone()), (DAY + 5 * H, DAY + 22 * H + H));
+        // All day is as no hours.
+        let all = Some(Hours::new(0, DAY).unwrap());
+        let (mut a, mut b) = (vec![], vec![]);
+        for (ready, secs) in [(5, 100), (7, DAY * 3), (DAY * 2, 50)] {
+            assert_eq!(place_within(&mut a, 1, ready, secs, all.clone()), place(&mut b, 1, ready, secs));
+        }
+    }
+
+    #[test]
+    fn a_working_calendar_closes_its_days_of_rest_and_holidays_and_the_work_waits() {
+        // Days 5 and 6 of each week are its days of rest, and day 9 a holiday: hours from 9 for 8 hours.
+        assert_eq!(Closed::new(&[0, 1, 2, 3, 4, 5, 6], &[]), None, "a week with no working day");
+        assert_eq!(Closed::new(&[7], &[]), None);
+        let h = Hours::new(9 * H, 8 * H).unwrap().closed_on(Closed::new(&[5, 6], &[9]).unwrap());
+        // Ready on day 4 after closing: nothing begins until day 7's opening.
+        assert_eq!(h.open_from(4 * DAY + 18 * H), 7 * DAY + 9 * H);
+        // Ready on a day of rest, in what would be its hours: the same.
+        assert_eq!(h.open_from(5 * DAY + 10 * H), 7 * DAY + 9 * H);
+        // Twelve hours begun at day 4's opening: eight on day 4, four on day 7.
+        let mut tl = vec![];
+        assert_eq!(place_within(&mut tl, 1, 4 * DAY, 12 * H, Some(h.clone())), (4 * DAY + 9 * H, 7 * DAY + 13 * H));
+        // Twenty hours from day 7: 8 on day 7, 8 on day 8, the holiday skipped, 4 on day 10.
+        let mut tl = vec![];
+        assert_eq!(place_within(&mut tl, 1, 7 * DAY, 20 * H, Some(h.clone())), (7 * DAY + 9 * H, 10 * DAY + 13 * H));
+        // Exactly the windows of days 7 and 8: done at day 8's closing.
+        assert_eq!(h.finish(7 * DAY + 9 * H, 16 * H), 8 * DAY + 17 * H);
+        // A calendar with no closed day is as no calendar.
+        let open = Hours::new(9 * H, 8 * H).unwrap();
+        let none = open.clone().closed_on(Closed::new(&[], &[]).unwrap());
+        for (ready, secs) in [(5, 100), (7, DAY * 3), (DAY * 2 + 20 * H, 50 * H)] {
+            let (mut a, mut b) = (vec![], vec![]);
+            assert_eq!(place_within(&mut a, 1, ready, secs, Some(none.clone())), place_within(&mut b, 1, ready, secs, Some(open.clone())));
+        }
     }
 }

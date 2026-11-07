@@ -8415,3 +8415,2503 @@ JSON value and three copies of its canonical bytes.
 - **Change:** `scripts/test.ts` reruns a failed file from the known-flakes list (the two merge.ts names) once alone, and
   accepts it only if it then passes; the line says so.
 - **Revisit if:** a listed file fails twice in a row (then it is a fault, not a flake), or the list grows past these two.
+
+## 2026-10-25 · Foundations-2 phase 1: capacity for every doer, systems included (law 10: P1, P2, P3, P5; branch `f2-phase1`, stacked on `f2-phase0`; no model called)
+
+Asked: build phase 1 of docs/design/foundations-2.md section 4 (P4 not in scope), with the WM-14 design of the same day
+("A system's work takes time too") as P3's detail. Naz approved the design, a national officers' ratio as a marked
+placeholder on a small town, and a non-resident officer as the seat's body if that is contained.
+
+- **P1, kernel and contract.** A template's `does` rows carry `seconds` for any block (`Does.seconds`; `work`'s keep their
+  per-unit meaning, read where the work's labour is). A system's act reads its template's covering row (the one naming
+  the kind, then the block's), then the world's `act_time.system` row, then a stated default (`oikos_time::ActTimes::seconds`;
+  the rows are made into one map per template at load, `ActTimes::with_template`: one look-up an act, as before). A
+  template's `hours` (`{from, seconds}`, a daily window) are placed by a pure function, `oikos_time::place_within`, with its
+  unit tests: an act begins at the first moment of the window after it is ready and its lane free, and what does not fit
+  goes on in the next day's window (arithmetic, not a walk over days), so a backlog is a queue, never a refusal. It is used
+  wherever a system's lanes are placed: an act's actor and performers (`begin`, and work placed late in `act`), a question
+  answered by a keeper's system (`ask_performer`, `place_ask`), a visit (`sites::begin`). Every day is a working day (a
+  known limit). `world-config.schema.json` and the Rust config gain `hours` and the wider `seconds` (and refuse hours on a
+  person's template, or outside the day); `contracts/README.md` has the change.
+- **P2, no implicit second.** `DEFAULT_ACT_SECONDS` is gone. An act whose rows (the performer's template's, the world's
+  table for their kind) and the world's stated `default` are all absent is refused **`unpriced`** when due, with a reason
+  naming what nobody priced and for whom, and takes nobody's time (`action_started` with `starts = done`); `check` says the
+  same. Code, words (`rules/words.rs`, `participants/src/llm/words.ts`: "nobody here knows what doing that takes, so it
+  can't be done") and the log schema's enum. The hand-written worlds that leaned on the second now state
+  `act_time.default: 1` with a note in `act_time.sources.default` that it is a placeholder for a test world: the thirteen
+  `contracts/examples/{valid,refused}/world-config` worlds and the kernel tests' worlds (`tests/common`, `tests/position.rs`,
+  and the tests that replace the table: `foundations.rs`, `foundation_fixes.rs`, `time.rs`). No TS fixture needed it (they
+  load those examples or the generator). The generated town states no default (the backstop already said so).
+- **Found on the way, and changed with it (both move results):**
+  1. *Someone who only orders an act was held until it began.* With `by` naming others only, the actor's lane was placed
+     from the act's start, so a case system that asked a desk of officers to decide a claim (P3) could pay nobody until they
+     were free: payments would have queued behind weeks of casework. The order is now placed when the actor is free and the
+     actor goes on (`ORDER_SECONDS`, the second it has always been, now a named convention and not a fallback). The act
+     still starts no earlier than the actor was free. No generated town named `by` before P3 (none in a year of au-vic), so
+     this moved nothing else.
+  2. *The engine's own code units could not name a system to do the work.* `done_by=<id>` on a call was given to the act as
+     `by` only by the TypeScript host (run.ts `performersOf`); in the engine (`kernel/src/engine.rs`, `Action::Call`) it
+     stayed on the call and the resolver refused it ("statement takes no argument done_by"): every act an office's system
+     was to do (the planning and rates offices' adopted systems, `offices/systems.rs` `assign`) was silently not done, a
+     note in the log and nothing more. Fixed as the host does it: a code unit's `done_by` ids leave the call and are the
+     act's `by`; the kernel still checks whose the system is and what its template does. This is why au-vic's state moves
+     with more than the casework (its offices adopt systems).
+  3. *An office offer's seconds were rows of the world's one table for every system* (`publish/rates_notice`,
+     `publish/permit_decision` at 15% of a person's), so any system writing those kinds wrote them at the offer's speed. They
+     are now the offer's template's own rows, with their sources keyed `template.<id>.<row>` in `act_time.sources`.
+- **P3, the support office's casework.** A template `agency-casework` (supplied by the outside) with rows
+  `publish/benefit_decision`, `evidence_request`, `confirmation_request` and `decision_review`, each an officer's minutes:
+  the person table's rows (us-oh's are sourced, FNS burden estimates, 75 minutes a decision; every other profile, gb-eng
+  included, has the generator's placeholders, 20 minutes a decision: the brief said gb-eng's were sourced, they are not:
+  its sourced rows are other papers). Its `hours` are an officer's working day: from the profile's `round.work_start_hour`,
+  the ordinary week (`ordinary_hours_per_week` over `work_days`) spread over every day of the week (a system's hours are
+  every day's, so the average day is right and the week's rhythm is not), times the town's share of officers over its lanes.
+  The desk, `outside-casework` (a system of the outside's, holding no post), has as many lanes as the town's share of the
+  agency's officers rounds up to: `public_service.support_officers_per_1000_claims` times the town's claims in payment at
+  generation (a national figure on a small town). The ratio is in all nine profiles as a **PLACEHOLDER** (4 per 1,000: an
+  order of magnitude recalled for Great Britain, DWP staff over claims in payment; not opened, to confirm). At 1,000 people
+  the share is under one officer everywhere (0.60, 0.94 and 0.70 in au-vic, gb-eng and us-oh), so the desk is one lane working a
+  share of a day (au-vic 3.3 hours, gb-eng 6.4, us-oh 4.0; ke-nakuru 14 minutes, from 8 claims). The support office
+  (`world.transfers` 0.11.0) names the desk (`done_by`) on every step that is only casework papers (`casework: {by,
+  kinds}`); a step with a payment in it stays the case system's, whole. The case system (`agency-system`) keeps its
+  one-second rows for payments and notices. Where a model holds the office, its staff route the casework to the desk; the
+  office-holder's own decisions on what is put before it are its own (not routed).
+- **The seat as a non-resident officer: not built.** A person with a body who is not a resident reaches the census, the
+  life table, elections, the registers of persons and every module that counts persons or bodies; giving one a body that
+  none of them sees is a change of its own, not contained in this phase. So a model seated in `outside-support` still
+  sits on the case system and decides what is put before it at a system's speed. Recorded in WM-14 as left.
+- **Not built: the charged row on each act** (P1's third part in the design's table). The design's backstop read acts
+  charged by a stated default; the generated town states none and the brief's backstop is acts refused `unpriced`, so no
+  log field was added. It belongs with law 11's strict mode (N3) if a reader of the log needs which row priced an act.
+- **Every machine says its hours.** The generator's machine templates (`agency-system`, `payment-system`, `market-system`,
+  `vendor-system`, the offers) state the whole day (`{0, 86400}`, identical to no hours: tested), so the backstop can ask
+  every system for its hours.
+- **P5, the backstop.** `all-work-takes-time.test.ts` gains `decisionsAtTheSystemsSecond` (a system template's row for a
+  kind the published decision law names, or `decision_review`, with no seconds of its own), `systemsWithoutHours`, and in
+  `unpricedWork` a template's own row with no source; each planted and named. The month's run is in a new slow-tier file,
+  `all-work-takes-time-runs.test.ts` (`unpricedActs`: nine towns of 300 for a month take 31 s alone and two to three times that under the suite's load, near the gate's budget
+  for a file), with a planted world (a system's `transfer` row taken away) whose refusals are named. A limit: the static
+  audit sees only a row that names a decision kind; a machine's generic `publish` row still covers one at the world's
+  second if a module publishes a decision without naming the desk (WM-14, left 5).
+- **Measured, code only, a year of `worlds/town-1000.yaml`, seed 1** (before: the f2-phase0 tip 644b2308, exported and
+  built apart; after: this branch; logs kept in `runs/f2-phase1-measure/`, on the run server; `after-au-vic-2026` is a
+  first after-run stopped part-way when fault 2 above was found, kept, not used). Claims made in the year (not those
+  brought forward), days from claim to decision:
+
+  | Town | Claims (decided) | Days, p10 / median / p90 / max | Open claims, mean / max | Casework acts' wait for the desk, median / p90 / max (days) |
+  |---|---|---|---|---|
+  | au-vic before | 203 (203) | 0.03 / 0.07 / 7.00 / 14.07 | 0.72 / 17 | none (decided at once) |
+  | au-vic after | 193 (191; 2 open at the year's end) | 0.55 / 4.43 / 9.94 / 16.49 | 2.50 / 88 | 0.57 / 5.37 / 7.89 |
+  | gb-eng before | 129 (129) | 0.02 / 0.08 / 5.63 / 7.01 | 0.42 / 3 | none |
+  | gb-eng after | 124 (124) | 0.14 / 0.58 / 1.57 / 7.42 | 0.33 / 16 | 0.09 / 0.66 / 0.73 |
+  | us-oh before | 140 (140) | 0.03 / 0.19 / 5.73 / 9.16 | 0.50 / 11 | none |
+  | us-oh after | 130 (130) | 0.50 / 1.84 / 6.04 / 11.64 | 0.95 / 22 | 0.49 / 2.36 / 4.40 |
+
+  The median claim now waits for an officer: hours to days, where it was an hour or two. The tails (p90) are still
+  mostly the law's waits for papers (14 days, the claimant's own time), and gb-eng's p90 fell (5.6 to 1.6 days) with a
+  different mix of claims in a town whose people now live differently (fewer waits for papers in its year): not chased.
+  The desk is far from the places' published waits (weeks): it is a share of an officer at the person table's minutes,
+  and the minutes are placeholders but for us-oh's; the law's own waits (a first Universal Credit payment's month) are not
+  data yet. Nothing tuned. Also moved, not chased: au-vic's citizens' own refusals (`not_at_work` 1,582 to 2,393,
+  `no_time_left` 1,414 to 2,173), gb-eng's the other way (1,498 to 916, 1,254 to 1,002), us-oh's down (401 to 207, 816 to
+  703): the towns diverge once support arrives days later (and au-vic's offices' systems now do their papers, fault 2);
+  no act anywhere was refused `unpriced`. A year took 396, 497 and 276 s after against 346 (gb-eng) and 195 (us-oh)
+  before, on a shared machine with other jobs in the slots (not a like-for-like timing).
+
+- **Pins re-taken** (culture-dial.test.ts, the one deliberate alarm, docs/testing.md "Change detectors"): the three config
+  hashes and the three Rust states, with the reason beside them (the casework desk, machines' hours, offers' rows, the
+  order, the engine's `done_by`). The figures fixture lost one unbased place (`templates.*.does.*.seconds`, now based).
+- **Why this way.** The kernel already charged and queued a system's time (lanes, `place`); what was wrong was that a
+  system's figures were one table for every system and that it worked every second of the day. Per-template rows and hours
+  are the two smallest changes that let a desk of people and a computer differ, as the WM-14 design said; refusing an
+  unpriced act turns the platform's silent "a second" into a finding.
+- **Revisit if** a place publishes its agency's officers and caseload (then the ratio is sourced, and the lanes move); a
+  support-office experiment is planned with a seat (then the non-resident officer, as its own change); weekly rhythm
+  matters to a result (then hours by weekday, as a person's working days are); a module's decision is found published by a
+  machine at its second (then the static audit should follow the module's issues, not only the rows); the order's second
+  is to be priced (then a row for ordering, and `ORDER_SECONDS` goes).
+- **Merged with main (2026-10-25, origin/main at 3b87959e: market realism, commercial leasing).** The generator is 0.68.0
+  (this phase on main's 0.67.0), and culture-dial's pins were re-taken once more on the merged tree, with the reason beside
+  them. The measurements above are from before the merge (f2-phase0 tip against this branch), not re-run on main's towns.
+
+## 2026-10-25 · Foundations-2 phase 2, C1: law 8's invariant and its backstop, with today's violations in an inventory (branch `f2-phase2`, stacked on `f2-phase1`; no result changes; no model called)
+
+Asked: build phase 2 of docs/design/foundations-2.md (law 8, conservation of everything physical), steps C1 to C6 and
+C3b, Naz having approved the design on 2026-10-25 (the outside's supply unlimited at its price except named scarce
+kinds; the tree model for networks; baselines move). C1 is the invariant over today's kinds and the backstop.
+
+- **The kernel's side: `kernel/tests/conservation.rs`, replacing `goods.rs`.** The goods property is kept whole (every
+  resource kind's total over holdings and edges changes only by work's inputs and outputs and construction's materials;
+  nobody but an edge below nought; goods moved only by their holder), and fields are added: in a world with a field on
+  every cell and a task that draws from it and one that emits to it, a step with no day of nature in it changes each
+  field's total by what work drew and emitted, exactly; a day of nature is nature's own (sources, decay, diffusion, flow),
+  and the totals are taken afresh after it. A third test holds that the runs are not vacuous (goods move, work draws and
+  emits). `foundations.rs` and `foundations-laws.test.ts` name the new file.
+- **The backstop: `orchestrator/test/nothing-from-nothing.test.ts`** (gate tier; its audits in `test/lib/law8.ts`). It
+  generates every profile's town (120 people, three factories, living) and reads the modules' sources, and names:
+  `stocksAsVariables` (a variable that grows by its occupants, has a kind's name, or is read as a meter), `orphanKinds`
+  (a kind consumed that no recipe, edge or nature makes; a kind made that nothing uses or takes in), `silentRecipes` (a
+  recipe at a workplace that does not state its energy and its water: nought is allowed, its basis then a row of the
+  figure table, law 11), `billsWithoutMeters` (a parameter that is an assumed use a head, customer, household or home),
+  `vanishing` (a draw from a field that holds no kind; a process whose only effect is to destroy a stock kind),
+  `allocationRules` (code that shares out a shortfall by a rule of its own: a pro rata, a ration, a share out, and the
+  utility's own reckoning of demand, `restriction_cut_bps` and `price_elasticity_bps`), and `specialCasesLeft` (a special
+  case a landed step deleted, standing again). Each is planted in the second half and seen named.
+- **The inventory, `orchestrator/test/fixtures/foundations-2-inventory.json`, only shrinks.** It lists today's findings
+  by audit and the special cases the plan deletes (literal strings, as `foundations-inventory.json` does), each with the
+  step that deletes it. A finding not in it fails (a new way round the law), and so does an entry no longer found (the
+  change that ended it removes it, with a line here); a step that has landed goes into `done`, and its entries stay as
+  guards. Today: the `waste` and `water_used` variables (growing per occupant; `waste` also a kind's name); fourteen
+  silent recipes at workplaces (the world has no `water` kind yet); the energy retailer's `units_per_customer_per_day` and
+  the water corporation's `litres_per_person_per_day` (assumed uses); vanishing: `draw_water` (into nothing),
+  `supply_energy` (energy at the depot), and `consume` and the five `consume-<kind>` tasks (goods and the shops' kinds
+  used up into nothing); the utility's own demand rules as allocation rules. No orphan kinds.
+- **Why this way.** It is the shape the two earlier laws took (`docs/all-work-takes-time.md`, `docs/no-god-view.md`): the
+  backstop reads what the generator makes and what the modules say, so that a world that breaks the law fails a test by
+  name, and the inventory makes the remaining work a list that can only get shorter.
+- **Revisit if** a finding turns out to be a false positive (then the audit is wrong, never the inventory widened); a kind
+  is found that the audits cannot see (law 8's honest limit: a kind nobody thought of); the profiles' towns at 120 people
+  miss a module a larger town has (then the backstop's town grows).
+
+## 2026-10-25 · Foundations-2 phase 2, C2: kinds have a class, a field may hold a kind, and a draw is held (branch `f2-phase2`; results move; no model called)
+
+- **Contract (world config).** `catalogue.resources[]` gains `class`: `stock` (the default: conserved), `dissipates`
+  (energy and fuel: may be a process's input with nothing out, as heat leaves the books) or `service` (a unit of a
+  service sold over a counter: no physical quantity). It gains also `settle` (`day` or `hour`) and `shape_bps` (24 hourly
+  shares of a day), for C3's connections. `catalogue.fields[]` gains `kind`: the field holds that kind, in its unit.
+  Refused at load: a field holding a kind the world does not declare, a field that holds a kind from anything but nought
+  (baseline 0, min at least 0), two fields holding one kind.
+- **Kernel.** A `draws` from a field that holds a kind moves what it takes into the actor's holding at the structure
+  (`exec.rs`, `work`); from a field that holds none it is as before (the backstop's `vanishing` names it). An `emits` to a
+  field that holds a kind is the process's output, put on the cell, and is refused (`overflow`) where it would pass the
+  field's most rather than be lost to the bound. Nature's day is nature's edge: for each field that holds a kind, what its
+  day changed (sources, decay, flow off the ground, a bound reached; diffusion and flow within the ground sum to nothing)
+  is counted in `nature.edge` (state, hashed; empty, and not serialised, for a world with no such field), so that the
+  kind's total over holdings, edges, the field and nature's edge changes only by what processes make and use
+  (`kernel/tests/conservation.rs`, a third property, a held draw, and the load refusals). A spin-up before the run is the
+  world's starting state and is not counted.
+- **The class `service` is an addition to the design** (2.1 had `stock` and `dissipates`). The shops' kinds the profiles
+  sell include a haircut and a visit to a venue (`personal_services`, `recreation`): units of a service, which no recipe
+  should have to turn into waste. Without a third class the backstop would have named their `consume-<kind>` as vanishing
+  stock for ever, or asked for an invented output. `transport` (a service station's sales: fuel) is `dissipates`. The class
+  of a kind is what a unit of it is, not a figure of the place, so it is the same in the three profiles that sell these
+  kinds (`spending.demand.kinds[].class`, au-vic, gb-eng and ke-nakuru); goods, food, clothing and a meal out stay stock,
+  and their use becomes waste at C4.
+- **Generator 0.69.0.** Energy is `dissipates`; the river's `water` field holds the kind `water`, in litres (the profile's
+  kilolitres times a thousand: inflow, a wetland's soaking, the bank's level and the flood depth; the field's most is a
+  thousand times higher too); `draw_water` draws a kilolitre a unit (1,000 litres), so the water corporation's draws, in
+  kilolitres, are unchanged, and **what it draws is now held at the works** (where until C4 nothing uses it: the backstop's
+  `orphanKinds` lists it, C4 ends it). The inventory: `draw_water` and `supply_energy` leave `vanishing` (supply_energy's
+  energy dissipates; that energy is still used up at the depot and not at the homes stays an entry, ended by C4); the
+  `consume` tasks of the service kinds and of fuel leave it too; the silent recipes now lack a kind the world has.
+- **Results move** (the river in litres decays and floods by the same rules at a finer grain; the works' holding of water is
+  new state). Measured: a year of the 1,000-person town before (f2-phase1 tip) and after this step, three profiles; the figures are in the C4 entry with the rest.
+- **Revisit if** a kind is found that is neither a thing, a fuel nor a service (then a class for it, with its reason);
+  a process is found that should put a kind on a cell beyond the field's bound (then a spill, as nature's own, rather than a
+  refusal).
+- **Pins re-taken:** culture-dial's three config hashes and three Rust states, with the reason beside them (generator 0.69.0).
+- **Found, not mine:** `figures.test.ts` (slow tier) fails on f2-phase1's tip already: four `commercial.*` parameters from commercial leasing (main) have no row in the figure table. Left to the merge of main (not a law-8 change).
+
+## 2026-10-26 · Foundations-2 phase 2, C3 and C3b's kernel part: the network for what flows, connections settled on trees, and the operators' acts (branch `f2-phase2`; no generated town has a network yet, so no result moves; no model called)
+
+- **Contract (world config).** `world.network`: `nodes` (an id, a cell or an edge, a height in metres), `links` (from,
+  to, `mode`, `length_m`, `capacity` an hour in what flows on it, `loss_m`: a pipe's head lost at capacity), `supplies`
+  (a kind, a mode, a node, the holder and the structure whose holding feeds it, `physics`: `pressure`, `rating` or
+  `drain`; for pressure the head at the source, the store whose level sets it, and the service and least heads).
+  `world.connections`: a holder's at a structure, on a node, a kind, a `rate` a day, an optional `uses` (a recipe of no
+  labour that uses the kind a unit at a time: use at the user) and `meter` (`on_site`, the default, or `remote`). Roads
+  and paths join the same network at law 9 (`mode`, `length_m` and a capacity an hour are already its shape; speed and
+  energy a kilometre by vehicle come with it). Refused at load: a link that joins no two nodes, out-of-range figures, a
+  supply whose kind is not declared or says no `settle`, a pressure supply without its heads, a connection on a node no
+  supply of its kind reaches, a use that is not such a recipe, connections with no network.
+- **Kernel (`oikos-contracts::network`, `oikos-world::network`).** Each supply's tree is found at load, breadth first
+  from its node over the links of its mode in the links' order; a link that would close a loop is cut (the known limit,
+  accepted by Naz). State: each link's (shut, tripped, a rotation, its last load) and each connection's (rate, meter,
+  closed, interrupted), in dense vectors behind an `Arc`, with derived indexes by id, holder, structure and supply.
+  Settled by a scheduled `Settle` each hour (a kind settled daily at midnight): one pass up each tree sums what is asked,
+  one down delivers, in integers.
+  - *Pressure (water).* The source's head is the full head times the store's level (what it holds over its storage); each
+    link loses its `loss_m` times its load over its capacity (a linear stand-in for friction, on what is asked); a node's
+    pressure is the head less its height; a connection there gets what it asks at or above the service head, nothing at or
+    below the least, and between them the square root of how far between (pressure-driven delivery, Wagner, Shamir and
+    Marks 1988, to confirm), by an integer square root. A store that cannot give what that delivers lowers its level until
+    it gives no more than it holds (the highest such head, found by halving): a fall of level, not a share-out.
+  - *Rating (power).* Bottom up, a link asked for more than its rating trips and carries nothing; a supply asked for more
+    than it holds trips its own links and nobody on the tree, at the source included, gets anything. A tripped link stays
+    tripped until its operator recloses it. A kind settled hourly is delivered by its `shape_bps` (24 shares of the day,
+    cumulative, so the 24 hours add to the rate exactly).
+  - *Drain (a sewer).* Each connection lets out what it holds, up to its rate, to the supply's holder.
+  - Deliveries move from the supply's holding to the user's; a connection with a `uses` recipe runs it as delivered (the
+    kind used, its outputs to the user's holding). Separate trees are solved apart from one pre-settlement state and applied
+    in the supplies' order, so the result does not depend on the order or on threads (solved one after another for now:
+    trees are few and small). **No allocation rule anywhere:** the code shares nothing out; who goes short is where they
+    are, what the links carry and what the operator did.
+  - *Logged:* acts on a connection (`connection_changed`) or a link (`link_changed`), and a link's tripping
+    (`link_changed`, op `tripped`, with its load and rating). Settlements are not: meters and loads are state, hashed.
+- **Acts.** `connection` (`open` a new one, or a closed one again; `close`; `interrupt`; `restore`: its operator, the
+  holder of the supply whose tree the node is on; `set` its rate: its user or its operator). `link` (`shut`, `open`,
+  `reclose`, `rotate`: a standing schedule, off for `off` seconds of every `every` from `from`, declared once; its
+  hours are state). Refusals: `not_theirs`, `unknown_ref`, `overflow`, `not_modelled` (a world with no network, or a link
+  on no tree). The engine's resolver has the calls (`connection(...)`, `link(...)`: contracts/calls.md), as **code's own**
+  for now (`calls.rs` `CODE_ONLY`): a seat's call vocabulary (calls.schema.json, the TypeScript parser) gains them when the
+  translator is taught them, since every function of a seat's contract must have its gold and its writer's words (the
+  translator is parked: a decision for its next round). A seat's preview says both acts in words. A connection opened by an act is `conn.<n>` (the kernel's id prefixes gain `conn`, in common.schema.json and the three
+  places that read them). Each act has its rows in the table of work (`connection`, `connection/<op>`, `link`,
+  `link/rotate`, person and system), placeholders with what would source them.
+- **Who sees what** (docs/no-god-view.md). A household sees its own connections, with their meters, through its holdings
+  channel (they are its own, on its premises). A supply's operator sees every connection on its network and its links
+  with their loads (its own register and instruments), with the meters it reads from afar (`remote`); an on-site meter is
+  read by going there: a visit's buildings show their on-site meters (`meters`), and only a visit (never what one sees in
+  passing, which would be stale between looks). Nobody else sees any.
+- **C3b in the kernel:** supply agreements and tariffs are content (agreements and statements the kernel stores and never
+  reads); the operators' acts are the ones above (valves, interruptions, rotations as standing schedules), with their
+  rows. Protected lists are content the operator keeps and reads when it chooses a rotation (C4, the operator's
+  behaviour). Kernel tests (`kernel/tests/network.rs`): the far end of a full main goes short first; a store run low lowers
+  the head and never gives more than it holds, and one all but empty runs dry; an overloaded feeder trips and stays dark
+  until reclosed; a supply short of stock trips its own links; a rotation keeps the main from tripping and an
+  interruptible customer is cut by an act; only whoever may opens, sets, closes; every kind conserved over holdings and
+  uses; meters seen only by their users and operators; load refusals; a loop cut to a tree; one world settles the same.
+- **Revisit if** a shortage a town plainly would not have comes from the tree (then loops by a fixed number of passes, its
+  cost to Naz first); the operator needs to see more than its instruments (then it is a register to declare); many trees
+  make settlement a cost worth threads (then `rayon` over trees, applied in order).
+
+## 2026-10-25 · Main's slow tier after commercial leasing: the station's head is a sworn officer, the paper is the council's to fill, and five tests re-taken with their reasons (branch `fix-main-leasing`; no model called)
+
+- **What we saw:** CI's slow tier failed eight files after the commercial-leasing merge (3b87959e); the gate's canaries
+  passed. Market realism moved every default town's draws (who is hired, by interview; incomes and savings drawn
+  together; businesses born by weighing), and the slow files run long default-town scenarios the canaries do not.
+- **Faults fixed in the mechanism:**
+  - *The station's officer in charge did no station work* (seat-acts, hazards). The station staffs its "police officer"
+    role; its head, employed as "officer in charge", was not counted. With the new hiring the one officer of the default
+    town is injured on day 171, and the station carried out no warrant and looked into no report for a month while its
+    head sat at the station. A small station's head is a sworn officer (a sergeant or inspector) who takes the work when
+    the officers are away. `police.station` 0.7.0 counts its staff in `in_charge_role` (default "officer in charge") who
+    are at the station after its officers; `Staffing::in_role` lists those employed in a role other than the one it staffs.
+  - *The paper was a headless one-person body* (deaths; WM-7). Its one person died and nobody filled the post, so it went
+    on paying the dead. The paper is kept on the town's grant as the courts are, so every profile's
+    `public_service.appointed_by` now has `press: council`, sourced as the courts are; bodies run on their own account
+    (bank, union, landlords, shops) are still not covered (WM-7 stays open for them).
+  - *Commercial leasing's figures had no basis rows* (figures). `firm.landlord`'s commercial rent, deposit, term and
+    notice are now read from the profile (`prof` rows); two stale rows of the old founding rate are gone.
+- **Tests re-taken, each with the reason in place:**
+  - production: a factory that bought an automation system has its units `make`; a system is the firm's performer and
+    is not held to a person's working day.
+  - hazards: reports left undealt are counted only while someone who looks into reports is at the station.
+  - unions: one stop where there were two (the town as drawn since puts fewer members at factory-1; not traced further).
+  - police-station-seat: seed 1 where it was 7, measured on the code twin for 330 days over seeds 1 to 10 (in the test).
+  - deaths: a housemate who reports the death and then leaves town the same day counts as living there (a widow's two
+    grown children, in this draw).
+  - seat-diary: the refusal of a crew member not at work is taken from a seat that sits at 07:00 in a town of the usual
+    size, since the 600-person town's works crew now have no home and sleep at the hall.
+- **Also:** culture-dial's config hashes and Rust states re-taken (the profiles and the station moved); manifests regenerated. The whole slow tier passes on the branch (58 files).
+- **Revisit if:** a station is ever seated with a head who should not do officers' work (a civilian manager), or the
+  600-person town gets homes for its people (seat-diary could look in its main run again).
+## 2026-10-25 · A memory budget for each person, held by a test (branch `mem-budget`; no model called)
+
+- **What was asked:** (Naz, 2026-10-25, "very important") a per-person memory budget, enforced, then cut towards about
+  50 KB a person at the peak (50,000 people in some 2.5 GB, 100,000 in 5 GB), beside a fixed overhead.
+- **Change:** `scripts/memory-budget.json` (the town, days and threads it is measured on; the fixed overhead; the
+  ceiling held now; the target) and `orchestrator/test/memory-budget.test.ts` in the slow tier: `worlds/town-1000.yaml`
+  for 30 days on the release kernel at 4 threads, failing if its peak resident memory less the overhead, over its
+  people, passes the ceiling. The kernel's `world` command prints its peak (`getrusage`). `scripts/heapprof.ts
+  --components` puts a heap profile's live bytes with components, and per person.
+- **The numbers it starts from** (main `3b87959e`, docs/design/performance.md "Bytes per person"): at 4 threads, 203
+  people 221 to 230 MB, 1,000 people 651 to 668 MB (two runs each): about 110 MB fixed and 546 KB a person. At 14
+  threads, 30 days: 1,000 people 0.69 GB, 10,000 5.25 GB (514 KB a person), 50,000 34.2 GB (682 KB). By component at
+  50,000, what's been seen was 408 KB a person of 697 live: it grows faster than the town.
+- **Why a ceiling and a target, not the target alone:** a test that fails on main cannot land (main stays green). So
+  the ceiling starts at main's cost (590 KB: the worst run, 558, and about 6%), and each cut lowers it in the commit
+  that lands it, until it is the target. Lowering it goes with the cut that earns it; raising it is a decision here.
+- **Why resident, and why 1,000 people for a month:** resident peak is what a run can be stopped for, and the same
+  measure on any platform; 1,000 people for 30 days takes 15 s, and per person it is near 10,000's (583 against
+  514 KB a person at 14 threads), so a cut that matters shows at 1,000. A cost that grows faster than the town (as
+  what's been seen did) shows only larger: the 50,000 numbers are measured with each cut and recorded here.
+- **Revisit if:** the test's spread from run to run nears the margin (then two runs, the lower), or a cut shows at
+  10,000 and 50,000 and not at 1,000 (then a 5,000-person town for the test, in the slow tier still).
+## 2026-10-25 · Test strength: the host's dead paths cut, the mutation catalogue rebuilt against the engine, the gaps it found held (branch `test-strength`; no model called)
+
+**Why.** The test pruning of 2026-10-25 found the catalogue mostly stale (15 of 49 bugs still applied, the rest in the
+TypeScript actors deleted at the cut-over), two twin bugs in host code the Rust world no longer runs, and nothing
+catching `kernel-care-draw-by-number`.
+
+**Dead code removed** (found by reachability: units are made only in `syncUnits`, which since the cut-over makes a unit
+for a seat alone, and an import graph from every tool, CLI and script; no whole library file was unreached):
+- `orchestrator/src/run.ts` (1,724 lines to 1,578): `codeUnit` and every branch for a code unit (`!u.llm`; a unit's
+  `capacity`, never set for a seat: the slice, prefixed looks, `only`, the performers a code unit named), the TS
+  resolver's `ts` and `shadow` modes (`OIKOS_RESOLVER`, `resolverShadow`, `<run>.resolver-diffs.json`; the engine's
+  resolver is the one, docs/design/rebuild.md has the shadow check's record), and `recordChangeOf` with its call (a
+  seat's units only ever returned nothing: a record is the engine's bookkeeping, held by `kernel/tests/entity_record.rs`).
+  Its two tests in `entity-records.test.ts` went; the API test there now says no orchestrator source sends
+  `entity_record` and keeps the participant-API check.
+- `orchestrator/src/rust-world.ts`: `runRustWorld` and `twinBrains` (no caller; experiments drive `RustWorld` directly).
+- Unused exports: `forkLogs` (experiment.ts), `datasetDirFor` (dataset.ts), `onParams` (module.ts: the manifests are no
+  longer written by running TS modules), `smallestNow` (money.ts).
+- **Not dead, contrary to the pruning's note:** the host's draw keying (`drawFor`, `stablePurpose`) still names the
+  streams of what the host runs on a seat's side (a mock seat's signing, `mock.ts`; a seat's office books' readers, e.g.
+  `Directions.standing` through openbooks-townhall). It moved to `orchestrator/src/draws.ts` (the same rules as the
+  engine's `actors/src/draws.rs`) with a unit test, `orchestrator/test/draws.test.ts`, so its twin bugs can be caught.
+
+**The catalogue** (`scripts/mutations.ts`): 46 bugs, 35 in `kernel/crates` and 11 in live TypeScript, each `kind` the rule
+it breaks: money 6, integer cents 3, the dead 6, the absent 1, work's time 4, sight 10, twins 7, review and appeal 4,
+the decision law 2, the generator, the measures and the translator 1 each. 13 kept from the old catalogue (the 10
+kernel bugs, `amounttext-round`, `self-sees-position-channels`, `view-cache-stale`), the two host twin bugs re-planted in
+draws.ts, 31 new (drafted by subagents by area, checked to apply once and to compile). `scripts/mutate.ts` now builds and
+tests the kernel in the `gate` profile (a mutant's rebuild in minutes, not the release link's half hour), points every
+test file and the kernel's tests at that build, runs the kernel's tests once unmutated each run, runs them under `--tests
+own` too (with the gate's 90-day invariants), and empties the copy's `runs/test-*` after each bug.
+
+**Measured** (main at 3f3e16b5 plus this branch): `--tests own` first, then the fast tier for the survivors. One fault
+of the harness was found and fixed on the way: kernel tests that write their town with the TS generator loaded the copy's
+stale release engine module, which is refused when its sources differ, so under any kernel bug they all failed: their
+catches were not catches. Results, 46 bugs: **34 caught for certain** (all 11 TypeScript; 23 kernel, each by a test of its own module, the
+invariants or a twin test; 7 of them only with the tests below), **2 survive**, **10 unconfirmed**.
+- Survive: `kernel-zero-transfer` (equivalent: the contract's Amount refuses 0 before the engine's range check) and
+  `rs-bank-dead-holder-pays-out` (near-equivalent: the bank's check of who may instruct on an account refuses the same
+  payments, so no money moves from a dead holder's account; the bank only writes "cannot" where it would have said
+  nothing).
+- Unconfirmed: the only catchers shown for these in the first pass were the generator-backed town tests (`a1_citizen`,
+  `c2_shop_mix` and the like). The fixed rerun was stopped at its third bug, when free disk fell under the 60 GB floor
+  (the copy's gate build is about 38 GB): `kernel-absent-may-work`, `rs-retailer-hours-used-forgotten`,
+  `rs-utilities-slip-row-misnamed`, `kernel-performer-not-charged`, `kernel-named-sees-private`,
+  `kernel-answer-cap-ignored`, `rs-world-price-moment`, `rs-appeal-window-off-by-one`, `rs-grievance-ignored-in-seconds`,
+  `rs-method-order-inverted`. Run them again with the fixed harness when the disk allows: `--tests own --only <ids>`,
+  about 10 minutes each.
+- The invariants caught 4 (doubled credit, work charged no time, records shown to those not allowed, a capacity handed another's letters); the 90-day gate
+  invariants are what `own` runs.
+
+**Tests added or strengthened**, each for the rule and not a figure:
+- `kernel/tests/services.rs`, `care_draws_on_the_condition_not_its_number`: on 16 seeds, care keeps or calls off a death
+  alike in two towns that differ only by one more injury filed first (the condition's number moves, its onset does not);
+  both outcomes occur across the seeds. Catches `kernel-care-draw-by-number`.
+- `kernel/crates/actors/src/offices/treasury.rs`: the tax clerk's assessment is exactly the law's rate of the rent
+  reported (it was a substring match that a tenfold tax passed). Catches `rs-treasury-rent-tax-tenfold`.
+- `kernel/tests/physics.rs`: a transfer of 0 or less is refused and moves nothing. (`kernel-zero-transfer` stays
+  uncaught and is equivalent for every act a participant sends: the contract's Amount refuses 0 before the engine's own
+  range check; noted in the catalogue.)
+- `participants/test/view.test.ts` (new): a seat's view takes in every change it is shown, and one capacity's slice holds
+  that capacity's channels only. Catches `view-cache-stale`, `self-sees-position-channels`.
+- `participants/test/staff-report.test.ts`: an office-holder's list of standing orders is its own organisation's.
+  Catches `ts-roster-orders-of-any-body` (the seat-side Roster had no test).
+- `translator/test/own-office.test.ts`: an office's own stationery is a form of its holder's only.
+- `orchestrator/test/draws.test.ts` (new, with draws.ts).
+
+**Disk** (`scripts/disk-tidy.ts`, `judgeTarget`): a worktree whose branch and HEAD are in origin/main and that nothing is
+running in (no process working there or using a file in it) loses its `kernel/target` at once, whatever its age or its
+agent lock (the lock names the session that started the agent, which outlives it). Protected names, wave copies and the
+tree it runs in are left. Finished agents' builds filled the disk twice on 2026-10-25.
+
+**Revisit if** a kernel bug is "caught" only by town-wide tests again (look at what they failed on before counting it), a
+catalogue bug stops applying (a refactor moved its line: re-plant it), or the host stops running anything on a seat's
+side (then draws.ts goes too).
+
+## 2026-10-26 · The state hash written as a stream, with no cache of encoded copies (branch `mem-state-hash`; no model called)
+
+- **Change:** `World::write_state` writes the state's canonical bytes for its hash member by member, and each large map
+  (entities, accounts, cells, structures, occupancy, records, participants, positions...) entry by entry, each entry
+  encoded alone and let go. Nothing is kept between one hash and the next: the cache of every record's encoded bytes,
+  which grew with the run, is gone. The bytes are exactly `canon::canonical` of the state (a test holds it on three
+  profiles' towns, `kernel/tests/config_stream.rs`), so every hash is the same.
+- **Measured** (30 days, 14 threads; main `3b87959e` against this): 1,000 people au-vic 693 to 592 MB, gb-eng 670 to
+  570, us-oh 565 to 514; 10,000 people 5.25 to 4.34 GB. The same state hash and log digest on all of them. At the
+  budget's own settings (4 threads) 1,000 people peak at 553 to 560 MB: 450 KB a person beside 110 MB, so the
+  budget's ceiling is lowered from 590 to 480 KB.
+- **Its cost:** instructions +0.4% at 10,000 people, +0.1 to 2.6% at 1,000: the records are encoded again at each
+  hash (the start's, each checkpoint's, the end's) where the cache had them. The cuts that follow it (what's been seen,
+  the delivered records) take far more off: all of them together are 10% under main at 10,000 and level at 1,000.
+- **Revisit if:** checkpoints become frequent (daily, say): then the records' bytes might be kept compressed between
+  them, not whole.
+
+## 2026-10-26 · Two more canaries: hazards and figures
+
+- **Why:** commercial leasing landed with the three canaries green and turned 8 slow-tier files red; the agent that fixed
+  them found `hazards` (a 200-day default-town run, about 50 s) and `figures` (law 11's count) would have caught most.
+- **Revisit if:** a broad change's gate grows past about 5 extra minutes on a quiet machine, or a red main again slips past.
+## 2026-10-26 · What's been seen held once for all who see it the same (branch `mem-seen`; no model called)
+
+- **What the profile showed:** at 50,000 people, what people have seen was 20.4 of 34.8 GB live (408 KB a person,
+  against 52 at 10,000): each person's own copy of each building as they last saw it, its spaces and who is in them,
+  where one building holds hundreds. It grew faster than the town.
+- **Change:** `sites::seen_structure`: a building as seen is made once for everyone who would see it the same, and
+  again only when what it is made from has changed; a view keeps its seen cells as one list, the one it hands out. No
+  one sees anything different (the same state hash and log digest on 203 people, three profiles' 1,000, 10,000 and
+  50,000, 30 days), and nothing is forgotten: this holds what was seen compactly, it does not bound it (a bound would
+  be a law, Naz's to decide).
+- **Measured** (14 threads, against main `3b87959e`, with the streamed state hash beneath it): 1,000 au-vic 693 to
+  521 MB; 10,000 5.25 to 3.12 GB; 50,000 34.2 to 17.2 GB resident, 1,004 to 956 s wall, 15.0 to 11.8 T instructions.
+  The budget (4 threads) at 496 MB, 386 KB a person: the ceiling lowered from 480 to 410 KB.
+- **Found on the way:** behind one lock per shard, the 50,000 month took 1,590 s against main's 1,004 (the run's own
+  thread waited on the lock: a building's people look at it at once, on many threads). Under a shared lock, compared
+  outside it, the wait is gone.
+- **Revisit if:** a building's view comes to depend on the looker beyond whether they can be told who is there (then
+  that goes in its key), or the state comes to change occupancy or departures in place (then comparing by where they
+  are in memory would not do: debug builds' check would catch it).
+
+## 2026-10-26 · Main red after foundations-2 phase 1: two faults it exposed, two towns it moved (branch `fix-main-f2p1`; no model called)
+
+Four slow-tier files failed from the phase-1 merge (0824efb6) on, and passed at 3d113a1f. Each was traced in its town's
+log against the same town built at 3d113a1f.
+
+- **retail.test.ts: a fault, fixed in the shop.** A delivery note gave 8 ordered where 9 were, and refunded nothing of
+  what was paid. An order at a price the shop has since raised buys what its money buys at the new price (docs/behaviour
+  /retailer.md, "Selling"): the shop rewrote the order's quantity and price in its queue, and its note then gave the
+  number the money bought as the number ordered. Worse, what a note settles (the money paid over the price, the items a
+  system got wrong) was forgotten when the serving was sent, not when it went out; a serving refused (a crew short of
+  time) or lapsed at the close waits its turn again, and the note of the one that went out refunded none of the
+  over-payment: the shop kept it. Phase 1's done_by fix put the shops' systems to work and moved the shops' timing,
+  which is what reached this path. Now the note says what was ordered and, where the price had risen, the price
+  charged (`unit_price`, optional on the paper and its form), and the shop forgets what a note settles only once the
+  note has gone out (`settle`); a serving not done drops the slips of its systems' items. The test checks the refund
+  against the price charged. Unit tests: the raised-price note, and a serving refused then served the next day still
+  refunding the over-payment. Revisit if a household's reading of a note (money.rs: served = delivered over ordered)
+  should not count a price rise against the shop's service: it now does, as a customer told "eight of your nine" would.
+- **production.test.ts: a fault, fixed in the factory, and the town set up for what is tested.** The slack town had
+  nobody let go in seven months. Its only redundancy until phase 1 was factory-2's, the food works, which had *more*
+  orders than it could make and ran out of cash on day 80 (its second hire signed on day 79, 18 days after it was
+  chosen, and it paid cash for its inputs); since phase 1 that hire signs the same day, the works makes and sells more,
+  buys on terms and borrows when short. The works with too little demand, factory-1, opens with about six months of its
+  wage bill and loses a third of it a month, so it never runs short in seven months, before phase 1 or after. The test
+  now opens it with two months' wages (by construction, said beside it). That run then showed a fault: a factory
+  counted a day's making in flight for twice its hours from when it was *planned*; a manager with other acts before it
+  sent it later, and, no longer held while the crew works (phase 1's order fix), woke while it was under way, saw nothing
+  in flight, and ordered the day's work again, past the top of its band (665 against 663). A making is now in flight
+  until its outcome comes back (a day at most, should none). Unit test: a day's work under way is not ordered again
+  four hours on. Revisit if a making's outcome can be lost for good (then the day's fallback is what bounds it).
+- **own-venture.test.ts: the town's timing, the test's world set up.** After giving its business up, its owner looked at
+  the jobs board at nearly every wake for 105 days and never applied: no posting stood open at any of those looks. In
+  this town a posting is filled within hours by whoever is looking when it goes up (a posting for ten went up and was
+  filled between two of the owner's wakes). Nothing in the owner's search changed; the town's postings came at other
+  hours. The test now keeps the others who open the year out of work, with no work of their own, out of the labour
+  force, so the owner is not racing them: they apply on day 60. Revisit if a person out of work should look more often
+  than they wake (a search habit by the day), which would be a behaviour with a source.
+- **police-station-seat.test.ts: the households' draws; the floor that was a seed hop made "some".** Fewer than two
+  warrants both towns issued were carried out: the second household of seed 1's town (lease-c0269) paid its arrears in
+  the seat's town and its claim was withdrawn, while the twin's issued a warrant on day 232. "Two or more" had been kept
+  by hopping the seed (3, 7, 1). A second case brought forward by construction (the town's other tenancy in arrears at
+  the opening's hearing stage) went the same way: its tenant left on the order's day in one town and days later in the
+  other. Per docs/testing.md ("Seed pins": "some" where the count is the draws'), the test holds some, and among them
+  the case the town opens with at a hearing, which both towns issue a warrant for in the second month; the rest
+  (the same set, the same day within one, lapses equal, the staff's reports) is unchanged. Revisit if the station's
+  handling of a later warrant could differ from its first (then a case later in the year is to be made by construction,
+  with a tenant who stays).
+- **Two more the fixes moved, in the slow tier.** `unions.test.ts`: an enterprise agreement made at day 149.98 of a
+  150-day run has its new wage orders after the end; the two days the test allows are now held only where they fall
+  in the run. `automation-run.test.ts`: in the town with a law against taking a system *to serve*, factory-3 takes a
+  production cell on day 151, which the law does not forbid; the test held that no system at all was delivered, and
+  now holds that no serving system is (and that the town that ignores the law takes one). Revisit the second if the
+  law the test writes is meant to cover every use.
+## 2026-10-26 · A fault in what's been seen, held once: two worlds in one process could share a building's view (branch `mem-seen-fix`; no model called)
+
+- **What was wrong:** `sites::seen_structure` (from `mem-seen`, 7f81ceb3) keeps one view of each building, keyed by the
+  building's id, and takes it again while what it was made from is the same: the building field for field, and its
+  occupancy and departures by where they are in memory. An empty building has neither, so in two worlds in one
+  process with a building of the same name, empty in both, the second took the first's view, made on the first's
+  config (its building types' spaces and variables). Found by a test that failed only beside the others; a run alone,
+  and forks of one run (which share their config), are not affected. Two worlds of different configs in one process
+  (tests side by side; a host running an experiment's arms, if their configs differ) could see the other's buildings.
+- **Fix:** what a view was made from includes the world's config, held and compared by where it is in memory.
+- **Test:** `kernel/tests/config_stream.rs` "two worlds side by side are each the world alone": one town, and the same
+  with its buildings' wear coming on twice as fast, stepped a day each in turn on one thread; each is its run alone.
+  Without the fix it fails (world 0's log differs); with it, it passes.
+- **Revisit if:** anything else in the engine is held across worlds in a process: it must be keyed by what it is made
+  of in full (as the controllers' members and the ventures are, by their text), or by its world.
+
+
+## 2026-10-26 · Foundations-2 phase 2, C4 and C3b's behaviour: homes on the network, use and waste as recipes, bills from meters (branch `f2-phase2`; results move; no model called)
+
+- **Generator 0.70.0** (`worlds/generator/network.ts`, new). The town's network: from the water works a main to each
+  district (the quarters of the town around the middle of its homes) and a service to each home; the same for the
+  feeders from the substation and the sewer back to the works. Capacities from what the homes ask at the start times the
+  profile's peak (pipes, 2.5) and margin over the peak hour (wires, 1.5); heads (50 m at the source, 20 m service, 5 m
+  least), losses (10 m a main, 5 m a service at capacity), a store of two days and an hourly load shape are a new profile
+  section, `utilities.network`, the same placeholders in all nine profiles, marked so (WM-1). Each occupied home's
+  leaseholder holds a water, an electricity and a sewer connection at the start, at its own use (the profile's litres a
+  head times its people; kWh a day: the figures that were the utilities' assumed use, now the household's). The works'
+  store starts full and the substation with a fortnight of the town's electricity. New kinds `wastewater`; `water`
+  settled daily, `energy` hourly by the shape. New recipes `use_water` (a litre in, a litre of wastewater out),
+  `use_energy` (dissipated, with the grid's emissions) and `treat_wastewater` (a kilolitre in, put back on the land at the
+  works: an emit of the river's kind, the process's output).
+- **Waste is what is used up.** `consume` and `consume-<kind>` of the stock kinds (goods, food, clothing, a meal out) make
+  waste in kilograms at home: a unit's share of a person's month of waste (the profile's grams a head a day) by its price
+  over what a person spends in the shops a month (derived from the shop wage, less saving, three adults in four:
+  placeholders, WM-9). A service or a fuel
+  makes none. The works' `collect` is now `collects: {waste, 10}`: a kernel field (law 8) by which a unit takes up to 10 kg
+  of what is held at the address worked on, from its holders in turn (a different one first each day), never more than is there, and makes nothing; the
+  crew sees what is left (`left` on the buildings it worked on: only those who did it). The household's bin is what it
+  holds of waste at home (`complain_about_held`), its complaint read from it. `city.works` reads what it left from `left`
+  and knows a home by its dwellings.
+- **Deleted:** the `waste` and `water_used` variables; `per_occupant_per_day` (refused at load, `stock_as_variable`, as is a
+  variable with a kind's name; kept in the schema only to be refused); the water corporation's `litres_per_person_per_day`,
+  draw for the published population, `price_elasticity_bps`, `reference_price_per_kl`, `restriction_cut_bps`,
+  `restriction_review_days` and its `meter` variable; the retailer's `units_per_customer_per_day`, `task`
+  (`supply_energy`), its price response; the `supply_energy` task. The inventory's found lists are empty but for the
+  silent recipes (C5), its C1 to C4 entries stay as guards (`done`).
+- **The utilities (Rust, `offices/utilities.rs`, rewritten: water 0.4.0, energy 0.5.0).** Both operate their networks:
+  open a household's connections on its `supply_request` (now with `kind` and `rate`; water brings the sewer with it) on
+  its home's node, close them when it has gone, died or asked (`supply_end`, now naming the connection). The water
+  corporation draws what keeps its store full, treats what the sewer brings back, announces and lifts restrictions as
+  before, and bills from meters read on a round (visits: the meters on the premises) to whom the place's law says
+  (`bill_to`: the owner by the roll, or the occupant by the connection; law data per profile: au-vic the owner, gb-eng
+  the occupier, both recalled, the rest placeholders, WM-12). The retailer buys from the grid when its stock falls below a
+  fortnight of what its meters say the town uses a day, bills each connection for its days and what its meter moved (a
+  wrong bill a slip on the units), answers a wrong bill from its own readings, recloses a tripped feeder, and puts the
+  feeders under a link that trips again within a week on a rotation (each off an hour in turn), sparing a feeder that
+  serves a connection on its protected list. Their network is their declared register (`keeps: connections`; the
+  no-god-view backstop's KEEPERS and `views.ts` see an operator's holdings channel as it).
+- **The household (Rust, `citizen/housing.rs`).** Its use is its own rule: it sets its connections to its litres a head and
+  kWh a day, again when the household changes; asks to be supplied at a home with no connection of its; turns a connection
+  where it no longer lives down to nothing and asks for it to be stopped. It does not yet read the tariff or a
+  restriction (WM-12, open).
+- **A deviation, accepted by the parent session (2026-10-26):** the `connection` and `link` calls are code's own for now
+  (TR-7, new): a seat in a utility or operator post cannot rotate, interrupt or reclose, nor a seated household set its use.
+- **The CLAUDE.md line is added in the commit that lands C4** (Naz's decision 1 on foundations-2, 2026-10-25: each law's line joins the hard rules when its enforcement and backstop land; added by the coordinating session, not by the branch's builder). The line,
+  worded like the hard rule on time: "**Nothing physical from nothing: every physical quantity is a
+  declared kind, held somewhere, and changed only by its holder's move, a process with a recipe, nature's declared
+  dynamics or a world edge.** A building's variable is a condition, never a stock; what flows all day flows on a network,
+  settled by its physics; who goes short follows from the network, the supply contracts in force and the operators' own
+  acts, never from an allocation rule; every recipe at a workplace states its energy and water. A gap is a missing law:
+  ask what the thing is, who holds it and which process makes or uses it, and make the world say it
+  (docs/nothing-from-nothing.md, docs/design/foundations-2.md). `orchestrator/test/nothing-from-nothing.test.ts` is the
+  backstop." The rule page `docs/nothing-from-nothing.md` is in this commit.
+- **Revisit if** the waste a unit makes is sourced by kind (then a profile figure for each); households read prices and
+  restrictions (then their response, with a source); a town grows past its network's sizing (then the operator's
+  reinforcement, a builder's work); a tree's shortage is one no real town would have (then loops, to the owner first).
+
+## 2026-10-26 · Foundations-2 phase 2, C5 and C6: every workplace recipe states its energy and water; scarce kinds at an edge (branch `f2-phase2`; C5 moves configs only, C6 nothing; no model called)
+
+- **C5, as far as it can go before workplaces are supplied.** Every recipe at a workplace (`in: workplace`: making,
+  serving, collecting, upkeep, repair, care, teaching, investigation) now states `energy` and `water` among its inputs, and
+  its water's `wastewater` among its outputs (`WORKPLACE_USE` in the generator), so `silentRecipes` is empty and the
+  inventory's found lists are all empty. **Every figure is nought**, its basis the generator's note beside it and WM-15 (the
+  figure table reads a recipe's amounts only as `catalogue.tasks.*.consumes.*`, a place already listed unbased: law 11's
+  structured notes, N3, will carry each kind's own basis): no
+  workplace is on the network, no firm or office asks to be supplied, and no firm pays a utility bill, so a figure above
+  nought would stop the work it is in (a factory with no energy held refuses `make`). The design's per-unit figures by
+  industry, sourced from an energy account or an input-output table, need those three things first: **not done, risk
+  WM-15 (new)**. This is a stop short of the brief's C5, recorded rather than worked round: figures above nought with no
+  supply would collapse production, and supplying firms is firm behaviour (asking, setting their rate by their output,
+  paying), its own piece of work.
+- **C6, scarce kinds at an edge.** `world.scarce` (contract): an edge sells from outside no more than `quantity` of a kind
+  in each period of `every` seconds from the run's start; a `move_goods` from the edge's outside beyond it is refused
+  **`beyond_supply`** (new refusal code, with its words in both word lists). What it has sold is state
+  (`scarce_sold`, absent unless a kind is scarce). Which buyer gets what is left is the edge's offers' order (whoever's
+  order its trade desk takes up first), never the kernel's. Refused at load: a scarce kind of no edge or no declared kind,
+  or one said twice. Kernel test: a scarce kind runs out at the edge and comes again the next period; materials stay
+  unlimited. No generated town names a scarce kind; a profile or a scenario does (the falling-price and scarcity
+  scenarios reading it is left for the scenarios' owner).
+- **Revisit if** workplaces are connected (then C5's figures, by industry, with sources; WM-15 closes); a scenario needs a
+  scarce kind (then its quantity in the scenario, with its source).
+## 2026-10-26 · Records delivered without their bytes for code actors; a town's channel lists read once (branch `mem-delivered`; no model called)
+
+- **Change:** `Delivered` (kernel/src/kernel.rs) keeps what a record adds to a seat's knowledge from the first time it
+  is shown, and its canonical bytes only once an observation that is written shows it (a seat's, or one whose hash the
+  log keeps); a code actor's look makes none. The config's reader holds each distinct channel list once for all the
+  participants given it.
+- **Measured** (against main `3b87959e`, with the cuts before it beneath): 1,000 au-vic 693 to 512 MB, 10,000 5.25 to
+  2.98 GB, 50,000 34.2 to 17.0 GB resident (857 s wall against 1,004; its own thread 651 s of CPU against 689). The
+  same state hash and log digest on 203 people, three profiles' 1,000 and 10,000, and the same hash at 50,000. The
+  budget at 476 to 477 MB, 366 KB a person: the ceiling lowered from 410 to 390 KB.
+- **No performance loss, and how that was told:** single runs showed this cut 1 to 2% over in instructions, within
+  what one build moves between runs as the load varies. Main and this build in turn, three times on each profile's
+  1,000-person month at 4 threads, at a load of 2 to 6: this build was faster in all nine pairs (wall -1 to -5%, user
+  CPU -5 to -8%, instructions -0.2 to -0.4%) and 22 to 26% smaller.
+- **A version tried and dropped:** the bytes held only while an observation held them (weakly): no smaller, and they
+  were made again for each seat that was shown the same record.
+- **Revisit if:** runs come to have many model seats (their records' bytes are kept for the run, as they always were).
+
+## 2026-10-26 · What's known of a building held once; 100,000 for a week (branch `mem-facts`; no model called)
+
+- **Change:** what a code actor's knowledge keeps of a building it is shown (its type, place and spaces) is one for
+  everyone while it says the same; it was made again whenever the building's view changed, and each person kept their
+  own (0.4 GB at 50,000 in the profile before).
+- **Measured** (14 threads; against the cut before, which was against main): 1,000 au-vic 512 to 499 MB, gb-eng 492
+  to 484, us-oh 456 to 439; 10,000 about the same (2.97 GB); 50,000 16.9 GB, 595 s. The same state hash on all; the log
+  the same but for one line, the engine's list of module versions (police.station 0.6.0 to 0.7.0, main's, merged in
+  beneath). The budget at 474 to 475 MB, 365 KB a person: ceiling 390 to 380 KB.
+- **With the minds' and memories' cut beside** (`mem-minds`, not landed yet; a local build): 1,000 people 322 KB a
+  person; 50,000 for a month 14.7 GB and 604 s; 100,000 for a week 31.0 GB resident and 320 s, its peak the first
+  moment (39 GB footprint).
+- **Tried and dropped:** a round's long prepared annotations held compressed until logged (for the first moment, where
+  every unit's decisions are held at once): no smaller (each decision is held as a value too, while seats are in the
+  round) and slower (100,000 for a week 40.4 GB and 551 s; the run's own thread 9 to 15% slower at 10,000 and 50,000).
+- **Revisit if:** a building's facts come to depend on who is in it (then the view's own would be needed again).
+
+## 2026-10-26 · The memory budget's ceiling raised from 380 to 415 KB a person: the margin was too small (branch `mem-budget-fix`)
+
+- **What happened:** `mem-facts` lowered the ceiling to 380 KB, 4% over what its own branch measured (365 KB at 4
+  threads). On main, with other merges beside it since (foundations-2's main fix, the producer's changes), the same
+  test measures 490 to 495 MB, 380 to 385 KB a person, and failed in CI's slow tier at 55c9528d. My error: the ceiling
+  followed the cut, not main, and its margin was within what other work moves.
+- **Change:** the ceiling 415 KB: main's 385 and about 8%. From now on a ceiling is lowered to about 8% over what main,
+  with the cut merged, measures (two runs), never over what the cut's own branch measures.
+- **Revisit if:** main's measure moves past 400 KB without a cut that explains it (then that change is looked into: a
+  person costing more is what the test is for).
+## 2026-10-26 · A town's first moment decided a window at a time; decisions not kept as values once written (branch `mem-first`; no model called)
+
+- **What it was:** at 100,000 people the week's peak is the first moment: every unit decides at once, and each one's
+  decisions were held (as their canonical bytes for the log, and, in a round with seats, as values too) until the
+  whole round was carried out.
+- **Change** (kernel/src/engine.rs): a round no seat waits in, of more than 2,048 units, is decided a window of 2,048 at
+  a time as it is carried out, not all at once. Each unit decides from what it was shown (made for all before any
+  decides) and its own state, as it did; a unit let go of in the round before it decides (`sync_units`) decides first,
+  as it would have with the others. And a step's decisions, once written for the log, are not kept as values in any
+  round: a round with seats may be saved while they think, and its snapshot reads them back from those bytes
+  (`kept_whole`). The window is an engine option (`decide_window`).
+- **Tests** (`kernel/tests/config_stream.rs`): a window of seven against all at once on three profiles' towns for 60
+  days, the same log; a run saved at its first moment while a seat thinks and taken up again from its bytes is the
+  run, its citizens' decisions all logged (a mutant whose snapshot did not read them back was caught). The path where
+  a unit is let go of before it decides is reached by no town tried (a year at 200 people and at 1,000: zero), so it
+  is held by its construction, not by a test.
+- **Measured:** the same state hash and log digest on 203 people, three profiles' 1,000 and 10,000 for a month. The
+  100,000 week, this build and the one before it in turn, twice each, 14 threads: peak footprint 33.1 to 33.4 GB
+  against 43.3 GB both times, resident about the same (31.0 to 33.6 against 32.8 to 35.8 GB), instructions the same
+  (7,362 G against 7,360 G on average), wall 414 s against 433 s on average (load 6 to 13). Nothing changes at 1,000
+  (no round there has more than 2,048 units), so the budget's ceiling stays at 380 KB.
+- **Revisit if:** a unit's decision comes to read anything another's carrying out changes within a round (then
+  windows would change results; the window test would catch it in the towns it runs).
+## 2026-10-26 · The gate's file-seconds budget is read at the recorded load
+
+- **What we saw:** a branch that added nothing to the gate tier went 32 s over the 1,200 file-second budget at load 20 to
+  27: files share cores, so under load each file's own time grows too.
+- **Change:** the total is divided by the run's load, the median of each gate file's time over its recorded time (when at
+  least ten files have one, and only when it is over 1). The per-file limit is unchanged.
+- **Revisit if:** the recorded times drift (they are rewritten by whole runs), or a real slowdown of every file at once (a
+  slower kernel) is hidden by it; then compare against a quiet-machine run.
+
+## 2026-10-26 · Who comes for a job is of working age (world.migration; found by migration.test.ts on foundations-2 phase 2; no model called)
+
+- **What failed.** `migration.test.ts:46` on `f2-phase2-land`: in a year, none of the households that moved in for the
+  town's jobs took one. Traced in the log: the households the outside drew were a couple of 79 and 80 (the one who "came
+  for the job" claimed a pension on day 7), a household whose earner was 55 with 134,000 in savings (looked at the jobs
+  board for three weeks, then stopped work by the stop-work curve on day 32), and two more of 72 and 62. Law 8 moved the
+  run's course, so the draws fell on other households than before; nothing in the newcomers' search had changed.
+- **The fault.** `world.migration` drew a household moving *for work* from the town's whole household mix, retired
+  couples included, and made its leaseholder the one who came for the job whatever their age. Migration for work is of
+  working ages (the labour peak of the model migration schedule: Rogers and Castro 1981, to confirm).
+- **The fix.** A new parameter `seeker_ages` (from, below): the household is drawn again, up to 32 times, until the one who
+  comes for the job is of those ages; absent, any age, as before. The generator gives it from adulthood (18) to the
+  profile's retirement age (with a basis row in `worlds/generator/figures.ts`). Unit test:
+  `the_one_who_comes_for_the_job_is_of_working_age`. The test's assertion is unchanged.
+- **Revisit if** a profile states the ages of those who move for work (then that, in place of 18 to retirement), or
+  households that move for other reasons (family, retirement) are wanted (a separate flow, with its own source).
+## 2026-10-25 · Citizens' minds and memories held compactly (SC-1; branch `mem-minds`; no result changes; no model called)
+
+**Measured first.** A sampling heap profile (`--features heapprof`, 8 KB rate; a dump at the run's end, `heapprof::dump("end")`,
+added to `oikos-kernel world`) of main's 1,000-person month (au-vic, `living.initiative_bps=10000`): what the citizen's
+code holds (stacks through `oikos_actors::citizen` or `::mind`) is **84.8 MB for 1,003 people, about 85 KB a person**, of
+a 663 MB peak footprint. The largest holders: what a person last wrote to their record, kept as `serde_json` values to
+compare the next write with (`State::written`, 16 KB a person); the mind's and the life's readings of their params, each
+person's own copy though nearly all alike (the mind's `P` with the `Inner`, `Wants`, culture and town-memory copies of its
+parts, about 10 KB; the life's `Params`, about 5 KB); the person and the mind themselves (7.7 KB each inline, the params'
+copies part of it); the book's indexes (about 11 KB); their home's building as last seen, copied out of the picture
+(2.8 KB); what others told them (2.1 KB); the unit's draws (3.9 KB).
+
+**What changed (each result-identical; the saved memories unchanged, so snapshots are too).**
+- *The params read once for all who have them alike but for a person's own members* (`citizen::params::PERSONS_OWN`:
+  `beliefs`, `own_values`, `started`, `stops_work_at`, `trade`, the members the generator gives each person their own).
+  The life's `Params::of` gives `Given` (the person's own, by name, and the rest, `Params`, through `Deref`); the mind's
+  `P` holds the person's own and its `Common` through `Deref`. Each rest is read from the params less those members, and
+  looked up by their text (and, for the mind, the world's dials and tick: all `Common::of` reads) with
+  `controller::read_once`: the same text, the same reading, held once. The mind's parts take theirs from it shared
+  (`Arc`): `Inner`'s params, population figures and outlook, `Wants`' params, `Culture`'s and `TownMemory`'s params
+  (from the culture dial's), the founding params (read once by their two members' text).
+- *What a person last wrote to their record kept as text* (`mind::packed::Packed`): read back where it is compared or
+  shown, it is the value it was made from (serde_json writes every number so that it reads back to the same bits, and a
+  map in key order); saved, the value. The mind's `started` figures, read once at the first plan, likewise.
+- *Their home's building shared with the picture* (`Absorbed::home_site` an `Arc`, as the picture holds it).
+- *Boxed where a map's node or the struct held room for nothing*: what others told us (a map node holds eleven of its
+  values, some 250 bytes each), the optional culture and town memory (1 KB a person where the culture dial is off), a
+  home being sold or bought.
+- *The book's places* (`common::book::Place`): minted ids (`rec.<n>`) in a sorted list, pushed at its end or put within
+  64 of it (16 bytes a record against a map node's 45 or so), the rest in a map; the statements of each kind and those
+  standing in one map. *The draws' keys* as `Box<str>` (exactly their text).
+
+**Measured after** (release builds, 8 engine threads, each run alone in a slot; the machine's load 20 to 30):
+- What the citizen's code holds at the 1,000-person month's end: **84.8 MB to 43.4 MB, about 85 KB to 43 KB a person**
+  (the profile of the same run). Of that 43 KB: the person and mind inline (8.5 KB), the book (about 10 KB), the record's
+  text, ties, what they learned, teachings, gatherings, word of mouth and the rest each under 1.5 KB.
+- Peak footprint, 1,000 people x 30 days: au-vic 663 to 609 MB, gb-eng 622 to 591, us-oh 534 to 506.
+- 10,000 people x 30 days (au-vic, a town made as SC-1's was: `town-1000.yaml`, `citizens=10000`): **5.10 to 4.68 GB** peak footprint (5.20 to 4.75 GB
+  resident), 1,180 to 1,161 G instructions, main thread 111 to 97 s of CPU.
+- Identical: the same final state hash and log digest (the log as written, less the header's build id and each entry's
+  own hash and prev) as main (`3b87959e`) on 30-day runs of the 1,000-person towns of au-vic (`b98638694d4b...`,
+  `ec2cc14727186a53`), gb-eng (`0b5859fe...`, `cf781cfa5b33f4cf`) and us-oh (`b5d61ceb...`, `2e29c52dfac0e567`), of the
+  200-person towns of the three, and of the 10,000-person au-vic month (`ce1314d1...`, `71cd6c7043f254ec`); and what
+  every actor keeps, as `OIKOS_KEPT` counts it from their saved memories, the same at the end. Tests:
+  `kernel/tests/mind_memory.rs`: held always, in three profiles' generated towns every person's shared readings are
+  what they would have read of all their params alone, one reading for each set of params alike but for their own; and
+  the proof against main, `#[ignore]`d and run by hand (`cargo test --test mind_memory -- --ignored`: the three
+  200-person living towns run a month to main's state hash and log digest), since a pin of a whole town is a change
+  detector (docs/testing.md) and culture-dial.test.ts is the one alarm kept. Beside them: the book finds every record
+  where it was taken in, in whatever order they come and after letting go (`common/tests.rs`); people given the same
+  params but their own hold one reading (`mind/tests.rs`); `packed`'s round trip, floats to the bit.
+- **Again on main as it moved** (2e3f6277, after scale-next's cuts and foundations 2 phase 1; merged with no
+  overlap in code): the same state hash and log digest on 30-day runs of the three profiles' 1,000-person towns
+  (au-vic `2220ea75...`/`f11b3714e6ae067e`, gb-eng `dca5e9de...`/`3ed720ffc2a55ad1`, us-oh `5e799346...`/
+  `9f1f372c7269a6c2`); peak footprint 512 to 466 MB, 494 to 445, 442 to 400 (about 45 KB a person). The ignored
+  proof's pins taken again from that main.
+- **Not reached:** the owner's 50 KB a person is for the whole run; minds and memories are now about 43 KB of the 10,000
+  town's 468 KB a person. The rest is the run's own (the hash's caches, knowledge, the engine, the log's buffer), the
+  other SC-1 work.
+- **Revisit if** a module comes to read one of `PERSONS_OWN` in the shared part (it would read nothing there: the
+  member must then be read per person), or a generator gives each person another member of their own (then add it, or
+  each person's reading is their own again, as before: memory, not results); a book's records come far out of order
+  (then most go to the map, as before); a profile at 50,000 shows what people keep (the book, the inline state) to
+  matter beside the run's own holders.
+
+## 2026-10-25 · The taxpayer's account: the tax collector keeps it, a credit is claimed back or set off (branch `taxpayer-accounts`; PB-23; world.tax_collector 0.1.0, generator 0.69.0; no model called)
+
+Asked: lv-12's clinic paid a month's withheld tax twice (its manager by hand, its payroll officer with the return) and
+could not get it back; build the real institution, so that an overpayment shows as a credit the taxpayer can claim
+back or set against its next return, done in time by whoever does the collector's work, wrong at a rate, with review
+routes as law data, nobody shown more than is theirs.
+
+- **The law, as data** (`law-tax-refunds`, the outside world's, public; the profile's `public_finance.refunds`:
+  `pay_within_days`, `set_off`, `wrong_refusal_bps`, with its source): the collector keeps each taxpayer's account,
+  tells it of a credit, repays one claimed back within the law's days, and (where `set_off`) agrees that it be set
+  against the next return. The review is the profile's `decisions` rule for `tax_credit_decision` (published in
+  `law-decisions` with the others; `Reconsiderations` reads it as the support office's reviews are read).
+- **Who does it.** A new office of the outside world, `outside-tax` (`world.tax_collector`, Rust,
+  `kernel/crates/actors/src/boundary/collector.rs`), held by the outside world's case system as the support office is.
+  Its casework is its officers' (law 10, as main's foundations-2 phase 1 made the support office's, met at the merge of
+  main): the decision, a review and its answer are named `by` a desk of the outside world's (`outside-tax-casework`,
+  template `tax-casework`: the person table's minutes, a decision twenty as a placeholder, in an officer's working day,
+  one lane, a placeholder since no figure sizes a collector's officers for a town); the refund's payment is a step of its
+  own, the case system's. (Before the merge the decision was a twenty-minute row on the case system; that row is gone.)
+  The decision has a row in the table of slips (a claim that is due refused, "the
+  payment could not be matched to the account", at the profile's rate, in a town with frictions). A taxpayer's claim
+  is a payroll officer's quarter of an hour (placeholder).
+- **What it sees: only its own.** Its channels are its accounts (the `ledger`), the returns, claims, requests and
+  reviews addressed to it, and the laws; it declares no `keeps` because nothing it is shown is anyone else's register.
+  A taxpayer sees its own account in the statements sent to it (when a credit first stands, and when the figure
+  changes) and in one it asks for on the public request form; the payroll officer's file `tax-account` holds the
+  collector's papers to its organisation, nothing else.
+- **The account** (`ledger`): each return a liability (what it says is owed less what the return before it under the
+  same rule left owing, since a payroll short of money carries the rest into the next figure); each payment allocated to
+  what is outstanding, the rest held on account and allocated to the next return; a refund paid out of what is on
+  account; the credit is what is on account less any set-off agreed and not yet used. A payment is the collector's when
+  its words say tax (tax, withheld, or a charge's id or name), into one of its charges' accounts from elsewhere: the
+  outside world's general account also takes orders, licences, repairs and dividends, and only the words tell them apart
+  (a real payment's structured reference is not modelled: PB-23, what is left).
+- **The taxpayer's side** (`Staffing::tax_account`, every payroll that files returns): a statement in credit is claimed
+  (set off where the law allows, repaid where not); a set-off agreed is used on the next return (it pays that much
+  less and says `set_off`, `set_off_of`; its own books carry nothing owed for it); a refusal while the collector's own
+  statement shows a credit is asked about once, inside the review's days. The forms `tax_credit_claim` and
+  `tax_account_request` are public, so a seat in any office that pays tax over can do the same.
+- **Sources.** Mexico (`mx-jal-2026`): refund within 40 days of the claim, CFF art. 22, and recurso de revocación within
+  30 days, art. 121, both read on a transcription (mley.mx), to confirm against the DOF; no set-off of withheld tax, art.
+  23 as a search snippet gives it (offset only against one's own debts of the same tax), to confirm. England: an
+  employer's PAYE credit used against its next payments or repaid (HMRC guidance, search snippets, to confirm); no
+  statutory time to repay found (30 days a placeholder); a review within 30 days (recalled). The other seven profiles:
+  placeholders, marked (30 days, no set-off, a review in 30 days). `wrong_refusal_bps` 500 everywhere, a placeholder.
+  `docs/research/references.md` has both rows.
+- **Left out** (docs/behaviour/public-finance.md, "Leaves out"): the authority's request for more papers (Mexico's 20
+  days), interest on a late refund, the time limit for claiming, the appeal past the review (the collector does not yet
+  carry out a venue's order, so no appeal route is published for it), allocation by period, chasing what is owing.
+- **When nobody overpays, nothing happens.** The collector writes only when a credit stands, a claim or a request comes,
+  or a review is asked for; payroll code writes only on the collector's papers; a return with no set-off is word for word
+  what it was. Checked: au-vic-2026 (town.yaml, seed 1) run 60 days with the collector and with it taken out (its office, system, desk, file, law and forms) has the same records (31,648 before the merge of main, 31,543 after it), payments and moves, line for line; the Mexican town of the new test, 80 days, writes no paper of the account.
+- **Pins re-taken, with this entry as the reason** (on main after foundations-2 phase 1, at the merge of 2026-10-26): `culture-dial.test.ts`, the three config hashes (a new office, its system and its officers' desk, the law and two forms, the payroll officer's file, a row of the table of work, generator 0.69.0: dbb34546..., b5082f8c..., 47fed11d... to 4c714b3d..., a6a15d31..., dd840c8e...) and the three Rust states (the new participants: f49ce487..., ce90d241..., 1605af11... to e6916c32..., 47582857..., f94c4358...). au-vic over 60 days has the same 31,543 records, payments and moves with the collector as with it taken out. No other pin moved in the tests run.
+- **Tests.** `collector.rs` (7: the lv-12 case in the ledger, a short return carried, payments told by their words, a
+  month paid twice stated once, repaid once, a second claim finding nothing; set-off only where the law allows and used
+  by paying less; a refusal reviewed inside the days and put right, and out of time after; a statement on request);
+  `staffing.rs` (2: a stated credit claimed and a set-off paid less on the next return, said; where the law has no
+  set-off a refund claimed and a refusal against the collector's own statement asked about once);
+  `orchestrator/test/taxpayer-account.test.ts` (a Mexican town run 80 days: nobody pays twice and no paper of the account
+  is written; the clinic's manager pays $1,000.00 by hand and the collector states it to the clinic alone, the clinic's
+  payroll officer claims it back, the collector grants it and the refund reaches the clinic's account). Changed:
+  `foundations-laws.test.ts` (F7's list of a living town's slips names the new row).
+- **Not done:** docs/plan.md does not exist (asked to tick PB-23's gap line there); PB-23 is marked mitigated in the
+  register, not fixed, because its figures are placeholders and the payment's reference is words. The translator has
+  not learnt the two new forms.
+- **Revisit if** a payment a seat makes for tax in words that do not say so is lost (the words rule missed it); a
+  study reads refund times or refusals (source the figures first); a place's figure for tax officers per employer is found
+  (size the desk by it); or a place's law allocates payments by period and it matters.
+
+## 2026-10-25 · Law 11: every unbased place given its basis, 310 to none (branch `figures-basis`; no value changed; no result changes; no model called)
+
+- **What was unbased.** On origin/main (3b87959e) the eleven counted towns had 310 unbased places: the 306 listed, and
+  four that the commercial-leasing merge added (`firm.landlord`'s `commercial.*`). By profile's town: au-vic 160, br-mg
+  234, de-ni 153, gb-eng 161, in-tn 165, jp-akita 156, ke-nakuru 166, mx-jal 163, us-oh 154; living au-vic and gb-eng
+  214 each. Now none in any of them, and `fixtures/figures-unbased.json` lists nothing.
+- **Why so few new sources were needed.** Nearly every place was a figure the profiles already speak for, reaching the
+  town through a module's parameter or a catalogue entry that the generator's table (`worlds/generator/figures.ts`) had
+  no row for: the bank's rates, the utilities' tariffs, the tribunal's possession steps, the union's dues, the clinic's
+  and school's staffing. Each now has a row that is true of the line of `generate.ts` that makes it: it names the
+  profile path it copies (the note then gives the class), or says it is derived (and from what), a placeholder (and
+  why) or a convention. The old places' numbers in the eleven towns now count 1,631 placeholder, 705 derived, 193
+  convention, 132 sourced and 71 to confirm. No profile note was added or changed and no value changed, so no town and
+  no log changes (the count is never in a config or a log).
+- **Marked as the generator's own placeholders** (each row says so; ME-11): a run's cap on created entities (50); a
+  child's other parent in the same cell; a let home's opening disrepair, drawn below the level of fault; heat losing
+  half a day; the councillors' leanings (-80 to 80); the budget's lead (45 days, the council's vote, two weeks);
+  casework at 80% of a worker's hours; the support office's statistics every 30 days; the builder's materials and build
+  times (as the structure types, already a placeholder); and the landlords' compliance, the spec's setting
+  (worlds/town.yaml). Conventions: the seed, the tick, the run's length, the log's checkpoints and anchors, a 365-day
+  year, units (an hour of upkeep or repair, 10 kg of waste, a kWh, a kilolitre, one item, 10,000 of skill for a year of
+  schooling), a field's floor and its arithmetic ceiling, a business of one employing nobody, and the grid's and the
+  river's own work taking no one in the town any time.
+- **Three changes to the counting, none to a world.** (1) A row's profile path reads the note of the same part below
+  it where the profile has one (`households.lone_bps` under the row for `households`). br-mg's notes are by part, with
+  no note for a whole section, so its households, nature and life were unbased though each part had a source; and in
+  every profile a part's own note is now read before its section's (a figure can now count as sourced where its
+  section's note calls another part a placeholder). (2) A row may hold for one id only (`id`): the catalogue's tasks and
+  fields share a pattern but are made from different sections (pollution from `nature.pollution`, the river from
+  `utilities` and `hazards`, heat from `climate`; a consultation's time from `health`, a lesson's from `education`),
+  and the old row read every field as `nature`. (3) A row may hold only where the config has a path (`given`): the
+  tribunal's days to a hearing are `frictions.venues.tribunal_days` in a town with frictions and
+  `justice.hearing_after_days` otherwise. Two of the citizen's rows (`found_bps`, `found_own_ppm`) spoke for parameters
+  the generator no longer makes, and the generic `wage` row for any module now matched nothing (each module's wage has
+  its own row: the shop, factory or construction wage, the doctor's, teacher's, officer's or public servant's); the
+  three were removed.
+- **Known faults left.** A row naming a section reads that section's note where the part has none, and some section
+  notes are long and mixed (a profile's `utilities` or `round`): the class is read from the note's words, so it errs
+  towards placeholder, never towards sourced. A `derived` row still does not carry through the class of what it is
+  derived from (N3). Numbers in behaviour code that never reach the config are not counted (N4).
+- **Revisit if** a row is found untrue of the code beside it (fix the row, not the count), or N3 puts the table in the
+  config (these rows are then its first provenance).
+## 2026-10-25 · Lease remedies: arrears, leaving early, rent reviews, and a business that sees its unit (branch `lease-remedies`; firm.landlord 0.21.0, firm.retailer 0.21.0, generator 0.70.0; risk ME-1; contract change: `{held: "occupancy"}`; no model called)
+
+**Asked (Naz, through the coordinator):** the four gaps commercial leasing left written down (a landlord with no remedy for a leased unit's arrears; a tenant who cannot leave early; no rent reviews within a lease; a business that cannot see its unit, so the day's first serving acts are refused until its owner arrives), each as institutions and law data, never kernel rules, as homes' tenancy law is done; each act in its performer's time; the profiles' sources where they exist, flagged where not. The design is docs/behaviour/leasing.md.
+
+**Built.**
+- *The law, as data.* A profile's `commercial.law` is published as `law-premises-leases` (generator): rent owed `arrears_days` before a landlord may end a lease for it, after `forfeiture_notice_days` (0: re-entry the next day); a tenant's own notice (`tenant_notice_days`; 0: only a surrender agreed); a review at most every `review_months`, on `review_notice_days`, `upward_only` or not; claims heard by the town's tribunal (`heard_by`). The landlord, the business and the tribunal read the record (`landlord::premises_law`); the kernel reads nothing of it. The lease's own terms of ending follow it: the landlord's clause (the notice it gives when it ends the lease for rent owed or on a surrender; a day where the law asks none, as the agreement reader needs a period), the tenant's only where the law gives one. `commercial.notice_days` (notice either side at the end) is gone: under the agreement reader a clause can be used at any time, which let either side end a five-year lease on 90 days (nobody did); its sourced figures went to the law (ke-nakuru's two months, Cap 301) or to "leaves out" (gb-eng's s 25 notice, which is about security of tenure at the end).
+- *Arrears* (`firm.landlord`, at its weekly look in the rent book). A premises lease's account: the deposit as signed, the rent monthly in advance to the lease's end at each month's rent, a surrender's price once agreed (paid; one asked for and not paid is no rent owed), against all received from the account it applied from. A month's rent behind: a written demand (`review_request`, matter arrears, as for homes), again a month on; still behind once `arrears_days` have run from when first seen: ended for it (`lease_forfeiture` to the tenant, and the landlord's notice under the lease). At the end, however it came, the deposit is set against what is owed and the rest given back; more owed is recorded as a debt (a `claim`) and brought before the tribunal as a `debt` application where the law sends it there; the tribunal's existing debt list, order to pay and registrar's garnishee do the rest. Nothing puts anyone out: the business moves itself out as its lease ends.
+- *Leaving early* (`firm.retailer`, a business of one in leased premises). Each month it weighs the premises as it weighed taking them (`premises_weighing`, the same sum as applying); worse than trading alone for `leave_after_months` running (3, a placeholder), or closing (its owner has given it up or gone), it asks to leave: its own notice where the lease gives one, else `surrender_request`. The landlord answers with `surrender_terms` (its practice, `surrender_months` of rent, a profile figure, a placeholder in all three) and, once paid, ends the lease by its notice. The business pays if it must leave, or if the price is no more than staying would lose it to the end, and if it holds it; a closing business that cannot pay closes a month on and the lease runs on (the landlord's remedies then apply). When the lease ends it stops its rent orders, takes its stock back where it traded before, and tells its owner (`trading_at` with `back`): the owner works from home again (citizen `trading_from`).
+- *Rent reviews* (`firm.landlord`). As often as the law lets, where the new rent starts before the lease ends: to the market rent from the landlord's own books (its other units' recent lets, its asking rents, how many stand empty; `oikos_rules::rent::reviewed` with the whole gap passed: a market review), never down where reviews are up only; from the first rent day once the notice has run (`rent_review`). The business moves its standing order to the new rent from that day and stops the old one after its last payment. A home's rent-review law does not reach it (its own kind, its own law).
+- *Who is at the unit* (a contract change, under the standing approval to change contracts; the kernel's part is sight, not law). A new `here` area for a `sites` channel: `{held: "occupancy"}`, the cells of the buildings where an agreement in force (or running out its notice) has another party give the capacity's organisation occupancy of a space; an organisation's only, a map only (not notices); nothing until it holds premises, and a change of what it holds delivers the whole of the new area, as a move does for `near` (`observe::held_structures`; `contracts/world-config.schema.json`; `knowing.ts` `held`; docs/no-god-view.md). The business of one's position (and the venture a founder starts one from) has it as `unit`. Leased, it serves with those it sees in the unit's workplace, its owner and its hands, as they come: nothing is served before the owner arrives, so no act is refused for nobody being there. Considered and not done: a premises channel named at generation (a unit's cells are its landlord's premises, and a cell is one organisation's only); a visit (it would take the looker's time to go where it already is); following the post-holder's body (an office is not where its holder sleeps).
+- *Work takes time.* Every new act is an ordinary block in the table of work (a statement `publish`, a notice `give_notice`, a payment `transfer`, a claim `record_claim`), charged to whoever does it (the landlord's letting office, the business's owner, the tribunal's member and registrar). No new rows: none is sourced, and the block rows are the placeholders every other paper uses (WM-1).
+
+**Sources** (in the profiles' notes and docs/research/references.md; most recalled, to confirm, or placeholders, ME-1): au-vic, the Retail Leases Act 2003 (Vic) on reviews at most yearly and no ratchet (s 35), market reviews (s 37), disputes to VCAT after mediation (Part 10), all recalled; a lease's common 14-day re-entry clause, a placeholder. gb-eng, forfeiture by peaceable re-entry under a 21-day clause, a tenant's six-month break and five-yearly upward-only reviews, recalled practice. ke-nakuru, Cap 301's two months' notice to end or alter a controlled tenancy (recalled), placed on the forfeiture, the tenant's and the review notice; the rest placeholders. The tribunal stands for VCAT, the county court and the Business Premises Rent Tribunal, as each profile already said of it.
+
+**Tests** (mechanisms, not draws). `firm.landlord`: a lease offered with the landlord's ending clause and the tenant's only where the law gives one; a tenant behind is asked, ended for it once the law's days have run (not before), and what the deposit does not cover claimed and brought before the tribunal once; one that pays what it is asked keeps its lease; a surrender priced at the landlord's months, ended once paid, the deposit back less what is owed; a review to the market from a rent day after the notice, down where the law allows and not where it is up only, not again within the period; the old deposit test now pays its rent (a lease in arrears no longer gives its deposit back whole). `firm.retailer`: in leased premises nothing is served until it sees its owner there, then served there; a demand paid if held and not if not; a review moves the order from its day and stops the old one after its last payment; a closing business asks to surrender (or gives its notice where the lease gives one), does not close while the lease binds it, and pays the price; at the lease's end the rent stops, the stock goes back and the owner is told; a lease that adds nothing to one person loses its rent in the weighing. Kernel (`kernel/tests/knowing.rs`): a person's held premises, and notices at held premises, do not load; an office's do; an organisation sees nothing until an agreement in force names it the occupant, then the building's ground and who is there by name.
+
+**Leaves out** (docs/behaviour/leasing.md): mediation, a valuer's market rent, a tenant's challenge, relief from forfeiture, distress and CRAR, rent lost after forfeiture, a guarantor (a lease holds nothing of the owner's), renewal and security of tenure, assignment; an owner weighing giving up still counts the rent to the lease's end. A business back from a lease trades from its owner's home.
+
+**Revisit if** a place's figures for any of the law's fields are opened (replace the recalled and placeholder ones); leased businesses' arrears or exits matter to a study (then the owner's liability, and what leaving costs in the owner's own weighing); a valuer or mediation office is built; or the `held` area is wanted for notices put up at held premises (records), which it refuses now.
+
+## 2026-10-26 · Ids interned (SC-1, the representation plan's R1; branch `representation`; no result changes; no model called)
+
+- **Change.** `oikos_core::Id` (kernel/crates/core/src/id.rs) replaces `blocks::Id = String`: a handle on the one copy
+  of an id's text the process holds, `Copy`, compared by where that copy is, ordered, hashed and serialised as the
+  text, so every map's order, every hash and the log are what they were. Contracts, world, perception, sight, nature,
+  the resolver's view of what was shown, and the kernel's engine hold it; the actors, which hold ids as `String`, take
+  and give text at their edge (their state is R4's). The texts sit in blocks kept for the process, beside a table
+  sharded by a fixed hash (FNV-1a; nothing depends on where a text is). Ids are never freed, so the ids of what passes
+  are not ids: an act in progress and a message on its way have `blocks::Passing` (their own text), so what the
+  process keeps is what lasts. A 200-person month ends with 22,302 ids (236 KB of text): its cells, records, people,
+  accounts, structures and positions; with acts' and messages' ids interned it was 32,314 and grew about 11,000 a
+  month (`OIKOS_KEPT=1` prints the count).
+- **Results, shown.** `orchestrator/test/representation.test.ts` (slow tier, new): three profiles' towns of 200 and
+  1,000 people (au-vic, gb-eng, us-oh), 30 days at 4 engine threads, end at the state hash and write the log pinned
+  in `scripts/fixtures/representation-results.json`, taken from main at 7230e71. The log is compared whole but for
+  its header's name of the build and the hash chain that runs from it, which every build writes anew
+  (`scripts/same-results.ts logDigest`). All six the same.
+- **Cost, paired.** `scripts/pair.sh` (new): main and this build in turn on the same configs, from a shell, at 4
+  threads (each binary copied afresh first in the last two rounds). This machine: 4 cores, 15 GB, Linux; a 10,000- or
+  50,000-person month does not fit beside the suite here, so 1,000 is the largest measured. Six pairs on each
+  1,000-person town: wall -7 to -18%, the run's own thread -8 to -19%, user CPU -7 to -15%, faster in every pair (the
+  run's own thread on average 35.3 s against 30.5 on au-vic, 31.8 against 27.6 on gb-eng, 26.3 against 22.7 on us-oh);
+  the 200-person towns' own thread -16 to +5%, faster on average on all three. Clones of an id are copies now, and
+  equality a comparison of addresses.
+- **Memory.** At 1,000 people the peak is 10 to 17 MB lower on au-vic and gb-eng (au-vic 461 to 463 MB against 473,
+  352 KB a person against 363), about level on us-oh; at 200 people level within its run to run (plus or minus 15
+  MB). Little, because few of the ids held were `Id`s: most are the actors' `String`s (R4) and strings in records'
+  JSON (R2), so the saving comes with those steps. The plan's -30 to -50 KB a person was for all the ids a run holds.
+- **Measuring on Linux.** `getrusage`'s peak is carried across `exec`, so a kernel started by Bun said Bun's size
+  (580 MB for a 200-person town); the kernel now reads `VmHWM` there, its own process's high-water mark. And a binary
+  whose file has been partly dropped from the page cache maps fewer of its pages per fault: main's hours-old binary
+  read 10 to 15 MB below a fresh copy of itself, which first looked like a cost of this step. `pair.sh` copies both
+  builds before it runs them. The heap profiler runs on Linux too (`llvm-symbolizer`).
+- **The budget.** 352 KB a person here on this build; this machine reads main about 6% below the Mini (363 KB against
+  the 380 to 385 the Mini measured), so about 373 KB there, and 8% over that is 403: the ceiling lowered from 415 to
+  400 KB. Revisit with the Mini's own measure of main with this merged (raise only with its entry here).
+- **Revisit if** a long run's id count grows with its length (an id made for something that passes, which should be
+  `Passing`), or if the interner's locks show in a profile of many engine threads (then a per-thread cache of lookups).
+
+## 2026-10-26 · Records' JSON held frozen (SC-1, the representation plan's R2; branch `representation`; no result changes; no model called)
+
+- **Change.** `oikos_core::Frozen` (kernel/crates/core/src/frozen.rs) holds what the state keeps as opaque JSON: a
+  record's `about` and its statement's `data`, `adico`, `formal`, `offer`, `practice`, `assertion` and `registry`, an
+  agreement's `attrs`, a commitment's `does`, an entity record's sections, the typed config's controllers and the
+  actors' `Params`. It is immutable: strings and arrays shared (`Arc`), an object a sorted array of interned keys
+  (`Id`) and values, so a clone is a count and a key is the one copy the process holds. It serialises as the
+  `Value` it was made from (objects in key order, as `serde_json` without `preserve_order` writes them), and it has
+  the read calls the code used of `Value` (`get`, `pointer`, `as_*`, `is_*`, indexing, comparison with numbers,
+  text and `Value`); `JsonRead`/`JsonRef` let a reader take either, and `from_frozen` reads a typed value straight
+  off it. What is built (a record's parts, a section) is built as `Value` and frozen once, where it is kept.
+  A `Frozen` is read (deserialised) as the `Value` it is and then frozen, so what `Value` took it takes, and a float
+  in a seat's data is refused where it was, at its canonical form (the kernel's source names no float type: the
+  determinism lint). That build, paired again against R1 (two rounds of the 1,000-person towns): the run's own thread
+  3 to 6% faster in all six pairs, the same hash and log in each.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at the state hash and log of main
+  at 7230e71.
+- **Cost, paired** against R1 (`scripts/pair.sh`, three rounds of all six towns, then five more of 1,000 us-oh): the
+  same hash and log in every pair. 1,000 people, the run's own thread: au-vic -3 to -10%, gb-eng -4 to 0%, us-oh
+  -7 to +5% over eight pairs, on average 23.6 s against 23.1 (-2%); 200 people level to faster.
+- **Memory.** 1,000 au-vic peaks at 409 to 419 MB against R1's 460 to 468 (gb-eng 400 to 411 against 451 to 454,
+  us-oh 365 to 380 against 400 to 406), about 305 KB a person against 352: some 47 KB a person, above the plan's
+  25 to 40, as records are many and each one's JSON had its own strings and keys. At 200 people 0 to 20 MB lower.
+- **The budget.** 305 KB a person here; with this machine reading about 6% below the Mini, about 323 KB there, and
+  8% over that is 349: the ceiling lowered from 400 to 350 KB.
+- **Revisit if** the count of interned ids (`OIKOS_KEPT=1`) grows with a run's length: an object keyed by something
+  that passes (an act's or message's id) would intern every key for the process; then such a map's keys are held as
+  text (`Frozen` kept as it is, the keys a `Passing`-like case). Or if a reader in a hot path shows `from_frozen` in a
+  profile (then a typed field in place of the JSON, as R4 does for the actors).
+
+## 2026-10-26 · Each transaction held once (SC-1, the representation plan's R3; branch `representation`; no result changes; no model called)
+
+- **Change.** A transfer's `Transaction` is made once, as an `Arc`, and that one copy is what every queue of a
+  capacity told of it (`Participant::new_transactions`), every office's file (`State::ledgers`), the look that
+  delivers it (`ChannelData::Accounts`) and the actor's picture of it (`Seen::Accounts`) hold: before, each held its
+  own copy, a row of some 170 bytes and its memo's text, and a look copied the queue again. Its fields were already
+  interned ids and integers (R1), and the queues and files already persistent vectors; an `Arc` serialises as what it
+  holds, so the state, its hash, the log and what a seat is shown are unchanged. `Picture::transactions` still yields
+  `&Transaction`, so no actor's reading changed.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at main's state hash and log.
+- **Cost, paired** against R2 (three rounds of the 1,000-person towns, one of the 200): the same hash and log in
+  every pair; the run's own thread -4 to +1% (au-vic 29.4 s on average against 29.1, gb-eng 27.0 against 26.0, us-oh
+  21.9 against 21.5).
+- **Memory.** Little in a month: at 1,000 people 11 MB lower to 6 higher, lower on average (au-vic 409 to 412 MB
+  against 411 to 415, about 300 KB a person), level at 200. An office keeps every payment on its organisation's accounts for the run, so the
+  saving grows with its length: 90 days, 1,000 au-vic 622 MB against 638, 200 gb-eng 244 against 258 (same hash).
+  The plan's -5 to -10 KB a person was for a month at 10,000.
+- **The budget.** About 300 KB a person here, some 318 on the Mini, and 8% over that is 343: the ceiling lowered from
+  350 to 345 KB.
+- **Revisit if** a memo's text shows in a heap profile of a long run (then memos interned, as they repeat: "rent",
+  "wages"), or offices' files dominate a ten-year run (then what an office keeps on file is a law of how long records
+  are kept, the owner's to decide, not a representation change).
+
+## 2026-10-27 · The actors' indexes keyed by interned ids (SC-1, the representation plan's R4, a first part; branch `representation`; no result changes; no model called)
+
+- **What a profile showed.** A heap profile of R3 at 1,000 people (au-vic, 30 days, 4 threads; `scripts/heapprof.ts`)
+  puts 206 MB live at the peak: the compiled schemas 43, the engine 42, unattributed 39, citizens 18, their minds 14,
+  offices, firms and the other actors 14, the world's records and accounts 12, the typed config 9, what's been seen 6.
+  The actors' state is spread thin: no holder of an office's or firm's own is above about 1.5 MB, and the largest
+  are not their JSON (R2 took that) but maps keyed by `String`: a book's indexes (about 15 MB across every actor's
+  book), a person's trust in each institution (2), the environment office's map of cover (1.6), the bank's last
+  entries for each account (1.3).
+- **Change.** Those keys and values are `Id`s, the one copy of the text the process holds (R1): a book's statements
+  by kind, claims by holder, counterparty and object, lots by cell, what is withdrawn, replaced and released, and
+  agreements' signatures and notices (common/book.rs); a person's trust by whom and its kind (mind/inner.rs); cover by
+  cell (boundary/environment.rs). Every one is the id of a record, an entity, a cell or a kind the world already
+  holds, so nothing is interned that would not be. An `Id` orders as its text, so every map iterates as it did. The
+  bank keeps the transactions it lists on statements as the world's shared copy (`Picture::transactions_held`,
+  R3). What is saved and shown is unchanged: an `Id` serialises as its text, and the rows a mind writes (`TrustRow`)
+  are still text.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at main's state hash and log.
+- **Cost, paired** against R3 (three rounds of the 1,000-person towns, one of the 200; the machine was restarted
+  between this and R3's pairs, and runs about a quarter slower since, so only pairs taken together compare): the
+  same hash and log in every pair; the run's own thread -6 to +1%, faster on average on all three profiles; the
+  200-person towns 2 to 6% faster.
+- **Memory.** 1,000 people 3 to 15 MB lower (au-vic 396 to 403 MB against 397 to 417, about 290 KB a person; gb-eng
+  377 to 390 against 391 to 399; us-oh 349 to 353 against 356 to 357); the 200-person towns level.
+- **The budget.** About 290 KB a person here, some 307 on the Mini, and 8% over that is 332: the ceiling lowered from
+  345 to 335 KB.
+- **Left of R4.** The rest of the actors' state is diffuse: many small maps and strings across some 40 actors, each
+  under a megabyte at 1,000. The plan's -10 to -20 KB a person for R4 assumed offices' books held as `Value`; R2
+  took most of that, so what is left of R4 is probably 5 KB a person or less, not worth a rewrite of every actor's
+  state in its own right. The large holders left are not the actors': the compiled schemas (fixed, 43 MB), the
+  engine's units and rounds (42), and what the profile cannot attribute (39).
+- **Revisit if** a profile at 10,000 shows one actor's state growing faster than the town (then that actor's state
+  typed), or the count of interned ids (`OIKOS_KEPT=1`) grows with a run's length.
+
+## 2026-10-27 · The allocator without huge pages (SC-1; branch `representation`; no result changes; no model called)
+
+- **What was held.** At the peak of a 1,000-person month about 206 MB is live (the heap profile) against some 400 MB
+  resident; at 200 people 230 MB resident, most of the "fixed" 110 MB the memory budget allows. mimalloc (v3) asks
+  Linux for transparent huge pages on what it maps (`madvise(MADV_HUGEPAGE)`), so a region it has touched is resident
+  in 2 MB pieces however little of each is in use, and it returns freed memory a second after (`purge_delay`).
+- **Settings tried**, each paired against R4's build (`scripts/pair.sh`, six towns, two to five rounds; the same hash
+  and log in every pair), the run's own thread at 1,000 people: memory returned at once, 30 to 40 MB lower, +3%;
+  that and arenas not committed ahead, 50 lower, 0 to +13%; returned after 10 ms, 20 to 35 lower, +4 to +11%; arenas
+  not committed ahead alone, 35 to 55 lower, level within noise; huge pages off alone, 30 to 45 lower, level. Set at
+  the start of `main` (`mi_option_set`) an option did nothing: the allocator has made its first arena before `main`.
+- **Change.** mimalloc built with `no_thp` (kernel/Cargo.toml and kernel/crates/napi/Cargo.toml): it never asks for
+  huge pages. Paired against R4's build, three rounds of all six towns: the same hash and log; 1,000 people 32 to 42
+  MB lower (au-vic 358 to 368 MB against 400 to 408, about 253 KB a person; gb-eng 353 to 355 against 385 to 388;
+  us-oh 322 to 325 against 360 to 363), the run's own thread +0.5 to +3.9%; 200 people 50 to 58 MB lower (about a
+  quarter), 4 to 7% faster. Naz (2026-10-27): more CPU for less memory is a fair trade where memory is what limits a
+  run (many people, many years); proposed for such trades: up to about 5% more CPU for about 10% less memory or more,
+  results byte-identical always, anything larger put to him.
+- **Where it holds.** Linux with transparent huge pages in `madvise` mode, as here. Where they are `always`, the
+  kernel's own policy gives huge pages without being asked, and this saves less (then `MIMALLOC_ALLOW_THP=0`, which
+  also turns them off for the process, measured the same here). On macOS mimalloc asks for none: the Mini, where the
+  budget is measured, gains nothing, so **the budget's ceiling stays at 335 KB** (this machine's 253 is not the Mini's).
+- **Revisit if** a mimalloc upgrade changes how it maps (re-pair), or a profile shows the purge delay's held memory at
+  10,000 people (then memory returned at once, as an opt-in for large runs: about 20 MB more at 1,000 for about 3%).
+
+## 2026-10-27 · The config's schemas let go (SC-1; branch `representation`; no result changes; no model called)
+
+- **What was held.** A heap profile at 1,000 people put 43 to 48 MB in the contract's compiled schemas, kept for the
+  whole run (`contracts()`, a `OnceLock`). Measured alone (the contracts' six schema files, `jsonschema` 0.30): the
+  four validators compile to 21 MB (the config's 12, a participant's 2, a command's 3, an annotation's 3), and the
+  first check of a 1,000-person config compiles 23 MB more (the references `jsonschema` compiles when first used).
+  The pattern engine makes no difference (`fancy_regex`, `regex`, a smaller lazy DFA: 21 and 23 MB each): each
+  `$ref` is compiled where it is used, so the same patterns are compiled many times over.
+- **Change.** The config's two validators (the whole config's and one participant's) are built when a config is
+  first checked and kept for the next (`contracts::config_check`), until `contracts::release_config_check()`: the
+  kernel's `world` command and the engine module (napi) call it once their config is read, and the next read builds
+  them again (some 13 ms, and the first check's own compiling as before). A command's and an annotation's validators
+  are each built when the first is checked (`Contracts::command()`, `::annotation()`), so a run that takes none never
+  builds them. What is checked, and against what, is unchanged.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at main's state hash and log.
+- **Cost, paired** against the allocator's build (three rounds of all six towns): the same hash and log in every
+  pair; the run's own thread -4 to +1%, level (au-vic -1.2% on average, gb-eng +1.2, us-oh -0.4).
+- **Memory.** 1,000 people 33 to 40 MB lower (au-vic 325 to 329 MB against 359 to 366, about 217 KB a person;
+  gb-eng 313 to 317 against 348 to 355; us-oh 283 to 289 against 321 to 329); 200 people 26 to 35 lower (139 to
+  147 MB against 167 to 179). This holds on every OS (the Mini's too).
+- **The budget.** About 217 KB a person here; the Mini, which gains this but not the allocator's, about 307 less 33,
+  274, and 8% over that is 296: the ceiling lowered from 335 to 300 KB.
+- **Revisit if** a process reads configs over and over (the engine module building worlds back to back: then keep
+  them a while), or `jsonschema` learns to compile a `$ref` once (then the four may be cheap to keep).
+
+## 2026-10-27 · What grows with a run's length, measured; the delivered records' cache let go of what is not shown (SC-1; branch `representation`; no result changes; no model called)
+
+- **What grows (the growth study).** 1,000 people (au-vic, 4 threads), runs of 30, 90, 180 and 365 days, each ending
+  with a heap profile (`scripts/heapprof.ts --components`): the peak rises about 3 MB a day, linearly, 365 MB at a
+  month, 587 at three, 914 at six and 1,706 at a year (1.7 MB a person; a year at 10,000 would be some 17 GB). Two
+  holders grow and the rest is about flat: the engine, 63 MB at a month to 562 at a year, and the world's records,
+  26 to 431. Interned ids grow too (60,000 at a month, 441,000 at a year) but their text is 4 MB at a year: no cause.
+  At six months the engine's was mostly the delivered records' cache (`Delivered`): the records themselves (67 MB,
+  the world's), each one's canonical bytes (60 MB) and what each adds to a reader (`RecordFacts`, 96 MB), kept for
+  every record ever shown, for the run.
+- **Change.** A record's bytes and facts are what the record makes (encoding it, reading it), so they are let go
+  when it has not been shown for 7 days (`KEPT_DAYS`) and made again if it is: `Delivered::trim`, called once a day
+  from the observation paths. Each entry stays, holding its record, so a record's place in memory is never another's
+  (what `Handed` relies on), and a register's lots, shown every day, stay held. What is shown and learned is the same.
+- **Results, shown.** `orchestrator/test/representation.test.ts`: all six towns at main's state hash and log; and a
+  year at 1,000 (au-vic) ends at the same state hash (`f29fb857...`) on both builds (its log discarded: over 3 GB).
+- **Cost and memory, paired** against the config's schemas' build: a month, two rounds of the 1,000-person towns
+  and one of the 200: the same hash and log; 1,000 people 13 to 28 MB lower (au-vic 304 to 305 MB against 326 to
+  332, about 195 KB a person), the run's own thread 0 to +3%; 200 people level. 180 days: 634 MB against 814, own
+  thread -1.6%. A year: 1,081 MB against 1,500 (-28%), own thread +2.3% (with a build beside both).
+- **The budget.** About 195 KB a person here; the Mini about 274 less 24, 250, and 8% over that is 270: the ceiling
+  lowered from 300 to 270 KB. The budget measures a month: no test holds what a run's length adds (proposed: a growth
+  budget on a 90-day run, the slow tier).
+- **What is left of the growth**, at a year after this: the world's records (431 MB: the history kept, whole, for the
+  run; what tiered storage is for), the actors' state (73 MB, offices' and firms' books growing with what they have
+  seen), citizens (56) and their minds (41).
+- **Where the CPU goes** (a perf profile of a 1,000-person month at 4 threads, the run's own thread): no one
+  function above 10%; allocation and freeing about 14%, comparing ids' text (map lookups) about 9%, copying 6%,
+  encoding observations canonically 5%, interning ids 2.6%, SHA-256 2.2% (with the CPU's own instructions; a
+  valgrind profile, which hides them, put it at 23%), the log 2.5%. At 200 people the one-time spin-up of nature is a
+  quarter of the instructions, a fixed cost a long run makes small. No change made from it yet.
+- **8-byte ids, measured before being built.** An `Id` made 8 bytes wider costs 11 to 23 MB at 1,000 (and 0 to 6%
+  of the run's own thread): 8 bytes narrower would save about that, some 5%, against a table read on every
+  comparison of ids' text (9% of the run's own thread now). Held back for Naz's call.
+- **Revisit if** a record shown again after its week is common in some world (then the week longer, or the facts
+  kept and only the bytes let go), or the cache's entries themselves (one per record ever shown) show in a profile of
+  a ten-year run (then let go with the record, when tiered storage moves it out).
+
+## 2026-10-27 · 10,000 people for a month, main against the branch; tiered storage proposed (SC-1; branch `representation`; no model called)
+
+- **Measured.** au-vic from `worlds/town-1000.yaml` with `citizens=10000`, 30 days, all code, 4 engine threads, on this
+  4-core Linux machine alone (the log discarded: the measure is memory and time): main (7230e71) peaks at 2.48 GB in
+  197 s (the run's own thread 159 s); the branch at 1067de9 at 1.67 GB in 150 s (own thread 120 s): -33% memory,
+  -24% time, the same state hash (`f39cebc9...`). About 156 KB a person at 10,000 against 195 at 1,000: nothing grows
+  faster than the town. 254,889 ids interned (2.8 MB of text).
+- **Tiered storage proposed** (docs/design/tiered-storage.md), from the growth study: at a year, about 550 of the
+  895 MB live at 1,000 people is history (records, payments). Not built; four decisions are Naz's.
+
+## 2026-10-25 · The Bevy explorer: Bevy for the scene, a web interface round it, one crate for browser and desktop (session branch; no model called)
+
+- **What was asked:** the next explorer, Bevy rendering the town with an HTML/CSS interface round it, browser-first
+  (WebAssembly, WebGPU with WebGL 2 behind it) and a native build from the same code; the map and a researcher
+  workbench; parity with the Three.js explorer, then beyond it in look and scale. It stays beside the Three.js one
+  (the default) until the owner reviews it. docs/explorer.md, "The Bevy explorer" and "The workbench".
+- **Why Bevy plus a web interface:** the data layer is Rust (`kernel/crates/explore`), and Bevy can hold it in the same
+  process natively and read it over HTTP in the browser, with one scene for both; its ECS suits a town of tens of
+  thousands of entities and time-indexed tracks; wgpu gives WebGPU, WebGL 2 and native from one code base. The panels,
+  tables and charts of a research tool are better as HTML (text, selection, links, accessibility, the Three.js
+  explorer's panel code reused as it is) than as an immediate-mode GUI, so the browser's interface is HTML and the
+  scene is the canvas. Natively the interface is egui for now (a webview would bring a second runtime); plainer, the
+  same scene and data.
+- **The architecture:** a crate of its own, `explorer/`, in its own Cargo workspace, so Bevy stays out of the kernel's
+  whole-program-optimised workspace build and the kernel never depends on it (it pins Rust 1.97.1, which Bevy 0.20
+  needs, in `explorer/rust-toolchain.toml`). The scene asks a `Source` and never waits: in the browser the Bun server's
+  `/api` (the Rust service behind it), natively an `Index` in process. The interface speaks to the scene only through
+  a bridge of JSON commands and events (`explorer/src/bridge.rs`). Tracks are streamed a window of days at a time, the
+  overlays' data one day at a time, so a big run's year is never in the browser. People are one mesh and one data
+  texture (one draw). Two WebAssembly builds (Bevy chooses its backend at compile time); the page loads the one the
+  browser can run. Routes along the roads are drawn by shortest path and are a visual only: the log has no routes.
+- **Deviations from the brief, and why:** (1) `load_run` loads through the scene's own source rather than the page
+  handing it the bytes, so the bridge stays small and the native shell is the same. (2) The data layer gained, read-only
+  and tested: `where`, `money`, `agency` by a window of days; a `partial` answer while a log is still being indexed (the
+  town shows from its header on); the workbench's routes (events, cohorts, per-building counts by class). (3) The
+  workbench's measures are computed by measure/'s Ledger in the Bun server (TypeScript), not in Rust: they are
+  measure/'s definitions and must not be written twice. (4) A run with no seats is not read for pilot data before the
+  data layer starts when the engine is Bevy (the Three.js path is unchanged): that read took minutes at 10,000 people
+  and held up the first sight for nothing. (5) A synthetic town (`--synthetic N`) exists to measure the scene at
+  50,000 people, where no such run could be made on the machine it was built on; it is never shown as a run.
+- **Measured** (no GPU here: software rendering only; docs/explorer.md, "Measured"): the scene's own CPU work per frame
+  at 50,000 people mean 0.70 ms, p95 3.2 ms (A* routes; the breadth-first trees cached by destination, tried first,
+  gave p95 8.2 ms at 50,000 as the cache thrashed); first paint of a 10,000-person month 23 s here, about 10 s of it
+  the data layer parsing the run's 222 MB header; the data layer held 8.1 GB resident for that month. Targets at 60 and
+  120 fps not measurable without a GPU.
+- **Revisit if:** the owner's Mac shows the scene GPU-bound well under the targets (then levels of detail: people as
+  per-building counts at far zoom, which the data texture allows); the data layer's memory or header time stays the
+  bound on the size of town (then its header is indexed lazily, by section); the egui interface proves not worth
+  keeping beside the web one (then the native shell wraps the web interface in a webview); Bevy's WebGL 2 path falls
+  behind its WebGPU one (then WebGL 2 is dropped once browsers allow).
+
+## 2026-10-31 · The owner's TARA proposal as the plan's north star (docs only; no model called)
+
+- **What:** the proposal Naz submitted to TARA on 2026-10-28 ("Better Off, Less in Control?") is kept verbatim in
+  `docs/north-star.md`; `docs/plan.md` gains a "North star" section mapping what the proposal needs against what the
+  platform has; CLAUDE.md's read-first list points to it.
+- **Why:** he asked for it to be the north star for the lines of work, "not completely rigid". The map shows the gap
+  is the delegation capabilities (models as hired assistants, AI interventions in forks, requests for scope), not the
+  world's physics: friction, scale to tens of thousands, forks and debriefs largely exist.
+- **Not decided here:** reordering the plan, and building the delegation capabilities; both are the owner's call.
+- **Revisit if:** the proposal changes (its 15 Nov project plan), or the owner chooses another study.
+
+## 2026-10-31 · Delegation capabilities: the design (D0; docs only; no model called)
+
+- **What:** `docs/design/delegation.md`, the design of the delegation capabilities the owner approved on 2026-10-31
+  ("we need to complete all of that + 1 to 3"): providers as organisations selling assistants as services (phase 4's
+  E1, taken into this work), remits per kind of matter at four levels with no ladder, the sign-off route, the principal's
+  instructions and the assistant's requests for more as records apart from its acts, learning from what the principal
+  itself saw, records by contract, replacement and taking back, forks that intervene at a checkpoint, and model seats as
+  assistants. The plan's item moves to "Now", in steps D0 to D7.
+- **Why this shape:** the owner's ruling of 2026-10-25 (assistants are systems sellers deploy, bought as services; no
+  separate mechanism for AI) and the kernel's own physics decide most of it: a system is delivered only to an
+  organisation and works only for its owner, so an organisation's assistant is a delivered system in an assistant post of
+  its own (its acts are the organisation's, readers unchanged), and a person's is the provider's own system writing in the
+  person's name on a mandate. A remit is a record with no power (D18-D22): an assistant beyond it is on record, not
+  refused. The one kernel addition is `set_channels` (access is a post's channels, and the principal must be able to
+  narrow them); it is checked by the knowing rules as a new post's channels are, so no hard rule changes. A code
+  principal's delegation is a wrapper round the code it already runs, so no kind's work changes until it delegates.
+- **Not decided here:** the study's definition, measures and arms; which principals a study's town has delegating; any
+  framing for a model assistant. All the owner's.
+- **Revisit if:** the wrapper breaks an existing kind's chains (then delegation moves into each kind that carries it);
+  `set_channels` needs any knowing exception (a hard rule: to the owner first); the seat host cannot follow a cast that
+  changes in a fork.
+
+## 2026-10-31 · Delegation D1 to D7: assistants as services, levels per kind of matter, the principal's rule, handover, forks that intervene, assistant seats, persons as principals (branch `delegation`; firm.provider 0.1.0, assistant 0.1.0; a town without `assistants` is generated and runs as before; no model called)
+
+- **What, in one landing** (the steps were built together because each needed the next to be exercised end to end):
+  - **D1, services anyone can buy.** `firm.provider` (`market/services.rs`) publishes `service_offer`s (kinds of matter,
+    levels, its *claimed* seconds and slip rate, fee, set-up, term, notice, exit, records term), delivers a system to an
+    organisation that orders and pays (the system is the client's, kernel F4), offers the `service` agreement
+    (`attrs.records`, `attrs.exit`), and switches its systems off when the agreement is unsigned, ended or unpaid. The
+    buyer's `Engagements` signs, sets the fee up, and leaves (notice, exit, the fee's order taken down).
+  - **D2, responsibilities.** `delegation::Delegating` wraps any module where the world gives `delegation` parameters
+    (offices/books.rs `create`/`restore`, so every code unit): its own work is unchanged; the lines of an act whose kinds
+    are delegated go to the assistant as a `referral` at the strictest of their levels, the rest done by the principal in
+    the same act; its code hears of the act when the assistant reports or when it does the matter itself. `advice`,
+    `draft` (a reading that may miss a slip: the person's row `publish/sign_off` in the table of slips), `approve`
+    (`approval_request`, `go_ahead`), `alone`. The `assistant` kind does each at its level and reports.
+  - **D3, learning.** `delegation/rule.rs`: each level's monthly cost (own time at its hour's value, the fee, expected
+    slips times what an error costs it, a draft's slips less those it finds), the estimate starting at the provider's claim
+    (as `prior_matters` matters) and moving only with what it has seen (caught slips, declined drafts, matters not done,
+    advice it would not have taken, complaints citing a delegated matter). Engage the best offer that pays by the hurdle;
+    set each kind's level; leave; replace. Every decision logged (`decision`, domain `delegation`) with the record ids it
+    rests on.
+  - **D4, records and replacement.** On leaving, the principal briefs the assistant to hand over (`brief.hand_over`);
+    the assistant sends a `handover` of its open matters, with its notes only where the records term is `principal`; the
+    principal takes each up again with the service now in use where its notes came, else does it itself. A replacement is
+    the rule's (another offer pays better by more than the exit and set-up spread over the horizon).
+  - **D5, forks that intervene.** `at_fork` in the engine (`kernel/src/engine.rs` `AtFork`, `Engine::intervene`, run at
+    the end of `resume`; host and stdio options); `intervene` on an arm, expanded by `orchestrator/src/interventions.ts`
+    from what the base's log shows of services (`seed-N/delegation.json`): grant, change, withdraw, take back, redirect,
+    constrain, replace, act. `hold_until` on a remit is the principal's own word, honoured by its rule. The harness
+    refuses an arm that withholds a `scope_request`.
+  - **D6, assistant seats.** `assistant_seats` in a town's description makes the systems of those templates seats (the
+    mock plays the assistant's code); the pilot host remakes a seat's unit when its posts change (a system appointed after
+    it was delivered); the experiment harness takes `post: "template:<id>"`, a steward for every system of that kind, each
+    seat its own controller and twin.
+  - **D7, persons as principals.** A provider that serves persons has a desk (its own post and system); the desk writes a
+    person's papers in their name (`for`), reports to them, and serves many clients, each under their own agreement.
+    Every person's code is wrapped where some provider serves persons (one shared parameter set: the account is read from
+    their own accounts channel).
+  - Generator (only with `assistants: true` and a profile's `values.assistants`: au-vic only, placeholders, ME-22): two
+    providers abroad with the same controller, an offer to organisations (tenancy papers, invoices, returns of tax
+    withheld) and one to persons (claims, applications, answers to the tribunal, requests to look again); the table's rows
+    for the papers (a referral half a minute); the slip rows (a system's truth; a reader's misses); `service_offer`
+    published; a principal of every post whose module issues a kind some organisations' offer takes, with a vacant
+    assistant post of its organisation.
+- **Why this way:** docs/design/delegation.md. The wrapper keeps every kind's work as it was (a test holds a wrapped
+  principal to its unwrapped acts, to the letter, until a kind is handed over) and makes any module a principal. A slip
+  of an assistant loses the matter as written (wrong advice, a draft not as asked, an act never sent though reported
+  done), so `draft` catches what a reading finds and `alone` hides what nothing brings back, by construction.
+- **Not built, and why:** `set_channels` (a new block needs a positive row in every town's table of work, moving every
+  town's hash; narrowing access is done by reorganising the post, `constrain` with `channels`); forms for a real model in
+  an assistant seat (the mock needs none; a real model's seat needs the papers of delegation as forms of its stationery:
+  next); invoicing a public body; local providers.
+- **Found on the way:** the call language's `agreement` had no `attrs` (added: contracts/calls.*, both resolvers); in a
+  300-person town most of an organisation's paperwork is mixed with a payment or a move of goods, so an act is parted
+  (what is handed over, and the rest done by the principal in the same act); at the profile's prices almost nobody's
+  volume pays for an assistant (realistic for small principals; the tests run at a twentieth of the prices).
+- **Without assistants, as before:** the generator emits nothing new for a town that does not ask for them (its generator
+  version is unchanged; `orchestrator/test/assistants.test.ts` holds `assistants: false` to the plain town and finds none
+  of the new kinds in it), and the towns whose states are pinned (culture-dial, living-dial) keep their hashes. A run
+  of one: a 300-person town at a twentieth of the prices, 150 days: 75 engagements (most by persons, whose volume of one
+  claim a month at day 30 pays at those prices, and 55 left again when it did not last), a city office's returns and a
+  landlord's notices handed over at `draft`, persons' claims and loan applications written by the desk in their names and
+  answered by the support office and the bank; at the profile's prices, nobody engages.
+- **Revisit if:** the wrapper breaks a kind's chains (an outcome its code needs that a report cannot carry); a receiver
+  that should take a person's paper by whom it speaks for does not; the placeholders find sources (ME-22).
+## 2026-10-31 · Years at 10,000: three faults that only a large town shows (code only; no model called)
+
+- **What:** the first runs of the study's size over months (a scaled 10,000-person town, `worlds/town-10000.yaml`, and
+  50,000, `worlds/town-50000.yaml`: town-1000 ten and fifty times over, homes, firms, landlords and land in proportion)
+  found three faults, each fixed with its law:
+  1. **The hall too small for its crew** (generator). The works crew is the profile's staff per 1,000 residents (60 at
+     10,000, 300 at 50,000), but the hall's workplace held 20 of them plus the offices' staff: 58 places for 98 at
+     10,000. 1,892 "holds 58 at most" refusals in the first month; the registrar of titles never got in to work until
+     day 30. Now the crew's room is the crew the town calls for (20 at the least, as before: towns under 3,334 people are
+     unchanged, config byte for byte). Test: `worlds/test/generate.test.ts`, every workplace has room for its staff.
+  2. **Owners homeless in their own homes** (citizen). An owner learns which building is on its lot from the land
+     register, which takes the officer's time; until it answered, the first plan marked the owner homeless, asked its
+     utilities to stop the supply ("we have moved out") and hunted for a rental. In a 1,000-person town that was 260
+     supply-stop requests on day 1 and four days; at 10,000, 1,420 owners waited on one officer (and, with fault 1, for a
+     month), and 484 of the 1,379 people who left town by day 76 were owners. Now an owner whose title's lot is still to
+     be told is not without a home, does not hunt, and stops no supply meanwhile (`Person::own_plan_pending`).
+     The 1,000 town over 120 days: supply stops 260 to 8, people leaving 79 to 79.
+  3. **The works office sent every inspection at once** (works). A visit's worth of the town's assets was sent, and at
+     the next observation in the same moment the next, one round each: 50,000 people's roads passed the engine's
+     thousand rounds in the first moment and stopped the run at t=300. Now the next visit goes when the last is back
+     (one inspector's round at a time). Test: the office's own, in `offices/treasury.rs`.
+  And one cost, result-identical: **the energy retailer looked through its whole file of bills once for each
+  connection at every wake**, the file growing a bill a customer a round: by day 115 of the 10,000 town it was 63% of
+  the run's own thread and the town ran at a third of a day a minute. Each connection's last bill is now found in one
+  pass (and the water corporation's last readings the same). The same state hash and log on the 1,000 town for 120 days
+  (`8ace88e3`, digest `2568ffd9e6d9bdf5`).
+- **Not faults, recorded:** households without a home leave town after their patience (45 to 80 days): 79 people of
+  1,000 in 120 days, the renters the tight housing leaves out (380 homes for 424 households). The gatherings at the
+  hall fill it (200) at 10,000: one hall for a town ten times the size is the spec's, not a law's.
+- **Why:** a robustness test of the study's size (docs/design/gradual-disempowerment.md §7). Every one of these is
+  invisible at 1,000 people, where the tests run.
+- **Revisit if:** the profile states a works crew's depot of its own (then the crew leaves the hall); the register
+  should answer owners at once (it is the owner's own certificate of title: genesis would hand each owner its lot's
+  plan, a change of what is delivered at the start); another office books a year's work in one moment.
+
+## 2026-10-31 · Foundations-2 phase 3, S1: law 9's backstop, with today's instant moves in an inventory (branch `f2-phase3`; no result changes; no model called)
+
+Asked: build phase 3 of docs/design/foundations-2.md (law 9, space: roads, pipes, wires and data lines with capacity and
+energy; people in transit; goods need a carrier; several towns as an option), Naz having approved the design on
+2026-10-25 and confirmed on 2026-10-31 that all of it is to be completed. S1 is the backstop with today's violations listed.
+
+- **The backstop: `orchestrator/test/everything-is-somewhere.test.ts`** (gate tier; its audits in `test/lib/law9.ts`). It
+  generates every profile's town and reads the actors' sources, and names: `unlocated` (a body in no space at the start, a
+  holding at no structure or edge, a system whose hardware is held nowhere), `edgesWithoutNode` (in a world with a
+  network, an edge that is no node of it, so imports and exports arrive nowhere), `waysOffNetwork` (ground a cover makes
+  quicker to cross than on foot: a car's speed baked into the cell instead of links with a speed and a capacity),
+  `uncarried` (an actor's move of goods that names no carrier). **`everything-is-somewhere-runs.test.ts`** (slow tier:
+  nine towns of 300 for a month, about 32 s) reads the logs for `uncarriedMoves` (goods moved from one place to another
+  with no carrier) and `workElsewhere` (work on a building done where the crew is not), by the module whose post the act
+  was done in. Each is planted and seen named in the gate file (the log audit on a written log).
+- **The inventory, `orchestrator/test/fixtures/space-inventory.json`, only shrinks**, as law 8's does. Today: the
+  unhoused, who are in no space (about one in twelve at the start, from `housed_bps`); six kinds of system with no place
+  (the casework desks, the payment and market systems, the vendors' and agencies'); every edge (the outside, the
+  vendors, the wholesalers: the town's network has no edge node); the road cover (2 or 3 s a cell against 18 on foot);
+  six actor files whose moves of goods name no carrier, and in the logs the citizen's, the works', the producer's, the
+  retailer's and the world market's moves; the builder's building, the works' collecting and upkeep, done from the
+  depot. Four special cases to delete, each with its step: the road as a cover (S2), a trip spent where one set out
+  (S3), `move_goods` between any two places (S4), work on a building from wherever the crew is (S4).
+- **The kernel's side: `kernel/tests/space.rs`**, grown step by step: over any sequence of operations a body is in at
+  most one building (with a check that bodies do move). The trip's time is already held by `services.rs`.
+- **Not in the design's list, added:** systems' places and the unhoused. Law 9 says every body and machine has a
+  location; the systems have none today (law 10 gave them lanes and hours, not a place), and a person with no home is in
+  no space and so nowhere, travelling from nowhere for nothing. Both are in the inventory, for the steps that end them.
+- **Revisit if** a finding turns out to be a false positive (then the audit is wrong, never the inventory widened); the
+  log audits need more than a month to see a module's moves (then the run grows).
+
+## 2026-10-31 · Foundations-2 phase 3, S2: roads are ways of the network, and vehicles are driven (branch `f2-phase3`; results move; no model called)
+
+- **Contract (world config, blocks, log; blanket approval).** A structure type may be a **way** (`way`: its mode, what a
+  link of it carries an hour each way, its speed for vehicles). Standing and complete, each cell of it is a node of the
+  world's ways, joined to the next cell's node of the same mode by a link a cell long; a world with a way says how many
+  metres a cell is (`world.ground.cell`, refused at load otherwise). The reserved `travel.roads` is gone (a road is a
+  built thing, so it is a structure that is a way, and the town's new roads join the ways when finished); a vehicle type
+  states its top speed (`speed_kmh`, for the reserved `seconds_per_cell`), and a vehicle who besides its owner may drive
+  it (`drivers`). `occupy` gains `vehicle` (the call's `by`, code's own until the translator is taught it, as the
+  network's calls are: `CODE_ONLY_ARGS` in the resolver), and `occupied` names it.
+- **Kernel.** A trip (`travel.rs`, `ways.rs`) is on foot over the cells all the way, or on foot to the way's node nearest
+  where it sets out, along the links (driven at the lower of the vehicle's speed and the link's, or walked at the round's
+  pace), and on foot from the node nearest where it goes, whichever is quicker; the ways and each node's quickest times are
+  worked out once a ground epoch (a way finished or pulled down is a new epoch), the trips cached by vehicle speed as
+  before. An `occupy` with a vehicle is refused unless the body may drive it (`not_theirs`) and it stands where the body
+  sets out (`not_present`); the vehicle then stands where the body arrived. A person's view shows the vehicles they may
+  drive and where each stands (theirs: their own things). A world with no way runs as before, to the hash (checked: main's
+  10,000-person config on this build gives main's state hash).
+- **Generator 0.72.0, profiles.** The road type is a way (the profile's `round.roads.speed_kmh`, 45 km/h or 30 where a
+  road cell took 3 s, the speed a road cell was crossed at; `capacity_per_hour` 900, a placeholder); the road cover is no
+  longer quicker than walking; the ground's cell is the nature's `cell_m`. Housed households have a vehicle by the
+  profile's `round.vehicles.households` shares (a car, or a motorcycle where the census counts them; at most one each),
+  owned by the leaseholder or owner, standing at home, the other adults let drive it. Sources in each profile's `round`
+  note, most recalled and to confirm (WM-4).
+- **Citizen.** Going where they belong, a citizen takes a vehicle of theirs that stands where they are; if the world says
+  it was not there to take (another of the household took it first) or not theirs, they go again at once on foot.
+- **Inventory.** S2 done: the road as a cover gone (`waysOffNetwork` empty; the entry `road-by-cover` a guard).
+- **Measured** (au-vic, `worlds/town-1000.yaml` with `citizens=10000`, `living.initiative_bps=10000`, 30 days, all code, 4
+  engine threads, the log discarded; the machine shared and loaded, so paired runs): before (main at cc6103d2) and after,
+  run alternately twice: wall 90 / 96 s and 106 / 108 s; the run's own thread 72.3 / 76.8 s and 82.3 / 85.5 s (+3 to
+  6%); peak 1.81 / 1.82 GB; log 3,332,887 / 3,345,323 lines (+0.4%). 6,460 of 28,075 moves into a space were driven;
+  1,596 drives refused `not_present` (a household's second driver finding the car gone; each then walks). The
+  10,000-person town of `town-1000.yaml` holds 10,000 people in its 380 homes, so most are unhoused and the round's moves
+  are few (28,075 in a month); the 300-person towns of the backstop run drive about four moves in ten.
+- **Not as designed:** roads are not explicit links of `world.network` (3.1: "today's reserved `travel.roads` becomes
+  links") but structures that are ways, so that a road the town builds is part of the network when it is finished; links
+  declared in `world.network` with a mode for travel (between towns) come with S6. The trip uses the nodes nearest its
+  ends, not the best of all entry nodes (a road with a gap is walked whole: the known limit, simple and stable).
+- **Found on the way, mended:** a child's parents now know of its birth at once (`person_created` is news of their body: the
+  engine wakes them, `kernel/src/schedule.rs`); the one who bore it brought it home and put it on the household's record only
+  at her next week's plan, so a child born in a run's last week was of no household at its end (the invariants canary,
+  ke-nakuru seed 2, once S2's moves had shifted the town's births).
+- **Pins re-taken:** culture-dial's three config hashes and Rust states, representation's six towns (their reason there).
+- **Revisit if** the nearest-node rule gives a trip plainly longer than a real one (then the entry node is chosen among
+  the few nearest by the whole trip's time); a household's second car matters to a result (then households hold more than
+  one, by the census's counts); the refused second drives show in a log's size (then a household's adults agree who takes
+  the car, as behaviour with a source).
+## 2026-10-31 · No whole-world copies during a step (SC-1; branch `mem-no-copies`, on `representation`; no result changes; no model called)
+
+- **What was copied.** Every act is worked on a copy of the state (all-or-nothing: a dry run when it begins, the act
+  itself when done), and the state's maps are persistent, so that copy is cheap. Not all of it was: an act that draws
+  from or emits to a field (`work` with a recipe that does) made nature's state its own (`Arc::make_mut` while the
+  state before the act still held it), which copied every field's and every species' cells and the covers' days; an
+  act on a link or connection, and each hour's settlement, copied the network's links, every connection (one a
+  metered home) and its indexes; and every act's copy took its own of the takings (which grow with the run), the
+  flooded buildings and the scarce sales.
+- **Change.** Those are now persistent too: a field's or species' cells an `imbl::OrdMap` (`oikos_nature::Cells`),
+  the covers' days one; the network's links and connections `imbl::Vector`s and its indexes behind an `Arc`; takings
+  a persistent vector, floods a persistent set, scarce sales a persistent map. An act's copy shares them, and a change
+  copies only the path to what it touches. Each is serialised as before (maps in key order, lists as lists). The
+  world's totals stay a plain map: a handful of counters, one for each the catalogue declares.
+- **Results.** The same state hash at 1,000 and 10,000 people (`worlds/town-1000.yaml`, 30 days, 4 threads); the
+  logs the same entry for entry, the header's build id aside.
+- **Memory** (Linux, 4 threads, against `representation` at 01d1798): 1,000 people 306 MB, 195.9 KB a person before
+  and 195.6 after; 10,000 people 1,675 MB, 156.5 KB a person, before and after. Nothing at the peak: the copies were
+  made and let go within an act. What it saves is the copying (an act on a field or the network no longer costs as
+  much as the whole of nature or the network), and a world whose nature or network is large no longer pays it per act.
+  The budget's ceiling is unchanged (270 KB): the measure did not move.
+- **Revisit if** a heap profile shows another part of the state copied whole within an act (any field of `State` that
+  is not a persistent map, vector or set, or behind an `Arc`, is copied by every act).
+
+## 2026-10-31 · Years at 10,000, continued: what grows with a run's length, and the rates office's notices indexed (code only)
+
+- **What:** the scaled towns run on the fixed build (docs/design/performance.md, "Years at 10,000 and 50,000"): 10,000
+  people grow about 25 MB a simulated day, steadily (a year in 1.9 hours, 10.7 GB); 50,000 about 85 MB a day, so two
+  years (about 75 GB) do not fit on the 64 GB machine. A heap profile puts the growth in the world's records (54%),
+  the resolver's knowledge of addressed statements, the twins' per-matter draw counts, minds and offices' files:
+  recorded as SC-6, not cut (each is kept by design; tiered storage waits on the owner). Sampled at day 536 of the
+  10,000 town, the rates office's check of whether each rates claim is paid went through every rates notice on its
+  file for each claim (`bill_settled`, `notices_of`): both grow every round, so the check grows as the square of the
+  run's length. The office now keeps an index of its notices by addressee, due date and amount, taken in as the file
+  grows (`RatesNotices`), answering as the search did (a test holds the two to the same answers; the 1,000 town over
+  400 days ends at the same state and log, `579afb1b`, digest `c121666ae2a9dff8`).
+- **Tried and dropped:** an index of a person's contacts in word of mouth (the 50,000 town's run's own thread was 43% in
+  it): results identical, but 12 to 13% more of the run's own thread at 1,000 and 10,000, where the spaces seen are small.
+- **Revisit if:** the bank (16% of the 10,000 town's own thread at day 536, going through its standing orders) or
+  another office's file search shows the same square growth in a longer run; tiered storage is approved (then SC-6's
+  numbers are taken again).
+
+## 2026-10-31 · A seat in the support office is a non-resident officer, not the case system (branch `gap-wm14`; generator; new kind `world.nonresident`; risk WM-14 item 1; no contract change; no model called)
+
+- **What:** where a model is seated in a post of the outside world held by a system (the support office, `outside-support`),
+  the generator gives the seat a person's body: an officer of the agency who lives outside the town, a person entity with
+  `present: false`, their own participant a new kind that does nothing in the world (`world.nonresident`: their life is the
+  boundary's), holding the post with `holds_abroad`. The seat shares that body (`shares_body`), keeping its old id
+  (`outside-support-system`). The case system's participant that held the post is not delivered in that town. Docs:
+  `docs/behaviour/staffing.md`, "A seat in an office of the outside world".
+- **Why it is contained:** the risk entry held this back because a person with a body who is not a resident reaches the
+  census, life events, elections and every module that counts persons. The kernel already has persons outside the world:
+  everyone who leaves it (`leave`) keeps a body with `present: false`, and their participant lives on for their affairs
+  abroad; posts held from abroad exist (a firm owner's, `holds_abroad`). An absent body is not counted by the census (it
+  counts from the generator's population and the registers' events), has no enrolment, home or job, is not exposed to injury
+  or illness (the kernel skips absent bodies), and cannot do physical work (`not_present`). It can still die of other causes,
+  as people abroad do; the post then falls vacant.
+- **Effect:** the support seat works at a person's speed in a person's day, like every other seat (WM-14's "a seat's speed
+  there is not a person's, unlike every other seat"). The code twin is unchanged (the case system holds the post): a town
+  with the seat differs from its twin in the post's holder and one body outside the world.
+- **Test:** `office-books.test.ts` (the support seat): the seat is a person sharing a body not in the world, the post is
+  held from abroad (`holds_abroad`), so the kernel times the seat's acts as a person's (the mock seat makes none in 45 days: its staff do the routine).
+- **Left:** the officer's age is a placeholder draw (25 to 60); no other outside post is seated yet (the rule applies to any
+  post held by a system of an entity of kind boundary); the case system's machine work (payments, notices) is the officer's
+  in that town, where the real office would still have it: a seat that orders it of a supplied system is not built.
+- **Revisit if:** an absent body is found to reach a count of the town's (a module reading every person entity); or the
+  agency's officers are simulated as people, when the seat should be one of them.
+## 2026-10-31 · Working calendars: a desk of officers keeps the place's week (branch `gap-weekends`; generator 0.73.0; risk WM-14 item 4; contract addition: a template's `hours.closed`; no model called)
+
+- **What:** a system template's `hours` may say the days its window does not open (`closed`: days of the world's week,
+  day d of the run being the week's day d mod 7, and days of the run, its holidays); the kernel's placing of work
+  (`oikos_time::Hours`, `place_within`) skips them, so work not done by a Friday's closing goes on at Monday's opening and
+  a holiday's work waits. Generic in the kernel (a list of closed days, no civil calendar); the law is data. The
+  generator gives both desks of officers (the support agency's casework, `agency-casework`, and the tax collector's,
+  `tax-casework`) the place's working calendar from its profile: `calendar.weekend` and `calendar.holidays` (all nine
+  profiles have them, sourced there), as days of the run from its start date. Each desk now works an officer's day on
+  each working day, where before the week's hours were spread evenly over seven days. A town with dates (`calendar` in
+  the spec) uses the real week from its start date; a town without dates keeps the week its people keep (their working
+  days first: `day % 7 < work_days`, as the actors count), with the profile's holidays from its start date.
+- **The law's backstop:** `all-work-takes-time.test.ts` fails, naming the template, on a desk of people (a system that
+  writes a decision with its own seconds in a day shorter than the whole day) whose hours are open every day of the
+  week. A machine's hours (the whole day) are not held to it: software runs when asked (the case-handling system).
+- **Why only the desks:** they are the only systems that stand for people's work. A machine's lanes run all day, as a
+  payment platform or case system does. People who staff the town's own bodies are persons, whose routines already keep
+  a working week (`work_days`); they do not yet keep public holidays (left, below).
+- **Effect:** the desks' yearly capacity falls by the holidays (eight in gb-eng), and decisions wait over weekends, as a
+  claim made on a Friday evening does. Every town's state hash with a support office or a tax collector moves.
+- **Left:** offices staffed by persons do not keep public holidays (each actor's `work_days` routine would need the
+  calendar's days; `common::next_working` already reads it where a town has dates); a town without dates numbers its
+  week from its people's first working day, not from a weekday (it has no weekdays); banks' settlement days (payments
+  on weekends) are not modelled.
+- **Revisit if:** a profile's officers work another pattern (shifts, a six-day week), which would be a `closed` of its
+  own; or an office of persons is held to the calendar, when the desks and the persons should read the one list.
+- **Pins re-taken on the merge with main (2026-11-01, main at 28c38600 and again at f56d2dbc: delegation, the long-run fixes,
+  business loans, then foundations-2 S2, which took generator 0.72.0, so working calendars are 0.73.0):**
+  `culture-dial.test.ts`'s three config hashes and three Rust states, taken on the merged tree, the working calendars as
+  the reason (the desks' `hours.closed` is in the config; the desks' days move the towns). Main's values are in the
+  comment beside them.
+
+## 2026-10-26 · Linux, and one Rust test program (PL-4 (2) and (3); branch `linux`; no result changes; no model called)
+
+**Asked (Naz):** PL-4's parts (2) and (3): Oikos and its gate build and pass on Linux x86_64, with a nightly hosted job
+and no secrets, any difference of a pinned hash between the Mac and Linux being a fault to find, not to skip; and the
+~50 programs of `kernel/tests/` made one, measured before and after.
+
+**Linux (2).** Built and run on a Linux x86_64 machine (4 cores, 15 GB; Rust 1.97, Bun 1.4.4), from a fresh clone.
+- *The hashes.* `orchestrator/test/culture-dial.test.ts` passes unchanged: the generated configs of three profiles and
+  the Rust state hashes of their towns are the Mac's to the byte. Nothing else was needed, as the design predicts (no
+  floats in the kernel or the contracts, D1, held by `kernel/tests/determinism_lint.rs`; one seeded PRNG; sorted maps;
+  SHA-256 the same with or without the ARM instructions, `sha2`'s `asm` feature on aarch64 only). The merge gate
+  (`bun run test:changed`; a kernel change, so the whole gate tier, 246 files, the kernel's tests and the canaries
+  culture-dial and invariants) passed here but for the two below, neither a hash. No difference of a pinned hash or a
+  log's bytes was found, so none was fixed; the slow tier's other pins were not run here (four cores; about two hours),
+  and the nightly job (below) runs them all.
+- *What was Mac-only, and what was done.* `scripts/disk-tidy.ts` asked `ps -E` for each command's environment, which
+  Linux's `ps` refuses: the listing came back empty and every build folder and worktree read as unused by any process,
+  so `--apply` could have removed a folder a running build was in. It now uses `ps e` off macOS, asks by uid (a user's
+  name may not resolve in a container: `lsof -u unknown` fails), and treats a failed listing as everything in use.
+  Its temp root is `/tmp` off macOS (`/private/tmp` on it) and its disk line reads the repo's own volume.
+  `scripts/status.ts` asks `lsof` by uid too. Already portable and left alone: caffeinate is used only on darwin
+  (`scripts/pilot-wave.ts`), notifications only on darwin (`orchestrator/src/pilot-alerts.ts`), the engine module is
+  found as `.dylib` or `.so`, the slots read `ps -A -o pid=,ppid=` (the same on both), the tests' temp folders come
+  from `os.tmpdir()`. launchd appears only in `docs/ci-runner.md` (the runner's service on the Mini); `scripts/mini` is a
+  tool for reaching the Mini from elsewhere, and its test runs against a local folder, so it runs on Linux as it is.
+- *Two failures in the first gate, and what they were.* `orchestrator/test/risks.test.ts`: this entry's own first edit
+  of PL-4 (its status and "Do when" must share a line). `orchestrator/test/mini.test.ts`, which then failed on every
+  Linux container: the run's model call (a `sleep`), ended by `scripts/mini stop` after its seed had gone, still
+  answered `kill -0` 300 ms later. Its parent gone, it is the first process's to reap, and this container's first
+  process (`process_api`, not launchd or systemd) reaps orphans only every second or two: until then the call is a
+  zombie. `stop` sent it TERM and said "stopped" at once, before it had left the process table. The fault was the
+  script's: `stop` now waits for what it ended to be gone (up to its wait, polled every 0.2 s), and names any that is
+  still there and not a zombie ("what it left did not end"). The test is main's, unchanged (a first fix had the test
+  count a zombie as ended; dropped for this). On the Mac it changes nothing (launchd reaps at once).
+- *The nightly job.* `.github/workflows/linux.yml`: `ubuntu-latest`, nightly at 04:30 UTC and by hand, `permissions:
+  contents: read`, no secrets; Bun pinned to 1.4.4, Rust stable with the wasm target, cargo-nextest; then the same
+  steps as ci.yml (installs, `bun run kernel`, typecheck, the gate tier, the slow tier), the cargo build cached from
+  the night before (`Swatinem/rust-cache`). A night with no commit on main in the last 25 hours is skipped by a small
+  first job (the code passed the night before), so a quiet repository costs nothing; a run by hand always goes. Hosted
+  runners are free for a public repository; no paid or larger runner. It does not record a result
+  for `merge.ts`: main's state stays the Mini's CI. `scripts/tiers.test.ts` now holds that no workflow on the
+  self-hosted runner has a `pull_request` trigger and that the Linux job is hosted, scheduled, secret-free and runs both
+  tiers. (`docs/ci-runner.md` still said ci.yml ran on every pull request; corrected.)
+
+**One Rust test program (3).** `kernel/Cargo.toml` has `autotests = false` and one `[[test]]`, `tests/main.rs`, which
+names each file in `kernel/tests/` as a module and `common` once (each file's `mod common;` became `use crate::common;`;
+no test was changed). The same 284 tests are listed before and after (each program's `--list` against the one's), and
+a new test in `main.rs` fails if a file in `tests/` is named by no `mod` line, since with `autotests = false` it would
+otherwise never run. A file is run alone with `cargo test --test main <file>::`; the comments and port guide that named
+`--test <file>` now say so. The proptest regression files are found by source path, so they still apply.
+
+*Measured* (this Linux machine, 4 cores, the `gate` profile the merge gate builds, warm, `cargo test -p oikos-kernel
+--tests --no-run` after a real one-line change: a public function appended whose body differs each time, then removed):
+
+| change in | 56 programs | one program |
+|---|---|---|
+| `kernel/tests/common` | 45 s, 14 s | 3.4 s, 3.6 s |
+| the kernel's library (`kernel/src/lib.rs`) | 48 s, 48 s | 34 s, 33 s |
+| `oikos-actors` (rebuilds actors, the kernel, its tests) | 169 s, 172 s | 153 s, 153 s |
+| running every test (`cargo test` runs programs in turn) | 353 s | 230 s |
+
+The saving is the link and the per-program build of `common` and the kernel's metadata: 14 s of the kernel's 48, 17 s of
+actors' 170 (where most is the crate itself), and nearly all of a change to the tests. Under nextest the programs ran
+side by side already, so the run time saves less there than under `cargo test`. On the Mini the counts differ (12 cores,
+sccache, more programs linked at once); not measured there.
+
+**Brought to main (2026-10-31).** Rebased onto main after the representation rewrite (an interned `oikos_core::Id`)
+and foundations-2 phase 3: both commits applied with one conflict (this file's end). One test file had joined
+`kernel/tests/` since, `space.rs`, and is now a module of `main.rs` (the guard test above names such a file). The gate
+on Linux (4 cores; the checkout's slots, 2 at a time): 1581 tests in 248 files and the kernel's cargo tests, all passing,
+the culture-dial pins still the Mac's to the byte; `mini.test.ts` passed three runs in three on main's test.
+
+**Leaves out.** PL-4 (1), the elastic slots, and the trial of sharding the slow tier on hosted runners (setup cold and
+warm, each file's time against the Mini's) — for after the nightly job has a few green nights to read times from.
+
+**Revisit if** the nightly Linux job finds a pinned hash that differs (a reproducibility fault: find the cause, never a
+pin per platform); a crate's own `tests/` grows to many files (the same change there); one test program's single link
+becomes the long pole of a kernel gate (split it in two by what a change reaches).
+## 2026-10-31 · A review never answered where the law has no deemed refusal: a complaint of the delay (MT-21) (branch `mt21-recourse`; no model called)
+
+**What.** Where a place's law requires a review before an appeal and has no deemed refusal (au-vic, gb-eng, us-oh's
+pension), a claimant whose review was never answered had nowhere to go: the citizen's `may_apply` shut every body that
+hears a refused claim, the town's ombudsman desk included, though the desk opens no appeal. What a real claimant does
+instead is complain of the delay to a body that takes it up and can only recommend: in Australia the Commonwealth
+Ombudsman (it asks that the agency be given 10 business days first, then investigates, free, and may recommend but not
+direct Services Australia); in England a complaint to the DWP office, a senior manager, then the Independent Case
+Examiner (there is no time limit on a mandatory reconsideration); in the US the member of Congress's caseworker, whose
+inquiry SSA answers. That is now law data: the review route's `complaint_after_days` (14, 21, and 30 a placeholder),
+with sources in each profile (most "to confirm"; docs/behaviour/decisions.md has the table). After that many days
+unanswered, a body that hears the matter and does not order (`can` without `order`) is among the claimant's ways; the
+tribunal never is, and the appeal still runs only from an answer. The work is the existing desk's: an officer's hours
+from the table of work, its slips, its asking the agency and its recommendation, which binds nobody. The law's words
+say it. Contract: an additive field on `law` `data.decisions[].review`, **proposed for Naz's sign-off**
+(contracts/README.md).
+- **Guarded:** at citizen level (`recourse.rs`: the ombudsman from day 31 for a review asked on day 10 and 21 days'
+  law, never the tribunal, which opens once an answer comes; the deemed-refusal test sees both bodies, as it should);
+  in the words (`rules/decisions.rs`); and in living towns whose office's answers are withheld
+  (`deemed-refusal-town.test.ts`, au-vic added: the ombudsman open only after the law's days, never the tribunal, and
+  any complaint heard).
+- **Choices.** The three real tiers in England and the US caseworker are one desk in the town (the generator's
+  ombudsman desk), as the town has one body that recommends on a refused claim. The desk's recommendation on a refused
+  claim is its generic one (set the decision aside, the agency not answering); a real ombudsman on delay asks first that
+  the review be decided. The first is a stronger push on the agency than the real one; noted, not built.
+- **Left:** asking again and judicial review / mandamus are not built; the 14 and 21 days read a wait for a complaint as
+  the wait after a request for review; us-oh's 30 days is a placeholder.
+- **Pins re-taken (2026-11-01, merged with main at c46643eb, after gap-weekends).** The new route moves au-vic, gb-eng and us-oh towns and
+  not ke-nakuru's (its law has no such route): culture-dial's config hashes and Rust states for au-vic and gb-eng
+  (a0a8a233..., a911615e... and ce297a1b..., 4c0f8261...; were main's c899c8ff..., 9b0a54d6... and af012071..., fab20a4d...),
+  and all six towns of `scripts/fixtures/representation-results.json` (au-vic, gb-eng, us-oh at 200 and 1,000 people).
+  Cause is the one this entry names, not a fault: the gate's failure showed only the first pin, the rest were taken by
+  running the towns on a freshly built kernel. (A first reading of the config hash on a stale `kernel/target` wasm gave a
+  wrong value, f4424f29...: the generated config carries words from the law crate, so take hashes only on a current build.)
+- **Revisit if:** a profile's figure is confirmed otherwise; a study reads how often claimants escalate (then the three
+  tiers in England may matter); or a steward is found to answer the ombudsman and still not the claimant.
+
+## 2026-10-31 · A crew's day three times as long, traced: the seat held until each order began (MT-23) (branch `mt23-crew`; no model called)
+
+**What.** On 2026-10-24 the seat-diary run's day 21 showed a works crew's forty notices taking 310 minutes where every
+other working day took 106 to 121, the crew's acts one after another. Traced to a mechanism fault already fixed:
+until foundations-2 P1 (`fc5eabd`, 2026-10-25) an actor who only orders an act was held on its own time until the work
+began, so a seat's orders queued behind whichever member of its crew was busy; P1 places the order when the actor is
+free and lets it go on. On current main every working day is alike (105 minutes of crew work a day in the 600-person
+town, days 1 to 22; 31 minutes in the town of the usual size, days 1 to 30). Not re-run on the old kernel (a cold
+build); the trace is from the code, the decision of 2026-10-25 and the dates, and is recorded as such.
+- **The measure was wrong too.** The test's `spanOf` read the log time of `action_started`, which since P1 is when the
+  seat gave the order (16 minutes a day), so its bound held whatever the crew did. It now reads the work's own `starts`
+  and `done`, and every working day is held under three hours, not the middle day (the median was a stand-in while the
+  outlier was untraced). No pinned hash moves: a test-side change only.
+- **Revisit if:** a day over the bound again (then look at who in the crew was busy, and with what, from the log's
+  timelines).
+
+## 2026-10-31 · Foundations-2 phase 3, S3: bodies on their way (branch `f2-phase3`; results move; no model called)
+
+- **Kernel.** An act that takes a body to another building puts it on its way when the act starts (it leaves its space
+  then, `vacated`) until the act is done (it enters the new one then, `occupied`), in `State.transit` (the reserved shape,
+  now with the space it left and the act that takes it). A body on its way is in no building, so the presence checks that
+  already exist refuse whatever would be done to it or by it at a place, and nobody sees it in either; its vehicle stands
+  with it (`at` the body: nobody else can take it). An act that starts later (its actor busy) sets them out at its start
+  (`Sched::Depart`, before the start's checks). A move refused when it is done (the space filled meanwhile; the act
+  refused when it starts) brings the body back where it set out, into the space it left if there is room (the way there
+  and back is the known limit); dead or gone on the way, it is only taken off the road. A person's visit to go and look
+  is a trip there and back: away from where they were for its whole time. A person knows where they are going and when
+  they arrive (`body.on_way`), and a citizen on their way sets out for nowhere else.
+- **Standing journeys not built** (3.1 has them, to keep the log from growing by a commute's acts): putting bodies on the
+  way adds no event (the `vacated` comes at the start instead of the end, the `occupied` as before), so the log does not
+  grow, and the daily round's wakes already happen at the round's hours. Revisit if a commute's acts show in a profile of
+  a long run or the log.
+- **Kernel tests** (`space.rs`): the property holds that a body on its way is in no building and arrives no sooner than
+  it set out; a trip by car (in no building until it arrives, the car with her, bob cannot take it, she knows where she
+  is going and when); a trip refused on arrival brings her home.
+- **Measured** (10,000 people, 30 days, as S2's; on the tree merged with main at 60c7ab07, so main's years-at-10,000
+  fixes are in it too): 3,337,279 log lines against main's 3,332,887 (+0.13%, within the plan's 5%); wall 99 s, the run's
+  own thread 74.7 s; peak 1.68 GB. 30,376 moves into a space, 6,772 driven; refusals for want of room fell from 1,486 to
+  11 and `no_time_left` from 499 to 139 (a body on its way holds no space: the house is not full of people who have gone
+  out), `not_present` 1,719 (a household's second driver finding the car gone).
+- **Inventory.** S3 done: the trip spent where one set out is gone (the entry a guard).
+- **Revisit if** a refused arrival's way back matters to a result (then the body stands at the door, a place of its own);
+  a body on its way should be met or seen on the road (then a link it is on, S5's flows).
+## 2026-10-31 · The assistants' prices from real products; gb-eng and us-oh get assistants (branch `assistant-prices`; profiles only; a town without `assistants` is unchanged; no model called)
+
+- **What.** Each offer's fee, set-up and exit in au-vic now rest on 2026 published prices of real general AI
+  assistants, and gb-eng and us-oh get the same two providers in their own currencies (sources in each profile's
+  `sources.assistants`; citations in docs/research/references.md). Businesses: A at a ChatGPT Business seat's annual
+  price (US$20; A$31.00 and £15.60 converted at the profiles' rates, no local price found), B at Microsoft 365 Copilot's
+  (A$44.90, £24.70, US$30). Persons: the consumer tier at about US$20, A at the cheaper and B at the dearer local price
+  found (A$29.99 / 32.99; £18.99 / 19.99; US$19.99 / 20.00). Set-up and exit 0 for a business (none listed for these
+  self-serve subscriptions; B's US$200 set-up and US$100 exit had no source), a person's set-up a month's fee (paid a
+  month ahead: a convention). Per use: none (flat subscriptions; an offer has no per-use field). For comparison, not
+  read by any code: what a bookkeeper or clerk costs in each place.
+- **Not changed, and why.** Speed (a tenth of a person's time), the claimed and true slip rates, the records terms and
+  every principal's figure stay placeholders, labelled: no honest source measures an assistant doing such papers alone
+  (Noy and Zhang 2023 measure a person with one; hallucination leaderboards measure summaries, at rates from under 1% to
+  over 10% by dataset), and picking a number out of such a range would be choosing the outcome. gb-eng's and us-oh's
+  error cost is au-vic's placeholder converted. Nothing was tuned: every price is moved to its source whichever way it
+  moves engagement; prices all fell (business fees by a third to a half, set-ups to nothing), so expect more engagement
+  at au-vic's prices than before, recorded, not targeted.
+- **Results.** Towns without `assistants: true` are generated and run as before (no pinned hash moved); towns with it
+  change in the providers' offers only.
+- **Which product stands for A or B** is a convention (the cheaper for A); the world names neither. B's dearer price
+  goes with its records returned to the client and its lower true slip rate, both placeholders, so a principal's choice
+  between them is a choice between placeholders as much as prices.
+- **Revisit if** a provider publishes an error rate or time per document for agent work of this kind, a study measures
+  an assistant working alone on administrative papers, a product sold to landlords or for persons' claims (rather than a
+  general assistant) is priced, or the primary price pages can be opened (most figures are from secondary pages: to
+  confirm).
+
+## 2026-10-31 · Main red after years at 10,000: two slow tests, one a test fault, one held to one seed
+
+- **What:** the first merge of years at 10,000 (a521b7ec) left two slow-tier files red in CI, neither run by its gate.
+  `word-of-mouth.test.ts`: its reading of "what the teller could see when it decided" walked back over wakes that carry
+  on a plan by `woke_for === "done"`, which the Rust world's logged observations never say; a tip planned at the hall and
+  sent on the way home, one act after another, read as a tip about a building not in sight. A wake that brings the
+  outcome of one's own act now counts as carrying on. `own-venture.test.ts` ("someone who meant a business starts one"):
+  held to one seed and moved seven times before; after the owners' fix the one person of seed 1 who meant a business
+  already ran one. It now holds the rule over seeds 1 to 3 (the first three, not chosen: 1 has no occasion, 2 and 3
+  have), counting only those who meant one while running none.
+- **Why:** the owner's standing permission for test fixes; the plan's gap list had own-venture among the tests pinned to
+  one seed. Not a seed hop: the occasion is the draws', the rule is every run's.
+- **Revisit if:** the three seeds all lose the occasion (then the test needs a town that makes one, not more seeds).
+## 2026-10-31 · Delegation D6, the rest: a seated assistant's stationery (branch `delegation`; no result changes for a town without assistant seats; no model called)
+
+- **What:** where a town seats a model in a kind of assistant (`assistant_seats`), its posts get stationery: the
+  assistant's own papers in words (`ASSISTANT_ISSUES`: advice, approval_request, report, scope_request, handover, each to
+  its client), and at an organisation's assistant post the principal's own forms for the kinds it may do, and each as a
+  draft for sign-off (`draftOf`: the paper as it would go, in `paper`). A code principal reads a form draft by the paper's
+  kind and addressees against what it asked (`paper_as_asked`); advice in words alone is counted as nothing.
+- **Why:** a model writes words, through the translator; a code principal reads only what an act would do. The kind and
+  the addressees are what a code principal can check of a paper it did not write; its wording is the assistant's, and is
+  on record beside the referral for whoever reads the log.
+- **Checked:** a cheap 300-person town for 120 days with assistant-a's kinds played by mock seats gave the same 21 reports
+  as with the assistant's code (the state hashes differ, as the seated town carries the stationery and the seats' channels).
+- **Revisit if:** a real model's drafts are declined for addressing alone where the matter was right (then the principal
+  needs a reading of more of the paper), or a seat cannot find its forms.
+
+## 2026-10-31 · The slow tier's budget: one computation made cheap, ten towns run only the span their laws need (branch `slow-tier-budget`; tests; no model called)
+
+- **Why:** the slow tier took about 1,526 s on the Mini against its 1,000 s budget (`scripts/test-budgets.json`).
+  Pruned as docs/testing.md, "Pruning", says: first the per-run trace (`OIKOS_RUN_TRACE`) for towns run twice (none
+  but the deliberate twins: nothing to share), then the slowest files' runs against when what they check happens.
+- **What:** no assertion loosened, no seed moved. Each shortened run states beside it the days it was measured to need,
+  read from the long run's own log that day.
+  - `orchestrator/src/figures.ts`: `matches` compiled a regular expression on every call (20,000 numbers a town times the
+    generator's table) and tested every prefix of the shape; now one expression per pattern, covering the shape and
+    anything under it. Same answer on all 1,064,124 pattern-and-shape pairs of two profiles' towns, old against new.
+  - `reading-dial.test.ts`: 200 → 30 days (worded decisions read from day 0, about forty in three weeks).
+  - `migration.test.ts`: 365 → 120 days where people come (first arrivals day 0, housed by 12, at work by 30, the next
+    wave days 63 to 93); "nobody comes" keeps its year.
+  - `scenarios.test.ts`: 60 → 35 days, the election's scenario 60 (its timetable fills two months).
+  - `recourse-town.test.ts`: 300 → 150 days (the span its own comment gave; first review day 3, application day 44).
+  - `deemed-refusal-town.test.ts`: 330 → 180 days (de-ni weighs an open venue on days 126, 154, 162).
+  - `justice.test.ts`: 300 → 250 and 200 days (rent reviews on day 181, orders on 238).
+  - `automation-run.test.ts`: 200 → 90 days (systems delivered and serving from day 31).
+  - `founding.test.ts`: 205 → 150 days (the first founding on day 120, code town and composed).
+  - `entry.test.ts`: 450 → 240 and 300 → 120 days (premises sold day 106, the buyer serving day 120, and day 165 after
+    main's change to citizens' work the same day: 160 days failed then, so the margin is wide; the living shop's record
+    begun day 85).
+- **Tried and kept:** `elections.test.ts` with polling at day 120 fails its paper's four editions (the paper is thin
+  until the notice); the twins' 120 days at 60 give 3 answers where the test asks more than 8; `credit` (second loans
+  and arrears from day 361), `unions` (a claim cycle a year after the closure), `prices`, `tenancy`, `households`
+  (births from day 279) need their spans.
+- **Measured** (a 4-core cloud container, three files at a time, `bun scripts/test.ts --tier slow`; before on main
+  c285778, after on the branch merged with main 1ae2561): 65 files, 9,730 → 8,042 file-seconds, 4,872 → 4,025 s wall,
+  all passing after (own-venture and word-of-mouth were red before, as on main). Per file, before → after:
+  reading-dial 547 → 59, scenarios 487 → 297, figures 184 → 8, recourse-town 295 → 123, migration 262 → 107,
+  deemed-refusal-town 286 → 134, automation-run 242 → 99, entry 211 → 68 (at 160 days; at 240 about 90), founding 230 → 171, justice 168 → 120; every
+  other file within the load's noise but `own-venture` 197 → 476, main's own change that day (three seeds where it
+  held one). Without that, the cut is 20%: on the Mini about 1,526 → 1,220 s, still over the budget.
+- **Mutations:** not run (limited credit; a cloud container, no copy-on-write clone). No planted bug is in `figures.ts`.
+  Three name a shortened file: `kernel-absent-may-work` (migration), `rs-appeal-window-off-by-one` and
+  `rs-grievance-ignored-in-seconds` (recourse-town). Owed: `scripts/mutate.ts --only` with those three, before and
+  after, on the Mini; if one is caught before and not after, the run it needs goes back to its old span.
+- **Not done, and what is left:** the rest of the slow tier is runs a law needs whole (twins of a year, three years
+  of records, the year of invariants) or held to one seed for a rare draw (production's dividend, the station's
+  warrants), each a case to be made by construction, as docs/testing.md says. The next payoffs: those cases built,
+  `elections.test.ts` (seven towns of 205 days; a paper fuller before the notice would let the election come sooner),
+  and the twin files (about 1,000 file-seconds between them). Or the budget raised, with its entry here.
+- **Then, on the coordinator's word (don't raise the budget; build rare cases, shorten the twins where the law allows),**
+  each file alone on the same container: `production.test.ts`'s dividend by construction, the outside paying a fifth
+  more for the town's goods (`profitable`) on the town's own seed, 120 days, where it was seed 5 and 300 days hunting a
+  rare draw (the "every line paid" checks now cover instructions a month before the end, where they were day 170 of
+  300): 246 → 134 s. `police-station-seat.test.ts`: 330 → 120 days (the opening case's warrant is in month two; the
+  rest is held only as both towns agreeing): 203 → 80 s. `twin-draws-seat.test.ts`, the prices twin: a year → 240 days
+  (the fault moved prices from the second month; 8 lists, 8 distinct): about −90 s. Kept: `twin-draws-year`'s mayor
+  floor (0.37 of decisions alike) is set against a year, where the fault it guards gave 35%; at 120 days the town gave
+  72% alike, so a shorter run would not catch it. `twin-seat-year` needs a seated resident's death and its floors are a
+  year's. The elections paper: not cheap (who files what before the notice), not done. With these, about 8,042 → 7,750
+  file-seconds here, 20% under the start (23% leaving own-venture's growth out): on the Mini about 1,526 → 1,200 s,
+  still over the budget. What is left is the twins of a year and the elections, each a law's whole span, or the
+  budget.
+- **Revisit if:** a shortened run's event moves past its end (the test fails on the count, not silently: each asks
+  for at least one of what it checks), or a scenario starts acting after its first month.
+
+## 2026-10-31 · Borrowing to start a business: the founder asks the bank, the lending office decides (branch `gap-me1`; citizen, generator; risk ME-1; no contract change; no model called)
+
+- **What:** a person who would start a business of one by what they expect it to pay them, with a home to trade from,
+  and short only of the money (its capital and the month's buffer), applies to their bank for the shortfall over its
+  longest term (`start_loan_months`, from the profile's `credit.max_months`, the term the bank publishes). The bank's
+  lending office decides it as any application: its rate for people, the serviceability buffer, its share of the least
+  monthly income it can see in the account, nothing to anyone behind or in default. The lending office is staffed by the
+  bank's people, so the decision takes its officer's time (the table of work's `loan_decision` row). Offered, the founder
+  weighs the business again at its expected pay less the repayment and signs only if it still pays; then it starts as
+  for anyone with the means, its later weighing less the repayment. Docs: `docs/behaviour/entry.md`, "Borrowing to start".
+- **Why this route:** most new small businesses are funded from the owner's savings and personal borrowing (in
+  Australia, the ABS's Business Use of Information Technology and the RBA's work on small business finance both find
+  owners' own funds and personal loans the main sources at start-up; to confirm, not opened for this work); an
+  unsecured lender lends against income, so the town's bank lends to the employed founder and refuses the one with
+  nothing coming in. No new figure: the term is the bank's, the rules and rates are its existing ones.
+- **Test:** `citizen::work` "short only of the money for a business that pays, we ask our bank to lend it and take the
+  loan only if it still pays" (the application's purpose, amount and term; nothing without a bank that lends to start
+  one; a loan too dear is not signed, one that leaves the business paying is). The lender's rules are already held by
+  `finance::credit`'s tests.
+- **Left (ME-1 stays open):** no lending against a home (households hold no home equity); a shop in premises, the
+  employing route, is not borrowed for; no start-up grants or microfinance; the lender does not read a business plan,
+  only the account (as ME-8 says of its income reading).
+- **Revisit if:** births move far beyond the profile's rate with borrowing on (the likely cause is what founders expect,
+  not the loan); a profile states lending to new businesses on other terms (a start-up product, security asked).
+## 2026-10-31 · Candidacy: the field of 19 traced, and the fault that is left (branch `gap-pb10`; docs only; risk PB-10; no model called)
+
+- **What was found:** the field of 19 candidates for about 118 formal votes (decisions 2026-10-24, "Two tests that failed in
+  the new town") is not the town's. `elections.test.ts` sets every citizen's `stand_bps` to 1,000 (a 10% chance of standing
+  when an election is called, shifted by the person's drive) to be sure of a contest; the profile's figure is 200
+  (au-vic, a placeholder). The test town (`worlds/town.yaml`, au-vic) has 166 electors: 166 x 10% x a mean drive a little
+  over one is the 17 to 19 seen. At the profile's own figure the same town fields about three or four candidates, which
+  is a handful, as real local elections have. So it is neither the mechanism's outcome nor emergent: it is the test's dial.
+- **The mechanism fault that is there:** the chance is each elector's, fixed, and blind to the field. The field is
+  therefore proportional to the electorate: at the profile's 2%, about 16 to 19 in the 1,000-person town (795 electors)
+  and some 800 in a town of 50,000 (the north star's size), where real fields per vacancy stay a handful whatever the
+  size of the ward (the VEC reports candidates per vacancy for each Victorian council election; about three in 2024, to
+  confirm). Real candidacy is lumpy and organised: a nomination costs a fee or a deposit and signatures (in Victoria a
+  nomination fee, to confirm the sum), a campaign costs time and money, most candidates come through a party or a local
+  group, and those who stand weigh their chance against the field (the citizen-candidate model: Osborne and Slivinski
+  1996; Besley and Coate 1997).
+- **Not built, and why:** fixing it is a new law of the world, not a patch: who stands (the decision weighed against the
+  field already nominated, which needs the decision spread through the nomination window so the field can be seen), the
+  nomination's cost (the law's fee, deposit and signatures, as law data per profile with sources), the time a campaign
+  takes, and backing (parties or groups, which the town does not have). Each needs sourced figures in nine profiles, and
+  the choice of a candidacy model is the owner's. Lowering `stand_bps` with the size of the town would be calibrating an
+  outcome, which the rules forbid. The test's 10% is left as it is: it forces a contest, and the test asserts only what the
+  mechanism guarantees (the incumbent's place in the voters' rankings).
+- **For Naz:** a proposal to approve or change: (1) nominations as law data (fee or deposit, signatures, from each
+  profile, sourced); (2) a person considers standing on a day of the nomination window drawn for them, weighing a
+  candidacy's cost in time and money and their chance against the nominations already public; (3) groups and parties
+  later, with founding (docs/behaviour/founding.md). Calibrated against candidates per vacancy, never set to it.
+- **Revisit if:** an election in a town of more than a few thousand is read; or the owner approves the proposal.
+## 2026-10-31 · A model steward in a fork is a pilot's seat (MT-22; mock only, no model called)
+
+- **What:** the experiment harness's model seat (`orchestrator/src/seat-host.ts`) closes the gaps it had against a
+  pilot's (run.ts):
+  1. **Told what was not taken.** The engine's notes about the seat's own sending (`rejected_action`,
+     `call_unresolved`) and its `action_started` events reach the seat at its next turn in the words a pilot's seat is
+     given (`toldOf`: run.ts `notSent`, the resolver's questions, `begin`'s "will be done at"), read from the fork's log
+     as the harness passes it on.
+  2. **The cast followed.** Who is who (`fork-cast.ts`, `Cast`) is the config's cast as the log changes it
+     (participants made and ended, posts made, appointments, bodies founded), read through the base and kept at the fork
+     (`seed-N/cast.json`), then through the fork. The reading is run.ts's `noteCast`/`whoIs`. A base kept before this has
+     no `cast.json` and is run again by `--resume`.
+  3. **Thinking takes time where the world says so.** A seat's host now sends `thinking` (world seconds) with its
+     action; the engine (`Engine::seat_thinks`, kernel/src/host.rs `submit`) puts it before the act's start, only where
+     `orchestration.thinking_time` is `costs_world_time`, and never past the round (not in a snapshot). The host reckons
+     it as run.ts does a pilot's: the deciding step's participant calls, output and input tokens at the world's rates.
+     (The engine gave seats no thinking at all; code still thinks `code_seconds`.)
+  4. **The composer and exit accounts** (`fork-composer.ts`): where the world's dial has a composer, the engine's
+     actors' questions are answered as a pilot's host answers them (pieces composed by the mock, the rest with nothing),
+     in the base and in every fork, the engine asked a day at a time as a pilot's is; the composer's month and every
+     person's record are kept at the fork (`seed-N/composer.json`); at a fork's end a sample of people give exit
+     accounts (`account_pieces`), the seat's acts' reach sampled first; the seat's debrief says a composer was on.
+     `readForEnd`'s record reading is now `PeopleAtEndReader`, shared.
+- **Why:** a seat whose act went untold may retry or wait where a pilot's would be told; names that did not follow the
+  cast misnamed posts and bodies made after the town began (most of a fork's day-30 town); thinking that took no time
+  made a model seat faster than a pilot's; and a world with a composer was a different world in a fork.
+- **Proof:** a small weather experiment (2 seeds; code, nobody and a mock-model arm) on origin/main and on this branch:
+  the code and nobody forks and the bases come out byte-identical (log and snapshot hashes, state hashes); the
+  mock-model fork ends in the same state (its log differs by what it is now told and shown). (Both on this branch's
+  engine: a code seat sends no thinking, so the engine's change does not reach it.)
+- **Fixed on the way:** with a composer the base is asked a day at a time; a pause reports the engine's clock, which may
+  be short of what was asked, so the base stops at the fork only when it asked for the fork.
+- **Not done (5):** a fork interrupted part-way is still run again from its seed's snapshot. Taking it up from where it
+  stopped needs snapshots during the fork and the seat's own state kept with them (its translator's arrangement,
+  drafts, notices, knowledge, view, office books, the controller's conversation): not cheap, and a model's answers
+  would not be served again in any case. Recorded in MT-22.
+- **Left as it was:** a fork answers no `consult`, `reading` or `words` question beyond the composer's (a pilot answers
+  them where it has the service: the sparse mind, the reading desk, a founder's words drafted by the translator); the
+  composer's system prompt is logged in full once more in each fork's log (harmless; the base has it too).
+- **Revisit if:** a fork's seat is told something a pilot's is not (or the reverse) in a model fork's log; a world with
+  `consult` or reading is run as an experiment; a fork part-way through needs taking up (a long model fork on a
+  subscription's window).
+## 2026-10-31 · Skills by use: practice and fading for every kind of work, a factor a run switches (foundations-2 E4; branch `f2-economy`; contract additions; a town without `skills` is as before, to the byte; no model called)
+
+- **What:** a body variable may be a **practised skill** (`practice`: `gain_bps_per_hour`, `half_life_days`, `floor`).
+  Its use is practice (each hour closes that share of the gap to the maximum: diminishing returns); unused, its part
+  above the floor halves every half-life, worked out when it is read or used (the lazy settling body variables already
+  had, so nothing is written a day). A task names one (`skill`: `variable`, `novice_bps`, `expert_bps`): its labour is
+  the stated labour at the variable's `initial`, in a straight line to `novice_bps` of it at the minimum and
+  `expert_bps` at the maximum, by the crew's mean (multiplying schooling's `labour_by`), and each person's share of the
+  time is practice. An act names one through the catalogue's `act_skills`, keyed as the table of work is (`publish/<kind>`,
+  else the block): a person's time for it scales the same way (`kernel.rs` `act_program`), and the doers practise it when
+  it is done. The contract refuses a skill on a variable that is not practised, and a practised variable that also drifts.
+  The generator's `skills` (off unless set; `true`, or a study's rates; `only` to make some skills live and not others)
+  gives each kind of work in the town a skill (each task that takes time, by the stem of its id) and a person's papers
+  one (`publish`, any kind), with the opening level derived: where a full-time worker settles at the run's rates over
+  the profile's working week, so the table's times stay an ordinary hand's.
+- **Why this way:** the owner's study treats skill decay as an experimental factor, so it is a switch with rates, not a
+  law always on; its shapes are the literature's (a law of practice with diminishing returns, fading by time unused) and
+  every size a placeholder, counted by law 11. Grouping by the stem keeps the generator free of a hand list of trades.
+  An ordinary hand's opening level keeps a town with skills on as quick as one without on its first day, so what differs
+  later is practice and fading, not a start of novices.
+- **Not built, and why:** slips by skill (no source for how a person's slip rate moves with practice: foundations-2 7.4
+  says "where a source gives one"); per-kind skills for papers (the kernel takes them; the generator groups all papers
+  in one, a choice to revisit if a study needs it); the code minds' plans and the delegation rule still use the table's
+  stated times, not their own skill (the kernel refuses work that does not fit the day, as it does for schooling); the
+  measure of who can still do the work (M8, step E6).
+- **Known limits:** everyone opens at the ordinary level in every skill (the generator does not know who did what before
+  the run); a person who does a kind of work part time drifts below the table's time, and someone who files a paper a
+  month drifts toward the floor, so with skills on a household's papers take longer than the table says after a year or
+  two. That is the mechanism at placeholder rates; a study sets its own.
+- **Found on the way:** 90 days of the 300-person town with skills on against off: the same work, a little slower where a
+  skill is used part time (a survey 4% longer, the food factory's making longer), and 116 refusals for time against 20.
+  Nearly all are the environment office asking its crew, every look, for a day's fieldwork sized by the task's stated
+  time when the crew's own is longer: it records the time left but not the crew's pace, so it asks again. The same
+  fault shows off (18 of the 20); fixing it moves every town's hash, so it is left for its own change (the shared
+  `common::Pace`, which learns a crew's pace from such refusals, is the fix).
+- **Off, as before:** absent or `false`, the generator returns the config untouched (`worlds/test/generate.test.ts`
+  holds it to the byte, and holds the town with skills on to the plain town but for the skills); the kernel's new paths
+  run only where a world names a practised skill.
+- **Revisit if:** a source gives slip rates by practice, or skill half-lives by kind of work; a study needs papers'
+  skills by kind; the opening level's assumption (everyone an ordinary hand) shows in results.
+
+## 2026-11-01 · Foundations-2 phase 3, S4: goods are carried, crews go to the site, the outside's freight takes its time (branch `f2-phase3`; results move; no model called)
+
+- **Contract (blocks, log, world config; blanket approval).** `move_goods` gains `carried` (the acting person carries
+  them), `carrier` (someone the actor may direct does) and `vehicle` (driven by the carrier); `goods_moved` names the
+  `carrier` and, for the outside's freight, when the goods `arrives`; a network link may carry travel (`speed_kmh`: a road
+  out of the town to an edge's node; between towns, S6). A new refusal, `not_carried`. The calls' `carried`, `carrier` and
+  `by` are code's own until the translator is taught them (the resolver's `CODE_ONLY_ARGS`), as S2's `by` is.
+- **Kernel.** In a world one travels (it has `catalogue.travel`; every world in phase 5's strict mode), goods between two
+  buildings go only with a carrier, and an act's journeys (`travel::journeys`) take each body it moves by the buildings
+  its blocks reach, in order: an `occupy`'s body into its building; a `move_goods`'s carrier by where the goods are and
+  where they go; a `work` on a building other than where it is done each performer to it. A body ends in the building it
+  goes into, or back where it set out (`turn_back` when the act is applied). Its trip is leg by leg; the act takes its
+  longest trip; each performer's and carrier's trip is placed on their own timeline. When the act is done the carrier must
+  have been by both places (`Transit.via`), else `not_present`. To or from an edge's outside, goods go by the outside's
+  freight (no town person's time): from the edge's node along the ways to the door, at the links' speeds, on their way
+  meanwhile (`Sched::Arrival`, counted by `State::total_goods`, so the conservation property holds over goods on the
+  road); at once where the world has no node for the edge (the backstop's `edgesWithoutNode` would name it). A vehicle
+  named that the body may not drive, or that is not where it sets out, means the body does not set out and the act is
+  refused when due (it looked, and the car was gone); on arrival the vehicle that went is the one that arrives.
+- **Generator, profiles.** The road out (`round.outside`: how far by road the outside's goods come from, and its freight's
+  speed, placeholders in all nine profiles, with what each would be sourced from), from the street end nearest the
+  town's west edge to a node off the ground, and every edge's node at its end.
+- **Actors.** Every move of goods an actor writes says it is carried (`uncarried` is empty). A citizen's order is collected
+  at the shop (it says where it serves from) and carried home at the weekly use, there and back; a seller delivering to
+  another business, and a shop moving its stock, carry it themselves. The crews (the builder's, the works', the
+  collectors') go to the buildings they work on with no change of their own: the kernel's journeys take them.
+- **Inventory.** S4 done: `edgesWithoutNode`, `uncarried`, `uncarriedMoves` and `workElsewhere` empty in every profile's
+  town and a month of each one's log; the special cases `goods-move-anywhere` and `crews-from-the-depot` gone (guards).
+  Left: the unhoused in no space, and the systems with no place.
+- **Not as designed:** carriage has no load yet (a body's or a vehicle's limit in mass: S5 with link capacity, which needs a
+  mass for each kind); a carrier's goods land when it is back, not when it passes their place (a trip's length late at
+  most); the freight's price is the edge's offer's as before (a freight charge by distance is the outside's behaviour, to
+  come with its sourced rate).
+- **Revisit if** a delivery round's order of stops matters (then the route is ordered by the carrier, not the blocks); the
+  outside's freight should take town people's time (then a carrier firm of the town's, its staff and vans).
+
+## 2026-10-31 · Elastic slots: the pool fits the machine as it is (branch `elastic-slots`; `scripts/slots.ts`; risk PL-4 (1); no result changes; no model called)
+- **What:** with `OIKOS_SLOTS` unset the pool is the core count (it was the cores less two, fixed), and a job that is not
+  the merge's starts only when the machine has room for it now (`fits` in `scripts/slots.ts`, a pure function of the
+  readings): `load average + expected cores of holders younger than a minute + job's expected cores <= cores`, and `free memory - expected
+  memory of holders younger than a minute - job's expected memory >= max(1 GiB, a tenth of the machine's)`. Free memory
+  is what can be had without swapping: Linux `MemAvailable`, macOS `vm_stat` free + inactive + speculative + purgeable.
+  Expected use is per token and per class (test, build, run, other): declared (a core; 1 GiB, a test file's 0.5 GiB) until
+  measured, then a moving average (0.7 old, 0.3 new) of cpu time over wall time and peak memory of the jobs of that
+  class that ended under the wrapper (`bun scripts/slots.ts -- ...`, cargo there is a build) or the test runner (its test
+  files and the kernel's cargo tests), kept in `usage.json` beside the tokens; a job under 2 s teaches nothing.
+- **Why so:** load 32 on 12 slots (2026-10-30) came from tokens that cost more than a core (builds, runs) and work
+  outside the slots, which a fixed count cannot see; a machine left at the cores less two sat idle when jobs were light.
+  The load average sees real use, outside the slots too, but lags by a minute; the expected use of the holders just
+  started covers that minute, so a burst of starts cannot pile up before the load shows it. (First written as the larger
+  of the load and every holder's expected use: on the first gate run a build's measured average, 3.3 cores a token, held
+  the test files back while the build's last rustc used one core. A long job's average is not its use now; the load is.) Memory gets the same two-part
+  reading (free now, less what the young holders will still take).
+- **What stays:** a job never stops another: one that does not fit waits. The head of the queue waits for room and
+  nobody passes it, so a big job is not starved by small ones. A job alone in the pool always starts. The merge's
+  (priority high) is not held by the machine's readings at all, only by the pool and the queue, as before. The cap per
+  checkout stays: a run or a build holds its tokens for minutes to hours and cannot give them back at a file boundary, so
+  lifting the cap for a lone agent (PL-4's first sketch) would leave the next agent waiting that long; only the test
+  runner's short tokens borrow past it, as before. `OIKOS_SLOTS=N` fixes the pool at N with no reading (the tests do).
+- **Not measured:** runs started by `oikos run` are in-process, so their use stays declared (a core a token, the engine
+  given as many threads as tokens). Peak memory is the largest single process a job waited for, not its tree's sum: a
+  cargo build's is one rustc's, an underestimate the memory reserve covers.
+- **Revisit if:** the load still runs well past the cores (then the measure misses the use: sample the holders' process
+  trees instead), the machine sits idle with jobs waiting (the reserve or the declared figures too high), or a big job
+  waits long at the head while small ones could run.
+## 2026-11-01 · The outside's capability over time: releases of what it sells, from a scenario, tagged for measurement only (foundations-2 E2, its first part; branch `f2-economy`; contract additions; a town under no capability scenario is as before, to the byte; no model called)
+
+- **What:** a scenario may give `capability` (`tag`, `of`, `every_days`, `time_bps`, `slip_bps`, `price_bps`, with its
+  basis): the outside world's technology released anew every so many days from the first, each release's time, slips
+  and prices a share of the one before. The generator (`worlds/generator/capability.ts`) makes each release a kind of
+  system of its own (`<kind>-r<n>`, its rows quicker, its row of the table of slips lower, `released` on its day) and
+  gives its sellers the schedule (`releases` in `world.vendor`'s and `firm.provider`'s parameters); a seller sells the
+  newest out, publishing the offer again when one comes out (a provider's claims move with it), and fills an order
+  from that kind. The kernel refuses to deliver a kind before its release (`unknown_template`: nothing from nothing).
+  The tag lists every kind the capability moves, and its releases, in `meta.study_tags`, for measurement; a backstop
+  (`orchestrator/test/generality.test.ts`) fails on any world code that reads it. The first scenario is
+  `rising-capability`: case-handling systems and assistants, a release every six months, each a fifth quicker and
+  slipping a fifth less, prices held (placeholders, well short of what is measured of language models: METR 2025,
+  Epoch AI 2025, both to confirm).
+- **Why this way:** the owner ruled that AI's capabilities and costs come from an outside scenario for now, and that
+  nothing in the world knows which systems are AI (foundations-2 7.2, 7.5). Discrete releases, each a template, keep the
+  kernel's systems what they are (a template's rows are fixed; a system is what it was delivered as), make upgrading an
+  ordinary purchase, and let the kernel refuse a kind before it exists. The schedule is the seller's parameter, never
+  published: nobody in the world knows of a release before it is out.
+- **Not built, and why:** technologies that are goods (a machine or hardware a firm holds, with `runs_on`'s energy and
+  water) wait for E5, where hardware has to be somewhere on the network (plan, "E2b"); a provider's desk for persons is
+  not replaced by a newer release (the desk's clients keep the first kind); buyers do not trade a delivered system in
+  for a newer one by any rule of their own beyond the comparison they already make; the scenario's sizes are not fitted.
+- **Off, as before:** with no capability the generator returns the config untouched; the vendor's and the provider's
+  saved state carry no `releases` and their published offers' keys are as before (`worlds/test/generate.test.ts` holds a
+  town with capability to the plain town but for its releases and its tag).
+- **Revisit if:** a study needs capability as a continuous path rather than releases; a scenario's sizes find sources;
+  buyers should replace delivered systems as releases come out (that is a buyer's rule, with a real basis, not this).
+## 2026-11-01 · The citizen model, step 1: a model of our own as an optional citizen mind, and its pipeline (docs/design/citizen-model.md steps 2, 3, 5; contract addition `dials.citizen_model`; a world without it is as before, to the byte; no model called)
+
+- **What:** `kernel/crates/actors/src/mind/model.rs`: the input builder (reads the `situation` the mind records with a
+  want decision, less the code mind's own scoring) and the forward pass of a small network that gives each of a want's
+  ways a score; `dials.citizen_model` (`weights`, `sha256`, `share_bps`), read and hash-checked by the engine
+  (`engine.rs` `citizen_model`), carried to every citizen through `WorldInfo`; in `pursue`, the way is drawn from the
+  code mind's exponents blended in log-odds with the model's (`model::blend`), both odds recorded. The trainer
+  (`kernel/crates/citizen-train`) and the pipeline (`scripts/citizen-model.ts`, one command; `towns` makes the code
+  towns of `worlds/citizen-model.yaml`). `Attractions::choose` now draws through `exponents` and `pick`, the same
+  arithmetic in the same order.
+- **Why this way:**
+  - *The want's way first:* it is the design's round 1 (whether to contest, and where), it is the one decision whose
+    situation the capture types fully, and the code mind's odds are recorded with it as targets.
+  - *An MLP over each option, not attention over items:* with the act head only, the options are a handful of kinds,
+    and a scorer applied to each alone keeps order out by construction. Attention over fact and paper items is for the
+    content heads (grounds, evidence), which need step 2's renderer and the teachers first.
+  - *Floats in a fixed order, weights in 1/65,536ths, not int8:* the code mind already computes its logit with IEEE
+    arithmetic and `mind::math::exp`, which is the same on any machine; whole-number weights make the file exactly
+    what runs, and an int8 forward buys speed this decision does not need (a few thousand calls a day in a town of
+    10,000). Revisit if a head runs on every decision.
+  - *Training in Rust, not PyTorch:* the network is small; one thread, a fixed order and `mind::math` make the same
+    data and seed give the same weights anywhere, and the trainer measures the very forward pass a run computes, so
+    no Python reference or bit-identity test is needed. `crates/citizen-train` is outside the determinism lint (as the
+    explorer is): it is not in the world, and a run reads only the file it writes, by its hash.
+  - *The weights by path and hash, read by the engine:* the actors crate may not touch files; inlining the weights in
+    the config would make every person's parameter key carry them. The hash in the config (and so in the log) says
+    which weights ran; a file that differs refuses to run.
+- **Not built:** the content heads (seeks, amount, grounds, evidence, register: step 2's renderer and teachers); the
+  teachers (paid API, the owner's go-ahead); scrambled-record and edit checks against the code mind's own response
+  (the code mind's odds are recorded, not recomputable from a row: the edits are checked for the direction of the code
+  mind's own sways instead); the content and patterns-not-told checks; twins over two years.
+- **Revisit if:** the model's odds are used past round 1 (a head per domain needs its own situation typed); a head runs
+  on every decision (then int8 and batching); the code mind's want weighing changes (retrain: the model learns the
+  code mind as it was when captured, which the data manifest records by source hash).
+## 2026-11-01 · The citizen model, round 1 trained and measured: `want-way-r1` (docs/citizen-data.md, "Round 1"; no model called)
+
+- **What:** 25 code towns made for it (`worlds/citizen-model.yaml`, nine profiles, a year each, captured: runs/citizen-model/towns/)
+  and the pilots' training split; 33,692 want decisions kept (the three held-out test pilots refused whole, decisions
+  with only waiting open left out); five seeds trained; seed 2 chosen. On two profiles never trained on: 1.3 points
+  from the code mind's odds (median), acting at all 67.30% against 67.32%, the spread between people kept (0.98), every
+  edit the code mind's way in every case, 23 microseconds a decision. Retrained, the same file byte for byte. Twins
+  in a town of 1,000: no difference in run time beyond the load's noise; waiting 53.0% against 54.0%.
+- **Why the splits so:** whole towns and whole profiles held out, as 11e asks, so the test says whether it learned the
+  citizen or one town's settings; the held-out pilot says whether seats' towns differ (they do not, here).
+- **What it shows, honestly:** a small net of our own reproduces the code mind's want weighing closely, fast, keeping
+  who people are, and the mechanism is in place for a round that adds teachers or content heads. It shows nothing about
+  real people: it inherits the code mind's placeholder sways (plan caveat). Nor is it faster than the code mind for
+  this decision; its use is as the base the later heads build on.
+- **Revisit if:** the code mind's want weighing changes (retrain from new captures; the manifest records each source's
+  hash); a profile whose parameters differ from all nine shows a larger distance (the model reads no profile parameter
+  directly, e.g. the mind's lambda); the scrambled-record figure (13.8 here) is to be compared with the code mind's own,
+  which needs the code mind run on edited records (a harness of its own).
+## 2026-11-01 · Compute in the town: what a system runs on, and a host on the town's network (foundations-2 P4 and E5; branch `f2-economy`; contract addition; new kind `firm.host`; a town without `hosting` is as before, to the byte; no model called)
+
+- **What:** the kernel's `runs_on` (foundations-2 4.1, P4): a system's template says the hardware it runs on (a kind, so
+  many units a lane), who holds it and where, and the recipe an hour of its work is there. A `deploy` is refused when the
+  hardware held does not cover the lanes of the systems there and the new one's; a hosted system's seconds of work (its
+  own acts, the acts it is named on, its share of a work) add up, and each whole hour is the recipe at the host, its
+  inputs taken from the holding there (refused, `insufficient_quantity`, when they are not there: a host with no power
+  does nothing). The generator's `hosting: "local"` (with `assistants`, the network and the profile's `values.hosting`)
+  puts the providers' systems at a hosting firm in the town: a building on a lot of its own (the last taken), its servers,
+  an electricity, a water and a sewer connection sized by a day at full work, held there rather than used as it comes, and
+  the feeders and mains sized with it; an hour of a server's work (`compute`) is its draw times the building's PUE, with the
+  grid's emissions, and its cooling water out to the sewer. `firm.host` uses each day what came in beyond a day's full work
+  kept in hand (the plant: idle servers, cooling), and pays the bills addressed to it; each provider pays it a fee a month
+  (`hosting` on `firm.provider`), its power and water at the tariffs with a margin. Figures in au-vic, with sources to
+  confirm or marked placeholders (risk ME-24).
+- **Why this way:** foundations-2 asks that compute compete for energy, water and land through laws 8 and 9 with nothing
+  built for AI: a data centre is a building and a firm like any other, on the same network, and the systems on it draw
+  through the same holdings and recipes as any work. The per-act draw with a remainder carried keeps law 8 exact (no part
+  of an hour lost or invented); a delivery refused without hardware keeps a system from running on nothing.
+- **Not built, and why:** the host entering by expected profit (step E3); the households' hourly shape on its connection
+  (the kind's, one shape for every connection: a known limit of C3); evaporation (no recipe carries water to the air yet);
+  its staff and its servers' wear; every other workplace on the network (WM-15, its own item).
+- **Off, as before:** absent `hosting`, the generator emits nothing new (the network's users are the homes as before);
+  the kernel's new paths run only for a template that says what it runs on, and the provider's state carries nothing new.
+- **Revisit if:** a source gives a data centre's hourly shape or its evaporation; a study needs the host to set its own
+  connection's rate; the placeholders find sources (ME-24).
+
+## 2026-11-01 · Deaths on the way: whoever comes by finds them, a household reports one who has not come home (WM-6; with S3 and S4; results move; no model called)
+
+- **What we saw:** the invariants canary (ke-nakuru seed 2, a year) failed on S3 and S4: a severely ill worker set out
+  from the builder's yard for the clinic and died six minutes into the walk. A body on its way is in no building (S3), so
+  nobody was in the room; the death was never reported and the employer's standing order paid wages for 58 days. Before
+  S3 the worker would have died at the yard, with coworkers present. The gap is WM-6's ("a death outdoors leaves no
+  trace"), made reachable by law 9. The coordinator's direction: real behaviour, the "they are there" way of knowing, no
+  invented find-rates, not a loosened invariant.
+- **Kernel.** A body that dies on its way lies on the road where it had come to (`State.remains`: the cell that far along
+  the straight line between the buildings it goes by, the known limit), its vehicle with it. Whoever comes by within a cell
+  and a half of it on their own way (at the end of their trip) sees who lies there: a look at that cell, delivered to
+  their first channel of what is at places (`SiteCell.remains`, shown to anyone there).
+- **Citizen.** Someone who has seen a body lying where they went by asks the police to come (`welfare_check_request`
+  naming the cell), once for each of the dead. An adult at home who sees that one of the household left home more than a
+  day ago and has not come back (the home's departures) reports them missing (`missing` on the request), once for each
+  going. A day is the round's own rhythm, as for a home that stands empty (deaths.md).
+- **Police.** Called to a place on the road, an officer goes (a visit, as to a home) and reports whoever lies there to the
+  registry as found there, once, and does not go to that place again; called about one who has not come home, they look
+  at the home and the street outside it (each cell next to its ground). The registry, the bank and the employer then learn
+  of the death the normal way (deaths.md, "Who is told").
+- **Not done:** the body is not taken away (nobody does an undertaker's work): others who come by still see it, and the
+  police, who found it, do not go again. A body lying where nobody passes, of someone with no household at home, is still
+  found by nobody (WM-6 stays open, narrower).
+- **Revisit if** a body lies unfound for long in a busy town (then the straight line is too far from the way people take:
+  draw the way cell by cell); deaths on the road show in a result (then an undertaker's or coroner's work, and the time).
+
+## 2026-11-01 · Foundations-2 phase 3, S5: a road carries so many an hour, a full one slows and holds, and a vehicle runs on what is in its tank (branch `f2-s5`; contract additions; results move; no model called)
+
+- **Contract (world config, log; blanket approval).** `catalogue.travel.congestion` (`alpha_bps`, `beta`): the volume-delay
+  function a road's time follows; a vehicle type's `fuel` (the kind it runs on), `fuel_per_100km` and `tank`; a holding may
+  be at a vehicle (its tank, or its load); a new event, `fuel_used` (the vehicle, the kind, how much, the metres driven).
+- **Kernel.** Each way link counts the vehicles that set out on it in the hour, each way (`State.flows`, only the current
+  hour kept). A driven leg's time is each link's free time times 1 + alpha (on it / its capacity)^beta, the Bureau of
+  Public Roads' form in integers; a link already at its capacity this hour takes the vehicle only in the next (it waits the
+  hour out). Routes are the free-flow quickest (no re-routing: the known limit, 3.6). A trip by a vehicle that runs on
+  something draws it from its owner's holding at the vehicle as it sets out, by the metres driven, in whole units as the
+  millionths add up (`Vehicle.fuel_owed`), so a short trip is never charged a unit it did not use; a tank with too little
+  for the trip leaves the vehicle where it stands and the trip is walked. Goods go into a vehicle where it stands, or by
+  driving it to where they are.
+- **Generator, profiles, actors.** Each kind of vehicle runs on the fuel the town's service stations sell (the shop mix's
+  transport kind), at the profile's `round.vehicles.types[].fuel_cost_per_100km` over the kind's price, with a tank of its
+  `range_km`, half full at the start (generator 0.75.0); roads have the profile's `round.roads.congestion` (alpha 0.15,
+  beta 4, the BPR defaults; Traffic Assignment Manual 1964, to confirm; in all nine profiles). A citizen who owns a vehicle
+  puts the transport they bought into its tank, as far as it holds, driving there and back (`use_up_kind`).
+- **Backstop.** `movesForNothing` (a vehicle type that uses no energy, a way with no capacity): the inventory lists the six
+  profiles whose shop mix has no transport kind (their cars and motorcycles, which run on nothing until those profiles
+  say what fuel is sold there). The log audit treats goods into a vehicle as at the place it stands (`farActs`).
+- **What it does:** a unit of the transport kind is about 100 km of a car's driving, so fuel is a small draw in a town
+  (on a 300-person town, 152 fills in 60 days); local roads at 900 vehicles an hour are almost never full, so congestion
+  bites only where the profile or a study gives a road little capacity.
+- **Measured (the stop rule, 3.5):** a 10,000-person year (town-1000 at 10,000, lean log, 4 threads), main at c46643eb
+  (S2 and the representation work, without S3 to S6) against this branch (S3, S4, the deaths on the way, S5, S6's kernel
+  fix): 554 s wall and 504 s on the main thread, against 586 s and 531 s (+6% and +5%); peak memory 4.11 and 4.06 GB; log
+  5.77 and 5.76 GB. Well within 1.3 times. (The two partly overlapped on a loaded machine; the main thread's time is the
+  steadier figure.)
+- **Not as designed:** no load limit in mass (no kind has a mass yet: a carrier takes any quantity); no re-routing round a
+  full road; flows have no day's history kept for whoever looks.
+- **Revisit if:** a study needs congestion (then the town's roads need sourced capacities, and re-routing); a kind gets a
+  mass (then a body's and a vehicle's load); the other profiles' shop mixes name their fuel.
+
+## 2026-11-01 · Foundations-2 phase 3, S6: several towns in one world, joined by road, sharing the outside (branch `f2-s5`; generator option, off by default; results of one town move only by a kernel fix below; no model called)
+
+- **What:** a spec's `towns: N` (`worlds/generator/towns.ts`). Each town is generated whole from the spec, at its own seed
+  (the first at `seed`, then the next), all under the first's weather (`weather_seed`, the stream the first town's weather
+  is drawn from), and composed: laid side by side on one ground, each east of the one before, within one root place,
+  `region`. The first town keeps its ids; every id another town defines is prefixed (`t2-`, `t3-`) wherever it is written,
+  but for the world's vocabulary (a kind, a type, a role, a channel's own name: the police are an entity and a kind, a
+  mayor a post and a role). Shared, once: the outside world (its entities, its accounts, the network's nodes off the
+  ground: the far end of every town's road out and the edges there, so the outside's freight reaches every town), and what
+  of the outside's is alike in every town and names nothing of a town's (the weather bureau, an agency's template). A
+  road joins each town's gate to the next town's, its length the distance between them.
+- **Why this way:** the generator draws one town from the profile; a world of several is several such towns, each as a
+  one-town world would have it, so every rule and figure that holds for one holds for each. The alternative, a generator
+  that draws several towns at once, would touch every one of its four thousand lines.
+- **What it does:** what is published reaches everyone, so a job or a home in another town is seen as one's own town's:
+  in a world of three 60-person towns run a year, 52 of the 84 hires were across towns, and 91 people went into another
+  town's buildings (gatherings at its hall, its shops, a home). Every invariant held, and law 9's log audits found
+  nothing.
+- **Not as designed, and the parity notes:** the world has one design of each building, as big as the town that needs most
+  of it (a school's classrooms, a shop's places of work); one wear rate a day and one rate of pay come short, the first
+  town's (the generator derives each from its town's people; the towns are of one spec, so theirs are near one another).
+  People choose a job without weighing the trip to it (the citizen's choice has no commuting cost yet: hires across towns
+  are as likely as within one, 3 km apart); recorded, not chased.
+- **Kernel fix found by the three-town year (results move in every town).** A crew member's time is theirs again when
+  their part of a round is done, but they are on its way until the act is (the manager's part can be longer); their own
+  trip meanwhile was applied, so they were at a gathering while the round they were on was done. A body on its way for
+  one act is now not there to be sent anywhere by another (`not_present` when due; `Exec.act`), and the citizen tries
+  again later. A single town showed it too (a year of 60 people). Known limit: they come back when the act is done, not
+  when their part is.
+- **Revisit if:** a study needs commuting weighed (then the trip's time and cost in the citizen's choice of job and home,
+  with a real basis); towns of different profiles or sizes in one world (then the composer takes specs, not one).
+## 2026-11-01 · Main red after foundations-2 S2: own-venture held the owner of a failing business to 150 days
+
+- **What:** CI went red at d0105172 on `own-venture.test.ts`, "someone out of work ... starts a business of one": its
+  owner applied for a job more than 14 days after founding it. Bisected on main: green at 9f30b45e, red from f56d2dbc
+  (the merge of f2-s2: roads as ways of the network, vehicles, trips driven or walked). Main went green again at c46643eb
+  by chance (working calendars moved the draws), so the test was fixed, not left.
+- **Why:** not a broken rule. The business's sales were thin from its third month at both commits (it paid its owner
+  nothing in months three and four at 9f30b45e, and nothing in month three at f56d2dbc); with S2's roads its owner gave it
+  up on day 134 rather than after day 150, by the rule the file's third test holds (a business of one that does not pay
+  its owner a living is given up), and then looked for work, as that rule says. The test asserted no application in the whole 150 days, an
+  outcome of how well the business did.
+- **Change:** the test holds what it means: no application for work while the business trades, from 14 days after its
+  founding until its giving up (the wake that takes its price list down, the closure minutes later), and a closure, if
+  any, is a giving up. Same seed, same horizon; nothing loosened beyond the rule.
+- **And the next test, on main at c46643eb** (E2a's releases and working calendars merged after d0105172): "a business
+  of one that does not pay its owner a living is given up" asked for a job application after the closure. The owner gave
+  up on day 44, then searched the jobs board 65 times (never once while trading), and all four postings in the 105 days
+  went up and were filled between two of their searches (the longest stood three days, while they did not wake): the
+  occasion is the town's, as the test's own comment already said. It now holds the rule: no search of the board (its
+  postings by pay) while the business trades, searches once it is given up, and an application whenever a posting stood
+  at one of them. Seed, horizon and set-up unchanged.
+- **Two more red at c46643eb, from working calendars (gap-weekends; both green at b9601b0b, just before it):**
+  `representation.test.ts`'s six 30-day towns moved, as every town with a support office or tax collector does: pins
+  re-taken (`scripts/fixtures/representation-results.json`, its own commit), the 200-person gb-eng state the same as
+  culture-dial's. `production.test.ts` (Lengnick) held a wind-up's redundancy notices to within an hour of the manager's
+  command to wind up; factory-2's two landed 61 minutes after it, the notices being acts in the manager's time. It now
+  holds what it meant, exactly: each such notice is for an agreement that command gave notice on, and comes after it.
+  These two were missed by gap-weekends' gate: the change reached 65 slow-tier files, so the gate ran the canaries and
+  left the rest to CI, as designed.
+- **Found, not fixed:** the owner founded the same business again two minutes after giving it up (day 134.54, $24,200 of
+  capital): entry by expected profit reads the profile's venture, not what the person just lived through. A behaviour
+  question (does a failed founder try again at once, and how soon?), to settle with a source, not a test.
+- **Revisit if:** a founder's own failure is to weigh in their next venture (ME-1).
+## 2026-11-01 · Entry into the town's other industry: a factory founded in works for sale (foundations-2 E3, its first part; branch `f2-economy`; citizen, firm.producer, generator; no contract change; no model called)
+
+- **What:** the town's ventures gain a factory (`kind: factory`, the works' type): when a closed factory's works are for
+  sale, someone with the means for them and the venture's capital weighs founding a factory there by expected profit
+  (`rules::entry::expected`, as for a shop): its price and its inputs' cost a unit, its custom the world market's
+  appetite for goods as it publishes it (`demand_per_month`) shared among the town's factories of goods (`sellers`) and
+  itself, a hand's month at the time a unit takes, hands while the margin pays their wage. Founded, `firm.producer` sets
+  itself up first (account, the founder's capital, shareholders, the works bought), by the setting up the retailer had,
+  moved to `market/founding.rs` unchanged (the retailer's words and order kept, so a shop's founding is as before).
+- **Why this way:** entry was already by expected profit (2026-10-24, ME-1) and premises already came up for sale by
+  type; widening the venture list to the factory is the general law (any industry whose premises can be had), and the
+  world market already buys from every seller (ME-15), so a new factory has a market as a real entrant would.
+- **Not built, and why:** new premises built through planning, the route for an industry with no premises standing (a
+  hosting firm's): it needs a founder to buy land, apply for a permit and pay the builder, a chain the town has for
+  landlords' homes but not for firms; borrowing for a venture in premises (ME-1 says so); products other than goods.
+- **Results:** every town's ventures list has the factory where it has factories, so its config moves and so does its
+  state hash (a person's parameters are part of what is kept); with the venture taken out of the config, the culture
+  dial's three pinned towns give exactly their pins before the change, so the moved founding steps change nothing.
+  The pins are re-taken (orchestrator/test/culture-dial.test.ts).
+- **Revisit if:** factories close often enough that founding matters, and entrants never pay (the likely cause is what a
+  founder counts of the market); a study needs capital-heavy entry (then the planning route, above).
+## 2026-11-01 · Tools: technologies that are goods, weighed as any technology is (foundations-2 E2, its second part; branch `f2-economy`; contract addition; firm.producer; au-vic's profile; no model called)
+
+- **What:** a task may name a `tool` (a kind, so many a person, the share of the time the work then takes): with enough
+  held by the actor where the work is done for the people doing it, the work takes that share; the tool is not used up.
+  A profile's `automation.tools` puts tools on sale by the outside world (its price list) and on their task; a factory
+  (`firm.producer` `tool`) buys one for each of its staff when the time it saves them a month, at their wage, beats its
+  price over the payback it asks by the hurdle, the comparison it already makes of a system (`automation.firms`). au-vic
+  offers production machinery for `make` (80% of the time, AUD 20,000 each: placeholders, risk ME-25).
+- **Why this way:** foundations-2 7.2 asks that adoption be widened from systems to any technology, "a forklift, a
+  self-service till and a casework system weighed the same way"; a tool as a held good keeps law 8 (it is somewhere,
+  bought and held, never made from nothing) and leaves the decision to the firm's own numbers.
+- **Not built, and why:** tools wear and are replaced (no source for a life, and a durable good is not used up by a
+  task); shops and offices weighing tools (only the producer's comparison was widened; the retailer's and the offices' are
+  systems-only); tools in other profiles.
+- **Off unless asked** (`tools: true`): at au-vic's placeholder figures every factory of the 1,000-person town buys one
+  for each worker on its first day (AUD 800,000 a factory: a fifth of a factory wage a month saved, against AUD 833 a
+  month of the price over two years, by the 20% hurdle), a large unsourced effect on every run; so the tools are a
+  town's choice until sourced, and off the town is as before (the seller, the kind, the task and the weighing absent).
+  Each tool has a seller of its own (`sellers-<kind>`, a boundary selling by the unit), so a firm's least order of one
+  is kept; the world market's least order of a hundred would have refused every order.
+- **Revisit if:** a source gives a tool's saving and price, or its life; shops should weigh tools too.
+## 2026-11-01 · Who could still do the work: a monthly census of practised skills (foundations-2 M8, E6's first part; branch `f2-economy`; log addition; a world with no practised skill writes nothing new; no model called)
+
+- **What:** where a world has practised skills, the kernel censuses them monthly (`skill_census`): for each, how many
+  living people stand in each tenth of its range, read as it stands that day (fading included). `measure/queries/town/skills.sql`
+  lists it (`oikos measure DIR town/skills`): by run, day and skill, the ten counts, the people, the upper half.
+- **Why this way:** M8 asks, for each kind of work, who could still do it and how well, month by month; a person's skill
+  lives in the state, not the log, and a census in the log is what a measure can read (as the counters' is). Ten bands
+  are a count, not a threshold: what a study calls "could still do it" is its own choice, made before an experiment.
+- **Not built:** M7 (what the town gives to AI: the share of its energy, water, land, capital and hours that goes to
+  study-tagged systems and their hosts): it needs the hosts' metered draw read against the town's, and its definition is
+  among the owner's measures (docs/design/gradual-disempowerment.md section 6); "who" by kind of work is by skill, not
+  yet by the kinds of work study-tagged systems do.
+- **Revisit if:** a study needs per-person levels (then the census grows, or a measure reads checkpoints).
+
+## 2026-11-02 · The slow tier's budget raised to 1,500 s (branch `slow-tier-budget`; tests; no model called)
+
+- **Why:** after the trims above the slow tier still takes about 1,220 s on the Mini against its 1,000 s budget, and what
+  is left is runs a law needs whole: the year-long towns (twins of a year, the year of invariants, credit's second loans
+  and arrears from day 361, births from day 279). Shortening those further would stop them guarding long runs, which is
+  what they are for. Naz approved raising the budget on 2026-11-02 so the year-long tests keep guarding long runs.
+- **Change:** `scripts/test-budgets.json` `slow.wall_seconds` 1,000 → 1,500 (25 minutes), about the tier's time today and
+  a quarter more. The gate's budget is unchanged. No test loosened.
+- **Also in this landing:** merged with main, `deemed-refusal-town.test.ts` keeps main's third town (au-vic, 200 days,
+  the ombudsman, from `mt21-recourse`) with this branch's 180 days for de-ni and gb-eng (measured on the merged tree: de-ni
+  a venue open in 3 weighings, none before 91 days; gb-eng's ombudsman open in 2; all assertions pass). The stray
+  scratch script `orchestrator/p-tmp.ts` the branch carried is removed.
+- **Revisit if:** the slow tier passes 1,500 s on the Mini, or merges wait on it; then the twin files and the elections'
+  towns first, as the entry above says, before any raise.
+## 2026-11-01 · The environment office learns its crew's pace from a refusal, and stops asking again for fieldwork it was told will not fit (`city.environment` 0.5.3; branch `env-office-fieldwork`; the pinned towns do not move; no model called)
+
+- **The fault (a mechanism bug, not behaviour).** The office sized each day's fieldwork by the survey's stated time a cell
+  and counted its staff's hours itself. When the world refused a batch for time ("w has N s left; this needs M"), it
+  recorded the time left but kept planning at the stated time, so at its next look (five minutes on) it asked for the
+  same number of cells, and was refused again, all afternoon. Any gap between the stated time and the crew's real one
+  does it: with skills on (E4) a scientist is slower than the table's ordinary hand. 100 days of the 300-person town
+  with skills on: 43 refusals of the office's fieldwork, all the same ask (left 13,357 s, needs 13,769 s, every look
+  from 12:35 on one day). It also never gave a refused batch's hours back to the crew's other members, so they looked
+  busier than they were.
+- **Skills off.** The note in "Skills by use" (2026-10-31) counted 18 such refusals in 90 days with skills off, on the
+  branch as it then stood. On today's main, 100 days of the 300-person town with skills off has none: there the stated
+  time is the world's, so the loop needs some other gap to start. The fault is the same either way (the office never
+  learnt from what it was told), and the fix covers both.
+- **The fix.** The office plans with `common::Pace`, as the factories and shops already do: the stated time at first;
+  after a refusal for time, each of the crew as slow as the batch turned out to need; after a batch that went through,
+  a little quicker once a week (so a crew that gets quicker with practice is asked for more). A refused batch's hours
+  go back to the whole crew; the named worker's day is the world's count, as before. After it, the same skills-on town
+  has no refusals of the office's fieldwork in 100 days, and more of the round's fieldwork done (6 batches against 4).
+- **Hashes.** Expected to move every town's; they did not. The pinned towns (`culture-dial`'s three profiles, the
+  default town) pass unchanged: the office's planning differs only after a refusal for time, which those towns never
+  give it (the state hash is the world's, not the actor's saved notes). So no pin was re-taken. A town where the office
+  is refused (skills on, or a crew short of time) runs differently from before, as it should.
+- **Guarded by:** `told_a_days_fieldwork_will_not_fit_it_asks_for_what_the_crews_own_pace_allows_not_the_same_again`
+  (the environment office's tests): refused four cells that need 9 hours against 8 left, it asks for three, never the
+  four again.
+- **Revisit if:** the weekly probe toward a quicker pace shows as a refusal a week in a study of the office (it is the
+  shared manager's behaviour; the factories and shops do the same), or the office comes to do work other than fieldwork.
+
+## 2026-11-01 · Founding again after giving a business up: the owner's own record (branch `refound-after-failure`; risk ME-1; no model called)
+
+- **What:** an owner who gives a business of one up keeps their record of it (months, what it paid them, what its market
+  said such a business pays), and weighs starting one again on the market's figure moved by that record, weighted by its
+  months against `venture_prior_months` (3, a placeholder, in `citizen.default` 0.61.0); the next weighing is a month on.
+  The record is used wherever a business of one is weighed (starting, borrowing to start, taking the loan) and in the
+  pay it is expected to bring. docs/behaviour/entry.md, "Founding again after giving one up".
+- **Why this way:** founding was weighed on the market's figure alone, so the evidence that had just closed the business
+  counted for nothing, and the weighing was overdue (it does not run while one owns a business), so it came at once. The
+  learning is Jovanovic's (an owner learns from what the venture pays them); the shrinkage toward the market's figure
+  rather than a bar keeps restarts possible, as they are in the literature on renascent and serial entrepreneurs. Behaviour,
+  not a count: nothing here is tuned to how often people refound.
+- **Not built:** the record does not carry to a shop in premises, and nobody hears of others' failures (a founder learns
+  of their own only). Someone with nothing coming in still weighs any positive figure against nothing.
+- **Revisit if:** a source gives how strongly founders weigh their own past venture against their view of the market
+  (`venture_prior_months`), or runs show owners cycling through the same failing business month after month.
+## 2026-11-02 · Taking from work under law 9: the taker was there if their way set out from it (landing `f2-s4`; kernel fix; no model called)
+
+- **Found:** at the landing of `f2-s4`, `orchestrator/test/hazards.test.ts` ("taking from work, found at a stocktake, ...")
+  had no takings at all (0 against more than 5), on the branch alone as on the tree merged with main. The citizen's theft is
+  one act: `take` at work, then the goods carried home (`move_goods`, `carried`). Law 9 (S4) sets the carrier out on its
+  way when the act begins and applies the act's blocks when it is done; `move_goods` reads the carrier's trip (it went by
+  both places), but `take` still asked that the taker be in the building at the end, where by then they were on the road.
+  Every such act was refused `not_present`.
+- **Change:** `Block::Take` (kernel/crates/world/src/exec.rs) counts the taker present at the act's end if their way set out
+  from the building or went by it (`started`, and their transit's `from` or `via`), as `move_goods` reads a carrier. A
+  take with no trip is checked as before. Not loosened: someone who was never there still cannot take.
+- **And:** the participants' world words gained `not_carried` (the kernel's words had it; `render.test.ts` holds that every
+  refusal has world words). With the fix in, the representation towns' pins moved (a taking in the month where a
+  carried theft had been refused) and were re-taken; culture-dial's did not move.
+- **Revisit if:** an act's trip should be tied to that act alone (f2-s5 adds `Exec.act`: then `tr.act` is the check), or
+  takings come to be acts of their own before the trip home.
+- **Then, in the f2-s5 landing:** with `Exec.act` (S5's), the trip counted is the taker's own for this act (`tr.act`).
+- **Revisit if:** takings come to be acts of their own before the trip home.
+
+## 2026-11-02 · Tiered storage: the world's records nobody reads held on disk, and what else grew with a run (SC-1, SC-6; branch `tiered-storage`; no result changes; no model called)
+
+- **What was asked:** Naz approved the proposal (docs/design/tiered-storage.md, then a proposal) on 2026-11-02 ("Yes to
+  all"): records out of memory once cold, read back on demand, the actors' books holding records through the shared
+  store rather than direct pointers; then the other growers fixed where they are a mechanism's fault; results
+  byte-identical; 50,000 people for two years or more within about 40 GB the goal.
+- **Built** (docs/design/tiered-storage.md says how): every holder of a record holds a `Rec`, a handle to its one slot;
+  the kernel's `Tier` moves records filed 30 days ago and unread for 14 to the run's cold file (`<out>/<run>.cold`,
+  removed at the end) in compressed blocks of 64, and a read brings one back; the state hash streams a cold record's
+  bytes as they are; books keep handles and let what they read go at their next day; the delivered cache is keyed by
+  slot and drops entries a week unshown; the offices' files of payments put what is past 30 days on the same file.
+- **Readers fixed** (found with `OIKOS_COLD_WHO`, which counts who reads old records): lists collected whole to skip what
+  was read (trade desk, producer, electoral office); a person's weekly going-through of public goings-on and weekly
+  plan reading every record of their book; a payroll going through every request on its book at every wake for its own
+  wage orders (at the bank's staff payroll, every payment anyone made: 450,000 of 1.17 million records held for it at
+  day 120 of the 10,000 town; `OIKOS_COLD_WHO_STACK` names where a reader reads). Each also cost the run's own thread
+  time growing with the run.
+- **Other growers fixed:** the resolver's addressed statements (a map from every addressed statement each participant
+  saw to its addressees) held by number with each list of addressees once; the twins' per-matter draw counts let go when
+  a matter says it is over (`Cx::rng_until`, `rng_once`: a gathering once it begins, a delivered order's faultiness once
+  drawn; no draw is named differently: a matter is never drawn for once it says it is over); the travel caches (quickest-time trees, 152 MB at
+  10,000 people by day 71, and trips) bounded.
+- **Results, shown:** the six pinned towns for a month, every record sent to disk from its second day whenever unread that
+  day, at main's state and log, with and without; 10,000 people for 60 and for 180 days and 1,000 for 180 at main's state
+  hash and log digest; `kernel/tests/a1_citizen.rs` holds a tiered town to one held in memory, byte for byte.
+- **Measured** (docs/design/performance.md, "Tiered storage"), on main f2a3568a: 10,000 people grow 8.8 MB a simulated
+  day against 24.3 (-64%), a footprint of 4.18 GB against 6.22 at day 180, the same state and log; 1,000 people for 180
+  days 533 to 557 MB against 691 to 695; the run's own thread within noise. 50,000 people (an earlier build, before the
+  payroll's fix) 17.4 GB against 23.6 at day 89, both stopped there by a fault of main's (the police post's wakes), so two
+  years at 50,000 are not measured yet: projected some 45 to 50 GB. Still growing: what stays of every record when it is
+  cold (slot, map entries, book entries: some 250 to 350 bytes a record), the units' views and knowledge, the actors' own
+  state.
+- **The budget:** the month's ceiling held at 270 KB a person: a month holds no record past the tier's 30 days, so its
+  measure did not move (main and the branch alike, about 218 KB on the release kernel, up to 250 on the gate's build the
+  merge measures with); a growth budget added (the same town's half-year past its month, 1,700 bytes a person a day; main
+  f2a3568a about 2,450, the branch 1,410 to 1,570), `orchestrator/test/memory-budget.test.ts`, slow tier (+90 s).
+- **Decided here, not in the proposal:** records leave memory one by one by when last read, not a month's segment at a
+  time; the cold file is the run's scratch, removed at its end (a snapshot carries every record whole, so nothing that
+  needs it outlives the run; kept, it would be gigabytes a run at 50,000); OIKOS_COLD=off keeps the old way.
+- **Revisit if:** a run's reads back from disk climb (a reader that goes through old records daily: then that reader is
+  the fault, as these were); a study's run needs to resume from a snapshot without the records whole in it; the cold
+  file's disk passes what the run server has to spare; 50,000 for two years does not fit (then the per-record cost that
+  stays when cold, the books' entries, and the units' views are next).
+
+## 2026-11-02 · Law 9 is a hard rule in CLAUDE.md (landing `f2-s5`; project rules; no model called)
+
+- **What:** CLAUDE.md's "Hard rules" gain law 9 after "All work takes time": everything physical is somewhere, and moves
+  only along a way (a body, holding, vehicle or machine is in a space, at a node or on its way; a move takes the mover's
+  time, the way's capacity and the vehicle's fuel; goods between places only with a carrier; the outside's goods by
+  freight from the edge's node), with `orchestrator/test/everything-is-somewhere.test.ts` as its backstop.
+- **Why:** foundations-2 phase 3 (S1 to S6 and WM-6, branches `f2-phase3`, `f2-s4`, `f2-s5`) makes it a law of the world
+  like the other four; a hard rule is what keeps later work from reintroducing goods or bodies that move by themselves.
+- **Approval:** Naz approved adding the line on 2026-11-02 (hard rules go to him first).
+- **Also:** docs/plan.md's summary line now says phase 3 has landed.
+- **Revisit if:** the law's wording drifts from docs/design/travel.md, or the backstop is renamed.
+
+## 2026-11-02 · A crew's trips are its working time, and planners size the day with them; goods on the road stay on order (law 9, after S4 and S5 landed; contract additions; results move; no model called)
+
+- **What we saw:** main went red after S4 and S5 landed: five slow files (services, production, unions, households,
+  own-venture). Read against main just before S4 (6770ecdc), where all five pass, two faults and one test:
+  - **The day planned without the trips.** S4 made a performer's trip to the site and back their time (it is placed on
+    their lane and counts against their working day), but the offices that size the day's work (the works office's
+    round and upkeep, the builder's projects and repairs) counted only the work. Their acts ran past the day and were
+    refused (the hall's upkeep never got done; the builder retried each day's work a trip too long).
+  - **Goods on the road counted nowhere.** The outside's freight takes its time (S4), but a buyer took its order off its
+    books when the delivery note came, before the goods arrived; until they did, they were neither on order nor held, and
+    it ordered again. A factory bought nearly three times its month's inputs in its second month, ran short, and paid no
+    dividend; at the strike town a striker's wages then came short, and they claimed for them.
+  - **A return counted as a move.** Someone the builder's act takes from home to a site comes back to the space they
+    left by that act; the households test read that as another adult moving them.
+- **Kernel and contract (participant API; blanket approval).** The working-day check counts each performer's trip with
+  their share (`over_the_day`). An outcome tells the one whose act it was how long each body it took somewhere was on
+  its way, there and back (`Outcome.trips`), and how long goods it sent by the outside's freight take to each place
+  (`Outcome.freight`): their own record of their trips, never the network's timetable.
+- **Actors.** A planner keeps its people's trips by site (`common::trips::Trips`: a round's trip shared among its sites; a
+  site never gone to is reckoned at the average of those known, or at nothing until the first trip is back) and sizes
+  the day's work with them: the works office's round and upkeep, the builder's projects and repairs. The outside's trade
+  desk keeps how long its freight takes to each place and says on the delivery note when the goods arrive (`arrives`);
+  a factory and a shop keep goods delivered and still on the road on order until then.
+- **Test.** households.test.ts: a body brought back by the act that took it, to the space it left, is no move.
+- **Not done:** the coordinator's design lets the works office, which keeps the road register, reckon a site it has
+  never been to from the roads' lengths and speeds; it uses the average of its own trips instead (simpler, and the first
+  day's trip is then known). An act still too long for the day is refused and done the next day, not split.
+- **Revisit if:** a planner other than these sends people elsewhere (then it keeps `Trips` too); a seller with its own
+  carrier (a town's haulier) sells on delivery (then it says `arrives` from its own trips).
+
+## 2026-11-02: stale incremental folders are pruned, incremental stays on
+
+- **Why.** `[profile.gate] incremental = true` is deliberate, but cargo keeps every `incremental/<crate>-<hash>/` whose hash
+  changed; one agent worktree's `kernel/target/gate` reached 72 GB (62 GB incremental) and the run server fell to 18 GB free.
+- **What.** `scripts/disk-tidy.ts --prune-incremental` keeps, per crate, the newest unit folder and those within 6 hours of it,
+  and never one written in the last 30 minutes. It runs before `bun run kernel`, before the gate's kernel build, at the start
+  of `merge.ts`'s check, and in the full tidy for every idle worktree. Test: the keep/remove rule (`disk-tidy.test.ts`).
+- **Measured** (agent worktree, `gate`): one-file edit 58 s unpruned, 69 s after an extreme prune, ~130 s non-incremental;
+  the pruned build tested fine. Removing a unit folder can only cost that unit a full compile, never correctness. The
+  `CARGO_INCREMENTAL=0` fallback was not needed.
+- **Revisit if:** gate builds get slower after merges (then widen the 6-hour window or keep the newest N per crate), or
+  worktrees still balloon (then the cause is something other than old hashes: look at `deps/` and `.fingerprint/`).
+
+- **Addendum, 2026-11-02 (retail.test.ts red on main after this landed).** An act refused for want of room in its
+  people's day still sent them on their way and put the trip on their day (S4's journeys were placed whatever the day
+  said, and now that the day counts the trip, the refusals came): a builder with no record of the trip yet planned the
+  work to the end of the day, was refused, and lost the trip from the day each time, refused again and again (814 times
+  in the retail town's year). Now an act refused that way sends nobody anywhere and charges no one, and its outcome says
+  how long the trips would have been (`Outcome.trips`), so the planner's next act fits. The whole slow tier was run on
+  the fix before it landed.
+
+## 2026-11-02 · A household moving back in does not bring a child who is already there (main red after refound-after-failure; citizen fix; no model called)
+
+- **Found:** CI on main after `refound-after-failure` failed `households.test.ts` (2 households split at the year's end,
+  at most 1 allowed). One household (leaseholder c0014, town.yaml, seed as the test has it): its tenancy ended on day 347
+  while the youngest was out, so the leaseholder's "leave" for the child was refused (`not_present`), and the child came home
+  to the dwelling afterwards. The household re-let the same home on day 351, and each day after the leaseholder's move-in
+  (one act: the leaseholder in, and each child brought) was refused whole, `already_present`, for the child already in it.
+  Five of six were out of any home for the last 18 days. Refounding only moved the draws that made this happen; the fault
+  was older: the move-in had no answer to a child who was already there.
+- **Change:** the citizen reads the refusal: if its move-in was refused `already_present` at the block that brought a
+  child, that child is not brought again into that home (`housing.already_in`, `absorbed.already_in_block`). The world
+  told them so: they knew it from their own act's refusal, not by looking. No test changed; the representation towns'
+  pins moved (one of them had such a move-in) and were re-taken; culture-dial's did not.
+- **Not changed:** a child coming home to a dwelling whose tenancy has ended (the leave refused while they were out) is
+  left as found; it is a behaviour question (who tells a child the home is gone?), not this fault.
+- **Revisit if:** households move with other members than children (the adults are told and come themselves).
+
+## 2026-11-02 · Tiered storage, a second step: 50,000 people measured to day 89, and what every record keeps made smaller (SC-6; branch `tiered-storage`; no result changes; no model called)
+
+- **50,000 people** (docs/design/performance.md, "Tiered storage"): resident 14.7 GB at day 80 against main's 21.8, growing
+  54 MB a simulated day against 110 (days 30 to 80). Main and both tiered builds stop at the same moment, t=7754574 on day
+  89, "participants kept waking each other (1000 rounds in one moment): c3090-self|police-oic among them": a fault of
+  main's (law 9's owners have it), so two years at 50,000 are not measured yet. Projected from the 10,000 town (whose
+  growth fell by a third once its first months were past): near 38 GB for two years, 50 GB if it does not fall.
+- **A snapshot of the 50,000 town does not fit:** at day 80 the footprint went from 22.5 to 82 GB while it was written (main
+  f2a3568a's binary host; `runs/tier-50000-police-snapshot`). Recorded under SC-2's resume, not fixed here: a snapshot would
+  have to be written as the state hash is, streamed.
+- **Smaller:** whom a person has talked with and come to know keyed by interned ids (the same order, the same words
+  written out); a book's places of minted ids in four bytes; the tier reads when a record was filed from its slot. 10,000
+  people for 180 days at landed main's state hash and log digest (`8e91f08e`, `061b34ba`), peak resident 4.39 GB against
+  4.58.
+- **Revisit if:** the police post's loop is fixed (then 50,000 for two years, measured); the projection's fall does not come.
+
+## 2026-11-02 · The police send one round of calls at a time, and a household reports one missing once until they are home (WM-6, after a 50,000-person run stopped; results move; no model called)
+
+- **What we saw:** main's 50,000-person town stopped at day 89 (t=7754574): "participants kept waking each other (1000
+  rounds in one moment)". Replayed with a line per wake from round 990, it was the police station: at each wake it sent
+  a round of calls (16 places) while the one before was still out, and each wake was the next in the same moment, so it
+  sent its whole list at once. The list held about four thousand missing-person calls of 729 people in 89 days (6 of them
+  dead): a household reported a member missing again for each of their goings, and one who lives elsewhere and drops by
+  was reported up to 86 times.
+- **Police:** a round of calls goes out, and the next when the officer is back (what they found comes in), as the works
+  office's inspector does; waited for until the next day at most (a round whose places were none to go to brings
+  nothing back). Law 9: a going takes the goer's time.
+- **Household:** a member is reported missing once, until they are seen home again (`missing:<person>`), not once for
+  each going.
+- **Test:** police/tests.rs, a round goes out one at a time and the next when the officer is back (fails without it).
+- **Not done:** the household still cannot tell a member who lives elsewhere from one who has not come home (it knows
+  their departures, not their other homes); such a member is reported once each time they drop by and go. Revisit if a
+  result counts missing-person reports (then the household asks the member first, by message, and reports only if no
+  answer comes).
+
+## 2026-11-03 · Perception's log of what changed keeps each id's latest entry (SC-6; branch `tiered-storage-changes`; no result changes; no model called)
+
+- **Found** (a heap profile of the 10,000-person town, days 98 to 240): what still grows is spread thin, 9.2 MB a
+  simulated day in all. Of it, perception's log of which accounts changed (`Changes::log`) kept an entry for every change
+  of every account for the whole run (0.35 MB a day there). Only an id's latest entry answers "which ids changed after
+  this stamp", so the earlier ones are let go once the log holds four times as many entries as the ids it names.
+- **Results:** 10,000 people for 180 days at main 0736a870's state hash and log digest (`1aa21c64`, `2c48bf87`); peak
+  resident 4.38 GB against 4.45.
+- **Also measured:** the 50,000-person two-year run on main (`runs/tier-50000-2y`) is past the day-89 stop (fixed on
+  main); resident 18.4 GB at day 130, growing some 74 MB a day from day 30 to 90 and 47 from 100 to 130.
+- **Revisit if:** a reader of the log comes to need an id's earlier stamps (none does: `since` asks only for what came after one).
+
+## 2026-11-03 · Minted record ids held by their number (SC-6; amends R1, "Ids interned"; branch `tiered-storage`; no result changes; no model called)
+
+- **Found** (a heap profile of the 10,000-person town, days 98 to 240): of the 9.2 MB a simulated day that still grows,
+  some 1.3 MB was interned record ids. A record's id (`rec.<n>`) is minted once a record and is the most numerous id a
+  run holds (3.8 million of them in 10,000 people's 180 days); R1 kept each in the interner's sharded hash tables,
+  whose slots, at most half full and doubling, cost some 60 bytes an id besides its text.
+- **Change** (kernel/crates/core/src/id.rs): an id whose text is a minted record id in canonical form (`rec.` then a
+  number written without a leading zero, below 2^32) is found by its number, in chunks of 4,096, not in the tables.
+  R1's design otherwise stands: still one copy of each text for the process, an `Id` still a handle on it, ordered,
+  hashed and serialised as the text, so every map's order, every hash and the log are as before. Any other text,
+  `rec.007` included, is interned as before. (The simplest form asked for was a number with its text rendered on
+  demand; it is not taken because an `Id` is a `&'static str` everywhere, and making it an enum would touch every
+  reader for a further saving of about ten bytes an id.)
+- **Results:** the six pinned towns for a month at main's state hashes and log digests; 10,000 people for 180 days at
+  main's state hash and log digest (`1aa21c64`, `2c48bf87`). Peak resident, sampled each minute, 3.80 GB against 4.04
+  for the build before it.
+- **Revisit if:** record ids are minted in another form (then `minted` learns it, or they go back to the tables, which
+  still work); or a run passes 2^32 records (held in the tables beyond that, correct but without the saving); or the
+  texts themselves show in a profile (then the number held and the text written when read, which needs `Id` to change
+  from a `&'static str`).
+
+## 2026-11-04 · Citizens hold the book's teachings as ids (SC-6; branch `tiered-storage-teachings`; no result changes; no model called)
+
+- **Found:** the 50,000-person two-year run on main 0736a870 (`runs/tier-50000-2y`) was stopped by its 44 GB guard at
+  day 707 of 730. Its footprint did not climb evenly: it stepped by some 8 GB over days 305 to 309 (25.1 to 33.8 GB
+  resident) and grew about 30 MB a day before and after. A 10,000-person town on main steps too, by 0.4 GB on days 306
+  to 308. Its full log (`runs/tier-10000-log312`) shows why. Days 303 to 311 hold the first election's nominations, about 200
+  public statements, nearly all of them citizens standing, each carrying its platform as an assertion. Every person's
+  book keeps each public assertion for a month (`public_memory`), and each citizen's mind rebuilt, at every wake, a
+  private copy of the ids of all of them as text (`teachings`, host -> ids). Candidates grow with the town and so do
+  the people who read them, so the copies grew as the town squared: 0.25 GB of a heap profile's growth across the
+  10,000 town's step (`runs/tier-10000-hp340`, dumps 52 and 53). Freed a month later, the memory stayed with the
+  allocator and was reused, so the 50,000-person run's resident size held near 34 GB for the next 250 days.
+- **Change** (kernel/crates/actors/src/mind/citizen.rs, voice.rs): `teachings` holds `Id`s (8 bytes each, the one copy
+  of the text) in place of `String`s. It is still built from the same book at the same moments, ordered by the
+  host's text, and saved as the same text.
+- **Results:** the six pinned towns for a month at main's state hashes and log digests. 10,000 people for 340 days at
+  main's state hash and log digest (`88077fb9`, `d3377966`). The 10,000 town's step was 0.2 GB in place of 0.4; its
+  resident size was 5.2 GB at day 310 against 5.6, with a peak of 5.45 GB against 5.62 for main (`runs/tier-10000-log312`, to day 312).
+- **Not changed:** each person's book still holds every public assertion of the last month, and that is what they
+  know. Whether some 2% of the people standing for council is plausible is a question about the citizens' rules, not
+  memory; it is noted here, not acted on.
+- **Revisit if:** the 50,000-person two-year run on this build still steps at its elections (then what a mind keeps
+  of its book's assertions is read from the book when asked, not copied).

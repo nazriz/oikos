@@ -73,8 +73,39 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-25, config hashes and Rust states both, on main after work-times and fix-memory-appeal (both slow-tier blind at their merges): generator 0.65.0
 // writes every town's `public_memory` bound (SC-1) and the table of work's rows changed; a3d0ce4e..., a805fb6d... and 2b872ca6... for the configs, and
 // 2ce3e90d..., 5dcf1eab... and 55a4e978... for the states, until then. Not every move is the bound: with `public_memory` left out the configs still differ (the version and work rows).)
+// (Re-taken on 2026-10-25 at foundations-2 phase 1 (law 10), config hashes and Rust states both: the support office's casework is done by a desk of
+// the agency's officers (`outside-casework`, an officer's minutes in an officer's hours: claims are decided in days, not hours), every machine's template
+// states its hours, an office offer's seconds are its template's rows, someone who only orders an act goes on at once, and the engine gives a code unit's `done_by` to the act as `by` (generator 0.68.0, on main's 0.67.0 at the merge of origin/main into f2-phase1);
+// 772a98b9..., 5704b7de... and da91782e... for the configs, and 1befde62..., cd0ed6c2... and 824018a6... for the states (main's, at market realism and commercial leasing), until then.)
+// (Re-taken on 2026-10-26 at the merge of main (8570d699: the appointments main took meanwhile, the press among the posts the council
+// fills) into foundations-2 phase 1, config hashes and Rust states both, on the merged tree; neither side's change alone is the town any
+// more; 6a09320a..., d7cf0e19... and f87b1c3a... for the configs, and 46b53dc8..., 4fd33b34... and 3ab351d6... for the states, until then.)
+// (Re-taken on 2026-10-26 at foundations-2 C2 (law 8), config hashes and Rust states both: kinds have a class, the river's water is a kind held in
+// litres (its figures a thousand times the profile's kilolitres, so its decay and spills round at a finer grain), and what the water works draws is
+// held at the works (generator 0.69.0); 3c86931d..., 6ee4f4ac... and 58f52331... for the configs, and 4f597e2a..., c2e206a4... and c944d672... for the
+// states, until then.)
+// (Re-taken on 2026-10-26 at foundations-2 C3, the config hashes only: the table of work gained the rows for acts on a connection and a link (and their sources);
+// no town has a network yet, and the states did not move; 910fbe98..., 90e0e68d... and 31bce73d... until then.)
+// (Re-taken on 2026-10-26 at the merge of main (phase 1 landed, 0824efb6) into foundations-2 phase 2, config hashes and Rust states both,
+// on the merged tree; main's dbb34546..., b5082f8c..., 47fed11d... and f49ce487..., ce90d241..., 1605af11..., and this branch's febd3aa0...,
+// 44ce5bcf..., 9ea834be... and fec98d61..., 0152badb..., 7787a6c6..., until then.)
+// (Re-taken on 2026-10-26 at foundations-2 C4 and C5 (law 8), on the tree merged with main at 457f7505, config hashes and Rust states
+// both: homes on water, electricity and sewer connections, use and waste as recipes, waste collected from where it is held, bills
+// from meters, the two variables and the assumed uses gone, every workplace recipe stating its energy and water (generator 0.70.0);
+// 12dfe7e7..., b0f0a2ac..., bd137799... for the configs and 47d84415..., a02d0f45..., 4f88cd1f... for the states, until then.)
+// (Re-taken on 2026-10-26 at foundations-2 phase 2 on main (law 8: homes on the network, use and waste as recipes, bills from meters)
+// with who comes for a job of working age (world.migration `seeker_ages`), config hashes and Rust states both; b5ce5637..., fe55cd7f...
+// and c9ee8b47... for the configs, and 1029d2b3..., 8ceb057e... and 9ed817f1... for the states, until then.)
+// (Re-taken on 2026-10-26 at taxpayer-accounts (PB-23), on main after foundations-2 phase 1, config hashes and Rust states both: the outside
+// world's tax collector keeps each taxpayer's account (a new office, its system and its officers' desk, the law on tax paid and not owed,
+// two public forms, a payroll officer's file of its account, a row of the table of work; generator 0.69.0). The towns' life did not move:
+// au-vic over 60 days has the same 31,543 records, payments and moves with the collector as with it taken out; the states move with the
+// participants. dbb34546..., b5082f8c... and 47fed11d... for the configs, and f49ce487..., ce90d241... and 1605af11... for the states, until then.)
+// (Re-taken on 2026-10-26 once more, at the merge of main (taxpayer-accounts, lease remedies, figures-basis) into foundations-2
+// phase 2, on the merged tree, config hashes and Rust states both; a6b3618e..., 24da9440..., ad040dcf... for the configs and
+// f8aaed1b..., 26b39d31..., 1e3107f0... for the states (main's), until then.)
 const CONFIG_BEFORE: { [profile: string]: string } = onRust
-  ? { "au-vic-2026": "772a98b97b10802a", "gb-eng-2026": "5704b7de4ac8121c", "ke-nakuru-2026": "da91782ee412b18d" }
+  ? { "au-vic-2026": "b63b2c19b3f1c2ff", "gb-eng-2026": "a18cf6dd689297f9", "ke-nakuru-2026": "cfe34895be14a485" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -95,10 +126,58 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // births (ventures weighed by expected profit), who works and what they have saved drawn together, hiring by fit with postings
 // for every hand, a business of one's running costs, and empty shop units to let on the landlords' lots (generator 0.67.0);
 // 482f5218..., b002520e... and 86c7a397... for the configs, and cfeeb1be..., d24f6f24... and 261e509d... for the states, until then.)
+// (Re-taken on 2026-10-26 at main's slow tier after commercial leasing, config hashes and Rust states both: the paper is among the
+// posts the council fills (every profile's `appointed_by`; WM-7), and the station's head takes the station's work after its officers
+// (police.station 0.7.0); 772a98b9..., 5704b7de... and da91782e... for the configs, and 1befde62..., cd0ed6c2... and 824018a6... for
+// the states, until then.)
+// (Re-taken on 2026-10-26 at the merge of lease remedies with main, config hashes and Rust states both: each town's records hold
+// the law on leases of shop premises (law-premises-leases), the landlords their surrender price and tribunal, a business of one
+// the ground of premises it holds by agreement (generator 0.70.0); the genesis records are in the state. 4c714b3d..., a6a15d31...
+// and dd840c8e... for the configs, and e6916c32..., 47582857... and f94c4358... for the states, until then.)
+// (Re-taken on 2026-10-31 at years at 10,000, the states only (the config hashes do not move: a hall's room changes only
+// in towns over 3,333 people): an owner waiting on the register for its lot's plan is not homeless meanwhile and stops
+// no supply, and the works office sends its inspector one visit at a time; ffab69c8..., c5619171... and e5d66985...
+// until then.)
+// (Re-taken on 2026-10-31 at borrowing to start (gap-me1, ME-1), on main at 60c7ab07, config hashes and Rust states both: a person
+// short only of the money for a business of one asks the bank for it over its longest term (`start_loan_months`, from the profile's
+// credit.max_months); 38412f4e..., fb039153..., 43665a61... for the configs and 553de625..., 3aa5f181..., aa994113... for the states,
+// until then.)
+// (Re-taken on 2026-10-31 at foundations-2 S2 (law 9), on the tree merged with main at 28c38600, config hashes and Rust states
+// both: a road is a way of the network, the ground says a cell's metres, housed households have a vehicle and drive it where
+// they belong (generator 0.72.0), and a child's parents know of its birth at once; ce5432bd..., becc4b5a..., a33d92aa... for the
+// configs and e2f908c0..., 66d41a64..., 29ee83f1... for the states, until then.)
+// (Re-taken on 2026-11-01 at working calendars (gap-weekends), on the tree merged with main at f56d2dbc (delegation, the long-run
+// fixes, business loans, foundations-2 S2), config hashes and Rust states both: the support agency's and the tax collector's desks of officers keep
+// the place's days of rest and public holidays (`hours.closed`), an officer's day on each working day (generator 0.73.0); main's
+// b69b5e45..., 1c0ed42c..., bee66230... for the configs and 001f22ed..., 1a754a5d..., caa00714... for the states, until then.)
+// (Re-taken on 2026-11-01 at mt21-recourse (MT-21), merged with main at c46643eb (after gap-weekends), au-vic and gb-eng only, config hashes and Rust
+// states both: their law on benefit decisions states the days after which an unanswered review may be complained of to a body
+// that recommends (`review.complaint_after_days`), so the published law's words and data move, and a claimant left unanswered
+// may now go to the ombudsman desk; ke-nakuru's law has no such route and did not move. c899c8ff... and 9b0a54d6... for the
+// configs, af012071... and fab20a4d... for the states, until then.)
+// (Re-taken on 2026-11-01 at foundations-2 E3, on the tree merged with main, and again on 2026-11-02 on the tree merged with main
+// after mt21-recourse (whose pins are just above), config hashes and Rust states both: every town where
+// there are factories offers a factory as a venture, in a closed factory's works for sale (docs/behaviour/entry.md, "Founding a
+// factory"). On the branch, with that venture taken out of the config the three towns gave exactly the pins before it, so the rest
+// of the change (the founding steps moved from the retailer to market/founding.rs) moves nothing; c899c8ff..., 9b0a54d6...,
+// a2f60218... for the configs and af012071..., fab20a4d..., e3093814... for the states, until then. On the tree merged with
+// main after mt21-recourse, both changes at once: ke-nakuru is this branch's own pin (recourse did not move it), au-vic and
+// gb-eng have the ombudsman and the factory venture both; mt21's a0a8a233..., a911615e..., a2f60218... and ce297a1b...,
+// 4c0f8261..., e3093814..., until then.)
+// (Re-taken on 2026-11-01 at foundations-2 S3 and S4 (law 9), config hashes and Rust states both: bodies on their way between
+// buildings, goods carried, crews to the building they work on, the outside's freight from the edge's node by the road out, the dead on
+// the way found by whoever comes by (generator 0.74.0); c899c8ff..., 9b0a54d6..., a2f60218... for the configs and af012071..., fab20a4d...,
+// e3093814... for the states, until then. Again on 2026-11-02 on the tree merged with main after
+// mt21-recourse and f2-economy (their pins just above), law 9 on top of theirs: fd3b3e05..., b9922d02..., 9764f24d... and 8f562cf9...,
+// 2a59777c..., ff1a5d7a... on the branch alone; main's a99a2860..., 2d6735b7..., 6c856c4d... and b51631ea..., c6c36e29..., 717229a9...,
+// until then.)
+// (Re-taken on 2026-11-02 at foundations-2 S5 and S6 (law 9: a road's flows an hour, congestion, fuel from the tank; several towns
+// in one world), on the tree merged with main after f2-s4 landed (the taker's trip for this act its own), config hashes and Rust
+// states both; main's 7b16c3db..., 2e42476d..., 58353057... and e39632a0..., 294d3077..., 3a55c1a5..., until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "1befde6244b82041ebbf329b143a15a6f22ad110b7e41cc2d552b80010a1ee41",
-  "gb-eng-2026": "cd0ed6c2f5c4b2a39e835bbff4e51e0a3b24d494ce8ff52d542e76c32188b23d",
-  "ke-nakuru-2026": "824018a608756ea3cc5ae0d43771a885414fafad19b2187685dd015875cc83cb",
+  "au-vic-2026": "d8300873a5c03da6d435069c7fe02c5b7e3c862730914970ffd57b0bd30b2790",
+  "gb-eng-2026": "e9564040f909ba83234cf899afe319fb813c973c3ba0c9191aec594bfd9de59a",
+  "ke-nakuru-2026": "7bf5ae46d53382f1530ad0dba3ed0087df4256c796ad28a94796ce9552b8d7fc",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

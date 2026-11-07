@@ -81,7 +81,7 @@ impl Plan for Statistician {
     type Then = ();
     fn absorb(&mut self, pic: &Picture, _: &mut Cx) {
         self.book.absorb(pic);
-        if let Some(Seen::Records { records, search: true }) = pic.channels.get(&self.adverts) {
+        if let Some(Seen::Records { records, search: true }) = pic.channels.get(self.adverts.as_str()) {
             // (Only price lists that list goods and set no minimum order are a shop's prices.)
             let mut prices = vec![];
             for r in records {
@@ -89,10 +89,10 @@ impl Plan for Statistician {
                 if !d.get("goods").is_some_and(truthy) || d.get("min_order").is_some_and(truthy) {
                     continue;
                 }
-                if let Some(goods) = d.get("goods").and_then(Value::as_object) {
+                if let Some(goods) = d.get("goods").and_then(|x| x.as_object()) {
                     for (kind, price) in goods {
                         if let Some(p) = price.as_i64() {
-                            prices.push((kind.clone(), p));
+                            prices.push((kind.to_string(), p));
                         }
                     }
                 }
@@ -233,22 +233,22 @@ impl Plan for Assessor {
     type Then = ();
     fn absorb(&mut self, pic: &Picture, _: &mut Cx) {
         self.book.absorb(pic);
-        if let Some(Seen::Records { records, .. }) = pic.channels.get(&self.roll_channel) {
+        if let Some(Seen::Records { records, .. }) = pic.channels.get(self.roll_channel.as_str()) {
             let mut sorted: Vec<_> = records.iter().collect();
             sorted.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
             for r in sorted {
                 let d = data(r);
-                if !matches!(r.body, oikos_sight::RecordBody::Statement { .. }) || self.taken.contains(&r.id) {
+                if !matches!(r.body, oikos_sight::RecordBody::Statement { .. }) || self.taken.contains(r.id.as_str()) {
                     continue;
                 }
                 let Some(lot) = d.s("lot") else { continue };
-                self.taken.insert(r.id.clone());
+                self.taken.insert(r.id.to_string());
                 let x = self.roll.entry(lot.to_string()).or_default();
                 if let Some(owner) = d.s("owner") {
                     x.owner = Some(owner.to_string());
                 }
                 if is_kind(r, "property_roll") {
-                    for b in d.get("buildings").and_then(Value::as_array).into_iter().flatten() {
+                    for b in d.get("buildings").and_then(|x| x.as_array()).into_iter().flatten() {
                         if let (Some(s), Some(t)) = (b.s("structure"), b.s("type")) {
                             x.buildings.insert(s.to_string(), t.to_string());
                         }
@@ -259,10 +259,10 @@ impl Plan for Assessor {
         // What the council asks us to value: something built, or brought down.
         let requests: Vec<_> = by_time(self.book.open("valuation_request").collect());
         for r in requests {
-            if self.taken.contains(&r.id) || !crate::common::addressed_to(r).contains(&self.me) {
+            if self.taken.contains(r.id.as_str()) || !crate::common::addressed_to(r).iter().any(|x| x == &self.me) {
                 continue;
             }
-            self.taken.insert(r.id.clone());
+            self.taken.insert(r.id.to_string());
             let d = data(r);
             if let Some(removed) = d.s("removed") {
                 for x in self.roll.values_mut() {
@@ -407,15 +407,15 @@ impl Plan for Landfill {
         let mut dockets: Vec<_> = self
             .book
             .open("disposal_docket")
-            .filter(|r| crate::common::addressed_to(r).contains(&self.me) && !self.billed.contains(&r.id) && data(r).s("kind") == Some(self.kind.as_str()))
+            .filter(|r| crate::common::addressed_to(r).iter().any(|x| x == &self.me) && !self.billed.contains(r.id.as_str()) && data(r).s("kind") == Some(self.kind.as_str()))
             .collect();
         dockets.sort_by(|a, b| filed_before(&a.id, &b.id));
         for d in dockets {
-            self.billed.insert(d.id.clone());
-            let Some(who) = d.speaks_for.clone() else { continue };
-            let x = due.entry(who).or_default();
+            self.billed.insert(d.id.to_string());
+            let Some(who) = d.speaks_for else { continue };
+            let x = due.entry(who.to_string()).or_default();
             x.0 += data(d).i("quantity").unwrap_or(0).max(0);
-            x.1.push(d.id.clone());
+            x.1.push(d.id.to_string());
         }
         let world = cx.ctx.world.clone();
         let mut steps = vec![];
@@ -488,6 +488,7 @@ impl Kind for Migration {
             jobseekers_payment: ctx.param("jobseekers_payment", String::new())?,
             participation_bps: ctx.param("participation_bps", 10_000)?,
             template_outside_lf: ctx.param("template_outside_lf", String::new())?,
+            seeker_ages: ctx.param("seeker_ages", None)?,
             schooling: ctx.param("schooling", None)?,
             who: ctx.param("who", String::new())?,
             asked: Asked::default(),
@@ -596,6 +597,9 @@ struct Newcomers {
     jobseekers_payment: String,
     participation_bps: i64,
     template_outside_lf: String,
+    /// The ages the one who comes for the job is of (from, below): a household that moves for work has its earner of working
+    /// age. Absent: any age, as before.
+    seeker_ages: Option<[i64; 2]>,
     schooling: Option<Schooling>,
     who: String,
     asked: Asked,
@@ -637,7 +641,7 @@ impl Newcomers {
             .jobseekers_payment
             .split(',')
             .filter(|k| !k.is_empty())
-            .map(|k| stats.and_then(|s| data(s).get("recipients")).and_then(|r| r.get(k)).and_then(Value::as_f64).map_or(0, |x| x as i64))
+            .map(|k| stats.and_then(|s| data(s).get("recipients")).and_then(|r| r.get(k)).and_then(|x| x.as_number().and_then(serde_json::Number::as_f64)).map_or(0, |x| x as i64))
             .sum();
         let competing = n + recent + jobseekers;
         let outside = self.outside_monthly_income;
@@ -656,7 +660,20 @@ impl Newcomers {
         let chance_pct = round_div(100 * n, competing);
         let mut r = cx.rng("households");
         for _ in 0..come {
-            let d = draw_household(&self.households, &mut |m| r.below(m as u64) as i64);
+            // (A household that moves for work is one whose earner, the one who comes for the job, is of working age: drawn
+            // again while it is not, a few times at most. Until 2026-10-26 a couple of pensioners could move to a town for its
+            // wages and the one who 'came for the job' claim a pension on arriving: migration for work is of working ages,
+            // the model migration schedule's labour peak, Rogers and Castro 1981, to confirm.)
+            let mut d = draw_household(&self.households, &mut |m| r.below(m as u64) as i64);
+            if let Some([from, below]) = self.seeker_ages {
+                for _ in 0..32 {
+                    let age = d.members[d.leaseholder].age;
+                    if age >= from && age < below {
+                        break;
+                    }
+                    d = draw_household(&self.households, &mut |m| r.below(m as u64) as i64);
+                }
+            }
             let refs: Vec<String> = (0..d.members.len()).map(|j| format!("m{j}")).collect();
             let born_at: Vec<i64> = d.members.iter().map(|m| t - (m.age * 365 + m.day) * DAY).collect();
             let mut lines = vec![];
@@ -715,8 +732,8 @@ impl Actor for Newcomers {
                 .iter()
                 .map(|x| {
                     let d = data(x);
-                    let wage = d.get("wage").and_then(Value::as_i64).unwrap_or(0);
-                    let period = d.get("period").and_then(Value::as_i64).filter(|p| *p > 0).unwrap_or(14 * DAY);
+                    let wage = d.get("wage").and_then(|x| x.as_i64()).unwrap_or(0);
+                    let period = d.get("period").and_then(|x| x.as_i64()).filter(|p| *p > 0).unwrap_or(14 * DAY);
                     (i128::from(wage) * i128::from(30 * DAY)).div_euclid(i128::from(period)) as i64
                 })
                 .collect();
@@ -736,7 +753,7 @@ impl Actor for Newcomers {
                 if let Seen::Directory { entities, .. } = ch {
                     for e in entities.iter() {
                         if let Some(p) = &e.participant {
-                            self.reach.insert(e.entity.clone(), p.clone());
+                            self.reach.insert(e.entity.to_string(), p.to_string());
                         }
                     }
                 }
@@ -1093,6 +1110,28 @@ mod migration_tests {
     fn it_needs_the_worlds_household_mix() {
         let ctx = Ctx { participant: "s".into(), performer: Default::default(), entity: "e".into(), position: None, params: Default::default(), world: Default::default() };
         assert!(Migration.create(&ctx).err().unwrap().contains("households is required"));
+    }
+
+    #[test]
+    fn the_one_who_comes_for_the_job_is_of_working_age() {
+        // (Only the one who came for the job looks for work: participation 0, the others outside the labour force.)
+        let mut r = town(json!({ "max_households_per_month": 5, "seeker_ages": [20, 60], "template_outside_lf": "out", "participation_bps": 0 }));
+        let out = found(&mut r, 30 * DAY, postings(10, 100_000 * 14 / 30 + 1), vec![]);
+        let progs = calls(&out);
+        assert_eq!(progs.len(), 5);
+        for p in progs {
+            let Program::Lines(lines) = p else { panic!() };
+            let seekers: Vec<i64> = lines
+                .iter()
+                .filter(|l| l.call.get("template") == Some(&Arg::Id("newcomer".into())))
+                .filter_map(|l| match l.call.get("age") {
+                    Some(Arg::Text(a)) => a.trim_end_matches(" days").parse::<i64>().ok(),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(seekers.len(), 1, "one comes for the job: {lines:?}");
+            assert!((20 * 365..60 * 365).contains(&seekers[0]), "of working age: {} days", seekers[0]);
+        }
     }
 
     #[test]

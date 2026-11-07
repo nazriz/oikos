@@ -2,7 +2,7 @@
 //! class raises skill); care shortens a condition and may call off a death due from it, once, and nobody is told which;
 //! skill makes work quicker; and illness rises with a field where the body is.
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};
@@ -96,7 +96,7 @@ fn care_calls_off_a_death_once_and_nobody_is_told() {
     let little = act(&mut run, "carol-self", None, json!([{"block": "work", "task": "treat", "units": 1, "at": "s-shop", "performers": ["carol"], "on": "alice"}])).unwrap();
     assert!(!little.iter().any(|e| matches!(e, EventBody::ConditionTreated { .. })));
     let ev = act(&mut run, "carol-self", None, json!([{"block": "work", "task": "treat", "units": 2, "at": "s-shop", "performers": ["carol"], "on": "alice"}])).unwrap();
-    let treated: Vec<_> = ev.iter().filter_map(|e| match e { EventBody::ConditionTreated { person, death_called_off, until, .. } => Some((person.clone(), *death_called_off, *until)), _ => None }).collect();
+    let treated: Vec<_> = ev.iter().filter_map(|e| match e { EventBody::ConditionTreated { person, death_called_off, until, .. } => Some((*person, *death_called_off, *until)), _ => None }).collect();
     assert_eq!(treated.len(), 1);
     assert!(treated[0].1, "the death is called off (fatal_kept_bps 0)");
     // It lasts half its remaining time: 10 days, not 20.
@@ -113,6 +113,46 @@ fn care_calls_off_a_death_once_and_nobody_is_told() {
     assert!(!ev.iter().any(|e| matches!(e, EventBody::PersonDied { person, .. } if person == "alice")));
     assert!(ev.iter().any(|e| matches!(e, EventBody::ConditionEnded { person, .. } if person == "alice")));
     assert!(run.kernel().state().body("alice").unwrap().conditions.is_empty());
+}
+
+/// Whether care saves a life is the condition's own draw (who, what, since when), never the number it was filed under:
+/// that number is its place among every condition in town, so keyed on it one more injury anywhere would change who
+/// dies, and a pilot would part from its twin (docs/reliability.md, "Draws and the order papers were filed in"). Alice
+/// is hurt and treated in two towns alike but for one more injury, to bob, filed before hers in the second; on every
+/// seed care keeps or calls off her death alike in both.
+#[test]
+fn care_draws_on_the_condition_not_its_number() {
+    let outcome = |seed: u64, other_first: bool| -> (bool, String) {
+        let mut w = services_world();
+        w["seed"] = json!(seed);
+        for t in w["catalogue"]["tasks"].as_array_mut().unwrap() {
+            if t["id"] == "treat" {
+                t["on_body"]["treats"][0]["fatal_kept_bps"] = json!(5000);
+            }
+        }
+        let mut run = start(&w);
+        if other_first {
+            act(&mut run, "alice-self", None, json!([{"block": "harm", "person": "bob"}])).unwrap();
+        }
+        // (Alice is hurt at the same moment in both towns: the condition's onset is part of what it is.)
+        advance(&mut run, DAY);
+        let ev = act(&mut run, "bob-self", None, json!([{"block": "harm", "person": "alice"}])).unwrap();
+        let id = ev.iter().find_map(|e| match e { EventBody::ConditionBegan { person, condition, .. } if person == "alice" => Some(*condition), _ => None }).unwrap();
+        act(&mut run, "alice-self", None, json!([{"block": "occupy", "space": "s-shop/dwelling.1"}])).unwrap();
+        let ev = act(&mut run, "carol-self", None, json!([{"block": "work", "task": "treat", "units": 2, "at": "s-shop", "performers": ["carol"], "on": "alice"}])).unwrap();
+        let off = ev.iter().find_map(|e| match e { EventBody::ConditionTreated { person, death_called_off, .. } if person == "alice" => Some(*death_called_off), _ => None }).unwrap();
+        (off, id.to_string())
+    };
+    let mut kept = 0;
+    for seed in 1..=16 {
+        let (alone, id_alone) = outcome(seed, false);
+        let (after, id_after) = outcome(seed, true);
+        assert_ne!(id_alone, id_after, "the second town files her condition under another number");
+        assert_eq!(alone, after, "seed {seed}: one more injury elsewhere changed whether care saved alice");
+        kept += usize::from(!alone);
+    }
+    // (At 5,000 basis points both outcomes happen across the seeds: the draw is a draw, not a constant.)
+    assert!(kept > 0 && kept < 16, "{kept} of 16 kept");
 }
 
 #[test]
@@ -185,7 +225,7 @@ fn a_body_is_in_one_place_and_going_somewhere_takes_the_trip() {
     advance(&mut run, done + 1);
     assert!(r.events.iter().map(|e| &e.body).any(|e| matches!(e, EventBody::Vacated { occupant, space, .. } if occupant == "alice" && space == "s-house/dwelling.1")));
     let st = run.kernel().state();
-    assert_eq!(st.structures_of("alice"), vec!["s-shop".to_string()]);
+    assert_eq!(st.structures_of("alice"), vec![oikos_kernel::blocks::Id::new("s-shop")]);
     assert_eq!(body_view(&mut run, "alice-self")["in"], json!("s-shop/dwelling.1"));
 }
 
@@ -249,4 +289,133 @@ fn two_investigations_in_one_action_draw_independently() {
         found_none += usize::from(!second);
     }
     assert!(differ > 0 && found_some > 0 && found_none > 0, "the two tries differ on some days ({differ}), and each way happens ({found_some}, {found_none})");
+}
+
+/// A practised skill (foundations-2 E4): the world's craft, ordinary at 5,000 (the stated time), twice as slow at none,
+/// half the time at the most; an hour's use closes a tenth of the gap to the most; unused, the part above 2,000 halves
+/// every 100 days.
+fn practised_world() -> Value {
+    let mut w = services_world();
+    w["catalogue"]["body_variables"].as_array_mut().unwrap().push(json!({"id": "craft", "min": 0, "max": 10000, "initial": 5000,
+        "practice": {"gain_bps_per_hour": 1000, "half_life_days": 100, "floor": 2000}}));
+    for t in w["catalogue"]["tasks"].as_array_mut().unwrap() {
+        if t["id"] == "make" {
+            t.as_object_mut().unwrap().remove("labour_by");
+            t["skill"] = json!({"variable": "craft", "novice_bps": 20000, "expert_bps": 5000});
+        }
+    }
+    w["catalogue"]["act_skills"] = json!([{"act": "message", "variable": "craft", "novice_bps": 20000, "expert_bps": 5000}]);
+    w["orchestration"]["act_time"]["person"] = json!({"message": 600});
+    w
+}
+
+fn craft(run: &Run<Vec<u8>>, who: &str) -> (i64, i64) {
+    run.kernel().state().body(who).unwrap().variables[&oikos_kernel::blocks::Id::new("craft")]
+}
+
+fn labour_of(ev: &[EventBody]) -> i64 {
+    ev.iter().find_map(|e| match e { EventBody::Worked { labour, .. } => Some(*labour), _ => None }).unwrap()
+}
+
+#[test]
+fn a_practised_skill_grows_with_use_and_fades_without_it() {
+    let w = practised_world();
+    let mut run = start(&w);
+    let make = json!([{"block": "work", "task": "make", "units": 2, "at": "s-shop", "performers": ["carol"]}]);
+    // An ordinary hand takes the stated time, and the hour is practice: a tenth of the 5,000 still to learn.
+    let ev = act(&mut run, "developer-system", Some("developer"), make.clone()).unwrap();
+    assert_eq!(labour_of(&ev), 3600);
+    assert_eq!(craft(&run, "carol").0, 5500);
+    // Quicker for it (a tenth of the way to half the time: 95%), and practised again, by less (diminishing returns).
+    let ev = act(&mut run, "developer-system", Some("developer"), make.clone()).unwrap();
+    assert_eq!(labour_of(&ev), 3420);
+    let v = craft(&run, "carol").0;
+    assert_eq!(v, 5500 + 4500 * 1000 * 3420 / (10_000 * 3600));
+    // A hundred days unused: the part above the floor halved, read as it stands (nothing is written until it is used).
+    let t = run.kernel().state().t;
+    advance(&mut run, t + 100 * DAY);
+    let cfg = run.kernel().statics().config.catalogue.body_variables[1].clone();
+    let stored = craft(&run, "carol");
+    assert_eq!(stored.0, v, "fading is read, not written each day");
+    let faded = 2000 + (v - 2000) / 2;
+    assert_eq!(oikos_kernel::state::body_variable_at(&cfg, stored, stored.1 + 100 * DAY).0, faded);
+    // Years without it: never below the floor.
+    assert_eq!(oikos_kernel::state::body_variable_at(&cfg, stored, stored.1 + 20_000 * DAY).0, 2000);
+    // ... and work is slower for it: below the ordinary hand, toward the novice's double time.
+    let now = run.kernel().state().t;
+    let at_now = oikos_kernel::state::body_variable_at(&cfg, stored, now).0;
+    assert!(at_now <= faded + 1 && at_now < 5000);
+    let ev = act(&mut run, "developer-system", Some("developer"), make.clone()).unwrap();
+    assert_eq!(labour_of(&ev), (3600 * (20_000 - 10_000 * at_now / 5000) + 9_999) / 10_000);
+
+    // An act with a skill: a person's time for it is scaled as work is, and doing it is practice.
+    let took = |run: &mut Run<Vec<u8>>| {
+        let cmd = direct("alice-self", None, serde_json::from_value(json!([{"block": "message", "to": ["bob-self"], "text": "hi"}])).unwrap()).unwrap();
+        let r = step(run, &cmd).unwrap();
+        r.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { starts, done, .. } => Some(done - starts), _ => None }).unwrap()
+    };
+    let mut w2 = w.clone();
+    for e in w2["world"]["entities"].as_array_mut().unwrap() {
+        if e["id"] == "alice" {
+            e["variables"] = json!({"craft": 0});
+        }
+    }
+    let mut run = start(&w2);
+    assert_eq!(took(&mut run), 1200, "a novice takes twice the table's ten minutes");
+    assert_eq!(craft(&run, "alice").0, 10_000 * 1000 * 1200 / (10_000 * 3600));
+    // Without the act's skill, the table's time, and no practice.
+    let mut w3 = w2.clone();
+    w3["catalogue"].as_object_mut().unwrap().remove("act_skills");
+    let mut run = start(&w3);
+    assert_eq!(took(&mut run), 600);
+    assert_eq!(craft(&run, "alice").0, 0);
+}
+
+#[test]
+fn a_skill_is_named_only_on_a_practised_variable() {
+    let mut w = practised_world();
+    w["catalogue"]["act_skills"][0]["variable"] = json!("skill");
+    assert!(Run::start(w, "services", Vec::new(), None).is_err(), "schooling is no practised skill");
+    let mut w = practised_world();
+    w["catalogue"]["body_variables"][1]["per_day"] = json!(1);
+    assert!(Run::start(w, "services", Vec::new(), None).is_err(), "a skill fades by its half-life, not a drift as well");
+}
+
+/// A technology that is a good (foundations-2 E2): a machine the developer holds at the shop, one for each person making,
+/// halves the work; one for two people does nothing; it is not used up.
+#[test]
+fn a_tool_held_for_each_person_at_the_work_makes_it_quicker_and_is_not_used_up() {
+    let made = |machines: &str, performers: &[&str]| {
+        let mut w = services_world();
+        w["catalogue"]["resources"].as_array_mut().unwrap().push(json!({"id": "machine", "unit": "item"}));
+        for t in w["catalogue"]["tasks"].as_array_mut().unwrap() {
+            if t["id"] == "make" {
+                t.as_object_mut().unwrap().remove("labour_by");
+                t["tool"] = json!({"kind": "machine", "per_performer": 1, "labour_bps": 5000});
+            }
+        }
+        if machines != "0" {
+            w["world"]["holdings"].as_array_mut().unwrap().push(json!({"kind": "machine", "holder": "devco", "at": "s-shop", "quantity": machines}));
+        }
+        let mut run = start(&w);
+        let ev = act(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "make", "units": 2, "at": "s-shop", "performers": performers}])).unwrap();
+        (labour_of(&ev), run.kernel().state().holding("devco", "s-shop", "machine"))
+    };
+    assert_eq!(made("1", &["carol"]), (1800, 1), "one machine for carol: half the time, and it is still there");
+    assert_eq!(made("0", &["carol"]), (3600, 0));
+}
+
+/// Who could do each kind of work (foundations-2 M8): a monthly census of each practised skill, how many living people in
+/// each tenth of its range; none in a world with no practised skill.
+#[test]
+fn the_practised_skills_are_censused_monthly_and_a_world_without_them_has_no_census() {
+    let mut run = start(&practised_world());
+    let ev = advance(&mut run, 31 * DAY);
+    let census = ev.iter().find_map(|e| match e { EventBody::SkillCensus { skills } => Some(skills.clone()), _ => None }).expect("a census at the month");
+    let craft = &census[&oikos_kernel::blocks::Id::new("craft")];
+    assert_eq!(craft.len(), 10);
+    // (Everyone at the ordinary 5,000, faded a month toward the floor: in the band from 4,000.)
+    assert_eq!(craft[4], craft.iter().sum::<i64>());
+    let mut plain = start(&services_world());
+    assert!(!advance(&mut plain, 31 * DAY).iter().any(|e| matches!(e, EventBody::SkillCensus { .. })));
 }

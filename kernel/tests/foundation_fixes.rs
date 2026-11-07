@@ -1,7 +1,7 @@
 //! Faults the independent review of the foundations found (runs/review-foundations-2026-10-16.md), each with the test that
 //! failed before its fix. One test per finding, named for it.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::EventBody;
@@ -16,9 +16,9 @@ const DAY: i64 = 86_400;
 fn cmd_by(participant: &str, position: Option<&str>, blocks: Value, by: &[&str]) -> Command {
     Command::Act {
         participant: participant.into(),
-        position: position.map(String::from),
+        position: position.map(String::from).map(Into::into),
         blocks: serde_json::from_value(blocks).expect("the blocks parse"),
-        by: by.iter().map(|s| s.to_string()).collect(),
+        by: by.iter().map(|s| s.to_string()).map(Into::into).collect(),
         provenance: json!({"via": "direct"}),
         reasoning: None,
         thinking: None,
@@ -108,7 +108,7 @@ fn f3_a_world_whose_post_is_held_by_anothers_system_does_not_load() {
 fn employ(run: &mut R, employer: &str, by: &str, position: Option<&str>, worker: &str) {
     let propose = cmd(by, position, json!([{"block": "propose_agreement", "terms": {"parties": [employer, worker], "commitments": [{"who": employer, "does": {"outcome": {"money": {"to": format!("acc-{worker}"), "amount": "100"}}}, "every": 2_592_000}]}, "speaks_for": employer}]));
     step(run, &propose).expect("accepted");
-    let id = run.kernel().state().record_order.iter().rev().find(|id| run.kernel().state().records[*id].record.body.kind_name() == "agreement").cloned().expect("an agreement");
+    let id = run.kernel().state().record_order.iter().rev().find(|id| run.kernel().state().records[*id].record.load().body.kind_name() == "agreement").cloned().expect("an agreement");
     step(run, &cmd(&format!("{worker}-self"), None, json!([{"block": "sign_agreement", "agreement": id, "as": worker}]))).expect("accepted");
     step(run, &cmd(by, position, json!([{"block": "sign_agreement", "agreement": id, "as": employer}]))).expect("accepted");
 }
@@ -143,7 +143,7 @@ fn f5_by_names_only_someone_the_actor_may_direct() {
 #[test]
 fn f8_each_performer_is_charged_their_own_time() {
     let mut c = world(&default_params());
-    c["orchestration"]["act_time"] = json!({"person": {"message": 2_400}, "system": {"message": 1}});
+    c["orchestration"]["act_time"] = json!({"default": 1, "person": {"message": 2_400}, "system": {"message": 1}});
     let mut run = start(c);
     employ(&mut run, "devco", "developer-system", Some("developer"), "carol");
     // A system names a person: the person is charged the person's 2,400 s, not the system's 1 s.
@@ -167,7 +167,7 @@ fn f8_each_performer_is_charged_their_own_time() {
 #[test]
 fn f2_work_that_could_not_be_checked_when_ordered_takes_effect_after_its_hours() {
     let mut c = world(&default_params());
-    c["orchestration"]["act_time"] = json!({"person": {"occupy": 100, "vacate": 1}, "system": {"message": 200, "work": 1}});
+    c["orchestration"]["act_time"] = json!({"default": 1, "person": {"occupy": 100, "vacate": 1}, "system": {"message": 200, "work": 1}});
     let mut run = start(c);
     let goods = |run: &R| run.kernel().state().holding("devco", "s-shop", "goods");
     // Carol leaves the shop, and starts back (she is there from t=102); the developer is busy for 200 s, then orders her work

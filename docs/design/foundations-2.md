@@ -149,6 +149,19 @@ stocks of that kind, connections' pipes (nought: settled at once) and edges chan
 outputs less inputs, nature's logged sources less sinks, and nothing else; nobody but an edge holds less than nought;
 every connection's meter equals the sum of its logged deliveries.
 
+**Built (2026-10-26, phase 2: C1 to C6 with C3b; branch `f2-phase2`; decisions "Foundations-2 phase 2"):** the invariant
+(`kernel/tests/conservation.rs`, replacing `goods.rs`) and the backstop with its inventory (C1); kinds' classes, with a third
+class `service` beside the design's two (a unit of a service sold over a counter: a haircut is no stock and need not become
+waste), fields that hold a kind, a draw held, nature's edge (C2); the network, connections settled on trees by pressure,
+ratings and drains, meters in state, the acts on connections and links, rotations as standing schedules (C3, C3b in the
+kernel); the generated town's homes on water, electricity and sewer connections, use and waste as recipes, collection from
+where waste is held, bills from meters, who pays the water bill as law data, the two variables, the assumed use and the
+energy at the depot deleted, and the operators' reclosing and rotation (C4); every workplace recipe states its energy and
+water, each nought with its basis (C5, short of the design: no workplace is supplied yet, WM-15); scarce kinds at an edge,
+refused `beyond_supply` (C6). **Not as designed:** the `connection` and `link` calls are code's own until the
+translator is taught them (TR-7); households do not yet read the tariff or a restriction (WM-12); the CLAUDE.md line is
+drafted in the decisions entry and added when C4 lands.
+
 ### 2.2 The backstop
 
 `orchestrator/test/nothing-from-nothing.test.ts`, fast tier. It generates the town of every profile (code seats, and
@@ -286,6 +299,27 @@ a profile figure.
 S3 is the largest behavioural change in the plan: every worker's free hours fall by their commute, which moves
 shopping, gatherings and seats' own sittings. It gets its own before and after.
 
+**Built (branch `f2-phase3`; decisions "Foundations-2 phase 3"):** S1 (2026-10-31): the backstop
+(`everything-is-somewhere.test.ts`, its log half `everything-is-somewhere-runs.test.ts` in the slow tier, audits in
+`test/lib/law9.ts`), the inventory (`fixtures/space-inventory.json`) and `kernel/tests/space.rs`. Added to the design's
+list: systems' places and the unhoused, who are in no space. S2 (2026-10-31): a structure type may be a way (roads), its
+cells joined into links a cell long; trips along the ways at the vehicle's speed or on foot; vehicles driven by whoever may,
+standing where they went; households' vehicles from the profiles. Not as designed: roads are structures that are ways, not
+links declared in `world.network` (so a road the town builds joins the network); declared travel links come with S6.
+S3 (2026-10-31): bodies on their way, in no building from when an act takes them until it is done, their vehicle with
+them; a refused trip brings them back; a visit is a trip there and back. Not as designed: no standing journeys (the
+transit adds no event, so the log does not grow). S4 (2026-11-01): goods between buildings go only with a carrier,
+taken by both places by the act's journeys; crews go to the building they work on; the outside's freight takes its time
+from the edge's node by the road out. Not as designed: no load limit yet (S5). S5 (2026-11-01): each way link's
+vehicles an hour, each way; a driven leg's time by the BPR volume-delay form, a full link holding a vehicle to the next
+hour; a vehicle's fuel drawn from its tank by the metres driven, a short tank leaving the trip walked; tanks filled by
+driving to where the fuel is. Not as designed: no load limit in mass (no kind has a mass), no re-routing. S6
+(2026-11-01): `towns: N` composes N generated towns into one world (`worlds/generator/towns.ts`): one ground, one weather,
+one outside, a road between each town's gate and the next's; commuting and moving between towns are the citizens'
+ordinary acts on what is published. Not as designed: one design of each building and one wear and short-pay rate for the
+world (the first town's), and no commuting cost in the choice of a job (decisions, "S6"). The three-town year found a
+kernel gap, fixed: a body out on one act's way could be sent elsewhere by another.
+
 ### 3.5 Performance
 
 The town's road network is a few hundred nodes, so all shortest paths from every node fit in memory and are made once
@@ -354,6 +388,20 @@ second" becomes, row by row, what the template's source says.
 | P3 | Generator and profiles: the support office's casework as officers' minutes (sourced per place or marked), its lanes from a sourced officers-per-claim ratio, its hours; or the officer as a non-resident person (decision 7) | claim-to-decision days come from officers' hours (measured, not aimed at) |
 | P4 | Kernel: `runs_on`, location, energy and water per second of work (needs C3 and E2) | a system without power stops |
 | P5 | The backstop's new findings, planted | it names each |
+
+**Built (2026-10-25, phase 1: P1, P2, P3, P5; branch `f2-phase1`; decisions "Foundations-2 phase 1"):** a template's
+`does` rows carry seconds for any block (read before the world's system row; `work`'s stay a unit's), and `hours` (a
+pure function, `oikos_time::place_within`, used wherever a system's lanes are placed: an act, a question answered, a
+visit); no implicit second (`unpriced`; test worlds state `default: 1` as a marked placeholder); someone who only orders
+an act goes on at once (`ORDER_SECONDS`); the support office's casework is done `by` the desk `outside-casework`
+(`agency-casework`: the person table's minutes, an officer's working day spread over the week, lanes from a placeholder
+national ratio in every profile); every machine's template states its hours (the whole day); an office offer's seconds
+are its template's rows; and the engine now gives a code unit's `done_by` to the act as `by` (found on the way: it had
+never reached an act in the engine). The backstop gained `decisionsAtTheSystemsSecond`, `systemsWithoutHours`, template rows'
+sources in `unpricedWork`, and (slow tier) `unpricedActs` over a month of each profile's town, each planted. **Not
+built here:** the charged row on each act in the log (P1's third part: the backstop reads `unpriced` refusals instead of
+acts charged by a default, since the generated town states none); the seat as a non-resident officer (decision 7: not
+contained, WM-14); P4 (`runs_on`), as planned.
 
 ### 4.5 Performance
 
@@ -431,7 +479,9 @@ reads every number of a config and finds its basis in the table of work's and sl
 parameter left at its module's default, the manifest's note; `oikos figures <world>` prints it and every batch writes
 `figures.txt` and `figures.json` beside its runs. A town of 200 (au-vic) has 54,483 numbers: 7% sourced, 6% to confirm,
 41% derived, 39% placeholder, 6% conventions, 0.9% unbased (464 in 156 places, listed in
-`orchestrator/test/fixtures/figures-unbased.json`, which only shrinks). Left for N3, when the table goes into the config
+`orchestrator/test/fixtures/figures-unbased.json`, which only shrinks; emptied on 2026-10-25 by rows for every module
+parameter and catalogue entry the table lacked, with no profile value changed: decisions, "Law 11: every unbased place
+given its basis"). Left for N3, when the table goes into the config
 and the kernel refuses: the kernel's own check, and the profiles' notes in structured form (a note's class is read from
 its words today, and a note that calls any of its figures a placeholder counts all of them as placeholders). The
 `derived` rows are the generator's statements of where a figure comes from; the class of what it is derived from is not

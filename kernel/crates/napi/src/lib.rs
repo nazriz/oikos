@@ -88,6 +88,8 @@ impl World {
             }
             _ => oikos_kernel::config::load_from(config.as_bytes()),
         };
+        // (The compiled schemas it was checked with go: built again, in milliseconds, for the next config read.)
+        oikos_kernel::contracts::release_config_check();
         let (loaded, rest) = read.map_err(|e| err(format!("invalid config: {e}")))?;
         drop(config);
         Ok(World { host: Host::start_loaded(loaded, rest, &opts).map_err(err)? })

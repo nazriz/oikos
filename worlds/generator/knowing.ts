@@ -30,6 +30,9 @@ export const kept = (id: string, match: string[] | Match, extra: Extra = {}) => 
 export const ask = (id: string, of: string, match: string[] | Match, by: string[], extra: Extra = {}) => ({ id, kind: "records", way: "ask", match: kinds(match), of, by, on_request: true, ...extra });
 /** The ground at an organisation's own premises (its cells), and who is there by name. */
 export const premises = (id: string, cells: string[], extra: Extra & { occupants?: "names" | "counts" } = { occupants: "names" }) => ({ id, kind: "sites", way: "here", area: { premises: cells }, ...extra });
+/** The ground at premises an organisation holds by agreement (a unit it leases), and who is there by name: none until
+ * it holds some; it moves as its agreements do. */
+export const held = (id: string, extra: Extra = {}) => ({ id, kind: "sites", way: "here", area: { held: "occupancy" }, occupants: "names", ...extra });
 /** The ground around where a person is. */
 export const around = (id: string, near: number, extra: Extra = {}) => ({ id, kind: "sites", way: "here", area: { near }, ...extra });
 /** Places gone to: nothing until a look names them, which takes the looker's time. `enters`: who is inside, by name. */
@@ -49,6 +52,8 @@ export const lookUp = (id = "who", extra: Extra = {}) => ({ id, kind: "directory
 /** What a town where things go wrong publishes besides (docs/behaviour/frictions.md): given only to such a town. */
 export const PUBLISHED_HEARINGS = { what: "has:hears", why: "A body that hears grievances says publicly what it hears, so that whoever has such a matter can bring it." };
 /** What a town where people found things publishes besides (docs/behaviour/founding.md): given only to such a town. */
+/** Where a town has providers of assistants (docs/behaviour/assistants.md). */
+export const PUBLISHED_SERVICES = { what: "service_offer", why: "A provider of assistants advertises what it sells, on what terms and with what it claims, to whoever might engage one." };
 export const PUBLISHED_MEMBERSHIPS = { what: "membership", why: "A group says publicly what joining it asks, so that whoever it is for can find it." };
 export const PUBLISHED: { what: string; why: string; board?: true; most?: number }[] = [
   { what: "law", why: "The law in force is promulgated to everyone it binds." },
@@ -108,7 +113,7 @@ export function answersOf(what: string, town: { holderSearch: string[]; dealings
  * The world's `knowing`: what is published, and the keeper of each register, taken from the behaviour module that
  * does each seat's job (its `keeps`, with the reason) for the organisation the seat belongs to.
  */
-export function knowing(positions: { entity: string; role_module?: { code?: string } }[], town: { holderSearch: string[]; dealings: number; visit_seconds?: number; hearings?: boolean; founding?: boolean }) {
+export function knowing(positions: { entity: string; role_module?: { code?: string } }[], town: { holderSearch: string[]; dealings: number; visit_seconds?: number; hearings?: boolean; founding?: boolean; services?: boolean }) {
   const keepers = new Map<string, { entity: string; what: string; why: string; answers?: ReturnType<typeof answersOf> }>();
   for (const pos of positions) {
     for (const k of modules[pos.role_module?.code ?? ""]?.keeps ?? []) {
@@ -118,5 +123,5 @@ export function knowing(positions: { entity: string; role_module?: { code?: stri
       if (!keepers.has(`${pos.entity}|${k.what}`)) keepers.set(`${pos.entity}|${k.what}`, { entity: pos.entity, what: k.what, why: k.why, ...(answers.length ? { answers } : {}) });
     }
   }
-  return { published: [...PUBLISHED, ...(town.hearings ? [PUBLISHED_HEARINGS] : []), ...(town.founding ? [PUBLISHED_MEMBERSHIPS] : [])].map((p) => ({ ...p })), keepers: [...keepers.values()].sort((a, b) => (`${a.entity}|${a.what}` < `${b.entity}|${b.what}` ? -1 : 1)), ...(town.visit_seconds !== undefined ? { visit_seconds: town.visit_seconds } : {}) };
+  return { published: [...PUBLISHED, ...(town.hearings ? [PUBLISHED_HEARINGS] : []), ...(town.founding ? [PUBLISHED_MEMBERSHIPS] : []), ...(town.services ? [PUBLISHED_SERVICES] : [])].map((p) => ({ ...p })), keepers: [...keepers.values()].sort((a, b) => (`${a.entity}|${a.what}` < `${b.entity}|${b.what}` ? -1 : 1)), ...(town.visit_seconds !== undefined ? { visit_seconds: town.visit_seconds } : {}) };
 }

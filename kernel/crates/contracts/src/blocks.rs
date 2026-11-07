@@ -9,11 +9,15 @@
 
 use crate::config::Channel;
 use serde::{Deserialize, Serialize};
+pub use oikos_core::Frozen;
 use serde_json::Value;
 
 /// An id, or a `$name` bound earlier in the same action.
 pub type IdOrRef = String;
-pub type Id = String;
+pub use oikos_core::Id;
+/// The id of what passes (an act in progress, a message on its way): its own text, not interned, so it goes with what
+/// it names (docs/design/performance.md, "A plan for what is left", R1). Every id of what lasts is an `Id`.
+pub type Passing = String;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "block", rename_all = "snake_case", deny_unknown_fields)]
@@ -45,6 +49,15 @@ pub enum Block {
         to: IdOrRef,
         /// Where they go (a structure, or for an edge, itself).
         to_at: IdOrRef,
+        /// Law 9 (foundations-2 S4): between two buildings goods are carried, by the acting person (`carried`) or by a body
+        /// the actor may direct (`carrier`), who goes by where they are and where they go (driving `vehicle`, if named); to
+        /// or from an edge's outside, by the outside's freight, which takes its time from the edge's node.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        carried: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        carrier: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        vehicle: Option<IdOrRef>,
     },
     /// Taking goods another holds at a structure where the taker is, without their consent (world-expansion 7.3).
     Take {
@@ -105,6 +118,10 @@ pub enum Block {
         space: IdOrRef,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         who: Option<IdOrRef>,
+        /// Law 9 (foundations-2 S2): the vehicle it goes by, driven (one it may drive, standing where it sets out); none, on
+        /// foot.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        vehicle: Option<IdOrRef>,
     },
     /// A body comes out of a structure (every space it's in there) or one space.
     Vacate {
@@ -330,6 +347,89 @@ pub enum Block {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         re: Option<Id>,
     },
+    // ---- what flows (foundations-2 C3, law 8) ----
+    /// An act on a connection. Its operator (the holder of the supply whose tree the node is on) opens one (`open`, with
+    /// the kind, the node, the user `to`, where `at`, the rate a day; or, naming a closed `connection`, opens it again),
+    /// closes it (a disconnection), interrupts or restores it (an interruptible customer cut); its user or its operator
+    /// sets its rate (`set`).
+    Connection {
+        op: ConnOp,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        connection: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kind: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        node: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        at: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rate: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        uses: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        meter: Option<crate::network::MeterKind>,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+    },
+    /// An act on a link by its operator: shut it (a valve closed, a feeder switched off), open it, reclose it after it
+    /// tripped, or put it on a rotation (a standing schedule: off for `off` seconds of every `every`, from `from`; `off`
+    /// nought ends it).
+    Link {
+        link: Id,
+        op: LinkOp,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        every: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        off: Option<i64>,
+    },
+}
+
+/// What is done to a connection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnOp {
+    Open,
+    Set,
+    Close,
+    Interrupt,
+    Restore,
+}
+
+impl ConnOp {
+    pub fn name(&self) -> &'static str {
+        match self {
+            ConnOp::Open => "open",
+            ConnOp::Set => "set",
+            ConnOp::Close => "close",
+            ConnOp::Interrupt => "interrupt",
+            ConnOp::Restore => "restore",
+        }
+    }
+}
+
+/// What is done to a link.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LinkOp {
+    Shut,
+    Open,
+    Reclose,
+    Rotate,
+}
+
+impl LinkOp {
+    pub fn name(&self) -> &'static str {
+        match self {
+            LinkOp::Shut => "shut",
+            LinkOp::Open => "open",
+            LinkOp::Reclose => "reclose",
+            LinkOp::Rotate => "rotate",
+        }
+    }
 }
 
 impl Block {
@@ -341,6 +441,8 @@ impl Block {
             Block::Publish { kind, .. } => Some(format!("publish/{kind}")),
             Block::CreateEntity { kind, .. } => Some(format!("create_entity/{kind}")),
             Block::Work { task, .. } => Some(format!("work/{task}")),
+            Block::Connection { op, .. } => Some(format!("connection/{}", op.name())),
+            Block::Link { op, .. } => Some(format!("link/{}", op.name())),
             _ => None,
         }
     }
@@ -376,6 +478,8 @@ impl Block {
             Block::Withdraw { .. } => "withdraw",
             Block::Vote { .. } => "vote",
             Block::Message { .. } => "message",
+            Block::Connection { .. } => "connection",
+            Block::Link { .. } => "link",
         }
     }
 }
@@ -392,15 +496,15 @@ pub enum Position {
 /// One record, or a list of them: how a basis is written (contracts: common Basis, records Basis).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum BasisForm {
-    One(Id),
-    Several(Vec<Id>),
+pub enum BasisForm<T = Id> {
+    One(T),
+    Several(Vec<T>),
 }
 
 /// The most records one act may cite.
 pub const MAX_BASES: usize = 64;
 
-fn listed(ids: &[Id], at_least: usize) -> Result<(), String> {
+fn listed<T: PartialEq + std::fmt::Display>(ids: &[T], at_least: usize) -> Result<(), String> {
     if ids.len() < at_least || ids.len() > MAX_BASES {
         return Err(format!("a basis written as a list names {at_least} to {MAX_BASES} records, not {}", ids.len()));
     }
@@ -414,8 +518,8 @@ fn listed(ids: &[Id], at_least: usize) -> Result<(), String> {
 /// or a list of them in the order cited (at least one, none twice). It is kept as written, so a command reads in the
 /// log as it was given; the record made from it has the one stored form (`Basis`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(try_from = "BasisForm", into = "BasisForm")]
-pub struct BasisArg(BasisForm);
+#[serde(try_from = "BasisForm<IdOrRef>", into = "BasisForm<IdOrRef>")]
+pub struct BasisArg(BasisForm<IdOrRef>);
 
 impl BasisArg {
     pub fn one(id: impl Into<IdOrRef>) -> Self {
@@ -431,9 +535,9 @@ impl BasisArg {
     }
 }
 
-impl TryFrom<BasisForm> for BasisArg {
+impl TryFrom<BasisForm<IdOrRef>> for BasisArg {
     type Error = String;
-    fn try_from(f: BasisForm) -> Result<Self, String> {
+    fn try_from(f: BasisForm<IdOrRef>) -> Result<Self, String> {
         if let BasisForm::Several(ids) = &f {
             listed(ids, 1)?;
         }
@@ -441,8 +545,8 @@ impl TryFrom<BasisForm> for BasisArg {
     }
 }
 
-impl From<BasisArg> for BasisForm {
-    fn from(b: BasisArg) -> BasisForm {
+impl From<BasisArg> for BasisForm<IdOrRef> {
+    fn from(b: BasisArg) -> BasisForm<IdOrRef> {
         b.0
     }
 }
@@ -588,14 +692,14 @@ pub struct AgreementTerms {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub attrs: Option<Value>,
+    pub attrs: Option<Frozen>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Commitment {
     pub who: IdOrRef,
-    pub does: Value,
+    pub does: Frozen,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub every: Option<i64>,
 }
@@ -617,7 +721,7 @@ pub const GENESIS: &str = "genesis";
 pub struct Record {
     pub id: Id,
     /// A participant id, or "genesis".
-    pub author: String,
+    pub author: Id,
     /// The position the author made it in (absent: as themselves). Not `position`: a claim's
     /// Hohfeld position has that name.
     #[serde(default, rename = "in_position", skip_serializing_if = "Option::is_none")]
@@ -643,7 +747,7 @@ pub enum RecordBody {
         holder: Id,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         counterparty: Option<Id>,
-        about: Value,
+        about: Frozen,
     },
     ClaimTransfer {
         claim: Id,
@@ -668,27 +772,27 @@ pub enum RecordBody {
         text: Option<String>,
     },
     Statement {
-        kind: String,
+        kind: Id,
         text: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        data: Option<Value>,
+        data: Option<Frozen>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        adico: Option<Value>,
+        adico: Option<Frozen>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        formal: Option<Value>,
+        formal: Option<Frozen>,
         /// What someone may take up, on what terms (contracts: Offer; docs/design/ai-citizens.md 2a). Facts only; the
         /// kernel executes none of it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        offer: Option<Value>,
+        offer: Option<Frozen>,
         /// A recurring situation people may take part in (contracts: Practice; 2b). It has no power.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        practice: Option<Value>,
+        practice: Option<Frozen>,
         /// Something put forward to be believed (contracts: Assertion; docs/design/contracts-0.7.md A1). No power.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        assertion: Option<Value>,
+        assertion: Option<Frozen>,
         /// A registry's act: an organisation registered or dissolved (contracts: Registry). Content, never physics.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        registry: Option<Value>,
+        registry: Option<Frozen>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         addressed_to: Option<Vec<Id>>,
         /// The cell it's put up on, if any.
@@ -759,7 +863,7 @@ impl Record {
                 v.extend(terms.termination.iter().flatten().map(|t| t.party.as_str()));
             }
             RecordBody::Signature { party, .. } | RecordBody::Notice { party, .. } => v.push(party),
-            RecordBody::Statement { addressed_to, .. } => v.extend(addressed_to.iter().flatten().map(String::as_str)),
+            RecordBody::Statement { addressed_to, .. } => v.extend(addressed_to.iter().flatten().map(Id::as_str)),
             RecordBody::EntityDeclaration { entity, .. } => v.push(entity),
             RecordBody::ClaimRelease { .. } | RecordBody::Withdrawal { .. } | RecordBody::Vote { .. } => {}
         }
@@ -770,7 +874,7 @@ impl Record {
     /// "about" someone just because they can see it).
     pub fn visibility_entities(&self) -> Vec<&str> {
         match &self.visible_to {
-            Visibility::Only(ids) => ids.iter().map(String::as_str).collect(),
+            Visibility::Only(ids) => ids.iter().map(Id::as_str).collect(),
             Visibility::Public(_) => vec![],
         }
     }

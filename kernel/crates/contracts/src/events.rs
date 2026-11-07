@@ -92,6 +92,14 @@ pub enum RefusalCode {
     /// A signature on an agreement whose owner has withdrawn it before every party had signed: an offer that no longer
     /// stands cannot be accepted.
     OfferWithdrawn,
+    /// An act the world's table of work does not price, for whoever would do it (no row of the performer's template, of
+    /// the world's table for their kind, and no `default` the world states): nobody said what it takes, so it is not done
+    /// (law 10, foundations-2 P2; before, it took a second).
+    Unpriced,
+    /// Law 9 (S4): goods between two places with nobody to carry them.
+    NotCarried,
+    /// An edge asked to sell more of a scarce kind than it has left this period (foundations-2 C6).
+    BeyondSupply,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -138,7 +146,7 @@ pub enum EventBody {
     /// An act begun (docs/design/rebuild.md 6.3): its actor is busy with it from `starts` (after any thinking) and it
     /// takes effect at `done`, when it's applied or refused.
     ActionStarted {
-        action: Id,
+        action: crate::blocks::Passing,
         participant: Id,
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
@@ -150,7 +158,7 @@ pub enum EventBody {
         free: Option<i64>,
     },
     ActionApplied {
-        action: Id,
+        action: crate::blocks::Passing,
         participant: Id,
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
@@ -162,7 +170,7 @@ pub enum EventBody {
         created: Option<BTreeMap<String, Id>>,
     },
     ActionRefused {
-        action: Id,
+        action: crate::blocks::Passing,
         participant: Id,
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
@@ -205,6 +213,47 @@ pub enum EventBody {
         structure: Id,
         by: Id,
     },
+    /// A vehicle driven on a trip used fuel from its tank (law 9, S5): its owner's holding of the kind at the vehicle, used
+    /// up (a kind that dissipates).
+    FuelUsed {
+        vehicle: Id,
+        kind: Id,
+        #[serde(with = "oikos_core::money::amount")]
+        quantity: oikos_core::money::Money,
+        metres: i64,
+        by: Id,
+    },
+    /// An act on a connection (foundations-2 C3): opened, set, closed, interrupted, restored. Its settlements are not
+    /// events: the meter is state.
+    ConnectionChanged {
+        connection: Id,
+        op: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rate: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kind: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        node: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        holder: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        at: Option<Id>,
+        by: Id,
+    },
+    /// A link's state changed: by its operator's act (shut, opened, reclosed, put on or taken off a rotation), or by its
+    /// own protection (`tripped`, with the load it was asked for and its rating; no `by`).
+    LinkChanged {
+        link: Id,
+        op: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        by: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        load: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        capacity: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rotation: Option<serde_json::Value>,
+    },
     GoodsMoved {
         kind: Id,
         #[serde(with = "oikos_core::money::amount")]
@@ -214,6 +263,11 @@ pub enum EventBody {
         to: Id,
         to_at: Id,
         by: Id,
+        /// Who carried them (law 9: a body, or the edge whose freight it was), and when they arrive, if later than now.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        carrier: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        arrives: Option<i64>,
     },
     AccountOpened {
         account: Id,
@@ -256,6 +310,9 @@ pub enum EventBody {
         occupant: Id,
         space: Id,
         by: Id,
+        /// The vehicle it came by, which now stands there too (law 9).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        vehicle: Option<Id>,
     },
     Vacated {
         occupant: Id,
@@ -290,6 +347,9 @@ pub enum EventBody {
     PersonDied {
         person: Id,
         died_of: DeathCause,
+        /// Where the body lies, if the person died on their way between buildings (law 9: a cell of the road).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        lies_at: Option<Id>,
     },
     BirthStarted {
         parents: Vec<Id>,
@@ -336,6 +396,11 @@ pub enum EventBody {
     /// The world's totals (tier 2: greenhouse gas), monthly, for measurement.
     CounterCensus {
         counters: BTreeMap<Id, i64>,
+    },
+    /// Who could do each kind of work, and how well (foundations-2 M8), monthly, for measurement: for each practised skill,
+    /// how many living people stand in each tenth of its range, as it stands (fading read to the day).
+    SkillCensus {
+        skills: BTreeMap<Id, Vec<i64>>,
     },
     /// Work changed a body variable (services: teaching raises skill): its value now.
     BodyChanged {
@@ -470,6 +535,9 @@ impl EventBody {
             EventBody::ActionRefused { .. } => "action_refused",
             EventBody::Transfer { .. } => "transfer",
             EventBody::GoodsMoved { .. } => "goods_moved",
+            EventBody::FuelUsed { .. } => "fuel_used",
+            EventBody::ConnectionChanged { .. } => "connection_changed",
+            EventBody::LinkChanged { .. } => "link_changed",
             EventBody::Worked { .. } => "worked",
             EventBody::DemolitionStarted { .. } => "demolition_started",
             EventBody::AccountOpened { .. } => "account_opened",
@@ -491,6 +559,7 @@ impl EventBody {
             EventBody::ConditionTreated { .. } => "condition_treated",
             EventBody::BodyChanged { .. } => "body_changed",
             EventBody::CounterCensus { .. } => "counter_census",
+            EventBody::SkillCensus { .. } => "skill_census",
             EventBody::Flooded { .. } => "flooded",
             EventBody::Taken { .. } => "taken",
             EventBody::FloodReceded { .. } => "flood_receded",
@@ -519,6 +588,9 @@ impl EventBody {
             self,
             EventBody::Transfer { .. }
                 | EventBody::GoodsMoved { .. }
+                | EventBody::FuelUsed { .. }
+                | EventBody::ConnectionChanged { .. }
+                | EventBody::LinkChanged { .. }
                 | EventBody::Worked { .. }
                 | EventBody::DemolitionStarted { .. }
                 | EventBody::AccountOpened { .. }

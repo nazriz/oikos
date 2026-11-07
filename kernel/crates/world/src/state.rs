@@ -82,7 +82,7 @@ pub struct State {
     /// holder is handed it as the payments it has not yet been told of, so it reads its office's books and not an empty
     /// memory. Derived from the log (never serialised, so the state and its hash are unchanged).
     #[serde(skip)]
-    pub ledgers: Map<String, imbl::Vector<Transaction>>,
+    pub ledgers: Map<String, Ledger>,
     /// Future physical effects and acts in progress, sorted by (at, seq).
     pub schedule: Schedule,
     /// Each actor's timeline (docs/design/rebuild.md 6.3): when each of its lanes is next free. A person's is keyed by
@@ -97,11 +97,12 @@ pub struct State {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub totals: BTreeMap<Id, i64>,
     /// Buildings under water now (world-expansion 7.3).
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub flooded: BTreeSet<Id>,
+    #[serde(default, skip_serializing_if = "imbl::OrdSet::is_empty")]
+    pub flooded: imbl::OrdSet<Id>,
     /// Goods taken without consent (world-expansion 7.3): the truth, which investigation can find.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub takings: Vec<Taking>,
+    /// (A persistent vector, like the maps: it grows with the run, and an act's copy of the state shares it.)
+    #[serde(default, skip_serializing_if = "imbl::Vector::is_empty")]
+    pub takings: imbl::Vector<Taking>,
     /// Questions put to a register's keeper that nobody was there to answer (no one of its posts present and on duty), in
     /// the order asked: taken up, one after another, when someone is (checked each hour while any are held).
     ///
@@ -114,17 +115,36 @@ pub struct State {
     /// (`caps.entity_record_bytes`), so it never grows. The kernel reads none of it: its sections are opaque.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub entity_records: Map<Id, Arc<EntityRecord>>,
-    /// Vehicles (reserved shapes for travel, docs/design/travel.md): each its type, its owner and where it stands, as
-    /// the config declares them. Things their owners own; nothing moves them yet.
+    /// Vehicles (law 9, foundations-2 S2): each its type, its owner, where it stands and who may drive it. Things their
+    /// owners own; a vehicle goes where whoever drives it goes.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub vehicles: Map<Id, Vehicle>,
-    /// Bodies on their way between places (reserved: nothing puts anyone in transit yet; a visit is still the time it
-    /// takes, spent where one set out). Keyed by the body.
+    /// Bodies on their way between places (law 9, foundations-2 S3): from when they set out until they arrive, in no
+    /// space of any building, so that nothing is done to them or by them at any place on the way. Keyed by the body.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub transit: Map<Id, Transit>,
+    /// The dead who died on their way, each where it lay (a cell of the ground: law 9, S3): seen by whoever is there
+    /// (`SiteCell.remains`), until the death is registered.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub remains: Map<Id, Id>,
+    /// What each way link carries this hour (law 9, S5): link -> (the hour, vehicles that set out on it in it). Only the
+    /// current hour's count is kept; an hour past is counted afresh.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub flows: Map<Id, (i64, u32)>,
+    /// The network for what flows (foundations-2 C3, law 8): each link's state, each connection with its meter. Behind
+    /// an `Arc`, as nature is: settled hourly, and an action's copy of the state shares it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<Arc<crate::network::NetState>>,
+    /// What each edge has sold of a scarce kind this period (`edge|kind` -> (the period, how much)): foundations-2 C6.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub scarce_sold: Map<String, (i64, crate::money::Money)>,
+    /// A hosted system's seconds of work not yet drawn as a whole hour of its `runs_on` recipe (foundations-2 P4): by system.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub metered: Map<Id, i64>,
 }
 
-/// A vehicle as the world keeps it (reserved shapes for travel).
+/// A vehicle as the world keeps it (law 9, foundations-2 S2): its type, its owner, where it stands, and who besides its owner
+/// may drive it. It goes where it is driven.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Vehicle {
     #[serde(rename = "type")]
@@ -132,20 +152,38 @@ pub struct Vehicle {
     pub owner: Id,
     /// A cell, or a structure.
     pub at: Id,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drivers: Vec<Id>,
+    /// Fuel its driving has used and its tank not yet given, in millionths of a unit (law 9, S5): a trip takes whole units
+    /// as the millionths add up to them, so a short trip is not charged a unit it did not use.
+    #[serde(default, skip_serializing_if = "is_zero_i64")]
+    pub fuel_owed: i64,
 }
 
-/// A body on its way (reserved shapes for travel): from where, to where, when it set out and when it arrives, and by
-/// which road and vehicle, where it goes by one.
+impl Vehicle {
+    /// Whether a body may drive it: its owner, or one its owner lets.
+    pub fn may_drive(&self, who: &str) -> bool {
+        self.owner == who || self.drivers.iter().any(|d| d == who)
+    }
+}
+
+/// A body on its way (law 9, foundations-2 S3): the building and space it left, where it is going (the same building, for a
+/// visit there and back), when it set out and arrives, the vehicle it is driving, and the act that takes it there (none for
+/// a visit).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Transit {
     pub from: Id,
+    pub space: Id,
     pub to: Id,
+    /// The buildings it goes by on the way (where goods are picked up and put down, a building worked on: S4).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub via: Vec<Id>,
     pub departed: i64,
     pub arrives: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub road: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vehicle: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub act: Option<Id>,
 }
 
 /// An entity's own record: its sections (opaque, whole numbers only), how many times it has been set (`n`), when
@@ -156,7 +194,8 @@ pub struct EntityRecord {
     pub n: u64,
     pub at: i64,
     pub chain: String,
-    pub sections: BTreeMap<String, Value>,
+    /// (Frozen: a record set again shares the sections it does not change with the record before it.)
+    pub sections: BTreeMap<Id, crate::blocks::Frozen>,
     /// The change stamp of its last change.
     pub changed: u64,
 }
@@ -283,17 +322,29 @@ pub struct Body {
 
 /// A body's variables as they start: what's given (clamped to the bounds), else each one's `initial`, as of `t`.
 pub fn body_variables(cat: &crate::config::Catalogue, given: Option<&BTreeMap<Id, i64>>, t: i64) -> BTreeMap<Id, (i64, i64)> {
-    cat.body_variables.iter().map(|v| (v.id.clone(), (given.and_then(|g| g.get(&v.id)).copied().unwrap_or(v.initial).clamp(v.min, v.max), t))).collect()
+    cat.body_variables.iter().map(|v| (v.id, (given.and_then(|g| g.get(&v.id)).copied().unwrap_or(v.initial).clamp(v.min, v.max), t))).collect()
 }
 
 /// A body variable's value at `t`, settled: its drift a whole day at a time since it was last set; and the time it's
 /// settled to (whole days on, so no part of a day's drift is lost when it's written back).
+/// A practised skill (foundations-2 E4) fades instead, by its half-life, toward its floor.
 pub fn body_variable_at(cfg: &crate::config::BodyVariableCfg, (v, at): (i64, i64), t: i64) -> (i64, i64) {
-    if cfg.per_day == 0 || t <= at {
+    if (cfg.per_day == 0 && cfg.practice.is_none()) || t <= at {
         return (v, at);
     }
     let days = (t - at) / 86_400;
+    if let Some(p) = &cfg.practice {
+        return (p.faded(v, days).clamp(cfg.min, cfg.max), at + days * 86_400);
+    }
     (v.saturating_add(cfg.per_day.saturating_mul(days)).clamp(cfg.min, cfg.max), at + days * 86_400)
+}
+
+/// A practised skill used for `seconds` at `t` (foundations-2 E4): settled to `t` (its fading), then the practice added.
+/// The time it is set from is `t` itself, so that a skill in use does not fade. Nothing for a variable that is no skill.
+pub fn practise(cfg: &crate::config::BodyVariableCfg, cur: (i64, i64), t: i64, seconds: i64) -> Option<(i64, i64)> {
+    let p = cfg.practice.as_ref()?;
+    let (v, _) = body_variable_at(cfg, cur, t);
+    Some((p.practised(cfg, v, seconds), t))
 }
 
 /// Someone leaving a space: who, why (they left, were removed, died, ...), and when.
@@ -401,18 +452,103 @@ pub struct AgreementMarks {
 impl State {
     /// The reading of an agreement by its terms, now (docs/design/rebuild.md section 7), if it's an agreement.
     pub fn reading(&self, agreement: &str) -> Option<oikos_terms::Reading> {
-        let stored = self.records.get(agreement)?;
-        let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { return None };
+        let r = self.records.get(agreement)?.record();
+        let crate::blocks::RecordBody::Agreement { terms } = &r.body else { return None };
         let m = self.marks.get(agreement).cloned().unwrap_or_default();
         Some(oikos_terms::read(terms, &m.signatures, &m.notices, self.t))
     }
 }
 
+/// An office's file of payments (`State::ledgers`), in the order made: its last weeks in memory, what is older on the
+/// run's cold file (docs/design/tiered-storage.md), each payment there as it serialises. It is read only when the post
+/// changes hands (`set_holder`), and then whole, the same payments in the same order wherever they were held.
+#[derive(Clone, Default)]
+pub struct Ledger {
+    cold: Vec<ColdPayments>,
+    hot: imbl::Vector<Arc<Transaction>>,
+}
+
+#[derive(Clone)]
+struct ColdPayments {
+    file: Arc<crate::held::ColdFile>,
+    block: u32,
+    count: u32,
+}
+
+impl Ledger {
+    pub fn push_back(&mut self, tx: Arc<Transaction>) {
+        self.hot.push_back(tx);
+    }
+    pub fn len(&self) -> usize {
+        self.cold.iter().map(|c| c.count as usize).sum::<usize>() + self.hot.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    /// Every payment on file, in the order made (those on disk read back).
+    pub fn all(&self) -> imbl::Vector<Arc<Transaction>> {
+        if self.cold.is_empty() {
+            return self.hot.clone();
+        }
+        let mut out: imbl::Vector<Arc<Transaction>> = imbl::Vector::new();
+        for c in &self.cold {
+            for b in c.file.items(c.block) {
+                let tx: Transaction = serde_json::from_slice(&b).unwrap_or_else(|e| panic!("a payment on an office's file could not be read back: {e}"));
+                out.push_back(Arc::new(tx));
+            }
+        }
+        out.append(self.hot.clone());
+        out
+    }
+    /// How many of the payments in memory were made before `before` (they are at its front: the file is in time order).
+    pub fn old(&self, before: i64) -> usize {
+        self.hot.iter().take_while(|tx| tx.t < before).count()
+    }
+    /// The payments made before `before` written to `file`, and let go of in memory: how many.
+    pub fn cool(&mut self, file: &Arc<crate::held::ColdFile>, before: i64) -> std::io::Result<usize> {
+        let n = self.old(before);
+        if n == 0 {
+            return Ok(0);
+        }
+        let rest = self.hot.split_off(n);
+        let bytes: Vec<Vec<u8>> = self.hot.iter().map(|tx| serde_json::to_vec(&**tx)).collect::<Result<_, _>>().map_err(std::io::Error::other)?;
+        #[cfg(debug_assertions)]
+        for (b, tx) in bytes.iter().zip(self.hot.iter()) {
+            assert_eq!(&serde_json::from_slice::<Transaction>(b).expect("a payment read back"), &**tx, "a payment read back is not the payment");
+        }
+        let block = file.append(&bytes)?;
+        self.cold.push(ColdPayments { file: file.clone(), block, count: n as u32 });
+        self.hot = rest;
+        Ok(n)
+    }
+}
+
+impl std::fmt::Debug for Ledger {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.all().fmt(f)
+    }
+}
+
+impl PartialEq for Ledger {
+    fn eq(&self, other: &Ledger) -> bool {
+        self.all() == other.all()
+    }
+}
+impl Eq for Ledger {}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Stored {
     pub seq: u64,
-    /// Records are immutable once made, so copies of the state share them.
-    pub record: Arc<Record>,
+    /// Records are immutable once made, so copies of the state share them: each is held once, in memory while it is
+    /// read and on disk once it is cold (`oikos_contracts::held`; docs/design/tiered-storage.md).
+    pub record: crate::held::Rec,
+}
+
+impl Stored {
+    /// The record, read (from memory, or back from disk).
+    pub fn record(&self) -> Arc<Record> {
+        self.record.load()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -469,11 +605,12 @@ pub struct Participant {
     pub status_changed: u64,
     /// Delivered at its next observation of each capacity ("self", or a position id), then cleared.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub pending: BTreeMap<Id, Pending>,
+    pub pending: BTreeMap<crate::blocks::Passing, Pending>,
     /// Delivered by its next look through an accounts channel of a capacity acting for that entity.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    /// (A persistent list: a busy custodian's queue holds a day's transfers, and a copy of the participant shares it.)
-    pub new_transactions: BTreeMap<Id, imbl::Vector<Transaction>>,
+    /// (A persistent list: a busy custodian's queue holds a day's transfers, and a copy of the participant shares it;
+    /// each transaction one copy, shared by every queue and office file it is on and the looks that deliver it.)
+    pub new_transactions: BTreeMap<Id, imbl::Vector<Arc<Transaction>>>,
     /// When it last looked through each channel (`channel`, or `position/channel`), and how far it had seen.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub looks: BTreeMap<Id, Look>,
@@ -579,7 +716,7 @@ pub struct RefusalInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Outcome {
-    pub action: Id,
+    pub action: crate::blocks::Passing,
     pub t: i64,
     pub status: OutcomeStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -596,11 +733,19 @@ pub struct Outcome {
     /// building worked on, as they left it, seen only by the one whose work it was.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub seen: Vec<crate::sites::SiteStructure>,
+    /// How long each body the act took somewhere was on its way, there and back (law 9): those doing the work went, so
+    /// the one whose work it was knows how long it took them. A planner sizes its next acts from these.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub trips: BTreeMap<Id, i64>,
+    /// Goods the act sent by the outside's freight (law 9, S4): where to, and how long they were to take on the road, for
+    /// the one who sent them (a seller's carrier tells it).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub freight: BTreeMap<Id, i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
-    pub id: Id,
+    pub id: crate::blocks::Passing,
     pub t: i64,
     /// The participant who wrote it, and the position it wrote in (absent: as itself).
     pub from: Id,
@@ -677,6 +822,14 @@ pub struct Placed {
     /// placed when the act takes effect.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub late: bool,
+    /// Nobody priced the act for whoever would do it (law 10, foundations-2 P2): it takes nobody's time and is refused
+    /// (`unpriced`) when due, with this reason.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unpriced: Option<String>,
+    /// How long each body the act took somewhere is on its way, there and back (law 9): their time, told to the one whose
+    /// act it was when it is done, as a crew's own record of its trips.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub trips: BTreeMap<Id, i64>,
 }
 
 /// A person who is to be at work when an act's work begins: alive, in the world, and, if `at` is given, in that
@@ -756,11 +909,15 @@ pub struct HeldAsk {
 pub enum Sched {
     /// Held questions looked at again: is someone there now to answer them?
     HeldAsks,
+    /// The network settled (foundations-2 C3): each hour, and a kind settled daily at midnight.
+    Settle,
     StructureComplete { structure: Id },
     /// Nature's day (docs/design/world-expansion.md 2): covers, fields and populations stepped.
     NatureDay { day: i64 },
     /// The world's totals, censused (monthly).
     CounterCensus,
+    /// The practised skills, censused (monthly: foundations-2 M8).
+    SkillCensus,
     /// A year of age: draws for the coming year (illness, injury, other causes).
     Birthday { person: Id },
     /// A drawn chance of injury, taken now against the danger of where the body is (thinning).
@@ -774,7 +931,7 @@ pub enum Sched {
     BirthDue { parents: Vec<Id>, name: String, template: Id },
     /// An act in progress: it takes effect when its actor is done with it (docs/design/rebuild.md 6.2).
     Act {
-        action: Id,
+        action: crate::blocks::Passing,
         participant: Id,
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
@@ -791,7 +948,7 @@ pub enum Sched {
     /// is refused now, the time placed for it is given back, and the item that would have applied it (`done`, `seq`)
     /// is taken out.
     Start {
-        action: Id,
+        action: crate::blocks::Passing,
         participant: Id,
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
@@ -806,6 +963,31 @@ pub enum Sched {
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
         look: crate::config::LookRequest,
+    },
+    /// A body sets out (law 9, foundations-2 S3): it leaves the space it is in for `to` (its own building again, for a visit
+    /// there and back), and is on its way until `arrives`, driving `vehicle` if it named one. `act`: the act that takes it.
+    /// Goods on their way by the outside's freight (law 9, S4): they reach `holder`'s holding at `at` now.
+    Arrival {
+        kind: Id,
+        #[serde(with = "crate::money::amount")]
+        quantity: crate::money::Money,
+        holder: Id,
+        at: Id,
+    },
+    Depart {
+        body: Id,
+        to: Id,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        via: Vec<Id>,
+        /// The fuel its vehicle's trip takes, and the metres driven (S5).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fuel: Option<(Id, crate::money::Money, i64)>,
+        arrives: i64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        vehicle: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        act: Option<Id>,
+        by: Id,
     },
     /// A visit in progress (docs/design/knowing.md): when it ends its looker sees what is at these cells.
     Visit {
@@ -822,6 +1004,11 @@ pub enum Sched {
 
 impl State {
     pub fn mint(&mut self, prefix: &str) -> Id {
+        Id::from_string(self.mint_passing(prefix))
+    }
+
+    /// A new id as its text: for what passes (an act, a message: `Passing`), or to be interned by `mint`.
+    pub fn mint_passing(&mut self, prefix: &str) -> String {
         let c = &mut self.counters;
         let n = match prefix {
             "ent" => &mut c.ent,
@@ -881,8 +1068,8 @@ impl State {
         self.mark(&record);
         self.counters.record_seq += 1;
         let seq = self.counters.record_seq;
-        self.record_order.push_back(record.id.clone());
-        self.records.insert(record.id.clone(), Stored { seq, record });
+        self.record_order.push_back(record.id);
+        self.records.insert(record.id, Stored { seq, record: crate::held::Rec::from_arc(record) });
     }
 
     /// What a record adds to the derived lookups (`agreements_of`, `marks`), as it is stored.
@@ -890,26 +1077,26 @@ impl State {
         match &record.body {
             crate::blocks::RecordBody::Agreement { terms } => {
                 for p in &terms.parties {
-                    self.agreements_of.entry(p.clone()).or_default().push_back(record.id.clone());
+                    self.agreements_of.entry(p.clone().into()).or_default().push_back(record.id);
                 }
             }
             crate::blocks::RecordBody::Signature { agreement, party } => {
-                let m = self.marks.entry(agreement.clone()).or_default();
-                m.signatures.push(oikos_terms::Mark { party: party.clone(), at: record.at });
+                let m = self.marks.entry(*agreement).or_default();
+                m.signatures.push(oikos_terms::Mark { party: party.to_string(), at: record.at });
             }
             crate::blocks::RecordBody::Notice { agreement, party, .. } => {
-                let m = self.marks.entry(agreement.clone()).or_default();
-                m.notices.push(oikos_terms::Mark { party: party.clone(), at: record.at });
+                let m = self.marks.entry(*agreement).or_default();
+                m.notices.push(oikos_terms::Mark { party: party.to_string(), at: record.at });
             }
             crate::blocks::RecordBody::Withdrawal { withdraws, .. } => {
                 // (Only its owner ends a paper's standing: the same test as perception's `taken_down`.)
-                let by_owner = self.records.get(withdraws).is_some_and(|t| {
-                    let owner = |r: &Record| -> Vec<String> { r.speaks_for.iter().cloned().chain(self.author_entity(r)).collect() };
-                    let by = owner(&record);
-                    matches!(t.record.body, crate::blocks::RecordBody::Agreement { .. }) && owner(&t.record).iter().any(|o| by.contains(o))
+                let by_owner = self.records.get(withdraws).map(|t| t.record()).is_some_and(|t| {
+                    let owner = |r: &Record| -> Vec<Id> { r.speaks_for.iter().cloned().chain(self.author_entity(r)).collect() };
+                    let by = owner(record);
+                    matches!(t.body, crate::blocks::RecordBody::Agreement { .. }) && owner(&t).iter().any(|o| by.contains(o))
                 });
                 if by_owner {
-                    let m = self.marks.entry(withdraws.clone()).or_default();
+                    let m = self.marks.entry(*withdraws).or_default();
                     m.withdrawn_at.get_or_insert(record.at);
                 }
             }
@@ -925,16 +1112,16 @@ impl State {
         for (sid, spaces) in self.occupancy.iter() {
             for bodies in spaces.values() {
                 for b in bodies {
-                    self.whereabouts.entry(b.clone()).or_default().insert(sid.clone());
+                    self.whereabouts.entry(*b).or_default().insert(*sid);
                 }
             }
         }
         self.positions_of = Map::new();
         self.held = Map::new();
         for (id, x) in self.positions.iter() {
-            self.positions_of.entry(x.entity.clone()).or_default().insert(id.clone());
+            self.positions_of.entry(x.entity).or_default().insert(*id);
             if let Some(h) = &x.holder {
-                self.held.entry(h.clone()).or_default().insert(id.clone());
+                self.held.entry(*h).or_default().insert(*id);
             }
         }
         self.marks = Map::new();
@@ -943,11 +1130,14 @@ impl State {
         // before it, and every record it can take down was.)
         let order: Vec<Id> = self.record_order.iter().cloned().collect();
         for id in order {
-            if let Some(r) = self.records.get(&id).map(|s| s.record.clone()) {
+            if let Some(r) = self.records.get(&id).map(|s| s.record()) {
                 self.mark(&r);
             }
         }
         self.ground = GroundCache::default();
+        if let Some(n) = self.network.as_mut() {
+            Arc::make_mut(n).reindex();
+        }
     }
 
     /// The quantity of a kind held by an entity at a place (0 if none).
@@ -959,7 +1149,13 @@ impl State {
     pub fn total_goods(&self) -> std::collections::BTreeMap<Id, crate::money::Money> {
         let mut t = std::collections::BTreeMap::new();
         for s in self.holdings.values() {
-            *t.entry(s.kind.clone()).or_insert(0) += s.quantity;
+            *t.entry(s.kind).or_insert(0) += s.quantity;
+        }
+        // (Goods on their way by the outside's freight are the world's still: law 9, S4.)
+        for x in self.schedule.iter() {
+            if let Sched::Arrival { kind, quantity, .. } = &x.what {
+                *t.entry(*kind).or_insert(0) += *quantity;
+            }
         }
         t
     }
@@ -968,7 +1164,7 @@ impl State {
     pub fn total_money(&self) -> std::collections::BTreeMap<Id, crate::money::Money> {
         let mut t = std::collections::BTreeMap::new();
         for a in self.accounts.values() {
-            *t.entry(a.currency.clone()).or_insert(0) += a.balance;
+            *t.entry(a.currency).or_insert(0) += a.balance;
         }
         t
     }
@@ -989,14 +1185,14 @@ impl State {
     /// The same, by looking through every building: what `whereabouts` must always agree with (checked in debug
     /// builds, so by every kernel test that moves anyone, and by a test of its own).
     pub fn structures_of_by_scan(&self, person: &str) -> Vec<Id> {
-        self.occupancy.iter().filter(|(_, spaces)| spaces.values().any(|b| b.contains(person))).map(|(s, _)| s.clone()).collect()
+        self.occupancy.iter().filter(|(_, spaces)| spaces.values().any(|b| b.contains(person))).map(|(s, _)| *s).collect()
     }
 
     /// Put a body into a space of a structure (the only way into `occupancy`, so `whereabouts` keeps step).
     pub fn enter(&mut self, sid: &str, space: &str, body: &str) {
-        Arc::make_mut(self.occupancy.entry(sid.to_string()).or_default()).entry(space.to_string()).or_default().insert(body.to_string());
-        self.whereabouts.entry(body.to_string()).or_default().insert(sid.to_string());
-        self.entered.insert(space.to_string(), self.t);
+        Arc::make_mut(self.occupancy.entry(sid.to_string().into()).or_default()).entry(space.to_string().into()).or_default().insert(body.to_string().into());
+        self.whereabouts.entry(body.to_string().into()).or_default().insert(sid.to_string().into());
+        self.entered.insert(space.to_string().into(), self.t);
     }
 
     /// A body has been taken out of a space of a structure: if it's in no other space of it, it's no longer there.
@@ -1020,8 +1216,8 @@ impl State {
     /// The entity a participant acts for in a capacity: its person as itself, or a position's organisation.
     pub fn acting_entity(&self, participant: &str, position: Option<&str>) -> Option<Id> {
         match position {
-            Some(p) => self.positions.get(p).map(|x| x.entity.clone()),
-            None => self.participants.get(participant).and_then(|x| x.person.clone()),
+            Some(p) => self.positions.get(p).map(|x| x.entity),
+            None => self.participants.get(participant).and_then(|x| x.person),
         }
     }
 
@@ -1045,10 +1241,10 @@ impl State {
 
     pub fn acting_for(&self, entity: &str) -> Vec<(Id, Id)> {
         if let Some(b) = self.body(entity) {
-            return b.participant.iter().map(|p| (p.clone(), crate::config::SELF.to_string())).collect();
+            return b.participant.iter().map(|p| (*p, Id::new(crate::config::SELF))).collect();
         }
-        let found: Vec<(Id, Id)> = self.positions_of.get(entity).into_iter().flatten().filter_map(|id| self.positions.get(id)?.holder.clone().map(|h| (h, id.clone()))).collect();
-        debug_assert_eq!(found, self.positions.iter().filter(|(_, x)| x.entity == entity).filter_map(|(id, x)| x.holder.clone().map(|h| (h, id.clone()))).collect::<Vec<_>>(), "positions_of out of step with positions for {entity}");
+        let found: Vec<(Id, Id)> = self.positions_of.get(entity).into_iter().flatten().filter_map(|id| self.positions.get(id)?.holder.map(|h| (h, *id))).collect();
+        debug_assert_eq!(found, self.positions.iter().filter(|(_, x)| x.entity == entity).filter_map(|(id, x)| x.holder.map(|h| (h, *id))).collect::<Vec<_>>(), "positions_of out of step with positions for {entity}");
         found
     }
 
@@ -1066,9 +1262,9 @@ impl State {
 
     /// A position made (the only way into `positions`, so `positions_of` and `held` keep step).
     pub fn add_position(&mut self, id: Id, position: Position) {
-        self.positions_of.entry(position.entity.clone()).or_default().insert(id.clone());
+        self.positions_of.entry(position.entity).or_default().insert(id);
         if let Some(h) = &position.holder {
-            self.held.entry(h.clone()).or_default().insert(id.clone());
+            self.held.entry(*h).or_default().insert(id);
         }
         self.positions.insert(id, position);
     }
@@ -1076,7 +1272,7 @@ impl State {
     /// A position changes hands, or falls vacant, at a change stamp (the only way its holder changes).
     pub fn set_holder(&mut self, position: &str, holder: Option<Id>, changed: u64) {
         let Some(x) = self.positions.get_mut(position) else { return };
-        let was = std::mem::replace(&mut x.holder, holder.clone());
+        let was = std::mem::replace(&mut x.holder, holder);
         x.changed = changed;
         if was == holder {
             return;
@@ -1090,12 +1286,12 @@ impl State {
             }
         }
         if let Some(h) = holder {
-            self.held.entry(h.clone()).or_default().insert(position.to_string());
+            self.held.entry(h).or_default().insert(position.to_string().into());
             // The office's file goes with the post: the new holder is told of every payment it has seen, as of any it has not.
             let key = transactions_key(position, &self.positions[position].entity);
             if let Some(ledger) = self.ledgers.get(&key) {
                 if let Some(p) = self.participants.get_mut(&h) {
-                    Arc::make_mut(p).new_transactions.insert(key, ledger.clone());
+                    Arc::make_mut(p).new_transactions.insert(key.into(), ledger.all());
                 }
             }
             // And so does every channel of it, whole: what the holder looked through before, in an earlier tenure (a person
@@ -1122,9 +1318,13 @@ impl State {
 #[derive(Default)]
 pub struct GroundCache {
     pub epoch: u64,
-    pub trips: std::sync::Mutex<Map<(Id, Id), (u64, i64)>>,
+    /// (From, to, the vehicle's speed or nought on foot) -> seconds, as of an epoch.
+    pub trips: std::sync::Mutex<Map<(Id, Id, i64), (u64, i64)>>,
     /// What entering each cell costs, as of an epoch (travel.rs): the same for every trip until the ground changes.
     pub costs: std::sync::Mutex<Option<(u64, Arc<CellCosts>)>>,
+    /// The ways of the ground as it stands, as of an epoch (ways.rs), and the quickest times from a node, by speed.
+    pub ways: std::sync::Mutex<Option<(u64, Arc<crate::ways::Ways>)>>,
+    pub trees: std::sync::Mutex<Map<(u32, i64), (u64, Arc<crate::ways::Tree>)>>,
 }
 
 /// What entering each cell of the ground costs a traveller (seconds), over the rectangle the cells lie in: none where
@@ -1147,18 +1347,32 @@ impl CellCosts {
         self.seconds[(dy * self.w + dx) as usize]
     }
 }
+/// How many trips worked out are kept at most (`GroundCache::put`).
+const TRIPS_KEPT: usize = 1 << 20;
+
 impl GroundCache {
     /// The ground has changed: every trip is worked out afresh.
     pub fn changed(&mut self) {
         self.epoch += 1;
     }
-    pub fn get(&self, from: &str, to: &str) -> Option<i64> {
+    pub fn get(&self, from: &str, to: &str, speed: i64) -> Option<i64> {
         let trips = self.trips.lock().ok()?;
-        trips.get(&(from.to_string(), to.to_string())).filter(|(e, _)| *e == self.epoch).map(|(_, s)| *s)
+        trips.get(&(Id::new(from), Id::new(to), speed)).filter(|(e, _)| *e == self.epoch).map(|(_, s)| *s)
     }
-    pub fn put(&self, from: &str, to: &str, seconds: i64) {
+    pub fn put(&self, from: &str, to: &str, speed: i64, seconds: i64) {
         if let Ok(mut trips) = self.trips.lock() {
-            trips.insert((from.to_string(), to.to_string()), (self.epoch, seconds));
+            // (Bounded: the pairs of places a long run's people go between grow with it, SC-6. Past the bound the
+            // trips of an earlier ground go, then all: they are worked out again when wanted, the same.)
+            if trips.len() >= TRIPS_KEPT {
+                let stale: Vec<(Id, Id, i64)> = trips.iter().filter(|(_, (e, _))| *e != self.epoch).map(|(k, _)| *k).collect();
+                for k in stale {
+                    trips.remove(&k);
+                }
+                if trips.len() >= TRIPS_KEPT {
+                    *trips = Default::default();
+                }
+            }
+            trips.insert((Id::new(from), Id::new(to), speed), (self.epoch, seconds));
         }
     }
 }
@@ -1168,6 +1382,8 @@ impl Clone for GroundCache {
             epoch: self.epoch,
             trips: std::sync::Mutex::new(self.trips.lock().map(|t| t.clone()).unwrap_or_default()),
             costs: std::sync::Mutex::new(self.costs.lock().map(|c| c.clone()).unwrap_or_default()),
+            ways: std::sync::Mutex::new(self.ways.lock().map(|c| c.clone()).unwrap_or_default()),
+            trees: std::sync::Mutex::new(self.trees.lock().map(|c| c.clone()).unwrap_or_default()),
         }
     }
 }
@@ -1188,4 +1404,31 @@ impl std::fmt::Debug for GroundCache {
 /// told of a payment in each (foundations F6).
 pub fn transactions_key(capacity: &str, entity: &str) -> String {
     format!("{capacity}|{entity}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_office_file_whose_old_payments_went_to_disk_reads_back_the_same_payments_in_order() {
+        let path = std::env::temp_dir().join(format!("oikos-ledger-{}.cold", std::process::id()));
+        let tier = crate::held::Tier::on(&path, crate::held::Policy::default()).expect("tier");
+        let file = tier.file().expect("on");
+        let tx = |t: i64, memo: &str| {
+            Arc::new(Transaction { t, from: "a".into(), to: "b".into(), amount: crate::money::parse("1250").unwrap(), currency: "USD".into(), by: "p1".into(), settles: (t % 2 == 0).then(|| "rec.4".into()), per_instruction: None, memo: Some(memo.into()), line: None })
+        };
+        let mut l = Ledger::default();
+        for i in 0..600 {
+            l.push_back(tx(i * 100, &format!("payment \"{i}\" é")));
+        }
+        let before = l.all();
+        assert_eq!(l.cool(&file, 30_000).expect("written"), 300);
+        assert_eq!(l.cool(&file, 30_000).expect("nothing more"), 0);
+        l.push_back(tx(60_000, "later"));
+        assert_eq!(l.len(), 601);
+        let after = l.all();
+        assert_eq!(after.iter().take(600).map(|x| (**x).clone()).collect::<Vec<_>>(), before.iter().map(|x| (**x).clone()).collect::<Vec<_>>());
+        assert_eq!(after.back().map(|x| x.memo.clone()), Some(Some("later".into())));
+    }
 }

@@ -32,7 +32,7 @@ pub fn within(a: Rect, b: Rect, n: i64) -> bool {
 pub fn structure_rect(s: &Statics, st: &State, structure: &str) -> Option<Rect> {
     let x = st.structures.get(structure)?;
     let (cx, cy) = cell_xy(&x.at)?;
-    let f = s.types.get(&x.structure_type)?.footprint;
+    let f = s.types.get(x.structure_type.as_str())?.footprint;
     Some(Rect { x: cx, y: cy, w: f.w, h: f.h })
 }
 

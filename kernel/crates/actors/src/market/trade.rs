@@ -64,7 +64,7 @@ pub struct Offerings {
 
 fn goods_of(r: &Record) -> Option<BTreeMap<String, i64>> {
     let g = data(r).get("goods")?.as_object()?;
-    Some(g.iter().filter_map(|(k, v)| v.as_i64().map(|x| (k.clone(), x))).collect())
+    Some(g.iter().filter_map(|(k, v)| v.as_i64().map(|x| (k.to_string(), x))).collect())
 }
 
 /// A seller's latest standing price list that lists goods (newest by time; of two at the same moment, the later filed).
@@ -89,8 +89,8 @@ pub fn goods_prices(book: &Book, seller: &str) -> Offerings {
         min_order: d.i("min_order"),
         at: d.s("at").map(str::to_string),
         terms_days: d.i("terms_days").filter(|n| *n > 0),
-        clearance: d.get("clearance").and_then(|c| c.get("quantity")).and_then(Value::as_i64).filter(|n| *n > 0),
-        regular: d.get("clearance").and_then(|c| c.get("regular")).and_then(Value::as_i64).filter(|n| *n > 0),
+        clearance: d.get("clearance").and_then(|c| c.get("quantity")).and_then(|x| x.as_i64()).filter(|n| *n > 0),
+        regular: d.get("clearance").and_then(|c| c.get("regular")).and_then(|x| x.as_i64()).filter(|n| *n > 0),
     }
 }
 
@@ -99,7 +99,7 @@ pub fn held(pic: &Picture, at: &str, kind: &str) -> i64 {
     pic.channels
         .values()
         .filter_map(|c| match c {
-            crate::sight::Seen::Holdings { holdings } => Some(holdings),
+            crate::sight::Seen::Holdings { holdings, .. } => Some(holdings),
             _ => None,
         })
         .flat_map(|h| h.iter())
@@ -247,6 +247,8 @@ pub struct Delivered {
     pub delivered: i64,
     pub refund: i64,
     pub seller: String,
+    /// When the goods are to arrive, where the note says (they go by a carrier and take their time: law 9).
+    pub arrives: Option<i64>,
 }
 
 /// Delivery notes addressed to us, not yet read (only new ones are read: no rescanning).
@@ -257,9 +259,11 @@ pub struct Deliveries {
 
 impl Deliveries {
     pub fn take(&mut self, book: &Book, me: &str) -> Vec<Delivered> {
-        let notes: Vec<_> = book.all("delivery_note").collect();
+        // (Only the new ones are read: those before the cursor stay where they are held.)
+        let notes = book.all("delivery_note");
+        let len = notes.len();
         let mut out = vec![];
-        for n in notes.iter().skip(self.cursor) {
+        for n in notes.skip(self.cursor) {
             if !crate::common::addressed_to(n).iter().any(|a| a == me) {
                 continue;
             }
@@ -271,10 +275,11 @@ impl Deliveries {
                 ordered: d.i("ordered").unwrap_or(delivered),
                 delivered,
                 refund: d.i("refund").unwrap_or(0),
-                seller: n.speaks_for.clone().unwrap_or_default(),
+                seller: n.speaks_for.unwrap_or_default().to_string(),
+                arrives: d.i("arrives"),
             });
         }
-        self.cursor = notes.len();
+        self.cursor = len;
         out
     }
 }
@@ -396,7 +401,7 @@ impl OrderBook {
             if other_role(memo) {
                 continue;
             }
-            *self.credit.entry(tx.from.clone()).or_insert(0) += x;
+            *self.credit.entry(tx.from.to_string()).or_insert(0) += x;
         }
     }
 
@@ -470,23 +475,24 @@ impl OrderBook {
 
     /// Open orders to us, oldest first.
     fn open(&mut self, book: &Book) -> Vec<Order> {
-        let orders: Vec<_> = book.all("order").collect();
-        for r in orders.iter().skip(self.cursor) {
-            if !crate::common::addressed_to(r).iter().any(|a| *a == self.me) || self.settled.contains(&r.id) {
+        let orders = book.all("order");
+        let len = orders.len();
+        for r in orders.skip(self.cursor) {
+            if !crate::common::addressed_to(r).iter().any(|a| *a == self.me) || self.settled.contains(r.id.as_str()) {
                 continue;
             }
             let d = data(r);
-            let buyer = r.speaks_for.clone().unwrap_or_default();
+            let buyer = r.speaks_for.unwrap_or_default();
             self.waiting.insert(
-                r.id.clone(),
+                r.id.to_string(),
                 Order {
-                    id: r.id.clone(),
+                    id: r.id.to_string(),
                     seller: self.me.clone(),
-                    buyer: buyer.clone(),
+                    buyer: buyer.to_string(),
                     kind: d.s("kind").unwrap_or_default().to_string(),
                     quantity: d.i("quantity").unwrap_or(0).max(0),
                     unit_price: d.i("unit_price").unwrap_or(0).max(0),
-                    to: d.s("deliver_to").map(str::to_string).unwrap_or(buyer),
+                    to: d.s("deliver_to").map(str::to_string).unwrap_or(buyer.to_string()),
                     at: d.s("at").unwrap_or_default().to_string(),
                     account: d.s("account").unwrap_or_default().to_string(),
                     placed: r.at,
@@ -495,7 +501,7 @@ impl OrderBook {
                 },
             );
         }
-        self.cursor = orders.len();
+        self.cursor = len;
         let gone: Vec<String> = self.waiting.keys().filter(|id| self.settled.contains(*id) || book.withdrawn(id)).cloned().collect();
         for id in gone {
             self.waiting.remove(&id);
@@ -592,7 +598,7 @@ pub fn then<T: From<TradeThen>>(tok: &TradeThen, done: Done, book: &mut OrderBoo
                     order.id,
                     o.refusal.as_ref().map(|r| r.detail.clone().unwrap_or_else(|| format!("{:?}", r.code))).unwrap_or_default()
                 );
-                vec![fill_as(order, 0, from_at, pay_from, &why, cx)]
+                vec![fill_as(order, 0, from_at, pay_from, &why, cx, None)]
             }
             _ => vec![],
         },
@@ -611,14 +617,21 @@ pub fn then<T: From<TradeThen>>(tok: &TradeThen, done: Done, book: &mut OrderBoo
 /// so in a delivery note. `pay_from` is our account; `from_at` where the goods are. If the delivery is refused (the
 /// place it was to go is gone, say), the whole order is refunded instead.
 pub fn fill<T: From<TradeThen>>(o: &Order, quantity: i64, from_at: &str, pay_from: &str, why: &str, cx: &Cx) -> Step<T> {
-    let mut s = fill_as(o, quantity, from_at, pay_from, why, cx);
+    fill_arriving(o, quantity, from_at, pay_from, why, cx, None)
+}
+
+/// As `fill`, for goods that go by a carrier and take their time (law 9: the outside's freight): the note says when they
+/// are to arrive (`arrives`, a time), as the seller's own carrier has taken to get there, so the buyer counts them as
+/// coming until then.
+pub fn fill_arriving<T: From<TradeThen>>(o: &Order, quantity: i64, from_at: &str, pay_from: &str, why: &str, cx: &Cx, arrives: Option<i64>) -> Step<T> {
+    let mut s = fill_as(o, quantity, from_at, pay_from, why, cx, arrives);
     if quantity > 0 {
         s.then = Some(TradeThen::DeliveryRefused { order: o.clone(), from_at: from_at.to_string(), pay_from: pay_from.to_string() }.into());
     }
     s
 }
 
-fn fill_as<T>(o: &Order, quantity: i64, from_at: &str, pay_from: &str, why: &str, cx: &Cx) -> Step<T> {
+fn fill_as<T>(o: &Order, quantity: i64, from_at: &str, pay_from: &str, why: &str, cx: &Cx, arrives: Option<i64>) -> Step<T> {
     let money = |n| money_words(n, &cx.ctx.world);
     // (On terms nothing was paid, so nothing is refunded: the invoice is for what was delivered.)
     let refund = if o.terms.is_some() { 0 } else { (o.quantity - quantity) * o.unit_price };
@@ -626,7 +639,7 @@ fn fill_as<T>(o: &Order, quantity: i64, from_at: &str, pay_from: &str, why: &str
     if quantity > 0 {
         calls.push(call(
             "goods",
-            vec![("kind", Some(arg(&o.kind))), ("quantity", Some(text(quantity.to_string()))), ("to", Some(arg(&o.to))), ("at", Some(arg(&o.at))), ("from_at", Some(arg(from_at)))],
+            vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&o.kind))), ("quantity", Some(text(quantity.to_string()))), ("to", Some(arg(&o.to))), ("at", Some(arg(&o.at))), ("from_at", Some(arg(from_at)))],
         ));
     }
     if refund > 0 {
@@ -638,6 +651,9 @@ fn fill_as<T>(o: &Order, quantity: i64, from_at: &str, pay_from: &str, why: &str
         format!("Delivered {quantity} of the {} {} ordered{}.", o.quantity, o.kind, if refund > 0 { format!("; {} refunded", money(refund)) } else { String::new() })
     };
     let mut d = json!({ "order": o.id, "kind": o.kind, "ordered": o.quantity, "delivered": quantity, "refund": refund });
+    if let (Some(a), true) = (arrives, quantity > 0) {
+        d.as_object_mut().expect("object").insert("arrives".into(), json!(a));
+    }
     if let (Some(days), true) = (o.terms, quantity > 0) {
         words.push_str(&format!(" Invoice: {}, to be paid within {days} days, into {pay_from}, naming the order ({}).", money(quantity * o.unit_price), o.id));
         let dm = d.as_object_mut().expect("object");
@@ -739,22 +755,23 @@ impl Payables {
     /// Invoices on the delivery notes addressed to us (only new ones are read); debts recorded against us for an order
     /// of ours are paid as debts.
     pub fn take(&mut self, book: &Book) {
-        let notes: Vec<_> = book.all("delivery_note").collect();
-        for n in notes.iter().skip(self.cursor) {
+        let notes = book.all("delivery_note");
+        let len = notes.len();
+        for n in notes.skip(self.cursor) {
             if !crate::common::addressed_to(n).iter().any(|a| *a == self.me) {
                 continue;
             }
             let d = data(n);
             if d.s("declined") == Some("overdue") {
                 if let Some(s) = &n.speaks_for {
-                    self.refused.insert(s.clone(), n.at);
+                    self.refused.insert(s.to_string(), n.at);
                 }
             }
             let (owed, days) = (d.i("owed").unwrap_or(0), d.i("pay_in_days").unwrap_or(0));
             let (true, true, Some(pay_to)) = (owed > 0, days > 0, d.s("pay_to")) else { continue };
             self.open.push(Owed {
                 order: d.s("order").unwrap_or_default().to_string(),
-                seller: n.speaks_for.clone().unwrap_or_default(),
+                seller: n.speaks_for.unwrap_or_default().to_string(),
                 account: pay_to.to_string(),
                 kind: d.s("kind").unwrap_or_default().to_string(),
                 quantity: d.i("delivered").unwrap_or(0),
@@ -762,12 +779,12 @@ impl Payables {
                 due: n.at + days * DAY,
             });
         }
-        self.cursor = notes.len();
+        self.cursor = len;
         if !self.open.is_empty() {
             let claimed: BTreeSet<String> = book
                 .of_type("claim")
-                .filter(|c| matches!(&c.body, RecordBody::Claim { counterparty: Some(cp), about, .. } if *cp == self.me && about.get("kind").and_then(Value::as_str) == Some("debt")))
-                .flat_map(|c| bases_of(c).to_vec())
+                .filter(|c| matches!(&c.body, RecordBody::Claim { counterparty: Some(cp), about, .. } if *cp == self.me && about.get("kind").and_then(|x| x.as_str()) == Some("debt")))
+                .flat_map(|c| bases_of(c).iter().map(|x| x.to_string()).collect::<Vec<_>>())
                 .collect();
             self.open.retain(|x| !claimed.contains(&x.order));
         }

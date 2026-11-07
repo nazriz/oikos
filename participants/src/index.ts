@@ -1,5 +1,6 @@
 export * from "./contracts";
 export * from "./module";
+export { ASSISTANT_ISSUES, draftOf } from "./kinds/assistants";
 export { manifests, paramErrors, type Manifest } from "./manifests";
 export * from "./rng";
 export { slip, slipPpm, slipRow, type SlipRow, type SlipTable, type Slipper, type SlipOptions } from "./slip";
@@ -28,15 +29,16 @@ export { DayBook, LISTED_DAYS } from "./readers/daybook";
 export { KIND as DECISION_KIND, type DecisionLaw, type Need as DecisionNeed } from "./shared/decisions";
 export { particularsOf } from "./shared/frictions";
 export { diaryText } from "./readers/diary";
-export { planLaw, planLawWords, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, possessionOrderFor } from "./shared/papers";
+export { planLaw, planLawWords, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, possessionOrderFor } from "./shared/papers";
 import type { BehaviourModule } from "./module";
 // (The kinds whose TypeScript actors were deleted at the cut-over: what is still read of each, the engine runs them.)
-import { bankPaymentSystem, bodyPayroll, disposal, electoralOffice, energy, exportDemand, founded, funding, grants, idle, migration, newspaper, producer, retailer, retirementFund, statistics, trade, transfers, valuer, water, weather } from "./engine-kinds";
+import { bankPaymentSystem, bodyPayroll, disposal, electoralOffice, energy, exportDemand, founded, funding, grants, idle, migration, newspaper, producer, retailer, retirementFund, statistics, taxCollector, trade, transfers, valuer, water, weather } from "./engine-kinds";
 import { lending } from "./kinds/credit";
 import { organiser } from "./kinds/union";
 import { citizen } from "./kinds/citizen";
 import { employer, landlord } from "./kinds/firms";
 import { vendor } from "./kinds/automation";
+import { assistant, host, provider } from "./kinds/assistants";
 import { builder, childProtection, inspector, landRegistry, planningOfficer, registry } from "./kinds/institutions";
 import { councilClerk, councillor, financeOfficer, mayorCode, ratesOfficer, taxClerk, works } from "./kinds/government";
 import { environment } from "./kinds/environment";
@@ -90,6 +92,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [funding, "engine-kinds.ts"],
       [weather, "engine-kinds.ts"],
       [valuer, "engine-kinds.ts"],
+      [taxCollector, "engine-kinds.ts"],
       [statistics, "engine-kinds.ts"],
       [grants, "engine-kinds.ts"],
       [disposal, "engine-kinds.ts"],
@@ -101,6 +104,9 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [producer, "engine-kinds.ts"],
       [retailer, "engine-kinds.ts"],
       [vendor, "kinds/automation.ts"],
+      [provider, "kinds/assistants.ts"],
+      [assistant, "kinds/assistants.ts"],
+      [host, "kinds/assistants.ts"],
       [planningOfficer, "kinds/institutions.ts"],
       [inspector, "kinds/institutions.ts"],
       [builder, "kinds/institutions.ts"],

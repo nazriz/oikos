@@ -14,7 +14,7 @@ oikos-kernel = { path = "../.." }
 napi = { version = "3", default-features = false, features = ["napi4"] }
 napi-derive = "3"
 serde_json = { workspace = true }
-mimalloc = { version = "0.1", default-features = false }
+mimalloc = { version = "0.1", default-features = false, features = ["no_thp"] }
 
 [build-dependencies]
 napi-build = "2"

@@ -966,6 +966,17 @@
       "schema": {},
       "source": "the world gives it (no default)"
     },
+    "commercial": {
+      "default": null,
+      "schema": {
+        "description": "shop premises it lets (docs/behaviour/leasing.md): rent, deposit_months, term_months, surrender_months (what it asks to accept a surrender, in months of rent) and tribunal (where a claim for rent owed is brought); the law on their leases is read from the published law-premises-leases",
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "source": "the profile: commercial"
+    },
     "compliance_bps": {
       "default": 10000,
       "schema": {
@@ -1247,5 +1258,5 @@
   },
   "perceives": [],
   "state": "none",
-  "version": "0.20.0"
+  "version": "0.21.0"
 }

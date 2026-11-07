@@ -1,0 +1,29 @@
+{
+ "//": "The 30-day results of each town (worlds/town.yaml, worlds/town-1000.yaml; profiles au-vic-2026, gb-eng-2026, us-oh-2026) at 4 engine threads, taken at fix-police-visits by `bun scripts/same-results.ts --pin scripts/fixtures/representation-results.json`. orchestrator/test/representation.test.ts holds every build to them: a change of representation leaves them byte-identical. A change meant to change results re-takes them, in its own commit, with the reason.",
+ "towns": {
+  "200-au-vic-2026": {
+   "state_hash": "19bacc5396a1038b4bc26b0634e01f7972a021449fef05ce3e763dfe461d8535",
+   "log_sha256": "89a6ccfae4378623ee6870e478e082efa2cc2c8b5006b5925b2856c9de556b6b"
+  },
+  "200-gb-eng-2026": {
+   "state_hash": "e9564040f909ba83234cf899afe319fb813c973c3ba0c9191aec594bfd9de59a",
+   "log_sha256": "f8c316f6d869079d09f14bd67aba81211fc73c9cc5432628b8f3ceedd2a577f2"
+  },
+  "200-us-oh-2026": {
+   "state_hash": "2ce21da3c0b23d5460789d0ee91771165a162dedfc6ba0f5b949a0fd6b1c5a32",
+   "log_sha256": "795d3d6edab4fc95bca99e99cca6698b8a2c219d75b3ee0e80bf983fd9476922"
+  },
+  "1000-au-vic-2026": {
+   "state_hash": "ccf353aa22823bc0cac9bdccdff46cb64656c4d8826d563464c7c7198b5683c5",
+   "log_sha256": "8c9c81b3f203fbb55917fd2003106522ed3e4291bb81098eeb4c5e9b1ce132c9"
+  },
+  "1000-gb-eng-2026": {
+   "state_hash": "3f98d164999ce6b2eb441e7a4994289fdf9fed79ec156303863e2454eeed6417",
+   "log_sha256": "0a66c07d8eaf383c6344fc5bf90a2d7ee999df2d178eab6855db15380f35de6c"
+  },
+  "1000-us-oh-2026": {
+   "state_hash": "b50824c24a660cbbdfa9c1ab7842693d9820c0bba5b488c290878adc3a88f231",
+   "log_sha256": "460b7af45a2e4feefaa986f008e141548878d8b92cf7b626bb53e7970469b3bc"
+  }
+ }
+}

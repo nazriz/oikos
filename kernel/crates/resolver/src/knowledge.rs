@@ -28,6 +28,118 @@ pub struct CellFact {
     pub built: bool,
 }
 
+/// The statements a seat has seen that are addressed to someone, and to whom (`Knowledge::addressed`). A seat sees
+/// thousands over a run (a town's bills, notices and letters), so each is held small: by its number where its id is a
+/// minted one (`rec.<n>`), with its list of addressees held once for every seat that has seen one like it (a town's
+/// lists are few: "the bank", a household, an office); anything else by its id. Written out (a snapshot) as the map of
+/// id to addressees it stands for, in the same order: the same bytes as when it was that map (SC-6).
+#[derive(Debug, Clone, Default)]
+pub struct Addressed {
+    numbers: Vec<u64>,
+    lists: Vec<u32>,
+    other: BTreeMap<Arc<str>, Arc<[String]>>,
+}
+
+/// Every list of addressees any seat has seen, each once, and where it is (for `Addressed`; never written out).
+static ADDRESSEES: std::sync::Mutex<(Vec<Arc<[String]>>, BTreeMap<Arc<[String]>, u32>)> = std::sync::Mutex::new((Vec::new(), BTreeMap::new()));
+
+fn addressees() -> std::sync::MutexGuard<'static, (Vec<Arc<[String]>>, BTreeMap<Arc<[String]>, u32>)> {
+    ADDRESSEES.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// The number of a minted record id (`rec.<n>`, written as `n` writes itself), if it is one.
+fn minted(id: &str) -> Option<u64> {
+    let n = id.strip_prefix("rec.")?;
+    let v: u64 = n.parse().ok()?;
+    (v.to_string() == n).then_some(v)
+}
+
+impl Addressed {
+    pub fn insert(&mut self, id: Arc<str>, to: Arc<[String]>) {
+        let Some(n) = minted(&id) else {
+            self.other.insert(id, to);
+            return;
+        };
+        let list = {
+            let mut t = addressees();
+            match t.1.get(&to) {
+                Some(&i) => i,
+                None => {
+                    let i = t.0.len() as u32;
+                    t.0.push(to.clone());
+                    t.1.insert(to, i);
+                    i
+                }
+            }
+        };
+        match self.numbers.last() {
+            Some(&last) if last < n => {
+                self.numbers.push(n);
+                self.lists.push(list);
+            }
+            None => {
+                self.numbers.push(n);
+                self.lists.push(list);
+            }
+            _ => match self.numbers.binary_search(&n) {
+                Ok(i) => self.lists[i] = list,
+                Err(i) => {
+                    self.numbers.insert(i, n);
+                    self.lists.insert(i, list);
+                }
+            },
+        }
+    }
+
+    /// Who a statement seen is addressed to.
+    pub fn get(&self, id: &str) -> Option<Arc<[String]>> {
+        match minted(id) {
+            Some(n) => self.numbers.binary_search(&n).ok().map(|i| addressees().0[self.lists[i] as usize].clone()),
+            None => self.other.get(id).cloned(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.numbers.len() + self.other.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// As the map it stands for.
+    fn as_map(&self) -> BTreeMap<Arc<str>, Arc<[String]>> {
+        let t = addressees();
+        let mut m = self.other.clone();
+        for (n, l) in self.numbers.iter().zip(&self.lists) {
+            m.insert(format!("rec.{n}").into(), t.0[*l as usize].clone());
+        }
+        m
+    }
+}
+
+impl Serialize for Addressed {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        self.as_map().serialize(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for Addressed {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let m = BTreeMap::<Arc<str>, Arc<[String]>>::deserialize(d)?;
+        let mut a = Addressed::default();
+        for (id, to) in m {
+            a.insert(id, to);
+        }
+        Ok(a)
+    }
+}
+
+impl PartialEq for Addressed {
+    fn eq(&self, other: &Addressed) -> bool {
+        self.as_map() == other.as_map()
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Knowledge {
     pub withdrawn: BTreeSet<String>,
@@ -60,7 +172,7 @@ pub struct Knowledge {
     pub forms: BTreeMap<Arc<str>, Arc<Value>>,
     /// Statements seen that are addressed to someone: who each is addressed to (whoever acts on it). What a hold on
     /// one is addressed to.
-    pub addressed: BTreeMap<Arc<str>, Arc<[String]>>,
+    pub addressed: Addressed,
     /// A routine of the seat's office as its own procedure states it (a paper on its file): task -> the procedure,
     /// and the routine's published rhythm where it has one (how often, or the paper that sets when). What a standing
     /// work order that does not say how often follows.
@@ -454,26 +566,26 @@ impl Knowledge {
     }
 
     pub fn absorb(&mut self, obs: &Value) {
-        self.absorb_with(obs, &BTreeMap::new());
+        self.absorb_with(obs, &BTreeMap::<String, Shown>::new());
     }
 
     /// As `absorb`, for an observation whose records and cells are handed over beside it: `shown` has, by channel
     /// path, what each record (`RecordFacts::of`) or cell (`CellFacts::of`) that channel delivered adds, in the order
     /// delivered, and the observation's own `records` or `cells` there are empty. The same as absorbing the
     /// observation with them in place.
-    pub fn absorb_with(&mut self, obs: &Value, shown: &BTreeMap<String, Shown>) {
+    pub fn absorb_with<K: std::borrow::Borrow<str> + Ord>(&mut self, obs: &Value, shown: &BTreeMap<K, Shown>) {
         self.absorb_sharing(obs, shown, &mut Registers::default());
     }
 
     /// As `absorb_with`, by a holder of many seats' knowledge: a register of lots a seat is shown whole is held once
     /// between the seats shown it (`Registers`). What the seat knows is the same.
-    pub fn absorb_sharing(&mut self, obs: &Value, shown: &BTreeMap<String, Shown>, registers: &mut Registers) {
+    pub fn absorb_sharing<K: std::borrow::Borrow<str> + Ord>(&mut self, obs: &Value, shown: &BTreeMap<K, Shown>, registers: &mut Registers) {
         self.absorb_seen(&Seen::of(obs), shown, registers);
     }
 
     /// As `absorb_sharing`, for an observation read already (`Seen`): by whoever has it in a shape of its own, and
     /// needn't make JSON of it to say what it holds.
-    pub fn absorb_seen(&mut self, obs: &Seen, shown: &BTreeMap<String, Shown>, registers: &mut Registers) {
+    pub fn absorb_seen<K: std::borrow::Borrow<str> + Ord>(&mut self, obs: &Seen, shown: &BTreeMap<K, Shown>, registers: &mut Registers) {
         self.entity = obs.entity.to_string();
         self.t = obs.t.unwrap_or(self.t);
         for p in &obs.positions {
@@ -848,7 +960,7 @@ mod tests {
         // One by one: what `learn` does with each, from nothing.
         let plain = |before: &Knowledge, list: &[Arc<RecordFacts>]| {
             let mut k = before.clone();
-            k.absorb_with(&obs, &BTreeMap::new());
+            k.absorb_with(&obs, &BTreeMap::<String, Shown>::new());
             for f in list {
                 k.learn(f);
             }

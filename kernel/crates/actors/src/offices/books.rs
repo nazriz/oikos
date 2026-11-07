@@ -259,17 +259,17 @@ impl Keeping {
         let mut best: Option<(i64, Listed)> = None;
         for r in self.book.all(BOOKS) {
             let d = data(r);
-            let Some(open) = d.get("open").and_then(Value::as_array) else { continue };
-            if d.get("office").and_then(Value::as_str) != Some(self.office.as_str()) {
+            let Some(open) = d.get("open").and_then(|x| x.as_array()) else { continue };
+            if d.get("office").and_then(|x| x.as_str()) != Some(self.office.as_str()) {
                 continue;
             }
-            let at = d.get("at").and_then(Value::as_i64).unwrap_or(r.at);
+            let at = d.get("at").and_then(|x| x.as_i64()).unwrap_or(r.at);
             if best.as_ref().is_some_and(|(t, _)| *t >= at) {
                 continue;
             }
             let mut m: Listed = BTreeMap::new();
             for x in open {
-                let (Some(what), Some(about), Some(says)) = (x.get("what").and_then(Value::as_str), x.get("about").and_then(Value::as_str), x.get("says").and_then(Value::as_str)) else { continue };
+                let (Some(what), Some(about), Some(says)) = (x.get("what").and_then(|x| x.as_str()), x.get("about").and_then(|x| x.as_str()), x.get("says").and_then(|x| x.as_str())) else { continue };
                 m.entry(what.to_string()).or_default().insert(about.to_string(), says.to_string());
             }
             best = Some((at, m));
@@ -327,15 +327,25 @@ pub struct StaffClerk {
 }
 
 fn staff_books(kind: &dyn Kind, ctx: &Ctx) -> Option<(String, Box<dyn OfficeBooks>)> {
-    if ctx.params.get("part").and_then(Value::as_str) != Some("staff") {
+    if ctx.params.get("part").and_then(|x| x.as_str()) != Some("staff") {
         return None;
     }
     let office = office_of(ctx.position.as_deref());
     books_of(kind.name(), &ctx.entity, &office, &ctx.params.to_map()).map(|b| (office, b))
 }
 
-/// The actor of `kind` for `ctx`: its own, with its staff's clerk where it keeps books and runs as staff.
+/// The actor of `kind` for `ctx`: its own, with its staff's clerk where it keeps books and runs as staff, and as a
+/// principal where the world gives it `delegation` (docs/design/delegation.md: none does unless the town has providers).
 pub fn create(kind: &dyn Kind, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
+    crate::delegation::wrap(ctx, create_kept(kind, ctx)?)
+}
+
+/// The same, taken up again as `save` left it.
+pub fn restore(kind: &dyn Kind, ctx: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
+    crate::delegation::rewrap(ctx, &saved, |inner| restore_kept(kind, ctx, inner))
+}
+
+fn create_kept(kind: &dyn Kind, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
     let inner = kind.create(ctx)?;
     Ok(match staff_books(kind, ctx) {
         Some((office, books)) => Box::new(StaffClerk { inner, keeping: Keeping::new(&ctx.entity, &office), books }),
@@ -343,8 +353,7 @@ pub fn create(kind: &dyn Kind, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
     })
 }
 
-/// The same, taken up again as `save` left it.
-pub fn restore(kind: &dyn Kind, ctx: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
+fn restore_kept(kind: &dyn Kind, ctx: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
     match staff_books(kind, ctx) {
         Some((_, mut books)) => {
             let inner = kind.restore(ctx, saved.get("inner").cloned().unwrap_or(Value::Null))?;
@@ -378,6 +387,9 @@ impl Actor for StaffClerk {
     }
     fn save(&self) -> Result<Value, String> {
         Ok(json!({ "inner": self.inner.save()?, "keeping": serde_json::to_value(&self.keeping).map_err(|e| e.to_string())?, "books": self.books.save()? }))
+    }
+    fn kept(&self) -> Option<std::collections::BTreeMap<String, u64>> {
+        self.inner.kept()
     }
 }
 

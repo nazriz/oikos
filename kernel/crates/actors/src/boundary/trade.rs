@@ -22,7 +22,7 @@
 
 use crate::common::book::Book;
 use crate::common::{cents, data, filed_before, money_words, withdraw, Fields, MONTH};
-use crate::market::trade::{self, decline, decline_on_terms, fill, held, price_list, send_back, Order, OrderBook, SellingTerms, TradeThen};
+use crate::market::trade::{self, decline, decline_on_terms, held, price_list, send_back, Order, OrderBook, SellingTerms, TradeThen};
 use crate::steps::{because, call, pay, say, text, Done, Pay, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture, DAY};
 use oikos_sight::OutcomeStatus;
@@ -101,6 +101,9 @@ struct Market {
     paid_for: BTreeMap<String, i64>,
     baseline: BTreeMap<String, i64>,
     answered: BTreeSet<String>,
+    /// How long our freight took to each place we sent goods to (law 9): what a note tells the buyer to expect.
+    #[serde(default)]
+    freight: BTreeMap<String, i64>,
 }
 
 impl Market {
@@ -145,7 +148,7 @@ impl Plan for Market {
             Then::List => {
                 if let Done::Outcome(o) = done {
                     if let Some(id) = o.created.as_ref().and_then(|c| c.get("list")) {
-                        self.list_id = Some(id.clone());
+                        self.list_id = Some(id.to_string());
                     }
                 }
                 vec![]
@@ -153,21 +156,24 @@ impl Plan for Market {
             Then::Offer { kind } => {
                 if let Done::Outcome(o) = done {
                     if let Some(id) = o.created.as_ref().and_then(|c| c.get("offer")) {
-                        self.offers.insert(kind.clone(), id.clone());
+                        self.offers.insert(kind.clone(), id.to_string());
                     }
                 }
                 vec![]
             }
-            Then::Delivered { order, t } => {
+            Then::Delivered { order, t } =>
                 match done {
                     Done::Outcome(o) if o.status == OutcomeStatus::Applied => {
+                        for (to, secs) in &o.freight {
+                            self.freight.insert(to.to_string(), *secs);
+                        }
                         *self.sent.entry(order.kind.clone()).or_insert(0) += order.quantity;
                         self.orders.bill(order, order.quantity, *t);
                         vec![]
                     }
                     d => trade::then(&TradeThen::DeliveryRefused { order: order.clone(), from_at: self.me.clone(), pay_from: self.p.account.clone() }, d, &mut self.orders, cx),
                 }
-            }
+            ,
             Then::Paid { kind, back } => {
                 if let Done::Outcome(o) = done {
                     if o.status == OutcomeStatus::Applied {
@@ -222,7 +228,7 @@ impl Plan for Market {
                 extra["terms_days"] = json!(self.p.terms_days);
             }
             let mut s = because(if first { "The world market's prices, for anyone in the town who buys from outside." } else { "World prices have moved: republishing ours." }, calls);
-            s.lines.push(oikos_sight::calls::Line { bind: Some("list".into()), call: price_list(&sells, &self.p.account, &words, extra, None, None, true) });
+            s.lines.push(oikos_sight::calls::Line { bind: Some("list".into()), call: price_list(&sells, &self.p.account, &words, extra, None, None, true), });
             s.then = Some(Then::List);
             steps.push(s);
         }
@@ -247,7 +253,9 @@ impl Plan for Market {
                     }
                 )
             };
-            let mut st: Step<Then> = fill(o, if ok { o.quantity } else { 0 }, &me, &self.p.account, &why, cx);
+            // (When they will be there, as our freight to that place has taken: none known, the buyer learns it from the goods.)
+            let arrives = self.freight.get(&o.at).map(|x| t + x);
+            let mut st: Step<Then> = trade::fill_arriving(o, if ok { o.quantity } else { 0 }, &me, &self.p.account, &why, cx, arrives);
             if ok {
                 st.then = Some(Then::Delivered { order: o.clone(), t });
             }
@@ -290,8 +298,8 @@ impl Plan for Market {
         }
         // Invoices for goods shipped to us: pay those whose goods have come, up to the month's appetite, in the order
         // they arrived; send back the rest.
-        let arrived = |s: &Self, kind: &str| held(pic, &me, kind) - s.baseline.get(kind).copied().unwrap_or(0) + s.sent.get(kind).copied().unwrap_or(0) - s.paid_for.get(kind).copied().unwrap_or(0);
-        let mut invoices: Vec<_> = self.book.open("invoice").filter(|r| crate::common::addressed_to(r).iter().any(|a| *a == me) && !self.answered.contains(&r.id)).cloned().collect();
+        let arrived = |s: &Self, kind: &str| { held(pic, &me, kind) - s.baseline.get(kind).copied().unwrap_or(0) + s.sent.get(kind).copied().unwrap_or(0) - s.paid_for.get(kind).copied().unwrap_or(0)};
+        let mut invoices: Vec<_> = self.book.open("invoice").filter(|r| crate::common::addressed_to(r).iter().any(|a| *a == me) && !self.answered.contains(r.id.as_str())).cloned().collect();
         invoices.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
         for inv in invoices {
             let d = data(&inv).clone();
@@ -299,27 +307,27 @@ impl Plan for Market {
             let q = d.i("quantity").unwrap_or(0).max(0);
             let owed = d.get("outcome").and_then(|o| o.get("money")).cloned();
             let offer = self.p.buys.get(&kind).map(|b| self.buying_now(&kind, b, t));
-            let from = inv.speaks_for.clone().unwrap_or_default();
+            let from = inv.speaks_for.unwrap_or_default();
             let to = owed.as_ref().and_then(|o| o.s("to")).map(str::to_string);
             let (Some(offer), true, Some(owed_to)) = (offer, q > 0, to) else {
-                self.answered.insert(inv.id.clone());
+                self.answered.insert(inv.id.to_string());
                 steps.push(because(
                     "An invoice we can't pay: it isn't for goods we buy, or doesn't say how many or where to pay.",
-                    vec![say("invoice_declined", &format!("Invoice {} declined: we don't buy this.", inv.id), Say { to: Some(vec![from.clone()]), visible: Some(Visible::Only(vec![from.clone(), me.clone()])), basis: Some(inv.id.clone()), data: Some(json!({ "invoice": inv.id })), ..Default::default() })],
+                    vec![say("invoice_declined", &format!("Invoice {} declined: we don't buy this.", inv.id), Say { to: Some(vec![from.to_string()]), visible: Some(Visible::Only(vec![from.to_string(), me.clone()])), basis: Some(inv.id.to_string()), data: Some(json!({ "invoice": inv.id })), ..Default::default() })],
                 ));
                 continue;
             };
             if arrived(self, &kind) < q {
                 if t - inv.at >= self.p.wait_days * DAY {
-                    self.answered.insert(inv.id.clone());
+                    self.answered.insert(inv.id.to_string());
                     steps.push(because(
                         format!("An invoice whose goods haven't come in {} days: declining it.", self.p.wait_days),
-                        vec![say("invoice_declined", &format!("Invoice {} declined: the goods haven't arrived.", inv.id), Say { to: Some(vec![from.clone()]), visible: Some(Visible::Only(vec![from.clone(), me.clone()])), basis: Some(inv.id.clone()), data: Some(json!({ "invoice": inv.id })), ..Default::default() })],
+                        vec![say("invoice_declined", &format!("Invoice {} declined: the goods haven't arrived.", inv.id), Say { to: Some(vec![from.to_string()]), visible: Some(Visible::Only(vec![from.to_string(), me.clone()])), basis: Some(inv.id.to_string()), data: Some(json!({ "invoice": inv.id })), ..Default::default() })],
                     ));
                 }
                 continue;
             }
-            self.answered.insert(inv.id.clone());
+            self.answered.insert(inv.id.to_string());
             *self.paid_for.entry(kind.clone()).or_insert(0) += q;
             // Room this month: in all, whoever the seller (the first invoices to arrive are the first paid).
             let room = offer.1 - self.bought.get(&kind).copied().unwrap_or(0);
@@ -333,16 +341,16 @@ impl Plan for Market {
             let return_to = d.s("from_at").unwrap_or_default().to_string();
             let mut calls = vec![];
             if amount > 0 {
-                calls.push(pay(&owed_to, amount, Pay { from: Some(self.p.account.clone()), for_: Some(format!("{take} {kind} bought.")), settles: Some(inv.id.clone()), ..Default::default() }, cx));
+                calls.push(pay(&owed_to, amount, Pay { from: Some(self.p.account.clone()), for_: Some(format!("{take} {kind} bought.")), settles: Some(inv.id.to_string()), ..Default::default() }, cx));
             }
             if back > 0 && !return_to.is_empty() {
-                calls.push(call("goods", vec![("kind", Some(crate::steps::arg(&kind))), ("quantity", Some(text(back.to_string()))), ("to", Some(crate::steps::arg(&from))), ("at", Some(crate::steps::arg(&return_to))), ("from_at", Some(crate::steps::arg(&me)))]));
+                calls.push(call("goods", vec![("carried", Some(crate::steps::arg("yes"))), ("kind", Some(crate::steps::arg(&kind))), ("quantity", Some(text(back.to_string()))), ("to", Some(crate::steps::arg(&from))), ("at", Some(crate::steps::arg(&return_to))), ("from_at", Some(crate::steps::arg(&me)))]));
             }
             if back > 0 {
                 calls.push(say(
                     "invoice_declined",
                     &format!("Invoice {}: {back} {kind} beyond this month's demand, sent back.", inv.id),
-                    Say { to: Some(vec![from.clone()]), visible: Some(Visible::Only(vec![from.clone(), me.clone()])), basis: Some(inv.id.clone()), data: Some(json!({ "invoice": inv.id, "returned": back, "paid_for": take })), ..Default::default() },
+                    Say { to: Some(vec![from.to_string()]), visible: Some(Visible::Only(vec![from.to_string(), me.clone()])), basis: Some(inv.id.to_string()), data: Some(json!({ "invoice": inv.id, "returned": back, "paid_for": take })), ..Default::default() },
                 ));
             }
             let why = if take == q { format!("Goods invoiced under our offer have arrived: paying for {q} {kind}.") } else { format!("Goods invoiced beyond this month's demand: paying for {take}, sending {back} back.") };
@@ -399,7 +407,7 @@ impl Kind for WorldTrade {
     }
     fn create(&self, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
         let p = read_params(ctx)?;
-        let sells = (p.terms_days > 0).then_some(SellingTerms { days: p.terms_days, stop_after_days: p.terms_stop_after_days, claim_after_days: p.terms_claim_after_days });
+        let sells = (p.terms_days > 0).then_some(SellingTerms { days: p.terms_days, stop_after_days: p.terms_stop_after_days, claim_after_days: p.terms_claim_after_days, });
         let me = ctx.entity.clone();
         let _ = Trade;
         Ok(Box::new(Stepper::new(Market {
@@ -414,6 +422,7 @@ impl Kind for WorldTrade {
             month: -1,
             bought: BTreeMap::new(),
             sent: BTreeMap::new(),
+            freight: BTreeMap::new(),
             paid_for: BTreeMap::new(),
             baseline: BTreeMap::new(),
             answered: BTreeSet::new(),
@@ -447,11 +456,11 @@ impl Plan for Schedule {
     type Then = ();
     fn absorb(&mut self, _: &Picture, _: &mut Cx) {}
     fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<()>> {
-        let Some(mine) = pic.accounts().find(|a| a.holder == pic.entity && a.custodian == pic.entity).map(|a| a.account.clone()) else { return vec![] };
+        let Some(mine) = pic.accounts().find(|a| a.holder == pic.entity && a.custodian == pic.entity).map(|a| a.account) else { return vec![]; };
         let mut calls = vec![];
         for (i, p) in self.purchases.iter().enumerate() {
             while self.next[i] <= pic.t && calls.len() < 32 && p.every > 0 {
-                calls.push(pay(&p.to, p.amount, Pay { from: Some(mine.clone()), for_: Some(p.memo.clone().unwrap_or_else(|| "export sales".into())), ..Default::default() }, cx));
+                calls.push(pay(&p.to, p.amount, Pay { from: Some(mine.to_string()), for_: Some(p.memo.clone().unwrap_or_else(|| "export sales".into())), ..Default::default() }, cx));
                 self.next[i] += p.every;
             }
         }

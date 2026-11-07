@@ -68,6 +68,9 @@ pub struct EngineOptions {
     pub audit: bool,
     /// Fewer actors than this in a round are stepped on one thread (starting threads costs more than it saves).
     pub share_at: usize,
+    /// A round with no seat of more units than this decides a window of this many at a time as it is carried out (not
+    /// all at once: `Engine::pending`). The same results, whatever it is.
+    pub decide_window: usize,
     /// The seats are the mock (no model): a seat that sits as its code twin (`mock.twin` with a `mock.brain`) is
     /// scheduled as its brain's unit would be (run.ts `llmUnit`). A host with a real model says false.
     pub mock_seats: bool,
@@ -83,9 +86,16 @@ pub struct EngineOptions {
     pub record_observations_of: BTreeSet<String>,
     /// Acts withheld: a researcher's intervention (risk MT-19), never a law of the world.
     pub withhold: Vec<Withhold>,
+    /// Acts carried out at a fork's moment in a participant's name: a researcher's intervention, never a law of the world.
+    pub at_fork: Vec<AtFork>,
     /// Capture the citizens' decisions to this file (docs/citizen-data.md: `<run>.citizens.jsonl.zst`, beside the log),
     /// for training. Nothing in the world or the log changes with it.
     pub capture_citizens: Option<String>,
+    /// Hold the world's records that nobody reads on disk, in this file (docs/design/tiered-storage.md; the policy from
+    /// `OIKOS_COLD_AFTER_DAYS` and `OIKOS_COLD_IDLE_DAYS`). Nothing anyone sees, logs or hashes changes with it.
+    pub cold: Option<std::path::PathBuf>,
+    /// When a record is cold, if not as the environment says (`Policy::from_env`): a test moves records out after a day.
+    pub cold_policy: Option<crate::held::Policy>,
 }
 
 /// One act withheld (docs/experiments.md, "Counterfactual forks"; risk MT-19): of the acts carried out from the start of
@@ -134,6 +144,35 @@ impl Withhold {
     }
 }
 
+/// An act carried out at the moment a fork (or a resume) begins, in a participant's name and post, as that participant would
+/// make it: `call` in the call language, resolved by what that capacity knows (docs/design/delegation.md section 7; docs/
+/// experiments.md, "Interventions"). A researcher's intervention, never a law of the world: the log notes it (`intervened`),
+/// nothing in the world is told it was one, and the act takes its actor's time as any act does. Its actor hears of its
+/// outcome as of an act it did not send (code: nothing follows from it; its own records show what it made).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct AtFork {
+    pub participant: String,
+    #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+    pub as_: Option<String>,
+    pub call: String,
+    #[serde(default)]
+    pub why: String,
+}
+
+/// The options' `at_fork` (a list of `{participant, as?, call, why?}`), as a host gives it.
+pub fn at_forks(v: &Value) -> Result<Vec<AtFork>, String> {
+    match v {
+        Value::Null => Ok(vec![]),
+        v => {
+            let a: Vec<AtFork> = serde_json::from_value(v.clone()).map_err(|e| format!("at_fork: {e}"))?;
+            for x in &a {
+                oikos_resolver::calls::parse_program(&x.call).map_err(|e| format!("at_fork: {}: {}", x.call, e.0))?;
+            }
+            Ok(a)
+        }
+    }
+}
+
 /// The options' `withhold` (a list of `{what, participant?, nth?}`), as a host gives it.
 pub fn withholds(v: &Value) -> Result<Vec<Withhold>, String> {
     match v {
@@ -158,12 +197,16 @@ impl Default for EngineOptions {
             decision_areas: None,
             audit: false,
             share_at: std::env::var("OIKOS_SHARE_AT").ok().and_then(|x| x.parse::<usize>().ok()).filter(|n| *n > 0).unwrap_or(WORTH_SHARING),
+            decide_window: WINDOW,
             mock_seats: true,
             host_seats: false,
             record_observations: false,
             record_observations_of: BTreeSet::new(),
             withhold: vec![],
+            at_fork: vec![],
             capture_citizens: None,
+            cold: None,
+            cold_policy: None,
         }
     }
 }
@@ -281,6 +324,24 @@ pub fn world_info(config: &Value) -> Result<WorldInfo, String> {
 }
 
 /// What the engine reads once from a world's config (the same at the start and when a snapshot is resumed).
+/// The citizen model a world's `dials.citizen_model` names (`{ weights, sha256, share_bps }`: docs/citizen-data.md, "The
+/// citizen model"): the file read, its SHA-256 checked against the config's (so the config says exactly which weights
+/// ran, and a replay cannot run other weights), and parsed. A world that names one it cannot read does not start.
+fn citizen_model(dial: Option<&Value>) -> Result<Option<Arc<oikos_actors::mind::model::CitizenModel>>, String> {
+    use sha2::{Digest, Sha256};
+    let Some(d) = dial.filter(|d| !d.is_null()) else { return Ok(None) };
+    let path = d["weights"].as_str().ok_or("dials.citizen_model: no weights (the model file's path)")?;
+    let want = d["sha256"].as_str().ok_or("dials.citizen_model: no sha256 (the model file's hash)")?;
+    let share = d.get("share_bps").map_or(Some(10_000), Value::as_i64).ok_or("dials.citizen_model.share_bps: not a whole number")?;
+    let bytes = std::fs::read(path).map_err(|e| format!("dials.citizen_model: {path}: {e}"))?;
+    let got = oikos_core::canon::to_hex(&Sha256::digest(&bytes));
+    if got != want {
+        return Err(format!("dials.citizen_model: {path} has SHA-256 {got}, the config names {want}"));
+    }
+    let v: Value = serde_json::from_slice(&bytes).map_err(|e| format!("dials.citizen_model: {path}: {e}"))?;
+    Ok(Some(Arc::new(oikos_actors::mind::model::CitizenModel::from_json(&v, &got, share)?)))
+}
+
 struct Base {
     types: BTreeMap<String, Value>,
     currency: Option<oikos_resolver::calls::Currency>,
@@ -327,6 +388,7 @@ impl Base {
             calendar: config.get("calendar").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| format!("calendar: {e}"))?,
             date_style: config.get("calendar").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| format!("calendar: {e}"))?,
             capture: false,
+            citizen_model: citizen_model(config.get("dials").and_then(|d| d.get("citizen_model")))?,
         });
         let dated = oikos_rules::calendar::Dated::from_config(config.get("calendar"));
         let templates =
@@ -363,11 +425,23 @@ pub struct Engine<W: Write> {
     until: i64,
     run_end: i64,
     round: Option<Round>,
+    /// A round's code units not yet decided, in the order it is carried out, with what each was shown: a round no seat
+    /// waits in, of more than `WINDOW` units, is decided a window at a time as it is carried out (`decide_window`), not
+    /// all at once (a town's first moment held every unit's decisions together till the round was done: SC-1). Each
+    /// decides from what it was shown and its own state, as it would have at once; the same results.
+    pending: std::collections::VecDeque<(String, crate::observe::Observation, Option<String>)>,
+    pending_keys: BTreeSet<String>,
+    /// Pending units decided early, as they went (`sync_units` lets one go): their decisions, for the round.
+    decided_early: BTreeMap<String, Decided>,
     rounds_at: (i64, u32),
     /// The calls each code actor made in this moment that did not resolve (unit key, program text), by moment: the
     /// same unresolved call again in the same moment ends that actor's wake (its mind decides the same from the same
     /// view, so going on would ask it forever: lv-10, 2026-10-25). Transient: a snapshot is taken between moments.
     unresolved_at: (i64, BTreeSet<(String, String)>),
+    /// A seat's thinking before its act this round, as its host reckons it (a model's by its tokens, as a pilot's host
+    /// does: run.ts), in world seconds; taken by the act it comes before, and only where the world's thinking costs
+    /// world time. Never carried past the round, so never in a snapshot.
+    seat_thinking: BTreeMap<String, i64>,
     /// Wakes of the engine's own actors by why they woke (not state: no result depends on it, and a resumed run counts afresh).
     wakes_by: std::collections::BTreeMap<String, u64>,
     /// Failures of its own actors recovered in place (`participant_error` notes), for the run's summary.
@@ -399,11 +473,16 @@ pub struct Engine<W: Write> {
     host_going_on: BTreeSet<String>,
     /// For whoever measures: how many steps the actors took (never logged).
     pub steps: u64,
+    /// Units a windowed round decided early, as it let them go (`sync_units`): for its test.
+    pub decided_early_n: u64,
     /// How many acts each of `opts.withhold` has counted so far.
     withheld: Vec<u32>,
     /// The capture of citizens' decisions, where the run makes one (`opts.capture_citizens`).
     capture: Option<capture::Capture>,
 }
+
+/// How many units of a round with no seat are decided at once, as it is carried out (`Engine::pending`).
+const WINDOW: usize = 2048;
 
 /// The canonical bytes of `subject_data(kind, subject, data)`, written from its parts, where the annotation plainly keeps
 /// to the contract (`plain_subject_data`); `None` where the contract's check is to decide (then logged from its value).
@@ -564,6 +643,12 @@ impl<W: Write> Engine<W> {
         if std::env::var_os("OIKOS_KERNEL_THREADS").is_none() {
             run.share(opts.threads, Some(opts.share_at));
         }
+        // (A cold file that can't be made leaves every record in memory, as before: the same results.)
+        if let Some(path) = &opts.cold {
+            if let Err(e) = run.tier_records(path, opts.cold_policy.unwrap_or_else(crate::held::Policy::from_env)) {
+                eprintln!("the world's records stay in memory: {}: {e}", path.display());
+            }
+        }
         let until = opts.until.map_or(base.run_end, |u| u.min(base.run_end));
         Engine {
             sched,
@@ -585,8 +670,12 @@ impl<W: Write> Engine<W> {
             until,
             run_end: base.run_end,
             round: None,
+            pending: Default::default(),
+            pending_keys: Default::default(),
+            decided_early: Default::default(),
             rounds_at: (-1, 0),
             unresolved_at: (-1, BTreeSet::new()),
+            seat_thinking: BTreeMap::new(),
             wakes_by: Default::default(),
             failures: 0,
             questions: vec![],
@@ -601,6 +690,7 @@ impl<W: Write> Engine<W> {
             for_host_any: false,
             host_going_on: BTreeSet::new(),
             steps: 0,
+            decided_early_n: 0,
             withheld: vec![],
             capture: None,
         }
@@ -685,14 +775,14 @@ impl<W: Write> Engine<W> {
                 crate::kernel::Observed { canonical: vec![], shown: self.run.shown(obs).map_err(|e| e.to_string())?, wire: None }
             };
             if let Command::Observe { participant, only } | Command::Look { participant, only, .. } = cmd {
-                let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
+                let key = only.as_ref().map_or_else(|| participant.to_string(), |o| format!("{participant}|{o}"));
                 let cur = self.currency.clone();
                 let dated = self.dated.clone();
                 let named = self.named;
-                self.knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(cur).with_dated(dated).with_names(named)).absorb_seen(
+                self.knowledge.entry(key.to_string()).or_insert_with(|| oikos_resolver::Knowledge::new(cur).with_dated(dated).with_names(named)).absorb_seen(
                     &crate::kernel::seen(obs),
                     &o.shown,
-                    &mut self.registers,
+                    &mut self.registers
                 );
             }
             seen = json.then_some(o);
@@ -714,7 +804,7 @@ impl<W: Write> Engine<W> {
                         let to: Vec<String> = self
                             .parts
                             .iter()
-                            .filter(|(_, p)| !p.ended && !p.shares_body && p.person.as_ref().is_some_and(|e| to.contains(e)))
+                            .filter(|(_, p)| !p.ended && !p.shares_body && p.person.as_ref().is_some_and(|e| to.iter().any(|x| x ==e)))
                             .map(|(pid, _)| format!("{pid}|self"))
                             .filter(|k| self.units.contains_key(k))
                             .collect();
@@ -734,44 +824,44 @@ impl<W: Write> Engine<W> {
         for e in events {
             match &e.body {
                 E::ParticipantCreated { participant, kind, person, template, traits, .. } => {
-                    let tpl = self.templates.get(template);
+                    let tpl = self.templates.get(template.as_str());
                     let kind =
                         serde_json::to_value(kind).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_else(|| "person".into());
                     self.parts.insert(
-                        participant.clone(),
+                        participant.to_string(),
                         Part {
                             kind,
-                            person: person.clone(),
+                            person: (*person).map(|x| x.to_string()),
                             controller: crate::config::Controller::new(tpl.map_or(Value::Null, |t| t["controller"].clone())),
                             traits: traits.clone().unwrap_or(Value::Null),
                             shares_body: false,
                             ended: false,
                         },
                     );
-                    changed.insert(participant.clone());
+                    changed.insert(*participant);
                 }
                 E::PositionCreated { position, entity, role_module, .. } => {
                     let rm = role_module.clone().unwrap_or(Value::Null);
                     let keeps = rm["keeps_record"].as_bool() == Some(true);
                     self.positions
-                        .insert(position.clone(), Pos { entity: entity.clone(), holder: None, role_module: rm, keeps_record: keeps });
+                        .insert(position.to_string(), Pos { entity: entity.to_string(), holder: None, role_module: rm, keeps_record: keeps });
                 }
                 E::Appointed { position, holder, .. } => {
-                    if let Some(x) = self.positions.get_mut(position) {
+                    if let Some(x) = self.positions.get_mut(position.as_str()) {
                         if let Some(h) = x.holder.take() {
-                            changed.insert(h);
+                            changed.insert(h.into());
                         }
-                        x.holder = holder.clone();
+                        x.holder = (*holder).map(|x| x.to_string());
                         if let Some(h) = holder {
-                            changed.insert(h.clone());
+                            changed.insert(*h);
                         }
                     }
                 }
                 E::ParticipantEnded { participant, .. } => {
-                    if let Some(p) = self.parts.get_mut(participant) {
+                    if let Some(p) = self.parts.get_mut(participant.as_str()) {
                         p.ended = true;
                     }
-                    changed.insert(participant.clone());
+                    changed.insert(*participant);
                 }
                 _ => {}
             }
@@ -790,7 +880,7 @@ impl<W: Write> Engine<W> {
     /// Every capacity of a participant has its unit, and nothing it no longer holds does (run.ts `syncUnits`).
     fn sync_units(&mut self, pid: &str, wake_at: Option<i64>) -> Result<(), String> {
         let Some(p) = self.parts.get(pid).cloned() else { return Ok(()) };
-        let seat = p.controller.get("type").and_then(Value::as_str) == Some("llm");
+        let seat = p.controller.get("type").and_then(|x| x.as_str()) == Some("llm");
         let mut want = BTreeSet::new();
         if !p.ended {
             if seat {
@@ -818,6 +908,13 @@ impl<W: Write> Engine<W> {
             .collect();
         debug_assert_eq!(gone, self.units.keys().filter(|k| (k.as_str() == pid || k.starts_with(&prefix)) && !want.contains(*k)).cloned().collect::<Vec<_>>());
         for k in &gone {
+            // (One still to decide this round decides first, on what it was shown, as it would have with the others.)
+            if self.pending_keys.contains(k) {
+                let mut early = std::mem::take(&mut self.decided_early);
+                self.decide_pending(0, Some(k), &mut early);
+                self.decided_early = early;
+                self.decided_early_n += 1;
+            }
             self.units.remove(k);
         }
         if !gone.is_empty() {
@@ -907,7 +1004,7 @@ impl<W: Write> Engine<W> {
     fn code_unit(&mut self, pid: &str, p: &Part, cap: &str, wake_at: Option<i64>) -> Result<Option<(Unit, Value)>, String> {
         let (impl_, params, entity) = if cap == "self" {
             (
-                p.controller.get("impl").and_then(Value::as_str).or(p.controller.get("code").and_then(Value::as_str)).map(String::from),
+                p.controller.get("impl").and_then(|x| x.as_str()).or(p.controller.get("code").and_then(|x| x.as_str())).map(String::from),
                 oikos_actors::Params::of_controller(&p.controller),
                 p.person.clone().unwrap_or_default(),
             )
@@ -915,7 +1012,7 @@ impl<W: Write> Engine<W> {
             let x = self.positions.get(cap).ok_or_else(|| format!("{pid} holds {cap}, which is not a position"))?;
             if p.kind == "system" {
                 (
-                    p.controller.get("impl").and_then(Value::as_str).or(p.controller.get("code").and_then(Value::as_str)).map(String::from),
+                    p.controller.get("impl").and_then(|x| x.as_str()).or(p.controller.get("code").and_then(|x| x.as_str())).map(String::from),
                     oikos_actors::Params::of_controller(&p.controller),
                     x.entity.clone(),
                 )
@@ -1097,6 +1194,13 @@ impl<W: Write> Engine<W> {
         }
     }
 
+    /// How long a seat thought before this round's action (its host's reckoning; see `seat_thinking`).
+    pub fn seat_thinks(&mut self, key: &str, seconds: i64) {
+        if seconds > 0 {
+            self.seat_thinking.insert(key.to_string(), seconds);
+        }
+    }
+
     /// The questions code actors have put to models since last asked (asked in one wake, answered by the next).
     pub fn questions(&mut self) -> Vec<(String, Question)> {
         std::mem::take(&mut self.questions)
@@ -1141,7 +1245,7 @@ impl<W: Write> Engine<W> {
             let Some(mut u) = self.units.remove(&key) else { continue };
             if u.seat() && self.opts.host_seats {
                 // (The host looks for it, through the participant API, as it decides and acts for it.)
-                seats.push(SeatWake { key: key.clone(), participant: u.participant.clone(), t, woke_for: u.woke_for.clone(), since: u.since, observation: Value::Null });
+                seats.push(SeatWake { key: key.clone(), participant: u.participant.clone(), t, woke_for: u.woke_for.clone(), since: u.since, observation: Value::Null, });
                 self.units.insert(key.clone(), u);
                 kept_awake.push((key, n));
                 continue;
@@ -1151,7 +1255,7 @@ impl<W: Write> Engine<W> {
                 Some(c) if c != "self" => ls
                     .into_iter()
                     .map(|mut l| {
-                        l.channel = format!("{c}/{}", l.channel);
+                        l.channel = format!("{c}/{}", l.channel).into();
                         l
                     })
                     .collect(),
@@ -1159,7 +1263,7 @@ impl<W: Write> Engine<W> {
             });
             let mut resp = match looks {
                 Some(looks) => {
-                    match self.command(&Command::Look { participant: u.participant.clone(), only: only.clone(), looks: looks.clone() }) {
+                    match self.command(&Command::Look { participant: u.participant.clone().into(), only: only.clone().map(Into::into), looks: looks.clone(), }) {
                         Ok(r) => Some(r),
                         Err(_) => {
                             self.note(&u.participant, json!({ "look_rejected": serde_json::to_string(&looks).unwrap_or_default().chars().take(4000).collect::<String>() }))?;
@@ -1170,7 +1274,7 @@ impl<W: Write> Engine<W> {
                 None => None,
             };
             if resp.is_none() {
-                resp = self.command(&Command::Observe { participant: u.participant.clone(), only: only.clone() }).ok();
+                resp = self.command(&Command::Observe { participant: u.participant.clone().into(), only: only.clone().map(Into::into) }).ok();
             }
             // (Its capacity may have gone with what it saw: a unit no longer there does not decide.)
             let Some(obs) = resp.and_then(|r| r.observation) else {
@@ -1210,7 +1314,7 @@ impl<W: Write> Engine<W> {
                     // (The capacity it was shown in: its unit's post, or the one post a system holds, which a system's
                     // unit of no capacity sees as run.ts's did.)
                     let held = self.held(&u.participant);
-                    let as_ = only.clone().filter(|c| c != "self").or_else(|| (held.len() == 1 && self.parts.get(&u.participant).is_some_and(|p| p.kind == "system")).then(|| held[0].clone()));
+                    let as_ = only.clone().filter(|c| c != "self").or_else(|| { (held.len() == 1 && self.parts.get(&u.participant).is_some_and(|p| p.kind == "system")).then(|| held[0].clone())});
                     if let Some(c) = as_ {
                         data["as"] = json!(c);
                     }
@@ -1220,15 +1324,35 @@ impl<W: Write> Engine<W> {
             }
             kept_awake.push((key, n));
         }
-        // Decide, all at once.
+        // Decide: all at once; or, a round no seat waits in and of many units, a window at a time as it is carried out.
+        let mut decided = BTreeMap::new();
+        if seats.is_empty() && stepping.len() > self.opts.decide_window {
+            for (u, obs, only) in stepping {
+                self.pending_keys.insert(u.key.clone());
+                self.pending.push_back((u.key.clone(), obs.expect("each unit is shown its observation"), only));
+                self.units.insert(u.key.clone(), u);
+            }
+        } else {
+            self.decide(stepping, &mut decided);
+        }
+        for s in &seats {
+            decided.insert(s.key.clone(), Decided::Seat(None));
+        }
+        self.round = Some(Round { awake: kept_awake, decided, cursor: 0, next: vec![] });
+        Ok((!seats.is_empty()).then_some(Due::Seats(seats)))
+    }
+
+    /// Each unit decides on what it was shown; its decision (and the unit) put back.
+    fn decide(&mut self, mut stepping: Vec<(Unit, Option<crate::observe::Observation>, Option<String>)>, decided: &mut BTreeMap<String, Decided>) {
         let seed = self.seed;
         let (areas, record, lean) = (self.opts.decision_areas.as_ref(), self.opts.record_decisions, self.lean);
         let capturing = self.capture.is_some();
-        // (A round no seat waits in is carried out before anything can save it: its decisions, once written for the
-        // log, need not be kept as values till then. One with seats may be saved while they think, values and all.)
-        let strip = seats.is_empty();
+        // (A step's decisions, once written for the log, are not kept as values till the round is carried out: a round
+        // with seats may be saved while they think, and its snapshot reads them back from those bytes, `kept_whole`.)
+        let strip = true;
         let results = each_mut(&mut stepping, self.opts.threads, self.opts.share_at, |(u, obs, only)| {
             let obs = obs.take().expect("each unit is stepped once");
+            let _reading = crate::held::who::reading_as(&u.kind);
             let pic = u.view.apply(obs, only.as_deref(), &u.entity, &u.woke_for, u.since);
             let pic = &pic;
             let answers = std::mem::take(&mut u.answers);
@@ -1259,7 +1383,6 @@ impl<W: Write> Engine<W> {
             }
         });
         self.steps += results.len() as u64;
-        let mut decided = BTreeMap::new();
         for ((u, _, _), r) in stepping.into_iter().zip(results) {
             let d = match r {
                 Ok((a, kept, prepared)) => Decided::Code(Ok((a, kept)), Some(prepared)),
@@ -1268,11 +1391,33 @@ impl<W: Write> Engine<W> {
             decided.insert(u.key.clone(), d);
             self.units.insert(u.key.clone(), u);
         }
-        for s in &seats {
-            decided.insert(s.key.clone(), Decided::Seat(None));
+    }
+
+    /// The next `n` pending units decided (or the one `only`, wherever it stands), their decisions put in `decided`.
+    fn decide_pending(&mut self, n: usize, only: Option<&str>, decided: &mut BTreeMap<String, Decided>) {
+        let mut stepping = vec![];
+        match only {
+            Some(key) => {
+                if let Some(i) = self.pending.iter().position(|(k, _, _)| k == key) {
+                    let (k, obs, cap) = self.pending.remove(i).expect("found just now");
+                    self.pending_keys.remove(&k);
+                    let u = self.units.remove(&k).expect("a pending unit is in the engine");
+                    stepping.push((u, Some(obs), cap));
+                }
+            }
+            None => {
+                while stepping.len() < n {
+                    let Some((k, obs, cap)) = self.pending.pop_front() else { break };
+                    self.pending_keys.remove(&k);
+                    // (One the round let go of decided as it went: `sync_units`.)
+                    let Some(u) = self.units.remove(&k) else { continue };
+                    stepping.push((u, Some(obs), cap));
+                }
+            }
         }
-        self.round = Some(Round { awake: kept_awake, decided, cursor: 0, next: vec![] });
-        Ok((!seats.is_empty()).then_some(Due::Seats(seats)))
+        if !stepping.is_empty() {
+            self.decide(stepping, decided);
+        }
     }
 
     /// What the round decided, carried out in key order; those whose wakes go on.
@@ -1290,6 +1435,12 @@ impl<W: Write> Engine<W> {
             }
             r.cursor += 1;
             let mut sending: Vec<oikos_actors::Worded> = vec![];
+            if !self.decided_early.is_empty() {
+                r.decided.append(&mut self.decided_early);
+            }
+            if self.pending_keys.contains(&key) {
+                self.decide_pending(self.opts.decide_window.max(1), None, &mut r.decided);
+            }
             let Some(d) = r.decided.remove(&key) else { continue };
             if !self.units.contains_key(&key) {
                 continue; // it ended this round
@@ -1325,12 +1476,13 @@ impl<W: Write> Engine<W> {
             };
             let pid = self.units[&key].participant.clone();
             let (goes_on, acted, until) = self.apply(&key, action)?;
+            self.seat_thinking.remove(&key); // (a seat's thinking is for this action's act, if it was one)
             // (The words this action carried out, as the TS host noted them once the acts were begun or not.)
             for w in std::mem::take(&mut sending) {
                 self.words_note(&pid, &w, if acted { None } else { Some("the acts could not be carried out".into()) })?;
                 if !acted {
                     if let Some(u) = self.units.get_mut(&key) {
-                        u.answers.push(Answer { kind: "words".into(), about: w.about.clone(), body: json!({ "done": false, "why": "the acts could not be carried out" }) });
+                        u.answers.push(Answer { kind: "words".into(), about: w.about.clone(), body: json!({ "done": false, "why": "the acts could not be carried out" }), });
                     }
                 }
             }
@@ -1500,7 +1652,7 @@ impl<W: Write> Engine<W> {
                 Ok((true, false, None))
             }
             Action::OptOut { statement } => {
-                let _ = self.command(&Command::OptOut { participant: pid.clone(), statement: statement.unwrap_or_default() });
+                let _ = self.command(&Command::OptOut { participant: pid.clone().into(), statement: statement.unwrap_or_default() });
                 if let Some(p) = self.parts.get_mut(&pid) {
                     p.ended = true;
                 }
@@ -1521,10 +1673,27 @@ impl<W: Write> Engine<W> {
                     Provenance::Direct => json!({ "via": "direct" }),
                     Provenance::Given(v) => v,
                 };
-                let acted = self.begin(key, &pid, as_.as_deref(), blocks, by, prov, reasoning.filter(|_| seat || !self.lean))?;
+                let acted = self.begin(key, &pid, as_.as_deref(), blocks, by.iter().map(|x| x.to_string()).collect(), prov, reasoning.filter(|_| seat || !self.lean))?;
                 Ok((true, acted, None))
             }
             Action::Call { program, reasoning } => {
+                // (A code unit that names a system of its organisation to do the work, `done_by=<id>` on a call: the act is done by it and
+                // on its time, as run.ts `performersOf` has it for the host's units; the kernel looks at whose it is. Until foundations-2 P3
+                // the engine's own units left `done_by` on the call, which the resolver refused: an office's system never did its papers.)
+                let mut program = program;
+                let mut done_by: Vec<String> = vec![];
+                if !seat {
+                    if let oikos_resolver::calls::Program::Lines(lines) = &mut program {
+                        for l in lines.iter_mut() {
+                            if let Some(oikos_resolver::calls::Value::Id(id)) = l.call.get("done_by") {
+                                if !done_by.contains(id) {
+                                    done_by.push(id.clone());
+                                }
+                            }
+                            l.call.args.retain(|(k, _)| k != "done_by");
+                        }
+                    }
+                }
                 let text = oikos_resolver::calls::program_text(&program);
                 let kkey = if seat { pid.clone() } else { key.to_string() };
                 let empty = oikos_resolver::Knowledge::new(self.currency.clone()).with_dated(self.dated.clone()).with_names(self.named);
@@ -1535,7 +1704,7 @@ impl<W: Write> Engine<W> {
                     oikos_resolver::Resolution::Blocks(blocks) => {
                         let prov = json!({ "via": "call", "call": text, "resolver": { "id": "resolver", "version": oikos_resolver::RESOLVER_VERSION } });
                         let acted =
-                            self.begin(key, &pid, as_.as_deref(), blocks, vec![], prov, reasoning.filter(|_| seat || !self.lean))?;
+                            self.begin(key, &pid, as_.as_deref(), blocks, done_by, prov, reasoning.filter(|_| seat || !self.lean))?;
                         Ok((true, acted, None))
                     }
                     oikos_resolver::Resolution::Questions { questions, invalid, ambiguous } => {
@@ -1591,7 +1760,9 @@ impl<W: Write> Engine<W> {
         if let Some(r) = reasoning {
             cmd["reasoning"] = json!(r);
         }
-        if let Some(th) = self.thinking.filter(|s| *s > 0 && !self.units[key].seat()) {
+        // (Code thinks a fixed time; a seat as its host reckoned it, where the world's thinking costs world time.)
+        let th = if self.units[key].seat() { self.seat_thinking.remove(key).filter(|_| self.thinking.is_some()) } else { self.thinking.filter(|s| *s > 0) };
+        if let Some(th) = th {
             cmd["thinking"] = json!(th);
         }
         let parsed: Result<Command, _> = serde_json::from_value(cmd.clone());
@@ -1612,6 +1783,23 @@ impl<W: Write> Engine<W> {
             }
         }
         Ok(false)
+    }
+
+    /// The acts `at_fork` asks for, carried out now, each noted (`intervened`) before it is begun.
+    pub fn intervene(&mut self) -> Result<(), String> {
+        for x in self.opts.at_fork.clone() {
+            let key = match &x.as_ {
+                Some(p) if self.units.contains_key(&format!("{}|{p}", x.participant)) => format!("{}|{p}", x.participant),
+                _ if self.units.contains_key(&x.participant) => x.participant.clone(),
+                None if self.units.contains_key(&format!("{}|self", x.participant)) => format!("{}|self", x.participant),
+                _ => return Err(format!("at_fork: {} acts in no capacity {} here", x.participant, x.as_.as_deref().unwrap_or("self"))),
+            };
+            let t = self.t();
+            self.note(&x.participant, json!({ "intervened": { "participant": x.participant, "as": x.as_, "call": x.call, "why": x.why, "t": t } }))?;
+            let program = oikos_resolver::calls::parse_program(&x.call).map_err(|e| format!("at_fork: {}", e.0))?;
+            self.apply(&key, Action::Call { program, reasoning: Some(x.why.clone()).filter(|w| !w.is_empty()) })?;
+        }
+        Ok(())
     }
 
     /// Whether this act is one a `withhold` takes out (counted by each; noted in the log when it is).
@@ -1652,7 +1840,8 @@ impl<W: Write> Engine<W> {
         let st = self.run.kernel().state();
         let read = |id: &str| -> Option<(String, Vec<String>, bool)> {
             let stored = st.records.get(id)?;
-            let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { return None };
+            let record = stored.record();
+            let crate::blocks::RecordBody::Agreement { terms } = &record.body else { return None };
             let status = st
                 .reading(id)
                 .map(|r| serde_json::to_value(&r).ok().and_then(|v| v["status"].as_str().map(String::from)).unwrap_or_default())
@@ -1664,7 +1853,7 @@ impl<W: Write> Engine<W> {
                 .get(p)
                 .into_iter()
                 .flat_map(|v| v.iter())
-                .filter_map(|id| read(id).map(|(t, ps, f)| (id.clone(), t, ps, f)))
+                .filter_map(|id| read(id).map(|(t, ps, f)| (id.to_string(), t, ps, f)))
                 .collect()
         };
         let mut found_now = vec![];
@@ -1739,6 +1928,11 @@ impl<W: Write> Engine<W> {
 /// Runs a world with no seats to its end (or `until`), and returns its final state hash. For the gate, the port's
 /// own tests and `oikos-kernel world`.
 impl<W: Write> Engine<W> {
+    /// Where the world's records are held, if they are tiered (for whoever measures).
+    pub fn tier_tally(&self) -> Option<crate::held::Tally> {
+        self.run.kernel().tier_tally()
+    }
+
     /// What its code actors keep, summed by what (`Actor::kept`), for whoever measures memory.
     pub fn kept(&self) -> BTreeMap<String, u64> {
         let mut out = BTreeMap::new();
@@ -1767,9 +1961,43 @@ impl<W: Write> Engine<W> {
         }
         let st = self.run.kernel().state();
         add("state.records", st.records.len());
+        add("state.ledgers", st.ledgers.len());
+        add("state.ledgers.transactions", st.ledgers.values().map(|l| l.len()).sum());
+        add("state.participants.new_transactions", st.participants.values().map(|p| p.new_transactions.values().map(|q| q.len()).sum::<usize>()).sum());
+        if std::env::var_os("OIKOS_KEPT_RC").is_some() {
+            // (Who holds the world's records: each one's count of holders, and its JSON size, by that count.)
+            for s in st.records.values() {
+                let rc = if s.record.is_hot() { 1 } else { 0 };
+                let r = s.record.peek();
+                let kind = match &r.body {
+                    crate::blocks::RecordBody::Statement { kind, .. } => format!("statement:{kind}"),
+                    b => b.kind_name().to_string(),
+                };
+                let n = serde_json::to_vec(&*r).map(|v| v.len()).unwrap_or(0);
+                add(&format!("rc.{rc}"), 1);
+                add(&format!("rc.{rc}.bytes"), n);
+                add(&format!("kind.{kind}"), 1);
+                add(&format!("kind.{kind}.bytes"), n);
+                add(&format!("kind.{kind}.rc{rc}"), 1);
+            }
+        }
         add("state.entities", st.entities.len());
         add("state.entity_records", st.entity_records.len());
         add("state.cells", st.cells.len());
+        let mut samples: BTreeMap<String, u64> = BTreeMap::new();
+        for u in self.units.values() {
+            let (sizes, some) = u.draws.kept();
+            for (what, n) in sizes {
+                add(what, n);
+            }
+            for k in some {
+                // (The shape of a matter's purpose, its digits taken out: what kinds of matter are kept.)
+                let shape: String = k.chars().map(|c| if c.is_ascii_digit() { '9' } else { c }).collect();
+                *samples.entry(format!("engine.draws.matter_shape {shape}")).or_default() += 1;
+            }
+        }
+        out.extend(samples);
+        let mut add = |what: &str, n: usize| *out.entry(format!("engine.{what}")).or_default() += n as u64;
         for u in self.units.values() {
             add("units", 1);
             add("units.answers", u.answers.len());

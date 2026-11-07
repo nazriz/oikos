@@ -400,7 +400,7 @@ export const TEXT_MAX = 16_384;
 const TO_MAX = 64;
 /** Whether something is written as an id (the contracts' forms: one a world gives, one made in the run, a cell of
  * ground, a room of a building): only that can be a letter's reference or whom it goes to. */
-export const isId = (s: string) => /^([a-z][a-z0-9_-]{0,63}|(ent|acc|str|rec|act|msg|par|pos|cnd)\.[0-9]{1,15}|cell\.[0-9]{1,6}\.[0-9]{1,6}|([a-z][a-z0-9_-]{0,63}|str\.[0-9]{1,15})\/[a-z][a-z0-9_-]{0,63}\.[0-9]{1,6})$/.test(s);
+export const isId = (s: string) => /^([a-z][a-z0-9_-]{0,63}|(ent|acc|str|rec|act|msg|par|pos|cnd|conn)\.[0-9]{1,15}|cell\.[0-9]{1,6}\.[0-9]{1,6}|([a-z][a-z0-9_-]{0,63}|str\.[0-9]{1,15})\/[a-z][a-z0-9_-]{0,63}\.[0-9]{1,6})$/.test(s);
 /** An id as written: without the square brackets a report shows it in, and out of the form a report names someone
  * in, "Name (id)" (a seat is shown "Town of Millbrook (city)", and wrote to exactly that: 2026-10-09). */
 const bare = (s: string) => {

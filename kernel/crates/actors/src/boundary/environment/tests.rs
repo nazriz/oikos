@@ -118,7 +118,7 @@ fn surveys(steps: &[Step<Then>]) -> Vec<&Step<Then>> {
 fn the_manifest_is_the_ts_manifest_and_its_answers() {
     let m = Environment.manifest();
     assert_eq!(m["name"], "city.environment");
-    assert_eq!(m["version"], "0.5.2");
+    assert_eq!(m["version"], "0.5.3");
     assert!(m["params"]["depot"]["required"] == json!(true));
     assert_eq!(m["answers"]["office"], "the environment office");
     assert!(m["takes"].as_array().is_some_and(|t| !t.is_empty()));
@@ -221,6 +221,25 @@ fn a_refused_survey_goes_back_in_the_queue_and_the_crew_is_spent_for_the_day() {
     d.office.then(s.then.as_ref().unwrap(), Done::Outcome(&o), &mut cx);
     assert!(d.office.queue.len() > before, "its cells are back to be done another day");
     assert_eq!(d.office.used.get("w1"), Some(&(8 * H - 600)));
+}
+
+#[test]
+fn told_a_days_fieldwork_will_not_fit_it_asks_for_what_the_crews_own_pace_allows_not_the_same_again() {
+    // One surveyor, 2 hours a cell stated, 8 hours a day: four cells. The world says the four need 9 hours (they are
+    // slower than the stated time) and she has 8: what is asked next is what fits at her pace, never the four again.
+    let mut d = Drive::new(json!({}));
+    let w = world(&["w1"], 1, vec![]);
+    let t0 = 31 * DAY + 9 * H;
+    let first = d.wake(t0, w.clone());
+    let s = surveys(&first)[0].clone();
+    let Some(Then::Survey { cells, .. }) = &s.then else { unreachable!() };
+    assert_eq!(cells.len(), 4, "{}", text_of(&first));
+    let o: Outcome = serde_json::from_value(json!({ "action": "a", "t": t0, "status": "refused", "refusal": { "code": "no_time_left", "detail": format!("w1 has {} s of work left today; this needs {}", 8 * H, 9 * H) } })).unwrap();
+    let mut cx = crate::Cx::new(t0, &d.ctx, &mut d.draws, 11, vec![]);
+    d.office.then(s.then.as_ref().unwrap(), Done::Outcome(&o), &mut cx);
+    let again = d.wake(t0 + 300, w);
+    let asked: Vec<usize> = surveys(&again).iter().map(|s| if let Some(Then::Survey { cells, .. }) = &s.then { cells.len() } else { 0 }).collect();
+    assert_eq!(asked, [3], "three cells at 2h15 each fit her 8 hours: {}", text_of(&again));
 }
 
 #[test]

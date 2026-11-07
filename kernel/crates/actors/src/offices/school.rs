@@ -211,7 +211,7 @@ struct School {
 impl School {
     fn in_room(&self, space: &str) -> Vec<String> {
         let occ = self.view.as_ref().and_then(|v| v.spaces.iter().find(|sp| sp.space == space)).and_then(|sp| sp.occupants.clone()).unwrap_or_default();
-        occ.into_iter().collect::<BTreeSet<_>>().into_iter().collect()
+        occ.into_iter().collect::<BTreeSet<_>>().into_iter().map(|x| x.to_string()).collect()
     }
 }
 
@@ -221,7 +221,7 @@ impl Plan for School {
     fn absorb(&mut self, pic: &Picture, _cx: &mut Cx) {
         self.book.absorb(pic);
         self.staff.absorb(pic);
-        if let Some(Seen::Sites { cells, .. }) = pic.channels.get(&self.p.channel) {
+        if let Some(Seen::Sites { cells, .. }) = pic.channels.get(self.p.channel.as_str()) {
             for c in cells.iter() {
                 if let Some(s) = &c.structure {
                     if s.structure == self.p.building {
@@ -260,13 +260,13 @@ impl Plan for School {
         let mut placed: BTreeMap<String, std::sync::Arc<oikos_sight::Record>> = BTreeMap::new();
         for x in self.book.open("school_place").filter(|x| ours(x)) {
             if let Some(who) = addressed_to(x).first() {
-                placed.insert(who.clone(), x.clone());
+                placed.insert(who.to_string(), x.clone());
             }
         }
         let mut answered: BTreeSet<String> = self.settled.clone();
         for k in ["school_place", "school_decline"] {
             for x in self.book.all(k).filter(|x| ours(x)) {
-                answered.extend(bases_of(x).iter().cloned());
+                answered.extend(bases_of(x).iter().map(|x| x.to_string()));
             }
         }
         let certified: BTreeSet<String> = self.book.all("school_certificate").filter(|x| ours(x)).filter_map(|x| data(x).s("person").map(String::from)).collect();
@@ -274,13 +274,13 @@ impl Plan for School {
 
         // ---- enrolment: a place for each child of school age who asks, in the least full classroom ----
         if enrolling {
-            let mut asks: Vec<_> = self.book.open("school_enrolment").filter(|x| addressed_to(x).contains(&me) && !answered.contains(&x.id)).cloned().collect();
+            let mut asks: Vec<_> = self.book.open("school_enrolment").filter(|x| addressed_to(x).iter().any(|x| x == &me) && !answered.contains(x.id.as_str())).cloned().collect();
             asks.sort_by(|a, b| filed_before(&a.id, &b.id));
             for r in asks {
-                self.settled.insert(r.id.clone());
+                self.settled.insert(r.id.to_string());
                 self.routines.did(ENROL, t, 1, &[]);
-                let Some(who) = r.speaks_for.clone() else { continue };
-                if placed.contains_key(&who) {
+                let Some(who) = r.speaks_for else { continue };
+                if placed.contains_key(who.as_str()) {
                     continue; // (already has a place)
                 }
                 let born = data(&r).i("born_at");
@@ -294,7 +294,7 @@ impl Plan for School {
                 } else {
                     (format!("An enrolment for someone not of school age ({age}): declined."), "school_decline", "No place: not of school age.".to_string(), json!({}))
                 };
-                steps.push(because(why, vec![say(kind, &words, Say { to: Some(vec![who.clone()]), visible: Some(Visible::Only(vec![who, me.clone()])), basis: Some(r.id.clone()), data: Some(d), ..Default::default() })]));
+                steps.push(because(why, vec![say(kind, &words, Say { to: Some(vec![who.to_string()]), visible: Some(Visible::Only(vec![who.to_string(), me.clone()])), basis: Some(r.id.to_string()), data: Some(d), ..Default::default() })]));
             }
         }
 
@@ -368,7 +368,7 @@ impl Plan for School {
             steps.extend(self.routines.report::<Then>(&self.book, cx, &o));
         }
         self.telling = false;
-        let _ = as_text;
+        let _ = as_text::<oikos_core::Frozen>;
         steps
     }
 

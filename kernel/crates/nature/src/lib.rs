@@ -24,7 +24,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use oikos_contracts::config::{Catalogue, FlowCfg, SpeciesCfg, COVER_BUILT, COVER_OPEN};
 use oikos_core::rng::{Randomness, Rng};
 
-type Id = String;
+use oikos_core::Id;
 
 const DAYS_A_YEAR: i64 = 365;
 const BPS: i64 = 10_000;
@@ -66,7 +66,7 @@ impl Ground {
     pub fn new(cells: &[(Id, i64, i64)], flows: &[FlowCfg]) -> Self {
         let mut sorted: Vec<(Id, i64, i64)> = cells.to_vec();
         sorted.sort();
-        let index: BTreeMap<Id, usize> = sorted.iter().enumerate().map(|(i, c)| (c.0.clone(), i)).collect();
+        let index: BTreeMap<Id, usize> = sorted.iter().enumerate().map(|(i, c)| (c.0, i)).collect();
         let at: BTreeMap<(i64, i64), usize> = sorted.iter().enumerate().map(|(i, c)| ((c.1, c.2), i)).collect();
         let neighbours = sorted
             .iter()
@@ -98,24 +98,40 @@ pub struct Land {
     pub anchored: Vec<Vec<Id>>,
 }
 
+/// A field's or a species' cells (sparse), as a persistent map: a copy of nature's state for an act shares them, and an
+/// act that changes a cell copies only the path to it, never the whole field (memory per person: no whole-world copies
+/// during a step). Iterates and serialises in key order, as a `BTreeMap` does.
+pub type Cells = imbl::OrdMap<Id, i64>;
+
 /// Nature's state: sparse (a field's cells at its baseline, and cells with none of a species, aren't kept).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NatureState {
     /// field -> cell -> value.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub fields: BTreeMap<Id, BTreeMap<Id, i64>>,
+    pub fields: BTreeMap<Id, Cells>,
     /// species -> cell -> count (> 0).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub populations: BTreeMap<Id, BTreeMap<Id, i64>>,
+    pub populations: BTreeMap<Id, Cells>,
     /// species -> the day it went extinct. Permanent.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extinct: BTreeMap<Id, i64>,
     /// Unbuilt cells whose cover succeeds: the cover, and the day it became that.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub since: BTreeMap<Id, (Id, i64)>,
+    #[serde(default, skip_serializing_if = "imbl::OrdMap::is_empty")]
+    pub since: imbl::OrdMap<Id, (Id, i64)>,
     /// The last day stepped.
     #[serde(default)]
     pub day: i64,
+    /// Nature's edge (law 8), for each field that holds a kind: what nature's own days have taken from the field, less
+    /// what they added (rain and inflow, decay, flow off the ground, a bound reached), since the run began. So the kind's
+    /// total over holdings, fields, edges and this changes only by what processes make and use (kernel/tests/conservation.rs).
+    /// A spin-up before the run is the world's starting state, not counted.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "oikos_core::money::amount_map")]
+    pub edge: BTreeMap<Id, oikos_core::money::Money>,
+}
+
+/// A field's total over the cells (dense), exactly.
+fn total(v: &[i64]) -> i128 {
+    v.iter().map(|x| *x as i128).sum()
 }
 
 /// What a day changed that the world must know: covers that succeeded (the cell's terrain becomes the new cover), and
@@ -136,7 +152,7 @@ fn sround(num: i64, den: i64, rng: &mut Rng) -> i64 {
     q + i64::from(r > 0 && (rng.below(den as u64) as i64) < r)
 }
 
-fn dense(sparse: Option<&BTreeMap<Id, i64>>, ground: &Ground, default: i64) -> Vec<i64> {
+fn dense(sparse: Option<&Cells>, ground: &Ground, default: i64) -> Vec<i64> {
     let mut v = vec![default; ground.cells.len()];
     if let Some(m) = sparse {
         for (c, x) in m {
@@ -148,8 +164,8 @@ fn dense(sparse: Option<&BTreeMap<Id, i64>>, ground: &Ground, default: i64) -> V
     v
 }
 
-fn sparse(v: &[i64], ground: &Ground, default: i64) -> BTreeMap<Id, i64> {
-    v.iter().enumerate().filter(|(_, x)| **x != default).map(|(i, x)| (ground.cells[i].clone(), *x)).collect()
+fn sparse(v: &[i64], ground: &Ground, default: i64) -> Cells {
+    v.iter().enumerate().filter(|(_, x)| **x != default).map(|(i, x)| (ground.cells[i], *x)).collect()
 }
 
 /// Step a day: covers, then fields, then populations (which read the day's fields).
@@ -159,12 +175,17 @@ pub fn step_day(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureSt
     succession(cat, ground, land, st, day, &mut out);
     let mut values: BTreeMap<Id, Vec<i64>> = BTreeMap::new();
     for f in &cat.fields {
+        // (A field that holds a kind: what its day changed is nature's, counted on its edge.)
+        let before = f.kind.as_ref().map(|_| total(&dense(st.fields.get(&f.id), ground, f.baseline)));
         let v = step_field(f, ground, land, st.fields.get(&f.id), day);
-        st.fields.insert(f.id.clone(), sparse(&v, ground, f.baseline));
+        if let Some(b) = before {
+            *st.edge.entry(f.id).or_insert(0) -= total(&v) - b;
+        }
+        st.fields.insert(f.id, sparse(&v, ground, f.baseline));
         if st.fields.get(&f.id).is_some_and(|m| m.is_empty()) {
             st.fields.remove(&f.id);
         }
-        values.insert(f.id.clone(), v);
+        values.insert(f.id, v);
     }
     for sp in &cat.species {
         if st.extinct.contains_key(&sp.id) {
@@ -178,11 +199,11 @@ pub fn step_day(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureSt
             st.populations.remove(&sp.id);
             // (A species present at the start, or since, and now gone everywhere.)
             if n.iter().any(|x| *x > 0) {
-                st.extinct.insert(sp.id.clone(), day);
-                out.extinct.push(sp.id.clone());
+                st.extinct.insert(sp.id, day);
+                out.extinct.push(sp.id);
             }
         } else {
-            st.populations.insert(sp.id.clone(), left);
+            st.populations.insert(sp.id, left);
         }
     }
     out
@@ -193,25 +214,28 @@ fn succession(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureStat
         cat.land_covers.iter().filter_map(|c| c.succeeds_to.as_ref().map(|s| (c.id.as_str(), (s.cover.as_str(), s.after_days)))).collect();
     // A cell whose cover doesn't succeed (or that's built on) keeps no day: those are taken out by going through the
     // days kept (few), not by looking every cell up among them.
-    st.since.retain(|cell, _| ground.index.get(cell).is_none_or(|&i| !land.built[i] && next.contains_key(land.cover[i].as_str())));
+    let gone: Vec<Id> = st.since.keys().filter(|cell| !ground.index.get(*cell).is_none_or(|&i| !land.built[i] && next.contains_key(land.cover[i].as_str()))).cloned().collect();
+    for cell in gone {
+        st.since.remove(&cell);
+    }
     for (i, cell) in ground.cells.iter().enumerate() {
         let cover = &land.cover[i];
         let Some(&(to, after)) = next.get(cover.as_str()).filter(|_| !land.built[i]) else { continue };
         match st.since.get(cell) {
             Some((c, from)) if c == cover => {
                 if day - from >= after {
-                    out.cover_changes.push((cell.clone(), to.to_string()));
-                    st.since.insert(cell.clone(), (to.to_string(), day));
+                    out.cover_changes.push((*cell, to.to_string().into()));
+                    st.since.insert(*cell, (to.to_string().into(), day));
                 }
             }
             _ => {
-                st.since.insert(cell.clone(), (cover.clone(), day));
+                st.since.insert(*cell, (*cover, day));
             }
         }
     }
 }
 
-fn step_field(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land: &Land, now: Option<&BTreeMap<Id, i64>>, day: i64) -> Vec<i64> {
+fn step_field(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land: &Land, now: Option<&Cells>, day: i64) -> Vec<i64> {
     step_field_dense(f, ground, land, dense(now, ground, f.baseline), day)
 }
 
@@ -417,7 +441,7 @@ struct Capacity {
 fn capacity(sp: &SpeciesCfg, ground: &Ground, land: &Land) -> Capacity {
     let cap: Vec<i64> = land.cover.iter().map(|c| sp.capacity_per_1000_cells.get(c).copied().unwrap_or(0)).collect();
     let room = home_range_sums(ground, &cap, sp.home_range);
-    let barriers: BTreeSet<&str> = sp.barriers.iter().map(String::as_str).collect();
+    let barriers: BTreeSet<&str> = sp.barriers.iter().map(Id::as_str).collect();
     let barrier = land.cover.iter().map(|c| barriers.contains(c.as_str())).collect();
     Capacity { cap, room, barrier }
 }
@@ -644,18 +668,18 @@ pub fn spin_up(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureSta
             let had_any = !pops[k].living.is_empty();
             pops[k].day(sp, ground, &caps[k], &values, &mut rng);
             if pops[k].living.is_empty() && had_any {
-                st.extinct.insert(sp.id.clone(), day);
-                gone.push(sp.id.clone());
+                st.extinct.insert(sp.id, day);
+                gone.push(sp.id);
             }
         }
     }
     for (f, v) in cat.fields.iter().zip(&fields) {
         let m = sparse(v, ground, f.baseline);
-        if m.is_empty() { st.fields.remove(&f.id); } else { st.fields.insert(f.id.clone(), m); }
+        if m.is_empty() { st.fields.remove(&f.id); } else { st.fields.insert(f.id, m); }
     }
     for (sp, v) in cat.species.iter().zip(&pops) {
         let m = sparse(&v.dense, ground, 0);
-        if m.is_empty() { st.populations.remove(&sp.id); } else { st.populations.insert(sp.id.clone(), m); }
+        if m.is_empty() { st.populations.remove(&sp.id); } else { st.populations.insert(sp.id, m); }
     }
     gone
 }
@@ -686,10 +710,10 @@ pub fn census(cat: &Catalogue, st: &NatureState, land: &Land) -> Census {
     let mut c = Census::default();
     for sp in &cat.species {
         let m = st.populations.get(&sp.id);
-        c.species.insert(sp.id.clone(), (m.map_or(0, |m| m.values().sum()), m.map_or(0, |m| m.len() as i64)));
+        c.species.insert(sp.id, (m.map_or(0, |m| m.values().sum()), m.map_or(0, |m| m.len() as i64)));
     }
     for cover in &land.cover {
-        *c.covers.entry(cover.clone()).or_insert(0) += 1;
+        *c.covers.entry(*cover).or_insert(0) += 1;
     }
     c
 }
@@ -697,8 +721,8 @@ pub fn census(cat: &Catalogue, st: &NatureState, land: &Land) -> Census {
 /// A cell's cover: its building's (the type's cover, else `built`), or unbuilt, its terrain, else the world's default.
 pub fn cover_of(cat: &Catalogue, terrain: Option<&str>, building_cover: Option<Option<&str>>) -> Id {
     match building_cover {
-        Some(c) => c.unwrap_or(COVER_BUILT).to_string(),
-        None => terrain.or(cat.default_cover.as_deref()).unwrap_or(COVER_OPEN).to_string(),
+        Some(c) => c.unwrap_or(COVER_BUILT).to_string().into(),
+        None => (terrain.or(cat.default_cover.as_deref()).unwrap_or(COVER_OPEN).to_string()).into(),
     }
 }
 

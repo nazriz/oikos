@@ -430,20 +430,32 @@ impl Attractions {
         if options.is_empty() {
             return (String::new(), vec![]);
         }
+        let weights: Vec<i64> = self.exponents(options, openness_bps).iter().map(|x| math::round(math::exp(*x) * 1_000_000.0)).collect();
+        let i = pick(rng, &weights);
+        (options[i].0.clone(), weights)
+    }
+
+    /// The logit's exponents `choose` draws on, each lam * (score - the largest score): the largest is 0. (The citizen
+    /// model's odds are blended with these: mind/model.rs `blend`.)
+    pub fn exponents(&self, options: &[(String, i64)], openness_bps: i64) -> Vec<f64> {
         let lam = self.e.lambda_milli as f64 / 1000.0 * (1.0 - openness_bps as f64 / 20_000.0);
         let scores: Vec<f64> = options.iter().map(|(k, v)| (self.get_f(k) + *v as f64) / 10_000.0).collect();
         let max = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        let weights: Vec<i64> = scores.iter().map(|s| math::round(math::exp(lam * (s - max)) * 1_000_000.0)).collect();
-        let total: i64 = weights.iter().sum();
-        let mut r = rng.below(total.max(1) as u64) as i64;
-        for (i, w) in weights.iter().enumerate() {
-            r -= w;
-            if r < 0 {
-                return (options[i].0.clone(), weights);
-            }
-        }
-        (options[options.len() - 1].0.clone(), weights)
+        scores.iter().map(|s| lam * (s - max)).collect()
     }
+}
+
+/// Which of the weights a draw falls on (one value of the stream: `below` their total), the last if none.
+pub fn pick(rng: &mut Rng, weights: &[i64]) -> usize {
+    let total: i64 = weights.iter().sum();
+    let mut r = rng.below(total.max(1) as u64) as i64;
+    for (i, w) in weights.iter().enumerate() {
+        r -= w;
+        if r < 0 {
+            return i;
+        }
+    }
+    weights.len().saturating_sub(1)
 }
 
 // ---------------------------------------------------------------- how to decide (CONSUMAT)
@@ -572,17 +584,17 @@ pub fn value(p: &Person, a: &Appraisal) -> i64 {
 }
 
 /// A number TS read with `Number(x)` (a string or a number); what is no integer counts as 0 (TS's NaN; decided).
-fn number(v: &serde_json::Value) -> i64 {
-    match v {
-        serde_json::Value::Number(n) => n.as_i64().unwrap_or_else(|| n.as_f64().map_or(0, math::round)),
-        serde_json::Value::String(s) => s.trim().parse::<i64>().unwrap_or(0),
+fn number<V: oikos_core::frozen::JsonRead + ?Sized>(v: &V) -> i64 {
+    match oikos_core::frozen::JsonRead::view(v) {
+        oikos_core::frozen::JsonRef::Number(n) => n.as_i64().unwrap_or_else(|| n.as_f64().map_or(0, math::round)),
+        oikos_core::frozen::JsonRef::String(s) => s.trim().parse::<i64>().unwrap_or(0),
         _ => 0,
     }
 }
 
 /// An offer's facts, from its typed terms (contracts: Offer): money a month in and out for the taker, a home, work
 /// hours, goods. Terms in words count for nothing here. `units`: how many, where a commitment is per unit (TS's 1).
-pub fn facts_of(offer: &serde_json::Value, units: i64) -> Facts {
+pub fn facts_of(offer: &oikos_core::Frozen, units: i64) -> Facts {
     const MONTH: i128 = 30 * 86_400;
     let mut f = Facts::default();
     let Some(cs) = offer.pointer("/terms/commitments").and_then(|c| c.as_array()) else { return f };
@@ -1161,19 +1173,19 @@ mod tests {
             { "who": "taker", "does": { "outcome": { "occupancy": { "in": "shop-3-premises/workplace.1" } } } },
         ] } });
         // Math.round(211356 * 2592000 / 1209600) = Math.round(452905.714...) = 452906.
-        assert_eq!(facts_of(&job, 1), Facts { money_per_month: 452_906, work_hours_per_month: Some(160), ..Default::default() });
+        assert_eq!(facts_of(&oikos_core::Frozen::of(&job), 1), Facts { money_per_month: 452_906, work_hours_per_month: Some(160), ..Default::default() });
         let lease = serde_json::json!({ "terms": { "commitments": [
             { "who": "landlord-1", "does": { "outcome": { "occupancy": { "in": "apts-1/dwelling.1" } } } },
             { "who": "taker", "does": { "outcome": { "money": { "to": "acc-landlord-1", "amount": "180000" } } }, "every": 2_592_000 },
         ] } });
-        assert_eq!(facts_of(&lease, 1), Facts { money_per_month: -180_000, home: Some(HomeFacts::default()), ..Default::default() });
+        assert_eq!(facts_of(&oikos_core::Frozen::of(&lease), 1), Facts { money_per_month: -180_000, home: Some(HomeFacts::default()), ..Default::default() });
         let goods = serde_json::json!({ "terms": { "commitments": [
             { "who": "taker", "does": { "outcome": { "money": { "to": "acc-shop-1", "amount": "13000" } } }, "per": "unit" },
             { "who": "shop-1", "does": { "outcome": { "goods": { "kind": "goods", "quantity": "1" } } }, "per": "unit" },
         ] } });
-        assert_eq!(facts_of(&goods, 5), Facts { money_per_month: -65_000, goods_per_month: Some(5), ..Default::default() });
+        assert_eq!(facts_of(&oikos_core::Frozen::of(&goods), 5), Facts { money_per_month: -65_000, goods_per_month: Some(5), ..Default::default() });
         let words = serde_json::json!({ "terms": { "commitments": [{ "who": "church", "does": { "text": "Counts the taker among its members." } }] } });
-        assert_eq!(facts_of(&words, 1), Facts::default());
+        assert_eq!(facts_of(&oikos_core::Frozen::of(&words), 1), Facts::default());
     }
 
     #[test]

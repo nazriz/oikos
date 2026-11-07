@@ -648,6 +648,15 @@
       },
       "source": "Lengnick 2013, Table 1: sellers a household deals with (7): how many it looks up, knowing none"
     },
+    "start_loan_months": {
+      "default": 0,
+      "schema": {
+        "description": "the term a person asks their bank to lend over to start a business of one: the bank's longest (0: nobody borrows to start one; risk ME-1)",
+        "type": "integer"
+      },
+      "source": "the world gives it: the generator, from the lender's longest term (credit.max_months)",
+      "unit": "months"
+    },
     "started": {
       "default": null,
       "schema": {},
@@ -792,6 +801,14 @@
       },
       "source": "placeholder"
     },
+    "venture_prior_months": {
+      "default": 3,
+      "schema": {
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "months"
+    },
     "ventures": {
       "default": [],
       "schema": {
@@ -835,5 +852,5 @@
   },
   "perceives": [],
   "state": "none",
-  "version": "0.60.0"
+  "version": "0.61.0"
 }

@@ -602,7 +602,7 @@ No schema changes: the kernel and the JSON Schemas are as they were. What change
 
 - **Breaking, statements (a kind renamed):** **`remedy_request` is now `review_request`**: the one request every grievance has (put this right, look at this again), whether it is about a bill, a repair, a short pay or a decision of an office. `remedy_answer` is unchanged. Logs made before this change hold `remedy_request`; they replay on a build of their version, and a measure query that reads the kind reads the new one (`measure/queries/town/frictions.sql`).
 - **Additive, statements:** `decision_review` (an office's record that it looked at one of its decisions again: `decision`, `kind`, `request`, `outcome` `changed` / `upheld` / `out_of_time`, `found`, `asked_by`, `decided_on`; who and when are the record's own author and time); `evidence_request` (an office to a claimant: `claim`, `need`, `what`, `by`) and `evidence` (the claimant's papers: `claim`, `need`, `request`); `confirmation_request` (an office to an employer: `claim`, `need`, `what`, `by`, `about` the worker) and `confirmation_answer` (`claim`, `need`, `request`, `subject`, `employed`, `known`, `ended_on`). A `benefit_decision` made on a second look carries `on_review` (the request) and `replaces` (the refusal); a `permit_decision` on a second look the same. A `remedy_answer` to a review carries `review` (the outcome) and `decision`.
-- **Additive, laws:** a `law` statement may carry **`data.decisions`**: a list of rules, each for a kind of decision (and, where it differs by payment, for named `payments`): `needs` (`id`, `from` `claimant` or `employer`, `what`, `within_days`, `else` `refuse` or `decide`), `review` (`within_days`, `grounds`, `required`, and since 2026-10-24 `deemed_refused_days`: a review asked for and not answered within so many days is taken as refused and the appeal runs from then, where the law says so; MT-21), `appeal` (`matter`, `within_days`, `grounds`, `fee` in the smallest unit), `refused_by` (`office-holder` or `staff`). The generator writes it as `law-decisions` from each profile's `values.decisions` (with sources). A procedure `proc-payments` carries **`data.approval`** (`by`: the post whose written approval a payment over `over` needs; `over` in cents); the law on possession's `data.enforced_by` (already there) is what the citizen reads for who carries out a removal. Participant parameters gone: `city.finance_officer`'s `approval_over` and `mayor_position`.
+- **Additive, laws:** a `law` statement may carry **`data.decisions`**: a list of rules, each for a kind of decision (and, where it differs by payment, for named `payments`): `needs` (`id`, `from` `claimant` or `employer`, `what`, `within_days`, `else` `refuse` or `decide`), `review` (`within_days`, `grounds`, `required`, and since 2026-10-24 `deemed_refused_days`: a review asked for and not answered within so many days is taken as refused and the appeal runs from then, where the law says so; MT-21; and since 2026-10-31 `complaint_after_days`, **proposed, for sign-off**: where the law has no deemed refusal, a review not answered within so many days may be complained of to a body that hears the matter and only recommends; no appeal follows), `appeal` (`matter`, `within_days`, `grounds`, `fee` in the smallest unit), `refused_by` (`office-holder` or `staff`). The generator writes it as `law-decisions` from each profile's `values.decisions` (with sources). A procedure `proc-payments` carries **`data.approval`** (`by`: the post whose written approval a payment over `over` needs; `over` in cents); the law on possession's `data.enforced_by` (already there) is what the citizen reads for who carries out a removal. Participant parameters gone: `city.finance_officer`'s `approval_over` and `mayor_position`.
 - **Additive, participant parameters (not contracts):** a body's `hears` entry may carry `fee` (what applying about that matter costs, where it differs from the body's): `office.desk` and `tribunal.member` publish one notice of what they hear for each fee.
 - **Breaking, replay:** the state hashes of every generated town move (the support office asks for papers before it decides; reviews are decisions; the appeal fee for a refused claim is the law's). Logs made before this change replay only on a build of their version.
 
@@ -692,3 +692,111 @@ Additive only; no schema file changed. A log made before is a valid log.
 - **Host protocol and napi `resolve`** (2026-10-25, names rule (b); blanket approval): an optional `names` ({id: name}),
   the names the seat's reports printed beside ids; the engine's resolver knows the seat's people and bodies by them
   where the world has names. Absent, nothing changes.
+
+## Foundations-2, phase 1: capacity for every doer, systems included (2026-10-25; law 10, steps P1, P2, P3, P5; docs/decisions.md, "Foundations-2 phase 1"; under the owner's blanket approval of contract changes, 2026-10-11, and his approval of the foundations-2 design)
+
+- **World config, templates (additive):** a `does` row's `seconds` is now allowed for **any** block, not only `work`: for a
+  block other than `work` it is the seconds one such act takes a system from the template, read before the world's
+  `act_time.system` row (the row naming a kind before the block's own). `work`'s keeps its meaning (seconds a unit, the
+  slowest of a crew of systems). At most a year. A template gains an optional **`hours`** `{ from, seconds }` (from
+  0 to 86,399 s after midnight, 1 to 86,400 s long): a system's lanes work only inside that daily window, and an act not
+  finished by its end goes on in the next day's (a queue, never a refusal). Every day is a working day (a known limit).
+  Never on a person's template. A template row's source is written beside the table's, in `act_time.sources`, keyed
+  `template.<id>.<row>` (and `template.<id>.hours`, `template.<id>.lanes`): the schema's `sources` is free-form.
+- **Breaking, kernel (no implicit second):** `act_time` has no fallback. An act whose rows (the performer's template's,
+  the world's table for their kind) and the world's stated `default` are all absent is **refused `unpriced`** when due,
+  with a reason naming what nobody priced and for whom; it takes nobody's time (`action_started` with `starts = done`).
+  A dry run (`check`) says the same. `contracts/log.schema.json` gains the code. `oikos_time::DEFAULT_ACT_SECONDS` is
+  gone; the second it takes to order an act that others do is `ORDER_SECONDS`, a convention of the platform. Hand-written
+  worlds (`contracts/examples/*/world-config`, the kernel tests' worlds) now state `act_time.default: 1` with a note in
+  `act_time.sources.default` that it is a placeholder for a test world. The generated town states no default.
+- **Behaviour change, kernel:** someone who only orders an act (`by` names others, not them) gives the order when they are
+  free and goes on: their lane holds `ORDER_SECONDS` from then, not from when the work begins (until now it was held to the
+  act's start, so a case system that asked a desk of officers to decide could do nothing else until they had).
+- **Host (the engine's own code units, not a schema):** a code unit's `done_by=<id>` on a call is given to the act as
+  `by` and taken off the call, as the TypeScript host always did (run.ts `performersOf`); until now the engine left it on
+  and the resolver refused the call, so an office's system never did its papers in the engine.
+- **Generator:** the support office's casework (`publish/benefit_decision`, `evidence_request`, `confirmation_request`,
+  `decision_review`) is done `by` a desk, `outside-casework`, from the template `agency-casework` (an officer's minutes for
+  each, the person table's rows; the officers' hours; lanes the town's share of the agency's officers); every machine's
+  template says its hours (the whole day); an office offer's seconds for its papers are its template's rows, not rows of
+  the world's table for every system.
+- **Breaking, replay:** the state hashes of every generated town move. Logs made before this change replay only on a
+  build of their version: the tag `pre-foundations-2`.
+
+## Foundations-2, phase 2: nothing physical from nothing (2026-10-26; law 8, steps C2, C3, C3b; docs/decisions.md, "Foundations-2 phase 2"; under the owner's blanket approval of contract changes, 2026-10-11, and his approval of the foundations-2 design)
+
+- **World config: `catalogue.resources[].class`** (`stock`, the default; `dissipates`: energy, fuel; `service`: a unit of a service sold over a counter), **`settle`** (`day`, `hour`: how a connection carrying it is settled) and **`shape_bps`** (24 hourly shares of a day's rate). Reason: law 8 conserves every physical kind and must know which may be used up into nothing.
+- **World config: `catalogue.fields[].kind`.** The field holds that kind, in its unit, from nought (baseline 0, min at least 0; refused at load otherwise, and for a kind undeclared or held by two fields). A `draws` from it goes into the actor's holding; an `emits` to it is the process's output, refused beyond the field's most; nature's day is counted on `nature.edge` (state).
+- **World config: `world.network`** (nodes, links, supplies with their physics: `pressure`, `rating`, `drain`) and **`world.connections`** (a holder's at a structure on a node, a kind, a rate a day, `uses`, `meter`). Refused at load as listed in docs/decisions.md. No allocation rule: who goes short follows from the physics, the contracts in force and the operators' acts.
+- **Blocks: `connection`** (`op`: open, set, close, interrupt, restore) and **`link`** (`op`: shut, open, reclose, rotate with `every`, `from`, `off`). The kernel's ids gain the prefix `conn` (a connection opened by an act). Calls: `connection(...)`, `link(...)` (calls.md), code's own for now (`CODE_ONLY` in the engine's resolver): a seat's vocabulary gains them when the translator is taught them.
+- **Log: `connection_changed`, `link_changed`** (a link's tripping is `link_changed` with op `tripped`, its load and its rating, and no `by`). Settlements are not logged: meters are state.
+- **Observation: a holdings channel's `connections` and `links`**: a holder's own connections with their meters; an operator's whole network (its register and instruments), with the meters it reads from afar. **A visit's buildings show their on-site `meters`.**
+- **Task `collects`** (`{kind, per_unit}`): a unit takes up to so much of a kind held at the structure worked on, never more than is there (C4: the works' round). **Variables' `per_occupant_per_day` is refused at load** (`stock_as_variable`), as is a variable with a kind's name (C4).
+- **World config: `world.scarce`** (`edge`, `kind`, `quantity`, `every`): a scarce kind at an edge; a `move_goods` from the edge's outside beyond it is refused **`beyond_supply`** (C6).
+
+## Working calendars (2026-10-31; plan gap "Systems keep the same hours every day"; docs/decisions.md, "Working calendars"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- **World config: a template's `hours.closed`** (`weekdays`: days of the world's week, day d of the run being the week's
+  day d mod 7, at least one left open; `days`: days of the run, holidays, from 0): the days its window does not open.
+  Work not done by a window's end goes on at the next open day's opening. Refused at load if every day of the week is
+  closed. Absent: every day is a working day, as before.
+- **Generator:** the support agency's casework desk (`agency-casework`) works the place's working week, closed on its
+  days of rest and its public holidays (the profile's `calendar.weekend` and `calendar.holidays`), so an officer's day is
+  a working day's and not a seventh of the week spread over seven.
+- **Breaking, replay:** the state hashes of every generated town with a support office move.
+## Delegation: assistants as services (2026-10-31; docs/design/delegation.md; docs/decisions.md, "Delegation D1 to D3"; under the owner's blanket approval of contract changes, 2026-10-11, and his approval of the delegation capabilities, 2026-10-31)
+
+Additive; no hard rule touched; nothing changes for a world that has no providers.
+
+- **The call language's `agreement` takes `attrs`** (`contracts/calls.schema.json`, `calls.md`): the terms' opaque
+  attributes, as JSON, which `AgreementTerms.attrs` already allowed; a service agreement states its records term there.
+- **New paper kinds** (world vocabulary, typed in `kernel/crates/actors/src/papers/delegation.rs`): `service_offer`
+  (published where a world declares it), `service_delivery`, `service_ended`, `remit`, `referral`, `brief`, `advice`,
+  `draft`, `sign_off`, `declined`, `approval_request`, `go_ahead`, `report`, `scope_request`, `handover`.
+- **The engine and host take `at_fork`** (`kernel/src/engine.rs` `AtFork`; host and stdio options beside `withhold`): acts
+  carried out at a fork's moment in a named participant's name and post, each noted (`note`, data `intervened`). A
+  researcher's intervention, as `withhold` is; nothing in the world is told of it.
+- No block was added: `set_channels`, in the design's first draft, is not built (decisions, "Delegation D1 to D3").
+
+## Skills by use (2026-10-31; docs/design/foundations-2.md 7.4, step E4; docs/behaviour/skills.md; docs/decisions.md, "Skills by use"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing changes for a world that names no practised skill.
+
+- **A body variable takes `practice`** (`gain_bps_per_hour`, `half_life_days`, `floor`): a skill that grows with use and
+  fades toward its floor without it, settled when read or used. Not with `per_day`.
+- **A task takes `skill`** (`variable`, `novice_bps`, `expert_bps`): its labour scales with the performers' mean of a
+  practised variable (the stated labour at its `initial`), and their time is practice.
+- **The catalogue takes `act_skills`** (`act`, keyed as the table of work is; `variable`, `novice_bps`, `expert_bps`):
+  a person's time for such an act scales the same way, and doing it is practice.
+
+## Technologies released during a run (2026-11-01; docs/design/foundations-2.md 7.2, step E2; docs/scenarios.md, "capability"; docs/decisions.md, "The outside's capability over time"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing changes for a world whose templates state no release.
+
+- **A template takes `released`** (seconds from the start): the kind first exists then; `deploy` before it is refused
+  (`unknown_template`). Absent: from the start.
+- **`meta` takes `study_tags`** (tag to template ids): what a study counts as one technology, for measurement only. No
+  code of the world reads it (`orchestrator/test/generality.test.ts`), and no participant is shown `meta`.
+
+## What a system runs on (2026-11-01; docs/design/foundations-2.md 4.1, P4, and 7.3, step E5; docs/behaviour/hosting.md; docs/decisions.md, "Compute in the town"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing changes for a world whose templates say nothing of what they run on.
+
+- **A template takes `runs_on`** (`hardware`, `per_lane`, `holder`, `at`, `hour`): a system from it is delivered only
+  where the hardware held covers its lanes beside those already there, and each whole hour of its work is the task
+  `hour` at its host (inputs from the holder's holding, refused if short: `insufficient_quantity`).
+
+## Tools: technologies that are goods (2026-11-01; docs/design/foundations-2.md 7.2, step E2; docs/behaviour/automation.md, "Tools"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing changes for a world whose tasks name no tool.
+
+- **A task takes `tool`** (`kind`, `per_performer`, `labour_bps`): with that many of the kind held by the actor where the
+  work is done, for each person doing it, the work takes `labour_bps` of its time; the tool is not used up.
+
+## A census of practised skills (2026-11-01; docs/behaviour/skills.md, "the census"; foundations-2 M8; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive; no hard rule touched; nothing is written for a world with no practised skill.
+
+- **The log takes `skill_census`** (monthly, where a world has practised skills): for each skill, how many living people
+  stand in each tenth of its range. For measurement only.

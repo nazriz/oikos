@@ -365,6 +365,14 @@
       },
       "source": "placeholder"
     },
+    "in_charge_role": {
+      "default": "officer in charge",
+      "schema": {
+        "description": "the station head's role in their agreement: a sworn officer, who takes the station's work after its officers",
+        "type": "string"
+      },
+      "source": "placeholder"
+    },
     "industry": {
       "default": "public_safety",
       "schema": {
@@ -500,5 +508,5 @@
     }
   ],
   "state": "none",
-  "version": "0.6.0"
+  "version": "0.7.0"
 }

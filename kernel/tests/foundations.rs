@@ -4,13 +4,13 @@
 //! are `#[ignore = "F<n>: ..."]`: written against the INTENDED interface (the plan's section 2: `by` on any act, a
 //! work table keyed by record kind, a template's `does` and `supplier`, `deploy.to`), never red in the suite, and
 //! switched on by the step that builds the thing (remove the `ignore`, adjust the names the step settles on).
-//! `cargo test --test foundations -- --ignored` runs the pending ones, which must all fail today (F0 checked this).
+//! `cargo test --test main foundations:: -- --ignored` runs the pending ones, which must all fail today (F0 checked this).
 //!
 //! Law 6 (who may do what is data) and law 7 (information with its keeper) are kept already and have their own tests:
 //! `statements_have_no_power.rs`, `knowing.rs` and `orchestrator/test/no-god-view.test.ts`. Law 1's money and goods are
-//! `money_conservation.rs` and `goods.rs`; what is added here is time.
+//! `money_conservation.rs` and `conservation.rs`; what is added here is time.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::EventBody;
@@ -23,7 +23,7 @@ type R = Run<Vec<u8>>;
 fn cmd(participant: &str, position: Option<&str>, blocks: Value) -> Command {
     Command::Act {
         participant: participant.into(),
-        position: position.map(String::from),
+        position: position.map(String::from).map(Into::into),
         blocks: serde_json::from_value(blocks).expect("the blocks parse"),
         by: vec![],
         provenance: json!({"via": "direct"}),
@@ -40,9 +40,12 @@ fn town() -> R {
     start(world(&default_params()))
 }
 
-/// The town with the world's table of act times set (`orchestration.act_time`).
+/// The town with the world's table of act times set (`orchestration.act_time`), over the test world's stated default
+/// (every act it does not name a second: foundations-2 P2).
 fn town_with_times(table: Value) -> R {
     let mut c = world(&default_params());
+    let mut table = table;
+    table["default"] = json!(1);
     c["orchestration"]["act_time"] = table;
     start(c)
 }
@@ -78,7 +81,7 @@ fn make(units: u64, performers: &[&str]) -> Command {
 /// A command naming who does the work (`by`, on the action).
 fn cmd_by(participant: &str, position: Option<&str>, blocks: Value, by: &[&str]) -> Command {
     match cmd(participant, position, blocks) {
-        Command::Act { participant, position, blocks, provenance, reasoning, thinking, .. } => Command::Act { participant, position, blocks, by: by.iter().map(|s| s.to_string()).collect(), provenance, reasoning, thinking },
+        Command::Act { participant, position, blocks, provenance, reasoning, thinking, .. } => Command::Act { participant, position, blocks, by: by.iter().map(|s| s.to_string()).map(Into::into).collect(), provenance, reasoning, thinking, },
         c => c,
     }
 }
@@ -89,7 +92,7 @@ fn employ(run: &mut R, employer: &str, employer_participant: &str, position: Opt
     let propose = cmd(employer_participant, position, json!([{"block": "propose_agreement", "terms": {"parties": [employer, worker], "commitments": [{"who": employer, "does": {"outcome": {"money": {"to": format!("acc-{worker}"), "amount": "100"}}}, "every": 2_592_000}]}, "speaks_for": employer}]));
     let r = step(run, &propose).expect("accepted");
     let _ = r;
-    let id = run.kernel().state().record_order.iter().rev().find(|id| run.kernel().state().records[*id].record.body.kind_name() == "agreement").cloned().expect("an agreement");
+    let id = run.kernel().state().record_order.iter().rev().find(|id| run.kernel().state().records[*id].record().body.kind_name() == "agreement").cloned().expect("an agreement");
     let sign_worker = cmd(&format!("{worker}-self"), None, json!([{"block": "sign_agreement", "agreement": id, "as": worker}]));
     step(run, &sign_worker).expect("accepted");
     let sign_employer = cmd(employer_participant, position, json!([{"block": "sign_agreement", "agreement": id, "as": employer}]));
@@ -145,7 +148,7 @@ fn law1_a_person_never_does_two_things_at_once_and_each_takes_its_table_time() {
 #[test]
 fn law1_a_system_never_has_more_in_hand_than_it_has_lanes() {
     let mut c = world(&default_params());
-    c["orchestration"]["act_time"] = json!({"system": {"message": 10}});
+    c["orchestration"]["act_time"] = json!({"default": 1, "system": {"message": 10}});
     for p in c["participants"].as_array_mut().unwrap() {
         if p["id"] == "mayor-system" {
             p["lanes"] = json!(2);
@@ -293,7 +296,7 @@ fn law3_a_system_that_lists_the_work_does_it_and_frees_the_people() {
     assert!(run.kernel().state().holding("devco", "s-shop", "goods") > goods, "the system made goods");
     let st = run.kernel().state();
     assert!(st.timelines.get("carol").is_none(), "carol's time was not taken");
-    assert_eq!(st.timelines[&bot].lanes.iter().copied().max(), Some(done));
+    assert_eq!(st.timelines[bot.as_str()].lanes.iter().copied().max(), Some(done));
 }
 
 /// A system has no working day (a person's limit): a long work is not refused for the hours it takes (F4).
@@ -358,7 +361,56 @@ fn law3_only_the_templates_supplier_delivers_a_system() {
     assert_eq!(outcome(&mut run, &own).as_deref(), Some("not_supplier"));
     // The supplier delivers, to the city; the system belongs to the city.
     let bot = deliver(&mut run);
-    assert_eq!(run.kernel().state().participants[&bot].owner.as_deref(), Some("city"));
+    assert_eq!(run.kernel().state().participants[bot.as_str()].owner.as_deref(), Some("city"));
+    // A kind of system released later in the run (foundations-2 E2) is delivered to nobody before it exists.
+    let mut run = with_template(|t| {
+        t["supplier"] = json!("outside");
+        t["released"] = json!(86_400);
+    });
+    let early = cmd("outside-system", Some("outside-trade"), json!([{"block": "deploy", "template": "clerk-bot", "to": "city"}]));
+    assert_eq!(outcome(&mut run, &early).as_deref(), Some("unknown_template"));
+    run.command(&Command::Advance { to: 86_400 }).unwrap();
+    deliver(&mut run);
+}
+
+/// What a system runs on (foundations-2 P4): the clerk-bot needs 400 kg of the developer's materials at the shop a lane
+/// (there are 1,000: room for two), and an hour of its work there is the recipe `eat` (a unit of goods used up). A
+/// message takes it half an hour.
+fn hosted(goods: &str) -> R {
+    let mut c = world(&default_params());
+    for h in c["world"]["holdings"].as_array_mut().unwrap() {
+        if h["holder"] == "devco" && h["kind"] == "goods" {
+            h["quantity"] = json!(goods);
+        }
+    }
+    let t = c["templates"].as_array_mut().unwrap().iter_mut().find(|t| t["id"] == "clerk-bot").unwrap();
+    t["supplier"] = json!("outside");
+    t["does"] = json!([{"block": "message", "seconds": 1800}]);
+    t["runs_on"] = json!({"hardware": "materials", "per_lane": 400, "holder": "devco", "at": "s-shop", "hour": "eat"});
+    start(c)
+}
+
+#[test]
+fn p4_a_system_runs_on_hardware_held_somewhere_and_its_work_draws_there() {
+    let goods = |run: &R| run.kernel().state().holding("devco", "s-shop", "goods");
+    let mut run = hosted("200");
+    let bot = deliver(&mut run);
+    deliver(&mut run);
+    let third = cmd("outside-system", Some("outside-trade"), json!([{"block": "deploy", "template": "clerk-bot", "to": "city"}]));
+    assert_eq!(outcome(&mut run, &third).as_deref(), Some("insufficient_quantity"), "no hardware left for a third");
+    applied(&mut run, &cmd("mayor-system", Some("mayor"), json!([{"block": "appoint", "position": "clerk", "participant": bot}])));
+    let say = cmd(&bot, Some("clerk"), json!([{"block": "message", "to": ["bob-self"], "text": "ok"}]));
+    assert_eq!(outcome(&mut run, &say), None);
+    assert_eq!(goods(&run), 200, "half an hour: nothing drawn yet");
+    assert_eq!(outcome(&mut run, &say), None);
+    assert_eq!(goods(&run), 199, "an hour of its work: the recipe's unit, at its host");
+    // A host with nothing to run it on: the hour's work is refused.
+    let mut run = hosted("0");
+    let bot = deliver(&mut run);
+    applied(&mut run, &cmd("mayor-system", Some("mayor"), json!([{"block": "appoint", "position": "clerk", "participant": bot}])));
+    let say = cmd(&bot, Some("clerk"), json!([{"block": "message", "to": ["bob-self"], "text": "ok"}]));
+    assert_eq!(outcome(&mut run, &say), None);
+    assert_eq!(outcome(&mut run, &say).as_deref(), Some("insufficient_quantity"));
 }
 
 #[test]
@@ -542,7 +594,7 @@ fn law5_presence_is_looked_at_when_the_work_begins() {
 #[test]
 fn law5_an_act_naming_performers_takes_their_time_shared() {
     let mut c = world(&default_params());
-    c["orchestration"]["act_time"] = json!({"person": {"message": 600}, "system": {"message": 1_200}});
+    c["orchestration"]["act_time"] = json!({"default": 1, "person": {"message": 600}, "system": {"message": 1_200}});
     c["orchestration"]["performers_in"] = json!("workplace");
     let mut run = start(c);
     employ(&mut run, "devco", "developer-system", Some("developer"), "carol");
@@ -569,7 +621,7 @@ fn law5_a_record_names_who_made_it_when_not_its_author() {
         let r = step(run, c).unwrap();
         r.events.iter().find_map(|e| match &e.body { EventBody::Recorded { record } => Some(record.by.clone()), _ => None }).expect("a record")
     };
-    assert_eq!(by_of(&mut run, &publish(&["carol"])), Some(vec!["carol".to_string()]));
+    assert_eq!(by_of(&mut run, &publish(&["carol"])), Some(vec!["carol".into()]));
     assert_eq!(by_of(&mut run, &publish(&[])), None, "the author did it: nothing to add");
 }
 
@@ -587,7 +639,7 @@ fn a_person_holding_two_posts_of_one_organisation_is_told_of_a_payment_in_each()
     applied(&mut run, &pay);
     let told = |run: &mut R, post: &str| -> usize {
         let o = run.command(&Command::Observe { participant: "bob-self".into(), only: Some(post.into()) }).unwrap().observation.unwrap();
-        match o.channels.get(&format!("{post}/money")) {
+        match o.channels.get(format!("{post}/money").as_str()) {
             Some(oikos_kernel::observe::ChannelData::Accounts { transactions, .. }) => transactions.len(),
             other => panic!("no accounts channel: {other:?}"),
         }

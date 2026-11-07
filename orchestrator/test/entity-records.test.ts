@@ -1,18 +1,17 @@
 // People's own records (docs/design/ai-citizens.md 10d): one a person, held by the kernel, bounded, chained, rebuilt
 // from the log and checked; never larger however long a run goes; the same for the same seed; set by a code mind's
-// bookkeeping and by nothing a model returns; and exported beside the citizens' decisions, recorded and never scored.
+// bookkeeping (the engine's) and by nothing a seat sends; and exported beside the citizens' decisions, recorded and never scored.
 
 import { expect, test } from "bun:test";
 import Ajv2020 from "ajv/dist/2020";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { RECORD } from "@oikos/participants";
 import { loadWorld } from "../src/batch";
 import { exportDataset } from "../src/dataset";
 import { logLines } from "../src/logs";
 import { digestOf, linkOf, rebuild, recordChanges, Records } from "../src/records";
-import { recordChangeOf, runWorld } from "../src/run";
+import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -159,48 +158,9 @@ test("the same town and seed twice: the same records, change for change; and the
   }
 }, 600_000);
 
-test("only a code mind's bookkeeping sets a record: nothing a model returns, and nothing done in an office", () => {
-  const change = { set: { agency: { now: 10_000, own: 10_000 } } };
-  const carrying = () => Object.defineProperty({ type: "wait" }, RECORD, { value: change, enumerable: false });
-  expect(recordChangeOf({ capacity: "self" }, carrying())).toEqual(change);
-  // A model seat, whatever is behind it (its own answer, a mock's code brain, a stand-in): nothing.
-  expect(recordChangeOf({ llm: { controller: {} }, capacity: "self" }, carrying())).toBeUndefined();
-  expect(recordChangeOf({ llm: {} }, carrying())).toBeUndefined();
-  // Acting in a position: an office has no record of its holder's to write.
-  expect(recordChangeOf({ capacity: "mayor" }, carrying())).toBeUndefined();
-  // What a model can return is JSON: a field named for it sets nothing (the symbol cannot be written in JSON).
-  expect(recordChangeOf({ capacity: "self" }, JSON.parse('{"type":"wait","record":{"set":{"agency":{"now":10000}}},"oikos.record":{"set":{}}}'))).toBeUndefined();
-  expect(recordChangeOf({ capacity: "self" }, { type: "wait" })).toBeUndefined();
-  // And the participant API has no act for it.
-  const api = JSON.parse(readFileSync(join(root, "contracts/participant-api.schema.json"), "utf8"));
-  const types = api.$defs.ParticipantAction.oneOf.map((x: any) => x.properties.type.const).sort();
-  expect(types).toEqual(["act", "call", "look", "message", "opt_out", "propose", "sign", "wait"]);
-});
-
-test("an organisation's record is taken only from the module its keeping post names, held by the one who produced it", () => {
-  const change = { set: { books: { open: 3 } } };
-  const carrying = () => Object.defineProperty({ type: "wait" }, RECORD, { value: change, enumerable: false });
-  const post = (o: object) => ({ id: "finance", entity: "city", channels: [], role_module: { code: "city.finance_officer" }, holder: "finance-system", keeps_record: true, ...o });
-  const positions = (p: any) => new Map<string, any>([["finance", p]]);
-  const unit = (o: object = {}) => ({ capacity: "finance", participant: "finance-system", module: { name: "city.finance_officer" }, ...o });
-  // The keeping post's own module, held by its producer: the change goes to the organisation's record.
-  expect(recordChangeOf(unit(), carrying(), positions(post({})))).toEqual({ ...change, entity: "city" });
-  // A post that does not keep the record (or says nothing of it): dropped.
-  expect(recordChangeOf(unit(), carrying(), positions(post({ keeps_record: false })))).toBeUndefined();
-  expect(recordChangeOf(unit(), carrying(), positions(post({ keeps_record: undefined })))).toBeUndefined();
-  expect(recordChangeOf(unit(), carrying())).toBeUndefined();
-  // Another module than the one the post names; a producer that no longer holds the post: dropped.
-  expect(recordChangeOf(unit({ module: { name: "city.inspector" } }), carrying(), positions(post({})))).toBeUndefined();
-  expect(recordChangeOf(unit(), carrying(), positions(post({ holder: "planning-system" })))).toBeUndefined();
-  // A model seat, whatever is behind it, sets nothing for an organisation either.
-  expect(recordChangeOf(unit({ llm: {} }), carrying(), positions(post({})))).toBeUndefined();
-  // A module acting as itself names no organisation, even if it asks to: its change is its own person's.
-  expect(recordChangeOf({ capacity: "self" }, Object.defineProperty({ type: "wait" }, RECORD, { value: { ...change, entity: "city" }, enumerable: false }))).toEqual(change);
-});
-
 test("the participant API has no way to an entity_record command", () => {
-  // No schema a participant or a model meets names it, and the only place the orchestrator sends it is the one that
-  // takes a change from a keeper's own output.
+  // No schema a participant or a model meets names it, the participant API has no act for it, and the host of seats
+  // never sends it: a record is the engine's bookkeeping for its keeper (kernel/tests/entity_record.rs).
   for (const f of ["participant-api.schema.json", "calls.schema.json", "common.schema.json"]) {
     const path = join(root, "contracts", f);
     if (!readdirSync(join(root, "contracts")).includes(f)) continue;
@@ -210,8 +170,10 @@ test("the participant API has no way to an entity_record command", () => {
   const resolver = join(root, "kernel/crates/resolver/src");
   for (const f of readdirSync(resolver)) expect(readFileSync(join(resolver, f), "utf8").includes("entity_record")).toBe(false);
   const sends = readdirSync(join(root, "orchestrator/src")).filter((f) => f.endsWith(".ts") && readFileSync(join(root, "orchestrator/src", f), "utf8").includes('command: "entity_record"'));
-  expect(sends).toEqual(["run.ts"]);
-  expect((readFileSync(join(root, "orchestrator/src/run.ts"), "utf8").match(/command: "entity_record"/g) ?? []).length).toBe(1);
+  expect(sends).toEqual([]);
+  const api = JSON.parse(readFileSync(join(root, "contracts/participant-api.schema.json"), "utf8"));
+  const types = api.$defs.ParticipantAction.oneOf.map((x: any) => x.properties.type.const).sort();
+  expect(types).toEqual(["act", "call", "look", "message", "opt_out", "propose", "sign", "wait"]);
 });
 
 test("an organisation's record is rebuilt from a log and checked like a person's, by the organisation or by the participant that kept it", async () => {

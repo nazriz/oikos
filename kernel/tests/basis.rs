@@ -2,7 +2,7 @@
 //! order cited; it never asks what any of them is, or whether the act follows from them. One record has one written
 //! form (its id alone), so every record made before a basis could be several reads and hashes as it did.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::blocks::{Basis, BasisArg, Block, Record};
@@ -25,14 +25,14 @@ fn act(run: &mut Run<Vec<u8>>, participant: &str, blocks: Value) -> Response {
 
 fn refusal(r: &Response) -> Option<RefusalCode> {
     match &r.events[0].body {
-        EventBody::ActionRefused { code, .. } => Some(code.clone()),
+        EventBody::ActionRefused { code, .. } => Some(*code),
         _ => None,
     }
 }
 
 fn made(r: &Response, name: &str) -> String {
     match &r.events[0].body {
-        EventBody::ActionApplied { created: Some(c), .. } => c[name].clone(),
+        EventBody::ActionApplied { created: Some(c), .. } => c[name].to_string(),
         other => panic!("expected an applied action, got {other:?}"),
     }
 }
@@ -42,7 +42,7 @@ fn notice(run: &mut Run<Vec<u8>>, basis: Value) -> Response {
 }
 
 fn stored(run: &Run<Vec<u8>>, id: &str) -> Value {
-    serde_json::to_value(&*run.kernel().state().records[id].record).unwrap()
+    serde_json::to_value(&*run.kernel().state().records[id].record()).unwrap()
 }
 
 #[test]
@@ -66,9 +66,9 @@ fn one_basis_has_one_written_form() {
     assert!(record(json!(many)).is_err(), "more than 64");
     assert!(record(json!(many[..64])).is_ok());
     // Put together from what a block cites: in order, each once, and nothing from nothing.
-    assert_eq!(serde_json::to_value(Basis::of(["a".to_string()]).unwrap()).unwrap(), json!("a"));
-    assert_eq!(serde_json::to_value(Basis::of(["b".to_string(), "a".into(), "b".into()]).unwrap()).unwrap(), json!(["b", "a"]));
-    assert!(Basis::of(Vec::<String>::new()).is_none());
+    assert_eq!(serde_json::to_value(Basis::of(["a".into()]).unwrap()).unwrap(), json!("a"));
+    assert_eq!(serde_json::to_value(Basis::of(["b".into(), "a".into(), "b".into()]).unwrap()).unwrap(), json!(["b", "a"]));
+    assert!(Basis::of(Vec::<oikos_kernel::blocks::Id>::new()).is_none());
 
     // In a block: one, or a list of one or more (kept as written, so the command reads in the log as it was given).
     let block = |basis: Value| -> Result<Block, serde_json::Error> { serde_json::from_value(json!({"block": "withdraw", "record": "rec.1", "basis": basis})) };
@@ -157,7 +157,7 @@ fn a_search_by_basis_finds_a_record_that_cites_it_among_several() {
         let looks = serde_json::from_value(json!([{"channel": "board", "query": q}])).unwrap();
         let o = run.command(&Command::Look { participant: "bob-self".into(), only: None, looks }).unwrap().observation.unwrap();
         match o.channels.get("board").unwrap() {
-            ChannelData::Records { records, .. } => records.iter().map(|r| r.id.clone()).collect(),
+            ChannelData::Records { records, .. } => records.iter().map(|r| r.id()).map(|x| x.to_string()).collect(),
             _ => panic!(),
         }
     };

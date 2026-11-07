@@ -39,6 +39,7 @@
 // outputs are ordered by vectors and sorted maps, so the world's determinism lints (kernel/clippy.toml) do not apply.
 #![allow(clippy::disallowed_types, clippy::disallowed_methods)]
 
+pub mod bench;
 mod consequential;
 mod frames;
 mod index;
@@ -189,4 +190,13 @@ pub const ROUTES: &[(&str, &str)] = &[
     ("GET /api/r/<run>/trace/<ord>?about=", "a kept line's row and its causal trace"),
     ("GET /api/r/<run>/line/<ord>", "a kept line as the log has it"),
     ("GET /api/r/<run>/seat/<id>", "a seat's sittings and notebook"),
+    (
+        "GET /api/r/<run>/events?kind=&who=&cls=&office=&about=&from=&to=&outcome=&q=&offset=&limit=&order=",
+        "the workbench's events table: a page of rows, the total, and counts by kind and class (bench.rs)",
+    ),
+    (
+        "GET /api/r/<run>/cohort?rule=reached|agency|money&cls=&hard=&word=&bps=&minor=&day=&from=&to=&offset=&limit=",
+        "a group of people by a rule, and its outcomes by day beside the rest of the town's",
+    ),
+    ("GET /api/r/<run>/decided?from=&to=", "per building, the consequential changes reaching those who live there, days from..=to, by class [self, person, system, seat, world]"),
 ];

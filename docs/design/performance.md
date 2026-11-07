@@ -3,6 +3,303 @@
 Two passes. The first (below, "Before the port") measured the TypeScript world on 2026-10-17. The second, here, measures the
 Rust world after the cut-over (branch `perf-2`, 2026-10-23), fixes what it found, and ranks what is left.
 
+## Years at 10,000 and 50,000 (2026-10-31, code only)
+
+**The towns.** `worlds/town-10000.yaml` and `worlds/town-50000.yaml`: town-1000 ten and fifty times over (homes, firms,
+landlords and land in proportion), au-vic-2026, seed 1, `living.initiative_bps=10000`, all code. Every earlier large
+measurement (below) was `town-1000.yaml` with `citizens=10000`: 380 homes for 4,026 households, 3,646 of them without a
+home at the start. Those numbers measure the engine, not a town that lives; use the scaled specs for anything else.
+Run with `oikos-kernel world` at 4 engine threads, the log through a pipe into zstd (the 10,000 town's full log; the
+50,000 town's lean), a sampler writing simulated day, resident memory and log size every minute
+(`runs/<run>/progress.tsv`), on the shared machine (load 12 to 30). Runs: `runs/long-10000-3y` (before the fixes),
+`runs/long-10000-3y-b` and `runs/long-50000-2y` (after), `runs/long-50000-2y-try1` (stopped by fault 3 below).
+
+**What broke, and the fixes** (docs/decisions.md 2026-10-31, "Years at 10,000"): the hall built for 20 of a crew of
+60, so the registrar of titles could not get in to work for a month; owners counting themselves homeless (and stopping
+their own water) while the register answered, so 484 owners left town by day 76; the works office sending every
+inspection in one moment, which stopped the 50,000 town at t=300 (1,000 rounds); and the energy retailer reading its
+whole file of bills once a connection at every wake, 63% of the run's own thread by day 115 (result-identical fix).
+Before the fixes the 10,000 town lost 3,567 people (36%) in 139 days and ran at a third of a simulated day a wall
+minute by then; after, 632 in six months (the households the tight housing leaves out, as at 1,000), and its pace
+held.
+
+**After the fixes** (wall time on the loaded machine, load 9 to 30; memory as the physical footprint, `footprint`,
+which counts what the compressor holds: `ps`'s resident size read 13 GB when the footprint was 18):
+
+| town | day 30 | day 90 | day 180 | day 365 | day 730 | day 1,095 |
+|---|---|---|---|---|---|---|
+| 10,000: wall | 6 min | 17 min | 40 min | 1.9 h | 6.0 h | 11.8 h |
+| 10,000: footprint | 2.4 GB | 4.0 GB | 6.2 GB | about 11 GB | about 20 GB | 25 GB (27 GB peak) |
+| 10,000: log (zstd, full) | 0.5 GB | 1.6 GB | 3.3 GB | 6.7 GB | 13.9 GB | 20.1 GB (248 million lines) |
+| 50,000: wall | 37 min | 1.9 h | 7.9 h | | | |
+| 50,000: footprint | 12.6 GB | about 16 GB | 28 GB | | | |
+
+(The 50,000 town at day 215: 12 hours, a 32 GB footprint, about 105 MB a simulated day since day 30, 11.4 GB of lean
+log; still running when this was written, to stop at its guard's 40 GB near day 290: `runs/long-50000-2y`.)
+
+**The 10,000 town's three years** (`runs/long-10000-3y-b`, final state `056f7f9f`): 11.8 hours of wall, of which the
+run's own thread 8.3 hours of CPU (it is the bound: 40,900 s of user CPU in all, so little else runs beside it);
+memory about 25 MB a simulated day, steady from the first month to the last; the log 18 MB a day compressed. A
+simulated day cost 10 to 15 s of wall in the first year and 40 to 80 s in the third, as the machine's load moved and as
+the run grew: 32 s of CPU a day on average, 44 s at day 730, the bank (16 to 17% of the run's own thread at days 536
+and 721, going through every standing order when what it checks has changed) and the building of observations (14%)
+the largest. No crash, no invariant the run checks broken. Its people: 1,054 left town (630 in the first six months,
+the households the tight housing leaves out; 5 to 20 a month after), 334 came (all in the first year: the outside
+world's migration then stops on its own rule, the expected wage below the outside income; its cap of 8 households a
+month does not scale with the town), 144 born, 271 died: about 9,150 at the end. Payments moved about $270 to $340
+million a month in the first year and $235 to $265 million in the third. The hall's 200 places refused 1,200 entries a
+month at first and 20,000 by the end, the town's groups growing in number with one hall to meet in. These are the
+town's, recorded, not tuned.
+
+**What grows with the run's length** (a heap profile of the 10,000 town, `--features heapprof`, four dumps five wall
+minutes apart in its first months): of 1.68 GB added, the world's records 0.91 GB (54%: every record made, kept
+whole, and each transaction; docs/design/tiered-storage.md, proposed), the engine 0.33 GB (of it the resolver's
+knowledge of every addressed statement each participant has seen, `Knowledge::learn`, 0.13 GB, and the per-matter
+counts of the twins' draws, `Draws::key`'s `matter_occurrences`, 74 MB: a gathering's every date is a matter each person
+keeps for the run), citizens' minds 0.18 GB, offices and firms 0.14 GB. None is a copy; each is a record of what
+happened or what was seen. At 2.5 KB a person a day at 10,000 (1 KB at 1,000) it grows faster than the town.
+
+**What it means for the study.** 10,000 people for 3 years fits: 27 GB at the peak, 20 GB of log, 12 hours on a shared
+machine. 50,000 for 2 years at about 105 MB a day (some 86 GB) does not fit on this 64 GB machine: the run's guard stops it at a
+40 GB footprint. A study at 50,000 for longer than about a year needs the history out of memory (tiered storage,
+waiting on the owner) and the twins' per-matter draw counts let go when a matter is over (a design question for
+reliability's owners: a matter would have to say when it ends).
+
+**Tiered storage (2026-11-02, docs/design/tiered-storage.md).** The world's records nobody reads are held on the run's
+cold file and read back when read; readers that read what they no longer needed were fixed (the largest, a payroll going
+through every request on its book at every wake); the resolver's addressed statements and perception's index held
+small; matters that say they are over let their draw counts go; the offices' files of payments tiered; the travel
+caches bounded. Results byte-identical: six pinned towns for a month with every record sent to disk from its second day
+whenever unread that day; 1,000 people for 180 days (`e18ab4e0`, digest `88f05b51`) and 10,000 for 60 and 180 days at
+main's state hash and log digest (on main f2a3568a, 180 days: `76f03d29`, digest `1c099a83`). Measured on the Mini
+(shared, load 10 to 30), the release kernel, 2 engine threads, the footprint (`footprint`) by simulated day:
+
+| 10,000 people | day 30 | day 60 | day 90 | day 120 | day 150 | day 180 | MB a day, days 135 to 180 |
+|---|---|---|---|---|---|---|---|
+| main f2a3568a | 2,413 | 3,204 | 3,939 | 4,741 | 5,446 | 6,221 | 24.3 |
+| tiered (1ee81be3) | | 2,875 | 3,253 | | 3,964 | 4,184 | 8.8 |
+
+(Peak resident 6.63 GB against 4.55; the run's own thread 1,778 s against 1,750. At day 180, 430,000 of 1.81 million
+records in memory and the rest on disk, 131 MB, about 95 bytes a record compressed; 77,000 read back since the start.)
+At 1,000 people for 180 days (4 threads, the peak resident): 691 to 695 MB on main, 533 to 557 MB tiered; the run's own
+thread 72.5 and 112.4 s on main against 70.1 and 115.3 tiered (two pairs, the machine's load moving between them): no
+cost found beyond its noise.
+
+At 50,000 people (`worlds/town-50000.yaml`, lean log, 3 engine threads; runs `tier-50000-before`, `tier-50000-after`
+and `tier-50000-after2`), resident GB (`ps`; the footprint, which `footprint` gives in whole GB here, runs about 0.5 GB
+under it on the tiered builds and 2 GB over it on main):
+
+| 50,000 people, resident GB | day 10 | day 30 | day 50 | day 70 | day 80 | MB a day, days 30 to 80 |
+|---|---|---|---|---|---|---|
+| main f2a3568a | 14.3 | 16.3 | 18.5 | 19.8 | 21.8 | 110 |
+| tiered, before the payroll's fix (9cbefc7b) | 11.4 | 12.8 | 14.6 | 15.8 | 15.6 | 56 |
+| tiered (1ee81be3) | 11.4 | 12.0 | 13.4 | 14.7 | 14.7 | 54 |
+
+All three stop at the same moment, t=7754574 on day 89: "participants kept waking each other (1000 rounds in one
+moment): c3090-self|police-oic among them", a fault of main's own (law 9's owners have it). Two years at 50,000 can't be
+measured until it is fixed. At day 87, 1.86 of 3.95 million records were in memory (the last 30 days' are near half of
+a run that young). At 10,000 the tiered town's growth fell by a third once its first months were past (13.5 MB a day at
+days 45 to 75, 8.8 at days 135 to 180), as the records read in force stopped growing: if 50,000 does the same, two
+years come to about 12 GB at day 30, 54 MB a day to day 90 and some 35 after, near 38 GB; at 54 MB a day throughout,
+50 GB. (A snapshot of the 50,000 town at day 80 took the footprint from 22.5 to 82 GB: it does not fit in this machine
+as snapshots are written today, `runs/tier-50000-police-snapshot`.)
+
+**What is left of the growth**, at 8.8 MB a simulated day for 10,000 people (0.9 KB a person a day): what every record
+keeps in memory when it is cold (its slot, its place in the state's map and in perception's index, its entries in the
+books that saw it: 250 to 350 bytes a record, some 2.5 MB a day here); the last 30 days' records and those read in
+force (a bank's standing orders, people's agreements and households, the property roll: flat once the run is past its
+first months); the units' views and knowledge, the offices' and firms' own state, citizens' minds. The memory budget
+gained a growth budget (`scripts/memory-budget.json`, `growth_bytes_per_person_day`: the 1,000-person town's half-year
+past its month).
+
+**Costs that grow with the town, not the run** (sampled on the 50,000 town at day 49, the run's own thread): a person's
+word of mouth (`CitizenMind::word_of_mouth`) 43%, taking in everyone it sees in every space around it into its list of
+contacts by a search of the list for each, before cutting the list back to its 15: quadratic in how crowded the
+spaces it sees are (a hall of 200). Tried indexed (results identical: the 1,000 town for 120 days and the 10,000 for
+30 the same hash and log), it cost the run's own thread 12 to 13% more at 1,000 and 10,000, where spaces are small and
+building the index every wake costs more than the search; dropped. Worth doing only where the spaces seen are large,
+and measured at 50,000.
+
+## Bytes per person: the budget, and what each person costs (2026-10-25, from branch `mem-budget` on)
+
+**The budget.** A town's memory is a fixed overhead and so much for each person; the goal (Naz, 2026-10-25) is about
+50 KB a person at the peak, so 50,000 people in some 2.5 GB and 100,000 in 5 GB beside the overhead.
+`scripts/memory-budget.json` holds the target, the fixed overhead (110 MB, measured), and the ceiling held now;
+`orchestrator/test/memory-budget.test.ts` (slow tier) runs `worlds/town-1000.yaml` for 30 days on the release kernel
+at 4 engine threads and fails if `(peak resident - overhead) / people` passes the ceiling. The kernel's `world` command
+says its peak (`getrusage`'s maximum resident set: the same measure on macOS and Linux). The ceiling starts at what
+main costs (590 KB, from 546 KB measured and a margin for run to run), and each cut that lands lowers it towards the
+target in the same commit; raising it is a decision with its entry in docs/decisions.md. The target is not met until
+the ceiling is 50 KB.
+
+**How it is measured.** Peak resident memory of `oikos-kernel world`, all code, the log piped away and not kept;
+`OIKOS_ENGINE_THREADS` given with every number. By component: the sampling heap profiler (`--features heapprof`) at
+its high-water mark, each live allocation put with a component by its call stack (`scripts/heapprof.ts <dump> <dwarf>
+--components PEOPLE`): the state hash's and the log's by any frame of theirs on the stack, the rest by the innermost
+of the kernel's own frames. Sampled live bytes at the peak, so a little under the resident peak (the allocator's own
+and the binary's are not in it).
+
+**Main at the start (`3b87959e`), 30 days, 14 threads.** Resident peak; per person after the 110 MB overhead.
+
+| town | peak resident | per person | wall |
+|---|---|---|---|
+| 203 people | 0.25 GB | | 3 s |
+| 1,000 (au-vic / gb-eng / us-oh) | 0.69 / 0.67 / 0.57 GB | 583 / 560 / 455 KB | 15 / 10 / 9 s |
+| 10,000 | 5.25 GB | 514 KB | 121 s |
+| 50,000 | 34.2 GB (40.8 GB footprint) | 682 KB | 1,004 s |
+
+By component at the peak (KB a person, live, sampled):
+
+| component | 1,000 | 10,000 | 50,000 |
+|---|---|---|---|
+| what's been seen (buildings seen, views, knowledge) | 59 | 52 | **408** |
+| the state hash's encoded copies (the whole state's canonical bytes, at a checkpoint) | (not at the peak) | 82 | (not at the peak) |
+| the engine (units, the records delivered and what they add) | 82 | 58 | 61 |
+| citizens' minds | 33 | 47 | 69 |
+| citizens (person, params) | 44 | 48 | 59 |
+| world state (records made, accounts, bodies) | 48 | 40 | 36 |
+| the config (typed, controllers) | 30 | 30 | 32 |
+| offices, firms and other actors | 18 | 9 | 9 |
+| other (the compiled schemas, the log's buffer, unattributed) | 112 | 25 | 16 |
+| all, live | 435 | 391 | 697 |
+
+What grows faster than the town is what's been seen: a building's view lists who is in each of its spaces to anyone
+known there, a workplace's hundreds of people are each shown all the others, and every person kept their own copy of
+each building as they last saw it, so it grows as people times the people they share a building with. At 10,000 the
+peak fell on the month's checkpoint, when the state hash wrote the whole state's canonical bytes out of a copy it
+held whole. Minds and memories are `mem-minds`'s (compact formats).
+
+**The cuts, each landed alone, each byte-identical (the same state hash and log digest on 203 people, three profiles'
+1,000 and 10,000, 30 days).** Peak resident at 14 threads; the budget's ceiling after it; instructions against main.
+
+| cut | 1,000 au-vic | 10,000 | 50,000 | ceiling | instructions |
+|---|---|---|---|---|---|
+| main (`3b87959e`) | 693 MB | 5.25 GB | 34.2 GB | 590 KB | |
+| the state hash streamed, no cache (`mem-state-hash`) | 592 MB | 4.34 GB | | 480 KB | +0.4% at 10,000, +0.1 to 2.6% at 1,000 |
+| what's been seen held once (`mem-seen`) | 521 MB | 3.12 GB | 17.2 GB (956 s, against 1,004) | 410 KB | at or under main: -0.5 to 0% at 1,000, -10.6% at 10,000, -21% at 50,000 |
+| records delivered without bytes for code actors; channel lists shared (`mem-delivered`) | 512 MB | 2.98 GB | 17.0 GB (857 s) | 390 KB | paired with main at 4 threads, three times on each profile: wall -1 to -5%, user CPU -5 to -8% |
+
+*Records as delivered.* The kernel kept, for every record anyone was shown, its canonical bytes and what it adds to a
+seat's knowledge, for the whole run. A code actor's look needs only what it adds: its bytes are now made only for an
+observation that is written (a seat's, or one whose hash the log keeps), and kept as before. A town's people's
+channel lists (one or two among them) are read once at the start and shared.
+
+*What's known of a building.* A code actor's knowledge keeps, for each building it is shown, its type, place and
+spaces (`StructureFact`); it was made again whenever the building's view changed (someone came or went), and each
+person's knowledge kept its own. It is made of the building, not of who is in it, so it is now one for everyone while
+it says the same.
+
+*Large towns, all of it with the minds' and memories' cut (`mem-minds`) beside (local build, 2026-10-26).* 50,000
+people for a month: 14.7 GB resident, 604 s (main: 34.2 GB, 1,004 s), the same state hash. **100,000 for a week:**
+31.0 GB resident, 320 s wall, state `6fea086aa5d0f8c1`. Its peak is the first moment (the footprint is 39 GB about
+two minutes in, then 22 to 27 GB): every unit decides at once, and with seats awake in that round each one's decisions
+are held, as values and as their canonical bytes, until the round is carried out (16 GB of bytes at 100,000). Holding
+the bytes compressed was tried and dropped: no smaller (the values stay) and slower (40.4 GB, 551 s). The next cut is
+there: a round's decisions held once, as bytes, when seats are in it, or the first moment decided in windows.
+
+*Biggest holders left* (10,000 people, the 10,000 month's peak, with mem-minds; 195 KB a person live): the engine
+(units, rounds, records delivered) 49, world state (records made, accounts) 39, minds 29, citizens' person and params
+25, the typed config 24, other 14, offices and firms 9, the compiled schemas 4, the log's buffer 2, what's been seen
+1, memories 1. At 1,000 people at the budget's settings: 322 KB a person (main 546). The target is 50.
+
+*How the cost was told.* Instructions retired move by 1 to 2% between runs of the same build as the machine's load
+varies (the thread pool's idle threads spin), so a cost of that size is told by running main and the cut in turn on
+the same towns, three times each, at a quiet hour: `pair.sh`, its numbers above.
+| what's known of a building, one per building (`mem-facts`) | 499 MB | 2.97 GB | 16.9 GB (595 s) | 380 KB | |
+| the first moment decided a window at a time (`mem-first`) | 508 MB | 2.99 GB | | 380 KB | the 100,000 week: footprint 33 GB against 43, the same instructions, wall 414 s against 433 (paired) |
+
+*What's been seen.* A building as someone sees it (its spaces, who is in each where that can be told, its wear) was
+made at every look and kept by everyone who saw it, each their own copy: at 50,000 people, 408 KB a person. Now it is
+made once for everyone who sees it the same (per building, and whether the looker can be told who is there) and made
+again only when what it is made from has changed (the building, its occupancy, its spaces' departures and arrivals:
+compared by where they are in memory, since the state never changes them in place, and field for field); held while
+anyone holds it. Debug builds check each one kept against one made afresh. A view kept the cells it had seen as a map
+and copied them into the list it handed its actor besides; it keeps the one list. A first version held the buildings
+behind one lock per shard and made the 50,000 month 58% slower in wall time (the people of one building look at once,
+on many threads, and queued for its shard); read under a shared lock, the comparison outside it, it is faster than
+main.
+
+### A plan for what is left: the world's data held compactly (begun on branch `representation`, 2026-10-26)
+
+What is left is no longer copies. It is the world's own data and the actors' state, held as general-purpose values:
+every id a `String` of its own wherever it appears (`blocks::Id = String`: in records, ledgers, maps' keys, knowledge),
+records' free parts and entity records' sections as `serde_json::Value` (a small map of a few members costs some
+600 bytes as a `BTreeMap` node), a transaction a row of five or six strings. Read through the profile's inlined frames,
+the "engine" holder at 10,000 people (49 KB a person) is mostly this: records made, money moved, entity records merged.
+So the remaining cut is a change of representation, landed in steps, each byte-identical (the same state hash and
+log digest on three profiles' towns at 1,000, and 10,000 and 50,000), each without loss of speed (paired against main),
+each lowering the budget's ceiling.
+
+| step | what | crates | estimate | expected (KB a person, live, of 195 at 10,000) |
+|---|---|---|---|---|
+| R1 | **Ids interned**: `Id` an interned shared string (one copy of each id for the process, ordered and serialised as the string it is, so every map's order, every hash and the log are unchanged) | every crate (`Id` is used in 28 files across contracts, world, perception, resolver, sight, nature, actors and the kernel: mostly mechanical, `String` operations on ids become the handle's) | 4 to 6 agent-days | -30 to -50: ids are the most repeated thing held |
+| R2 | **A compact frozen value** for what is opaque JSON in the state: records' `about`/`data`, entity records' sections, the typed config's controllers (`oikos_core::Frozen`: immutable, maps as sorted arrays with interned keys, shared subtrees), with the read API the code uses of `Value` and the same serialisation | core, contracts, world, perception, resolver, sight, actors (readers) | 4 to 6 agent-days | -25 to -40 |
+| R3 | **Compact ledgers**: a transaction a fixed row (interned ids, integers), accounts' histories in persistent vectors of them | world, perception (accounts channel), sight, actors (statements, books) | 2 agent-days | -5 to -10 |
+| R4 | **The actors' remaining state** in typed forms (offices' and firms' books, held as `Value` maps now), after `mem-minds`'s minds and memories | actors | 2 to 4 agent-days | -10 to -20 |
+
+**Landed** (each byte-identical: `orchestrator/test/representation.test.ts` holds three profiles' towns of 200 and
+1,000 people to the state hash and log of main at 7230e71; each paired against main, `scripts/pair.sh`; measured on a
+4-core Linux machine, where a 10,000-person month does not fit beside the suite, so at 1,000):
+
+| step | 1,000 au-vic peak (4 threads) | KB a person | the run's own thread (1,000, three to eight pairs) | ceiling |
+|---|---|---|---|---|
+| main (7230e71) | 467 to 473 MB | 363 | | 415 |
+| R1, ids interned | 459 to 466 MB (gb-eng 445 to 475 against 463 to 467; us-oh level) | 352 | -8 to -19% on all three profiles | 400 |
+| R2, records' JSON frozen | 409 to 419 MB (gb-eng 400 to 411, us-oh 365 to 380) | 305 | against R1: au-vic -3 to -10%, gb-eng -4 to 0%, us-oh -7 to +5% (-2% on average) | 350 |
+| R3, each transaction held once | 409 to 412 MB (90 days: 622 against 638) | 300 | against R2: -4 to +1% | 345 |
+| R4 (first part), the actors' indexes keyed by `Id` | 396 to 403 MB | 290 | against R3: -6 to +1% | 335 |
+| the allocator without huge pages (Linux only) | 358 to 368 MB (200 people: 172 to 177 against 222 to 238) | 253 | +0.5 to +3.9% (200: 4 to 7% faster) | 335 (the Mini gains nothing) |
+| the config's schemas let go | 325 to 329 MB (200 people: 139 to 147) | 217 | -4 to +1%, level | 300 |
+| the delivered records' cache let go of what is not shown (a year: 1,081 MB against 1,500) | 304 to 305 MB | 195 | 0 to +3% (a year +2.3%) | 270 |
+| no whole-world copies during a step (`mem-no-copies`: nature's cells, the network's lists, takings, floods and scarce sales persistent, so an act's copy shares them) | 306 MB (10,000: 1,675 MB, 156.5 KB a person, unchanged) | 196 | not paired (the copies were made and let go within an act: no change at the peak) | 270 |
+
+R1 saved little memory because few of the ids held were `Id`s: the actors' are `String`s (R4) and records' JSON holds
+its own strings (R2). Acts' and messages' ids are `Passing` (their own text), as they go with what they name; every
+other id is interned for the process (docs/decisions.md 2026-10-26, "Ids interned").
+
+In all 12 to 18 agent-days, to perhaps 90 to 120 KB a person live at 10,000 (from 195), about 150 resident at the
+budget's 1,000 (from 322 with `mem-minds`). **That is not the 50 KB target.** Past it, what is left is what people
+hold (minds, memories, what they have seen, their knowledge of records) as the world gives it to them; holding less
+of that is a bound on what a person remembers, which is a law, the owner's to decide (docs/design/knowing.md), not a
+representation change.
+
+**Interleaving with foundations-2 phases 2 and 3,** which add stocks and flows (conservation: water, energy,
+materials, waste, metered homes) and space (networks with capacity, people in transit, carriers) to the world's state,
+through contracts, world, rules, perception and actors: the same crates.
+- R1 changes a type every crate uses: it goes in a short window between phases (after phase 2 lands, before phase 3
+  begins), as one merge, with the two phases' owners told; begun mid-phase, every open branch would conflict.
+- R3 (ledgers) goes after phase 2, so that its new flows are held compactly from the start, or with it, designed with
+  its owner.
+- R2 and R4 touch representations the phases read but do not reshape, and can go beside either phase, each a branch
+  of a few days, merged often.
+- Each step's measures and its ceiling go in this table and docs/decisions.md as the earlier cuts' did.
+
+## Citizens' minds and memories (branch `mem-minds`, 2026-10-25)
+
+au-vic-2026 from `worlds/town-1000.yaml`, `living.initiative_bps=10000`, seed 1, all code, 30 days, `oikos-kernel world`
+with 8 engine threads. What the citizen's code holds is read from a heap profile at the run's end (`heapprof::dump("end")`,
+8 KB rate): every live sample whose stack runs through `oikos_actors::citizen` or `::mind` (the total:
+`bun scripts/heapprof.ts <out>.end.txt <dwarf> --focus 'oikos_actors::(citizen|mind)::' 0`), split by the innermost
+frame of the actors' own, inlined frames expanded. Details, and what each change is: docs/decisions.md 2026-10-25, "Citizens' minds and memories held compactly".
+
+| what (1,000 people) | main | after |
+|---|---|---|
+| what a person last wrote to their record (`State::written`, JSON values; now their text) | 16.0 MB | 2.6 MB |
+| the mind's and life's readings of their params, each person's own copy (now one for all alike; their heap, the inline part in the next row) | about 15 MB | under 1 MB |
+| the person and the mind inline (`Box<Person>`, `Box<CitizenMind>`) | 15.5 MB | 8.5 MB |
+| the book's indexes | about 11 MB | about 10 MB |
+| their home's building, copied out of the picture (now shared with it) | 2.8 MB | 0 |
+| what others told them | 2.1 MB | 0.6 MB |
+| **all of the citizen's, per person** | **85 KB** | **43 KB** |
+
+| run | main | after |
+|---|---|---|
+| 1,000 x 30 d peak footprint, au-vic / gb-eng / us-oh | 663 / 622 / 534 MB | 609 / 591 / 506 MB |
+| 10,000 x 30 d (`citizens=10000`) | 5.10 GB peak footprint, 1,180 G instructions | **4.68 GB**, 1,161 G |
+
+The same state hash and log digest as main on all of them. Left of the 43 KB: the inline state (8.5 KB) and the book
+(10 KB), then a long tail under 1.5 KB each (ties, what was learned, teachings, gatherings, word of mouth, the draws).
+
 ## What held memory, and the config read participant by participant (branch `scale-next`, 2026-10-25)
 
 au-vic-2026 from `worlds/town-1000.yaml` with `citizens=10000` (and `50000`), `living.initiative_bps=10000`, seed 1,

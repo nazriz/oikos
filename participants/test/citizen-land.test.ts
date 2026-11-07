@@ -50,8 +50,9 @@ test("an owner from the start knows their title unasked, looks up the plan of it
   await p.wake(DAY, { records: [title("title-7", "c1", "lot-7")], balance: 500_000, street: street(["c1"]), in: HOME, looked: reg.looked });
   expect(reg.of("lots")).toEqual(["lot-7"]);
   expect(reg.of("titles")).toEqual([]);
-  // (One look: the plan is asked for with the glance at the boards, not in a look of its own before it.)
-  expect(reg.rounds).toEqual([["lots", "homes", "jobs", "petitions"]]);
+  // (One look: the plan is asked for with the glance at the boards, not in a look of its own before it; and no glance at
+  // the homes to rent while it is out: an owner in the house it owns is not hunting for one (years at 10,000, 2026-10-31).)
+  expect(reg.rounds).toEqual([["lots", "jobs", "petitions"]]);
   expect(reg.asked.find((l) => l.channel === "lots")!.query).toEqual({ where: [{ field: "id", op: "=", value: "lot-7" }], limit: 1 });
   // From then on they have a home (no hunt for one to rent), and never ask for the plan again.
   for (const day of [8, 15, 40]) {

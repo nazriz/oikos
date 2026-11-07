@@ -11,7 +11,7 @@
 
 use crate::returns::{return_rule_in_words, return_rules_of, returns_of, ReturnRule, MONTH_WORDS};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use oikos_core::Frozen;
 use std::collections::{BTreeMap, BTreeSet};
 
 const DAY: i64 = 86_400;
@@ -126,12 +126,12 @@ impl IncomeTaxLaw {
 /// A tax law's terms, from its record's data. `charges` as above (a charge that names no collector is its lawmaker's).
 /// A law in the short form (`brackets`, `levy_bps`, `levy_from`, `account`) is read as the two charges it is: marginal
 /// rates on a year's pay, and a levy on the whole of a pay from a threshold, both paid into one account.
-pub fn tax_law_of(id: &str, data: &Value, lawmaker: Option<&str>) -> Option<IncomeTaxLaw> {
-    let data_collector = data.get("collector").and_then(Value::as_str).or(lawmaker).unwrap_or("");
-    if let Some(list) = data.get("charges").and_then(Value::as_array) {
+pub fn tax_law_of(id: &str, data: &Frozen, lawmaker: Option<&str>) -> Option<IncomeTaxLaw> {
+    let data_collector = data.get("collector").and_then(|x| x.as_str()).or(lawmaker).unwrap_or("");
+    if let Some(list) = data.get("charges").and_then(|x| x.as_array()) {
         let mut charges = vec![];
         for c in list {
-            let mut charge: Charge = serde_json::from_value(c.clone()).ok()?;
+            let mut charge: Charge = oikos_core::frozen::from_frozen(c).ok()?;
             if c.get("collector").is_none() || c["collector"].is_null() {
                 charge.collector = data_collector.to_string();
             }
@@ -140,8 +140,8 @@ pub fn tax_law_of(id: &str, data: &Value, lawmaker: Option<&str>) -> Option<Inco
         let returns = data.get("returns").and_then(return_rules_of).filter(|r| !r.is_empty());
         return Some(IncomeTaxLaw { id: id.to_string(), charges, returns });
     }
-    let brackets: Vec<Band> = serde_json::from_value(data.get("brackets")?.clone()).ok()?;
-    let account = data.get("account").and_then(Value::as_str).unwrap_or("").to_string();
+    let brackets: Vec<Band> = oikos_core::frozen::from_frozen(data.get("brackets")?).ok()?;
+    let account = data.get("account").and_then(|x| x.as_str()).unwrap_or("").to_string();
     let to = |id: &str, base: Option<Base>, schedule: Vec<Band>| Charge {
         id: id.into(),
         name: None,
@@ -152,10 +152,10 @@ pub fn tax_law_of(id: &str, data: &Value, lawmaker: Option<&str>) -> Option<Inco
         account: account.clone(),
         itemised: false,
     };
-    let levy_bps = data.get("levy_bps").and_then(Value::as_i64).unwrap_or(0);
+    let levy_bps = data.get("levy_bps").and_then(|x| x.as_i64()).unwrap_or(0);
     let mut charges = vec![to("income-tax", None, brackets)];
     if levy_bps > 0 {
-        let from = data.get("levy_from").and_then(Value::as_i64).unwrap_or(0);
+        let from = data.get("levy_from").and_then(|x| x.as_i64()).unwrap_or(0);
         charges.push(to(
             "levy",
             Some(Base { from: Some(from), ..Default::default() }),
@@ -486,10 +486,11 @@ pub fn returns_in_words(law: &IncomeTaxLaw) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
     use serde_json::json;
 
     fn law(charges: Value) -> IncomeTaxLaw {
-        tax_law_of("l", &json!({ "charges": charges }), Some("o")).unwrap()
+        tax_law_of("l", &oikos_core::Frozen::from(json!({ "charges": charges })), Some("o")).unwrap()
     }
     fn to() -> Value {
         json!({ "collector": "o", "account": "a" })
@@ -513,7 +514,7 @@ mod tests {
         let cases = file["cases"].as_array().unwrap();
         assert!(cases.len() >= 10);
         for c in cases {
-            let l = tax_law_of("l", &c["law"], Some("outside")).unwrap();
+            let l = tax_law_of("l", &oikos_core::Frozen::of(&c["law"]), Some("outside")).unwrap();
             for (gross, period, total, parts) in c["pays"].as_array().unwrap().iter().map(|p| (p["gross"].as_i64().unwrap(), p["period"].as_i64().unwrap(), p["total"].as_i64().unwrap(), &p["parts"])) {
                 let w = withheld(Some(&l), gross, period);
                 let got: Vec<Value> = w.parts.iter().map(|(c, a)| json!([c.id, a])).collect();
@@ -550,7 +551,7 @@ mod tests {
         ];
         for (b, levy, levy_from) in forms {
             let data = json!({ "brackets": b.iter().map(|(f, r)| json!({ "from": f, "rate_bps": r })).collect::<Vec<_>>(), "levy_bps": levy, "levy_from": levy_from, "collector": "o", "account": "a" });
-            let l = tax_law_of("l", &data, None).unwrap();
+            let l = tax_law_of("l", &oikos_core::Frozen::of(&data), None).unwrap();
             assert_eq!(l.charges.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(), if levy > 0 { vec!["income-tax", "levy"] } else { vec!["income-tax"] });
             let mut income = 0;
             while income < 30_000_000 {
@@ -566,7 +567,7 @@ mod tests {
                 }
             }
         }
-        assert!(tax_law_of("l", &json!({ "rate_ppm": 4 }), None).is_none());
+        assert!(tax_law_of("l", &oikos_core::Frozen::from(json!({ "rate_ppm": 4 })), None).is_none());
         assert_eq!(withholding(None, 100_000, 14 * DAY), 0);
     }
 
@@ -675,7 +676,7 @@ mod tests {
     #[test]
     fn money_in_percentages_and_the_laws_words() {
         assert_eq!((pct(2000), pct(1910), pct(1933), pct(5)), ("20%".into(), "19.1%".into(), "19.33%".into(), "0.05%".into()));
-        let l = tax_law_of("l", &json!({ "charges": [{ "id": "a", "name": "Income tax", "schedule": [{ "from": 0, "rate_bps": 0 }, { "from": 1000, "rate_bps": 1000 }], "account": "x", "collector": "o" }], "returns": [{ "id": "r", "day": 9, "charges": ["a"] }] }), None).unwrap();
+        let l = tax_law_of("l", &oikos_core::Frozen::from(json!({ "charges": [{ "id": "a", "name": "Income tax", "schedule": [{ "from": 0, "rate_bps": 0 }, { "from": 1000, "rate_bps": 1000 }], "account": "x", "collector": "o" }], "returns": [{ "id": "r", "day": 9, "charges": ["a"] }] })), None).unwrap();
         assert!(returns_in_words(&l).starts_with("Employers report what they withheld, and pay it over with the report, in this return: r: Income tax reported"));
         assert_eq!(
             charges_in_words(&l.charges, &|n| format!("${n}"), &|c| c.account.clone()),

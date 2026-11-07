@@ -13,6 +13,7 @@
 //! named payments is the more particular and wins over one for the kind; among equals, the law published later).
 
 use serde::{Deserialize, Serialize};
+use oikos_core::Frozen;
 use serde_json::Value;
 
 pub const DAY: i64 = 86_400;
@@ -65,12 +66,23 @@ pub struct ReviewRoute {
     /// refused (a deemed refusal), and the appeal's days run from then. None: silence is only silence.
     #[serde(default, deserialize_with = "opt_whole", skip_serializing_if = "Option::is_none")]
     pub deemed_refused_days: Option<i64>,
+    /// Where the law has no deemed refusal but a body that recommends (an ombudsman, a complaints examiner, a
+    /// representative's caseworker) takes up an agency's delay: a review asked for and not answered within so many
+    /// days of the asking may be complained of there. It opens no appeal; it is a complaint, heard by that body at its
+    /// own cost and time, and what it recommends binds nobody (MT-21).
+    #[serde(default, deserialize_with = "opt_whole", skip_serializing_if = "Option::is_none")]
+    pub complaint_after_days: Option<i64>,
 }
 
 impl ReviewRoute {
     /// When a review asked for at `asked` and not answered is taken as refused, if the law has a deemed refusal.
     pub fn deemed_refused_at(&self, asked: i64) -> Option<i64> {
         self.deemed_refused_days.map(|d| asked + d * DAY)
+    }
+
+    /// From when a review asked for at `asked` and not answered may be complained of to a body that recommends.
+    pub fn complaint_from(&self, asked: i64) -> Option<i64> {
+        self.complaint_after_days.map(|d| asked + d * DAY)
     }
 }
 
@@ -140,14 +152,14 @@ fn opt_whole<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<i64>, D::E
 #[derive(Debug, Clone, Copy)]
 pub struct OnFile<'a> {
     pub at: i64,
-    pub data: &'a Value,
+    pub data: &'a Frozen,
 }
 
 /// The rules a law's data carries (`data.decisions`), those that read; a malformed rule is not a rule (decisions.ts
 /// took the list as it came and ignored what lacked a `kind`).
-pub fn rules_of(data: &Value) -> Vec<DecisionLaw> {
+pub fn rules_of(data: &Frozen) -> Vec<DecisionLaw> {
     match data.get("decisions") {
-        Some(Value::Array(list)) => list.iter().filter_map(|r| serde_json::from_value(r.clone()).ok()).collect(),
+        Some(Frozen::Array(list)) => list.iter().filter_map(|r| oikos_core::frozen::from_frozen(r).ok()).collect(),
         _ => vec![],
     }
 }
@@ -220,6 +232,10 @@ pub fn decisions_in_words(rules: &[DecisionLaw], written: impl Fn(i64) -> String
                     let last = parts.pop().unwrap_or_default();
                     parts.push(format!("{last}; a review not answered within {d} days of being asked for is taken as refused"));
                 }
+                if let Some(d) = v.complaint_after_days {
+                    let last = parts.pop().unwrap_or_default();
+                    parts.push(format!("{last}; a review not answered within {d} days of being asked for may be complained of to a body that hears such complaints, which may recommend but not order"));
+                }
             }
             if let Some(a) = &r.appeal {
                 let after = match &r.review {
@@ -262,10 +278,10 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn law(at: i64, rules: Value) -> (i64, Value) {
-        (at, json!({ "decisions": rules }))
+    fn law(at: i64, rules: Value) -> (i64, Frozen) {
+        (at, Frozen::from(json!({ "decisions": rules })))
     }
-    fn on_file(laws: &[(i64, Value)]) -> Vec<OnFile<'_>> {
+    fn on_file(laws: &[(i64, Frozen)]) -> Vec<OnFile<'_>> {
         laws.iter().map(|(at, data)| OnFile { at: *at, data }).collect()
     }
 
@@ -299,7 +315,7 @@ mod tests {
             { "name": "no kind" },
             { "kind": "bad", "needs": [{ "id": "a", "from": "nobody" }] },
         ] });
-        let rules = rules_of(&data);
+        let rules = rules_of(&oikos_core::Frozen::of(&data));
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].needs[0].within_days, 14);
         assert_eq!(rules[0].needs[0].otherwise, Else::Decide);
@@ -325,7 +341,7 @@ mod tests {
             "review": { "within_days": 28, "grounds": "error", "required": true },
             "appeal": { "matter": "support_appeal", "within_days": 30, "grounds": "wrong law", "fee": 2500 },
             "refused_by": "staff" }] });
-        let words = decisions_in_words(&rules_of(&data), |n| format!("${}.{:02}", n / 100, n % 100));
+        let words = decisions_in_words(&rules_of(&oikos_core::Frozen::of(&data)), |n| format!("${}.{:02}", n / 100, n % 100));
         assert_eq!(
             words,
             "Support (carer): before it is decided, the claimant is asked for proof of care, to send it within 14 days; if it does not come in time, the claim is refused; \
@@ -340,7 +356,7 @@ the office's staff may refuse a claim."
         let data = json!({ "decisions": [{ "kind": "k", "name": "Support",
             "review": { "within_days": 30, "grounds": "any", "required": true, "deemed_refused_days": 91 },
             "appeal": { "matter": "claim_refused", "within_days": 30, "grounds": "any error" } }] });
-        let rules = rules_of(&data);
+        let rules = rules_of(&oikos_core::Frozen::of(&data));
         let words = decisions_in_words(&rules, |n| format!("{n}"));
         assert_eq!(
             words,
@@ -350,8 +366,14 @@ it may be appealed to a body that hears claim refused and can set it aside, with
         );
         let review = rules[0].review.as_ref().unwrap();
         assert_eq!(review.deemed_refused_at(5 * DAY), Some(96 * DAY));
-        let none = rules_of(&json!({ "decisions": [{ "kind": "k", "name": "S", "review": { "within_days": 30, "grounds": "any", "required": true } }] }));
+        let none = rules_of(&oikos_core::Frozen::from(json!({ "decisions": [{ "kind": "k", "name": "S", "review": { "within_days": 30, "grounds": "any", "required": true } }] })));
         assert_eq!(none[0].review.as_ref().unwrap().deemed_refused_at(0), None, "no deemed refusal unless the law says so");
+        assert_eq!(none[0].review.as_ref().unwrap().complaint_from(0), None, "no complaint of delay unless the law says so");
+        // Where the law has a complaint of delay instead (MT-21): said in the words, dated from the asking, opening no appeal.
+        let c = rules_of(&oikos_core::Frozen::from(json!({ "decisions": [{ "kind": "k", "name": "S", "review": { "within_days": 30, "grounds": "any", "required": true, "complaint_after_days": 21 } }] })));
+        assert_eq!(c[0].review.as_ref().unwrap().complaint_from(5 * DAY), Some(26 * DAY));
+        assert_eq!(c[0].review.as_ref().unwrap().deemed_refused_at(5 * DAY), None);
+        assert!(decisions_in_words(&c, |n| format!("{n}")).contains("not answered within 21 days of being asked for may be complained of to a body that hears such complaints, which may recommend but not order"));
     }
 
     #[test]

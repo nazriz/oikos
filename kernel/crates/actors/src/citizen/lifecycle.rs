@@ -65,6 +65,12 @@ pub struct Lifecycle {
     /// The daily round: a place the world refused us until then; our home under water until then.
     pub refused_go: Option<(String, i64)>,
     pub flooded_out: Option<(String, i64)>,
+    /// The vehicle the round move we sent last went by, and a vehicle the world said was not ours to take then (law 9:
+    /// another of the household took it, or it is not where we are): that go again on foot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drove: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub walk_next: bool,
     /// The body: the workplace we're off sick from; at the clinic (the condition, since); conditions we sought care for.
     pub off_sick: Option<String>,
     pub at_clinic: Option<(String, i64)>,
@@ -185,7 +191,7 @@ impl Person {
         }
         let t = w.t;
         let our_home = self.our_home();
-        if let Some(Seen::Sites { as_of, cells: next, .. }) = w.pic.channels.get(&wf.channel) {
+        if let Some(Seen::Sites { as_of, cells: next, .. }) = w.pic.channels.get(wf.channel.as_str()) {
             if *as_of != self.lifecycle.next_door_as_of {
                 self.lifecycle.next_door_as_of = *as_of;
                 let mut still = BTreeSet::new();
@@ -207,11 +213,11 @@ impl Person {
         let mut known = vec![];
         for st in cells(w.pic, "street").iter().filter_map(|c| c.structure.as_ref()) {
             for sp in &st.spaces {
-                if sp.kind != "dwelling" || Some(&sp.space) == our_home.as_ref() || sp.occupants.is_none() || !stood_empty(sp, t) {
+                if sp.kind != "dwelling" || Some(sp.space.as_str()) == our_home.as_deref() || sp.occupants.is_none() || !stood_empty(sp, t) {
                     continue;
                 }
                 for l in sp.left.iter().flatten().filter(|l| died(l.reason) && !self.of_household(&l.occupant)) {
-                    known.push((format!("died:{}", l.occupant), sp.space.clone(), st.structure.clone(), st.at.clone(), l.at));
+                    known.push((format!("died:{}", l.occupant), sp.space, st.structure, st.at, l.at));
                 }
             }
         }
@@ -229,11 +235,77 @@ impl Person {
                 &format!("Nobody has been seen at {} for some days. Please call there.", x.space),
                 Say {
                     to: Some(vec![wf.police.clone()]),
-                    data: Some(crate::papers::data(&WelfareCheckRequest { space: x.space.clone(), structure: x.structure, at: x.at, since: x.since })),
+                    data: Some(crate::papers::data(&WelfareCheckRequest { space: x.space.clone(), structure: x.structure, at: x.at, since: x.since, missing: None })),
                     ..Default::default()
                 },
             )],
         ))
+    }
+
+    /// Someone lying dead where we went by (law 9: we were there and saw them): we ask the police to come, once for each
+    /// of them (docs/behaviour/deaths.md, "On the way"). Whoever reports a death on the road names no family: nobody there
+    /// can say who it is.
+    pub fn saw_dead_on_the_way(&mut self, w: &mut Week) -> Option<Step<()>> {
+        let wf = self.p.welfare.clone()?;
+        let t = w.t;
+        // (Seen as a look at the place, through what we saw on our way.)
+        let (cell, who) = crate::common::asking::visited(w.pic, oikos_contracts::config::ON_THE_WAY)
+            .into_iter()
+            .flat_map(|c| c.remains.iter().map(move |r| (c.cell.to_string(), r.to_string())))
+            .find(|(_, r)| !self.lifecycle.asked_about.contains(&format!("remains:{r}")) && *r != self.me)?;
+        self.lifecycle.asked_about.insert(format!("remains:{who}"));
+        Some(because(
+            format!("Someone is lying dead at {cell}, on our way: asking the police to come."),
+            vec![say(
+                "welfare_check_request",
+                &format!("Someone is lying dead at {cell}. Please come."),
+                Say { to: Some(vec![wf.police.clone()]), data: Some(crate::papers::data(&WelfareCheckRequest { space: cell.clone(), structure: cell.clone(), at: cell.clone(), since: t, missing: None })), ..Default::default() },
+            )],
+        ))
+    }
+
+    /// One of our household who has not come home (law 9: someone who died on their way lies where nobody may see them): an
+    /// adult at home who sees that a member of the household left home more than a day ago (the round's own rhythm: a
+    /// household that lives together is home every day) and has not come back reports them missing to the police, once for
+    /// each going (docs/behaviour/deaths.md, "On the way").
+    pub fn missed_at_home(&mut self, w: &mut Week) -> Option<Step<()>> {
+        let wf = self.p.welfare.clone()?;
+        let t = w.t;
+        if !self.adult_body(w.pic, t) {
+            return None;
+        }
+        let home = self.our_home()?;
+        let hh = self.s.household.clone()?;
+        let here: Vec<SiteSpace> = spaces(w.pic).filter(|sp| sp.space == home).cloned().collect();
+        let sp = here.first()?;
+        if !has(sp, &self.me) {
+            return None;
+        }
+        let in_now: BTreeSet<String> = sp.occupants.iter().flatten().map(|o| o.to_string()).collect();
+        let structure = structure_of(&home).to_string();
+        let at = cells(w.pic, wf.channel.as_str()).iter().find(|c| c.structure.as_ref().is_some_and(|s| s.structure == structure.as_str())).map(|c| c.cell.to_string()).unwrap_or_else(|| structure.clone());
+        // (Reported once until they are home again: a household that has told the police does not tell them again each
+        // time it looks round, nor for each going of one who comes and goes and was never back while we were in.)
+        for m in hh.members.iter().filter(|m| in_now.contains(&m.person)) {
+            self.lifecycle.asked_about.remove(&format!("missing:{}", m.person));
+        }
+        for m in hh.members.iter().filter(|m| m.person != self.me && !in_now.contains(&m.person) && !self.s.mourned.contains(m.person.as_str())) {
+            let Some(l) = sp.left.iter().flatten().filter(|l| l.occupant == m.person.as_str()).max_by_key(|l| l.at) else { continue };
+            let key = format!("missing:{}", m.person);
+            if died(l.reason) || l.reason != oikos_contracts::events::VacateReason::Left || t - l.at <= DAY || self.lifecycle.asked_about.contains(&key) {
+                continue;
+            }
+            self.lifecycle.asked_about.insert(key);
+            return Some(because(
+                format!("{} left home more than a day ago and has not come back: reporting them missing to the police.", m.person),
+                vec![say(
+                    "welfare_check_request",
+                    &format!("{} of our household has not come home since they left. Please look for them.", m.person),
+                    Say { to: Some(vec![wf.police.clone()]), data: Some(crate::papers::data(&WelfareCheckRequest { space: home.clone(), structure, at, since: l.at, missing: Some(m.person.clone()) })), ..Default::default() },
+                )],
+            ));
+        }
+        None
     }
 
     // ------------------------------------------------------------------ deaths (citizen.ts 1623-1728)
@@ -251,14 +323,14 @@ impl Person {
             return;
         }
         for l in room.left.iter().flatten() {
-            if !died(l.reason) || self.s.mourned.contains(&l.occupant) || self.of_household(&l.occupant) {
+            if !died(l.reason) || self.s.mourned.contains(l.occupant.as_str()) || self.of_household(&l.occupant) {
                 continue;
             }
             let first = room.occupants.iter().flatten().filter(|o| **o != l.occupant).min();
-            if first != Some(&me) {
+            if first.map(|x| x.as_str()) != Some(me.as_str()) {
                 continue;
             }
-            self.s.mourned.insert(l.occupant.clone());
+            self.s.mourned.insert(l.occupant.to_string());
             w.push(because(
                 format!("{}, who worked where we work, has died here: reporting it to the registry.", l.occupant),
                 vec![death_notification(&registry, &format!("{} has died at {wp}.", l.occupant), stranger(&l.occupant, &wp))],
@@ -296,7 +368,7 @@ impl Person {
         // died at a gathering with another of the household beside them was never reported, and the household's record
         // named the dead for good: the invariants' one_household, ke-nakuru seed 1.)
         let away: Vec<SiteSpace> = if sites {
-            spaces(w.pic).filter(|sp| Some(&sp.space) != our_home.as_ref() && has(sp, &me) && sp.left.iter().flatten().any(|l| died(l.reason) && self.of_household(&l.occupant))).cloned().collect()
+            spaces(w.pic).filter(|sp| Some(sp.space.as_str()) != our_home.as_deref() && has(sp, &me) && sp.left.iter().flatten().any(|l| died(l.reason) && self.of_household(&l.occupant))).cloned().collect()
         } else {
             vec![]
         };
@@ -305,17 +377,17 @@ impl Person {
         if let (Some(home), Some(registry), true) = (&our_home, self.p.registry.clone(), self.adult_body(w.pic, t)) {
             if here.iter().any(|sp| has(sp, &me)) {
                 for l in here.iter().flat_map(|sp| sp.left.iter().flatten()) {
-                    if !died(l.reason) || self.s.mourned.contains(&l.occupant) || self.of_household(&l.occupant) {
+                    if !died(l.reason) || self.s.mourned.contains(l.occupant.as_str()) || self.of_household(&l.occupant) {
                         continue;
                     }
                     // (A guest's or lodger's death, with others who came with them at home now: their family reports it,
                     // and we leave it to them for a day from when we saw it. Where none is home, we do.)
                     let theirs = here.iter().flat_map(|sp| sp.occupants.iter().flatten()).any(|o| *o != me && *o != l.occupant && !self.of_household(o));
-                    let seen = *self.lifecycle.host_saw_death.entry(l.occupant.clone()).or_insert(t);
+                    let seen = *self.lifecycle.host_saw_death.entry(l.occupant.to_string()).or_insert(t);
                     if theirs && t - seen < DAY {
                         continue;
                     }
-                    self.s.mourned.insert(l.occupant.clone());
+                    self.s.mourned.insert(l.occupant.to_string());
                     w.push(because(
                         format!("{}, who lived where we live and is not of our household, has died here: reporting it to the registry.", l.occupant),
                         vec![death_notification(&registry, &format!("{} has died at {home}.", l.occupant), stranger(&l.occupant, home))],
@@ -327,9 +399,9 @@ impl Person {
             self.absorbed.told_dead.clear();
             return;
         };
-        let at_home: BTreeSet<String> = here.iter().chain(away.iter()).flat_map(|sp| sp.occupants.iter().flatten().cloned()).collect();
+        let at_home: BTreeSet<String> = here.iter().chain(away.iter()).flat_map(|sp| sp.occupants.iter().flatten().cloned()).map(|x| x.to_string()).collect();
         // (Seen ourselves; or told by a child of the household, who tells one adult when none is at home: ours to report.)
-        let mut deaths: Vec<(String, Option<String>)> = here.iter().chain(away.iter()).flat_map(|sp| sp.left.iter().flatten()).filter(|l| died(l.reason)).map(|l| (l.occupant.clone(), None)).collect();
+        let mut deaths: Vec<(String, Option<String>)> = here.iter().chain(away.iter()).flat_map(|sp| sp.left.iter().flatten()).filter(|l| died(l.reason)).map(|l| (l.occupant.to_string(), None)).collect();
         deaths.extend(std::mem::take(&mut self.absorbed.told_dead).into_iter().map(|(p, s)| (p, Some(s))));
         for (who, told) in deaths {
             if self.s.mourned.contains(&who) {
@@ -405,22 +477,22 @@ impl Person {
         let t = w.t;
         let me = self.me.clone();
         if self.lifecycle.known_children.is_none() {
-            self.lifecycle.known_children = Some(body.children.iter().map(|k| k.person.clone()).collect());
+            self.lifecycle.known_children = Some(body.children.iter().map(|k| k.person).map(|x| x.to_string()).collect());
         }
         let female = body.sex == Some(oikos_contracts::vocab::Sex::Female);
         for k in &body.children {
             let known = self.lifecycle.known_children.get_or_insert_with(BTreeSet::new);
-            if known.contains(&k.person) || !k.alive {
+            if known.contains(k.person.as_str()) || !k.alive {
                 continue;
             }
-            known.insert(k.person.clone());
+            known.insert(k.person.to_string());
             // The parent who bore the child does it (the other parent sees the child too).
             if !female {
                 continue;
             }
             // A child of the household now, wherever the household goes (before the record says so).
             if !self.s.children_now.iter().any(|c| c.person == k.person) {
-                self.s.children_now.push(Member { person: k.person.clone(), participant: None, born_at: k.born_at, sex: sex_of(k.sex), parents: None });
+                self.s.children_now.push(Member { person: k.person.to_string(), participant: None, born_at: k.born_at, sex: sex_of(k.sex), parents: None });
             }
             let at = self.s.home.as_ref().filter(|h| h.moved_in).map(|h| h.space.clone()).or_else(|| self.s.living_at.clone());
             if let Some(at) = at {
@@ -433,14 +505,14 @@ impl Person {
                     vec![say(
                         "birth_notification",
                         &format!("A child was born to {me}."),
-                        Say { to: Some(vec![registry]), data: Some(crate::papers::data(&BirthNotification { child: k.person.clone(), born_at: k.born_at, mother: me.clone() })), ..Default::default() },
+                        Say { to: Some(vec![registry]), data: Some(crate::papers::data(&BirthNotification { child: k.person.to_string(), born_at: k.born_at, mother: me.clone() })), ..Default::default() },
                     )],
                 ));
             }
             if let (Some(hh), Some(sex)) = (self.s.household.clone(), k.sex) {
                 let father = hh.partner_of(&me).and_then(|p| hh.member(p)).filter(|m| m.sex == Sex::Male).map(|m| m.person.clone());
                 let mut members = hh.members.clone();
-                members.push(Member { person: k.person.clone(), participant: None, born_at: k.born_at, sex: sex_of(Some(sex)), parents: Some(father.map_or(vec![me.clone()], |f| vec![me.clone(), f])) });
+                members.push(Member { person: k.person.to_string(), participant: None, born_at: k.born_at, sex: sex_of(Some(sex)), parents: Some(father.map_or(vec![me.clone()], |f| vec![me.clone(), f])) });
                 let next = HouseholdData { members: members.clone(), ..hh.clone() };
                 let to: Vec<String> = members.iter().map(|m| m.person.clone()).collect();
                 let d = self.household_data(&next);
@@ -542,11 +614,11 @@ impl Person {
 
     /// The dwelling we were last in, as this picture shows it (where we go back to).
     fn last_dwelling_now(&self, pic: &Picture) -> Option<String> {
-        let here = pic.body.as_ref().and_then(|b| b.in_space.clone());
+        let here = pic.body.as_ref().and_then(|b| b.in_space);
         let mut last = self.s.last_dwelling.clone();
         if let Some(h) = here {
-            if spaces(pic).any(|sp| sp.space == h && sp.kind == "dwelling") && !self.s.gave_up.contains(&h) {
-                last = Some(h);
+            if spaces(pic).any(|sp| sp.space == h && sp.kind == "dwelling") && !self.s.gave_up.contains(h.as_str()) {
+                last = Some(h.to_string());
             }
         }
         last.filter(|l| !self.s.gave_up.contains(l))
@@ -561,7 +633,7 @@ impl Person {
         let r = self.p.round?;
         let body = pic.body.as_ref()?;
         let t = pic.t;
-        let here = body.in_space.clone();
+        let here = body.in_space;
         let mut home = self.home_now(self.last_dwelling_now(pic));
         // (Our home under water: the relief centre, until a day on, when we try home again.)
         if let (Some((h, until)), Some(relief)) = (&self.lifecycle.flooded_out, &self.p.relief) {
@@ -574,7 +646,7 @@ impl Person {
         }
         // (At a gathering, the mind's: kept where we are while it lasts.)
         if self.mind.at_gathering(t).is_some() {
-            return here;
+            return here.map(|x| x.to_string());
         }
         let tod = t.rem_euclid(DAY);
         let workday = t.div_euclid(DAY) % 7 < r.work_days;
@@ -614,7 +686,11 @@ impl Person {
     pub fn go_where_we_belong(&mut self, pic: &Picture, _cx: &mut Cx) -> Option<Todo> {
         self.s.last_dwelling = self.last_dwelling_now(pic);
         let to = self.belong(pic)?;
-        if pic.body.as_ref().and_then(|b| b.in_space.as_ref()) == Some(&to) {
+        if pic.body.as_ref().and_then(|b| b.in_space.as_deref()) == Some(to.as_str()) {
+            return None;
+        }
+        // (On our way somewhere: not again until we are there.)
+        if pic.body.as_ref().is_some_and(|b| b.on_way.is_some()) {
             return None;
         }
         if self.lifecycle.refused_go.as_ref().is_some_and(|(r, until)| *r == to && pic.t < *until) {
@@ -627,7 +703,15 @@ impl Person {
         } else {
             "Going"
         };
-        Some(Todo { step: because(format!("{what}: {to}."), vec![move_in(&to)]), mark: Mark::Go(to) })
+        // (By a vehicle we may drive, if one stands where we are, the first of them; else on foot.)
+        let here = pic.body.as_ref().and_then(|b| b.in_space).map(|sp| structure_of(&sp).to_string());
+        let car = here.and_then(|h| pic.body.as_ref()?.vehicles.iter().find(|v| v.at == h.as_str()).map(|v| v.vehicle)).filter(|_| !std::mem::take(&mut self.lifecycle.walk_next));
+        self.lifecycle.drove = car.map(|v| v.to_string());
+        let go = match car {
+            Some(v) => crate::common::calls::move_in_by(&to, &v),
+            None => move_in(&to),
+        };
+        Some(Todo { step: because(format!("{what}: {to}."), vec![go]), mark: Mark::Go(to) })
     }
 
     /// How the round move we sent last went (the outcome comes with our next look).
@@ -638,8 +722,13 @@ impl Person {
             return;
         }
         let t = pic.t;
-        self.lifecycle.refused_go = Some((to.clone(), self.next_change(t)));
         let code = out.refusal.as_ref().map(|r| r.code);
+        // (By a vehicle that was not there to take, or not ours: on foot, at once.)
+        if self.lifecycle.drove.take().is_some() && matches!(code, Some(RefusalCode::NotPresent | RefusalCode::NotTheirs | RefusalCode::UnknownRef)) {
+            self.lifecycle.walk_next = true;
+            return;
+        }
+        self.lifecycle.refused_go = Some((to.clone(), self.next_change(t)));
         // (Our home under water: to the relief centre at once. Work or school under water: not before things change.)
         let home_now = self.home_now(self.s.last_dwelling.clone());
         if code == Some(RefusalCode::Flooded) && home_now.as_ref() == Some(&to) && self.p.relief.is_some() {
@@ -674,7 +763,7 @@ impl Person {
             .filter(|st| st.structure == school.building)
             .flat_map(|st| st.spaces.iter())
             .find(|sp| sp.kind == "classroom" && has(sp, &self.me))
-            .map(|sp| sp.space.clone())
+            .map(|sp| sp.space.to_string())
     }
 
     /// A child of school age who isn't at school: to the place offered, or asking for one (once a month).
@@ -686,13 +775,13 @@ impl Person {
         if age < school.ages[0] || age > school.ages[1] || self.classroom_of(w.pic).is_some() {
             return None;
         }
-        let place = self.school_place().map(|r| (r.id.clone(), data(r).s("classroom").map(String::from)));
+        let place = self.school_place().map(|r| (r.id, data(r).s("classroom").map(String::from)));
         // (With the round, a place is ours to go to in school hours; without it, we go now and stay.)
         if let Some((id, Some(room))) = &place {
             if self.p.round.is_some() {
                 return None;
             }
-            if self.lifecycle.tried_place.insert(id.clone()) {
+            if self.lifecycle.tried_place.insert(id.to_string()) {
                 return Some(because("A place at school: going.", vec![move_in(room)]));
             }
         }
@@ -775,13 +864,13 @@ impl Person {
             }
             return;
         }
-        let Some(ill) = now.iter().find(|x| !x.treated && c.severities.contains(&x.severity) && !self.lifecycle.sought_care.contains(&x.id)) else { return };
-        self.lifecycle.sought_care.insert(ill.id.clone());
+        let Some(ill) = now.iter().find(|x| !x.treated && c.severities.contains(&x.severity) && !self.lifecycle.sought_care.contains(x.id.as_str())) else { return };
+        self.lifecycle.sought_care.insert(ill.id.to_string());
         let kind = serde_json::to_value(ill.kind).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_default();
         if w.cx.rng(&format!("care-{kind}-{}", ill.since)).below(10_000) as i64 >= c.seek_bps {
             return;
         }
-        self.lifecycle.at_clinic = Some((ill.id.clone(), t));
+        self.lifecycle.at_clinic = Some((ill.id.to_string(), t));
         w.push(because(
             format!("A {} {kind}: going to the clinic.", ill.severity),
             vec![
@@ -792,7 +881,7 @@ impl Person {
                     Say {
                         to: Some(vec![c.entity.clone()]),
                         visible: Some(Visible::Only(vec![me, c.entity.clone()])),
-                        data: Some(crate::papers::data(&CareRequest { condition: Some(ill.id.clone()), kind: Some(kind.clone()), severity: Some(ill.severity.clone()), children: vec![] })),
+                        data: Some(crate::papers::data(&CareRequest { condition: Some(ill.id.to_string()), kind: Some(kind.clone()), severity: Some(ill.severity.clone()), children: vec![] })),
                         ..Default::default()
                     },
                 ),
@@ -939,14 +1028,14 @@ mod tests {
     }
     fn pic(me: &str, t: i64, body: Value, street: Vec<SiteCell>, extra: Vec<(&str, Seen)>) -> Picture {
         let mut channels = BTreeMap::new();
-        channels.insert("street".to_string(), Seen::Sites { as_of: t, cells: Arc::new(street), visit: None });
+        channels.insert("street".into(), Seen::Sites { as_of: t, cells: Arc::new(street), visit: None });
         let accounts = vec![serde_json::from_value(json!({ "account": format!("acc.{me}"), "holder": me, "custodian": "bank", "currency": "XTS", "balance": "500000" })).unwrap()];
-        channels.insert("bank".to_string(), Seen::Accounts { accounts: Arc::new(accounts), transactions: vec![] });
+        channels.insert("bank".into(), Seen::Accounts { accounts: Arc::new(accounts), transactions: vec![] });
         for (k, v) in extra {
-            channels.insert(k.to_string(), v);
+            channels.insert(k.into(), v);
         }
         Picture {
-            participant: format!("p.{me}"),
+            participant: format!("p.{me}").into(),
             t,
             status: serde_json::from_value(json!("active")).unwrap(),
             entity: me.into(),
@@ -959,8 +1048,7 @@ mod tests {
             asking: vec![],
             readings: Default::default(),
             woke_for: "cadence".into(),
-            since: 0,
-        }
+            since: 0, held: Default::default() }
     }
     fn adult(sex: &str, at: Option<&str>) -> Value {
         json!({ "born_at": -40 * YEAR, "sex": sex, "present": true, "alive": true, "in": at })
@@ -1120,6 +1208,23 @@ mod tests {
         let p = pic("ann", 9 * DAY, adult("female", None), vec![], vec![next(9 * DAY)]);
         let (s, _) = week(&mut ann, &c, &p, |a, w| a.wonder_next_door(w));
         assert!(s.is_none(), "once");
+    }
+
+    #[test]
+    fn someone_seen_lying_dead_on_the_way_is_reported_to_the_police_once() {
+        let c = ctx("ann", json!({ "welfare": { "police": "police", "channel": "next", "found_after": [{ "within_days": 3, "bps": 10_000 }] } }));
+        let mut ann = Person::new(&c).unwrap();
+        let road = |as_of: i64| {
+            let cell: SiteCell = serde_json::from_value(json!({ "cell": "cell.4.2", "x": 4, "y": 2, "remains": ["dan"] })).unwrap();
+            ("on_the_way", Seen::Sites { as_of, cells: Arc::new(vec![cell]), visit: Some(oikos_sight::Visit { seen_at: Default::default(), fresh: vec!["cell.4.2".into()] }) })
+        };
+        let p = pic("ann", DAY, adult("female", None), vec![], vec![road(DAY)]);
+        let (s, _) = week(&mut ann, &c, &p, |a, w| a.saw_dead_on_the_way(w));
+        let text = oikos_sight::calls::program_text(&s.expect("asked").program());
+        assert!(text.contains("welfare_check_request") && text.contains("police") && text.contains("cell.4.2"), "{text}");
+        let p = pic("ann", 2 * DAY, adult("female", None), vec![], vec![road(2 * DAY)]);
+        let (s, _) = week(&mut ann, &c, &p, |a, w| a.saw_dead_on_the_way(w));
+        assert!(s.is_none(), "once for each of them");
     }
 
     #[test]

@@ -571,7 +571,7 @@ mod tests {
                 &[("alive-one", "person", Some("alive-one-self")), ("dead-one", "person", Some("dead-one-self"))],
             );
             let (programs, looks, _) = drive(actor.as_mut(), &pic, &c);
-            looked.extend(looks.iter().map(|l| l.channel.clone()));
+            looked.extend(looks.iter().map(|l| l.channel.to_string()));
             found.extend(appointments(&calls_of(&programs).into_iter().map(|c| (day, c)).collect::<Vec<_>>()));
         }
         assert!(!found.is_empty());

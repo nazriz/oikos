@@ -10,6 +10,7 @@
 //! hundredths from the mind, a parameter's float read once as thousandths, a chance in basis points or, for a business
 //! of one, parts per million), rounded half away from zero; postings tie-broken by the order they were seen.
 
+use oikos_core::Frozen;
 use super::mind::{Choice, ConductAsk, Decide, Event, Facts, Outcome, Way};
 use super::params::Params;
 #[allow(unused_imports)]
@@ -57,6 +58,25 @@ pub struct Work {
     pub next_own_review: i64,
     pub next_venture: i64,
     pub next_take_chance: i64,
+    /// Borrowing to start a business of one (risk ME-1): when we applied to our bank for the capital we were short of, and
+    /// the monthly repayment of the loan we signed for it (weighed against what the business is expected to pay us).
+    #[serde(default)]
+    pub start_loan: Option<i64>,
+    #[serde(default)]
+    pub start_repayment: Option<i64>,
+    /// Our own record of a business of one we ran and gave up (docs/behaviour/entry.md, "Founding again after giving one
+    /// up"): what it paid us and what its market, as we saw it, said it would, over the months we judged it by.
+    #[serde(default)]
+    pub ran_own: Option<RanOwn>,
+}
+
+/// What a business of one we gave up paid us, against what its market (as we saw it then) said it would, summed over the
+/// months we judged it by: our own evidence of what such a business does in our hands (Jovanovic 1982).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RanOwn {
+    pub months: i64,
+    pub paid: i64,
+    pub expected: i64,
 }
 
 impl Work {
@@ -100,8 +120,8 @@ fn swayed(bps: i64, z: i64, per_milli: i64) -> i64 {
 }
 
 /// A float parameter read once as thousandths.
-fn milli(v: Option<&Value>, default: i64) -> i64 {
-    v.and_then(Value::as_f64).map_or(default, |f| (f * 1_000.0).round() as i64)
+fn milli(v: Option<&Frozen>, default: i64) -> i64 {
+    v.and_then(|x| x.as_number()).and_then(serde_json::Number::as_f64).map_or(default, |f| (f * 1_000.0).round() as i64)
 }
 
 /// citizen.ts `SWAY`, as the world may set some of it (`params.sway`), in thousandths.
@@ -150,14 +170,14 @@ fn tenths_words(t: i64) -> String {
 }
 
 /// An offer's facts, from its typed terms (mind.ts `factsOf`): money a month for the taker, work hours, a home, goods.
-fn facts_of(offer: &Value) -> Facts {
+fn facts_of(offer: &Frozen) -> Facts {
     let mut f = Facts::default();
-    let Some(cs) = offer.get("terms").and_then(|t| t.get("commitments")).and_then(Value::as_array) else { return f };
+    let Some(cs) = offer.get("terms").and_then(|t| t.get("commitments")).and_then(|x| x.as_array()) else { return f };
     for c in cs {
         let Some(o) = c.get("does").and_then(|d| d.get("outcome")) else { continue };
         let every = c.get("every").and_then(crate::papers::lenient::whole).filter(|e| *e != 0);
         let per_month = |x: i64| every.map_or(x, |e| div_round(x * MONTH, e));
-        let taker = c.get("who").and_then(Value::as_str) == Some("taker");
+        let taker = c.get("who").and_then(|x| x.as_str()) == Some("taker");
         if let Some(m) = o.get("money") {
             let a = m.get("amount").and_then(crate::papers::lenient::whole).unwrap_or(0);
             f.money_per_month += if taker { -per_month(a) } else { per_month(a) };
@@ -217,11 +237,11 @@ impl Person {
         let mut out = serde_json::Map::new();
         // (A citizen's `values` param holds the population's spread under `values`, beside its own.)
         let given = cx.ctx.params.get("values");
-        if let Some(pop) = given.and_then(|v| v.get("values")).or(given).and_then(Value::as_object) {
+        if let Some(pop) = given.and_then(|v| v.get("values")).or(given).and_then(|x| x.as_object()) {
             for (name, spread) in pop {
-                let (Some(mean), Some(sd)) = (spread.get("mean_bps").and_then(Value::as_i64), spread.get("sd_bps").and_then(Value::as_i64)) else { continue };
+                let (Some(mean), Some(sd)) = (spread.get("mean_bps").and_then(|x| x.as_i64()), spread.get("sd_bps").and_then(|x| x.as_i64())) else { continue };
                 let z = self.mind.value_z(name);
-                out.insert(name.clone(), json!((mean + (z * sd).div_euclid(100)).clamp(0, 10_000)));
+                out.insert(name.to_string(), json!((mean + (z * sd).div_euclid(100)).clamp(0, 10_000)));
             }
         }
         Value::Object(out)
@@ -258,7 +278,7 @@ impl Person {
     /// The ground cell a building stands on, as we have seen it (being there).
     fn wk_cell_of(pic: &Picture, structure: &str) -> Option<String> {
         pic.channels.values().find_map(|c| match c {
-            Seen::Sites { cells, .. } => cells.iter().find(|c| c.structure.as_ref().is_some_and(|s| s.structure == structure)).map(|c| c.cell.clone()),
+            Seen::Sites { cells, .. } => cells.iter().find(|c| c.structure.as_ref().is_some_and(|s| s.structure == structure)).map(|c| c.cell.to_string()),
             _ => None,
         })
     }
@@ -320,7 +340,18 @@ impl Person {
         }
         let pm = v.role_module.get("params").cloned().unwrap_or(Value::Null);
         let g = |k: &str| pm.get(k).and_then(crate::papers::lenient::whole);
-        let kind = pm.get("kind").and_then(Value::as_str).unwrap_or(&self.p.goods).to_string();
+        let opportunity = self.s.job.as_ref().map_or(0, |j| div_round(j.wage * MONTH, j.period.max(DAY)));
+        // (A factory, in works for sale (foundations-2 E3): its custom is the market for its kind, as the world market
+        // publishes what it takes a month, shared among the town's factories of that kind and itself; a hand makes what a
+        // working month at its time a unit allows; the going wage is its own, as a factory posts it.)
+        if v.role_module.get("code").and_then(|c| c.as_str()) == Some("firm.producer") {
+            let per = g("labour_per_unit").filter(|x| *x > 0)?;
+            let units_per_worker = g("working_day").unwrap_or(8 * 3_600) * g("work_days").unwrap_or(5) * 30 / 7 / per;
+            let period = g("period").unwrap_or(14 * DAY).max(DAY);
+            let wage = if hires { g("wage").map_or(0, |w| div_round(w * MONTH, period)) } else { 0 };
+            return Some(oikos_rules::entry::Prospect { price: g("price")?, unit_cost: v.unit_cost.unwrap_or(0), units_per_household: v.demand_per_month?, households_reached: 1, sellers_known: v.sellers.unwrap_or(0), units_per_worker, wage, fixed: v.fixed_per_month.unwrap_or(0).max(0), opportunity });
+        }
+        let kind = pm.get("kind").and_then(|x| x.as_str()).unwrap_or(&self.p.goods).to_string();
         let mine: BTreeSet<String> = self.s.own_work.iter().map(|o| o.firm.clone()).collect();
         let known: Vec<super::money::Shop> = super::money::shops(&self.book, &kind).into_iter().filter(|s| !mine.contains(&s.shop)).collect();
         let mut prices: Vec<i64> = known.iter().map(|s| s.price).collect();
@@ -354,8 +385,25 @@ impl Person {
             })
             .max();
         let wage = if hires { posted.or_else(|| g("wage").map(|w| div_round(w * MONTH, period))).unwrap_or(0) } else { 0 };
-        let opportunity = self.s.job.as_ref().map_or(0, |j| div_round(j.wage * MONTH, j.period.max(DAY)));
         Some(oikos_rules::entry::Prospect { price, unit_cost, units_per_household, households_reached: if v.own { homes.len() as i64 } else { self.p.population }, sellers_known: known.len() as i64, units_per_worker, wage, fixed: v.fixed_per_month.unwrap_or(0).max(0), opportunity })
+    }
+
+    /// What a business of one would leave us, as we judge it: its market's figure (`venture_prospect`), weighed with our
+    /// own record of running one, where we have one (docs/behaviour/entry.md, "Founding again after giving one up"). The
+    /// record moves the market's figure by what ours paid against what its market said it would, as evidence of what such a
+    /// business does in our hands (Jovanovic 1982: one learns one's own aptitude from what the venture pays), counted as
+    /// its months against the market figure's weight (`venture_prior_months`, a placeholder): a short record moves it a
+    /// little, a long one nearly wholly. The market's figure itself is read now, so a market that has changed since counts.
+    pub fn own_expected(&self, pic: &Picture, v: &super::params::Venture, hires: bool) -> Option<oikos_rules::entry::Expected> {
+        let mut e = oikos_rules::entry::expected(&self.venture_prospect(pic, v, hires)?);
+        if let Some(r) = self.work.ran_own.as_ref().filter(|r| v.own && r.months > 0 && e.profit > 0) {
+            let k = self.p.venture_prior_months.max(0);
+            // (In basis points of the market's figure: the record's ratio, paid over expected; none expected, none learned.)
+            let ratio = if r.expected > 0 { (r.paid.max(0) * 10_000 / r.expected).min(10_000 * 10) } else { 10_000 };
+            let bps = div_round(k * 10_000 + r.months * ratio, (k + r.months).max(1));
+            e.profit = div_round(e.profit * bps, 10_000);
+        }
+        Some(e)
     }
 
     /// Whether to start it (docs/behaviour/entry.md, "Entry by expected profit"): the mind's decision between the
@@ -460,9 +508,20 @@ impl Person {
         let Some(own) = self.s.own_work.clone() else { return };
         // (Our business has taken premises on a lease, and says so: we work there now, and not from home:
         // docs/behaviour/leasing.md.)
-        let moved = crate::common::latest_by_speaker(&self.book, "trading_at", |r| crate::common::addressed_to(r).contains(&self.me))
-            .get(&Some(own.firm.as_str()))
-            .map(|r| (data(r).s("space").map(String::from), data(r).i("rent"), data(r).i("until")));
+        let latest = crate::common::latest_by_speaker(&self.book, "trading_at", |r| crate::common::addressed_to(r).iter().any(|x| x == &self.me)).get(&Some(own.firm.as_str())).cloned();
+        // (Its lease has ended, and it says so: it trades from where it did before, and we work from home again, as we did:
+        // where that is, we tell it, as for any move home.)
+        if latest.as_ref().is_some_and(|r| data(r).flag("back")) {
+            if own.lease.is_some() {
+                if let Some(o) = self.s.own_work.as_mut() {
+                    o.at = None;
+                    o.lease = None;
+                }
+                self.work.trading_from = None;
+            }
+        }
+        let moved = latest.filter(|r| !data(r).flag("back")).map(|r| (data(r).s("space").map(String::from), data(r).i("rent"), data(r).i("until")));
+        let own = self.s.own_work.clone().unwrap_or(own);
         if let Some((Some(space), rent, until)) = moved.filter(|m| m.0.is_some() && own.at.as_deref() != m.0.as_deref()) {
             if let Some(o) = self.s.own_work.as_mut() {
                 o.at = Some(space);
@@ -577,7 +636,7 @@ impl Person {
         }
         w.push(because(format!("Our notice is worked out: starting the job we took ({} every {} days).", Self::wk_usd(w, terms.wage), div_round(terms.period, DAY)), calls));
         let employer = other_party(&r, &me).unwrap_or_default().to_string();
-        self.s.job = Some(Job { agreement: r.id.clone(), employer: employer.clone(), wage: terms.wage, period: terms.period, workplace: terms.workplace.clone(), since: t, ..Default::default() });
+        self.s.job = Some(Job { agreement: r.id.to_string(), employer: employer.clone(), wage: terms.wage, period: terms.period, workplace: terms.workplace.clone(), since: t, ..Default::default() });
         self.s.employers.insert(employer.clone());
         self.s.jobless_since = None;
         self.tell(w, mine("job", &employer, "hired", facts([("wage", json!(terms.wage)), ("period_days", json!(div_round(terms.period, DAY))), ("after_notice", json!(true))])));
@@ -719,17 +778,17 @@ impl Person {
                 && (held == 0 || wage * j.period * 10_000 > j.wage * period * (10_000 + p.wk_held_in(w, t, d.s("industry"))))
         };
         let told: Vec<Arc<Record>> = if job.is_some() { vec![] } else { self.s.lead_jobs.iter().filter(|id| !self.work.applied.contains(*id)).filter_map(|id| self.wk_record(w.pic, id)).collect() };
-        let told_ids: BTreeSet<String> = told.iter().map(|r| r.id.clone()).collect();
+        let told_ids: BTreeSet<String> = told.iter().map(|r| r.id).map(|x| x.to_string()).collect();
         let mut posts: Vec<Arc<Record>> = told.clone();
         posts.extend(self.s.found_jobs.iter().filter(|id| !told_ids.contains(*id)).filter_map(|id| self.wk_record(w.pic, id)));
-        posts.retain(|r| !self.work.applied.contains(&r.id) && r.speaks_for.is_some() && better(self, r));
+        posts.retain(|r| !self.work.applied.contains(r.id.as_str()) && r.speaks_for.is_some() && better(self, r));
         self.work.searching_work = false;
         // An employer is one option (its first posting: one we were told of, if any).
         let mut by_employer: Vec<(String, Arc<Record>)> = vec![];
         for r in posts {
-            let e = r.speaks_for.clone().unwrap_or_default();
+            let e = r.speaks_for.unwrap_or_default();
             if !by_employer.iter().any(|(x, _)| *x == e) {
-                by_employer.push((e, r));
+                by_employer.push((e.to_string(), r));
             }
         }
         if by_employer.is_empty() {
@@ -747,13 +806,13 @@ impl Person {
                 } else {
                     facts_of(offer)
                 };
-                Choice { key: e.clone(), facts: Some(f), others: Some(i64::from(told_ids.contains(&r.id))), meaning: None }
+                Choice { key: e.clone(), facts: Some(f), others: Some(i64::from(told_ids.contains(r.id.as_str()))), meaning: None }
             })
             .collect();
         let life = self.life(w.pic, t, Some(acc.balance));
         let d = self.mind.decide(w.cx, &life, Decide { domain: "job".into(), options, satisfied_here: Some(if job.is_some() { 10_000 } else { 0 }), purpose: Some("job".into()), ..Default::default() });
         let Some((employer, best)) = d.key.as_ref().and_then(|k| by_employer.iter().find(|(e, _)| e == k)).cloned() else { return };
-        self.work.applied.insert(best.id.clone());
+        self.work.applied.insert(best.id.to_string());
         if let Some(i) = data(&best).s("industry") {
             self.s.industry_of.insert(employer.clone(), i.to_string());
         }
@@ -769,10 +828,10 @@ impl Person {
             .flatten()
             .find_map(|e| self.s.industry_of.get(&e).cloned())
             .or_else(|| self.p.trade.clone());
-        let paper = crate::papers::data(&JobApplication { posting: best.id.clone(), account: acc.account.clone(), trade });
+        let paper = crate::papers::data(&JobApplication { posting: best.id.to_string(), account: acc.account.clone(), trade });
         w.push(because(
             format!("Applying for a job at {} a pay period{ours}{how}.", Self::wk_usd(w, data(&best).i("wage").unwrap_or(0))),
-            vec![say("job_application", "Application for the advertised job.", Say { to: Some(vec![employer.clone()]), visible: only(&me, &employer), data: Some(paper), basis: Some(best.id.clone()), ..Default::default() })],
+            vec![say("job_application", "Application for the advertised job.", Say { to: Some(vec![employer.clone()]), visible: only(&me, &employer), data: Some(paper), basis: Some(best.id.to_string()), ..Default::default() })],
         ));
     }
 
@@ -796,7 +855,7 @@ impl Person {
         // The capital our new business calls for.
         if let Some(f) = self.work.founded.clone().filter(|f| f.firm.is_some() && !f.paid) {
             let firm = f.firm.clone().unwrap_or_default();
-            let calls: Vec<Arc<Record>> = self.book.all("capital_call").filter(|r| r.speaks_for.as_deref() == Some(firm.as_str()) && crate::common::addressed_to(r).contains(&me)).cloned().collect();
+            let calls: Vec<Arc<Record>> = self.book.all("capital_call").filter(|r| r.speaks_for.as_deref() == Some(firm.as_str()) && crate::common::addressed_to(r).iter().any(|x| x == &me)).cloned().collect();
             // (TS paid every call of the firm's addressed to us, without breaking: so here; a firm calls once.)
             for r in calls {
                 let d = data(&r);
@@ -851,14 +910,19 @@ impl Person {
             && (venturing || wanted || {
                 // (Hands only where the business can take them on: its room for staff.)
                 let hires = v.role_module.get("params").and_then(|p| p.get("max_staff")).and_then(crate::papers::lenient::whole).unwrap_or(0) > 0;
-                let e = self.venture_prospect(w.pic, &v, hires).map(|p| oikos_rules::entry::expected(&p));
-                e.is_some_and(|e| e.units > 0 && self.weigh_venture(w, e.profit, false))
+                let e = self.own_expected(w.pic, &v, hires);
+                // (Less what we repay a month on a loan we took to start it.)
+                let owed = self.work.start_repayment.unwrap_or(0);
+                e.is_some_and(|e| e.units > 0 && self.weigh_venture(w, e.profit - owed, false))
             });
         if means && !venturing && wanted {
             self.wk_record_choice(w, "venture", "found_own", "not", 10_000, founds);
         }
         if !means {
             self.work.venturing = None;
+            if dwelling.is_some() && cell.is_some() {
+                self.borrow_to_start(w, acc, &v, housing, wanted);
+            }
             return;
         }
         if !founds {
@@ -897,8 +961,9 @@ impl Person {
         .collect();
         // (What we expect it to pay us a month, by what we know of its market, until it has a record of its own; the
         // venture's figure where we know no price.)
-        let expect = self.venture_prospect(w.pic, &v, false).map(|p| oikos_rules::entry::expected(&p).profit).filter(|x| *x > 0).or(v.expect_per_month).unwrap_or(0);
+        let expect = self.own_expected(w.pic, &v, false).map(|e| e.profit).filter(|x| *x > 0).or(v.expect_per_month).unwrap_or(0);
         self.work.founded = Some(Founded { firm: None, capital: v.capital, paid: false, own: Some((dwelling.clone(), expect)) });
+        self.work.start_loan = None;
         let entity = call(
             "entity",
             vec![
@@ -914,6 +979,63 @@ impl Person {
             vec![bound("firm", entity)],
         ));
         self.absorbed.pending_firm = Some(v.capital);
+    }
+
+    /// Borrowing to start a business of one (docs/behaviour/entry.md, "Borrowing to start"; risk ME-1): a business we would
+    /// start, by what we expect it to pay us, that we lack only the money for (a home to trade from, and short of its capital
+    /// and the month's buffer): we ask our bank to lend us what we are short of, over the longest term it lends for. The
+    /// bank's lending office decides it by its own rules (what it can see of our account), in its officer's time; whether to
+    /// take the loan it offers is weighed again when we see its repayment (`borrowing`). Nothing if our town's bank does not
+    /// lend to start one (`start_loan_months` 0), or we may not apply (waiting, repaying, refused lately, in default).
+    fn borrow_to_start(&mut self, w: &mut Week, acc: &crate::common::OwnAccount, v: &super::params::Venture, housing: i64, wanted: bool) {
+        let t = w.t;
+        let lender = self.p.bank.clone().unwrap_or_default();
+        if self.p.start_loan_months <= 0 || self.work.start_loan.is_some() || !self.money.borrowing.can_apply(&lender, t) {
+            return;
+        }
+        let short = v.capital + self.p.found_own_buffer_months * (housing + self.p.essentials) - acc.balance;
+        if short <= 0 {
+            return;
+        }
+        let worth = wanted || {
+            let e = self.own_expected(w.pic, v, false);
+            e.is_some_and(|e| e.units > 0 && self.weigh_venture(w, e.profit, false))
+        };
+        if !worth {
+            return;
+        }
+        let amount = short.div_euclid(10_000) * 10_000 + if short.rem_euclid(10_000) > 0 { 10_000 } else { 0 };
+        let months = self.p.start_loan_months;
+        let world = &w.cx.ctx.world;
+        let why = format!(
+            "We have {}, and starting a business of our own ({}) takes {} with a month in hand: asking our bank to lend us {} over {months} months to start it.",
+            money_words(acc.balance, world),
+            v.name.to_lowercase(),
+            money_words(acc.balance + short, world),
+            money_words(amount, world)
+        );
+        let text = format!("Application for a loan of {} over {months} months, for a business.", money_words(amount, world));
+        self.money.borrowing.applied = Some(t);
+        self.work.start_loan = Some(t);
+        let app = crate::papers::finance::LoanApplication { amount, months, account: acc.account.clone(), purpose: "a business".into(), price: None, home: None };
+        let me = self.me.clone();
+        w.push(because(why, vec![say("loan_application", &text, Say { to: Some(vec![lender.clone()]), visible: Some(Visible::Only(vec![me, lender])), data: Some(crate::papers::data(&app)), ..Default::default() })]));
+    }
+
+    /// A loan offered for a business we asked to borrow for: whether to take it, weighing the business as for starting it,
+    /// less the loan's repayment (`borrow_to_start`). Meant by a founding's draw: taken.
+    pub fn take_start_loan(&mut self, w: &mut Week, repayment: i64) -> bool {
+        let wanted = w.t < self.s.venture_wanted;
+        let Some(v) = self.p.ventures.iter().find(|v| v.own).cloned() else { return false };
+        let takes = wanted || {
+            let e = self.own_expected(w.pic, &v, false);
+            e.is_some_and(|e| e.units > 0 && self.weigh_venture(w, e.profit - repayment, false))
+        };
+        self.work.start_loan = None;
+        if takes {
+            self.work.start_repayment = Some(repayment);
+        }
+        takes
     }
 
     /// Giving a business of one up (docs/behaviour/entry.md, "Giving it up"): each month after its first, its owner
@@ -969,6 +1091,14 @@ impl Person {
             format!("Our business has paid us {} a month over {} months: not worth keeping against {alt}. Closing it, and looking for work.", Self::wk_usd(w, pays), window),
             vec![say("trading_from", "Closing: the business is given up.", Say { to: Some(vec![own.firm.clone()]), visible: only(&self.me, &own.firm), data: Some(dd), ..Default::default() })],
         ));
+        // (Our record of it, beside any earlier one: what it paid us against what its market, as we see it now, says such
+        // a business pays; and the next weighing of starting one a month on, as for anyone, not at once.)
+        let market = self.p.ventures.iter().find(|v| v.own).cloned().and_then(|v| self.venture_prospect(w.pic, &v, false)).map(|p| oikos_rules::entry::expected(&p).profit).filter(|x| *x > 0).unwrap_or(own.expect_per_month);
+        let r = self.work.ran_own.get_or_insert_with(Default::default);
+        r.months += window;
+        r.paid += pays * window;
+        r.expected += market.max(0) * window;
+        self.work.next_own_venture = t + MONTH;
         self.s.own_work = None;
         self.work.trading_from = None;
         self.work.own_since = -1;
@@ -1026,7 +1156,7 @@ impl Person {
         let with: BTreeMap<&str, Value> = [
             ("{values}", owner_values),
             ("{structure}", json!(structure)),
-            ("{cell}", d.get("cell").cloned().unwrap_or(Value::Null)),
+            ("{cell}", (d.get("cell").cloned().unwrap_or((Value::Null).into())).to_value()),
             ("{listing}", json!(l.id)),
             ("{founder}", json!(me)),
             ("{capital}", json!(capital)),
@@ -1102,7 +1232,7 @@ impl Person {
             format!("We can't make ends meet ({}, less than a month's essentials): taking {} {} from {}'s stock at work, and home with them.", Self::wk_usd(w, balance), crime.quantity, self.p.goods, job.employer),
             vec![
                 call("take", vec![("kind", Some(arg(&self.p.goods))), ("quantity", Some(text(q.clone()))), ("from", Some(arg(&job.employer))), ("at", Some(arg(&at)))]),
-                call("goods", vec![("kind", Some(arg(&self.p.goods))), ("quantity", Some(text(q))), ("to", Some(arg(&me))), ("at", Some(arg(&home_at))), ("from_at", Some(arg(&at)))]),
+                call("goods", vec![("carried", Some(arg("yes"))), ("kind", Some(arg(&self.p.goods))), ("quantity", Some(text(q))), ("to", Some(arg(&me))), ("at", Some(arg(&home_at))), ("from_at", Some(arg(&at)))]),
             ],
         ));
     }
@@ -1156,7 +1286,7 @@ mod tests {
             let cell: oikos_sight::SiteCell = serde_json::from_value(json!({ "cell": "c.1", "x": 0, "y": 0, "structure": { "structure": "b1", "type": "house", "at": "c.1", "w": 1, "h": 1, "complete": true,
                 "spaces": [{ "space": "b1/dwelling.1", "kind": "dwelling", "capacity": 4, "count": homes, "occupants": ["ann"] }] } }))
             .unwrap();
-            channels.insert("street".to_string(), Seen::Sites { as_of: t, cells: Arc::new(vec![cell]), visit: None });
+            channels.insert("street".into(), Seen::Sites { as_of: t, cells: Arc::new(vec![cell]), visit: None });
         }
         let body = born_at.map(|b| serde_json::from_value(json!({ "born_at": b, "present": true, "alive": true })).unwrap());
         Picture {
@@ -1173,8 +1303,7 @@ mod tests {
             asking: vec![],
             readings: Default::default(),
             woke_for: "cadence".into(),
-            since: 0,
-        }
+            since: 0, held: Default::default() }
     }
     fn acc(balance: i64) -> Option<crate::common::OwnAccount> {
         Some(crate::common::OwnAccount { account: "acc.ann".into(), balance, custodian: "bank".into(), currency: "XTS".into() })
@@ -1363,6 +1492,44 @@ mod tests {
     }
 
     #[test]
+    fn short_only_of_the_money_for_a_business_that_pays_we_ask_our_bank_to_lend_it_and_take_the_loan_only_if_it_still_pays() {
+        // (ME-1: the bank's lending office decides the application by its own rules; here, what the founder does.)
+        let c = ctx_with(json!({ "ventures": own_venture(), "bank": "bank", "start_loan_months": 60 }));
+        let mut ann = Person::new(&c).unwrap();
+        at_home(&mut ann);
+        ann.book.take_all(&known_shops(2, 1_200));
+        ann.work.next_own_venture = 0;
+        // The capital (50,000) and a month's housing and essentials (140,000) against 100,000: short by 90,000, asked for over the
+        // bank's longest term, for a business.
+        let out = run(&mut ann, &c, &homes_around(DAY, None, 200), 100_000, |a, w| a.ventures(w));
+        assert!(out.len() == 1 && out[0].contains("loan_application") && out[0].contains("\"purpose\":\"a business\"") && out[0].contains("\"amount\":90000") && out[0].contains("\"months\":60"), "{out:?}");
+        // Not again while it is waiting on the answer, nor next month while we may not apply.
+        ann.work.next_own_venture = 0;
+        assert!(run(&mut ann, &c, &homes_around(2 * DAY, None, 200), 100_000, |a, w| a.ventures(w)).is_empty());
+        // Without a bank that lends to start one: nothing.
+        let none = ctx_with(json!({ "ventures": own_venture(), "bank": "bank" }));
+        let mut bob = Person::new(&none).unwrap();
+        at_home(&mut bob);
+        bob.book.take_all(&known_shops(2, 1_200));
+        bob.work.next_own_venture = 0;
+        assert!(run(&mut bob, &none, &homes_around(DAY, None, 200), 100_000, |a, w| a.ventures(w)).is_empty());
+        // The loan offered: one whose repayment takes all the business would pay us is not taken; one that leaves it paying is.
+        let me = ann.me.clone();
+        let app = st("rec.app", "loan_application", &me, json!({ "amount": 90_000, "months": 60, "account": "acc.ann", "purpose": "a business" }));
+        let offer = |id: &str, repay: i64| rec(json!({ "id": id, "record": "agreement", "author": "p.bank", "at": 3 * DAY, "visible_to": ["bank", me], "basis": "rec.app",
+            "terms": { "template": "loan", "parties": ["bank", me], "commitments": [{ "who": me, "does": { "outcome": { "money": { "to": "acc-bank", "amount": repay.to_string() } } }, "every": MONTH }] } }));
+        ann.book.take_all(&[app, offer("rec.dear", 900_000)]);
+        let out = run(&mut ann, &c, &homes_around(3 * DAY, None, 200), 100_000, |a, w| a.borrowing(w));
+        assert!(out.iter().all(|x| !x.contains("agreement")), "too dear to take: {out:?}");
+        ann.money.borrowing = Default::default();
+        ann.work.start_loan = Some(DAY);
+        ann.book.take_all(&[offer("rec.fair", 2_000)]);
+        let out = run(&mut ann, &c, &homes_around(4 * DAY, None, 200), 100_000, |a, w| a.borrowing(w));
+        assert!(out.iter().any(|x| x.contains("agreement") && x.contains("rec.fair")), "{out:?}");
+        assert_eq!((ann.work.start_loan, ann.work.start_repayment), (None, Some(2_000)));
+    }
+
+    #[test]
     fn someone_out_of_work_with_a_home_and_the_means_starts_a_business_of_one_where_it_pays_puts_in_its_capital_and_trades_from_home() {
         let c = ctx_with(json!({ "ventures": own_venture() }));
         let mut ann = Person::new(&c).unwrap();
@@ -1426,6 +1593,50 @@ mod tests {
         assert!(e.profit > 0 && e.profit < 100_000 * MONTH / (14 * DAY), "{e:?}");
     }
 
+    /// A factory's venture (foundations-2 E3): works for sale bought, the town's goods made there; its market the world
+    /// market's appetite (1,000 a month) shared with the one factory there is.
+    fn factory_venture() -> Value {
+        json!([{ "kind": "factory", "name": "Factory", "capital": 2_000_000, "unit_cost": 2_700, "demand_per_month": 1_000, "sellers": 1,
+            "channels": [], "role_module": { "code": "firm.producer", "params": { "works": "{structure}", "founder": "{founder}", "capital": "{capital}", "listing": "{listing}", "bank": "bank",
+                "price": 6_000, "labour_per_unit": 5_400, "wage": 150_000, "period": 14 * DAY, "working_day": 8 * 3_600, "work_days": 5, "max_staff": 40 } } }])
+    }
+
+    #[test]
+    fn a_closed_factorys_works_for_sale_are_bought_for_a_factory_where_its_market_pays_and_not_where_it_does_not() {
+        let listing = |price: i64| st("rec.fs", "property_for_sale", "factory-1", json!({ "structure": "factory-1-works", "type": "factory", "cell": "c.9", "price": price, "account": "acc.factory-1" }));
+        // Its market: half of 1,000 a month at a margin of 3,300 a unit, made by hands at 114 a month each: hands pay.
+        let c = ctx_with(json!({ "ventures": factory_venture() }));
+        let mut ann = Person::new(&c).unwrap();
+        at_home(&mut ann);
+        ann.book.take_all(&[listing(5_000_000)]);
+        let p = ann.venture_prospect(&pic(DAY, None, false), &ann.p.ventures[0].clone(), true).unwrap();
+        assert_eq!((p.price, p.unit_cost, p.units_per_household, p.households_reached, p.sellers_known, p.units_per_worker), (6_000, 2_700, 1_000, 1, 1, 114));
+        // Short of the works and the capital: nothing; with the means, it is weighed and started within the year.
+        ann.work.next_venture = 0;
+        assert!(run(&mut ann, &c, &pic(DAY, None, false), 1_000_000, |a, w| a.ventures(w)).is_empty());
+        let mut out = vec![];
+        for m in 1..=12 {
+            ann.work.next_venture = 0;
+            out = run(&mut ann, &c, &pic(m * MONTH, None, false), 9_000_000, |a, w| a.ventures(w));
+            if !out.is_empty() {
+                break;
+            }
+        }
+        assert!(out.len() == 1 && out[0].contains("firm.producer") && out[0].contains("\"works\":\"factory-1-works\"") && out[0].contains("\"listing\":\"rec.fs\""), "{out:?}");
+        assert_eq!(ann.absorbed.pending_firm, Some(7_000_000));
+        // No margin (goods sell for what their inputs cost): never, however long it is weighed.
+        let mut v = factory_venture();
+        v[0]["unit_cost"] = json!(6_000);
+        let c = ctx_with(json!({ "ventures": v }));
+        let mut bob = Person::new(&c).unwrap();
+        at_home(&mut bob);
+        bob.book.take_all(&[listing(5_000_000)]);
+        for m in 1..=24 {
+            bob.work.next_venture = 0;
+            assert!(run(&mut bob, &c, &pic(m * MONTH, None, false), 9_000_000, |a, w| a.ventures(w)).is_empty(), "month {m}");
+        }
+    }
+
     #[test]
     fn someone_in_a_job_who_means_to_work_for_themself_gives_notice_first() {
         let c = ctx_with(json!({ "ventures": own_venture() }));
@@ -1479,6 +1690,32 @@ mod tests {
             assert!(run(&mut bob, &c, &pic(m * MONTH + 2 * DAY, None, false), 0, |a, w| a.ventures(w)).is_empty(), "month {m}");
         }
         assert!(bob.s.own_work.is_some());
+    }
+
+    #[test]
+    fn an_owner_who_gives_a_business_of_one_up_keeps_its_record_and_weighs_founding_again_by_it_a_month_on() {
+        // (ME-1: refounded the same business at once, on the market's figure alone.)
+        let c = ctx_with(json!({ "ventures": own_venture(), "own_work": { "firm": "stall-1", "account": "acc.stall", "home": "b1/dwelling.1", "expect_per_month": 100_000 } }));
+        let mut ann = Person::new(&c).unwrap();
+        at_home(&mut ann);
+        ann.book.take_all(&known_shops(2, 1_200));
+        let market = ann.own_expected(&homes_around(DAY, None, 200), &ann.p.ventures[0].clone(), false).unwrap().profit;
+        // Three months that paid nothing: given up, and its record kept against the market's figure.
+        ann.work.next_own_review = 0;
+        ann.work.next_own_venture = 0;
+        let t = 3 * MONTH + DAY;
+        let out = run(&mut ann, &c, &homes_around(t, None, 200), 500_000, |a, w| a.ventures(w));
+        assert!(out.len() == 1 && out[0].contains("\"closed\":true"), "{out:?}");
+        assert_eq!(ann.work.ran_own, Some(RanOwn { months: 3, paid: 0, expected: market * 3 }));
+        // Not weighed again until a month on.
+        assert_eq!(ann.work.next_own_venture, t + MONTH);
+        assert!(run(&mut ann, &c, &homes_around(t + DAY, None, 200), 500_000, |a, w| a.ventures(w)).is_empty());
+        // What it would pay is the market's figure moved by the record: three months of nothing against the figure's
+        // weight of three, half of it; a record that paid what the market said leaves the figure as it is.
+        let half = ann.own_expected(&homes_around(t, None, 200), &ann.p.ventures[0].clone(), false).unwrap().profit;
+        assert_eq!(half, div_round(market, 2));
+        ann.work.ran_own = Some(RanOwn { months: 3, paid: market * 3, expected: market * 3 });
+        assert_eq!(ann.own_expected(&homes_around(t, None, 200), &ann.p.ventures[0].clone(), false).unwrap().profit, market);
     }
 
     #[test]

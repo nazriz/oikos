@@ -13,6 +13,7 @@
 //! `Math.round` was used on a non-negative value; ties broken by id; a record's place by `filed_before`; dates by
 //! `rules::calendar` where the world has one.
 
+use oikos_core::Frozen;
 use super::mind::{self, Born, Event, Heard, Housed, Life, Mind, Outcome, Treated};
 use super::params::Params;
 use crate::common::{laws::noted, money::OwnAccount, Book, DAY, MONTH};
@@ -36,7 +37,7 @@ impl Kind for Citizen {
     fn version(&self) -> &'static str {
         // (Held equal to the TS manifest until the cut-over, docs/port-guide.md section 2; the integration step bumps
         // it with the Rust's own changes, listed in the decisions entry.)
-        "0.60.0"
+        "0.61.0"
     }
     fn doc(&self) -> &'static str {
         "docs/behaviour/citizen.md"
@@ -276,7 +277,7 @@ pub enum Said {
 
 /// The person: parameters, memory, book and mind.
 pub struct Person {
-    pub p: Params,
+    pub p: super::params::Given,
     pub me: String,
     pub s: State,
     pub housing: super::housing::Housing,
@@ -332,7 +333,7 @@ impl Person {
         let mut cx = Cx::new(0, ctx, &mut d, ctx.world.seed, vec![]);
         let stop_age = p.stop_age(cx.rng("stops-work").below(10_000) as i64);
         let life = Life { adult: true, in_labour_force: p.in_labour_force, essentials: p.essentials, ..Default::default() };
-        let m = mind::make(&mut cx, &Born { life: &life, own_values: ctx.params.get("own_values").filter(|v| !v.is_null()), parents: vec![] })?;
+        let m = mind::make(&mut cx, &Born { life: &life, own_values: ctx.params.get("own_values").filter(|v| !v.is_null()).map(Frozen::to_value).as_ref(), parents: vec![] })?;
         let s = State {
             stop_age,
             own_work: p.own_work.clone(),
@@ -468,7 +469,7 @@ impl Person {
             .channels
             .values()
             .flat_map(|c| match c {
-                Seen::Holdings { holdings } => holdings.iter().filter(|h| h.kind == self.p.goods).map(|h| crate::common::money::cents(h.quantity)).collect::<Vec<_>>(),
+                Seen::Holdings { holdings, .. } => holdings.iter().filter(|h| h.kind == self.p.goods).map(|h| crate::common::money::cents(h.quantity)).collect::<Vec<_>>(),
                 _ => vec![],
             })
             .sum::<i64>();
@@ -478,7 +479,7 @@ impl Person {
                 .iter()
                 .filter_map(|c| c.structure.as_ref())
                 .filter(|st| st.structure == crate::common::structure_of(d))
-                .flat_map(|st| st.spaces.iter().filter(|sp| &sp.space != d).flat_map(|sp| occupants(sp).iter().cloned()))
+                .flat_map(|st| st.spaces.iter().filter(|sp| &sp.space != d).flat_map(|sp| occupants(sp).iter().map(|x| x.to_string())))
                 .collect(),
             None => vec![],
         };
@@ -631,7 +632,7 @@ pub fn spaces(pic: &Picture) -> impl Iterator<Item = &SiteSpace> {
     cells(pic, "street").iter().filter_map(|c| c.structure.as_ref()).flat_map(|st| st.spaces.iter())
 }
 /// Who is in a space, as the view shows (none shown: nobody we can tell).
-pub fn occupants(sp: &SiteSpace) -> &[String] {
+pub fn occupants(sp: &SiteSpace) -> &[oikos_sight::Id] {
     sp.occupants.as_deref().unwrap_or(&[])
 }
 /// Whether we are in a space: around us we see who's in our own buildings; without that view, assume we are.
@@ -767,9 +768,20 @@ impl Person {
         if self.s.mourned.len() > mourned_before {
             self.s.next_plan_at = self.s.next_plan_at.min(t);
         }
+        // (Someone seen lying dead where we went by: we call the police at once, whatever else we were doing; what we saw is
+        // shown with the observation that brings it, and only then.)
+        {
+            let mut w = Week { pic, cx: &mut *cx, t, acc: None, steps: vec![] };
+            if let Some(s) = self.saw_dead_on_the_way(&mut w) {
+                return self.send(s, cx);
+            }
+        }
         if self.todo.is_empty() {
             let mut w = Week { pic, cx: &mut *cx, t, acc: None, steps: vec![] };
             if let Some(s) = self.wonder_next_door(&mut w) {
+                return self.send(s, cx);
+            }
+            if let Some(s) = self.missed_at_home(&mut w) {
                 return self.send(s, cx);
             }
         }
@@ -789,7 +801,7 @@ impl Person {
             if let Some(go) = self.go_where_we_belong(pic, cx) {
                 return self.send_go(go, cx);
             }
-            return self.wait(self.next_change(t).min(self.s.next_plan_at).min(practice_wake.filter(|p| *p > t).unwrap_or(i64::MAX)));
+            return self.wait(self.next_change(t).min(self.s.next_plan_at).min(practice_wake.filter(|p| *p > t).unwrap_or(i64::MAX)).min(arrived(pic, t)));
         }
         // Planned when a wake begins; woken because an act of ours is done, we carry on with the plan.
         if self.s.planned_at != t && (pic.woke_for != "done" || self.todo.is_empty()) {
@@ -825,7 +837,7 @@ impl Person {
             self.s.last_was_move = false;
             let pw = self.s.mind_wake_at.filter(|p| *p > t);
             return match self.p.round {
-                Some(_) => self.wait(pw.unwrap_or(i64::MAX).min(self.s.next_plan_at).min(self.next_change(t))),
+                Some(_) => self.wait(pw.unwrap_or(i64::MAX).min(self.s.next_plan_at).min(self.next_change(t)).min(arrived(pic, t))),
                 None => match pw {
                     Some(p) => self.wait(p.min(t + 7 * DAY)),
                     None => Action::wait(),
@@ -944,7 +956,7 @@ impl Person {
         let home_ag = self.s.home.as_ref().map(|h| h.agreement.clone());
         let job_ag = self.s.job.as_ref().map(|j| j.agreement.clone());
         for r in self.book.of_type("agreement") {
-            if Some(&r.id) == home_ag.as_ref() || Some(&r.id) == job_ag.as_ref() || !self.book.in_force(&r.id) {
+            if Some(r.id.as_str()) == home_ag.as_deref() || Some(r.id.as_str()) == job_ag.as_deref() || !self.book.in_force(&r.id) {
                 continue;
             }
             if !crate::papers::agreements::parties_of(r).iter().any(|x| x == &self.me) || !ends_by_our_notice(r, &self.me) {
@@ -1005,8 +1017,15 @@ fn ends_by_our_notice(r: &oikos_sight::Record, me: &str) -> bool {
     match &r.body {
         oikos_sight::RecordBody::Agreement { terms, .. } => {
             let t = serde_json::to_value(terms).unwrap_or(Value::Null);
-            t.get("termination").and_then(Value::as_array).is_some_and(|a| a.iter().any(|x| x.get("party").and_then(Value::as_str) == Some(me)))
+            t.get("termination").and_then(|x| x.as_array()).is_some_and(|a| a.iter().any(|x| x.get("party").and_then(|x| x.as_str()) == Some(me)))
         }
         _ => false,
     }
 }
+
+/// On our way somewhere (law 9, S3): a look again just after we arrive, to go on where we belong (a crew taken to a site and
+/// back after the working day is over goes home then; until 2026-11-01 it waited for the next morning's round).
+fn arrived(pic: &oikos_sight::Picture, t: i64) -> i64 {
+    pic.body.as_ref().and_then(|b| b.on_way.as_ref()).map(|w| w.arrives + 1).filter(|a| *a > t).unwrap_or(i64::MAX)
+}
+

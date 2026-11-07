@@ -129,6 +129,8 @@ fn world(args: &[String]) -> Result<(), String> {
     // (Read participant by participant, never whole: a large world's config is over a gigabyte of JSON.)
     let (loaded, rest) = oikos_kernel::config::load_from(std::fs::File::open(&args[1]).map_err(|e| format!("{}: {e}", args[1]))?)
         .map_err(|e| format!("{}: invalid config: {e}", args[1]))?;
+    // (Its one config read, the compiled schemas it was checked with go: docs/decisions.md 2026-10-27.)
+    oikos_kernel::contracts::release_config_check();
     let out = flag("--out").ok_or("--out <dir> is needed")?;
     std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
     let run_id = flag("--run-id").unwrap_or_else(|| "world".into());
@@ -138,6 +140,11 @@ fn world(args: &[String]) -> Result<(), String> {
     }
     opts.until = flag("--until").map(|u| u.parse::<i64>()).transpose().map_err(|_| "--until S")?;
     opts.stand_in = flag("--stand-in");
+    // (The world's records nobody reads are held on disk beside the log, and the file is removed at the end:
+    // docs/design/tiered-storage.md. OIKOS_COLD=off keeps them all in memory; the results are the same.)
+    if std::env::var("OIKOS_COLD").map_or(true, |v| v != "off") {
+        opts.cold = Some(std::path::PathBuf::from(format!("{out}/{run_id}.cold")));
+    }
     if args.iter().any(|a| a == "--binary") {
         let mut o = serde_json::json!({ "run_id": run_id, "log": format!("{out}/{run_id}.oklog"), "threads": opts.threads, "until": opts.until, "stand_in": opts.stand_in });
         if let Some(d) = flag("--snapshot-every") {
@@ -159,15 +166,64 @@ fn world(args: &[String]) -> Result<(), String> {
     let log = oikos_kernel::spool::Spool::new(std::fs::File::create(format!("{out}/{run_id}.jsonl")).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let (hash, e) = oikos_kernel::engine::run_code_world_loaded(loaded, rest, &run_id, log, opts)?;
     println!("{{\"run_id\":{:?},\"state_hash\":{:?},\"t\":{},\"steps\":{}}}", run_id, hash, e.t(), e.steps);
+    // (For whoever measures memory: what is live at the run's end, the world still held: `<out>.end.txt`.)
+    #[cfg(feature = "heapprof")]
+    heapprof::dump("end");
     // (For whoever measures memory: what the code actors keep, summed by what.)
     if std::env::var_os("OIKOS_KEPT").is_some() {
         eprintln!("kept {}", serde_json::to_string(&e.kept()).unwrap_or_default());
+        let (n, b) = oikos_core::id::interned();
+        eprintln!("ids interned {n} ({b} bytes of text)");
+    }
+    // (For whoever measures: where the world's records were held at the end.)
+    if let Some(t) = e.tier_tally() {
+        eprintln!("records {} ({} in memory), {} read back from disk, {} bytes on disk", t.records, t.hot, t.reads, t.disk_bytes);
+    }
+    if oikos_kernel::held::who::on() {
+        for (who, kind, n) in oikos_kernel::held::who::counts().into_iter().take(60) {
+            eprintln!("read by {who}: {kind} {n}");
+        }
     }
     // (For whoever measures: the run's own thread's CPU time, the critical path when the machine is shared.)
     if let Some(ms) = thread_cpu_ms() {
         eprintln!("main thread cpu {ms} ms");
     }
+    // (And its peak resident memory, for the memory budget: scripts/memory-budget.json.)
+    if let Some(b) = peak_resident_bytes() {
+        eprintln!("peak resident {b} bytes");
+    }
     Ok(())
+}
+
+/// The process's peak resident memory so far, in bytes (`getrusage`'s `ru_maxrss`: bytes on macOS, KiB on Linux). On
+/// Linux, the high-water mark of this process's own memory (`VmHWM`): `ru_maxrss` is carried across `exec`, so a kernel
+/// started by a large process (a test's Bun) would say that process's size.
+fn peak_resident_bytes() -> Option<i64> {
+    #[cfg(target_os = "linux")]
+    if let Some(kb) = std::fs::read_to_string("/proc/self/status").ok().and_then(|s| {
+        s.lines().find_map(|l| l.strip_prefix("VmHWM:").and_then(|v| v.trim().trim_end_matches("kB").trim().parse::<i64>().ok()))
+    }) {
+        return Some(kb * 1024);
+    }
+    #[repr(C)]
+    struct Rusage {
+        utime: [i64; 2],
+        stime: [i64; 2],
+        maxrss: i64,
+        rest: [i64; 13],
+    }
+    extern "C" {
+        fn getrusage(who: i32, usage: *mut Rusage) -> i32;
+    }
+    let mut r = Rusage { utime: [0; 2], stime: [0; 2], maxrss: 0, rest: [0; 13] };
+    // SAFETY: `r` is a valid, writable rusage of the platform's layout (two timevals, then longs) for the call.
+    if unsafe { getrusage(0, &mut r) } != 0 {
+        return None;
+    }
+    #[cfg(target_os = "macos")]
+    return Some(r.maxrss);
+    #[cfg(not(target_os = "macos"))]
+    return Some(r.maxrss * 1024);
 }
 
 /// This thread's CPU time so far, in milliseconds (`clock_gettime` of the thread's CPU clock), where the platform has it.

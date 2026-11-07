@@ -1,6 +1,10 @@
 {
  "//": "The slow tier (docs/dev-machine.md, \"Tiers\"): run by CI on every push to main and nightly, never by the merge gate. Every other test file is the gate tier. A file moves here when it simulates towns for long (more than ~30 s), with why; scripts/tiers.test.ts holds that every file is in exactly one tier.",
  "slow": {
+  "explorer/test/smoke.test.ts": "the Bevy explorer in headless Chromium, drawn in software (SwiftShader) without a GPU: a town run for three days, then the page driven milestone by milestone (about 170 s on 2026-10-25, 4 cores)",
+  "orchestrator/test/all-work-takes-time-runs.test.ts": "nine towns run for a month each, and a planted one: 31 s alone on 2026-10-25, two to three times that under the suite's load (law 10's backstop of acts refused unpriced; foundations-2 P5)",
+  "orchestrator/test/assistants-fork.test.ts": "a 300-person town run 100 days to a fork, and four forks of 30 days (334 s on 2026-10-31, the machine loaded)",
+  "orchestrator/test/assistants.test.ts": "a 300-person town run 150 days with assistants, and the town generated three times (about 24 s for the run alone on 2026-10-31; minutes under load)",
   "orchestrator/test/auditor.test.ts": "the 1,000-person town (74 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/automation-run.test.ts": "several towns run for months (115 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/batch.test.ts": "several seeds or towns (29 s on 2026-10-24, the whole suite at once)",
@@ -11,10 +15,11 @@
   "orchestrator/test/culture-dial.test.ts": "the 1,000-person town (82 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/deaths.test.ts": "towns run a year or more (54 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/debrief.test.ts": "towns run a year or more (72 s on 2026-10-24, the whole suite at once)",
-  "orchestrator/test/deemed-refusal-town.test.ts": "two 300-person towns run 330 days (265 s in a gate of 2026-10-24, the machine loaded)",
+  "orchestrator/test/deemed-refusal-town.test.ts": "three 300-person towns run 330, 330 and 200 days (two: 265 s in a gate of 2026-10-24, the machine loaded; au-vic added 2026-10-31, MT-21)",
   "orchestrator/test/elections.test.ts": "several seeds or towns (86 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/entity-records.test.ts": "towns run a year or more (190 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/entry.test.ts": "towns run a year or more; several seeds or towns (71 s on 2026-10-24, the whole suite at once)",
+  "orchestrator/test/everything-is-somewhere-runs.test.ts": "nine towns run for a month each: about 32 s alone on 2026-10-31 (law 9's backstop read from logs: goods moved uncarried, work on a building from afar; foundations-2 S1)",
   "orchestrator/test/figures.test.ts": "every profile's town generated and counted, two of them living (115 s in the merge gate of 2026-10-25, over the gate's 90 s file limit; the other files of that gate ran at their recorded times)",
   "orchestrator/test/founding.test.ts": "several seeds or towns (106 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/hazards.test.ts": "several towns run for months (55 s on 2026-10-24, the whole suite at once)",
@@ -27,6 +32,7 @@
   "orchestrator/test/keepers-answers.test.ts": "several towns run for months (38 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/living-dial.test.ts": "several towns run for months (97 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/llm.test.ts": "several towns run for months (66 s on 2026-10-24, the whole suite at once)",
+  "orchestrator/test/memory-budget.test.ts": "the 1,000-person town for a month on the release kernel, for its peak memory (the memory budget)",
   "orchestrator/test/migration.test.ts": "towns run a year or more (150 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/nature.test.ts": "towns run a year or more (67 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/office-books-walk.test.ts": "towns run a year or more (474 s on 2026-10-24, the whole suite at once)",
@@ -43,6 +49,7 @@
   "orchestrator/test/reading-dial.test.ts": "several towns run for months (273 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/recourse-town.test.ts": "several towns run for months, living and not (114 s in the merge gate of 2026-10-24, where it came in untimed)",
   "orchestrator/test/reliability.test.ts": "several seeds or towns (52 s on 2026-10-24, the whole suite at once)",
+  "orchestrator/test/representation.test.ts": "six towns (three profiles, 200 and 1,000 people) for a month on the release kernel, their results against the pinned ones (the representation steps; 2026-10-26)",
   "orchestrator/test/retail.test.ts": "towns run a year or more; the 1,000-person town (32 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/river.test.ts": "several towns run for months (56 s on 2026-10-24, the whole suite at once)",
   "orchestrator/test/run-machinery.test.ts": "several seeds or towns (32 s on 2026-10-24, the whole suite at once)",
@@ -71,6 +78,12 @@
   },
   "orchestrator/test/home-market.test.ts": {
    "why": "a town's sales, mortgages and leavers' money end to end; on 2026-10-25 it was where a broad change (who the run's seed draws) showed a real bug, a leaver's savings sent before the mortgage payoff"
+  },
+  "orchestrator/test/hazards.test.ts": {
+   "why": "a 200-day default-town run: where moved draws and headless offices show up (it was red after commercial leasing, 2026-10-25, with the canaries green)"
+  },
+  "orchestrator/test/figures.test.ts": {
+   "why": "law 11's count: a new figure with no basis row fails it, and broad changes add figures (red after commercial leasing, 2026-10-25)"
   }
  }
 }

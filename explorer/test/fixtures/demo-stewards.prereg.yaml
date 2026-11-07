@@ -1,0 +1,20 @@
+# The explorer workbench's test experiment (explorer/test): code stewards only, no model. Registered before it was run.
+preregistration: 1
+experiment: demo-stewards
+registered: "2026-10-25"
+question: >-
+  With nobody in the support office's post, is less support paid and are fewer claims decided than under its own code?
+post: outside-support
+arms: [code, nobody]
+reference: code
+seeds: [1, 2, 3]
+forkDay: 5
+untilDay: 25
+level: 0.95
+correction: bonferroni
+primary:
+  - { measure: support_paid, arm: nobody, vs: code, expect: lower }
+  - { measure: decisions, arm: nobody, vs: code, expect: lower }
+secondary:
+  - { measure: support_refused, arm: nobody, vs: code }
+notes: A fixture for the explorer's workbench; it says nothing about any steward.

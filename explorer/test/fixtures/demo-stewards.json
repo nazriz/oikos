@@ -1,0 +1,20 @@
+{
+  "name": "demo-stewards",
+  "world": { "file": "worlds/town.yaml", "sets": ["opening_caseload=true"] },
+  "post": "outside-support",
+  "seeds": [1, 2, 3],
+  "forkDay": 5,
+  "untilDay": 25,
+  "arms": [
+    { "name": "code", "steward": { "kind": "code" } },
+    { "name": "nobody", "steward": { "kind": "none" } }
+  ],
+  "reference": "code",
+  "measures": ["acts", "stewardship"],
+  "preregistration": "demo-stewards.prereg.yaml",
+  "threads": 1,
+  "institutions": {
+    "public": ["government", "tribunal", "police", "school", "health_service", "electoral_commission", "registry", "audit_office"],
+    "firms": ["shop", "factory", "landlord", "builder", "firm", "utility", "bank"]
+  }
+}

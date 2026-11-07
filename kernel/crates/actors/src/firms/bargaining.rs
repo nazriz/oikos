@@ -76,7 +76,7 @@ impl Bargaining {
         let usd = |n: i64| money_words(n, &world);
         let mut steps: Vec<Step<T>> = vec![];
         let mut raised = vec![];
-        let mine = |handled: &BTreeSet<String>, r: &Arc<Record>| !handled.contains(&r.id) && crate::common::addressed_to(r).contains(&me) && data(r).s("employer") == Some(me.as_str());
+        let mine = |handled: &BTreeSet<String>, r: &Arc<Record>| !handled.contains(r.id.as_str()) && crate::common::addressed_to(r).iter().any(|x| x == &me) && data(r).s("employer") == Some(me.as_str());
         let staff: Vec<Arc<Record>> = staffing.staff(book, t).into_iter().cloned().collect();
         let worker = |a: &Record| crate::papers::agreements::parties_of(a).get(1).cloned().unwrap_or_default();
         let month_bill: i64 = staff.iter().map(|a| staffing.wage_of(a) * MONTH / job_terms(a, &worker(a), None).period.max(1)).sum();
@@ -103,9 +103,9 @@ impl Bargaining {
         let hours_of = |s: &Staffing, a: &Record| i128::from(job_terms(a, &worker(a), None).hours.unwrap_or(usual)) * i128::from(s.hours_bps_at(&worker(a), t)) / 10_000;
         let claims: Vec<Arc<Record>> = book.open("wage_claim").filter(|r| mine(&self.handled, r)).cloned().collect();
         for c in claims {
-            self.handled.insert(c.id.clone());
+            self.handled.insert(c.id.to_string());
             let claim_bps = data(&c).i("rise_bps").unwrap_or(0).max(0);
-            let d = Dispute { claim: c.id.clone(), union: c.speaks_for.clone().unwrap_or_default(), claim_bps, offer_bps: claim_bps.min(offer_for(claim_bps)), stoppages: 0, last_days: 0 };
+            let d = Dispute { claim: c.id.to_string(), union: c.speaks_for.unwrap_or_default().to_string(), claim_bps, offer_bps: claim_bps.min(offer_for(claim_bps)), stoppages: 0, last_days: 0 };
             steps.push(because(
                 format!("A wage claim from {} for {}%: offering {}%, as far as what we hold beyond a month's wages ({}) covers twice its cost for a year.", d.union, fmt_dec(claim_bps, 100), fmt_dec(d.offer_bps, 100), usd((balance - month_bill).max(0))),
                 vec![offer(&d, "capacity to pay")],
@@ -114,7 +114,7 @@ impl Bargaining {
         }
         let accepted: Vec<Arc<Record>> = book.open("offer_accepted").filter(|r| mine(&self.handled, r)).cloned().collect();
         for a in accepted {
-            self.handled.insert(a.id.clone());
+            self.handled.insert(a.id.to_string());
             let Some(open) = self.open.as_ref().filter(|o| data(&a).s("claim") == Some(o.claim.as_str())) else { continue };
             let (rise, union) = (open.offer_bps, open.union.clone());
             self.open = None;
@@ -124,14 +124,14 @@ impl Bargaining {
                 vec![say(
                     "enterprise_agreement",
                     &format!("Enterprise agreement between {me} and {union}: wages rise {}% from now.", fmt_dec(rise, 100)),
-                    Say { visible: Some(Visible::Public), to: Some(vec![union.clone()]), basis: Some(a.id.clone()), data: Some(json!({ "employer": me, "union": union, "rise_bps": rise, "from": t })), ..Default::default() },
+                    Say { visible: Some(Visible::Public), to: Some(vec![union.clone()]), basis: Some(a.id.to_string()), data: Some(json!({ "employer": me, "union": union, "rise_bps": rise, "from": t })), ..Default::default() },
                 )],
             ));
             steps.extend(staffing.raise(book, t, cx, account, rise, &format!("The enterprise agreement: everyone's wages up {}%, from their next pay.", fmt_dec(rise, 100)), None));
         }
         let stops: Vec<Arc<Record>> = book.open("stop_work").filter(|r| mine(&self.handled, r)).cloned().collect();
         for s in stops {
-            self.handled.insert(s.id.clone());
+            self.handled.insert(s.id.to_string());
             let members: Vec<String> = data(&s).ids("members").into_iter().map(String::from).collect();
             self.strikers = members.into_iter().filter(|w| staff.iter().any(|a| worker(a) == *w)).collect();
             // What the stoppage takes of our work: the strikers' hours of all our hours, and how long the notice says.
@@ -149,11 +149,11 @@ impl Bargaining {
                 days: length.map_or(1, |l| (round_div(i128::from(l), i128::from(DAY)) as i64).max(1)),
                 share_bps: if total > 0 { (out * 10_000 / total) as i64 } else { 0 },
             });
-            steps.extend(staffing.stop(book, t, &self.strikers, &format!("A strike by {}'s members: no pay for the time on strike.", s.speaks_for.clone().unwrap_or_default())));
+            steps.extend(staffing.stop(book, t, &self.strikers, &format!("A strike by {}'s members: no pay for the time on strike.", s.speaks_for.unwrap_or_default())));
         }
         let returns: Vec<Arc<Record>> = book.open("return_to_work").filter(|r| mine(&self.handled, r)).cloned().collect();
         for r in returns {
-            self.handled.insert(r.id.clone());
+            self.handled.insert(r.id.to_string());
             let strikers = std::mem::take(&mut self.strikers);
             steps.extend(staffing.resume(book, t, cx, account, &strikers, "Back from the strike: paying what they earned before it, and restarting their wages."));
             let Some(mut o) = self.open.take() else { continue };

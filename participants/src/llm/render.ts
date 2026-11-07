@@ -150,12 +150,18 @@ export function outcomeLines(x: Outcome, what: string, now: number): string[] {
   const o = x as Outcome & { [k: string]: any };
   const value = (v: unknown): string => (v !== null && typeof v === "object" ? details(v, Infinity) : String(v));
   const more = (from: object, said: string[]) => Object.entries(from).filter(([k]) => !said.includes(k)).map(([k, v]) => ` ${cap(k)}: ${value(v)}.`).join("");
-  const rest = Object.entries(o).filter(([k]) => !["action", "t", "status", "created", "refusal", "surveyed", "investigated", "seen"].includes(k)).map(([k, v]) => `  ${cap(k)}: ${value(v)}.`);
+  const rest = Object.entries(o).filter(([k]) => !["action", "t", "status", "created", "refusal", "surveyed", "investigated", "seen", "trips", "freight"].includes(k)).map(([k, v]) => `  ${cap(k)}: ${value(v)}.`);
   const at = o.t !== undefined && Math.floor(o.t / DAY) !== Math.floor(now / DAY) ? ` (${when(o.t)})` : "";
+  // How long the going took (law 9): those it took somewhere, there and back; goods sent by the outside's freight.
+  const took = (s: number) => { const m = Math.round(s / 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}`; };
+  const going = [
+    ...(Object.keys(o.trips ?? {}).length ? [`  On their way, there and back: ${Object.entries(o.trips!).map(([who, s]) => `${who} ${took(s)}`).join(", ")}.`] : []),
+    ...(Object.keys(o.freight ?? {}).length ? [`  By the outside's freight: ${Object.entries(o.freight!).map(([to, s]) => `to ${to}, ${took(s)} on the road`).join("; ")}.`] : []),
+  ];
   if (o.status !== "applied") {
     const part = o.refusal?.block;
     const why = Number.isInteger(part) && part! > 0 ? refusalText(o.refusal?.code, part, 2) : refusalText(o.refusal?.code);
-    return [`${what} couldn't be done${at}: ${why}.${more(o.refusal ?? {}, ["code", "block", "detail"])}`, ...rest];
+    return [`${what} couldn't be done${at}: ${why}.${more(o.refusal ?? {}, ["code", "block", "detail"])}`, ...going, ...rest];
   }
   const out = [`Done${at}: ${what.charAt(0).toLowerCase()}${what.slice(1)}.`];
   const made = Object.entries(o.created ?? {});
@@ -173,7 +179,7 @@ export function outcomeLines(x: Outcome, what: string, now: number): string[] {
   }
   // Work on a building: those who did it were there, and this is how they left it.
   if (o.seen?.length) out.push("  As those who did the work left it:", ...describeBuildings(o.seen as SiteStructure[], "", now).map((l) => l.split("\n").map((x) => `  ${x}`).join("\n")));
-  return [...out, ...rest];
+  return [...out, ...going, ...rest];
 }
 
 /**

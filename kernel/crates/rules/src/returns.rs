@@ -14,7 +14,7 @@
 
 use crate::calendar::{civil_from_days, days_from_civil, Calendar, Date};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use oikos_core::Frozen;
 
 const DAY: i64 = 86_400;
 const YEAR: i64 = 365 * DAY;
@@ -63,7 +63,7 @@ pub fn return_rest() -> ReturnRule {
 
 /// A law's rules as the profile or the paper gives them, kept to what can be read (anything else is dropped).
 /// `None` where the data is not a list.
-pub fn return_rules_of(data: &Value) -> Option<Vec<ReturnRule>> {
+pub fn return_rules_of(data: &Frozen) -> Option<Vec<ReturnRule>> {
     let list = data.as_array()?;
     Some(
         list.iter()
@@ -74,7 +74,7 @@ pub fn return_rules_of(data: &Value) -> Option<Vec<ReturnRule>> {
                     return None;
                 }
                 let every = match r.get("every_months") {
-                    None | Some(Value::Null) => None,
+                    None | Some(Frozen::Null) => None,
                     Some(v) => {
                         let m = v.as_i64()?;
                         if ![1, 2, 3, 4, 6, 12].contains(&m) {
@@ -84,17 +84,17 @@ pub fn return_rules_of(data: &Value) -> Option<Vec<ReturnRule>> {
                     }
                 };
                 let in_ = match r.get("in") {
-                    None | Some(Value::Null) => None,
-                    Some(Value::String(s)) if s == "following" => Some(In::Following),
-                    Some(Value::String(s)) if s == "same" => Some(In::Same),
+                    None | Some(Frozen::Null) => None,
+                    Some(Frozen::String(s)) if &**s == "following" => Some(In::Following),
+                    Some(Frozen::String(s)) if &**s == "same" => Some(In::Same),
                     Some(_) => return None,
                 };
                 Some(ReturnRule {
                     id,
-                    name: r.get("name").and_then(Value::as_str).map(String::from),
+                    name: r.get("name").and_then(|x| x.as_str()).map(String::from),
                     charges: r
                         .get("charges")
-                        .and_then(Value::as_array)
+                        .and_then(|x| x.as_array())
                         .map(|a| a.iter().filter_map(|c| c.as_str().map(String::from)).collect()),
                     every_months: every,
                     day,
@@ -254,6 +254,7 @@ pub const MONTH_WORDS: &str =
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
     use serde_json::json;
 
     #[test]
@@ -262,7 +263,7 @@ mod tests {
         let cases = table["cases"].as_array().unwrap();
         assert!(cases.len() > 10);
         for c in cases {
-            let rule = return_rules_of(&json!([c["rule"].clone()])).unwrap().remove(0);
+            let rule = return_rules_of(&Frozen::from(json!([c["rule"].clone()]))).unwrap().remove(0);
             let r = next_return(&rule, c["after"].as_i64().unwrap() * DAY);
             let got = (r.due / DAY, r.from / DAY, r.to / DAY);
             assert_eq!(got, (c["due"].as_i64().unwrap(), c["from"].as_i64().unwrap(), c["to"].as_i64().unwrap()), "{c}");
@@ -278,13 +279,13 @@ mod tests {
 
     #[test]
     fn rules_are_kept_to_what_can_be_read_and_every_charge_falls_under_exactly_one() {
-        let rules = return_rules_of(&json!([
+        let rules = return_rules_of(&Frozen::from(json!([
             { "id": "a", "day": 9, "charges": ["x"] }, { "id": "bad", "day": 31 }, { "id": "q", "day": 3, "every_months": 5 },
             { "day": 2 }, { "id": "s", "day": 4, "in": "same", "every_months": 3 },
-        ]))
+        ])))
         .unwrap();
         assert_eq!(rules.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(), ["a", "s"]);
-        assert!(return_rules_of(&json!({})).is_none());
+        assert!(return_rules_of(&Frozen::from(json!({}))).is_none());
         let by = returns_of(Some((&["x", "y"][..], &rules[..1])));
         assert_eq!(by.iter().map(|r| (r.id.as_str(), r.day, r.charges.clone().unwrap())).collect::<Vec<_>>(), vec![
             ("a", 9, vec!["x".to_string()]),

@@ -15,19 +15,22 @@
 //     *.jsonl.zst of 50 MB or more outside a *.dataset; anchors, summaries, measure/, STATUS, cost files, datasets
 //     stay), since the log can be regenerated from git, the world and the seed.
 // A run with a live process (a pid file whose process is alive) or written to within --days is left alone.
-// The system temp root (/private/tmp) is swept too: oikos-*, forms-trained* and sz-* folders (what tests and tools leave)
+// The system temp root (/private/tmp on macOS, /tmp elsewhere) is swept too: oikos-*, forms-trained* and sz-* folders (what tests and tools leave)
 // older than a day (--tmp-hours), and a finished test run's own oikos-test-<pid>-*. The home caches are not touched.
 // Worktrees under .claude/worktrees/ go by scripts/worktree-clean.ts's rules (merged into origin/main, clean, no runs
 // inside, nothing working in it, not a wave copy, not the one this runs in), plus: never a protected name (merge-main
 // and the running agents' trees, --protect adds more), never one made in the last day, and an old agent lock
 // ("claude agent ... pid N") is lifted only for the pid given with --unlock-pid, and only if the tree meets the rest.
-// Removal is `git worktree remove` then `git worktree prune`, never rm -rf on a worktree.
+// Removal is `git worktree remove` then `git worktree prune`, never rm -rf on a worktree. A worktree that stays loses its
+// `kernel/target` at once when its branch is merged into origin/main and nothing is running in it (`judgeTarget`).
+// Stale incremental folders (cargo's `<crate>-<hash>/` units whose hash changed) are pruned from each idle worktree's
+// kernel/target, keeping each crate's newest build (`classifyIncremental`); `--prune-incremental [DIR]` does only that.
 // Build folders `.claude/target-*` (a CARGO_TARGET_DIR an agent was given) go whole when nothing has been built in them for
 // a day (--target-hours: the folder, its first two levels of folders, none written since) and no running process uses one
 // (none has a file open in it or its working folder there, none names it in its command line or environment). They hold
 // only what cargo builds again.
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, userInfo } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { scan, type Tree } from "./worktree-clean";
 
@@ -192,9 +195,62 @@ export function classifyTargets(claudeDir: string, inUse: (path: string) => bool
 /** Whether any running process of this user uses a folder: a file open in it (or mapped), its working folder there, or its
  * command line or environment naming it. One look at all processes, asked again for each folder. */
 export function processUses(): (path: string) => boolean {
-  const open = Bun.spawnSync(["lsof", "-u", process.env.USER ?? "", "-Fn"], { stdout: "pipe", stderr: "pipe" }).stdout.toString().split("\n").filter((l) => l.startsWith("n")).map((l) => l.slice(1));
-  const cmds = Bun.spawnSync(["ps", "-E", "-ww", "-u", process.env.USER ?? "", "-o", "pid=,command="], { stdout: "pipe", stderr: "pipe" }).stdout.toString().split("\n").filter((l) => Number(l.trim().split(/\s+/)[0]) !== process.pid);
+  // (Each command with its environment: `ps -E` on macOS, `ps e` on Linux, where `-E` is refused. Where either listing
+  // can't be had, everything counts as in use: a folder is never removed on a blind look.)
+  const user = String(process.getuid?.() ?? (process.env.USER || userInfo().username)); // (the uid: a name may not resolve in a container)
+  const run = (cmd: string[]) => { try { const r = Bun.spawnSync(cmd, { stdout: "pipe", stderr: "pipe" }); return r.exitCode === 0 ? r.stdout.toString() : undefined; } catch { return undefined; } };
+  const lsof = run(["lsof", "-u", user, "-Fn"]);
+  const ps = run(process.platform === "darwin" ? ["ps", "-E", "-ww", "-u", user, "-o", "pid=,command="] : ["ps", "eww", "-u", user, "-o", "pid=,args="]);
+  if (lsof === undefined || ps === undefined) return () => true;
+  const open = lsof.split("\n").filter((l) => l.startsWith("n")).map((l) => l.slice(1));
+  const cmds = ps.split("\n").filter((l) => Number(l.trim().split(/\s+/)[0]) !== process.pid);
   return (path: string) => open.some((f) => f === path || f.startsWith(path + "/")) || cmds.some((c) => c.includes(path));
+}
+
+export interface IncrementalVerdict { path: string; crate: string; action: "remove" | "keep"; reason: string }
+/**
+ * Stale incremental-compilation folders in one profile's `incremental/` (`kernel/target/<profile>/incremental`). Cargo names
+ * each unit `<crate>-<hash>/` and never deletes a unit whose hash changed (a new flag, dependency or toolchain), so they pile
+ * up (62 GB in one agent worktree, 2026-11-02). Per crate, the newest unit folder and any written within `windowHours` (6)
+ * of it stay (one build writes a crate's lib and test units together); the rest go. A folder written to in the last
+ * `idleMinutes` (30) is never removed (a build may be using it). Removing a unit only costs that unit one non-incremental
+ * compile: rustc treats a missing folder as a first build, so it is never a correctness risk.
+ */
+export function classifyIncremental(dir: string, o: { windowHours?: number; idleMinutes?: number; now?: number } = {}): IncrementalVerdict[] {
+  const now = o.now ?? Date.now(), win = (o.windowHours ?? 6) * 3600_000, idle = (o.idleMinutes ?? 30) * 60_000;
+  const byCrate = new Map<string, { path: string; t: number }[]>();
+  for (const name of existsSync(dir) ? readdirSync(dir) : []) {
+    const m = name.match(/^(.+)-[0-9a-z]{13}$/);
+    if (!m) continue;
+    const path = join(dir, name);
+    let t = 0;
+    try { const st = lstatSync(path); if (!st.isDirectory()) continue; t = st.mtimeMs; for (const e of readdirSync(path)) t = Math.max(t, lstatSync(join(path, e)).mtimeMs); } catch { continue; }
+    const list = byCrate.get(m[1]!) ?? [];
+    list.push({ path, t });
+    byCrate.set(m[1]!, list);
+  }
+  const out: IncrementalVerdict[] = [];
+  for (const [crate, us] of byCrate) {
+    const newest = Math.max(...us.map((u) => u.t));
+    for (const u of us.sort((a, b) => b.t - a.t)) {
+      if (u.t >= newest - win) out.push({ path: u.path, crate, action: "keep", reason: "the newest build of this crate" });
+      else if (now - u.t < idle) out.push({ path: u.path, crate, action: "keep", reason: "written to in the last half hour" });
+      else out.push({ path: u.path, crate, action: "remove", reason: `${((newest - u.t) / 3600_000).toFixed(1)} h older than the crate's newest build` });
+    }
+  }
+  return out;
+}
+/** Prunes every `<target>/<profile>/incremental` under a `kernel/target`; returns the kilobytes removed (or that would be). */
+export function pruneIncremental(target: string, apply: boolean, o: { windowHours?: number; idleMinutes?: number } = {}): number {
+  let kb = 0;
+  for (const prof of existsSync(target) ? readdirSync(target) : []) {
+    for (const v of classifyIncremental(join(target, prof, "incremental"), o)) {
+      if (v.action !== "remove") continue;
+      kb += Number(Bun.spawnSync(["du", "-sk", v.path], { stdout: "pipe" }).stdout.toString().split(/\s/)[0]) || 0;
+      if (apply) rmSync(v.path, { recursive: true, force: true });
+    }
+  }
+  return kb;
 }
 
 const gb = (kb: number) => (kb / 1048576).toFixed(2) + " GB";
@@ -237,6 +293,24 @@ export function judgeWorktree(t: Tree, lockReason: string | undefined, o: { prot
   return { tree: t, action: "remove", reason: "merged into origin/main, clean, unlocked, idle" };
 }
 
+/**
+ * A worktree that stays, whose `kernel/target` goes now: its branch (and HEAD) are in origin/main and nothing is running in
+ * it (no process working there or using a file in it). Finished agents' build folders filled the disk twice on 2026-10-25,
+ * waiting out the day's grace a whole worktree gets. Its agent's lock is no guide: it names the session that started the
+ * agent, which outlives it. Never a protected tree, a wave copy or this one; the build is all cargo makes again.
+ */
+export function judgeTarget(t: Tree, usedNow: boolean, o: { protect?: string[] } = {}): { action: "remove" | "keep"; reason: string } {
+  const no = (reason: string) => ({ action: "keep" as const, reason });
+  if (!t.targetKb) return no("no kernel/target");
+  if ([...PROTECTED, ...(o.protect ?? [])].includes(t.name)) return no("protected name");
+  if (t.wave) return no("wave copy");
+  if (t.self) return no("the tree this runs in");
+  if (!t.merged || !t.branchMerged) return no("not merged into origin/main");
+  if (t.inUse) return no(t.inUse);
+  if (usedNow) return no("a running process uses it");
+  return { action: "remove", reason: "merged into origin/main and nothing running in it" };
+}
+
 function lockReasons(repo: string): Map<string, string> {
   const p = Bun.spawnSync(["git", "worktree", "list", "--porcelain"], { cwd: repo, stdout: "pipe" });
   const m = new Map<string, string>();
@@ -275,6 +349,16 @@ if (import.meta.main) {
   const unlockPid = opt("--unlock-pid") ? Number(opt("--unlock-pid")) : undefined;
   const protect = (opt("--protect") ?? "").split(",").filter(Boolean);
 
+  // `--prune-incremental [DIR]`: only the stale incremental folders of one kernel/target (default this repo's), cheap enough
+  // to run before every build (scripts/merge.ts, `bun run kernel`). The full tidy below does it for every worktree too.
+  if (a.includes("--prune-incremental")) {
+    const next = opt("--prune-incremental");
+    const target = resolve(next && !next.startsWith("--") ? next : (process.env.CARGO_TARGET_DIR ?? join(repo, "kernel/target")));
+    const kb = pruneIncremental(target, apply);
+    if (kb) console.log(`${apply ? "pruned" : "would prune"} stale incremental folders in ${target} (${gb(kb)})`);
+    process.exit(0);
+  }
+
   const docsText = readTree(join(repo, "docs"), /\.md$/);
   const entries = readdirSync(runsDir);
   const statusText = (skip: string) => entries.filter((e) => e !== skip && existsSync(join(runsDir, e, "STATUS"))).map((e) => readFileSync(join(runsDir, e, "STATUS"), "utf8")).join("\n");
@@ -287,13 +371,13 @@ if (import.meta.main) {
     return judgeWorktree(t, locks.get(t.path), { protect, ...(unlockPid ? { unlockPid } : {}), birthMs: birth });
   });
 
-  const df = Bun.spawnSync(["df", "-h", "/System/Volumes/Data"]).stdout.toString().split("\n")[1]?.split(/\s+/) ?? [];
+  const df = Bun.spawnSync(["df", "-h", process.platform === "darwin" ? "/System/Volumes/Data" : sc.repo]).stdout.toString().split("\n")[1]?.split(/\s+/) ?? [];
   const free = df[3] ?? "unknown";
   const inv = opt("--inventory");
   if (inv) { mkdirSync(dirname(resolve(inv)), { recursive: true }); writeFileSync(resolve(inv), inventoryMarkdown(new Date().toISOString().slice(0, 10), free, runs, trees)); console.log(`inventory written to ${inv}`); }
 
   let freeKb = 0;
-  const tmpRoot = resolve(opt("--tmp") ?? "/private/tmp");
+  const tmpRoot = resolve(opt("--tmp") ?? (process.platform === "darwin" ? "/private/tmp" : "/tmp"));
   const tmps = classifyTmp(tmpRoot, { hours: Number(opt("--tmp-hours") ?? 24) });
   for (const t of tmps) {
     if (t.action === "keep") continue;
@@ -303,7 +387,26 @@ if (import.meta.main) {
   const tmpKb = tmps.filter((t) => t.action === "remove").reduce((s, t) => s + t.kb, 0);
   if (tmpKb || tmps.length) console.log(`${apply ? "REMOVED" : "would remove"} ${tmps.filter((t) => t.action === "remove").length} temp folders in ${tmpRoot} (${gb(tmpKb)}; oikos-*, forms-trained*, sz-* older than a day)`);
   const claudeDir = join(sc.repo, ".claude");
-  const targets = classifyTargets(claudeDir, processUses(), { hours: Number(opt("--target-hours") ?? 24) });
+  const uses = processUses();
+  const targets = classifyTargets(claudeDir, uses, { hours: Number(opt("--target-hours") ?? 24) });
+  // A merged worktree with nothing running in it loses its kernel/target at once, whether or not the tree itself goes
+  // (one that goes takes it along: counted there).
+  for (const w of trees) {
+    if (w.action !== "keep") continue;
+    const j = judgeTarget(w.tree, uses(w.tree.path), { protect });
+    if (j.action === "keep") continue;
+    freeKb += w.tree.targetKb;
+    console.log(`${apply ? "REMOVING" : "would remove"} ${w.tree.name}/kernel/target (${gb(w.tree.targetKb)}) -- ${j.reason}`);
+    if (apply) rmSync(join(w.tree.path, "kernel/target"), { recursive: true, force: true });
+  }
+  // Stale incremental folders in every worktree's kernel/target that nothing is running in (the target stays, so builds stay incremental).
+  for (const t of sc.trees) {
+    if (!existsSync(join(t.path, "kernel/target")) || uses(t.path)) continue;
+    const kb = pruneIncremental(join(t.path, "kernel/target"), apply);
+    if (!kb) continue;
+    freeKb += kb;
+    console.log(`${apply ? "PRUNED" : "would prune"} ${t.name}/kernel/target stale incremental folders (${gb(kb)})`);
+  }
   for (const t of targets) {
     if (t.action === "keep") continue;
     const kb = Number(Bun.spawnSync(["du", "-sk", t.path], { stdout: "pipe" }).stdout.toString().split(/\s/)[0]) || 0;

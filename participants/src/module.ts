@@ -429,15 +429,9 @@ export const DAY = 86_400;
 
 /** A module's parameters: its documented defaults, overridden by the world's (controller.params). */
 export function params<D extends object>(defaults: D, given: { [k: string]: any }): D & { [k: string]: any } {
-  paramsSeen?.(defaults);
   return { ...defaults, ...given };
 }
 
-/** Tooling only (the manifests: participants/manifests): see each module's parameter defaults as it's created. */
-let paramsSeen: ((defaults: object) => void) | undefined;
-export function onParams(f: ((defaults: object) => void) | undefined): void {
-  paramsSeen = f;
-}
 
 /**
  * Parameters a world must give: who a module deals with (its supplier, the town, the account it pays from). A module's

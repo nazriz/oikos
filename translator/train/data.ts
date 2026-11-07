@@ -290,7 +290,7 @@ const flat = (j: unknown): j is { [slot: string]: string } =>
  * model's scope, so a program carrying one is no gold program. (A list of names or ids is copied name by name, and a
  * claim's content is slots: see `needed`.)
  */
-export const JSON_OUT_OF_SCOPE = ["statement.data", "statement.adico", "statement.offer", "statement.practice", "statement.assertion", "statement.registry", "presence.variables", "position.channels", "position.role_module", "entity.channels", "entity.role_module"] as const;
+export const JSON_OUT_OF_SCOPE = ["agreement.attrs", "statement.data", "statement.adico", "statement.offer", "statement.practice", "statement.assertion", "statement.registry", "presence.variables", "position.channels", "position.role_module", "entity.channels", "entity.role_module"] as const;
 
 /**
  * Why a program isn't one a person could ask for in a sentence or two, or undefined if it is (§16.2): a line, or a

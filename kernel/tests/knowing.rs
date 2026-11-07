@@ -4,7 +4,7 @@
 //! directory to read through) does not load, and a look that asks for "everything" is refused before it reaches
 //! the log.
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::events::EventBody;
@@ -63,6 +63,8 @@ fn a_whole_view_cannot_be_written() {
         ("a holder's titles, for someone not listed", None, json!({"id": "x", "kind": "records", "way": "ask", "of": "city", "by": ["holder"], "match": {"records": ["claim"]}, "on_request": true})),
         ("a holder's titles, for an office not listed", Some("builder"), json!({"id": "x", "kind": "records", "way": "ask", "of": "city", "by": ["holder"], "match": {"records": ["claim"]}, "on_request": true})),
         ("a person's premises", None, json!({"id": "x", "kind": "sites", "way": "here", "area": {"premises": ["cell.1.1"]}})),
+        ("a person's premises held by agreement", None, json!({"id": "x", "kind": "sites", "way": "here", "area": {"held": "occupancy"}})),
+        ("notices at premises held by agreement", Some("builder"), json!({"id": "x", "kind": "records", "way": "here", "area": {"held": "occupancy"}, "match": {"statement_kinds": ["price_list"]}})),
         ("more publishers than a seat deals with", None, json!({"id": "x", "kind": "records", "way": "published", "match": {"statement_kinds": ["price_list"]}, "from": ["a", "b", "c", "d", "e", "f", "g", "h", "i"]})),
     ] {
         assert!(!refused(with_channel(position, channel)).is_empty(), "{what} should not load");
@@ -71,6 +73,7 @@ fn a_whole_view_cannot_be_written() {
     for (what, position, channel) in [
         ("the ground around one", None, json!({"id": "x", "kind": "sites", "way": "here", "area": {"near": 1}})),
         ("an office's premises", Some("developer"), json!({"id": "x", "kind": "sites", "way": "here", "area": {"premises": ["cell.0.2"]}, "occupants": "names"})),
+        ("an office's premises held by agreement", Some("builder"), json!({"id": "x", "kind": "sites", "way": "here", "area": {"held": "occupancy"}, "occupants": "names"})),
         ("places gone to", None, json!({"id": "x", "kind": "sites", "way": "visit"})),
         ("who's who, looked up", None, json!({"id": "x", "kind": "directory", "way": "ask"})),
         ("its own papers", None, json!({"id": "x", "kind": "records", "way": "mine", "match": {"statement_kinds": ["lot"]}})),
@@ -94,6 +97,36 @@ fn a_whole_view_cannot_be_written() {
     };
     assert!(!made(&mut run, json!([{"id": "x", "kind": "records", "way": "kept", "match": {"statement_kinds": ["lot"]}}])));
     assert!(made(&mut run, json!([{"id": "x", "kind": "records", "way": "mine", "match": {}}])));
+}
+
+#[test]
+fn an_organisation_sees_premises_it_holds_by_an_agreement_in_force_and_no_others_and_not_before() {
+    // The builder's office is shown the ground of premises it holds by agreement: none yet.
+    let c = with_channel(Some("builder"), json!({"id": "unit", "kind": "sites", "way": "here", "area": {"held": "occupancy"}, "occupants": "names"}));
+    let mut run = Run::start(c, "knowing-held", Vec::new(), None).unwrap();
+    let unit = |run: &mut Run<Vec<u8>>| -> Vec<oikos_kernel::observe::SiteCell> {
+        let o = run.command(&Command::Observe { participant: "builder-system".into(), only: None }).unwrap().observation.unwrap();
+        match o.channels.get("builder/unit") {
+            Some(ChannelData::Sites { cells, .. }) => cells.clone(),
+            other => panic!("{other:?} in {:?}", o.channels.keys()),
+        }
+    };
+    assert!(unit(&mut run).is_empty(), "it holds nothing yet");
+    // The developer lets it the shop's workplace: offered, it is not yet the builder's to be in.
+    let offer = direct("developer-system", Some("developer"), serde_json::from_value(json!([
+        {"block": "propose_agreement", "speaks_for": "devco", "ref": "lease", "terms": {"template": "lease", "parties": ["devco", "buildco"], "term": 365 * DAY,
+            "commitments": [{"who": "devco", "does": {"outcome": {"occupancy": {"who": "buildco", "in": "s-shop/workplace.1"}}}}, {"who": "buildco", "does": {"outcome": {"money": {"to": "acc-devco", "amount": "100"}}}, "every": 30 * DAY}]}},
+        {"block": "sign_agreement", "agreement": "$lease", "as": "devco"}])).unwrap()).unwrap();
+    let r = step(&mut run, &offer).unwrap();
+    let id = r.events.iter().find_map(|e| match &e.body { EventBody::Recorded { record } if matches!(record.body, oikos_kernel::blocks::RecordBody::Agreement { .. }) => Some(record.id), _ => None }).expect("the lease made");
+    assert!(unit(&mut run).is_empty(), "offered, not held");
+    let sign = direct("builder-system", Some("builder"), serde_json::from_value(json!([{"block": "sign_agreement", "agreement": id, "as": "buildco"}])).unwrap()).unwrap();
+    step(&mut run, &sign).unwrap();
+    // In force: the shop's ground, and who is in it, by name; nothing else.
+    let cells = unit(&mut run);
+    assert_eq!(cells.iter().map(|c| c.cell.as_str()).collect::<Vec<_>>(), vec!["cell.0.2"]);
+    let sp = cells[0].structure.as_ref().unwrap().spaces.iter().find(|s| s.space == "s-shop/workplace.1").cloned().unwrap();
+    assert_eq!(sp.occupants, Some(vec!["carol".into()]));
 }
 
 #[test]
@@ -169,7 +202,7 @@ fn a_board_is_read_a_few_at_a_time() {
 fn the_directory_is_a_look_up() {
     let mut run = Run::start(base(), "knowing-who", Vec::new(), None).unwrap();
     let dir = |o: &Observation| match o.channels.get("who") {
-        Some(ChannelData::Directory { entities, positions }) => (entities.iter().map(|e| e.entity.clone()).collect::<Vec<_>>(), positions.iter().map(|p| p.position.clone()).collect::<Vec<_>>()),
+        Some(ChannelData::Directory { entities, positions }) => (entities.iter().map(|e| e.entity).collect::<Vec<_>>(), positions.iter().map(|p| p.position).collect::<Vec<_>>()),
         None => (vec!["(nothing)".into()], vec![]),
         other => panic!("{other:?}"),
     };
@@ -182,11 +215,11 @@ fn the_directory_is_a_look_up() {
     assert!(look(&mut run, "alice-self", json!([{"channel": "who", "who": {"role": "mayor"}}])).is_err(), "whose office?");
     assert!(look(&mut run, "alice-self", json!([{"channel": "mine", "who": {"entity": "bob"}}])).is_err(), "only a directory is looked up in");
     // One entity; the person a participant acts as; one position and who holds it; by exact name.
-    assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"entity": "bob"}}])).unwrap()), (vec!["bob".to_string()], vec![]));
-    assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"participant": "bob-self"}}])).unwrap()), (vec!["bob".to_string()], vec![]));
-    assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"position": "mayor"}}])).unwrap()), (vec![], vec!["mayor".to_string()]));
-    assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"name": "carol"}}])).unwrap()), (vec!["carol".to_string()], vec![]));
-    assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"name": "Clerk"}}])).unwrap()), (vec![], vec!["clerk".to_string()]));
+    assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"entity": "bob"}}])).unwrap()), (vec!["bob".into()], vec![]));
+    assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"participant": "bob-self"}}])).unwrap()), (vec!["bob".into()], vec![]));
+    assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"position": "mayor"}}])).unwrap()), (vec![], vec!["mayor".into()]));
+    assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"name": "carol"}}])).unwrap()), (vec!["carol".into()], vec![]));
+    assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"name": "Clerk"}}])).unwrap()), (vec![], vec!["clerk".into()]));
     // Nobody of that name, no such office: an empty answer, not an error and not everyone.
     assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"name": "car"}}])).unwrap()), (vec![], vec![]));
     assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"entity": "nobody"}}])).unwrap()), (vec![], vec![]));
@@ -196,7 +229,7 @@ fn the_directory_is_a_look_up() {
         p["role"] = json!(if p["id"] == "mayor" { "mayor" } else { "council_clerk" });
     }
     let mut run = Run::start(c, "knowing-who", Vec::new(), None).unwrap();
-    assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"entity": "city", "role": "council_clerk"}}])).unwrap()), (vec![], vec!["clerk".to_string()]));
+    assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"entity": "city", "role": "council_clerk"}}])).unwrap()), (vec![], vec!["clerk".into()]));
     assert_eq!(dir(&look(&mut run, "alice-self", json!([{"channel": "who", "who": {"entity": "city", "role": "treasurer"}}])).unwrap()), (vec![], vec![]));
 }
 
@@ -208,7 +241,7 @@ fn a_register_answers_by_holder_only_those_it_is_bound_to() {
     let c = with_channel(Some("developer"), json!({"id": "titles", "kind": "records", "way": "ask", "of": "city", "by": ["holder", "id"], "match": {"records": ["claim"]}, "on_request": true}));
     let mut run = Run::start(c, "knowing-holder", Vec::new(), None).unwrap();
     let titles = |o: &Observation| match o.channels.get("developer/titles") {
-        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id.clone()).collect::<Vec<_>>(),
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id()).collect::<Vec<_>>(),
         _ => vec![],
     };
     let o = look(&mut run, "developer-system", json!([{"channel": "developer/titles", "query": {"where": [{"field": "holder", "op": "=", "value": "city"}], "order": {"field": "id"}, "limit": 200}}])).unwrap();
@@ -229,7 +262,7 @@ fn going_to_look_takes_time_and_shows_what_is_there_then() {
     let out = run.command(&Command::Look { participant: "alice-self".into(), only: None, looks: looks.clone() }).unwrap();
     let (starts, done) = out.events.iter().find_map(|e| match &e.body {
         EventBody::VisitStarted { starts, done, places, .. } => {
-            assert_eq!(places, &vec!["s-flats".to_string()]);
+            assert_eq!(places, &vec![oikos_kernel::blocks::Id::new("s-flats")]);
             Some((*starts, *done))
         }
         _ => None,
@@ -274,7 +307,7 @@ fn going_to_look_takes_time_and_shows_what_is_there_then() {
     let o = run.command(&Command::Observe { participant: "mayor-system".into(), only: None }).unwrap().observation.unwrap();
     let Some(ChannelData::Sites { cells, .. }) = o.channels.get("mayor/calls") else { panic!() };
     assert_eq!(cells.len(), 2);
-    assert_eq!(cells[0].structure.as_ref().unwrap().spaces[0].occupants, Some(vec!["alice".to_string()]));
+    assert_eq!(cells[0].structure.as_ref().unwrap().spaces[0].occupants, Some(vec!["alice".into()]));
     assert!(cells[1].structure.is_none());
     // A visit that names nowhere, too many places, or only somewhere that isn't: refused, and nobody sets out.
     let none = |run: &mut Run<Vec<u8>>, looks: Value| look(run, "mayor-system", looks).is_err();
@@ -337,13 +370,13 @@ fn a_keeper_answers_in_its_own_time_a_clerk_slowly_and_a_system_fast() {
     let titles = json!({"id": "titles", "kind": "records", "way": "ask", "of": "city", "by": ["holder", "id"], "match": {"records": ["claim"]}, "on_request": true});
     let ask = |a: &str| json!([{"channel": "developer/titles", "query": {"where": [{"field": "holder", "op": "=", "value": a}], "order": {"field": "id"}, "limit": 200}}]);
     let got = |o: &Observation| match o.channels.get("developer/titles") {
-        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id.clone()).collect::<Vec<_>>(),
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id()).collect::<Vec<_>>(),
         _ => vec![],
     };
     let asked = |run: &mut Run<Vec<u8>>| -> (Observation, Vec<(i64, i64, String)>) {
         let looks = serde_json::from_value(ask("city")).unwrap();
         let out = run.command(&Command::Look { participant: "developer-system".into(), only: None, looks }).unwrap();
-        let by = out.events.iter().filter_map(|e| match &e.body { EventBody::AskStarted { starts, done, by, .. } => Some((*starts, *done, by.clone())), _ => None }).collect();
+        let by = out.events.iter().filter_map(|e| match &e.body { EventBody::AskStarted { starts, done, by, .. } => Some((*starts, *done, by.to_string())), _ => None }).collect();
         (out.observation.unwrap(), by)
     };
     // No row: at once.
@@ -416,7 +449,7 @@ fn an_advance_to_news_stops_where_a_keeper_answers_an_office() {
 fn an_answer_needs_a_performer_present_and_on_duty_and_counts_against_the_day() {
     let titles = json!({"id": "titles", "kind": "records", "way": "ask", "of": "city", "by": ["holder", "id"], "match": {"records": ["claim"]}, "on_request": true});
     let got = |o: &Observation| match o.channels.get("developer/titles") {
-        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id.clone()).collect::<Vec<_>>(),
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id()).collect::<Vec<_>>(),
         _ => vec![],
     };
     let ask = |run: &mut Run<Vec<u8>>| {
@@ -492,7 +525,7 @@ fn two_answers_from_one_keeper_arriving_together_are_both_shown() {
     run.command(&Command::Advance { to: 120 }).unwrap();
     let o = run.command(&Command::Observe { participant: "developer-system".into(), only: None }).unwrap().observation.unwrap();
     let ids: Vec<String> = match o.channels.get("developer/titles") {
-        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id.clone()).collect(),
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id()).map(|x| x.to_string()).collect(),
         other => panic!("{other:?}"),
     };
     assert!(ids.contains(&"title-lot-a".to_string()), "the first answer: {ids:?}");

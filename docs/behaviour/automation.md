@@ -30,10 +30,26 @@ firm does) with a sales and delivery system (`vendor-system`). It does what a se
 3. **It switches a system off** (`retire`, the supplier's physical power) when the buyer has not signed the licence in thirty days, when the licence has ended,
    or when the fee has not been paid for 75 days. Lock-in is physical, as the kernel has it.
 4. **It answers a tender** with a bid, for each of its offers for offices that does what the tender asks.
+5. **It sells the newest release** of an offer whose technology has later ones (`releases`, a capability scenario's:
+   docs/scenarios.md, "capability"): from a release's day, the offer is published again as the release is (its kind of
+   system, its speed, its prices) and an order is filled from that kind. Nothing of a release is said before it is out;
+   a system already delivered stays the kind it was, and a buyer that wants the new one orders it, as any buyer does.
 
 An error rate is a row of the world's table of slips (`orchestration.slip.system.<offer>`), with the offer's source; the vendor says in its offer what the
 table says. A system's speed is its template's `does` row for work (`seconds`), and for a paper an office writes, the table's row for a system
 (`publish/<kind>`); the time is the system's, on its own lane, so no person's hours are taken (all work takes time: docs/all-work-takes-time.md).
+
+## Tools: technologies that are goods (2026-11-01; foundations-2 7.2, step E2)
+
+A technology need not be a system. **A tool is a good**: the outside world sells it at its price (`automation.tools` in a
+profile: its kind, the task it is used at, the share of the time the work then takes, its price), a firm buys it as it
+buys inputs (an order to the world market, paid with it), and holds it where its staff work. The kernel's law is the
+task's `tool`: with one held for each person doing the work, the work takes its share of the time; the tool is not used
+up. A factory weighs buying one for each of its staff by the same comparison as a system (below): the time it saves them
+a month at their wage against its price spread over the payback it asks, by the hurdle (`automation.firms`). A factory
+founded in the run weighs it too. Off unless a town asks (`tools: true`, with the profile's `automation.tools`): the
+figures are placeholders (risk ME-25), and at au-vic's every factory buys one for each worker on its first day, so a
+study turns them on knowingly. A tool does not wear and is weighed only by factories.
 
 ## A business's comparison
 

@@ -3,7 +3,8 @@
 //! observation is built by perception from the world as it is, then delivered by the world (what was looked through
 //! is marked seen; outcomes and messages are handed over), and its hash goes in the log.
 
-use crate::blocks::{Id, Record};
+use crate::blocks::Id;
+use crate::held::Rec;
 use crate::canon;
 use crate::config::LookRequest;
 use crate::events::{EventBody, Timed};
@@ -13,6 +14,7 @@ use crate::statics::Statics;
 use oikos_resolver::knowledge::{CellFacts, RecordFacts, StructureFact, Seen, SeenAccount, SeenChannel, SeenEntity, SeenHolding, SeenPosition, Shown};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, RwLock};
 
 pub use oikos_world::kernel::{Check, Command, ProtocolError};
@@ -45,31 +47,51 @@ pub struct Observed {
 /// What is kept for a record or a building is the same whoever encodes it first.)
 #[derive(Default)]
 pub struct Delivered {
-    /// Each record shown, by where it is in memory (it's kept here, so nothing else can come to be there): its
-    /// canonical bytes and what it adds. A record is immutable once made, and an observation shows the state's own.
+    /// Each record shown, by where its slot is in memory (`Rec::addr`; the slot is kept here, so nothing else can come
+    /// to be there): its canonical bytes and what it adds. A record is immutable once made, and an observation shows
+    /// the state's own. (The slot, not the record: a record nobody reads can leave memory, docs/design/tiered-storage.md.)
     records: RwLock<BTreeMap<usize, Shared>>,
     /// structure id -> the building as it was last shown (the latest few ways: with its occupants named and without,
     /// say), each with its canonical bytes and what's known of it. Used only for a building that's equal to one of
     /// them, field for field: the bytes are what encoding it again would give.
     structures: RwLock<BTreeMap<Id, Vec<Building>>>,
+    /// structure id -> what's known of it (its type, where it is, its spaces): one for everyone told of it, while it is
+    /// the same. It is made of what a building is, not of who is in it, so the many ways a building is shown (as its
+    /// occupants come and go) share it; each person's knowledge held its own (SC-1: 0.4 GB at 50,000 people).
+    facts: RwLock<BTreeMap<Id, Arc<StructureFact>>>,
+    /// The day records shown now are marked with (`trim`).
+    today: AtomicI64,
 }
 
 /// For a host that asked for records by reference: record id -> the record it was last handed whole under that id
-/// (where it is in memory), and every record it holds so. A record is handed over whole the first time, and by its
-/// id from then on: one record is shown to many seats (a register of lots, to everyone who reads it), and the host
-/// reads it once. (In the order observations are delivered, one at a time: never part of encoding one.)
+/// (where its slot is in memory), and every record it holds so (each kept here, so that no other record's slot comes
+/// to be where it is). A record is handed over whole the first time, and by its id from then on: one record is shown
+/// to many seats (a register of lots, to everyone who reads it), and the host reads it once. (In the order
+/// observations are delivered, one at a time: never part of encoding one.)
 #[derive(Default)]
 struct Handed {
     by_id: BTreeMap<Id, usize>,
-    whole: BTreeSet<usize>,
+    whole: BTreeMap<usize, Rec>,
 }
 
-/// A record as it's delivered.
+/// A record as it's delivered: what it adds (kept from the first time it is shown: a record is shown to many, and
+/// read again at each look), and its canonical bytes, made the first time an observation that is written shows it (a
+/// seat's, or one whose hash the log keeps) and kept from then on. A code actor's look makes no bytes: they were made
+/// and kept for every record anyone was shown (SC-1). Let go of when it has not been shown for `KEPT_DAYS`.
 struct Shared {
-    record: Arc<Record>,
-    bytes: Arc<[u8]>,
-    facts: Arc<RecordFacts>,
+    /// (Held, never read: while this is kept, no other record's slot comes to be where it is, `Rec::addr`.)
+    #[allow(dead_code)]
+    record: Rec,
+    bytes: Option<Arc<[u8]>>,
+    facts: Option<Arc<RecordFacts>>,
+    /// The day it was last shown: its bytes and facts are let go when it has not been for `KEPT_DAYS` (`trim`).
+    shown: AtomicI64,
 }
+
+/// How many days a record's bytes and facts are kept after it was last shown. They are what its record makes (encoding
+/// it, reading it), made again when it is next shown, and the entry with them (a host's `Handed` keeps the records it
+/// holds itself). What is shown is the same either way: only what's kept to show it again quickly.
+const KEPT_DAYS: i64 = 7;
 
 /// A building as it was shown: its canonical bytes, and what's known of it.
 type Building = (Arc<SiteStructure>, Arc<[u8]>, Arc<StructureFact>);
@@ -84,31 +106,68 @@ fn held<T>(lock: Result<T, std::sync::PoisonError<T>>) -> T {
 
 impl Delivered {
     /// A record an observation shows: its canonical bytes, what it adds, and where it's kept here.
-    fn record(&self, r: &Arc<Record>) -> Result<(Arc<[u8]>, Arc<RecordFacts>, usize), canon::CanonError> {
-        let at = Arc::as_ptr(r) as usize;
-        if let Some(shared) = held(self.records.read()).get(&at) {
-            return Ok((shared.bytes.clone(), shared.facts.clone(), at));
-        }
-        let v = serde_json::to_value(&**r).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
+    fn record(&self, r: &Rec) -> Result<(Arc<[u8]>, Arc<RecordFacts>), canon::CanonError> {
+        let at = r.addr();
+        let today = self.today.load(Ordering::Relaxed);
+        let facts = match held(self.records.read()).get(&at) {
+            Some(shared) => {
+                shared.shown.store(today, Ordering::Relaxed);
+                if let (Some(b), Some(f)) = (&shared.bytes, &shared.facts) {
+                    return Ok((b.clone(), f.clone()));
+                }
+                shared.facts.clone()
+            }
+            None => None,
+        };
+        let record = r.load();
+        let v = serde_json::to_value(&*record).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
         let bytes: Arc<[u8]> = canon::canonical_value(&v)?.into();
-        let facts = Arc::new(RecordFacts::of(&v));
+        let facts = facts.unwrap_or_else(|| Arc::new(RecordFacts::of(&v)));
         // (Encoded by another meanwhile: theirs is kept, and given.)
         let mut records = held(self.records.write());
-        let shared = records.entry(at).or_insert(Shared { record: r.clone(), bytes, facts });
-        Ok((shared.bytes.clone(), shared.facts.clone(), at))
+        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts: None, shown: AtomicI64::new(today) });
+        let bytes = shared.bytes.get_or_insert(bytes).clone();
+        let facts = shared.facts.get_or_insert(facts).clone();
+        Ok((bytes, facts))
+    }
+
+    /// What a record adds to a seat's knowledge, without its bytes (a code actor's look: nothing of it is written).
+    fn record_facts(&self, r: &Rec) -> Result<Arc<RecordFacts>, canon::CanonError> {
+        let at = r.addr();
+        let today = self.today.load(Ordering::Relaxed);
+        if let Some(shared) = held(self.records.read()).get(&at) {
+            shared.shown.store(today, Ordering::Relaxed);
+            if let Some(f) = &shared.facts {
+                return Ok(f.clone());
+            }
+        }
+        let record = r.load();
+        let v = serde_json::to_value(&*record).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
+        let facts = Arc::new(RecordFacts::of(&v));
+        let mut records = held(self.records.write());
+        let shared = records.entry(at).or_insert_with(|| Shared { record: r.clone(), bytes: None, facts: None, shown: AtomicI64::new(today) });
+        Ok(shared.facts.get_or_insert(facts).clone())
+    }
+
+    /// A new day: what is kept of records not shown for `KEPT_DAYS` is let go (made again if they are).
+    fn trim(&self, day: i64) {
+        if self.today.swap(day, Ordering::Relaxed) == day {
+            return;
+        }
+        held(self.records.write()).retain(|_, shared| shared.shown.load(Ordering::Relaxed) >= day - KEPT_DAYS);
     }
 
     /// Writes a record for a host that keeps what it's handed: whole the first time, its id from then on.
-    fn hand_over(&self, handed: &mut Handed, at: usize, bytes: &[u8], out: &mut Vec<u8>) {
-        let records = held(self.records.read());
-        let Some(shared) = records.get(&at) else { return out.extend_from_slice(bytes) };
-        if handed.whole.contains(&at) {
-            return canon::write_string(&shared.record.id, out);
+    fn hand_over(handed: &mut Handed, r: &Rec, bytes: &[u8], out: &mut Vec<u8>) {
+        let at = r.addr();
+        if let Some(r) = handed.whole.get(&at) {
+            return canon::write_string(&r.id(), out);
         }
-        handed.whole.insert(at);
+        let id = r.id();
+        handed.whole.insert(at, r.clone());
         out.extend_from_slice(bytes);
         // (Another record handed over under this id before, if that could be: the host no longer holds it.)
-        if let Some(was) = handed.by_id.insert(shared.record.id.clone(), at).filter(|was| *was != at) {
+        if let Some(was) = handed.by_id.insert(id, at).filter(|was| *was != at) {
             handed.whole.remove(&was);
         }
     }
@@ -119,9 +178,9 @@ impl Delivered {
             return Ok((bytes.clone(), fact.clone()));
         }
         let bytes: Arc<[u8]> = canon::canonical(&**x)?.into();
-        let fact = Arc::new(StructureFact { type_: x.structure_type.clone(), at: x.at.clone(), spaces: x.spaces.iter().map(|sp| sp.space.clone()).collect() });
+        let fact = self.fact_of(x);
         let mut structures = held(self.structures.write());
-        let ways = structures.entry(x.structure.clone()).or_default();
+        let ways = structures.entry(x.structure).or_default();
         ways.insert(0, (x.clone(), bytes.clone(), fact.clone()));
         ways.truncate(WAYS);
         Ok((bytes, fact))
@@ -133,7 +192,18 @@ impl Delivered {
         if let Some(fact) = held(self.structures.read()).get(&x.structure).and_then(|ways| ways.iter().find(|(shown, _, _)| Arc::ptr_eq(shown, x)).map(|(_, _, f)| f.clone())) {
             return fact;
         }
-        Arc::new(StructureFact { type_: x.structure_type.clone(), at: x.at.clone(), spaces: x.spaces.iter().map(|sp| sp.space.clone()).collect() })
+        self.fact_of(x)
+    }
+
+    /// What's known of a building as shown: the one held for it, if it still says the same; else made, and held.
+    fn fact_of(&self, x: &SiteStructure) -> Arc<StructureFact> {
+        let same = |f: &StructureFact| f.type_ == x.structure_type && f.at == x.at && f.spaces.len() == x.spaces.len() && f.spaces.iter().zip(&x.spaces).all(|(a, b)| *a == b.space);
+        if let Some(f) = held(self.facts.read()).get(&x.structure).filter(|f| same(f)) {
+            return f.clone();
+        }
+        let f = Arc::new(StructureFact { type_: x.structure_type.to_string(), at: x.at.to_string(), spaces: x.spaces.iter().map(|sp| sp.space).map(|x| x.to_string()).collect() });
+        held(self.facts.write()).insert(x.structure, f.clone());
+        f
     }
 
     /// A cell as a sites channel shows it: its canonical bytes (exactly `canon::canonical` of it, written here member
@@ -191,7 +261,7 @@ impl Delivered {
 
 /// What was taken out of a channel while the rest of its observation is encoded.
 enum Taken {
-    Records(Vec<Arc<Record>>),
+    Records(Vec<Rec>),
     Cells(Vec<SiteCell>),
 }
 
@@ -213,8 +283,8 @@ impl Encoded {
         let mut taken: Vec<(Id, Taken)> = vec![];
         for (path, ch) in obs.channels.iter_mut() {
             match ch {
-                ChannelData::Records { records, .. } if !records.is_empty() => taken.push((path.clone(), Taken::Records(std::mem::take(records)))),
-                ChannelData::Sites { cells, .. } if !cells.is_empty() => taken.push((path.clone(), Taken::Cells(std::mem::take(cells)))),
+                ChannelData::Records { records, .. } if !records.is_empty() => taken.push((*path, Taken::Records(std::mem::take(records)))),
+                ChannelData::Sites { cells, .. } if !cells.is_empty() => taken.push((*path, Taken::Cells(std::mem::take(cells)))),
                 _ => {}
             }
         }
@@ -225,14 +295,14 @@ impl Encoded {
         let mut failed = None;
         let mut buildings = vec![];
         for (path, what) in &taken {
-            let (_, list) = elements.entry(path.clone()).or_insert((if matches!(what, Taken::Records(_)) { "records" } else { "cells" }, vec![]));
-            let facts = shown.entry(path.clone()).or_default();
+            let (_, list) = elements.entry(*path).or_insert((if matches!(what, Taken::Records(_)) { "records" } else { "cells" }, vec![]));
+            let facts = shown.entry(*path).or_default();
             match what {
                 Taken::Records(records) => {
                     for r in records {
                         match delivered.record(r) {
-                            Ok((b, f, at)) => {
-                                list.push((Some(at), b));
+                            Ok((b, f)) => {
+                                list.push((Some(r.clone()), b));
                                 facts.records.push(f);
                             }
                             Err(e) => failed = Some(e),
@@ -259,7 +329,7 @@ impl Encoded {
         let top = canon::canonical_members(&*obs);
         let parts: Result<Vec<Part>, canon::CanonError> = channels
             .iter()
-            .map(|(path, ch)| Ok((path.clone(), if elements.contains_key(path) { Err(canon::canonical_members(ch)?) } else { Ok(canon::canonical(ch)?) })))
+            .map(|(path, ch)| Ok((*path, if elements.contains_key(path) { Err(canon::canonical_members(ch)?) } else { Ok(canon::canonical(ch)?) })))
             .collect();
         obs.channels = channels;
         for (path, what) in taken {
@@ -284,11 +354,11 @@ impl Encoded {
 
     /// As it's delivered, now: for a host that takes records by reference, written again with each record it has
     /// been handed already as its id (and those it's handed here noted as handed).
-    fn deliver(self, delivered: &Delivered, handed: Option<&mut Handed>) -> Observed {
+    fn deliver(self, handed: Option<&mut Handed>) -> Observed {
         let wire = handed.map(|handed| {
             let mut line = Vec::with_capacity(1024);
-            write_with(&self.top, &self.parts, &mut line, &self.elements, &mut |at, b, out| match at {
-                Some(at) => delivered.hand_over(handed, at, b, out),
+            write_with(&self.top, &self.parts, &mut line, &self.elements, &mut |r, b, out| match r {
+                Some(r) => Delivered::hand_over(handed, r, b, out),
                 None => out.extend_from_slice(b),
             });
             line
@@ -301,8 +371,8 @@ impl Encoded {
 /// read from the observation itself, as `Seen::of` reads it from the observation's JSON with each records channel's
 /// records and each sites channel's cells left out.
 pub fn seen(obs: &Observation) -> Seen<'_> {
-    fn word(x: &Option<String>) -> &str {
-        x.as_deref().unwrap_or_default()
+    fn word<S: AsRef<str>>(x: &Option<S>) -> &str {
+        x.as_ref().map_or("", |s| s.as_ref())
     }
     Seen {
         entity: word(&obs.entity),
@@ -314,7 +384,7 @@ pub fn seen(obs: &Observation) -> Seen<'_> {
             .map(|(path, ch)| {
                 let channel = match ch {
                     ChannelData::Accounts { accounts, .. } => SeenChannel::Accounts(accounts.iter().map(|a| SeenAccount { account: &a.account, holder: &a.holder, custodian: &a.custodian, closed: a.closed == Some(true) }).collect()),
-                    ChannelData::Holdings { holdings } => SeenChannel::Holdings(holdings.iter().map(|h| SeenHolding { kind: &h.kind, at: &h.at, gone: h.quantity == 0 }).collect()),
+                    ChannelData::Holdings { holdings, .. } => SeenChannel::Holdings(holdings.iter().map(|h| SeenHolding { kind: &h.kind, at: &h.at, gone: h.quantity == 0 }).collect()),
                     ChannelData::Sites { .. } => SeenChannel::Sites(vec![]),
                     ChannelData::Directory { entities, positions } => SeenChannel::Directory {
                         entities: entities.iter().map(|e| SeenEntity { entity: &e.entity, name: &e.name, participant: e.participant.as_deref() }).collect(),
@@ -330,7 +400,7 @@ pub fn seen(obs: &Observation) -> Seen<'_> {
 
 /// By channel path: the member taken out of the channel (`records` or `cells`), and its elements in order: each one's
 /// canonical bytes, and for a record, where it's kept in `Delivered`.
-type Elements = BTreeMap<Id, (&'static str, Vec<(Option<usize>, Arc<[u8]>)>)>;
+type Elements = BTreeMap<Id, (&'static str, Vec<(Option<Rec>, Arc<[u8]>)>)>;
 
 /// A channel of an observation, by its path: its canonical bytes, or (one something was taken out of) its members'.
 type Part = (Id, Result<Vec<u8>, Vec<(String, Vec<u8>)>>);
@@ -338,7 +408,7 @@ type Part = (Id, Result<Vec<u8>, Vec<(String, Vec<u8>)>>);
 /// An observation's canonical form, from its members' canonical bytes (`top`, its channels left out) and its
 /// channels' (`parts`, in canonical order), with what was taken out of each channel written, element by element,
 /// where its (empty) member stands: `element` writes one (a record's place in `Delivered`, its bytes).
-fn write_with(top: &[(String, Vec<u8>)], parts: &[Part], out: &mut Vec<u8>, elements: &Elements, element: &mut dyn FnMut(Option<usize>, &[u8], &mut Vec<u8>)) {
+fn write_with(top: &[(String, Vec<u8>)], parts: &[Part], out: &mut Vec<u8>, elements: &Elements, element: &mut dyn FnMut(Option<&Rec>, &[u8], &mut Vec<u8>)) {
     let members = |members: &[(String, Vec<u8>)], out: &mut Vec<u8>, value: &mut dyn FnMut(&str, &[u8], &mut Vec<u8>)| {
         out.push(b'{');
         for (i, (key, bytes)) in members.iter().enumerate() {
@@ -366,7 +436,7 @@ fn write_with(top: &[(String, Vec<u8>)], parts: &[Part], out: &mut Vec<u8>, elem
                         if i > 0 {
                             out.push(b',');
                         }
-                        element(*id, b, out);
+                        element(id.as_ref(), b, out);
                     }
                     out.push(b']');
                 } else {
@@ -415,6 +485,9 @@ const LOOK_AHEAD: usize = 64;
 /// Fewer than this aren't worth the starting of threads.
 const WORTH_SHARING: usize = 16;
 
+/// How many of an office's old payments go to disk together (fewer wait for more).
+const LEDGER_BLOCK: usize = 256;
+
 /// `f` of each item, in the items' order, worked out on up to `threads` threads. Each thread takes the next item not
 /// yet taken; every result is put where its item stands, so the list is the same however the work fell out.
 fn each<T: Sync, R: Send>(items: &[T], threads: usize, f: impl Fn(&T) -> R + Sync) -> Vec<R> {
@@ -447,22 +520,75 @@ pub struct Kernel {
     worth_sharing: usize,
     /// How many observations were delivered as they had been made ready (for whoever measures; nothing reads it).
     from_ready: u64,
+    /// Where the world's records are held (docs/design/tiered-storage.md): off, all in memory; on, those nobody reads
+    /// move to the run's cold file, a day at a time (`tier_pass`), and come back when read. Nothing depends on it.
+    tier: crate::held::Tier,
+    /// The day the tier last looked, and how many of the world's records it has been told of.
+    tier_day: i64,
+    tiered: usize,
 }
 
 impl Kernel {
     pub fn new(loaded: &crate::config::LoadedConfig) -> Result<Kernel, String> {
-        Ok(Kernel { world: oikos_world::World::new(loaded)?, index: Default::default(), delivered: Default::default(), handed: None, planned: vec![], planned_done: 0, ready: BTreeMap::new(), threads: threads(), worth_sharing: WORTH_SHARING, from_ready: 0 })
+        Ok(Kernel { world: oikos_world::World::new(loaded)?, index: Default::default(), delivered: Default::default(), handed: None, planned: vec![], planned_done: 0, ready: BTreeMap::new(), threads: threads(), worth_sharing: WORTH_SHARING, from_ready: 0, tier: Default::default(), tier_day: -1, tiered: 0 })
     }
 
     /// A kernel in a state it was in before (a snapshot's): see `World::resume`. Nothing it derives (perception's
     /// index, what has been encoded) is carried over: it is made again as it is needed, and no answer depends on it.
     pub fn resume(loaded: &crate::config::LoadedConfig, state: State) -> Result<Kernel, String> {
-        Ok(Kernel { world: oikos_world::World::resume(loaded, state)?, index: Default::default(), delivered: Default::default(), handed: None, planned: vec![], planned_done: 0, ready: BTreeMap::new(), threads: threads(), worth_sharing: WORTH_SHARING, from_ready: 0 })
+        Ok(Kernel { world: oikos_world::World::resume(loaded, state)?, index: Default::default(), delivered: Default::default(), handed: None, planned: vec![], planned_done: 0, ready: BTreeMap::new(), threads: threads(), worth_sharing: WORTH_SHARING, from_ready: 0, tier: Default::default(), tier_day: -1, tiered: 0 })
     }
 
     /// The same world, apart from now on (a fork: see `World::fork`), with the same number of threads.
     pub fn fork(&self) -> Kernel {
-        Kernel { world: self.world.fork(), index: Default::default(), delivered: Default::default(), handed: None, planned: vec![], planned_done: 0, ready: BTreeMap::new(), threads: self.threads, worth_sharing: self.worth_sharing, from_ready: 0 }
+        Kernel { world: self.world.fork(), index: Default::default(), delivered: Default::default(), handed: None, planned: vec![], planned_done: 0, ready: BTreeMap::new(), threads: self.threads, worth_sharing: self.worth_sharing, from_ready: 0, tier: Default::default(), tier_day: -1, tiered: 0 }
+    }
+
+    /// From now on, the world's records that nobody reads are held on disk, in `path` (made anew, and removed when the
+    /// run is over), and read back when they are read (docs/design/tiered-storage.md). Nothing anyone sees, logs or
+    /// hashes changes.
+    pub fn tier_records(&mut self, path: &std::path::Path, policy: crate::held::Policy) -> std::io::Result<()> {
+        self.tier = crate::held::Tier::on(path, policy)?;
+        self.tier_day = -1;
+        self.tiered = 0;
+        Ok(())
+    }
+
+    /// What the tier holds, and has done (for whoever measures), if it is on.
+    pub fn tier_tally(&self) -> Option<crate::held::Tally> {
+        self.tier.is_on().then_some(self.tier.tally)
+    }
+
+    /// Once a day: the tier is told of the records filed since, and looks at what is held in memory (`Tier::pass`).
+    fn tier_pass(&mut self) {
+        let day = self.world.t().div_euclid(86_400);
+        if !self.tier.is_on() || day == self.tier_day {
+            return;
+        }
+        self.tier_day = day;
+        let st = self.world.state();
+        for id in st.record_order.iter().skip(self.tiered) {
+            if let Some(stored) = st.records.get(id) {
+                self.tier.add(&stored.record, day);
+            }
+        }
+        self.tiered = st.record_order.len();
+        // (The offices' files of payments: what is older than the tier keeps records filed, in blocks of a few hundred.)
+        if let Some(file) = self.tier.file() {
+            let before = (day - self.tier.policy().after_days) * 86_400;
+            if let Err(e) = self.world.cool_ledgers(&file, before, LEDGER_BLOCK) {
+                panic!("the offices' files could not be written: {e}");
+            }
+        }
+        match self.tier.pass(day) {
+            Ok(t) => {
+                if std::env::var_os("OIKOS_COLD_TRACE").is_some() {
+                    eprintln!("tier day {day}: {} records, {} in memory, {} cooled ({} written), {} read back, {} bytes on disk", t.records, t.hot, t.cooled, t.written, t.reads, t.disk_bytes);
+                }
+            }
+            // (Disk decides nothing: a run whose records can't be written stops.)
+            Err(e) => panic!("the world's cold records could not be written: {e}"),
+        }
     }
 
     /// From now on, an observation's JSON has a second form (`Observed::wire`) for a host that keeps the records it's
@@ -474,7 +600,7 @@ impl Kernel {
 
     /// An observation this kernel returned (of the state as it is), in JSON.
     pub fn observed(&mut self, obs: &mut Observation) -> Result<Observed, canon::CanonError> {
-        Ok(Encoded::of(obs, &self.delivered)?.deliver(&self.delivered, self.handed.as_mut()))
+        Ok(Encoded::of(obs, &self.delivered)?.deliver(self.handed.as_mut()))
     }
 
     /// What an observation's records and cells add to a seat's knowledge, by channel path: `observed(obs).shown`, without
@@ -494,13 +620,13 @@ impl Kernel {
         for (path, ch) in &obs.channels {
             match ch {
                 ChannelData::Records { records, .. } if !records.is_empty() => {
-                    let facts = shown.entry(path.clone()).or_default();
+                    let facts = shown.entry(*path).or_default();
                     for r in records {
-                        facts.records.push(delivered.record(r)?.1);
+                        facts.records.push(delivered.record_facts(r)?);
                     }
                 }
                 ChannelData::Sites { cells, .. } if !cells.is_empty() => {
-                    let facts = shown.entry(path.clone()).or_default();
+                    let facts = shown.entry(*path).or_default();
                     for c in cells {
                         let structure = c.structure.as_ref().map(|x| {
                             let at = Arc::as_ptr(x) as usize;
@@ -561,7 +687,7 @@ impl Kernel {
             return false;
         }
         log.observations.as_deref() != Some("seats")
-            || !self.world.state().participants.get(participant).is_some_and(|p| p.def.controller.get("type").and_then(serde_json::Value::as_str) == Some("code"))
+            || !self.world.state().participants.get(participant).is_some_and(|p| p.def.controller.get("type").and_then(|x| x.as_str()) == Some("code"))
     }
 
     fn unplan(&mut self) {
@@ -576,7 +702,7 @@ impl Kernel {
         if self.planned.is_empty() {
             return None;
         }
-        let key = (participant.to_string(), only.map(String::from));
+        let key = (Id::new(participant), only.map(Id::new));
         // (The next of those planned, or one a little further on: the host may pass over a unit that has gone.)
         if !self.ready.contains_key(&key) {
             if let Some(ahead) = self.planned[self.planned_done.min(self.planned.len())..].iter().take(LOOK_AHEAD).position(|k| *k == key) {
@@ -587,7 +713,7 @@ impl Kernel {
         let ready = self.ready.remove(&key);
         // Whatever else was made ready for this participant was made before this was delivered to it (what it has
         // seen, and what's waiting for it, are about to change): it's built again when asked for.
-        let others: Vec<(Id, Option<Id>)> = self.ready.range((participant.to_string(), None)..).take_while(|(k, _)| k.0 == participant).map(|(k, _)| k.clone()).collect();
+        let others: Vec<(Id, Option<Id>)> = self.ready.range((Id::new(participant), None)..).take_while(|(k, _)| k.0 == participant).map(|(k, _)| *k).collect();
         for k in others {
             self.ready.remove(&k);
         }
@@ -597,10 +723,12 @@ impl Kernel {
     /// Build and encode the next of the planned observations, on several threads: each from the state as it is (the
     /// same for all: read, never changed), the first only of any one participant's.
     fn make_ready(&mut self) {
+        self.delivered.trim(self.world.t().div_euclid(86_400));
+        self.tier_pass();
         let from = self.planned_done;
         let to = (from + WINDOW).min(self.planned.len());
         self.planned_done = to;
-        let (s, st) = (self.world.statics(), self.world.state());
+        let (_s, st) = (self.world.statics(), self.world.state());
         let mut seen: BTreeSet<&str> = BTreeSet::new();
         let wanted: Vec<&(Id, Option<Id>)> = self.planned[from..to]
             .iter()
@@ -631,7 +759,7 @@ impl Kernel {
         });
         for (key, ready) in wanted.into_iter().zip(made) {
             if let Some(ready) = ready {
-                self.ready.insert(key.clone(), ready);
+                self.ready.insert(*key, ready);
             }
         }
     }
@@ -650,6 +778,11 @@ impl Kernel {
 
     pub fn canonical_state(&self) -> Result<Vec<u8>, canon::CanonError> {
         self.world.canonical_state()
+    }
+
+    /// The same bytes made whole by `canon::canonical` (for checking the stream `canonical_state` writes).
+    pub fn canonical_state_whole(&self) -> Result<Vec<u8>, canon::CanonError> {
+        self.world.canonical_state_whole()
     }
 
     pub fn state_hash(&self) -> Result<String, canon::CanonError> {
@@ -724,6 +857,8 @@ impl Kernel {
     }
 
     fn observe(&mut self, participant: &str, only: Option<&str>, looks: &[LookRequest]) -> Output {
+        self.delivered.trim(self.world.t().div_euclid(86_400));
+        self.tier_pass();
         // The answers a keeper has given to its questions since (foundations F11) are looked through with this observation.
         let answered = self.world.take_asks(participant, only);
         let looks: Vec<LookRequest> = if answered.is_empty() { looks.to_vec() } else { looks.iter().cloned().chain(answered).collect() };
@@ -736,7 +871,7 @@ impl Kernel {
             debug_assert!(outcomes == obs.outcomes && inbox == obs.inbox && visits.is_empty(), "what was waiting for {participant} isn't what was delivered to it");
             self.from_ready += 1;
             let Some((encoded, hash)) = encoded else { return Output { events: vec![], observation: Some(obs), observed: None } };
-            let observed = encoded.deliver(&self.delivered, self.handed.as_mut());
+            let observed = encoded.deliver(self.handed.as_mut());
             return Output { events: vec![Timed::new(self.world.t(), EventBody::Observation { participant: participant.into(), observation_hash: hash })], observation: Some(obs), observed: Some(observed) };
         }
         let (obs, seen, drained) = observe::observe(self.world.statics(), self.world.state(), &mut self.index, participant, only, looks);

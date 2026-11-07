@@ -33,7 +33,7 @@ const SAMPLES: any[] = [
   { block: "close_account", account: "acc-old" },
   { block: "construct", at: "cell.3.4", structure_type: "park", materials_at: "str.2", ref: "s" },
   { block: "demolish", structure: "str.9" },
-  { block: "occupy", space: "apts-3/dwelling.2", who: "c0042" },
+  { block: "occupy", space: "apts-3/dwelling.2", who: "c0042", vehicle: "car-c0042" },
   { block: "vacate", occupant: "c0042", from: "apts-3/dwelling.2" },
   { block: "create_entity", kind: "trust", name: "River Land Trust", speaks_for: "greenco", visible_to: ["city", "bank"], ref: "t",
     first_position: { title: "Trustee", role: "trustee", channels: [{ id: "books", kind: "accounts" }], role_module: { module: "x.y", params: { a: 1 } }, ref: "p" } },
@@ -67,9 +67,14 @@ const SAMPLES: any[] = [
   { block: "appoint", position: "planning", participant: "c0042-self" },
   { block: "deploy", template: "assistant", to: "greenco", title: "Front desk", ref: "d" },
   { block: "retire", participant: "works-system" },
-  { block: "move_goods", kind: "gravel", quantity: "40", from_at: "str.7", to: "builder", to_at: "str.8" },
+  { block: "move_goods", kind: "gravel", quantity: "40", from_at: "str.7", to: "builder", to_at: "str.8", carrier: "c0042", vehicle: "van-1" },
+  { block: "move_goods", kind: "gravel", quantity: "40", from_at: "str.7", to: "builder", to_at: "str.8", carried: true },
   { block: "work", task: "build", units: 7200, at: "str.2", performers: ["c0042", "builder"], on: "str.5", survey: { of: "glider", cells: ["cell.1.1", "cell.1.2"] }, investigate: { from: "greenco", at: "str.7", kind: "gravel" } },
   { block: "take", kind: "gravel", quantity: "40", from: "greenco", at: "str.7" },
+  { block: "connection", op: "open", kind: "water", node: "n-str-7", to: "greenco", at: "str.7", rate: 400, uses: "use_water", meter: "remote", ref: "c" },
+  { block: "connection", op: "set", connection: "conn.4", rate: 250 },
+  { block: "link", link: "wire-d00", op: "rotate", every: 7200, from: 3600, off: 3600 },
+  { block: "link", link: "pipe-d01", op: "shut" },
 ];
 
 /** Every leaf of a value, as a path. */

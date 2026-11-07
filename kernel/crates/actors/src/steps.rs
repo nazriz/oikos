@@ -290,7 +290,7 @@ impl<P: Plan> Actor for Stepper<P> {
         self.returned = None;
         if self.hooked {
             for o in &pic.outcomes {
-                if let Some((s, _)) = self.under_way.remove(&o.action) {
+                if let Some((s, _)) = self.under_way.remove(o.action.as_str()) {
                     let more = self.follow(&s, Done::Outcome(o), cx);
                     follow.extend(more);
                 }
@@ -621,8 +621,8 @@ mod tests {
             for seen in pic.channels.values() {
                 if let oikos_sight::Seen::Records { records, .. } = seen {
                     for r in records {
-                        if !self.known.contains(&r.id) {
-                            self.known.push(r.id.clone());
+                        if !self.known.contains(&r.id.to_string()) {
+                            self.known.push(r.id.to_string());
                         }
                     }
                 }

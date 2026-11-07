@@ -394,6 +394,28 @@
           "items": {
             "$ref": "#/$defs/SiteStructure"
           }
+        },
+        "trips": {
+          "description": "How long each of those the act took somewhere was on their way, there and back, in seconds (law 9): those doing the work went, so the one whose work it was knows how long it took them (for an act refused for want of time in their day, how long it would have: nobody set out). A planner sizes its next acts from these, never from the network.",
+          "type": "object",
+          "propertyNames": {
+            "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "freight": {
+          "description": "Goods the act sent by the outside's freight (law 9): where each went, and how many seconds it was to take on the road, for the one who sent them; a seller tells its buyers when to expect what it sent from these.",
+          "type": "object",
+          "propertyNames": {
+            "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
         }
       }
     },

@@ -1,0 +1,139 @@
+{
+  "answers": {
+    "acts": "What it acts on: a taxpayer's claim to have a credit on its account repaid or set against its next return, made on the claim form; a taxpayer's request for a statement of its own account; and a request to look at one of its decisions again. A letter changes nothing on an account.",
+    "office": "the tax collector"
+  },
+  "doc": "docs/behaviour/public-finance.md",
+  "issues": [
+    {
+      "does": "Says what is decided on a taxpayer's claim, to the taxpayer: a refund granted (and how much), a credit that may be set against its next return, or a refusal and why. A refund granted on it is paid by a payment from the collector's account into the account the claim names; it moves no money by itself.",
+      "fields": {
+        "amount": {
+          "description": "Where granted: how much.",
+          "type": "amount"
+        },
+        "claim": {
+          "description": "The claim decided.",
+          "required": true,
+          "type": "record"
+        },
+        "granted": {
+          "description": "Whether it is granted.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "type": "choice"
+        },
+        "reason": {
+          "description": "Why not, or why less than was asked.",
+          "type": "text"
+        },
+        "taxpayer": {
+          "description": "Who made the claim.",
+          "required": true,
+          "type": "entity"
+        },
+        "use": {
+          "description": "What was asked for.",
+          "options": [
+            "refund",
+            "set_off"
+          ],
+          "required": true,
+          "type": "choice"
+        }
+      },
+      "form": "tax_credit_decision",
+      "title": "Decision on a claim for tax paid and not owed",
+      "writes": {
+        "basis": "=claim",
+        "data": {
+          "amount": "#amount",
+          "claim": "=claim",
+          "granted": "?granted",
+          "reason": "=reason",
+          "taxpayer": "=taxpayer",
+          "use": "=use"
+        },
+        "kind": "tax_credit_decision",
+        "text": "Claim {claim}: granted {granted}.",
+        "to": [
+          "=taxpayer"
+        ],
+        "visible": [
+          "=taxpayer",
+          "=self"
+        ]
+      }
+    },
+    {
+      "does": "Tells a taxpayer how its own account stands: what its returns say was owed, what was received from it, what was repaid, and what is owing or in credit. It changes nothing on the account.",
+      "fields": {
+        "credit": {
+          "description": "In credit by (nothing: 0).",
+          "type": "amount"
+        },
+        "outstanding": {
+          "description": "Owing (nothing: 0).",
+          "type": "amount"
+        },
+        "owed": {
+          "description": "Owed on its returns, in all.",
+          "required": true,
+          "type": "amount"
+        },
+        "paid": {
+          "description": "Received from it, in all.",
+          "required": true,
+          "type": "amount"
+        },
+        "refunded": {
+          "description": "Repaid to it, in all.",
+          "type": "amount"
+        },
+        "taxpayer": {
+          "description": "Whose account.",
+          "required": true,
+          "type": "entity"
+        }
+      },
+      "form": "tax_statement",
+      "title": "Statement of a taxpayer's account",
+      "writes": {
+        "data": {
+          "credit": "#credit",
+          "outstanding": "#outstanding",
+          "owed": "#owed",
+          "paid": "#paid",
+          "refunded": "#refunded",
+          "taxpayer": "=taxpayer"
+        },
+        "kind": "tax_statement",
+        "text": "Statement of account: owed {owed}, paid {paid}; in credit {credit}.",
+        "to": [
+          "=taxpayer"
+        ],
+        "visible": [
+          "=taxpayer",
+          "=self"
+        ]
+      }
+    }
+  ],
+  "name": "world.tax_collector",
+  "params": {
+    "casework": {
+      "default": null,
+      "schema": {
+        "description": "who does the collector's casework (law 10): `by`, a system of the office's own organisation named on every step that is only papers of `kinds` (its officers' desk, whose template gives an officer's minutes for each and the officers' hours); absent, whoever acts does it",
+        "type": "object"
+      },
+      "source": "the world gives it: the generator's tax collector and its officers' desk (docs/behaviour/public-finance.md)"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "version": "0.1.0"
+}

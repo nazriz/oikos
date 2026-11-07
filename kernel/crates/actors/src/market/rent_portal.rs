@@ -88,7 +88,7 @@ impl Plan for Portal {
     fn then(&mut self, key: &String, done: crate::steps::Done, _: &mut Cx) -> Vec<Step<String>> {
         if let crate::steps::Done::Outcome(o) = done {
             if let Some(id) = o.created.as_ref().and_then(|c| c.values().next()) {
-                self.standing.insert(key.clone(), id.clone());
+                self.standing.insert(key.clone(), id.to_string());
             }
         }
         vec![]

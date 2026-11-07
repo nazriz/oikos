@@ -18,6 +18,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 pub use crate::controller::Controller;
+pub use crate::network::{ConnectionCfg, LinkCfg, MeterKind, NetworkCfg, NodeCfg, Physics, SupplyCfg};
 
 pub const CONTRACTS_VERSION: &str = "0.8";
 
@@ -27,6 +28,9 @@ pub const BOUNDARY: &str = "boundary";
 
 /// The capacity name for a participant acting, or looking, as itself (its own person).
 pub const SELF: &str = "self";
+/// The channel what a body saw on its way comes through (law 9: someone lying dead where it went by), as a look at the
+/// place would show it. No world declares it: every person has it.
+pub const ON_THE_WAY: &str = "on_the_way";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -74,6 +78,10 @@ pub struct Meta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub canary: String,
+    /// What a study counts as one technology (foundations-2 7.5: `ai`, say): template ids, by tag. For measurement only:
+    /// nothing in the world reads it (`orchestrator/test/generality.test.ts`), and no participant is shown `meta`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub study_tags: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -137,6 +145,10 @@ pub struct Catalogue {
     /// exactly and attaches no meaning to them; work changes them (a task's `on_body`), and they drift by `per_day`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_variables: Vec<BodyVariableCfg>,
+    /// Skill at acts (foundations-2 E4): the person's time for an act the table of work keys this way (`publish/<kind>`,
+    /// else its block) scales with the doer's practised skill, and doing it is practice. Absent: acts take the table's time.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub act_skills: Vec<ActSkill>,
     /// World totals the kernel keeps (tier 2: greenhouse gas).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub counters: Vec<CounterCfg>,
@@ -153,6 +165,18 @@ pub struct TravelCfg {
     pub seconds_per_cell: i64,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub by_cover: BTreeMap<Id, i64>,
+    /// Law 9 (S5): how a link's time rises with the vehicles on it in an hour against its capacity: the free time times
+    /// one and `alpha_bps` (basis points) of (vehicles over capacity) to the power `beta` (a volume-delay function, the
+    /// Bureau of Public Roads' form); a link at capacity takes one more vehicle only in the next hour. Absent: free flow.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub congestion: Option<CongestionCfg>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CongestionCfg {
+    pub alpha_bps: i64,
+    pub beta: u32,
 }
 
 /// A body variable: its bounds, its value for a body born here (or given none), and its drift a day.
@@ -165,7 +189,114 @@ pub struct BodyVariableCfg {
     pub initial: i64,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub per_day: i64,
+    /// A skill that grows with use and fades without it (foundations-2 E4): absent, the variable changes only as above.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub practice: Option<PracticeCfg>,
 }
+
+/// How a practised skill moves (foundations-2 E4). Each hour of use closes `gain_bps_per_hour` of the distance still to
+/// its maximum (diminishing returns: a law of practice); each whole day it goes unused, its distance above `floor` halves
+/// every `half_life_days` (fading toward what is never lost). Settled when it is read or used, from when it was last
+/// set, so it costs nothing a day.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PracticeCfg {
+    pub gain_bps_per_hour: u32,
+    pub half_life_days: i64,
+    pub floor: i64,
+}
+
+/// A practised skill a piece of work uses (foundations-2 E4): its time is the stated time at the variable's `initial`
+/// (an ordinary hand's), `novice_bps` of it at the variable's minimum and `expert_bps` at its maximum, in a straight line
+/// between; and the performers' time on it is practice.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SkillUse {
+    pub variable: Id,
+    pub novice_bps: u32,
+    pub expert_bps: u32,
+}
+
+/// A tool a piece of work may be done with (foundations-2 E2): a good, so many for each person at the work, and the share
+/// of the time the work then takes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ToolUse {
+    pub kind: Id,
+    pub per_performer: i64,
+    pub labour_bps: u32,
+}
+
+/// An act's skill (foundations-2 E4): `act` as the table of work keys it (`publish/<kind>`, or a block).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActSkill {
+    pub act: String,
+    pub variable: Id,
+    pub novice_bps: u32,
+    pub expert_bps: u32,
+}
+
+impl ActSkill {
+    pub fn skill(&self) -> SkillUse {
+        SkillUse { variable: self.variable, novice_bps: self.novice_bps, expert_bps: self.expert_bps }
+    }
+}
+
+impl SkillUse {
+    /// The time a performer at `v` takes, for `seconds` at an ordinary hand's.
+    pub fn scale(&self, cfg: &BodyVariableCfg, v: i64, seconds: i64) -> i64 {
+        let f = skill_factor_bps(cfg, v, self.novice_bps, self.expert_bps);
+        ((seconds as i128 * f as i128 + 9_999) / 10_000).max(if seconds > 0 { 1 } else { 0 }) as i64
+    }
+}
+
+/// The time factor, in basis points, of a performer at `v`: `novice` at the minimum, 10,000 at `initial`, `expert` at the
+/// maximum, in a straight line between.
+pub fn skill_factor_bps(cfg: &BodyVariableCfg, v: i64, novice: u32, expert: u32) -> i64 {
+    let v = v.clamp(cfg.min, cfg.max) as i128;
+    let (min, mid, max) = (cfg.min as i128, cfg.initial as i128, cfg.max as i128);
+    let f = if v <= mid {
+        if mid == min { 10_000 } else { novice as i128 + (10_000 - novice as i128) * (v - min) / (mid - min) }
+    } else if max == mid {
+        10_000
+    } else {
+        10_000 + (expert as i128 - 10_000) * (v - mid) / (max - mid)
+    };
+    f as i64
+}
+
+impl PracticeCfg {
+    /// A value after `seconds` of use: the distance to `max` closed by the hour's share, in proportion to the seconds.
+    pub fn practised(&self, cfg: &BodyVariableCfg, v: i64, seconds: i64) -> i64 {
+        if seconds <= 0 || v >= cfg.max {
+            return v.clamp(cfg.min, cfg.max);
+        }
+        let gap = (cfg.max - v) as i128;
+        let gain = (gap * self.gain_bps_per_hour as i128 * seconds as i128 / (10_000 * 3_600)).min(gap);
+        (v as i128 + gain).clamp(cfg.min as i128, cfg.max as i128) as i64
+    }
+
+    /// A value after `days` without use: its distance above the floor halved every half-life (a whole number of
+    /// halvings, then the rest of a half-life read from a table of 2^-x at sixteenths, in a straight line between).
+    pub fn faded(&self, v: i64, days: i64) -> i64 {
+        if days <= 0 || v <= self.floor || self.half_life_days <= 0 {
+            return v;
+        }
+        let above = (v - self.floor) as i128;
+        let halvings = days / self.half_life_days;
+        if halvings >= 64 {
+            return self.floor;
+        }
+        let rest = (days % self.half_life_days) as i128 * 16 * 65_536 / self.half_life_days as i128; // sixteenths, in 1/65,536
+        let (i, frac) = ((rest / 65_536) as usize, rest % 65_536);
+        let f = POW2_NEG_16THS[i] as i128 + (POW2_NEG_16THS[i + 1] as i128 - POW2_NEG_16THS[i] as i128) * frac / 65_536;
+        self.floor + ((above >> halvings) * f / 1_000_000) as i64
+    }
+}
+
+/// 2^(-k/16) for k = 0..=16, in millionths.
+const POW2_NEG_16THS: [i64; 17] = [1_000_000, 957_603, 917_004, 878_126, 840_896, 805_245, 771_105, 738_413, 707_107, 677_128, 648_420, 620_929, 594_604, 569_394, 545_254, 522_137, 500_000];
 
 /// The reserved cover of a cell with a building whose type names none.
 pub const COVER_BUILT: &str = "built";
@@ -194,6 +325,10 @@ pub struct SuccessionCfg {
 #[serde(deny_unknown_fields)]
 pub struct FieldCfg {
     pub id: Id,
+    /// Law 8: the kind the field holds (a river's water, in the kind's unit). A draw moves it into a holding; nature's
+    /// day is nature's edge, counted. Absent: a field that is no stock (a concentration, a habitat's quality).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<Id>,
     pub min: i64,
     pub max: i64,
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -320,6 +455,14 @@ pub struct TaskCfg {
     /// variable's minimum to `at_max_bps` of it at its maximum.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub labour_by: Option<LabourBy>,
+    /// A practised skill (foundations-2 E4): the labour scales with the performers' mean of it as well, and their time on the
+    /// task is practice.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skill: Option<SkillUse>,
+    /// A technology that is a good (foundations-2 E2): with `per_performer` of the `kind` held by the actor where the work
+    /// is done, for each person doing it, the work takes `labour_bps` of its time. The tool is not used up. Absent: none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<ToolUse>,
     /// Per unit: taken from a field, at the cell (the structure's, or the four around them) that has the most of it
     /// (water from the river).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -327,6 +470,18 @@ pub struct TaskCfg {
     /// Per unit: added to a field at the structure's corner cell (pollution), or to a world counter (greenhouse gas).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub emits: BTreeMap<Id, i64>,
+    /// Collection (law 8; a round emptying the bins): per unit, up to `per_unit` of a kind held at the structure worked on
+    /// (`on`) by anyone there is taken into the actor's holding at `at`, from the holders in turn (a different one first each day); what is not there
+    /// is not taken, and nothing is made. What is left is seen by those who did it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collects: Option<Collects>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Collects {
+    pub kind: Id,
+    pub per_unit: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -375,8 +530,8 @@ pub struct LabourBy {
     pub at_max_bps: u32,
 }
 
-/// A state variable of structures, with its dynamics: it changes by `per_day`, and `per_occupant_per_day` for each
-/// body inside, every whole day, within [min, max]. `types`: the structure types it applies to (absent: all).
+/// A state variable of structures, with its dynamics: it changes by `per_day` every whole day, within [min, max]: a
+/// condition (wear, disrepair), never a stock (law 8: nothing grows by its occupants). `types`: the structure types it applies to (absent: all).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VariableCfg {
@@ -386,8 +541,9 @@ pub struct VariableCfg {
     pub initial: i64,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub per_day: i64,
-    #[serde(default, skip_serializing_if = "is_zero")]
-    pub per_occupant_per_day: i64,
+    /// Read only to refuse it (law 8, `stock_as_variable`): a variable does not grow by its occupants.
+    #[serde(default, rename = "per_occupant_per_day", skip_serializing_if = "is_zero")]
+    pub grows_by_occupants: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub types: Option<Vec<Id>>,
 }
@@ -406,6 +562,40 @@ fn is_zero(x: &i64) -> bool {
 pub struct ResourceCfg {
     pub id: Id,
     pub unit: String,
+    /// Law 8 (docs/nothing-from-nothing.md): conserved (`stock`, the default), one that may be used up with nothing out
+    /// (`dissipates`: energy, whose heat leaves the world's books), or a unit of a service (`service`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub class: Option<KindClass>,
+    /// How a connection carrying this kind is settled (foundations-2 C3): daily or hourly. Absent: it flows on none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settle: Option<Settle>,
+    /// For a kind settled hourly: each hour's share of a connection's daily rate (24 shares summing to 10,000).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape_bps: Option<Vec<i64>>,
+}
+
+/// A kind's class (law 8): conserved; used up into heat; or a unit of a service sold over a counter (no physical
+/// quantity: used as it is bought). The kernel counts all three alike; the backstop reads the class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KindClass {
+    Stock,
+    Dissipates,
+    Service,
+}
+
+/// How often a connection's flow is settled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Settle {
+    Day,
+    Hour,
+}
+
+impl ResourceCfg {
+    pub fn dissipates(&self) -> bool {
+        self.class == Some(KindClass::Dissipates)
+    }
 }
 
 /// A holding at the start: a quantity of a kind, held by an entity at a structure (or, for an edge, at itself).
@@ -451,6 +641,21 @@ pub struct StructureType {
     /// Floods (world-expansion 7.3): above what level of which field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub floods: Option<FloodsCfg>,
+    /// Law 9 (foundations-2 S2): a way (a road, a path). Standing, each of its cells is a node of the world's ways, joined to
+    /// the next cell's node of the same mode by a link a cell long.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub way: Option<WayCfg>,
+}
+
+/// What a way is: its mode (the world's vocabulary: road, path), what it carries an hour each way (vehicles), and its speed
+/// for vehicles (none: on foot only).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WayCfg {
+    pub mode: String,
+    pub capacity: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speed_kmh: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -504,6 +709,29 @@ pub struct World {
     /// in its own balance, not the generator's guess at it (no events; the census begins with the run).
     #[serde(default, skip_serializing_if = "is_zero")]
     pub nature_spin_up_days: i64,
+    /// The network for what flows (foundations-2 C3, law 8): nodes, links, the supplies that feed each tree. Absent: nothing
+    /// flows on a network, and every connection is refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<NetworkCfg>,
+    /// Connections at the start: a holder's at a structure, on a node, taking a kind at a rate a day.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub connections: Vec<ConnectionCfg>,
+    /// Scarce kinds at the world's edges (foundations-2 C6; decision 2 of section 9): an edge sells no more of a kind than
+    /// `quantity` in each period of `every` seconds (counted from the run's start); every other kind is unlimited at its
+    /// price. To whom it sells what it has is its offers', never the kernel's.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scarce: Vec<ScarceCfg>,
+}
+
+/// A scarce kind at an edge: so much a period.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScarceCfg {
+    pub edge: Id,
+    pub kind: Id,
+    #[serde(with = "oikos_core::money::amount")]
+    pub quantity: oikos_core::money::Money,
+    pub every: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -585,7 +813,7 @@ pub struct TerrainArea {
 
 /// A cell's id.
 pub fn cell_id(x: i64, y: i64) -> Id {
-    format!("cell.{x}.{y}")
+    Id::from_string(format!("cell.{x}.{y}"))
 }
 
 /// A cell id's coordinates, if it is one.
@@ -692,7 +920,7 @@ pub struct OccupancyCfg {
 
 /// A space's id: `<structure>/<kind>.<n>`, numbering each kind from 1 in the type's order.
 pub fn space_id(structure: &str, kind: &str, n: u32) -> Id {
-    format!("{structure}/{kind}.{n}")
+    Id::from_string(format!("{structure}/{kind}.{n}"))
 }
 
 /// A space id's structure and its local part (`dwelling.3`).
@@ -836,6 +1064,55 @@ pub struct Template {
     /// the client), and it may switch one off (`retire`) as the client may. Absent: nobody supplies it, so none is delivered.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supplier: Option<Id>,
+    /// A system's: the daily window its lanes work in (law 10, foundations-2 P1): from `from` seconds after midnight, for
+    /// `seconds`. An act not finished by the window's end goes on in the next working day's (a queue, not a refusal); its
+    /// `closed` days (a working calendar) have no window. Absent: any time of day.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hours: Option<TemplateHours>,
+    /// A system's (foundations-2 E2): the moment the kind first exists, a technology the outside world releases during the
+    /// run. Before it nobody can deliver one (`deploy` is refused, `unknown_template`). Absent: it exists from the start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub released: Option<i64>,
+    /// A system's (foundations-2 P4, law 10): the hardware it runs on, who holds it and where, and the recipe an hour of
+    /// its work is there. A system from it is delivered only where there is hardware for its lanes, and each second of its
+    /// work draws the recipe's inputs from the host's holding: a host with no power does nothing. Absent: it runs on
+    /// nothing in the world (the outside's own machines, abroad).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runs_on: Option<RunsOn>,
+}
+
+/// What a system runs on (foundations-2 P4): `per_lane` units of the `hardware` kind for each of its lanes, held by
+/// `holder` at the structure `at`; an hour of a lane's work is the task `hour` there (its `consumes`, `produces`,
+/// `emits`, a unit an hour), drawn as the seconds add up.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RunsOn {
+    pub hardware: Id,
+    pub per_lane: i64,
+    pub holder: Id,
+    pub at: Id,
+    pub hour: Id,
+}
+
+/// A template's working hours (law 10).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TemplateHours {
+    pub from: i64,
+    pub seconds: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub closed: Option<ClosedDays>,
+}
+
+/// The days a template's hours do not open (a working calendar, from a profile's days of rest and holidays): days of the
+/// world's week (day `d` of the run is the week's day `d mod 7`) and days of the run, counted from its first (0).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ClosedDays {
+    #[serde(default)]
+    pub weekdays: Vec<i64>,
+    #[serde(default)]
+    pub days: Vec<i64>,
 }
 
 /// One thing a system from a template can do (foundations F4).
@@ -851,6 +1128,8 @@ pub struct Does {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
     /// For `work`: the seconds a unit when the system is the one doing it (in place of the task's labour). Absent: the task's.
+    /// For any other block (law 10, foundations-2 P1): the seconds one such act takes a system from this template, read
+    /// before the world's `act_time.system` row. Absent: the world's row.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seconds: Option<i64>,
 }
@@ -864,6 +1143,14 @@ impl Does {
         match self.task.as_deref().or(self.kind.as_deref()) {
             None => true,
             Some(x) => makes.and_then(|m| m.split_once('/')).is_some_and(|(_, m)| m == x),
+        }
+    }
+
+    /// The key of this row in a table of work: `block`, or `block/kind` (`work/task`) where it names one.
+    pub fn key(&self) -> String {
+        match self.task.as_deref().or(self.kind.as_deref()) {
+            None => self.block.clone(),
+            Some(x) => format!("{}/{x}", self.block),
         }
     }
 }
@@ -1102,6 +1389,10 @@ pub enum Area {
     Near(Near),
     /// The cells an office occupies or runs: one organisation's only.
     Premises(Premises),
+    /// The cells of the buildings where an agreement in force gives the capacity's organisation occupancy of a space
+    /// (premises it leases: docs/behaviour/leasing.md). It is there as its premises are; the area moves as its
+    /// agreements do, and after a change the next look delivers the whole of it in place of the old.
+    Held(Held),
     /// (A whole view not yet replaced: the cells of a place, where it's detailed.)
     Place(PlaceArea),
 }
@@ -1110,6 +1401,20 @@ pub enum Area {
 #[serde(deny_unknown_fields)]
 pub struct Premises {
     pub premises: Vec<Id>,
+}
+
+/// What an organisation holds a right to be in: `occupancy`, an agreement in force naming it as the occupant of a
+/// space (the only kind there is).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HeldBy {
+    Occupancy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Held {
+    pub held: HeldBy,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1243,13 +1548,16 @@ struct Parts {
     bytes: zstd::stream::Encoder<'static, Vec<u8>>,
     len: u64,
     scratch: Vec<u8>,
+    /// The participants' channel lists read so far, by their canonical JSON: a town's people have one or two lists
+    /// among them, each held once for all who have it (as a list the participant shares with the state already).
+    channels: BTreeMap<Vec<u8>, Arc<Vec<Channel>>>,
     /// What went wrong, told the way the whole config's check tells it (the reader's own error carries no more).
     failed: Option<String>,
 }
 
 impl Parts {
     fn new() -> Parts {
-        Parts { list: vec![], bytes: zstd::stream::Encoder::new(vec![], CANON_LEVEL).expect("an encoder"), len: 0, scratch: vec![], failed: None }
+        Parts { list: vec![], bytes: zstd::stream::Encoder::new(vec![], CANON_LEVEL).expect("an encoder"), len: 0, scratch: vec![], channels: BTreeMap::new(), failed: None }
     }
 
     fn write(&mut self, b: &[u8]) {
@@ -1267,14 +1575,30 @@ impl Parts {
             e => e,
         })
         .map_err(|e| e.to_string())?;
-        crate::contracts::check_at(&crate::contracts::contracts().participant, &v, &at).map_err(|e| format!("config {e}"))?;
+        crate::contracts::check_at(&crate::contracts::config_check().participant, &v, &at).map_err(|e| format!("config {e}"))?;
         let mut b = std::mem::take(&mut self.scratch);
         b.clear();
         b.push(if i == 0 { b'[' } else { b',' });
         canon::write_value(&v, &mut b);
         self.write(&b);
         self.scratch = b;
-        self.list.push(ParticipantCfg::deserialize(v).map_err(|e| format!("config does not match contract: {e}"))?);
+        let channels_key = v.get("channels").map(|c| {
+            let mut k = Vec::new();
+            canon::write_value(c, &mut k);
+            k
+        });
+        let mut p = ParticipantCfg::deserialize(v).map_err(|e| format!("config does not match contract: {e}"))?;
+        if let Some(k) = channels_key {
+            // (The same text read into the same list: the one held already, if there is one.)
+            match self.channels.get(&k) {
+                Some(same) if **same == *p.channels => p.channels = same.clone(),
+                Some(_) => {}
+                None => {
+                    self.channels.insert(k, p.channels.clone());
+                }
+            }
+        }
+        self.list.push(p);
         Ok(())
     }
 
@@ -1428,7 +1752,7 @@ pub fn rest_of<R: std::io::Read>(r: R) -> Result<Rest, String> {
 /// The rest of the config checked and read, with its participants (`Parts`) put in.
 fn finish(v: Value, parts: Parts) -> Result<(LoadedConfig, Rest), String> {
     canon::check_integers(&v).map_err(|e| e.to_string())?;
-    crate::contracts::check(&crate::contracts::contracts().config, &v).map_err(|e| format!("config {e}"))?;
+    crate::contracts::check(&crate::contracts::config_check().config, &v).map_err(|e| format!("config {e}"))?;
     // (The schema's own limit on the list, which its check of the rest saw empty.)
     if parts.list.len() > 1_000_000 {
         return Err(format!("config violates the contract: /participants: has more than 1000000 items ({})", parts.list.len()));
@@ -1635,7 +1959,17 @@ pub fn check_channels(owner: &str, channels: &[Channel], seat: &Seat) -> Result<
                     }
                     Ok(())
                 }
-                _ => no("what is here is near where one is (`near`) or at one's premises (`premises`): a whole map or a list of other cells is not expressible".into()),
+                // (The ground of premises an organisation holds by agreement: a map of where it is, never notices.)
+                Some(Area::Held(_)) => {
+                    if seat.organisation.is_none() {
+                        return no("premises held by agreement are an organisation's (a person is where their body is: near)".into());
+                    }
+                    if !map {
+                        return no("premises held by agreement are a map of the ground there (`kind: sites`), not of notices".into());
+                    }
+                    Ok(())
+                }
+                _ => no("what is here is near where one is (`near`) or at one's premises (`premises`, or `held` by agreement): a whole map or a list of other cells is not expressible".into()),
             }
         };
         match &ch.kind {
@@ -1764,7 +2098,7 @@ pub fn premises_of_positions<'a>(positions: impl Iterator<Item = (&'a str, &'a [
             };
             if let Some(Area::Premises(p)) = area {
                 for c in &p.premises {
-                    m.entry(c.clone()).or_insert_with(|| org.to_string());
+                    m.entry(*c).or_insert_with(|| Id::new(org));
                 }
             }
         }
@@ -1865,6 +2199,17 @@ pub fn check_traits(owner: &str, traits: &Option<Value>) -> Result<(), String> {
     Ok(())
 }
 
+/// A practised skill named by work: a variable that is practised, a novice no quicker than an ordinary hand, an expert no slower.
+fn check_skill_use(vars: &BTreeMap<&str, &BodyVariableCfg>, what: &str, variable: &str, novice: u32, expert: u32) -> Result<(), String> {
+    if !vars.get(variable).is_some_and(|v| v.practice.is_some()) {
+        return Err(format!("{what}: skill names no practised body variable {variable}"));
+    }
+    if novice < 10_000 || expert > 10_000 || novice > 1_000_000 {
+        return Err(format!("{what}: a skill's novice_bps is 10000..=1000000 and its expert_bps at most 10000"));
+    }
+    Ok(())
+}
+
 /// Bodies' variables, care and skill at work (docs/design/world-expansion.md 4.2): what they name exists, in range.
 fn check_bodies(c: &Config) -> Result<(), String> {
     let cat = &c.catalogue;
@@ -1873,6 +2218,16 @@ fn check_bodies(c: &Config) -> Result<(), String> {
     for v in &cat.body_variables {
         if v.min > v.max || v.initial < v.min || v.initial > v.max {
             return Err(format!("body variable {}: min <= initial <= max", v.id));
+        }
+        if let Some(p) = &v.practice {
+            // (A skill moves by use and by time unused, never by a drift of its own as well.)
+            if v.per_day != 0 {
+                return Err(format!("body variable {}: a practised skill has no per_day drift", v.id));
+            }
+            if p.half_life_days < 1 || p.floor < v.min || p.floor > v.max {
+                return Err(format!("body variable {}: practice needs half_life_days >= 1 and min <= floor <= max", v.id));
+            }
+            bps(p.gain_bps_per_hour, &format!("body variable {}: practice.gain_bps_per_hour", v.id))?;
         }
         if vars.insert(&v.id, v).is_some() {
             return Err(format!("duplicate body variable {}", v.id));
@@ -1899,6 +2254,21 @@ fn check_bodies(c: &Config) -> Result<(), String> {
             }
             bps(lb.at_max_bps, &format!("task {}: labour_by.at_max_bps", t.id))?;
         }
+        if let Some(sk) = &t.skill {
+            check_skill_use(&vars, &format!("task {}", t.id), &sk.variable, sk.novice_bps, sk.expert_bps)?;
+        }
+        if let Some(tl) = &t.tool {
+            if !cat.resources.iter().any(|r| r.id == tl.kind) || tl.per_performer < 1 || tl.labour_bps > 10_000 {
+                return Err(format!("task {}: a tool is a kind the world holds, one or more for each person, its time at most all of it", t.id));
+            }
+        }
+    }
+    let mut acts: BTreeSet<&str> = BTreeSet::new();
+    for a in &cat.act_skills {
+        if !acts.insert(&a.act) {
+            return Err(format!("act skill {}: one skill an act", a.act));
+        }
+        check_skill_use(&vars, &format!("act skill {}", a.act), &a.variable, a.novice_bps, a.expert_bps)?;
     }
     let mut counters: BTreeSet<&str> = BTreeSet::new();
     for x in &cat.counters {
@@ -1906,7 +2276,38 @@ fn check_bodies(c: &Config) -> Result<(), String> {
             return Err(format!("counter {}: its id must be unique among counters and fields", x.id));
         }
     }
+    // A building's variable is a condition, never a stock (law 8, `stock_as_variable`): nothing grows by its occupants
+    // (what they use is a flow on a connection, what they throw away a process's output), and none has a kind's name.
+    for v in &cat.variables {
+        if v.grows_by_occupants != 0 {
+            return Err(format!("stock_as_variable: variable {} grows by its occupants (per_occupant_per_day): what occupants use flows on a connection and what they throw away is a process's output (law 8)", v.id));
+        }
+        if cat.resources.iter().any(|r| r.id == v.id) {
+            return Err(format!("stock_as_variable: variable {} has the name of a kind the world holds: a stock is held, not kept as a building's variable (law 8)", v.id));
+        }
+    }
+    // Fields that hold a kind (law 8): a kind the world declares, held from nought (nothing below it, nothing assumed
+    // at a baseline), one field a kind.
+    let mut held_by_field: BTreeSet<&str> = BTreeSet::new();
+    for f in &cat.fields {
+        if let Some(k) = &f.kind {
+            if !cat.resources.iter().any(|r| &r.id == k) {
+                return Err(format!("field {}: holds no kind the world declares ({k})", f.id));
+            }
+            if f.baseline != 0 || f.min < 0 {
+                return Err(format!("field {}: a field that holds {k} counts it from nought (baseline 0, min at least 0)", f.id));
+            }
+            if !held_by_field.insert(k) {
+                return Err(format!("field {}: {k} is held by another field already", f.id));
+            }
+        }
+    }
     for t in &cat.tasks {
+        if let Some(x) = &t.collects {
+            if !cat.resources.iter().any(|r| r.id == x.kind) || x.per_unit <= 0 {
+                return Err(format!("task {}: collects no kind the world declares ({}), or nothing a unit", t.id, x.kind));
+            }
+        }
         if let Some(d) = &t.draws {
             if !cat.fields.iter().any(|f| f.id == d.field) || d.per_unit < 0 {
                 return Err(format!("task {}: draws from no field {} (or a negative amount)", t.id, d.field));
@@ -2061,33 +2462,15 @@ fn check_nature(c: &Config) -> Result<(), String> {
     Ok(())
 }
 
-/// Reserved shapes for travel (lane F, 2026-10-17; docs/design/travel.md): what traffic will be built on. Nothing moves
-/// along a road or drives a vehicle yet; they are checked, and vehicles are kept in the state as their owners' things.
+/// Travel's things (docs/design/travel.md; law 9, foundations-2 S2): kinds of vehicle and the vehicles entities own, kept in
+/// the state as their owners' things, each where it stands. The ways they go on are structures that are ways (`way`).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Travel {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub roads: Vec<Road>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub vehicle_types: Vec<VehicleType>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub vehicles: Vec<VehicleCfg>,
-}
-
-/// A road: the cells it runs through in order, and how much it carries.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Road {
-    pub id: Id,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    pub cells: Vec<Id>,
-    /// Vehicles an hour each way, at most.
-    pub capacity_per_hour: i64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub lanes: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub seconds_per_cell: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -2097,11 +2480,20 @@ pub struct VehicleType {
     pub seats: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub load_kg: Option<i64>,
+    /// The most it goes, km/h (a way's own speed may be less).
+    pub speed_kmh: i64,
+    /// Law 9 (S5): the kind it runs on, how much of it a hundred kilometres driven takes (in the kind's unit), and how much
+    /// its tank holds. Its owner's holding of the kind at the vehicle is what is in the tank; a trip draws on it as it sets
+    /// out, and a vehicle with too little for the trip is not driven. Absent: it uses nothing (the backstop names it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub seconds_per_cell: Option<i64>,
+    pub fuel: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fuel_per_100km: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tank: Option<i64>,
 }
 
-/// A vehicle: a thing its owner owns, standing at a cell or in a structure.
+/// A vehicle: a thing its owner owns, standing at a cell or in a structure, and who besides its owner may drive it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VehicleCfg {
@@ -2110,6 +2502,8 @@ pub struct VehicleCfg {
     pub type_: Id,
     pub owner: Id,
     pub at: Id,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drivers: Vec<Id>,
 }
 
 /// The travel section checked against the world: each road runs through cells of the ground, a cell next to the one
@@ -2122,33 +2516,15 @@ fn validate_travel(t: &Travel, w: &World) -> Result<(), String> {
         (it.next().is_none() && (0..w.ground.w).contains(&x) && (0..w.ground.h).contains(&y)).then_some((x, y))
     };
     let mut ids = std::collections::BTreeSet::new();
-    for r in &t.roads {
-        if !ids.insert(r.id.clone()) {
-            return Err(format!("travel: {} is declared twice", r.id));
-        }
-        if r.cells.len() < 2 || r.capacity_per_hour < 1 || r.lanes.is_some_and(|l| l < 1) || r.seconds_per_cell.is_some_and(|s| s < 1) {
-            return Err(format!("travel: road {} needs two cells or more and a positive capacity", r.id));
-        }
-        let mut last: Option<(i64, i64)> = None;
-        for c in &r.cells {
-            let at = cell(c).ok_or_else(|| format!("travel: road {} runs through {c}, which is no cell of the ground", r.id))?;
-            if let Some(l) = last {
-                if (l.0 - at.0).abs() + (l.1 - at.1).abs() != 1 {
-                    return Err(format!("travel: road {} jumps from one cell to {c}, which is not next to it", r.id));
-                }
-            }
-            last = Some(at);
-        }
-    }
     for v in &t.vehicle_types {
-        if !ids.insert(v.id.clone()) || v.seats < 0 {
-            return Err(format!("travel: vehicle type {} is declared twice, or has fewer than no seats", v.id));
+        if !ids.insert(v.id) || v.seats < 0 || !(1..=1_000).contains(&v.speed_kmh) {
+            return Err(format!("travel: vehicle type {} is declared twice, has fewer than no seats or no speed", v.id));
         }
     }
     let structures: std::collections::BTreeSet<&str> = w.structures.iter().map(|s| s.id.as_str()).collect();
     let entities: std::collections::BTreeSet<&str> = w.entities.iter().map(|e| e.id.as_str()).collect();
     for v in &t.vehicles {
-        if !ids.insert(v.id.clone()) {
+        if !ids.insert(v.id) {
             return Err(format!("travel: {} is declared twice", v.id));
         }
         if !t.vehicle_types.iter().any(|x| x.id == v.type_) {
@@ -2160,6 +2536,9 @@ fn validate_travel(t: &Travel, w: &World) -> Result<(), String> {
         if cell(&v.at).is_none() && !structures.contains(v.at.as_str()) {
             return Err(format!("travel: vehicle {} stands at {}, which is no cell or structure", v.id, v.at));
         }
+        if let Some(d) = v.drivers.iter().find(|d| !entities.contains(d.as_str())) {
+            return Err(format!("travel: vehicle {} may be driven by {d}, who is no entity of the world", v.id));
+        }
     }
     Ok(())
 }
@@ -2167,6 +2546,25 @@ fn validate_travel(t: &Travel, w: &World) -> Result<(), String> {
 pub fn validate(c: &Config) -> Result<(), String> {
     if let Some(t) = &c.travel {
         validate_travel(t, &c.world)?;
+    }
+    crate::network::validate(c)?;
+    // (A way is so many metres a cell long: the ground says how big a cell is.)
+    for t in &c.catalogue.structure_types {
+        let Some(w) = &t.way else { continue };
+        if w.mode.is_empty() || !(1..=1_000_000).contains(&w.capacity) || w.speed_kmh.is_some_and(|v| !(1..=1_000).contains(&v)) {
+            return Err(format!("structure type {}: a way needs a mode, a capacity of 1 to a million an hour and a speed of 1 to 1,000 km/h", t.id));
+        }
+        if c.world.ground.cell.is_none() {
+            return Err(format!("structure type {} is a way, and the ground does not say how many metres a cell is (world.ground.cell)", t.id));
+        }
+    }
+    for x in &c.world.scarce {
+        if !c.world.boundaries.contains(&x.edge) || !c.catalogue.resources.iter().any(|r| r.id == x.kind) || x.quantity < 0 || !(1..=31_622_400 * 100).contains(&x.every) {
+            return Err(format!("scarce: {} of {} is no edge's kind the world declares, or its quantity or period is out of range", x.kind, x.edge));
+        }
+        if c.world.scarce.iter().filter(|y| y.edge == x.edge && y.kind == x.kind).count() > 1 {
+            return Err(format!("scarce: {} of {} is said twice", x.kind, x.edge));
+        }
     }
     if c.contracts != CONTRACTS_VERSION {
         return Err(format!("contracts version {} is not {}", c.contracts, CONTRACTS_VERSION));
@@ -2313,7 +2711,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
     }
 
     // Structures: footprints on the ground, on terrain they can stand on, not overlapping.
-    let mut covered: BTreeMap<String, &str> = BTreeMap::new();
+    let mut covered: BTreeMap<Id, &str> = BTreeMap::new();
     let mut structures = BTreeMap::new();
     for s in &w.structures {
         let ty = types.get(s.structure_type.as_str()).ok_or_else(|| format!("structure {} has unknown type {}", s.id, s.structure_type))?;
@@ -2331,7 +2729,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
             if !fits {
                 return Err(format!("structure {} can't stand on {cell} ({})", s.id, t.unwrap_or("no terrain")));
             }
-            if let Some(other) = covered.insert(cell.clone(), s.id.as_str()) {
+            if let Some(other) = covered.insert(cell, s.id.as_str()) {
                 return Err(format!("structures {other} and {} overlap at {cell}", s.id));
             }
         }
@@ -2404,8 +2802,8 @@ pub fn validate(c: &Config) -> Result<(), String> {
             }
         }
         for (k, q) in t.consumes.iter().chain(t.produces.iter()) {
-            if *q < 1 {
-                return Err(format!("task {}: {k} must be a positive quantity", t.id));
+            if *q < 0 {
+                return Err(format!("task {}: {k} must be a quantity of nought or more (law 8: nought is stated, as a workplace's energy and water are)", t.id));
             }
         }
         for v in t.changes.keys() {
@@ -2435,8 +2833,10 @@ pub fn validate(c: &Config) -> Result<(), String> {
         }
         entity(&st.holder)?;
         let edge = w.boundaries.contains(&st.holder);
-        if !(structures.contains_key(st.at.as_str()) || (edge && st.at == st.holder)) {
-            return Err(format!("{}'s holding of {} is at {}, which isn't a structure (or, for an edge, itself)", st.holder, st.kind, st.at));
+        // (A vehicle is a place too, law 9 S5: its tank, its load.)
+        let vehicle = c.travel.as_ref().is_some_and(|t| t.vehicles.iter().any(|v| v.id == st.at));
+        if !(structures.contains_key(st.at.as_str()) || vehicle || (edge && st.at == st.holder)) {
+            return Err(format!("{}'s holding of {} is at {}, which isn't a structure, a vehicle or (for an edge) itself", st.holder, st.kind, st.at));
         }
         if !(0..=oikos_core::money::MAX_MONEY).contains(&st.quantity) && !edge {
             return Err(format!("{}'s holding of {} is out of range", st.holder, st.kind));
@@ -2484,7 +2884,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
     }
     let premises = premises_of_positions(c.positions.iter().map(|p| (p.entity.as_str(), p.channels.as_slice())));
     let entity_exists = |e: &str| entities.contains_key(e);
-    let premises_of = |cell: &str| premises.get(cell).cloned();
+    let premises_of = |cell: &str| premises.get(cell).map(|o| o.to_string());
     macro_rules! seat {
         ($organisation:expr) => {
             Seat { organisation: $organisation, knowing: k, premises_most: None, entity_exists: &entity_exists, cell_exists: &cell_exists, place_exists: &place_exists, premises_of: &premises_of }
@@ -2616,7 +3016,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
         for e in r.entities_named().into_iter().chain(r.visibility_entities()) {
             entity(e).map_err(|x| format!("record {}: {x}", r.id))?;
         }
-        for other in r.body.records_referenced().into_iter().chain(r.basis.iter().flat_map(|b| b.ids()).map(String::as_str)) {
+        for other in r.body.records_referenced().into_iter().chain(r.basis.iter().flat_map(|b| b.ids()).map(Id::as_str)) {
             if !records.contains_key(other) {
                 return Err(format!("record {} references unknown record {other}", r.id));
             }
@@ -2653,8 +3053,20 @@ pub fn validate(c: &Config) -> Result<(), String> {
         }
     };
     for t in &c.templates {
-        if t.kind == ParticipantKind::Person && (t.does.is_some() || t.supplier.is_some()) {
-            return Err(format!("template {}: a person's has no `does` or supplier (only a system is supplied)", t.id));
+        if t.kind == ParticipantKind::Person && (t.does.is_some() || t.supplier.is_some() || t.hours.is_some()) {
+            return Err(format!("template {}: a person's has no `does`, supplier or hours (only a system is supplied; a person's day is their own)", t.id));
+        }
+        if let Some(h) = &t.hours {
+            if !(0..86_400).contains(&h.from) || !(1..=86_400).contains(&h.seconds) {
+                return Err(format!("template {}: `hours` opens within the day (0 to 86399 s after midnight) and lasts 1 to 86400 s", t.id));
+            }
+            // (A working calendar leaves a working day in the week, or no work could ever be done.)
+            if let Some(c) = &h.closed {
+                let week: BTreeSet<i64> = c.weekdays.iter().copied().collect();
+                if week.iter().any(|w| !(0..7).contains(w)) || week.len() == 7 || c.days.iter().any(|d| *d < 0) {
+                    return Err(format!("template {}: `hours.closed` names days of the week 0 to 6, leaving one open, and days of the run from 0", t.id));
+                }
+            }
         }
         if let Some(s) = &t.supplier {
             org_exists(s, &format!("template {}: its supplier", t.id))?;
@@ -2664,8 +3076,20 @@ pub fn validate(c: &Config) -> Result<(), String> {
             return Err(format!("template {}: a system's template says what it does (`does`)", t.id));
         }
         for r in t.does.iter().flatten() {
-            if r.seconds.is_some_and(|x| x < 1) || (r.seconds.is_some() && r.block != "work") {
-                return Err(format!("template {}: `seconds` is a work row's, and is positive", t.id));
+            if r.seconds.is_some_and(|x| !(1..=31_536_000).contains(&x)) {
+                return Err(format!("template {}: a row's `seconds` is positive and at most a year", t.id));
+            }
+        }
+        if let Some(ro) = &t.runs_on {
+            if t.kind != ParticipantKind::System || ro.per_lane < 1 {
+                return Err(format!("template {}: runs_on is a system's, with per_lane of 1 or more", t.id));
+            }
+            org_exists(&ro.holder, &format!("template {}: runs_on's holder", t.id))?;
+            if !c.catalogue.resources.iter().any(|r| r.id == ro.hardware) {
+                return Err(format!("template {}: runs_on names no kind {}", t.id, ro.hardware));
+            }
+            if !c.catalogue.tasks.iter().any(|x| x.id == ro.hour && x.labour == 0) {
+                return Err(format!("template {}: runs_on's hour is a task that takes nobody's time ({})", t.id, ro.hour));
             }
         }
     }

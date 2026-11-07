@@ -106,8 +106,14 @@ export function basisOf(config: any, leaf: Leaf, profile?: { values: any; source
   for (const [row, b] of table.entries()) {
     if (b.module && b.module !== pa?.module) continue;
     if (!matches(b.at, sh)) continue;
+    if (b.id !== undefined && !passes(config, p, b.id)) continue;
+    if (b.given !== undefined && valueAt(config, b.given.split(".")) === undefined) continue;
     if (b.profile && profile) {
-      const note = sourceFor(profile.sources, b.profile);
+      // (Below the row's pattern, the profile's note for the same part, where it has one: `households.lone_bps` under
+      // `households`. Its own path's note, or the nearest above it, otherwise.)
+      const n = b.at.split(".").length, below = b.at.includes("**") ? [] : sh.split(".").slice(n);
+      const at = [b.profile, ...below].join(".");
+      const note = sourceFor(profile.sources, at);
       return { class: note ? classify(note) : "unbased", why: `profile ${b.profile}`, row };
     }
     if (b.profile) return { class: "derived", why: `profile ${b.profile} (no profile given)`, row };
@@ -127,11 +133,25 @@ export function basisOf(config: any, leaf: Leaf, profile?: { values: any; source
 
 const valueAt = (v: any, path: string[]) => path.reduce((x, k) => x?.[k], v);
 
+/** Does a leaf's path go through `id`: a key of that name, or an element whose `id` it is? */
+function passes(config: any, path: string[], id: string): boolean {
+  const is = (x: unknown) => typeof x === "string" && (id.endsWith("*") ? x.startsWith(id.slice(0, -1)) : x === id);
+  let node = config;
+  for (const seg of path) {
+    if (is(seg) || (node && typeof node === "object" && is(node.id))) return true;
+    node = node?.[seg];
+  }
+  return false;
+}
+
 /** Does a pattern (dotted, `*` for one segment, `**` for any number) match a path's shape? */
+const patterns = new Map<string, RegExp>();
 export function matches(pattern: string, sh: string): boolean {
-  const re = new RegExp(`^${pattern.split(".").map((s) => (s === "**" ? "(?:[^.]+(?:\\.[^.]+)*)?" : s === "*" ? "[^.]+" : s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).join("\\.")}$`);
-  // (A pattern covers everything under it, as a profile's source key does.)
-  return re.test(sh) || sh.startsWith(`${pattern}.`) || (pattern.includes("*") && [...sh.matchAll(/\./g)].some((m) => re.test(sh.slice(0, m.index))));
+  // A pattern covers everything under it, as a profile's source key does: the shape itself, or the shape down to one of its
+  // dots. (Compiled once a pattern: a town's figures ask the generator's table of each of its 20,000 numbers.)
+  let re = patterns.get(pattern);
+  if (!re) patterns.set(pattern, (re = new RegExp(`^${pattern.split(".").map((s) => (s === "**" ? "(?:[^.]+(?:\\.[^.]+)*)?" : s === "*" ? "[^.]+" : s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).join("\\.")}(?:\\..*)?$`)));
+  return re.test(sh);
 }
 
 /** A profile's note for a dotted path: the note of the path itself or of the nearest section above it. */

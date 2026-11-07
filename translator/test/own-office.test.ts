@@ -92,3 +92,11 @@ test("work asked for with neither how much nor how often is asked back in the as
   const order = resolve(calls.parseProgram('work(at=str.7, task=maintain, every="every day")'), fixture("works"), () => undefined, "works");
   expect(order.ok && order.blocks[0]).toMatchObject({ kind: "work_order", data: { work: { task: "maintain", at: "str.7" }, every: 86_400 } });
 });
+
+test("an office's own stationery is a form of its holder's only: another office that has seen the same file does not know it as its own", () => {
+  const stationery = (k: ReturnType<typeof fixture>) => k.forms.filter((f) => f.data?.writes).map((f) => f.data!.form).sort();
+  expect(stationery(fixture("mayor"))).toEqual(["invoice_approval", "nomination"]);
+  expect(stationery(fixture("works"))).toEqual([]);
+  // (A form that writes no paper of an office's own is whoever has seen it's.)
+  expect(fixture("mayor").forms.some((f) => f.data?.form === "works_collection")).toBe(true);
+});

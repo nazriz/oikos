@@ -65,7 +65,13 @@ test("taking from work, found at a stocktake, investigated, charged, ordered and
   const unsolved = recs.filter((r) => r.kind === "investigation_closed");
   // (Each report made a fortnight before the end, by then: officers take them in turn, as their hours allow.)
   const dealt = new Set([...charges, ...unsolved].map((r) => r.data.report));
-  expect(reports.filter((r) => r.at < 186 * DAY && !dealt.has(r.id)).map((r) => r.id)).toEqual([]);
+  // (While an officer who looks into reports is at the station: the station's one officer off sick or injured is nobody to
+  // take them, and they wait, as work waits for whoever does it. Since 2026-10-25 the officer of this town is injured on day
+  // 171 and away to the end.)
+  const lookers = new Set(ev.filter((e) => e.event === "worked" && e.task === "investigate").flatMap((e) => e.performers as string[]));
+  const atStation = (from: number) => ev.some((e) => e.event === "occupied" && lookers.has(e.occupant) && String(e.space).startsWith("police-station/") && e.t > from);
+  expect(reports.filter((r) => r.at < 186 * DAY && !dealt.has(r.id) && atStation(r.at)).map((r) => r.id)).toEqual([]);
+  expect(lookers.size).toBeGreaterThan(0);
   // A charge names someone who did take from that shop; the tribunal orders them to pay; paid.
   for (const c of charges) expect(taken.some((e) => e.by === c.data.against && e.from === c.data.victim)).toBe(true);
   const orders = recs.filter((r) => r.kind === "tribunal_order" && r.data.kind === "charge");

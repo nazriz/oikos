@@ -88,6 +88,14 @@
       },
       "source": "placeholder"
     },
+    "seeker_ages": {
+      "default": null,
+      "schema": {
+        "description": "the ages the one who comes for the job is of: from, and below (a household moving for work has its earner of working age); absent: any",
+        "type": "array"
+      },
+      "source": "the world gives it: the profile's working ages (18 to its retirement age)"
+    },
     "template": {
       "default": "newcomer",
       "schema": {

@@ -139,6 +139,10 @@ export interface Outcome {
   refusal?: { code: string; block?: number; detail?: string };
   /** A survey's estimates (nature), for the one who surveyed only. */
   surveyed?: { of: Id; cells: { [cell: string]: number } };
+  /** How long each of those the act took somewhere was on their way, there and back (law 9), for the one whose act it was. */
+  trips?: { [body: string]: number };
+  /** Goods the act sent by the outside's freight: where to, and how many seconds on the road (law 9), for the sender. */
+  freight?: { [to: string]: number };
   /** What an investigation found (crime), for the one who investigated only: whether goods were taken as said, and who. */
   investigated?: { from: Id; at: Id; kind: Id; taken: boolean; taker: Id | null };
   /** Work done on a building: the building as those who did it left it (they were there), for the one whose work it was. */
@@ -175,10 +179,14 @@ export interface Body { born_at: number; sex?: Sex; present: boolean; alive: boo
 
 /** What an entity holds, and where (phase B): a quantity (a decimal-string integer) of a resource kind at a place. */
 export interface HoldingItem { kind: Id; at: Id; quantity: string }
+/** A connection as its user or its operator sees it (foundations-2 C3): its meter shown to its user, and to its operator where it reads it from afar. */
+export interface ConnectionItem { id: Id; kind: Id; at: Id; node: Id; holder: Id; rate: number; meter?: string; closed?: true; interrupted?: true; operated?: true }
+/** A link of an operator's network, as its instruments show it. */
+export interface LinkItem { id: Id; mode: string; from: Id; to: Id; capacity: number; load: number; shut?: true; tripped?: true; rotation?: { every: number; from: number; off: number } }
 
 export type ChannelData =
   | { kind: "accounts"; accounts: { account: Id; holder: Id; custodian: Id; currency: string; balance: string; closed?: true }[]; transactions: Transaction[] }
-  | { kind: "holdings"; holdings: HoldingItem[] }
+  | { kind: "holdings"; holdings: HoldingItem[]; connections?: ConnectionItem[]; links?: LinkItem[] }
   | { kind: "records"; records: Record[]; search?: true; whole?: true }
   | { kind: "sites"; as_of: number; cells: SiteCell[]; whole?: true; /** What a visit found: the places gone to, as they were at `as_of`. */ visited?: true;
       /** Places gone to, as a participant's view keeps them (its memory of them): when each cell was last seen, and the cells its latest visit saw. */ seen_at?: { [cell: Id]: number }; fresh?: Id[] }

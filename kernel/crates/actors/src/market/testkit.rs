@@ -49,6 +49,10 @@ pub struct Harness {
     pub t: i64,
     /// Every program the actor has sent, in order, as text.
     pub sent: Vec<String>,
+    /// The readings of agreements it is shown at each wake (agreement id -> reading), as the kernel gives them.
+    pub readings: Value,
+    /// The decisions it recorded (`Cx::decided`), in order.
+    pub decisions: Vec<Value>,
 }
 
 impl Harness {
@@ -56,7 +60,7 @@ impl Harness {
         let ctx = ctx(entity, params);
         let actor = kind.create(&ctx).expect("the actor is made");
         let draws = Draws::new(&ctx.participant, "self");
-        Harness { kind, ctx, actor, draws, view: View::default(), seed: 11, n: 0, t: 0, sent: vec![] }
+        Harness { kind, ctx, actor, draws, view: View::default(), seed: 11, n: 0, t: 0, sent: vec![], readings: json!({}), decisions: vec![] }
     }
 
     /// Replace the actor with its own saved self (every actor's memory saves).
@@ -68,7 +72,7 @@ impl Harness {
 
     fn observation(&self, t: i64, channels: Value, outcomes: Value) -> Observation {
         serde_json::from_value(json!({ "participant": self.ctx.participant, "t": t, "status": "active", "outcomes": outcomes,
-            "inbox": [], "drafts": [], "channels": channels }))
+            "inbox": [], "drafts": [], "channels": channels, "readings": self.readings }))
         .expect("an observation")
     }
 
@@ -76,6 +80,12 @@ impl Harness {
     /// line bound to a name is `rec.<n>` under that name), and it is woken again, until it waits. Returns the programs
     /// sent, as text.
     pub fn wake(&mut self, t: i64, channels: Value) -> Vec<String> {
+        self.wake_leaving(t, channels, None)
+    }
+
+    /// Like `wake`, but an act whose program text contains `pending` is left under way: no outcome comes back for it in
+    /// this wake (as the world goes on with an actor who only ordered work others do, while the work is not yet done).
+    pub fn wake_leaving(&mut self, t: i64, channels: Value, pending: Option<&str>) -> Vec<String> {
         self.t = t;
         let mut out = vec![];
         let mut chans = channels;
@@ -86,6 +96,7 @@ impl Harness {
             let pic: Picture = self.view.apply(obs, None, &self.ctx.entity, woke_for, 0);
             let mut cx = Cx::new(t, &self.ctx, &mut self.draws, self.seed, vec![]);
             let action = self.actor.step(&pic, &mut cx);
+            self.decisions.extend(cx.into_kept().decisions);
             chans = json!({});
             outcomes = json!([]);
             match action {
@@ -103,9 +114,14 @@ impl Harness {
                     self.actor.sent(&id);
                     let text = program_text(&program);
                     out.push(text.clone());
+                    let left = pending.is_some_and(|p| text.contains(p));
                     self.sent.push(text);
-                    outcomes = json!([{ "action": id, "t": t, "status": "applied", "created": created }]);
-                    woke_for = "done";
+                    if left {
+                        woke_for = "free";
+                    } else {
+                        outcomes = json!([{ "action": id, "t": t, "status": "applied", "created": created }]);
+                        woke_for = "done";
+                    }
                 }
                 Action::Wait { .. } => break,
                 Action::Look { .. } => woke_for = "asked",
@@ -127,6 +143,7 @@ impl Harness {
             let pic: Picture = self.view.apply(obs, None, &self.ctx.entity, woke_for, 0);
             let mut cx = Cx::new(t, &self.ctx, &mut self.draws, self.seed, vec![]);
             let action = self.actor.step(&pic, &mut cx);
+            self.decisions.extend(cx.into_kept().decisions);
             chans = json!({});
             outcomes = json!([]);
             match action {

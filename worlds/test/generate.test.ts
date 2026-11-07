@@ -175,3 +175,105 @@ test("people stop work at one age where the profile gives no curve, and at ages 
   // Those who come later draw their own from the same curve.
   expect(many.c.templates.filter((t: any) => t.kind === "person").every((t: any) => JSON.stringify(t.controller.params.stop_work_curve) === JSON.stringify(P.values.labour_force_share_by_age))).toBe(true);
 }, 120_000);
+
+// Every workplace holds the staff it starts with. A 10,000-person town's works crew of 60 had a hall built for 20 of
+// them and its offices' staff (58 places for 98): the registrar never got in, and the owners waiting on the register
+// left town (docs/decisions.md, "Years at 10,000"). Checked on the small town given a crew as large as a big town's.
+test("every workplace has room for those employed there from the start", async () => {
+  const { generateFrom } = await import("../generator/generate");
+  const { loadProfile } = await import("../generator/profile");
+  const P = loadProfile(spec.profile ?? "au-vic-2026");
+  const c = generateFrom(spec, { ...P, values: { ...P.values, services: { ...P.values.services, council_staff_per_1000: 150 } } }) as any;
+  const at = new Map<string, number>();
+  for (const r of c.world.records) {
+    if (r.record !== "agreement" || r.terms?.template !== "employment") continue;
+    for (const x of r.terms.commitments) { const sp = x.does?.outcome?.occupancy?.in; if (sp) at.set(sp, (at.get(sp) ?? 0) + 1); }
+  }
+  const types = new Map<string, any>(c.catalogue.structure_types.map((t: any) => [t.id, t]));
+  const room = new Map<string, number>();
+  for (const s of c.world.structures) for (const sp of types.get(s.type)?.spaces ?? []) for (let i = 1; i <= (sp.count ?? 1); i++) room.set(`${s.id}/${sp.kind}.${i}`, sp.capacity);
+  expect(at.get("town-hall/workplace.1")!).toBeGreaterThan(20);
+  expect([...at].filter(([space, n]) => n > (room.get(space) ?? 0))).toEqual([]);
+});
+
+// Skills by use (docs/behaviour/skills.md): a factor a study switches, so off must be the town as before, to the byte.
+test("skills: off is the town as before; on, every kind of work and a person's papers are practised", () => {
+  const plain = JSON.stringify(generate(spec));
+  expect(JSON.stringify(generate({ ...spec, skills: false }))).toBe(plain);
+  const on = generate({ ...spec, skills: true }) as any;
+  const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });
+  for (const f of ["common", "blocks", "records", "world-config", "participant-api", "log"]) ajv.addSchema(JSON.parse(readFileSync(join(root, `contracts/${f}.schema.json`), "utf8")));
+  expect(ajv.getSchema("urn:oikos:contracts:0.8:world-config")!(on)).toBe(true);
+  const practised = new Map((on.catalogue.body_variables as any[]).filter((v) => v.practice).map((v) => [v.id, v]));
+  // Every task that takes anyone's time has a practised skill; nothing else of the town changed.
+  for (const t of on.catalogue.tasks) expect(t.labour > 0 ? practised.has(t.skill?.variable) : t.skill === undefined).toBe(true);
+  expect(on.catalogue.act_skills).toEqual([expect.objectContaining({ act: "publish", variable: "skill-papers" })]);
+  const strip = (c: any) => ({ ...c, catalogue: { ...c.catalogue, act_skills: undefined, body_variables: c.catalogue.body_variables.filter((v: any) => !v.practice), tasks: c.catalogue.tasks.map(({ skill, ...t }: any) => t) } });
+  expect(JSON.stringify(strip(on))).toBe(JSON.stringify(strip(JSON.parse(plain))));
+  // The opening level is where a full-time hand settles: slower rates of fading open higher.
+  const level = (s: object) => (generate({ ...spec, skills: s }) as any).catalogue.body_variables.find((v: any) => v.id === "skill-papers").initial;
+  expect(level({ half_life_days: 730 })).toBeGreaterThan(level({ half_life_days: 365 }));
+  // Only the skills a study names are live; a name the town has no work for is refused.
+  const only = generate({ ...spec, skills: { only: ["papers"] } }) as any;
+  expect(only.catalogue.tasks.some((t: any) => t.skill)).toBe(false);
+  expect(() => generate({ ...spec, skills: { only: ["juggling"] } })).toThrow(/no skill of this town/);
+});
+
+// The outside world's capability over time (docs/scenarios.md, "Capability"): each release a kind of system of its own,
+// released on its day, quicker and slipping less; the seller sells the newest out; the study's tag lists them all.
+test("capability: releases are kinds of system released on their days, sold newest first, and tagged for measurement only", () => {
+  const cap = { tag: "ai", of: ["case-handling-system"], every_days: 182, time_bps: 8000, slip_bps: 8000, price_bps: 10_000 };
+  const plain = generate(spec) as any;
+  const on = generate({ ...spec, capability: cap }) as any;
+  const base = plain.templates.find((t: any) => t.id === "case-handling-system");
+  const r2 = on.templates.find((t: any) => t.id === "case-handling-system-r2");
+  expect(r2.released).toBe(2 * 182 * 86_400);
+  expect(r2.does.find((d: any) => d.kind === "permit_decision").seconds).toBe(Math.round(base.does.find((d: any) => d.kind === "permit_decision").seconds * 0.64));
+  expect(on.orchestration.slip.system["case-handling-system-r2"].bps).toBe(Math.round(plain.orchestration.slip.system["case-handling-system"].bps * 0.64));
+  const vendor = on.participants.find((p: any) => p.controller?.impl === "world.vendor").controller.params;
+  expect(vendor.releases["case-handling-system"].map((r: any) => r.template)).toEqual(["case-handling-system-r1", "case-handling-system-r2", "case-handling-system-r3", "case-handling-system-r4"]);
+  expect(on.meta.study_tags.ai).toContain("case-handling-system-r4");
+  // Nothing else moves: the town is the plain town but for the releases and the tag.
+  const strip = (c: any) => JSON.stringify({ ...c, templates: c.templates.filter((t: any) => t.released === undefined) },
+    (k, v) => (k === "releases" || k === "study_tags" || /-r\d+(\.|$)/.test(k) ? undefined : v));
+  expect(strip(on)).toBe(strip(plain));
+  expect(() => generate({ ...spec, capability: { ...cap, of: ["a-machine-nobody-sells"] } })).toThrow(/no offer/);
+});
+
+// A host in the town (docs/behaviour/hosting.md): the assistants' systems run on its servers, in its building on the
+// town's network; what comes in is held there for the work, and the providers pay its fee. Absent: abroad, as before.
+test("hosting: the assistants' systems run at a host on the town's network, which the providers pay", () => {
+  const on = generate({ ...spec, assistants: true, hosting: "local" }) as any;
+  const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });
+  for (const f of ["common", "blocks", "records", "world-config", "participant-api", "log"]) ajv.addSchema(JSON.parse(readFileSync(join(root, `contracts/${f}.schema.json`), "utf8")));
+  expect(ajv.getSchema("urn:oikos:contracts:0.8:world-config")!(on)).toBe(true);
+  const conns = on.world.connections.filter((c: any) => c.holder === "host");
+  expect(conns.map((c: any) => c.kind).sort()).toEqual(["energy", "wastewater", "water"]);
+  expect(conns.every((c: any) => c.uses === undefined && c.at === "data-centre")).toBe(true);
+  // Every provider's kind of system runs there, and the systems there at the start fit its servers.
+  const hosted = on.templates.filter((t: any) => t.runs_on);
+  expect(hosted.length).toBe(on.templates.filter((t: any) => t.supplier?.startsWith("provider-")).length);
+  const servers = Number(on.world.holdings.find((h: any) => h.holder === "host" && h.kind === "hardware").quantity);
+  expect(on.participants.filter((p: any) => hosted.some((t: any) => t.id === p.template)).length).toBeLessThanOrEqual(servers);
+  const fees = on.positions.filter((p: any) => p.role_module?.code === "firm.provider").map((p: any) => p.role_module.params.hosting);
+  expect(fees.length).toBeGreaterThan(0);
+  expect(fees.every((f: any) => f.account === "acc-host" && f.fee_month > 0)).toBe(true);
+  // Absent, abroad: nothing of it.
+  const abroad = JSON.stringify(generate({ ...spec, assistants: true }));
+  expect(/data-centre|runs_on|"firm\.host"/.test(abroad)).toBe(false);
+  expect(() => generate({ ...spec, hosting: "local" })).toThrow(/assistants/);
+});
+
+// Tools (docs/behaviour/automation.md, "Tools"): a town that asks has the profile's tools sold by the unit by a seller of
+// their own, used at their task, and weighed by the factories that do it; a town that does not ask is as before.
+test("tools: sold by the unit, used at their task, weighed by the factories; off, nothing of them", () => {
+  const on = generate({ ...spec, tools: true }) as any;
+  const T = JSON.parse(readFileSync(join(root, `worlds/profiles/${spec.profile}.json`), "utf8")).values.automation.tools[0];
+  expect(on.catalogue.tasks.find((t: any) => t.id === T.task).tool).toEqual({ kind: T.kind, per_performer: 1, labour_bps: T.labour_bps });
+  const seller = on.positions.find((p: any) => p.role_module?.code === "world.trade" && p.role_module.params.sells?.[T.kind]);
+  expect(seller.role_module.params).toMatchObject({ min_order: 1, sells: { [T.kind]: T.price } });
+  const weighing = on.positions.filter((p: any) => p.role_module?.code === "firm.producer" && (p.role_module.params.task ?? "make") === T.task);
+  expect(weighing.length).toBeGreaterThan(0);
+  expect(weighing.every((p: any) => p.role_module.params.tool?.seller === seller.entity && p.channels.some((c: any) => c.id === "market" && JSON.stringify(c).includes(seller.entity)))).toBe(true);
+  expect(JSON.stringify(generate(spec)).includes(`"${T.kind}"`)).toBe(false);
+});

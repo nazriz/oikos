@@ -133,12 +133,11 @@ pub mod rig {
                 positions: vec![],
                 outcomes,
                 inbox: vec![],
-                channels: channels.into_iter().map(|(k, v)| (k.to_string(), v)).collect::<BTreeMap<_, _>>(),
+                channels: channels.into_iter().map(|(k, v)| (oikos_sight::Id::new(k), v)).collect::<BTreeMap<_, _>>(),
                 asking: vec![],
                 readings: BTreeMap::new(),
                 woke_for: woke_for.into(),
-                since: 0,
-            }
+                since: 0, held: Default::default() }
         }
 
         /// One wake: the actor steps until it waits, each act it makes counted as done. Returns every action it took.

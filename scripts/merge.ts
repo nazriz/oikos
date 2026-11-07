@@ -182,6 +182,8 @@ async function main() {
   /** Builds and tests the worktree as it stands: true if it passes. */
   const check = async (): Promise<boolean> => {
     // Installs (cloned when missing), then the kernel only if kernel/ changed since the last build here.
+    // (Stale incremental folders of the build go first: cheap, and it keeps the merge worktree's target from growing.)
+    Bun.spawnSync(["bun", join(main, "scripts", "disk-tidy.ts"), "--prune-incremental", "--apply", "--repo", wt], { cwd: wt, stdout: "pipe", stderr: "pipe" });
     const w = await stream(wt, ["bun", join(main, "scripts", "worktree-warm.ts"), wt, "--no-build"]);
     if (w.code !== 0) { console.error(w.text.split("\n").slice(-20).join("\n")); return false; }
     for (const cwd of [wt, join(wt, "docs/research/cel-check")]) if (existsSync(cwd)) await stream(cwd, ["bun", "install"]);

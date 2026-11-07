@@ -126,6 +126,10 @@ pub struct DeliveryNote {
     pub delivered: i64,
     #[serde(deserialize_with = "lenient::int")]
     pub refund: i64,
+    /// The price charged for each delivered, where it was not the order's own (a shop's price risen since: the money
+    /// paid bought fewer, and the rest is in `refund`).
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int")]
+    pub unit_price: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub declined: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int")]
@@ -134,6 +138,9 @@ pub struct DeliveryNote {
     pub pay_in_days: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pay_to: Option<String>,
+    /// When the goods are to arrive (law 9: they go by the seller's carrier, and take their time).
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int")]
+    pub arrives: Option<i64>,
 }
 impl Paper for DeliveryNote {
     const KIND: &'static str = "delivery_note";

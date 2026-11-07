@@ -18,7 +18,14 @@ process id you started.
 ## Slots: a limit on heavy jobs, machine-wide
 
 `scripts/slots.ts` is a pool of tokens shared by every checkout and worktree of the user: files in `~/.oikos/slots`
-(`OIKOS_SLOTS_DIR`), as many as the cores less two (`OIKOS_SLOTS=N`; `OIKOS_SLOTS=off` turns it off). What takes them:
+(`OIKOS_SLOTS_DIR`), as many as the cores (`OIKOS_SLOTS=N` fixes N and reads nothing of the machine; `OIKOS_SLOTS=off`
+turns it off). **Elastic:** how many of them may be held at once follows the machine. A job other than the merge's starts
+only when the load average, plus the expected use of holders younger than a minute (not in the load yet), plus its own
+expected use stay within the cores, and the free memory (less what holders younger than a minute will still take) leaves its expected
+memory and a reserve (a tenth of the machine's, at least 1 GiB). Expected use is per token and per class (test, build,
+run, other), declared at first and then measured from the jobs that end (`usage.json` beside the tokens; `status` shows
+it). A job that does not fit waits; the head of the queue is not passed; a job alone always starts; the merge's is held by
+nothing but the pool and the queue (docs/decisions.md, 2026-10-31, "Elastic slots"). What takes them:
 
 | job | tokens |
 |---|---|
@@ -28,7 +35,8 @@ process id you started.
 | `bun run kernel` | half the cores |
 | anything else heavy | `bun scripts/slots.ts [--weight K] -- <command...>` (K a whole number of tokens, or `half`; anything else is refused at once, with the weights there are) |
 
-- `bun scripts/slots.ts status` lists who holds tokens (pid, how long, what, where) and who waits.
+- `bun scripts/slots.ts status` lists who holds tokens (pid, how long, what, where) and who waits, and the machine's
+  readings: load, free memory, whether another token would start now, and each class's use per token.
 - A job that waits says so once a minute (`slots: waiting 61 s so far for 1 of 12 ...`). Waiting costs time and nothing
   else: a run's state hash is the same with and without (checked on a 30-day run of 1,000 people).
 - A holder that dies leaves its tokens behind; the next taker sees its pid is dead and reclaims them.
@@ -88,6 +96,16 @@ day); an old agent lock is lifted only with `--unlock-pid PID` for that pid. It 
 `forms-trained*` and `sz-*` folders older than a day. Tests no longer leave those: `scripts/tmp-preload.ts` (in
 `bunfig.toml`) points TMPDIR at one folder per test process and a reaper removes it when the process ends, killed or not.
 Not touched: caches in the home folder (huggingface models) and `/private/tmp/claude-*`.
+
+**Stale incremental folders (2026-11-02).** The `gate` profile is incremental on purpose (a one-file change rebuilds in
+about a minute), but cargo never deletes a `target/<profile>/incremental/<crate>-<hash>/` whose hash changed, and one agent
+worktree reached 72 GB, 62 of it incremental. `scripts/disk-tidy.ts --prune-incremental [--apply] [DIR]` removes them: per
+crate it keeps the newest unit folder and any written within 6 hours of it (a build writes a crate's lib and test units
+together), and never touches one written in the last half hour. It runs by itself before `bun run kernel`, before the gate's
+kernel build (`scripts/test.ts`) and at the start of each `scripts/merge.ts` check, and the full tidy does it for every idle
+worktree. Safe by construction (rustc treats a missing folder as a first build) and measured: after an extreme prune
+(only the newest folder per crate kept, 17 of 39 units, 1.8 of 3.9 GB) a one-file edit rebuilt in 69 s, against 58 s unpruned
+and about 130 s for a non-incremental build, and the tests built and ran. On the merge worktree it frees 29 of 48 GB.
 ## Tiers (2026-10-24)
 
 - **The gate tier** is every test file not named in `scripts/test-tiers.json`. `bun scripts/test.ts --gate [--base REF]`

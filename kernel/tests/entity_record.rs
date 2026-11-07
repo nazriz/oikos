@@ -2,7 +2,7 @@
 //! shown to nobody but the entity, and set only by the platform's bookkeeping for that entity, named in the world's
 //! config (never by anything a model can reach).
 
-mod common;
+use crate::common;
 
 use common::*;
 use oikos_kernel::canon;
@@ -34,7 +34,7 @@ fn keeper_of(r: &oikos_kernel::run::Response) -> Option<String> {
 
 fn recorded(r: &oikos_kernel::run::Response) -> (String, u64, String, String) {
     match &r.events[0].body {
-        EventBody::EntityRecorded { entity, n, chain, digest, .. } => (entity.clone(), *n, chain.clone(), digest.clone()),
+        EventBody::EntityRecorded { entity, n, chain, digest, .. } => (entity.to_string(), *n, chain.clone(), digest.clone()),
         other => panic!("expected entity_recorded, got {other:?}"),
     }
 }

@@ -15,6 +15,7 @@
 //! - **Guards:** at most three news wakes a unit a tick (then the next tick); more than `MAX_COHORTS_PER_MOMENT`
 //!   cohorts at one moment stops the run.
 
+use crate::blocks::Id;
 use crate::events::{Event, EventBody, VacateReason};
 use crate::state::State;
 use serde::{Deserialize, Serialize};
@@ -356,7 +357,7 @@ impl Scheduler {
             match &e.body {
                 EventBody::ActionStarted { participant, position, done, free, .. } => self.news(st, News::Started { participant, capacity: position.as_deref(), done: free.unwrap_or(*done) }, t),
                 EventBody::VisitStarted { participant, position, done, .. } => self.news(st, News::Started { participant, capacity: position.as_deref(), done: *done }, t),
-                EventBody::MessageDelivered { to, .. } => self.news(st, News::Delivered(to.iter().map(String::as_str).collect()), t),
+                EventBody::MessageDelivered { to, .. } => self.news(st, News::Delivered(to.iter().map(|x| x.as_str()).collect()), t),
                 // A keeper has answered an office's question: the office is woken to go on from the answer. (Not a person's own unit: someone
                 // asking for themselves has it at their next wake. A wake at the moment it is done moved the hours a person wakes at.)
                 EventBody::AskAnswered { participant, position: Some(position), .. } => self.news(st, News::Answered { participant, capacity: position }, t),
@@ -365,13 +366,21 @@ impl Scheduler {
                 EventBody::Vacated { occupant, reason: VacateReason::Died, space, .. } => {
                     if let Some(st) = st {
                         let structure = space.split('/').next().unwrap_or_default();
-                        let present: Vec<String> = st.occupancy.get(structure).and_then(|m| m.get(space)).into_iter().flatten().filter(|b| *b != occupant).cloned().collect();
+                        let present: Vec<String> = st.occupancy.get(structure).and_then(|m| m.get(space)).into_iter().flatten().filter(|b| *b != occupant).cloned().map(|x| x.to_string()).collect();
                         for who in present {
                             self.news(Some(st), News::Body(&who), t);
                         }
                     }
                 }
                 EventBody::ConditionBegan { person, .. } | EventBody::ConditionEnded { person, .. } | EventBody::ConditionTreated { person, .. } => self.news(st, News::Body(person), t),
+                // A child born: its parents know at once (the one who bore it brings it home and puts it on the household's
+                // record; until 2026-10-31 that waited for her next week's plan, and a child born in a run's last week was of
+                // no household at its end).
+                EventBody::PersonCreated { parents, .. } => {
+                    for p in parents {
+                        self.news(st, News::Body(p), t);
+                    }
+                }
                 EventBody::Recorded { record } => {
                     if st.is_some() {
                         let record = serde_json::to_value(&**record).expect("records serialize");
@@ -459,8 +468,8 @@ impl Scheduler {
     }
 
     /// What each of a cohort's units looks as when it wakes: its participant, in its capacity (none: in all).
-    pub fn looks(&self, cohort: &[(String, &'static str, i64)]) -> Vec<(String, Option<String>)> {
-        cohort.iter().filter_map(|(key, _, _)| self.units.get(key)).map(|u| (u.participant.clone(), u.capacity.clone())).collect()
+    pub fn looks(&self, cohort: &[(String, &'static str, i64)]) -> Vec<(Id, Option<Id>)> {
+        cohort.iter().filter_map(|(key, _, _)| self.units.get(key)).map(|u| (Id::new(&u.participant), u.capacity.as_deref().map(Id::new))).collect()
     }
 
     pub fn cohort_json(cohort: &[(String, &'static str, i64)], t: i64) -> Value {

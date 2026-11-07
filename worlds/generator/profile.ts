@@ -209,6 +209,10 @@ export interface Profile {
     spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number; shops_known: number; shop_search_bps_per_month: number;
       /** The household demand system (docs/behaviour/demand.md): each kind's average share of spending and its income elasticity from the place's household expenditure survey, and Frisch's money flexibility. */
       demand?: { frisch_bps: number; kinds: { kind: string; share_bps: number; income_elasticity_bps: number;
+        /** What a unit of it is, physically (law 8, docs/nothing-from-nothing.md): `stock` (a thing, which becomes waste when
+         * used; the default), `dissipates` (fuel: its energy leaves the world as heat) or `service` (a unit of a service sold
+         * over a counter, a haircut or a visit to a venue: no physical quantity, used as it is bought). */
+        class?: "stock" | "dissipates" | "service";
         /** What a shop that sells this kind is like (docs/behaviour/demand.md, "A town's mix of shops"): a kind with no `seller` is not sold by shops (energy is billed by the utilities). `wholesale_bps`: what the shop pays for a unit as a share of its retail price (left out for `goods`: the profile's `industry.retail_purchases_share_bps`); `labour_bps`: the staff's pay for serving a unit as a share of its price, which fixes the size of the unit (left out for `goods`: `industry.retail_labour_share_bps`); `business_share_bps`: the kind's share of the place's retail and service businesses, where counts by industry are sourced (left out: the shops are divided by spending); `occupation`: what the shop's staff are, in the place's terms (the job a shop of this kind advertises); `wage_vs_shop_bps`: their pay as a share of `wages_per_pay_period.shop` (from the place's earnings survey by occupation; left out: the shop wage, 10,000). */
         seller?: { wholesale_bps?: number; labour_bps?: number; business_share_bps?: number; occupation?: string; wage_vs_shop_bps?: number } }[] } };
     /** An adult's savings (cash and deposits), by age: percentiles 10, 25, 50, 75, 90 (cents). */
@@ -216,8 +220,17 @@ export interface Profile {
     /** Shop premises to let (docs/behaviour/leasing.md; risk ME-1): `vacant_bps`, the share of a place's shop units that
      * stand empty (the town opens with that share of empty units beside its shops, let by its landlords); a lease's
      * `rent_per_month` for a small unit, its `deposit_months` (a security deposit, held and given back at the end),
-     * `term_months` and the `notice_days` either side gives at its end. Each with its source; left out, no premises to let. */
-    commercial?: { vacant_bps: number; rent_per_month: number; deposit_months: number; term_months: number; notice_days: number };
+     * `term_months`, and what a landlord asks to accept a tenant's surrender (`surrender_months` of rent, its practice).
+     * `law`, the place's law on leases of shop premises (published as `law-premises-leases`; docs/behaviour/leasing.md,
+     * "Remedies"): rent owed `arrears_days` before a landlord may end a lease for it, after `forfeiture_notice_days` of
+     * notice (0: re-entry the next day); a tenant's own notice to end it early (`tenant_notice_days`; 0: none, only a
+     * surrender agreed); a rent review at most every `review_months`, on `review_notice_days` of notice, `upward_only` or
+     * not; and who hears a claim for rent owed (`disputes`: the town's tribunal). Each with its source; left out, no
+     * premises to let. */
+    commercial?: {
+      vacant_bps: number; rent_per_month: number; deposit_months: number; term_months: number; surrender_months: number;
+      law?: { arrears_days: number; forfeiture_notice_days: number; tenant_notice_days: number; review_months: number; review_notice_days: number; upward_only?: boolean; disputes?: "tribunal" };
+    };
     /** How savings lean on pay (risk ME-17; docs/design/market-realism.md): the rank correlation of income and wealth
      * once age is accounted for (basis points), from a wealth survey. A person's savings are drawn from their age's
      * distribution at a rank that leans on their pay's rank by it. Left out: drawn on their own, as before. */
@@ -303,13 +316,13 @@ export interface Profile {
      * `needs`: what the decision waits for before it is made (papers from the claimant, a confirmation from their last employer), within so many days,
      * and `else` what comes of it when they do not come (`refuse`, or `decide` on what is on hand). `review`: the office looks at its own decision again
      * if asked within so many days, on what grounds, whether an appeal lies only after it (`required`), and, where the law takes silence as a
-     * refusal, after how many days of asking an unanswered review counts as refused (`deemed_refused_days`; the appeal's days run from then). `appeal`: the matter a venue that can set the
+     * refusal, after how many days of asking an unanswered review counts as refused (`deemed_refused_days`; the appeal's days run from then), or, where it has none, after how many days a body that only recommends takes up the delay (`complaint_after_days`: an ombudsman's or a complaints examiner's; no appeal follows). `appeal`: the matter a venue that can set the
      * decision aside hears (`claim_refused`), within so many days, on what grounds, and its fee in hours of ordinary pay (0: none). `refused_by`: where the
      * office is a head and staff, whether the head alone may refuse. Each with its source (`sources["decisions.<kind>.<payment or all>"]`), or marked
      * "PLACEHOLDER" or "(to confirm)". A route a place's law lacks is left out (no `review`: no internal reconsideration). */
     decisions?: { kind: string; name: string; payments?: string[]; refused_by?: "office-holder" | "staff";
       needs?: { id: string; from: "claimant" | "employer"; what: string; within_days: number; else: "refuse" | "decide" }[];
-      review?: { within_days: number; grounds: string; required?: boolean; deemed_refused_days?: number };
+      review?: { within_days: number; grounds: string; required?: boolean; deemed_refused_days?: number; complaint_after_days?: number };
       appeal?: { matter: string; within_days: number; grounds: string; fee_hours_of_pay: number } }[];
     /** Founding (docs/behaviour/founding.md), read only for a living town that turns it on: how often new associations
      * are registered here (`registered_per_100000_per_year`, with its source; code never reads it) and how many more
@@ -400,6 +413,13 @@ export interface Profile {
        * 30 days from the year's first day (the twelfth takes the last five). Left out: every charge monthly, on the first
        * day of the month after (a neutral stand-in). */
       returns?: ReturnRule[];
+      /** The law on tax paid and not owed (docs/behaviour/public-finance.md, "The taxpayer's account"; risk PB-23): the collector keeps
+       * each taxpayer's account and repays a credit claimed back within `pay_within_days` of the claim (said in the law; the time it
+       * takes is its officers'); `set_off`: whether a taxpayer may instead set the credit against its next return; `wrong_refusal_bps`:
+       * of the claims that are due, the share the collector refuses (a row of the table of slips, in a town with frictions). Its source
+       * in `sources["public_finance.refunds"]`, or marked a placeholder. Left out: no collector keeps accounts, and nothing paid twice
+       * can be claimed back. The review of a decision on a claim is the place's `decisions` rule for `tax_credit_decision`. */
+      refunds?: { pay_within_days: number; set_off: boolean; wrong_refusal_bps: number };
       grants_per_resident_per_year: number;
       rates_per_resident_per_year: number;
       rates_instalments: number;
@@ -429,6 +449,10 @@ export interface Profile {
         /** The auditor's staff (docs/behaviour/auditor.md): full-time equivalents per 1,000 residents, as any body's (a body keeps at least one). */
         audit?: number };
       licences: { payment_system: { per_resident_per_year: number; term_days: number } };
+      /** The support agency's officers (full-time equivalents who handle claims) per 1,000 claims in payment, nationally: the town's
+       * share of them is its casework desk (law 10; docs/behaviour/boundary.md, "Who decides a claim"). Sourced in
+       * `sources["public_service.support_officers_per_1000_claims"]`, or marked a placeholder. */
+      support_officers_per_1000_claims: number;
       /** Who fills a post of a body when none of its own staff is left (its constitution): "council" (the town's council, which seconds
        * one of its own staff to it). A body not named has none, and a post of it whose staff have all died stays empty. */
       appointed_by?: { [kind in "administration" | "audit" | "courts" | "oversight" | "elections" | "land_registry" | "press" | "banking" | "utilities" | "union" | "property_management" | "police"]?: "council" };
@@ -442,6 +466,22 @@ export interface Profile {
       firms: { payback_months: { small: number; large: number }; large_from: number; hurdle_bps: number; reference_bps: number; on_cost_bps: number; most?: number };
       /** The law on public buying: a contract worth more than the threshold (in the world\'s smallest unit) is put out to tender, and bids are open this long. */
       procurement?: { threshold: number; bid_days: number };
+      /** Tools the outside world sells (worlds/generator/tools.ts): goods a firm holds, with which a task takes a share of its time. */
+      tools?: import("./tools").ToolOffer[];
+    };
+    /** Assistants on offer (docs/behaviour/assistants.md; docs/design/delegation.md): the outside world's providers of services
+     * and what each sells, at today's prices; read only where a town asks for them (`assistants: true`). `claim_slip_bps` is
+     * what a provider says; `slip_bps` is how often its systems really slip (the world's table of slips), which need not agree.
+     * `principals`: what a principal weighs that no market gives (what an error costs it, the share of slips it finds in a draft
+     * it reads, how much a claim counts against what it has seen, its hurdle); `review_misses_bps` how often a reading misses a
+     * slip (a person's row in the table of slips). No figure here sets how much anyone delegates. */
+    /** A hosting firm in the town (docs/behaviour/hosting.md): read only where a town asks for its assistants' systems to run
+     * in the town (`hosting: "local"`). worlds/generator/hosting.ts says what each figure is. */
+    hosting?: import("./hosting").HostingFigures;
+    assistants?: {
+      providers: { id: string; name: string; offers: { id: string; title: string; for: "organisations" | "persons"; template: string; kinds: string[]; levels: ("advice" | "draft" | "approve" | "alone")[];
+        speed_bps: number; claim_slip_bps: number; slip_bps: number; fee_month: number; setup: number; exit: number; notice_days: number; term_days: number; records: "principal" | "provider" | "on_request" }[] }[];
+      principals: { error_cost: number; finds_bps: number; prior_matters: number; hurdle_bps: number; review_days: number; horizon_months: number; review_misses_bps: number; complaints: string[] };
     };
     unions: { membership_bps: { [kind: string]: number }; dues_per_month: number; resignation_notice_days: number; claim_margin_bps: number; meeting_every_days?: number; teaching?: string };
     /** Social groups that meet (clubs, congregations): their kinds, how often and how long they meet, how many. */
@@ -458,7 +498,13 @@ export interface Profile {
     round?: { work_start_hour: number; work_end_hour: number; work_days: number; school_start_hour: number; school_end_hour: number; travel_seconds_per_cell: number; travel_by_cover: { [cover: string]: number };
       /** Roads (world-expansion 6.3): a road cell's travel time, how far from one a building may stand before the town builds
        * toward it, and what the town budgets for roads a year per resident (cents). */
-      roads?: { seconds_per_cell: number; within_cells: number; budget_per_resident: number } };
+      roads?: { speed_kmh: number; capacity_per_hour: number; within_cells: number; budget_per_resident: number; congestion?: { alpha_bps: number; beta: number } };
+      /** Law 9 (foundations-2 S2): the kinds of vehicle (seats, top speed) and, of housed households, the share whose vehicle is
+       * of each kind (at most one a household). */
+      vehicles?: { types: { id: string; seats: number; speed_kmh: number; fuel_cost_per_100km?: number; range_km?: number }[]; households: { type: string; bps: number }[] };
+      /** Law 9 (foundations-2 S4): how far by road the outside's goods come from (the nearest city or depot that supplies the
+       * town, and takes its exports), and the speed its freight goes there. */
+      outside?: { km: number; speed_kmh: number } };
     /** Home ownership (world-expansion 6.2): which houses their households own, with a mortgage or outright. */
     /** `owner_bps_by_age`: of households, the share who own their home, by the age of the household's head; read as
      * how much likelier one household is than another to be among the town's owners (their number is the houses'). */
@@ -468,7 +514,10 @@ export interface Profile {
     /** Utilities (world-expansion 6.1): water drawn from the river and billed to owners; energy bought from the grid and
      * billed to households. */
     utilities?: {
-      water: { litres_per_person_per_day: number; price_per_kl: number; service_per_quarter: number; river_inflow_kl_per_cell_per_day: number; river_decay_bps_per_day: number; river_flow_bps_per_day: number };
+      /** The town's network for what flows (foundations-2 C4; worlds/generator/network.ts): its engineering figures, each a stand-in until sourced. */
+      network?: import("./network").NetworkFigures;
+      /** `bill_to`: whom the water bill goes to, the property's owner or its occupant, as the place's law has it (WM-12). */
+      water: { litres_per_person_per_day: number; bill_to?: "owner" | "occupant"; price_per_kl: number; service_per_quarter: number; river_inflow_kl_per_cell_per_day: number; river_decay_bps_per_day: number; river_flow_bps_per_day: number };
       energy: { kwh_per_household_per_day: number; price_per_kwh: number; supply_per_day: number; grid_price_per_kwh: number; grid_emissions_g_per_kwh: number };
     };
     /** Floods (world-expansion 7.3): the river's banks and spill, how deep before a building floods, wetland's soaking. */

@@ -72,6 +72,7 @@ export function wholeViews(config: any): WholeView[] {
   for (const a of (config.world.accounts ?? []) as { id: string; holder: string }[]) accountsOf.set(a.holder, [...(accountsOf.get(a.holder) ?? []), a.id]);
   const populations = [...byKind].filter(([, ids]) => ids.length >= POPULATION);
   /** How many accounts an organisation keeps for others. */
+  const operators = new Set<string>(((config.world.network?.supplies ?? []) as { holder: string }[]).map((s) => s.holder));
   const kept = (entity: string) => ((config.world.accounts ?? []) as { holder: string; custodian?: string }[]).filter((a) => a.custodian === entity && a.holder !== entity).length;
 
   const found = new Map<string, WholeView>();
@@ -93,6 +94,12 @@ export function wholeViews(config: any): WholeView[] {
       // a bank keeps its customers' accounts, and nobody else is shown anyone's balance but their own.
       if (ch.kind === "accounts") {
         if (entity && kept(entity) >= WHOLE.least) add(module, through, "accounts", seat);
+        continue;
+      }
+      // An operator's network (foundations-2 C3): a supply's holder is shown every connection on its tree and its links,
+      // through its holdings channel. Whole, and to be declared (`connections`): nobody else sees anyone's but their own.
+      if (ch.kind === "holdings") {
+        if (entity && operators.has(entity)) add(module, through, "connections", seat);
         continue;
       }
       // What a seat is asked about, goes to, reads as published, or sees where it is, is not a whole view: the kernel

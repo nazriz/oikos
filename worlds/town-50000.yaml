@@ -1,0 +1,20 @@
+# The generated town at the study's scale: town-1000.yaml fifty times over (homes, firms, landlords and land in proportion).
+# `oikos run worlds/town-50000.yaml` (docs/design/performance.md)
+generate: town
+name: Millbrook
+seed: 1
+citizens: 50000               # people, in households (docs/behaviour/households.md)
+years: 2
+grid: { w: 283, h: 212 }
+apartment_blocks: 750     # 12 units each: 3 one-bedroom, 7 two, 2 three
+houses: 10000             # 55% three-bedroom, 45% four (19,000 homes for about 20,000 households: housing is tight)
+shops: 1500                # 9,000 jobs
+factories: 500             # 20,000 jobs
+landlords: 1000
+profile: au-vic-2026                           # where its figures come from (worlds/profiles/; docs/profiles.md)
+# exports_per_month: (absent) the world market takes what the factories' opening staff make, less the town's own purchases: a boundary condition, set by rule (docs/behaviour/generator.md)
+housed_bps: 9500                               # of households
+employed_bps: 9500                             # of those in the labour force at the start: about the unemployment rate's complement
+savings_months: [1, 6]
+landlord_compliance_bps: 5000                  # landlords obey a refusal, fine or order half the time
+mayor: code                                    # the all-code control; "llm" puts an AI in the mayor's office

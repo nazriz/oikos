@@ -2,9 +2,11 @@
 //! simulation's boundary conditions. Ported from participants/src/behaviour/world.ts (agent C2 ports the rest).
 
 pub mod census;
+pub mod collector;
 pub mod environment;
 mod environment_staff;
 mod household_draw;
+pub mod nonresident;
 pub mod shared;
 pub mod support;
 pub mod support_law;
@@ -20,7 +22,9 @@ pub static KINDS: &[&dyn crate::Kind] = &[
     &trade::ExportDemand,
     &census::Disposal,
     &census::Migration,
+    &nonresident::NonResident,
     &census::Statistics,
+    &collector::TaxCollector,
     &census::Valuer,
     &trade::WorldTrade,
     &weather::Weather,

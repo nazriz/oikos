@@ -254,7 +254,7 @@ pub fn founding_params(given: &Value, dial: &Value) -> Option<FoundingParams> {
     // (The dial's shapes, if it lists them; else the figures'; else all. Only the known shapes are kept, in order.)
     let named = match dial.get("shapes") {
         Some(Value::Array(a)) => Some(a.clone()),
-        _ => g.get("shapes").and_then(Value::as_array).cloned(),
+        _ => g.get("shapes").and_then(|x| x.as_array()).cloned(),
     };
     let shapes: Vec<Shape> = match named {
         Some(a) => a.iter().filter_map(|s| s.as_str().and_then(Shape::from_name)).collect(),
@@ -426,8 +426,8 @@ pub fn dark_of(want_about: &str, record: &Value, z_agency: f64) -> Vec<String> {
     }
     let defining: Vec<&str> = record
         .pointer("/memory/defining")
-        .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(|m| m.get("what").and_then(Value::as_str)).collect())
+        .and_then(|x| x.as_array())
+        .map(|a| a.iter().filter_map(|m| m.get("what").and_then(|x| x.as_str())).collect())
         .unwrap_or_default();
     for w in ["bereaved", "ruined", "evicted", "left_on_order"] {
         if defining.contains(&w) {
@@ -571,7 +571,7 @@ pub fn accept_gathering(me: &str, g: &GatherBounds, blocks: &[Block]) -> Result<
     if p.offer.is_some() {
         return Err("a notice carrying an offer as well".into());
     }
-    let at = pr.get("at").and_then(Value::as_str);
+    let at = pr.get("at").and_then(|x| x.as_str());
     if at != Some(g.at.as_str()) {
         return Err(format!("a gathering at {}, where we have no place", at.unwrap_or("undefined")));
     }
@@ -588,8 +588,8 @@ pub fn accept_gathering(me: &str, g: &GatherBounds, blocks: &[Block]) -> Result<
     if f.is_none_or(|f| f < g.first.0 as f64 || f > g.first.1 as f64) {
         return Err("a first gathering outside the days open to it".into());
     }
-    let during = pr.get("during").and_then(Value::as_array).is_some_and(|a| !a.is_empty());
-    let own_rules = pr.get("roles").and_then(Value::as_array).is_some_and(|rs| rs.iter().any(|r| r.get("who").and_then(Value::as_object).is_some_and(|w| !w.is_empty())));
+    let during = pr.get("during").and_then(|x| x.as_array()).is_some_and(|a| !a.is_empty());
+    let own_rules = pr.get("roles").and_then(|x| x.as_array()).is_some_and(|rs| rs.iter().any(|r| r.get("who").and_then(|x| x.as_object()).is_some_and(|w| !w.is_empty())));
     if during || own_rules {
         return Err("a gathering with rules of its own".into());
     }
@@ -615,18 +615,18 @@ pub fn accept_membership(me: &str, o: &MembershipBounds, blocks: &[Block]) -> Re
     if p.speaks_for.unwrap_or(me) != me || !p.public {
         return Err("an offer that is not ours, or not public".into());
     }
-    if offer.get("take_up").and_then(Value::as_str) != Some("join") || offer.get("hears").is_some_and(|h| !falsy(h)) || p.practice.is_some() {
+    if offer.get("take_up").and_then(|x| x.as_str()) != Some("join") || offer.get("hears").is_some_and(|h| !falsy(h)) || p.practice.is_some() {
         return Err("an offer of something other than joining".into());
     }
-    if offer.get("to").and_then(Value::as_object).is_some_and(|to| to.keys().any(|k| k != "anyone")) {
+    if offer.get("to").and_then(|x| x.as_object()).is_some_and(|to| to.keys().any(|k| k != "anyone")) {
         return Err("an offer with conditions of its own".into());
     }
     let mut dues = 0.0;
     let none = vec![];
-    for c in offer.pointer("/terms/commitments").and_then(Value::as_array).unwrap_or(&none) {
+    for c in offer.pointer("/terms/commitments").and_then(|x| x.as_array()).unwrap_or(&none) {
         let m = c.pointer("/does/outcome/money");
-        let Some(m) = m.filter(|_| c.get("who").and_then(Value::as_str) == Some("taker")) else { continue };
-        if m.get("to").and_then(Value::as_str) != o.account.as_deref() {
+        let Some(m) = m.filter(|_| c.get("who").and_then(|x| x.as_str()) == Some("taker")) else { continue };
+        if m.get("to").and_then(|x| x.as_str()) != o.account.as_deref() {
             return Err("dues paid to an account that is not ours".into());
         }
         if num(c.get("every")) != Some(30.0 * 86_400.0) {
@@ -673,17 +673,17 @@ pub enum Came {
 /// An answer to a `words` question (run.ts `wordsFor`, its half after the draft): a draft the kernel would refuse is not
 /// what was meant; otherwise the module's `accept` says what it may be. `Null` (no translator to be had) is not done.
 pub fn words_came(about: &str, what: &str, idea: &str, body: &Value, accept: impl FnOnce(&[Block]) -> Result<Vec<Value>, String>) -> Came {
-    let s = |k: &str| body.get(k).and_then(Value::as_str).map(String::from);
+    let s = |k: &str| body.get(k).and_then(|x| x.as_str()).map(String::from);
     let mut w = crate::Worded { about: about.into(), what: what.into(), idea: Some(idea.to_string()).filter(|i| !i.is_empty()), draft: s("draft"), by: s("by"), ..Default::default() };
-    if body.get("ok").and_then(Value::as_bool) != Some(true) {
+    if body.get("ok").and_then(|x| x.as_bool()) != Some(true) {
         w.why = Some(s("why").unwrap_or_else(|| "The translator did not answer.".into()));
         return Came::NotDone(w);
     }
     w.draft_hash = s("draft_hash");
     let drafted = body.get("blocks").cloned().unwrap_or(json!([]));
     let blocks: Result<Vec<Block>, _> = serde_json::from_value(drafted.clone());
-    let accepted = if body.pointer("/check/ok").and_then(Value::as_bool) == Some(false) {
-        Err(format!("the acts would be refused ({})", body.pointer("/check/refusal").and_then(Value::as_str).unwrap_or("refused")))
+    let accepted = if body.pointer("/check/ok").and_then(|x| x.as_bool()) == Some(false) {
+        Err(format!("the acts would be refused ({})", body.pointer("/check/refusal").and_then(|x| x.as_str()).unwrap_or("refused")))
     } else {
         match &blocks {
             Ok(b) => accept(b),
@@ -704,7 +704,7 @@ pub fn words_came(about: &str, what: &str, idea: &str, body: &Value, accept: imp
         Err(why) => {
             w.accepted = Some(false);
             w.why = Some(why);
-            if body.get("again").and_then(Value::as_bool) == Some(true) {
+            if body.get("again").and_then(|x| x.as_bool()) == Some(true) {
                 w.again = true;
                 Came::Again(w)
             } else {

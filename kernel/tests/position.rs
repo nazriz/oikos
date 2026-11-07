@@ -5,7 +5,7 @@
 //! you see how many are in it, not who. Nothing here knows what a cell,
 //! building or notice is for.
 
-mod common;
+use crate::common;
 
 use common::*;
 use serde_json::{json, Value};
@@ -75,7 +75,7 @@ fn street() -> Run<Vec<u8>> {
             {"what": "records:withdrawal", "why": "And what is taken down."}
         ]},
         "caps": {"max_created_entities": 1},
-        "orchestration": {"thinking_time": "free"}
+        "orchestration": {"thinking_time": "free", "act_time": {"default": 1, "sources": {"default": "PLACEHOLDER for a test world: every act a second, as the platform once took for any act its table did not name (foundations-2 P2: a world now states its default)."}}}
     });
     Run::start(config, "position", Vec::new(), None).unwrap()
 }
@@ -83,7 +83,7 @@ fn street() -> Run<Vec<u8>> {
 fn act(run: &mut Run<Vec<u8>>, participant: &str, blocks: Value) -> Result<Option<String>, RefusalCode> {
     let r = run.done(&rb_act(participant, blocks)).unwrap();
     match &r.events[0].body {
-        EventBody::ActionApplied { created, .. } => Ok(created.as_ref().and_then(|c| c.values().next().cloned())),
+        EventBody::ActionApplied { created, .. } => Ok((created.as_ref().and_then(|c| c.values().next().cloned())).map(|x| x.to_string())),
         EventBody::ActionRefused { code, .. } => Err(*code),
         other => panic!("{other:?}"),
     }
@@ -102,8 +102,8 @@ fn sites(o: &Observation, ch: &str) -> (Vec<SiteCell>, bool) {
 
 fn ids(o: &Observation, ch: &str) -> Vec<String> {
     match &o.channels[ch] {
-        ChannelData::Records { records, .. } => records.iter().map(|r| r.id.clone()).collect(),
-        ChannelData::Sites { cells, .. } => cells.iter().map(|p| p.cell.clone()).collect(),
+        ChannelData::Records { records, .. } => records.iter().map(|r| r.id()).map(|x| x.to_string()).collect(),
+        ChannelData::Sites { cells, .. } => cells.iter().map(|p| p.cell).map(|x| x.to_string()).collect(),
         other => panic!("{other:?}"),
     }
 }
@@ -116,7 +116,7 @@ fn who(p: &SiteCell) -> Vec<String> {
         .spaces
         .iter()
         .flat_map(|sp| match &sp.occupants {
-            Some(names) => names.clone(),
+            Some(names) => names.iter().map(|x| x.to_string()).collect(),
             None if sp.count > 0 => vec![format!("{} {}", sp.count, sp.kind)],
             None => vec![],
         })

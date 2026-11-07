@@ -248,7 +248,7 @@ impl Index {
 
     /// The raw tracks the client reads (little-endian): `where` (uint32, by day by person), `pulses` (int32 x6 per
     /// pulse), `money` (float64, by day by holder, persons first), `agency` (int16, by day by person), `moves`
-    /// (int32 x3 per move, days `from..to`).
+    /// (int32 x3 per move). `from..to` (days) narrows `where`, `money`, `agency` and `moves` to those days' rows.
     pub fn track_bytes(&self, name: &str, from: Option<i64>, to: Option<i64>) -> Option<Vec<u8>> {
         let s = self.r();
         if !s.have_header {
@@ -256,11 +256,18 @@ impl Index {
         }
         let tr = s.tracks();
         let mut out = vec![];
+        let span = tr.days as i64 + 1;
+        let rows = |per: usize| {
+            let a = from.unwrap_or(0).clamp(0, span) as usize;
+            let b = to.unwrap_or(span).clamp(0, span).max(a as i64) as usize;
+            a * per..b * per
+        };
         match name {
-            "where" => tr.where_.iter().for_each(|v| out.extend_from_slice(&v.to_le_bytes())),
+            // (by day: `from..to` days of rows, all of them when neither is given; a viewer streams a window of days)
+            "where" => tr.where_[rows(tr.persons)].iter().for_each(|v| out.extend_from_slice(&v.to_le_bytes())),
             "pulses" => s.pulses.iter().for_each(|v| out.extend_from_slice(&v.to_le_bytes())),
-            "money" => tr.money.iter().for_each(|&v| out.extend_from_slice(&(v as f64).to_le_bytes())),
-            "agency" => tr.agency.iter().for_each(|v| out.extend_from_slice(&v.to_le_bytes())),
+            "money" => tr.money[rows(tr.holders)].iter().for_each(|&v| out.extend_from_slice(&(v as f64).to_le_bytes())),
+            "agency" => tr.agency[rows(tr.persons)].iter().for_each(|v| out.extend_from_slice(&v.to_le_bytes())),
             "moves" => {
                 let n = s.moves.len() / MOVE_INTS;
                 let from = from.unwrap_or(0).max(0) as usize;
@@ -300,6 +307,22 @@ impl Index {
         let row = crate::trace::event_row(&s, ord, about).to_value();
         let links = crate::trace::trace(&s, ord, about, 8);
         Some(Obj::new().set("row", row).set("links", serde_json::to_value(links).ok()?).build())
+    }
+
+    /// The workbench's events table (bench.rs).
+    pub fn events_json(&self, q: &crate::bench::EventQuery) -> Option<Value> {
+        let s = self.r();
+        s.have_header.then(|| crate::bench::events(&s, q))
+    }
+    /// A group of people and its outcomes over time beside the rest (bench.rs).
+    pub fn cohort_json(&self, q: &crate::bench::CohortQuery) -> Option<Value> {
+        let s = self.r();
+        s.have_header.then(|| crate::bench::cohort(&s, q))
+    }
+    /// Per building, the consequential changes reaching those who live there (bench.rs).
+    pub fn by_building(&self, from: i64, to: i64) -> Option<Vec<[u32; 5]>> {
+        let s = self.r();
+        s.have_header.then(|| crate::bench::by_building(&s, from, to))
     }
 
     pub fn seat_json(&self, id: &str) -> Value {

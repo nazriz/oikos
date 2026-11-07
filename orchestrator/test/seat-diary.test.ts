@@ -26,10 +26,10 @@ const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 /** The works crew of the town at its start: those the town's genesis employs at the hall with no role named in their agreement. */
 const crewOf = (config: any): string[] => (config.world.records as any[]).filter((r) => r.record === "agreement" && r.terms?.template === "employment" && r.terms.parties[0] === "city" && !r.text && r.terms.commitments.some((x: any) => x.does?.outcome?.occupancy?.in === "town-hall/workplace.1")).map((r) => String(r.terms.parties[1]));
 
-async function arm(delegate: boolean, o: { days?: number; by?: (crew: string[], i: number) => string } = {}) {
+async function arm(delegate: boolean, o: { days?: number; by?: (crew: string[], i: number) => string; sits_at?: number; citizens?: number } = {}) {
   const days = o.days ?? 60;
-  const config = generate({ ...spec, citizens: 600, opening_orders: false, model_seats: ["works"] });
-  for (const p of config.participants) if (p.id === "works-system") Object.assign(p.controller.params, { cadence_days: 1, max_actions: 40 });
+  const config = generate({ ...spec, citizens: o.citizens ?? 600, opening_orders: false, model_seats: ["works"] });
+  for (const p of config.participants) if (p.id === "works-system") Object.assign(p.controller.params, { cadence_days: 1, max_actions: 40 }, o.sits_at === undefined ? {} : { sessions: { ...p.controller.params.sessions, start: o.sits_at } });
   const crew = crewOf(config);
   const by = o.by ?? ((c: string[], i: number) => c[i % c.length]!);
   const notices = (day: number): Sitting => ({ day, asks: () => Array.from({ length: 40 }, (_, i) => ({ what: `Put notice ${i + 1} of day ${day} on the town's file.`, program: `statement(kind=notice, text="Notice ${i + 1} of day ${day}.", to=city${delegate ? `, done_by=${by(crew, i)}` : ""})` })) });
@@ -41,10 +41,12 @@ async function arm(delegate: boolean, o: { days?: number; by?: (crew: string[], 
 }
 
 const transcripts = (r: Awaited<ReturnType<typeof arm>>) => r.log.filter((e) => e.kind === "annotation" && e.body.annotation === "transcript" && e.body.subject === "works-system" && e.body.data.purpose === "participant").map((e) => JSON.stringify(e.body.data.input));
-/** How long a day's paperwork took the seat to begin: from its first act of the day to its last. */
+/** How long a day's paperwork took whoever did it: from when the first of the day's acts began to when the last was done,
+ * as the kernel placed them on their performers' time (`starts`, `done`). (Until 2026-10-31 this read the log's time of
+ * `action_started`, which since foundations-2 P1 is when the seat gave the order, not when the work was done: MT-23.) */
 const spanOf = (r: Awaited<ReturnType<typeof arm>>, day: number) => {
-  const at = r.log.filter((e) => e.kind === "event" && e.body.event === "action_started" && e.body.participant === "works-system" && e.t >= day * DAY && e.t < (day + 1) * DAY).map((e) => e.t as number);
-  return { acts: at.length, span: Math.max(...at) - Math.min(...at) };
+  const acts = r.log.filter((e) => e.kind === "event" && e.body.event === "action_started" && e.body.participant === "works-system" && e.t >= day * DAY && e.t < (day + 1) * DAY);
+  return { acts: acts.length, span: Math.max(...acts.map((e) => e.body.done as number)) - Math.min(...acts.map((e) => e.body.starts as number)) };
 };
 
 test("a seat is shown its own time and its crew's hours, told when its work will be done, and a day's paperwork takes it longer than its day when it does it all itself", async () => {
@@ -75,16 +77,26 @@ test("a seat has its crew do the paperwork by naming them: on their time and not
   const applied = theirs.log.filter((e) => e.kind === "event" && e.body.event === "action_applied" && e.body.participant === "works-system" && (e.body.by ?? []).length > 0);
   expect(applied.length).toBeGreaterThan(20);
   for (const e of applied) expect((e.body.by as string[]).every((p) => crew.has(p))).toBe(true);
-  // (The delegated paperwork takes the crew's time, on a working day: 106 to 121 minutes on eighteen of the nineteen working days of days 1 to 28 at seed 1. Day 21 alone took 310 on
-  // 2026-10-24, after the run's seed began to draw who the people are, with the crew's acts run one after another where they run side by side on the other days (not traced further: MT-23).
-  // A day is one draw; the claim is about the crew's days, so the middle day is held to the bound, as against more than nine hours when the seat writes them all itself.)
-  const spans = Array.from({ length: 58 }, (_, i) => spanOf(theirs, i + 1)).filter((x) => x.acts > 0).map((x) => x.span).sort((a, b) => a - b);
+  // The delegated paperwork takes the crew's time, side by side, on every working day: under three hours (105 minutes at
+  // seed 1 on 2026-10-31), as against more than nine when the seat writes them all itself. (Every day, not the middle one:
+  // day 21's 310 minutes of 2026-10-24 was the seat held on its own time until each order began, so its orders queued
+  // behind a busy member of the crew; fixed by foundations-2 P1 the next day. MT-23.)
+  const spans = Array.from({ length: 58 }, (_, i) => spanOf(theirs, i + 1)).filter((x) => x.acts > 0).map((x) => x.span);
   expect(spans.length).toBeGreaterThan(20);
-  expect(spans[Math.floor(spans.length / 2)]!).toBeLessThan(3 * 3_600);
+  expect(Math.max(...spans)).toBeLessThan(3 * 3_600);
   // Someone who is not at work cannot do it, and the kernel says so (the seat is told in the town's words).
+  // (Until 2026-10-25 this was looked for in the run above, where it came of a crew member named before they were in.
+  // Since market realism the 600-person town's works crew are four with no home, who sleep at the hall (the town has
+  // homes for fewer than half its people, as it had before), so whoever is named is there. In the town of the usual size
+  // the crew live at home, and a seat that sits at 07:00, before they come in, names them while they are not at work,
+  // which is the claim.)
   const refused = theirs.log.filter((e) => e.kind === "event" && e.body.event === "action_refused" && e.body.participant === "works-system");
-  expect(refused.length).toBeGreaterThan(0);
-  expect(new Set(refused.map((e) => e.body.code))).toEqual(new Set(["not_at_work"]));
+  expect(refused.every((e) => e.body.code === "not_at_work")).toBe(true);
+  const early = await arm(true, { days: 6, sits_at: 7 * 3_600, citizens: spec.citizens });
+  const before = early.log.filter((e) => e.kind === "event" && e.body.event === "action_refused" && e.body.participant === "works-system");
+  expect(before.length).toBeGreaterThan(0);
+  expect(new Set(before.map((e) => e.body.code))).toEqual(new Set(["not_at_work"]));
+  expect(transcripts(early).some((x) => /aren't there to do it/.test(x))).toBe(true);
   // A name that is not one of its staff: nothing is drawn up, and it is told so.
   const strange = await arm(true, { days: 6, by: () => "c0099" });
   const asked = transcripts(strange).filter((x) => /is not one of your staff/.test(x));

@@ -7,6 +7,9 @@
 //! - A draw that names its matter (a `#` and a digit, or five digits in a row) is that matter's: the nth time this unit
 //!   drew for it. Any other draw is the calendar day's, and the nth time that day. The nth is counted by moments:
 //!   drawing again in the same moment is the same occurrence.
+//! - A matter may say when it is over (`key_until`: a gathering once it has begun, a paper's one reading once it is
+//!   read): from then on it is never drawn for again, so its count is let go (risk SC-6: a person kept one for every
+//!   order they ever had delivered and every gathering they ever thought of going to, for the run).
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -17,12 +20,18 @@ pub struct Draws {
     participant: String,
     capacity: String,
     day: i64,
-    day_occurrences: BTreeMap<String, (i64, u64)>,
-    matter_occurrences: BTreeMap<String, (i64, u64)>,
-    drawn_on: BTreeMap<String, BTreeMap<String, usize>>,
+    // (Keys held as `Box<str>`, exactly their text: a unit keeps one for every paper it has drawn on, for good. SC-1.)
+    day_occurrences: BTreeMap<Box<str>, (i64, u64)>,
+    matter_occurrences: BTreeMap<Box<str>, (i64, u64)>,
+    drawn_on: BTreeMap<Box<str>, BTreeMap<Box<str>, usize>>,
     /// The same, for draws about one thing (`Cx::chance`; run.ts names those papers apart from the unit's own draws).
     #[serde(default)]
-    chance_drawn_on: BTreeMap<String, BTreeMap<String, usize>>,
+    chance_drawn_on: BTreeMap<Box<str>, BTreeMap<Box<str>, usize>>,
+    /// Matters that said when they are over (`key_until`): each one's end, and by end. A matter's count goes at its end.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    ending: BTreeMap<Box<str>, i64>,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeSet::is_empty")]
+    by_end: std::collections::BTreeSet<(i64, Box<str>)>,
 }
 
 /// Every `rec.<digits>` in `s`, each replaced by `f(the id)`.
@@ -60,6 +69,16 @@ fn names_matter(p: &str) -> bool {
 }
 
 impl Draws {
+    /// What it keeps, for whoever measures memory: entries counted by what, and a few of its matters' purposes.
+    pub fn kept(&self) -> (Vec<(&'static str, usize)>, Vec<&str>) {
+        let papers: usize = self.drawn_on.values().map(BTreeMap::len).sum();
+        let chance: usize = self.chance_drawn_on.values().map(BTreeMap::len).sum();
+        (
+            vec![("draws.day", self.day_occurrences.len()), ("draws.matter", self.matter_occurrences.len()), ("draws.papers", papers), ("draws.purposes", self.drawn_on.len()), ("draws.chance_papers", chance)],
+            self.matter_occurrences.keys().take(3).map(|k| &**k).collect(),
+        )
+    }
+
     pub fn new(participant: &str, capacity: &str) -> Self {
         Draws { participant: participant.into(), capacity: capacity.into(), day: -1, ..Default::default() }
     }
@@ -76,21 +95,54 @@ impl Draws {
         Self::stable_in(&mut self.chance_drawn_on, purpose)
     }
 
-    fn stable_in(drawn_on: &mut BTreeMap<String, BTreeMap<String, usize>>, purpose: &str) -> String {
+    fn stable_in(drawn_on: &mut BTreeMap<Box<str>, BTreeMap<Box<str>, usize>>, purpose: &str) -> String {
         if !purpose.contains("rec.") {
             return purpose.to_string();
         }
         let what = replace_records(purpose, |_| "rec".into());
-        let seen = drawn_on.entry(what).or_default();
+        if !drawn_on.contains_key(what.as_str()) {
+            drawn_on.insert(what.as_str().into(), BTreeMap::new());
+        }
+        let seen = drawn_on.get_mut(what.as_str()).expect("just inserted");
         replace_records(purpose, |id| {
             let n = seen.len() + 1;
-            let k = *seen.entry(id.to_string()).or_insert(n);
+            let k = match seen.get(id) {
+                Some(k) => *k,
+                None => {
+                    seen.insert(id.into(), n);
+                    n
+                }
+            };
             format!("paper#{k}")
         })
     }
 
+    /// `key`, for a matter that is over at `ends` (drawn for only before then, never at or after it): its count is let
+    /// go once it is. Where the purpose names no matter, the same as `key`.
+    pub fn key_until(&mut self, t: i64, purpose: &str, ends: i64) -> Vec<String> {
+        let key = self.key(t, purpose);
+        let purpose = &key[4];
+        if names_matter(purpose) {
+            let was = self.ending.insert(purpose.as_str().into(), ends);
+            if let Some(was) = was {
+                self.by_end.remove(&(was, purpose.as_str().into()));
+            }
+            self.by_end.insert((ends, purpose.as_str().into()));
+        }
+        key
+    }
+
     /// The key of the stream for `purpose` at moment `t` (`["participant", pid, capacity, day or "", purpose, n]`).
     pub fn key(&mut self, t: i64, purpose: &str) -> Vec<String> {
+        // (Matters over by now: never drawn for again, so their counts go.)
+        while let Some((end, _)) = self.by_end.first() {
+            if *end > t {
+                break;
+            }
+            let Some((_, p)) = self.by_end.pop_first() else { break };
+            self.ending.remove(&p);
+            self.matter_occurrences.remove(&p);
+        }
         let purpose = self.stable(purpose);
         let day = t.div_euclid(86_400);
         if day != self.day {
@@ -99,7 +151,10 @@ impl Draws {
         }
         let matter = names_matter(&purpose);
         let seen = if matter { &mut self.matter_occurrences } else { &mut self.day_occurrences };
-        let occ = seen.entry(purpose.clone()).or_insert((t, 0));
+        if !seen.contains_key(purpose.as_str()) {
+            seen.insert(purpose.as_str().into(), (t, 0));
+        }
+        let occ = seen.get_mut(purpose.as_str()).expect("just inserted");
         if occ.1 == 0 || occ.0 != t {
             occ.0 = t;
             occ.1 += 1;
@@ -149,5 +204,23 @@ mod tests {
         let k = d.key(9, "answer-rec.977");
         assert_eq!((k[3].as_str(), k[5].as_str()), ("", "2"), "a matter's draw: no day, its own count");
         assert_eq!(d.key(0, "lease-12345")[3], "");
+    }
+
+    #[test]
+    fn a_matter_counts_its_draws_until_it_is_over_and_is_then_let_go() {
+        let mut d = Draws::new("p1", "self");
+        let at = 10 * 86_400;
+        // A gathering at `at`, decided on twice before it: the count runs on, the same as without an end.
+        assert_eq!(d.key_until(100, "practice-rec.5-864000", at)[5], "1");
+        assert_eq!(d.key_until(86_500, "practice-rec.5-864000", at)[5], "2");
+        assert_eq!(d.kept().0[1], ("draws.matter", 1));
+        // Once it has begun, nothing more is drawn for it: its count goes at the next draw.
+        d.key(at, "shop");
+        assert_eq!(d.kept().0[1], ("draws.matter", 0));
+        // A paper read once: over once drawn, in the same moment still the same occurrence.
+        assert_eq!(d.key_until(at + 5, "faulty-rec.9", at + 6)[5], "1");
+        assert_eq!(d.key(at + 5, "faulty-rec.9")[5], "1");
+        d.key(at + 6, "shop");
+        assert_eq!(d.kept().0[1], ("draws.matter", 0));
     }
 }

@@ -119,7 +119,7 @@ impl OrgParams {
     /// The defaults with the world's keys over them (`org` of a module's parameters). A key of the wrong type is ignored.
     pub fn from_json(given: &Value) -> OrgParams {
         let mut p = OrgParams::default();
-        let int = |k: &str| given.get(k).and_then(Value::as_i64);
+        let int = |k: &str| given.get(k).and_then(|x| x.as_i64());
         let num = |k: &str| given.get(k).and_then(|v| scaled(v, 10_000));
         p.hold_bps = int("hold_bps").unwrap_or(p.hold_bps);
         p.rise_bps = int("rise_bps").unwrap_or(p.rise_bps);
@@ -233,7 +233,7 @@ pub struct Org<W> {
 impl<W: Wanting + Serialize + DeserializeOwned> Org<W> {
     /// `wants`: the book of wants, made by the caller from `p.wants`.
     pub fn new(cx: &mut Cx, given: Given, wants: W) -> Org<W> {
-        let dial = cx.ctx.world.dials.get("initiative_bps").and_then(Value::as_i64).unwrap_or(0);
+        let dial = cx.ctx.world.dials.get("initiative_bps").and_then(|x| x.as_i64()).unwrap_or(0);
         let lively = match given.initiative {
             Some(x) => x,
             None => dial > 0 && cx.rng("initiative").below(10_000) < dial as u64,
