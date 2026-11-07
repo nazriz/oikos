@@ -146,9 +146,12 @@ test("a founding's draw of the shape \"business\" reaches the business of one: s
   // (Held over three seeds since 2026-10-31, not one: the test had been moved to another seed seven times as changes moved
   // who is out of work and when, each time because its run had no occasion, not because the rule broke; after the owners'
   // fix of that day the one person of seed 1 who meant a business already ran one. The occasions are the draws'; the rule
-  // is the same in every run, so the runs together must show it. Seeds 1 to 3 are the first three, not chosen.)
+  // is the same in every run, so the runs together must show it. Seeds 1 to 3 are the first three, not chosen. Five since
+  // 2026-11-08, the first five: with no household car in a town that sells nothing for one to run on (law 9 strict), the
+  // three runs had no occasion (who meant one already ran one, or meant it too late to start within the run); seeds 4 and
+  // 5 each have one, started within a fortnight.)
   let meantFree = 0, kept = 0;
-  for (const seed of [1, 2, 3]) {
+  for (const seed of [1, 2, 3, 4, 5]) {
     const out = join(root, "runs", `test-own-venture-meant-${seed}`);
     rmSync(out, { recursive: true, force: true });
     const s = await runWorld({ config: { ...config, seed }, runId: "meant", outDir: out, until: 600 * DAY, recordObservations: "none" });
