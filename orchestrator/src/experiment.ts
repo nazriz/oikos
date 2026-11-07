@@ -139,6 +139,9 @@ export async function buildConfig(spec: ExperimentSpec, seed: number): Promise<a
   } else if (w.spec) {
     const { generate } = await import("@oikos/worlds/generator/generate");
     config = generate({ ...structuredClone(w.spec), seed } as any);
+    // (Law 11, strict: a generated world with an unbased number is not run; loadWorld says so for a file.)
+    const { refuseUnbased } = await import("./figures");
+    refuseUnbased(config, w.spec);
   } else if (w.config) {
     config = structuredClone(w.config);
     config.seed = seed;

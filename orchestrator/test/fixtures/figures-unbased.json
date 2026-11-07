@@ -1,4 +1,0 @@
-{
-  "about": "Law 11, counting (docs/design/foundations-2.md, N1 and N2): the places in a generated town whose numbers nothing yet speaks for, in any profile's town of 60. orchestrator/test/figures.test.ts fails on a place not listed here and on one listed that no town has any more: this list only shrinks. To take a place off, give it a row in worlds/generator/figures.ts that is true of the code that makes it.",
-  "unbased": []
-}

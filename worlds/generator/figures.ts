@@ -6,11 +6,12 @@
 // `households`, else the path's own or the nearest above), or a class and why. A row may hold only for one id (`id`:
 // which task, field or kind, where `*` covers several made from different figures) or only where the config has a
 // path (`given`). The first row that matches is used. Read by `orchestrator/src/figures.ts`
-// to count what a world rests on; nothing in the generator or the world reads it, so it changes no town.
+// to count what a world rests on, and by the run to refuse a generated world with an unbased number; nothing in the
+// generator or the world reads it, so it changes no town.
 //
 // A row is a statement about the generator, so it must be true of the code beside it: when the generator changes where
-// a figure comes from, its row changes too. What no row covers is counted as unbased and listed in the report, and the
-// list in `orchestrator/test/fixtures/figures-unbased.json` may only shrink.
+// a figure comes from, its row changes too. What no row covers is unbased: listed in the report, failed by
+// orchestrator/test/figures.test.ts in every profile's town, and a generated world with any does not run (law 11, strict).
 
 export type BasisClass = "sourced" | "to_confirm" | "derived" | "fitted" | "placeholder" | "convention";
 
@@ -38,9 +39,14 @@ const derived = (at: string, why: string): Basis => ({ at, class: "derived", why
 const placeholder = (at: string, why: string): Basis => ({ at, class: "placeholder", why });
 const prof = (at: string, profile: string): Basis => ({ at, profile });
 
+/** Where a module's parameters are: a participant's or template's controller, a post's role module, the mock a model's
+ * seat carries for its code twin (`controller.params.mock.params`: the twin's module, with the twin's figures), and the
+ * office's own module's that its clerk keeps the books for (`role_module.params.with`). */
+const PARAMS_AT = ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params", "participants.*.controller.params.mock.params", "templates.*.controller.params.mock.params", "positions.*.role_module.params.with"];
+
 /** Rows for one module's parameters (`participants.*.controller.params.<at>`), read only where that module runs. */
 const of = (module: string, rows: Basis[]): Basis[] =>
-  rows.flatMap((r) => ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params"].map((at) => ({ ...r, module, family: `${module}: ${r.at}`, at: `${at}.${r.at}` })));
+  rows.flatMap((r) => PARAMS_AT.map((at) => ({ ...r, module, family: `${module}: ${r.at}`, at: `${at}.${r.at}` })));
 
 /** Rows for one task of the catalogue's (`catalogue.tasks.*.<at>`, the task with this id). */
 const task = (id: string, rows: Basis[]): Basis[] => rows.map((r) => ({ ...r, id, family: `task ${id}: ${r.at}`, at: `catalogue.tasks.*.${r.at}` }));
@@ -58,6 +64,11 @@ export const FIGURE_BASIS: Basis[] = [
   // What a seat may see: the sizes of the areas and how often (the generator's design of knowing, docs/no-god-view.md).
   conv("participants.*.channels.**", "what a seat may see and how often: the platform's design of knowing (docs/no-god-view.md)"),
   conv("templates.*.channels.**", "what a seat may see and how often: the platform's design of knowing (docs/no-god-view.md)"),
+  // A model's seat: how often it is woken when nothing comes to it, and the hours it sits (the platform's design of a seat,
+  // docs/real-models.md; its hours the office's working day).
+  conv("participants.*.controller.params.cadence_days", "how often a model's seat is woken when nothing comes to it: the platform's design of a seat (docs/real-models.md)"),
+  conv("templates.*.controller.params.cadence_days", "how often a model's seat is woken when nothing comes to it: the platform's design of a seat (docs/real-models.md)"),
+  derived("participants.*.controller.params.sessions.**", "a model's seat sits in its office's hours: the profile's working day and days (round)"),
   // The citizen (generate.ts, `citizenController`).
   ...of(CITIZEN, [
     derived("population", "the town's adult count, drawn from the profile's households"),
@@ -299,7 +310,8 @@ export const FIGURE_BASIS: Basis[] = [
   ]),
   ...of("body.payroll", [prof("wage", "public_service.wage_per_pay_period")]),
   ...of("police.station", [derived("officers", "the profile's crime.police_per_1000 of the town, at least one"), prof("wage", "crime.officer_wage_per_pay_period")]),
-  ...of("city.electoral_office", [derived("term_days", "the profile's elections.term_years, in days")]),
+  ...of("city.electoral_office", [derived("term_days", "the profile's elections.term_years, in days"),
+    conv("first_poll_day", "when the sitting term happens to end: a year in, or the spec's first_election_days (a scenario's, with its basis: worlds/scenarios/election-due.yaml)")]),
   ...of("tribunal.member", [
     { ...prof("hearing_after_days", "frictions.venues.tribunal_days"), given: "dials.friction_bps" },
     prof("hearing_after_days", "justice.hearing_after_days"),
@@ -392,7 +404,11 @@ export const FIGURE_BASIS: Basis[] = [
     { ...prof("work_days", "round.work_days"), given: "catalogue.travel" },
     prof("open_from", "round.work_start_hour"),
     prof("open_until", "round.work_end_hour"),
-  ].flatMap((r) => ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params"].map((at) => ({ ...r, family: `any module: ${r.at}${r.given ? ` (${r.given})` : ""}`, at: `${at}.${r.at}` }))),
+    // (A scenario's scripted shocks to the world market, and its prices of systems falling: each change with its basis in
+    // the scenario, worlds/scenarios.)
+    derived("shocks.**", "a scenario's scripted shock to the world market: the spec's `shocks`, each with its basis in its scenario (worlds/scenarios)"),
+    prof("change_bps_per_year", "automation.price_fall_bps_per_year"),
+  ].flatMap((r) => PARAMS_AT.map((at) => ({ ...r, family: `any module: ${r.at}${r.given ? ` (${r.given})` : ""}`, at: `${at}.${r.at}` }))),
   // Delegation (docs/behaviour/assistants.md): what a principal weighs, and what a provider sells, where a town has
   // assistants on offer (`assistants: true`).
   ...[
@@ -412,7 +428,7 @@ export const FIGURE_BASIS: Basis[] = [
     prof("offers.*.setup", "assistants.providers"),
     prof("offers.*.term_days", "assistants.providers"),
     derived("offers.*.seconds", "what a provider claims a matter takes its system: a person's time for the paper at the offer's speed (assistants.providers)"),
-  ].flatMap((r) => ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params"].map((at) => ({ ...r, family: `delegation: ${r.at}`, at: `${at}.${r.at}` }))),
+  ].flatMap((r) => PARAMS_AT.map((at) => ({ ...r, family: `delegation: ${r.at}`, at: `${at}.${r.at}` }))),
   // Parameters several modules take, from the same sections of the profile.
   ...[
     derived("households.adult_age_bands", "the adults' ages by band, drawn to fit the profile's age structure and households (households.age_bands_bps and the households' kinds)"),
@@ -422,7 +438,7 @@ export const FIGURE_BASIS: Basis[] = [
     prof("adjust", "employment.adjustment"),
     derived("working_day", "the working day, from the profile's ordinary hours a week"),
     derived("per_resident_per_year", "the profile's grants or charges per resident, by the town's count"),
-  ].flatMap((r) => ["participants.*.controller.params", "templates.*.controller.params", "positions.*.role_module.params"].map((at) => ({ ...r, family: `any module: ${r.at}`, at: `${at}.${r.at}` }))),
+  ].flatMap((r) => PARAMS_AT.map((at) => ({ ...r, family: `any module: ${r.at}`, at: `${at}.${r.at}` }))),
   // The network for what flows (foundations-2 C4, law 8; worlds/generator/network.ts): its engineering figures are the
   // profile's (`utilities.network`, stand-ins until sourced); capacities and lengths are made from them and the layout.
   { ...prof("world.network.links.*.length_m", "round.outside"), id: "road-out", family: "world.network.links (the road out)" },

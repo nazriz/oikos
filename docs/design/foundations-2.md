@@ -493,6 +493,11 @@ yet carried through.
 | N5 | Reach tallies in the kernel and the run summary; decisions' parameter lists in manifests | every run states its reach |
 | N6 | `oikos reliance`; the first tables for au-vic, gb-eng, us-oh | a table per measure |
 
+**Built (2026-11-08, phase 5; decisions "Foundations-2 phase 5: law 11 strict"):** N3, at the loader rather than the
+kernel: a generated world with an unbased number is not loaded to be run (`refuseUnbased`), the list of unbased places is
+gone, and seats' figures have their rows. Law 9 strict and law 12's flags (L1 to L3) landed the same day
+(docs/everything-is-somewhere.md, docs/flags.md). Left: N4, N5, N6; the unhoused (WM-16).
+
 ### 5.5 Performance
 
 The load check is one pass over the config's numeric leaves against compiled patterns; at 10,000 people a second or

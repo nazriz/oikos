@@ -8,10 +8,11 @@
 // (`worlds/generator/figures.ts`), which names the profile's paths or says what the generator chose. A number none of
 // these covers is *unbased*, and is counted and listed by where it is.
 //
-// Counting only: nothing here refuses a world or changes a run. The kernel's refusal of an unbased figure is step N3,
-// when the figure table goes into the config itself; until then the report is written beside a batch's runs
-// (figures.txt, figures.json) and by `oikos figures <world>`, never into the log, so a run's log is byte for byte what
-// it was.
+// Strict since foundations-2 phase 5 (N3): a generated world with an unbased number does not run (`refuseUnbased`, read
+// where a world is loaded to be run); a hand-written world is counted and runs. Not in the kernel, as designed: the
+// basis of a number is read from the generator's table, the profiles' notes and the manifests, all here, and the run
+// that starts every world is here too (docs/decisions.md, "Foundations-2 phase 5: law 11 strict"). The report is written
+// beside a batch's runs (figures.txt, figures.json) and by `oikos figures <world>`, never into the log or the config.
 
 import { manifests } from "@oikos/participants";
 import { FIGURE_BASIS, type Basis } from "@oikos/worlds/generator/figures";
@@ -52,7 +53,8 @@ export function shape(path: string[], config: any): string {
   let node: any = config;
   for (const seg of path) {
     // (A parameter's name is never an id, whatever else bears it: `school` the parameter, `school` the entity.)
-    const param = out.at(-1) === "params";
+    // (Nor is the name of one a clerk keeps for its office's module: `params.with.<name>`.)
+    const param = out.at(-1) === "params" || (out.at(-1) === "with" && out.at(-2) === "params");
     out.push(Array.isArray(node) || /^\d+$/.test(seg) || /[-.]\d/.test(seg) || (!param && known.has(seg)) ? "*" : seg);
     node = node?.[seg];
   }
@@ -75,14 +77,25 @@ function idsOf(config: any): Set<string> {
 }
 
 /** Where a module's parameters are in a config, and which module's they are. */
-function paramsAt(config: any, path: string[]): { module: string; param: string } | undefined {
+function paramsAt(config: any, path: string[]): { module: string; param: string; index: number } | undefined {
   const [top, i, ...rest] = path;
   const item = top !== undefined && i !== undefined ? config[top]?.[Number(i)] : undefined;
   if (!item) return undefined;
+  // (`index`: where the parameter's name is in the path.)
   const at = (holder: any, n: number) => {
     const module = holder?.code ?? holder?.impl;
-    return typeof module === "string" && rest[n] === "params" && rest[n + 1] ? { module, param: rest[n + 1]! } : undefined;
+    return typeof module === "string" && rest[n] === "params" && rest[n + 1] ? { module, param: rest[n + 1]!, index: n + 3 } : undefined;
   };
+  // (A model's seat carries a mock of its code twin: its parameters are the twin's module's, the module of the post it holds
+  // unless the mock names one. And an office's clerk keeps the books for the office's own module: `of`, its parameters `with`.)
+  if ((top === "participants" || top === "templates") && rest[0] === "controller" && rest[1] === "params" && rest[2] === "mock" && rest[3] === "params" && rest[4]) {
+    const mock = item.controller?.params?.mock;
+    const module = mock?.impl ?? mock?.code ?? config.positions?.find((p: any) => p.holder === item.id)?.role_module?.code;
+    return typeof module === "string" ? { module, param: rest[4], index: 6 } : undefined;
+  }
+  if (top === "positions" && rest[0] === "role_module" && rest[1] === "params" && rest[2] === "with" && rest[3] && typeof item.role_module?.params?.of === "string") {
+    return { module: item.role_module.params.of, param: rest[3], index: 5 };
+  }
   if ((top === "participants" || top === "templates") && rest[0] === "controller") return at(item.controller, 1);
   if (top === "positions" && rest[0] === "role_module") return at(item.role_module, 1);
   return undefined;
@@ -100,12 +113,12 @@ export function basisOf(config: any, leaf: Leaf, profile?: { values: any; source
     const note = src[`${p[2]}.${p[3]}`] ?? src[p[2]];
     return { class: classify(note), why: note ? `${p[1]}.sources ${src[`${p[2]}.${p[3]}`] ? `${p[2]}.${p[3]}` : p[2]}` : "no note for the row" };
   }
-  // The generator's table: patterns over the config's paths (first match).
+  // The generator's table: patterns over the config's paths (first match). (The rows whose pattern and module fit a shape
+  // are found once a shape and module: a town of 1,000 has some 285,000 numbers in about 800 shapes.)
   const sh = shape(p, config);
   const pa = paramsAt(config, p);
-  for (const [row, b] of table.entries()) {
-    if (b.module && b.module !== pa?.module) continue;
-    if (!matches(b.at, sh)) continue;
+  for (const row of candidates(table, sh, pa?.module)) {
+    const b = table[row]!;
     if (b.id !== undefined && !passes(config, p, b.id)) continue;
     if (b.given !== undefined && valueAt(config, b.given.split(".")) === undefined) continue;
     if (b.profile && profile) {
@@ -124,7 +137,7 @@ export function basisOf(config: any, leaf: Leaf, profile?: { values: any; source
     const m = manifests().get(pa.module)?.params[pa.param];
     if (m && !/^the world gives it/.test(m.source) && JSON.stringify(m.default) !== undefined && m.default !== undefined) {
       // (A value equal to the module's own default is the module's figure; any other the world chose.)
-      const given = valueAt(config, p.slice(0, p.indexOf("params") + 2));
+      const given = valueAt(config, p.slice(0, pa.index + 1));
       if (JSON.stringify(given) === JSON.stringify(m.default)) return { class: classify(m.source), why: `manifest ${pa.module}.${pa.param}` };
     }
   }
@@ -132,6 +145,38 @@ export function basisOf(config: any, leaf: Leaf, profile?: { values: any; source
 }
 
 const valueAt = (v: any, path: string[]) => path.reduce((x, k) => x?.[k], v);
+
+const candidateCache = new WeakMap<Basis[], Map<string, number[]>>();
+/** The rows of a table whose pattern covers a shape and whose module (if any) is this one, in order. */
+function candidates(table: Basis[], sh: string, module: string | undefined): number[] {
+  let byKey = candidateCache.get(table);
+  if (!byKey) candidateCache.set(table, (byKey = new Map()));
+  const key = `${module ?? ""}|${sh}`;
+  let rows = byKey.get(key);
+  if (!rows) {
+    rows = [];
+    for (const [row, b] of table.entries()) if ((!b.module || b.module === module) && matches(b.at, sh)) rows.push(row);
+    byKey.set(key, rows);
+  }
+  return rows;
+}
+
+/** Was this world made by the generator? (Its description says so: a hand-written world is a fixture.) */
+export function isGenerated(config: any): boolean {
+  // (One town, or several composed on one ground: `towns: N`.)
+  return typeof config?.meta?.description === "string" && /^(Generated town|\d+ towns on one ground)/.test(config.meta.description);
+}
+
+/**
+ * Law 11, strict (docs/design/foundations-2.md, N3): a generated world with a number nothing speaks for does not run.
+ * Thrown where a world is loaded to be run (`loadWorld`, an experiment's spec), naming where the unbased numbers are; with
+ * the spec, its profile's notes are read too. A hand-written world (a test's fixture) is counted as it is, and runs.
+ */
+export function refuseUnbased(config: any, spec?: any): void {
+  if (!isGenerated(config)) return;
+  const r = figuresFor(config, spec);
+  if (r.by_class.unbased) throw new Error(`unbased_figure: this generated world has ${r.by_class.unbased} number${r.by_class.unbased > 1 ? "s" : ""} nothing speaks for (law 11; give each a row in worlds/generator/figures.ts that is true of the code that makes it): ${r.unbased.slice(0, 10).map((u) => `${u.at} (${u.count})`).join(", ")}${r.unbased.length > 10 ? ", ..." : ""}`);
+}
 
 /** Does a leaf's path go through `id`: a key of that name, or an element whose `id` it is? */
 function passes(config: any, path: string[], id: string): boolean {

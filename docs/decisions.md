@@ -11362,3 +11362,27 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
 - **Revisit if:** a second seed of D moves the mark by more than the 3 points between runs (v3's seeds differed more
   than anything else); the pilot's real requests change the order of D and A (A reads unseen forms slightly better);
   C trained longer (it was still rising, 1,393 to 1,401 of 1,500, at epoch 3) closes the gap at its latency.
+
+## 2026-11-08 · Foundations-2 phase 5: law 11 strict (N3; branch `f2-phase5-law11`; no model called)
+
+- **What:** a generated world with a number nothing speaks for is not run. `refuseUnbased` (orchestrator/src/figures.ts)
+  reads every number of the world as the count does (the table of work's notes, the generator's table, the profile's
+  notes, the manifests) and throws `unbased_figure`, naming the places, where a world is loaded to be run: `loadWorld`
+  (every batch, run and experiment from a world file) and an experiment's spec. The list of places still unbased
+  (`fixtures/figures-unbased.json`, empty since 2026-10-25) is gone: figures.test.ts fails on any unbased place in any
+  profile's town, a living one, a hosted one with assistants' seats, and one with every office a model's. A hand-written
+  world (a test's fixture) is counted and runs, as the design's blanket pattern would have it.
+- **Found on the way:** a model's seat had unbased numbers (5 to 34 in a town): its cadence, its sitting hours, the mock
+  of its code twin (`controller.params.mock.params`, now read as the twin's module's parameters) and the parameters its
+  office's clerk keeps for the office's module (`role_module.params.with`). Each given its row; a seat's cadence is a
+  convention of the platform's design of a seat, its hours the profile's working day.
+- **Not as designed:** not in the kernel, and not a figure table in the config. The basis of a number is read from the
+  generator's table, the profiles' notes and the manifests, all in TypeScript beside the loader that starts every run;
+  putting the table into the config would have the kernel re-check what the generator wrote from the same table (a
+  config has some 800 shapes of number, so the table would be small), at the cost of a contract and a port. A config
+  handed to the kernel binary directly, or edited after it was loaded (a test, a study's own `prepare`), is not checked.
+  The count got faster on the way (the generator's rows that fit a shape are found once a shape): a town of 1,000 in
+  under a second.
+- **Revisit if:** a run is refused for a figure of a spec flag no test town covers (give it its row: the error names
+  it); configs are handed to the kernel by anything but the loader (then the table goes into the config, as designed);
+  N5's reach tallies need the class of each charged row in the kernel.

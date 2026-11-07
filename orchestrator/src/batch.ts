@@ -51,6 +51,11 @@ export async function loadWorld(path: string, sets: string[] = []): Promise<{ co
     const { framing, ...town } = v;
     const config = generate(town);
     if (framing !== undefined) { const { applyFraming } = await import("@oikos/participants/llm"); applyFraming(config, framing); }
+    // Law 11, strict (foundations-2 N3): a world generated here with a number nothing speaks for is not run, nor measured,
+    // nor handed on (its profile's notes read too). A config edited after this, by a test or a study's own `prepare`, is
+    // its author's.
+    const { refuseUnbased } = await import("./figures");
+    refuseUnbased(config, v);
     return { config, spec: v, generator: GENERATOR_VERSION };
   }
   return { config: v };
@@ -470,8 +475,8 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
       if (real) throw new Error(`${join(out, f)} holds a real model's answers (${real}): nothing in its folder is overwritten, whatever was asked. Choose another --out.`);
     }
   }
-  // What the world's numbers rest on (docs/design/foundations-2.md, law 11; counting only): written beside the runs,
-  // never into a log, and never a reason for a batch to fail.
+  // What the world's numbers rest on (docs/design/foundations-2.md, law 11): written beside the runs, never into a log. (A
+  // generated world with an unbased number was refused when it was loaded.)
   try {
     const { figuresFor, figuresText } = await import("./figures");
     const r = figuresFor(config, spec);
