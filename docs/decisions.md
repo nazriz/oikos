@@ -11268,3 +11268,36 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
   it and the table's), a model's answers come back unread often enough in `text` to try `json` or `tools` for it, or a
   host's credit or rate-limit errors use words `COMPAT_CREDIT`/`COMPAT_LIMITED` don't match (Fireworks' and Together's
   wording is unverified).
+
+## 2026-11-08 · Translator v4, batch 1: the control wins; the reader and the text writer add nothing yet (GPU 3.32 USD; no API spend)
+
+- **What ran** (`runs/translator-v4-2026-11-07/models/`, scores in `scores/`): on the v4 data (the rows re-rendered in
+  real seats' cards, labels made one way, the assistants' papers three times), D `deberta-v3-small` 6 epochs, A
+  `ettin-encoder-150m` 6 epochs at 2,048 tokens, C Gemma 3 270M 3 epochs (the RunPod balance held C to one cheap pod).
+  Whole requests by meaning (`v4-score.ts`), on this machine's CPU, against today's first (`pod-small-v3-s2`):
+
+  | | right, validation-real (615) | right served at the 1% mark | scope set recognised (67) / false (81) | validation-uf (824) right | p95 ms |
+  |---|---|---|---|---|---|
+  | v3-s2 (today) | 540 (87.8%) | 216 (35.1%) | 20 / 0 | 803 (97.5%) | 586 |
+  | D deberta, v4 data | 536 (87.2%) | **351 (57.1%)** | **64 / 7** | 805 (97.7%) | 207 |
+  | A ettin-150m | 540 (87.8%) | 310 (50.4%) | 61 / 4 | 811 (98.4%) | 234 |
+  | C Gemma 270M, text | 522 (84.9%) | 306 (49.8%) | 47 / 10 | 680 (82.5%) | ~3,000 under load (1,338 lighter) |
+
+- **The winner by the design's rule is D**, and the stop rule fires: no run beats D by 3 points at the mark, so the
+  gain of batch 1 is the data's (the scope papers taught, the cards, the labels made one way: served at the mark 35% to
+  57%, scope recall 30% to 96%), not the reader's. The pass mark is not met (57% served right at 1%, against the 90%
+  wanted; 87% right in all): today's first stays first in serving until the data says otherwise.
+- **No cut-off is certified at 1% by a one-sided 95% bound for any model** on 615 requests: each has wrong answers among
+  its surest (sureness about 1.0). Sureness, not reading, now limits what is served. As served at D's 1% mark no scope
+  request clears the cut-off: all would be asked back (none misread), which the study can live with but not count on.
+- **Parity on validation-real is indicative only** (writers there had different situations): spreads of 29 to 37 points
+  of right served between writers with 20 or more requests, Codex's requests the least served. The parity set needs the
+  Claude pilot's test-split situations (not run yet).
+- **Spend:** GPU 3.32 USD (6.14 to 2.82; D 1.54 on the only free 4090 at 0.89/h, two pods lost to dying hosts, A about
+  1.0, C 0.37), of the 15 approved; teacher labels 0 USD of the API credit (all on the owner's plan, about 70 subagent
+  launches); Gemma 4 not run.
+- **Next, by the rule:** more real requests before more models (the Claude pilot's, keyed; its test third set aside);
+  then sureness: a calibrated stop for D (its parts, `least`, two seeds agreeing) measured on validation-real only.
+- **Revisit if:** a second seed of D moves the mark by more than the 3 points between runs (v3's seeds differed more
+  than anything else); the pilot's real requests change the order of D and A (A reads unseen forms slightly better);
+  C trained longer (it was still rising, 1,393 to 1,401 of 1,500, at epoch 3) closes the gap at its latency.
