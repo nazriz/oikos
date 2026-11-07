@@ -614,6 +614,13 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     result.costText = shown.text;
     rmSync(join(out, MEASURE_FAILED_FILE), { force: true });
   });
+  // Law 12's flags (docs/flags.md), beside the runs for a person to read: never read by anything that runs a world.
+  if (result.measureDir) await step("flagging the runs", async () => {
+    const { flags, flagsText } = await import("@oikos/measure");
+    const fs = await flags(measureDir);
+    writeFileSync(join(out, "flags.json"), JSON.stringify(fs, null, 2));
+    writeFileSync(join(out, "flags.txt"), `${flagsText(fs)}\n`);
+  });
   // Only the measures kept, if asked and the runs can be regenerated; else compressed once measured, if asked (about a
   // seventh the size; everything that reads logs reads these too).
   if (o.keep === "measures") {

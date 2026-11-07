@@ -36,6 +36,12 @@ jobs:
       - name: Slow tier
         if: ${{ !cancelled() }}
         run: bun scripts/test.ts --tier slow --no-build
+      # Law 12's flags (docs/flags.md, step L3), nightly only: a code-only year of three towns, its flags printed. A finding
+      # for the risk register, never a failure of the night.
+      - name: Flags of a code-only year
+        if: ${{ github.event_name == 'schedule' && !cancelled() }}
+        continue-on-error: true
+        run: bun scripts/nightly-flags.ts
       # What the merge script reads: while the latest result on main is a failure, it merges nothing but the fix.
       - name: Record the result for the merge script
         if: ${{ !cancelled() }}

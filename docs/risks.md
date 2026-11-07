@@ -239,6 +239,21 @@ The mechanism:
 - **Notice by:** an experiment on housing or homelessness; the unhoused's days to a job or a home against the housed's.
 - **Fix when:** before any study reads outcomes for the unhoused, and before law 9's line joins the hard rules.
 
+### WM-17 · Most papers do not cite the law they rest on, so a law in use looks dead
+- **Gap:** (law 12's first flags, 2026-11-08) in a code-only year of a 300-person town, 13 to 15 of the town's laws are
+  cited by no paper written in the run (au-vic, gb-eng, us-oh), among them the tenancy, possession, property and support
+  laws, which the offices read: a lease, a notice or a decision names the agreement or the claim it answers, not the
+  law. Only the rates, income tax, audit, planning and a few others are cited. The flags (docs/flags.md) report each as
+  a dead law; also flagged, and real: offices that did nothing in a year (owners' posts held abroad, deputies, the
+  weather bureau's post, the tax collector's own post beside its desk) and forms never filled in (the seats'
+  directions, a review request, the tax account forms).
+- **Where:** the papers' `basis` as each office writes it (`kernel/crates/actors/src/offices`, `papers`); `measure/src/flags.ts`.
+- **Effect:** a reader (or a seat) cannot follow a paper to the law it applies; the dead-law flags cannot tell a law
+  nobody needs from one applied without saying so.
+- **L / I:** high / low · **Status:** open
+- **Notice by:** the nightly flags (ci.yml, `scripts/nightly-flags.ts`).
+- **Fix when:** before a study reads which laws are applied, or the flags' dead laws are read as findings.
+
 ### WM-10 · Repeal does not reach those who read the law; new kinds of binding law cannot be made
 - **Gap:** A law repealed without a replacement is still taken as in force by landlords, tenants, the union and the
   tribunal (their books show laws, not withdrawals). A law of a new kind that binds (a rent cap, a winter ban on

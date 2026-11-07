@@ -25,6 +25,7 @@ A batch folder holds:
 | `measure/` | The measurement tables (below). |
 | `cost.txt`, `cost.json` | The cost report (below). |
 | `figures.txt`, `figures.json` | What the world's numbers rest on: how many are sourced, to confirm, derived, fitted, placeholders, conventions or unbased, and where the unbased are (`oikos figures <world>`; docs/design/foundations-2.md, law 11; PS-1). Counting only: never in the log. |
+| `flags.txt`, `flags.json` | Law 12's flags (docs/flags.md): states no world should be in (a stampede, a freeze, a stock that breaks physics, a dead law), each with the run, the moment and what it rests on. A finding for the risk register, never a target or a gate (`oikos flags <batch>`). |
 
 ## Measurement tables
 
@@ -41,6 +42,7 @@ Each run's log is exported to Parquet, one file per table per run (`measure/<tab
 | `appointments` | the world config's holders (`t` = 0, `by` = genesis), then every appointment | `position`, `holder` (null: left vacant), `by` (the participant who appointed, or null when it fell vacant because its holder ended) |
 | `life` | a body's coming, going and health | `event` (person_created, person_arrived, person_left, person_died, birth_started, condition_began, condition_ended, harmed), `person`, `by`, `detail` (the cause of death, or illness or injury), `severity`, `condition`, `until`, `parents` |
 | `events` | kernel event | `seq`, `t`, `event`, `cause` (the command's seq), `body` (JSON) |
+| `accounts` | account: the world config's (`opened_t` = 0) and those opened during the run | `account`, `holder`, `custodian`, `currency`, `opening_balance` (the config's balance; 0 for one opened in the run) |
 | `transfers` | money movement | `from`, `to`, `amount` (in the currency's smallest unit: `runs.minor_units`), `reason`, `by`, `settles`, `per_instruction`, `memo` |
 | `occupancy` | a body going into or out of a space, including the world's starting occupancy (`t` = 0, `by` = genesis) | `event` (occupied or vacated), `occupant` (a person), `space`, `structure` and `space_kind` (split out of the space id, `<structure>/<kind>.<n>`), `reason` (a departure's: departed, died, evicted…), `by` |
 | `spaces` | space in a building, the world's and those built during the run (`built_t`) | `space`, `structure`, `type`, `kind`, `capacity`, `bedrooms` (a dwelling's, from its attributes), `attrs` |

@@ -11235,3 +11235,28 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
   household with a car fills it; their shop mix and their households' spending move (measured below).
 - **Revisit if:** a profile's full shop table is written (then its two-kind table goes); a system is found that is
   neither the outside's nor hosted (then it names its hardware); the owner decides where the unhoused are.
+
+## 2026-11-08 · Foundations-2 phase 5: law 12's flags (L1 to L3; branch `f2-phase5`; measure 0.7.0; no model called)
+
+- **What:** `oikos flags <batch>` (`measure/src/flags.ts`), written beside every batch as `flags.txt` and `flags.json`, and
+  printed nightly for a code-only year of three towns (`scripts/nightly-flags.ts`, ci.yml on the schedule, never
+  failing the night). Four kinds, each with the run, the moment and `rests_on`: a stampede (half of the town leaving, or
+  signing a new agreement of one kind, in a month), a freeze (a kind of agreement the town opened with that nobody made
+  again in a year), a dead law (a law no paper of a year cites, a form never filled in, an office that did nothing), and
+  a stock that breaks physics (an account outside the edges below nought; an organisation's balance, or the town's money,
+  growing month after month without levelling). Thresholds are the run's own, stated once with their reasons.
+- **Not as designed:** the physics flags read money only. Holdings and flows are state, not acts, so the log does not
+  carry them; a holding below nought outside an edge is the kernel's own refusal (law 8). Reading them would take a
+  replay with a state dump (a kernel subcommand); not built, said in docs/flags.md. Routes nobody uses are not read
+  (link flows are not logged). A law is "dead" when no paper cites it: the log cannot show a condition applying.
+- **The backstop** (`orchestrator/test/flags-only-flag.test.ts`, fast): nothing that runs a world reads the flags; a
+  planted log of each broken state is flagged, each flag with what it rests on; a trend that levels is no flag. The
+  slow tier flags a month of every profile's plain town (`everything-is-somewhere-runs.test.ts`): none raised.
+- **What three plain years raise** (300 people, code only, seed 1): au-vic 41, gb-eng 55, us-oh 45 flags, all dead laws:
+  offices that did nothing (19, 27, 20: owners' posts held abroad, deputies, the weather bureau's and the tax
+  collector's own posts beside their desks, child protection, the land registrar), forms never filled in (8, 13, 12:
+  the seats' directions, a review request, the tax account forms) and laws no paper cites (14, 15, 13). No stampede, no
+  freeze, no broken physics. The uncited laws are mostly laws in use whose papers do not name them (risk WM-17).
+- **Revisit if:** a flag fires on most towns (then the next missing laws are behaviour: a checkpoint with the owner, not
+  a chase); papers cite their laws (WM-17: the dead-law flags then mean what they say); holdings are wanted (the replay
+  dump).

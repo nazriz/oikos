@@ -98,8 +98,14 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
     paid by whoever bills and pays (docs/behaviour/utilities.md, "Workplaces"; risk WM-15, its remainder).
   - [~] E6. The measures: M8's census of who can still do the work (`skill_census`, `town/skills`) and the tag's
     backstop are built; M7 (what the town gives to AI: its share of energy, water, land and hours) is still to write.
-- [ ] **Foundations-2, phase 5:** strict modes on, old exception lists empty, each law's line in CLAUDE.md as its
-  enforcement lands.
+- [~] **Foundations-2, phase 5:** strict modes on, old exception lists empty, each law's line in CLAUDE.md as its
+  enforcement lands (branch `f2-phase5`).
+  - [~] Law 9 strict: systems somewhere (`unlocated`), vehicles that run on something (`moves_for_nothing`), the six
+    profiles' fuel; its rule page (docs/everything-is-somewhere.md). Left: the unhoused, for the owner (WM-16).
+  - [x] Law 12: L1 to L3, `oikos flags`, the backstop, the nightly flags (docs/flags.md). Holdings left to a replay dump.
+  - [ ] Law 11: N3 (the kernel refuses an unbased figure), N4 (the code's figures in registries, the lint's inventory
+    to nought), N5 (reach tallies), N6 (`oikos reliance`).
+  - [ ] The hard-rule lines for laws 9, 11 and 12, to the owner first.
 - [ ] **Market power in prices** (ME-16), after phase 4.
 - [ ] **Translator rebuild,** once forms settle: about the current size, writing an act constrained by the form's
   grammar; Sonnet only as the safety net, its share reported in every run. Retrain plan: the 2026-10-25 "Translator v3"
