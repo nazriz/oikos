@@ -11040,3 +11040,34 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
 - **Revisit if:** fair scoring moves validation-real far from the 55 near-misses; the Claude pilot's requests differ in
   length from validation-real's; the owner refuses the Gemma terms (then SmolLM2-135M); or a Linux host serves int8
   faster.
+
+## 2026-11-07 · Translator v4 approved; Gemma 4 parked; step 1, the data by code (no model called)
+
+- **Approved:** the owner approved docs/design/translator-v4.md on 2026-11-07 ("happy to proceed and let's see where it
+  takes us"), Gemma 3 270M as the challenger and its terms of use included. Batch 1 stays as designed: the DeBERTa
+  control (D), ettin-encoder-150m (A) and Gemma 3 270M (C).
+- **Gemma 4 parked:** a benchmark of Gemma 4 E2B (2.3B effective) as a fourth candidate or an offline teacher was asked
+  for, then dropped by the owner the same evening before any was run: no benchmark, quantised or otherwise, and no
+  fourth candidate. Revisit only if every small candidate plateaus well below the target on the v4 data.
+- **What step 1 found:** the length shift is the cards, not the request. On v3's joined data, validation-real's median
+  request is 224 characters against training's 178, but it is shown 6 forms (90th percentile 15; bimodal: a mayor's two
+  town forms, or an office's 10 to 25) against training's 1; two thirds of training (synthetic, log and case rows) is
+  shown none. Programs of more than one line are 5.4% of training and 1.8% of validation-real, so the design's joins into
+  programs of 2 to 5 lines would open a new shift: not done. The wording round a request is left as it is (the request
+  lengths are already near).
+- **What was built:** `translator/model/rerender.ts` puts a training or validation row inside a card list a seat really
+  had (1,732 distinct lists of 94 seats, from the train side's pilot and in-situ rows; a test pilot's never: `TEST_ONLY`),
+  of a length drawn from validation-real's own counts. Left as they were: rows already in a view (3 forms or more), rows
+  whose answer depends on what was not shown (`none(unknown_form)`, `none(no_such_act)`), and draws of 0 or 1 cards. A
+  card is never added where its name or office shares a word of the request the row's own forms do not (it might be what
+  the request means), nor a form kept out for validation-uf; a form row's own line goes in that form's place in the
+  list; a row that no longer reads in two passes to its program is kept as it was. `translator/model/py/length_check.py`
+  checks the export before training and exits 1 when the training choose median is off the real one by more than a
+  quarter, or the share past 512 tokens is under half the real share.
+- **Result** (`runs/translator-v4-2026-11-07/joined-v4`, `data-v4`): of 69,294 training rows 43,943 re-rendered; choose
+  inputs in deberta-v3 tokens: median 305 and 11.3% past 512, against validation-real's 282 and 9.4% (v3's training:
+  101 and 3.7%). Validation: 231 and 9.5%. The held-out cases were checked by code (no row dropped).
+- **Revisit if:** the Claude pilot's requests come with longer views (the 25-form offices) or more multi-line programs;
+  a model trained on it does worse on validation-real's 2-form rows than v3's (the draw may under-weight them); or the
+  name-and-office word rule turns out to leave real near-distractors out of form rows too often (it is strict on
+  purpose).

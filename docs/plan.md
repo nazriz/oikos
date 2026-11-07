@@ -100,13 +100,17 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 - [ ] **Market power in prices** (ME-16), after phase 4.
 - [ ] **Translator rebuild,** once forms settle: about the current size, writing an act constrained by the form's
   grammar; Sonnet only as the safety net, its share reported in every run. Retrain plan: the 2026-10-25 "Translator v3"
-  entry in docs/decisions.md. The v4 design for the study (2026-11-07, awaiting the owner): docs/design/translator-v4.md.
+  entry in docs/decisions.md. The v4 design for the study (approved 2026-11-07): docs/design/translator-v4.md.
   For the retrain (2026-11-07): train on the labels made one way
   (`runs/translator-fair-2026-11-07/data-v3-fair/`); the assistants' papers (`scope_request` above all) written in many
   styles, never trained so far (risk TR-8); report the fair score beside the exact one; run `translator/eval/scope-run.ts`.
   - [x] The translator as part of the instrument: fair scoring checked against the resolver, labels made one way,
     field-type masks, requests of several lines, the scope-request check (decisions 2026-11-07).
   - [ ] Sonnet behind measured on the scope-request set, before the delegation study counts requests for more scope.
+  - [x] v4 step 1: data by code (rows re-rendered inside real seats' card lists; the length check before training).
+  - [ ] v4 step 2: the Claude pilot's test split; keying; rewrites in several voices (45 USD cap).
+  - [ ] v4 step 3: reader swap (ettin-encoder-150m); the text writer (Gemma 3 270M under the grammar, copy constraint).
+  - [ ] v4 steps 4 and 5: batch 1 on RunPod (D, A, C) and its scores.
 - [x] **Citizen model,** trained from the captured citizen decisions (docs/design/citizen-model.md, docs/citizen-data.md).
   Caveat: trained on code minds' decisions, it inherits their assumptions; it is faster, not an independent check of how
   people delegate or respond to AI. Round 1 landed 2026-11-01: the act head for a want's way (`want-way-r1`, 1.3 points
