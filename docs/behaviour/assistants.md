@@ -123,6 +123,22 @@ carries the paper as it would go. A code principal reads a draft on a form by wh
 whom, against what it asked), signs it off or declines it, and sets advice in words beside nothing (it cannot read words:
 nothing is counted). A desk's seat writes a person's papers through the translator in their name (`for`).
 
+## A delegation decided by hand (`commit`)
+
+A principal's `delegation` parameters may carry a delegation already decided (`commit`: the offer, a level for each
+kind, until when it holds those levels, until when it keeps the service, and why): a study's design, or an owner's earlier
+choice, written into the world with its reason. It is the principal's own word, as a remit's `hold_until` is. On its
+first day it orders that offer whatever its rule would say (the decision is logged with `committed` and the reason); once
+the service is in use it writes each kind's remit at the level decided, held until the day given, and it does not leave
+or replace the service before the day it said. After those days its rule weighs everything as ever, on its review days
+and whenever the assistant asks for more scope. Nothing else in the world reads it. Test:
+`kernel/crates/actors/src/delegation/tests.rs`, `a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after`.
+
+**A set-up of nothing is paid as placed.** An order whose total is nothing (au-vic's offers to organisations cost
+nothing to set up) is set up at once: before 2026-11-07 the seller waited for a payment that never came and declined the
+order as unpaid after a week, so no organisation could ever be delivered an assistant at the sourced prices
+(`market/trade.rs`, `OrderBook::due`; the scope pilot's dry run found it).
+
 ## Leaves out (for now)
 
 - A local provider (a firm of the town with premises): providers are the outside world's until a profile asks for one.

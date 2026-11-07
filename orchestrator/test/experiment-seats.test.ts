@@ -25,6 +25,12 @@ test("only the allowed models are seated: never the largest Claude model, Fable 
   expect(modelProblems(arm("codex/gpt-6-astra")).join()).toMatch(/never used/);
   expect(modelProblems(arm("anthropic/claude-sonnet-5-5"))).toEqual([]);
   expect(modelProblems(arm("anthropic/claude-opus-5-5")).join()).toMatch(/never used/);
+  // (Allowed only by name, with the owner's word, on the API's credit: never through his plan, never as the translator, never astra.)
+  const allow = (m: string, why = "the owner's word") => ({ allow_models: [{ model: m, why }] });
+  expect(modelProblems({ ...arm("anthropic/claude-fable-5-1"), seats: allow("anthropic/claude-fable-5-1") })).toEqual([]);
+  expect(modelProblems({ ...arm("anthropic/claude-fable-5-1"), seats: allow("anthropic/claude-fable-5-1", " ") }).join()).toMatch(/never used/);
+  expect(modelProblems({ ...arm("claude-code/claude-fable-5-1"), seats: allow("claude-code/claude-fable-5-1") }).join()).toMatch(/never used/);
+  expect(modelProblems({ ...arm("anthropic/claude-sonnet-5-5"), seats: { ...allow("anthropic/claude-opus-5-5"), translator: { behind: "anthropic/claude-opus-5-5" } } }).join()).toMatch(/never used/);
   expect(modelProblems(arm("openai/gpt-6.1-sol")).join()).toMatch(/paid API/);
   expect(modelProblems({ ...arm("openai/gpt-6.1-sol"), seats: { allow_paid_api: true } })).toEqual([]);
   expect(modelProblems(arm("claude-code/claude-sonnet-5-5"))).toEqual([]);

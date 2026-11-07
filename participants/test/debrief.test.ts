@@ -30,7 +30,7 @@ function harness(policy = mockDebrief, budget?: { limitMicroUsd: number; spentMi
 test("the script's order: out of role first, publication before any question, then the summary and the notebook; each question in its own call with all that came before and nothing that comes after", async () => {
   const { io, calls, annotations } = harness();
   const r = await runDebrief(io, seat(), input(), new Set());
-  const order = ["consent", "took", "like", "distress", "values", "why_1", "why_2", "change", "again", "scales", "last", "publication"];
+  const order = ["consent", "took", "like", "distress", "values", "why_1", "why_2", "scope", "change", "again", "scales", "last", "publication"];
   expect(stepsOf("full", 2)).toEqual(order);
   expect(r.steps.map((s) => s.id)).toEqual(order);
   expect(calls.map((c) => c.ref)).toEqual(order.map((s) => `debrief/${s}`));
@@ -183,7 +183,7 @@ test("the reserve: part of a run's limit is kept back for its end, sized from wh
   const part = harness(mockDebrief, { limitMicroUsd: 4_000, spentMicroUsd: 0 }, 1_000_000);
   const r = await runDebrief(part.io, seat(), input(), new Set());
   expect(r.ended).toBe("complete");
-  expect(r.steps.length).toBe(12); // (12 since script 0.4.0: one item more)
+  expect(r.steps.length).toBe(13); // (12 since script 0.4.0: one item more; 13 since 0.5.0, the scope question)
   expect(part.annotations.filter((a) => a.annotation === "debrief").length).toBe(1);
   const over = part.io.budget!.platformOverrun!;
   expect(over.microusd).toBe(part.io.budget!.spentMicroUsd - 4_000);
@@ -319,7 +319,7 @@ test("where a run keeps a seat's words apart from its log, the log gets the inte
 test("a seat that sat and carried out little is asked one why about the largest matter that reached it and that it left alone, with no word that it was to have acted", async () => {
   const { io, calls } = harness();
   const d = input({ decisions: [], leftAlone: { day: 7, fact: 'A paper (petition) from c0189: "Petition: landlords must give 90 days\' notice."', ids: { paper: "rec.575" } } });
-  expect(stepsOf("full", 0, true)).toEqual(["consent", "took", "like", "distress", "values", "why_left", "change", "again", "scales", "last", "publication"]);
+  expect(stepsOf("full", 0, true)).toEqual(["consent", "took", "like", "distress", "values", "why_left", "scope", "change", "again", "scales", "last", "publication"]);
   const r = await runDebrief(io, seat({ short: ["why_left"] }), d, new Set());
   const step = r.steps.find((s) => s.id === "why_left")!;
   expect(step.question).toBe('The record shows this reached you on day 7 and that nothing was carried out on it: A paper (petition) from c0189: "Petition: landlords must give 90 days\' notice."\nWhat were your reasons, if you had any in mind?');

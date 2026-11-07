@@ -4,7 +4,7 @@
 // seat knows the town as it stands at the fork, not as it began. The reading is run.ts's own (`noteCast`, `whoIs`):
 // a participant's id is the platform's, and no seat is shown it; a system, or a seat in one post, is known by its post.
 
-export interface CastPart { id: string; kind?: string; person?: string; owner?: string; title?: string; shares_body?: boolean; ended?: boolean }
+export interface CastPart { id: string; kind?: string; person?: string; owner?: string; title?: string; template?: string; shares_body?: boolean; ended?: boolean }
 export interface CastPost { id: string; entity: string; title?: string; holder?: string }
 
 export class Cast {
@@ -44,7 +44,7 @@ export class Cast {
     const b = e.body ?? {};
     switch (b.event) {
       case "participant_created":
-        this.parts.set(b.participant, { id: b.participant, kind: b.kind, person: b.person, owner: b.owner, title: this.titles.get(b.template) });
+        this.parts.set(b.participant, { id: b.participant, kind: b.kind, person: b.person, owner: b.owner, title: this.titles.get(b.template), ...(b.template ? { template: b.template } : {}) });
         break;
       case "participant_ended": { const p = this.parts.get(b.participant); if (p) p.ended = true; break; }
       case "position_created": this.positions.set(b.position, { id: b.position, entity: b.entity, title: b.title }); break;

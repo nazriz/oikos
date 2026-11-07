@@ -23,7 +23,7 @@ import { mockCompose } from "./compose";
 import { mockAccount } from "./account";
 import { mockDebrief } from "./debrief";
 
-export const MOCK_VERSION = "0.6.1"; // 0.6.1: a claim its brain records beside a paper is said on the form that records both, where the office has one; 0.6.0: back at its desk as often as its brain's own module looks in (it sat weekly whatever the office); a look the brain asks for while reading what it missed between sittings is made at the sitting (it was dropped, and the brain never asked again); 0.5.0: a paper the brain issues is asked for on the office's own form for it, where it has one; 0.4.0: a brain's looks are made through the seat's own look (asking a register, looking someone up, sending someone to a place)
+export const MOCK_VERSION = "0.6.2"; // 0.6.2: an assistant seat may be scripted to ask for more scope (`scope_after_days` beside its brain), to exercise that path; 0.6.1: a claim its brain records beside a paper is said on the form that records both, where the office has one; 0.6.0: back at its desk as often as its brain's own module looks in (it sat weekly whatever the office); a look the brain asks for while reading what it missed between sittings is made at the sitting (it was dropped, and the brain never asked again); 0.5.0: a paper the brain issues is asked for on the office's own form for it, where it has one; 0.4.0: a brain's looks are made through the seat's own look (asking a register, looking someone up, sending someone to a place)
 
 export interface MockBrain {
   controller: Controller;
@@ -44,6 +44,26 @@ export interface MockBrain {
   busy?: boolean;
   /** Days it says it is back after, whatever its brain would: a seat that chooses to come back in a week, as real ones have. */
   backDays?: number;
+  /** An assistant's requests for more scope, to exercise their path (no code assistant asks: docs/behaviour/assistants.md):
+   * from this time (seconds) on, at its first sitting with a service on its files and a request form on its stationery,
+   * it asks to do one kind alone, citing nothing; thirty days later, once more, citing the newest matter it was handed. */
+  scopeAt?: number;
+  /** (Its scripted requests made so far.) */
+  scoped?: number;
+}
+
+/** The mock's scripted request for more scope (`MockBrain.scopeAt`), on its own form, if it is due and it can make one. */
+function scopeRequest(brain: MockBrain, obs: { t: number }, forms: FormData[], recs: any[]): string | undefined {
+  const done = brain.scoped ?? 0;
+  if (brain.scopeAt === undefined || done >= 2 || obs.t < brain.scopeAt + done * 30 * 86_400) return undefined;
+  const form = forms.find((f) => f.writes?.kind === "scope_request");
+  const remit = [...recs].reverse().find((r: any) => r.record === "statement" && r.kind === "remit" && r.data?.agreement && r.speaks_for);
+  if (!form || !remit) return undefined;
+  const referral = [...recs].reverse().find((r: any) => r.record === "statement" && r.kind === "referral" && r.speaks_for === remit.speaks_for);
+  brain.scoped = done + 1;
+  const answers = done >= 1 ? referral?.id : undefined;
+  return programText({ lines: [{ call: call("form", { form: form.form, ...(form.office ? { to: form.office } : {}), agreement: remit.data.agreement, client: remit.speaks_for,
+    words: text(`(mock) We ask to do ${String(remit.data.kind).replace(/_/g, " ")}s alone: a scripted request, to exercise the path.`), kind: text(String(remit.data.kind)), level: "alone", ...(answers ? { answers } : {}) }) }] });
 }
 
 const PREFIX = "(mock) ";
@@ -151,10 +171,15 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
   const owed = new Map<string, LookRequest[]>();
   /** Each seat's own stationery, as it has been shown it: the forms that write a paper of its office's. */
   const stationery = new Map<string, Map<string, FormData>>();
+  /** The remits and referrals each seat has been shown (an observation shows what is new): for a scripted scope request. */
+  const handed = new Map<string, any[]>();
   const see = (id: string, capacity: string, obs: { channels: { [k: string]: any } }) => {
     const mine = stationery.get(id) ?? new Map<string, FormData>();
     stationery.set(id, mine);
+    const papers = handed.get(id) ?? [];
+    handed.set(id, papers);
     for (const ch of Object.values(obs.channels)) for (const r of ch.kind === "records" ? ch.records : []) {
+      if (r.record === "statement" && (r.kind === "remit" || r.kind === "referral") && !papers.some((x) => x.id === r.id)) { papers.push(r); if (papers.length > 64) papers.shift(); }
       if (r.record === "statement" && r.kind === "form" && r.data?.writes && r.data.office === capacity) mine.set(r.id, r.data as FormData);
       if (r.record === "withdrawal") mine.delete(r.withdraws);
     }
@@ -232,8 +257,10 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
       brain.busy = false;
       return [tool("confirm", { ref: draft.id, decision: accept ? "confirm" : "decline", note: faithful ? (accept ? "As I asked." : "(mock) Declined to exercise the path.") : "That isn't what I asked for." })];
     }
-    const next = q.shift();
     const as = brain.capacity === "self" ? {} : { as: brain.capacity };
+    const scope = scopeRequest(brain, obs, [...(stationery.get(id)?.values() ?? [])].sort((x, y) => (x.form < y.form ? -1 : 1)), handed.get(id) ?? []);
+    if (scope) { brain.busy = true; return [tool("do", { what: PREFIX + scope, ...as })]; }
+    const next = q.shift();
     if (next?.type === "message") return [tool("write", { to: next.to, text: next.text, ...as, ...(next.re ? { about: next.re } : {}) })];
     if (next) {
       // A paper of the office's own is asked for on the office's form for it, as whoever holds the office would.

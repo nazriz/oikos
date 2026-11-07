@@ -302,6 +302,14 @@ impl Host {
         serde_json::to_value(check).map_err(|x| x.to_string())
     }
 
+    /// The full picture a participant's channels cover now (the protocol's `view`): what a seat that takes a post over
+    /// at a fork is shown as the office's file stands, since what was sent before went to its code twin. Changes
+    /// nothing; not logged.
+    pub fn view(&mut self, participant: &str) -> Result<Value, String> {
+        let obs = self.e.run_mut().full_view(participant).ok_or_else(|| format!("unknown participant {participant}"))?;
+        serde_json::to_value(obs).map_err(|x| x.to_string())
+    }
+
     pub fn questions(&mut self) -> Value {
         Value::Array(self.e.questions().into_iter().map(|(key, q)| json!({ "key": key, "kind": q.kind, "about": q.about, "body": q.body })).collect())
     }
