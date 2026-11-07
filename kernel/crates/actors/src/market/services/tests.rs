@@ -79,6 +79,15 @@ fn a_paid_order_delivers_a_system_to_the_organisation_then_offers_the_agreement_
 }
 
 #[test]
+fn an_order_of_a_service_with_no_set_up_is_set_up_without_waiting_for_a_payment() {
+    // (au-vic's offers to organisations cost nothing to set up: no payment comes, and the order was declined as unpaid.)
+    let mut h = harness(offer_json(json!({ "setup": 0 })));
+    h.wake(H, world(vec![], json!([])));
+    let out = all(&h.wake(DAY + H, world(vec![order("rec.50", DAY, 0)], json!([]))));
+    assert!(out.contains("system(") && out.contains("to=planning") && !out.contains("declined"), "{out}");
+}
+
+#[test]
 fn an_order_below_the_set_up_or_for_a_person_is_refunded_and_nothing_is_delivered() {
     let mut h = harness(offer_json(json!({})));
     let txs = json!([tx("acc-planning", "acc-prov-a", 1_000, DAY, "Order: 1 service:assist.")]);

@@ -16,32 +16,14 @@
 // positive: a request labelled otherwise that it files as one.
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ASSISTANT_ISSUES, draftOf, type Issued } from "@oikos/participants";
 import { DecideAdapter } from "../model/adapter";
-import { formLine } from "../train/data";
+import { formsFiled, SITUATIONS } from "./scope-situations";
 
 const args = process.argv.slice(2);
 const flag = (name: string) => { const i = args.indexOf(`--${name}`); return i < 0 ? undefined : args.splice(i, 2)[1]; };
 const jsonOut = flag("json");
 const [model, file = join(import.meta.dir, "scope-requests.jsonl")] = args;
 if (!model?.startsWith("decide/")) throw new Error("usage: bun translator/eval/scope-run.ts decide/<name> [scope-requests.jsonl] [--json FILE]");
-
-/** The forms each situation's seat is shown: the assistant's papers at its post, and (the town's planning assistant)
- * the principal's own form for the kind it holds, as itself and as a draft for sign-off (worlds/generator, assistant
- * posts' stationery). */
-const PERMIT_DECISION: Issued = { form: "permit_decision", title: "A decision on a permit application", fields: {
-  applicant: { type: "entity", required: true, description: "" }, application: { type: "record", required: true, description: "" },
-  decision: { type: "choice", options: ["granted", "refused", "incomplete"], required: true, description: "" }, law: { type: "record", description: "" },
-  lot: { type: "lot", description: "" }, missing: { type: "list", description: "" }, reason: { type: "text", description: "" },
-  structure_type: { type: "structure_type", description: "" } }, writes: { kind: "permit_decision", text: "{decision}" } } as Issued;
-const lines = (post: string, issued: Issued[]) => issued.map((x) => formLine({ form: x.form, to: post, fields: x.fields } as never));
-export const SITUATIONS: { [s: string]: string[] } = {
-  A: lines("planning-assistant", [...ASSISTANT_ISSUES, PERMIT_DECISION, draftOf(PERMIT_DECISION)]),
-  B: lines("helpwell-desk", ASSISTANT_ISSUES),
-};
-
-/** The form a program files, by name, for each line that files one. */
-export const formsFiled = (program: string): string[] => [...program.matchAll(/[(,\s]form="?([a-z_]+)/g)].map((m) => m[1]!); // (only a form has a `form` argument)
 
 interface Case { id: string; writer: string; style: string; situation: string; label: string; level: string | null; unprompted: boolean | null; request: string }
 const cases: Case[] = readFileSync(file, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));

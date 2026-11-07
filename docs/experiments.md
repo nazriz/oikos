@@ -287,6 +287,23 @@ with a model is one sample.
 
 `experiments/tara-draft/` is the draft for the owner's TARA project (README there).
 
+### Assistant seats (2026-11-07, the scope pilot)
+
+- **Several kinds at once.** `post: "template:<id>,<id>"` seats every system of each kind named: those delivered during
+  the run and those the config already has (a provider's desk), each its own seat with its template's code as its twin.
+- **One limit a fork.** Every seat of a fork shares the fork's spending limit and its record of calls (`<arm>.calls.jsonl`,
+  each line naming its seat); what is kept back for the end grows with each seat made. Until 2026-11-07 each seat had the
+  whole fork's limit (a dry run of three seats spent 12.78 against a limit of 9.93).
+- **The office's file at the first sitting.** A seat that takes a post over during a run (at the fork, or once its system
+  is put to work) is shown its channels whole at its first sitting (the kernel's `view`, `RustWorld.view`): what was sent
+  of them before went to its code twin, so without it the seat saw neither its forms nor its papers. A mock seat's brain
+  is handed only what the kernel sent, as before, and is told the id of each act the seat starts, as run.ts tells a
+  twin's.
+- **Otherwise refused models, by name** (`seats.allow_models: [{ model, why }]`): the largest Claude model and Fable stay
+  refused as seats unless an experiment names one on the API's credit (`anthropic/`), with the owner's word in `why`;
+  never through his plan, never as the translator, never gpt-6-astra.
+- **Room for thinking:** an arm's `steward.params.max_tokens` sets the most a seat's call may write (default 4,000).
+
 ## The unit of an experiment
 
 The unit is a set of forks (docs/port-guide.md, lane G): `results.json` holds every fork's result; `report.json` the

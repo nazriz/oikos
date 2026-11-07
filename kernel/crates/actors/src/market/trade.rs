@@ -531,7 +531,8 @@ impl OrderBook {
                 }
                 continue;
             }
-            if total > 0 && have >= total {
+            // (An order of nothing to pay, a set-up that costs nothing, is paid as it is placed: no payment will come.)
+            if total == 0 || have >= total {
                 if full || !accept(&o) {
                     full = true;
                     continue;

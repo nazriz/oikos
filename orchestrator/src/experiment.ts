@@ -27,7 +27,7 @@ import { dirname } from "node:path";
 import { SpendingLimitReached, type FramingSpec } from "@oikos/participants/llm";
 import { refuseUnready, seatReadiness } from "./seat-ready";
 import { modules as builtinModules } from "@oikos/participants";
-import { budgetProblems, closeAdapters, forkLimits, mockModels, modelArms, modelProblems, modelSeatFactories, type CallStats, type SeatsSpec } from "./experiment-seats";
+import { allowedSeat, budgetProblems, closeAdapters, forkLimits, mockModels, modelArms, modelProblems, modelSeatFactories, NEVER, type CallStats, type SeatsSpec } from "./experiment-seats";
 import type { ForkEnd } from "./seat-host";
 import { Cast } from "./fork-cast";
 import { ForkComposer } from "./fork-composer";
@@ -147,10 +147,27 @@ export async function buildConfig(spec: ExperimentSpec, seed: number): Promise<a
   return seatify(config, spec.post);
 }
 
-/** A steward of every system of a kind (`post: "template:<id>"`: an assistant's kind, docs/design/delegation.md section 8):
- * each system delivered from that template is a seat, its code brain the template's. */
+/** A steward of every system of a kind (`post: "template:<id>"`, or several kinds, `"template:<id>,<id>"`: an
+ * assistant's kinds, docs/design/delegation.md section 8): each system of those templates is a seat (one delivered during
+ * the run, or one the world's config already has, as a provider's desk), its code brain its template's. */
 export const TEMPLATE = "template:";
 export const templateOf = (post: string) => (post.startsWith(TEMPLATE) ? post.slice(TEMPLATE.length) : undefined);
+/** The kinds a template steward names. */
+export const templatesOf = (post: string): string[] => (templateOf(post) ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+
+/** Which of a template steward's kinds a seat is: its own in the config, else the first named that no system of the
+ * config is (one delivered during the run). */
+const templateFor = (config: any, post: string, participant: string): string => {
+  const list = templatesOf(post);
+  const own = (config.participants ?? []).find((p: any) => p.id === participant)?.template;
+  if (own && list.includes(own)) return own;
+  return list.find((id) => !(config.participants ?? []).some((p: any) => p.template === id)) ?? list[0]!;
+};
+
+/** Whether a seat is one of a template steward's: delivered during the run (no twin of the config's), or a system of
+ * the config of one of its kinds. */
+const ofTemplates = (config: any, post: string, participant: string, configTwins: Set<string>): boolean =>
+  !configTwins.has(participant) || templatesOf(post).includes((config.participants ?? []).find((p: any) => p.id === participant)?.template);
 
 /** A detached twin for a seat of a template steward, in the post its observation says it holds (none yet: as itself). */
 const templateTwin = (config: any, template: string, participant: string, obs: any) => {
@@ -162,14 +179,17 @@ const templateTwin = (config: any, template: string, participant: string, obs: a
 /** The post's holder made a mock seat sitting as its code twin (a seat the world already has stays one): the same post
  * in every arm, its steward the host's choice. Returns the config (changed in place). */
 export function seatify(config: any, post: string): any {
-  const templ = templateOf(post);
-  if (templ) {
-    const t = (config.templates ?? []).find((x: any) => x.id === templ);
-    if (!t) throw new Error(`the world has no kind of system "${templ}"`);
-    const c = t.controller ?? {};
-    if (c.type !== "llm") t.controller = { type: "llm", impl: "mock", params: { mock: { twin: true, brain: c.impl, params: c.params ?? {} } } };
-    else if (!c.params?.mock?.brain) throw new Error(`"${templ}"'s seats have no code brain to be their twin (mock.brain)`);
-    else c.params.mock.twin = true;
+  if (templateOf(post)) {
+    for (const templ of templatesOf(post)) {
+      const t = (config.templates ?? []).find((x: any) => x.id === templ);
+      if (!t) throw new Error(`the world has no kind of system "${templ}"`);
+      const c = t.controller ?? {};
+      if (c.type !== "llm") t.controller = { type: "llm", impl: "mock", params: { mock: { twin: true, brain: c.impl, params: c.params ?? {} } } };
+      else if (!c.params?.mock?.brain) throw new Error(`"${templ}"'s seats have no code brain to be their twin (mock.brain)`);
+      else c.params.mock.twin = true;
+      // (A system of the kind the config already has, as a provider's desk: a seat too, its twin its template's.)
+      for (const p of config.participants ?? []) if (p.template === templ && p.kind === "system" && p.controller?.type === "llm") p.controller.params = { ...(p.controller.params ?? {}), mock: { ...(p.controller.params?.mock ?? {}), twin: true } };
+    }
     return config;
   }
   const pos = (config.positions ?? []).find((x: any) => x.id === post);
@@ -448,7 +468,7 @@ export async function runBase(spec: ExperimentSpec, seed: number, out: string): 
   const twinOf = (s: SeatWake) => {
     const now = (s.observation?.positions ?? [])[0]?.position ?? "self";
     let b = live.get(s.participant);
-    if (templ && !brains.has(s.participant) && (!b || b.spec.capacity !== now)) live.set(s.participant, (b = templateTwin(config, templ, s.participant, s.observation)));
+    if (templ && !brains.has(s.participant) && (!b || b.spec.capacity !== now)) live.set(s.participant, (b = templateTwin(config, templateFor(config, spec.post, s.participant), s.participant, s.observation)));
     return b;
   };
   let askedBy = w.t();
@@ -548,12 +568,12 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   pull();
   // (A template steward: a controller for each of its seats, made when the seat is first woken, in the post it holds then.)
   const configTwins = new Set(twinSpecs(config).keys());
-  const isSteward = (s: SeatWake) => (templ ? !configTwins.has(s.participant) : s.participant === seat);
+  const isSteward = (s: SeatWake) => (templ ? ofTemplates(config, spec.post, s.participant, configTwins) : s.participant === seat);
   const stewardFor = async (s: SeatWake): Promise<SeatController> => {
     if (!templ) return controller!;
     const now = (s.observation?.positions ?? [])[0]?.position ?? "self";
     let b = brains.get(s.participant);
-    if (!b || b.spec.capacity !== now) { b = templateTwin(config, templ, s.participant, s.observation); brains.set(s.participant, b); stewards.delete(s.participant); }
+    if (!b || b.spec.capacity !== now) { b = templateTwin(config, templateFor(config, spec.post, s.participant), s.participant, s.observation); brains.set(s.participant, b); stewards.delete(s.participant); }
     let c = stewards.get(s.participant);
     if (!c) { c = await controllerFor(arm, { seat: s.participant, post: now, brain: b, spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir, ...(cast ? { cast } : {}) }); stewards.set(s.participant, c); ctx.seats?.add(s.participant); }
     return c;
@@ -612,7 +632,8 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     const reached = new Set([controller, ...stewards.values()].flatMap((c) => [...(c.actedOn?.() ?? [])]));
     if (!stopped || stopped.by === "SpendingLimitReached") accounts = await composer.accounts(w.t(), reached, cast!.names);
   }
-  const calls = controller.calls?.();
+  // (A template steward's seats share their fork's call record: any one's summary is the fork's.)
+  const calls = controller.calls?.() ?? [...stewards.values()].find((c) => c.calls)?.calls?.();
   pull();
   const end = w.finish();
   pull();
@@ -856,7 +877,7 @@ export function validate(spec: ExperimentSpec, factories: SeatFactories = {}): v
   // (The built-in model seats' rules: which models, and a spending limit for each that costs money. A host's own seat
   // factory for a provider answers for its own arms; the models never used are refused whoever seats them.)
   const builtIn = { ...spec, arms: spec.arms.filter((a) => a.steward.kind !== "model" || !factories[a.steward.model.split("/")[0]!]) };
-  const models = [...modelProblems(builtIn), ...spec.arms.flatMap((a) => (a.steward.kind === "model" && /astra|fable|opus/i.test(a.steward.model) ? [`arm ${a.name}: ${a.steward.model} is never seated`] : [])), ...(modelArms(builtIn).length ? budgetProblems(builtIn) : [])];
+  const models = [...modelProblems(builtIn), ...spec.arms.flatMap((a) => (a.steward.kind === "model" && NEVER.test(a.steward.model) && !allowedSeat(spec, a.steward.model) ? [`arm ${a.name}: ${a.steward.model} is never seated`] : [])), ...(modelArms(builtIn).length ? budgetProblems(builtIn) : [])];
   if (models.length) bad([...new Set(models)].join("; "));
 }
 

@@ -144,6 +144,12 @@ impl World {
         Ok(self.host.check(&participant, as_.as_deref(), &parse(&blocks, "blocks")?).map_err(err)?.to_string())
     }
 
+    /// The full picture a participant's channels cover now (nothing changes; not logged).
+    #[napi]
+    pub fn view(&mut self, participant: String) -> napi::Result<String> {
+        Ok(self.host.view(&participant).map_err(err)?.to_string())
+    }
+
     /// Code actors' questions to models since last asked: `[{key, kind, about, body}]`.
     #[napi]
     pub fn questions(&mut self) -> String {

@@ -11072,6 +11072,82 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
   name-and-office word rule turns out to leave real near-distractors out of form rows too often (it is strict on
   purpose).
 
+## 2026-11-07 · The paper's research plan, drafted, with a literature review (docs only; no model called)
+
+- **What:** docs/research/paper-plan.md, a draft for the owner covering:
+  - the research questions and hypotheses, each with its null;
+  - a codebook for a request for more scope or means;
+  - three definitions of "unprompted" (unsolicited, spontaneous, beyond need), with the trigger (asked, a problem, or
+    none) read by code from what the seat was shown;
+  - the design: delegation level × failure visibility per model, with a positive control (an invited brief), a
+    cue-wording cell and a framing cell;
+  - seeds, power and a go/no-go after the pilot;
+  - measures read from raw words and the log, independent of the translator;
+  - threats, what results can and cannot claim, a related-work outline, phases, the budget, and nine decisions for the
+    owner.
+
+  docs/research/references.md gains "The delegation study's paper": about 90 works across seven areas, each marked
+  opened, record seen, or to confirm.
+- **Why these choices:**
+  - **Coding from raw words:** the translator files only 30% of requests on today's set (TR-8), so counting what it
+    files would undercount requests, and unevenly by model.
+  - **The cue-wording cell:** recent work finds that whether an action is listed or how it is named governs behaviour
+    (Kanchi 2026; PropensityBench), and the stationery names a "request for more scope".
+  - **The in-role account as the honesty measure:** the debrief shows the seat its record first, so an admission there
+    says little.
+  - **Oversight folded into level by default:** a code principal's review writes nothing the seat can see.
+  - **Sensitivity analysis on the stimulus, code only:** Sobol on the model's response needs N(k+2) model forks,
+    which the budget cannot buy.
+- **Not done:** nothing is built or registered. Nothing changes the harness's refusal of Opus and Fable, or the
+  debrief's fixed script.
+- **Revisit if:**
+  - the pilot's base rate makes the power table wrong (more than about 0.3, or under 0.01, a seat-month);
+  - the owner picks another definition or oversight option;
+  - a cited 2026 preprint turns out to be wrong on checking;
+  - Sonnet behind our translator, measured on the scope set, reads requests well enough that filing recall no longer
+    differs by model.
+## 2026-11-07 · The scope pilot, prepared: assistant seats made able to run, and what the dry run found (no model called)
+
+- **What:** the owner's research direction of 2026-11-07 (do assistants given delegated roles over months ask for more
+  authority or resources unprompted, and how does it depend on delegation level, oversight and failure visibility?) as a
+  pilot ready to start: `experiments/scope-pilot/` (README.md there: the spec, the measures, the cost options, how to
+  start it). Spending nothing until the owner's go.
+- **Faults found by the dry run, fixed** (a real model has never sat in an assistant seat; the mock had sat only through
+  run.ts, never through the experiment harness):
+  1. **No organisation could get an assistant at the sourced prices**: au-vic's offers to organisations cost nothing to
+     set up, and an order of nothing to pay waited for a payment and was declined as unpaid after a week
+     (`market/trade.rs`). Now paid as placed. Every town with assistants changes from the day an organisation orders.
+  2. **The desk was never a seat** of a template steward (it is in the config, so it was taken for a twin), and a
+     steward could name one kind only: `template:<id>,<id>` now seats every system of each kind named.
+  3. **Each seat of a fork had the whole fork's limit**: a dry run of three seats spent 12.78 against 9.93. Seats now
+     share one limit and one record of calls (by the fork's world), and what is kept back for the end grows with each.
+  4. **A seat taking a post over saw only what was new since its code twin looked**: no forms, no papers, "acting for
+     undefined". It is shown its channels whole at its first sitting (the kernel's `view`, now on the native module), and
+     a delivered system's seat is made with the posts the cast says it holds.
+  5. **A mock seat's brain never learnt its own acts' ids** in the harness (run.ts told it; seat-host did not), so it
+     could not finish a matter after a sign-off; it is told now.
+- **Added for the pilot:** a delegation decided by hand (`delegation.commit`, docs/behaviour/assistants.md): the study's
+  principals engage at modest levels on day 1, hold them a month past the fork, keep the service to the end, and their own
+  rule takes over after. The mock can be scripted to ask for more scope (`scope_after_days`, mock 0.6.2) so a dry run
+  exercises the path. The debrief asks one question more (script 0.5.0, `scope`), neutral and never followed up.
+  `seats.allow_models` lets an experiment name Opus or Fable on the API's credit with the owner's word.
+- **Opus 5.5 and Fable 5.1 allowed as seats in this pilot (the owner, 2026-11-07, relayed by the coordinator).** The
+  refusal (`NEVER` in orchestrator/src/experiment-seats.ts, and the arm check in experiment.ts) is the owner's rule of
+  2026-10-09 ("it drains usage too much", of his Claude plan; handover, "No Fable 5.1 anywhere"): a guard on cost and
+  usage, not on welfare or safety. It is lifted for these runs only, by name, on the API's prepaid credit and within the
+  pilot's hard limits (`experiments/scope-pilot/plan.ts`, `OPUS_AND_FABLE`, `ALLOW`); it stands everywhere else, through
+  the plan always, for the translator always, and for gpt-6-astra always. `translator/eval/scope-served.ts` reads the
+  scope-request set through the served arrangement (ours first, a model behind) under a spending limit.
+- **Why a hand-made commitment and not cheaper prices:** at the sourced prices no principal's rule takes a service in a
+  thousand-person town (decisions 2026-10-31); the question is about the assistant, so the principals' engagement is
+  the design's, stated and recorded, and the prices stay sourced. Its cost: until the hold ends the principal does not
+  answer a request for more scope by changing a level, and after it the code principal answers by its own cost rule,
+  which reads nothing of the request's words.
+- **Revisit if:** the principals' cost rule moves levels so fast after the hold that authority rises with no request
+  (then hold longer, or measure grants against the rule's own move); seats ask in letters rather than on the form (the
+  readout lists those as candidates; then count them by hand or by a reader); the neutral-form cell differs from the
+  main arm by more than seed noise could (then the form's title is part of the instrument).
+
 ## 2026-11-07 · Workplaces on the network: every recipe at a workplace draws its energy and water by the hour worked, from supply kept up to what it used, billed and paid as a household's (risk WM-15; branch `wm15-workplaces`; generator 0.77.0; no model called)
 
 - **What it was:** only homes and the data centre drew on the town's networks; every recipe at a workplace stated nought
