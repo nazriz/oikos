@@ -11204,3 +11204,28 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
   placeholders go); an experiment on public bodies' costs (then offices' and buildings' own plant, WM-15); a business
   tariff is sourced; a firm's rate-setting from its meter turns out to chase its own systems' growth without bound, or two
   days' margin to trip feeders in a grown town (then the operator's reinforcement, a builder's work).
+## 2026-11-07 · Hosted open-weight models through OpenAI-compatible APIs (branch `openai-compat-provider`; no model called)
+
+- **What:** a provider `openai-compat/<host>/<model>` for hosted OpenAI-compatible chat APIs: Fireworks AI, Together,
+  OpenRouter (`participants/src/llm/openai-compat.ts`, chosen in `orchestrator/src/models.ts`). Each host's key comes
+  from its own variable (`OIKOS_FIREWORKS_KEY`, `OIKOS_TOGETHER_KEY`, `OIKOS_OPENROUTER_KEY`), its base URL from
+  `--base-url`, `OIKOS_<HOST>_BASE_URL` or the host's default. The provider is `openai-compat` and the model
+  `<host>/<model>`, so the price key, usage records and transcripts all name the host the call went to. How a model is
+  asked for its answer is its price entry's `answer`: `tools` (the API's function calling), `json` (the answer's shape
+  in the prompt, `response_format: json_object`), or `text`, the default (the same prompt, and the reply read exactly or
+  passed on unread, which the seat is told about and asked again, as with every way in). The credit or quota spent stops
+  the run (`CreditExhausted`); a rate limit that outlasts the retries stops it as a usage limit does, to be resumed. The
+  key goes in the authorization header and is cut out of any error that might echo it.
+- **Why:** the study (docs/north-star.md) wants a wide net of models, open-weight and abliterated ones among them, which
+  are mostly reached through these hosts. One adapter with the host in the model's name keeps one code path and lets
+  each model's price and answer mode be data. `text` is the default because open-weight models' tool and JSON modes
+  vary, and a malformed tool call is worse evidence than an unread answer the seat is asked again about.
+- **Prices:** three Fireworks serverless models are entered from memory of the price page, each marked `to_confirm`,
+  and `chooseModel` refuses a price so marked: no call is priced from a guess. Confirming one is checking the page,
+  setting the figures and date, and taking the mark out. No price was read from the web in this session (no key, no call).
+- **Alternatives:** a provider per host (`fireworks/…`): more names, the same code. Reusing `local/… --base-url`: no
+  key, no price, no credit or limit handling.
+- **Revisit if:** a host reports cost on its replies (OpenRouter's is already recorded: callModel takes the greater of
+  it and the table's), a model's answers come back unread often enough in `text` to try `json` or `tools` for it, or a
+  host's credit or rate-limit errors use words `COMPAT_CREDIT`/`COMPAT_LIMITED` don't match (Fireworks' and Together's
+  wording is unverified).

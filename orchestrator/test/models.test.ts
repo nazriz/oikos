@@ -4,7 +4,8 @@ import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
-import { chooseModel } from "../src/models";
+import type { Price } from "@oikos/participants/llm";
+import { chooseModel, priceTable } from "../src/models";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -23,6 +24,18 @@ test("a model that costs money needs a price, a spending limit and a key; a loca
   expect(local.budget).toBeUndefined();
   expect(local.prices["ollama/qwen3:8b"]).toEqual({ input: 0, output: 0, cache_read: 0, cache_write: 0 });
   expect(() => chooseModel("local/x", { env: {} })).toThrow("--base-url");
+  // A hosted OpenAI-compatible model: its host's key, a spending limit, and a price that has been confirmed.
+  const fw = "openai-compat/fireworks/accounts/fireworks/models/llama-v3p3-70b-instruct";
+  expect(() => chooseModel("openai-compat/nowhere/m", { budgetUsd: 1, env: {} })).toThrow("no published price");
+  expect(() => chooseModel(fw, { budgetUsd: 1, env: { OIKOS_FIREWORKS_KEY: "k" } })).toThrow("to_confirm"); // (until it is checked against the price page)
+  const confirmed = { ...priceTable()[fw]!, to_confirm: undefined } as Price;
+  const env = { OIKOS_FIREWORKS_KEY: "k", OIKOS_FIREWORKS_BASE_URL: "http://localhost:1/v1" };
+  const choose = (e: any, b?: number) => { const t = priceTable(); t[fw] = confirmed; return chooseModel(fw, { prices: t, env: e, ...(b !== undefined ? { budgetUsd: b } : {}) }); };
+  expect(() => choose(env)).toThrow("spending limit is required");
+  expect(() => choose({}, 1)).toThrow("OIKOS_FIREWORKS_KEY");
+  const hosted = choose(env, 1);
+  expect([hosted.adapter.provider, hosted.adapter.model]).toEqual(["openai-compat", "fireworks/accounts/fireworks/models/llama-v3p3-70b-instruct"]);
+  expect(hosted.budget).toEqual({ limitMicroUsd: 1_000_000, spentMicroUsd: 0 });
 });
 
 test("a run on a model that costs money stops at its limit, says why, and still debriefs", async () => {
