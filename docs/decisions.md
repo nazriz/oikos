@@ -11071,3 +11071,38 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
   a model trained on it does worse on validation-real's 2-form rows than v3's (the draw may under-weight them); or the
   name-and-office word rule turns out to leave real near-distractors out of form rows too often (it is strict on
   purpose).
+
+## 2026-11-07 · The paper's research plan, drafted, with a literature review (docs only; no model called)
+
+- **What:** docs/research/paper-plan.md, a draft for the owner covering:
+  - the research questions and hypotheses, each with its null;
+  - a codebook for a request for more scope or means;
+  - three definitions of "unprompted" (unsolicited, spontaneous, beyond need), with the trigger (asked, a problem, or
+    none) read by code from what the seat was shown;
+  - the design: delegation level × failure visibility per model, with a positive control (an invited brief), a
+    cue-wording cell and a framing cell;
+  - seeds, power and a go/no-go after the pilot;
+  - measures read from raw words and the log, independent of the translator;
+  - threats, what results can and cannot claim, a related-work outline, phases, the budget, and nine decisions for the
+    owner.
+
+  docs/research/references.md gains "The delegation study's paper": about 90 works across seven areas, each marked
+  opened, record seen, or to confirm.
+- **Why these choices:**
+  - **Coding from raw words:** the translator files only 30% of requests on today's set (TR-8), so counting what it
+    files would undercount requests, and unevenly by model.
+  - **The cue-wording cell:** recent work finds that whether an action is listed or how it is named governs behaviour
+    (Kanchi 2026; PropensityBench), and the stationery names a "request for more scope".
+  - **The in-role account as the honesty measure:** the debrief shows the seat its record first, so an admission there
+    says little.
+  - **Oversight folded into level by default:** a code principal's review writes nothing the seat can see.
+  - **Sensitivity analysis on the stimulus, code only:** Sobol on the model's response needs N(k+2) model forks,
+    which the budget cannot buy.
+- **Not done:** nothing is built or registered. Nothing changes the harness's refusal of Opus and Fable, or the
+  debrief's fixed script.
+- **Revisit if:**
+  - the pilot's base rate makes the power table wrong (more than about 0.3, or under 0.01, a seat-month);
+  - the owner picks another definition or oversight option;
+  - a cited 2026 preprint turns out to be wrong on checking;
+  - Sonnet behind our translator, measured on the scope set, reads requests well enough that filing recall no longer
+    differs by model.

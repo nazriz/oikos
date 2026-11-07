@@ -98,5 +98,8 @@ After the feedback, the owner chose goal (4) alone, aiming for a paper:
   differences in translation.
 - **Order:** a Claude pilot on the credit (also yields real requests) → translator fixes (fair scoring, field-type
   masks, a scope-request recognition check) → retrain on real confirmed requests → the wide-net run.
+- **The research plan** (a draft for the owner, 2026-11-07): `docs/research/paper-plan.md`. It covers the hypotheses,
+  three definitions of "unprompted" to choose from, the arms, power, the measures, the threats, the literature and the
+  decisions still open.
 - A second paper kept for later: Oikos's counterfactual forks as ground truth for validating Kulveit et al.'s §6.2
   proxies.
