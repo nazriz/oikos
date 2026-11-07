@@ -11296,7 +11296,13 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
 - **Also:** a stale liberty taken off the first foundations' list of liberties that must stand ("goods move instantly",
   ended by S4); `docs/everything-is-somewhere.md`, law 9's rule page, as nothing-from-nothing.md is law 8's.
 - **What it does to a town:** the six profiles' towns now have service stations and shoppers who buy fuel, and every
-  household with a car fills it; their shop mix and their households' spending move (measured below).
+  household with a car fills it; their shop mix and their households' spending move. Not measured against a baseline
+  beyond the pins: us-oh's 30-day states moved (representation pins re-taken, in a commit of their own); au-vic, gb-eng
+  and ke-nakuru moved only by the generator's version (culture-dial's config hashes re-taken; with 0.77.0 written in,
+  each is the hash it was). A code-only year of us-oh (300 people) raises no stampede, freeze or broken physics (the
+  flags, below). The single-goods towns of the tests (`shop_mix: false`) lose their cars: own-venture's three seeds then
+  had no occasion for its rule (who meant a business already ran one, or meant it too late), so it reads the first five
+  (seeds 4 and 5 each have one, started within a fortnight).
 - **Revisit if:** a profile's full shop table is written (then its two-kind table goes); a system is found that is
   neither the outside's nor hosted (then it names its hardware); the owner decides where the unhoused are.
 
