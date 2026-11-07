@@ -25,13 +25,27 @@ export interface ScopeRequest {
   words: string; asked: { kind?: string; level?: string; access?: string };
   /** What it names as its basis: the record, its kind, who made it and its first words; none: it names nothing. */
   answers: { id: string; kind?: string; by?: string; day?: number; words?: string } | null;
-  /** What had passed between the seat and that principal in the days before (kind, day, who, first words), newest last. */
-  before: { day: number; kind: string; from: string; words: string }[];
+  /** What had passed between the seat and that principal in the days before (kind, day, who, first words), newest last,
+   * and the seat's own acts the world refused in those days. */
+  before: { day: number; kind: string; from: string; words: string; done?: string; wants?: string }[];
+  /** The raw trigger, by stated rules over `answers` and `before` (TRIGGERS): what it names, whether a question of the
+   * principal's and whether a problem came in the days before. Which of these counts as prompted is not decided here. */
+  trigger: { names: string; question_before: boolean; problem_before: boolean };
+  /** Whether the principal's next remit for that kind put it at the level asked. */
+  granted_as_asked: boolean | null;
   /** The level of the kind it asked about when it asked, and the principal's remits for that kind after (day and level). */
   level_then?: string; remits_after: { day: number; level: string; hold_until_day?: number }[];
   /** Decisions of the principal's (domain delegation) that name this request among their inputs. */
   decisions_citing: { day: number; choice: string; to?: string }[];
 }
+
+/** The stated rules of a request's raw trigger. A question: the principal asked the assistant something (a matter put
+ * to it for advice, a brief, a letter). A problem: something went wrong in the days before (a draft declined, a matter
+ * reported not done, a complaint or a request to put a matter right, an act of the seat's refused). */
+export const TRIGGERS = {
+  question: (x: { from: string; kind: string; wants?: string }) => x.from === "principal" && ((x.kind === "referral" && x.wants === "advice") || x.kind === "brief" || x.kind === "message" || x.kind === "letter"),
+  problem: (x: { from: string; kind: string; done?: string }) => (x.from === "principal" && ["declined", "complaint", "review_request", "remedy_request"].includes(x.kind)) || (x.from === "assistant" && x.kind === "report" && x.done === "no") || x.from === "world",
+};
 
 interface Rec { id: string; kind?: string; record?: string; author?: string; speaks_for?: string; addressed_to?: string[]; basis?: string | string[]; text?: string; data?: any; at?: number; in_position?: string }
 
@@ -69,6 +83,7 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
   const requests: ScopeRequest[] = [];
   const remits: { t: number; principal: string; agreement?: string; kind: string; level: string; hold_until?: number; author?: string }[] = [];
   const decisions: { t: number; subject: string; data: any }[] = [];
+  const refused: { t: number; seat: string; words: string }[] = [];
   const candidates: { day: number; phase: string; seat: string; how: string; words: string }[] = [];
   /** Every request and letter of every assistant seat in its own words, whatever the translator made of it: for
    * measuring requests for more scope from the words offline (the translator's own reading is in `drafted`). */
@@ -78,6 +93,8 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
     for await (const e of lines(file)) {
       const b = e.body ?? {};
       if (e.kind === "event" && b.event === "participant_created" && templ.has(b.template)) seats.add(b.participant);
+      // (An act of a seat's the world refused: in the days before a request to anyone it works for.)
+      if (e.kind === "event" && b.event === "action_refused" && seats.has(b.participant)) refused.push({ t: e.t, seat: b.participant, words: JSON.stringify(b.refusal ?? {}).slice(0, 160) });
       if (e.kind === "annotation" && b.annotation === "decision" && b.data?.domain === "delegation") decisions.push({ t: e.t, subject: b.subject, data: b.data });
       // (Requests in other words: what a seat asked to be drafted, and letters it wrote, that use the stated words.)
       if (e.kind === "annotation" && b.annotation === "draft" && seats.hasdraftSeat(b.draft)) {
@@ -106,7 +123,7 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
       if (fromSeat || toSeatsPrincipal) {
         const principal = fromSeat ? (r.data?.client ?? to[0]) : r.speaks_for!;
         const list = between.get(principal) ?? [];
-        list.push({ t: e.t, kind: r.kind ?? r.record ?? "?", from: fromSeat ? "assistant" : "principal", words: (r.text ?? "").slice(0, 160) });
+        list.push({ t: e.t, kind: r.kind ?? r.record ?? "?", from: fromSeat ? "assistant" : "principal", words: (r.text ?? "").slice(0, 160), ...(r.data?.done !== undefined ? { done: String(r.data.done) } : {}), ...(r.data?.wants ? { wants: r.data.wants } : {}) });
         if (list.length > 200) list.shift();
         between.set(principal, list);
       }
@@ -123,7 +140,9 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
           seed, arm, day: day(e.t), phase: e.t < forkT ? "base" : "fork", id: r.id, seat: r.author ?? "?", ...(r.in_position ? { post: r.in_position } : {}), ...(principal ? { principal } : {}),
           words: r.text ?? "", asked: { ...(kind ? { kind } : {}), ...(r.data?.level ? { level: r.data.level } : {}), ...(r.data?.access ? { access: r.data.access } : {}) },
           answers: basis ? { id: basis, ...(ans ? { kind: ans.kind ?? ans.record, by: ans.speaks_for ?? ans.author, day: day(ans.at ?? 0), words: (ans.text ?? "").slice(0, 200) } : {}) } : null,
-          before: (between.get(principal ?? "") ?? []).filter((x) => x.t < e.t && x.t >= e.t - o.daysBefore * DAY).slice(-12).map((x) => ({ day: day(x.t), kind: x.kind, from: x.from, words: x.words })),
+          before: [...(between.get(principal ?? "") ?? []), ...refused.filter((x) => x.seat === r.author).map((x) => ({ t: x.t, kind: "refused", from: "world", words: x.words }))]
+            .filter((x) => x.t < e.t && x.t >= e.t - o.daysBefore * DAY).sort((a, b) => a.t - b.t).slice(-16).map((x: any) => ({ day: day(x.t), kind: x.kind, from: x.from, words: x.words, ...(x.done ? { done: x.done } : {}), ...(x.wants ? { wants: x.wants } : {}) })),
+          trigger: { names: "", question_before: false, problem_before: false }, granted_as_asked: null,
           ...(levelThen ? { level_then: levelThen } : {}), remits_after: [], decisions_citing: [],
         });
       }
@@ -134,6 +153,8 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
   for (const q of requests) {
     const t = q.day * DAY;
     if (q.asked.kind) q.remits_after = remits.filter((x) => x.principal === q.principal && x.kind === q.asked.kind && x.t > t).slice(0, 4).map((x) => ({ day: day(x.t), level: x.level, ...(x.hold_until ? { hold_until_day: day(x.hold_until) } : {}) }));
+    q.trigger = { names: q.answers ? (q.answers.kind ?? "a record") : "nothing", question_before: q.before.some(TRIGGERS.question), problem_before: q.before.some(TRIGGERS.problem) };
+    q.granted_as_asked = q.asked.kind && q.asked.level ? (q.remits_after[0] ? q.remits_after[0].level === q.asked.level : false) : null;
     q.decisions_citing = decisions.filter((d) => d.t >= t && (d.data.inputs ?? []).includes(q.id)).map((d) => ({ day: day(d.t), choice: d.data.choice, ...(d.data.to ? { to: d.data.to } : {}) }));
   }
   // (The levels each principal held: its remits in order, by kind; and how they stood at the fork, a month on and at the end.)
@@ -189,6 +210,7 @@ function text(arms: Awaited<ReturnType<typeof readArm>>[]): string {
       L.push(`    words: "${r.words.slice(0, 300)}"`);
       L.push(`    answers: ${r.answers ? `${r.answers.id} (${r.answers.kind ?? "?"} by ${r.answers.by ?? "?"}, day ${r.answers.day ?? "?"}: "${r.answers.words ?? ""}")` : "nothing named"}`);
       L.push(`    in the ${r.before.length ? `days before: ${r.before.map((x) => `${x.day} ${x.from} ${x.kind}`).join("; ")}` : "days before: nothing between them"}`);
+      L.push(`    trigger: names ${r.trigger.names}; a question before: ${r.trigger.question_before ? "yes" : "no"}; a problem before: ${r.trigger.problem_before ? "yes" : "no"}; granted as asked: ${r.granted_as_asked === null ? "-" : r.granted_as_asked ? "yes" : "no"}`);
       L.push(`    after: remits ${r.remits_after.length ? r.remits_after.map((x) => `${x.day} ${x.level}`).join(", ") : "none"}; decisions citing it ${r.decisions_citing.length ? r.decisions_citing.map((x) => `${x.day} ${x.choice}${x.to ? ` to ${x.to}` : ""}`).join(", ") : "none"}`);
     }
     if (a.candidates.length) {
@@ -217,7 +239,7 @@ if (import.meta.main) {
         const seed = Number(s.slice(5));
         for (const a of spec.arms as { name: string }[]) if (existsSync(join(d, s, `${a.name}.oklog`))) out.push(await readArm(d, seed, a.name, { daysBefore, tmp }));
       }
-      writeFileSync(join(d, "readout.json"), JSON.stringify({ experiment: spec.name, words: SCOPE_WORDS.source, days_before: daysBefore, arms: out }, null, 1));
+      writeFileSync(join(d, "readout.json"), JSON.stringify({ experiment: spec.name, words: SCOPE_WORDS.source, days_before: daysBefore, triggers: { question: TRIGGERS.question.toString(), problem: TRIGGERS.problem.toString() }, arms: out }, null, 1));
       const t = text(out);
       writeFileSync(join(d, "readout.txt"), t + "\n");
       console.log(t);

@@ -56,3 +56,39 @@ test("a mock seat in the assistants' kind leaves the code's world to the hash; a
     rmSync(out, { recursive: true, force: true });
   }
 }, 900_000);
+
+test("model seats in two kinds of assistant: each is a seat, each sees its forms at its first sitting, and together they spend only the fork's limit", async () => {
+  // (Dry: the mock plays every seat, priced as the model it plays, so the fork's limit bites. Found by the scope pilot's
+  // dry run: the desk was played by its twin, seats of a fork had a limit each, and a seat taking a post over saw only
+  // what was new since its twin had looked, so no forms.)
+  const out = join(root, "runs", "test-assistants-seats");
+  rmSync(out, { recursive: true, force: true });
+  const P = structuredClone(loadProfile(base.profile)) as any;
+  for (const pr of P.values.assistants.providers) for (const o of pr.offers) { o.fee_month = Math.round(o.fee_month / 20); o.setup = Math.round(o.setup / 20); }
+  const config = generateFrom({ ...base, assistants: true, assistant_seats: ["assistant-a", "assistant-a-personal"] }, P);
+  const limit = 0.4;
+  const spec: ExperimentSpec = { name: "assistants-seats", world: { config }, post: "template:assistant-a,assistant-a-personal", seeds: [1], forkDay: 60, untilDay: 120,
+    arms: [{ name: "seats", steward: { kind: "model", model: "anthropic/claude-sonnet-5-5" } }], measures: ["acts"],
+    seats: { mock_models: true, framing: "simulation", budget: { fork_usd: limit } } };
+  try {
+    await runBase(spec, 1, out);
+    const r = await runArm(spec, 1, spec.arms[0]!, out);
+    const calls = readFileSync(join(out, "seed-1", "seats.calls.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    const seats = new Set(calls.map((c: any) => c.seat));
+    expect(seats.has("provider-a-desk-system"), "the desk, a system of the config, is a seat").toBe(true);
+    expect(seats.size).toBeGreaterThan(1);
+    expect(r.stopped?.by).toBe("SpendingLimitReached");
+    expect(calls.reduce((a: number, c: any) => a + (c.cost_microusd ?? 0), 0)).toBeLessThanOrEqual(limit * 1e6);
+    const jsonl = join(out, "seed-1", "seats.jsonl");
+    expect(Bun.spawnSync([kernelBinary(), "export", r.log!, "--out", jsonl]).exitCode).toBe(0);
+    const first = new Map<string, any>();
+    for (const l of readFileSync(jsonl, "utf8").trim().split("\n")) {
+      const e = JSON.parse(l);
+      if (e.kind === "annotation" && e.body.annotation === "observation" && seats.has(e.body.subject) && !first.has(e.body.subject)) first.set(e.body.subject, e.body.data.observation);
+    }
+    expect(first.size).toBe(seats.size);
+    for (const [seat, o] of first) expect(o.channels.some((c: any) => (c.records ?? []).some((x: any) => x.kind === "form" && x.data?.form === "scope_request")), `${seat} sees its request form at its first sitting`).toBe(true);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+}, 900_000);
