@@ -162,6 +162,15 @@ class Writer:
         self.vocabulary = json.loads((d / "vocabulary.json").read_text())
         self.grammar = json.loads((d / "export.json").read_text())["grammar"]
         self.end = self.tok.convert_tokens_to_ids(END)
+        self._pieces: dict[int, str | None] = {}
+
+    def piece(self, c: int) -> str | None:
+        """A token's characters, as they add to what is written (sentencepiece: `▁` a space); None for a byte of a
+        character written in several (decoded with the rest instead)."""
+        if c not in self._pieces:
+            p = self.tok.convert_ids_to_tokens(c)
+            self._pieces[c] = None if p is None or (p.startswith("<0x") and p.endswith(">")) or p.startswith("<") and p.endswith(">") else p.replace("▁", " ")
+        return self._pieces[c]
 
     @torch.no_grad()
     def answer(self, request: str, forms: list[str], most: int = 256, tries: int = 64) -> dict:
@@ -180,7 +189,7 @@ class Writer:
                     if s.complete(text):
                         chosen = (c, v, text); break
                     refused += 1; continue
-                t = self.tok.decode(out + [c])
+                t = text + self.piece(c) if self.piece(c) is not None else self.tok.decode(out + [c])
                 if t.startswith(text) and s.viable(t):
                     chosen = (c, v, t); break
                 refused += 1

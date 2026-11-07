@@ -11,7 +11,9 @@ import { labelled } from "../readers";
 import { OUT, jsonl, meetsIntent, formsFiled } from "./lib.ts";
 const ANSWERS = join(import.meta.dir, "../../../runs/translator-v4-2026-11-07/assistants/readers");
 
-const requests: any[] = jsonl(join(OUT, "requests.jsonl"));
+// (Each request on one line, each break a space, every character where it stood, as the adapter shows a request to
+// the model, `oneLine`: a line of a list that begins "- " would otherwise be read as a form's line.)
+const requests: any[] = jsonl(join(OUT, "requests.jsonl")).map((r: any) => ({ ...r, request: r.request.replace(/[\r\n]/g, " ") }));
 const answersOf = (reader: string) => {
   const out: { id: string; program: string }[] = [];
   for (const f of readdirSync(ANSWERS).filter((f) => f.startsWith(`${reader}-`) && f.endsWith(".json")).sort()) {
@@ -125,7 +127,8 @@ for (const e of examples) {
   if (!m.ok) { inc(tally.off_intent, `${i.cls}/${m.why}`); continue; }
   if (sharesScope(e.request)) { tally.leak_scope_set++; continue; }
   if (sharesHeld(e.request)) { tally.leak_held_out++; continue; }
-  const row = { id: `v4a/${e.id}`, request: e.request, forms: e.forms, program: e.program, spans: e.spans, kind: e.kind, shape: e.shape, origin: "generated", source: `v4 assistants/${i.situation}`, written_by: q.from.writer, verified_by: `${S} + ${H}`, currency: q.currency,
+  // (On one line, each break a space, every character where it stood: as the adapter shows a request, `oneLine`.)
+  const row = { id: `v4a/${e.id}`, request: e.request.replace(/[\r\n]/g, " "), forms: e.forms, program: e.program, spans: e.spans, kind: e.kind, shape: e.shape, origin: "generated", source: `v4 assistants/${i.situation}`, written_by: q.from.writer, verified_by: `${S} + ${H}`, currency: q.currency,
     groups: { writer: q.from.writer, style: i.style, intent: `${i.cls}/${i.type}`, part: "v4 assistants", situation: i.situation, key: keyOf.get(e.id)! } };
   let two: unknown; try { two = cardRows(row as never); } catch { two = undefined; }
   if (!two) { tally.not_two_passes++; continue; }

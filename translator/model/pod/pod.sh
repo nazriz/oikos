@@ -106,11 +106,11 @@ watchdog() {
 start() {
   local PK=$(cat ~/.ssh/oikos_runpod.pub) ID="" G R price max=${OIKOS_POD_MAX_PER_HOUR:-1}
   say "balance before: $(balance)"
-  for G in "NVIDIA GeForce RTX 4090" "NVIDIA GeForce RTX 5080" "NVIDIA RTX A6000" "NVIDIA GeForce RTX 3090" "NVIDIA RTX A5000" "NVIDIA GeForce RTX 5090"; do
+  for G in "NVIDIA GeForce RTX 4090" "NVIDIA GeForce RTX 5080" "NVIDIA RTX A6000" "NVIDIA GeForce RTX 3090" "NVIDIA RTX A5000" "NVIDIA GeForce RTX 5090" "NVIDIA L40S" "NVIDIA A40" "NVIDIA RTX 4000 Ada Generation" "NVIDIA L4"; do
     # (supportPublicIp: without it a pod can come with no SSH port that can be reached from here.)
-    R=$(api "{\"query\":\"mutation { podFindAndDeployOnDemand(input:{cloudType:COMMUNITY, supportPublicIp:true, gpuCount:1, volumeInGb:0, containerDiskInGb:40, minVcpuCount:4, minMemoryInGb:16, gpuTypeId:\\\"$G\\\", name:\\\"$NAME\\\", imageName:\\\"runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04\\\", ports:\\\"22/tcp\\\", env:[{key:\\\"PUBLIC_KEY\\\", value:\\\"$PK\\\"}]}) { id costPerHr } }\"}")
+    R=$(api "{\"query\":\"mutation { podFindAndDeployOnDemand(input:{cloudType:${OIKOS_POD_CLOUD:-COMMUNITY}, supportPublicIp:true, gpuCount:1, volumeInGb:0, containerDiskInGb:40, minVcpuCount:4, minMemoryInGb:16, gpuTypeId:\\\"$G\\\", name:\\\"$NAME\\\", imageName:\\\"runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04\\\", ports:\\\"22/tcp\\\", env:[{key:\\\"PUBLIC_KEY\\\", value:\\\"$PK\\\"}]}) { id costPerHr } }\"}")
     ID=$(print -r -- "$R" | sed -n 's/.*"id":"\([a-z0-9]*\)".*/\1/p')
-    [ -n "$ID" ] || continue
+    [ -n "$ID" ] || { say "$G: not had ($(print -r -- "$R" | sed -n "s/.*\"message\":\"\([^\"]*\)\".*/\1/p" | head -c 160))"; continue; }
     # From here the pod is billed: its id on file, its time limit, and the watchdog, before anything else.
     echo $ID > $S/pod-id; echo $(( $(date +%s) + ${SECONDS_LIMIT:-21600} )) > $S/deadline; date +%s > $S/started
     (nohup zsh $SELF watchdog $ID $$ > /dev/null 2>&1 < /dev/null &)
