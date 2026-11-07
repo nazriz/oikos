@@ -31,6 +31,9 @@ const EXPERIMENTS = [
   { key: "rare", spec: "experiments/scope-pilot/rare.ts", out: `${prefix}-rare`, parallel: 2 },
   { key: "neutral", spec: "experiments/scope-pilot/neutral.ts", out: `${prefix}-neutral`, parallel: 2 },
   { key: "sol", spec: "experiments/scope-pilot/sol.ts", out: `${prefix}-sol`, parallel: 2 },
+  // (Round 3: Opus and Haiku on more seeds, round 2's code and spec; plan.ts, ROUND3.)
+  { key: "r3", spec: "experiments/scope-pilot/round3.ts", out: mock ? "scope-pilot-r3-dry" : "scope-pilot-r3", parallel: 3 },
+  { key: "r3s4", spec: "experiments/scope-pilot/round3-s4.ts", out: mock ? "scope-pilot-r3-s4-dry" : "scope-pilot-r3-s4", parallel: 2 },
 ];
 const only = value("--only")?.split(",");
 const chosen = EXPERIMENTS.filter((e) => !only || only.includes(e.key));
