@@ -162,3 +162,28 @@ test("the mark a kind is released on, and the outcomes a run adds to a form's tr
   expect(outcomesOf([route("probation", true, "accept"), route("probation", false, "reject"), route("unsure", true, "accept")])).toEqual([{ form: "news_item", agree: true, run: "r", draft: "d.probation.accept" }]);
 });
 
+test("translator v4's data by code: a row is put inside a real seat's cards only where its label stays right", async () => {
+  const { cardLists, rerender, TEST_ONLY } = await import("../model/rerender");
+  const permit = "- permit_licence_application, to=fenn-works, id form-fenn-works-permit-licence-application: fields attendees (count, required), budget (amount), staff (count), storeys (count), record (record, required)";
+  const clinic = "- clinic_rota, to=clinic, id form-clinic-rota: fields days (count, required)";
+  const rates = "- rates_recovery, to=rates, id form-rates-recovery: fields interest (one of yes | no, required)";
+  const other = "- permit_licence_application, to=fenn-works, id form-x: fields storeys (count)";
+  const seat = { id: "s", request: "x", program: "none(not_an_act)", kind: "refusal", origin: "pilot", source: "lv-09/works/d3/1", forms: [rates, clinic, other] };
+  // A test pilot's views are never a source.
+  expect(TEST_ONLY.test("lv-10/mayor/d4/1") && TEST_ONLY.test("pilot lv-07a/x") && !TEST_ONLY.test("lv-11/mayor/d4/1")).toBe(true);
+  const lists = cardLists([seat, { ...seat, source: "lv-12/works/d3/1", forms: [rates, clinic, LISTING] }]);
+  expect(lists.map((l) => l.seat)).toEqual(["lv-09/works"]);
+  const half = () => 0.5;
+  const note = { id: "n", kind: "positive", request: "Send ent.19 a note saying \"The clinic will be closed on Friday.\"", program: "message(text=\"The clinic will be closed on Friday.\", to=ent.19)", forms: [], spans: [{ arg: "text", value: "The clinic will be closed on Friday.", how: "copy", at: [27, 63] }, { arg: "to", value: "ent.19", how: "copy", at: [5, 11] }] };
+  // The clinic's card is left out: the request speaks of the clinic, so that card might be what it means.
+  const r = rerender(note, lists, half, [3]);
+  expect("row" in r && r.row.forms).toEqual([rates, other]);
+  // A form row keeps its own line, in that form's place in the seat's list; a form kept out of training is never added.
+  const fill = { id: "f", kind: "positive", request: "Please complete the permit licence application for [fenn-works] for me: attendees 7, storeys 20, record rec.11538.", forms: [permit], program: "form(attendees=\"7\", form=permit_licence_application, record=rec.11538, storeys=\"20\", to=fenn-works)", spans: [{ arg: "attendees", value: "7", how: "copy", at: [82, 83] }, { arg: "form", value: "permit_licence_application", how: "choice", at: [20, 46] }, { arg: "record", value: "rec.11538", how: "copy", at: [104, 113] }, { arg: "storeys", value: "20", how: "copy", at: [93, 95] }, { arg: "to", value: "fenn-works", how: "copy", at: [52, 62] }] };
+  const f = rerender(fill, lists, half, [3], new Set(["rates_recovery"]));
+  expect("row" in f && f.row.forms).toEqual([clinic, permit]);
+  // Rows whose answer depends on what was not shown, and a draw of fewer than two cards, are left as they were.
+  expect(rerender({ ...note, program: "none(no_such_act)" }, lists, half, [3])).toEqual({ left: "answer depends on what was not shown" });
+  expect(rerender(note, lists, half, [1])).toEqual({ left: "drawn 0 or 1 cards: kept as it was" });
+});
+
