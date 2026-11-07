@@ -20,14 +20,14 @@ if (import.meta.main) {
   const [joined, exp, out] = process.argv.slice(2) as [string, string, string];
   mkdirSync(out, { recursive: true });
   const jl = (f: string): any[] => readFileSync(f, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
-  const report: Record<string, Record<string, number>> = {};
+  const report: Record<string, object> = {};
   for (const side of ["train", "validation", "validation-real", "validation-uf"]) {
     if (!existsSync(join(joined, `${side}.jsonl`))) continue;
     // (The export writes each example's rows in order, choose then its fills, and leaves out the ones it cuts: read in
     // step. An id can stand more than once in the joined data.)
     const xs = jl(join(exp, `${side}.jsonl`)) as Row[];
     let at = 0;
-    const n: Record<string, number> = { examples: 0, written: 0, changed_by_canonical: 0, not_exported: 0 };
+    const n = { examples: 0, written: 0, changed_by_canonical: 0, not_exported: 0, not_joined: 0 };
     const lines: string[] = [];
     for (const e of jl(join(joined, `${side}.jsonl`))) {
       n.examples++;
@@ -36,7 +36,7 @@ if (import.meta.main) {
       const fills: Row[] = [];
       while (xs[at]?.mode === "fill" && xs[at]!.id.startsWith(`${e.id}#f`)) fills.push(xs[at++]!);
       let program: string;
-      try { program = programOfRows(e, choose, fills); } catch { n.not_joined = (n.not_joined ?? 0) + 1; continue; }
+      try { program = programOfRows(e, choose, fills); } catch { n.not_joined++; continue; }
       if (program !== calls.programText(calls.parseProgram(e.program))) n.changed_by_canonical++;
       lines.push(JSON.stringify({ id: e.id, kind: e.kind, request: e.request, forms: e.forms, program, ...(e.groups ? { groups: e.groups } : {}), ...(e.currency ? { currency: e.currency } : {}) }));
       n.written++;

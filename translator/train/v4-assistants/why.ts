@@ -1,7 +1,7 @@
 // Diagnostic: of the requests left "not_copied", how many the two readers read alike (by meaning, free text aside).
 import { readFileSync } from "node:fs";
 import { sameButForFreeText, sameMeaning } from "../meaning";
-import { OUT, jsonl } from "./lib.ts";
+import { OUT, jsonl } from "./lib";
 const rejects = jsonl(`${OUT}/rejects.jsonl`).filter((r: any) => r.why === "not_copied");
 let same = 0, sameFree = 0;
 const diff: string[] = [];

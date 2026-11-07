@@ -2,8 +2,8 @@
 //   bun write.ts <nSituations> [--writers haiku,sonnet,opus,codex] [--per-call 5] [--from N]
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Caller, objectsIn } from "/Users/clawd/oikos/.claude/worktrees/agent-aea601ddedad89913/orchestrator/src/pipeline.ts";
-import { OUT, LEDGER, STYLES, STYLE_NAMES, makeSituation, intentsFor, jsonl, putJson, prng, shuffle, writeSpend, spend, STOP_USD, CAP_USD, type Intent, type Situation } from "./lib.ts";
+import { Caller, objectsIn } from "../../../orchestrator/src/pipeline";
+import { OUT, LEDGER, STYLES, STYLE_NAMES, makeSituation, intentsFor, jsonl, putJson, prng, shuffle, writeSpend, spend, STOP_USD, CAP_USD, type Intent, type Situation } from "./lib";
 
 const args = process.argv.slice(2);
 const flag = (n: string, d?: string) => { const i = args.indexOf(`--${n}`); return i < 0 ? d : args[i + 1]; };

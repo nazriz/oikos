@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { loadHeldOut, sharesWording } from "../../eval/held-out";
 import { cardRows } from "../../model/export";
 import { labelled } from "../readers";
-import { OUT, jsonl, meetsIntent, formsFiled } from "./lib.ts";
+import { OUT, jsonl, meetsIntent, formsFiled } from "./lib";
 const ANSWERS = join(import.meta.dir, "../../../runs/translator-v4-2026-11-07/assistants/readers");
 
 // (Each request on one line, each break a space, every character where it stood, as the adapter shows a request to
@@ -85,7 +85,7 @@ const keyOf = new Map<string, string>([...strict.examples.map((e) => [e.id, "two
 // Implied by the card: where the two readers agreed and what is "not copied" is only the form's name, its office or
 // an option of its field, all of which the two passes point at in the form's own line (encode.ts `cards`; v3's
 // `withImplied`), the first reader's program is kept with those spans implied. `cardRows` below is the check.
-const { withImplied } = await import("./implied.ts");
+const { withImplied } = await import("./implied");
 const { spansIn, shapeOf } = await import("../data");
 const { formOfLine } = await import("../blind");
 const { sameButForFreeText } = await import("../meaning");

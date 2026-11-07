@@ -1,7 +1,7 @@
 // Shared by the generation scripts of the v4 assistants' papers data (run folder, not committed).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-const R = "/Users/clawd/oikos/.claude/worktrees/agent-aea601ddedad89913";
+const R = join(import.meta.dir, "../../..");
 export const OUT = "/Users/clawd/oikos/runs/translator-v4-2026-11-07/assistants";
 export const JOINED = "/Users/clawd/oikos/runs/translator-v4-2026-11-07/joined-v4/train.jsonl";
 export const LEDGER = join(OUT, "ledger.jsonl");

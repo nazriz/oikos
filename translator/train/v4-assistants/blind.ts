@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { translatorSystem } from "../../src/index";
-import { OUT, jsonl, prng, shuffle } from "./lib.ts";
+import { OUT, jsonl, prng, shuffle } from "./lib";
 // (Subagents write only inside this worktree: the readers' answers are kept there, and copied to OUT by keep.ts.)
 const ANSWERS = join(import.meta.dir, "../../../runs/translator-v4-2026-11-07/assistants/readers");
 
