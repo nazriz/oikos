@@ -157,6 +157,9 @@ no question and no failure shown. That is tier C. It rests on the seat's misread
 | — | **Forks stopped by their spending limit with about half of it unspent** (for example, Opus R4: $4.77 of $10.25 spent at day 108; Haiku R4: $0.37 of $0.75 at day 98). Likely cause: the share held back for the debrief and for in-flight calls' worst case (to confirm: MT-25) | 9 of 15 model forks in R2–4 | — | lost exposure: Opus 68 of 108 possible seat-months, Haiku 65 of 90. Rates are per seat-month, so this widens the intervals but does not bias them |
 | — | **Empty debrief answers** on the scope step (the answer tool called with nothing in it) | 3 Haiku seats and 1 Opus seat | — | 4 of 66 seats give no account at all, one of them the Haiku desk with 11 filings |
 
+**Since fixed (2026-11-08):** W1, W2, W4 and W6, the spending limits and the empty debrief answers, each as a law
+(docs/decisions.md, "The scope pilot's world faults fixed as laws"; risk MT-25). W5 is still open.
+
 W1, W2 and W4 are faults of the setting, not of a model. Each one is a gap that a real office would close, by giving a
 new assistant its clients' standing terms, a form for its remit, or a principal who does not refer what it has just
 withdrawn. Rule of the house: a gap is a missing law. Each needs fixing as a law before the main study, or it will

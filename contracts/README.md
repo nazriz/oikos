@@ -547,6 +547,14 @@ Additions only; nothing renamed or removed. A log or a world made before them is
 
 - **The `ambiguous` label and a world's `names` (2026-10-25, under the owner's blanket approval of contract changes, 2026-10-11, and his ruling of 2026-10-23: "Build person-by-name lookup with an 'ambiguous' answer, within what the seat has been shown. It's on wherever names are on."; docs/decisions.md, "A name the seat knows more than one by is asked back").** `calls.schema.json`: `ambiguous` joins the labels of `none` (the resolver's answer; a translator that writes it is refused as unclear). `world-config.schema.json`: an optional top-level boolean `names` (the generator sets it with a spec's `names`); the kernel reads none of it, the resolver does (calls.md). The resolver's answer to a call (`resolve`, and the `note` a call that did not resolve leaves in the log) gains `ambiguous`, a list of `{ label, name, for, candidates: [{ id, known_by }] }`, only where there is one; a world without `names` answers and logs as before, word for word. Both resolvers are held to `contracts/test/names.json`. Additive; the version stays 0.8.
 
+## Changes since v0.8 closed (2026-11-08: the scope pilot's world faults; docs/decisions.md of the day; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- **`QueryField`:** `from`, whom a paper is from as a list of papers names it: whom it speaks for, or else its author. A
+  person's papers are written by their own participant on their behalf, so a search by author never found them under the
+  name a list gives them (the scope pilot's desk looked for a client's remits and was told there were none).
+- **The papers of delegation** (kernel `papers/delegation.rs`): a `referral` names the remit it is handed under
+  (`remit`); a `remit` names the matters it takes back (`takes_back`), where it hands a kind over no longer.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).

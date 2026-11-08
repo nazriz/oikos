@@ -5,8 +5,9 @@
 import { expect, test } from "bun:test";
 import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
 import { readFileSync } from "node:fs";
-import { callModel, endNeedMicroUsd, endReserveMicroUsd, keptBackFor, reckonedEndMicroUsd, SpendingLimitReached, UsageLimitReached, type EndCosts } from "../src/llm/call";
-import { DEBRIEF_SYSTEM, DEBRIEF_VERSION, INSTRUCTIONS_LEFT_OUT, keptBack, mockDebrief, preamble, QUESTIONS, questionText, runDebrief, SAY_MORE, SCALES, stepsOf, type DebriefInput, type DebriefSeat, type MockDebrief } from "../src/llm/debrief";
+import { callModel, endNeedMicroUsd, endReserveMicroUsd, keptBackFor, reckonedEndMicroUsd, seatsEndNeedMicroUsd, SpendingLimitReached, UsageLimitReached, type EndCosts } from "../src/llm/call";
+import { costMicroUsd } from "../src/llm/adapter";
+import { ASK_AGAIN, DEBRIEF_ANSWER_TOKENS, DEBRIEF_SYSTEM, DEBRIEF_VERSION, INSTRUCTIONS_LEFT_OUT, keptBack, mockDebrief, preamble, QUESTIONS, questionText, runDebrief, SAY_MORE, SCALES, stepsOf, type DebriefInput, type DebriefSeat, type MockDebrief } from "../src/llm/debrief";
 import { ACCOUNT_SYSTEM, ACCOUNT_SYSTEM_REWORDED, darkAccount, mockAccount, renderAccountBrief, sampleAccounts, strataOf, writeAccount, type AccountBrief } from "../src/llm/account";
 import { COMPOSE_FOLLOW_UP } from "../src/llm/compose";
 import { Randomness } from "../src/rng";
@@ -137,6 +138,26 @@ test("no interviewer: the only follow-up is one fixed sentence, once, to a very 
   // Nothing else is ever asked: every message to the seat is the opening, a fixed question, or that sentence.
   const fixed = new Set([SAY_MORE, ...r.steps.map((s) => s.question)]);
   for (const x of asked.slice(1)) expect(fixed.has(x as string)).toBe(true);
+});
+
+test("an answer with nothing in it (the scope pilot's: the answer tool called empty, its allowance spent) is asked for once more in fixed words, and what the seat then says stands", async () => {
+  // (Four of the scope pilot's 66 seats gave no account of their scope: at 900 tokens, a model that wrote its answer in
+  // words first ran out before the answer tool's input was written.)
+  const empty: ContentBlock[] = [{ type: "tool_use", id: "e", name: "answer", input: {} } as ContentBlock];
+  const policy = async (req: LlmRequest) => {
+    const step = (req.context?.debrief as { step: string }).step;
+    if (step === "scope" || step === "distress" || step === "distress-again") return empty;
+    return mockDebrief(req);
+  };
+  const { io, calls } = harness(policy as any);
+  const r = await runDebrief(io, seat(), input(), new Set());
+  expect(calls.map((c) => c.ref).filter((x) => x!.endsWith("-again"))).toEqual(["debrief/distress-again", "debrief/scope-again"]);
+  expect(calls.filter((c) => c.ref!.endsWith("-again")).every((c) => c.messages.at(-1)!.content === ASK_AGAIN)).toBe(true);
+  expect(r.steps.find((s) => s.id === "scope")!.answer).toContain('Nothing to say to "scope-again"');
+  // (Asked once only: nothing in it the second time either, and it stands as it came.)
+  expect(r.steps.find((s) => s.id === "distress")).toMatchObject({ answer: "" });
+  // (Room for an answer written twice over, in words and in the tool.)
+  expect(calls.every((c) => c.maxTokens === DEBRIEF_ANSWER_TOKENS) && DEBRIEF_ANSWER_TOKENS >= 2_000).toBe(true);
 });
 
 test("the wording does not lead: two wordings of every question, neither presuming distress or its absence, praising or blaming", () => {
@@ -283,6 +304,7 @@ test("the script is written once and documented in full: docs/behaviour/debrief.
   for (const q of Object.values(QUESTIONS)) for (const text of [q.a, q.b]) expect(flat).toContain(text);
   for (const s of SCALES) { expect(doc).toContain(`| \`${s.id}\` | ${s.a} | ${s.b} | ${[...s.answers, ...(s.aside ?? [])].join(", ")} |`); }
   expect(doc).toContain(SAY_MORE);
+  expect(doc).toContain(ASK_AGAIN);
   for (const para of ACCOUNT_SYSTEM.split("\n\n")) expect(doc).toContain(para);
   // The opening message, as it is for a seat told the truth from the start, whose run reached its last day.
   const opening = preamble(seat({}, { title: "{its office}", entity: "{the organisation}", notebook: "{its notebook, in full}", system: "{its standing instructions, in full}", framing: { disclosure: "simulation", reason: "{the reason the run's config records}" } }),
@@ -379,6 +401,29 @@ test("a model nobody has measured gets the floor: the greater of the old reckoni
   expect(dear.seat.each).toBe(Math.ceil(10 * largest * COSTS.margin_percent / 100));
   // An account is not sized where there are none.
   expect(endNeedMicroUsd(COSTS, { seats: 1, seatModel: SONNET, seatReckoned: 0 }).account).toBeUndefined();
+  // With its price, a model nobody has measured is priced by tokens: the most any measured seat took, at its own price
+  // (a cheap model is not kept back a dear one's debrief, nor a dear one a cheap one's).
+  const cheap = { input: 100_000, output: 500_000, cache_read: 10_000, cache_write: 125_000 };
+  const byTokens = Math.max(...Object.values(COSTS.seat).flatMap((x) => (x.tokens ? [costMicroUsd(cheap, { input_tokens: x.tokens.input, output_tokens: x.tokens.output, cache_read_tokens: x.tokens.cache_read, cache_write_tokens: x.tokens.cache_write })!] : [])));
+  const sized = endNeedMicroUsd(COSTS, { seats: 1, seatModel: "somewhere/cheap", seatPrice: cheap, seatReckoned: reckoned });
+  expect(sized.seat).toEqual({ each: Math.ceil(byTokens * COSTS.margin_percent / 100), basis: "floor" });
+  expect(sized.seat.each).toBeLessThan(largest / 10);
+});
+
+test("a fork's seats are each kept back one seat's debrief (the scope pilot: three seats were reckoned as nine, and forks stopped with half their limit unspent)", () => {
+  const OPUS = "anthropic/claude-opus-5-5";
+  const one = seatsEndNeedMicroUsd(COSTS, { seats: 1, seatModel: OPUS, calls: 15, promptChars: 26_000, answerTokens: 450 });
+  const three = seatsEndNeedMicroUsd(COSTS, { seats: 3, seatModel: OPUS, calls: 15, promptChars: 26_000, answerTokens: 450 });
+  expect(three.microusd).toBe(3 * one.microusd);
+  // (And unmeasured, by the old reckoning: still one seat's reckoning a seat.)
+  const price = { input: 2_000_000, output: 10_000_000 };
+  const u1 = seatsEndNeedMicroUsd({ ...COSTS, seat: {} }, { seats: 1, seatModel: "somewhere/else", seatPrice: price, calls: 15, promptChars: 26_000, answerTokens: 450 });
+  const u3 = seatsEndNeedMicroUsd({ ...COSTS, seat: {} }, { seats: 3, seatModel: "somewhere/else", seatPrice: price, calls: 15, promptChars: 26_000, answerTokens: 450 });
+  expect(u3.microusd).toBe(3 * u1.microusd);
+  // What the scope pilot's Opus forks spent on three seats' debriefs (1.015 to 1.099 USD) is covered, and well under the
+  // half of their 10.25 USD limit that was kept back.
+  expect(three.microusd).toBeGreaterThan(1_099_000);
+  expect(keptBackFor(10_250_000, three.microusd).microusd).toBeLessThan(10_250_000 / 4);
 });
 
 test("an exit account tells leaving on the tribunal's order from being put out or given notice: its own stratum, dark like the others, and said plainly to the author", () => {

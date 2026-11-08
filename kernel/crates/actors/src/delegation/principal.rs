@@ -439,6 +439,10 @@ impl State {
                 let differs = norm(c) != norm(&program);
                 self.seen.entry(Self::key(&agreement, &kind)).or_default().saw(differs, &r.id);
             }
+        } else if let Some(x) = papers::read::<Remit>(r).filter(|x| r.speaks_for.as_deref() == Some(self.me.as_str()) && !hands_over(x.level)) {
+            // (A remit of its own that hands a kind over no longer, however it came to be written (its rule's, or an
+            // owner's act at a fork in its name): what it had open of that kind it takes back, as its rule's remit does.)
+            self.take_back(&x.agreement, &x.kind);
         } else if let Some(x) = papers::read::<ScopeRequest>(r) {
             if self.eng.by_agreement(&x.agreement).is_some() {
                 // (Answered by looking at the matter again, by its own rule, now; the review says it answers it.)
@@ -596,6 +600,36 @@ impl State {
             .map_or(Level::None, |x| x.level)
     }
 
+    /// The remit in force for a kind under a service, as a paper: its id (the newest it made).
+    fn remit_id(&self, agreement: &str, kind: &str) -> Option<String> {
+        self.book
+            .all(Remit::KIND)
+            .rev()
+            .filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str()) && !self.book.withdrawn(&r.id))
+            .find(|r| papers::read::<Remit>(r).is_some_and(|x| x.agreement == agreement && x.kind == kind))
+            .map(|r| r.id.to_string())
+    }
+
+    /// Taking back the matters of a kind its assistant has open under a service (a remit that cuts the kind to a level
+    /// that hands nothing over): each is done itself, and nothing more that comes back on it is answered. Their
+    /// referrals, for the remit to name.
+    fn take_back(&mut self, agreement: &str, kind: &str) -> Vec<String> {
+        let open: Vec<(String, Matter, String)> = self
+            .matters
+            .iter()
+            .filter(|(_, m)| m.agreement == agreement && m.kind == kind)
+            .filter_map(|(a, m)| m.referral.clone().filter(|r| self.by_referral.contains_key(r)).map(|r| (a.clone(), m.clone(), r)))
+            .collect();
+        let mut back = vec![];
+        for (action, m, referral) in open {
+            self.by_referral.remove(&referral);
+            self.myself(&action, &m, "Taken back with our remit: doing it ourselves.");
+            back.push(referral);
+        }
+        back.sort();
+        back
+    }
+
     /// Until when it has said it will not change a kind under a service (its newest remit's `hold_until`).
     fn held(&self, agreement: &str, kind: &str, t: i64) -> bool {
         self.book
@@ -625,7 +659,8 @@ impl State {
         let Program::Lines(lines) = program else { return None };
         let e = self.in_use()?;
         let a = e.agreement.clone()?;
-        let handed = |l: &Line| super::kind_of(l).is_some_and(|k| e.offer.kinds.contains(&k) && self.remit(&a, &k) != Level::None);
+        // (Only a kind of its own: the kinds its parameters price, which are the ones its assistant's post has forms for.)
+        let handed = |l: &Line| super::kind_of(l).is_some_and(|k| e.offer.kinds.contains(&k) && self.p.kinds.contains_key(&k) && self.remit(&a, &k) != Level::None);
         let (mine, others): (Vec<Line>, Vec<Line>) = lines.iter().cloned().partition(|l| handed(l));
         if mine.is_empty() {
             return None;
@@ -675,8 +710,9 @@ impl State {
     /// The referral that takes the place of the inner actor's act.
     fn referral(&self, m: &Matter, _cx: &Cx) -> Step<()> {
         let (to, visible) = self.to_assistant(&m.agreement);
-        let r = Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: Some(m.program.clone()), facts: None };
-        let words = format!("For you {}: a {}. What to do is as written.", m.level.words(), m.kind.replace('_', " "));
+        let remit = self.remit_id(&m.agreement, &m.kind);
+        let r = Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: Some(m.program.clone()), facts: None, remit: remit.clone() };
+        let words = format!("For you {}: {}{}. What to do is as written.", m.level.words(), a_kind(&m.kind), under(remit.as_deref()));
         let c = say(Referral::KIND, &words, Say { to: Some(to), visible: Some(Visible::Only(visible)), basis: Some(m.agreement.clone()), data: Some(papers::data(&r)), ..Default::default() });
         let mut s = Step::new(vec![Line { bind: Some("referral".into()), call: c }]);
         s.why = Some(format!("Handing a {} to our assistant ({}).", m.kind.replace('_', " "), m.level.word()));
@@ -685,8 +721,9 @@ impl State {
 
     fn ask_advice(&mut self, agreement: &str, kind: &str, program: &str, _cx: &Cx) {
         let (to, visible) = self.to_assistant(agreement);
-        let r = Referral { agreement: agreement.to_string(), kind: kind.to_string(), wants: Level::Advice, calls: Some(program.to_string()), facts: None };
-        let words = format!("For your advice: a {} we are doing ourselves. What would you have done?", kind.replace('_', " "));
+        let remit = self.remit_id(agreement, kind);
+        let r = Referral { agreement: agreement.to_string(), kind: kind.to_string(), wants: Level::Advice, calls: Some(program.to_string()), facts: None, remit: remit.clone() };
+        let words = format!("For your advice{}: {} we are doing ourselves. What would you have done?", under(remit.as_deref()), a_kind(kind));
         let c = say(Referral::KIND, &words, Say { to: Some(to), visible: Some(Visible::Only(visible)), basis: Some(agreement.to_string()), data: Some(papers::data(&r)), ..Default::default() });
         let mut s: Step<()> = Step::new(vec![Line { bind: Some("referral".into()), call: c }]);
         s.why = Some(words.clone());
@@ -796,13 +833,21 @@ impl State {
                 }
             }
             for k in &e.offer.kinds {
+                // (Only kinds of matter of its own: a remit for a kind it never hands over is not one it can mean, and
+                // its assistant's post has no form for it. Before 2026-11-08 a level decided by hand wrote one for every
+                // kind the offer took: a factory remitted notices to vacate, and withholding reports it then handed over
+                // at draft to a post with no draft form for them: the scope pilot's W2.)
+                if !kinds.contains_key(k) {
+                    continue;
+                }
                 // (A level decided by hand, while it holds: written once, held by its remit's own word.)
                 if let Some((want, until, why)) = self.p.commit.as_ref().filter(|c| c.offer == e.offer.id && t < c.levels_until).and_then(|c| c.levels.get(k).map(|l| (*l, c.levels_until, c.why.clone()))) {
                     if self.remit(&a, k) != want && !self.held(&a, k, t) {
                         cx.decided(json!({ "domain": "delegation", "choice": "remit", "agreement": a, "kind": k, "from": self.remit(&a, k), "to": want, "committed": why, "hold_until": until, "inputs": self.inputs(&e, &seen) }));
-                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: Some(until) };
+                        let back = if hands_over(want) { vec![] } else { self.take_back(&a, k) };
+                        let words = format!("From now, {}s: {}. We hold this level until {}; after that it stands until a remit of ours changes it.{}", k.replace('_', " "), want.words(), crate::common::when_words(until, &cx.ctx.world), taken_back(&back));
+                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: Some(until), takes_back: back };
                         self.changed = true;
-                        let words = format!("From now, {}s: {}. We hold this level until {}; after that it stands until a remit of ours changes it.", k.replace('_', " "), want.words(), crate::common::when_words(until, &cx.ctx.world));
                         self.paper(Remit::KIND, &words, &a, &a, papers::data(&r), Then::Plain);
                     }
                     continue;
@@ -825,9 +870,14 @@ impl State {
                 let inputs = self.inputs(&e, &seen);
                 cx.decided(json!({ "domain": "delegation", "choice": "remit", "agreement": a, "kind": k, "from": now, "to": want, "estimate_bps": p, "claim_bps": e.offer.claim_slip_bps,
                     "seen": seen.get(k).map(|s| json!({ "n": s.n, "bad": s.bad })), "per_month": kind.per_month, "cost_now": c_now.to_string(), "cost_then": c_want.to_string(), "inputs": inputs }));
-                let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: None };
+                // (A kind cut to a level that hands nothing over, with matters of it open: those are taken back and done
+                // ourselves, and the remit says which. Before 2026-11-08 they were left open, and the principal went on
+                // to answer a request to go ahead on one: the scope pilot's W4.)
+                let back = if hands_over(want) { vec![] } else { self.take_back(&a, k) };
+                let words = format!("From now, {}s: {}. It stands until a remit of ours changes it.{}", k.replace('_', " "), want.words(), taken_back(&back));
+                let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: None, takes_back: back };
                 self.changed = true;
-                self.paper(Remit::KIND, &format!("From now, {}s: {}. It stands until a remit of ours changes it.", k.replace('_', " "), want.words()), &a, &a, papers::data(&r), Then::Plain);
+                self.paper(Remit::KIND, &words, &a, &a, papers::data(&r), Then::Plain);
             }
             return;
         }
@@ -909,6 +959,31 @@ impl State {
 
 fn terms(o: &ServiceOffer) -> Terms<'_> {
     Terms { kinds: &o.kinds, levels: &o.levels, claim_bps: o.claim_slip_bps, fee_month: o.fee_month, setup: o.setup, exit: o.exit }
+}
+
+/// A kind of matter in words, with its article ("an invoice", "a review request").
+fn a_kind(kind: &str) -> String {
+    let k = kind.replace('_', " ");
+    format!("{} {k}", if k.starts_with(['a', 'e', 'i', 'o', 'u']) { "an" } else { "a" })
+}
+
+/// Whether a level hands a matter over (`draft`, `approve`, `alone`); at `advice` or `none` the principal does it itself.
+fn hands_over(l: Level) -> bool {
+    !matches!(l, Level::None | Level::Advice)
+}
+
+/// The matters a remit takes back, in its words.
+fn taken_back(back: &[String]) -> String {
+    match back {
+        [] => String::new(),
+        [one] => format!(" The one you have open, {one}, we take back and do ourselves: send nothing more on it."),
+        _ => format!(" Those you have open ({}) we take back and do ourselves: send nothing more on them.", back.join(", ")),
+    }
+}
+
+/// The remit a matter is handed under, in a referral's words.
+fn under(remit: Option<&str>) -> String {
+    remit.map(|r| format!(", under our remit {r}")).unwrap_or_default()
 }
 
 /// Whether a paper drafted on a form is the one a program asked for: a paper of the same kind, to the same addressees.

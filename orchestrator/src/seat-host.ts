@@ -14,8 +14,8 @@
 import { appendFileSync } from "node:fs";
 import { calls, forms, inCalendar, inCurrency, modules, Randomness, View, type DayBook, type Observation, type ParticipantAction, type ParticipantContext, type Roster, type Tally } from "@oikos/participants";
 import {
-  applyFraming, createLlmParticipant, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, LLM_PARTICIPANT_VERSION, MOCK_VERSION, mockPolicies, MockAdapter, ModelCallFailed, ModelUnreachable,
-  reckonedEndMicroUsd, SpendingLimitReached, stepsOf, UsageLimitReached, type Budget, type DebriefInput, type FramingSpec, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price,
+  applyFraming, createLlmParticipant, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, keptBackFor, seatsEndNeedMicroUsd, LLM_PARTICIPANT_VERSION, MOCK_VERSION, mockPolicies, MockAdapter, ModelCallFailed, ModelUnreachable,
+  SpendingLimitReached, stepsOf, UsageLimitReached, type Budget, type DebriefInput, type FramingSpec, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price,
 } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, NOT_CHECKED, TRANSLATOR_VERSION, type Draft, type Route } from "@oikos/translator";
 import { actedOn, drawTies, largest, leftAlone, besideOf, renderSummary, SeatRecords, idsFrom } from "./debrief-summary";
@@ -146,7 +146,7 @@ export class ModelSeat {
       // (Seats that share their fork's limit, a template steward's, keep back for every one of them: each seat made adds its own.)
       const shared = o.budget as Budget & { seats?: number };
       const seats = (shared.seats = (shared.seats ?? 0) + 1);
-      const need = endNeedMicroUsd(endCosts(), { seats, seatModel, seatReckoned: reckonedEndMicroUsd({ seats, seatPrice: o.prices[seatModel], calls, promptChars: DEBRIEF_PROMPT_CHARS, answerTokens: Math.round(DEBRIEF_ANSWER_TOKENS / 2) }) });
+      const need = seatsEndNeedMicroUsd(endCosts(), { seats, seatModel, ...(o.prices[seatModel] ? { seatPrice: o.prices[seatModel] } : {}), calls, promptChars: DEBRIEF_PROMPT_CHARS, answerTokens: Math.round(DEBRIEF_ANSWER_TOKENS / 2) });
       o.budget.keptBackMicroUsd = keptBackFor(o.budget.limitMicroUsd, need.microusd).microusd;
       this.keptBack = o.budget.keptBackMicroUsd;
     }

@@ -191,6 +191,11 @@ pub struct Remit {
     pub level: Level,
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int")]
     pub hold_until: Option<i64>,
+    /// Matters of this kind the assistant had open that the principal takes back with this remit (a kind cut to a level
+    /// that hands nothing over, `none` or `advice`): it does them itself, and answers nothing more on them. A matter
+    /// already handed over stays at the level it was handed at otherwise (the remit governs what is handed from then on).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub takes_back: Vec<String>,
 }
 impl Paper for Remit {
     const KIND: &'static str = "remit";
@@ -210,6 +215,11 @@ pub struct Referral {
     pub calls: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub facts: Option<Value>,
+    /// The remit it is handed under (the principal's newest for its kind under the agreement), so that whoever takes the
+    /// matter up has its authority in hand with the matter, as a client's instruction cites the standing terms it is
+    /// given under (the scope pilot's desk, which took its post a month after its clients' remits, could not find them).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remit: Option<String>,
 }
 impl Paper for Referral {
     const KIND: &'static str = "referral";

@@ -287,7 +287,7 @@ test("what to find, in the world's words or the old ones, becomes the same searc
     { field: "author", op: "!=", value: "c1" }, { field: "speaks_for", value: "city" }, { field: "basis", value: "law-2" }, { field: "data.rent", op: "<=", value: 90000 }];
   const { p } = harness([[use("a", "look", { report: "mayor/mine", find: find.slice(0, 5), limit: 5 }), use("b", "look", { report: "mayor/files", find: find.slice(5), current_only: true })]], seat);
   expect(await p.step(obs(0), ctx)).toEqual({ type: "look", looks: [{ channel: "mayor/mine", query: { where: [
-    { field: "author", op: "=", value: "clerk" }, { field: "speaks_for", op: "=", value: "city" }, { field: "basis", op: "=", value: "law-1" }, { field: "data.employer", op: "=", value: "works" },
+    { field: "from", op: "=", value: "clerk" }, { field: "speaks_for", op: "=", value: "city" }, { field: "basis", op: "=", value: "law-1" }, { field: "data.employer", op: "=", value: "works" },
     { field: "at", op: ">=", value: 11 * DAY }, { field: "at", op: "<", value: 12 * DAY }], order: { field: "at", desc: true }, limit: 5 } }] });
   expect(await p.step(obs(60), ctx)).toEqual({ type: "look", looks: [{ channel: "mayor/files", query: { standing: true, where: [
     { field: "author", op: "!=", value: "c1" }, { field: "speaks_for", op: "=", value: "city" }, { field: "basis", op: "=", value: "law-2" }, { field: "data.rent", op: "<=", value: 90000 }], order: { field: "at", desc: true }, limit: 20 } }] });
