@@ -11520,6 +11520,10 @@ The pilot's own logs were read for each fault's cause before anything was change
   it ran out, and the tool came back empty (`{}`). Fixed: an answer may run to 2,400 tokens, and an answer with nothing in
   it is asked for once more in fixed words (`ASK_AGAIN`, in docs/behaviour/debrief.md); debrief script 0.5.1. Not by the
   provider's stop reason, which a resumed run does not have: by what the answer holds, so a resume takes the same path.
+- **Found on the way: a system delivered during a fork never saw its forms.** It sat once before it was appointed, with
+  nothing to see, and was thereafter shown only what was new, never its post's stationery. A system not yet put to work
+  now does not sit, and is handed its channels whole at its first sitting in its post (`seat-host.ts`). It showed once
+  shops, their withholding returns now theirs to hand over, engaged assistants in the test fork.
 - **Not fixed here:** W5 (the collector's account could not be found, and paying it was not in the remit) and the
   translator's own refusals (the instrument's, MT-25 and TR-8).
 - **Revisit if:** a mock fork of the pilot's spec shows a seat's window naming a missing remit, form, agreement or draft

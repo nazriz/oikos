@@ -77,7 +77,8 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
     await runBase(spec, 1, out);
     const r = await runArm(spec, 1, spec.arms[0]!, out);
     const calls = readFileSync(join(out, "seed-1", "seats.calls.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
-    const seats = new Set(calls.map((c: any) => c.seat));
+    // (Those that sat: a system delivered too late to be put to work before the limit sits never, and is only debriefed.)
+    const seats = new Set(calls.filter((c: any) => c.purpose === "participant").map((c: any) => c.seat));
     expect(seats.has("provider-a-desk-system"), "the desk, a system of the config, is a seat").toBe(true);
     expect(seats.size).toBeGreaterThan(1);
     expect(r.stopped?.by).toBe("SpendingLimitReached");
