@@ -140,6 +140,8 @@ the R180 seat-days, `pilot-cases.ts` and the held-out file. New: before the Clau
 of its seat-days (seeded, by seat-day) are made test-only; a rewrite inherits its source seat-day's split; the per-model
 parity set (section 5) is written from test-split situations only. The join's leak check (five words running) runs
 against all of them; a hit drops the row. No choice among runs is made on held out.
+(Round 2, 2026-11-08: the scope pilot's requests follow a few set forms of words, so the five-words check is not run
+against its own test side, which would leave nothing; the seat-day split is the guard there. `translator/train/v4-pilot/`.)
 
 ## 4. What is exact goes in code; where weight-space programming fits
 

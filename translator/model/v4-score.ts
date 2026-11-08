@@ -61,7 +61,7 @@ function upper(k: number, n: number): number {
   for (let it = 0; it < 60; it++) { const m = (lo + hi) / 2; tail(m) > 0.05 ? (lo = m) : (hi = m); }
   return hi;
 }
-interface Ans { id: string; program: string | null; sure: number; ms: number; ok: boolean; writer: string }
+interface Ans { id: string; program: string | null; sure: number; ms: number; ok: boolean; writer: string; parts?: object; steps?: number }
 /** Served: an answer that is an act or a refusal other than asking back (`none(unclear)`, or no program: the request is
  * asked back to the seat in the world's own terms, never counted confidently wrong). */
 const servable = (a: Ans) => !!a.program && a.program.trim() !== "none(unclear)";
@@ -91,7 +91,9 @@ for (const m of all("model")) {
       const t0 = performance.now();
       const x = await a.translate(r.request, r.forms, { draft: true });
       const program = x.wrote ?? x.program;
-      answers.push({ id: r.id, program, sure: x.sure, ms: x.ms ?? performance.now() - t0, ok: right(program, r.program, r), writer: writerOf(r) });
+      // (Its sureness in parts, for a calibration measured outside: calibrate.py.)
+      const last = a.answers.at(-1);
+      answers.push({ id: r.id, program, sure: x.sure, ms: x.ms ?? performance.now() - t0, ok: right(program, r.program, r), writer: writerOf(r), ...(last?.parts ? { parts: last.parts } : {}), ...(last?.steps !== undefined ? { steps: last.steps } : {}) });
     }
     a.close();
   } else if (m.startsWith("text:")) {

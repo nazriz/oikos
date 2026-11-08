@@ -11439,3 +11439,75 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
   first): the resolver's law, held.
 - **Revisit if:** a provider's own staff need to see an organisation's matters (a support desk: then a channel of its
   own, declared); round 2's requests are again set off by refusals of the world (read each trigger before counting).
+
+## 2026-11-08 · Translator v4, round 2: the scope pilot's requests keyed, sureness calibrated, the control retrained (GPU 1.94 USD; no API spend)
+
+- **Split first, by code** (`translator/train/v4-pilot/split.ts`, before any keying): the scope pilot's model arms, rounds
+  1 to 3 (round 4 was still running and is not in it), 1,469 real requests on 463 seat-days. Within each seat model a
+  third of its seat-days (rounded up, by a seeded hash) is test-only: 525 requests on 156 seat-days; one in ten of the
+  rest is validation (76), the rest train (868). Readers were given hashed ids that say nothing of model, side or seat.
+  **Not as designed:** the five-words-running leak rule is not run against the new test side: the pilot's requests follow
+  a few set forms of words, and 926 of the 944 other-side requests share five words running with some test-side one, so
+  the rule would leave nothing. The seat-day split is the guard; the rule still runs against the scope set (4 dropped)
+  and the held-out cases (0). So the test side measures new seat-days of the same pilot, in its own forms of words: an
+  optimistic read of how the translator reads a new pilot.
+- **Keyed** (`keep.ts`): two blind readers, Sonnet 5.5 and Opus 5.5 as Claude Code subagents on the owner's plan (40
+  batches of 75; no API key), each with the translator's own prompt. Both answered all 1,469; they read 1,015 the same
+  (69%; 414 disagreed). Kept: 581 train, 62 validation, 368 test (by model on the test side: Sonnet 114, Opus 97, Fable 88,
+  Haiku 59, Codex sol 10). **The seat's sign-off as evidence, one way only.** A first look showed seats confirm drafts
+  that fall short of their words (a report's words left out, a basis narrowed) and decline right drafts for reasons of
+  their own (the matter moved on, the world's faults), so a confirmed draft that differs from two agreeing readers does
+  not overturn them: of the kept, 818 had the same act confirmed, 38 another act confirmed, 33 this act declined (all kept,
+  counted). Where the readers disagreed, a train-side request was to be kept with the reading that matches a confirmed
+  draft of our own model (two readings of three): none qualified, because nearly every disagreement was on a request our
+  model had sent behind to Sonnet, and a Sonnet draft is no independent reading. No multi-voice rewrites were written
+  this round (the keyed real requests were the larger and surer gain; left for the next).
+- **Retrained** the batch-1 winner's recipe (deberta-v3-small, 6 epochs, `--forms 0`) on batch 1's data plus the 581
+  pilot rows four times (`join.ts`, 75,527 rows; validation sets unchanged), two seeds on two RunPod community pods at
+  0.19 an hour (RTX A4500). A first attempt on a 20 GB card ran out of memory in epoch 4: `pod.sh` now gives cards under
+  23 GB the 4,096-token step (it was under 20 GB), and takes `OIKOS_POD_GPUS` so a cheap batch asks only for cards under
+  its price. Spend: RunPod 12.81 to 10.88 USD (1.94: the two runs about 1.20, the run lost to memory about 0.70, rentals
+  ended at once for their price or a dead host the rest); teacher labels 0 USD of the credit.
+- **Calibration** (`translator/model/py/calibrate.py`), fitted on validation-real only (batch 1's 615 and the pilot's 62),
+  cross-fitted by whole seats so no request is scored by a fit that saw it: (a) a logistic fit on the passes' parts, the
+  request's length, the words left after the last copied text and the answer's kind: worse at the top than the raw
+  sureness (15 served at 1% against 351 for batch 1's D: a likelihood fit spends itself on the bulk); (b) **per-pass
+  scaling** (a temperature for each of choices, places, texts and the least decision, and a weight on words left after a
+  copy), chosen on a grid for the headline itself: about a point either way, at best (D1 +0.8 and +1.0, seed 2 +0.7; seed 1
+  -3.1, on validation-real); (c) **two seeds agreeing** (served only when both write the same program, at the
+  lesser sureness): the one signal that moves it, +4.5 points over seed 1 alone. Conformal (one-sided 95%) bound: no cut-off
+  is certified at 1% for any model on any set; it needs about 300 surest answers with none wrong, and every model has a
+  wrong answer among its surest (copied text that stops a sentence early; a refusal of the neighbouring kind; keys missing
+  a required field, which are the keys' own fault, recorded, not chased).
+
+  | | right, validation-real 615 | right served at 1%, validation-real 615 / 677 (with the pilot's 62) | test side 368: right | test side: right served at the cut set on validation-real (wrong served) | unseen forms 824 right | scope set 67: recognised / false of 81 |
+  |---|---|---|---|---|---|---|
+  | v3-s2 (today's first) | 540 | 216 (35.1%) / - | 251 (68.2%) | - | 803 | 20 / 0 |
+  | batch 1 D (before) | 536 | 351 (57.1%) / 362 (53.5%); scaled 369 (54.5%) | 263 (71.5%) | 113 (30.7%; 3 = 2.6% of served); scaled 117 (31.8%; 3) | 805 | 64 / 7 |
+  | round 2 D seed 1 | 537 | 208 (33.8%) / 420 (62.0%); scaled 399 (58.9%) | **341 (92.7%)** | 238 (64.7%; 0); scaled 241 (65.5%; 0) | 804 | 63 / 6 |
+  | round 2 D seed 2 | 539 | 206 (33.5%) / 396 (58.5%); scaled 401 (59.2%) | 334 (90.8%) | 229 (62.2%; 1); scaled 227 (61.7%; 0) | 808 | 63 / 7 |
+  | both seeds agreeing | - | - / 450 (66.5%) | - | **246 (66.8%; 0)** | - | - |
+
+- **Per-model parity on the test side** (seed 1, scaled, at the cut set on validation-real): confidently wrong 0 for every
+  model (passes at most 1%); right served Fable 72.7%, Opus 69.1%, Sonnet 67.5%, Haiku 50.8% (Codex sol 30.0% on 10
+  requests): a spread of 21.9 points among the models with 20 or more, against 5 allowed (fails). Right in all: Opus 96.9%,
+  Sonnet 92.1%, Fable 90.9%, Haiku 88.1%, Codex 10 of 10. Haiku's requests are read right nearly as often but less surely: the
+  model asks Haiku back more (29 of 59). Two seeds agreeing: 0 wrong, spread 29.8 points (Fable 77.3, Haiku 47.5).
+- **Scope set:** 63 of 67 recognised, 6 false positives (batch 1's D: 64, 7): misses in blunt (1), plain (1) and structured
+  (2); false positives in hedged (3), blunt (2), second-language (1); by writer Sonnet 25 of 27, Haiku 19 of 20 (all six
+  false positives on Haiku's look-alikes), Codex luna 19 of 20. At the 1% cut no scope request is served (all asked back,
+  none misread), as in batch 1.
+- **The pass mark is not met** (90% right served at 1% confidently wrong): 62 to 67% on real requests at the mark, 87% right
+  in all on validation-real, no cut-off certified by the bound, and the parity spread four times the limit. So no release is
+  proposed; today's first stays first. What round 2 bought is the pilot's own requests (the test side from 71% to 93% right,
+  30% to 65% served) at no loss on unseen forms or the scope set. On batch 1's validation-real alone the new models serve
+  fewer at the mark (208 against 351) though they are as often right: one wrong answer at sureness 0.99998 sets the cut, so
+  that figure moves by a hundred and more on a single request (with the pilot's 62 added the order turns over).
+- **Next, by what this says:** sureness, not reading, is the limit, and the one signal that lifts it is a second model
+  agreeing: serving two seeds (latency about doubles, 0.2 to 0.4 s a request) is the cheapest next step to measure. Haiku's
+  requests need more of their own kind in training (the parity fault is Haiku's served share). The design's per-model
+  parity set (100 test-side situations written by every model) is still to write: today's parity is on each model's own
+  situations, so it mixes the writer with what was asked of it.
+- **Revisit if:** round 4's requests read worse than the test side (the test side shares the pilot's forms of words, see
+  above); serving two seeds does not hold the 0 wrong on a new pilot; the readers' 31% disagreement turns out to cluster on
+  one kind of request (then the keys under-represent it, in training and test alike).
