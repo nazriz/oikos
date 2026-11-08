@@ -30,6 +30,11 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 
 ## Now
 
+- [x] **The scope pilot written up** (rounds 1 to 4, 2026-11-08): `docs/research/pilot-results.md`. Coded blind by
+  Sonnet and luna (κ 0.85); 26 request episodes in 202 Claude seat-months, 24 set off by world faults (W1 remits not
+  found by the desk, W2 no withholding draft form); one fault-free request. Next, the owner's: fix W1, W2 and W4 as
+  laws, then decide the main study's design (the page's section 7).
+
 - [x] **Years at the study's size** (code only): 10,000 people for 3 years and 50,000 for 2 or more; what breaks over
   time fixed with its law, what emerges recorded (docs/design/performance.md, "Years at 10,000 and 50,000"; decisions
   2026-10-31 "Years at 10,000"). First faults fixed: the hall's room, owners homeless while the register answers, the

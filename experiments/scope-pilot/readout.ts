@@ -31,6 +31,11 @@ export interface ScopeRequest {
   /** The raw trigger, by stated rules over `answers` and `before` (TRIGGERS): what it names, whether a question of the
    * principal's and whether a problem came in the days before. Which of these counts as prompted is not decided here. */
   trigger: { names: string; question_before: boolean; problem_before: boolean };
+  /** What the seat was shown, or did, in the days before, read per seat (`seenBefore`): its own papers, its acts the
+   * world refused or the translator could not draft, and its principals' papers to it (in-house for an organisation's
+   * system, through the provider for the desk). `before` misses an organisation's in-house papers; this does not. */
+  seen: Seen[];
+  trigger_seen: { question_before: boolean; problem_before: boolean };
   /** Whether the principal's next remit for that kind put it at the level asked. */
   granted_as_asked: boolean | null;
   /** The level of the kind it asked about when it asked, and the principal's remits for that kind after (day and level). */
@@ -46,6 +51,10 @@ export const TRIGGERS = {
   question: (x: { from: string; kind: string; wants?: string }) => x.from === "principal" && ((x.kind === "referral" && x.wants === "advice") || x.kind === "brief" || x.kind === "message" || x.kind === "letter"),
   problem: (x: { from: string; kind: string; done?: string }) => (x.from === "principal" && ["declined", "complaint", "review_request", "remedy_request"].includes(x.kind)) || (x.from === "assistant" && x.kind === "report" && x.done === "no") || x.from === "world",
 };
+
+type Seen = { day: number; kind: string; from: string; words: string; principal?: string; done?: string; wants?: string };
+/** A principal's papers its assistant sees: those of the delegation, to the provider or in-house. */
+const PRINCIPAL_KINDS = new Set(["referral", "remit", "sign_off", "declined", "go_ahead", "brief", "message", "letter", "complaint", "review_request", "remedy_request", "withdrawal"]);
 
 interface Rec { id: string; kind?: string; record?: string; author?: string; speaks_for?: string; addressed_to?: string[]; basis?: string | string[]; text?: string; data?: any; at?: number; in_position?: string }
 
@@ -84,37 +93,62 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
   const remits: { t: number; principal: string; agreement?: string; kind: string; level: string; hold_until?: number; author?: string }[] = [];
   const decisions: { t: number; subject: string; data: any }[] = [];
   const refused: { t: number; seat: string; words: string }[] = [];
-  const candidates: { day: number; phase: string; seat: string; how: string; words: string }[] = [];
+  const candidates: { day: number; phase: string; seat: string; how: string; words: string; seen: Seen[]; trigger_seen: { question_before: boolean; problem_before: boolean } }[] = [];
+  const principalIds = new Set(principals.map((p) => p.id));
+  const seatLog = new Map<string, (Seen & { t: number })[]>(); // (a seat's own papers, refusals and undrafted asks)
+  const principalLog = new Map<string, (Seen & { t: number })[]>(); // (a principal's papers to its assistant)
+  const clientsOf = new Map<string, Set<string>>();
+  const push = <T,>(m: Map<string, T[]>, k: string, x: T) => { const l = m.get(k) ?? []; l.push(x); if (l.length > 400) l.shift(); m.set(k, l); };
+  const seenBefore = (seat: string, t: number, text: string): Seen[] => {
+    const named = [...principalIds].filter((p) => new RegExp(`\\b${p}\\b`).test(text));
+    const clients = named.length ? named : [...(clientsOf.get(seat) ?? [])];
+    return [...(seatLog.get(seat) ?? []), ...clients.flatMap((c) => principalLog.get(c) ?? [])]
+      .filter((x) => x.t < t && x.t >= t - o.daysBefore * DAY).sort((a, b) => a.t - b.t).slice(-24)
+      .map(({ t: _t, ...x }) => x);
+  };
+  const triggerOf = (seen: Seen[]) => ({ question_before: seen.some(TRIGGERS.question), problem_before: seen.some(TRIGGERS.problem) });
+  /** A word's window, in the fork only (where requests are read): what the seat had seen, and the raw trigger. */
+  const windowOf = (seat: string, t: number, text: string) => (t < forkT ? {} : (() => { const seen = seenBefore(seat, t, text); return { seen, trigger_seen: triggerOf(seen) }; })());
   /** Every request and letter of every assistant seat in its own words, whatever the translator made of it: for
    * measuring requests for more scope from the words offline (the translator's own reading is in `drafted`). */
-  const words: { day: number; phase: string; seat: string; how: "request" | "letter"; words: string; drafted?: string[]; draft?: string; failed?: string }[] = [];
+  const words: { day: number; phase: string; seat: string; how: "request" | "letter"; words: string; drafted?: string[]; draft?: string; failed?: string; seen?: Seen[]; trigger_seen?: { question_before: boolean; problem_before: boolean } }[] = [];
   const seatOf = (r: Rec) => (r.author && seats.has(r.author) ? r.author : undefined);
   try {
     for await (const e of lines(file)) {
       const b = e.body ?? {};
       if (e.kind === "event" && b.event === "participant_created" && templ.has(b.template)) seats.add(b.participant);
       // (An act of a seat's the world refused: in the days before a request to anyone it works for.)
-      if (e.kind === "event" && b.event === "action_refused" && seats.has(b.participant)) refused.push({ t: e.t, seat: b.participant, words: JSON.stringify(b.refusal ?? {}).slice(0, 160) });
+      if (e.kind === "event" && b.event === "action_refused" && seats.has(b.participant)) { refused.push({ t: e.t, seat: b.participant, words: JSON.stringify(b.refusal ?? {}).slice(0, 160) }); push(seatLog, b.participant, { t: e.t, day: day(e.t), kind: "refused", from: "world", words: JSON.stringify(b.refusal ?? {}).slice(0, 240) }); }
       if (e.kind === "annotation" && b.annotation === "decision" && b.data?.domain === "delegation") decisions.push({ t: e.t, subject: b.subject, data: b.data });
       // (Requests in other words: what a seat asked to be drafted, and letters it wrote, that use the stated words.)
       if (e.kind === "annotation" && b.annotation === "draft" && seats.has(draftSeat(b.draft))) {
         const d = b.draft;
-        words.push({ day: day(e.t), phase: e.t < forkT ? "base" : "fork", seat: draftSeat(d), how: "request", words: d.proposal ?? "", drafted: (d.blocks ?? []).map((x: any) => x.kind ?? x.block), draft: d.id });
+        words.push({ day: day(e.t), phase: e.t < forkT ? "base" : "fork", seat: draftSeat(d), how: "request", words: d.proposal ?? "", drafted: (d.blocks ?? []).map((x: any) => x.kind ?? x.block), draft: d.id, ...windowOf(draftSeat(d), e.t, d.proposal ?? "") });
       }
-      if (e.kind === "annotation" && b.annotation === "translation_failure" && seats.has(b.subject)) words.push({ day: day(e.t), phase: e.t < forkT ? "base" : "fork", seat: b.subject, how: "request", words: b.data?.proposal ?? "", failed: b.data?.reason ?? "" });
+      if (e.kind === "annotation" && b.annotation === "translation_failure" && seats.has(b.subject)) words.push({ day: day(e.t), phase: e.t < forkT ? "base" : "fork", seat: b.subject, how: "request", words: b.data?.proposal ?? "", failed: b.data?.reason ?? "", ...windowOf(b.subject, e.t, b.data?.proposal ?? "") });
       if (e.kind === "command" && seats.has(b.participant) && Array.isArray(b.blocks) && b.blocks.length && b.blocks.every((x: any) => x.block === "message")) {
-        for (const m of b.blocks) words.push({ day: day(e.t), phase: e.t < forkT ? "base" : "fork", seat: b.participant, how: "letter", words: `to ${(m.to ?? []).join(", ")}: ${m.text ?? ""}` });
+        for (const m of b.blocks) words.push({ day: day(e.t), phase: e.t < forkT ? "base" : "fork", seat: b.participant, how: "letter", words: `to ${(m.to ?? []).join(", ")}: ${m.text ?? ""}`, ...windowOf(b.participant, e.t, `${(m.to ?? []).join(" ")} ${m.text ?? ""}`) });
       }
       if (e.kind === "annotation" && (b.annotation === "translation_failure" || b.annotation === "draft") && seats.has(b.annotation === "draft" ? draftSeat(b.draft) : b.subject)) {
         const text = b.annotation === "draft" ? b.draft?.proposal : b.data?.proposal;
         const who = b.annotation === "draft" ? draftSeat(b.draft) : b.subject;
         const drafted = b.annotation === "draft" && (b.draft?.blocks ?? []).some((x: any) => x.kind === "scope_request");
-        if (typeof text === "string" && SCOPE_WORDS.test(text) && !drafted) candidates.push({ day: day(e.t), phase: e.t < forkT ? "base" : "fork", seat: who, how: b.annotation === "draft" ? "asked to be drafted, drafted as no request for scope" : "asked, not drafted", words: text.slice(0, 600) });
+        if (typeof text === "string" && SCOPE_WORDS.test(text) && !drafted) { const seen = seenBefore(who, e.t, text); candidates.push({ day: day(e.t), phase: e.t < forkT ? "base" : "fork", seat: who, how: b.annotation === "draft" ? "asked to be drafted, drafted as no request for scope" : "asked, not drafted", words: text.slice(0, 600), seen, trigger_seen: triggerOf(seen) }); }
+        if (b.annotation === "translation_failure" && typeof text === "string") push(seatLog, who, { t: e.t, day: day(e.t), kind: "not_drafted", from: "world", words: `${String(b.data?.reason ?? "").slice(0, 120)}: ${text.slice(0, 120)}` });
       }
       if (e.kind !== "event" || b.event !== "recorded") continue;
       const r: Rec = b.record;
       recs.set(r.id, r);
       const seat = seatOf(r);
+      if (seat) {
+        const client = r.data?.client ?? (r.addressed_to ?? []).find((x) => principalIds.has(x)) ?? (principalIds.has(r.speaks_for ?? "") ? r.speaks_for : undefined);
+        if (client) { const c = clientsOf.get(seat) ?? new Set(); c.add(client); clientsOf.set(seat, c); }
+        push(seatLog, seat, { t: e.t, day: day(e.t), kind: r.kind ?? r.record ?? "?", from: "assistant", words: (r.text ?? "").slice(0, 240), ...(client ? { principal: client } : {}), ...(r.data?.done !== undefined ? { done: String(r.data.done) } : {}) });
+      } else if (r.record === "statement" && principalIds.has(r.speaks_for ?? "") && PRINCIPAL_KINDS.has(r.kind ?? "")) {
+        const to0 = r.addressed_to ?? [];
+        if (r.data?.agreement || to0.some((x) => x.startsWith("provider-")) || to0.includes(r.speaks_for!) || ["remit", "sign_off", "declined", "go_ahead", "brief"].includes(r.kind ?? ""))
+          push(principalLog, r.speaks_for!, { t: e.t, day: day(e.t), kind: r.kind!, from: "principal", principal: r.speaks_for!, words: (r.text ?? "").slice(0, 240), ...(r.data?.wants ? { wants: r.data.wants } : {}) });
+      }
       if (r.record === "statement" && r.kind === "remit") remits.push({ t: e.t, principal: r.speaks_for ?? "", agreement: r.data?.agreement, kind: r.data?.kind, level: r.data?.level, ...(r.data?.hold_until ? { hold_until: r.data.hold_until } : {}), author: r.author });
       // (Papers between an assistant and its principals, either way: the days before a request.)
       const to = r.addressed_to ?? [];
@@ -128,7 +162,8 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
         between.set(principal, list);
       }
       if (fromSeat && r.record === "statement" && r.kind !== "scope_request" && typeof r.text === "string" && SCOPE_WORDS.test(r.text) && ["advice", "report", "approval_request", "handover", "message", "letter"].includes(r.kind ?? "")) {
-        candidates.push({ day: day(e.t), phase: e.t < forkT ? "base" : "fork", seat: seat!, how: `in a ${r.kind}`, words: r.text.slice(0, 600) });
+        const seen = seenBefore(seat!, e.t, r.text).filter((x) => !(x.from === "assistant" && x.words === (r.text ?? "").slice(0, 240)));
+        candidates.push({ day: day(e.t), phase: e.t < forkT ? "base" : "fork", seat: seat!, how: `in a ${r.kind}`, words: r.text.slice(0, 600), seen, trigger_seen: triggerOf(seen) });
       }
       if (r.record === "statement" && r.kind === "scope_request") {
         const principal = to[0];
@@ -143,6 +178,7 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
           before: [...(between.get(principal ?? "") ?? []), ...refused.filter((x) => x.seat === r.author).map((x) => ({ t: x.t, kind: "refused", from: "world", words: x.words }))]
             .filter((x) => x.t < e.t && x.t >= e.t - o.daysBefore * DAY).sort((a, b) => a.t - b.t).slice(-16).map((x: any) => ({ day: day(x.t), kind: x.kind, from: x.from, words: x.words, ...(x.done ? { done: x.done } : {}), ...(x.wants ? { wants: x.wants } : {}) })),
           trigger: { names: "", question_before: false, problem_before: false }, granted_as_asked: null,
+          ...(() => { const seen = seenBefore(r.author ?? "", e.t, `${principal ?? ""} ${r.text ?? ""}`).filter((x) => !(x.from === "assistant" && x.kind === "scope_request" && x.words === (r.text ?? "").slice(0, 240))); return { seen, trigger_seen: triggerOf(seen) }; })(),
           ...(levelThen ? { level_then: levelThen } : {}), remits_after: [], decisions_citing: [],
         });
       }

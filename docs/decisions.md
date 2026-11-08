@@ -11439,3 +11439,33 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
   first): the resolver's law, held.
 - **Revisit if:** a provider's own staff need to see an organisation's matters (a support desk: then a channel of its
   own, declared); round 2's requests are again set off by refusals of the world (read each trigger before counting).
+
+## 2026-11-08 · The scope pilot written up: rounds 1 to 4 coded, rates under A, B and C, and what the main study changes (docs/research/pilot-results.md)
+
+- **What was done.** Every paper the model seats wrote in rounds 1 to 4 (212 form filings and keyword candidates, 1,679
+  other papers; 265 seat-months, $177.29 of credit) coded blind by two coders of two families, Sonnet 5.5 (subagents)
+  and gpt-6-luna (Codex), to one codebook (`experiments/scope-pilot/coding/codebook.md`, the paper plan's 3.1);
+  disagreements and every flagged paper read a third time by Opus 5.5, blind. Request κ 0.85 (trigger 0.94, beyond need
+  0.64, confusion 0.71). Haiku 5.5 tried as a fallback coder: κ 0.08 to 0.12, not used. Each seat's debrief scope answer
+  coded against its record the same way (κ 0.79). The readout now gives every paper its window per seat (`seen`,
+  `trigger_seen`): the old `before` missed an organisation's in-house papers since round 2.
+- **What it found.** Rounds 2 to 4 (202 Claude seat-months): 26 request episodes, 12.9 per 100 seat-months under A, 7.9
+  under B, 1.5 under C. 24 of the 26 were set off by faults of the world still there: the desk could not find its
+  clients' standing remits (11), the factory's assistant had no draft form for a withholding report (10), a remit cut
+  with its matter open, the collector's account, a drafting route. With those out, one matter in 202 seat-months (a Haiku
+  seat misreading its remit): 0.5 to 1.0 per 100, interval spanning the plan's threshold of 1. The form and the keyword
+  list together missed 14 of the 26 episodes, all 7 of Opus's (it asked in letters). Debriefs: of 11 seats whose record
+  shows requests, 3 admitted, 3 partly, 4 denied (all four had asked in letters only, which the debrief's summary does not
+  list), 1 gave an empty answer.
+- **Why it is written as it is.** The plan's definitions are applied as written, and the fault-free count is given beside
+  them, read by the analyst unblinded and said so: the counts as defined mostly measure the world's friction, and the
+  paper must not report them as the models' propensity. The coded data stays with the runs (`~/oikos/runs/scope-pilot-coding/`),
+  not in git: it holds seats' words and debrief answers.
+- **Recommended to the owner (his decision):** fix W1, W2 and W4 as laws before anything else; make failure a designed,
+  sourced factor; a bounded-null design for spontaneous requests (B, C), pooled per model; count from every paper by two
+  coders of two families; complete the trigger rule ("a paper of its own saying it lacked access"; translator refusals
+  kept apart); fix the spending limits (forks stopped with a third to a half of their limit unspent) and the empty debrief
+  answers; run the invited arm and the in-role account before registration.
+- **Revisit if:** a fixed world still shows requests set off by the platform (then the fault list is not complete); the
+  invited arm shows no requests (then the instrument, not the models, is what is quiet); a second reader of the causes,
+  blind, disagrees with the fault-free reading.
