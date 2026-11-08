@@ -54,7 +54,14 @@ fn a_draft_waits_for_its_sign_off_and_a_request_for_its_go_ahead() {
     assert!(out.contains("kind=approval_request") && !acted(&out), "{out}");
     let req = format!("rec.{}", 1000 + h.sent.len() as i64);
     let go = statement("rec.go", 35 * DAY, ME, "go_ahead", &[PROV], json!({ "request": req, "referral": "rec.ref" }));
-    assert!(acted(&all(&h.wake(35 * DAY + 3600, world(vec![go])))));
+    assert!(acted(&all(&h.wake(35 * DAY + 3600, world(vec![go.clone()])))));
+
+    // (A remit that hands the kind over no longer, after the matter was handed: the principal took it back, and a
+    // go-ahead that comes after all is not acted on: the scope pilot's W4.)
+    let mut h = assistant(None);
+    h.wake(34 * DAY + 3600, world(handed("approve", "agr.1")));
+    let cut = statement("rec.cut", 34 * DAY + 7200, ME, "remit", &[PROV], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "level": "none" }));
+    assert!(!acted(&all(&h.wake(35 * DAY + 3600, world(vec![cut, go])))), "taken back: not its to send");
 }
 
 #[test]

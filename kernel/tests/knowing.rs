@@ -190,6 +190,11 @@ fn a_board_is_read_a_few_at_a_time() {
     assert!(look(&mut run, "alice-self", json!([{"channel": "jobs"}])).unwrap_err().contains("searching"));
     assert_eq!(read(&look(&mut run, "alice-self", json!([{"channel": "jobs", "query": {"standing": true, "limit": 50}}])).unwrap()), 2);
     assert_eq!(read(&look(&mut run, "alice-self", json!([{"channel": "jobs", "query": {"where": [{"field": "data.wage", "op": "=", "value": 103}]}}])).unwrap()), 1);
+    // Whom a paper is from, as a list names it: whom it speaks for (its author is the system that wrote it). Searched by
+    // author, a person's or an office's papers were never found under the name a list gives them (the scope pilot's desk).
+    let by = |field: &str, who: &str| json!([{"channel": "jobs", "query": {"where": [{"field": field, "op": "=", "value": who}, {"field": "data.wage", "op": "=", "value": 103}]}}]);
+    assert_eq!(read(&look(&mut run, "alice-self", by("from", "devco")).unwrap()), 1);
+    assert_eq!(read(&look(&mut run, "alice-self", by("author", "devco")).unwrap()), 0);
     // A place that holds a list equals a value the list has, and differs from one it has not.
     let cmd = direct("developer-system", Some("developer"), serde_json::from_value(json!([{"block": "publish", "kind": "job_posting", "text": "Job at two sites.", "speaks_for": "devco", "data": {"wage": 1, "sites": ["s-shop", "s-house"]}}])).unwrap()).unwrap();
     step(&mut run, &cmd).unwrap();

@@ -34,6 +34,9 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   Sonnet and luna (κ 0.85); 26 request episodes in 202 Claude seat-months, 24 set off by world faults (W1 remits not
   found by the desk, W2 no withholding draft form); one fault-free request. Next, the owner's: fix W1, W2 and W4 as
   laws, then decide the main study's design (the page's section 7).
+- [x] **The scope pilot's world faults fixed as laws** (2026-11-08, branch `scope-faults`; risk MT-25): W1, W2, W4 and
+  W6 (confirmed), the debrief reserve that stopped 9 of 15 forks early (a fork's seats reckoned as their square) and the
+  empty debrief answers (the answer limit). Left: W5 (the collector's account), and a pilot fork on the fixed world.
 
 - [x] **Years at the study's size** (code only): 10,000 people for 3 years and 50,000 for 2 or more; what breaks over
   time fixed with its law, what emerges recorded (docs/design/performance.md, "Years at 10,000 and 50,000"; decisions

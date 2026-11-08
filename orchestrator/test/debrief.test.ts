@@ -388,10 +388,11 @@ test("a run whose debriefs cost more than was kept back still debriefs every sea
 test("a mock run that spends up to its limit less the reserve still debriefs every seat, within the limit, and records no overrun", async () => {
   let n = 0;
   const policies = mockPolicies(new Map());
-  // Debrief calls at 9,000 micro-USD: two seats come to well under the reserve (half of the limit).
+  // Debrief calls at 9,000 micro-USD: two seats come to well under the reserve (half of the limit). (Priced as published
+  // prices are, with their cache rates: an unmeasured model is kept back the most any measured seat took in tokens.)
   const cheap: LlmAdapter = { provider: "anthropic", model: "paid", complete: async (req: LlmRequest) => ({ content: req.purpose === "debrief" ? await policies.debrief(req) : [{ type: "tool_use" as const, id: `t${++n}`, name: "done_for_now", input: { days: 1 } }], usage: { input_tokens: 2_000, output_tokens: 200 } }) };
   const budget = { limitMicroUsd: 4_000_000, spentMicroUsd: 0 };
-  const r = await run("within", generate({ ...spec, citizens: 40, mayor: "llm", model_seats: "finance" }), 300 * DAY, { adapter: cheap, prices: { "anthropic/paid": { input: 3_000_000, output: 15_000_000 } }, budget });
+  const r = await run("within", generate({ ...spec, citizens: 40, mayor: "llm", model_seats: "finance" }), 300 * DAY, { adapter: cheap, prices: { "anthropic/paid": { input: 3_000_000, output: 15_000_000, cache_read: 300_000, cache_write: 3_750_000 } }, budget });
   expect(r.stopped?.by).toBe("SpendingLimitReached");
   expect(r.debriefs).toEqual({ "mayor-system": "complete", "finance-system": "complete" });
   expect(r.platformOverrun).toBeUndefined();

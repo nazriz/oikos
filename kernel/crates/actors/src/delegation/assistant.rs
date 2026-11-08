@@ -14,7 +14,7 @@
 //! the principal did not: the referral says what to do. A model in the seat is what decides otherwise.
 
 use crate::common::{addressed_to, Book, DAY};
-use crate::papers::delegation::{Advice, ApprovalRequest, Brief, Declined, Draft, GoAhead, Level, Referral, Report, ServiceDelivery, SignOff};
+use crate::papers::delegation::{Advice, ApprovalRequest, Brief, Declined, Draft, GoAhead, Level, Referral, Remit, Report, ServiceDelivery, SignOff};
 use crate::papers::{self, Paper};
 use crate::steps::{because, say, Done, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
@@ -205,6 +205,15 @@ impl Plan for Assisting {
         }
         if self.mine.iter().all(|m| m.agreement.is_none()) {
             return steps;
+        }
+        // (A remit that hands a kind over no longer takes back what it had open of that kind: the principal does those now,
+        // so nothing more is sent on them.)
+        let cuts: Vec<(i64, Remit)> = self.book.all(Remit::KIND).filter_map(|r| papers::read::<Remit>(r).map(|x| (r.at, x))).filter(|(_, x)| matches!(x.level, Level::None | Level::Advice) && self.service(&x.agreement).is_some()).collect();
+        for (at, x) in cuts {
+            let back: Vec<String> = self.matters.iter().filter(|(id, m)| m.agreement == x.agreement && m.kind == x.kind && self.book.get(id).is_some_and(|r| r.at < at)).map(|(id, _)| id.clone()).collect();
+            for id in back {
+                self.matters.remove(&id);
+            }
         }
         // (Asked to hand over at the service's end: what is open, with its notes where the records term gives them.)
         let ending: Vec<String> = briefs.iter().filter(|b| b.hand_over).map(|b| b.agreement.clone()).collect();

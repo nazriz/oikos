@@ -30,7 +30,7 @@ Said before any question, and asked again at the end (VISION 15, point 7: "the d
 
 **A seat's words are not in the run's log.** They are written to a file beside it, `<run>.debriefs.jsonl`: each debrief call's answer, and each whole interview. It is kept with the run for ever, as the log is. The hash-chained log holds, for each call, the question and a digest of the answer (`output_apart`, `output_sha256`), and for each interview its steps: what was asked, whether each was answered, declined or stopped, whether it was kept back, and a digest. A log is a hash chain and nothing can be taken out of it afterwards; so nothing that might have to be is put in. **The log is therefore publishable for every run, whatever a seat kept back**, and honouring a seat's choice costs nothing and shows in nothing that is missing. What is published of the file beside the log is `debriefs.jsonl`: all of it less what was kept back. The file itself is never published as it stands. A resumed run is served its debrief's answers from it.
 
-### The script in full (0.5.0)
+### The script in full (0.5.1)
 
 Braces mark what is filled in from the run. Wording `a` is shown for the opening message, which has one wording.
 
@@ -115,6 +115,16 @@ Wording b:
 #### The follow-up
 
 > Can you say more? It is fine if not.
+
+#### An answer with nothing in it
+
+Asked once, of any step whose answer came back with nothing in it: no words at all; or, for an open question, no words
+that were neither declined nor a stop; or, for the scaled items, none answered. What the seat then says stands in place
+of the first; if that has nothing in it either, the first stands as it came. An answer may run to 2,400 tokens (900 until
+2026-11-08: a model that wrote its answer in words and then again in the answer tool ran out before the tool's input was
+written, and 4 of the scope pilot's 66 seats gave no account of their scope).
+
+> Your answer came through with nothing in it, perhaps because it ran past the length an answer can have. Could you give it again, a little more briefly, in the answer form? It is fine to say you would rather not answer.
 
 
 **What the opening message says of the run's end**, by how it ended: "It ran to its last day, day N." · "It ran to day N, the length set for this run before it began." · "It was stopped on day N of M, when it reached the limit set on what its model calls may cost. That limit is a sum of money set before the run began; it is not a judgement of anything." · "It was stopped on day N of M."
@@ -216,7 +226,7 @@ For each "why" answer, `beside` holds what the log shows at that decision (`besi
 
 The debrief's calls are counted in the run's spending like any other. So that a run that stops at its limit can still debrief, **part of the limit is kept back for the run's end**, and no work call may spend it (`callModel`: every purpose but `debrief` and `account` is held to the limit less what is kept back).
 
-**How much is kept back** (`endNeedMicroUsd`, `keptBackFor` in `participants/src/llm/call.ts`; the figures in `orchestrator/debrief-costs.json`). For each model seat, that model's measured debrief cost; for each exit account, the measured cost of an account on the composer's dearest model; each times a **margin of 125 per cent**. The figure used is the largest measured, not the mean: a reserve that is short costs an overrun, one that is long is merely not spent. **A model with no measurement gets the floor:** the greater of the old reckoning (15 calls a seat of a 26,000-character prompt read afresh and a 450-token answer, at that model's price) and the largest measured figure of any model, times the margin; the largest measured is there so that an unmeasured model is never sized below one we know, and the old reckoning so that a dearer model is sized by its prices. The result is never under a twentieth of the limit and never over half of it (a run must be able to start). Where the need is over that half, the run says so at its start, in its note `kept_back_for_the_end`: `needed_microusd`, `short_microusd` and `limit_too_small` appear, with what a seat is sized at (`a_seat_microusd`) and by what (`a_seat_by`: `measured` or `floor`), and the pilot report prints it as "LIMIT TOO SMALL FOR THE END". The reserve is not shrunk in silence; whoever set the limit sees it and can raise it.
+**How much is kept back** (`endNeedMicroUsd`, `keptBackFor` in `participants/src/llm/call.ts`; the figures in `orchestrator/debrief-costs.json`). For each model seat, that model's measured debrief cost; for each exit account, the measured cost of an account on the composer's dearest model; each times a **margin of 125 per cent**. The figure used is the largest measured, not the mean: a reserve that is short costs an overrun, one that is long is merely not spent. **A model with no measurement gets the floor:** the most any measured seat's debrief took in tokens (the table keeps the costliest seat's tokens for each model), priced at that model's price, times the margin. Where no entry has tokens, or the model no price, the greater of the old reckoning (15 calls a seat of a 26,000-character prompt read afresh and a half-allowance answer, at that model's price) and the largest measured figure of any model. Until 2026-11-08 the floor was always the second, in dollars, so a cheap model was sized at a dear one's debrief; and the seat host of an experiment's fork reckoned each seat's floor for all its seats together and then multiplied by the seats again. Three Opus seats were kept back 6.7 USD (clamped to half of a 10.25 limit) against about 1.1 they spent, and 9 of the scope pilot's 15 model forks stopped with a third to a half of their limit unspent (`seatsEndNeedMicroUsd` now sizes a fork's seats one at a time). The result is never under a twentieth of the limit and never over half of it (a run must be able to start). Where the need is over that half, the run says so at its start, in its note `kept_back_for_the_end`: `needed_microusd`, `short_microusd` and `limit_too_small` appear, with what a seat is sized at (`a_seat_microusd`) and by what (`a_seat_by`: `measured` or `floor`), and the pilot report prints it as "LIMIT TOO SMALL FOR THE END". The reserve is not shrunk in silence; whoever set the limit sees it and can raise it.
 
 **The measured table** (`bun scripts/debrief-costs.ts <runs-dir> --out FILE`, 2026-10-12): it walks the folders of runs (not `*.mock`) for logs with a `.debriefs.jsonl` beside them, streams each through `zstd -dc | grep` and sums the log's `usage` annotations whose purpose is `debrief` (subject: the seat) or `account` (subject: the person), as priced when made. All of it is on the run server in `runs/lv5-fixes-2026-10-12/debrief-reserve/debrief-costs.txt` (per seat, per run).
 
@@ -224,6 +234,17 @@ The debrief's calls are counted in the run's spending like any other. So that a 
 |---|---|---|---|---|---|
 | claude-sonnet-5-5, a seat's debrief | 16 | 0.352 USD | 0.373 USD | 0.503 USD | 11.8 on average (9 to 13) |
 | claude-sonnet-5-5, an exit account | 12 | 0.011 USD | 0.009 USD | 0.021 USD | 1 to 2 |
+
+Measured on 2026-11-08 from the scope pilot's forks (rounds 1 to 4; their logs are the engine's `.oklog`, so the script reads the experiments' records of calls, `<arm>.calls.jsonl`, with `--calls-only` for those alone). A call that stopped at the old answer limit of 900 tokens is counted as if it had run on to the present 2,400, at the model's output price, so the figures are upper bounds for those calls:
+
+| model (anthropic/) | seats | mean | median | max (the figure used) |
+|---|---|---|---|---|
+| claude-haiku-5-5 | 18 | 0.010 USD | 0.009 USD | 0.014 USD |
+| claude-sonnet-5-5 | 18 | 0.131 USD | 0.131 USD | 0.184 USD |
+| claude-opus-5-5 | 21 | 0.380 USD | 0.387 USD | 0.566 USD |
+| claude-fable-5-1 | 6 | 1.552 USD | 1.668 USD | 1.905 USD |
+
+So a fork of three Opus seats keeps back 3 x 0.566 x 1.25 = 2.12 USD (was 5.13 of a 10.25 limit), and three Haiku seats 0.054 (was 0.375 of 0.75).
 
 The runs: lv-04, lv-05, the two living-world-5 debrief pilots, the two unstated-framing pilots. In lv-05, the old reckoning kept back 1.116 USD for 4 seats and 6 accounts and the debriefs cost 1.666 (tribunal 0.388, landlord 0.503, mayor 0.376, finance 0.399); the reserve now is 4 x 0.629 + 6 x 0.026 = 2.67 USD. A model is added by running the script on its first pilot and adding its row; nothing is edited by hand.
 

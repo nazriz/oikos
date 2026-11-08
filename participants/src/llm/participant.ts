@@ -240,8 +240,8 @@ export function lookable(c: LlmParticipantConfig): Map<string, "records" | "site
 
 /** What a participant calls the places in a paper it can search by, and what the participant API calls them (which it
  * may use too): it reads "from", "citing" and dates in its reports, never the store's field names (principle 14). */
-const FIELD_WORDS: { [said: string]: string } = { from: "author", "on behalf of": "speaks_for", on_behalf_of: "speaks_for", citing: "basis", date: "at" };
-const FIELD = /^(id|record|kind|at|author|speaks_for|basis|claim|holder|(data|about)(\.[A-Za-z0-9_-]+)+)$/;
+const FIELD_WORDS: { [said: string]: string } = { from: "from", "on behalf of": "speaks_for", on_behalf_of: "speaks_for", citing: "basis", date: "at" };
+const FIELD = /^(id|record|kind|at|author|speaks_for|from|basis|claim|holder|(data|about)(\.[A-Za-z0-9_-]+)+)$/;
 /** What a register is asked by, in a participant's words. */
 const BY_WORDS: { [field: string]: string } = { id: "id (its own number)", claim: "claim (the title a dealing is in)", holder: "holder (whose it is)", speaks_for: "on behalf of", "about.object": "about.object (what it is a title to)", "data.cells": "detail.cells (a cell of its ground, such as cell.3.4)" };
 /** How many names one look-up of who's who takes (the participant API's: a look names up to 16 things). */

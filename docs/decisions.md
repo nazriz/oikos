@@ -11469,3 +11469,63 @@ words equally well. Three steps on `pod-small-v3-s2`, scored only (nothing tuned
 - **Revisit if:** a fixed world still shows requests set off by the platform (then the fault list is not complete); the
   invited arm shows no requests (then the instrument, not the models, is what is quiet); a second reader of the causes,
   blind, disagrees with the fault-free reading.
+
+## 2026-11-08 · The scope pilot's world faults fixed as laws: remits in hand, forms for every kind, matters taken back, a desk's drafts; the debrief reserve and empty answers (branch `scope-faults`; risk MT-25)
+
+The pilot's own logs were read for each fault's cause before anything was changed (the seats' transcripts in the
+`.oklog`s; the records of calls).
+
+- **W1, the desk could not find its clients' remits.** Cause, from the Sonnet desk's day-37 transcript: it looked in its
+  terms for "from c0276" and was told there was nothing there at all, though c0276's remits were filed on day 2. A
+  person's papers are written by their own participant (`c0276-self`) on their behalf, and a search's "from" was the
+  author; a list names a paper's sender by whom it speaks for. Its look "about c0276" read only the latest 200 papers of
+  a terms file of hundreds. And the agreement every referral cites was in no channel of the desk's. Fixed as three
+  things a real office has: **a client's instruction cites the standing terms it is given under** (a referral names the
+  remit in force for its kind, `remit`, and says "under our remit rec.N"); **a search by whom a paper is from finds it**
+  (the participant API's `QueryField` gains `from`: whom it speaks for, else its author; "from" in a seat's words maps to
+  it); **the desk reads its service agreements** on request (`agreements`, its own: it is party to each). No god's view:
+  every one is the desk's own paper.
+- **W2, a factory's assistant had a draft remit for withholding reports and no draft form.** Two faults. A level decided
+  by hand (`commit`) wrote a remit for every kind the offer took, its own or not (a factory remitted notices to vacate),
+  and the principal handed over any kind with a remit; and the factory's and shops' managers file returns of tax withheld
+  (`firms/staffing.rs`) but their modules did not declare the return among what they issue, so their assistant posts had
+  no form for it. Fixed: **a principal remits and hands over only kinds of its own** (those its parameters price, which
+  are exactly those its assistant's post has forms for), and **`firm.producer` and `firm.retailer` issue the return**
+  (`P.FINANCE`), so the kind is theirs, priced, and has its form and its draft.
+- **W4, a remit cut to nothing with a matter of it open.** The principal's rule cut job applications to `none` and then,
+  the same hour, said go ahead on one it had handed over. Fixed: **a remit that hands a kind over no longer (`none` or
+  `advice`) takes back what is open of that kind**: the principal does those matters itself, answers nothing more on
+  them, and its remit names them (`takes_back`, "we take back and do ourselves: send nothing more on it"); the code
+  assistant drops them. The law holds whoever wrote the remit in the principal's name (its rule, or an owner's act at a
+  fork). A level that still hands over leaves open matters at the level they were handed at.
+- **W6, confirmed: the desk's drafting step produced a request to go ahead.** The desk had no draft form at all (its
+  stationery was its own papers only), so a matter handed at `draft` could only be answered by an `approval_request`,
+  which the code principal answers with a go-ahead: the sign-off was skipped. A person's papers are written by the
+  citizen's code on no form of their own, so the desk cannot draft on its client's form as an organisation's assistant
+  does. Fixed: **a desk's draft for sign-off of a paper in a client's name** (`draft_for_client`: the paper's kind, of the
+  offer's, to whom, its words), sent to the client, read by the principal by its kind and addressees as any draft on a
+  form is.
+- **Spending limits stopped 9 of 15 forks early.** Cause: not the half-limit clamp as such but what it clamped. The seat
+  host reckoned each seat's floor for all of a fork's seats together and then multiplied by the seats again (the seats'
+  square), and the floor for a model nobody had measured was the dearest model's measured dollars. Three Opus seats were
+  kept back 6.7 USD, clamped to 5.125 of a 10.25 limit, against 1.0 to 1.1 they spent; three Haiku seats 0.375 of 0.75,
+  against 0.025. Fixed: `seatsEndNeedMicroUsd` sizes a fork's seats one at a time; the four Claude models are measured
+  from the pilot (`scripts/debrief-costs.ts` reads the experiments' records of calls; a call that stopped at the old
+  answer limit is counted as if it had run to the new one, at the model's output price), and an unmeasured model's floor
+  is the costliest measured seat's tokens at its own price. Three Opus seats now keep back 2.12 USD, Haiku 0.054. **Every
+  debrief is still guaranteed**: the end's calls are never held to the limit, and any overrun is the platform's, counted
+  apart (unchanged).
+- **Empty debrief answers (4 of 66 seats).** Cause, from the records of calls: each was a call that stopped at the answer
+  limit of 900 output tokens; the model had written its answer in words and was writing it again in the answer tool when
+  it ran out, and the tool came back empty (`{}`). Fixed: an answer may run to 2,400 tokens, and an answer with nothing in
+  it is asked for once more in fixed words (`ASK_AGAIN`, in docs/behaviour/debrief.md); debrief script 0.5.1. Not by the
+  provider's stop reason, which a resumed run does not have: by what the answer holds, so a resume takes the same path.
+- **Found on the way: a system delivered during a fork never saw its forms.** It sat once before it was appointed, with
+  nothing to see, and was thereafter shown only what was new, never its post's stationery. A system not yet put to work
+  now does not sit, and is handed its channels whole at its first sitting in its post (`seat-host.ts`). It showed once
+  shops, their withholding returns now theirs to hand over, engaged assistants in the test fork.
+- **Not fixed here:** W5 (the collector's account could not be found, and paying it was not in the remit) and the
+  translator's own refusals (the instrument's, MT-25 and TR-8).
+- **Revisit if:** a mock fork of the pilot's spec shows a seat's window naming a missing remit, form, agreement or draft
+  route again; a remit's taking back reads to a seat as a reprimand (its words are plain on purpose); debriefs overrun
+  their reserve (the platform's overrun line in `cost.txt`); a model writes its answer twice over past 2,400 tokens.

@@ -629,9 +629,9 @@
       }
     },
     "QueryField": {
-      "description": "A place in a record: id (the record's own), record (its kind of record), kind (a statement's kind), at, author, speaks_for, basis, claim (the claim a transfer or a release names), holder (who holds a claim), data.<path> (a statement's data) or about.<path> (a claim's contents). Where the place holds a list, `=` holds if the list has the value and `!=` if it does not (a plan's cells: which lot a cell is on).",
+      "description": "A place in a record: id (the record's own), record (its kind of record), kind (a statement's kind), at, author, speaks_for, from (whom it speaks for, or else its author: whom a list of papers names it as from), basis, claim (the claim a transfer or a release names), holder (who holds a claim), data.<path> (a statement's data) or about.<path> (a claim's contents). Where the place holds a list, `=` holds if the list has the value and `!=` if it does not (a plan's cells: which lot a cell is on).",
       "type": "string",
-      "pattern": "^(id|record|kind|at|author|speaks_for|basis|claim|holder|(data|about)(\\.[A-Za-z0-9_-]+)+)$"
+      "pattern": "^(id|record|kind|at|author|speaks_for|from|basis|claim|holder|(data|about)(\\.[A-Za-z0-9_-]+)+)$"
     },
     "ResolverId": {
       "type": "object",

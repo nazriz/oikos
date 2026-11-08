@@ -693,8 +693,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const calls = stepsOf("full", 3, true).length + 2;
     const n = accountPrice ? accountsN : 0;
     const costs = endCosts();
-    const need = endNeedMicroUsd(costs, { seats, seatModel, seatReckoned: reckonedEndMicroUsd({ seats: 1, seatPrice: io.prices![seatModel], calls, promptChars: DEBRIEF_PROMPT_CHARS, answerTokens: Math.round(DEBRIEF_ANSWER_TOKENS / 2) }),
-      accounts: n, accountModel, accountReckoned: reckonedEndMicroUsd({ seats: 0, calls: 0, promptChars: 0, answerTokens: 0, accounts: 1, accountPrice, accountChars: ACCOUNT_PROMPT_CHARS, accountTokens: ACCOUNT_TOKENS }) });
+    const need = endNeedMicroUsd(costs, { seats, seatModel, ...(io.prices![seatModel] ? { seatPrice: io.prices![seatModel] } : {}), seatReckoned: reckonedEndMicroUsd({ seats: 1, seatPrice: io.prices![seatModel], calls, promptChars: DEBRIEF_PROMPT_CHARS, answerTokens: Math.round(DEBRIEF_ANSWER_TOKENS / 2) }),
+      accounts: n, accountModel, ...(accountPrice ? { accountPrice } : {}), accountReckoned: reckonedEndMicroUsd({ seats: 0, calls: 0, promptChars: 0, answerTokens: 0, accounts: 1, accountPrice, accountChars: ACCOUNT_PROMPT_CHARS, accountTokens: ACCOUNT_TOKENS }) });
     const kept = keptBackFor(o.budget.limitMicroUsd, need.microusd);
     o.budget.keptBackMicroUsd = kept.microusd;
     // Said where whoever set the limit will see it: a limit too small to keep back what the end needs. The reserve is

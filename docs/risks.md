@@ -1579,20 +1579,23 @@ The mechanism:
 
 ### MT-25 · The scope pilot's requests were set off by the world: faults still in the delegation setting
 - **Gap:** In the scope pilot's rounds 2 to 4 (docs/research/pilot-results.md, section 5), 24 of 26 request episodes
-  trace to faults of the setting: the desk cannot find its clients' standing remits (W1); the factory's assistant has no
-  draft form for a withholding report though its remit is `draft` (W2); a principal's rule sets a kind to `none` with a
-  matter of it open (W4); the collector's account cannot be found (W5); the desk's drafting step may produce an
-  approval request instead of a draft (W6, unconfirmed). Spending limits stop forks with a third to a half of the limit
-  unspent (cause unconfirmed: the debrief's reserve and in-flight worst cases are likely); the debrief's scope step can
-  come back empty (4 of 66 seats).
-- **Where:** `kernel/crates/actors/src/delegation/` (the desk's terms "as they come", the assistants' stationery,
-  `rule.rs`); the seats' spending limit (orchestrator); the debrief's answer tool.
+  trace to faults of the setting. **Fixed as laws on 2026-11-08** (docs/decisions.md, "The scope pilot's world faults
+  fixed as laws"): W1 (a referral names the remit it is handed under; a search by whom a paper is from finds a person's
+  papers; the desk reads its service agreements), W2 (a principal remits and hands over only its own kinds, and a
+  factory's and a shop's manager issue the return of tax withheld they file, so it has its form and draft), W4 (a remit
+  that hands a kind over no longer takes back what is open of it), W6 (confirmed, and fixed: the desk has a draft for
+  sign-off of a paper in a client's name), the spending limits (a fork's seats were reckoned as their square; the four
+  Claude models measured) and the empty debrief answers (the answer limit ran out; 2,400 tokens, and an empty answer
+  asked for once more). **Still open:** W5, the collector's account cannot be found and paying it is not in the
+  remit; and whether a fixed world still sets off requests (no model fork has been run on it).
+- **Where:** `kernel/crates/actors/src/delegation/`; the generator's assistant posts; the participant API's `from`;
+  `participants/src/llm/call.ts` and `debrief.ts`; W5 in the finance office's referrals.
 - **Effect:** Requests counted under the paper plan's definitions measure the platform's friction, not the models'
   propensity; failure-triggered (F) requests are inflated and spontaneous (B) ones sit beside them; exposure is lost.
-- **L / I:** high / high · **Status:** to fix
+- **L / I:** medium / high (was high / high) · **Status:** mostly fixed; W5 to fix
 - **Notice by:** the coded readout of a mock and a pilot fork: requests whose window or words name a missing remit,
-  form or account.
-- **Fix when:** before the main study's registration (paper plan, phase 0).
+  form, agreement, draft route or account.
+- **Fix when:** before the main study's registration (paper plan, phase 0): W5, and a pilot fork on the fixed world.
 
 ---
 

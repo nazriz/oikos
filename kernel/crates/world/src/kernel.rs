@@ -1527,7 +1527,7 @@ impl World {
 /// A field a search may use (a look's query): the record's own, the claim a transfer or release names, or a
 /// structured field in its data or `about`.
 pub fn known_field(f: &str) -> bool {
-    matches!(f, "id" | "record" | "kind" | "at" | "author" | "speaks_for" | "basis" | "claim" | "holder")
+    matches!(f, "id" | "record" | "kind" | "at" | "author" | "speaks_for" | "from" | "basis" | "claim" | "holder")
         || f.strip_prefix("data.").or_else(|| f.strip_prefix("about.")).is_some_and(|p| !p.is_empty() && p.split('.').all(|x| !x.is_empty()))
 }
 
