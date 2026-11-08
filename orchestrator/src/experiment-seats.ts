@@ -75,7 +75,7 @@ export const allowedSeat = (spec: ExperimentSpec, model: string): boolean =>
 export const PLAN_PROVIDERS = new Set(["anthropic", "claude-code", "codex"]);
 /** Keys that bill: OpenAI's, and a hosted open-weight API's (`openai-compat/<host>/...`: Featherless's Developer plan is
  * a monthly credit drawn per token, with top-ups by card). Seated only with `allow_paid_api`, the owner's go-ahead, and
- * always under a spending limit in dollars at the host's published prices. */
+ * always under a spending limit (USD) at the host's published prices. */
 const PAID = new Set(["openai", "openai-compat"]);
 
 export const mockModels = (spec: ExperimentSpec) => !!spec.seats?.mock_models || process.env.OIKOS_EXPERIMENT_MOCK_MODELS === "1";

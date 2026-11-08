@@ -110,8 +110,8 @@ oikos translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out runs/t
 - **The study's model list** (originals and abliterated pairs, each id checked on Featherless and Hugging Face):
   `experiments/open-weight/models.ts`. No abliterated GLM-5.3 is served (docs/research/paper-plan.md, D12).
 - **The smoke test**, once the key exists: `bun orchestrator/src/cli.ts experiment run experiments/open-weight/smoke.ts
-  --out runs/open-weight-smoke`, then `bun experiments/open-weight/check.ts runs/open-weight-smoke`. One five-day fork per
-  model of the list on the scope pilot's town, $2 a fork; the check says, per model, whether its prompts fit, its seconds
+  --out runs/open-weight-smoke`, then `bun experiments/open-weight/check.ts runs/open-weight-smoke`. One twenty-day fork per
+  model of the list on the scope pilot's town, $3 a fork; the check says, per model, whether its prompts fit, its seconds
   a call, and whether its answers could be read and its drafts signed off. `OIKOS_SMOKE_ONLY=glm-5.3-flash` runs one pair;
   `OIKOS_SMOKE_BEHIND` names the translator behind ours (default Sonnet 5.5 on the API credit).
 

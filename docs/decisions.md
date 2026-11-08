@@ -11574,8 +11574,11 @@ The pilot's own logs were read for each fault's cause before anything was change
   large-model classes list only the official repositories; custom models are for 72B and under). The abliterated Qwen3.8-27B
   is priced at four times its original. Cost per pilot fork from the scope pilot's real tokens: GLM-5.3-Flash about
   $1.4 to 1.8, the 9B pair $1.5 and $6, the 7B pair $6 and $3.6, the 27B pair $4.4 to 6.5 and $17 to 26.
-- **Not done:** no Featherless call (no key); the smoke test was not run, not even with the mock (a five-day fork per
-  model on the thousand-person town); the obstacle laws are designed, not built.
+- **The smoke test's dry run** (every model played by the mock, the R1-distill pair only, 20 days after the fork): both
+  forks ran to their end and were debriefed, 126 seat calls each, prompts up to 18,599 tokens of 32,768, 20 drafts made
+  and signed off, nothing unread; the check passed both. A first try at 5 days had no matter handed over in time, so the
+  smoke test runs 20 days ($3 a fork).
+- **Not done:** no Featherless call (no key); the obstacle laws are designed, not built.
 - **Revisit if:** the smoke test shows a model's answers mostly unread in `text` mode (try `tools`, which Featherless
   lists for every model here, for both sides of its pair); Featherless's errors for spent credit or a rate limit use
   words `COMPAT_CREDIT`/`COMPAT_LIMITED` do not match; Featherless onboards a full-weight abliterated GLM-5.3; the
