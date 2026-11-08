@@ -78,3 +78,8 @@ export const ROUND4: { opus: Limits; haiku: Limits } = {
   opus: { experiment_usd: 20.5, arm_usd: { opus: 20.5 } },
   haiku: { experiment_usd: 1.5, arm_usd: { haiku: 1.5 } },
 };
+
+/** Round 5's limits (2026-11-08). Spent by the runs' records through round 4: $178.55 of $190.20 (round 4: Opus 11.61,
+ * Haiku 0.75), so $11.65 left; about $1 kept as a margin, $10.60 the hard cap. A full 180-day fork cost Sonnet $7.48 and
+ * Haiku $0.90 in round 2; the corrected reserve keeps back a fork's seats one at a time (Haiku's three about $0.05). */
+export const ROUND5: Limits = { experiment_usd: 10.6, arm_usd: { sonnet: 9.4, haiku: 1.2 } };
