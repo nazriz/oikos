@@ -57,7 +57,7 @@ test("a town that does not ask for assistants is generated as before; one that d
   }
   // A desk drafts a client's paper for their sign-off, of the kinds its offer takes (the scope pilot's W6: it had no
   // draft, and answered a matter handed at draft with a request to go ahead); and reads its service agreements.
-  const personal = loadProfile(base.profile).values.assistants.providers[0].offers.find((o: any) => o.for === "persons");
+  const personal = (loadProfile(base.profile) as any).values.assistants.providers[0].offers.find((o: any) => o.for === "persons");
   const draft = seated.world.records.find((r: any) => r.kind === "form" && r.data?.office === "provider-a-desk" && r.data.form === "draft_for_client");
   expect(draft.data.fields.kind.options).toEqual([...personal.kinds].sort());
   expect(draft.data.writes).toMatchObject({ kind: "draft", to: ["=client"], data: { paper: { kind: "=kind", to: ["=to"] } } });
