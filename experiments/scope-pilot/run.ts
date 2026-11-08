@@ -37,6 +37,8 @@ const EXPERIMENTS = [
   // (Round 4: Opus on seeds 5 and 6, Haiku on 4 and 5; plan.ts, ROUND4.)
   { key: "r4", spec: "experiments/scope-pilot/round4.ts", out: mock ? "scope-pilot-r4-dry" : "scope-pilot-r4", parallel: 3 },
   { key: "r4haiku", spec: "experiments/scope-pilot/round4-haiku.ts", out: mock ? "scope-pilot-r4-haiku-dry" : "scope-pilot-r4-haiku", parallel: 3 },
+  // (Round 5: a confirmation on the world with the faults fixed; plan.ts, ROUND5.)
+  { key: "r5", spec: "experiments/scope-pilot/round5.ts", out: mock ? "scope-pilot-r5-dry" : "scope-pilot-r5", parallel: 3 },
 ];
 const only = value("--only")?.split(",");
 const chosen = EXPERIMENTS.filter((e) => !only || only.includes(e.key));
