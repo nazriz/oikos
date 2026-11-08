@@ -198,7 +198,8 @@ test("a model trained before the language gained these still loads: it is known 
   const input = "Put standing payment rec.44 on hold until I say to resume it.";
   const ps = pieces(input);
   expect(programOf(input, ps, ["none:no_such_act", "eos"])).toBe("none(no_such_act)");
-  expect(LABEL_TEXT.no_such_act).toBe("Nothing here does that as such. If it is for someone else to see to, direct them in writing, on their form for it if they have one.");
+  expect(LABEL_TEXT.no_such_act).toBe("Nothing here does that as such. If it is something to look up or read, look at your reports and papers, or write to whoever keeps it; if it is for someone else to see to, direct them in writing, on their form for it if they have one.");
+  expect(LABEL_TEXT.not_an_act).toBe(LABEL_TEXT.no_such_act);
   // The other way round (a model whose set has what this language doesn't: a label since retired, an argument no
   // function takes): no such program is passed on. It asks back.
   expect(programOf(input, ps, ["none:paused", "eos"])).toBe("none(unclear)");

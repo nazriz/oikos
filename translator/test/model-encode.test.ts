@@ -1,7 +1,9 @@
 // A program as decisions and copies (translator/model/encode.ts): every kind of value comes back exactly.
 import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
-import { CUT_OFF, DecideAdapter, formsMisfit, formsShown, programOf, shown } from "../model/adapter";
+import { AgreeAdapter, CUT_OFF, DecideAdapter, formsMisfit, formsShown, programOf, shown } from "../model/adapter";
+import { cutShort } from "../model/serve-rules";
+import { LABEL_TEXT, toldAlike } from "../src/resolver";
 import { asWord, decode, encode, vocabulary, type Span } from "../model/encode";
 import { pieces, row, stepsOf } from "../model/export";
 import { copies, goldText, literals, spansIn, strayIds, styleBrief } from "../train/data";
@@ -245,4 +247,32 @@ test("answering first, with another translator behind it: the cut-off holds ever
   // A model's folder that holds no model is said before anything is started on it.
   expect(() => new DecideAdapter("nowhere", { dir: "/nonexistent/model", quiet: true }).check()).toThrow("/nonexistent/model/config.json is not there");
   await expect(new DecideAdapter("nowhere", { dir: "/nonexistent/model", quiet: true }).ready()).rejects.toThrow("is not there");
+});
+
+test("served only where it is safe to: copied words cut short are asked back, two models must agree, and refusals told alike are one answer (translator v4, round 3)", async () => {
+  // A message's words that stop where the request's sentence goes on, with nothing else of the answer accounting for it.
+  const r = "Ask the rates officer to send me the total of the roll, so I can put a revenue figure beside the budget.";
+  expect(cutShort(r, 'message(text="send me the total of the roll", to="the rates officer")')).toEqual({ field: "text", kind: "cut_short" });
+  expect(cutShort(r, 'message(text="send me the total of the roll, so I can put a revenue figure beside the budget", to="the rates officer")')).toBeUndefined();
+  // The rest of the sentence is another argument's: not cut short.
+  const p = "Pay $40.00 from acc-1 to acc-9 for the waste taken in rec.12.";
+  expect(cutShort(p, 'money(amount="$40.00", basis=rec.12, for="the waste taken", from=acc-1, to=acc-9)')).toBeUndefined();
+  // Words that end at a sentence's end, with a sentence after them that nothing accounts for: asked back only when
+  // trailing sentences are checked (as served).
+  const t = "Ask the inspector to report what is on lot-01-17. A general count is not what I need.";
+  const m = 'message(text="report what is on lot-01-17.", to=inspector)';
+  expect(cutShort(t, m)).toBeUndefined();
+  expect(cutShort(t, m, [], { trailing: true })).toEqual({ field: "text", kind: "trailing" });
+  // Two models: a draft only where both write the same program, at the lesser sureness.
+  const pair = new AgreeAdapter("a+b", { first: true, quiet: true });
+  const said = (program: string, sure: number) => async () => ({ program, sure, ms: 5 });
+  (pair.pair[0] as any).translate = said("money(to=c0412)", 0.99);
+  (pair.pair[1] as any).translate = said("money(to=c0412)", 0.9);
+  expect(await pair.translate("Pay c0412.", [])).toMatchObject({ program: "money(to=c0412)", sure: 0.9 });
+  (pair.pair[1] as any).translate = said("money(to=c0413)", 0.95);
+  expect(await pair.translate("Pay c0412.", [])).toMatchObject({ program: "none(unclear)", withheld: "disagree", wrote: "money(to=c0412)" });
+  // not_an_act and no_such_act are told in one sentence, so either is the other served; look_first is not.
+  expect(LABEL_TEXT.not_an_act).toBe(LABEL_TEXT.no_such_act);
+  expect(toldAlike("none(not_an_act)", "none(no_such_act)")).toBe(true);
+  expect(toldAlike("none(not_an_act)", "none(look_first)")).toBe(false);
 });
