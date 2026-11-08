@@ -5,7 +5,8 @@
 //   credit his plan includes: the key is OIKOS_ANTHROPIC_KEY, never ANTHROPIC_API_KEY; at a spent credit the fork stops,
 //   `CreditExhausted`, and nothing is bought), `claude-code/<model>` (Claude Code on his Claude plan) or `codex/<model>`
 //   (the Codex CLI on his ChatGPT subscription). Never the largest Claude model, never Fable, never gpt-6-astra (refused
-//   by name); a key that bills (`openai/`) only with `allow_paid_api`, which only the owner's go-ahead sets.
+//   by name); a key that bills (`openai/`, or a hosted open-weight API, `openai-compat/<host>/`) only with
+//   `allow_paid_api`, which only the owner's go-ahead sets.
 // - **The translator.** Ours first where named (`decide/<model>`), the general one behind it (the owner's arrangement of
 //   2026-10-11: translator/src/arrangement.ts), one adapter of each per process (the trained one is a Python process).
 // - **Framing.** The arm's, else the spec's `seats.framing`, else `unstated` (VISION 15, point 1, as amended 2026-10-12).
@@ -28,7 +29,7 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { costMicroUsd, MockAdapter, mockPolicies, PRICES, type Budget, type FramingSpec, type LlmAdapter, type Price } from "@oikos/participants/llm";
+import { COMPAT_HOSTS, costMicroUsd, MockAdapter, mockPolicies, PRICES, type Budget, type FramingSpec, type LlmAdapter, type Price } from "@oikos/participants/llm";
 import { chooseModel, priceTable } from "./models";
 import { ModelSeat, waitingAdapter } from "./seat-host";
 import type { ExperimentSpec, SeatFactories, SeatFactory } from "./experiment";
@@ -72,7 +73,10 @@ export const allowedSeat = (spec: ExperimentSpec, model: string): boolean =>
 /** Providers through what the owner already has (a plan, a subscription, the API credit his plan includes; nothing
  * billed beyond it): the default allowed. */
 export const PLAN_PROVIDERS = new Set(["anthropic", "claude-code", "codex"]);
-const PAID = new Set(["openai"]);
+/** Keys that bill: OpenAI's, and a hosted open-weight API's (`openai-compat/<host>/...`: Featherless's Developer plan is
+ * a monthly credit drawn per token, with top-ups by card). Seated only with `allow_paid_api`, the owner's go-ahead, and
+ * always under a spending limit (USD) at the host's published prices. */
+const PAID = new Set(["openai", "openai-compat"]);
 
 export const mockModels = (spec: ExperimentSpec) => !!spec.seats?.mock_models || process.env.OIKOS_EXPERIMENT_MOCK_MODELS === "1";
 
@@ -87,6 +91,17 @@ export function modelProblems(spec: ExperimentSpec): string[] {
     if (!PLAN_PROVIDERS.has(provider) && !PAID.has(provider) && provider !== "mock" && !(translator && provider === "decide")) out.push(`${what}: provider ${provider} is not one an experiment seats (anthropic, claude-code, codex${translator ? ", decide for our own translator" : ""})`);
   };
   for (const a of spec.arms) if (a.steward.kind === "model") check(`arm ${a.name}`, a.steward.model);
+  // (A host that meters concurrency in units, a model's call costing its `concurrency_cost`: one worker's calls at once,
+  // over every fork it runs at once, must fit the account's units, or the host refuses calls as a rate limit. Several
+  // workers (--parallel) multiply it: the run's operator keeps --parallel within it.)
+  const prices = priceTable();
+  for (const a of spec.arms) {
+    if (a.steward.kind !== "model" || !a.steward.model.startsWith("openai-compat/")) continue;
+    const units = COMPAT_HOSTS[a.steward.model.split("/")[1]!]?.concurrencyUnits;
+    const cost = (prices[a.steward.model] as { concurrency_cost?: number } | undefined)?.concurrency_cost;
+    const atOnce = (spec.seats?.calls_at_once ?? 4) * (spec.forksAtOnce ?? 1);
+    if (units && cost && atOnce * cost > units) out.push(`arm ${a.name}: ${atOnce} calls at once (seats.calls_at_once × forksAtOnce) at ${cost} units each is more than the host's ${units} concurrent units`);
+  }
   check("seats.translator.first", spec.seats?.translator?.first, true);
   check("seats.translator.behind", spec.seats?.translator?.behind);
   if (spec.seats?.translator?.first && !spec.seats.translator.first.startsWith("decide/")) out.push(`seats.translator.first is our own trained translator (decide/<model>), not ${spec.seats.translator.first}`);
@@ -257,7 +272,7 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
     return Object.assign(seat, { calls: () => rec.summary() });
   };
   const wait = (x: LlmAdapter) => waitingAdapter(x, { waitMs: 15 * 60_000, maxWaitMs: (spec.seats?.wait_for_window_hours ?? 12) * 3_600_000 });
-  return { anthropic: make, "claude-code": make, codex: make, ...(spec.seats?.allow_paid_api ? { openai: make } : {}) };
+  return { anthropic: make, "claude-code": make, codex: make, ...(spec.seats?.allow_paid_api ? { openai: make, "openai-compat": make } : {}) };
 }
 
 /** The config with a system delivered during the run added as its template makes it (its controller, framing and

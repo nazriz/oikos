@@ -287,6 +287,21 @@ test("hosted OpenAI-compatible (Fireworks and the like), against a local stub se
     expect(e).not.toBeInstanceOf(CreditExhausted);
     expect(e.message).toContain("HTTP 400");
     expect(e.message).not.toContain(KEY);
+    // A context window (Featherless's models carry one): a call that would not fit, its prompt estimated generously and
+    // its answer's room added, is never sent and never cut; it fails in words the participant reads as "send less".
+    const { promptTooLong } = await import("../src/llm/call");
+    const { overContext } = await import("../src/llm/openai-compat");
+    const fl = (contextTokens: number) => new OpenAICompatHostedAdapter("featherless", "zai-org/GLM-5.3-Flash", { apiKey: KEY, baseUrl, answer: "text", retries: 0, backoffMs: 1, contextTokens });
+    const sent = got.length;
+    const tight = await fl(600).complete(req).catch((x) => x);
+    expect(got.length).toBe(sent);
+    expect(promptTooLong(tight.message)).toBe(true);
+    expect(overContext(req, 100_000)).toBeUndefined();
+    // A reasoning model's thinking ahead of its answer is not read as the answer.
+    next = { status: 200, body: reply(`<think>\nThe seat should publish.\n</think>\n${JSON.stringify({ tool: "do", input_json: '{"what":"Publish."}', also: [], text: "" })}`) };
+    const r1 = await fl(100_000).complete(req);
+    expect(got.length).toBe(sent + 1);
+    expect(r1.content).toEqual([{ type: "tool_use", id: "compat-1", name: "do", input: { what: "Publish." } }]);
   } finally {
     server.stop(true);
   }

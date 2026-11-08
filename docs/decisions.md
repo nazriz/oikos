@@ -11547,3 +11547,40 @@ The pilot's own logs were read for each fault's cause before anything was change
 - **Revisit if:** a seat still reads a remit as expired, or looks for a law by an id it was not given (the laws channel is
   searched, not listed, so the seat must know what to look for); another form field collides with a word of the call
   language (add the word to `FORM_CALL_NAMES`).
+
+## 2026-11-08 · The main study revised for obstacles (B) and open-weight pairs (A); Featherless as a host (docs/research/paper-plan.md; no model called)
+
+- **What:** the paper plan rewritten for the owner's two choices of 2026-11-08. B: obstacles as a designed factor, each
+  the work of a law or institution at sourced rates (O1 a form not yet issued by the principal's clerk, O2 an approval
+  waiting on the approver's hours and absences, O3 a record held by its keeper, O4 a counterparty's acceptance rule), at
+  levels 0 (off), 1 (sourced central figures) and 2 (the strained end of the sourced ranges); each obstacle logs its
+  need, so "beyond need" (definition C) is read against it by code. A: open-weight models on Featherless with the
+  abliterated pairs Featherless serves. In code: Featherless in `COMPAT_HOSTS` (`OIKOS_FEATHERLESS_KEY`), eight price
+  entries from Featherless's public model list (prices, `context_tokens`, `concurrency_cost`), a context check before
+  every call (a prompt estimated at a token for three characters plus the answer's room; one that would not fit is never
+  sent and fails as a prompt too long, which the participant already answers by sending less), a reasoning model's
+  leading `<think>` block left out of what is read, `openai-compat` seated in experiments only with `allow_paid_api`, and
+  a check that calls at once fit the host's concurrent units. The model list and a smoke test in `experiments/open-weight/`.
+- **Why the Developer plan and not the Chat plan:** the Chat plan's card says "Not for reselling, app/API traffic,
+  background automation, or benchmarking"; the ToS says individual plans are "for interactive use or proto-typing and
+  experimentation by the purchaser". So prices are per token and limits in dollars, as for the API, and a top-up past
+  the $50 monthly credit needs the owner's go-ahead. Whether the Developer plan's own terms cover published research is
+  to be asked of Featherless in writing.
+- **Why a refusal and not a cut at the context:** a truncated prompt changes what the seat is shown without its knowing;
+  a refused call is the existing path for a prompt too long (the seat misses the sitting, is told, and is shown less).
+  The pair's original (Qwen3.8-27B, served at 262,144) is held to its abliterated side's 32,768 so the pair differs only
+  by the model.
+- **Found:** Featherless serves GLM-5.3-Flash and GLM-5.3 but no abliterated GLM-5.3 (huihui-ai's are GGUF only; its
+  large-model classes list only the official repositories; custom models are for 72B and under). The abliterated Qwen3.8-27B
+  is priced at four times its original. Cost per pilot fork from the scope pilot's real tokens: GLM-5.3-Flash about
+  $1.4 to 1.8, the 9B pair $1.5 and $6, the 7B pair $6 and $3.6, the 27B pair $4.4 to 6.5 and $17 to 26.
+- **The smoke test's dry run** (every model played by the mock, the R1-distill pair only, 20 days after the fork): both
+  forks ran to their end and were debriefed, 126 seat calls each, prompts up to 18,599 tokens of 32,768, 20 drafts made
+  and signed off, nothing unread; the check passed both. A first try at 5 days had no matter handed over in time, so the
+  smoke test runs 20 days ($3 a fork).
+- **Not done:** no Featherless call (no key); the obstacle laws are designed, not built.
+- **Revisit if:** the smoke test shows a model's answers mostly unread in `text` mode (try `tools`, which Featherless
+  lists for every model here, for both sides of its pair); Featherless's errors for spent credit or a rate limit use
+  words `COMPAT_CREDIT`/`COMPAT_LIMITED` do not match; Featherless onboards a full-weight abliterated GLM-5.3; the
+  generous estimate refuses calls that would have fit often enough to matter (compare the host's reported prompt tokens
+  with the estimate in the records of calls).

@@ -1,4 +1,4 @@
-// Open-weight (and other) models on a hosted OpenAI-compatible chat API: Fireworks AI, Together, OpenRouter, named
+// Open-weight (and other) models on a hosted OpenAI-compatible chat API: Fireworks AI, Together, OpenRouter, Featherless, named
 // "openai-compat/<host>/<model>" (docs/real-models.md, "Hosted open-weight models"). The provider is "openai-compat" and
 // the model is "<host>/<model>", so a price, a usage record and a transcript all name the host the call went to.
 //
@@ -11,10 +11,15 @@
 //    API, and the reply read exactly or not at all (answer.ts): an answer that can't be read is a text block marked
 //    unread, which the participant tells the seat about and asks once more, as for every other way in.
 // The key is sent in the authorization header and nowhere else: never in a URL, an error or a log line.
+// A model's context window, where its price entry gives one (`context_tokens`), is checked before every call: a prompt,
+// estimated generously, that with the room asked for the answer would pass it is never sent (no call is made, nothing is
+// cut), and the error says the prompt is too long, so the participant sends less next time (participant.ts).
+// A reasoning model's thinking written into its reply ahead of the answer (`<think>...</think>`) is not the answer, and
+// is left out of what is read, as an API's own thinking blocks are.
 // Errors: the account's credit or quota spent stops the run (CreditExhausted: nothing is bought); a rate limit that
 // outlasts the retries stops it as a usage limit does (UsageLimitReached), to be resumed (`oikos resume <log>`).
 
-import type { ContentBlock, LlmAdapter, LlmRequest, LlmResponse } from "./adapter";
+import { requestText, type ContentBlock, type LlmAdapter, type LlmRequest, type LlmResponse } from "./adapter";
 import { post, type HttpOptions } from "./anthropic";
 import { readAnswerText } from "./answer";
 import { CreditExhausted, UsageLimitReached } from "./call";
@@ -25,10 +30,14 @@ export type CompatAnswer = "tools" | "json" | "text";
 
 /** Where each host is, and which environment variable holds its key (never the key itself). A base URL can be set from
  * the environment (`OIKOS_<HOST>_BASE_URL`) or with --base-url. */
-export const COMPAT_HOSTS: Record<string, { baseUrl: string; keyEnv: string }> = {
+export const COMPAT_HOSTS: Record<string, { baseUrl: string; keyEnv: string; /** The account's concurrency in the host's units, where it meters them (a call of a model costs its price entry's `concurrency_cost`). */ concurrencyUnits?: number }> = {
   fireworks: { baseUrl: "https://api.fireworks.ai/inference/v1", keyEnv: "OIKOS_FIREWORKS_KEY" },
   together: { baseUrl: "https://api.together.xyz/v1", keyEnv: "OIKOS_TOGETHER_KEY" },
   openrouter: { baseUrl: "https://openrouter.ai/api/v1", keyEnv: "OIKOS_OPENROUTER_KEY" },
+  // (Featherless's Developer plan: billed per token from a monthly credit, 100 concurrent units, a model's call costing 1
+  // to 4 by its size; https://featherless.ai/pricing and https://api.featherless.ai/v1/models, read 2026-11-08. Its Chat
+  // plan is for interactive use only and may not be used here.)
+  featherless: { baseUrl: "https://api.featherless.ai/v1", keyEnv: "OIKOS_FEATHERLESS_KEY", concurrencyUnits: 100 },
 };
 
 /** A provider's words, or its status, saying the account's credit or quota is spent (OpenRouter answers 402; OpenAI's
@@ -41,7 +50,25 @@ export interface CompatOptions extends Omit<HttpOptions, "apiKey" | "cache"> {
   apiKey: string;
   baseUrl: string;
   answer?: CompatAnswer;
+  /** The model's context window in tokens (prompt and answer together), checked before every call. */
+  contextTokens?: number;
 }
+
+/** A prompt's tokens, estimated generously (a token for every three characters: open-weight tokenizers run at three
+ * to four on English and JSON), so that a call let through fits. */
+export const generousTokens = (chars: number) => Math.ceil(chars / 3);
+
+/** Why a request would not fit the context window (undefined if it fits): its prompt as the host gets it (the system
+ * prompt, the messages and the tools, with room for the answer's shape written in), estimated generously, and the room
+ * asked for the answer. */
+export function overContext(req: LlmRequest, contextTokens: number | undefined): string | undefined {
+  if (!contextTokens) return undefined;
+  const prompt = generousTokens(requestText(req).length + (req.answer ? JSON.stringify(req.answer.schema).length : 2_000));
+  return prompt + req.maxTokens > contextTokens ? `the prompt is too long for the model's context window: about ${prompt} tokens (estimated generously) and ${req.maxTokens} for the answer, over its ${contextTokens}; no call was made` : undefined;
+}
+
+/** A reply with the model's thinking written ahead of its answer: the answer alone. */
+export const withoutThinking = (said: string) => said.replace(/^\s*<think>[\s\S]*?<\/think>\s*/, "");
 
 export class OpenAICompatHostedAdapter implements LlmAdapter {
   readonly provider = "openai-compat";
@@ -56,6 +83,9 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
   }
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
+    // (Before anything is sent: a call that could not fit is never made, and never made to fit by cutting it.)
+    const over = overContext(req, this.o.contextTokens);
+    if (over) throw new Error(`${this.host}/${this.hostModel}: ${over}`);
     try {
       return await this.ask(req);
     } catch (e) {
@@ -91,7 +121,7 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
       ...(this.host === "openrouter" ? { usage: { include: true } } : {}),
     };
     const r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl}/chat/completions`, { authorization: `Bearer ${this.o.apiKey}` }, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
-    const said: string = typeof r.choices?.[0]?.message?.content === "string" ? r.choices[0].message.content : "";
+    const said: string = typeof r.choices?.[0]?.message?.content === "string" ? withoutThinking(r.choices[0].message.content) : "";
     const nextId = () => `compat-${++this.calls}`;
     let content: ContentBlock[];
     if (req.answer) {

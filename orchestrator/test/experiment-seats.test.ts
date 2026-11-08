@@ -33,6 +33,11 @@ test("only the allowed models are seated: never the largest Claude model, Fable 
   expect(modelProblems({ ...arm("anthropic/claude-sonnet-5-5"), seats: { ...allow("anthropic/claude-opus-5-5"), translator: { behind: "anthropic/claude-opus-5-5" } } }).join()).toMatch(/never used/);
   expect(modelProblems(arm("openai/gpt-6.1-sol")).join()).toMatch(/paid API/);
   expect(modelProblems({ ...arm("openai/gpt-6.1-sol"), seats: { allow_paid_api: true } })).toEqual([]);
+  // A hosted open-weight API bills too; and its calls at once must fit the host's concurrent units (GLM-5.3-Flash: 4 a call, of 100).
+  const glm = "openai-compat/featherless/zai-org/GLM-5.3-Flash";
+  expect(modelProblems(arm(glm)).join()).toMatch(/paid API/);
+  expect(modelProblems({ ...arm(glm), seats: { allow_paid_api: true } })).toEqual([]);
+  expect(modelProblems({ ...arm(glm), forksAtOnce: 7, seats: { allow_paid_api: true } }).join()).toMatch(/more than the host's 100 concurrent units/);
   expect(modelProblems(arm("claude-code/claude-sonnet-5-5"))).toEqual([]);
   expect(modelProblems(arm("codex/gpt-6-luna"))).toEqual([]);
   expect(modelProblems({ ...arm("codex/gpt-6-luna"), seats: { translator: { first: "decide/pod", behind: "claude-code/claude-sonnet-5-5" } } })).toEqual([]);

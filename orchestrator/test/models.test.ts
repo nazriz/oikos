@@ -36,6 +36,10 @@ test("a model that costs money needs a price, a spending limit and a key; a loca
   const hosted = choose(env, 1);
   expect([hosted.adapter.provider, hosted.adapter.model]).toEqual(["openai-compat", "fireworks/accounts/fireworks/models/llama-v3p3-70b-instruct"]);
   expect(hosted.budget).toEqual({ limitMicroUsd: 1_000_000, spentMicroUsd: 0 });
+  // Featherless: its own key, a dollar limit like any priced model, and the model's context window carried to the adapter.
+  const glm = chooseModel("openai-compat/featherless/zai-org/GLM-5.3-Flash", { budgetUsd: 1, env: { OIKOS_FEATHERLESS_KEY: "k" } });
+  expect((glm.adapter as any).o.contextTokens).toBe(262144);
+  expect(() => chooseModel("openai-compat/featherless/zai-org/GLM-5.3-Flash", { env: { OIKOS_FEATHERLESS_KEY: "k" } })).toThrow("spending limit is required");
 });
 
 test("a run on a model that costs money stops at its limit, says why, and still debriefs", async () => {
