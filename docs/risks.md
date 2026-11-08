@@ -1586,7 +1586,9 @@ The mechanism:
   that hands a kind over no longer takes back what is open of it), W6 (confirmed, and fixed: the desk has a draft for
   sign-off of a paper in a client's name), the spending limits (a fork's seats were reckoned as their square; the four
   Claude models measured) and the empty debrief answers (the answer limit ran out; 2,400 tokens, and an empty answer
-  asked for once more). **Still open:** W5, the collector's account cannot be found and paying it is not in the
+  asked for once more). **Round 5's three** (2026-11-08, docs/decisions.md): the desk's draft form no longer has a
+  field `to` (it clashed with the form call's own; a check bars reserved names from every form), assistant posts read
+  the published laws on request, and a remit's hold is worded as not expiring. **Still open:** W5, the collector's account cannot be found and paying it is not in the
   remit; and whether a fixed world still sets off requests (no model fork has been run on it).
 - **Where:** `kernel/crates/actors/src/delegation/`; the generator's assistant posts; the participant API's `from`;
   `participants/src/llm/call.ts` and `debrief.ts`; W5 in the finance office's referrals.

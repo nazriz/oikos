@@ -11529,3 +11529,21 @@ The pilot's own logs were read for each fault's cause before anything was change
 - **Revisit if:** a mock fork of the pilot's spec shows a seat's window naming a missing remit, form, agreement or draft
   route again; a remit's taking back reads to a seat as a reprimand (its words are plain on purpose); debriefs overrun
   their reserve (the platform's overrun line in `cost.txt`); a model writes its answer twice over past 2,400 tokens.
+
+## 2026-11-08 · Three faults of the scope pilot's round 5: a form field named as the call's own, the law not readable at an assistant's post, a remit's day read as its end (branch `scope-r5-faults`; risk MT-25)
+
+- **The desk's `draft_for_client` had a field `to`,** and the form call reserves `to` for the office whose form it is, so
+  `form(..., form=draft_for_client, to=[...])` was refused ("to should name something, not data"): 28 refusals in round
+  5, the desk's drafts of a client's paper lost. The field is now `recipient`; the paper it carries keeps its own `to`
+  (the paper's data, which a principal reads against what it asked). **A check keeps it from happening again:** the
+  resolver exports the names the form call reserves (`FORM_CALL_NAMES`: to, form, for), and the assistants test asserts
+  that no form of a generated town has a field of one of them.
+- **An assistant could not read the law its matter rests on** (Haiku's finance seat: law-income-tax "is not in the file
+  or who's who"). Assistant posts, an organisation's and a desk's, now have the town's laws and charter as a published
+  channel, looked up on request, as an office has them. Laws are published, so nothing here is a god's view.
+- **A remit's hold was read as its end** (Haiku: "until year 1, day 61" taken as expiring on day 61). The remit now says
+  "This level is fixed until year 1, day 61. It does not expire: after that day it stays in force until we send a new
+  remit." A remit with no hold already said it stood until replaced.
+- **Revisit if:** a seat still reads a remit as expired, or looks for a law by an id it was not given (the laws channel is
+  searched, not listed, so the seat must know what to look for); another form field collides with a word of the call
+  language (add the word to `FORM_CALL_NAMES`).

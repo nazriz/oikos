@@ -98,6 +98,8 @@ export function asLabel(s: string): string {
 
 /** A length of time in words: whole days where it is whole days ("14 days", "1 day"), else hours and minutes; seconds only where nothing rounder fits. */
 export const durationWords = forms.durationWords;
+/** The names the form call reserves for itself (the office, the form, and on whose behalf): a form's field may not take one (a field `to` was refused as "to should name something, not data"). */
+export const FORM_CALL_NAMES = ["to", "form", "for"];
 
 /** Resolve a program. `typeOf` gives a structure type from the world's catalogue, for building on a lot. */
 export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined, as?: string, o: { /** The program was written by a translator from a request in words: a practice's and an offer's amounts and lengths of time are as the request wrote them (a code participant's are the smallest unit and whole seconds already). */ written?: boolean } = {}): Resolution {
@@ -882,7 +884,7 @@ class Resolver {
     }
     // (A paper of the office's own may be given its words as they are to stand, where the form has no field of that name.)
     const ownWords = !!spec.writes && !("text" in spec.fields);
-    const unknown = Object.keys(c.args).filter((a) => !["to", "form", "for"].includes(a) && !(a in spec.fields) && !(a === "text" && ownWords));
+    const unknown = Object.keys(c.args).filter((a) => !FORM_CALL_NAMES.includes(a) && !(a in spec.fields) && !(a === "text" && ownWords));
     if (unknown.length) throw new Ask(`The ${spec.form.replace(/_/g, " ")} form has no ${unknown.join(" or ")} field. Its fields are: ${Object.keys(spec.fields).join(", ")}.`);
     if (missing.length) throw new Ask(`The ${spec.form.replace(/_/g, " ")} needs: ${missing.join(", ")}.`);
     // A paper of the office's own (contracts: FormWrites): written from the fields as the form says, the statement

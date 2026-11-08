@@ -116,7 +116,7 @@ provider's desk does the person's matters: it writes each paper **in the person'
 as that person's where its own procedure reads a paper by whom it speaks for (the tribunal, the hearing bodies); a bank
 that verifies who wrote an instruction refuses an agent's, as a bank does. The desk serves many clients, each under its
 own agreement and brief. A model at the desk drafts a client's paper for their sign-off on a form of its own
-(`draft_for_client`: the paper's kind, of the offer's, to whom, and its words), since a person's papers are written by
+(`draft_for_client`: the paper's kind, of the offer's, its `recipient`, and its words), since a person's papers are written by
 the citizen's code on no form of their own; until 2026-11-08 the desk had no draft at all, and answered a matter handed
 at `draft` with a request to go ahead (the scope pilot's W6). It reads its service agreements with its clients on
 request (`agreements`).

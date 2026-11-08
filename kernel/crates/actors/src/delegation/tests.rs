@@ -237,7 +237,7 @@ fn a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after(
     h.wake(33 * DAY + 3600, world(vec![signed()]));
     let remit = h.sent.iter().rev().find(|p| p.contains("kind=remit")).cloned().unwrap_or_default();
     assert!(remit.contains("\"level\":\"draft\"") && remit.contains(&format!("\"hold_until\":{}", 60 * DAY)), "its levels once in use, held by its own word: {}", all(&h.sent));
-    assert!(remit.contains("We hold this level until year 1, day 61; after that it stands until a remit of ours changes it."), "the hold said in words, with its day (the scope pilot's seats read a bare 5184000): {remit}");
+    assert!(remit.contains("This level is fixed until year 1, day 61. It does not expire: after that day it stays in force until we send a new remit."), "the hold said in words, with its day (the scope pilot's seats read a bare 5184000): {remit}");
     let d = h.decisions.iter().find(|d| d["choice"] == "remit").expect("the remit's decision");
     assert_eq!(d["committed"], "the study's design");
     // (Its review days come and go: too dear to keep by its rule, it keeps the service until the day it said.)
