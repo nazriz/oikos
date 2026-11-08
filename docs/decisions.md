@@ -11730,3 +11730,78 @@ The pilot's own logs were read for each fault's cause before anything was change
 - **Revisit if:** a third reader overturns the two surest wrong keys (then round 3's cut falls to about round 2's and its
   pair should be read again); the trailing check asks back much of a new pilot's right drafts (then keep only cut_short);
   seats in a pilot misread the merged refusal sentence (then split it again with a check for which advice applies).
+
+## 2026-11-08 · Translator v4, round 4: a third reader on the keys, the new validation side, an edge-tolerant text sureness and a style-blind calibrator; the pass mark not met, stopped (no GPU, no API spend)
+
+The round tested round 3's three levers (keys, validation size, a style-fair sureness) without retraining, then stopped.
+Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
+
+- **Keys** (`translator/train/v4-pilot/third.ts`): every request of validation-real and the pilot's validation side
+  where some model (round 2's and round 3's seeds) served a wrong answer, 110 in all, read by a third blind reader (Opus
+  5.5 subagents on the owner's plan: the request and its forms under a hashed id, no key, no model answer). Rule: the
+  reader reads it as the key, the key stands (60); as a model's answer and not the key, the key is mended to the reader's
+  reading (22: two independent readings of three); as neither, the key stands, recorded as read three ways (28). Most
+  mends are the edge of meaning round 3 named (whether an asker's trailing reason belongs in a message; a `for` or a
+  `basis` left implicit); the mend only ever moves toward a model, so it flatters validation, and the test side is not
+  mended. **It moved nothing at the top:** the two surest wrong answers that set round 3's cut stay wrong (one read three
+  ways: "show me X; if not filed, ask the officer when"; one mended, but to an ending neither round-3 seed wrote).
+  Right in all on validation 591 to 600 of 670; the certified cut unchanged (332 served).
+- **More validation** (`split.ts --all validation`): the scope pilot's rounds 4 and 5 (six model arms, none in round
+  2's split, no request of them in training or the test side, by exact text): 307 requests on 90 seat-days, keyed by
+  Sonnet 5.5 and Opus 5.5 subagents blind as round 2 (`keep.ts`): 235 kept (Haiku 70, Opus 110, Sonnet 55; 74% agreed).
+  Validation is now 905 rows. They read worse than the test side: 87% right in all (round 3's seed 2: Sonnet 54 of 55, Haiku 62 of
+  70, Opus 86 of 110, whose misses are mostly round 5's new matters: job applications made as statements with data, a
+  desk's drafts for a client), the revisit of round 2 ("round
+  4's requests read worse than the test side") come true. With them a cut is certified that serves about 500 on
+  validation with one wrong (the bound at or under 1%): certification is now possible on the set; on the test side 0
+  wrong in 250 served still bounds at 1.2%.
+- **Why sureness holds hedged and Haiku's requests back** (read by part and by writer): on the parity set (the same
+  situations written by every model) Haiku's right answers are served about as often as the others' (36% against 36 to
+  43% of right, at round 3's cut): there the gap is reading (85% right against 93 to 97%), not sureness. On the pilot's
+  test side Haiku's right answers are served at 30% against 73%, and the low part is (a) **texts**: Haiku's seats write a
+  report's words unquoted and unmarked ("done: yes. The invoice for ... was issued"), so the model is unsure of an end to a
+  token while the score accepts either (punctuation or a word at the edge); and (b) **choices** on export invoices: which
+  optional fields the request fills (memo, offer, kind written "goods" or not), where the keys themselves go both ways.
+  (b) is real uncertainty; (a) is a mismatch between what sureness measures and what is scored.
+- **The fix for (a), no retraining** (`model.py` `_edge_mass`, the part `texts_edge` beside `texts`; `v4-serve.ts
+  --edges`): a copied text of more than six words is as sure as the probability that it is right as scored: the start's
+  mass over starts giving the same words or one word (no figure) more or fewer, times the end's, one edge moving at most.
+  The program and the old sureness are unchanged (checked: 62 of 62 identical). **The style-blind calibrator**
+  (`--pow c,p,t`): a temperature on each part's sureness, the same for every writer, fitted on validation alone for the
+  most right served at the certified cut (nothing of writer or wording enters it; best: texts squared for round 3's seed
+  2, choices cubed for round 2's pair).
+- **Scores** (cut certified on the 905 validation rows by the one-sided 95% bound, read on the test side 368 and the
+  parity set 334; checks on, as round 3):
+
+  | | test: served right (wrong; bound) | Haiku, test | parity set: served right (wrong) | parity spread (all / common 54) | test spread |
+  |---|---|---|---|---|---|
+  | round 3 pair (round 3's headline) | 214 (58.1%; 0; 1.39%) | 16/59 | 122 (0) | 9.4 / 18.5 | 45 |
+  | round 3 seed 2 | 224 (60.9%; 0) | 23/59 | 143 (0) | 10.7 / 20.4 | 33 |
+  | seed 2, edges | 243 (66.0%; 0; 1.23%) | 29/59 | 178 (0) | 19.7 / 24.1 | 24 |
+  | **seed 2, edges, calibrated** | **250 (67.9%; 0; 1.19%)** | 32/59 | 185 (1, Haiku's) | 14.8 / - | 20 |
+  | round 2 pair, edges | 251 (68.2%; 1) | 29/59 | 176 (1) | 15.3 / 18.5 | 28 |
+  | round 2 pair, edges, calibrated | 256 (69.6%; 2; 2.4%) | 31/59 | 183 (1) | 15.3 / - | 25 |
+
+- **The pass mark is not met and the gains have stalled: this is whack-a-mole, and round 4 stops here.** Best served
+  right at a certified cut is 68% on the test side (90% wanted); parity is 15 to 20 points (5 allowed), and the one
+  wrong answer served on the parity set is Haiku's (1 of 29 Haiku served: over 1% for that writer; a copied gist that
+  starts late, a family the checks do not cover). No release is proposed; today's first stays first.
+- **What is left, by the numbers.** On validation, answers below sureness 0.9996 are wrong 8 to 14% of the time
+  (0.999-0.9996: 4 wrong of 49; 0.99-0.999: 6 of 67; 0.9-0.99: 13 of 91), and those above it about 0.4%. No calibrator,
+  style-blind or not, can serve that band at 1%: serving 90% right at 1% wrong needs the model right on about 91% of
+  requests and ranked almost perfectly, and it is right on 87 to 93%. The limit is reading, mostly in the requests at the
+  edge of meaning (where a paper's words begin and end, optional fields, look_first against not_an_act) and on new
+  matters (round 5's 87%), and in keys that themselves split there (28 of 110 read three ways). My read: the 90% / 1%
+  mark is not reachable for this reader on these requests without either (i) a much larger supply of real keyed
+  requests on the forms in use (round 5 shows each new matter costs points until trained on), or (ii) changing what is
+  asked of the instrument: serving at 1% and asking back the rest (68% served now, every model's ask-back reported as
+  part of parity), or a mark on the served share's error alone. That is the owner's choice, not a tuning step.
+- **Retraining not done:** nothing here calls for it. The new validation side is the one source of new reading data and
+  is spent as validation; training on it would need a new validation side.
+- **Kept in code:** `v4-right.ts` (the score's `right`, shared by v4-score, v4-serve and third.ts); v4-serve scores
+  against the rows given, so a mended key is read as mended; the edge part (`texts_edge`) is recorded by every model and
+  used only where `--edges` asks (the adapter serves on the old sureness until a release says otherwise).
+- **Revisit if:** the owner changes the mark (then seed 2 with edges and the calibration is the arrangement to read
+  first, at its certified cut); a pilot with the new forms trained in reads above 93% right in all (then the bands above
+  move and serving 80%+ at 1% becomes possible); the leading-words family (a copied text that starts late) recurs (a
+  check like cut_short at the start).

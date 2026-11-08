@@ -142,6 +142,9 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
   - [x] v4 round 3: two seeds served together, copied-words checks, not_an_act and no_such_act told alike, Haiku-style
     data, retrained (two seeds); a cut-off certified on validation, the pass mark and parity not met, nothing released
     (decisions 2026-11-08).
+  - [x] v4 round 4: a third blind reader on the keys, rounds 4 and 5 of the pilot as validation (905 rows), an
+    edge-tolerant text sureness and a style-blind calibrator; 68% served right at a certified cut, parity 15-20 points;
+    stalled, stopped; the mark's next step is the owner's (decisions 2026-11-08).
   - [x] v4 step 3: reader swap (ettin-encoder-150m); the text writer (Gemma 3 270M under the grammar, copy constraint).
   - [x] v4 steps 4 and 5: batch 1 on RunPod (D, A, C) and its scores: D wins, the stop rule fires (decisions 2026-11-08).
 - [x] **Citizen model,** trained from the captured citizen decisions (docs/design/citizen-model.md, docs/citizen-data.md).

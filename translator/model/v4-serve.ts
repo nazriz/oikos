@@ -5,7 +5,7 @@
 // latency.
 //
 //   bun translator/model/v4-serve.ts --rows <rows.jsonl>... --a <answers.jsonl>... [--b <answers.jsonl>...] [--checks]
-//        [--cut <sureness>] [--out <file.json>]
+//        [--trailing] [--edges] [--pow <c>,<p>,<t>] [--cut <sureness>] [--out <file.json>]
 //
 // --rows: the sets' rows (each with id, request, forms, program, groups.writer). --a / --b: v4-score.ts answer files
 // (`--answers` there), the first and second model's, by id. --cut: read at a cut-off set elsewhere (on validation-real),
@@ -14,7 +14,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { oneLine } from "./adapter";
 import { cutShort } from "./serve-rules";
 import * as C from "./v4-curve";
-import { toldAlike } from "../src/resolver";
+import { right } from "./v4-right";
 
 const args = process.argv.slice(2);
 const all = (k: string) => args.flatMap((a, i) => (a === `--${k}` ? [args[i + 1]!] : []));
@@ -31,11 +31,22 @@ if (args.includes("--common")) {
 const byId = (fs: string[]) => new Map(fs.flatMap(jsonl).map((a) => [a.id, a]));
 const A = byId(all("a")), B = all("b").length ? byId(all("b")) : undefined;
 const checks = args.includes("--checks"), trailing = args.includes("--trailing");
+// --edges (round 4): a copied text's sureness as the probability that it is right as scored (its ends may differ by
+// punctuation or a word: model.py `_edge_mass`, the answer's `parts.texts_edge`) in place of that of its exact ends.
+const edges = args.includes("--edges");
+// --pow <c>,<p>,<t> (round 4): sureness recalibrated by its parts, the same for every writer (nothing of the writer or
+// the wording enters it): choices^c x places^p x texts^t, the exponents fitted on validation (a temperature a pass).
+const pow = all("pow")[0]?.split(",").map(Number);
+const textsOf = (a: any): number => (edges && a.parts.texts_edge !== undefined ? a.parts.texts_edge : a.parts.texts);
+const sureOf = (a: any): number => {
+  if (!a) return 0;
+  if (pow && a.parts) return Math.pow(a.parts.choices, pow[0]!) * Math.pow(a.parts.places, pow[1]!) * Math.pow(Math.min(1, textsOf(a)), pow[2]!);
+  return edges && a.parts?.texts_edge !== undefined && a.parts.texts > 0 ? Math.min(1, (a.sure * a.parts.texts_edge) / a.parts.texts) : a.sure ?? 0;
+};
 const cut = all("cut")[0] !== undefined ? Number(all("cut")[0]) : undefined;
 
 const servable = (p: string | null | undefined) => !!p && p.trim() !== "none(unclear)";
-// Two refusals the seat is told in the same words are one answer (resolver.ts `toldAlike`, as v4-score.ts scores now):
-// an answer file scored before they were told alike is read so too.
+// (Right where the answer file said wrong: two refusals told alike since it was scored, or a key mended since.)
 let flipped = 0;
 const why: { [k: string]: number } = { disagree: 0, cut_short: 0, trailing: 0 };
 const xs: (C.Scored & { id: string })[] = [];
@@ -44,13 +55,15 @@ for (const [id, a] of A) {
   if (!r) continue;
   // (An answer scored with the checks already applied keeps the model's own as `own`.)
   const program: string | null = a.own !== undefined ? a.own : a.program;
-  let ok: boolean = a.own_ok !== undefined ? a.own_ok : a.ok;
-  if (!ok && toldAlike(program, r.program)) { ok = true; flipped++; }
-  let served = servable(program), sure: number = a.sure;
+  // Scored here against the row's key (v4-right.ts), not the answer file's own verdict: a key mended since the answers
+  // were written (the third reader, round 4) is read as mended. Two refusals told alike count as one answer.
+  const ok = right(program, r.program, r);
+  if (ok && !(a.own_ok !== undefined ? a.own_ok : a.ok)) flipped++;
+  let served = servable(program), sure: number = sureOf(a);
   if (B) {
     const b = B.get(id);
     const other = b ? (b.own !== undefined ? b.own : b.program) : undefined;
-    sure = Math.min(sure, b?.sure ?? 0);
+    sure = Math.min(sure, b ? sureOf(b) : 0);
     if (served && other !== program) { served = false; why.disagree!++; }
   }
   const c = served && checks && !/^none\(\w+\)$/.test(program!.trim()) ? cutShort(oneLine(r.request), program!, r.forms ?? [], { trailing }) : undefined;
@@ -62,7 +75,7 @@ const point = C.curve(xs, false), bound = C.curve(xs, true);
 const ranked = xs.filter((x) => x.served).sort((a, b) => b.sure - a.sure);
 const surestWrong = ranked.flatMap((x, k) => (x.ok ? [] : [{ rank: k + 1, id: x.id, sure: +x.sure.toFixed(6), writer: x.writer }])).slice(0, 12);
 const report: any = {
-  rows: xs.length, right: xs.filter((x) => x.ok).length, asked_back_by: why, told_alike_right: flipped, surest_wrong: surestWrong,
+  rows: xs.length, right: xs.filter((x) => x.ok).length, asked_back_by: why, right_since_scored: flipped, surest_wrong: surestWrong,
   own_best: { at_1pct: point, at_1pct_bound95: bound, ...C.byWriter(xs, point.cut) },
   ...(cut !== undefined ? { at_cut: { ...C.atCut(xs, cut), ...C.byWriter(xs, cut) } } : {}),
 };

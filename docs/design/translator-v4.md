@@ -211,6 +211,11 @@ span, free-text edges), its field-type masks and its scope-request recognition c
   head at their edge (`refusal_probe.py`), so either is the same answer served and is scored so (`toldAlike`). A score
   reads the served answer; the model's own is kept beside it (`own`), and `v4-serve.ts` reads any arrangement offline
   from the answers of each seed.
+- **Round 4 (2026-11-08).** Two optional readings of sureness, the same for every writer: an edge-tolerant text part
+  (`texts_edge`, model.py `_edge_mass`: a copied text is as sure as being right as scored, its ends free by punctuation
+  or one word), and a temperature a part fitted on validation (`v4-serve.ts --edges --pow`). Validation for the cut is
+  validation-real (keys mended by a third blind reader, `third.ts`) with the pilot's rounds 4 and 5 (905 rows). Neither
+  is served yet: the pass mark is not met (decisions, "Translator v4, round 4").
 
 ## 6. Trial plan and cost
 

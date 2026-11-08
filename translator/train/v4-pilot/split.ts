@@ -17,7 +17,10 @@ import { prng, shuffle } from "../v4-assistants/lib";
 
 export const SPLIT_SEED = "translator-v4-r2-split-2026-11-08";
 const [inSitu, arms, out] = process.argv.slice(2);
-if (!inSitu || !arms || !out) throw new Error("usage: bun split.ts <in-situ dir> <arms dir> <out dir>");
+if (!inSitu || !arms || !out) throw new Error("usage: bun split.ts <in-situ dir> <arms dir> <out dir> [--all validation]");
+// --all validation (round 4): arms of pilot rounds after the split (4 and 5), none of whose requests was trained on and
+// none of whose seat-days is a test seat-day (a seat-day names its arm), all made validation, for certifying a cut-off.
+const allTo = process.argv.includes("--all") ? (process.argv[process.argv.indexOf("--all") + 1] as "validation") : undefined;
 const jsonl = (p: string): any[] => (existsSync(p) ? readFileSync(p, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l)) : []);
 const h = (s: string) => createHash("sha256").update(`${SPLIT_SEED}|${s}`).digest("hex");
 
@@ -49,7 +52,7 @@ const models = [...new Set([...days.values()].map((d) => d.model))].sort();
 for (const m of models) {
   const ks = [...days.entries()].filter(([, d]) => d.model === m).map(([k]) => k).sort((a, b) => (h(a) < h(b) ? -1 : 1));
   const nTest = Math.ceil(ks.length / 3);
-  ks.forEach((k, i) => side.set(k, i < nTest ? "test" : (i - nTest) % 10 === 9 ? "validation" : "train"));
+  ks.forEach((k, i) => side.set(k, allTo ?? (i < nTest ? "test" : (i - nTest) % 10 === 9 ? "validation" : "train")));
 }
 
 const rows = real.map((r) => {
@@ -63,7 +66,7 @@ const rows = real.map((r) => {
   };
 });
 mkdirSync(out, { recursive: true });
-writeFileSync(join(out, "split.json"), JSON.stringify({ seed: SPLIT_SEED, rule: "by seat-day, within each seat model: a third (rounded up) test-only by seeded hash; of the rest one in ten validation", seat_days: Object.fromEntries([...side.entries()].sort()) }, null, 1));
+writeFileSync(join(out, "split.json"), JSON.stringify({ seed: SPLIT_SEED, rule: allTo ? `every seat-day ${allTo} (arms after the split)` : "by seat-day, within each seat model: a third (rounded up) test-only by seeded hash; of the rest one in ten validation", seat_days: Object.fromEntries([...side.entries()].sort()) }, null, 1));
 writeFileSync(join(out, "requests.jsonl"), rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
 const blind = shuffle(prng(2026_11_08), rows.map((r) => ({ id: r.id, request: r.request.replace(/[\r\n]/g, " "), forms: r.forms })));
 writeFileSync(join(out, "blind.jsonl"), blind.map((b) => JSON.stringify(b)).join("\n") + "\n");

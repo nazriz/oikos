@@ -11,51 +11,14 @@
 // wrong (wrong and served) is at most 1% of what is served, and right served there (the headline); the same cut-off
 // held to a one-sided 95% bound (Clopper-Pearson) instead of the point; by writer at that cut-off (parity); latency.
 import { readFileSync, writeFileSync } from "node:fs";
-import { calls } from "@oikos/participants";
-import { formOfLine } from "../train/blind";
-import { sameMeaning } from "../train/meaning";
 import { AgreeAdapter, DecideAdapter, SERVING_CHECKS } from "./adapter";
 import * as C from "./v4-curve";
-import { toldAlike } from "../src/resolver";
+import { right } from "./v4-right";
 
 const args = process.argv.slice(2);
 const all = (k: string) => args.flatMap((a, i) => (a === `--${k}` ? [args[i + 1]!] : []));
 const one = (k: string) => all(k)[0];
 const rows: any[] = readFileSync(one("set")!, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
-
-const FREE: { [fn: string]: string[] } = { message: ["text"], statement: ["text"], agreement: ["text", "terms"], money: ["for"] };
-const words = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean);
-/** Free texts of a program, in order. */
-function freeTexts(p: string): string[] {
-  try {
-    const x = calls.parseProgram(p);
-    if ("none" in x) return [];
-    const out: string[] = [];
-    const visit = (c: calls.Call) => { for (const [k, v] of Object.entries(c.args)) { if ("call" in v) visit(v.call); else if ("text" in v && (FREE[c.fn]?.includes(k) || (c.fn === "form" && v.text.split(" ").length > 6))) out.push(v.text); } };
-    x.lines.forEach((l) => visit(l.call));
-    return out;
-  } catch { return []; }
-}
-/** Two copies of one text that differ only at their edges: punctuation, or at most two words with no figure. */
-function edgesOnly(a: string, b: string): boolean {
-  const x = words(a), y = words(b);
-  const [s, l] = x.length <= y.length ? [x, y] : [y, x];
-  if (l.length - s.length > 2) return false;
-  for (let k = 0; k + s.length <= l.length; k++) {
-    if (s.every((w, j) => l[k + j] === w)) return [...l.slice(0, k), ...l.slice(k + s.length)].every((w) => !/\d/.test(w));
-  }
-  return false;
-}
-function right(got: string | null | undefined, gold: string, r: any): boolean {
-  if (!got) return false;
-  // (Two refusals the seat is told in the same words are the same answer served: resolver.ts `toldAlike`.)
-  if (toldAlike(got, gold)) return true;
-  const ctx = { ...(r.currency ? { currency: r.currency } : {}), forms: r.forms.map(formOfLine).filter(Boolean) };
-  if (sameMeaning(got, gold, ctx)) return true;
-  if (!sameMeaning(got, gold, { ...ctx, freeText: false })) return false;
-  const a = freeTexts(got), b = freeTexts(gold);
-  return a.length === b.length && a.every((t, k) => t === b[k] || edgesOnly(t, b[k]!));
-}
 
 interface Ans { id: string; program: string | null; sure: number; ms: number; ok: boolean; writer: string; parts?: object; steps?: number; own?: string | null; own_ok?: boolean; withheld?: string }
 /** Served: an answer that is an act or a refusal other than asking back (`none(unclear)`, or no program: the request is

@@ -311,6 +311,59 @@ class Translator(nn.Module):
         pe = F.log_softmax(self.end_scores(state, kind, torch.tensor([[a]], device=dev), read, pad)[0, 0], -1)
         return c, a, int(pe.argmax()), ps, pe
 
+    EDGE_WINDOW = 12
+
+    @staticmethod
+    def _words(s: str) -> list[str]:
+        """A text's words as the score compares them (v4-right.ts `words`): lower case, punctuation as spaces."""
+        return re.sub(r"[^\w\s]|_", " ", s.lower()).split()
+
+    def _edge_mass(self, follow, ps, pe, a: int, z: int) -> float:
+        """The probability that a copied text is right as it is scored (v4-right.ts `edgesOnly`: free text may differ
+        at its edges by punctuation, or by at most two words with no figure), not only that its two ends are exactly
+        these: the start's mass over the starts that give the same words, or one word (no figure) more or fewer at the
+        front, times the end's (given this start) likewise; one edge may move a word, not both (the shorter text then is
+        always a run of the longer). A text of six words or fewer is scored exactly, so its sureness is unchanged.
+        (Round 4: a request whose paper's words are not quoted has ends the model is unsure of to a token, and the score
+        does not care which.)"""
+        text, span = follow.text, follow.t.span
+        x0, y0 = span[a][0], span[z][1]
+        mine = self._words(text[x0:y0]) if y0 > x0 else []
+        exact = math.exp(float(ps[a]) + float(pe[z]))
+        if len(mine) <= 6:
+            return exact
+
+        def near(other: list[str], front: bool) -> int:
+            """0: the same words; 1: one word with no figure more or fewer at this edge; 2: neither."""
+            if other == mine:
+                return 0
+            if abs(len(other) - len(mine)) != 1:
+                return 2
+            s, l = (other, mine) if len(other) < len(mine) else (mine, other)
+            extra = l[0] if front else l[-1]
+            rest = l[1:] if front else l[:-1]
+            return 1 if rest == s and not any(ch.isdigit() for ch in extra) else 2
+
+        sp = sw = 0.0
+        for a2 in range(max(0, a - self.EDGE_WINDOW), min(len(span), a + self.EDGE_WINDOW + 1)):
+            if a2 > z or span[a2][1] <= span[a2][0]:
+                continue
+            k = near(self._words(text[span[a2][0]:y0]), True)
+            if k < 2:
+                m = math.exp(float(ps[a2]))
+                sw += m
+                sp += m if k == 0 else 0.0
+        ep = ew = 0.0
+        for z2 in range(max(a, z - self.EDGE_WINDOW), min(len(span), z + self.EDGE_WINDOW + 1)):
+            if span[z2][1] <= span[z2][0]:
+                continue
+            k = near(self._words(text[x0:span[z2][1]]), False)
+            if k < 2:
+                m = math.exp(float(pe[z2]))
+                ew += m
+                ep += m if k == 0 else 0.0
+        return max(exact, sp * ew, sw * ep)
+
     @torch.no_grad()
     def translate_slots(self, f: dict[str, torch.Tensor], follow, masks: torch.Tensor | None = None, whole: bool = False) -> tuple[list, float, dict]:
         """One request, greedily, slot by slot: `follow` (slots.Follow) says what is to be decided next and what it
@@ -326,7 +379,7 @@ class Translator(nn.Module):
         inputs = []
         steps: list = []
         sure, least = 0.0, 0.0
-        parts = {"choices": 0.0, "places": 0.0, "texts": 0.0}
+        parts = {"choices": 0.0, "places": 0.0, "texts": 0.0, "texts_edge": 0.0}
         at = 0
         while follow.now is not None:
             if at >= self.cfg.max_steps:
@@ -360,6 +413,8 @@ class Translator(nn.Module):
                     z = int(pe.argmax())
                 sure += float(ps[a]) + float(pe[z])
                 parts["texts" if POINTERS[c - self.first_pointer] == "text" else "places"] += float(ps[a]) + float(pe[z])
+                if POINTERS[c - self.first_pointer] == "text":
+                    parts["texts_edge"] += math.log(max(1e-300, min(1.0, self._edge_mass(follow, ps, pe, a, z))))
                 least = min(least, float(ps[a]), float(pe[z]))
                 step = [POINTERS[c - self.first_pointer], a, z]
                 a0, z0 = a, z
