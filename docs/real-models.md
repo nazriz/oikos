@@ -14,7 +14,7 @@ oikos run worlds/town.yaml --seeds 1 --set mayor=llm --model anthropic/claude-so
   - `openai/…`, with `OPENAI_API_KEY`;
   - `ollama/…`, a local open-weight model behind Ollama (`http://localhost:11434/v1` by default);
   - `local/… --base-url URL`, any other OpenAI-compatible server (vLLM, LM Studio);
-  - `openai-compat/<host>/<model>`, a hosted open-weight model on Fireworks AI, Together or OpenRouter (below);
+  - `openai-compat/<host>/<model>`, a hosted open-weight model on Fireworks AI, Together, OpenRouter or Featherless (below);
   - `codex/…`, OpenAI models through the Codex CLI and a ChatGPT subscription (below).
   - `claude-code/…`, Anthropic models through Claude Code and a Claude plan's monthly credit (below).
 - Keys are read from the environment and never logged.
@@ -80,6 +80,40 @@ oikos translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out runs/t
   again with backoff, and one that outlasts the retries stops the run as a usage limit does (`UsageLimitReached`):
   resume it with `oikos resume <log>`. Fireworks' and Together's exact wording for these is to confirm.
 - **Tests** run against a local stub server only (`participants/test/adapters.test.ts`); no host has been called.
+
+### Featherless (2026-11-08)
+
+`openai-compat/featherless/<Hugging Face id>`, for example `openai-compat/featherless/zai-org/GLM-5.3-Flash`, with
+`OIKOS_FEATHERLESS_KEY` in `~/.zshenv` (not yet created) and `https://api.featherless.ai/v1`.
+- **The plan is the Developer plan**, billed per token from a $50 monthly credit at each model's own rate. The $25 Chat
+  plan (unlimited tokens) is not usable here: its terms say "Not for reselling, app/API traffic, background automation,
+  or benchmarking" (https://featherless.ai/pricing, read 2026-11-08). A top-up past the credit is a card charge and needs
+  the owner's go-ahead.
+- **Prices** are entered from Featherless's own model list (`https://api.featherless.ai/v1/models`, public: each model's
+  `pricing.input` and `.output` per million tokens, `context_length`, `concurrency_cost`), read 2026-11-08, so none is
+  marked to confirm. Spending limits are in dollars, as for every priced model. Featherless lists no cache price, so a
+  repeated prompt is paid in full each call.
+- **The context window is checked before every call.** A price entry's `context_tokens` is the window. The prompt as sent
+  (system, messages, tools and the answer's shape), estimated generously at a token for every three characters, plus the
+  room asked for the answer, must fit; a call that would not is never made and never cut. It fails as "the prompt is too
+  long for the model's context window", which the participant reads as a prompt too long: the seat misses that sitting,
+  its prompt limit is halved, and it is told so at its next sitting. Give an arm on a 32,768-token model an answer room
+  of about 8,000 (`params.max_tokens`), not the pilot's 16,000: the pilot's prompts reached 16,000 tokens at the 99th
+  percentile and 33,000 at most.
+- **Concurrency** is metered in units (100 on the Developer plan; a call of GLM-5.3 costs 4, a 27B model 2, a 9B model 1).
+  An experiment checks that `seats.calls_at_once × forksAtOnce × concurrency_cost` fits the host's units; several workers
+  (`--parallel`) multiply it, so keep `--parallel` within it.
+- **A reasoning model's thinking** written ahead of its answer (`<think>...</think>`, as DeepSeek's R1 distills write it)
+  is left out of what is read.
+- **In an experiment** a hosted open-weight model is a paid API: seated only with `seats.allow_paid_api` (the owner's
+  go-ahead; Featherless chosen 2026-11-08).
+- **The study's model list** (originals and abliterated pairs, each id checked on Featherless and Hugging Face):
+  `experiments/open-weight/models.ts`. No abliterated GLM-5.3 is served (docs/research/paper-plan.md, D12).
+- **The smoke test**, once the key exists: `bun orchestrator/src/cli.ts experiment run experiments/open-weight/smoke.ts
+  --out runs/open-weight-smoke`, then `bun experiments/open-weight/check.ts runs/open-weight-smoke`. One five-day fork per
+  model of the list on the scope pilot's town, $2 a fork; the check says, per model, whether its prompts fit, its seconds
+  a call, and whether its answers could be read and its drafts signed off. `OIKOS_SMOKE_ONLY=glm-5.3-flash` runs one pair;
+  `OIKOS_SMOKE_BEHIND` names the translator behind ours (default Sonnet 5.5 on the API credit).
 
 ## A ChatGPT subscription, through the Codex CLI
 

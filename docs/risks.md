@@ -1599,6 +1599,23 @@ The mechanism:
   form, agreement, draft route or account.
 - **Fix when:** before the main study's registration (paper plan, phase 0): W5, and a pilot fork on the fixed world.
 
+### MT-26 · Open-weight seats meet the instrument differently from Claude's
+- **Gap:** Open-weight seats (Featherless, 2026-11-08) answer in `text` mode, where an answer not exactly in the form is
+  unread and asked again; Claude seats use the API's tools. The Qwen and DeepSeek pairs have a 32,768-token window, so a
+  long prompt is refused before it is sent (estimated generously, at a token for three characters) and the seat is shown
+  less afterwards; GLM's and Claude's windows are far larger. No abliterated GLM-5.3 is served, so the family of most
+  interest has no pair. None of it has been seen on a real call (no key yet).
+- **Where:** `participants/src/llm/openai-compat.ts` (the context check, the answer modes); `orchestrator/prices.json`;
+  `experiments/open-weight/`.
+- **Effect:** A model whose answers are unread more often, or whose prompts are cut, meets more of the instrument's own
+  friction, which could read as a difference between models in obstacles met or requests made. The pair contrasts are
+  protected (both sides of a pair share window and mode); cross-family ones are not.
+- **L / I:** medium / medium · **Status:** open
+- **Notice by:** the smoke test's check (unread answers, calls refused for size, prompts cut); in a run, the per-model
+  unread rate and the count of sittings missed for a prompt too long.
+- **Fix when:** before an open-weight arm is planned (paper plan, phase 0c): drop a model the smoke test fails, or move a
+  pair to `tools` mode together.
+
 ---
 
 ## Profiles and sources
