@@ -20,6 +20,14 @@ const args = process.argv.slice(2);
 const all = (k: string) => args.flatMap((a, i) => (a === `--${k}` ? [args[i + 1]!] : []));
 const jsonl = (p: string): any[] => readFileSync(p, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
 const rows = new Map(all("rows").flatMap(jsonl).map((r) => [r.id, r]));
+// --common: the parity set read only on situations every writer's request of was kept (groups.situation), so each writer
+// is read on the same situations.
+if (args.includes("--common")) {
+  const writersOf = new Map<string, Set<string>>();
+  for (const r of rows.values()) (writersOf.get(r.groups?.situation) ?? writersOf.set(r.groups?.situation, new Set()).get(r.groups?.situation)!).add(r.groups?.writer);
+  const every = new Set([...rows.values()].map((r) => r.groups?.writer)).size;
+  for (const [id, r] of rows) if ((writersOf.get(r.groups?.situation)?.size ?? 0) < every) rows.delete(id);
+}
 const byId = (fs: string[]) => new Map(fs.flatMap(jsonl).map((a) => [a.id, a]));
 const A = byId(all("a")), B = all("b").length ? byId(all("b")) : undefined;
 const checks = args.includes("--checks"), trailing = args.includes("--trailing");
