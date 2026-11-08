@@ -24,7 +24,7 @@
 # own), OIKOS_POD_MODELS (where runs come home, one folder each: NAME), OIKOS_REPO (the checkout the trainer and the scoring
 # come from; default: the one this script is in), SECONDS_LIMIT (the time limit, in seconds from the renting of the pod, after
 # which it is ended whatever is going on; 6 hours if absent), OIKOS_POD_MAX_PER_HOUR (the dearest pod taken, the provider's
-# price an hour; 1 if absent). Needs ~/.zshenv to set RUNPOD_API_KEY, and the key pair ~/.ssh/oikos_runpod(.pub). The key is
+# price an hour; 1 if absent), OIKOS_POD_GPUS (the cards to try, in order, by the provider's names, separated by commas). Needs ~/.zshenv to set RUNPOD_API_KEY, and the key pair ~/.ssh/oikos_runpod(.pub). The key is
 # never written anywhere, nor put on a command line. The first hand-run batches, and this script's first run, are in
 # docs/decisions.md.
 source ~/.zshenv
@@ -106,7 +106,11 @@ watchdog() {
 start() {
   local PK=$(cat ~/.ssh/oikos_runpod.pub) ID="" G R price max=${OIKOS_POD_MAX_PER_HOUR:-1}
   say "balance before: $(balance)"
-  for G in "NVIDIA GeForce RTX 4090" "NVIDIA GeForce RTX 5080" "NVIDIA RTX A6000" "NVIDIA GeForce RTX 3090" "NVIDIA RTX A5000" "NVIDIA GeForce RTX 5090" "NVIDIA L40S" "NVIDIA A40" "NVIDIA RTX 4000 Ada Generation" "NVIDIA L4"; do
+  # (OIKOS_POD_GPUS, cards by the provider's names separated by commas, tried in that order instead: a cheap batch asks
+  # only for cards under its price, and is not rented a dearer one only to end it.)
+  local cards=("NVIDIA GeForce RTX 4090" "NVIDIA GeForce RTX 5080" "NVIDIA RTX A6000" "NVIDIA GeForce RTX 3090" "NVIDIA RTX A5000" "NVIDIA GeForce RTX 5090" "NVIDIA L40S" "NVIDIA A40" "NVIDIA RTX 4000 Ada Generation" "NVIDIA L4")
+  [ -n "$OIKOS_POD_GPUS" ] && cards=("${(@s/,/)OIKOS_POD_GPUS}")
+  for G in "${cards[@]}"; do
     # (supportPublicIp: without it a pod can come with no SSH port that can be reached from here.)
     R=$(api "{\"query\":\"mutation { podFindAndDeployOnDemand(input:{cloudType:${OIKOS_POD_CLOUD:-COMMUNITY}, supportPublicIp:true, gpuCount:1, volumeInGb:0, containerDiskInGb:40, minVcpuCount:4, minMemoryInGb:${OIKOS_POD_RAM_GB:-16}, gpuTypeId:\\\"$G\\\", name:\\\"$NAME\\\", imageName:\\\"runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04\\\", ports:\\\"22/tcp\\\", env:[{key:\\\"PUBLIC_KEY\\\", value:\\\"$PK\\\"}]}) { id costPerHr } }\"}")
     ID=$(print -r -- "$R" | sed -n 's/.*"id":"\([a-z0-9]*\)".*/\1/p')
@@ -128,14 +132,15 @@ start() {
   say "SSH answers at $(cat $S/ssh-address); setting up"
   # (The torch build is the cu128 one: recent cards are not served by the image's own.)
   ${=SSH} root@$H 'mkdir -p /work/py /work/data /work/runs && pip install -q uv 2>&1 | tail -1; cd /work && uv venv -q --python 3.11 .venv && . .venv/bin/activate && uv pip install -q torch --index-url https://download.pytorch.org/whl/cu128 && uv pip install -q transformers==5.18.0 tokenizers==0.23.2 safetensors sentencepiece protobuf tiktoken && (apt-get update -qq && apt-get install -y -qq rsync) > /tmp/apt.log 2>&1; nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1 > /work/gpu-mb; python -c "import torch;x=torch.randn(1000,1000,device=\"cuda\");print(\"gpu ok\",torch.__version__,torch.cuda.get_device_name(0))"; echo "card memory $(cat /work/gpu-mb) MiB"' < /dev/null 2>&1 | tee -a $S/pod.log | grep "^gpu ok" > /dev/null || { say "setting up failed"; return 1; }
-  # (A card of 16 GB takes a step in smaller parts, --token-budget 4096: the loss is the same, taken in more parts. Extra
+  # (A card under 23 GB takes a step in smaller parts, --token-budget 4096: the loss is the same, taken in more parts; a
+  # 20 GB card ran out of memory in the fourth epoch of the v4 data, 2026-11-08. Extra
   # flags come after it, so a run that names its own budget has it.)
   ${=SSH} root@$H 'cat > /work/run.sh <<"X"
 #!/bin/sh
 # One training run: name, reader, seed, data, extra flags. Its log in its folder; resumed if cut short.
 N=$1; E=$2; S=$3; D=$4; shift 4
 . /work/.venv/bin/activate; cd /work/py; mkdir -p /work/runs/$N
-TB=""; [ "$(cat /work/gpu-mb)" -lt 20000 ] && TB="--token-budget 4096"
+TB=""; [ "$(cat /work/gpu-mb)" -lt 23000 ] && TB="--token-budget 4096"
 for try in 1 2 3; do
   # (A reader named text=BASE is the text writer of translator v4 (text_model.py), a decoder that writes the program as text.)
   case "$E" in

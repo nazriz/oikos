@@ -134,8 +134,10 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
     field-type masks, requests of several lines, the scope-request check (decisions 2026-11-07).
   - [ ] Sonnet behind measured on the scope-request set, before the delegation study counts requests for more scope.
   - [x] v4 step 1: data by code (rows re-rendered inside real seats' card lists; the length check before training).
-  - [~] v4 step 2: the assistants' papers written and keyed (1,451 rows) done; the Claude pilot's test split, keying and
-    rewrites wait for its requests.
+  - [~] v4 step 2: the assistants' papers written and keyed (1,451 rows); the scope pilot's test split and keying done
+    (round 2, decisions 2026-11-08: 581 train, 368 test rows); rewrites in many voices and the per-model parity set not yet.
+  - [x] v4 round 2: sureness calibrated on validation-real, the control retrained with the pilot's requests (two seeds),
+    scored with parity by model; the pass mark not met, nothing released (decisions 2026-11-08).
   - [x] v4 step 3: reader swap (ettin-encoder-150m); the text writer (Gemma 3 270M under the grammar, copy constraint).
   - [x] v4 steps 4 and 5: batch 1 on RunPod (D, A, C) and its scores: D wins, the stop rule fires (decisions 2026-11-08).
 - [x] **Citizen model,** trained from the captured citizen decisions (docs/design/citizen-model.md, docs/citizen-data.md).

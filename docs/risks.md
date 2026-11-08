@@ -1210,6 +1210,9 @@ The mechanism:
 - **L / I:** high / high · **Status:** accepted (parked by the owner, 2026-10-11)
 - **Notice by:** The held-out score against the pass mark (90% right, 1% confidently wrong) at each release.
 - **Fix when:** the next round, with real cases for the new forms.
+- **Round 2 (2026-11-08):** translator v4's retrained control reads the scope pilot's held-back seat-days 93% right, but
+  serves only 62 to 67% at 1% confidently wrong; its served share differs by seat model by 22 points (Haiku lowest): a
+  reading fault that differs by model, for the study to name until it is closed (decisions 2026-11-08).
 
 ### TR-7 · Seats cannot act on connections or links
 - **Gap:** The network's acts (`connection`: open, set, close, interrupt, restore; `link`: shut, open, reclose,
