@@ -105,7 +105,7 @@ def two_passes(model, cfg, tokenizer, masks, text: str, head: int, at: list) -> 
         if fs is None:
             return {"too_long": True, "read": read}
         sure *= fsure
-        for k in ("choices", "places", "texts"):
+        for k in ("choices", "places", "texts", "texts_edge"):
             parts[k] = parts.get(k, 1.0) * fparts.get(k, 1.0)
         least = min(least, fparts.get("least", 1.0))
         fills.append((after, [back(chars(tf, x), _starts(fill), lambda line, i=index: i + 1 if line == 1 else None, lambda line, i=index: len(lines[i])) for x in fs], index))
