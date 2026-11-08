@@ -31,21 +31,37 @@ export type Resolution = { ok: true; blocks: Block[] } | { ok: false; questions:
  * (docs/design/names-and-dates.md section 4): every candidate, and what tells each apart on the seat's own file. */
 export interface Ambiguity { label: "ambiguous"; name: string; for: string; candidates: { id: string; known_by: string[] }[] }
 
-/** Fixed texts for the translator's refusal labels (§11.1). */
+/** What the seat is told for `not_an_act` and for `no_such_act`: one sentence for both (translator v4, round 3). The two
+ * are told apart by the readers on the scope pilot's requests, but at their edge ("have the record shown to me at each
+ * sitting", "inspect the bank's references and allocate them once") neither the trained model nor a probe of its state
+ * fitted on 2,400 training requests tells them apart better than the other (refusal_probe.py: 96% on held-out real
+ * requests, the same errors), and round 2's surest wrong answers included both ways round. Both bring nothing about;
+ * what differs is the advice, so the seat is given both, and an answer of either is served as the same. */
+export const NOTHING_DONE = "Nothing here does that as such. If it is something to look up or read, look at your reports and papers, or write to whoever keeps it; if it is for someone else to see to, direct them in writing, on their form for it if they have one.";
+
+/** Fixed texts for the translator's refusal labels (§11.1). Labels told in the same words are served as one answer
+ * (`toldAlike`). */
 export const LABEL_TEXT: Record<calls.Label, string> = {
   not_yours: "That's for someone else to decide. You could write to them, or propose something.",
   needs_calculation: "Please state the amount itself.",
   too_much: "Please take this one step at a time.",
   unclear: "It isn't clear what should happen. Could you say it more plainly?",
   unknown_form: "You haven't seen a form by that name.",
-  not_an_act: "That's something to look up or read, not something to do. Look at your reports and papers, or write to whoever keeps it.",
-  no_such_act: "Nothing here does that as such. If it is for someone else to see to, direct them in writing, on their form for it if they have one.",
+  not_an_act: NOTHING_DONE,
+  no_such_act: NOTHING_DONE,
   // (Said of the request alone: nothing is looked up to say it, so it tells the caller nothing it didn't know.)
   look_first: "That needs something found out first. Look it up (in your own papers, or by asking whoever keeps it), then say what is to be done, naming each paper by its id.",
   // (The resolver's own answer, never a translator's: the translator does not know who exists. Given alone, with no
   // candidates, it says only this.)
   ambiguous: "More than one of those you know of goes by that name. Name the one you mean by their id.",
 };
+
+/** Two refusals the seat is told in the same words (LABEL_TEXT): what is served is the same, so a score counts either
+ * as the other (translator/model/v4-score.ts). */
+export function toldAlike(a: string | null | undefined, b: string | null | undefined): boolean {
+  const la = /^\s*none\((\w+)\)\s*$/.exec(a ?? "")?.[1], lb = /^\s*none\((\w+)\)\s*$/.exec(b ?? "")?.[1];
+  return !!la && !!lb && la in LABEL_TEXT && lb in LABEL_TEXT && LABEL_TEXT[la as calls.Label] === LABEL_TEXT[lb as calls.Label];
+}
 
 class Ask extends Error {}
 /** A name that could be more than one of those the seat knows of: the question, and the answer as data. */

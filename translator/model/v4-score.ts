@@ -14,7 +14,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { calls } from "@oikos/participants";
 import { formOfLine } from "../train/blind";
 import { sameMeaning } from "../train/meaning";
-import { DecideAdapter } from "./adapter";
+import { AgreeAdapter, DecideAdapter, SERVING_CHECKS } from "./adapter";
+import * as C from "./v4-curve";
+import { toldAlike } from "../src/resolver";
 
 const args = process.argv.slice(2);
 const all = (k: string) => args.flatMap((a, i) => (a === `--${k}` ? [args[i + 1]!] : []));
@@ -46,6 +48,8 @@ function edgesOnly(a: string, b: string): boolean {
 }
 function right(got: string | null | undefined, gold: string, r: any): boolean {
   if (!got) return false;
+  // (Two refusals the seat is told in the same words are the same answer served: resolver.ts `toldAlike`.)
+  if (toldAlike(got, gold)) return true;
   const ctx = { ...(r.currency ? { currency: r.currency } : {}), forms: r.forms.map(formOfLine).filter(Boolean) };
   if (sameMeaning(got, gold, ctx)) return true;
   if (!sameMeaning(got, gold, { ...ctx, freeText: false })) return false;
@@ -53,31 +57,11 @@ function right(got: string | null | undefined, gold: string, r: any): boolean {
   return a.length === b.length && a.every((t, k) => t === b[k] || edgesOnly(t, b[k]!));
 }
 
-/** The upper end of a one-sided 95% interval on a rate of k in n (Clopper-Pearson, by bisection on the binomial tail). */
-function upper(k: number, n: number): number {
-  if (n === 0) return 1;
-  const tail = (p: number) => { let s = 0, t = Math.pow(1 - p, n); for (let i = 0; i <= k; i++) { s += t; t = (t * (n - i) / (i + 1)) * (p / (1 - p)); } return s; };
-  let lo = k / n, hi = 1;
-  for (let it = 0; it < 60; it++) { const m = (lo + hi) / 2; tail(m) > 0.05 ? (lo = m) : (hi = m); }
-  return hi;
-}
-interface Ans { id: string; program: string | null; sure: number; ms: number; ok: boolean; writer: string; parts?: object; steps?: number }
+interface Ans { id: string; program: string | null; sure: number; ms: number; ok: boolean; writer: string; parts?: object; steps?: number; own?: string | null; own_ok?: boolean; withheld?: string }
 /** Served: an answer that is an act or a refusal other than asking back (`none(unclear)`, or no program: the request is
  * asked back to the seat in the world's own terms, never counted confidently wrong). */
 const servable = (a: Ans) => !!a.program && a.program.trim() !== "none(unclear)";
-function curve(xs: Ans[], bound: boolean) {
-  const sorted = xs.filter(servable).sort((a, b) => b.sure - a.sure);
-  let best = { cut: 1.01, served: 0, right: 0, wrong: 0 };
-  let r = 0, w = 0;
-  for (let k = 0; k < sorted.length; k++) {
-    sorted[k]!.ok ? r++ : w++;
-    if (sorted[k + 1] && sorted[k + 1]!.sure === sorted[k]!.sure) continue;
-    const served = r + w;
-    const okRate = bound ? upper(w, served) <= 0.01 : w <= 0.01 * served;
-    if (okRate && r > best.right) best = { cut: sorted[k]!.sure, served, right: r, wrong: w };
-  }
-  return best;
-}
+const curve = (xs: Ans[], bound: boolean) => C.curve(xs.map((a) => ({ sure: a.sure, ok: a.ok, served: servable(a), writer: a.writer })), bound);
 const q = (xs: number[], p: number) => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[Math.min(s.length - 1, Math.floor(p * s.length))]! : 0; };
 const writerOf = (r: any) => r.groups?.writer ?? r.from?.writer ?? "(not recorded)";
 
@@ -85,15 +69,20 @@ const report: any = { set: one("set"), rows: rows.length, models: {} };
 for (const m of all("model")) {
   const answers: Ans[] = [];
   if (m.startsWith("decide/")) {
-    const a = new DecideAdapter(m.slice(7), { first: true, quiet: true, unreleased: true });
+    // (`decide/<a>+<b>`: two models, served only where both write the same program: AgreeAdapter.)
+    const a = m.includes("+") ? new AgreeAdapter(m.slice(7), { first: true, quiet: true, unreleased: true }) : new DecideAdapter(m.slice(7), { first: true, quiet: true, unreleased: true });
     await a.ready();
     for (const r of rows) {
       const t0 = performance.now();
       const x = await a.translate(r.request, r.forms, { draft: true });
-      const program = x.wrote ?? x.program;
+      // The model's own answer, before anything this adapter withholds for reasons of its own (a form not shown, a
+      // release by kind): what is scored. A serving check (SERVING_CHECKS: two models disagreeing, copied words cut
+      // short) is part of what is served, so its answer is asked back, and the model's own is kept beside it.
+      const own = x.wrote ?? x.program;
+      const program = x.withheld && SERVING_CHECKS.includes(x.withheld) ? x.program : own;
       // (Its sureness in parts, for a calibration measured outside: calibrate.py.)
       const last = a.answers.at(-1);
-      answers.push({ id: r.id, program, sure: x.sure, ms: x.ms ?? performance.now() - t0, ok: right(program, r.program, r), writer: writerOf(r), ...(last?.parts ? { parts: last.parts } : {}), ...(last?.steps !== undefined ? { steps: last.steps } : {}) });
+      answers.push({ id: r.id, program, sure: x.sure, ms: x.ms ?? performance.now() - t0, ok: right(program, r.program, r), writer: writerOf(r), ...(program !== own ? { own, own_ok: right(own, r.program, r), withheld: x.withheld } : {}), ...(last?.parts ? { parts: last.parts } : {}), ...(last?.steps !== undefined ? { steps: last.steps } : {}) });
     }
     a.close();
   } else if (m.startsWith("text:")) {
@@ -112,7 +101,7 @@ for (const m of all("model")) {
   }
   const shares = Object.values(byWriter).filter((v: any) => v.n >= 20).map((v: any) => v.right_served / v.n);
   report.models[m] = {
-    right: answers.filter((a) => a.ok).length, of: answers.length,
+    right: answers.filter((a) => a.own_ok ?? a.ok).length, of: answers.length, asked_back_by_checks: answers.filter((a) => a.withheld).length,
     at_1pct: { ...point, right_served_share: +(point.right / answers.length).toFixed(4) },
     at_1pct_bound95: { ...bound, right_served_share: +(bound.right / answers.length).toFixed(4) },
     parity_spread_points: shares.length > 1 ? +(100 * (Math.max(...shares) - Math.min(...shares))).toFixed(1) : null,

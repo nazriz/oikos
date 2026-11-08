@@ -11655,3 +11655,78 @@ The pilot's own logs were read for each fault's cause before anything was change
   words `COMPAT_CREDIT`/`COMPAT_LIMITED` do not match; Featherless onboards a full-weight abliterated GLM-5.3; the
   generous estimate refuses calls that would have fit often enough to matter (compare the host's reported prompt tokens
   with the estimate in the records of calls).
+
+## 2026-11-08 · Translator v4, round 3: two seeds served together, the sure-but-wrong families closed in code, Haiku-style data and the parity set (GPU 1.26 USD; no API spend)
+
+- **Serving two seeds** (`AgreeAdapter`, `decide/<a>+<b>`; `orchestrator/src/models.ts` takes the name): both read every
+  request at once, a draft is served only where both write the same program, at the lesser sureness. Live on the run
+  server (round 3's seeds, validation-real 615): median 90 ms, p95 242 ms a request (the slower model's time; round 2's
+  pair 89 / 363), under the 0.5 s asked. The live answers equal the offline pairing of the two seeds' own answers (613 of
+  615; the two others a seed's answer withheld as too long), so every arrangement below is read offline
+  (`translator/model/v4-serve.ts`) from each seed's answers.
+- **The two families of sure-but-wrong, closed as exact checks** (`translator/model/serve-rules.ts`, in the adapter for
+  every model, `checks: false` or `OIKOS_DECIDE_NO_CHECKS` to turn off). (1) *Copied words cut short*: a paper's words (a
+  message's or statement's text, terms, a payment's `for`, a form's field typed text of three words or more) that stop
+  where the request's sentence goes on, nothing else of the answer accounting for the rest, are asked back. (2) *Words
+  before sentences nothing accounts for* (`trailing`): whether a trailing sentence belongs to the paper is a reading the
+  copy cannot settle; the keys go both ways (round 2's surest wrong message left out "A general count of buildings is not
+  what I need."; as many right ones leave out the asker's reason), so it is asked back. A code check, not weight-space
+  programming: the property is of the answer and the request, exact, and a mask needs no weights.
+- **The neighbouring refusals, audited and told alike.** A linear probe of the model's state at its first decision
+  (`translator/model/py/refusal_probe.py`), fitted on 2,400 training requests (program, not_an_act, no_such_act,
+  look_first), reads held-out real requests no better than the model's own head (96.35% of refusals right, both, the same
+  errors): what the head misses is not in the state, and both ways round of not_an_act/no_such_act were among round 2's
+  surest wrong answers, at the edge of meaning ("have the record shown to me at each sitting"; "inspect the bank's
+  references and allocate them once"). Both bring nothing about and differ only in the advice, so **the seat is now told
+  one sentence for both** (`NOTHING_DONE` in translator/src/resolver.ts and kernel/crates/resolver/src/resolve.rs; the
+  contract table `contracts/test/holds.json` with it), and a score counts either as the other (`toldAlike`, v4-score.ts):
+  the answer served is the same. A contract change under the blanket approval; it reaches every translator, Sonnet behind
+  included. look_first stays apart (its advice is a different act). On round 2's pair this one change and the two checks
+  give the first cut-off certified at 1% by the one-sided bound: 419 of 670 served on validation-real with the pilot's
+  validation, none wrong.
+- **Haiku-style data** (`translator/train/v4-pilot/rewrites.ts`): every keyed train-side request of the scope pilot (581)
+  written again by Haiku 5.5 subagents in two of hedged, blunt and second-language (1,162; 1,154 written), keyed blind by
+  Sonnet 5.5 and Opus 5.5 subagents together with the parity set (hashed ids, shuffled; the readers agreed on 87%), kept
+  where both agree and the key is the same act as the source's (free text not compared): 1,059 kept (hedged 331, blunt 358,
+  second-language 370; 29 drifted in meaning). Train side only, joined three times to round 2's data (78,704 rows).
+- **The parity set** (test only): 100 test-side situations of the scope pilot, one a seat-day, spread over forms and the
+  original writers, each written by Haiku 5.5, Sonnet 5.5, Opus 5.5 and Fable 5.1 **as Claude Code subagents, stand-ins**:
+  each was given the seat's forms and what it wanted done in the seat's words, and wrote its own request. They are the
+  models writing, not the models in a seat; real seats' writing is the pilot's test side, and the open-weight models'
+  will come from their runs. Kept as above: 334 (Sonnet 90, Opus 92, Fable 90, Haiku 62: Haiku drifted in meaning on 13);
+  54 situations kept for all four (`--common`). Codex not written (not waited on).
+- **Retrained** the control recipe (deberta-v3-small, 6 epochs, `--forms 0`), two seeds on two community RTX A4500 pods at
+  0.19 an hour, 193 and 197 minutes: RunPod 10.88 to 9.62 USD. Subagents: about 70 launches on the owner's plan, no key.
+- **Scores.** Cut-offs are set on validation-real with the pilot's validation (670) at the one-sided 95% bound, and read
+  at that cut-off on the test side (368, never tuned on) and the parity set.
+
+  | | right in all, test side 368 | served right at the certified cut, test side (wrong; bound) | parity set 334: right in all / served right (wrong) | parity spread, points (all / common 54) | Haiku served right, test side | unseen forms 824 right | scope 67 recognised / false of 81 |
+  |---|---|---|---|---|---|---|---|
+  | round 2 seed 1 alone (as round 2 served) | 341 | 238 (64.7%; 0) at round 2's scaled cut, uncertified | 293 / - | - | 50.8% | 804 | 63 / 6 |
+  | round 2 pair + checks | 341 | **236 (64.1%; 0; 1.26%)**, cut certified on 670: 419 served | 293 / 143 (1) | 13.4 / 22.2 | 23 of 59 (39%) | 804 | 63 / 6 |
+  | round 3 seed 2 alone + checks | 344 | 224 (60.9%; 0; 1.33%), certified on 670: 363 | 312 / 143 (0) | 10.7 / 20.4 | 23 of 59 (39%) | 808 | 59 / 7 |
+  | round 3 pair + checks | 343 | 214 (58.2%; 0; 1.39%), certified on 670: 332 | 309 / 122 (0) | 9.4 / 18.5 | 16 of 59 (27%) | 806 | 62 / 9 |
+
+  At the uncertified 1% point cut (as round 2 reported): round 3's pair serves 245 right on the test side (66.6%, 2 wrong,
+  0.8%) and 197 on the parity set (59.0%, 4 wrong, 2.0%: over 1%); round 2's pair 251 (68.2%, 1) and 185 (55.4%, 1).
+- **What it says.** The Haiku-style data moved what is read: right in all on the parity set 87.7% to 92.5-93.4%, Haiku's
+  parity requests 50 to 53-55 of 62 right, the test side 341 to 343-344. It did not move what is served: the certified
+  cut-off is set by the two surest wrong answers on validation, and round 3's are at sureness 0.9996 (a "show me X, and if
+  it is not filed ask the officer when" keyed as a message, the model's not_an_act; a long message whose last sentence the
+  key and the model end differently), so the cut rises and less is served. Two seeds agreeing helps round 2's pair and not
+  round 3's at the certified cut. On the test side nothing served at a certified cut is wrong (0 of 214 to 236), but 0 of
+  that many bounds the rate at 1.3-1.4%, not 1%: certifying 1% on a set needs about 300 served with none wrong.
+- **The pass mark is not met** (≤1% confidently wrong certified, ≥90% right served): 58-64% served right on the test side
+  at a cut certified on validation, 93% right in all. **Parity is not met**: the spread of served right is 9 to 13 points
+  on the parity set (5 allowed) and 33 to 45 on the test side; Haiku is still lowest. **No release is proposed**; today's
+  first stays first. Of what this round built, the checks and the told-alike refusal stand for any model (they lift round
+  2's pair to a certified cut and cost nothing on the test side but asked-back requests); the trailing check costs 16% of
+  unseen-forms requests asked back (134 of 824: those forms' long words with a reason after them) and should be read again.
+- **Next, by what this says:** the top of the sureness curve is now set by a handful of keys at the edge of meaning, so the
+  next gain is in those keys (a third blind reader on validation-real's surest disagreements) and in more validation (the
+  bound needs about 300 surest with none wrong on the set it certifies); Haiku's requests are read right but held under
+  the cut, so a sureness signal that does not penalise hedged and second-language wording is the parity lever, not more
+  reading data.
+- **Revisit if:** a third reader overturns the two surest wrong keys (then round 3's cut falls to about round 2's and its
+  pair should be read again); the trailing check asks back much of a new pilot's right drafts (then keep only cut_short);
+  seats in a pilot misread the merged refusal sentence (then split it again with a check for which advice applies).

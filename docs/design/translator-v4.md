@@ -201,6 +201,16 @@ span, free-text edges), its field-type masks and its scope-request recognition c
   ours does not serve is asked back to the seat in the world's own terms (`Unsure`), the same for every model, and the
   ask-back share is reported per model as part of parity. Sonnet stays behind in development pilots only.
 - **Also reported:** validation-uf (new forms, release by kind as v3), latency median and p95 on the run server.
+- **What is served (round 3, 2026-11-08).** Served is not the same as what the model writes. Three exact checks stand
+  between them, each the same for every writer: (1) **two seeds agreeing** (`decide/<a>+<b>`, `AgreeAdapter`): both
+  read the request at once and a draft is served only where they write the same program, at the lesser sureness;
+  (2) **copied words** (`serve-rules.ts`): a paper's words that stop part way through the request's sentence, or before
+  sentences of it nothing else of the answer accounts for, are asked back (whether those belong is a reading the copy
+  cannot settle); (3) **refusals told alike**: `not_an_act` and `no_such_act` give the seat one sentence
+  (`NOTHING_DONE`, resolver.ts and resolve.rs), because a probe of the model's state separates them no better than its
+  head at their edge (`refusal_probe.py`), so either is the same answer served and is scored so (`toldAlike`). A score
+  reads the served answer; the model's own is kept beside it (`own`), and `v4-serve.ts` reads any arrangement offline
+  from the answers of each seed.
 
 ## 6. Trial plan and cost
 

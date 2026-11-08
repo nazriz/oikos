@@ -7,7 +7,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { formsFiled, SITUATIONS } from "../eval/scope-situations";
-import { DecideAdapter } from "./adapter";
+import { AgreeAdapter, DecideAdapter, SERVING_CHECKS } from "./adapter";
 
 const args = process.argv.slice(2);
 const all = (k: string) => args.flatMap((a, i) => (a === `--${k}` ? [args[i + 1]!] : []));
@@ -20,18 +20,19 @@ if (one("rows")) {
 const cuts = new Map(all("cut").map((c) => [c.slice(0, c.lastIndexOf("=")), Number(c.slice(c.lastIndexOf("=") + 1))]));
 const report: any = { cases: cases.length, models: {} };
 for (const m of all("model")) {
-  const got = new Map<string, { program: string | null; sure: number }>();
+  const got = new Map<string, { program: string | null; sure: number; held?: boolean }>();
   if (m.startsWith("decide/")) {
-    const a = new DecideAdapter(m.slice(7), { first: true, quiet: true, unreleased: true });
+    // (`decide/<a>+<b>`: two models agreeing, AgreeAdapter. A serving check's answer is the model's own, not served.)
+    const a = m.includes("+") ? new AgreeAdapter(m.slice(7), { first: true, quiet: true, unreleased: true }) : new DecideAdapter(m.slice(7), { first: true, quiet: true, unreleased: true });
     await a.ready();
-    for (const c of cases) { const x = await a.translate(c.request, SITUATIONS[c.situation]!, { draft: true }); got.set(c.id, { program: x.wrote ?? x.program, sure: x.sure }); }
+    for (const c of cases) { const x = await a.translate(c.request, SITUATIONS[c.situation]!, { draft: true }); got.set(c.id, { program: x.wrote ?? x.program, sure: x.sure, held: !!x.withheld && SERVING_CHECKS.includes(x.withheld) }); }
     a.close();
   } else for (const l of readFileSync(m.slice(5), "utf8").split("\n").filter((l) => l.trim())) { const x = JSON.parse(l); got.set(x.id, { program: x.program, sure: x.sure ?? 0 }); }
   const cut = cuts.get(m);
   const tally = (xs: any[]) => {
     const pos = xs.filter((c) => c.label === "scope"), neg = xs.filter((c) => c.label !== "scope");
     const filed = (c: any) => formsFiled(got.get(c.id)?.program ?? "").includes("scope_request");
-    const served = (c: any) => cut === undefined || ((got.get(c.id)?.sure ?? 0) >= cut && got.get(c.id)?.program !== "none(unclear)");
+    const served = (c: any) => cut === undefined || ((got.get(c.id)?.sure ?? 0) >= cut && got.get(c.id)?.program !== "none(unclear)" && !got.get(c.id)?.held);
     return { scope: pos.length, recognised: pos.filter(filed).length, others: neg.length, false_positives: neg.filter(filed).length,
       ...(cut !== undefined ? { scope_served_as_scope: pos.filter((c) => filed(c) && served(c)).length, scope_served_as_other: pos.filter((c) => !filed(c) && served(c)).length } : {}) };
   };

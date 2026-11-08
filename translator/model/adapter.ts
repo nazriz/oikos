@@ -10,6 +10,7 @@ import { calls } from "@oikos/participants";
 import { formsIn, inputOf, lineOf, programFrom, type Decoding, type Grammar } from "./encode";
 import { pieces } from "./export";
 import { namedAmong, partsOf, ranked, taken, type FormFacts } from "./subset";
+import { cutShort } from "./serve-rules";
 
 const HERE = import.meta.dir;
 
@@ -184,7 +185,14 @@ export const CUT_OFF = 0.1;
 /** Why this adapter offers no draft where the model's own answer was not a refusal it is sure of: its sureness is under
  * the cut-off; the form it filled in is not one of the forms shown as shown; or its steps make no program of the call
  * language; or the request with its forms is longer than the model reads. */
-export type Withheld = "cut_off" | "form_check" | "no_program" | "too_long" | "form_not_shown" | "forms_subset" | "form_unseen" | "type_unreleased" | "probation";
+export type Withheld = "cut_off" | "form_check" | "no_program" | "too_long" | "form_not_shown" | "forms_subset" | "form_unseen" | "type_unreleased" | "probation" | "cut_short" | "trailing" | "disagree";
+
+/** The checks that are part of what is served, not of what a model can be scored on (translator v4, round 3): copied
+ * words cut short part way through the request's sentence, or ending where the request goes on with sentences nothing
+ * else of the answer accounts for (serve-rules.ts `cutShort`), and two models that do not write the same program
+ * (`AgreeAdapter`). An answer withheld by one is asked back (or goes behind), and scoring counts it so;
+ * the other reasons above are this adapter's own and a score reads past them to the model's answer. */
+export const SERVING_CHECKS: readonly string[] = ["cut_short", "trailing", "disagree"];
 
 /** A field's kind of value as a form's line shows it: `choice` for one of a few options, else the type it names. */
 /** A request as the model is shown it: on one line, each line break a space (adapter.translate). */
@@ -285,6 +293,14 @@ export function readerOf(dir: string): { most?: number; forms?: number; trained?
   }
 }
 
+export interface DecideOptions {
+  dir?: string; threshold?: number; unchecked?: boolean; quiet?: boolean; first?: boolean;
+  /** A `cards` model measured before anything is released for it (release.ts): its drafts as they are, with no release by kind and no trial. */
+  unreleased?: boolean;
+  /** The serving checks on copied words (serve-rules.ts): on unless false (or OIKOS_DECIDE_NO_CHECKS is set). */
+  checks?: boolean;
+}
+
 export class DecideAdapter implements LlmAdapter {
   provider = "decide";
   private proc?: ChildProcess;
@@ -321,7 +337,7 @@ export class DecideAdapter implements LlmAdapter {
   /** `first`: this model answers first with another translator behind it (translator/src/arrangement.ts), so whoever
    * it is unsure for is never told so by it: the request goes behind. Then nobody is "given its best draft the next
    * time", and the cut-off holds for every request. */
-  constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean; quiet?: boolean; first?: boolean; /** A `cards` model measured before anything is released for it (release.ts): its drafts as they are, with no release by kind and no trial. */ unreleased?: boolean } = {}) {
+  constructor(public model: string, private o: DecideOptions = {}) {
     const vocabulary = vocabularyOf(this.dir());
     this.decoding = decodingOf(this.dir());
     this.grammar = this.decoding !== "steps" ? grammarOf(this.dir()) : undefined;
@@ -446,6 +462,14 @@ export class DecideAdapter implements LlmAdapter {
       program = "none(unclear)";
       unsure = { kind: least === "places" ? "which" : least === "texts" ? "words" : "act" };
     }
+    // Copied words that stop part way through the request's sentence, or before sentences of it nothing else of the
+    // answer accounts for, are asked back: what is sent might not be what was said (serve-rules.ts).
+    const short = !withheld && (this.o.checks ?? !process.env.OIKOS_DECIDE_NO_CHECKS) && !/^none\(\w+\)$/.test(program) ? cutShort(oneLine(request), program, forms, { trailing: true }) : undefined;
+    if (short) {
+      withheld = short.kind;
+      program = "none(unclear)";
+      unsure = { kind: "words" };
+    }
     // (A form that can't be one of the forms shown is not offered, however sure the model is.)
     const misfit = this.o.unchecked || withheld === "form_not_shown" ? undefined : formsMisfit(program, forms);
     if (misfit) {
@@ -511,5 +535,45 @@ export class DecideAdapter implements LlmAdapter {
 
   close(): void {
     this.proc?.stdin?.end();
+  }
+}
+
+/**
+ * Two trained models read every request and a draft is served only where both write the same program
+ * (`decide/<a>+<b>`; translator v4, round 3: of the signals measured in round 2 the only one that lifted right served at
+ * the mark). Both read at once, each in its own process, so a request takes about as long as the slower of the two.
+ * Its sureness is the lesser of theirs. Where they differ the request is asked back (`disagree`), or goes behind where
+ * another translator stands behind; the first model's answer is kept as what it wrote.
+ */
+export class AgreeAdapter extends DecideAdapter {
+  readonly pair: [DecideAdapter, DecideAdapter];
+  constructor(model: string, o: DecideOptions = {}) {
+    const [x, y, ...more] = model.split("+");
+    if (!x || !y || more.length) throw new Error(`decide/${model}: two models agreeing are named decide/<a>+<b>`);
+    super(x, { ...o, quiet: true });
+    this.model = model;
+    this.pair = [new DecideAdapter(x, o), new DecideAdapter(y, { ...o, quiet: true })];
+  }
+  override check(): void {
+    for (const p of this.pair) p.check();
+  }
+  override async ready(): Promise<void> {
+    await Promise.all(this.pair.map((p) => p.ready()));
+  }
+  override close(): void {
+    for (const p of this.pair) p.close();
+  }
+  override probationOutcome(form: string, agree: boolean): void {
+    for (const p of this.pair) p.probationOutcome(form, agree);
+  }
+  override async translate(request: string, all: string[], o: Parameters<DecideAdapter["translate"]>[2] = {}): ReturnType<DecideAdapter["translate"]> {
+    const [a, b] = await Promise.all(this.pair.map((p) => p.translate(request, all, o)));
+    const sure = Math.min(a!.sure, b!.sure), ms = Math.max(a!.ms, b!.ms);
+    const [la, lb] = this.pair.map((p) => p.answers.at(-1));
+    const parts = la?.parts && lb?.parts ? { choices: Math.min(la.parts.choices, lb.parts.choices), places: Math.min(la.parts.places, lb.parts.places), texts: Math.min(la.parts.texts, lb.parts.texts), least: Math.min(la.parts.least, lb.parts.least) } : undefined;
+    const own = a!.wrote ?? a!.program;
+    const out = own === (b!.wrote ?? b!.program) ? { ...a!, sure, ms } : { program: "none(unclear)", sure, ms, unsure: { kind: "act" }, withheld: "disagree" as const, wrote: own, ...(a!.shown ? { shown: a!.shown } : {}) };
+    this.answers.push({ sure, ms, program: out.program, ...(la?.steps !== undefined ? { steps: la.steps } : {}), ...(parts ? { parts } : {}) });
+    return out;
   }
 }

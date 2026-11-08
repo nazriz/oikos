@@ -9,7 +9,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DecideAdapter } from "../../translator/model/adapter";
+import { AgreeAdapter, DecideAdapter } from "../../translator/model/adapter";
 import { AnthropicAdapter, ClaudeCodeAdapter, CodexCliAdapter, COMPAT_HOSTS, OpenAICompatHostedAdapter, OpenAICompatibleAdapter, type Budget, type LlmAdapter, type Price } from "@oikos/participants/llm";
 
 /** Providers whose calls cost nothing per call: local models (your compute), and the Codex CLI on a ChatGPT subscription (flat rate; its usage limits apply). */
@@ -54,7 +54,7 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
     : provider === "openai" ? new OpenAICompatibleAdapter("openai", model, { apiKey: need("OPENAI_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
     : provider === "codex" ? new CodexCliAdapter(model, undefined, o.timeoutMs ? { timeoutMs: o.timeoutMs } : {}) // ("model@effort": the effort is part of the model's name, so the log records it)
     : provider === "claude-code" ? new ClaudeCodeAdapter(model, undefined, o.timeoutMs ? { timeoutMs: o.timeoutMs } : {}) // ("model@effort", as for codex)
-    : provider === "decide" ? new DecideAdapter(model, { ...(env.OIKOS_DECIDE_THRESHOLD ? { threshold: Number(env.OIKOS_DECIDE_THRESHOLD) } : {}), ...(env.OIKOS_DECIDE_UNCHECKED ? { unchecked: true } : {}), ...(o.first ? { first: true } : {}) }) // our own trained model (translator/model)
+    : provider === "decide" ? new (model.includes("+") ? AgreeAdapter : DecideAdapter)(model, { ...(env.OIKOS_DECIDE_THRESHOLD ? { threshold: Number(env.OIKOS_DECIDE_THRESHOLD) } : {}), ...(env.OIKOS_DECIDE_UNCHECKED ? { unchecked: true } : {}), ...(o.first ? { first: true } : {}) }) // our own trained model (translator/model)
     : provider === "openai-compat" ? (() => {
       // openai-compat/<host>/<model>: a hosted OpenAI-compatible API (Fireworks, Together, OpenRouter), its key from the
       // host's own variable, its base URL from --base-url, OIKOS_<HOST>_BASE_URL or the host's default.

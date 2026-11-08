@@ -112,7 +112,7 @@ test("then: each request's route is in the log; the report and the dataset read 
   const shown = all.filter((e) => e.body?.annotation === "transcript" && e.body.data.purpose === "participant").map((e) => JSON.stringify([e.body.data.system ?? "", e.body.data.input]));
   expect(shown.length).toBeGreaterThan(8);
   for (const text of shown) expect(text).not.toMatch(/decide\/|trained-x1|mock\/mock|sure_ppm|translation_route|look_first|cut_off|behind it|answers first/);
-  expect(shown.some((x) => x.includes("That's something to look up or read"))).toBe(true); // (the refusal that stood, in the world's words)
+  expect(shown.some((x) => x.includes("If it is something to look up or read"))).toBe(true); // (the refusal that stood, in the world's words)
 
   // The pilot report: one line, and the counts behind it.
   const r = await pilotReport(out, false);
