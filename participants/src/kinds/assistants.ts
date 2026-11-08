@@ -51,9 +51,9 @@ export function clientDraft(kinds: string[]): Issued {
   return { form: "draft_for_client", title: "A draft for sign-off: a paper in a client's name",
     does: "Sends the client the paper as it would go in their name, for them to read and sign off. Nothing goes in their name until they have; once signed off, send it as it stands.",
     fields: { referral: f("record", "The matter you were handed.", req), client: f("entity", "Whom you work for in it: the paper goes in their name.", req),
-      kind: f("choice", "The kind of paper, as the referral names it.", { required: true, options: [...kinds].sort() }), to: f("list", "Whom the paper goes to, as the referral has it.", req),
+      kind: f("choice", "The kind of paper, as the referral names it.", { required: true, options: [...kinds].sort() }), recipient: f("list", "Whom the paper goes to, as the referral has it.", req),
       words: f("text", "The paper's words, as they would stand.", req) },
-    writes: { kind: "draft", text: "Draft for sign-off. {words}", basis: "=referral", to: ["=client"], visible: ["=self", "=client"], data: { referral: "=referral", paper: { kind: "=kind", to: ["=to"], text: "=words" } } } };
+    writes: { kind: "draft", text: "Draft for sign-off. {words}", basis: "=referral", to: ["=client"], visible: ["=self", "=client"], data: { referral: "=referral", paper: { kind: "=kind", to: ["=recipient"], text: "=words" } } } };
 }
 
 /**

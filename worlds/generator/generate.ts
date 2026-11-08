@@ -194,6 +194,7 @@ const assistantChannels = (also: string[] = []) => [
   K.mine("terms", ASSISTANT_TERMS, { title: "The service you work under: its delivery, briefs and remits" }),
   K.mine("matters", ASSISTANT_MATTERS, { title: "Matters handed to you, and the answers to what you asked" }),
   K.mine("file", [...new Set([...ASSISTANT_SEES, ...ASSISTANT_PAPERS, ...also])], { title: "Your file: the matters handed to you, your papers on them and what you sent, looked up on request (look, with what to find)", on_request: true }),
+  K.board("laws", ["law", "charter"], { title: "The town's laws and charter, published: looked up on request (look, with what to find), for the law a matter rests on" }),
   K.lookUp("who", { title: WHO }),
 ];
 
