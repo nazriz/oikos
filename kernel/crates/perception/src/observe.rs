@@ -894,6 +894,10 @@ fn field(r: &Record, f: &str) -> Option<Frozen> {
         "at" => Some(Frozen::Number(r.at.into())),
         "author" => Some(text(r.author.as_str())),
         "speaks_for" => r.speaks_for.as_deref().map(text),
+        // (Whom a paper is from, as a list of papers names it: whom it speaks for, or else who wrote it. A person's paper
+        // is written by their own participant on their behalf, so a search for "from c0276" by the author found nothing
+        // until 2026-11-08: the scope pilot's desk looked for a client's remits by whom they were from and was told none.)
+        "from" => Some(text(r.speaks_for.as_deref().unwrap_or(r.author.as_str()))),
         // (Of several, the one cited first: what a search orders by. Whether one is cited at all is `holds`.)
         "basis" => r.basis.as_ref().map(|b| text(b.first())),
         _ => {

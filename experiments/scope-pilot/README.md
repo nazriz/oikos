@@ -156,3 +156,11 @@ household cohort of **one adult in 15**.
 bun experiments/scope-pilot/run.ts --go --only pilot,rare,neutral    # round 2, detached; again to take up where stopped
 bun experiments/scope-pilot/readout.ts ~/oikos/runs/scope-pilot-r2 ~/oikos/runs/scope-pilot-r2-rare ~/oikos/runs/scope-pilot-r2-neutral
 ```
+
+## Rounds 3 and 4, and the results (2026-11-08)
+
+Round 3 (`~/oikos/runs/scope-pilot-r3`, `-r3-s4`): Opus on seeds 2 to 4 and Haiku on 2 and 3, on round 2's spec. Round 4
+(`~/oikos/runs/scope-pilot-r4`, `-r4-haiku`): Opus on seeds 5 and 6 and Haiku on 4 and 5. Most of their forks stopped at
+their spending limit with a third to a half of it unspent. The coded results of all four rounds, the faults still
+visible and what the main study should change: `docs/research/pilot-results.md`. The coding (codebooks and scripts) is in
+`coding/`; its data stays with the runs (`~/oikos/runs/scope-pilot-coding/`).

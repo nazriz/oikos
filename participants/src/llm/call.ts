@@ -53,15 +53,22 @@ export function reckonedEndMicroUsd(o: { seats: number; seatPrice?: Price; calls
 export interface EndCosts {
   /** What the figures are multiplied by (room for a seat that says more than any measured). */
   margin_percent: number;
-  seat: { [model: string]: { microusd: number; n?: number } };
-  account: { [model: string]: { microusd: number; n?: number } };
+  seat: { [model: string]: EndCost };
+  account: { [model: string]: EndCost };
 }
+/** One model's measured figure, and the tokens of the costliest one measured (what prices it for a model nobody has
+ * measured: tokens carry from one model to another, a price does not). */
+export interface EndCost { microusd: number; n?: number; tokens?: { input: number; cache_read: number; cache_write: number; output: number } }
 
-/** One figure sized from the table: the model's measured figure, or for a model nobody has measured the floor, the
- * greater of the old reckoning and the largest measured figure; times the margin. */
-function sized(table: EndCosts["seat"], model: string | undefined, reckoned: number, margin_percent: number): { each: number; basis: "measured" | "floor" } {
+/** One figure sized from the table: the model's measured figure; or, for a model nobody has measured, the floor: the
+ * most any measured one took in tokens, at this model's price, where the table has tokens and the model a price, and
+ * otherwise the greater of the old reckoning and the largest measured figure; times the margin. (Until 2026-11-08 the
+ * floor was always a price: a Haiku seat was kept back a Sonnet seat's debrief, 60 times what it costs.) */
+function sized(table: EndCosts["seat"], model: string | undefined, reckoned: number, margin_percent: number, price?: Price): { each: number; basis: "measured" | "floor" } {
   const m = model ? table[model] : undefined;
   if (m) return { each: Math.ceil(m.microusd * margin_percent / 100), basis: "measured" };
+  const byTokens = price ? Object.values(table).flatMap((x) => (x.tokens ? [costMicroUsd(price, { input_tokens: x.tokens.input, output_tokens: x.tokens.output, cache_read_tokens: x.tokens.cache_read, cache_write_tokens: x.tokens.cache_write })!] : [])) : [];
+  if (byTokens.length) return { each: Math.ceil(Math.max(...byTokens) * margin_percent / 100), basis: "floor" };
   const largest = Math.max(0, ...Object.values(table).map((x) => x.microusd));
   return { each: Math.ceil(Math.max(reckoned, largest) * margin_percent / 100), basis: "floor" };
 }
@@ -71,10 +78,20 @@ function sized(table: EndCosts["seat"], model: string | undefined, reckoned: num
  * figure and each exit account likewise, times the margin. `reckoned` is the old reckoning for one seat (and one
  * account) at the model's price, used only as the floor of a model with no measurement.
  */
-export function endNeedMicroUsd(costs: EndCosts, o: { seats: number; seatModel?: string; seatReckoned: number; accounts?: number; accountModel?: string; accountReckoned?: number }): { microusd: number; seat: { each: number; basis: "measured" | "floor" }; account?: { each: number; basis: "measured" | "floor" } } {
-  const seat = sized(costs.seat, o.seatModel, o.seatReckoned, costs.margin_percent);
-  const account = o.accounts ? sized(costs.account, o.accountModel, o.accountReckoned ?? 0, costs.margin_percent) : undefined;
+export function endNeedMicroUsd(costs: EndCosts, o: { seats: number; seatModel?: string; seatPrice?: Price; seatReckoned: number; accounts?: number; accountModel?: string; accountPrice?: Price; accountReckoned?: number }): { microusd: number; seat: { each: number; basis: "measured" | "floor" }; account?: { each: number; basis: "measured" | "floor" } } {
+  const seat = sized(costs.seat, o.seatModel, o.seatReckoned, costs.margin_percent, o.seatPrice);
+  const account = o.accounts ? sized(costs.account, o.accountModel, o.accountReckoned ?? 0, costs.margin_percent, o.accountPrice) : undefined;
   return { microusd: o.seats * seat.each + (o.accounts ?? 0) * (account?.each ?? 0), seat, ...(account ? { account } : {}) };
+}
+
+/**
+ * What a fork keeps back for debriefing its `seats` model seats (all of one model, sharing the fork's limit): each seat
+ * sized as one (`endNeedMicroUsd`), times the seats. Until 2026-11-08 the seat host reckoned each seat's floor for all of
+ * them together and then multiplied by the seats again (the seats' square): three Opus seats were kept back 6.7 USD, half
+ * of a 10.25 limit after the clamp, against about 1.1 they spent; 9 of the scope pilot's 15 model forks stopped early.
+ */
+export function seatsEndNeedMicroUsd(costs: EndCosts, o: { seats: number; seatModel: string; seatPrice?: Price; calls: number; promptChars: number; answerTokens: number }) {
+  return endNeedMicroUsd(costs, { seats: o.seats, seatModel: o.seatModel, ...(o.seatPrice ? { seatPrice: o.seatPrice } : {}), seatReckoned: reckonedEndMicroUsd({ seats: 1, ...(o.seatPrice ? { seatPrice: o.seatPrice } : {}), calls: o.calls, promptChars: o.promptChars, answerTokens: o.answerTokens }) });
 }
 
 /** What is kept back of the limit for a need: never under a twentieth of the limit, never over half of it (a run must be

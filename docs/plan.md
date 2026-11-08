@@ -30,6 +30,20 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 
 ## Now
 
+- [x] **The scope pilot written up** (rounds 1 to 4, 2026-11-08): `docs/research/pilot-results.md`. Coded blind by
+  Sonnet and luna (κ 0.85); 26 request episodes in 202 Claude seat-months, 24 set off by world faults (W1 remits not
+  found by the desk, W2 no withholding draft form); one fault-free request. Next, the owner's: fix W1, W2 and W4 as
+  laws, then decide the main study's design (the page's section 7).
+- [x] **The scope pilot's world faults fixed as laws** (2026-11-08, branch `scope-faults`; risk MT-25): W1, W2, W4 and
+  W6 (confirmed), the debrief reserve that stopped 9 of 15 forks early (a fork's seats reckoned as their square) and the
+  empty debrief answers (the answer limit). Left: W5 (the collector's account), and a pilot fork on the fixed world.
+- [x] **The main study's design revised for B and A** (2026-11-08; `docs/research/paper-plan.md`): obstacles as a
+  designed, sourced factor (a missing form, an approval that does not come, a record held by another, a counterparty's
+  refusal, at levels 0, 1, 2), beyond need read against each obstacle's logged need; open-weight models on Featherless's
+  Developer plan with three abliterated pairs (Qwen3.5-9B, Qwen3.8-27B, R1-Distill-Qwen-7B; no abliterated GLM-5.3 is
+  served). The Featherless host, its prices and the context check built and stub-tested; the smoke test
+  (`experiments/open-weight/`) waits for the key. Next, the owner's decisions D1, D6 to D14, then the obstacle builds.
+
 - [x] **Years at the study's size** (code only): 10,000 people for 3 years and 50,000 for 2 or more; what breaks over
   time fixed with its law, what emerges recorded (docs/design/performance.md, "Years at 10,000 and 50,000"; decisions
   2026-10-31 "Years at 10,000"). First faults fixed: the hall's room, owners homeless while the register answers, the

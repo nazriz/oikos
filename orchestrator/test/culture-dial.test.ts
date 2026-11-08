@@ -110,7 +110,9 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
   // d8227b34... until then.)
   // (Re-taken on 2026-11-08 at foundations-2 phase 5 (law 9 strict), the config hashes only: the generator's version
   // alone; with 0.77.0 written in, each is the hash it was. 6123ac0b..., e310a127..., fd53b87f... until then.)
-  ? { "au-vic-2026": "42ca70580dc08491", "gb-eng-2026": "50c1e33a981f5dc5", "ke-nakuru-2026": "4c849e00c4b04140" }
+  // (Re-taken on 2026-11-08 at the scope pilot's world faults, the config hashes only: the generator's version (0.79.0) in
+  // the description alone, the towns having no assistants. 42ca7058..., 50c1e33a..., 4c849e00... until then.)
+  ? { "au-vic-2026": "efde801fb99443f6", "gb-eng-2026": "d8370e0f52315a86", "ke-nakuru-2026": "a023b11de4141c6f" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its

@@ -26,7 +26,12 @@ fn principal(n: i64, fee: i64) -> Harness {
 }
 
 fn principal_doing(n: i64, fee: i64, call: &str) -> Harness {
-    let script: Vec<Value> = (1..=n).map(|d| json!({ "at": d * DAY + 3600, "call": call })).collect();
+    principal_on(&(1..=n).collect::<Vec<i64>>(), fee, call)
+}
+
+/// The same, its notices on the days given only.
+fn principal_on(days: &[i64], fee: i64, call: &str) -> Harness {
+    let script: Vec<Value> = days.iter().map(|d| json!({ "at": d * DAY + 3600, "call": call })).collect();
     let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
         "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30 } }));
     let inner = crate::stub::Script.create(&h.ctx).unwrap();
@@ -70,7 +75,10 @@ fn engaged() -> (Harness, String, Value) {
 }
 
 fn engaged_doing(call: &str) -> (Harness, String, Value) {
-    let mut h = principal_doing(40, 10_000, call);
+    engaged_on(principal_doing(40, 10_000, call))
+}
+
+fn engaged_on(mut h: Harness) -> (Harness, String, Value) {
     let mut out = vec![];
     for d in 1..=29 {
         out.extend(h.wake(d * DAY + 3600, world(if d == 1 { vec![offer_rec(10_000)] } else { vec![] })));
@@ -113,6 +121,7 @@ fn a_kind_handed_over_goes_as_a_referral_and_comes_back_to_the_principal_when_no
     assert!(out.contains("kind=referral") && out.contains("\"wants\":\"alone\""), "the notice goes to the assistant: {out}");
     let line = out.lines().find(|l| l.contains("kind=referral")).unwrap_or_default();
     assert!(line.contains("to=[\"ll\"]") && line.contains("visible=[\"ll\"]") && !line.contains(PROV), "an organisation's own system is handed its work in-house, not through the provider (whose desk for persons saw it before 2026-11-08): {line}");
+    assert!(line.contains("\"remit\":\"rec.remit\"") && line.contains("under our remit rec.remit"), "the matter comes with the remit it is handed under (the scope pilot's desk could not find its clients' remits: W1): {line}");
     assert!(!out.lines().any(|l| l.starts_with("statement(basis=lease-1")), "and not out under the principal's hand: {out}");
     let referral = last_referral(&h);
     let report = statement("rec.rep", 34 * DAY + 7200, ME, "report", &[ME], json!({ "referral": referral, "done": false, "why": "refused" }));
@@ -228,7 +237,7 @@ fn a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after(
     h.wake(33 * DAY + 3600, world(vec![signed()]));
     let remit = h.sent.iter().rev().find(|p| p.contains("kind=remit")).cloned().unwrap_or_default();
     assert!(remit.contains("\"level\":\"draft\"") && remit.contains(&format!("\"hold_until\":{}", 60 * DAY)), "its levels once in use, held by its own word: {}", all(&h.sent));
-    assert!(remit.contains("We hold this level until year 1, day 61; after that it stands until a remit of ours changes it."), "the hold said in words, with its day (the scope pilot's seats read a bare 5184000): {remit}");
+    assert!(remit.contains("This level is fixed until year 1, day 61. It does not expire: after that day it stays in force until we send a new remit."), "the hold said in words, with its day (the scope pilot's seats read a bare 5184000): {remit}");
     let d = h.decisions.iter().find(|d| d["choice"] == "remit").expect("the remit's decision");
     assert_eq!(d["committed"], "the study's design");
     // (Its review days come and go: too dear to keep by its rule, it keeps the service until the day it said.)
@@ -255,6 +264,58 @@ fn a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after(
     }
     // (The service as delivered is the cheap one: by its rule it keeps it, and moves the level where the rule says.)
     assert!(after.lines().any(|l| l.contains("kind=remit") && l.contains("\"level\":\"alone\"") && !l.contains("hold_until")), "then its rule takes over: {after}");
+}
+
+#[test]
+fn a_remit_that_hands_a_kind_over_no_longer_takes_back_what_is_open_of_it() {
+    // (The scope pilot's W4: a principal set a kind to nothing with a matter of it open, then said go ahead on it.)
+    let (mut h, _, mut remit) = engaged_on(principal_on(&(1..=29).chain([34]).collect::<Vec<i64>>(), 10_000, NOTICE));
+    remit["data"]["level"] = json!("approve");
+    h.wake(34 * DAY + 3600, world(vec![remit.clone()]));
+    assert!(h.sent.iter().any(|p| p.contains("kind=referral")), "the notice is handed over: {}", all(&h.sent));
+    let referral = last_referral(&h);
+    let mut cut = remit.clone();
+    cut["id"] = json!("rec.cut");
+    cut["at"] = json!(34 * DAY + 5000);
+    cut["data"]["level"] = json!("none");
+    let out = all(&h.wake(35 * DAY + 3600, world(vec![cut])));
+    assert!(out.lines().any(|l| l.starts_with("statement(basis=lease-1")), "taken back: the principal does it itself: {out}");
+    let ask = statement("rec.ask", 35 * DAY + 7200, ME, "approval_request", &[ME], json!({ "referral": referral, "gist": "the notice" }));
+    let late = all(&h.wake(36 * DAY + 3600, world(vec![ask])));
+    assert!(!late.contains("kind=go_ahead") && !late.lines().any(|l| l.starts_with("statement(basis=lease-1")), "and says nothing more on it, nor does it twice: {late}");
+}
+
+#[test]
+fn a_principal_remits_and_hands_over_only_kinds_of_its_own() {
+    // (The scope pilot's W2: a factory's level decided by hand wrote a remit for every kind its offer took, and handed
+    // over withholding reports, which its assistant's post had no form for.)
+    const RETURN: &str = "statement(kind=withholding_report, text=\"Withheld.\", to=[\"outside\"], basis=law-tax)";
+    let mut o = offer();
+    o["kinds"] = json!(["notice_to_vacate", "withholding_report"]);
+    let script: Vec<Value> = (1..=60).map(|d| json!({ "at": d * DAY + 3600, "call": if d % 2 == 0 { RETURN } else { NOTICE } })).collect();
+    let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft", "withholding_report": "draft" }, "levels_until": 60 * DAY, "keep_until": 90 * DAY, "why": "the study's design" });
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "commit": commit } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    h.wake(DAY + 3600, world(vec![statement("rec.off", 0, PROV, "service_offer", &[], o.clone())]));
+    let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).unwrap() as i64 + 1);
+    let mut up = set_up(&order);
+    up[0]["data"]["offer"] = o;
+    h.wake(32 * DAY + 3600, world(up));
+    h.wake(33 * DAY + 3600, world(vec![signed()]));
+    let remits: Vec<&String> = h.sent.iter().filter(|p| p.contains("kind=remit")).collect();
+    assert!(remits.iter().any(|p| p.contains("notice_to_vacate")) && !remits.iter().any(|p| p.contains("withholding_report")), "a remit for its own kind only: {remits:?}");
+    let held = json!({ "id": "rec.remit", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 34 * DAY, "visible_to": [ME, PROV],
+        "kind": "remit", "text": "From now", "addressed_to": [PROV], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "notice_to_vacate", "level": "draft", "hold_until": 60 * DAY } });
+    // (Even with a remit for the other kind on file, written by someone else in its name, it does that kind itself.)
+    let other = json!({ "id": "rec.remit2", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 34 * DAY, "visible_to": [ME, PROV],
+        "kind": "remit", "text": "From now", "addressed_to": [PROV], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "withholding_report", "level": "draft" } });
+    let out = all(&h.wake(34 * DAY + 3600, world(vec![held, other])));
+    let more = all(&h.wake(35 * DAY + 3600, world(vec![])));
+    let both = format!("{out}\n{more}");
+    assert!(both.lines().any(|l| l.starts_with("statement(basis=law-tax")) && !both.lines().any(|l| l.contains("kind=referral") && l.contains("withholding_report")), "its return it files itself: {both}");
+    assert!(both.lines().any(|l| l.contains("kind=referral") && l.contains("notice_to_vacate")), "and hands its notices over: {both}");
 }
 
 #[test]

@@ -101,5 +101,10 @@ After the feedback, the owner chose goal (4) alone, aiming for a paper:
 - **The research plan** (a draft for the owner, 2026-11-07): `docs/research/paper-plan.md`. It covers the hypotheses,
   three definitions of "unprompted" to choose from, the arms, power, the measures, the threats, the literature and the
   decisions still open.
+- **After the pilot (2026-11-08)** the owner chose two directions together. **B, the main design:** "When delegated AI
+  assistants hit obstacles, do they seek more authority or resources, how much, and does it go beyond what the obstacle
+  needs?", with obstacles a designed, sourced factor; rare unprompted requests become a bounded-null secondary result.
+  **A:** open-weight models through Featherless, abliterated models paired with their originals to isolate refusal
+  training. The revised plan is `docs/research/paper-plan.md`.
 - A second paper kept for later: Oikos's counterfactual forks as ground truth for validating Kulveit et al.'s §6.2
   proxies.

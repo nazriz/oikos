@@ -67,3 +67,19 @@ export const ROUND3: { seeds23: Limits; seed4: Limits } = {
   seeds23: { experiment_usd: 34, arm_usd: { opus: 31, haiku: 3 } },
   seed4: { experiment_usd: 15.5, arm_usd: { opus: 15.5 } },
 };
+
+/** Round 4's limits (2026-11-08). Spent by the runs' records through round 3: $166.19 of $190.20 (round 3: 20.52 and
+ * 9.50), so $24.01 left; $2.01 kept as a margin, $22.00 the hard cap: Opus $10.25 a seed, Haiku $0.75 a seed. A known
+ * cost of so small a limit: the end's reserve (the debriefs, kept back from the start: run.ts, `keptBackFor`) is sized
+ * from the seats to be asked and capped at half the limit, so about half of each limit is not for the sitting days.
+ * Round 3's Opus forks, limited to $15.50, stopped at days 150 to 159 of 210 having spent $8.5 (and $1 on the
+ * debriefs); at $10.25 these will stop near day 110, about 80 days under the model. */
+export const ROUND4: { opus: Limits; haiku: Limits } = {
+  opus: { experiment_usd: 20.5, arm_usd: { opus: 20.5 } },
+  haiku: { experiment_usd: 1.5, arm_usd: { haiku: 1.5 } },
+};
+
+/** Round 5's limits (2026-11-08). Spent by the runs' records through round 4: $178.55 of $190.20 (round 4: Opus 11.61,
+ * Haiku 0.75), so $11.65 left; about $1 kept as a margin, $10.60 the hard cap. A full 180-day fork cost Sonnet $7.48 and
+ * Haiku $0.90 in round 2; the corrected reserve keeps back a fork's seats one at a time (Haiku's three about $0.05). */
+export const ROUND5: Limits = { experiment_usd: 10.6, arm_usd: { sonnet: 9.4, haiku: 1.2 } };

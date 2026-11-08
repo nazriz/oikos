@@ -1,7 +1,15 @@
 {
-  "about": "What debriefs and exit accounts have cost, measured from the usage annotations of every run on file that debriefed a seat in the present way (scripts/debrief-costs.ts; the table is in docs/behaviour/debrief.md). microusd is the figure used: the largest measured (a shortfall is costlier than a surplus, which is simply not spent). The run multiplies it by margin_percent (a whole number, per cent). A model with no entry gets the floor: the greater of the old reckoning at its price and the largest figure here, times margin_percent. Add a model by measuring it, not by editing a figure.",
+  "about": "What debriefs and exit accounts have cost, measured from the usage annotations of every run on file that debriefed a seat in the present way, and from the experiments' records of calls (scripts/debrief-costs.ts; the table is in docs/behaviour/debrief.md). microusd is the figure used: the largest measured (a shortfall is costlier than a surplus, which is simply not spent); a debrief call measured at the old answer limit (900 tokens, until 2026-11-08) is counted as if it had run on to the present one, at the model's output price. The run multiplies it by margin_percent (a whole number, per cent). tokens: the costliest seat's, by which a model with no entry is priced (the floor: the most any measured seat took in tokens, at that model's price, times margin_percent; where no entry has tokens, the greater of the old reckoning at its price and the largest figure here). Add a model by measuring it, not by editing a figure.",
   "margin_percent": 125,
   "seat": {
+    "anthropic/claude-haiku-5-5": { "microusd": 14328, "n": 18, "mean_microusd": 9921, "median_microusd": 9486, "measured": "2026-11-08",
+      "runs": ["scope-pilot", "scope-pilot-r2", "scope-pilot-r3", "scope-pilot-r4-haiku"], "tokens": { "input": 56, "cache_read": 64087, "cache_write": 24146, "output": 21311 } },
+    "anthropic/claude-sonnet-5-5": { "microusd": 184186, "n": 18, "mean_microusd": 130646, "median_microusd": 131428, "measured": "2026-11-08",
+      "runs": ["scope-pilot", "scope-pilot-neutral", "scope-pilot-r2", "scope-pilot-r2-neutral", "scope-pilot-r2-rare", "scope-pilot-rare"], "tokens": { "input": 56, "cache_read": 63906, "cache_write": 52851, "output": 3916 } },
+    "anthropic/claude-opus-5-5": { "microusd": 565892, "n": 21, "mean_microusd": 380195, "median_microusd": 387304, "measured": "2026-11-08",
+      "runs": ["scope-pilot", "scope-pilot-r2", "scope-pilot-r3", "scope-pilot-r3-s4", "scope-pilot-r4"], "tokens": { "input": 60, "cache_read": 98842, "cache_write": 30908, "output": 19567 } },
+    "anthropic/claude-fable-5-1": { "microusd": 1904928, "n": 6, "mean_microusd": 1552355, "median_microusd": 1667901, "measured": "2026-11-08",
+      "runs": ["scope-pilot", "scope-pilot-r2"], "tokens": { "input": 68, "cache_read": 87918, "cache_write": 36701, "output": 28470 } },
     "claude-code/claude-sonnet-5-5": {
       "microusd": 503112,
       "n": 16,

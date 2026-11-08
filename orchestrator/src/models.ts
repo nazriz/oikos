@@ -1,5 +1,5 @@
 // Real models, by name: "anthropic/<model>", "openai/<model>", "openai-compat/<host>/<model>" (a hosted
-// OpenAI-compatible API: Fireworks, Together, OpenRouter; its key from OIKOS_<HOST>_KEY), or a local
+// OpenAI-compatible API: Fireworks, Together, OpenRouter, Featherless; its key from OIKOS_<HOST>_KEY), or a local
 // open-weight model behind an OpenAI-compatible server ("ollama/<model>", or
 // "local/<model>" with --base-url). Keys come from the environment
 // (OIKOS_ANTHROPIC_KEY, OPENAI_API_KEY) and are never logged. The Anthropic key is
@@ -61,7 +61,7 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
       const [host, ...m] = model.split("/");
       const h = COMPAT_HOSTS[host!];
       if (!h || !m.length) throw new Error(`openai-compat/<host>/<model>: the host is one of ${Object.keys(COMPAT_HOSTS).join(", ")}, got "${model}"`);
-      return new OpenAICompatHostedAdapter(host!, m.join("/"), { apiKey: need(h.keyEnv), baseUrl: o.baseUrl ?? env[`OIKOS_${host!.toUpperCase()}_BASE_URL`] ?? h.baseUrl, answer: (prices[name] as any).answer ?? "text" });
+      return new OpenAICompatHostedAdapter(host!, m.join("/"), { apiKey: need(h.keyEnv), baseUrl: o.baseUrl ?? env[`OIKOS_${host!.toUpperCase()}_BASE_URL`] ?? h.baseUrl, answer: (prices[name] as any).answer ?? "text", ...(typeof (prices[name] as any).context_tokens === "number" ? { contextTokens: (prices[name] as any).context_tokens } : {}) });
     })()
     : provider === "ollama" ? new OpenAICompatibleAdapter("ollama", model, { baseUrl: o.baseUrl ?? "http://localhost:11434/v1" })
     : provider === "local" ? new OpenAICompatibleAdapter("local", model, { baseUrl: o.baseUrl ?? (() => { throw new Error("local/<model> needs --base-url (an OpenAI-compatible server)"); })() })

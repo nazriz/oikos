@@ -1580,6 +1580,45 @@ The mechanism:
   carry no situation.
 - **Fix when:** Step 2 (the input builder), before any training; papers before the content heads.
 
+### MT-25 · The scope pilot's requests were set off by the world: faults still in the delegation setting
+- **Gap:** In the scope pilot's rounds 2 to 4 (docs/research/pilot-results.md, section 5), 24 of 26 request episodes
+  trace to faults of the setting. **Fixed as laws on 2026-11-08** (docs/decisions.md, "The scope pilot's world faults
+  fixed as laws"): W1 (a referral names the remit it is handed under; a search by whom a paper is from finds a person's
+  papers; the desk reads its service agreements), W2 (a principal remits and hands over only its own kinds, and a
+  factory's and a shop's manager issue the return of tax withheld they file, so it has its form and draft), W4 (a remit
+  that hands a kind over no longer takes back what is open of it), W6 (confirmed, and fixed: the desk has a draft for
+  sign-off of a paper in a client's name), the spending limits (a fork's seats were reckoned as their square; the four
+  Claude models measured) and the empty debrief answers (the answer limit ran out; 2,400 tokens, and an empty answer
+  asked for once more). **Round 5's three** (2026-11-08, docs/decisions.md): the desk's draft form no longer has a
+  field `to` (it clashed with the form call's own; a check bars reserved names from every form), assistant posts read
+  the published laws on request, and a remit's hold is worded as not expiring. **Still open:** W5, the collector's account cannot be found and paying it is not in the
+  remit; and whether a fixed world still sets off requests (no model fork has been run on it).
+- **Where:** `kernel/crates/actors/src/delegation/`; the generator's assistant posts; the participant API's `from`;
+  `participants/src/llm/call.ts` and `debrief.ts`; W5 in the finance office's referrals.
+- **Effect:** Requests counted under the paper plan's definitions measure the platform's friction, not the models'
+  propensity; failure-triggered (F) requests are inflated and spontaneous (B) ones sit beside them; exposure is lost.
+- **L / I:** medium / high (was high / high) · **Status:** mostly fixed; W5 to fix
+- **Notice by:** the coded readout of a mock and a pilot fork: requests whose window or words name a missing remit,
+  form, agreement, draft route or account.
+- **Fix when:** before the main study's registration (paper plan, phase 0): W5, and a pilot fork on the fixed world.
+
+### MT-26 · Open-weight seats meet the instrument differently from Claude's
+- **Gap:** Open-weight seats (Featherless, 2026-11-08) answer in `text` mode, where an answer not exactly in the form is
+  unread and asked again; Claude seats use the API's tools. The Qwen and DeepSeek pairs have a 32,768-token window, so a
+  long prompt is refused before it is sent (estimated generously, at a token for three characters) and the seat is shown
+  less afterwards; GLM's and Claude's windows are far larger. No abliterated GLM-5.3 is served, so the family of most
+  interest has no pair. None of it has been seen on a real call (no key yet).
+- **Where:** `participants/src/llm/openai-compat.ts` (the context check, the answer modes); `orchestrator/prices.json`;
+  `experiments/open-weight/`.
+- **Effect:** A model whose answers are unread more often, or whose prompts are cut, meets more of the instrument's own
+  friction, which could read as a difference between models in obstacles met or requests made. The pair contrasts are
+  protected (both sides of a pair share window and mode); cross-family ones are not.
+- **L / I:** medium / medium · **Status:** open
+- **Notice by:** the smoke test's check (unread answers, calls refused for size, prompts cut); in a run, the per-model
+  unread rate and the count of sittings missed for a prompt too long.
+- **Fix when:** before an open-weight arm is planned (paper plan, phase 0c): drop a model the smoke test fails, or move a
+  pair to `tools` mode together.
+
 ---
 
 ## Profiles and sources

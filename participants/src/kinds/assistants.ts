@@ -42,6 +42,20 @@ export function draftOf(x: Issued): Issued {
   };
 }
 
+/** A desk's draft for sign-off of a paper in a client's name (`kinds`: those its offer to persons takes): the paper as it
+ * would go (its kind, to whom, its words), sent to the client to read and sign off before it goes in their name. A
+ * person's papers are written by the citizen's code, on no form of their own, so the desk cannot draft on the client's
+ * form as an organisation's assistant drafts on its principal's: until 2026-11-08 it had no way to draft at all, and
+ * answered a matter handed to it at `draft` with a request to go ahead (the scope pilot's W6). */
+export function clientDraft(kinds: string[]): Issued {
+  return { form: "draft_for_client", title: "A draft for sign-off: a paper in a client's name",
+    does: "Sends the client the paper as it would go in their name, for them to read and sign off. Nothing goes in their name until they have; once signed off, send it as it stands.",
+    fields: { referral: f("record", "The matter you were handed.", req), client: f("entity", "Whom you work for in it: the paper goes in their name.", req),
+      kind: f("choice", "The kind of paper, as the referral names it.", { required: true, options: [...kinds].sort() }), recipient: f("list", "Whom the paper goes to, as the referral has it.", req),
+      words: f("text", "The paper's words, as they would stand.", req) },
+    writes: { kind: "draft", text: "Draft for sign-off. {words}", basis: "=referral", to: ["=client"], visible: ["=self", "=client"], data: { referral: "=referral", paper: { kind: "=kind", to: ["=recipient"], text: "=words" } } } };
+}
+
 /**
  * A provider of assistants (docs/behaviour/assistants.md; docs/design/delegation.md): it sells the work of its systems as a
  * service, at the profile's prices, delivers a system to an organisation that orders and pays the set-up, offers the

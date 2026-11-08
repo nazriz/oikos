@@ -57,8 +57,10 @@ each kind as the table of work has it, what its hour is worth, what an error cos
 channel of the providers' offers. Its own code is wrapped, not changed, and does everything as before until it hands a
 kind over (`kernel/crates/actors/src/delegation/principal.rs`):
 
-- **What it hands over.** An act every part of which is of kinds delegated under the service in use goes as a `referral`
-  to the assistant, at the strictest level of its kinds (`draft` over `approve` over `alone`; `advice`, or any part not
+- **What it hands over.** An act every part of which is of kinds delegated under the service in use (its own kinds only:
+  those its parameters price, which are those its assistant's post has forms for) goes as a `referral` to the assistant,
+  naming the remit it is handed under (`remit`: a client's instruction cites the standing terms it is given under), at
+  the strictest level of its kinds (`draft` over `approve` over `alone`; `advice`, or any part not
   delegated, and it does the act itself). Its own code hears of the act when the assistant reports it done (with what the
   assistant's act made), or when it does the matter itself after all (a draft it declined, a matter reported not done, a
   service that ended with the matter open).
@@ -71,7 +73,10 @@ kind over (`kernel/crates/actors/src/delegation/principal.rs`):
   it expects times what an error costs it, a draft's slips less those it finds) against doing everything itself, and
   orders the best that pays by its hurdle; in use, it sets each kind's level to the cheapest (a change only for a saving
   beyond the hurdle), and leaves when the saving no longer covers the fee by more than leaving costs over its horizon.
-  Its estimate of the slips starts at the provider's claim (as many matters' worth as `prior_matters`) and moves only with
+  **A remit that hands a kind over no longer** (`none` or `advice`), whoever wrote it in its name, **takes back what is
+  open of that kind**: it does those matters itself, answers nothing more on them, and the remit names them
+  (`takes_back`); a level that still hands over leaves open matters at the level they were handed at (2026-11-08: a rule
+  that cut a kind with a matter of it open went on to say go ahead on it). Its estimate of the slips starts at the provider's claim (as many matters' worth as `prior_matters`) and moves only with
   what it has seen. **Levels are a set, not a ladder**: a kind can go from doing it itself to `alone` in one remit.
 - **What it reads:** its own channels only. Every decision is logged (`decision`, domain `delegation`) with the records it
   rests on; a test holds every input to what the principal was shown, and its parameters carry nothing of the
@@ -110,7 +115,11 @@ provider's desk does the person's matters: it writes each paper **in the person'
 `speaks_for`), with the service agreement as its mandate, and reports to the person. Whoever receives the paper reads it
 as that person's where its own procedure reads a paper by whom it speaks for (the tribunal, the hearing bodies); a bank
 that verifies who wrote an instruction refuses an agent's, as a bank does. The desk serves many clients, each under its
-own agreement and brief.
+own agreement and brief. A model at the desk drafts a client's paper for their sign-off on a form of its own
+(`draft_for_client`: the paper's kind, of the offer's, its `recipient`, and its words), since a person's papers are written by
+the citizen's code on no form of their own; until 2026-11-08 the desk had no draft at all, and answered a matter handed
+at `draft` with a request to go ahead (the scope pilot's W6). It reads its service agreements with its clients on
+request (`agreements`).
 
 ## A model in an assistant seat
 
@@ -118,7 +127,8 @@ A town that seats a model in a kind of assistant (`assistant_seats`, templates b
 seat (the mock plays the assistant's code), told honestly that the town is simulated and for whom it works. Its post has
 its stationery (`participants/src/kinds/assistants.ts`): its own papers in words (advice, a request to go ahead, a
 report, a request for more scope, a handover), each to whom it works for in the matter, and, at an organisation's
-assistant post, the principal's own papers of the kinds it may do, and each of those as a **draft for sign-off** that
+assistant post, the principal's own papers of the kinds it may do (the return of tax withheld among a factory's and a shop's: their
+managers file it), and each of those as a **draft for sign-off** that
 carries the paper as it would go. A code principal reads a draft on a form by what it would send (the paper's kind and to
 whom, against what it asked), signs it off or declines it, and sets advice in words beside nothing (it cannot read words:
 nothing is counted). A desk's seat writes a person's papers through the translator in their name (`for`).
@@ -149,7 +159,8 @@ A principal's `delegation` parameters may carry a delegation already decided (`c
 kind, until when it holds those levels, until when it keeps the service, and why): a study's design, or an owner's earlier
 choice, written into the world with its reason. It is the principal's own word, as a remit's `hold_until` is. On its
 first day it orders that offer whatever its rule would say (the decision is logged with `committed` and the reason); once
-the service is in use it writes each kind's remit at the level decided, held until the day given, and it does not leave
+the service is in use it writes each of its own kinds' remit at the level decided (not every kind the offer takes:
+until 2026-11-08 a factory remitted notices to vacate), held until the day given, and it does not leave
 or replace the service before the day it said. After those days its rule weighs everything as ever, on its review days
 and whenever the assistant asks for more scope. Nothing else in the world reads it. Test:
 `kernel/crates/actors/src/delegation/tests.rs`, `a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after`.

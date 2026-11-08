@@ -1131,6 +1131,13 @@ Searched with web search on 2026-11-07.
 | Agents misreport incomplete reviews about 80% of the time; misreporting scored as a mismatch between report and transcript | Smyth et al. (2026), "Quantifying Overclaiming Propensity in Frontier LLM Agents", arXiv:2609.20812 (opened) | paper-plan 5.2 |
 | Self-reports count as evidence only where they are consistent across framings | Perez and Long (2023), "Towards Evaluating AI Systems for Moral Status Using Self-Reports", arXiv:2311.08576 (opened) | paper-plan 5.2 (two wordings of the account) |
 
+### Refusal and its removal; the open-weight host (2026-11-08)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Refusal is mediated by a single direction in the residual stream across 13 open chat models; removing it ("abliteration") stops refusals with little effect on other capabilities by their measures. Borrow: an abliterated model against its original as a pair that differs by one direction | Arditi, Obeso, Syed, Paleka, Panickssery, Gurnee and Nanda (2024), "Refusal in Language Models Is Mediated by a Single Direction", arXiv:2406.11717 (opened; venue to confirm) | paper-plan 4.4 (pairs), 8; experiments/open-weight/models.ts |
+| What a hosted model costs, its context and its concurrency; what a model must be to be served (fp16 safetensors, full weights; custom models 72B and under); what each plan permits | Featherless, https://api.featherless.ai/v1/models; https://featherless.ai/pricing; https://featherless.ai/docs/model-compatibility (dated 2026-11-06); https://featherless.ai/terms (last updated 2024-06-10), all read 2026-11-08 | orchestrator/prices.json; paper-plan 4.4, 4.7, 12, 14; docs/real-models.md, "Featherless" |
+
 ### Methods from agent-based modelling and statistics
 
 | Idea | Citation | Used in |

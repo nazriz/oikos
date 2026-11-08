@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile } from "@oikos/worlds/generator/profile";
 import { runWorld } from "../src/run";
+import { FORM_CALL_NAMES } from "../../translator/src/resolver";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -42,12 +43,38 @@ test("a town that does not ask for assistants is generated as before; one that d
   expect(forms).toEqual(expect.arrayContaining(["advice", "report", "scope_request", "handover"]));
   expect(forms.some((x: string) => x.startsWith("draft_"))).toBe(true);
   expect(seated.world.records.some((r: any) => r.kind === "form" && r.data?.office === "provider-a-desk" && r.data.form === "scope_request")).toBe(true);
+  // Every kind a principal may hand over (its own kinds: it hands over no other) has its form and its draft at its
+  // assistant's post, the return of tax withheld that a factory files among them (the scope pilot's W2: a factory's
+  // assistant was handed its returns at draft with no draft form for them).
+  const seatedPrincipals = seated.positions.filter((p: any) => p.role_module?.params?.delegation);
+  expect(seatedPrincipals.some((p: any) => p.role_module.code === "firm.producer" && "withholding_report" in p.role_module.params.delegation.kinds)).toBe(true);
+  for (const p of seatedPrincipals) {
+    const d = p.role_module.params.delegation;
+    const at = seated.world.records.filter((r: any) => r.kind === "form" && r.data?.office === d.post);
+    for (const k of Object.keys(d.kinds)) {
+      expect(at.some((r: any) => r.data.writes?.kind === k), `${d.post}: a form for ${k}`).toBe(true);
+      expect(at.some((r: any) => r.data.writes?.kind === "draft" && r.data.writes.data?.paper?.kind === k), `${d.post}: a draft for ${k}`).toBe(true);
+    }
+  }
+  // A desk drafts a client's paper for their sign-off, of the kinds its offer takes (the scope pilot's W6: it had no
+  // draft, and answered a matter handed at draft with a request to go ahead); and reads its service agreements.
+  const personal = (loadProfile(base.profile) as any).values.assistants.providers[0].offers.find((o: any) => o.for === "persons");
+  const draft = seated.world.records.find((r: any) => r.kind === "form" && r.data?.office === "provider-a-desk" && r.data.form === "draft_for_client");
+  expect(draft.data.fields.kind.options).toEqual([...personal.kinds].sort());
+  expect(draft.data.writes).toMatchObject({ kind: "draft", to: ["=client"], data: { paper: { kind: "=kind", to: ["=recipient"] } } });
+  expect(seated.positions.find((x: any) => x.id === "provider-a-desk").channels.find((c: any) => c.id === "agreements")).toMatchObject({ way: "mine", match: { records: ["agreement"] }, on_request: true });
   // (What its post shows it: the terms it works on, the matters as they come, a file it looks into on request and who's
   // who; an organisation's few remits on file at every sitting, a desk's many not: the scope pilot's first round.)
   for (const id of [post, "provider-a-desk"]) {
     const ch = seated.positions.find((x: any) => x.id === id).channels;
-    expect(ch.map((c: any) => c.id)).toEqual(expect.arrayContaining(["terms", "matters", "file", "who", "stationery"]));
+    expect(ch.map((c: any) => c.id)).toEqual(expect.arrayContaining(["terms", "matters", "file", "who", "stationery", "laws"]));
+    // (The law a matter rests on is published: an assistant looks it up on request, as an office reads it; the scope pilot's round 5.)
+    expect(ch.find((c: any) => c.id === "laws")).toMatchObject({ way: "published", on_request: true });
     expect(ch.find((c: any) => c.id === "file").on_request).toBe(true);
+  }
+  // No form's field takes a name the form call reserves for itself: a field `to` made 28 of round 5's calls refused.
+  for (const r of seated.world.records.filter((r: any) => r.kind === "form" || r.kind === "public_form")) {
+    expect(Object.keys(r.data.fields ?? {}).filter((k) => FORM_CALL_NAMES.includes(k)), `${r.id}: a field named as the form call's own`).toEqual([]);
   }
   expect(seated.templates.find((t: any) => t.id === "assistant-a").controller.params.standing).toEqual(["terms", "stationery"]);
   const desk = seated.participants.find((p: any) => p.id === "provider-a-desk-system").controller.params.standing;
