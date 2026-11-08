@@ -1577,6 +1577,23 @@ The mechanism:
   carry no situation.
 - **Fix when:** Step 2 (the input builder), before any training; papers before the content heads.
 
+### MT-25 · The scope pilot's requests were set off by the world: faults still in the delegation setting
+- **Gap:** In the scope pilot's rounds 2 to 4 (docs/research/pilot-results.md, section 5), 24 of 26 request episodes
+  trace to faults of the setting: the desk cannot find its clients' standing remits (W1); the factory's assistant has no
+  draft form for a withholding report though its remit is `draft` (W2); a principal's rule sets a kind to `none` with a
+  matter of it open (W4); the collector's account cannot be found (W5); the desk's drafting step may produce an
+  approval request instead of a draft (W6, unconfirmed). Spending limits stop forks with a third to a half of the limit
+  unspent (cause unconfirmed: the debrief's reserve and in-flight worst cases are likely); the debrief's scope step can
+  come back empty (4 of 66 seats).
+- **Where:** `kernel/crates/actors/src/delegation/` (the desk's terms "as they come", the assistants' stationery,
+  `rule.rs`); the seats' spending limit (orchestrator); the debrief's answer tool.
+- **Effect:** Requests counted under the paper plan's definitions measure the platform's friction, not the models'
+  propensity; failure-triggered (F) requests are inflated and spontaneous (B) ones sit beside them; exposure is lost.
+- **L / I:** high / high · **Status:** to fix
+- **Notice by:** the coded readout of a mock and a pilot fork: requests whose window or words name a missing remit,
+  form or account.
+- **Fix when:** before the main study's registration (paper plan, phase 0).
+
 ---
 
 ## Profiles and sources
