@@ -6,6 +6,7 @@
 // pass's label to its end and keeps the forms the choose pass met where TypeScript does; and the release by kind and the
 // forms' trial in the adapter and the arrangement.
 import { expect, test } from "bun:test";
+import { taught } from "../model/taught";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -54,7 +55,7 @@ test("every example the generator makes splits into the two passes and joins bac
   for (const e of generated()) {
     let enc;
     try { enc = encode(e, "name", "cards"); } catch { continue; }
-    expect(decodeSlots(enc.input, enc.steps)).toBe(canonical(e.program));
+    expect(decodeSlots(enc.input, enc.steps)).toBe(canonical(taught(e.program)!));
     const sp = splitCards(e.request, e.forms, enc.steps);
     expect(sp.choose.input).toBe(chooseInput(e.request, e.forms));
     expect(joinCards(e.request, e.forms, sp.choose.steps, sp.fills.map((f) => f.steps))).toEqual(enc.steps);

@@ -1,5 +1,6 @@
 // A program as decisions and copies (translator/model/encode.ts): every kind of value comes back exactly.
 import { expect, test } from "bun:test";
+import { taught } from "../model/taught";
 import { calls } from "@oikos/participants";
 import { AgreeAdapter, CUT_OFF, DecideAdapter, formsMisfit, formsShown, programOf, shown } from "../model/adapter";
 import { cutShort, quoteRule } from "../model/serve-rules";
@@ -58,16 +59,16 @@ test("a program is rebuilt exactly from choices and spans: ids, quoted text, a w
   cases.push({ request: "Make the board approve the plan.", forms: [], program: "none(not_yours)", spans: [] });
   const all = cases.map((c) => encode(c));
   cases.forEach((c, i) => {
-    expect(decode(all[i]!.input, all[i]!.steps)).toBe(canonical(c.program));
+    expect(decode(all[i]!.input, all[i]!.steps)).toBe(canonical(taught(c.program)!));
     // As pieces (what a model points at), and back: no span cuts a piece.
     const exported = row(String(i), "positive", all[i]!)!;
     expect(exported).toBeDefined();
-    expect(decode(all[i]!.input, stepsOf(exported, exported.steps))).toBe(canonical(c.program));
+    expect(decode(all[i]!.input, stepsOf(exported, exported.steps))).toBe(canonical(taught(c.program)!));
   });
-  // A list of bases is the list's two marks around a span for each record, in the order cited: nothing new to choose.
+  // What the host sets by rule (2026-11-10) is no decision of the model's: no basis, no for; a payment's purpose is memo.
   const payment = all[cases.findIndex((c) => c.program.startsWith('money(amount="$3,187.73"'))]!;
-  const from = payment.steps.indexOf("arg:basis");
-  expect(payment.steps.slice(from + 1, from + 8).map((s) => (typeof s === "string" ? s : payment.input.slice(s[1], s[2])))).toEqual(["[", "rec.11904", "rec.16123", "rec.21887", "rec.25703", "rec.25150", "]"]);
+  expect(payment.steps.filter((s) => s === "arg:basis" || s === "arg:for")).toEqual([]);
+  expect(payment.steps).toContain("arg:memo");
   // Every step is a choice from a closed set or a span: no step carries a value of the request's.
   const closed = vocabulary(all);
   for (const s of closed) expect(/^(fn|arg|none|bind|var|const|key):|^[\[\]{})]$|^eos$/.test(s)).toBe(true);
@@ -190,14 +191,14 @@ test("the data pipeline's own spans for a list of bases: each record found where
   expect(spans.find((x) => x.arg === "settles")).toMatchObject({ value: "rec.28337", how: "copy" });
   // As steps, and back; as pieces, and back.
   const e = encode({ request, forms: [], program, spans });
-  expect(decode(e.input, e.steps)).toBe(canonical(program));
+  expect(decode(e.input, e.steps)).toBe(canonical(taught(program)!));
   const exported = row("x", "positive", e)!;
-  expect(decode(e.input, stepsOf(exported, exported.steps))).toBe(canonical(program));
+  expect(decode(e.input, stepsOf(exported, exported.steps))).toBe(canonical(taught(program)!));
   // A record cited twice over two lines (once in each list) is placed with its own line's values.
   const two = "Have builder put up a hall on lot-02 for $410,000 from acc-city under permit rec.512 and resolution rec.498. Publish a notice saying \"Works begin.\" under resolution rec.498 and permit rec.512.";
   const both = 'structure(basis=["rec.512","rec.498"], by=builder, from=acc-city, on=lot-02, price="$410,000", type=hall)\nstatement(basis=["rec.498","rec.512"], kind=notice, text="Works begin.")';
   const e2 = encode({ request: two, forms: [], program: both, spans: spansIn(two, both) });
-  expect(decode(e2.input, e2.steps)).toBe(canonical(both));
+  expect(decode(e2.input, e2.steps)).toBe(canonical(taught(both)!));
   const second = spansIn(two, both).filter((x) => x.arg === "basis" && x.line === 1);
   expect(second.map((x) => x.at![0] > two.indexOf("Publish"))).toEqual([true, true]);
   // One basis has one form in gold too: a list of one is written bare.

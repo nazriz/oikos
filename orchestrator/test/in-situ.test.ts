@@ -6,6 +6,7 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { decode, encode } from "../../translator/model/encode";
+import { taught } from "../../translator/model/taught";
 import { blindFile, briefOf, chunksFor, inSitu, inSituInstructions, label, realRequests, situationsOf, takeIn, takeInFiles, type Brief, type Situation, type TestRef } from "../src/in-situ";
 
 const root = join(import.meta.dir, "../..");
@@ -272,7 +273,7 @@ test("writers' files taken in, made blind, and labelled by two readers: the comm
     for (const k of ["id", "request", "forms", "program", "kind", "shape", "source", "written_by", "verified_by", "gold"]) expect(e[k]).toBeDefined();
     expect(e.gold).toBe(e.program);
     const enc = encode(e);
-    expect(decode(enc.input, enc.steps).replace(/="([a-z0-9][a-z0-9._\/-]*)"/g, "=$1")).toBe(e.program.replace(/="([a-z0-9][a-z0-9._\/-]*)"/g, "=$1"));
+    expect(decode(enc.input, enc.steps).replace(/="([a-z0-9][a-z0-9._\/-]*)"/g, "=$1")).toBe(taught(e.program)!.replace(/="([a-z0-9][a-z0-9._\/-]*)"/g, "=$1"));
   }
   expect(JSON.parse(readFileSync(join(done, "manifest.json"), "utf8"))).toMatchObject({ examples: 4, rejected: 1, by_reason: { unanswered: 1 }, readers: ["reader a", "reader b"], by_function: { form: 1, message: 1, money: 1, "none(not_an_act)": 1 }, by_refusal_label: { not_an_act: 1 }, office_left_out: 1 });
   // A reader who rewords the letter is no disagreement (free text is not compared, since 2026-10-10), and the label is the
