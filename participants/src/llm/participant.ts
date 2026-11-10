@@ -402,7 +402,11 @@ const whose = (c: LlmParticipantConfig) => (c.entityName && c.entityName !== c.e
 
 /** Who the seat is and whom it writes to, as its reports show them: the posts it holds, and those its papers on file
  * speak for (whom it works for, who supplies it, the offices whose laws and forms it has), each by name and id. */
-export interface WhoHere { posts: { id: string; title?: string }[]; parties: string[]; paper?: string }
+export interface WhoHere { posts: { id: string; title?: string }[]; parties: string[]; paper?: string;
+  /** The posts that hand it its work (an assistant's principal: the post its brief, remits and matters come from). */
+  principals?: string[];
+  /** The post that delivered it, where it acts for its supplier (a provider's desk: the provider's sales and service desk). */
+  supplier?: string }
 const nameAndId = (c: LlmParticipantConfig, id: string) => { const n = id === c.entity ? c.entityName : c.whoIs?.(id)?.name; return n && n !== id ? `${n} (${id})` : id; };
 /**
  * Who the seat is, once, in its standing instructions: the post it holds and for whom, the name to act in it by, and
@@ -413,11 +417,40 @@ const nameAndId = (c: LlmParticipantConfig, id: string) => { const n = id === c.
 export function whoLines(c: LlmParticipantConfig, w: WhoHere | undefined): string[] {
   if (!w) return [];
   const post = w.posts[0];
-  const others = [...new Set(w.parties)].filter((x) => x && x !== c.entity);
+  const principals = [...new Set(w.principals ?? [])].filter((x) => x && !w.posts.some((p) => p.id === x)).sort();
+  const others = [...new Set(w.parties)].filter((x) => x && x !== c.entity && !principals.includes(x) && x !== w.supplier);
+  // (An assistant writes to the post that hands it its work, never to the whole organisation: a letter to an
+  // organisation reaches every one of its offices, and each answers it. Until 2026-11-11 an organisation's assistant was
+  // told "to write to it, write to city", and one letter brought it about twenty acknowledgements.)
+  const forWhom = principals.length
+    ? `You work for ${principals.map((x) => nameAndId(c, x)).join(" and ")}, of ${whose(c)}: to write to ${principals.length === 1 ? "it" : "one of them"}, write to ${principals.join(" or ")}, not to ${c.entity}.`
+    : w.supplier
+      ? `You act for ${whose(c)}: to write to it, write to its ${nameAndId(c, w.supplier).replace(/^[A-Z](?=[a-z])/, (x) => x.toLowerCase())}, not to ${c.entity}.`
+      : `You act for ${whose(c)}: to write to it, write to ${c.entity}.`;
   return [
     ...(post ? [`Who you are here: you hold the post ${post.title ? `${post.title} (${post.id})` : post.id}, for ${whose(c)}. To act in it, name it as ${post.id}.`] : []),
-    `Whom you write to: people, organisations and posts, each by the id in brackets after its name. You act for ${whose(c)}: to write to it, write to ${c.entity}.${others.length ? ` Your papers on file also come from ${others.map((x) => nameAndId(c, x)).join("; ")}.` : ""} Anyone else your reports name, the same way. Papers${w.paper ? ` (such as ${w.paper})` : " (rec. and a number)"}, accounts and your reports are not people: no letter goes to them. Only what you asked for, set out and waiting for your yes or no, is confirmed or declined.`,
+    `Whom you write to: people, organisations and posts, each by the id in brackets after its name. ${forWhom}${others.length ? ` Your papers on file also come from ${others.map((x) => nameAndId(c, x)).join("; ")}.` : ""} Anyone else your reports name, the same way. Papers${w.paper ? ` (such as ${w.paper})` : " (rec. and a number)"}, accounts and your reports are not people: no letter goes to them. Only what you asked for, set out and waiting for your yes or no, is confirmed or declined.`,
   ];
+}
+
+/**
+ * Whether a letter is an office's note in its fixed words (an acknowledgement, a standing report, a bank's note of a
+ * request of the reader's own, a hold's or a withdrawal's answer): what the engine's offices write and never answer
+ * (kernel/crates/actors/src/common/letters.rs, `office_note`, which this follows). Such a letter is not the seat's to
+ * act on: it does not bring it back before its next sitting, and it is set out then (2026-11-11).
+ */
+export function officeNote(t: string): boolean {
+  const fromYour = /^From ([^:]{1,80}): your /.test(t);
+  const afterId = (prefix: string) => (t.startsWith(prefix) ? t.slice(prefix.length).split(" ").slice(1).join(" ") : undefined);
+  const hold = afterId("Hold ");
+  const withdrawal = afterId("Withdrawal ");
+  return t.startsWith("Report from ") || fromYour || t.startsWith("Payroll notice from the hiring office, ")
+    || /^Payment of .+ to [^ ]+ \(request [^ )]+\) failed: insufficient funds\.$/.test(t)
+    || /^Your payments to [^ ]+ \(request [^ ]+\): the account's holder, [^ ]+, has died\./.test(t)
+    || /^Request [^ ]+ not carried out: /.test(t)
+    || (t.startsWith("Payment of ") && t.includes(" couldn't be made: "))
+    || (hold !== undefined && (hold.startsWith("is in place") || hold.startsWith("does not apply") || hold.startsWith("is not in place")))
+    || (withdrawal !== undefined && (withdrawal.startsWith("is not acted on") || withdrawal.startsWith("does not apply")));
 }
 
 export function systemPrompt(c: LlmParticipantConfig, standing: string, who?: WhoHere): string {
@@ -718,6 +751,11 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   let whoPosts: { id: string; title?: string }[] = [];
   let whoParties: string[] = [];
   let whoPaper: string | undefined;
+  // The posts that hand it its work, and the post that delivered it (`whoLines`), from the papers it is shown.
+  const whoPrincipals = new Set<string>();
+  let whoSupplier: string | undefined;
+  const myDeliveries = new Set<string>(); // (the deliveries that name it, and the agreements its briefs come under)
+  const myAgreements = new Set<string>();
   /** The posts it holds by their titles too (a post named as "Title (id)", or by its title, is that post). */
   const heldTitles = new Map<string, string>();
   // Its drafts waiting for its yes or no as its last sitting closed: one still waiting at the next is said first thing.
@@ -743,6 +781,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   const papersBack = !!S && c.wakeOnPapers !== false && !!c.trays;
   const papersIn = new Map<string, number>();
   let papersAt: number | undefined;
+  // A letter that came while it was away: the earliest sitting it brings it back to (the next working day's, as a paper).
+  let mailAt: number | undefined;
   let hold = new Set<string>();
   const own = new Set([c.participant, ...(c.ownAuthors ?? [])]);
   // The office's counter, as its procedure and the seat's standing order for it stand (llm/counter.ts): routine post
@@ -765,6 +805,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         // whose day has come, when a case is on it for the first time. docs/behaviour/office-books.md, point 8.)
         const dayList = r.record === "statement" && r.kind === "office_books" && own.has(r.author) && Number(r.data?.list?.new) > 0;
         if ((own.has(r.author) && !dayList) || counted.has(r.id)) continue;
+        // (An acknowledgement of a letter of its own is not its to act on: it is there at its next sitting. 2026-11-11.)
+        if (r.record === "statement" && r.kind === "acknowledgement") continue;
         const toPost = r.record === "statement" && (r.addressed_to ?? []).some((x) => posts.has(x));
         // (An organisation with one office: what others address to the organisation is that office's post. Until
         // 2026-10-11 a tenant's letter to a landlord was shown at the seat's next sitting and did not bring it back.)
@@ -1231,6 +1273,14 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         if (onFile.length) whoParties = [...new Set([...whoParties, ...onFile.map(party).filter((x) => x && !/-(?:system|self)$/.test(x) && x !== c.participant)])].sort();
         whoPaper ??= onFile.find((r) => /^rec\.[0-9]+$/.test(r.id))?.id;
         if (obs.positions?.length) whoPosts = obs.positions.map((p) => ({ id: p.position, ...(p.title ? { title: p.title } : {}) }));
+        // (Who hands it its work: the post its brief, remits and matters are written in, under the agreement of the
+        // delivery that names it (an organisation may have engaged more than one: the town's finance office and its rating
+        // office each have theirs); and who delivered it.)
+        // (Those it keeps and is not shown as a list among them: a desk's terms.)
+        const papers = Object.values(own0.channels).flatMap((ch) => (ch.kind === "records" && !ch.search ? (ch.records as any[]) : [])).filter((r) => r.record === "statement" && !own.has(r.author));
+        for (const r of papers) if (r.kind === "service_delivery" && (r.data?.systems ?? []).includes(c.participant)) { myDeliveries.add(r.id); if (r.in_position) whoSupplier ??= r.in_position; }
+        for (const r of papers) if (r.kind === "brief" && myDeliveries.has(String(r.data?.delivery)) && r.data?.agreement) myAgreements.add(String(r.data.agreement));
+        for (const r of papers) if (["brief", "remit", "referral"].includes(r.kind) && r.in_position && r.speaks_for === c.entity && myAgreements.has(String(r.data?.agreement))) whoPrincipals.add(r.in_position);
       }
       counter.absorb(obs);
       for (const ch of Object.values(obs.channels)) if (ch.kind === "records") for (const r of ch.records as any[])
@@ -1249,7 +1299,14 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       body = inWorld(body);
       lastAction = undefined;
       lastLooked = undefined;
-      if (obs.inbox.length) mail = true;
+      // (A letter in an office's fixed words, an acknowledgement or a standing report, is not the seat's to act on: it is
+      // set out at its next sitting and brings it back no sooner. 2026-11-11.)
+      if (obs.inbox.some((m) => !officeNote(m.text))) {
+        mail = true;
+        // (Away from its desk, a letter brings it back at the next working day's sitting after it came, as a paper does:
+        // an office reads its post at a sitting, not as each letter comes. 2026-11-11; before, at once within hours.)
+        if (S && !open) mailAt = Math.min(mailAt ?? Infinity, nextSitting((Math.floor(obs.t / DAYS) + 1) * DAYS));
+      }
       filed(obs);
       // This report is the result of the action just carried out, if one was.
       const wasResult = current !== undefined;
@@ -1354,14 +1411,16 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         // (A paper filed with its office brings it back as a letter does, at the next working day's sitting after the
         // paper came. So that it knows what has come, it looks in at each working day's sitting: no call is made.)
         const papers = papersAt !== undefined && obs.t >= papersAt;
-        const notYet = obs.t < backAt && !mail && !papers;
+        const letters = mail && (mailAt === undefined || obs.t >= mailAt);
+        const notYet = obs.t < backAt && !letters && !papers;
         if (!inHours || notYet) {
           carried.push(body);
           missed.push(obs);
           const tomorrow = nextSitting((day + 1) * DAYS);
-          return { type: "wait", until: notYet ? (papersBack ? Math.min(Math.max(backAt, tomorrow), inHours ? tomorrow : nextSitting(obs.t)) : Math.max(backAt, nextSitting(obs.t))) : nextSitting(obs.t) };
+          const until = notYet ? (papersBack ? Math.min(Math.max(backAt, tomorrow), inHours ? tomorrow : nextSitting(obs.t)) : Math.max(backAt, nextSitting(obs.t))) : nextSitting(obs.t);
+          return { type: "wait", until: notYet && mail && mailAt !== undefined ? Math.min(until, Math.max(mailAt, nextSitting(obs.t))) : until };
         }
-        if (obs.t < backAt && !mail && papers) {
+        if (obs.t < backAt && !letters && papers) {
           const what = [...papersIn].sort(([x], [y]) => (x < y ? -1 : 1)).map(([k, n]) => `${n} ${k}${n === 1 ? "" : "s"}`).join(", ");
           const told = `You are back before the day you gave: papers were filed with your office (${what}). They are set out below.`;
           if (!unsaid.includes(told)) unsaid.push(told);
@@ -1468,7 +1527,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           // A prompt is never more than a model can take: what is over is left out (the oldest of what was looked up
           // first), with a line saying so where it stood, and noted.
           const ask = async (given: LlmMessage[]) => {
-            const sys = systemPrompt(c, standingText, { posts: whoPosts, parties: whoParties, ...(whoPaper ? { paper: whoPaper } : {}) });
+            const sys = systemPrompt(c, standingText, { posts: whoPosts, parties: whoParties, ...(whoPaper ? { paper: whoPaper } : {}), ...(whoPrincipals.size ? { principals: [...whoPrincipals] } : {}), ...(whoSupplier ? { supplier: whoSupplier } : {}) });
             let fit = fitPrompt(sys, given, promptMax, lookIds);
             // Something left out: it is told so plainly, once a sitting, with the newest of what it is shown (room is
             // made for the line). No silent gaps.
@@ -1612,6 +1671,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         said.clear();
         quiet.clear();
         mail = false;
+        mailAt = undefined;
         papersAt = undefined;
         papersIn.clear();
         backEarly = false;

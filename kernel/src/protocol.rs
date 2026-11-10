@@ -426,6 +426,7 @@ fn start_engine(session: &mut Session, req: &Value, config: Option<Value>) -> Re
     if let Some(b) = o["mock_seats"].as_bool() {
         opts.mock_seats = b;
     }
+    opts.seats_keep_to_own = o["seats_keep_to_own"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(String::from)).collect();
     opts.withhold = crate::engine::withholds(&o["withhold"])?;
     opts.at_fork = crate::engine::at_forks(&o["at_fork"])?;
     // (Where to capture the citizens' decisions, for training: docs/citizen-data.md. Changes nothing in the run.)

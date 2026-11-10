@@ -1760,6 +1760,26 @@ The mechanism:
 - **Fix when:** before a run with more than a few seats on a small limit: refuse to start a fork whose end need is over
   half its limit, or stop the sittings earlier.
 
+### MT-31 · Two assistants of one organisation see each other's matters
+- **Gap:** A principal's papers to its in-house assistant (brief, remits, referrals, sign-offs, answers) are addressed
+  to the organisation and visible to it alone, and an assistant post's channels show the organisation's papers of those
+  kinds. Where two offices of one organisation have each engaged an assistant (the study's town: the finance office and
+  the rating office, both of `city`, with systems `par.3` and `par.5`), each assistant post is shown the other's matters,
+  and a seat that keeps to its own post (2026-11-11) is woken by them. The code assistant acts only on what comes under
+  its own delivery's agreement; a model is shown the rest.
+- **Where:** `worlds/generator/generate.ts` (`assistantChannels`: `mine` channels by kind); the principal's papers in
+  `kernel/crates/actors/src/delegation/principal.rs` (addressed to the organisation).
+- **Effect:** A seat reads another office's referrals as possibly its own, may act on them, and may ask for scope over a
+  matter that was never its; it sits more often than its own work brings it back. Seen in the 2026-11-11 mock run:
+  until the seat's instructions named its principal by its delivery's agreement, both town assistants were told they
+  worked for the finance officer and the rates officer.
+- **L / I:** high (in the study's town) / medium · **Status:** open
+- **Fix when:** before the first true pilot is read: address the principal's papers to the assistant's post and give
+  the assistant's channels a filter by what is addressed to the post (a change to the contracts' `RecordFilter` and to
+  every town with providers' hash), or give each office's assistant an organisation of its own records.
+- **Notice by:** a seat's papers citing a referral under another agreement; `oikos-kernel delegation` rows of
+  `not_handed` at an organisation with two principals.
+
 ---
 
 ## Profiles and sources

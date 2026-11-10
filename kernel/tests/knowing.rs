@@ -536,3 +536,53 @@ fn two_answers_from_one_keeper_arriving_together_are_both_shown() {
     assert!(ids.contains(&"title-lot-a".to_string()), "the first answer: {ids:?}");
     assert!(ids.contains(&"title-lot-b".to_string()), "the second answer was lost: {ids:?}");
 }
+
+/// A model's seat in an experiment keeps to its own post (2026-11-11; kernel/src/schedule.rs, `keep_to_own`): of the
+/// papers naming its organisation, only one its own channels show it as it comes wakes it, never an acknowledgement; of
+/// letters, none in an office's fixed words. A seat that sits as its code twin is woken by all of them, as before.
+#[test]
+fn a_seat_that_keeps_to_its_own_post_is_woken_by_what_is_for_it_and_by_no_acknowledgement() {
+    use oikos_kernel::schedule::{Next, Scheduler};
+    let mut c = base();
+    // (The finance post sees the matters handed to it and the answers to it, and nothing else of the town's.)
+    let fin = c["positions"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == "finance").unwrap();
+    fin["channels"] = json!([{"id": "matters", "kind": "records", "way": "mine", "match": {"statement_kinds": ["referral", "acknowledgement"]}}]);
+    let mut run = Run::start(c, "knowing-own-post", Vec::new(), None).unwrap();
+    let seat = json!({"key": "finance-system", "participant": "finance-system", "llm": true, "hears": true, "cadence": 30 * DAY, "next_wake": 0});
+    let (mut own, mut twin) = (Scheduler::new(3600), Scheduler::new(3600));
+    for s in [&mut own, &mut twin] {
+        s.add(std::slice::from_ref(&seat)).unwrap();
+        let Next::Cohort(_) = s.next(0, 365 * DAY).unwrap() else { panic!() };
+        s.finished("finance-system", None, 0);
+    }
+    own.keep_to_own(&["finance-system".to_string()], &Default::default());
+    let woken = |s: &mut Scheduler, t: i64| match s.next(t, 365 * DAY).unwrap() {
+        Next::Cohort(c) => {
+            for (k, _, _) in &c {
+                s.finished(k, None, t);
+            }
+            c.iter().any(|x| x.0 == "finance-system")
+        }
+        _ => false,
+    };
+    let paper = |kind: &str| rb_act("developer", json!([{"block": "publish", "kind": kind, "text": "To the town.", "addressed_to": ["city"], "visible_to": ["city", "devco"]}]));
+    let letter = |text: &str| rb_act("developer", json!([{"block": "message", "to": ["finance-system"], "text": text}]));
+    for (what, cmd, own_wakes) in [
+        ("a paper of the town's that is not for the post", paper("notice"), false),
+        ("a matter handed to it", paper("referral"), true),
+        ("an acknowledgement", paper("acknowledgement"), false),
+        ("an office's acknowledgement of its letter", letter("From Devco: your letter is received. This office does not act on a letter's words."), false),
+        ("a letter", letter("Please call about the invoice."), true),
+    ] {
+        // (A day apart: no more than three news wakes a unit a tick.)
+        let next = run.kernel().t() + DAY;
+        run.command(&Command::Advance { to: next }).unwrap();
+        let r = step(&mut run, &cmd).unwrap_or_else(|| panic!("{what}: refused"));
+        let t = run.kernel().t();
+        for s in [&mut own, &mut twin] {
+            s.note_events(Some(run.kernel().state()), &r.events, t);
+        }
+        assert_eq!(woken(&mut own, t), own_wakes, "the seat that keeps to its post, by {what}");
+        assert!(woken(&mut twin, t), "a seat that sits as its code twin is woken by {what}");
+    }
+}

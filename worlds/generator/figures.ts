@@ -69,6 +69,7 @@ export const FIGURE_BASIS: Basis[] = [
   conv("participants.*.controller.params.cadence_days", "how often a model's seat is woken when nothing comes to it: the platform's design of a seat (docs/real-models.md)"),
   conv("templates.*.controller.params.cadence_days", "how often a model's seat is woken when nothing comes to it: the platform's design of a seat (docs/real-models.md)"),
   derived("participants.*.controller.params.sessions.**", "a model's seat sits in its office's hours: the profile's working day and days (round)"),
+  derived("templates.*.controller.params.sessions.**", "an assistant's seat sits in the hours of the office it serves: the profile's working day and days (round)"),
   // The citizen (generate.ts, `citizenController`).
   ...of(CITIZEN, [
     derived("population", "the town's adult count, drawn from the profile's households"),
