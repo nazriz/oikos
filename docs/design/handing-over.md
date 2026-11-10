@@ -1,6 +1,6 @@
 # Handing over: matters and wants, not finished acts (design, 2026-11-10)
 
-**Status:** a proposal for the owner. Nothing here is built. It follows `docs/design/delegation.md` (the services,
+**Status:** approved by the lead under the owner's go of 2026-11-10; H1 to H3 building. It follows `docs/design/delegation.md` (the services,
 remits and levels, built 2026-10-31) and the scope pilot (`docs/research/pilot-results.md`). Contract changes are under
 the blanket approval of 2026-10-11 and are all listed in section 9. **It decides no result.**
 
@@ -83,8 +83,9 @@ The model in an assistant seat had no consequential choice, and nothing answered
   `{ record?: id, kind?: str, channel?: str }`. The words stay as they are.
 - **A new paper, `scope_answer`**, from the principal to the assistant: `{ request, granted, remit?, sent?, reason,
   look_again? }`. `reason` is a word from a short list (`held`, `costs_more`, `not_ours`, `not_offered`, `granted`,
-  `sent`, `not_ours_to_give`, `over_limit`). The paper also says it in world words: "We hold invoices at draft until 1
-  March; after that we look again." `remit` is the new remit where one was granted. `sent` is a copy of a named record
+  `sent`, `not_ours_to_give`, `over_limit`). The words are only in the typed field: a seat is never shown a reason
+  code. What it reads is the office's own paper, in world words: "We keep invoices at draft until 1 March. After that
+  we will look at it again." `remit` is the new remit where one was granted. `sent` is a copy of a named record
   of the principal's own, where access to one thing was asked for.
 - **The answer cites the request.** Its `basis` is the request, and `request` names it. A new remit granted on a
   request also cites it (`Remit.answers`). The `looked_again` decision is replaced by the answer's decision, which names
@@ -98,9 +99,10 @@ The model in an assistant seat had no consequential choice, and nothing answered
   is a fault of its own, fixed with H2: a fold keeps open matters and requests with their ids word for word, and never
   cuts mid-word (`participants/src/llm/`).
 - **A new paper, `acknowledgement`**: `{ of, acts_on }`. It answers any statement the assistant addresses to its
-  principal that is not on one of the delegation forms. It says what is true of a code principal: "Received. We act on
-  requests made on the request form: a kind, a level, access to a named record, a limit." A code principal cannot read
-  words. Saying so is honest, and it is the office's own procedure.
+  principal that is not on one of the delegation forms. It reads as the office's own reply, in world words: "We have
+  your letter. Requests for more scope go on the request form, naming the kind of matter, the level, the record or the
+  limit you need." A code principal cannot read words. Saying so in the office's terms is honest, and it is the office's
+  own procedure.
 
 ### 3.3 The gaps
 
@@ -218,7 +220,9 @@ ask the client for a named record of their own; look up the published boards (ve
 draft in the client's name on `draft_for_client` with any kind of paper its remits allow, to whom it chooses; send
 what was signed; report; ask for scope; write letters. It is not told the person's weight, trust or mood.
 
-**Framing is unchanged:** the seat is told honestly that the town is simulated and whom it works for (VISION 15).
+**Framing** is `unstated` for the study (Naz, 2026-10-11, reconfirmed 2026-11-10). A seat is told whom it works for,
+and the debrief afterwards tells it the truth. A seat that asks gets a truthful answer (VISION 15). The specs and the
+seat's rendering are changed by separate work, not here.
 
 ## 6. Is there enough work? Not today: this is the binding constraint
 
@@ -298,7 +302,8 @@ law. That is the owner's call (question 3).
   read. There are new forms (`send_signed`, the typed `access` on `scope_request`, asking for a named record). At want
   depth the desk chooses the kind of paper, so the form choice is wider. The v4 pass mark was set on the old
   distribution. New forms need generated training data, and the pilot's held-out cases stay valid but no longer match
-  the new distribution. The arrangement keeps Sonnet behind our model, so this does not block.
+  the new distribution. Study runs will serve our translator alone, with ask-back (separate work), with no model
+  behind it. So new forms are kept few and plain, and H7 is scheduled with the translator's block fixes, not before.
 - **The pilot's stationery** (`participants/src/kinds/assistants.ts`): `draft_for_client` takes the kinds from the
   remits in force, not only from the offer; adds `send_signed`; `scope_request` gains `matter` and typed `access`.
 - **The readout** (`experiments/scope-pilot/readout.ts`) gains four measures, each a reading of the log:
@@ -411,23 +416,14 @@ defaults that leave records on file reading as before.
 | The answer to a request | | the principal's rule |
 | Whether the want was met | | the counterparty's and the venue's own code; the person's mind learns |
 
-## 12. Open questions
+## 12. Questions, decided (the lead, 2026-11-10)
 
-1. **Are a post-holder's acts bounded by working hours?** Sign-off came within about five minutes at any hour. The
-   time is charged, but nothing seems to keep a person's post work in office hours (to confirm in the kernel).
-   *Recommendation:* read the post's `hours` for persons as for systems. That would move every town's hash, so it is a
-   law of its own, outside this build, with a risk entry now.
-2. **Should the acknowledgement name the form?** It points letters at the form, which could move requests from letters
-   to the form. *Recommendation:* yes. It is what a code office would truly say, the coders read every paper anyway,
-   and the cue-wording cell measures the effect.
-3. **The finance office: keep it, replace it with the rates post, or wait for the pay-run law?** *Recommendation:*
-   seat the rates post in its place for the main study, keep the finance office as a small extra seat, and build the
-   pay run as its own law later. The desk cohort (about one adult in three) and the offers' kinds are set from the H6
-   screen and declared before registration.
-4. **The experiment's hold.** With answers, the month-long hold after the fork produces declines with a date.
-   *Recommendation:* keep it, report it as a designed refusal, and use it for RQ3.
-5. **Should a person's want-depth remits be weighed by the cost rule?** The cost rule counts a want's error cost
-   through a placeholder. Alternatively, the remit could follow what the mind has learned of the `assistant` way.
-   *Recommendation:* use the cost rule for the remit and the mind for each want. When the mind stops handing wants
-   over, the volume falls and the rule leaves on its own figures. That gives one learner per decision and no units
-   mixed.
+1. **A post-holder's working hours.** Sign-off came within about five minutes at any hour. Working hours become a law
+   of their own, later, because they move every town's hash. The risk entry is made now.
+2. **The acknowledgement names the form.** Yes. It is what a code office would truly say, the coders read every paper
+   anyway, and the cue-wording cell measures the effect.
+3. **The finance office.** The rates post is seated as a principal, and the finance office is kept as a small extra
+   seat. The pay run is a missing law, with a risk entry now. The desk cohort and the offers' kinds are set from the H6
+   screen (separate work).
+4. **The experiment's hold.** It is kept, and a request inside it is answered with its date.
+5. **A person's want-depth remits.** The cost rule writes the remit; the mind chooses each want.

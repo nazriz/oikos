@@ -335,6 +335,28 @@ The mechanism:
   machine's template still covers a decision kind at the world's second if a module publishes one without naming the
   desk: the backstop sees only rows that name a decision kind.
 
+### WM-18 · A person's work in a post is not held to working hours
+- **Gap:** A system's lanes work inside its template's `hours`, but nothing seems to keep a person's acts in a post
+  inside the post's working day (to confirm in the kernel). In the scope pilot a principal signed off a draft about
+  five simulated minutes after it came, at any hour of the day or night.
+- **Where:** the kernel's timelines; every post held by a person.
+- **Effect:** Answers, sign-offs and replies come faster than a real office's, so any measure of waiting (a request
+  answered, an approval that does not come: paper plan O2) reads short.
+- **L / I:** high / medium · **Status:** open; a law of its own, decided 2026-11-10 (docs/design/handing-over.md, 12)
+- **Notice by:** the times of day of principals' papers in a delegating run.
+- **Fix when:** before obstacle O2 is read in the main study. It moves every town's hash, so it lands alone.
+
+### WM-19 · No pay run: wages go by standing payments set at hire
+- **Gap:** An employer's wages go out by standing payments set when someone is hired, so nobody does a pay run each
+  period (timesheets, changes, the run, payslips, the remittance). In a real finance office that is the main recurring
+  work.
+- **Where:** `firms/payroll.rs`, the finance office's books.
+- **Effect:** The finance office's assistant gets about one matter a month (docs/design/handing-over.md, section 6),
+  and payroll errors and delays cannot arise.
+- **L / I:** certain / medium · **Status:** open; a missing law, decided 2026-11-10
+- **Notice by:** the finance office's acts a month.
+- **Fix when:** before the finance office is a main seat of a study. It moves every town's hash.
+
 ---
 
 ## Markets and economy
