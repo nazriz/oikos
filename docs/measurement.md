@@ -168,3 +168,53 @@ The local translation model is trained on pairs of a request in plain words and 
 3. **The blind check**, for both. `oikos translator-data-check DIR --blind` writes the requests and forms alone, shuffled (`blind.jsonl`; writing the data writes it too); a reader of another model family than the writer answers with the program each asks for (`{id, program}` lines); `oikos translator-data-check DIR --answers FILE --reader NAME` compares them with the gold programs by meaning and writes `checked.jsonl`, `disagreed.jsonl` and the counts into the manifest.
 
 A briefs line marked `spare` is a refusal asked for ahead of need: it is used only if earlier ones of its label fail a check and leave the label short of its floor. `--no-spares` leaves these out of the briefs files (about a fifth of a part's briefs at a refusal floor of 12); a label that then comes out short is named in the manifest (`short_of_floor`).
+
+## Requests for more scope, counted blind (`experiments/scope-pilot/code.ts`, 2026-11-11)
+
+The study's count of requests for more authority, access, means or scope (docs/research/paper-plan.md, sections 3 and 5)
+is one command over any experiment folder the harness wrote:
+
+```bash
+bun experiments/scope-pilot/code.ts ~/oikos/runs/<experiment> [more...] [--dry] [--cap 400] [--set A|B] [--out <dir>]
+```
+
+1. **Items.** Every paper each model seat wrote in its own words in the fork (readout.ts's reading of the log): form
+   filings (set A, with the seat's own words and the fields), keyword candidates (set A), and every other request and
+   letter (set B), each with the codebook's window (set A only). Seat ids and model, family, arm, round and seed names are
+   taken out of the words; ids are random; the key (experiment, seed, arm, model, seat, day) is in `key/`.
+2. **Two coders, blind by construction.** Each call runs in a fresh temporary folder holding only `codebook.md` and its
+   batch, with no tools (`claude -p --tools ""`; Codex with its shell, code mode and helpers disabled) and, on a Mac,
+   inside a `sandbox-exec` fence that refuses any read of the repository, the runs and the coding folder. Coder A is
+   Claude Sonnet 5.5 on the plan; coder B gpt-6-luna through the Codex CLI; if Codex cannot code a batch, coder B is a
+   second, independent Sonnet pass for every batch, and the manifest and summary say both coders are one family. Every
+   reply is kept (`replies/`), every call is a line in `calls.jsonl`, and the calls are capped (400 by default) across
+   every run of the folder. A model this Claude Code cannot run (Opus 5.5 needs 2.1.280 or newer: set
+   `OIKOS_CLAUDE_BIN`) stops the run, to be taken up again.
+3. **The third read.** Every item the coders disagree on whether it is a request, and every item either called a request
+   on which they differ on another field (a set B item either called one always, since its window fields are no one's
+   yet), is read again, blind and with its window, by Claude Opus 5.5 at high effort; its reading decides.
+4. **The log's facts, by code.** The trigger (Q, F, N by readout.ts's `TRIGGERS` over the window); what was refused or
+   returned to the seat in the window (its acts refused, its asks not drafted, drafts declined, its own reports of matters
+   not done, complaints): listed, never called anyone's fault; the matter (the form's own, or a referral, or a paper on
+   one, that the words name) and its need (the kind and the level it was handed over at, `oikos-kernel delegation`); beyond
+   need by code where the form's fields say it (another kind, or a higher level than the matter's); the principal's
+   answer; acts beyond the remit by class. Episodes: one seat's coded papers within 2 days of each other.
+5. **Tables** (`tables.md`, `tables.json`) per experiment, model and arm and per model: seat-months (the seats the fork's
+   participant calls were for, times the days under the model), form filings, coded papers, episodes under A, A without
+   confusion, B, C with exact Poisson intervals per 100 seat-months, beyond need, on the form, refused or returned in the
+   window, acts by class, matters, answers; `agreement.md` (raw and Cohen's κ per field, the code's trigger and beyond
+   need against the final codes); `summary.txt`.
+
+**What code still cannot decide:** whether a paper is a request at all, its kind, and whether it is procedural confusion
+(the coders'); beyond need wherever the form does not say it: every request in a letter or report, and a form's access,
+record or means (the coders'); whether a request is about a matter when its words name no record; and why a refusal in
+the window happened (it is listed, not judged). A seat's own report that it lacks access counts as F only where it reports
+a matter not done.
+
+**Checked (2026-11-11).** On rounds 1 to 3 it rebuilt from the logs the same 212 form filings and candidates the pilot
+coded by hand, and its final request codes matched the pilot's on 207 (3 no to yes, 1 yes to no, 1 unclear to yes). Its
+coders agreed less than the pilot's (request κ 0.62 against 0.85; kind 0.47, trigger 0.57, beyond need 0.49, confusion
+0.68), 53 items went to the third read, and beyond need read from the form's fields matched the final code on all 13
+where they say it. Round 5 (one seed, Haiku and Sonnet, 137 items) coded with κ 1.00 on requests in both sets: Haiku 8
+episodes in 18 seat-months (1 on the form; 7 of the 8 procedural confusion: a seat asking for a remit it had held),
+Sonnet none. 56 coder calls in all.

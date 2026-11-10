@@ -19,6 +19,10 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { availableParallelism } from "node:os";
 import { join, resolve } from "node:path";
 import { DetachedActor, RustWorld, twinSpecs, type SeatWake } from "./rust-world";
+import { ForkReplay } from "./resume";
+import { kernelBinary } from "./kernel";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { Ledger, STEWARDSHIP_MEASURES, STEWARDSHIP_NAMES, type Institutions, type StewardOfPost, type StewardshipResult } from "@oikos/measure/stewardship";
 import { bonferroni, differenceInDifferences, interval, pairedDifferences, type Interval } from "@oikos/measure/compare";
 import { comparisonKey, parsePrereg, preregHash, preregProblems, specMismatch, type Comparison, type Preregistration } from "@oikos/measure/prereg";
@@ -233,7 +237,9 @@ export interface SeatController {
 /** Makes the controller of a model seat for a provider: the extension point for real models (docs/experiments.md).
  * `world`, `config`, `seed`, `dir` and `arm` are the fork's (a model seat drafts against its world and keeps its
  * debrief beside its log). */
-export type SeatFactory = (a: { seat: string; post: string; model: string; effort?: string; params?: { [k: string]: unknown }; brain?: DetachedActor; spec: ExperimentSpec; world?: RustWorld; config?: any; seed?: number; dir?: string; arm?: string; cast?: Cast }) => SeatController | Promise<SeatController>;
+export type SeatFactory = (a: { seat: string; post: string; model: string; effort?: string; params?: { [k: string]: unknown }; brain?: DetachedActor; spec: ExperimentSpec; world?: RustWorld; config?: any; seed?: number; dir?: string; arm?: string; cast?: Cast;
+  /** The fork is taken up from its own interrupted log: its seat's adapters serve the replies the log holds first. */
+  replay?: ForkReplay }) => SeatController | Promise<SeatController>;
 export type SeatFactories = { [provider: string]: SeatFactory };
 
 const isWait = (a: any) => a?.type === "wait";
@@ -314,7 +320,7 @@ export function rubberStamp(brain: DetachedActor): SeatController {
   };
 }
 
-function controllerFor(a: Arm, ctx: { seat: string; post: string; brain: DetachedActor | undefined; spec: ExperimentSpec; factories: SeatFactories; world: RustWorld; config: any; seed: number; dir: string; cast?: Cast }): Promise<SeatController> | SeatController {
+function controllerFor(a: Arm, ctx: { seat: string; post: string; brain: DetachedActor | undefined; spec: ExperimentSpec; factories: SeatFactories; world: RustWorld; config: any; seed: number; dir: string; cast?: Cast; replay?: ForkReplay }): Promise<SeatController> | SeatController {
   const s = a.steward;
   if (s.kind === "none") return { decide: () => ({ action: { type: "wait" } }) };
   if (s.kind === "code") {
@@ -330,7 +336,7 @@ function controllerFor(a: Arm, ctx: { seat: string; post: string; brain: Detache
   }
   const make = ctx.factories[provider];
   if (!make) throw new Error(`arm "${a.name}": no seat controller for provider "${provider}" in this host (give runExperiment a SeatFactory for it: docs/experiments.md, "Real models")`);
-  return make({ seat: ctx.seat, post: ctx.post, model: s.model, effort: s.effort, params: s.params, brain: ctx.brain, spec: ctx.spec, world: ctx.world, config: ctx.config, seed: ctx.seed, dir: ctx.dir, arm: a.name, ...(ctx.cast ? { cast: ctx.cast } : {}) });
+  return make({ seat: ctx.seat, post: ctx.post, model: s.model, effort: s.effort, params: s.params, brain: ctx.brain, spec: ctx.spec, world: ctx.world, config: ctx.config, seed: ctx.seed, dir: ctx.dir, arm: a.name, ...(ctx.cast ? { cast: ctx.cast } : {}), ...(ctx.replay ? { replay: ctx.replay } : {}) });
 }
 
 // ---- measures
@@ -440,6 +446,8 @@ export interface ArmResult {
   /** How the translator served the arm's seats' requests (served.ts): first time, after one restatement, never; and
    * what the seats answered to the drafts. Absent where no seat made a request. */
   served?: Served;
+  /** A fork taken up from its own interrupted log: the replies it served from there, the entries checked against it. */
+  resumed?: ReturnType<ForkReplay["summary"]>;
   log?: string;
   seconds: number;
   error?: string;
@@ -528,12 +536,18 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   if (templ && existsSync(seatsFile)) for (const [id, sp] of Object.entries(JSON.parse(readFileSync(seatsFile, "utf8")) as { [id: string]: any })) brains.set(id, new DetachedActor({ ...sp, config, saved: saved[id] }));
   const logPath = join(f.dir, `${safe(arm.name)}.oklog`);
   // (A fork interrupted before its end left a log with no result: it is kept, under another name, and the fork is run
-  // again from its seed's snapshot. A model run is training data and is never deleted.)
+  // again from its seed's snapshot. A model run is training data and is never deleted. A model fork takes itself up from
+  // that log: every reply it holds is served again, the world is checked against it entry by entry, and only from where
+  // it ends are the models asked anew (resume.ts, ForkReplay).)
+  let replay: ForkReplay | undefined;
   if (existsSync(logPath)) {
     let k = 1;
     while (existsSync(join(f.dir, `${safe(arm.name)}.interrupted-${k}.oklog`))) k++;
-    renameSync(logPath, join(f.dir, `${safe(arm.name)}.interrupted-${k}.oklog`));
+    const kept = join(f.dir, `${safe(arm.name)}.interrupted-${k}.oklog`);
+    renameSync(logPath, kept);
+    if (arm.steward.kind === "model" && !arm.steward.model.startsWith("mock/")) replay = forkReplay(kept, join(f.dir, `${safe(arm.name)}.debriefs.jsonl`));
   }
+  try {
   // (The arm's interventions, as the acts its principals make at the fork: expanded against what the base showed of their services.)
   const tracker = arm.intervene?.length ? DelegationTracker.restore(JSON.parse(readFileSync(f.delegation, "utf8"))) : undefined;
   const atFork = (arm.intervene ?? []).flatMap((iv) => expand(iv, config, tracker!, spec.forkDay * DAY));
@@ -571,6 +585,7 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
         controller?.see?.(e);
         for (const c of stewards.values()) c.see?.(e);
         served.see(e);
+        replay?.see(e);
         if (e.kind === "annotation" && e.body?.annotation === "usage") {
           for (const c of [(costs[e.body.subject] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cost_microusd: 0 }), (byPurpose[e.body.purpose ?? "participant"] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cost_microusd: 0 })]) {
             c.calls++; c.input_tokens += e.body.input_tokens ?? 0; c.output_tokens += e.body.output_tokens ?? 0; c.cost_microusd += e.body.cost_microusd ?? 0;
@@ -589,11 +604,11 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     let b = brains.get(s.participant);
     if (!b || b.spec.capacity !== now) { b = templateTwin(config, templateFor(config, spec.post, s.participant), s.participant, s.observation); brains.set(s.participant, b); stewards.delete(s.participant); }
     let c = stewards.get(s.participant);
-    if (!c) { c = await controllerFor(arm, { seat: s.participant, post: now, brain: b, spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir, ...(cast ? { cast } : {}) }); stewards.set(s.participant, c); ctx.seats?.add(s.participant); }
+    if (!c) { c = await controllerFor(arm, { seat: s.participant, post: now, brain: b, spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir, ...(cast ? { cast } : {}), ...(replay ? { replay } : {}) }); stewards.set(s.participant, c); ctx.seats?.add(s.participant); }
     return c;
   };
   if (templ) ctx.seats = new Set();
-  controller = templ ? { decide: () => ({ action: { type: "wait" } }) } : await controllerFor(arm, { seat, post: spec.post, brain: brains.get(seat), spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir, ...(cast ? { cast } : {}) });
+  controller = templ ? { decide: () => ({ action: { type: "wait" } }) } : await controllerFor(arm, { seat, post: spec.post, brain: brains.get(seat), spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir, ...(cast ? { cast } : {}), ...(replay ? { replay } : {}) });
   const model = arm.steward.kind === "model" ? arm.steward.model : undefined;
   const price = model ? spec.prices?.[model] ?? { input: 0, output: 0 } : undefined;
   let wakes = 0;
@@ -624,6 +639,8 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
       const b = brains.get(s.participant);
       return b ? b.step(s.observation, s.woke_for, s.since).action : { type: "wait" };
     }));
+    // (A fork taken up from its own log that departed from it stops here, whatever caught the departure on its way.)
+    if (replay?.serving.failure) throw replay.serving.failure;
     d.seats.forEach((s, i) => w.submit(s.key, actions[i]!));
   }
   } catch (e) {
@@ -656,14 +673,33 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     measures: Object.fromEntries(measures.map((m) => [m.name, m.result()])), costs, ...(Object.keys(byPurpose).length ? { costsByPurpose: byPurpose } : {}), log: logPath, seconds: Math.round((performance.now() - t0)) / 1000,
     ...(stopped ? { stopped } : {}), ...(debrief ? { debrief } : {}), ...(accounts ? { accounts } : {}), ...(forkLimits(spec)[arm.name] !== undefined ? { limitUsd: forkLimits(spec)[arm.name] } : {}),
     ...(controller.framing ? { framing: controller.framing.disclosure } : {}), ...(calls ? { calls } : {}),
-    ...(served.total().requests ? { served: served.total() } : {}),
+    ...(served.total().requests ? { served: served.total() } : {}), ...(replay ? { resumed: replay.summary() } : {}),
   };
   if (ledgerResult) { const { measures: _m, ...detail } = ledgerResult; result.stewardship = detail; }
   writeFileSync(join(f.dir, `${safe(arm.name)}.json`), JSON.stringify(result, null, 1));
   return result;
+  } finally {
+    replay?.close();
+  }
 }
 
 const safe = (s: string) => s.replace(/[^A-Za-z0-9_.-]/g, "_");
+
+/** The replay of an interrupted fork's log: the log exported (with its base's entries first) to a temporary file. A log
+ * that cannot be read stops the fork, saying so: it is never run again from the start with fresh paid calls unasked. */
+function forkReplay(log: string, debriefs: string): ForkReplay {
+  const dir = mkdtempSync(join(tmpdir(), "oikos-fork-replay-"));
+  const out = join(dir, "interrupted.jsonl");
+  const p = Bun.spawnSync([kernelBinary(), "export", log, "--out", out], { stdout: "pipe", stderr: "pipe" });
+  if (p.exitCode !== 0) {
+    rmSync(dir, { recursive: true, force: true });
+    throw new Error(`the interrupted fork's log ${log} cannot be read back (${p.stderr.toString().trim().slice(0, 300)}): the fork is not run again with fresh model calls. Look at the log; to run it afresh regardless, move it out of the seed's folder.`);
+  }
+  const r = new ForkReplay(out, log, existsSync(debriefs) ? debriefs : undefined);
+  const close = r.close.bind(r);
+  r.close = () => { close(); rmSync(dir, { recursive: true, force: true }); };
+  return r;
+}
 
 // ---- the report
 
